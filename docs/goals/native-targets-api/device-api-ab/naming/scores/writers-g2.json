@@ -1,0 +1,1804 @@
+{
+ "system-1": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "**Orders:** A Filter button that opens a drawer sliding up from the bottom, with a backdrop, a title, the All, Open and Shipped choices, and a Close button."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "**WhatsNew:** A purple drawer with white text and 24px rounded top corners, open when the page loads, which \"Got it\" closes."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title=\"Invoice\" style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "**Invoice:** The PDF shown inside the page by the browser's own PDF viewer."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "system-2": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "const native = platform !== 'web'; ... @if (native) {",
+     "Orders: the order list and a Filter button that opens a sliding drawer with All, Open and Shipped, plus a Close button."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: the same purple panel, already open at the bottom when the page loads. \"Got it\" closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={src} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "Invoice: the PDF inside the page, in the browser's own PDF viewer."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "system-3": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "**Orders:** A Filter button that opens a drawer from `@markless/ui` with All, Open and Shipped buttons."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "**WhatsNew:** The same purple panel with white text and 24px rounded top corners, open when the page loads. \"Got it\" closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={src} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "**Invoice:** The browser's own PDF viewer inside an iframe."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "system-4": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: a Filter button that opens a styled bottom drawer with All, Open and Shipped."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: the same purple panel with rounded top corners, open when the page loads, with a \"Got it\" button."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={src} title=\"Invoice\" style=\"width: 100%; height: 80vh;\" />",
+     "Invoice: the browser's own PDF viewer inside the page."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "system-5": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "const native = computed(() => platform !== 'web'); ... @if (native) {",
+     "Orders: a website visitor sees the order list, a Filter button, and a styled bottom drawer with a backdrop and the All, Open and Shipped choices."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: the same purple panel with rounded top corners and a \"Got it\" button, open on page load."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title=\"Invoice\" style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "Invoice: the browser's own PDF viewer embedded in the page."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "builtin-1": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "const native = platform !== 'web'; ... @if (native) {",
+     "It opens a drawer that slides up from the bottom over a backdrop and holds All, Open, Shipped and Close."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "**WhatsNew:** The same purple panel with rounded top corners."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform !== 'web') { ... <iframe src={src} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "**Invoice:** The PDF shown inline in the browser's viewer."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "builtin-2": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "const native = platform !== 'web'; ... @if (native) {",
+     "Orders: website visitors see a Filter button that opens a styled drawer sliding up from the bottom, with All, Open and Shipped buttons."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: they see the same purple panel with rounded top corners, already open when the page loads, and a \"Got it\" button that closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Orders phone sheet content uses declared builtin.menu/builtin.item. Invoice uses X alone on web; webSays is hedged (\"assume\"/\"probably\"/\"whatever web viewer\"). Scan webSays browser-own is stated as an assumption."
+ },
+ "builtin-3": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: the Filter button opens a drawer that slides up from the bottom, with a title, the three choices and a Close button."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: the same purple panel as in the apps, open when the page loads, closed by \"Got it\"."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Invoice uses X alone on web; webSays is hedged (\"assume\"/\"probably\"/\"whatever web viewer\"). Scan webSays browser-own is stated as an assumption."
+ },
+ "builtin-4": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "In Orders, a website visitor sees a Filter button that opens a sliding drawer with All, Open, Shipped and Cancel; picking one updates the heading."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "In WhatsNew, they see the same purple panel with rounded top corners, open when the page loads, and \"Got it\" closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "In Invoice, they see the PDF embedded in the browser's own viewer inside the page."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "builtin-5": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "The button opens a drawer from `@markless/ui` with All, Open and Shipped, plus a backdrop and a Close button."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: a website visitor sees the same purple panel with white text and 24px rounded top corners."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Invoice uses X alone on web; webSays is hedged (\"assume\"/\"probably\"/\"whatever web viewer\"). Scan webSays browser-own is stated as an assumption."
+ },
+ "host-1": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: the website visitor sees a Filter button that opens a drawer, which is a web-drawn sheet with All, Open and Shipped buttons and a Close button."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: the visitor sees the same purple panel with rounded top corners sliding up when the page opens, and \"Got it\" closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title=\"Invoice\" style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "Invoice: the visitor sees the PDF inside an iframe on the page."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "host-2": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "In Orders, a website visitor sees a Filter button that opens a sliding drawer with All, Open, Shipped and Close."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "In WhatsNew, they see the same purple panel with rounded top corners as the apps, open when the page loads, with a \"Got it\" button that closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title=\"Invoice\" style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "In Invoice, they see the PDF in the browser's viewer inside the page."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "host-3": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "The button opens a styled drawer that slides up from the bottom with All, Open and Shipped."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: a website visitor sees the same purple panel with rounded top corners sliding up when the page loads. \"Got it\" closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Invoice uses X alone on web; webSays is hedged (\"assume\"/\"probably\"/\"whatever web viewer\"). Scan webSays browser-own is stated as an assumption."
+ },
+ "host-4": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: a Filter button that opens a styled `drawer` panel with All, Open and Shipped."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: the same purple panel with rounded top corners, open as soon as the page loads, with a \"Got it\" button that closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={src} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "Invoice: the PDF shown in an iframe by the browser's own PDF viewer."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "host-5": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "**Orders:** A Filter button that opens a sliding drawer with All, Open, Shipped and Close."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "**WhatsNew:** The same purple panel with white text, rising from the bottom on page load, closed by \"Got it\"."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={src} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "**Invoice:** The PDF embedded in the page through the browser's viewer."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "native-1": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: a website visitor sees the order list and a Filter button that opens a drawer sliding up from the bottom, with All, Open and Shipped choices."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: they see the same purple panel with rounded top corners sliding up on load, and \"Got it\" closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Invoice uses X alone on web. Scan webSays browser-own is stated as an assumption."
+ },
+ "native-2": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: a Filter button that opens a styled drawer from the bottom with All, Open and Shipped buttons and a Close button."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: the same purple panel with white text and 24px rounded top corners slides up when the page opens. \"Got it\" closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={src} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "Invoice: the PDF shown in an iframe using the browser's PDF viewer."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "native-3": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "In Orders, a website visitor sees the order list and a Filter button that opens a drawer with All, Open and Shipped, and picking one closes it."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "In WhatsNew, a website visitor sees the same purple panel with white text and 24px rounded top corners slide up when the page opens, and Got it closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title=\"Invoice\" style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "In Invoice, a website visitor sees the PDF inside the page through the browser's PDF viewer."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "native-4": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: a website visitor sees the list and a Filter button that opens a sliding drawer with All, Open and Shipped, plus a backdrop and a Close button."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "B: WhatsNew: a website visitor sees the same purple panel with white text and 24px rounded top corners sliding up from the bottom, closed with \"Got it\"."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "B: Invoice: a website visitor sees the browser's built-in PDF viewer inside the page."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "native-5": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: a Filter button that opens a drawer from the bottom with All, Open and Shipped, plus a Close button."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: the same purple panel with white text and rounded top corners, open when the page loads. \"Got it\" closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "Invoice: the PDF inside the page, shown by the browser's own PDF viewer in an iframe."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "os-1": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: the list and a Filter button that opens a bottom drawer with All, Open, Shipped and Close buttons."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: the same purple panel with rounded top corners as in the apps, open when the page loads and closed by \"Got it\"."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title=\"Invoice\" style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "Invoice: the PDF in an iframe, shown by the browser's viewer."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "os-2": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "**Orders:** a Filter button that opens a drawer sliding up from the bottom, with All, Open and Shipped buttons and a Close button."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "**WhatsNew:** the same purple drawer as in the apps, open when the page loads. \"Got it\" closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "unsure",
+    "quotes": [
+     "If it doesn't, an empty spot where the preview should be."
+    ]
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title=\"Invoice\" style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "**Invoice:** the browser's own PDF viewer, embedded in the page."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback)."
+ },
+ "os-3": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: a website visitor sees a Filter button that opens a drawer from the bottom with All, Open and Shipped buttons and a Close button."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "B: WhatsNew: a website visitor sees the same purple panel with rounded top corners sliding up when the page opens. \"Got it\" closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={src} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "B: Invoice: a website visitor sees the PDF in an embedded frame."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "os-4": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: a website visitor sees the order list and a Filter button that opens a styled bottom drawer with All, Open and Shipped."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: the visitor sees the same purple panel with white text and 24px rounded top corners, already open, and \"Got it\" closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "Invoice: the visitor sees the PDF in the browser's own viewer inside the page."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "os-5": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: a Filter button that opens a web drawer sliding up from the bottom, with All, Open, Shipped and Close buttons."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: the same purple panel with white text and 24px rounded top corners, open when the page loads, closed by \"Got it\"."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "browser-own",
+    "quotes": []
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={src} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "Invoice: the PDF shown inside the page by the browser's own PDF viewer."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan webSays browser-own is stated as an assumption."
+ },
+ "pair-1": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "On Orders, a website visitor sees the order list and a Filter button that opens a drawer with All, Open and Shipped."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "On WhatsNew, they see the same purple panel with rounded top corners that slides up on load, and \"Got it\" closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X",
+     "other: <p>Use your computer's camera to scan a receipt.</p>"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "nothing",
+    "quotes": [
+     "@if (platform === 'web') { ... <p>Use your computer's camera to scan a receipt.</p>",
+     "On Scan, they see an instruction line and a Scan button that calls `camera().takePhoto()`, with no live preview."
+    ]
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title=\"Invoice\" style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "On Invoice, they see the PDF in the browser's built-in viewer inside an iframe."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan web branch shows only a text line, no preview; Scan still calls camera().takePhoto()."
+ },
+ "pair-2": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: the order list, then a Filter button that opens a drawer with All, Open and Shipped."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: the same purple panel with rounded top corners, open on load, which \"Got it\" closes."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <video",
+     "Scan: a \"Start camera\" button, then a live `<video>` preview, and a Scan button that grabs a frame and uploads it."
+    ]
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "Invoice: the PDF shown by the browser inside an iframe."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan web branch is a hand-built <video> fed by navigator.mediaDevices.getUserMedia."
+ },
+ "pair-3": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: a Filter button that opens a `drawer` panel with All, Open and Shipped choices and a Close button."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "B: WhatsNew: the same purple panel with rounded top corners, sliding up from the bottom, closed by \"Got it\"."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X",
+     "other: <p>Your browser will ask to use your camera when you press Scan.</p>"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "nothing",
+    "quotes": [
+     "@if (platform === 'web') { ... <p>Your browser will ask to use your camera when you press Scan.</p>",
+     "B: Scan: a message and a Scan button with no live preview."
+    ]
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={src} title={`Invoice ${id}`} style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "B: Invoice: the PDF embedded in the page through the browser's PDF viewer in an `<iframe>`."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan web branch shows only a text line, no preview; Scan still calls camera().takePhoto()."
+ },
+ "pair-4": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "Orders: a website visitor sees the list and a Filter button that opens a web drawer with All, Open and Shipped."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "WhatsNew: the same purple panel slides up on page open, and \"Got it\" closes it."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X",
+     "other: <p>Your browser will ask to use your camera when you press Scan.</p>"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "nothing",
+    "quotes": [
+     "@if (platform === 'web') { ... <p>Your browser will ask to use your camera when you press Scan.</p>",
+     "Scan: a website visitor sees a short note and the Scan button, with no live preview."
+    ]
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title=\"Invoice\" style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "Invoice: the PDF shows in an inline iframe."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan web branch shows only a text line, no preview; Scan still calls camera().takePhoto()."
+ },
+ "pair-5": {
+  "tasks": {
+   "orders": {
+    "used": [
+     "X",
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') {",
+     "In Orders, a website visitor sees a Filter button that opens a `drawer` with All, Open and Shipped."
+    ]
+   },
+   "whatsnew": {
+    "used": [
+     "drawer"
+    ],
+    "wrongKind": false,
+    "webGuard": false,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "other",
+    "quotes": [
+     "In WhatsNew, they see the same purple panel as the apps, with a \"Got it\" button."
+    ]
+   },
+   "scan": {
+    "used": [
+     "X",
+     "other: <p>Your computer's camera will be used when you press Scan.</p>"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "nothing",
+    "quotes": [
+     "@if (platform === 'web') { ... <p>Your computer's camera will be used when you press Scan.</p>",
+     "In Scan, they see a message and a Scan button that uses `camera().takePhoto()` (presumably the browser's camera prompt), but no live preview."
+    ]
+   },
+   "invoice": {
+    "used": [
+     "X",
+     "html"
+    ],
+    "wrongKind": false,
+    "webGuard": true,
+    "styledFrame": false,
+    "inventedMembers": [],
+    "webSays": "author-fallback",
+    "quotes": [
+     "@if (platform === 'web') { ... <iframe src={`/invoices/${id}.pdf`} title=\"Invoice\" style=\"width: 100%; height: 80vh; border: 0;\" />",
+     "In Invoice, they see the PDF in an iframe inside the page."
+    ]
+   }
+  },
+  "wrongImport": false,
+  "notes": "whatsnew webSays \"other\": the same author-drawn drawer on every platform, which the task asks for (not a website fallback). Scan web branch shows only a text line, no preview; Scan still calls camera().takePhoto()."
+ }
+}

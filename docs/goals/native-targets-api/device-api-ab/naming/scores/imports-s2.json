@@ -1,0 +1,635 @@
+{
+ "native-device-mobile-1": {
+  "contains": "mixed",
+  "expects": [
+   "alerts and action sheets",
+   "date and time pickers",
+   "share sheet",
+   "haptics",
+   "permission prompts"
+  ],
+  "surprised": [
+   "custom-drawn button, card or layout grid",
+   "routing, data fetching or state helpers",
+   "pure JS reimplementations of platform controls"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-device-mobile-2": {
+  "contains": "mixed",
+  "expects": [
+   "date and time pickers",
+   "alerts and action sheets",
+   "share sheet",
+   "haptics, location, notifications, biometrics",
+   "safe-area insets"
+  ],
+  "surprised": [
+   "custom-styled design-system components",
+   "routing, data fetching or state management"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-device-mobile-3": {
+  "contains": "mixed",
+  "expects": [
+   "alerts and action sheets",
+   "date and time pickers",
+   "share sheets",
+   "photo and file pickers",
+   "haptics, geolocation, biometrics, notifications"
+  ],
+  "surprised": [
+   "framework-drawn cards, buttons, grids",
+   "routing, data fetching, state management, analytics"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-device-web-1": {
+  "contains": "mixed",
+  "expects": [
+   "geolocation",
+   "push notifications",
+   "share sheet",
+   "haptics/vibration",
+   "platform check and permission prompts"
+  ],
+  "surprised": [
+   "buttons, grids, cards or a theme system",
+   "data fetching, routing or state helpers"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-device-web-2": {
+  "contains": "mixed",
+  "expects": [
+   "geolocation, notifications",
+   "share sheet",
+   "haptics/vibration",
+   "alerts/action sheets, date pickers",
+   "status bar or safe-area helper"
+  ],
+  "surprised": [
+   "ordinary styled buttons, cards, form layouts",
+   "routing, data fetching, state management",
+   "cross-platform visual widgets with no system equivalent"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-device-web-3": {
+  "contains": "mixed",
+  "expects": [
+   "date/time pickers",
+   "share button",
+   "alerts or confirm dialogs, toasts",
+   "haptics, geolocation, notifications",
+   "platform check"
+  ],
+  "surprised": [
+   "buttons, cards, grids, inputs that look the same everywhere",
+   "data fetching or routing",
+   "website-only features with no phone version"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-own-mobile-1": {
+  "contains": "mixed",
+  "expects": [
+   "date and time pickers",
+   "alerts or action sheets",
+   "share sheet",
+   "navigation bar or toolbar, maps, web view",
+   "location, haptics, notifications, biometrics"
+  ],
+  "surprised": [
+   "custom-drawn branded buttons, cards, layout helpers",
+   "fetch, routing or state helpers"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-own-mobile-2": {
+  "contains": "mixed",
+  "expects": [
+   "alerts and action sheets",
+   "date and time pickers",
+   "share sheet",
+   "navigation bar, switches, segmented controls",
+   "haptics, biometrics, notifications"
+  ],
+  "surprised": [
+   "branded button or card",
+   "stacks or grids",
+   "routing, data fetching, state",
+   "web-only things with no native counterpart"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-own-mobile-3": {
+  "contains": "mixed",
+  "expects": [
+   "alerts/action sheets",
+   "date and time pickers",
+   "share sheet",
+   "navigation bar/stack, switches, maps",
+   "haptics, safe-area insets, status bar"
+  ],
+  "surprised": [
+   "design-system cards, branded buttons, layout helpers",
+   "HTTP fetching, state, routing, database",
+   "raw device APIs with no view (Bluetooth, file system, push setup)"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-own-web-1": {
+  "contains": "platform-ui",
+  "expects": [
+   "alerts or confirm dialogs",
+   "share sheet",
+   "date and time pickers",
+   "toasts, map, video",
+   "haptics, notifications, geolocation"
+  ],
+  "surprised": [
+   "buttons, grids, cards, form inputs styled by Markless",
+   "server side or data fetching"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-own-web-2": {
+  "contains": "mixed",
+  "expects": [
+   "alerts and confirm dialogs",
+   "share button",
+   "date picker",
+   "toasts",
+   "location, haptics, notifications"
+  ],
+  "surprised": [
+   "buttons, layout grids, text inputs, styling helpers",
+   "data fetching or routing"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-own-web-3": {
+  "contains": "platform-ui",
+  "expects": [
+   "date and time pickers",
+   "alerts and confirm dialogs",
+   "share button, toasts, maps",
+   "file or photo picker",
+   "platform check"
+  ],
+  "surprised": [
+   "buttons, grids, cards or text",
+   "server data, routing or state",
+   "components that break on the website"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-ui-mobile-1": {
+  "contains": "platform-ui",
+  "expects": [
+   "alerts or action sheets",
+   "date and time pickers",
+   "toggles, sliders, share sheets",
+   "navigation bars, maps, video players",
+   "cross-platform buttons, inputs, lists, dialogs"
+  ],
+  "surprised": [
+   "haptics, geolocation, push, secure storage, biometrics in a ui package",
+   "custom-drawn design system imitating native"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-ui-mobile-2": {
+  "contains": "platform-ui",
+  "expects": [
+   "native.alert, native.actionSheet",
+   "native.datePicker, native.picker",
+   "native.toast, native.share",
+   "native.navbar, native.webview",
+   "cross-platform buttons, lists, inputs, dialogs"
+  ],
+  "surprised": [
+   "storage, networking, push, biometrics, location",
+   "heavily styled theme under native"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-ui-mobile-3": {
+  "contains": "platform-ui",
+  "expects": [
+   "alerts and action sheets",
+   "date and time pickers",
+   "share sheet, map, video player",
+   "toast, switches, navigation bar",
+   "cross-platform buttons, dialogs, popovers, lists"
+  ],
+  "surprised": [
+   "device APIs with no screen (push, haptics, geolocation, storage, biometrics)",
+   "app-wide theming",
+   "data fetching or routing"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-ui-web-1": {
+  "contains": "platform-ui",
+  "expects": [
+   "alerts or confirm dialogs, toasts",
+   "share sheet",
+   "date and time pickers, switch",
+   "navigation bar, pull to refresh, maps",
+   "cross-platform buttons, inputs, dialogs, tabs"
+  ],
+  "surprised": [
+   "geolocation, push, storage, fetch, router",
+   "styled design system with a theme"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-ui-web-2": {
+  "contains": "platform-ui",
+  "expects": [
+   "cross-platform buttons, inputs, dialogs, popovers, tabs",
+   "date picker",
+   "share sheet",
+   "alerts or toasts, photo picker",
+   "maps, haptics"
+  ],
+  "surprised": [
+   "data fetching, routing, storage, auth",
+   "styled branded design system",
+   "native component that breaks on the website"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "native-ui-web-3": {
+  "contains": "platform-ui",
+  "expects": [
+   "date/time picker",
+   "share sheet",
+   "alert/confirm, toast",
+   "file picker, map, video, haptics, notifications",
+   "cross-platform buttons, inputs, dialogs, popovers"
+  ],
+  "surprised": [
+   "routing, data fetching, state()",
+   "device APIs with no visible element",
+   "opinionated themed design system"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-device-mobile-1": {
+  "contains": "platform-ui",
+  "expects": [
+   "date/time picker",
+   "share sheet",
+   "alerts and action sheets, toasts",
+   "photo and file picker",
+   "location, permissions, clipboard, notifications"
+  ],
+  "surprised": [
+   "custom UI Markless draws itself",
+   "data fetching, routing, state management"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-device-mobile-2": {
+  "contains": "mixed",
+  "expects": [
+   "alerts and action sheets",
+   "date and time pickers",
+   "share sheet",
+   "navigation bar, map view",
+   "haptics, location, biometrics, notifications"
+  ],
+  "surprised": [
+   "branded buttons, cards, layout grids",
+   "things with no native equivalent",
+   "routing, state, data fetching, server code"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-device-mobile-3": {
+  "contains": "mixed",
+  "expects": [
+   "date/time pickers",
+   "photo library picker",
+   "share sheet",
+   "alerts and action sheets",
+   "haptics, biometrics, location, notifications"
+  ],
+  "surprised": [
+   "framework-drawn buttons, cards, theme",
+   "networking, routing, state management"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-device-web-1": {
+  "contains": "mixed",
+  "expects": [
+   "date/time picker",
+   "share sheet",
+   "alerts and confirm dialogs",
+   "file and photo picker",
+   "geolocation, vibration, clipboard"
+  ],
+  "surprised": [
+   "cards, grids or styled buttons",
+   "data fetching, routing, state",
+   "theming or CSS system"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-device-web-2": {
+  "contains": "mixed",
+  "expects": [
+   "date/time pickers",
+   "alert or confirm dialog",
+   "share sheet",
+   "file or photo picker",
+   "location, notifications, vibration, clipboard"
+  ],
+  "surprised": [
+   "generic styled cards, buttons, grids",
+   "data fetching, routing, state",
+   "anything the OS doesn't provide"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-device-web-3": {
+  "contains": "mixed",
+  "expects": [
+   "geolocation, notifications",
+   "share sheet",
+   "file picker, clipboard, vibration",
+   "alerts and confirm dialogs, date pickers",
+   "network status or battery level"
+  ],
+  "surprised": [
+   "styled buttons, cards, grids",
+   "routing, data fetching, state",
+   "PDF viewer next to hardware features"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-own-mobile-1": {
+  "contains": "mixed",
+  "expects": [
+   "alerts and action sheets",
+   "share sheet",
+   "date and time pickers",
+   "photo/media and file picker",
+   "haptics, notifications, keyboard, safe areas"
+  ],
+  "surprised": [
+   "app-styled buttons, cards, list rows, layout",
+   "data fetching, storage, routing"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-own-mobile-2": {
+  "contains": "platform-ui",
+  "expects": [
+   "alerts and action sheets",
+   "share sheet",
+   "date and time pickers",
+   "navigation bar, toolbar, search bar, switches",
+   "haptics, notifications, keyboard, safe-area insets"
+  ],
+  "surprised": [
+   "custom cards, avatars, design-system buttons, grids",
+   "router, data fetching, state",
+   "one shared design forced on all targets"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-own-mobile-3": {
+  "contains": "mixed",
+  "expects": [
+   "alerts and action sheets",
+   "share sheet",
+   "date and time pickers",
+   "photo or file picker, toasts",
+   "haptics, location, notifications, keyboard"
+  ],
+  "surprised": [
+   "design-system cards, branded buttons, grids",
+   "data fetching, routing, state",
+   "anything not backed by the OS"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-own-web-1": {
+  "contains": "mixed",
+  "expects": [
+   "alerts and confirm dialogs",
+   "share sheet",
+   "date and time pickers",
+   "toasts, file or photo picker",
+   "map, haptics or vibration"
+  ],
+  "surprised": [
+   "cards, branded buttons, grids, carousel",
+   "data fetching, routing, state"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-own-web-2": {
+  "contains": "mixed",
+  "expects": [
+   "share sheet",
+   "alerts and confirm dialogs",
+   "date and time picker",
+   "file or photo picker, geolocation, clipboard",
+   "status bar/safe-area wrapper, navigation bar"
+  ],
+  "surprised": [
+   "Button, Card, Grid, input that look the same everywhere",
+   "data client, router, form validation, state",
+   "data table or chart"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-own-web-3": {
+  "contains": "mixed",
+  "expects": [
+   "alerts and confirm dialogs",
+   "share sheet",
+   "date and time pickers",
+   "file and photo pickers",
+   "geolocation, haptics, map view"
+  ],
+  "surprised": [
+   "buttons, cards, grids, typography",
+   "routing, data fetching, state"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-ui-mobile-1": {
+  "contains": "platform-ui",
+  "expects": [
+   "alerts or dialogs, action sheet",
+   "date/time picker",
+   "share sheet, toasts",
+   "navigation bar, map or web view",
+   "cross-platform buttons, lists, inputs, layout"
+  ],
+  "surprised": [
+   "device APIs with no UI under a ui package",
+   "branded custom widgets inside system"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-ui-mobile-2": {
+  "contains": "platform-ui",
+  "expects": [
+   "date/time pickers",
+   "alerts or action sheets",
+   "share sheets, toasts",
+   "navigation bars, photo pickers, maps, web view",
+   "cross-platform buttons, inputs, lists, dialogs, tabs"
+  ],
+  "surprised": [
+   "device APIs with no UI (geolocation, push, storage, haptics, Bluetooth)",
+   "data grid",
+   "anything under system drawn by Markless"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-ui-mobile-3": {
+  "contains": "platform-ui",
+  "expects": [
+   "date and time pickers",
+   "alerts and action sheets",
+   "share sheet",
+   "photo or file picker, map, web view",
+   "non-native buttons, lists, dialogs"
+  ],
+  "surprised": [
+   "non-visual device APIs (geolocation, push, keychain, storage, Bluetooth)",
+   "custom-styled widgets that look the same everywhere",
+   "state management and routing"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-ui-web-1": {
+  "contains": "platform-ui",
+  "expects": [
+   "date picker",
+   "share sheet",
+   "alerts and confirm boxes, toasts",
+   "file picker, map",
+   "styleable buttons, inputs, modals, tabs, dropdowns"
+  ],
+  "surprised": [
+   "device features that don't draw (geolocation, storage, push, haptics)",
+   "system meaning non-UI OS things",
+   "fully custom-drawn components"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-ui-web-2": {
+  "contains": "platform-ui",
+  "expects": [
+   "date picker",
+   "share sheet",
+   "alert or confirm dialogs, toasts",
+   "file picker, maps, video players",
+   "unstyled buttons, inputs, dialogs, popovers"
+  ],
+  "surprised": [
+   "data fetching, routing, state, themes",
+   "non-visual device features (geolocation, storage, push)"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ },
+ "system-ui-web-3": {
+  "contains": "platform-ui",
+  "expects": [
+   "alerts or confirm dialogs",
+   "share sheet",
+   "date and time pickers",
+   "file or photo pickers, toasts",
+   "unstyled buttons, dialogs, tabs, popovers, inputs"
+  ],
+  "surprised": [
+   "data fetching, routing, storage, auth",
+   "non-visual device features (battery, GPS, vibration)",
+   "heavily branded styled components"
+  ],
+  "whoDraws": "platform",
+  "misfit": false,
+  "quote": ""
+ }
+}
