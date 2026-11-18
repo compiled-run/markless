@@ -13,7 +13,7 @@ name: j3-await-catch
 - assertNotVisible: 'Steps: 0'
 - extendedWaitUntil:
       visible: 'Result: FOUND'
-      timeout: 14000
+      timeout: 17000
 - assertNotVisible: 'Result: none'
 - assertVisible: 'Result: FOUND'
 - assertVisible: 'Steps: 2'
@@ -26,7 +26,7 @@ name: j3-await-catch
 - assertNotVisible: 'Failed: No entry for missing'
 - extendedWaitUntil:
       visible: 'Failed: No entry for missing'
-      timeout: 14000
+      timeout: 17000
 - assertVisible: 'Failed: No entry for missing'
 - assertVisible: 'Failed: No entry for missing'
 - assertVisible: 'Result: FOUND'

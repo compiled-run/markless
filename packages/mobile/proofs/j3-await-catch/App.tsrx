@@ -5,7 +5,7 @@ function later(ms: number): Promise<void> {
 }
 
 async function lookup(word: string): Promise<string> {
-	await later(2000);
+	await later(5000);
 	if (word === 'missing') throw new Error(`No entry for ${word}`);
 	return word.toUpperCase();
 }

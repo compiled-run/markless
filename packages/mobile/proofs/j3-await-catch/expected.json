@@ -14,7 +14,7 @@
 		},
 		{
 			"do": {
-				"wait": 4000
+				"wait": 7000
 			},
 			"visible": ["Result: FOUND", "Steps: 2"],
 			"absent": ["Result: none"]
@@ -28,7 +28,7 @@
 		},
 		{
 			"do": {
-				"wait": 4000
+				"wait": 7000
 			},
 			"visible": ["Failed: No entry for missing", "Result: FOUND", "Steps: 3"],
 			"absent": []
