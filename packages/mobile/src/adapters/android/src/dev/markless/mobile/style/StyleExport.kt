@@ -36,6 +36,14 @@ sealed interface StyleWrite {
 	/** [size] in CSS px. */
 	data class Font(val family: String, val size: Double) : StyleWrite
 	data class TextColor(val color: Rgba) : StyleWrite
+	/** Overflow other than visible: the children are clipped to the padding box. */
+	data object PaddingBoxClip : StyleWrite
+	/** clip-path: inset(): top, right, bottom, left, each in CSS px or (percent) of the border box's width or height. */
+	data class ClipPathInset(val edges: List<Pair<Double, Boolean>>) : StyleWrite
+	/** The text a clip-path leaves exposed to the screen reader; a canvas clip does not change accessibility, so nothing to apply. */
+	data object ClipText : StyleWrite
+	/** The box paints in another stacking context's order (Dragon's re-hosting); [host] is that context's node. */
+	data class PaintOrder(val host: String) : StyleWrite
 }
 
 /** One drawing operation of a dashed or dotted border, in device px; [side] names the side whose colour it takes (-1: none). */
@@ -298,6 +306,15 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					StyleWrite.Font(f.field("family", what).str("family"), f.field("size", what).num("size"))
 				}
 				"text-color" -> StyleWrite.TextColor(color(o.field("color", what), "$what.color"))
+				"padding-box-clip" -> StyleWrite.PaddingBoxClip
+				"clip-path-inset" -> StyleWrite.ClipPathInset(o.field("edges", what).arr("edges").map {
+					val e = it.obj("$what.edges[]")
+					val unit = e.field("unit", what).str("unit")
+					if (unit != "px" && unit != "%") throw MarklessDecodeError("$what: clip-path inset unit $unit is not px or %")
+					e.field("value", what).num("value") to (unit == "%")
+				}.also { if (it.size != 4) throw MarklessDecodeError("$what has ${it.size} inset edges, not 4") })
+				"clip-text" -> StyleWrite.ClipText.also { o.field("texts", what).arr("texts").forEach { t -> t.str("$what.texts[]") } }
+				"paint-order" -> StyleWrite.PaintOrder(o.field("host", what).str("host"))
 				else -> throw MarklessDecodeError("$what has unknown style write kind \"$kind\"")
 			}
 		}

@@ -59,18 +59,63 @@
 				"aria-selected": [
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
 						},
 						"value": "true"
 					},
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
 						},
 						"value": "false"
 					},
 					{
 						"when": {
+							"state:shown": "a",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:shown": "c",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
 						},
 						"value": "false"
@@ -79,18 +124,63 @@
 				"ui-selected": [
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
 						},
 						"value": ""
 					},
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
 						},
 						"value": null
 					},
 					{
 						"when": {
+							"state:shown": "a",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
 						},
 						"value": null
@@ -118,18 +208,63 @@
 				"aria-selected": [
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
 						},
 						"value": "false"
 					},
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
 						},
 						"value": "true"
 					},
 					{
 						"when": {
+							"state:shown": "a",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"state:shown": "c",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
 						},
 						"value": "false"
@@ -138,18 +273,63 @@
 				"ui-selected": [
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
 						},
 						"value": null
 					},
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
 						},
 						"value": ""
 					},
 					{
 						"when": {
+							"state:shown": "a",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "c",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
 						},
 						"value": null
@@ -177,18 +357,63 @@
 				"aria-selected": [
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
 						},
 						"value": "false"
 					},
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
 						},
 						"value": "false"
 					},
 					{
 						"when": {
+							"state:shown": "a",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:shown": "c",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
 						},
 						"value": "true"
@@ -197,18 +422,63 @@
 				"ui-selected": [
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
 						},
 						"value": null
 					},
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
 						},
 						"value": null
 					},
 					{
 						"when": {
+							"state:shown": "a",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
 						},
 						"value": ""
@@ -236,18 +506,63 @@
 				"hidden": [
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
 						},
 						"value": null
 					},
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
 						},
 						"value": ""
 					},
 					{
 						"when": {
+							"state:shown": "a",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "c",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
 						},
 						"value": ""
@@ -256,18 +571,63 @@
 				"ui-selected": [
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
 						},
 						"value": ""
 					},
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
 						},
 						"value": null
 					},
 					{
 						"when": {
+							"state:shown": "a",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
 						},
 						"value": null
@@ -295,18 +655,63 @@
 				"hidden": [
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
 						},
 						"value": ""
 					},
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
 						},
 						"value": null
 					},
 					{
 						"when": {
+							"state:shown": "a",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
 						},
 						"value": ""
@@ -315,18 +720,63 @@
 				"ui-selected": [
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
 						},
 						"value": null
 					},
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
 						},
 						"value": ""
 					},
 					{
 						"when": {
+							"state:shown": "a",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "c",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
 						},
 						"value": null
@@ -354,18 +804,63 @@
 				"hidden": [
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
 						},
 						"value": ""
 					},
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
 						},
 						"value": ""
 					},
 					{
 						"when": {
+							"state:shown": "a",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "c",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
 						},
 						"value": null
@@ -374,18 +869,63 @@
 				"ui-selected": [
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
 						},
 						"value": null
 					},
 					{
 						"when": {
+							"state:shown": "a",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
 						},
 						"value": null
 					},
 					{
 						"when": {
+							"state:shown": "a",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "b",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
+							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:shown": "c",
 							"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
 						},
 						"value": ""
@@ -412,14 +952,92 @@
 			"kind": "text",
 			"id": "h2:text0",
 			"parent": "h2",
-			"text": "Showing a"
+			"text": "Showing a",
+			"textByState": [
+				{
+					"when": {
+						"state:shown": "a",
+						"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+					},
+					"value": "Showing a"
+				},
+				{
+					"when": {
+						"state:shown": "a",
+						"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+					},
+					"value": "Showing a"
+				},
+				{
+					"when": {
+						"state:shown": "a",
+						"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+					},
+					"value": "Showing a"
+				},
+				{
+					"when": {
+						"state:shown": "b",
+						"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+					},
+					"value": "Showing b"
+				},
+				{
+					"when": {
+						"state:shown": "b",
+						"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+					},
+					"value": "Showing b"
+				},
+				{
+					"when": {
+						"state:shown": "b",
+						"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+					},
+					"value": "Showing b"
+				},
+				{
+					"when": {
+						"state:shown": "c",
+						"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "a"
+					},
+					"value": "Showing c"
+				},
+				{
+					"when": {
+						"state:shown": "c",
+						"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "b"
+					},
+					"value": "Showing c"
+				},
+				{
+					"when": {
+						"state:shown": "c",
+						"component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value": "c"
+					},
+					"value": "Showing c"
+				}
+			]
 		}
 	],
 	"css": ".list.mk-4970yy {\n\t\t\t\tdisplay: flex;\n\t\t\t\tgap: 8px;\n\t\t\t\tmargin: 12px 0;\n\t\t\t}\n\t\t\t.tab.mk-4970yy {\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #e9ecef;\n\t\t\t\tcolor: #22223b;\n\t\t\t}\n\t\t\t.tab[ui-selected].mk-4970yy {\n\t\t\t\tbackground: #ffd166;\n\t\t\t}\n\t\t\t.panel.mk-4970yy {\n\t\t\t\tpadding: 12px;\n\t\t\t\tborder: 2px solid #8d99ae;\n\t\t\t}",
 	"states": [
 		{
+			"cell": "state:shown",
+			"domain": [
+				"a",
+				"b",
+				"c"
+			],
+			"initial": "a"
+		},
+		{
 			"cell": "component-edge:0/shared:packages/headless/components/src/tabs/tabs.tsrx#tabsState/state:tabs.value",
-			"domain": ["a", "b", "c"],
+			"domain": [
+				"a",
+				"b",
+				"c"
+			],
 			"initial": "a"
 		}
 	]
