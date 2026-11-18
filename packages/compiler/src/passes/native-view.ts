@@ -1045,12 +1045,18 @@ export function createNativeViewPayload(
 			let value: unknown = binding.initialValue;
 			let known = binding.initialValueKnown === true;
 			const initializer = native?.stateInitializers[binding.name];
+			if (!known && initializer?.kind === 'call' && initializer.callee === 'Date.now' && initializer.arguments.length === 0 && !binding.storage) {
+				// `state(Date.now())`: its first value is the clock when the page renders, so when the screen opens.
+				byName.set(binding.name, id);
+				byBinding.set(binding.id, id);
+				addCell({ id, name: binding.name, initial: 0, clock: true, ...(row ? { row } : {}) });
+				continue;
+			}
 			if (!known && initializer) {
-				const lowered = exprOf(
-					initializer,
-					`the first value of \`${binding.name}\``,
-					scope,
-				);
+				const lowered = exprOf(initializer, `the first value of \`${binding.name}\``, {
+					...scope,
+					...(binding.sourceSpan ? { span: binding.sourceSpan } : {}),
+				});
 				const folded = lowered && foldConstant(lowered, initialOf);
 				if (folded && lowered && cellsOf(lowered).size === 0) {
 					value = folded.value;
@@ -1058,7 +1064,7 @@ export function createNativeViewPayload(
 				}
 			}
 			if (!known || !isNativeValue(value)) {
-				refuse(`state \`${binding.name}\` needs a JSON initial value known at build time`);
+				refuse(`state \`${binding.name}\` needs a JSON initial value known at build time`, binding.sourceSpan);
 				continue;
 			}
 			if (row && binding.storage) {
@@ -1424,7 +1430,7 @@ export function createNativeViewPayload(
 			const value = attributeOf(element, first.value);
 			return method === 'getAttribute' ? value : { binary: '!==', left: value, right: { literal: null } };
 		}
-		return refuse(`${what} calls \`.${method}()\` on an element, which has no native meaning yet`);
+		return refuse(`${what} calls \`.${method}()\` on an element, which has no native meaning yet`, scope.span);
 	};
 
 	/** Whether `expr` is known when the app is built (no cell, row item or event read), and what it is then. */

@@ -484,6 +484,9 @@ final class ViewTree {
 				field.addAction(
 					UIAction { [weak field] _ in onAction(NativeAction(event: .input, host: id, value: field?.text ?? "")) },
 					for: .editingChanged)
+			case (.idle, _), (.visible, _):
+				// Raised by the screen's controller when the run loop goes idle or the element comes on screen.
+				continue
 			default:
 				throw HostError("\(event.event.rawValue) on <\(element)> \(id) has no iOS control event yet")
 			}

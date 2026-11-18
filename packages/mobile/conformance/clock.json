@@ -10,6 +10,12 @@
 				"initial": "never"
 			},
 			{
+				"id": "state:since",
+				"name": "since",
+				"initial": 0,
+				"clock": true
+			},
+			{
 				"id": "clock:open",
 				"name": "Date.now()",
 				"initial": 0,
@@ -109,13 +115,37 @@
 			{
 				"kind": "element",
 				"id": "h4",
-				"element": "button",
+				"element": "p",
 				"parent": "h0"
 			},
 			{
 				"kind": "text",
 				"id": "h4:text0",
 				"parent": "h4",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Started ",
+								{
+									"cell": "state:since"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
 				"parts": [
 					{
 						"text": "Press"
@@ -125,7 +155,7 @@
 		],
 		"events": [
 			{
-				"host": "h4",
+				"host": "h5",
 				"event": "activate",
 				"handler": "handler:event:0"
 			}
@@ -146,6 +176,20 @@
 								}
 							]
 						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:since",
+						"value": {
+							"binary": "+",
+							"left": {
+								"call": "Date.now",
+								"arguments": []
+							},
+							"right": {
+								"literal": 1
+							}
+						}
 					}
 				]
 			}
@@ -156,19 +200,25 @@
 		["h1:text0", "Opened 2026-11-19T00:00:00.123Z"],
 		["h2:text0", "Since 1970 true"],
 		["h3:text0", "Pressed never"],
-		["h4:text0", "Press"]
+		["h4:text0", "Started 1795046400123"],
+		["h5:text0", "Press"]
 	],
 	"steps": [
 		{
 			"action": {
 				"event": "activate",
-				"host": "h4"
+				"host": "h5"
 			},
 			"journal": [
 				{
 					"op": "text",
 					"node": "h3:text0",
 					"value": "Pressed 2026-11-19T00:00:00.123Z"
+				},
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Started 1795046400124"
 				}
 			]
 		}

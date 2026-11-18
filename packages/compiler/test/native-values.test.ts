@@ -142,6 +142,17 @@ export function App() @{
 		]);
 	});
 
+	it('starts a state read from the clock at the clock when the screen opens', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function App() @{
+	let now = state(Date.now());
+	<main><button onClick={() => (now = Date.now())}>{now > 0 ? 'Ticking' : 'Stopped'}</button></main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.cells).toEqual([{ id: 'state:now', name: 'now', initial: 0, clock: true }]);
+		expect(payload?.handlers[0]?.ops).toEqual([{ op: 'assign', cell: 'state:now', value: { call: 'Date.now', arguments: [] } }]);
+	});
+
 	it('refuses by name what formats a date in a time zone, and a date made from a value', async () => {
 		const { diagnostics } = await nativeView(`export function App() @{
 	<main><p>{new Date().toTimeString()}</p><p>{new Date(0).getTime()}</p><p>{new Date()}</p></main>

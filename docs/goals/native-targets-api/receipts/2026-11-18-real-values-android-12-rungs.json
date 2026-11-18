@@ -1,0 +1,78 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "r131-module-constants",
+			"failure": null,
+			"installSeconds": 5.3993421249999995,
+			"flowSeconds": 12.948251374999993
+		},
+		{
+			"name": "r132-body-constants",
+			"failure": null,
+			"installSeconds": 1.6561170839999977,
+			"flowSeconds": 12.885175707999995
+		},
+		{
+			"name": "r133-props-down",
+			"failure": null,
+			"installSeconds": 2.857266250000001,
+			"flowSeconds": 11.151323917000017
+		},
+		{
+			"name": "r134-app-functions",
+			"failure": null,
+			"installSeconds": 2.4261259169999976,
+			"flowSeconds": 17.710021958
+		},
+		{
+			"name": "r135-idle",
+			"failure": null,
+			"installSeconds": 2.4846285830000125,
+			"flowSeconds": 20.149768208999973
+		},
+		{
+			"name": "r136-visible",
+			"failure": null,
+			"installSeconds": 2.8947678329999906,
+			"flowSeconds": 17.334010624999994
+		},
+		{
+			"name": "r137-clock",
+			"failure": null,
+			"installSeconds": 2.871609291000001,
+			"flowSeconds": 14.503915500000003
+		},
+		{
+			"name": "r138-trailing-slash",
+			"failure": null,
+			"installSeconds": 2.4416753749999915,
+			"flowSeconds": 10.010887958000007
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 1.396350999999966,
+			"flowSeconds": 11.494719207999996
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 1.5234792499999747,
+			"flowSeconds": 13.61942508299998
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 1.5381873750000377,
+			"flowSeconds": 15.438867750000034
+		},
+		{
+			"name": "n1-two-routes",
+			"failure": null,
+			"installSeconds": 1.7490220410000183,
+			"flowSeconds": 30.119840790999994
+		}
+	]
+}

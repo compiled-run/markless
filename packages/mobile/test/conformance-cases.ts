@@ -309,7 +309,7 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		name: 'clock',
 		fixture: 'test/fixtures/Clock.tsrx',
 		now: 1795046400123,
-		actions: [{ event: 'activate', host: 'h4' }],
+		actions: [{ event: 'activate', host: 'h5' }],
 	},
 	{
 		name: 'load-events',
