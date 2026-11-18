@@ -1,14 +1,14 @@
 # Native integration: conformance report, 2026-11-17
 
 Branch `cw/native-integration` (draft PR #820, base `cw/native-targets`) holds today's navigation, styles, device, sheet
-and headless-UI branches together. On it, 42 of 45 buildable rungs pass on the iPhone simulator and 44 of 45 on the
-Android emulator; the 4 phone failures are the iOS system sheet (also broken on its own branch today) and Android's
-return from Settings (broken only by combining the branches).
+and headless-UI branches together. On it, 42 of 45 buildable rungs pass on the iPhone simulator and 45 of 45 on the
+Android emulator: the full run gave 44, and its one failure (the return from Settings, broken only by combining the branches)
+is fixed and proven since; the 3 iOS failures are the system sheet, also broken on its own branch today.
 
 | Area | Rungs | iOS | Android | What is missing |
 |---|---|---|---|---|
 | One-screen basics | 01 to 11 (15) | 14 of 14 | 14 of 14 | Async values: rung 11 is refused (`a @try inside an @if arm, a @for row or another @try`), stopped by owner decision |
-| Device | D1 to D7, D4b, P1 (9) | 9 of 9 | 8 of 9 | D7 on Android: back from Settings leaves Settings on top (only together: the Android launch-mode choice, below) |
+| Device | D1 to D7, D4b, P1 (9) | 9 of 9 | 9 of 9 | D7 on Android failed in the full run (only together); fixed and proven since (follow-ups) |
 | System sheet | Y1 to Y4 (4) | 0 of 3 | 3 of 3 | iOS: the sheet does not present on tap (also on `cw/system-sheet` today); Y4 refused (the headless drawer beside it) |
 | Headless UI | U1 to U6, U11 to U14 (10) | 10 of 10 | 10 of 10 | 43 of 46 families still refused by the probe: dismiss, pointer events, style bindings, more |
 | Navigation | N1 to N4 (4) | 4 of 4 | 4 of 4 | A modal-sheet route (N5) not built; state lost when the system kills the app |
@@ -70,7 +70,7 @@ rejects an iPhone 17 (`Incompatible device`); `markless-integ` was created on `i
 | d4b-photo-refused | pass | pass | pass | pass | passes both phones (receipt on `cw/system-sheet`) |
 | d5-recorder | pass | pass | pass | pass | passes both phones (receipt on `cw/system-sheet`) |
 | d6-sharesheet | pass | pass | pass | pass | passes both phones (receipt on `cw/system-sheet`) |
-| d7-settings | pass | pass | pass | **fail** step 3 (settings): Assertion is false: "Access granted" is visible | only together: passes on `cw/system-sheet` tip (rerun today) |
+| d7-settings | pass | pass | pass | **fail** step 3 (settings): Assertion is false: "Access granted" is visible | only together: passes on `cw/system-sheet` tip (rerun today); fixed since, passes with N1 to N4 and D1 (follow-ups) |
 | p1-platform | pass | pass | pass | pass | passes both phones (receipt on `cw/system-sheet`) |
 | u1-base | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
 | u2-collapsible | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
@@ -165,9 +165,9 @@ its @for rows`, 21 families) and `children` read as a value (8 families) block m
 
 ## Findings beside the conformance
 
-- `ladder-native-reference.test.ts` accepts any numbered rung that is refused by name, so a rung that lowers on its own
-  branch could start being refused and the test would still pass. It was caught here only by the harness load (all ten UI rungs
-  looked refused through a stale local install). A list of the rungs expected to lower would close it; owner of the ladder.
+- `ladder-native-reference.test.ts` accepted any numbered rung that was refused by name, so a rung that lowers on its own
+  branch could start being refused and the test would still pass (it hid a stale local install under which all ten UI rungs
+  looked refused). Closed on this branch: see the follow-ups.
 - The harness picks the newest iOS runtime; a device-specific runtime (`iOS-27-2-iPhone19-4`) breaks simulator creation.
 
 ## Decisions taken without the owner (all reversible)
@@ -179,6 +179,25 @@ its @for rows`, 21 families) and `children` read as a value (8 families) block m
 - The contact sheet compares the launch screen (step 0) of every rung; the web column is Chromium at the iOS proof device's
   size for every rung, captured with the web ladder's own build path.
 - Everything under "Resolved: one implementation kept" below.
+
+## Follow-ups (2026-11-18)
+
+**Android: deep links and the return from Settings together.** The launch mode stays standard (one activity per screen, as
+navigation's back stack needs; deep links open with `markless-proof://app/<path>`). Instead, the Android host opens Settings
+with `FLAG_ACTIVITY_NEW_TASK` (`view/Device.kt`, `settings.open`), so Settings lives in its own task and relaunching the app
+shows the app, which is what `singleTask` gave the device branch. Proven in one harness run on `markless_integ`: N1, N2, N3,
+N4, D1 (a device link into the running page) and D7 all pass on Android
+(`receipts/2026-11-18-integration-android-n1-n4-d1-d7-settings-task.json`). iOS is unchanged.
+For the owners: **device** (#794, #808, #814): drop `android:launchMode="singleTask"` and open Settings in its own task, as
+here. **Navigation** (#800): no change needed; its standard launch mode is kept.
+
+**Reference ladder: a silent refusal now fails.** `ladder-native-reference.test.ts` keeps an explicit list of the one-screen
+rungs a native build refuses (`REFUSED_RUNGS`: `11-async`, `y4-sheet-beside-drawer`). Every other rung must lower on both
+targets, and a listed rung that starts lowering fails too, so the list stays exact. Checked both ways: with `11-async` dropped
+from the list and `u1-base` added to it, those four tests (two rungs, two targets) fail; restored, 85 of 85 pass.
+
+**Left as they are:** perf-guards G16 stays failing (+217 B gzip on the docs page, only together); its size record is not
+accepted. The iOS sheet failure (Y1 to Y3) is being investigated on `cw/sheet-styled-content`; nothing here changed for it.
 
 ## 7. Contact sheet
 
@@ -219,7 +238,7 @@ UI rows. Every resolution below is in a merge commit on `cw/native-integration`;
 | Which component module an import names | #816's `modules` (analysis by filename, package specifiers resolved) | nav's and device's `importedModules` (by relative specifier) | #816's covers `@markless/ui` packages; nav's imported-module style collection is kept beside it in `compile.ts`. |
 | Which bound attributes reach Dragon per state | #816's `isNativeStyleStateAttribute` (`ui-*`, `aria-*`, `data-*`, `hidden`, `role`; only written true/false cells add assignments) | #811's `nativeStyleAttribute` (`class` and `ui-*`) | #816's is the wider rule. Visible effect: rung 4's style input now carries `aria-label` and `aria-pressed` by state, and S1 to S5's style sizes move by 1 to 2 bytes (Dragon side, below). |
 | A row instance's handler (`<node>@<key>`) | #813's instance scope (row item and row state) | #800's `scopeOf` (row item only) | Same id format; #813's also reaches row state. Removed nav's `scopeOf` in TS, Swift and Kotlin. |
-| Android launch mode | standard (nav: one activity per screen of the stack) | device's `singleTask` | `singleTask` allows one activity per task, which breaks nav's back stack. Measured consequence: D7 fails on Android, only together (after granting location in Settings, relaunching the app leaves Settings on top, because Settings opened inside the app's task and only `singleTask` cleared it); D1's device link still works. **Device owner: return from Settings without `singleTask`, or nav owner: a stack that survives it.** Nav's deep-link reader now ignores links whose host is not `app`. |
+| Android launch mode | standard (nav: one activity per screen of the stack) | device's `singleTask` | `singleTask` allows one activity per task, which breaks nav's back stack. Measured consequence in the full run: D7 failed on Android, only together (after granting location in Settings, relaunching the app leaves Settings on top, because Settings opened inside the app's task and only `singleTask` cleared it); D1's device link still works. Resolved since: Settings opens in its own task (follow-ups). Nav's deep-link reader now ignores links whose host is not `app`. |
 | Link schemes | one scheme (`PROOF_LINK_SCHEME = PROOF_URL_SCHEME`, both `markless-proof`) | a second constant with the same value | The iOS shell routes host `device` to the test device and anything else to the app stack. |
 | Reference test for a refused rung | every error is `MARKLESS_NATIVE_UNSUPPORTED`, every warning `MARKLESS_NATIVE_KEYBOARD_ONLY`, at least one error | every diagnostic `MARKLESS_NATIVE_UNSUPPORTED` | #816 added a keyboard-only warning; y4, refused on its own branch, now also carries two of them. |
 | Dragon: Markless node ids | #590's reversible encoding (`treeId`/`marklessId`) | #592's `m<k>` renaming (`dragonElementIds`) | Same capability; #590's hidden-node handling depends on its encoding. #592's page canvas is kept. |
