@@ -4,6 +4,7 @@ import type {
 	NativeFactCollectors,
 	SemanticComponent,
 	SemanticComponentPropDeclaration,
+	SemanticModuleNativeFacts,
 	SemanticComponentEdge,
 	SemanticBehavior,
 	SemanticElementHandleBinding,
@@ -54,6 +55,7 @@ export type MutableSemanticGraphArtifact = {
 	filename: string;
 	moduleId: string;
 	components: SemanticComponent[];
+	nativeModule?: SemanticModuleNativeFacts;
 	componentPropBindings: SemanticComponentPropDeclaration[];
 	componentEdges: SemanticComponentEdge[];
 	moduleImports: SemanticModuleImport[];

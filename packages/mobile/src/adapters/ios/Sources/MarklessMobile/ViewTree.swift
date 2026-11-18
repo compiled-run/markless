@@ -43,6 +43,7 @@ final class ViewTree {
 	private var dialogIds = Set<String>()
 	/// The open dialog's top layer and the place in the page its view returns to.
 	private var topLayer: (layer: TopLayerView, home: UIView, index: Int)?
+	private var overlays: OverlayHost!
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void
@@ -80,6 +81,13 @@ final class ViewTree {
 		}
 		if layout == nil { stackTree(root) }
 		refreshRelations()
+		overlays = OverlayHost(
+			runtime: runtime, root: root, onAction: onAction,
+			nodeOf: { [unowned self] view in
+				view.accessibilityIdentifier.flatMap { id in self.elements[id] === view ? self.templates[id] : nil }
+			},
+			viewOf: { [unowned self] id in self.elements[id] },
+			restack: { [unowned self] container in if self.layout == nil { self.stack(container) } })
 	}
 
 	func mount(in screen: UIView) {
@@ -92,6 +100,7 @@ final class ViewTree {
 			root.trailingAnchor.constraint(equalTo: guide.trailingAnchor),
 		])
 		if let layout { root.heightAnchor.constraint(equalToConstant: layout.viewport.height).isActive = true }
+		do { try overlays.mount(in: screen) } catch { fatalError("Markless iOS host: \(error)") }
 	}
 
 	/// The journal applier: the only code that changes a retained view after the first build.
@@ -113,6 +122,10 @@ final class ViewTree {
 				throw HostError("a navigate entry reaches the page's controller, not its views")
 			case let .dialog(node, open):
 				try present(node, open: open)
+			case let .overlay(node, open, modal):
+				if open { try overlays.open(node, modal: modal) } else { overlays.close(node) }
+			case let .focus(node):
+				try overlays.focus(node)
 			case let .state(cell, value):
 				guard let layout else { continue }
 				assignment = try layout.next(from: assignment, cell: cell, value: value)
@@ -153,6 +166,7 @@ final class ViewTree {
 			}
 		}
 		refreshRelations()
+		overlays.flush()
 	}
 
 	/// The top layer: a full-screen view above the page and the bars holding the dialog's own view (styled by its CSS, not a
@@ -285,6 +299,10 @@ final class ViewTree {
 						field.widthAnchor.constraint(equalToConstant: 240).isActive = true
 					}
 					view = field
+				} else if OverlayHost.isOverlay(staticAttributes) {
+					let overlay = OverlayElementView()
+					overlay.onEscape = { [unowned self] in self.overlays.escape() }
+					view = overlay
 				} else {
 					view = UIView()
 					view.isUserInteractionEnabled = context.button == nil
@@ -380,6 +398,8 @@ final class ViewTree {
 				field.addAction(
 					UIAction { [weak field] _ in onAction(NativeAction(event: .input, host: id, value: field?.text ?? "")) },
 					for: .editingChanged)
+			case (.dismiss, _), (.pointerdown, _), (.pointerup, _):
+				continue
 			default:
 				throw HostError("\(event.event.rawValue) on <\(element)> \(id) has no iOS control event yet")
 			}
@@ -436,7 +456,7 @@ final class ViewTree {
 			let hidden = current["hidden"] != nil
 			if view.isHidden != hidden {
 				view.isHidden = hidden
-				if let parent = view.superview, !(parent is UIButton) { stack(parent) }
+				if let parent = view.superview, !(parent is UIButton || parent is OverlayCard) { stack(parent) }
 			}
 		}
 	}

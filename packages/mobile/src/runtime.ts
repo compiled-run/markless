@@ -8,7 +8,13 @@ import type {
 	NativeValue,
 	NativeViewPayload,
 } from '@markless/serializer';
+import { NATIVE_DOCUMENT_BODY } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
+import {
+	OVERLAY_ATTRIBUTE,
+	OVERLAY_MODAL_ATTRIBUTE,
+	OVERLAY_MODAL_VALUE,
+} from '@markless/web/fns/overlay-protocol';
 
 /** A host-side action: what a person does to a retained view. */
 export type NativeAction =
@@ -16,7 +22,31 @@ export type NativeAction =
 	/** The field's whole text after an edit. */
 	| { readonly event: 'input'; readonly host: string; readonly value: string }
 	/** The host's back gesture (or Escape) on an open `<dialog>`: it closes, as the browser's cancel does. */
-	| { readonly event: 'cancel'; readonly host: string };
+	| { readonly event: 'cancel'; readonly host: string }
+	/**
+	 * The host's back gesture (Escape) while an overlay is open: reported to `host`, the topmost one. An outside press is
+	 * not sent: the runtime reports it from `pointerdown`, as the web's overlay behaviour does.
+	 */
+	| { readonly event: 'dismiss'; readonly host: string; readonly reason: 'escape' }
+	/** A touch going down or up on the element `host` (the innermost element under it). */
+	| { readonly event: 'pointerdown' | 'pointerup'; readonly host: string };
+
+/** What the event running a handler carries, by the field a `{ event }` expression names. */
+export type NativeEventFields = {
+	readonly value?: string;
+	readonly reason?: string;
+	readonly pressTarget?: string | null;
+	readonly target?: string;
+	readonly button?: number;
+};
+
+/** The element facts an expression reads: focus, each overlay's focus origin, and the element tree. */
+export type NativeElements = {
+	readonly focused: () => string | null;
+	readonly focusOrigin: (overlay: string) => string | null;
+	readonly isElement: (id: string) => boolean;
+	readonly contains: (within: string, node: string) => boolean;
+};
 
 type Value = NativeValue;
 
@@ -41,6 +71,10 @@ export type NativeRuntime = {
 	readonly properties: () => ReadonlyArray<readonly [node: string, name: 'value', value: string]>;
 	/** Every `<dialog>` and whether it is open in the top layer. */
 	readonly dialogs: () => ReadonlyArray<readonly [node: string, open: boolean]>;
+	/** The overlay stack, topmost last: each element marked `overlay` that is shown, and whether it is modal. */
+	readonly overlays: () => ReadonlyArray<readonly [node: string, modal: boolean]>;
+	/** The element that has focus, or null. */
+	readonly focused: () => string | null;
 	/** Every shown branch's chosen arm (null: none). */
 	readonly arms: () => ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Every shown list's row keys, in order. */
@@ -67,10 +101,30 @@ const BUILTINS: { readonly [name in NativeBuiltin]: (...args: Value[]) => Value 
 export function evaluateNativeExpr(
 	expr: NativeExpr,
 	read: (cell: string) => Value,
-	eventValue?: string,
+	/** The event's fields; a string is an `input` event's text. */
+	eventValue?: string | NativeEventFields,
 	scope: NativeScope = EMPTY_SCOPE,
+	elements?: NativeElements,
 ): Value {
-	const evaluate = (e: NativeExpr): Value => evaluateNativeExpr(e, read, eventValue, scope);
+	const evaluate = (e: NativeExpr): Value => evaluateNativeExpr(e, read, eventValue, scope, elements);
+	const dom = (): NativeElements => {
+		if (!elements) throw new Error('an element read where there are no elements');
+		return elements;
+	};
+	if ('focused' in expr) return dom().focused() ?? NATIVE_DOCUMENT_BODY;
+	if ('focusOrigin' in expr) {
+		const overlay = evaluate(expr.focusOrigin);
+		return typeof overlay === 'string' ? dom().focusOrigin(overlay) : null;
+	}
+	if ('isElement' in expr) {
+		const value = evaluate(expr.isElement);
+		return typeof value === 'string' && dom().isElement(value);
+	}
+	if ('contains' in expr) {
+		const within = evaluate(expr.contains);
+		const node = evaluate(expr.node);
+		return typeof within === 'string' && typeof node === 'string' && dom().contains(within, node);
+	}
 	if ('route' in expr) {
 		if (!scope.params) throw new Error('route params read on a component that is not a page');
 		return { ...scope.params };
@@ -97,11 +151,17 @@ export function evaluateNativeExpr(
 		const args = expr.arguments.map((argument) =>
 			'lambda' in argument
 				? (...values: Value[]) =>
-						evaluateNativeExpr(argument.body, read, eventValue, {
-							items: scope.items,
-							...(scope.params ? { params: scope.params } : {}),
-							locals: new Map([...scope.locals, ...argument.lambda.map((name, i) => [name, values[i] ?? null] as const)]),
-						})
+						evaluateNativeExpr(
+							argument.body,
+							read,
+							eventValue,
+							{
+								items: scope.items,
+								...(scope.params ? { params: scope.params } : {}),
+								locals: new Map([...scope.locals, ...argument.lambda.map((name, i) => [name, values[i] ?? null] as const)]),
+							},
+							elements,
+						)
 				: evaluate(argument),
 		);
 		const method = (target as unknown as Record<string, unknown> | null)?.[expr.method];
@@ -114,9 +174,10 @@ export function evaluateNativeExpr(
 	if ('cell' in expr) return read(expr.cell);
 	if ('literal' in expr) return expr.literal;
 	if ('event' in expr) {
-		if (eventValue === undefined)
-			throw new Error('the event value read outside an input handler');
-		return eventValue;
+		const fields: NativeEventFields | undefined = typeof eventValue === 'string' ? { value: eventValue } : eventValue;
+		const value = fields?.[expr.event];
+		if (value === undefined) throw new Error(`the event's ${expr.event} read where the event has none`);
+		return value;
 	}
 	if ('unary' in expr) {
 		const value = evaluate(expr.value);
@@ -210,8 +271,24 @@ export function createNativeRuntime(
 		if (!values.has(cell)) throw new Error(`unknown cell ${cell}`);
 		return values.get(cell)!;
 	};
-	const evaluate = (expr: NativeExpr, eventValue?: string, scope?: NativeScope): Value =>
-		evaluateNativeExpr(expr, read, eventValue, scope ?? base);
+	const nodesById = new Map(payload.nodes.map((node) => [node.id, node]));
+	/** Focus, the overlay stack (topmost last) and each overlay's focus origin, kept as the web's overlay behaviour keeps them. */
+	let focused: string | null = null;
+	let stack: string[] = [];
+	const origins = new Map<string, string>();
+	const elements: NativeElements = {
+		focused: () => focused,
+		focusOrigin: (overlay) => origins.get(overlay) ?? null,
+		isElement: (id) => id === NATIVE_DOCUMENT_BODY || nodesById.get(id)?.kind === 'element',
+		contains: (within, node) => {
+			if (within === NATIVE_DOCUMENT_BODY) return true;
+			for (let at: string | null | undefined = node; at; at = nodesById.get(at)?.parent)
+				if (at === within) return true;
+			return false;
+		},
+	};
+	const evaluate = (expr: NativeExpr, eventValue?: string | NativeEventFields, scope?: NativeScope): Value =>
+		evaluateNativeExpr(expr, read, eventValue, scope ?? base, elements);
 	const armOf = (branch: Extract<NativeNode, { kind: 'branch' }>): number | null => {
 		if (branch.test) return evaluate(branch.test) ? 0 : branch.arms > 1 ? 1 : null;
 		const tests = branch.tests ?? [];
@@ -296,21 +373,76 @@ export function createNativeRuntime(
 	const keyed = <T,>(list: ReadonlyArray<readonly [string, string, T]>) =>
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));
 
+	// The overlay behaviour enlists an element marked `overlay` whose `hidden` binding shows it; one with no such binding never.
+	const overlayNodes = payload.nodes.filter(
+		(node): node is Extract<NativeNode, { kind: 'element' }> =>
+			node.kind === 'element' &&
+			node.attributes?.[OVERLAY_ATTRIBUTE] !== undefined &&
+			(node.bindings ?? []).some((binding) => 'attribute' in binding && binding.attribute === 'hidden'),
+	);
+	const shownOverlays = (): string[] => {
+		const now = keyed(attributes());
+		return overlayNodes.flatMap((node) =>
+			instances(node).length > 0 && now.get(`${node.id}\0hidden`) === null ? [node.id] : [],
+		);
+	};
+	const isModal = (overlay: string): boolean => {
+		const now = keyed(attributes());
+		return payload.nodes.some((node) => {
+			if (node.kind !== 'element' || !elements.contains(overlay, node.id)) return false;
+			const bound = now.get(`${node.id}\0${OVERLAY_MODAL_ATTRIBUTE}`);
+			return (bound !== undefined ? bound : node.attributes?.[OVERLAY_MODAL_ATTRIBUTE]) === OVERLAY_MODAL_VALUE;
+		});
+	};
+	// Served shown: the document's focus is the body.
+	for (const overlay of shownOverlays()) {
+		stack.push(overlay);
+		origins.set(overlay, NATIVE_DOCUMENT_BODY);
+	}
+	const handlerOf = (host: string, name: NativeAction['event']) =>
+		payload.events.find((candidate) => candidate.host === host && candidate.event === name);
+
 	return {
 		texts,
 		attributes,
 		properties,
 		arms,
 		dialogs: () => [...dialogs],
+		overlays: () => stack.map((overlay) => [overlay, isModal(overlay)] as const),
+		focused: () => focused,
 		rows,
 		dispatch(action) {
-			const event = payload.events.find((candidate) => candidate.host === action.host && candidate.event === action.event);
+			const event = handlerOf(action.host, action.event);
+			const isPointer = action.event === 'pointerdown' || action.event === 'pointerup';
 			if (action.event === 'cancel') {
 				if (dialogs.get(action.host) !== true) throw new Error(`${action.host} is not an open dialog`);
+			} else if (action.event === 'dismiss') {
+				if (stack.at(-1) !== action.host) throw new Error(`${action.host} is not the topmost overlay`);
+			} else if (isPointer) {
+				if (!nodesById.has(action.host)) throw new Error(`${action.host} is not a node`);
 			} else if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
 			const dialogsBefore = new Map(dialogs);
 			if (action.event === 'cancel') dialogs.set(action.host, false);
+			// A press focuses the control it presses, as the browser does.
+			if (action.event === 'activate') focused = action.host;
+			const focusBefore = focused;
+			const stackBefore = stack;
 			const eventValue = action.event === 'input' ? action.value : undefined;
+			// Handlers in the order the web runs them, each with what its event carries.
+			const runs: { readonly handler: string; readonly fields?: NativeEventFields }[] = [];
+			if (action.event === 'dismiss') {
+				if (event) runs.push({ handler: event.handler, fields: { reason: action.reason, pressTarget: null } });
+			} else if (isPointer) {
+				// The behaviour's document listener hears the press first: the topmost overlay it landed outside is told.
+				const top = stack.at(-1);
+				const dismiss = top !== undefined && action.event === 'pointerdown' && !elements.contains(top, action.host) ? handlerOf(top, 'dismiss') : undefined;
+				if (dismiss) runs.push({ handler: dismiss.handler, fields: { reason: 'outside-press', pressTarget: action.host } });
+				for (let at: string | null | undefined = action.host; at; at = nodesById.get(at)?.parent) {
+					const own = handlerOf(at, action.event);
+					if (own) runs.push({ handler: own.handler, fields: { target: action.host, button: 0 } });
+				}
+			} else if (event) runs.push({ handler: event.handler, ...(eventValue !== undefined ? { fields: { value: eventValue } } : {}) });
+			let focusMoved = false;
 			const cellsBefore = new Map(values);
 			const beforeTexts = new Map(texts());
 			const beforeAttributes = keyed(attributes());
@@ -319,10 +451,22 @@ export function createNativeRuntime(
 			if (eventValue !== undefined) beforeProperties.set(`${action.host}\0value`, eventValue);
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
+			let fields: NativeEventFields | undefined;
 			const run = (ops: ReadonlyArray<NativeOp>): NativeJournalEntry | undefined => {
 				for (const op of ops) {
 					if (op.op === 'navigate')
 						return { op: 'navigate', route: op.route, params: op.params };
+					if (op.op === 'focus') {
+						const node = evaluate(op.node, fields);
+						if (node === null) continue;
+						if (typeof node !== 'string' || !elements.isElement(node)) throw new Error('focus() on a value that is not an element');
+						// The body takes no focus; focusing an element inside a closed overlay still moves it, as the journal says.
+						if (node !== NATIVE_DOCUMENT_BODY) {
+							focused = node;
+							focusMoved = true;
+						}
+						continue;
+					}
 					if (op.op === 'dialog') {
 						if (!dialogs.has(op.node)) throw new Error(`${op.node} is not a dialog`);
 						dialogs.set(op.node, op.method === 'showModal');
@@ -330,20 +474,29 @@ export function createNativeRuntime(
 					}
 					if (op.op === 'if') {
 						const taken = run(
-							evaluate(op.test, eventValue) ? op.whenTrue : op.whenFalse,
+							evaluate(op.test, fields) ? op.whenTrue : op.whenFalse,
 						);
 						if (taken) return taken;
 						continue;
 					}
-					const value = evaluate(op.value, eventValue);
+					const value = evaluate(op.value, fields);
 					values.set(op.cell, value);
 					const key = storageKeys.get(op.cell);
 					if (key !== undefined) store.set(key, value);
 				}
 				return undefined;
 			};
-			const navigated = event ? run(handlers.get(event.handler) ?? []) : undefined;
-			if (navigated) return [navigated];
+			for (const step of runs) {
+				fields = step.fields;
+				const navigated = run(handlers.get(step.handler) ?? []);
+				if (navigated) return [navigated];
+			}
+			fields = undefined;
+			const shownNow = shownOverlays();
+			const released = stackBefore.filter((overlay) => !shownNow.includes(overlay));
+			const enlisted = shownNow.filter((overlay) => !stackBefore.includes(overlay));
+			stack = [...stackBefore.filter((overlay) => shownNow.includes(overlay)), ...enlisted];
+			for (const overlay of enlisted) origins.set(overlay, focusBefore ?? NATIVE_DOCUMENT_BODY);
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());
 			const afterProperties = keyed(properties());
@@ -394,7 +547,12 @@ export function createNativeRuntime(
 					}),
 				));
 			});
-			return [...styles, ...nodes];
+			const overlays: NativeJournalEntry[] = [
+				...released.map((node): NativeJournalEntry => ({ op: 'overlay', node, open: false, modal: isModal(node) })),
+				...enlisted.map((node): NativeJournalEntry => ({ op: 'overlay', node, open: true, modal: isModal(node) })),
+			];
+			const focus: NativeJournalEntry[] = focusMoved && focused !== null ? [{ op: 'focus', node: focused }] : [];
+			return [...styles, ...nodes, ...overlays, ...focus];
 		},
 	};
 }

@@ -2,6 +2,9 @@ package dev.markless.mobile.core
 
 const val NATIVE_VIEW_VERSION = "markless.native-view/0"
 
+/** The element id that stands for the document body, which no node has. */
+const val NATIVE_DOCUMENT_BODY = "#body"
+
 /** A JavaScript value a cell or expression holds; arrays and objects compare by identity, as `===` does. */
 sealed interface JsValue {
 	data object Null : JsValue
@@ -50,8 +53,15 @@ sealed interface Expr {
 	/** The current row's item of a list. */
 	data class Item(val repeat: String) : Expr
 	data class Call(val name: String, val arguments: List<Expr>) : Expr
-	/** In an `input` handler: the field's whole text after the edit. */
-	data object EventValue : Expr
+	/** A field of the event running the handler: `value`, `reason`, `pressTarget`, `target` or `button`. */
+	data class Event(val field: String) : Expr
+	/** The focused element's id, or [NATIVE_DOCUMENT_BODY] when none has focus. */
+	data object Focused : Expr
+	/** Whether the element [node] is [within] or inside it. */
+	data class Contains(val within: Expr, val node: Expr) : Expr
+	/** The element that had focus when the overlay [overlay] was last shown, or null. */
+	data class FocusOrigin(val overlay: Expr) : Expr
+	data class IsElement(val value: Expr) : Expr
 	/** The page's route params, an object of strings. */
 	data object RouteParams : Expr
 }
@@ -81,7 +91,7 @@ sealed interface Node {
 	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 }
 
-enum class EventName(val wire: String) { Activate("activate"), Input("input"), Cancel("cancel") }
+enum class EventName(val wire: String) { Activate("activate"), Input("input"), Cancel("cancel"), Dismiss("dismiss"), PointerDown("pointerdown"), PointerUp("pointerup") }
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
@@ -92,6 +102,8 @@ sealed interface Op {
 	data class If(val test: Expr, val then: List<Op>, val otherwise: List<Op>) : Op
 	/** `showModal()` ([open] true) or `close()` on a `<dialog>`: the host puts it in its top layer or takes it out. */
 	data class Dialog(val node: String, val open: Boolean) : Op
+	/** `element.focus()` on the element [node] evaluates to; null does nothing. */
+	data class Focus(val node: Expr) : Op
 }
 
 /** A page's route as the router spells it (`/[fruit]`) and its param names. */
@@ -186,13 +198,17 @@ data class Payload(
 			is Expr.Lambda -> cellsOf(e.body)
 			is Expr.Local, is Expr.Item, Expr.RouteParams -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
-			Expr.EventValue -> emptyList()
+			is Expr.Event, Expr.Focused -> emptyList()
+			is Expr.Contains -> cellsOf(e.within) + cellsOf(e.node)
+			is Expr.FocusOrigin -> cellsOf(e.overlay)
+			is Expr.IsElement -> cellsOf(e.value)
 		}
 
 		private val UNARY = setOf("!", "-", "+")
 		private val BINARY = setOf("+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=")
 		private val LOGICAL = setOf("&&", "||", "??")
 		private val METHODS = setOf("filter", "map", "findIndex", "some", "every", "includes", "indexOf", "join", "concat", "slice", "reverse", "toReversed", "toUpperCase", "toLowerCase", "trim")
+		private val EVENT_FIELDS = setOf("value", "reason", "pressTarget", "target", "button")
 		private val BUILTINS = setOf("String", "Number", "Boolean", "Math.abs", "Math.floor", "Math.max", "Math.min", "Math.round")
 
 		private fun oneOf(o: Map<String, Json>, key: String, allowed: Set<String>, what: String): String {
@@ -245,7 +261,15 @@ data class Payload(
 					Expr.Call(oneOf(o, "call", BUILTINS, what), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })
 				}
 				o.containsKey("route") -> { o.only(setOf("route"), what); oneOf(o, "route", setOf("params"), what); Expr.RouteParams }
-				o.containsKey("event") -> { o.only(setOf("event"), what); oneOf(o, "event", setOf("value"), what); Expr.EventValue }
+				o.containsKey("event") -> { o.only(setOf("event"), what); Expr.Event(oneOf(o, "event", EVENT_FIELDS, what)) }
+				o.containsKey("focused") -> {
+					o.only(setOf("focused"), what)
+					if (o.field("focused", what) != Json.Bool(true)) throw MarklessDecodeError("$what.focused must be true")
+					Expr.Focused
+				}
+				o.containsKey("contains") -> { o.only(setOf("contains", "node"), what); Expr.Contains(sub("contains"), sub("node")) }
+				o.containsKey("focusOrigin") -> { o.only(setOf("focusOrigin"), what); Expr.FocusOrigin(sub("focusOrigin")) }
+				o.containsKey("isElement") -> { o.only(setOf("isElement"), what); Expr.IsElement(sub("isElement")) }
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")
 			}
 		}
@@ -362,6 +386,12 @@ data class Payload(
 				val method = o.field("method", what).str("$what.method")
 				if (method != "showModal" && method != "close") throw MarklessDecodeError("$what has unknown dialog method \"$method\"")
 				return Op.Dialog(o.field("node", what).str("$what.node"), method == "showModal")
+			}
+			if (name == "focus") {
+				o.only(setOf("op", "node"), what)
+				val node = expr(o.field("node", what), "$what.node")
+				for (c in cellsOf(node)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				return Op.Focus(node)
 			}
 			if (name == "if") {
 				o.only(setOf("op", "test", "whenTrue", "whenFalse"), what)

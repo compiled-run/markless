@@ -148,6 +148,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		if (name) state.helperFunctions.set(name, declaration);
 	}
 	graph.moduleGraphInterface = collectModuleGraphInterface({ statements, state });
+	if (state.nativeFacts) graph.nativeModule = state.nativeFacts.module(statements as never);
 
 	for (const statement of statements) {
 		collectModuleScopeGraphCreation(statement, state);

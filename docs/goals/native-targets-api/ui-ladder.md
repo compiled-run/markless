@@ -223,3 +223,50 @@ the `dismiss` event (13); initial values not known at build time (13); pointer e
 4. `pnpm install` in Markless, then `pnpm --filter @markless/mobile proof --simulator markless-native-ui --avd
    markless_native_ui --port 5584 proofs/u1-base ...`. Under `~/.claude/bin/heavy`, `--keep-devices` does not survive the
    job: heavy stops the emulator it leaves behind.
+
+## Overlay primitive (job 3): modal and popover on phones
+
+Owner rule for this job: the web's behaviour and family source are the reference. No family source, family API, mark or
+web runtime behaviour changed; the native pass and the hosts supply what the families' web code already reads.
+
+| Rung | Family | Web | Reference | iOS | Android | Styles |
+|---|---|---|---|---|---|---|
+| u20 | `modal` (and `alert`): trigger, backdrop, content, title, description, close | fails at step 8 (Escape), web defect below; steps 0 to 7 pass | pass | pass | pass (back gesture included) | none: stacking layout, centred top layer |
+| u21 | `popover`: trigger, content, title, description, close | fails at step 2 (outside press), web defect below | pass | pass | see receipt | none |
+
+What the families read, and how each is supplied without a change to them:
+
+- **The `dismiss` event.** `onDismiss` is a native event; `event.detail.reason` and `event.detail.pressTarget` are event
+  fields. The runtime keeps the overlay stack the web keeps (an `overlay` element enlists when its `hidden` binding shows
+  it; modal when `aria-modal="true"` is on it or inside it), reports an outside press from `pointerdown` to the topmost
+  overlay the press landed outside, and the hosts send Escape from Android back and VoiceOver's escape gesture.
+- **"Which element had focus when this opened".** Modal's `focusBackToOpener` reads the overlay behaviour's
+  focus-origin property. The native pass lowers a read of that property (its name imported from
+  `@markless/web/fns/overlay-protocol`) to `{ focusOrigin }`, which the runtime records when the overlay enlists. No new
+  `@markless/core` API was needed.
+- **"A press that starts and ends on the backdrop".** Modal's guard keeps a module-level `WeakSet` across `pointerdown`
+  and `pointerup`. The native pass keeps a module-level `new WeakSet()` as one cell holding its members; the hosts report
+  every touch's down and up on the innermost element under it (a touch on the top layer outside the lifted view is a
+  touch on the overlay element itself), and the runtime runs the pointer handlers on it and each element it is inside.
+  No new mark was needed.
+- **Focus moves.** `el.focus()` is a `focus` op whose node is an expression (`isTriggerOpened ? trigger : origin`);
+  elements are values (node ids), with `contains`, `document.activeElement`, `instanceof HTMLElement` and
+  `ownerDocument.body`. Hosts move VoiceOver and TalkBack focus. Not observable from Maestro, so focus is proven by the
+  vectors (`overlay.json`, `popover.json`), not on the device flows.
+- **Helpers.** The families' plain functions in sibling `.ts` files are inlined (as statements, or as values; one with
+  effects whose value a `const` reads runs as ops into a cell). Draft #816 adds overlapping helper inlining, `event.target`
+  and `focus()` as a `command` op with a fixed node; the two branches will conflict in `native-view.ts`,
+  `expression-tree.ts` and the runtimes, and modal needs a focus target computed at run time.
+
+Not proven on a device: VoiceOver's escape gesture (Maestro cannot perform it; the iOS flow skips the back step), and
+where focus lands. Drawer was not attempted: its drag is an owner decision not yet made, and it is still refused for its
+shared state's first value and `style={...}`. Menu is still refused: a `style` binding, `contextmenu`, a helper with a
+script-only body (`takeReturn`) and keyboard handlers.
+
+**Web defect found (pre-existing, reproduced on `bbb807ad8`):** in a router production build the overlay behaviour is
+never installed. The resume runtime reads `globalThis.__marklessOverlay` once at its start, and the app module that
+assigns it initializes later; on the u21 page the loader is defined but no element carries `__marklessOverlayInstalled`,
+and a press outside the open popover raises `pointerdown` but no `dismiss`. So on the web, popover's outside press and
+Escape, and modal's Escape, do nothing on router-built pages. Not fixed here (web and bundler code, outside this job).
+
+Family probe: 3 of 46 families built a payload before, 5 after (modal and popover moved to "works").

@@ -5,19 +5,22 @@ import type {
 	SemanticComponentNativeFacts,
 	SemanticExpression,
 	SemanticHandlerStatement,
+	SemanticModuleNativeFacts,
 } from '../../artifacts.ts';
 
 const UNARY = new Set(['!', '-', '+']);
 const BINARY = new Set(['+', '-', '*', '/', '%', '===', '!==', '<', '<=', '>', '>=']);
 const LOGICAL = new Set(['&&', '||', '??']);
 const COMPOUND = new Set(['+=', '-=', '*=', '/=', '%=']);
-/** Calls with exact JavaScript meaning that a native host implements; any other call needs a script engine. */
+/** Calls with exact JavaScript meaning that a native host implements; a call to any other name is a function the build inlines or refuses. */
 const BUILTINS = new Set(['String', 'Number', 'Boolean', 'Math.abs', 'Math.floor', 'Math.max', 'Math.min', 'Math.round']);
-/** Array and string methods with exact JavaScript meaning that return a new value and change nothing. */
+/** Methods with exact JavaScript meaning that return a value and change nothing: of arrays and strings, `Set#has` and `Node#contains`. */
 const METHODS = new Set([
 	'filter', 'map', 'find', 'findIndex', 'some', 'every', 'includes', 'indexOf', 'join', 'concat', 'slice',
-	'reverse', 'toReversed', 'toUpperCase', 'toLowerCase', 'trim',
+	'reverse', 'toReversed', 'toUpperCase', 'toLowerCase', 'trim', 'has', 'contains',
 ]);
+/** The DOM interfaces `instanceof` may test: element values. */
+const ELEMENT_TYPES = new Set(['Element', 'HTMLElement']);
 
 const lambdaOf = (node: AnyNode): SemanticExpression => {
 	const parameters = asNodes(node.params);
@@ -80,6 +83,12 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 				? { kind: 'unary', operator: node.operator as '!' | '-' | '+', value: expressionTreeOf(node.argument as AnyNode) }
 				: unsupported(`the \`${String(node.operator)}\` operator`);
 		case 'BinaryExpression':
+			if (node.operator === 'instanceof') {
+				const type = (node.right as AnyNode | undefined)?.name;
+				return typeof type === 'string' && ELEMENT_TYPES.has(type)
+					? { kind: 'instanceof', value: expressionTreeOf(node.left as AnyNode), type }
+					: unsupported('`instanceof` of something other than an element type');
+			}
 			return typeof node.operator === 'string' && BINARY.has(node.operator)
 				? {
 						kind: 'binary',
@@ -124,9 +133,9 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 				};
 			}
 			const name = calleeName(callee);
-			return name && BUILTINS.has(name)
+			return name
 				? { kind: 'call', callee: name, arguments: asNodes(node.arguments).map(expressionTreeOf) }
-				: unsupported(`a call to \`${name ?? 'a computed function'}\``);
+				: unsupported('a call to a computed function');
 		}
 		case 'AwaitExpression':
 			return unsupported('`await`');
@@ -250,6 +259,17 @@ const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
 				})
 			: { kind: 'unsupported', construct: `the \`${operator}\` assignment` };
 	}
+	const callee = expression.type === 'CallExpression' ? (expression.callee as AnyNode | undefined) : undefined;
+	const method = callee?.type === 'MemberExpression' && !callee.computed ? (callee.property as AnyNode | undefined)?.name : undefined;
+	if (typeof method === 'string') {
+		const args = asNodes(expression.arguments).map(expressionTreeOf);
+		return {
+			kind: 'method-call',
+			object: expressionTreeOf(callee!.object as AnyNode),
+			method,
+			...(args.length > 0 ? { arguments: args } : {}),
+		};
+	}
 	const tree = expressionTreeOf(expression);
 	return { kind: 'unsupported', construct: tree.kind === 'unsupported' ? tree.construct : 'an expression statement' };
 };
@@ -306,10 +326,15 @@ function blockStatementsOf(statement: AnyNode | undefined, inList = false): Sema
 	}
 	if (statement.type === 'ExpressionStatement')
 		return [statementOf(statement.expression as AnyNode)];
-	if (statement.type === 'ReturnStatement')
-		return statement.argument
-			? [{ kind: 'unsupported', construct: 'a `return` with a value' }]
-			: [{ kind: 'return' }];
+	if (statement.type === 'ReturnStatement') {
+		const argument = statement.argument as AnyNode | null | undefined;
+		if (!argument) return [{ kind: 'return' }];
+		const inner = argument.type === 'ChainExpression' ? (argument.expression as AnyNode) : argument;
+		// `return f()` runs the call as a statement; its value is known only to a caller that drops it.
+		if (inner.type === 'CallExpression')
+			return [statementOf(argument), { kind: 'return', value: unsupported("a returned call's value") }];
+		return [{ kind: 'return', value: expressionTreeOf(argument) }];
+	}
 	if (statement.type === 'IfStatement')
 		return [
 			{
@@ -342,7 +367,9 @@ function readsName(tree: SemanticExpression, name: string): boolean {
 		case 'member':
 			return readsName(tree.object, name);
 		case 'call':
-			return tree.arguments.some((argument) => readsName(argument, name));
+			return tree.callee.split('.')[0] === name || tree.arguments.some((argument) => readsName(argument, name));
+		case 'instanceof':
+			return readsName(tree.value, name);
 		case 'method':
 			return readsName(tree.object, name) || tree.arguments.some((argument) => readsName(argument, name));
 		case 'array':
@@ -405,7 +432,12 @@ export function computedBodyOf(node: AnyNode): SemanticExpression {
 export function handlerStatementsOf(
 	node: AnyNode | undefined,
 ): ReadonlyArray<SemanticHandlerStatement> | undefined {
-	if (!node || (node.type !== 'ArrowFunctionExpression' && node.type !== 'FunctionExpression'))
+	if (
+		!node ||
+		(node.type !== 'ArrowFunctionExpression' &&
+			node.type !== 'FunctionExpression' &&
+			node.type !== 'FunctionDeclaration')
+	)
 		return undefined;
 	if (node.async) return [{ kind: 'unsupported', construct: 'an async handler' }];
 	// A parameter's default applies when no value (undefined, which native values spell null) is passed.
@@ -481,10 +513,57 @@ export function componentNativeFactsOf(
 	return { propDefaults, ...(restProp ? { restProp } : {}), stateInitializers, renderStatements };
 }
 
+/**
+ * A module's plain functions, as statements to run where they are called and as the value they return, and its
+ * module-level `new WeakSet()` and `new Set()` constants, which a native build keeps as a list of members.
+ */
+export function moduleNativeFactsOf(statements: ReadonlyArray<AnyNode>): SemanticModuleNativeFacts {
+	const functions: SemanticModuleNativeFacts['functions'][number][] = [];
+	const sets: string[] = [];
+	for (const statement of statements) {
+		const exported = statement.type === 'ExportNamedDeclaration';
+		const declaration = exported ? (statement.declaration as AnyNode | undefined) : statement;
+		if (!declaration) continue;
+		if (declaration.type === 'FunctionDeclaration') {
+			const name = (declaration.id as AnyNode | undefined)?.name;
+			if (typeof name !== 'string' || declaration.generator) continue;
+			const parameters = asNodes(declaration.params).map((parameter) =>
+				parameter.type === 'AssignmentPattern' ? (parameter.left as AnyNode | undefined)?.name : parameter.name,
+			);
+			if (parameters.some((parameter) => typeof parameter !== 'string')) continue;
+			const body = declaration.body as AnyNode | undefined;
+			functions.push({
+				name,
+				...(exported ? { exportName: name } : {}),
+				parameters: parameters as string[],
+				statements: handlerStatementsOf(declaration) ?? [],
+				value: declaration.async || !body ? unsupported('an async function') : computedBodyOf(body),
+			});
+			continue;
+		}
+		if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		for (const declarator of asNodes(declaration.declarations)) {
+			const id = declarator.id as AnyNode | undefined;
+			const init = declarator.init as AnyNode | undefined;
+			const type = (init?.callee as AnyNode | undefined)?.name;
+			if (
+				id?.type === 'Identifier' &&
+				typeof id.name === 'string' &&
+				init?.type === 'NewExpression' &&
+				(type === 'WeakSet' || type === 'Set') &&
+				asNodes(init.arguments).length === 0
+			)
+				sets.push(id.name);
+		}
+	}
+	return { functions, sets };
+}
+
 /** What a native build passes as `nativeFacts`; nothing else imports this module. */
 export const NATIVE_FACT_COLLECTORS: NativeFactCollectors = {
 	expression: expressionTreeOf as NativeFactCollectors['expression'],
 	computedBody: computedBodyOf as NativeFactCollectors['computedBody'],
 	handlerStatements: handlerStatementsOf as NativeFactCollectors['handlerStatements'],
 	component: componentNativeFactsOf as unknown as NativeFactCollectors['component'],
+	module: moduleNativeFactsOf as unknown as NativeFactCollectors['module'],
 };

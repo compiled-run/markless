@@ -4,11 +4,14 @@ public struct NativeAction: Equatable, Sendable {
 	public let host: String
 	/// For `input`: the field's whole text after the edit.
 	public let value: String?
+	/// For `dismiss`: why (`escape`; an outside press arrives as `pointerdown`).
+	public let reason: String?
 
-	public init(event: NativeEventName, host: String, value: String? = nil) {
+	public init(event: NativeEventName, host: String, value: String? = nil, reason: String? = nil) {
 		self.event = event
 		self.host = host
 		self.value = value
+		self.reason = reason
 	}
 }
 
@@ -29,6 +32,10 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case navigate(route: String, params: [NativeRouteParam])
 	/// A `<dialog>` put in the top layer (`open`) or taken out.
 	case dialog(node: String, open: Bool)
+	/// An element marked `overlay` joined the overlay stack (`open`) or left it; a modal one goes in the top layer.
+	case overlay(node: String, open: Bool, modal: Bool)
+	/// Focus moved to `node` by a `focus` op; sent after the entries that show it.
+	case focus(node: String)
 
 	public var json: JSONValue {
 		switch self {
@@ -47,6 +54,9 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("navigate")), ("route", .string(route)), ("params", .object(params.map { ($0.name, .string($0.value)) }))])
 		case let .dialog(node, open):
 			return .object([("op", .string("dialog")), ("node", .string(node)), ("open", .bool(open))])
+		case let .overlay(node, open, modal):
+			return .object([("op", .string("overlay")), ("node", .string(node)), ("open", .bool(open)), ("modal", .bool(modal))])
+		case let .focus(node): return .object([("op", .string("focus")), ("node", .string(node))])
 		}
 	}
 }
@@ -91,9 +101,16 @@ public final class NativeRuntime {
 	private let handlers: [String: [NativeOp]]
 	private let nodesById: [String: NativeNode]
 	private let params: [NativeRouteParam]
-	private var eventValue: String?
+	private var eventFields: [NativeEventField: NativeValue]?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
+	/// The element that has focus, or nil.
+	public private(set) var focused: String?
+	/// The overlay stack, topmost last, and the focus each overlay was shown from.
+	private var stack: [String] = []
+	private var origins: [String: String] = [:]
+	/// Elements marked `overlay` whose `hidden` binding shows them; one with no such binding is never enlisted.
+	private let overlayNodes: [NativeNode]
 
 	/// `params`: the route params the page opened with.
 	public init(payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = []) {
@@ -110,6 +127,52 @@ public final class NativeRuntime {
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
 			return nil
 		})
+		overlayNodes = payload.nodes.filter { node in
+			guard case let .element(_, attributes, bindings) = node.kind else { return false }
+			return attributes[OverlayProtocol.attribute] != nil && bindings.contains { !$0.isProperty && $0.name == "hidden" }
+		}
+		// Shown at mount: the document's focus is the body.
+		if let shown = try? shownOverlays() {
+			stack = shown
+			for overlay in shown { origins[overlay] = nativeDocumentBody }
+		}
+	}
+
+	public func isElement(_ id: String) -> Bool { id == nativeDocumentBody || nodesById[id]?.isElement == true }
+
+	/// `within.contains(node)`, read from the payload's parent chain; everything is inside the body.
+	public func contains(_ within: String, _ node: String) -> Bool {
+		if within == nativeDocumentBody { return true }
+		var at: String? = node
+		while let current = at {
+			if current == within { return true }
+			at = nodesById[current]?.parent
+		}
+		return false
+	}
+
+	private func keyedAttributes() throws -> [String: String?] {
+		Dictionary(try attributes().map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { $1 })
+	}
+
+	private func shownOverlays() throws -> [String] {
+		let now = try keyedAttributes()
+		return try overlayNodes.filter { node in try !instances(of: node).isEmpty && now["\(node.id)\u{0}hidden"] == .some(nil) }.map(\.id)
+	}
+
+	/// An overlay is modal when it or an element inside it has `aria-modal="true"`, bound or else static.
+	private func isModal(_ overlay: String, _ now: [String: String?]) -> Bool {
+		payload.nodes.contains { node in
+			guard case let .element(_, attributes, _) = node.kind, contains(overlay, node.id) else { return false }
+			let value = now["\(node.id)\u{0}\(OverlayProtocol.modalAttribute)"] ?? attributes[OverlayProtocol.modalAttribute]
+			return value == OverlayProtocol.modalValue
+		}
+	}
+
+	/// The overlay stack, topmost last, with whether each is modal.
+	public func overlays() throws -> [(node: String, modal: Bool)] {
+		let now = try keyedAttributes()
+		return stack.map { ($0, isModal($0, now)) }
 	}
 
 	private func read(_ cell: String) throws -> NativeValue {
@@ -154,9 +217,21 @@ public final class NativeRuntime {
 			}
 			return try callMethod(method, on: targetValue, args)
 		case .routeParams: return .object(params.map { (key: $0.name, value: .string($0.value)) })
-		case .eventValue:
-			guard let eventValue else { throw RuntimeError(reason: "the event value read outside an input handler") }
-			return .string(eventValue)
+		case let .event(name):
+			guard let value = eventFields?[name] else { throw RuntimeError(reason: "the event's \(name.rawValue) read where the event has none") }
+			return value
+		case .focused: return .string(focused ?? nativeDocumentBody)
+		case let .focusOrigin(inner):
+			guard case let .string(overlay) = try evaluate(inner) else { return .null }
+			return origins[overlay].map(NativeValue.string) ?? .null
+		case let .isElement(inner):
+			guard case let .string(id) = try evaluate(inner) else { return .bool(false) }
+			return .bool(isElement(id))
+		case let .contains(within, node):
+			let outer = try evaluate(within)
+			let inner = try evaluate(node)
+			guard case let .string(a) = outer, case let .string(b) = inner else { return .bool(false) }
+			return .bool(contains(a, b))
 		case let .unary(op, inner):
 			let value = try evaluate(inner)
 			switch op {
@@ -290,16 +365,45 @@ public final class NativeRuntime {
 
 	/// Runs the handler bound to the action and returns the journal the host applies.
 	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
-		let bound = payload.events.first(where: { $0.host == action.host && $0.event == action.event })
+		let handlerOf = { (host: String, name: NativeEventName) in self.payload.events.first { $0.host == host && $0.event == name } }
+		let bound = handlerOf(action.host, action.event)
+		let isPointer = action.event == .pointerdown || action.event == .pointerup
 		if action.event == .cancel {
 			guard dialogs[action.host] == true else { throw RuntimeError(reason: "\(action.host) is not an open dialog") }
+		} else if action.event == .dismiss {
+			guard stack.last == action.host else { throw RuntimeError(reason: "\(action.host) is not the topmost overlay") }
+			guard action.reason != nil else { throw RuntimeError(reason: "a dismiss of \(action.host) without a reason") }
+		} else if isPointer {
+			guard nodesById[action.host] != nil else { throw RuntimeError(reason: "\(action.host) is not a node") }
 		} else if bound == nil {
 			throw RuntimeError(reason: "no \(action.event.rawValue) handler on \(action.host)")
 		}
 		let dialogsBefore = dialogs
 		if action.event == .cancel { dialogs[action.host] = false }
-		eventValue = action.event == .input ? action.value ?? "" : nil
-		defer { eventValue = nil }
+		// A press focuses the control it presses, as the browser does.
+		if action.event == .activate { focused = action.host }
+		let focusBefore = focused
+		let stackBefore = stack
+		let eventValue = action.event == .input ? action.value ?? "" : nil
+		var runs: [(handler: String, fields: [NativeEventField: NativeValue]?)] = []
+		switch action.event {
+		case .dismiss:
+			if let bound { runs.append((bound.handler, [.reason: .string(action.reason!), .pressTarget: .null])) }
+		case .pointerdown, .pointerup:
+			// The behaviour's document listener hears the press first: the topmost overlay it landed outside is told.
+			if action.event == .pointerdown, let top = stack.last, !contains(top, action.host), let dismiss = handlerOf(top, .dismiss) {
+				runs.append((dismiss.handler, [.reason: .string("outside-press"), .pressTarget: .string(action.host)]))
+			}
+			var at: String? = action.host
+			while let current = at {
+				if let own = handlerOf(current, action.event) { runs.append((own.handler, [.target: .string(action.host), .button: .number(0)])) }
+				at = nodesById[current]?.parent
+			}
+		default:
+			if let bound { runs.append((bound.handler, eventValue.map { [.value: .string($0)] })) }
+		}
+		defer { eventFields = nil }
+		var focusMoved = false
 		let keyed = { (list: [(node: String, name: String, value: String?)]) in
 			Dictionary(list.map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { $1 })
 		}
@@ -323,11 +427,29 @@ public final class NativeRuntime {
 				case let .dialog(node, open):
 					guard dialogs[node] != nil else { throw RuntimeError(reason: "\(node) is not a dialog") }
 					dialogs[node] = open
+				case let .focus(expr):
+					let value = try evaluate(expr)
+					if value == .null { continue }
+					guard case let .string(node) = value, isElement(node) else { throw RuntimeError(reason: "focus() on a value that is not an element") }
+					// The body takes no focus.
+					if node != nativeDocumentBody {
+						focused = node
+						focusMoved = true
+					}
 				}
 			}
 			return nil
 		}
-		if let bound, let navigated = try run(handlers[bound.handler] ?? []) { return [navigated] }
+		for step in runs {
+			eventFields = step.fields
+			if let navigated = try run(handlers[step.handler] ?? []) { return [navigated] }
+		}
+		eventFields = nil
+		let shownNow = try shownOverlays()
+		let released = stackBefore.filter { !shownNow.contains($0) }
+		let enlisted = shownNow.filter { !stackBefore.contains($0) }
+		stack = stackBefore.filter(shownNow.contains) + enlisted
+		for overlay in enlisted { origins[overlay] = focusBefore ?? nativeDocumentBody }
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let afterAttributes = keyed(try attributes())
 		let afterProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
@@ -362,6 +484,10 @@ public final class NativeRuntime {
 				}
 			}
 		}
-		return styles + entries
+		let now = try keyedAttributes()
+		let overlays = released.map { NativeJournalEntry.overlay(node: $0, open: false, modal: isModal($0, now)) }
+			+ enlisted.map { NativeJournalEntry.overlay(node: $0, open: true, modal: isModal($0, now)) }
+		let focus: [NativeJournalEntry] = focusMoved ? focused.map { [.focus(node: $0)] } ?? [] : []
+		return styles + entries + overlays + focus
 	}
 }

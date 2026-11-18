@@ -213,6 +213,33 @@ private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) 
 	#expect(heart.accessibilityLabel == "Unlike")
 }
 
+@MainActor @Test func aModalOverlayLiftsIntoItsTopLayerAndReturns() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("overlay"), store: MemoryStore())
+	let views = try tree(controller)
+	#expect(controller.view.gestureRecognizers?.contains { $0 is PointerObserver && !$0.cancelsTouchesInView } == true)
+	let overlay = try #require(views.elements["component-edge:2/h2"] as? OverlayElementView)
+	let home = try #require(overlay.superview)
+	#expect(overlay.isHidden)
+	try #require(views.elements["component-edge:1/h1"] as? UIButton).sendActions(for: .touchUpInside)
+	let layer = try #require(controller.view.subviews.last as? OverlayLayerView)
+	#expect(layer.node == "component-edge:2/h2")
+	#expect(overlay.isDescendant(of: layer))
+	#expect(!overlay.isHidden)
+	#expect(layer.accessibilityViewIsModal)
+	#expect(views.root.accessibilityElementsHidden)
+	controller.perform(NativeAction(event: .pointerdown, host: "component-edge:2/h2"))
+	controller.perform(NativeAction(event: .pointerup, host: "component-edge:2/h2"))
+	#expect(overlay.superview === home)
+	#expect(overlay.isHidden)
+	#expect(layer.superview == nil)
+	#expect(!views.root.accessibilityElementsHidden)
+	try #require(views.elements["component-edge:1/h1"] as? UIButton).sendActions(for: .touchUpInside)
+	let again = try #require(controller.view.subviews.last as? OverlayLayerView)
+	#expect(again.accessibilityPerformEscape())
+	#expect(overlay.superview === home)
+	#expect(again.superview == nil)
+}
+
 @MainActor @Test func journalNamingAnUnknownNodeIsAnError() throws {
 	let controller = try MarklessViewController(payload: counterPayload())
 	let views = try tree(controller)

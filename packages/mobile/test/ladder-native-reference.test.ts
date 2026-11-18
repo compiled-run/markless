@@ -101,6 +101,20 @@ function walk(
 		if (action && 'relaunch' in action) {
 			runtime = createNativeRuntime(payload, store, params);
 			mount();
+		} else if (action && ('back' in action || 'pressBackdrop' in action)) {
+			const top = runtime.overlays().at(-1)?.[0];
+			if (!top) throw new Error(`step ${index}: no overlay is open to ${Object.keys(action)[0]}`);
+			const dispatched =
+				'back' in action
+					? runtime.dispatch({ event: 'dismiss', host: top, reason: 'escape' })
+					: [
+							...runtime.dispatch({ event: 'pointerdown', host: top }),
+							...runtime.dispatch({ event: 'pointerup', host: top }),
+						];
+			for (const entry of dispatched) {
+				if (entry.op === 'text') texts.set(entry.node, entry.value);
+				else if (entry.op === 'attribute') attributes.set(`${entry.node}\0${entry.name}`, entry.value);
+			}
 		} else if (action && !('tap' in action) && !('type' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action) {
@@ -114,10 +128,25 @@ function walk(
 				throw new Error(`step ${index}: "${name}" is disabled`);
 			// Typing shows the text in the field at once; the input event then runs the handler.
 			if ('type' in action) properties.set(host, action.type.text);
-			const dispatched =
+			// A tap is a touch going down and up on what it lands on, then the control's activation, as on a phone.
+			const pressed =
 				'tap' in action
-					? runtime.dispatch({ event: 'activate', host })
-					: runtime.dispatch({ event: 'input', host, value: action.type.text });
+					? [
+							...runtime.dispatch({ event: 'pointerdown', host }),
+							...runtime.dispatch({ event: 'pointerup', host }),
+						]
+					: [];
+			const activates = payload.events.some((event) => event.host === host && event.event === 'activate');
+			if ('tap' in action && !activates && pressed.length === 0)
+				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
+			const dispatched = [
+				...pressed,
+				...('tap' in action
+					? activates
+						? runtime.dispatch({ event: 'activate', host })
+						: []
+					: runtime.dispatch({ event: 'input', host, value: action.type.text })),
+			];
 			for (const entry of dispatched) {
 				if (entry.op === 'text') texts.set(entry.node, entry.value);
 				else if (entry.op === 'dialog') openDialogs.set(entry.node, entry.open);

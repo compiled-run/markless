@@ -66,6 +66,23 @@ export type NativeFactCollectors = {
 		node: never,
 		isFrameworkCall: (node: never, api: 'state') => boolean,
 	) => SemanticComponentNativeFacts;
+	/** The module's top-level statements: its plain functions and its module-level sets. */
+	readonly module: (statements: never) => SemanticModuleNativeFacts;
+};
+
+/** What a native build lowers from a module's own top level, collected only when `nativeFacts` is passed. */
+export type SemanticModuleNativeFacts = {
+	/** Each plain function declaration (not a component): run as statements where it is called, or as the value it returns. */
+	readonly functions: ReadonlyArray<{
+		readonly name: string;
+		/** Set when the declaration is exported under its own name. */
+		readonly exportName?: string;
+		readonly parameters: ReadonlyArray<string>;
+		readonly statements: ReadonlyArray<SemanticHandlerStatement>;
+		readonly value: SemanticExpression;
+	}>;
+	/** Module-level `const name = new WeakSet()` or `new Set()`: a set of members the module keeps, by name. */
+	readonly sets: ReadonlyArray<string>;
 };
 
 export type ElementOnlyAttribute = {
@@ -1233,7 +1250,10 @@ export type SemanticExpression =
 	  }
 	| { readonly kind: 'template'; readonly parts: ReadonlyArray<string | SemanticExpression> }
 	| { readonly kind: 'member'; readonly object: SemanticExpression; readonly property: string }
+	/** A call to a named function (`Math.max`, a helper `isOpen(x)`, `items.has`): a builtin, or one the build inlines. */
 	| { readonly kind: 'call'; readonly callee: string; readonly arguments: ReadonlyArray<SemanticExpression> }
+	/** `value instanceof HTMLElement` (or `Element`): whether the value is an element. */
+	| { readonly kind: 'instanceof'; readonly value: SemanticExpression; readonly type: string }
 	| {
 			readonly kind: 'array';
 			readonly items: ReadonlyArray<{ readonly spread: boolean; readonly value: SemanticExpression }>;
@@ -1273,14 +1293,21 @@ export type SemanticHandlerStatement =
 			readonly arguments?: ReadonlyArray<SemanticExpression>;
 			readonly optional?: true;
 	  }
+	/** `(a ?? b).focus()`: a method called on a value that is not a name or a member path. */
+	| {
+			readonly kind: 'method-call';
+			readonly object: SemanticExpression;
+			readonly method: string;
+			readonly arguments?: ReadonlyArray<SemanticExpression>;
+	  }
 	| {
 			readonly kind: 'if';
 			readonly test: SemanticExpression;
 			readonly whenTrue: ReadonlyArray<SemanticHandlerStatement>;
 			readonly whenFalse: ReadonlyArray<SemanticHandlerStatement>;
 	  }
-	/** `return;` with no value: the rest of the body does not run. */
-	| { readonly kind: 'return' }
+	/** `return` or `return value`: the rest of the body does not run, and a caller that reads the call's value gets `value`. */
+	| { readonly kind: 'return'; readonly value?: SemanticExpression }
 	/** `const name = value`: the statements after it in its block read `name` as the value it had here. */
 	| { readonly kind: 'const'; readonly name: string; readonly value: SemanticExpression }
 	| { readonly kind: 'unsupported'; readonly construct: string };
@@ -1690,6 +1717,8 @@ export type SemanticGraphArtifact = {
 	readonly filename: string;
 	readonly moduleId: string;
 	readonly components: ReadonlyArray<SemanticComponent>;
+	/** Native builds only (`nativeFacts`). */
+	readonly nativeModule?: SemanticModuleNativeFacts;
 	/** Props the host declared server-only: not graph state, so writes through them are plain JS. */
 	readonly serverOnlyProps?: ReadonlyArray<{
 		readonly componentName: string;

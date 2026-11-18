@@ -81,6 +81,8 @@ class MarklessHost(
 		it.assignments.map { a -> absoluteOrigins(a.nodes) }
 	} ?: emptyList()
 
+	private val overlays = Overlays(this, context, dpr)
+
 	/** The root's frame inside the viewport, when a style export placed it. */
 	var rootFrame: Rect? = null
 		private set
@@ -100,6 +102,7 @@ class MarklessHost(
 		buildShown()
 		root = views.getValue(top.id)
 		refreshRelations()
+		if (runtime.overlays().isNotEmpty()) root.post { overlays.mount() }
 	}
 
 	fun view(id: String): View = views[id] ?: throw MarklessHostError("no view for \"$id\"")
@@ -108,6 +111,14 @@ class MarklessHost(
 
 	/** Every instance id that has a retained view. */
 	fun viewIds(): Set<String> = built.keys.toSet()
+
+	/** Each element view and the payload node it shows, for finding the element under a touch. */
+	internal fun elementNodes(): Map<View, String> = java.util.IdentityHashMap<View, String>().apply {
+		for ((id, inst) in built) if (inst.node is Node.Element) views[id]?.let { put(it, inst.node.id) }
+	}
+
+	/** Reports a touch in window coordinates to the runtime as pointer events; call it before the views see the touch. */
+	fun touch(event: android.view.MotionEvent) = overlays.touch(event)
 
 	fun textView(id: String): TextView = textViews[id] ?: throw MarklessHostError("no text view for \"$id\"")
 
@@ -127,6 +138,8 @@ class MarklessHost(
 					root.requestLayout()
 				}
 				is JournalEntry.Dialog -> dialog(entry.node, entry.open)
+				is JournalEntry.Overlay -> overlays.show(entry.node, entry.open, entry.modal)
+				is JournalEntry.Focus -> overlays.focus(entry.node)
 				is JournalEntry.Arm -> {
 					if (runtime.node(entry.node) !is Node.Branch) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
 					rebuild()
@@ -269,7 +282,7 @@ class MarklessHost(
 		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(e.host, EventName.Activate)) }
-			EventName.Cancel -> {}
+			EventName.Cancel, EventName.Dismiss, EventName.PointerDown, EventName.PointerUp -> {}
 			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}

@@ -7,7 +7,14 @@ export type LadderAction =
 	| { readonly tap: string }
 	| { readonly type: { readonly field: string; readonly text: string } }
 	| { readonly relaunch: true }
-	| { readonly wait: number };
+	| { readonly wait: number }
+	/** Escape on the web, the back gesture on Android; iOS has none a flow can perform, so the step runs on Android only. */
+	| { readonly back: true }
+	/** A press that starts and ends on the topmost overlay element itself, beside what it holds (a modal's backdrop). */
+	| { readonly pressBackdrop: true };
+
+/** Where a phone flow presses the backdrop: above a centred surface, below the status bar. */
+export const BACKDROP_POINT = '50%,8%';
 
 /** What the screen shows after a step's action (or at launch, for the first step). */
 export type LadderStep = {
@@ -98,6 +105,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			'hideKeyboard',
 		];
 	if ('relaunch' in action) return ['stopApp', 'launchApp'];
+	if ('back' in action) return ['back'];
+	if ('pressBackdrop' in action) return [{ tapOn: { point: BACKDROP_POINT } }];
 	return [
 		{
 			extendedWaitUntil: {
@@ -116,12 +125,17 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 			...(rung.start && { arguments: { route: rung.start } }),
 		},
 	};
-	return rung.steps.map((step, index) => [
-		...(index === 0 ? [launch] : []),
-		...(step.do ? actionCommands(step.do, step) : []),
-		...(index > 0 ? assertions(changeWitness(rung.steps[index - 1]!, step)) : []),
-		...assertions(step),
-	]);
+	return rung.steps.map((step, index) => {
+		const commands = [
+			...(index === 0 ? [launch] : []),
+			...(step.do ? actionCommands(step.do, step) : []),
+			...(index > 0 ? assertions(changeWitness(rung.steps[index - 1]!, step)) : []),
+			...assertions(step),
+		];
+		return step.do && 'back' in step.do
+			? [{ runFlow: { when: { platform: 'Android' }, commands } }]
+			: commands;
+	});
 }
 
 /** The one Maestro flow for a rung, written from its expected.json so the two never drift. */

@@ -2,6 +2,11 @@ package dev.markless.mobile.core
 
 class MarklessRuntimeError(message: String) : RuntimeException(message)
 
+/** The overlay protocol of `@markless/web/fns/overlay-protocol`: the marker attribute and what makes an overlay modal. */
+const val OVERLAY_ATTRIBUTE = "overlay"
+const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
+const val OVERLAY_MODAL_VALUE = "true"
+
 sealed interface JournalEntry {
 	val node: String
 	fun toJson(): String
@@ -38,6 +43,16 @@ sealed interface JournalEntry {
 	/** A `<dialog>` put in the top layer ([open]) or taken out. */
 	data class Dialog(override val node: String, val open: Boolean) : JournalEntry {
 		override fun toJson() = "{\"op\":\"dialog\",\"node\":${jsonString(node)},\"open\":$open}"
+	}
+
+	/** An element marked `overlay` joined the overlay stack ([open]) or left it; a [modal] one goes in the host's top layer. */
+	data class Overlay(override val node: String, val open: Boolean, val modal: Boolean) : JournalEntry {
+		override fun toJson() = "{\"op\":\"overlay\",\"node\":${jsonString(node)},\"open\":$open,\"modal\":$modal}"
+	}
+
+	/** Focus moved to [node] by a `focus` op; sent after the entries that show it. */
+	data class Focus(override val node: String) : JournalEntry {
+		override fun toJson() = "{\"op\":\"focus\",\"node\":${jsonString(node)}}"
 	}
 
 	/** Shows arm [index] of a branch (null: none). */
@@ -86,7 +101,8 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
 	private val handlers = payload.handlers.associateBy { it.id }
 	private val byId = payload.nodes.associateBy { it.id }
-	private var eventValue: String? = null
+	/** The fields of the event whose handler is running, by the name an `event` expression reads. */
+	private var fields: Map<String, JsValue>? = null
 
 	fun value(cell: String): JsValue = values[cell] ?: throw MarklessRuntimeError("unknown cell \"$cell\"")
 
@@ -96,7 +112,15 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		fun eval(x: Expr) = evaluate(x, scope)
 		return when (e) {
 			Expr.RouteParams -> JsValue.Obj(params.entries.associateTo(LinkedHashMap()) { it.key to JsValue.Str(it.value) })
-			Expr.EventValue -> JsValue.Str(eventValue ?: throw MarklessRuntimeError("the event value read outside an input handler"))
+			is Expr.Event -> fields?.get(e.field) ?: throw MarklessRuntimeError("the event's ${e.field} read where the event has none")
+			Expr.Focused -> JsValue.Str(focused ?: NATIVE_DOCUMENT_BODY)
+			is Expr.FocusOrigin -> (eval(e.overlay) as? JsValue.Str)?.let { o -> origins[o.value]?.let(JsValue::Str) } ?: JsValue.Null
+			is Expr.IsElement -> JsValue.Bool((eval(e.value) as? JsValue.Str)?.let { isElement(it.value) } ?: false)
+			is Expr.Contains -> {
+				val within = eval(e.within)
+				val node = eval(e.node)
+				JsValue.Bool(within is JsValue.Str && node is JsValue.Str && contains(within.value, node.value))
+			}
 			is Expr.CellRef -> value(e.cell)
 			is Expr.Literal -> e.value
 			is Expr.Item -> scope.items[e.repeat] ?: throw MarklessRuntimeError("the row item of ${e.repeat} read outside its row")
@@ -221,18 +245,94 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 
 	fun isDialogOpen(id: String): Boolean = dialogs[id] == true
 
+	private var focused: String? = null
+	/** The overlay stack, topmost last, and the focus each overlay was shown from. */
+	private var stack: List<String> = emptyList()
+	private val origins = HashMap<String, String>()
+
+	fun isElement(id: String): Boolean = id == NATIVE_DOCUMENT_BODY || byId[id] is Node.Element
+
+	/** Whether [node] is [within] or inside it, by the payload's parent chain; everything is inside the body. */
+	fun contains(within: String, node: String): Boolean {
+		if (within == NATIVE_DOCUMENT_BODY) return true
+		var at: String? = node
+		while (!at.isNullOrEmpty()) {
+			if (at == within) return true
+			at = byId[at]?.parent
+		}
+		return false
+	}
+
+	// An element marked `overlay` joins the stack while its `hidden` binding shows it; one with no such binding never does.
+	private val overlayNodes = payload.nodes.filterIsInstance<Node.Element>().filter { e -> OVERLAY_ATTRIBUTE in e.attributes && e.bindings.any { !it.property && it.name == "hidden" } }
+
+	private fun shownOverlays(): List<String> {
+		val now = attributes().associate { (n, a, v) -> (n to a) to v }
+		return overlayNodes.filter { instances(it).isNotEmpty() && (it.id to "hidden") in now && now[it.id to "hidden"] == null }.map { it.id }
+	}
+
+	/** Whether [overlay] or an element inside it has `aria-modal="true"`, its bound value first, else its static one. */
+	fun isModal(overlay: String): Boolean {
+		val now = attributes().associate { (n, a, v) -> (n to a) to v }
+		return payload.nodes.any { n ->
+			if (n !is Node.Element || !contains(overlay, n.id)) return@any false
+			val key = n.id to OVERLAY_MODAL_ATTRIBUTE
+			(if (key in now) now[key] else n.attributes[OVERLAY_MODAL_ATTRIBUTE]) == OVERLAY_MODAL_VALUE
+		}
+	}
+
+	init {
+		stack = shownOverlays()
+		for (o in stack) origins[o] = NATIVE_DOCUMENT_BODY
+	}
+
+	/** The overlay stack, topmost last, each with whether it is modal. */
+	fun overlays(): List<Pair<String, Boolean>> = stack.map { it to isModal(it) }
+
+	/** The element that has focus, or null. */
+	fun focused(): String? = focused
+
 	fun handlerFor(host: String, event: EventName): String? = payload.events.firstOrNull { it.host == host && it.event == event }?.handler
 
-	/** Runs the handler for [event] on [host]; an `input` event carries the field's whole text as [value]. */
-	fun dispatch(host: String, event: EventName, value: String? = null): List<JournalEntry> {
+	/**
+	 * Runs the handlers for [event] on [host]; an `input` event carries the field's whole text as [value], a `dismiss` its
+	 * [reason]. A pointer event reaches [host] and each element it is inside, innermost first, after a `dismiss` of the
+	 * topmost overlay when a `pointerdown` lands outside it.
+	 */
+	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null): List<JournalEntry> {
 		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
+		if ((event == EventName.Dismiss) != (reason != null)) throw MarklessRuntimeError("a ${event.wire} event ${if (reason == null) "needs" else "carries no"} a reason")
 		val handlerId = handlerFor(host, event)
-		if (event == EventName.Cancel) {
-			if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
-		} else if (handlerId == null) throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
-		val handler = handlerId?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
+		val pointer = event == EventName.PointerDown || event == EventName.PointerUp
+		when {
+			event == EventName.Cancel -> if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
+			event == EventName.Dismiss -> if (stack.lastOrNull() != host) throw MarklessRuntimeError("\"$host\" is not the topmost overlay")
+			pointer -> if (host !in byId) throw MarklessRuntimeError("\"$host\" is not a node")
+			handlerId == null -> throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
+		}
 		val dialogsBefore = HashMap(dialogs)
 		if (event == EventName.Cancel) dialogs[host] = false
+		// A press focuses the control it presses, as the browser does.
+		if (event == EventName.Activate) focused = host
+		val focusBefore = focused
+		val stackBefore = stack
+		fun handler(id: String) = handlers[id] ?: throw MarklessRuntimeError("unknown handler \"$id\"")
+		val runs = ArrayList<Pair<Handler, Map<String, JsValue>?>>()
+		when {
+			event == EventName.Dismiss -> handlerId?.let { runs.add(handler(it) to mapOf("reason" to JsValue.Str(reason!!), "pressTarget" to JsValue.Null)) }
+			pointer -> {
+				// The overlay behaviour's document listener hears the press first: the topmost overlay it landed outside is told.
+				val top = stackBefore.lastOrNull()
+				if (top != null && event == EventName.PointerDown && !contains(top, host)) handlerFor(top, EventName.Dismiss)?.let { runs.add(handler(it) to mapOf("reason" to JsValue.Str("outside-press"), "pressTarget" to JsValue.Str(host))) }
+				var at: String? = host
+				while (!at.isNullOrEmpty()) {
+					handlerFor(at, event)?.let { runs.add(handler(it) to mapOf("target" to JsValue.Str(host), "button" to JsValue.Num(0.0))) }
+					at = byId[at]?.parent
+				}
+			}
+			else -> handlerId?.let { runs.add(handler(it) to value?.let { v -> mapOf("value" to JsValue.Str(v)) }) }
+		}
+		var focusMoved = false
 		val cellsBefore = HashMap(values)
 		val beforeTexts = texts().toMap()
 		val beforeAttributes = attributes().associate { (n, a, v) -> (n to a) to v }
@@ -241,7 +341,6 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		if (value != null) beforeProperties[host to "value"] = value
 		val beforeArms = arms().toMap()
 		val beforeRows = rows().toMap()
-		eventValue = value
 		fun run(ops: List<Op>): JournalEntry.Navigate? {
 			for (op in ops) when (op) {
 				is Op.Navigate -> return JournalEntry.Navigate(op.route, op.params)
@@ -255,14 +354,33 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 					if (op.node !in dialogs) throw MarklessRuntimeError("\"${op.node}\" is not a dialog")
 					dialogs[op.node] = op.open
 				}
+				is Op.Focus -> {
+					val node = evaluate(op.node)
+					if (node != JsValue.Null) {
+						if (node !is JsValue.Str || !isElement(node.value)) throw MarklessRuntimeError("focus() on a value that is not an element")
+						// The body takes no focus.
+						if (node.value != NATIVE_DOCUMENT_BODY) {
+							focused = node.value
+							focusMoved = true
+						}
+					}
+				}
 			}
 			return null
 		}
 		try {
-			handler?.let { h -> run(h.ops)?.let { return listOf(it) } }
+			for ((h, f) in runs) {
+				fields = f
+				run(h.ops)?.let { return listOf(it) }
+			}
 		} finally {
-			eventValue = null
+			fields = null
 		}
+		val shownNow = shownOverlays()
+		val released = stackBefore.filter { it !in shownNow }
+		val enlisted = shownNow.filter { it !in stackBefore }
+		stack = stackBefore.filter { it in shownNow } + enlisted
+		for (o in enlisted) origins[o] = focusBefore ?: NATIVE_DOCUMENT_BODY
 		val afterTexts = texts().toMap()
 		val afterAttributes = attributes().associate { (n, a, v) -> (n to a) to v }
 		val afterProperties = properties().associate { (n, a, v) -> (n to a) to v }
@@ -290,6 +408,9 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				}
 			}
 		}
+		for (o in released) journal.add(JournalEntry.Overlay(o, open = false, modal = isModal(o)))
+		for (o in enlisted) journal.add(JournalEntry.Overlay(o, open = true, modal = isModal(o)))
+		focused?.takeIf { focusMoved }?.let { journal.add(JournalEntry.Focus(it)) }
 		return journal
 	}
 }

@@ -68,8 +68,26 @@ export type NativeExpr =
 	/** The page's route params, an object of strings (the page component's `params` prop). */
 	| { readonly route: 'params' }
 	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> }
-	/** In an `input` handler: the field's text after the edit (`event.currentTarget.value`). */
-	| { readonly event: 'value' };
+	/**
+	 * What the event that runs the handler carries: an `input` handler's field text after the edit
+	 * (`event.currentTarget.value`); a `dismiss` handler's `event.detail.reason` and `event.detail.pressTarget` (an element,
+	 * or null for Escape); a pointer handler's `event.target` (an element) and `event.button` (0, a touch).
+	 */
+	| { readonly event: 'value' | 'reason' | 'pressTarget' | 'target' | 'button' }
+	/** The element that has focus (`document.activeElement`), or the document body when none has. */
+	| { readonly focused: true }
+	/** Whether the element `node` is `within` or inside it (`within.contains(node)`); false when either is not an element. */
+	| { readonly contains: NativeExpr; readonly node: NativeExpr }
+	/** The element that had focus when the overlay element `overlay` was last shown, or null if it never was. */
+	| { readonly focusOrigin: NativeExpr }
+	/** Whether the value is an element (`value instanceof HTMLElement`). */
+	| { readonly isElement: NativeExpr };
+
+/**
+ * Elements are values: an element is its node id, and the document body (what `document.activeElement` answers when no
+ * element has focus, and `element.ownerDocument.body`) is this id, which no node has.
+ */
+export const NATIVE_DOCUMENT_BODY = '#body';
 
 export type NativeTextPart =
 	| { readonly text: string }
@@ -128,8 +146,22 @@ export type NativeNode = NativePlace &
 		  }
 	);
 
-/** Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click). */
-export type NativeEventName = 'activate' | 'input' | 'cancel';
+/**
+ * Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click).
+ * `dismiss` is the overlay behaviour's report on an element marked `overlay` while it is shown: Escape (the host's back
+ * gesture) or a press outside it. `pointerdown` and `pointerup` are a touch going down and up; they reach the element the
+ * touch is on and each element it is inside, innermost first, as on the web.
+ */
+export type NativeEventName =
+	| 'activate'
+	| 'input'
+	| 'cancel'
+	| 'dismiss'
+	| 'pointerdown'
+	| 'pointerup';
+
+/** Why the overlay behaviour reported a dismissal; the vocabulary of `OverlayGestureReason` in `@markless/web`. */
+export type NativeDismissReason = 'escape' | 'outside-press';
 
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
 export type NativeOp =
@@ -146,6 +178,8 @@ export type NativeOp =
 	 * page, with the page behind inert, or takes it out again.
 	 */
 	| { readonly op: 'dialog'; readonly node: string; readonly method: 'showModal' | 'close' }
+	/** `element.focus()`: the element `node` evaluates to takes focus (the screen reader's cursor moves to it); null does nothing. */
+	| { readonly op: 'focus'; readonly node: NativeExpr }
 	/** Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. */
 	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
 
@@ -178,6 +212,13 @@ export type NativeJournalEntry =
 	| { readonly op: 'text'; readonly node: string; readonly value: string }
 	/** A `<dialog>` opened in the top layer or closed (by an op, or by the host's back gesture as a `cancel`). */
 	| { readonly op: 'dialog'; readonly node: string; readonly open: boolean }
+	/**
+	 * An element marked `overlay` joined the overlay stack (its `hidden` binding showed it) or left it. A `modal` one (it or
+	 * an element inside it carries `aria-modal="true"`) goes in the host's top layer with the page behind inert.
+	 */
+	| { readonly op: 'overlay'; readonly node: string; readonly open: boolean; readonly modal: boolean }
+	/** Focus moved to `node` by a `focus` op; sent after the entries that show it. */
+	| { readonly op: 'focus'; readonly node: string }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
 	| { readonly op: 'attribute'; readonly node: string; readonly name: string; readonly value: string | null }
 	/** An input's text, as `String(value)`; never sent for the field whose edit caused it while it already shows that text. */

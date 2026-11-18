@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compileNativeComponent, nativeConformance } from '../src/index.ts';
-import { CONFORMANCE_CASES } from './conformance-cases.ts';
+import { CONFORMANCE_CASES, readCaseModule } from './conformance-cases.ts';
 
 for (const entry of CONFORMANCE_CASES) {
 	const source = readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8');
@@ -10,6 +10,7 @@ for (const entry of CONFORMANCE_CASES) {
 		filename: `src/${entry.name}.tsrx`,
 				...(entry.page ? { page: entry.page } : {}),
 		source,
+		readModule: readCaseModule,
 	});
 	if (!payload)
 		throw new Error(`${entry.fixture}: ${diagnostics.map((d) => d.message).join('; ')}`);

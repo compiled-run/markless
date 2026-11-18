@@ -89,6 +89,13 @@ async function act(page: Page, step: LadderStep) {
 		await field.fill('');
 		await field.pressSequentially(action.type.text);
 	} else if ('relaunch' in action) await page.reload();
+	else if ('back' in action) await page.keyboard.press('Escape');
+	else if ('pressBackdrop' in action) {
+		// Unstyled, the backdrop has no area beside its surface to click, so the press is dispatched on the element itself.
+		const backdrop = await page.locator('[overlay]:not([hidden])').last().elementHandle();
+		for (const type of ['pointerdown', 'pointerup', 'click'])
+			await backdrop!.dispatchEvent(type, { button: 0, isPrimary: true, pointerType: 'touch' });
+	}
 	else await page.clock.runFor(action.wait);
 }
 

@@ -1,0 +1,41 @@
+{
+	"rung": 121,
+	"name": "@markless/ui popover: a press outside closes it, its own trigger toggles it, its close part and the back gesture close it",
+	"steps": [
+		{
+			"visible": ["Popover", "Filters", "Changes 0"],
+			"absent": ["Show only", "Pick what the list shows", "Done"]
+		},
+		{
+			"do": { "tap": "Filters" },
+			"visible": ["Show only", "Pick what the list shows", "Done", "Changes 1"]
+		},
+		{
+			"do": { "tap": "Changes 1" },
+			"visible": ["Changes 2"],
+			"absent": ["Show only", "Done", "Changes 1"]
+		},
+		{
+			"do": { "tap": "Filters" },
+			"visible": ["Show only", "Changes 3"],
+			"absent": ["Changes 2"]
+		},
+		{
+			"do": { "tap": "Filters" },
+			"visible": ["Changes 4"],
+			"absent": ["Show only", "Changes 3"]
+		},
+		{
+			"do": { "tap": "Filters" },
+			"visible": ["Show only", "Changes 5"],
+			"absent": ["Changes 4"]
+		},
+		{ "do": { "tap": "Done" }, "visible": ["Changes 6"], "absent": ["Show only", "Changes 5"] },
+		{
+			"do": { "tap": "Filters" },
+			"visible": ["Show only", "Changes 7"],
+			"absent": ["Changes 6"]
+		},
+		{ "do": { "back": true }, "visible": ["Changes 8"], "absent": ["Show only", "Changes 7"] }
+	]
+}

@@ -7,7 +7,7 @@ import {
 	nativeConformance,
 	nativeStyleInput,
 } from '../src/index.ts';
-import { CONFORMANCE_CASES } from './conformance-cases.ts';
+import { CONFORMANCE_CASES, readCaseModule } from './conformance-cases.ts';
 
 const fixture = (name: string) =>
 	readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -39,6 +39,7 @@ describe('native conformance vectors', () => {
 				filename: `src/${entry.name}.tsrx`,
 				...(entry.page ? { page: entry.page } : {}),
 				source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
+				readModule: readCaseModule,
 			});
 			expect(committed(`${entry.name}.json`), entry.name).toEqual(
 				nativeConformance(payload!, entry.actions, entry.params),

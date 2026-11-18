@@ -1,0 +1,1144 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:changes",
+				"name": "changes",
+				"initial": 0
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open",
+				"name": "popover.open",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "handler:component-edge:1/event:0/kept:0",
+				"name": "next",
+				"initial": null
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Popover"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Changes "
+					},
+					{
+						"cell": "state:changes"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "div",
+				"parent": "h0",
+				"bindings": [
+					{
+						"attribute": "ui-open",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open"
+						}
+					},
+					{
+						"attribute": "ui-closed",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h1",
+				"element": "button",
+				"parent": "component-edge:0/h0",
+				"attributes": {
+					"type": "button",
+					"aria-haspopup": "dialog"
+				},
+				"bindings": [
+					{
+						"attribute": "aria-expanded",
+						"value": {
+							"if": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open"
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": "false"
+							}
+						}
+					},
+					{
+						"attribute": "ui-open",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open"
+						}
+					},
+					{
+						"attribute": "ui-closed",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					},
+					{
+						"attribute": "aria-controls",
+						"value": {
+							"literal": "component-edge:2/h2"
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h1:text0",
+				"parent": "component-edge:1/h1",
+				"parts": [
+					{
+						"text": "Filters"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:2/h2",
+				"element": "div",
+				"parent": "component-edge:0/h0",
+				"attributes": {
+					"role": "dialog",
+					"overlay": ""
+				},
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					},
+					{
+						"attribute": "ui-open",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open"
+						}
+					},
+					{
+						"attribute": "ui-closed",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					},
+					{
+						"attribute": "aria-labelledby",
+						"value": {
+							"literal": "component-edge:3/h3"
+						}
+					},
+					{
+						"attribute": "aria-describedby",
+						"value": {
+							"literal": "component-edge:4/h4"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/h3",
+				"element": "h2",
+				"parent": "component-edge:2/h2"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:3/h3:text0",
+				"parent": "component-edge:3/h3",
+				"parts": [
+					{
+						"text": "Show only"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:4/h4",
+				"element": "p",
+				"parent": "component-edge:2/h2"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:4/h4:text0",
+				"parent": "component-edge:4/h4",
+				"parts": [
+					{
+						"text": "Pick what the list shows"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:5/h5",
+				"element": "button",
+				"parent": "component-edge:2/h2",
+				"attributes": {
+					"type": "button"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:5/h5:text0",
+				"parent": "component-edge:5/h5",
+				"parts": [
+					{
+						"text": "Done"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:1/h1",
+				"event": "activate",
+				"handler": "handler:component-edge:1/event:0"
+			},
+			{
+				"host": "component-edge:2/h2",
+				"event": "dismiss",
+				"handler": "handler:component-edge:2/event:1"
+			},
+			{
+				"host": "component-edge:5/h5",
+				"event": "activate",
+				"handler": "handler:component-edge:5/event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:1/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "handler:component-edge:1/event:0/kept:0",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					},
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open"
+							},
+							"right": {
+								"cell": "handler:component-edge:1/event:0/kept:0"
+							}
+						},
+						"whenTrue": [],
+						"whenFalse": [
+							{
+								"op": "assign",
+								"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open",
+								"value": {
+									"cell": "handler:component-edge:1/event:0/kept:0"
+								}
+							},
+							{
+								"op": "assign",
+								"cell": "state:changes",
+								"value": {
+									"binary": "+",
+									"left": {
+										"cell": "state:changes"
+									},
+									"right": {
+										"literal": 1
+									}
+								}
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:2/event:1",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "!==",
+							"left": {
+								"logical": "&&",
+								"left": {
+									"logical": "&&",
+									"left": {
+										"binary": "!==",
+										"left": {
+											"event": "pressTarget"
+										},
+										"right": {
+											"literal": null
+										}
+									},
+									"right": {
+										"binary": "!==",
+										"left": {
+											"literal": "component-edge:1/h1"
+										},
+										"right": {
+											"literal": null
+										}
+									}
+								},
+								"right": {
+									"contains": {
+										"literal": "component-edge:1/h1"
+									},
+									"node": {
+										"event": "pressTarget"
+									}
+								}
+							},
+							"right": {
+								"literal": true
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "if",
+								"test": {
+									"binary": "===",
+									"left": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open"
+									},
+									"right": {
+										"literal": false
+									}
+								},
+								"whenTrue": [],
+								"whenFalse": [
+									{
+										"op": "assign",
+										"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open",
+										"value": {
+											"literal": false
+										}
+									},
+									{
+										"op": "assign",
+										"cell": "state:changes",
+										"value": {
+											"binary": "+",
+											"left": {
+												"cell": "state:changes"
+											},
+											"right": {
+												"literal": 1
+											}
+										}
+									}
+								]
+							}
+						],
+						"whenFalse": []
+					},
+					{
+						"op": "if",
+						"test": {
+							"logical": "&&",
+							"left": {
+								"binary": "===",
+								"left": {
+									"event": "reason"
+								},
+								"right": {
+									"literal": "escape"
+								}
+							},
+							"right": {
+								"logical": "&&",
+								"left": {
+									"binary": "!==",
+									"left": {
+										"literal": "component-edge:2/h2"
+									},
+									"right": {
+										"literal": null
+									}
+								},
+								"right": {
+									"contains": {
+										"literal": "component-edge:2/h2"
+									},
+									"node": {
+										"focused": true
+									}
+								}
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "focus",
+								"node": {
+									"literal": "component-edge:1/h1"
+								}
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:5/event:2",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open"
+							},
+							"right": {
+								"literal": false
+							}
+						},
+						"whenTrue": [],
+						"whenFalse": [
+							{
+								"op": "assign",
+								"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open",
+								"value": {
+									"literal": false
+								}
+							},
+							{
+								"op": "assign",
+								"cell": "state:changes",
+								"value": {
+									"binary": "+",
+									"left": {
+										"cell": "state:changes"
+									},
+									"right": {
+										"literal": 1
+									}
+								}
+							}
+						]
+					},
+					{
+						"op": "focus",
+						"node": {
+							"literal": "component-edge:1/h1"
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		["h1:text0", "Popover"],
+		["h2:text0", "Changes 0"],
+		["component-edge:1/h1:text0", "Filters"],
+		["component-edge:3/h3:text0", "Show only"],
+		["component-edge:4/h4:text0", "Pick what the list shows"],
+		["component-edge:5/h5:text0", "Done"]
+	],
+	"initialAttributes": [
+		["component-edge:0/h0", "ui-open", null],
+		["component-edge:0/h0", "ui-closed", ""],
+		["component-edge:1/h1", "aria-expanded", "false"],
+		["component-edge:1/h1", "ui-open", null],
+		["component-edge:1/h1", "ui-closed", ""],
+		["component-edge:1/h1", "aria-controls", "component-edge:2/h2"],
+		["component-edge:2/h2", "hidden", ""],
+		["component-edge:2/h2", "ui-open", null],
+		["component-edge:2/h2", "ui-closed", ""],
+		["component-edge:2/h2", "aria-labelledby", "component-edge:3/h3"],
+		["component-edge:2/h2", "aria-describedby", "component-edge:4/h4"]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open",
+					"value": true
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Changes 1"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "true"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": true,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "component-edge:3/h3"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "component-edge:3/h3"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Changes 2"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "false"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": false,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h2"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open",
+					"value": true
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Changes 3"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "true"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": true,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "component-edge:1/h1"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "component-edge:1/h1"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Changes 4"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "false"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": false,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open",
+					"value": true
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Changes 5"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "true"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": true,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "dismiss",
+				"host": "component-edge:2/h2",
+				"reason": "escape"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Changes 6"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "false"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": false,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open",
+					"value": true
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Changes 7"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "true"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": true,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:5/h5"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/popover/popover.tsrx#popoverState/state:popover.open",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Changes 8"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "false"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": false,
+					"modal": false
+				},
+				{
+					"op": "focus",
+					"node": "component-edge:1/h1"
+				}
+			]
+		}
+	]
+}

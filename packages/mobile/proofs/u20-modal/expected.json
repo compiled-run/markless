@@ -1,0 +1,37 @@
+{
+	"rung": 120,
+	"name": "@markless/ui modal: opens centred in a top layer, closes from its close part, a backdrop press and the back gesture; an alert refuses the backdrop",
+	"steps": [
+		{
+			"visible": ["Modal", "Delete draft", "Sign out", "Deleted 0", "Changes 0"],
+			"absent": ["Delete this draft?", "It cannot be undone", "Sign out now?", "Stay"]
+		},
+		{
+			"do": { "tap": "Delete draft" },
+			"visible": ["Delete this draft?", "It cannot be undone", "Delete"]
+		},
+		{
+			"do": { "pressBackdrop": true },
+			"visible": ["Delete draft", "Deleted 0", "Changes 2"],
+			"absent": ["Delete this draft?", "It cannot be undone"]
+		},
+		{ "do": { "tap": "Delete draft" }, "visible": ["Delete this draft?"] },
+		{
+			"do": { "tap": "Delete" },
+			"visible": ["Deleted 1", "Changes 4"],
+			"absent": ["Delete this draft?", "Deleted 0", "Sign out now?"]
+		},
+		{ "do": { "tap": "Sign out" }, "visible": ["Sign out now?", "Stay"] },
+		{
+			"do": { "tap": "Stay" },
+			"visible": ["Sign out", "Deleted 1"],
+			"absent": ["Sign out now?", "Stay", "Delete this draft?"]
+		},
+		{ "do": { "tap": "Delete draft" }, "visible": ["Delete this draft?"] },
+		{
+			"do": { "back": true },
+			"visible": ["Delete draft", "Changes 6"],
+			"absent": ["Delete this draft?", "Changes 4"]
+		}
+	]
+}

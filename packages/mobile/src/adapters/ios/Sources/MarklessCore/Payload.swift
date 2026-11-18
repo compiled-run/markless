@@ -2,6 +2,21 @@ import Foundation
 
 public let nativeViewVersion = "markless.native-view/0"
 
+/// The document body as an element value (`NATIVE_DOCUMENT_BODY` in `@markless/serializer`): no node has this id.
+public let nativeDocumentBody = "#body"
+
+/// The overlay behaviour's names, as `packages/web/src/fns/overlay-protocol.ts` spells them.
+public enum OverlayProtocol {
+	public static let attribute = "overlay"
+	public static let modalAttribute = "aria-modal"
+	public static let modalValue = "true"
+}
+
+/// What an event carries, by the field an `{ event }` expression names.
+public enum NativeEventField: String, Sendable {
+	case value, reason, pressTarget, target, button
+}
+
 public enum NativeBuiltin: String, Sendable {
 	case string = "String", number = "Number", boolean = "Boolean"
 	case abs = "Math.abs", floor = "Math.floor", max = "Math.max", min = "Math.min", round = "Math.round"
@@ -32,16 +47,25 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	/// The current row's item of a list (`repeat` id).
 	case item(String)
 	case call(NativeBuiltin, [NativeExpr])
-	/// In an `input` handler: the field's text after the edit.
-	case eventValue
+	/// A field of the event running the handler: an `input`'s text, a `dismiss`'s reason and press target, a pointer's target and button.
+	case event(NativeEventField)
+	/// The element that has focus, or the document body when none has.
+	case focused
+	/// Whether `node` is the element `within` or inside it; false unless both are strings.
+	case contains(within: NativeExpr, node: NativeExpr)
+	/// The element that had focus when the overlay was last shown, or null.
+	case focusOrigin(NativeExpr)
+	/// Whether the value is an element id or the document body.
+	case isElement(NativeExpr)
 	/// The page's route params, an object of strings.
 	case routeParams
 
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .eventValue, .local, .item, .routeParams: return []
-		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner): return inner.cells
+		case .literal, .event, .focused, .local, .item, .routeParams: return []
+		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
+		case let .contains(within, node): return within.cells + node.cells
 		case let .array(items): return items.flatMap(\.value.cells)
 		case let .object(fields): return fields.flatMap(\.value.cells)
 		case let .method(_, target, arguments): return target.cells + arguments.flatMap(\.cells)
@@ -114,6 +138,10 @@ public enum NativeEventName: String, Sendable {
 	case input
 	/// The host's back gesture or Escape on an open `<dialog>`: it closes, as the browser's cancel does.
 	case cancel
+	/// The overlay behaviour's report on a shown overlay: Escape (the back gesture) or a press outside it.
+	case dismiss
+	/// A touch going down or up: it reaches the element under it and each element it is inside, innermost first.
+	case pointerdown, pointerup
 }
 
 public enum NativeOp: Equatable, Sendable {
@@ -125,6 +153,8 @@ public enum NativeOp: Equatable, Sendable {
 	indirect case when(test: NativeExpr, then: [NativeOp], otherwise: [NativeOp])
 	/// `showModal()` (`open`) or `close()` on a `<dialog>`: the host puts it in its top layer or takes it out.
 	case dialog(node: String, open: Bool)
+	/// `element.focus()` on what `node` evaluates to; null does nothing.
+	case focus(node: NativeExpr)
 }
 
 public struct NativeRouteParam: Equatable, Sendable {
@@ -298,6 +328,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 						throw PayloadError(path: op.path + ".method", reason: "unknown dialog method \"\(method)\"")
 					}
 					return .dialog(node: try opField["node"].string(), open: method == "showModal")
+				case "focus":
+					return .focus(node: try decodeExpr(try op.object(["op", "node"])["node"]))
 				case "if":
 					let opField = try op.object(["op", "test", "whenTrue", "whenFalse"])
 					return .when(
@@ -351,8 +383,14 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["cell"]: return .cell(try field("cell").string())
 		case ["event"]:
 			let name = try field("event").string()
-			guard name == "value" else { throw PayloadError(path: reader.path + ".event", reason: "unknown event read \"\(name)\"") }
-			return .eventValue
+			guard let read = NativeEventField(rawValue: name) else { throw PayloadError(path: reader.path + ".event", reason: "unknown event read \"\(name)\"") }
+			return .event(read)
+		case ["focused"]:
+			guard try field("focused").bool() else { throw PayloadError(path: reader.path + ".focused", reason: "focused is only ever true") }
+			return .focused
+		case ["contains", "node"]: return .contains(within: try decodeExpr(try field("contains")), node: try decodeExpr(try field("node")))
+		case ["focusOrigin"]: return .focusOrigin(try decodeExpr(try field("focusOrigin")))
+		case ["isElement"]: return .isElement(try decodeExpr(try field("isElement")))
 		case ["literal"]: return .literal(try field("literal").scalar())
 		case ["unary", "value"]: return .unary(try oneOf("unary", ["!", "-", "+"]), try decodeExpr(try field("value")))
 		case ["binary", "left", "right"]:

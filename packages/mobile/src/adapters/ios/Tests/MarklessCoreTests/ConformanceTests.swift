@@ -47,12 +47,13 @@ func reproducesConformanceVector(file: URL) throws {
 			case let .object(actionFields)? = stepFields.first(where: { $0.0 == "action" })?.1,
 			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
 			case let .string(host)? = actionFields.first(where: { $0.0 == "host" })?.1,
-			actionFields.allSatisfy({ ["event", "host", "value"].contains($0.0) }),
+			actionFields.allSatisfy({ ["event", "host", "value", "reason"].contains($0.0) }),
 			let expected = stepFields.first(where: { $0.0 == "journal" })?.1
 		else { Issue.record("malformed step \(step.jsonText)"); return }
 		let event = try #require(NativeEventName(rawValue: eventName))
 		let typed: String? = if case let .string(text)? = actionFields.first(where: { $0.0 == "value" })?.1 { text } else { nil }
-		let journal = JSONValue.array(try runtime.dispatch(NativeAction(event: event, host: host, value: typed)).map(\.json))
+		let reason: String? = if case let .string(text)? = actionFields.first(where: { $0.0 == "reason" })?.1 { text } else { nil }
+		let journal = JSONValue.array(try runtime.dispatch(NativeAction(event: event, host: host, value: typed, reason: reason)).map(\.json))
 		#expect(Array(journal.jsonText.utf8) == Array(expected.jsonText.utf8), "\(file.lastPathComponent) \(eventName) on \(host)")
 	}
 }
