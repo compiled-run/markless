@@ -1,0 +1,62 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime-start"
+			],
+			"delta": 144,
+			"reason": "the resume runtime queues the overlay install for a route module that assigns its installer after the runtime starts; without it no router-built page ever installs the overlay behaviour (popover outside press and Escape did nothing)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 4,
+			"reason": "the resume runtime queues the overlay install for a route module that assigns its installer after the runtime starts; without it no router-built page ever installs the overlay behaviour (popover outside press and Escape did nothing)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime-start"
+			],
+			"delta": 144,
+			"reason": "the resume runtime queues the overlay install for a route module that assigns its installer after the runtime starts; without it no router-built page ever installs the overlay behaviour (popover outside press and Escape did nothing)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 4,
+			"reason": "the resume runtime queues the overlay install for a route module that assigns its installer after the runtime starts; without it no router-built page ever installs the overlay behaviour (popover outside press and Escape did nothing)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 18,
+			"reason": "the resume runtime queues the overlay install for a route module that assigns its installer after the runtime starts; without it no router-built page ever installs the overlay behaviour (popover outside press and Escape did nothing)",
+			"date": "2026-11-18"
+		}
+	]
+}

@@ -67,14 +67,19 @@ import type {
 	OverlayInstalledRoot,
 	OverlayPrimedDismissalHost,
 } from '../overlay-handoff.ts';
+import {
+	DISMISS_EVENT,
+	OVERLAY_ATTRIBUTE,
+	OVERLAY_FOCUS_ORIGIN_PROPERTY,
+	OVERLAY_HINT_ATTRIBUTE,
+	OVERLAY_MODAL_ATTRIBUTE,
+	OVERLAY_MODAL_VALUE,
+} from './overlay-protocol.ts';
 
-/** The DOM spelling the compiler lowers the `overlay` mark to. */
-const OVERLAY_SELECTOR = '[overlay]';
-/** The second mark a hint surface writes beside `overlay`, as authored. */
-export const OVERLAY_HINT_ATTRIBUTE = 'overlay-hint';
+const OVERLAY_SELECTOR = `[${OVERLAY_ATTRIBUTE}]`;
+export { OVERLAY_HINT_ATTRIBUTE };
 const HINT_SELECTOR = `[${OVERLAY_HINT_ATTRIBUTE}]`;
-const MODAL_SELECTOR = '[aria-modal="true"]';
-const DISMISS_EVENT = 'dismiss';
+const MODAL_SELECTOR = `[${OVERLAY_MODAL_ATTRIBUTE}="${OVERLAY_MODAL_VALUE}"]`;
 
 /** The gestures the document produces; the only reasons a primer can hold. */
 export type OverlayGestureReason = 'escape' | 'outside-press';
@@ -289,7 +294,7 @@ function enlist(element: HTMLElement, owner: Document, becameShown: boolean): vo
 	// the focused element sits in inert, which blurs it, so asking afterwards
 	// answers the body on exactly the pages a family needs this for.
 	const active = owner.activeElement;
-	if (active) (element as OverlayFocusOriginHost).__marklessOverlayFocusOrigin = active;
+	if (active) (element as OverlayFocusOriginHost)[OVERLAY_FOCUS_ORIGIN_PROPERTY] = active;
 
 	// Modality is derived, never configured: the family authored `aria-modal` and
 	// this module reads it. The mark and `aria-modal` sit on different elements in

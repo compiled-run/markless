@@ -50,6 +50,8 @@ const ELEMENT_BINDING_SEGMENT = '/element:';
  */
 type MarklessOverlayHost = {
 	__marklessOverlay?: (root: Element) => Promise<(() => void) | undefined> | undefined;
+	/** Installs a root started before the app module assigned the installer; the assignment runs them. */
+	__marklessOverlayPending?: Array<() => unknown>;
 };
 
 /**
@@ -319,16 +321,18 @@ export async function startResumeRuntime(input: {
 	// makes every app ship the chunk. It is then FETCHED only once a root turns out
 	// to carry a marked element, which is why the installer takes the root and
 	// answers `undefined` for a root with no mark on it.
-	const installOverlay = (globalThis as MarklessOverlayHost).__marklessOverlay;
-	if (installOverlay) {
+	const overlayHost = globalThis as MarklessOverlayHost;
+	const installOverlay = async () => {
 		// The installer's own gate is the mark query; this scan is behind the same
 		// `undefined` an app with no `overlay` demand already answers, so a page
 		// without elevation walks no records.
 		(runtimeInput.root as unknown as OverlayHiddenBoundRoot).__marklessOverlayHiddenBound =
 			hiddenBoundElements(runtimeInput.view, prepared.elementsByHostId);
-		const overlayTeardown = await installOverlay(runtimeInput.root as unknown as Element);
+		const overlayTeardown = await overlayHost.__marklessOverlay!(runtimeInput.root as unknown as Element);
 		if (overlayTeardown) storeContainerSubscription(overlayTeardown);
-	}
+	};
+	if (overlayHost.__marklessOverlay) await installOverlay();
+	else (overlayHost.__marklessOverlayPending ??= []).push(installOverlay);
 	// Container capture listeners see every DOM event of a registered type,
 	// including non-markless ones (router links): unmatched must pass through.
 	const dispatchCaptured = (event: Parameters<typeof events.dispatch>[0]) =>

@@ -628,6 +628,7 @@ export function emitOverlayLoaderInstall(): string {
 		"\troot.querySelector('[overlay]')",
 		"\t\t? import('@markless/web/fns/overlay').then((m) => m.installOverlayBehavior(root))",
 		'\t\t: undefined;',
+		'for (const install of globalThis.__marklessOverlayPending?.splice(0) ?? []) install();',
 	].join('\n');
 }
 
