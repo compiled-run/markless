@@ -281,10 +281,12 @@ class Runtime(
 	/** Called with each engine entry's duration in nanoseconds, including starting the engine when the entry had to. */
 	var onScriptEntry: ((nanos: Long) -> Unit)? = null
 
-	/** Starts the engine and loads this screen's script ahead of its first entry; nothing for a payload without a script. */
-	fun warm() {
-		val script = payload.script ?: return
-		if (engine == null) load(script)
+	/** Starts the engine and loads this screen's script ahead of its first entry; false when there was nothing to load (no script, or already loaded). */
+	fun warm(): Boolean {
+		val script = payload.script ?: return false
+		if (engine != null) return false
+		load(script)
+		return true
 	}
 
 	private fun load(script: ScriptSource): ScriptEngine {

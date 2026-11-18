@@ -79,7 +79,7 @@ object AppScriptEngine : ScriptHost {
 	/** Starts the engine and loads [runtime]'s script before any entry needs it. */
 	fun warm(runtime: Runtime) {
 		val started = System.nanoTime()
-		runtime.warm()
+		if (!runtime.warm()) return
 		startedInEntry = false
 		Log.i(TAG, "engine warm ${millis(System.nanoTime() - started)} ms")
 	}
