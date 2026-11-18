@@ -186,6 +186,19 @@ public final class MarklessViewController: UIViewController {
 		view.backgroundColor = tree?.canvas ?? .systemBackground
 	}
 
+	public override func viewDidLoad() {
+		super.viewDidLoad()
+		// As a phone browser does once the keyboard is up: the focused field is scrolled into what the keyboard leaves shown.
+		NotificationCenter.default.addObserver(forName: UIResponder.keyboardDidShowNotification, object: nil, queue: .main) { [weak self] _ in
+			MainActor.assumeIsolated { self?.revealFocusedField() }
+		}
+	}
+
+	private func revealFocusedField() {
+		guard let tree, let field = tree.focusedField else { return }
+		tree.bringIntoView(field, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
+	}
+
 	public override func viewIsAppearing(_ animated: Bool) {
 		super.viewIsAppearing(animated)
 		if let layout, abs(traitCollection.displayScale - layout.dpr) > 0.001 {
@@ -230,7 +243,7 @@ public final class MarklessViewController: UIViewController {
 		for object in payload.objects { device.release(object.id) }
 		runtime = NativeRuntime(payload: payload, store: store, params: params)
 		tree?.closeSheets()
-		tree?.root.removeFromSuperview()
+		tree?.page.removeFromSuperview()
 		try buildPage()
 		paintCanvas()
 		if isViewLoaded { tree?.mount(in: view) }

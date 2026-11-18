@@ -9,6 +9,7 @@ import dev.markless.mobile.core.field
 import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.only
+import dev.markless.mobile.core.ScrollRange
 import dev.markless.mobile.core.str
 
 const val STYLE_EXPORT_SCHEMA_0 = "dragon.native-style-export/0"
@@ -36,12 +37,24 @@ sealed interface StyleWrite {
 	/** [size] in CSS px. */
 	data class Font(val family: String, val size: Double) : StyleWrite
 	data class TextColor(val color: Rgba) : StyleWrite
+	/** `overflow-x` / `overflow-y` `auto` or `scroll`: the box hosts its children in a scroll view over its padding box. */
+	data class ScrollContainer(val x: Boolean, val y: Boolean) : StyleWrite
+	/** `scrollbar-width: none`. */
+	data object ScrollIndicatorsHidden : StyleWrite
+	/** Children clipped to the padding box (`overflow` other than visible); a scroll container's scroll view is that clip. */
+	data object PaddingBoxClip : StyleWrite
+	/** `overscroll-behavior: none` on an axis; Android draws no bounce, so it is read and kept only. */
+	data class ScrollBounce(val x: Boolean, val y: Boolean) : StyleWrite
 }
 
-data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>)
+/** [scrollRange], device px, only on a scroll container. */
+data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null)
 
-/** One reachable combination of style states: every node's frame and writes, complete, and the canvas behind the page (null: white). */
-data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>, val canvas: Rgba? = null) {
+/**
+ * One reachable combination of style states: every node's frame and writes, complete, the canvas behind the page (null: white),
+ * and [pageScroll] in device px, null when Dragon leaves it undecided.
+ */
+data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>, val canvas: Rgba? = null, val pageScroll: ScrollRange? = null) {
 	val byId: Map<String, StyledNode> = nodes.associateBy { it.id }
 }
 
@@ -72,7 +85,7 @@ data class Bands(val atoms: List<BandAtom>, val bands: List<List<Boolean>>) {
  * One platform's slice of a Dragon style export: per state assignment, frames (device px, relative to the parent box) and
  * lowered writes per node id; [next] is `next[a][s][v]`, the assignment reached by setting state s to its v-th value (-1: none).
  */
-data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val bands: Bands? = null) {
+data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val bands: Bands? = null, val pageScrollUndecided: String? = null) {
 
 	/** The index of [BAND_KEY] among [states], or -1 for an export without @media. */
 	val bandState: Int = states.indexOfFirst { it.key == BAND_KEY }
@@ -137,11 +150,15 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				val nodes = t.field("nodes", target).arr("nodes").mapIndexed { n, v -> node(v, "nodes[$n]") { w, what -> writes(w, what) } }
 				return StyleExport(dpr, width, height, emptyList(), 0, listOf(Assignment(emptyMap(), nodes)), listOf(emptyList()))
 			}
-			return program(t, target, dpr, width, height) { w, what -> writes(w, what) }
+			// Dragon's reason, for this target, when it leaves the page's scroll range undecided.
+			val undecided = root["warnings"]?.arr("warnings")?.map { it.obj("warnings[]") }?.firstOrNull { w ->
+				w.field("code", "warning").str("code") == "DRAGON_PAGE_SCROLL_UNDECIDED" && w.field("message", "warning").str("message").startsWith("$target: ")
+			}?.let { it.getValue("message").str("message").removePrefix("$target: ") }
+			return program(t, target, dpr, width, height, undecided) { w, what -> writes(w, what) }
 		}
 
 		/** One target's states, assignments and next table; [writesOf] reads a node's `writes` field. */
-		private fun program(t: Map<String, Json>, target: String, dpr: Double, width: Double, height: Double, writesOf: (Json, String) -> List<StyleWrite>): StyleExport {
+		private fun program(t: Map<String, Json>, target: String, dpr: Double, width: Double, height: Double, undecided: String?, writesOf: (Json, String) -> List<StyleWrite>): StyleExport {
 			val states = t.field("states", target).arr("states").mapIndexed { n, v ->
 				val o = v.obj("states[$n]")
 				StyleState(o.field("key", "states[$n]").str("key"), o.field("domain", "states[$n]").arr("domain").map { scalar(it, "states[$n].domain[]") })
@@ -151,13 +168,13 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				val values = o.field("values", "assignments[$a]").obj("values").mapValues { (k, x) -> scalar(x, "assignments[$a].values.$k") }
 				val canvas = o["canvas"]?.let { color(it, "assignments[$a].canvas") }
 				if (canvas != null && canvas.alpha != 255) throw MarklessDecodeError("assignments[$a].canvas is not opaque")
-				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]", writesOf) }, canvas)
+				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]", writesOf) }, canvas, o["pageScroll"]?.let { range(it, "assignments[$a].pageScroll") })
 			}
 			val initial = t.field("initial", target).num("initial").toInt()
 			val next = t.field("next", target).arr("next").map { row -> row.arr("next[]").map { col -> col.arr("next[][]").map { it.num("next[][][]").toInt() } } }
 			if (initial !in assignments.indices) throw MarklessDecodeError("style export initial $initial names no assignment")
 			if (next.size != assignments.size || next.any { r -> r.size != states.size || r.withIndex().any { (si, c) -> c.size != states[si].domain.size || c.any { it != -1 && it !in assignments.indices } } }) throw MarklessDecodeError("style export next table does not match its assignments and states")
-			return StyleExport(dpr, width, height, states, initial, assignments, next, t["bands"]?.let { bands(it, "$target.bands") })
+			return StyleExport(dpr, width, height, states, initial, assignments, next, t["bands"]?.let { bands(it, "$target.bands") }, undecided)
 		}
 
 		private fun bands(v: Json, what: String): Bands {
@@ -175,6 +192,12 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			if (table.isEmpty() || table.any { it.size != atoms.size }) throw MarklessDecodeError("$what: every band needs one truth value per atom")
 			o.field("conditions", what).arr("$what.conditions").forEach { it.str("$what.conditions[]") }
 			return Bands(atoms, table)
+		}
+
+		private fun range(v: Json, what: String): ScrollRange? {
+			if (v == Json.Null) return null
+			val o = v.obj(what)
+			return ScrollRange(o.field("minX", what).num("minX"), o.field("maxX", what).num("maxX"), o.field("minY", what).num("minY"), o.field("maxY", what).num("maxY"))
 		}
 
 		/**
@@ -201,7 +224,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments"), "routes[$n]")
 				val pattern = o.field("pattern", "routes[$n]").str("pattern")
 				if (pattern in routes) throw MarklessDecodeError("app style lists route $pattern twice")
-				routes[pattern] = program(o, "routes[$n] ($pattern)", dpr, width, height) { w, what ->
+				routes[pattern] = program(o, "routes[$n] ($pattern)", dpr, width, height, null) { w, what ->
 					val i = w.num("$what.writes")
 					if (i != Math.floor(i) || i.toInt() !in lists.indices) throw MarklessDecodeError("$what.writes is $i, not an index of the app's write lists")
 					lists[i.toInt()]
@@ -222,7 +245,10 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val kind = o.field("kind", what).str("$what.kind")
 			if (kind !in setOf("element", "text", "anonymous")) throw MarklessDecodeError("$what has unknown node kind \"$kind\"")
 			val bw = o["borderWidths"]?.takeIf { it != Json.Null }?.obj("$what.borderWidths")?.let { Edges(it.field("top", what).num("top"), it.field("right", what).num("right"), it.field("bottom", what).num("bottom"), it.field("left", what).num("left")) }
-			return StyledNode(id, parent, kind, frame, bw, writesOf(o.field("writes", what), id))
+			val writes = writesOf(o.field("writes", what), id)
+			val scroll = o["scrollRange"]?.let { range(it, "$what.scrollRange") }
+			if ((scroll != null) != writes.any { it is StyleWrite.ScrollContainer }) throw MarklessDecodeError("$what: a scroll range comes with a scroll-container write, and only then")
+			return StyledNode(id, parent, kind, frame, bw, writes, scroll)
 		}
 
 		private fun scalar(v: Json, what: String): JsValue = when (v) {
@@ -260,6 +286,10 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					StyleWrite.Font(f.field("family", what).str("family"), f.field("size", what).num("size"))
 				}
 				"text-color" -> StyleWrite.TextColor(color(o.field("color", what), "$what.color"))
+				"scroll-container" -> StyleWrite.ScrollContainer((o.field("x", what) as? Json.Bool ?: throw MarklessDecodeError("$what.x must be a boolean")).value, (o.field("y", what) as? Json.Bool ?: throw MarklessDecodeError("$what.y must be a boolean")).value)
+				"scroll-indicators-hidden" -> StyleWrite.ScrollIndicatorsHidden
+				"padding-box-clip" -> StyleWrite.PaddingBoxClip
+				"scroll-bounce" -> StyleWrite.ScrollBounce((o.field("bounceX", what) as? Json.Bool ?: throw MarklessDecodeError("$what.bounceX must be a boolean")).value, (o.field("bounceY", what) as? Json.Bool ?: throw MarklessDecodeError("$what.bounceY must be a boolean")).value)
 				else -> throw MarklessDecodeError("$what has unknown style write kind \"$kind\"")
 			}
 		}

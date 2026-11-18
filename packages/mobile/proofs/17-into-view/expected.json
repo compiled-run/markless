@@ -1,0 +1,35 @@
+{
+	"rung": 17,
+	"name": "scrollIntoView() and focus() bring an element below the screen into view",
+	"steps": [
+		{
+			"visible": ["Into view", "Show target", "Focus field"],
+			"offScreen": ["Target paragraph", "Far field"]
+		},
+		{
+			"do": {
+				"tap": "Show target"
+			},
+			"visible": ["Target paragraph", "Gap 61"],
+			"offScreen": ["Into view", "Show target", "Gap 50"]
+		},
+		{
+			"do": {
+				"swipe": {
+					"from": [50, 25],
+					"to": [50, 80],
+					"until": "Focus field"
+				}
+			},
+			"visible": ["Focus field"],
+			"offScreen": ["Target paragraph"]
+		},
+		{
+			"do": {
+				"tap": "Focus field"
+			},
+			"visible": ["Far field"],
+			"offScreen": ["Focus field", "Into view"]
+		}
+	]
+}

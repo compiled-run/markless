@@ -52,6 +52,8 @@ export type NativeViewArtifact = {
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 	/** Modules the build resolved but was not given an analysis of; the caller analyzes them and builds again. */
 	readonly missingModules?: ReadonlyArray<string>;
+	/** Where each element node of the payload is written, by node id, for build errors that name an element. */
+	readonly elementSources: ReadonlyMap<string, { readonly element: string; readonly span?: SourceSpan }>;
 };
 
 type ElementBindings = NonNullable<Extract<NativeNode, { kind: 'element' }>['bindings']>;
@@ -108,7 +110,7 @@ const TEXT_ENTRY = new Set(['input', 'textarea']);
 export const NATIVE_KEYBOARD_ONLY_CODE = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
 
 type Item =
-	| { readonly kind: 'host'; readonly id: string; readonly path: ReadonlyArray<number> }
+	| { readonly kind: 'host'; readonly id: string; readonly path: ReadonlyArray<number>; readonly span?: SourceSpan }
 	| { readonly kind: 'part'; readonly part: NativeTextPart; readonly path: ReadonlyArray<number> }
 	| {
 			readonly kind: 'branch';
@@ -662,12 +664,14 @@ export function createNativeViewPayload(
 			docsUrl: `https://markless.dev/errors/${NATIVE_KEYBOARD_ONLY_CODE}`,
 		});
 	};
+	const elementSources = new Map<string, { readonly element: string; readonly span?: SourceSpan }>();
 	const done = (payload: NativeViewPayload | null): NativeViewArtifact => ({
 		passId: 'native-view',
 		payload: diagnostics.some((diagnostic) => diagnostic.severity === 'error') ? null : payload,
 		features: [...features],
 		diagnostics,
 		...(missingModules.size > 0 ? { missingModules: [...missingModules] } : {}),
+		elementSources,
 	});
 
 	const root = graph.markup.root;
@@ -1937,6 +1941,7 @@ export function createNativeViewPayload(
 				kind: 'host',
 				id: host.hostNodeId,
 				path: host.coordinate.path,
+				...(host.sourceSpan ? { span: host.sourceSpan } : {}),
 			})),
 			...(chunk.texts ?? []).map((text): Item => ({
 				kind: 'part',
@@ -2154,6 +2159,7 @@ export function createNativeViewPayload(
 					}
 					if (key) boundHandles.set(key, [...(boundHandles.get(key) ?? []), id]);
 				}
+				elementSources.set(id, { element: element ?? '*', ...(item.span ? { span: item.span } : {}) });
 				nodes.push({
 					kind: 'element',
 					id,

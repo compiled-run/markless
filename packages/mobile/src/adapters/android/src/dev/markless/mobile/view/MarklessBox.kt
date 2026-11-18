@@ -9,8 +9,15 @@ import android.widget.FrameLayout
 /** The element view: children stack vertically until a style export assigns frames, then each child sits at its frame. */
 class MarklessBox(context: Context) : FrameLayout(context) {
 	internal val frames = HashMap<View, Rect>()
+	/** A scroll container's content box: its size in px whatever its scroll view offers, so the scroll view has a range. */
+	internal var fixedSize: Pair<Int, Int>? = null
 
 	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+		fixedSize?.let { (w, h) ->
+			for ((child, f) in frames) child.measure(MeasureSpec.makeMeasureSpec(f.width(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(f.height(), MeasureSpec.EXACTLY))
+			setMeasuredDimension(w, h)
+			return
+		}
 		if (frames.isNotEmpty()) {
 			for (i in 0 until childCount) {
 				val child = getChildAt(i)

@@ -1,3 +1,4 @@
+export { pageScrollDiagnostics } from './page-scroll.ts';
 export {
 	createNativeAppRuntime,
 	matchNativeRoute,

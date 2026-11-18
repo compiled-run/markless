@@ -36,6 +36,8 @@ export type NativeBuild = {
 	readonly features: ReadonlyArray<NativeDeviceFeature>;
 	readonly manifest: DeviceManifest;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+	/** Each payload element's tag and where it is written, by node id, for build errors that name an element. */
+	readonly elementSources: NativeViewArtifact['elementSources'];
 };
 
 /** A stylesheet's text as the web build ships it, unscoped: its rules reach every page that imports it. */
@@ -202,6 +204,7 @@ export async function compileNativeComponent(input: {
 		),
 		features: native.features,
 		manifest: deviceEntries,
+		elementSources: native.elementSources,
 		diagnostics: [...errors, ...native.diagnostics, ...usage],
 	};
 }

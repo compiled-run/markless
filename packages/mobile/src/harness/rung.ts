@@ -4,8 +4,14 @@ import { createRequire } from 'node:module';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
 import { nativeAppStyle, nativeAppStyleSize, type DragonStyleExport } from '../app-style.ts';
-import { compileNativeApp, compileNativeComponent, type NativeAppBuild } from '../compile.ts';
+import {
+	compileNativeApp,
+	compileNativeComponent,
+	type NativeAppBuild,
+	type NativeBuild,
+} from '../compile.ts';
 import type { DeviceAppConfig, DeviceManifest } from '../permissions.ts';
+import { pageScrollDiagnostics } from '../page-scroll.ts';
 import { dragonDir, dragonStyleExport } from '../style-export.ts';
 import { nativeStyleInput } from '../style-input.ts';
 import { readProofExpected } from './expected.ts';
@@ -160,6 +166,17 @@ function appStyle(dir: string, name: string, inputs: NativeAppBuild['styleInputs
 	return new TextEncoder().encode(JSON.stringify(style));
 }
 
+/** A styled page whose scroll range Dragon cannot decide is a build error naming the file and the element. */
+function checkPageScroll(bytes: Uint8Array, build: NativeBuild, filename: string, name: string): Uint8Array {
+	const exported = JSON.parse(new TextDecoder().decode(bytes)) as Parameters<typeof pageScrollDiagnostics>[0];
+	const unscrollable = pageScrollDiagnostics(exported, build, filename);
+	if (unscrollable.length > 0)
+		throw new Error(
+			`${name}: ${COMPONENT_FILE} has no native build\n${unscrollable.map((d) => `  ${d.code}: ${d.message}`).join('\n')}`,
+		);
+	return bytes;
+}
+
 /** The style file and every font face it names, checked against the face's `sha256:` id. */
 function styleAssets(bytes: Uint8Array, name: string): Array<[string, Uint8Array]> {
 	const dragon = dragonDir();
@@ -242,7 +259,15 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 					`${JSON.stringify(nativeStyleInput(build.payload, build.styles), null, '\t')}\n`,
 				);
 				if (platform === 'android') {
-					const styled = styleAssets(styleExport(join(dir, STYLE_INPUT), name), name);
+					const styled = styleAssets(
+						checkPageScroll(
+							styleExport(join(dir, STYLE_INPUT), name),
+							build,
+							relative(repoRoot, component),
+							name,
+						),
+						name,
+					);
 					assets.ios.push(...styled);
 					assets.android.push(...styled);
 				}

@@ -618,7 +618,10 @@ function walk(
 			if (!labels().some(([, label]) => label === action.tap))
 				throw new Error(`step ${index}: no audio control reads "${action.tap}"`);
 			playing = action.tap === 'Play';
-		} else if (action && 'swipe' in action) openSheet(index);
+		} else if (action && 'swipe' in action && action.swipe === 'up') openSheet(index);
+		else if (action && 'swipe' in action) {
+			// Scrolling changes what is on screen, not what the page holds; the devices and the web judge the screen.
+		}
 		else if (action && 'scrollTo' in action) {
 			openSheet(index);
 			if (!shownTexts().some(([, text]) => text === action.scrollTo))
@@ -684,6 +687,9 @@ function walk(
 		];
 		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
+		expect(shown, `step ${index}: scrolled out of sight, still held`).toEqual(
+			expect.arrayContaining([...(step.offScreen ?? [])]),
+		);
 		if (step.order)
 			expect(shown.filter((text) => step.order!.includes(text))).toEqual(step.order);
 		for (const text of step.disabled ?? []) {

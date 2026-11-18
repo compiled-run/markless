@@ -525,10 +525,12 @@ function emitNode(
 	}
 	const hostNodeId = context.hostIds.get(node);
 	if (hostNodeId) {
+		const hostSpan = context.nativeFacts ? sourceSpan(node, context.filename) : undefined;
 		builder.hosts.push({
 			hostNodeId,
 			tagName,
 			coordinate: { kind: 'child-index', path },
+			...(hostSpan ? { sourceSpan: hostSpan } : {}),
 		});
 	}
 

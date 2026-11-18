@@ -480,6 +480,34 @@ compares Dragon's build-time layout with Chrome, not the device's pixels.
    to run if the device's scale differs from the target's `dpr`. Text keeps Dragon's frame; after a journal entry the
    frame is not recomputed yet (on-device layout is a later rung), which is visible only when text width changes.
 
+### Scrolling (pushed 2026-11-17, branch `cw/native-scroll`)
+
+- **The page** is the platform's scroll view: iOS `UIScrollView` with `contentInsetAdjustmentBehavior = .always`, and
+  Android `ScrollView` padded by the system bars with `clipToPadding = false`. Content starts inside the safe area and
+  scrolls under the bars, as a phone browser's page does. Its bottom follows the keyboard (`keyboardLayoutGuide`; Android
+  IME insets). Unstyled pages size it from native layout. Styled pages use Dragon's `pageScroll`, the viewport's offset range in
+  device px per assignment. When Dragon leaves that range undecided (a range control, or a control that scrolls; block
+  buttons are decided since dragoncss#593), the build fails with `MARKLESS_NATIVE_UNSUPPORTED`, naming the file, the element
+  (with its source span, an analyzer fact collected for native builds) and Dragon's reason from `pageScrollUndecided`
+  (`pageScrollDiagnostics`, `packages/mobile/src/page-scroll.ts`). An app never refuses to open over it and never loses its
+  scrolling. The hosts' own check for this case stays only as an invariant for exports that did not come through the build.
+- **A box with `overflow-x`/`overflow-y` `auto` or `scroll`** has a `scroll-container` write and a `scrollRange`. The host puts
+  a scroll view over its padding box and hosts the children there, at their frames less the border:
+  - iOS: a `UIScrollView`;
+  - Android: a `ScrollView` for the block axis, a `HorizontalScrollView` for the inline axis, nested when both have a range.
+
+  A drag belongs to the box it starts in while the box can scroll that way, and otherwise to the page. This is decided once,
+  when the drag starts, as Chrome latches a gesture. `scroll-indicators-hidden`, `scroll-bounce` and `padding-box-clip`
+  (only together with a scroll container) are read. A padding-box clip without scrolling, and a range starting before 0
+  (right to left), are host errors.
+- **scrollIntoView() and focus()**: `packages/mobile/src/scroll.ts` is the reference. Its vectors are in
+  `conformance/scroll/scroll-into-view.json`, which `ladder-web.test.ts` checks against Chrome and which both hosts reproduce
+  (`ScrollIntoViewTests.swift`, `test-jvm.sh`). scrollIntoView() is `{ block: start, inline: nearest }`. focus() is Chrome's
+  "if needed": no scroll when fully shown, the closest edge when partly shown, centred when hidden. Every scrolling ancestor
+  scrolls, innermost first. A focused text field is brought into view the same way when the keyboard comes up.
+- **Ladder rungs 12 to 17**. 17 needs `element()` and the `command` op from #816. On this branch the compiler refuses it by
+  name; it passes on both phones on a local merge with `cw/ui-next-blockers`.
+
 ## 5. The ladder
 
 Each rung: a real `.tsrx` compiled by the real compiler, the same Maestro flow green on the iOS simulator and the Android

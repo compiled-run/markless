@@ -21,6 +21,9 @@ private struct Context {
 @MainActor
 final class ViewTree {
 	let root = UIView()
+	/// The page's own scroll view, as a browser's viewport: it fills the screen, insets its content by the safe areas and
+	/// scrolls it under the bars.
+	let page = UIScrollView()
 	let keyboard: KeyboardDismisser
 	private let runtime: NativeRuntime
 	private let layout: StyleLayout?
@@ -44,13 +47,15 @@ final class ViewTree {
 	weak var presenter: UIViewController?
 	private var anchors = Set<ObjectIdentifier>()
 	private var assignment: Int
-	/// Taps and drags on the page dismiss the keyboard; a stack makes them wait for its edge-swipe Back.
-	let dismissGestures: [UIGestureRecognizer] = [UITapGestureRecognizer(), UIPanGestureRecognizer()]
+	/// A tap on the page dismisses the keyboard; a stack makes it wait for its edge-swipe Back.
+	let dismissGestures: [UIGestureRecognizer] = [UITapGestureRecognizer()]
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 	private var forwards: [LabelForward] = []
 	private var dialogIds = Set<String>()
 	/// The open dialog's top layer and the place in the page its view returns to.
 	private var topLayer: (layer: TopLayerView, home: UIView, index: Int)?
+	/// The scroll view each scroll container hosts its children in.
+	private var scrollViews: [String: ContainerScrollView] = [:]
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void,
@@ -61,7 +66,7 @@ final class ViewTree {
 		self.layout = layout
 		self.faces = faces
 		self.onAction = onAction
-		keyboard = KeyboardDismisser(root)
+		keyboard = KeyboardDismisser(page)
 		assignment = layout?.start ?? 0
 		let payload = runtime.payload
 		let nodes = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
@@ -81,16 +86,22 @@ final class ViewTree {
 		}
 		self.slots = slots
 		events = Dictionary(grouping: payload.events, by: \.host)
+		page.contentInsetAdjustmentBehavior = .always
+		page.accessibilityIdentifier = "markless-page"
+		page.addSubview(root)
 		var index = 0
 		_ = try build("", in: root, at: &index, Context())
+		// A tap outside a field blurs it, as on the web; a drag scrolls and keeps the keyboard up.
 		for gesture in dismissGestures {
 			gesture.cancelsTouchesInView = false
 			gesture.addTarget(keyboard, action: #selector(KeyboardDismisser.dismiss))
-			root.addGestureRecognizer(gesture)
+			page.addGestureRecognizer(gesture)
 		}
 		if layout == nil {
 			stackTree(root)
 			for sheet in sheets.values { stackTree(sheet.content) }
+		} else {
+			try sizePage()
 		}
 		refreshRelations()
 	}
@@ -104,20 +115,78 @@ final class ViewTree {
 		for sheet in sheets.values { sheet.close(animated: false) }
 	}
 
+	/// The page's scrollable size: Dragon's page range over the viewport it laid out at.
+	private func sizePage() throws {
+		guard let layout else { return }
+		let viewport = layout.viewport
+		let range = layout.pageScrolls[assignment]
+		page.contentSize = CGSize(width: viewport.width + (range?.maxX ?? 0), height: viewport.height + (range?.maxY ?? 0))
+		root.frame = CGRect(origin: .zero, size: page.contentSize)
+		guard range == nil else { return }
+		let drawn = root.subviews.reduce(CGRect.null) { $0.union($1.frame) }
+		if drawn.maxX > viewport.width + 0.5 || drawn.maxY > viewport.height + 0.5 {
+			throw HostError("the page is \(drawn.maxY) points tall on a \(viewport.height) point screen, and Dragon does not decide its scroll range: \(layout.pageScrollUndecided ?? "the style export has no page range")")
+		}
+	}
+
 	func mount(in screen: UIView) {
-		let guide = layout == nil ? screen.layoutMarginsGuide : screen.safeAreaLayoutGuide
-		root.translatesAutoresizingMaskIntoConstraints = false
-		screen.addSubview(root)
+		page.translatesAutoresizingMaskIntoConstraints = false
+		screen.addSubview(page)
+		screen.keyboardLayoutGuide.usesBottomSafeArea = false
 		NSLayoutConstraint.activate([
-			root.topAnchor.constraint(equalTo: guide.topAnchor),
-			root.leadingAnchor.constraint(equalTo: guide.leadingAnchor),
-			root.trailingAnchor.constraint(equalTo: guide.trailingAnchor),
+			page.topAnchor.constraint(equalTo: screen.topAnchor),
+			page.leadingAnchor.constraint(equalTo: screen.leadingAnchor),
+			page.trailingAnchor.constraint(equalTo: screen.trailingAnchor),
+			page.bottomAnchor.constraint(equalTo: screen.keyboardLayoutGuide.topAnchor),
 		])
-		if let layout { root.heightAnchor.constraint(equalToConstant: layout.viewport.height).isActive = true }
+		guard layout == nil else { return }
+		root.translatesAutoresizingMaskIntoConstraints = false
+		let content = page.contentLayoutGuide
+		NSLayoutConstraint.activate([
+			root.topAnchor.constraint(equalTo: content.topAnchor),
+			root.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+			root.leadingAnchor.constraint(equalTo: screen.layoutMarginsGuide.leadingAnchor),
+			root.trailingAnchor.constraint(equalTo: screen.layoutMarginsGuide.trailingAnchor),
+			content.leadingAnchor.constraint(equalTo: page.frameLayoutGuide.leadingAnchor),
+			content.widthAnchor.constraint(equalTo: page.frameLayoutGuide.widthAnchor),
+		])
 	}
 
 	/// The colour behind the page in the current assignment: the export's canvas, else the web canvas's white.
 	var canvas: UIColor? { layout.map { $0.canvases[assignment].map(uiColor) ?? .white } }
+
+	/// Scrolls every scrolling ancestor of `target`, innermost first, as Chrome's scrollIntoView() (`scrollIntoViewAlign`) or
+	/// focus() (`focusIntoViewAlign`) does.
+	func bringIntoView(_ target: UIView, block: ScrollAlign, inline: ScrollAlign) {
+		page.layoutIfNeeded()
+		var chain: [UIScrollView] = []
+		var ancestor = target.superview
+		while let view = ancestor {
+			if let scroll = view as? UIScrollView { chain.append(scroll) }
+			ancestor = view.superview
+		}
+		guard let inner = chain.first else { return }
+		let boxes = chain.enumerated().map { index, scroll -> ScrollBox in
+			let inset = scroll.adjustedContentInset
+			let width = scroll.bounds.width - inset.left - inset.right
+			let height = scroll.bounds.height - inset.top - inset.bottom
+			let origin = index + 1 < chain.count ? scroll.superview!.convert(scroll.frame.origin, to: chain[index + 1]) : scroll.frame.origin
+			return ScrollBox(
+				port: ScrollRect(x: origin.x + inset.left, y: origin.y + inset.top, width: width, height: height),
+				offset: (scroll.contentOffset.x + inset.left, scroll.contentOffset.y + inset.top),
+				range: ScrollOffsetRange(minX: 0, maxX: max(0, scroll.contentSize.width - width), minY: 0, maxY: max(0, scroll.contentSize.height - height)))
+		}
+		let shown = target.convert(target.bounds, to: inner)
+		let offsets = scrollIntoView(
+			boxes, target: ScrollRect(x: shown.minX, y: shown.minY, width: shown.width, height: shown.height), block: block, inline: inline)
+		for (scroll, offset) in zip(chain, offsets) {
+			let inset = scroll.adjustedContentInset
+			scroll.setContentOffset(CGPoint(x: offset.x - inset.left, y: offset.y - inset.top), animated: false)
+		}
+	}
+
+	/// The focused text field in this page, if any.
+	var focusedField: UITextField? { elements.values.lazy.compactMap { $0 as? UITextField }.first { $0.isFirstResponder } }
 
 	/// The journal applier: the only code that changes a retained view after the first build.
 	func apply(_ journal: [NativeJournalEntry]) throws {
@@ -162,8 +231,9 @@ final class ViewTree {
 				guard let layout else { continue }
 				assignment = try layout.next(from: assignment, cell: cell, value: value)
 				for (id, view) in elements.map({ ($0.key, $0.value as UIView) }) + labels.map({ ($0.key, $0.value as UIView) }) {
-					if let style = style(of: id) { try paint(view, style, faces: faces) }
+					if let style = style(of: id) { try place(id, view, style) }
 				}
+				try sizePage()
 			case let .arm(node, index):
 				guard let branch = branches[node], let context = contexts[node] else { throw HostError("journal names branch \(node), which is not shown") }
 				let container = branch.anchor.superview ?? root
@@ -272,6 +342,18 @@ final class ViewTree {
 		}
 	}
 
+	/// Paints a view and puts it at its frame; inside a scroll container, frames count from the scroll view's padding box.
+	private func place(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
+		try paint(view, style, faces: faces)
+		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
+		guard let scroll = scrollViews[id] else {
+			if style.scroll != nil { throw HostError("\(id) became a scroll container after it was built") }
+			return
+		}
+		guard let s = style.scroll else { throw HostError("\(id) stopped being a scroll container after it was built") }
+		scroll.configure(s, in: view.bounds.size, cornerRadius: style.cornerRadius)
+	}
+
 	private func style(of id: String) -> ResolvedStyle? {
 		guard let layout, let template = templates[id] else { return nil }
 		return layout.assignments[assignment][template]
@@ -354,6 +436,10 @@ final class ViewTree {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = UITextField()
 					field.addAction(UIAction { [weak field] _ in field?.resignFirstResponder() }, for: .editingDidEndOnExit)
+					field.addAction(UIAction { [weak self, weak field] _ in
+						guard let self, let field else { return }
+						self.bringIntoView(field, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
+					}, for: .editingDidBegin)
 					if layout == nil {
 						field.borderStyle = .roundedRect
 						field.widthAnchor.constraint(equalToConstant: 240).isActive = true
@@ -373,10 +459,18 @@ final class ViewTree {
 					dialogIds.insert(id)
 					view.isHidden = true
 				}
-				if let style = style(of: id) { try paint(view, style, faces: faces) }
 				container.insertSubview(view, at: index)
 				index += 1
-				try wire(events[template] ?? [], on: view, element: element, id: id)
+				if let style = style(of: id) {
+					if style.scroll != nil {
+						let scroll = ContainerScrollView()
+						scroll.accessibilityIdentifier = "\(id):scroll"
+						view.addSubview(scroll)
+						scrollViews[id] = scroll
+					}
+					try place(id, view, style)
+				}
+				try wire(events[template] ?? [], on: view, element: element, id: id, inRow: !context.suffix.isEmpty)
 				let boundFor = try bindings.first { $0.name == "for" }.map { try runtime.evaluate($0.value, in: context.scope).text }
 				if element == "label", let target = staticAttributes["for"] ?? boundFor {
 					// A press on a label activates its control, as a browser does.
@@ -398,7 +492,7 @@ final class ViewTree {
 					} ?? staticAttributes["value"]
 				}
 				var childIndex = 0
-				_ = try build(template, in: view, at: &childIndex, inner)
+				_ = try build(template, in: scrollViews[id] ?? view, at: &childIndex, inner)
 				applyAttributes(id, view)
 				// The stacking layout sizes a control by its text; one with none (a switch's thumb) gets the 44 pt touch target.
 				if layout == nil, view is UIButton, text(within: view).isEmpty {
@@ -416,10 +510,10 @@ final class ViewTree {
 				} else if context.heading {
 					label.accessibilityTraits.insert(.header)
 				}
-				if let style = style(of: id) { try paint(label, style, faces: faces) }
 				labels[id] = label
 				container.insertSubview(label, at: index)
 				index += 1
+				if let style = style(of: id) { try place(id, label, style) }
 				if let button = context.button { refreshLabel(of: button) }
 			case .branch:
 				if !context.suffix.isEmpty { throw HostError("@if inside a list row (\(id)) has no iOS host support yet") }
@@ -491,6 +585,7 @@ final class ViewTree {
 			for child in slots[template] ?? [] { remove(child + suffix) }
 		}
 		labels.removeValue(forKey: id)?.removeFromSuperview()
+		scrollViews.removeValue(forKey: id)
 		if let view = elements.removeValue(forKey: id) {
 			stackConstraints.removeValue(forKey: ObjectIdentifier(view))
 			view.removeFromSuperview()
@@ -720,5 +815,38 @@ private final class ActivateGesture: UITapGestureRecognizer {
 		addTarget(self, action: #selector(fire))
 	}
 	@objc private func fire() { if state == .ended { action() } }
+}
+
+/// A scroll container's scroll view over its padding box. A drag that starts toward an edge it is already at goes to the
+/// scroll view around it, as the web chains a scroll to the page once a box is at its end.
+@MainActor
+final class ContainerScrollView: UIScrollView {
+	private(set) var inset: (top: Double, left: Double, bottom: Double, right: Double) = (0, 0, 0, 0)
+
+	func configure(_ scroll: ResolvedScroll, in box: CGSize, cornerRadius: Double) {
+		inset = scroll.inset
+		contentInsetAdjustmentBehavior = .never
+		let port = CGSize(width: box.width - inset.left - inset.right, height: box.height - inset.top - inset.bottom)
+		frame = CGRect(x: inset.left, y: inset.top, width: port.width, height: port.height)
+		contentSize = CGSize(
+			width: port.width + (scroll.x ? scroll.range.maxX : 0), height: port.height + (scroll.y ? scroll.range.maxY : 0))
+		contentOffset = CGPoint(x: min(contentOffset.x, contentSize.width - port.width), y: min(contentOffset.y, contentSize.height - port.height))
+		showsVerticalScrollIndicator = scroll.indicators
+		showsHorizontalScrollIndicator = scroll.indicators
+		bouncesVertically = scroll.bounceY
+		bouncesHorizontally = scroll.bounceX
+		layer.cornerRadius = max(0, cornerRadius - min(inset.top, inset.left))
+	}
+
+	override func gestureRecognizerShouldBegin(_ gesture: UIGestureRecognizer) -> Bool {
+		guard gesture === panGestureRecognizer else { return super.gestureRecognizerShouldBegin(gesture) }
+		let velocity = panGestureRecognizer.velocity(in: self)
+		let vertical = abs(velocity.y) >= abs(velocity.x)
+		let at = vertical ? contentOffset.y : contentOffset.x
+		let end = vertical ? contentSize.height - bounds.height : contentSize.width - bounds.width
+		let toward = vertical ? -velocity.y : -velocity.x
+		if (toward > 0 && at >= end - 0.5) || (toward < 0 && at <= 0.5) { return false }
+		return super.gestureRecognizerShouldBegin(gesture)
+	}
 }
 #endif
