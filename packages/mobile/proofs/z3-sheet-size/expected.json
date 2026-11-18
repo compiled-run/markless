@@ -1,0 +1,27 @@
+{
+	"rung": "Z3",
+	"name": "Layout that follows the sheet's width and its resting height",
+	"steps": [
+		{
+			"visible": ["Fruit", "Browse fruit"],
+			"absent": ["Apple", "Pinned to the bottom of the sheet"]
+		},
+		{
+			"do": { "tap": "Browse fruit" },
+			"visible": ["Apple", "Pear", "Plum", "Fig", "Pinned to the bottom of the sheet"]
+		},
+		{
+			"do": { "swipe": "up" },
+			"visible": ["Apple", "Fig", "Pinned to the bottom of the sheet"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Fruit", "Browse fruit", "On the web, the fruit open in a drawer"],
+				"absent": ["Apple", "Pinned to the bottom of the sheet"]
+			}
+		],
+		"absentFromOutput": ["Pinned to the bottom of the sheet", "@markless/device"]
+	}
+}

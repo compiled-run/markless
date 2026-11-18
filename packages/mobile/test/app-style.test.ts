@@ -96,3 +96,59 @@ test('an export without a canvas colour is refused by name', () => {
 		"/basil: the ios export's assignment 0 has no canvas",
 	);
 });
+
+test("a sheet's content at each resting height shares the page's write lists and keeps its own viewport", () => {
+	const atHeight = (height: number): DragonStyleExport => {
+		const exported = page('ShelfSheet0', 1);
+		return {
+			...exported,
+			targets: {
+				ios: { ...exported.targets.ios!, viewport: { width: 386, height } },
+			},
+		};
+	};
+	const pages = [
+		{
+			pattern: '/',
+			exported: page('Shelf', 1),
+			sheets: [
+				{ node: 'sheet:component-edge:1', snapPoint: 0.5, exported: atHeight(418) },
+				{ node: 'sheet:component-edge:1', snapPoint: 1, exported: atHeight(778) },
+			],
+		},
+	];
+	const style = nativeAppStyle(pages);
+	const route = style.targets.ios!.routes[0]!;
+	expect(style.targets.ios!.writes).toHaveLength(2);
+	expect(route.sheets).toHaveLength(1);
+	const [half, full] = route.sheets![0]!.heights;
+	expect([half!.snapPoint, full!.snapPoint]).toEqual([0.5, 1]);
+	expect([half!.viewport, full!.viewport]).toEqual([
+		{ width: 386, height: 418 },
+		{ width: 386, height: 778 },
+	]);
+	expect(half!.assignments[0]!.nodes[1]!.writes).toBe(route.assignments[0]!.nodes[1]!.writes);
+	expect(nativeAppStyleSize(pages, style).targets.ios).toEqual({
+		writeLists: 2,
+		writeListReferences: 6,
+	});
+});
+
+test('a sheet laid out at another pixel ratio than its page is refused by name', () => {
+	const other = page('ShelfSheet0', 1);
+	expect(() =>
+		nativeAppStyle([
+			{
+				pattern: '/',
+				exported: page('Shelf', 1),
+				sheets: [
+					{
+						node: 'sheet:component-edge:1',
+						snapPoint: 1,
+						exported: { ...other, targets: { ios: { ...other.targets.ios!, dpr: 2 } } },
+					},
+				],
+			},
+		]),
+	).toThrow("/: sheet:component-edge:1's ios export at 1 was laid out for another device");
+});

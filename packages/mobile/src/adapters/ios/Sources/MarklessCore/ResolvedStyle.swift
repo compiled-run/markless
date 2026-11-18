@@ -62,6 +62,8 @@ public struct StyleLayout: Sendable {
 	public let dpr: Double
 	public let fontFiles: [(id: String, file: String)]
 	public let bands: StyleBands?
+	/// Each assignment's document height in points: how far the laid-out content reaches down.
+	public let extents: [Double]
 }
 
 extension StyleLayout {
@@ -85,6 +87,42 @@ extension StyleExport {
 		for payload: NativeViewPayload, initialTexts: [(node: String, text: String)], value: (String) throws -> NativeValue,
 		dark: Bool = false
 	) throws -> StyleLayout {
+		let roots = sheetRoots(of: payload)
+		for node in payload.nodes where roots[node.id] == node.id && !sheets.contains(where: { $0.node == node.id }) {
+			throw styleError("\(node.id): the style export has no styles for this system sheet's content")
+		}
+		return try layout(
+			for: payload, nodes: payload.nodes.filter { roots[$0.id] == nil }, root: nil, everyStyledCell: true,
+			initialTexts: initialTexts, value: value, dark: dark)
+	}
+
+	/// The layout of each resting height of the sheet `node`, in its `heights` order.
+	public func resolveSheet(
+		_ node: String, for payload: NativeViewPayload, initialTexts: [(node: String, text: String)],
+		value: (String) throws -> NativeValue, dark: Bool = false
+	) throws -> [(snapPoint: Double, layout: StyleLayout)] {
+		guard let sheet = sheets.first(where: { $0.node == node }) else { throw styleError("\(node): the style export has no styles for this system sheet") }
+		let roots = sheetRoots(of: payload)
+		let content = payload.nodes.filter { roots[$0.id] == node && $0.id != node }
+		return try sheet.heights.map { height in
+			(height.snapPoint, try height.style.layout(
+				for: payload, nodes: content, root: node, everyStyledCell: false, initialTexts: initialTexts, value: value, dark: dark))
+		}
+	}
+
+	/// Each node inside a system sheet (and the sheet itself) names that sheet.
+	private func sheetRoots(of payload: NativeViewPayload) -> [String: String] {
+		var roots: [String: String] = [:]
+		for node in payload.nodes {
+			if case .sheet = node.kind { roots[node.id] = node.id } else if let parent = node.parent, let root = roots[parent] { roots[node.id] = root }
+		}
+		return roots
+	}
+
+	private func layout(
+		for payload: NativeViewPayload, nodes: [NativeNode], root: String?, everyStyledCell: Bool,
+		initialTexts: [(node: String, text: String)], value: (String) throws -> NativeValue, dark: Bool
+	) throws -> StyleLayout {
 		let styledCells = payload.cells.filter(\.styled).map(\.id)
 		let stateCells = try states.map { state in
 			if state.key == StyleBands.state { return state.key }
@@ -92,7 +130,7 @@ extension StyleExport {
 			guard named.count == 1 else { throw styleError("style state \(state.key) names \(named.count) styled cells of the payload") }
 			return named[0]
 		}
-		if let unstyled = styledCells.first(where: { !stateCells.contains($0) }) {
+		if everyStyledCell, let unstyled = styledCells.first(where: { !stateCells.contains($0) }) {
 			throw styleError("the payload's styled cell \(unstyled) has no state in the style export")
 		}
 		let current = try stateCells.map { cell in
@@ -106,25 +144,33 @@ extension StyleExport {
 		}
 		return StyleLayout(
 			assignments: try assignments.indices.map { index in
-				try resolveNodes(assignments[index].nodes, for: payload, initialTexts: index == start ? initialTexts : nil)
+				try resolveNodes(assignments[index].nodes, for: nodes, root: root, initialTexts: index == start ? initialTexts : nil)
 			},
 			canvases: assignments.map(\.canvas),
 			start: start, stateCells: stateCells, domains: states.map(\.domain), next: next,
 			viewport: viewport, pageScrolls: try pageScrolls.map { try $0.map(points) }, pageScrollUndecided: pageScrollUndecided,
-			dpr: dpr, fontFiles: fonts, bands: bands)
+			dpr: dpr, fontFiles: fonts, bands: bands,
+			extents: assignments.map { assignment in
+				let byId = Dictionary(uniqueKeysWithValues: assignment.nodes.map { ($0.id, $0) })
+				func top(_ id: String?) -> Double {
+					guard let id, let node = byId[id] else { return 0 }
+					return (node.frame?.y ?? 0) + top(node.parent)
+				}
+				return (assignment.nodes.compactMap { node in node.frame.map { top(node.parent) + $0.y + $0.height } }.max() ?? 0) / dpr
+			})
 	}
 
 	private func resolveNodes(
-		_ nodes: [StyleNode], for payload: NativeViewPayload, initialTexts: [(node: String, text: String)]?
+		_ nodes: [StyleNode], for payloadNodes: [NativeNode], root: String?, initialTexts: [(node: String, text: String)]?
 	) throws -> [String: ResolvedStyle] {
 		let byId = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
-		let payloadIds = Set(payload.nodes.map(\.id))
+		let payloadIds = Set(payloadNodes.map(\.id))
 		let texts = initialTexts.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.node, $0.text) }) }
 		var styles: [String: ResolvedStyle] = [:]
-		for node in payload.nodes {
+		for node in payloadNodes {
 			if case .branch = node.kind { throw styleError("\(node.id): @if is not styled on iOS yet, the style export lays out one state") }
 			if case .repeat = node.kind { throw styleError("\(node.id): @for is not styled on iOS yet, the style export lays out one state") }
-			if case .sheet = node.kind { throw styleError("\(node.id): a system sheet's content is not styled on iOS yet, the style export lays out one page") }
+			if case .sheet = node.kind { throw styleError("\(node.id): a system sheet inside another sheet's content is not styled on iOS") }
 			guard let styled = byId[node.id] else { throw styleError("no style export node for \(node.id)") }
 			switch node.kind {
 			case .element:
@@ -144,7 +190,7 @@ extension StyleExport {
 				offset.y += skipped.frame?.y ?? 0
 				cursor = skipped.parent
 			}
-			guard cursor == node.parent else {
+			guard cursor == (node.parent == root ? nil : node.parent) else {
 				throw styleError("\(node.id)'s parent is \(node.parent ?? "none") in the payload, \(cursor ?? "none") in the style export")
 			}
 			var style = try resolve(styled, styled.writes)

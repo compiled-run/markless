@@ -110,7 +110,7 @@ final class DrawingView: UIView {
 
 	override func draw(_ rect: CGRect) {
 		guard let context = UIGraphicsGetCurrentContext() else { return }
-		if let box = drawing.viewBox, box[2] > 0, box[3] > 0 {
+		if let box = drawing.viewBox?.map({ CGFloat($0) }), box[2] > 0, box[3] > 0 {
 			// SVG 2 xMidYMid meet: one scale that fits both axes, the rest centred.
 			let scale = min(bounds.width / box[2], bounds.height / box[3])
 			context.translateBy(x: -box[0] * scale + (bounds.width - box[2] * scale) / 2, y: -box[1] * scale + (bounds.height - box[3] * scale) / 2)
@@ -191,6 +191,10 @@ final class ViewTree {
 	weak var presenter: UIViewController?
 	private var anchors = Set<ObjectIdentifier>()
 	private var assignment: Int
+	/// Each styled sheet's layout per resting height, the height it rests at, and each height's current assignment.
+	private var sheetStyles: [String: (heights: [(snapPoint: Double, layout: StyleLayout)], height: Int, assignments: [Int])] = [:]
+	/// The sheet each node inside a system sheet belongs to.
+	private let sheetOf: [String: String]
 	/// A tap on the page dismisses the keyboard; a stack makes it wait for its edge-swipe Back.
 	let dismissGestures: [UIGestureRecognizer] = [UITapGestureRecognizer()]
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
@@ -230,7 +234,8 @@ final class ViewTree {
 	private var ticks: [String: (radio: Bool, checked: Bool)] = [:]
 
 	init(
-		runtime: NativeRuntime, layout: StyleLayout?, faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void,
+		runtime: NativeRuntime, layout: StyleLayout?, sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:],
+		faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void,
 		objectView: @escaping (_ object: String, _ device: String) throws -> UIView = { object, _ in throw HostError("no device to show \(object)") }
 	) throws {
 		self.runtime = runtime
@@ -257,6 +262,13 @@ final class ViewTree {
 			slots[key, default: []].append(node.id)
 		}
 		self.slots = slots
+		var sheetOf: [String: String] = [:]
+		for node in payload.nodes {
+			guard let parent = node.parent else { continue }
+			if case .sheet = nodes[parent]?.kind { sheetOf[node.id] = parent } else if let sheet = sheetOf[parent] { sheetOf[node.id] = sheet }
+		}
+		self.sheetOf = sheetOf
+		sheetStyles = sheetLayouts.mapValues { heights in (heights, 0, heights.map(\.layout.start)) }
 		events = Dictionary(grouping: payload.events, by: \.host)
 		page.contentInsetAdjustmentBehavior = .always
 		page.accessibilityIdentifier = "markless-page"
@@ -380,13 +392,6 @@ final class ViewTree {
 		UIAccessibility.post(notification: .announcement, argument: text)
 	}
 
-	/// Brings a view into sight; only a scrolling ancestor can.
-	private func reveal(_ view: UIView) {
-		var ancestor = view.superview
-		while let candidate = ancestor, !(candidate is UIScrollView) { ancestor = candidate.superview }
-		if let scroll = ancestor as? UIScrollView { scroll.scrollRectToVisible(view.convert(view.bounds, to: scroll), animated: false) }
-	}
-
 	/// The colour behind the page in the current assignment: the export's canvas, else the web canvas's white.
 	var canvas: UIColor? { layout.map { $0.canvases[assignment].map(uiColor) ?? .white } }
 
@@ -466,10 +471,13 @@ final class ViewTree {
 			case let .command(node, command, preventScroll):
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				root.layoutIfNeeded()
-				// As on the web, focus brings the element into view unless told not to.
-				if command == "scrollIntoView" || !preventScroll { reveal(view) }
+				// As on the web: scrollIntoView aligns the element to the start; focus brings it into view unless told not to.
 				if command == "scrollIntoView" {
-				} else if view is UITextField {
+					bringIntoView(view, block: scrollIntoViewAlign.block, inline: scrollIntoViewAlign.inline)
+					break
+				}
+				if !preventScroll { bringIntoView(view, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline) }
+				if view is UITextField {
 					view.becomeFirstResponder()
 				} else {
 					UIAccessibility.post(notification: .layoutChanged, argument: view)
@@ -478,7 +486,7 @@ final class ViewTree {
 				guard let view = elements[node] else { throw HostError("journal names field \(node), which is not shown") }
 				if let field = view as? UITextField {
 					root.layoutIfNeeded()
-					reveal(field)
+					bringIntoView(field, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
 					field.becomeFirstResponder()
 				}
 				show(text)
@@ -494,11 +502,17 @@ final class ViewTree {
 			case let .clearTimer(timer):
 				timers.removeValue(forKey: timer)?.cancel()
 			case let .state(cell, value):
-				guard let layout else { continue }
-				assignment = try layout.next(from: assignment, cell: cell, value: value)
-				for (id, view) in elements.map({ ($0.key, $0.value as UIView) }) + labels.map({ ($0.key, $0.value as UIView) }) {
-					if let style = style(of: id) { try place(id, view, style) }
+				if let layout, cell != StyleBands.state || layout.stateCells.contains(cell) {
+					assignment = try layout.next(from: assignment, cell: cell, value: value)
 				}
+				for (sheet, styles) in sheetStyles {
+					var moved = styles
+					for (index, height) in styles.heights.enumerated() where height.layout.stateCells.contains(cell) {
+						moved.assignments[index] = try height.layout.next(from: styles.assignments[index], cell: cell, value: value)
+					}
+					sheetStyles[sheet] = moved
+				}
+				try repaint { _ in true }
 				try sizePage()
 			case let .arm(node, index):
 				guard let branch = branches[node], let context = contexts[node] else { throw HostError("journal names branch \(node), which is not shown") }
@@ -623,8 +637,37 @@ final class ViewTree {
 	}
 
 	private func style(of id: String) -> ResolvedStyle? {
-		guard let layout, let template = templates[id] else { return nil }
-		return layout.assignments[assignment][template]
+		guard let template = templates[id] else { return nil }
+		if let sheet = sheetOf[template] {
+			guard let styles = sheetStyles[sheet] else { return nil }
+			return styles.heights[styles.height].layout.assignments[styles.assignments[styles.height]][template]
+		}
+		return layout?.assignments[assignment][template]
+	}
+
+	private func repaint(where included: (String) -> Bool) throws {
+		for (id, view) in elements.map({ ($0.key, $0.value as UIView) }) + labels.map({ ($0.key, $0.value as UIView) }) where included(id) {
+			if let style = style(of: id) { try place(id, view, style) }
+		}
+	}
+
+	/// The sheet came to rest at another height: its content takes that height's layout.
+	private func sheetRested(_ sheet: String, at snapPoint: Double) throws {
+		guard var styles = sheetStyles[sheet], let height = styles.heights.firstIndex(where: { $0.snapPoint == snapPoint }) else { return }
+		guard height != styles.height else { return }
+		styles.height = height
+		sheetStyles[sheet] = styles
+		try repaint { id in templates[id].flatMap { sheetOf[$0] } == sheet }
+	}
+
+	/// A styled sheet's content area at a resting height, and the size its document takes there.
+	private func sheetArea(_ sheet: String, at snapPoint: Double) -> (viewport: CGSize, content: CGSize)? {
+		guard let styles = sheetStyles[sheet], let index = styles.heights.firstIndex(where: { $0.snapPoint == snapPoint }) else { return nil }
+		let layout = styles.heights[index].layout
+		let extent = layout.extents[styles.assignments[index]]
+		return (
+			CGSize(width: layout.viewport.width, height: layout.viewport.height),
+			CGSize(width: layout.viewport.width, height: max(layout.viewport.height, extent)))
 	}
 
 	private func settle(_ container: UIView, built: [String], _ context: Context) {
@@ -871,6 +914,14 @@ final class ViewTree {
 					if !dismissedBy.isEmpty { onAction(NativeAction(event: .dismiss, host: id)) }
 				}
 				sheet.content.accessibilityIdentifier = id
+				if sheetStyles[template] != nil {
+					sheet.area = { [weak self] snapPoint in self?.sheetArea(template, at: snapPoint) }
+					sheet.onRest = { [weak self] snapPoint in
+						do { try self?.sheetRested(template, at: snapPoint) } catch { fatalError("Markless iOS host: \(error)") }
+					}
+				} else if layout != nil {
+					throw HostError("system sheet \(id) is on a styled page but has no styles of its own")
+				}
 				var childIndex = 0
 				_ = try build(template, in: sheet.content, at: &childIndex, Context())
 				sheets[id] = sheet
@@ -1416,6 +1467,7 @@ private func uiColor(_ color: RGBA) -> UIColor {
 	UIColor(red: color.r / 255, green: color.g / 255, blue: color.b / 255, alpha: color.alpha / 255)
 }
 /// One sublayer per side, for borders whose sides differ; Chrome's diagonal corner joins are not drawn.
+@MainActor
 private func paintSides(_ view: UIView, _ sides: [ResolvedStyle.Side]?) {
 	let name = "markless-border-side"
 	view.layer.sublayers?.filter { $0.name == name }.forEach { $0.removeFromSuperlayer() }

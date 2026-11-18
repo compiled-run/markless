@@ -199,7 +199,16 @@ export async function buildAndroidShell(
 		...filesUnder(generated, '.java'),
 	]);
 	const classpath = [tools.androidJar, classes, ...libraries.jars].join(':');
-	await exec('kotlinc', ['-classpath', classpath, '-jvm-target', '17', '-nowarn', '-d', classes, ...sources]);
+	await exec('kotlinc', [
+		'-classpath',
+		classpath,
+		'-jvm-target',
+		'17',
+		'-nowarn',
+		'-d',
+		classes,
+		...sources,
+	]);
 	await exec(join(tools.buildTools, 'd8'), [
 		'--min-api',
 		'26',

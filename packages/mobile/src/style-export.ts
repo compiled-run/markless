@@ -15,7 +15,8 @@ export const dragonDir = (): string =>
 export function dragonStyleExport(inputPath: string, dir: string = dragonDir()): Uint8Array {
 	const manifest = join(dir, 'package.json');
 	const scripts = existsSync(manifest)
-		? ((JSON.parse(readFileSync(manifest, 'utf8')) as { scripts?: Record<string, string> }).scripts ?? {})
+		? ((JSON.parse(readFileSync(manifest, 'utf8')) as { scripts?: Record<string, string> })
+				.scripts ?? {})
 		: {};
 	if (!scripts[DRAGON_STYLE_SCRIPT])
 		throw new Error(
@@ -25,13 +26,28 @@ export function dragonStyleExport(inputPath: string, dir: string = dragonDir()):
 	try {
 		const out = join(scratch, 'native-style.json');
 		try {
-			execFileSync('pnpm', ['--silent', '--dir', dir, 'run', DRAGON_STYLE_SCRIPT, '--', resolve(inputPath), out], {
-				encoding: 'utf8',
-				stdio: ['ignore', 'pipe', 'pipe'],
-			});
+			execFileSync(
+				'pnpm',
+				[
+					'--silent',
+					'--dir',
+					dir,
+					'run',
+					DRAGON_STYLE_SCRIPT,
+					'--',
+					resolve(inputPath),
+					out,
+				],
+				{
+					encoding: 'utf8',
+					stdio: ['ignore', 'pipe', 'pipe'],
+				},
+			);
 		} catch (error) {
 			const failed = error as { stdout?: string; stderr?: string };
-			throw new Error(`Dragon refused the styles:\n${[failed.stdout, failed.stderr].filter(Boolean).join('\n').trim()}`);
+			throw new Error(
+				`Dragon refused the styles:\n${[failed.stdout, failed.stderr].filter(Boolean).join('\n').trim()}`,
+			);
 		}
 		return readFileSync(out);
 	} finally {

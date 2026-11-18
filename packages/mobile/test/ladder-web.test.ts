@@ -25,6 +25,7 @@ import {
 	callsText,
 	proofsDir,
 	readRung,
+	sheetStyleRungFolders,
 	styleRungFolders,
 	SWIPES_UNTIL,
 	type LadderRung,
@@ -83,6 +84,7 @@ async function serveRung(
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router', 'device'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
+	// `base.camera` comes from the headless parts, which the camera rung imports.
 	await symlink(
 		join(packagesRoot, 'headless/components'),
 		join(root, 'node_modules/@markless/ui'),
@@ -304,7 +306,7 @@ describe.each(allRungFolders())('%s', (folder) => {
 		for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 	}, 60_000);
 
-	const styled = styleRungFolders().includes(folder);
+	const styled = [...styleRungFolders(), ...sheetStyleRungFolders()].includes(folder);
 	test.each(styled ? (['ios', 'android'] as const) : ([undefined] as const))(
 		`${rung.name}: the web build shows every step's expected texts%s`,
 		{ timeout: 60_000 },

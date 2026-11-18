@@ -123,7 +123,6 @@ class MarklessHost(
 	/** The page's own box when its top holds more than one node (text at the top of the page). */
 	private val pageBox: MarklessBox?
 	private val baseTextSize = TextView(context).textSize
-	private var assignment = style?.start(payload.cells.filter { it.styled }.map { it.id }, runtime::value, isDark(context.resources.configuration)) ?: 0
 	private val expanded = HashMap<View, Boolean?>()
 	private val sheets = LinkedHashMap<String, SystemSheet>()
 	/** Each view's current attributes, for the relations and roles the accessibility delegate reports. */
@@ -132,10 +131,53 @@ class MarklessHost(
 	private val scrollers = HashMap<String, Pair<List<FrameLayout>, MarklessBox>>()
 	private val dpr = context.resources.displayMetrics.density.toDouble()
 	private var enterPressedAt = Long.MIN_VALUE / 2
-	private val absolutes: List<Map<String, Pair<Double, Double>>> = style?.let {
-		if (Math.abs(dpr - it.dpr) > 1e-3) throw MarklessHostError("style export is for pixel ratio ${it.dpr}; this device is $dpr")
-		it.assignments.map { a -> absoluteOrigins(a.nodes) }
-	} ?: emptyList()
+	private val styledCells = payload.cells.filter { it.styled }.map { it.id }
+
+	/** One laid-out document (the page, or a sheet's content at one resting height) and the assignment it shows. */
+	private inner class Layout(val export: StyleExport, everyCell: Boolean) {
+		var assignment = export.start(styledCells, runtime::value, isDark(context.resources.configuration), everyCell)
+		val absolutes: List<Map<String, Pair<Double, Double>>> = export.assignments.map { a -> absoluteOrigins(a.nodes) }
+
+		init {
+			if (Math.abs(dpr - export.dpr) > 1e-3) throw MarklessHostError("style export is for pixel ratio ${export.dpr}; this device is $dpr")
+		}
+
+		/** Moves to the assignment [cell] = [value] reaches; false when no state of this document follows [cell]. */
+		fun advance(cell: String, value: JsValue): Boolean {
+			val state = if (cell == BAND_KEY) export.bandState else export.stateOrNone(cell)
+			if (state < 0) return false
+			assignment = export.next(assignment, state, value)
+			return true
+		}
+
+		/** The bottom edge of its lowest box, in device px from the document's top. */
+		fun contentBottom(): Double = export.assignments[assignment].nodes.maxOf { n -> (absolutes[assignment][n.id]?.second ?: 0.0) + (n.frame?.height ?: 0.0) }
+	}
+
+	private val page: Layout? = style?.let { Layout(it, everyCell = true) }
+
+	/** The system sheet whose content each payload node is, if any. */
+	private val sheetOf: Map<String, String?> = HashMap<String, String?>().apply {
+		val byId = payload.nodes.associateBy { it.id }
+		for (n in payload.nodes) {
+			var at = n.parent
+			while (at != null && byId[at] !is Node.Sheet) at = byId[at]?.parent
+			put(n.id, at)
+		}
+	}
+
+	/** Each styled sheet's layouts, in its snap point order, and the one its resting height shows. */
+	private class SheetLayouts(val snapPoints: List<Double>, val layouts: List<Layout>) {
+		var current = 0
+		var warned = false
+	}
+	private val sheetLayouts = LinkedHashMap<String, SheetLayouts>()
+
+	private fun sheetLayout(id: String): Layout? = sheetLayouts[id]?.let { it.layouts[it.current] }
+
+	private fun layoutOf(node: Node): Layout? = sheetOf[node.id]?.let { sheetLayout(it) } ?: page
+
+	private fun allLayouts(): List<Layout> = listOfNotNull(page) + sheetLayouts.values.flatMap { it.layouts }
 
 	/** The root's frame inside the viewport, when a style export placed it. */
 	var rootFrame: Rect? = null
@@ -184,7 +226,11 @@ class MarklessHost(
 			if (sheet.dismissible && runtime.handlerFor(sheet.id, EventName.Dismiss) == null) throw MarklessHostError("\"${sheet.id}\" is dismissible but has no dismiss handler")
 			val content = MarklessBox(context).apply { named(this, sheet.id) }
 			views[sheet.id] = content
-			sheets[sheet.id] = SystemSheet(context, sheet, content) { closedByPlatform(sheet.id) }
+			style?.let { st ->
+				sheetLayouts[sheet.id] = SheetLayouts(sheet.snapPoints, st.sheetHeights(sheet.id, sheet.snapPoints).map { Layout(it, everyCell = false) })
+				content.setBackgroundColor(android.graphics.Color.WHITE)
+			}
+			sheets[sheet.id] = SystemSheet(context, sheet, content, onRest = { snapPoint, width, height -> rested(sheet.id, snapPoint, width, height) }) { closedByPlatform(sheet.id) }
 		}
 		for (cell in payload.cells) cell.device?.let { runtime.device(cell.id, needDevice().read(it, cell.obj)) }
 		buildShown()
@@ -379,9 +425,10 @@ class MarklessHost(
 					val field = view(entry.node) as? EditText ?: throw MarklessHostError("journal sets the value of \"${entry.node}\", which is not an input")
 					if (field.text.toString() != entry.value) { field.setText(entry.value); field.setSelection(entry.value.length) }
 				}
-				is JournalEntry.State -> style?.let { st ->
-					assignment = st.next(assignment, st.stateFor(entry.node), entry.value)
-					repaint(st)
+				is JournalEntry.State -> if (page != null) {
+					if (!page.advance(entry.node, entry.value)) throw MarklessHostError("style export has no state for cell \"${entry.node}\"")
+					for (s in sheetLayouts.values) for (l in s.layouts) l.advance(entry.node, entry.value)
+					repaint()
 				}
 				is JournalEntry.Check -> if (entry.node !in inert) (view(entry.node) as? CompoundButton ?: throw MarklessHostError("journal sets the checkedness of \"${entry.node}\", which is not a checkbox or radio button")).isChecked = entry.checked
 				is JournalEntry.Dialog -> dialog(entry.node, entry.open)
@@ -418,26 +465,49 @@ class MarklessHost(
 	}
 
 	/** The colour behind the page in the current assignment (the export's canvas, else the web canvas's white); null unstyled. */
-	val canvasColor: Int? get() = style?.let { it.assignments[assignment].canvas?.argb ?: Color.WHITE }
+	val canvasColor: Int? get() = page?.let { it.export.assignments[it.assignment].canvas?.argb ?: Color.WHITE }
 
 	/** Called with [canvasColor] whenever the assignment changes. */
 	var onCanvas: ((Int) -> Unit)? = null
 
 	/** The device's appearance changed: move to the @media band it selects, as a cell's `state` entry moves to its assignment. */
 	fun configurationChanged(configuration: Configuration) {
-		val st = style ?: return
-		if (st.bandState < 0) return
-		val band = st.band(isDark(configuration))
-		if (st.assignments[assignment].values[BAND_KEY] == JsValue.Num(band.toDouble())) return
-		assignment = st.next(assignment, st.bandState, JsValue.Num(band.toDouble()))
-		repaint(st)
-		Log.i(TAG, "band $band (${if (isDark(configuration)) "dark" else "light"}), style assignment $assignment")
+		var changed = false
+		for (l in allLayouts()) {
+			if (l.export.bandState < 0) continue
+			val band = JsValue.Num(l.export.band(isDark(configuration)).toDouble())
+			if (l.export.assignments[l.assignment].values[BAND_KEY] == band) continue
+			l.advance(BAND_KEY, band)
+			changed = true
+		}
+		if (!changed) return
+		repaint()
+		Log.i(TAG, "band (${if (isDark(configuration)) "dark" else "light"}), style assignments ${allLayouts().map { it.assignment }}")
 	}
 
-	private fun repaint(st: StyleExport) {
+	/** A sheet came to rest at [snapPoint]: its content takes that height's layout. */
+	private fun rested(id: String, snapPoint: Double, widthPx: Int, heightPx: Int) {
+		val s = sheetLayouts[id] ?: return
+		val at = s.snapPoints.indexOf(snapPoint)
+		if (at < 0) throw MarklessHostError("sheet \"$id\" rests at $snapPoint, not one of ${s.snapPoints}")
+		val layout = s.layouts[at]
+		val w = widthPx / dpr; val h = heightPx / dpr
+		if (!s.warned && (Math.abs(w - layout.export.viewportWidth) > 1 || Math.abs(h - layout.export.viewportHeight) > 1)) {
+			s.warned = true
+			Log.w(TAG, "sheet \"$id\" at $snapPoint shows its content in ${w}x$h dp, but its styles were laid out for ${layout.export.viewportWidth}x${layout.export.viewportHeight} (a Pixel 7, API 36)")
+		}
+		if (at == s.current) return
+		s.current = at
+		repaint()
+		Log.i(TAG, "sheet $id at $snapPoint, style assignment ${layout.assignment}")
+	}
+
+	private fun repaint() {
 		canvasColor?.let { onCanvas?.invoke(it) }
-		for (inst in built.values.sortedBy { order.getValue(it.node.id) }) place(inst, views.getValue(inst.id), st)
+		for (inst in built.values.sortedBy { order.getValue(it.node.id) }) place(inst, views.getValue(inst.id))
 		root.requestLayout()
+		// A sheet's boxes live in its dialog, outside the page's root.
+		for (view in views.values) if (view is MarklessBox) view.requestLayout()
 	}
 
 	/** After an arm or rows entry: drop instances no longer shown, build the new ones from current values, then put each parent's children in order. */
@@ -507,7 +577,7 @@ class MarklessHost(
 				box.addView(view)
 				reorder(box)
 			}
-			style?.let { place(inst, view, it) }
+			if (style != null) place(inst, view)
 		}
 		for (id in fresh) render(id)
 	}
@@ -662,7 +732,7 @@ class MarklessHost(
 				}
 			}
 		}
-		style?.assignments?.get(assignment)?.byId?.get(inst.id)?.let { styled -> scrollContainer(inst.id, view, styled) }
+		layoutOf(inst.node)?.let { l -> l.export.assignments[l.assignment].byId[inst.id] }?.let { styled -> scrollContainer(inst.id, view, styled) }
 		views[inst.id] = view
 		if (!unseen && type !in TICKABLE) for (b in node.bindings) if (b.property && b.name == "value") (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
 		// A field's `value` attribute is its text until something sets it, as on the web.
@@ -776,7 +846,7 @@ class MarklessHost(
 		val st = style ?: return null
 		val w = (st.viewportWidth * dpr).roundToInt()
 		val h = (st.viewportHeight * dpr).roundToInt()
-		val range = st.assignments[assignment].pageScroll
+		val range = st.assignments[page!!.assignment].pageScroll
 		if (range != null) {
 			if (range.minX != 0.0 || range.minY != 0.0 || range.maxX != 0.0) throw MarklessHostError("a page scroll range of $range (wider than the screen, or starting before 0) is not implemented on Android")
 			return w to h + range.maxY.roundToInt()
@@ -838,9 +908,9 @@ class MarklessHost(
 
 	/** `focus()`: a text field takes the keyboard, anything else TalkBack's cursor; `scrollIntoView()`: its scrolling ancestors bring it on screen. */
 	private fun command(view: View, command: String, preventScroll: Boolean) {
-		// As on the web, focus brings the element into view unless told not to.
-		if (command == "scrollIntoView" || !preventScroll) view.requestRectangleOnScreen(android.graphics.Rect(0, 0, view.width, view.height), true)
-		if (command == "scrollIntoView") return
+		// As on the web: scrollIntoView aligns the element to the start; focus brings it into view unless told not to.
+		if (command == "scrollIntoView") return bringIntoView(view, dev.markless.mobile.core.SCROLL_INTO_VIEW)
+		if (!preventScroll) bringIntoView(view, dev.markless.mobile.core.FOCUS_INTO_VIEW)
 		if (view is EditText) {
 			view.requestFocus()
 			(context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).showSoftInput(view, 0)
@@ -949,12 +1019,13 @@ class MarklessHost(
 		}
 	}
 
-	private fun place(inst: Instance, view: View, style: StyleExport) {
+	private fun place(inst: Instance, view: View) {
 		val node = inst.node
-		val styled = style.assignments[assignment]
+		val layout = layoutOf(node) ?: return
+		val styled = layout.export.assignments[layout.assignment]
 		val s = styled.byId[inst.id] ?: throw MarklessHostError("style export has no node \"${inst.id}\"")
 		if (s.kind != (if (node is Node.Text) "text" else "element")) throw MarklessHostError("style node \"${inst.id}\" is a ${s.kind}")
-		val absolute = absolutes[assignment]
+		val absolute = layout.absolutes[layout.assignment]
 		val frame = s.frame
 		val origin = absolute[s.id]
 		if (inst.id in inert) {
@@ -967,6 +1038,8 @@ class MarklessHost(
 			return
 		}
 		view.visibility = View.VISIBLE
+		val sheet = sheetOf[node.id]
+		if (sheet != null) (views.getValue(sheet) as MarklessBox).fixedSize = Math.round(layout.export.viewportWidth * dpr).toInt() to Math.round(maxOf(layout.export.viewportHeight * dpr, layout.contentBottom())).toInt()
 		val (ax, ay) = origin
 		val parentId = parentOf(inst)
 		if (node is Node.Text && view is Button) {
@@ -974,7 +1047,8 @@ class MarklessHost(
 			val box = styled.byId.getValue(parentId).frame!!
 			view.setPadding((ax - bx).roundToInt(), (ay - by).roundToInt(), (bx + box.width).roundToInt() - (ax + frame.width).roundToInt(), (by + box.height).roundToInt() - (ay + frame.height).roundToInt())
 		} else {
-			var (ox, oy) = parentId?.let { absolute.getValue(it) }?.let { it.first.roundToInt() to it.second.roundToInt() } ?: (0 to 0)
+			// A sheet's top-level content sits in the sheet's content box, which is its document's origin.
+			var (ox, oy) = parentId?.takeIf { it != sheet }?.let { absolute.getValue(it) }?.let { it.first.roundToInt() to it.second.roundToInt() } ?: (0 to 0)
 			// Inside a scroll container, frames count from its padding box, where its content box starts.
 			parentId?.let { scrollers[it] }?.let { styled.byId.getValue(parentId).borderWidths?.let { bw -> ox += bw.left.roundToInt(); oy += bw.top.roundToInt() } }
 			// Text rounds outward: a run a fraction of a pixel narrower than its frame wraps.
@@ -991,14 +1065,15 @@ class MarklessHost(
 
 	/** After layout: the largest gap, in device px, between any edge of a view's laid-out box (relative to the root) and its Dragon frame. */
 	fun frameDeviation(): Double {
-		val style = style ?: throw MarklessHostError("no style export to compare frames with")
-		val absolute = absolutes[assignment]
-		val styled = style.assignments[assignment]
+		val page = page ?: throw MarklessHostError("no style export to compare frames with")
+		val absolute = page.absolutes[page.assignment]
+		val styled = page.export.assignments[page.assignment]
 		val origin = absolute.getValue(payload.nodes.first().id)
 		val rootAt = IntArray(2).also { root.getLocationInWindow(it) }
 		var worst = 0.0
 		for (inst in built.values.sortedBy { order.getValue(it.node.id) }) {
 			val node = inst.node
+			if (sheetOf[node.id] != null) continue
 			val view = views.getValue(inst.id)
 			if (view.visibility == View.GONE) continue
 			val frame = styled.byId.getValue(inst.id).frame!!

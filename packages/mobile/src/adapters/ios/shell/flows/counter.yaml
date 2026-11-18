@@ -2,12 +2,12 @@ appId: dev.markless.shell.ioshost
 ---
 - launchApp
 - assertVisible:
-    text: "Counter"
+      text: 'Counter'
 - tapOn:
-    text: "Count 0"
-    id: "h2"
+      text: 'Count 0'
+      id: 'h2'
 - assertVisible:
-    text: "Count 1"
-    id: "h2"
-- tapOn: "Count 1"
-- assertVisible: "Count 2"
+      text: 'Count 1'
+      id: 'h2'
+- tapOn: 'Count 1'
+- assertVisible: 'Count 2'

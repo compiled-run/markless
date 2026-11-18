@@ -27,6 +27,8 @@ name: s3-state-styles
 - assertNotVisible: Notifications
 - assertVisible: Help
 - setDarkMode: enabled
+- waitForAnimationToEnd:
+      timeout: 5000
 - assertVisible: How alerts work
 - assertVisible: Help
 - runFlow:
@@ -48,6 +50,8 @@ name: s3-state-styles
 - assertNotVisible: How alerts work
 - assertVisible: Settings
 - setDarkMode: disabled
+- waitForAnimationToEnd:
+      timeout: 5000
 - assertVisible: Notifications
 - assertVisible: Alerts on
 - assertVisible: Settings

@@ -14,6 +14,12 @@ import { startEchoServer } from './echo-server.ts';
 import { exec } from './exec.ts';
 import { instrumentFlow } from './flow.ts';
 import {
+	androidHostTests,
+	describeHostTests,
+	iosHostTests,
+	type HostTestOutcome,
+} from './host-tests.ts';
+import {
 	bootSimulator,
 	buildIosShell,
 	installProofApp,
@@ -26,14 +32,17 @@ import { PROOF_REPORT_VERSION, proofVerdict, type ProofReport } from './report.t
 import { loadRung, type ProofRung } from './rung.ts';
 import { verdictCommand } from './verdict.ts';
 import { androidTools, cacheRoot } from './tools.ts';
+import { dragonDir } from '../style-export.ts';
 
 const USAGE = `usage: markless-proof [options] <rung folder>...
        markless-proof verdict <dir>/ios.json <dir>/android.json
+       markless-proof host-tests --platform ios|android [--simulator <name>]
 
 Builds each rung (packages/mobile/proofs/<nn>-<name>/) for iOS and Android, installs it on a simulator and an emulator
 this command boots (and shuts down afterwards), runs the rung's flow.yaml with Maestro on both, saves a screenshot after
 each step and before each action under <rung>/screenshots/{ios,android}/ and checks expected.json. Exits 1 unless both platforms pass
-every rung.
+every rung. Before any rung, the hosts' own tests run (the iOS package on the simulator, the Kotlin host's JVM test); a
+failure there stops the run. \`host-tests\` runs only those.
 
   --host adapters|stub   the platform hosts in src/adapters (default) or the harness's hand-made stand-ins
   --simulator <name>     iOS simulator to use or create (default $MARKLESS_PROOF_SIMULATOR or markless-proof)
@@ -84,8 +93,42 @@ type PlatformOutcome = {
 const seconds = (since: number) => (performance.now() - since) / 1000;
 const fixed = (value: number) => value.toFixed(1);
 
+/** The Dragon checkout when there is one: the iOS UIKit tests that paint with its faces read their files from it. */
+const dragonCheckout = (): string | undefined => {
+	const dir = dragonDir();
+	return existsSync(join(dir, 'package.json')) ? dir : undefined;
+};
+
+async function hostTestsCommand(argv: string[]): Promise<number> {
+	const { values } = parseArgs({
+		args: argv,
+		options: {
+			platform: { type: 'string' },
+			simulator: {
+				type: 'string',
+				default: process.env.MARKLESS_PROOF_SIMULATOR ?? 'markless-proof',
+			},
+		},
+	});
+	const hosts = join(mobileDir, 'src', 'adapters');
+	let outcome: HostTestOutcome;
+	if (values.platform === 'ios') {
+		const simulator = await bootSimulator(values.simulator);
+		try {
+			outcome = await iosHostTests(join(hosts, 'ios'), simulator.udid, dragonCheckout());
+		} finally {
+			await shutdownSimulator(simulator);
+		}
+	} else if (values.platform === 'android') {
+		outcome = await androidHostTests(join(hosts, 'android', 'src'));
+	} else throw new Error(`host-tests needs --platform ios or android, not ${values.platform}`);
+	console.log(describeHostTests(outcome));
+	return outcome.passed ? 0 : 1;
+}
+
 async function main(argv: string[]): Promise<number> {
 	if (argv[0] === 'verdict') return verdictCommand(argv.slice(1));
+	if (argv[0] === 'host-tests') return hostTestsCommand(argv.slice(1));
 	const { values, positionals } = parseArgs({
 		args: argv,
 		allowPositionals: true,
@@ -147,6 +190,20 @@ async function main(argv: string[]): Promise<number> {
 		console.log(
 			`devices and shells ready in ${fixed(seconds(setupStarted))} s (${devices.join(', ')})`,
 		);
+		// The stand-in host has no tests of its own.
+		if (values.host === 'adapters') {
+			const outcomes = await Promise.all([
+				simulator
+					? iosHostTests(hosts.iosPackage, simulator.udid, dragonCheckout())
+					: undefined,
+				runs('android') ? androidHostTests(hosts.androidSources) : undefined,
+			]);
+			for (const outcome of outcomes) if (outcome) console.log(describeHostTests(outcome));
+			if (outcomes.some((outcome) => outcome && !outcome.passed)) {
+				console.log('host tests failed: no rung runs on a host whose own tests fail');
+				return 1;
+			}
+		}
 
 		for (const [index, rung] of rungs.entries()) {
 			const flow = flows[index]!;

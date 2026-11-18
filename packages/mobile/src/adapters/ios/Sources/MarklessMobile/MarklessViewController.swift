@@ -21,8 +21,9 @@ public final class MarklessViewController: UIViewController {
 	private let device: NativeDevice
 	private var runtime: NativeRuntime
 	private var layout: StyleLayout?
-	/// The `@media` band the views show; nil without bands.
+	/// The `@media` band the views show, and the bands it is picked from; nil without bands.
 	private var band: Int?
+	private var bands: StyleBands?
 	private(set) var tree: ViewTree?
 	/// Set once the page's first frame is on screen: `idle` and `visible` wait for it, as the web waits for load.
 	private var appeared = false
@@ -86,7 +87,7 @@ public final class MarklessViewController: UIViewController {
 	}
 
 	private func applyBand() {
-		guard let bands = layout?.bands, let band else { return }
+		guard let bands, let band else { return }
 		do {
 			let now = try bands.band(dark: traitCollection.userInterfaceStyle == .dark)
 			guard now != band else { return }
@@ -122,13 +123,21 @@ public final class MarklessViewController: UIViewController {
 			if let name = cell.device { _ = try runtime.device(cell.id, try device.read(name, object: cell.object)) }
 		}
 		let dark = traitCollection.userInterfaceStyle == .dark
-		layout = try style.map { try $0.resolve(for: payload, initialTexts: try runtime.texts(), value: runtime.value(of:), dark: dark) }
-		band = try layout?.bands?.band(dark: dark)
+		let texts = try runtime.texts()
+		layout = try style.map { try $0.resolve(for: payload, initialTexts: texts, value: runtime.value(of:), dark: dark) }
+		var sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:]
+		for sheet in style?.sheets ?? [] {
+			sheetLayouts[sheet.node] = try style!.resolveSheet(sheet.node, for: payload, initialTexts: texts, value: runtime.value(of:), dark: dark)
+		}
+		bands = layout?.bands ?? sheetLayouts.values.joined().lazy.compactMap(\.layout.bands).first
+		band = try bands?.band(dark: dark)
 		let faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts)
 		let device = self.device
 		tree = try ViewTree(
-			runtime: runtime, layout: layout, faces: faces, onAction: { [weak self] action in self?.perform(action) },
+			runtime: runtime, layout: layout, sheetLayouts: sheetLayouts, faces: faces,
+			onAction: { [weak self] action in self?.perform(action) },
 			objectView: { object, kind in try device.view(for: object, device: kind) })
+		tree?.presenter = self
 		navigationItem.title = try runtime.title()
 		try runCalls(try runtime.tasks())
 	}
@@ -272,7 +281,7 @@ public final class MarklessViewController: UIViewController {
 		}
 		applyBand()
 		var pops = [navigationController?.interactivePopGestureRecognizer]
-		// The content pop gesture exists only in the iOS 26 SDK (Swift 6.2); older Xcodes build without it.
+		// The content swipe-back is iOS 26 API: Swift 6.2 (Xcode 26) is the first toolchain whose SDK declares it.
 		#if compiler(>=6.2)
 		if #available(iOS 26, *) { pops.append(navigationController?.interactiveContentPopGestureRecognizer) }
 		#endif

@@ -91,6 +91,12 @@ public struct StyleBands: Sendable {
 	}
 }
 
+/// A system sheet's styles: one export per resting height, each laid out in that height's content area.
+public struct SheetStyle: Sendable {
+	public let node: String
+	public let heights: [(snapPoint: Double, style: StyleExport)]
+}
+
 /// One target of a decoded `dragon.native-style-export/0` or `/1` file; `/0` reads as one assignment and no states.
 public struct StyleExport: Sendable {
 	public let fonts: [(id: String, file: String)]
@@ -110,6 +116,8 @@ public struct StyleExport: Sendable {
 	public let pageScrolls: [ScrollOffsetRange?]
 	/// Dragon's reason, for this target, when it leaves a page scroll range undecided.
 	public let pageScrollUndecided: String?
+	/// Each system sheet's content, laid out as its own document at every resting height (app style files only).
+	public var sheets: [SheetStyle] = []
 
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
@@ -157,11 +165,8 @@ public struct StyleExport: Sendable {
 		let targetFields = try chosen.object(["backend", "viewport", "dpr", "writes", "routes"])
 		let writes = try targetFields["writes"].array().map { list in _ = try list.array(); return list.value }
 		var routes: [String: StyleExport] = [:]
-		for route in try targetFields["routes"].array() {
-			let f = try route.object(
-				required: ["pattern", "component", "compiler", "readiness", "states", "initial", "next", "assignments"], optional: ["bands"])
-			let pattern = try f["pattern"].string()
-			_ = (try f["component"].string(), try f["compiler"].string())
+		let raw = { (fields: Fields, key: String) throws -> (String, JSONValue) in (key, try fields[key].value) }
+		let expanded = { (reader: Reader, f: Fields, viewport: (String, JSONValue)) throws -> StyleExport in
 			let assignments: [JSONValue] = try f["assignments"].array().map { assignment in
 				let a = try assignment.object(["values", "nodes", "canvas"])
 				let nodes: [JSONValue] = try a["nodes"].array().map { node in
@@ -172,14 +177,33 @@ public struct StyleExport: Sendable {
 				}
 				return .object([("values", try a["values"].value), ("nodes", .array(nodes)), ("canvas", try a["canvas"].value)])
 			}
-			let raw = { (fields: Fields, key: String) throws -> (String, JSONValue) in (key, try fields[key].value) }
 			var page: [(String, JSONValue)] = [
-				try raw(targetFields, "backend"), try raw(targetFields, "viewport"), try raw(targetFields, "dpr"),
+				try raw(targetFields, "backend"), viewport, try raw(targetFields, "dpr"),
 				try raw(f, "readiness"), try raw(f, "states"), try raw(f, "initial"), ("assignments", .array(assignments)), try raw(f, "next"),
 			]
 			if f.has("bands") { page.append(("bands", try f["bands"].value)) }
+			return try decodeTarget(try Reader(.object(page), at: reader.path), perState: true, fonts: fonts, backend: backend)
+		}
+		for route in try targetFields["routes"].array() {
+			let f = try route.object(
+				required: ["pattern", "component", "compiler", "readiness", "states", "initial", "next", "assignments"], optional: ["bands", "sheets"])
+			let pattern = try f["pattern"].string()
+			_ = (try f["component"].string(), try f["compiler"].string())
 			guard routes[pattern] == nil else { throw route.fail("route \(pattern) is listed twice") }
-			routes[pattern] = try decodeTarget(try Reader(.object(page), at: route.path), perState: true, fonts: fonts, backend: backend)
+			var style = try expanded(route, f, try raw(targetFields, "viewport"))
+			if f.has("sheets") {
+				style.sheets = try f["sheets"].array().map { sheet in
+					let s = try sheet.object(["node", "heights"])
+					let heights = try s["heights"].array().map { height in
+						let h = try height.object(
+							required: ["snapPoint", "viewport", "readiness", "states", "initial", "next", "assignments"], optional: ["bands"])
+						return (snapPoint: try h["snapPoint"].number(), style: try expanded(height, h, try raw(h, "viewport")))
+					}
+					guard !heights.isEmpty else { throw sheet.fail("a sheet's styles need at least one resting height") }
+					return SheetStyle(node: try s["node"].string(), heights: heights)
+				}
+			}
+			routes[pattern] = style
 		}
 		return routes
 	}

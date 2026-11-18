@@ -1,0 +1,187 @@
+{
+ "gateDevicePx": 1,
+ "compared": 20,
+ "failed": 0,
+ "rows": [
+  {
+   "target": "ios",
+   "values": {
+    "state:express": false
+   },
+   "id": "html",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:express": false
+   },
+   "id": "body",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:express": false
+   },
+   "id": "h3",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:express": false
+   },
+   "id": "h4",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:express": false
+   },
+   "id": "h4:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:express": true
+   },
+   "id": "html",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:express": true
+   },
+   "id": "body",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:express": true
+   },
+   "id": "h3",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:express": true
+   },
+   "id": "h4",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:express": true
+   },
+   "id": "h4:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:express": false
+   },
+   "id": "html",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:express": false
+   },
+   "id": "body",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:express": false
+   },
+   "id": "h3",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:express": false
+   },
+   "id": "h4",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:express": false
+   },
+   "id": "h4:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:express": true
+   },
+   "id": "html",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:express": true
+   },
+   "id": "body",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:express": true
+   },
+   "id": "h3",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:express": true
+   },
+   "id": "h4",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:express": true
+   },
+   "id": "h4:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  }
+ ]
+}

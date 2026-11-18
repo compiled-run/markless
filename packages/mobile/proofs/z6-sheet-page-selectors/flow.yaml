@@ -1,0 +1,14 @@
+appId: ${APP_ID}
+name: z6-sheet-page-selectors
+---
+- launchApp:
+      clearState: true
+- assertVisible: Spices
+- assertVisible: Pick a spice
+- assertNotVisible: Saffron
+- assertNotVisible: Coloured by the page
+- tapOn: Pick a spice
+- assertVisible: Saffron
+- assertVisible: Coloured by the page
+- assertVisible: Saffron
+- assertVisible: Coloured by the page
