@@ -1,10 +1,8 @@
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { expect, test } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 
@@ -50,13 +48,7 @@ test.each([
 	const root = await mkdtemp(join(tmpdir(), 'markless-navigate-first-use-'));
 	try {
 		await writeApp(root, helper);
-		const builder = await createBuilder({
-			root,
-			configFile: false,
-			logLevel: 'silent',
-			plugins: [markless(), router()],
-		});
-		await builder.buildApp();
+		await buildFixture({ root });
 		const closures = JSON.parse(
 			await readFile(join(root, '.output/.markless/public/interaction-closures.json'), 'utf8'),
 		) as {
