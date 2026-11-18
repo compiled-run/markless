@@ -94,6 +94,8 @@ export type SsrRenderOutput = {
 			readonly elementStart: number;
 			/** How many page elements precede the anchor's end. */
 			readonly elementEnd: number;
+			/** A @try in a keyed row: the boundary's own id, which `id` qualifies with the row. */
+			readonly site?: string;
 		}>;
 	};
 };

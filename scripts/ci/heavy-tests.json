@@ -69,6 +69,7 @@
 		"packages/bundler/test/prerender-arm-children.test.ts",
 		"packages/bundler/test/prerender-inline-event-record.test.ts",
 		"packages/bundler/test/prerender-late-event-types.test.ts",
+		"packages/bundler/test/prerender-wake-try.test.ts",
 		"packages/bundler/test/projection-live-arm.test.ts",
 		"packages/bundler/test/prop-decided-arm-callers.test.ts",
 		"packages/bundler/test/prop-decided-row-callers.test.ts",

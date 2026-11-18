@@ -42,6 +42,7 @@ import {
 	type PrerenderBoundaryArmRegistration,
 } from '../prerender/staged-boundary-authority.ts';
 import { marklessInstanceScopedLoadSymbol } from './instance-scope.ts';
+import { pageCommentCensus } from '../resume-anchor-census.ts';
 
 let journal: typeof import('../dom-journal.ts') | undefined;
 
@@ -124,6 +125,8 @@ export function resumePrerenderTriggerGroup(
 			dispatchRegistered: false,
 		};
 		stagedContainers.set(page, container);
+		// Records index the served page's comments; a settled arm holding a @try adds more.
+		input.root.__marklessComments ??= pageCommentCensus(input.root, true);
 		attachPrerenderBoundaryAuthority(input.root);
 		releaseRemovedHosts(input, container);
 	}

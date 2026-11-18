@@ -56,10 +56,7 @@ export type MarklessVirtualModuleType =
 	| 'trigger-group'
 	| 'style';
 
-export type BuiltPrerenderRecords = {
-	readonly state: import('@markless/serializer').ProtocolStatePayload;
-	readonly view: import('@markless/serializer').ProtocolViewPayload;
-};
+export type BuiltPrerenderRecords = import('./build/prerender.ts').BuiltPrerenderRecords;
 
 export interface MarklessVirtualModule {
 	id: string;
