@@ -525,6 +525,7 @@ class MarklessHost(
 				else -> continue
 			}
 			views[inst.id] = view
+			(node as? Node.Element)?.live?.let { view.accessibilityLiveRegion = if (it.assertive) View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE else View.ACCESSIBILITY_LIVE_REGION_POLITE }
 			built[inst.id] = inst
 			val parentId = parentOf(inst)
 			val outer = if (parentId != null) views[parentId] else pageBox

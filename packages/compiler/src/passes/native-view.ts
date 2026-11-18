@@ -223,6 +223,25 @@ const isNativeValue = (value: unknown): value is NativeValue =>
 		Object.getPrototypeOf(value) === Object.prototype &&
 		Object.values(value as object).every(isNativeValue));
 
+/** Every value an attribute expression can write, when each comes from a literal in it; undefined when one may not. */
+function writtenValuesOf(expr: NativeExpr): Set<string> | undefined {
+	if ('literal' in expr) return new Set(expr.literal === null || expr.literal === false ? [] : [String(expr.literal)]);
+	const parts =
+		'if' in expr
+			? [expr.whenTrue, expr.whenFalse]
+			: 'logical' in expr
+				? [expr.left, expr.right]
+				: undefined;
+	if (!parts) return undefined;
+	const values = new Set<string>();
+	for (const part of parts) {
+		const inner = writtenValuesOf(part);
+		if (!inner) return undefined;
+		for (const value of inner) values.add(value);
+	}
+	return values;
+}
+
 /** A first value as a native cell holds it: `undefined` is null, as a native expression spells it. */
 const nativeInitialOf = (value: unknown): unknown =>
 	value === undefined
@@ -1642,6 +1661,46 @@ export function createNativeViewPayload(
 	};
 
 	/** An element's attribute as the web writes it (null when absent), from what it was built with or a binding. */
+	/** What a screen reader announces when the text inside changes, as ARIA defines it from the attributes written. */
+	const liveRegionOf = (
+		element: string,
+		attributes: Readonly<Record<string, string>>,
+		bindings: ReadonlyArray<{ readonly attribute: string } | { readonly property: string }>,
+		span: SourceSpan | undefined,
+	): NonNullable<Extract<NativeNode, { kind: 'element' }>['live']> | undefined => {
+		const LIVE_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
+			role: new Set(['status', 'alert', 'log']),
+			'aria-live': new Set(['polite', 'assertive']),
+			'aria-atomic': new Set(['true', 'false']),
+		};
+		for (const [name, live] of Object.entries(LIVE_VALUES)) {
+			const bound = bindings.find(
+				(binding): binding is { readonly attribute: string; readonly value: NativeExpr } =>
+					'attribute' in binding && binding.attribute === name,
+			);
+			if (!bound) continue;
+			const values = writtenValuesOf(bound.value);
+			if (values && ![...values].some((value) => live.has(value))) continue;
+			refuse(`the \`${name}\` of a <${element}> follows state; a native host makes a live region when it builds the view`, span);
+			return undefined;
+		}
+		const role = attributes['role'];
+		const implicit = role === 'status' || role === 'alert' || (role === undefined && element === 'output');
+		const written = attributes['aria-live'];
+		const politeness =
+			written === 'polite' || written === 'assertive'
+				? written
+				: written === 'off'
+					? undefined
+					: role === 'alert'
+						? 'assertive'
+						: implicit || role === 'log'
+							? 'polite'
+							: undefined;
+		if (!politeness) return undefined;
+		const atomic = attributes['aria-atomic'] === undefined ? implicit : attributes['aria-atomic'] === 'true';
+		return { politeness, atomic };
+	};
 	/** Whether a click on the element does nothing on the web beyond its handlers, so `preventDefault()` there changes nothing. */
 	const clickHasNoDefault = (id: string): boolean => {
 		const byId = nodeById();
@@ -3057,6 +3116,7 @@ export function createNativeViewPayload(
 					if (result.title !== undefined && !('aria-label' in attributes))
 						attributes['aria-label'] = result.title;
 				}
+				const live = liveRegionOf(element ?? '*', attributes, bindings, item.span);
 				nodes.push({
 					kind: 'element',
 					id,
@@ -3066,6 +3126,7 @@ export function createNativeViewPayload(
 					...(bindings.length > 0 ? { bindings } : {}),
 					...(defaultStyle ? { defaultStyle } : {}),
 					...(drawing ? { drawing } : {}),
+					...(live ? { live } : {}),
 					...place,
 				});
 				for (const event of scope.module.eventsByHost.get(item.id) ?? []) {
@@ -4660,6 +4721,7 @@ export function createNativeViewPayload(
 			(node.attributes && name in node.attributes) ||
 			node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === name);
 		const flows =
+			!node.live &&
 			!events.some((event) => event.host === node.id) &&
 			!handled.has(node.id) &&
 			!own('hidden') &&

@@ -122,6 +122,8 @@ public struct NativeNode: Equatable, Sendable {
 	public var defaultStyle: NativeDefaultStyle? = nil
 	/// On an `<svg>`: the shapes it draws.
 	public var drawing: NativeDrawing? = nil
+	/// A live region: a change to the text inside is announced.
+	public var live: NativeLive? = nil
 
 	public var isElement: Bool { if case .element = kind { true } else { false } }
 	public var isText: Bool { if case .text = kind { true } else { false } }
@@ -416,7 +418,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let place = ["arm", "row"]
 			switch kind {
 			case "element":
-				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing"] + place)
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live"] + place)
 				var attributes: [String: String] = [:]
 				if field.has("attributes") {
 					let reader = try field["attributes"]
@@ -437,7 +439,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 					row: try decodeRow(field), kind: .element(element: try field["element"].string(), attributes: attributes, bindings: bindings),
 					object: field.has("object") ? try field["object"].string() : nil,
 					defaultStyle: field.has("defaultStyle") ? try decodeDefaultStyle(try field["defaultStyle"]) : nil,
-					drawing: field.has("drawing") ? try decodeDrawing(try field["drawing"]) : nil)
+					drawing: field.has("drawing") ? try decodeDrawing(try field["drawing"]) : nil,
+					live: field.has("live") ? try decodeLive(try field["live"]) : nil)
 			case "text":
 				let field = try node.object(required: ["kind", "id", "parent", "parts"], optional: place)
 				let parts = try decodeParts(try field["parts"])
@@ -637,6 +640,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.marker = try oneOf("marker", ["disc", "decimal"])
 		style.table = try oneOf("table", ["table", "row", "cell"])
 		return style
+	}
+
+	private static func decodeLive(_ reader: Reader) throws -> NativeLive {
+		let live = try reader.object(["politeness", "atomic"])
+		let politeness = try live["politeness"].string()
+		guard ["polite", "assertive"].contains(politeness) else { throw PayloadError(path: reader.path, reason: "unknown politeness \"\(politeness)\"") }
+		return NativeLive(assertive: politeness == "assertive", atomic: try live["atomic"].bool())
 	}
 
 	private static func decodeDrawing(_ reader: Reader) throws -> NativeDrawing {
@@ -1025,4 +1035,10 @@ public struct NativeDeviceObject: Equatable, Sendable {
 	public let device: String
 	/// The first node of the component instance that made it.
 	public let owner: String
+}
+
+/// A live region: an assertive one interrupts the screen reader; an atomic one is read whole.
+public struct NativeLive: Sendable, Equatable {
+	public let assertive: Bool
+	public let atomic: Bool
 }

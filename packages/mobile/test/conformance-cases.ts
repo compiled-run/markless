@@ -379,6 +379,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h6' }],
 	},
 	{
+		name: 'live',
+		fixture: 'test/fixtures/Live.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h8' },
+			{ event: 'activate', host: 'h8' },
+			{ event: 'activate', host: 'h9' },
+			{ event: 'activate', host: 'h10' },
+		],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [

@@ -230,6 +230,7 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	abbr: { flow: 'inline' },
 	time: { flow: 'inline' },
 	data: { flow: 'inline' },
+	output: { flow: 'inline' },
 	bdi: { flow: 'inline' },
 	bdo: { flow: 'inline' },
 	wbr: { flow: 'inline' },
@@ -322,6 +323,11 @@ export type NativeNode = NativePlace &
 				readonly defaultStyle?: NativeDefaultStyle;
 				/** On an `<svg>`: what it draws. Its shapes are not nodes. */
 				readonly drawing?: NativeDrawing;
+				/**
+				 * A live region (`aria-live`, `role="status"`, `"alert"` or `"log"`, `<output>`): a change to the text inside is
+				 * announced, after the screen reader's current speech when polite; `atomic` reads the whole region, else the changed text.
+				 */
+				readonly live?: { readonly politeness: 'polite' | 'assertive'; readonly atomic: boolean };
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
 				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */
