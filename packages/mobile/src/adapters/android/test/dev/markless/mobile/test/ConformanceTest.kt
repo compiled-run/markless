@@ -19,7 +19,9 @@ import dev.markless.mobile.core.jsonValue
 import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
+import dev.markless.mobile.style.Rgba
 import dev.markless.mobile.style.StyleExport
+import dev.markless.mobile.style.StyleWrite
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -340,10 +342,40 @@ private fun appStyle(fixtures: File) {
 		val err = try { StyleExport.decodeApp(changed.toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
 		check("app style refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
 	}
-	refusesApp("an atom of another media feature", text.replace("\"feature\":\"prefers-color-scheme\"", "\"feature\":\"width\""), "@media (width) is not implemented on Android")
+	// The fixture may be compact or formatted: each edit allows whitespace after a colon.
+	refusesApp("an atom of another media feature", text.replace(Regex("\"feature\":\\s*\"prefers-color-scheme\""), "\"feature\":\"width\""), "@media (width) is not implemented on Android")
 	refusesApp("an unknown version", text.replace("markless.native-app-style/0", "markless.native-app-style/9"), "unknown app style version")
-	refusesApp("a write index out of range", text.replace(Regex("\"writes\":\\d+}"), "\"writes\":99999}"), "not an index of the app's write lists")
-	refusesApp("an unknown route field", text.replace("\"pattern\":\"/help\"", "\"pattern\":\"/help\",\"extra\":1"), "unknown field \"extra\"")
+	refusesApp("a write index out of range", text.replace(Regex("\"writes\":\\s*\\d+(\\s*)}"), "\"writes\":99999$1}"), "not an index of the app's write lists")
+	refusesApp("an unknown route field", text.replace(Regex("\"pattern\":\\s*\"/help\""), "\"pattern\":\"/help\",\"extra\":1"), "unknown field \"extra\"")
+}
+
+/** A system sheet's styled content: its own layout per resting height, and state that reaches it. */
+private fun sheetStyles(fixtures: File) {
+	val sheet = "sheet:component-edge:0"
+	val z3 = runCatching { StyleExport.decodeApp(File(fixtures, "z3-sheet-size.native-app-style.json").readBytes()).getValue("/") }
+	check("decodes Z3's app style with its sheet", z3.isSuccess) { z3.exceptionOrNull().toString() }
+	val page = z3.getOrNull() ?: return
+	val heights = runCatching { page.sheetHeights(sheet, listOf(0.5, 1.0)) }
+	check("Z3's sheet has a layout per resting height", heights.getOrNull()?.size == 2) { heights.exceptionOrNull().toString() }
+	val (half, full) = heights.getOrNull() ?: return
+	check("half height is laid out in the measured 411 x 371 dp", Math.abs(half.viewportWidth - 411.43) < 1 && Math.abs(half.viewportHeight - 371.43) < 1) { "${half.viewportWidth}x${half.viewportHeight}" }
+	check("full height is laid out in the measured 411 x 790 dp", Math.abs(full.viewportWidth - 411.43) < 1 && Math.abs(full.viewportHeight - 790.48) < 1) { "${full.viewportWidth}x${full.viewportHeight}" }
+	check("the page's export holds no sheet content", page.assignments.all { a -> a.byId["h9"] == null && a.byId[sheet] == null }) { "" }
+	val footer = { st: StyleExport -> st.assignments[st.start(emptyList(), { JsValue.Null }, false, everyCell = false)].byId.getValue("h9").frame }
+	check("the footer sits lower at full height than at half", (footer(full)?.y ?: 0.0) > (footer(half)?.y ?: 0.0)) { "${footer(half)} vs ${footer(full)}" }
+	val refused = try { page.sheetHeights(sheet, listOf(1.0)); null } catch (e: MarklessDecodeError) { e.message }
+	check("a sheet resting elsewhere than its layouts is refused", refused?.contains("rests at [1.0]") == true) { "$refused" }
+	val missing = try { page.copy(sheets = emptyMap()).sheetHeights(sheet, listOf(0.5, 1.0)); null } catch (e: MarklessDecodeError) { e.message }
+	check("a styled page with an unstyled sheet is refused by name", missing?.contains("no styles for the content of system sheet \"$sheet\"") == true) { "$missing" }
+
+	val z5 = StyleExport.decodeApp(File(fixtures, "z5-sheet-state-style.native-app-style.json").readBytes()).getValue("/")
+	val options = z5.sheetHeights(sheet, listOf(1.0)).single()
+	val cells = listOf("state:express")
+	val off = options.start(cells, { JsValue.Bool(false) }, false, everyCell = false)
+	val on = options.next(off, options.stateFor("state:express"), JsValue.Bool(true))
+	val fill = { a: Int -> options.assignments[a].byId.getValue("h4").writes.filterIsInstance<StyleWrite.BackgroundColor>().singleOrNull()?.color }
+	check("express on paints the toggle teal", fill(on) == Rgba(42, 157, 143, 255) && fill(off) == Rgba(255, 255, 255, 255)) { "${fill(off)} -> ${fill(on)}" }
+	check("a sheet's export lists only the cells its content reads", z3.getOrThrow().sheetHeights(sheet, listOf(0.5, 1.0)).all { it.states.isEmpty() } && options.stateOrNone("state:choosing") == -1) { "" }
 }
 
 fun main(args: Array<String>) {
@@ -355,6 +387,7 @@ fun main(args: Array<String>) {
 	numberFormatting()
 	styleExport(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appStyle(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)
 	val files = dirs.flatMap { d -> d.listFiles { f -> f.name.endsWith(".json") }?.sortedBy { it.name } ?: error("no vector directory $d") }

@@ -1,0 +1,168 @@
+{
+	"version": "markless.native-app/0",
+	"routes": [
+		{
+			"pattern": "/",
+			"params": [],
+			"page": {
+				"version": "markless.native-view/0",
+				"component": "Index",
+				"route": { "pattern": "/", "params": [] },
+				"cells": [{ "id": "state:browsing", "name": "browsing", "initial": false }],
+				"nodes": [
+					{
+						"kind": "element",
+						"id": "h0",
+						"element": "main",
+						"parent": null,
+						"attributes": { "class": "page mk-1y3dukl" }
+					},
+					{
+						"kind": "element",
+						"id": "h1",
+						"element": "h1",
+						"parent": "h0",
+						"attributes": { "class": "title mk-1y3dukl" }
+					},
+					{
+						"kind": "text",
+						"id": "h1:text0",
+						"parent": "h1",
+						"parts": [{ "text": "Fruit" }]
+					},
+					{
+						"kind": "element",
+						"id": "h2",
+						"element": "button",
+						"parent": "h0",
+						"attributes": { "class": "open mk-1y3dukl" }
+					},
+					{
+						"kind": "text",
+						"id": "h2:text0",
+						"parent": "h2",
+						"parts": [{ "text": "Browse fruit" }]
+					},
+					{
+						"kind": "sheet",
+						"id": "sheet:component-edge:0",
+						"parent": "h0",
+						"open": { "cell": "state:browsing" },
+						"snapPoints": [0.5, 1],
+						"dismissible": true,
+						"modal": true
+					},
+					{
+						"kind": "element",
+						"id": "h3",
+						"element": "div",
+						"parent": "sheet:component-edge:0",
+						"attributes": { "class": "panel mk-1y3dukl" }
+					},
+					{
+						"kind": "element",
+						"id": "h4",
+						"element": "div",
+						"parent": "h3",
+						"attributes": { "class": "grid mk-1y3dukl" }
+					},
+					{
+						"kind": "element",
+						"id": "h5",
+						"element": "p",
+						"parent": "h4",
+						"attributes": { "class": "cell mk-1y3dukl" }
+					},
+					{
+						"kind": "text",
+						"id": "h5:text0",
+						"parent": "h5",
+						"parts": [{ "text": "Apple" }]
+					},
+					{
+						"kind": "element",
+						"id": "h6",
+						"element": "p",
+						"parent": "h4",
+						"attributes": { "class": "cell mk-1y3dukl" }
+					},
+					{
+						"kind": "text",
+						"id": "h6:text0",
+						"parent": "h6",
+						"parts": [{ "text": "Pear" }]
+					},
+					{
+						"kind": "element",
+						"id": "h7",
+						"element": "p",
+						"parent": "h4",
+						"attributes": { "class": "cell mk-1y3dukl" }
+					},
+					{
+						"kind": "text",
+						"id": "h7:text0",
+						"parent": "h7",
+						"parts": [{ "text": "Plum" }]
+					},
+					{
+						"kind": "element",
+						"id": "h8",
+						"element": "p",
+						"parent": "h4",
+						"attributes": { "class": "cell mk-1y3dukl" }
+					},
+					{
+						"kind": "text",
+						"id": "h8:text0",
+						"parent": "h8",
+						"parts": [{ "text": "Fig" }]
+					},
+					{
+						"kind": "element",
+						"id": "h9",
+						"element": "p",
+						"parent": "h3",
+						"attributes": { "class": "footer mk-1y3dukl" }
+					},
+					{
+						"kind": "text",
+						"id": "h9:text0",
+						"parent": "h9",
+						"parts": [{ "text": "Pinned to the bottom of the sheet" }]
+					}
+				],
+				"events": [
+					{ "host": "h2", "event": "activate", "handler": "handler:event:0" },
+					{
+						"host": "sheet:component-edge:0",
+						"event": "dismiss",
+						"handler": "handler:sheet:component-edge:0"
+					}
+				],
+				"handlers": [
+					{
+						"id": "handler:event:0",
+						"ops": [
+							{
+								"op": "assign",
+								"cell": "state:browsing",
+								"value": { "literal": true }
+							}
+						]
+					},
+					{
+						"id": "handler:sheet:component-edge:0",
+						"ops": [
+							{
+								"op": "assign",
+								"cell": "state:browsing",
+								"value": { "literal": false }
+							}
+						]
+					}
+				]
+			}
+		}
+	]
+}

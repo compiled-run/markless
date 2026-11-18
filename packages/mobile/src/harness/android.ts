@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { androidLibraries } from './android-libraries.ts';
 import { exec } from './exec.ts';
 import {
+	ANDROID_DEVICE_LINK_ACTIVITY,
 	ANDROID_SHELL_ACTIVITY,
 	PROOF_APP_ID,
 	PROOF_APP_NAME,
@@ -183,7 +184,16 @@ export async function buildAndroidShell(
 		...filesUnder(generated, '.java'),
 	]);
 	const classpath = [tools.androidJar, classes, ...libraries.jars].join(':');
-	await exec('kotlinc', ['-classpath', classpath, '-jvm-target', '17', '-nowarn', '-d', classes, ...sources]);
+	await exec('kotlinc', [
+		'-classpath',
+		classpath,
+		'-jvm-target',
+		'17',
+		'-nowarn',
+		'-d',
+		classes,
+		...sources,
+	]);
 	await exec(join(tools.buildTools, 'd8'), [
 		'--min-api',
 		'26',
@@ -206,7 +216,7 @@ const androidManifest = (
 	<uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
 ${permissions.map((name) => `\t<uses-permission android:name="${name}" />\n`).join('')}
 	<application android:label="${PROOF_APP_NAME}" android:hasCode="true">
-		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:launchMode="singleTask" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
+		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
@@ -215,7 +225,15 @@ ${permissions.map((name) => `\t<uses-permission android:name="${name}" />\n`).jo
 				<action android:name="android.intent.action.VIEW" />
 				<category android:name="android.intent.category.DEFAULT" />
 				<category android:name="android.intent.category.BROWSABLE" />
-				<data android:scheme="${PROOF_URL_SCHEME}" />
+				<data android:scheme="${PROOF_URL_SCHEME}" android:host="app" />
+			</intent-filter>
+		</activity>
+		<activity android:name="${ANDROID_DEVICE_LINK_ACTIVITY}" android:exported="true" android:theme="@android:style/Theme.NoDisplay">
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+				<data android:scheme="${PROOF_URL_SCHEME}" android:host="device" />
 			</intent-filter>
 		</activity>
 	</application>

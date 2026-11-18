@@ -1,0 +1,50 @@
+{
+	"rung": "Z4",
+	"name": "Dark mode inside a system sheet: opened in dark, switched to light and back while it is open",
+	"steps": [
+		{
+			"visible": ["Journal", "Read today"],
+			"absent": ["Today", "Walked by the river"]
+		},
+		{
+			"do": {
+				"appearance": "dark"
+			},
+			"visible": ["Journal", "Read today"],
+			"absent": ["Today", "Walked by the river"]
+		},
+		{
+			"do": {
+				"tap": "Read today"
+			},
+			"visible": ["Today", "Walked by the river"]
+		},
+		{
+			"do": {
+				"appearance": "light"
+			},
+			"visible": ["Today", "Walked by the river"]
+		},
+		{
+			"do": {
+				"appearance": "dark"
+			},
+			"visible": ["Today", "Walked by the river"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Journal", "Read today", "On the web, the entry opens in a drawer"],
+				"absent": ["Today", "Walked by the river"]
+			},
+			{
+				"do": {
+					"appearance": "dark"
+				},
+				"visible": ["Journal", "Read today"]
+			}
+		],
+		"absentFromOutput": ["Walked by the river", "@markless/device"]
+	}
+}

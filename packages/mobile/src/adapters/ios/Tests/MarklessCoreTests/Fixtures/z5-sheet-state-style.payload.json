@@ -1,0 +1,134 @@
+{
+	"version": "markless.native-app/0",
+	"routes": [
+		{
+			"pattern": "/",
+			"params": [],
+			"page": {
+				"version": "markless.native-view/0",
+				"component": "Index",
+				"route": { "pattern": "/", "params": [] },
+				"cells": [
+					{ "id": "state:choosing", "name": "choosing", "initial": false },
+					{ "id": "state:express", "name": "express", "initial": false, "styled": true }
+				],
+				"nodes": [
+					{
+						"kind": "element",
+						"id": "h0",
+						"element": "main",
+						"parent": null,
+						"attributes": { "class": "page mk-1mbdoue" }
+					},
+					{
+						"kind": "element",
+						"id": "h1",
+						"element": "h1",
+						"parent": "h0",
+						"attributes": { "class": "title mk-1mbdoue" }
+					},
+					{
+						"kind": "text",
+						"id": "h1:text0",
+						"parent": "h1",
+						"parts": [{ "text": "Delivery" }]
+					},
+					{
+						"kind": "element",
+						"id": "h2",
+						"element": "button",
+						"parent": "h0",
+						"attributes": { "class": "open mk-1mbdoue" }
+					},
+					{
+						"kind": "text",
+						"id": "h2:text0",
+						"parent": "h2",
+						"parts": [{ "text": "Delivery options" }]
+					},
+					{
+						"kind": "sheet",
+						"id": "sheet:component-edge:0",
+						"parent": "h0",
+						"open": { "cell": "state:choosing" },
+						"snapPoints": [1],
+						"dismissible": true,
+						"modal": true
+					},
+					{
+						"kind": "element",
+						"id": "h3",
+						"element": "div",
+						"parent": "sheet:component-edge:0",
+						"attributes": { "class": "options mk-1mbdoue" }
+					},
+					{
+						"kind": "element",
+						"id": "h4",
+						"element": "button",
+						"parent": "h3",
+						"attributes": { "class": "toggle mk-1mbdoue" },
+						"bindings": [
+							{ "attribute": "ui-active", "value": { "cell": "state:express" } }
+						]
+					},
+					{
+						"kind": "text",
+						"id": "h4:text0",
+						"parent": "h4",
+						"parts": [
+							{
+								"expr": {
+									"if": { "cell": "state:express" },
+									"whenTrue": { "literal": "Express on" },
+									"whenFalse": { "literal": "Express off" }
+								}
+							}
+						]
+					}
+				],
+				"events": [
+					{ "host": "h2", "event": "activate", "handler": "handler:event:0" },
+					{ "host": "h4", "event": "activate", "handler": "handler:event:1" },
+					{
+						"host": "sheet:component-edge:0",
+						"event": "dismiss",
+						"handler": "handler:sheet:component-edge:0"
+					}
+				],
+				"handlers": [
+					{
+						"id": "handler:event:0",
+						"ops": [
+							{
+								"op": "assign",
+								"cell": "state:choosing",
+								"value": { "literal": true }
+							}
+						]
+					},
+					{
+						"id": "handler:event:1",
+						"ops": [
+							{
+								"op": "assign",
+								"cell": "state:express",
+								"value": { "unary": "!", "value": { "cell": "state:express" } }
+							}
+						]
+					},
+					{
+						"id": "handler:sheet:component-edge:0",
+						"ops": [
+							{
+								"op": "assign",
+								"cell": "state:choosing",
+								"value": { "literal": false }
+							}
+						]
+					}
+				]
+			}
+		}
+	]
+}

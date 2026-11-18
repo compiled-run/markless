@@ -18,6 +18,8 @@ export const PROOF_STYLE_PATH = 'markless/style.json';
 export const PROOF_FONTS_FOLDER = 'markless-fonts';
 
 export const ANDROID_SHELL_ACTIVITY = 'dev.markless.proof.ShellActivity';
+/** Takes the test build's device links (`markless-proof://device/...`) without opening a screen. */
+export const ANDROID_DEVICE_LINK_ACTIVITY = 'dev.markless.proof.DeviceLinkActivity';
 
 export type ProofPlatform = 'ios' | 'android';
 export const PROOF_PLATFORMS: ReadonlyArray<ProofPlatform> = ['ios', 'android'];

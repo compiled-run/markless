@@ -44,12 +44,17 @@ final class ViewTree {
 	weak var presenter: UIViewController?
 	private var anchors = Set<ObjectIdentifier>()
 	private var assignment: Int
+	/// Each styled sheet's layout per resting height, the height it rests at, and each height's current assignment.
+	private var sheetStyles: [String: (heights: [(snapPoint: Double, layout: StyleLayout)], height: Int, assignments: [Int])] = [:]
+	/// The sheet each node inside a system sheet belongs to.
+	private let sheetOf: [String: String]
 	/// Taps and drags on the page dismiss the keyboard; a stack makes them wait for its edge-swipe Back.
 	let dismissGestures: [UIGestureRecognizer] = [UITapGestureRecognizer(), UIPanGestureRecognizer()]
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 
 	init(
-		runtime: NativeRuntime, layout: StyleLayout?, faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void,
+		runtime: NativeRuntime, layout: StyleLayout?, sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:],
+		faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void,
 		objectView: @escaping (_ object: String, _ device: String) throws -> UIView = { object, _ in throw HostError("no device to show \(object)") }
 	) throws {
 		self.runtime = runtime
@@ -76,6 +81,13 @@ final class ViewTree {
 			slots[key, default: []].append(node.id)
 		}
 		self.slots = slots
+		var sheetOf: [String: String] = [:]
+		for node in payload.nodes {
+			guard let parent = node.parent else { continue }
+			if case .sheet = nodes[parent]?.kind { sheetOf[node.id] = parent } else if let sheet = sheetOf[parent] { sheetOf[node.id] = sheet }
+		}
+		self.sheetOf = sheetOf
+		sheetStyles = sheetLayouts.mapValues { heights in (heights, 0, heights.map(\.layout.start)) }
 		events = Dictionary(grouping: payload.events, by: \.host)
 		var index = 0
 		_ = try build("", in: root, at: &index, Context())
@@ -134,11 +146,17 @@ final class ViewTree {
 			case .call, .release:
 				throw HostError("a \(entry.json.jsonText) entry reaches the page's device, not its views")
 			case let .state(cell, value):
-				guard let layout else { continue }
-				assignment = try layout.next(from: assignment, cell: cell, value: value)
-				for (id, view) in elements.map({ ($0.key, $0.value as UIView) }) + labels.map({ ($0.key, $0.value as UIView) }) {
-					if let style = style(of: id) { try paint(view, style, faces: faces) }
+				if let layout, cell != StyleBands.state || layout.stateCells.contains(cell) {
+					assignment = try layout.next(from: assignment, cell: cell, value: value)
 				}
+				for (sheet, styles) in sheetStyles {
+					var moved = styles
+					for (index, height) in styles.heights.enumerated() where height.layout.stateCells.contains(cell) {
+						moved.assignments[index] = try height.layout.next(from: styles.assignments[index], cell: cell, value: value)
+					}
+					sheetStyles[sheet] = moved
+				}
+				try repaint { _ in true }
 			case let .arm(node, index):
 				guard let branch = branches[node], let context = contexts[node] else { throw HostError("journal names branch \(node), which is not shown") }
 				let container = branch.anchor.superview ?? root
@@ -175,8 +193,37 @@ final class ViewTree {
 	}
 
 	private func style(of id: String) -> ResolvedStyle? {
-		guard let layout, let template = templates[id] else { return nil }
-		return layout.assignments[assignment][template]
+		guard let template = templates[id] else { return nil }
+		if let sheet = sheetOf[template] {
+			guard let styles = sheetStyles[sheet] else { return nil }
+			return styles.heights[styles.height].layout.assignments[styles.assignments[styles.height]][template]
+		}
+		return layout?.assignments[assignment][template]
+	}
+
+	private func repaint(where included: (String) -> Bool) throws {
+		for (id, view) in elements.map({ ($0.key, $0.value as UIView) }) + labels.map({ ($0.key, $0.value as UIView) }) where included(id) {
+			if let style = style(of: id) { try paint(view, style, faces: faces) }
+		}
+	}
+
+	/// The sheet came to rest at another height: its content takes that height's layout.
+	private func sheetRested(_ sheet: String, at snapPoint: Double) throws {
+		guard var styles = sheetStyles[sheet], let height = styles.heights.firstIndex(where: { $0.snapPoint == snapPoint }) else { return }
+		guard height != styles.height else { return }
+		styles.height = height
+		sheetStyles[sheet] = styles
+		try repaint { id in templates[id].flatMap { sheetOf[$0] } == sheet }
+	}
+
+	/// A styled sheet's content area at a resting height, and the size its document takes there.
+	private func sheetArea(_ sheet: String, at snapPoint: Double) -> (viewport: CGSize, content: CGSize)? {
+		guard let styles = sheetStyles[sheet], let index = styles.heights.firstIndex(where: { $0.snapPoint == snapPoint }) else { return nil }
+		let layout = styles.heights[index].layout
+		let extent = layout.extents[styles.assignments[index]]
+		return (
+			CGSize(width: layout.viewport.width, height: layout.viewport.height),
+			CGSize(width: layout.viewport.width, height: max(layout.viewport.height, extent)))
 	}
 
 	private func settle(_ container: UIView, built: [String], _ context: Context) {
@@ -330,6 +377,14 @@ final class ViewTree {
 					if !dismissedBy.isEmpty { onAction(NativeAction(event: .dismiss, host: id)) }
 				}
 				sheet.content.accessibilityIdentifier = id
+				if sheetStyles[template] != nil {
+					sheet.area = { [weak self] snapPoint in self?.sheetArea(template, at: snapPoint) }
+					sheet.onRest = { [weak self] snapPoint in
+						do { try self?.sheetRested(template, at: snapPoint) } catch { fatalError("Markless iOS host: \(error)") }
+					}
+				} else if layout != nil {
+					throw HostError("system sheet \(id) is on a styled page but has no styles of its own")
+				}
 				var childIndex = 0
 				_ = try build(template, in: sheet.content, at: &childIndex, Context())
 				sheets[id] = sheet

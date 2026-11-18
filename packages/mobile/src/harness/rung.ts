@@ -75,11 +75,7 @@ export function readRelativeStylesheet(specifier: string, importer: string) {
 const APP_DOCUMENT = 'document.tsrx';
 
 /** Compiles a navigation rung's app: every page under `pages/`, with repo-relative filenames as for one-screen rungs. */
-export function compileRungApp(
-	dir: string,
-	target?: ProofPlatform,
-	device?: DeviceAppConfig,
-) {
+export function compileRungApp(dir: string, target?: ProofPlatform, device?: DeviceAppConfig) {
 	const document = join(dir, APP_DOCUMENT);
 	return compileNativeApp({
 		...(target ? { target } : {}),
@@ -130,18 +126,27 @@ const APP_STYLE_INPUTS = 'native-style-input';
 /** Runs Dragon once per styled page and joins the exports into the app's one style file. */
 function appStyle(dir: string, name: string, inputs: NativeAppBuild['styleInputs']) {
 	rmSync(join(dir, APP_STYLE_INPUTS), { recursive: true, force: true });
-	const pages = inputs.map(({ pattern, page, input }) => {
-		const file = join(
-			dir,
-			APP_STYLE_INPUTS,
-			`${relative('pages', page).slice(0, -'.tsrx'.length)}.json`,
-		);
+	const exportOf = (file: string, input: unknown): DragonStyleExport => {
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, `${JSON.stringify(input, null, '\t')}\n`);
-		const exported = JSON.parse(
-			new TextDecoder().decode(styleExport(file, name)),
-		) as DragonStyleExport;
-		return { pattern, exported };
+		return JSON.parse(new TextDecoder().decode(styleExport(file, name))) as DragonStyleExport;
+	};
+	const pages = inputs.map(({ pattern, page, input, sheets }) => {
+		const base = join(dir, APP_STYLE_INPUTS, relative('pages', page).slice(0, -'.tsrx'.length));
+		const sheetNodes = [...new Set(sheets.map((sheet) => sheet.node))];
+		return {
+			pattern,
+			exported: exportOf(`${base}.json`, input),
+			sheets: sheets.map((sheet) => ({
+				node: sheet.node,
+				snapPoint: sheet.snapPoint,
+				// One input per sheet and resting height: `index.sheet0-0.5.json`.
+				exported: exportOf(
+					`${base}.sheet${sheetNodes.indexOf(sheet.node)}-${sheet.snapPoint}.json`,
+					sheet.input,
+				),
+			})),
+		};
 	});
 	const style = nativeAppStyle(pages);
 	writeFileSync(
@@ -245,12 +250,16 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			const build = await compileRungApp(dir, platform, appConfig.device);
 			if (!build.payload) {
 				const lines = build.diagnostics.map(
-					(diagnostic) => `  ${diagnostic.page}: ${diagnostic.code}: ${diagnostic.message}`,
+					(diagnostic) =>
+						`  ${diagnostic.page}: ${diagnostic.code}: ${diagnostic.message}`,
 				);
 				throw new Error(`${name}: the app has no ${platform} build\n${lines.join('\n')}`);
 			}
 			payloads[platform] = JSON.stringify(build.payload);
-			assets[platform].push([PROOF_PAYLOAD_PATH, new TextEncoder().encode(payloads[platform])]);
+			assets[platform].push([
+				PROOF_PAYLOAD_PATH,
+				new TextEncoder().encode(payloads[platform]),
+			]);
 			if (platform === 'android' && build.styleInputs.length > 0) {
 				if (payloads.ios !== payloads.android)
 					throw new Error(

@@ -1,5 +1,6 @@
 package dev.markless.proof
 
+import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -15,6 +16,7 @@ import dev.markless.mobile.view.MarklessActivity
 import dev.markless.mobile.view.NativeDevice
 import dev.markless.mobile.view.PlatformDevice
 import java.io.FileNotFoundException
+import java.lang.ref.WeakReference
 
 /**
  * The proof build's device: the phone's own, except that it lists every call it receives in the view
@@ -109,18 +111,29 @@ class ShellActivity : MarklessActivity() {
 		addContentView(microphoneLabel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply {
 			setMargins(bottom / 2, 0, 0, bottom * 3)
 		})
-		open(intent)
 	}
 
-	override fun onNewIntent(intent: Intent) {
-		super.onNewIntent(intent)
-		open(intent)
+	override fun onResume() {
+		super.onResume()
+		shown = WeakReference(this)
 	}
 
-	private fun open(intent: Intent) {
-		val link = intent.data ?: return
-		if (link.scheme != "markless-proof" || link.host != "device") return
+	internal fun setDeviceValue(link: android.net.Uri) {
 		val value = link.getQueryParameter("value") ?: return
 		device.set(link.path.orEmpty().removePrefix("/"), JsValue.fromJson(Json.parse(value.toByteArray())))
+	}
+
+	companion object {
+		/** The screen on top, whose device a `markless-proof://device/...` link sets. */
+		internal var shown: WeakReference<ShellActivity>? = null
+	}
+}
+
+/** Receives `markless-proof://device/<value>?value=<json>` without opening a screen: the value goes to the screen on top. */
+class DeviceLinkActivity : Activity() {
+	override fun onCreate(savedInstanceState: Bundle?) {
+		super.onCreate(savedInstanceState)
+		intent.data?.let { link -> ShellActivity.shown?.get()?.setDeviceValue(link) }
+		finish()
 	}
 }

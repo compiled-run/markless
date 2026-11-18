@@ -21,8 +21,9 @@ public final class MarklessViewController: UIViewController {
 	private let device: NativeDevice
 	private var runtime: NativeRuntime
 	private var layout: StyleLayout?
-	/// The `@media` band the views show; nil without bands.
+	/// The `@media` band the views show, and the bands it is picked from; nil without bands.
 	private var band: Int?
+	private var bands: StyleBands?
 	private(set) var tree: ViewTree?
 	/// In an app: opens the page a `navigate` entry names, pushed or in this screen's place.
 	var navigator: ((_ route: String, _ params: [NativeRouteParam], _ replace: Bool) throws -> Void)?
@@ -87,7 +88,7 @@ public final class MarklessViewController: UIViewController {
 	}
 
 	private func applyBand() {
-		guard let bands = layout?.bands, let band else { return }
+		guard let bands, let band else { return }
 		do {
 			let now = try bands.band(dark: traitCollection.userInterfaceStyle == .dark)
 			guard now != band else { return }
@@ -111,13 +112,21 @@ public final class MarklessViewController: UIViewController {
 			if let name = cell.device { _ = try runtime.device(cell.id, try device.read(name, object: cell.object)) }
 		}
 		let dark = traitCollection.userInterfaceStyle == .dark
-		layout = try style.map { try $0.resolve(for: payload, initialTexts: try runtime.texts(), value: runtime.value(of:), dark: dark) }
-		band = try layout?.bands?.band(dark: dark)
+		let texts = try runtime.texts()
+		layout = try style.map { try $0.resolve(for: payload, initialTexts: texts, value: runtime.value(of:), dark: dark) }
+		var sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:]
+		for sheet in style?.sheets ?? [] {
+			sheetLayouts[sheet.node] = try style!.resolveSheet(sheet.node, for: payload, initialTexts: texts, value: runtime.value(of:), dark: dark)
+		}
+		bands = layout?.bands ?? sheetLayouts.values.joined().lazy.compactMap(\.layout.bands).first
+		band = try bands?.band(dark: dark)
 		let faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts)
 		let device = self.device
 		tree = try ViewTree(
-			runtime: runtime, layout: layout, faces: faces, onAction: { [weak self] action in self?.perform(action) },
+			runtime: runtime, layout: layout, sheetLayouts: sheetLayouts, faces: faces,
+			onAction: { [weak self] action in self?.perform(action) },
 			objectView: { object, kind in try device.view(for: object, device: kind) })
+		tree?.presenter = self
 		navigationItem.title = try runtime.title()
 		try runCalls(try runtime.tasks())
 	}
@@ -169,7 +178,6 @@ public final class MarklessViewController: UIViewController {
 		} catch {
 			fatalError("Markless iOS host: \(error)")
 		}
-		tree?.presenter = self
 	}
 
 	@available(*, unavailable)

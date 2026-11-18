@@ -72,7 +72,10 @@ data class Bands(val atoms: List<BandAtom>, val bands: List<List<Boolean>>) {
  * One platform's slice of a Dragon style export: per state assignment, frames (device px, relative to the parent box) and
  * lowered writes per node id; [next] is `next[a][s][v]`, the assignment reached by setting state s to its v-th value (-1: none).
  */
-data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val bands: Bands? = null) {
+/** A system sheet's content at one resting height: its own document, laid out in the sheet's content area. */
+data class SheetHeight(val snapPoint: Double, val style: StyleExport)
+
+data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val bands: Bands? = null, val sheets: Map<String, List<SheetHeight>> = emptyMap()) {
 
 	/** The index of [BAND_KEY] among [states], or -1 for an export without @media. */
 	val bandState: Int = states.indexOfFirst { it.key == BAND_KEY }
@@ -87,11 +90,12 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 
 	/**
 	 * The assignment matching the cells' values at mount and the device's band, [initial] when it matches. Every state but the
-	 * band must follow exactly one of [cells] (the payload's styled cells), and every styled cell must have a state.
+	 * band must follow exactly one of [cells] (the payload's styled cells); with [everyCell], every styled cell must have a state
+	 * (a page's export), else only the cells its nodes read do (a sheet's).
 	 */
-	fun start(cells: List<String>, value: (String) -> JsValue, dark: Boolean): Int {
+	fun start(cells: List<String>, value: (String) -> JsValue, dark: Boolean, everyCell: Boolean = true): Int {
 		val wanted = states.mapIndexed { s, st -> if (s == bandState) JsValue.Num(band(dark).toDouble()) else value(cellOf(st, cells)) }
-		for (c in cells) stateFor(c)
+		if (everyCell) for (c in cells) stateFor(c)
 		fun matches(a: Int) = states.withIndex().all { (s, st) -> assignments[a].values[st.key]?.let { Js.strictEquals(it, wanted[s]) } == true }
 		if (matches(initial)) return initial
 		return assignments.indices.firstOrNull(::matches) ?: throw MarklessDecodeError("no style assignment matches the values ${states.map { it.key }.zip(wanted)}")
@@ -101,6 +105,16 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		val named = cells.filter { state.key == it || state.key.endsWith("#$it") }
 		if (named.size != 1) throw MarklessDecodeError("style state \"${state.key}\" follows ${named.size} styled cells of the payload")
 		return named[0]
+	}
+
+	/** The export state for a payload cell, or -1 when no state follows it. */
+	fun stateOrNone(cell: String): Int = if (states.none { it.key == cell || it.key.endsWith("#$cell") }) -1 else stateFor(cell)
+
+	/** The layouts of a system sheet's content, one per resting height in [snapPoints] order; a sheet without them is refused. */
+	fun sheetHeights(sheet: String, snapPoints: List<Double>): List<StyleExport> {
+		val heights = sheets[sheet] ?: throw MarklessDecodeError("the page is styled but its style export has no styles for the content of system sheet \"$sheet\"")
+		if (heights.map { it.snapPoint } != snapPoints) throw MarklessDecodeError("system sheet \"$sheet\" rests at $snapPoints but its styles are laid out at ${heights.map { it.snapPoint }}")
+		return heights.map { it.style }
 	}
 
 	/** The export state for a payload cell: its key is the cell id, or ends in `#<cell id>`. */
@@ -196,14 +210,31 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val routes = LinkedHashMap<String, StyleExport>()
 			for ((n, r) in t.field("routes", target).arr("routes").withIndex()) {
 				val o = r.obj("routes[$n]")
-				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments"), "routes[$n]")
+				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets"), "routes[$n]")
 				val pattern = o.field("pattern", "routes[$n]").str("pattern")
 				if (pattern in routes) throw MarklessDecodeError("app style lists route $pattern twice")
-				routes[pattern] = program(o, "routes[$n] ($pattern)", dpr, width, height) { w, what ->
+				val listed = { w: Json, what: String ->
 					val i = w.num("$what.writes")
 					if (i != Math.floor(i) || i.toInt() !in lists.indices) throw MarklessDecodeError("$what.writes is $i, not an index of the app's write lists")
 					lists[i.toInt()]
 				}
+				val sheets = LinkedHashMap<String, List<SheetHeight>>()
+				for ((k, sv) in (o["sheets"]?.arr("routes[$n].sheets") ?: emptyList()).withIndex()) {
+					val where = "routes[$n].sheets[$k]"
+					val so = sv.obj(where)
+					so.only(setOf("node", "heights"), where)
+					val node = so.field("node", where).str("$where.node")
+					if (node in sheets) throw MarklessDecodeError("$where lists sheet $node twice")
+					sheets[node] = so.field("heights", where).arr("$where.heights").mapIndexed { h, hv ->
+						val at = "$where.heights[$h]"
+						val ho = hv.obj(at)
+						ho.only(setOf("snapPoint", "viewport", "readiness", "states", "initial", "next", "bands", "assignments"), at)
+						val hp = ho.field("viewport", at).obj("$at.viewport")
+						hp.only(setOf("width", "height"), "$at.viewport")
+						SheetHeight(ho.field("snapPoint", at).num("$at.snapPoint"), program(ho, at, dpr, hp.field("width", at).num("width"), hp.field("height", at).num("height"), listed))
+					}.also { if (it.isEmpty() || it.map { h -> h.snapPoint }.distinct().size != it.size) throw MarklessDecodeError("$where needs one layout per resting height") }
+				}
+				routes[pattern] = program(o, "routes[$n] ($pattern)", dpr, width, height, listed).copy(sheets = sheets)
 			}
 			return routes
 		}

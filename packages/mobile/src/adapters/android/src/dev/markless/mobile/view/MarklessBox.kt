@@ -10,6 +10,9 @@ import android.widget.FrameLayout
 class MarklessBox(context: Context) : FrameLayout(context) {
 	internal val frames = HashMap<View, Rect>()
 
+	/** A sheet's styled content: the size its document was laid out at, in device px, whatever its parent offers. */
+	internal var fixedSize: Pair<Int, Int>? = null
+
 	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
 		if (frames.isNotEmpty()) {
 			for (i in 0 until childCount) {
@@ -17,7 +20,9 @@ class MarklessBox(context: Context) : FrameLayout(context) {
 				val f = frames[child] ?: throw IllegalStateException("a child of a framed box has no frame")
 				child.measure(MeasureSpec.makeMeasureSpec(f.width(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(f.height(), MeasureSpec.EXACTLY))
 			}
-			setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.getSize(heightMeasureSpec))
+			val fixed = fixedSize
+			if (fixed != null) setMeasuredDimension(fixed.first, fixed.second)
+			else setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.getSize(heightMeasureSpec))
 			return
 		}
 		val width = MeasureSpec.getSize(widthMeasureSpec) - paddingLeft - paddingRight

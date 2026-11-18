@@ -18,6 +18,7 @@ import { compileRungApp, readAppConfig, readRelativeModule } from '../src/harnes
 import {
 	looksOnly,
 	navRungFolders,
+	sheetStyleRungFolders,
 	styleRungFolders,
 	proofsDir,
 	readRung,
@@ -364,7 +365,12 @@ function walk(
 			openSheet(index);
 			if (!shownTexts().some(([, text]) => text === action.scrollTo))
 				throw new Error(`step ${index}: "${action.scrollTo}" is not in the open sheet`);
-		} else if (action && !('tap' in action) && !('type' in action) && !('dismissSheet' in action))
+		} else if (
+			action &&
+			!('tap' in action) &&
+			!('type' in action) &&
+			!('dismissSheet' in action)
+		)
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
@@ -411,7 +417,10 @@ function walk(
 				);
 			expect(running ? 'on' : 'off', `step ${index}: the camera session`).toBe(step.camera);
 		}
-		const shown = [...shownTexts().map(([, text]) => text), ...labels().map(([, label]) => label)];
+		const shown = [
+			...shownTexts().map(([, text]) => text),
+			...labels().map(([, label]) => label),
+		];
 		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
 		if (step.order)
@@ -453,6 +462,8 @@ function mirror(
 	const properties = new Map<string, string>();
 	const chosen = new Map<string, number | null>();
 	let title: string | null = null;
+	// What the platform's sheets show: changed only by `sheet` entries.
+	const sheetOpen = new Map<string, boolean>();
 	const mount = (next: NativeRuntime) => {
 		runtime = next;
 		texts.clear();
@@ -465,11 +476,22 @@ function mirror(
 		for (const [node, index] of runtime.arms()) chosen.set(node, index);
 		for (const [node, , value] of runtime.properties()) properties.set(node, value);
 		title = runtime.title();
+		sheetOpen.clear();
+		for (const [node, open] of runtime.sheets()) sheetOpen.set(node, open);
 	};
 	mount(opened);
 	const nodeOf = new Map(payload.nodes.map((node) => [node.id, node]));
 	const baseOf = (id: string) => (id.includes('@') ? id.slice(0, id.indexOf('@')) : id);
+	const inClosedSheet = (id: string): boolean => {
+		const parent = nodeOf.get(baseOf(id))?.parent;
+		if (!parent) return false;
+		return (
+			(nodeOf.get(parent)?.kind === 'sheet' && !sheetOpen.get(parent)) ||
+			inClosedSheet(parent)
+		);
+	};
 	const shownNode = (id: string): boolean => {
+		if (inClosedSheet(id)) return false;
 		const place = nodeOf.get(id)?.arm;
 		return !place || (shownNode(place.branch) && chosen.get(place.branch) === place.index);
 	};
@@ -490,7 +512,7 @@ function mirror(
 	const elementReading = (text: string) => {
 		const labelled = labels().find(([, label]) => label === text)?.[0];
 		if (labelled) return labelled;
-		const node = [...texts].find(([, shown]) => shown === text)?.[0];
+		const node = [...texts].find(([id, shown]) => shown === text && !inClosedSheet(id))?.[0];
 		if (!node) return undefined;
 		const parent = nodeOf.get(baseOf(node))?.parent ?? undefined;
 		return parent && node.includes('@') && nodeOf.get(parent)?.row
@@ -499,6 +521,7 @@ function mirror(
 	};
 	const apply = (entry: NativeJournalEntry, index: number) => {
 		if (entry.op === 'text') texts.set(entry.node, entry.value);
+		else if (entry.op === 'sheet') sheetOpen.set(entry.node, entry.open);
 		else if (entry.op === 'title') title = entry.value;
 		else if (entry.op === 'attribute')
 			attributes.set(`${entry.node}\0${entry.name}`, entry.value);
@@ -552,7 +575,10 @@ function mirror(
 					value,
 				);
 			}
-			const shown = [...texts.values(), ...labels().map(([, label]) => label)];
+			const shown = [
+				...[...texts].flatMap(([id, text]) => (inClosedSheet(id) ? [] : [text])),
+				...labels().map(([, label]) => label),
+			];
 			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 			for (const text of step.absent ?? [])
 				expect(shown, `step ${index}`).not.toContain(text);
@@ -604,8 +630,8 @@ function walkApp(app: NativeAppPayload, steps: readonly LadderStep[], start: str
 				`step ${index}: Back journals nothing`,
 			).toEqual([]);
 			stack.pop();
-		} else if (looksOnly(action)) {
-			// The appearance changes no state: the screens' texts stay as they are; the hosts restyle from the band table.
+		} else if (looksOnly(action) || (action && ('swipe' in action || 'scrollTo' in action))) {
+			// Neither the appearance nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
 		} else if (action) {
 			const top = stack.at(-1)!;
 			const host = top.elementReading(
@@ -634,7 +660,6 @@ function walkApp(app: NativeAppPayload, steps: readonly LadderStep[], start: str
 		stack.at(-1)!.check(step, index);
 	}
 }
-
 
 test.each(
 	rungFolders().flatMap((folder) =>
@@ -678,15 +703,16 @@ test.each(
 	},
 );
 
-
-test.each([...navRungFolders(), ...styleRungFolders()])(
+test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders()])(
 	'%s: the app payload walks the steps as a stack of screens',
 	async (folder) => {
 		const rung = readRung(folder);
-		const build = await compileRungApp(join(proofsDir, folder));
-		expect(
-			build.diagnostics.map((diagnostic) => `${diagnostic.page}: ${diagnostic.message}`),
-		).toEqual([]);
-		walkApp(build.payload!, rung.steps, rung.start ?? '/');
+		for (const target of ['ios', 'android'] as const) {
+			const build = await compileRungApp(join(proofsDir, folder), target);
+			expect(
+				build.diagnostics.map((diagnostic) => `${diagnostic.page}: ${diagnostic.message}`),
+			).toEqual([]);
+			walkApp(build.payload!, rung.steps, rung.start ?? '/');
+		}
 	},
 );

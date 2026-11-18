@@ -18,7 +18,7 @@ import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { NATIVE_APP_VERSION } from '@markless/serializer/native-view';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
-import { nativeStyleInput, type NativeStyleInput } from './style-input.ts';
+import { nativeStyleInputs, type NativeStyleInput } from './style-input.ts';
 
 export type NativeBuild = {
 	readonly payload: NativeViewPayload | null;
@@ -171,6 +171,12 @@ export type NativeAppBuild = {
 		readonly pattern: string;
 		readonly page: string;
 		readonly input: NativeStyleInput;
+		/** Each system sheet's content, laid out once per resting height. */
+		readonly sheets: ReadonlyArray<{
+			readonly node: string;
+			readonly snapPoint: number;
+			readonly input: NativeStyleInput;
+		}>;
 	}>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic & { readonly page: string }>;
 };
@@ -232,12 +238,15 @@ export async function compileNativeApp(input: {
 		const sheets = [...documentSheets, ...build.stylesheets].filter(
 			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 		);
-		if (sheets.length > 0 || build.styles.some((style) => style.cssText.length > 0))
+		if (sheets.length > 0 || build.styles.some((style) => style.cssText.length > 0)) {
+			const inputs = nativeStyleInputs(build.payload, build.styles, sheets);
 			styleInputs.push({
 				pattern: route.pattern,
 				page: page.page,
-				input: nativeStyleInput(build.payload, build.styles, sheets),
+				input: inputs.page,
+				sheets: inputs.sheets,
 			});
+		}
 	}
 	return {
 		payload: diagnostics.length > 0 ? null : { version: NATIVE_APP_VERSION, routes },

@@ -108,7 +108,11 @@ describe('W2: a device element renders nothing on the web', () => {
 });
 
 describe('native.* elements do not exist on the web', () => {
-	const page = (tag: string, guarded: boolean, imports = 'native, platform') => `import { state } from '@markless/core';
+	const page = (
+		tag: string,
+		guarded: boolean,
+		imports = 'native, platform',
+	) => `import { state } from '@markless/core';
 import { ${imports} } from '@markless/device';
 export default function App() @{
 	let open = state(false);
@@ -126,7 +130,10 @@ export default function App() @{
 			const compiled = await web(page(tag, true));
 			expect(codes(compiled)).toEqual([]);
 			expect(clientCode(compiled)).not.toContain('@markless/device');
-			for (const code of [clientCode(compiled), compiled.publicRenderModule.ssrModuleSource]) {
+			for (const code of [
+				clientCode(compiled),
+				compiled.publicRenderModule.ssrModuleSource,
+			]) {
 				expect(code).not.toContain('Only on a phone');
 				expect(code).not.toContain(tag);
 			}
@@ -137,11 +144,14 @@ export default function App() @{
 		['native.sheet', 'native, platform'],
 		['native.camera', 'native, platform'],
 		['shown.sheet', 'native as shown, platform'],
-	])('an unguarded <%s> is refused, telling the author to guard it and what to use on the web', async (tag, imports) => {
-		const compiled = await web(page(tag, false, imports));
-		expect(codes(compiled)).toEqual(['MARKLESS_DEVICE_WEB_ABSENT']);
-		expect(compiled.semanticGraph.diagnostics[0]!.message).toBe(
-			`\`<${tag}>\` is the platform's own piece and does not exist on the web; put it inside a \`platform\` check, such as \`@if (!platform.web)\`, in the component that renders it, and use \`drawer\`, \`modal\` or \`<dialog>\` for the web`,
-		);
-	});
+	])(
+		'an unguarded <%s> is refused, telling the author to guard it and what to use on the web',
+		async (tag, imports) => {
+			const compiled = await web(page(tag, false, imports));
+			expect(codes(compiled)).toEqual(['MARKLESS_DEVICE_WEB_ABSENT']);
+			expect(compiled.semanticGraph.diagnostics[0]!.message).toBe(
+				`\`<${tag}>\` is the platform's own piece and does not exist on the web; put it inside a \`platform\` check, such as \`@if (!platform.web)\`, in the component that renders it, and use \`drawer\`, \`modal\` or \`<dialog>\` for the web`,
+			);
+		},
+	);
 });

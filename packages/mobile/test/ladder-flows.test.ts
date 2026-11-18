@@ -110,7 +110,8 @@ test.each(allRungFolders())(
 			// scrollUntilVisible fails by itself unless the text comes on screen.
 			if (
 				index === 0 ||
-				(step.do && ('relaunch' in step.do || 'swipe' in step.do || 'scrollTo' in step.do)) ||
+				(step.do &&
+					('relaunch' in step.do || 'swipe' in step.do || 'scrollTo' in step.do)) ||
 				looksOnly(step.do)
 			)
 				continue;
