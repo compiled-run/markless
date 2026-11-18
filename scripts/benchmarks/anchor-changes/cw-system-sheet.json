@@ -1,0 +1,72 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/row-event-repeats"
+			],
+			"set": 322,
+			"reason": "row-event-repeats moves out of render-csr so the onIdle wake (fns/idle-trigger) can check a mount's row records; render-csr shrinks by the same function",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/render-csr"
+			],
+			"delta": -129,
+			"reason": "row-event-repeats moves out of render-csr so the onIdle wake (fns/idle-trigger) can check a mount's row records; render-csr shrinks by the same function",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 7,
+			"reason": "row-event-repeats moves out of render-csr so the onIdle wake (fns/idle-trigger) can check a mount's row records; render-csr shrinks by the same function",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/row-event-repeats"
+			],
+			"set": 322,
+			"reason": "row-event-repeats moves out of render-csr so the onIdle wake (fns/idle-trigger) can check a mount's row records; render-csr shrinks by the same function",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/render-csr"
+			],
+			"delta": -129,
+			"reason": "row-event-repeats moves out of render-csr so the onIdle wake (fns/idle-trigger) can check a mount's row records; render-csr shrinks by the same function",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 5,
+			"reason": "row-event-repeats moves out of render-csr so the onIdle wake (fns/idle-trigger) can check a mount's row records; render-csr shrinks by the same function",
+			"date": "2026-11-18"
+		}
+	]
+}

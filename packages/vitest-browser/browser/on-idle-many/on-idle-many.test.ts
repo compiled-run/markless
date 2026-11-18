@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
+import BranchOnly from './branch-only.tsrx';
 import Composed from './composed-hosts.tsrx';
 import NestedVisible from './nested-visible.tsrx';
 import ThreeHosts from './three-hosts.tsrx';
@@ -43,4 +44,12 @@ test('ssr: nested onVisible elements each run once', async () => {
 	await expect.poll(() => Object.keys(host.__idleCounts ?? {}).length).toBe(3);
 	await settle(300);
 	expect(host.__idleCounts).toEqual({ outer: 1, inner: 1, aside: 1 });
+});
+
+test('csr: a mount with no onIdle record stays unstarted at idle once another module has one', async () => {
+	await render(ThreeHosts);
+	await expect.poll(() => Object.keys(host.__idleCounts ?? {}).length).toBe(3);
+	const { runtime } = await render(BranchOnly);
+	await settle(300);
+	expect(runtime.runtime.getBranch('branch-site:0')).toBeUndefined();
 });
