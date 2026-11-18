@@ -14,7 +14,9 @@ import { marklessAttributeValue } from '@markless/web/dom-attribute';
 export type NativeAction =
 	| { readonly event: 'activate'; readonly host: string }
 	/** The field's whole text after an edit. */
-	| { readonly event: 'input'; readonly host: string; readonly value: string };
+	| { readonly event: 'input'; readonly host: string; readonly value: string }
+	/** The host's back gesture (or Escape) on an open `<dialog>`: it closes, as the browser's cancel does. */
+	| { readonly event: 'cancel'; readonly host: string };
 
 type Value = NativeValue;
 
@@ -37,6 +39,8 @@ export type NativeRuntime = {
 	>;
 	/** Every shown input's bound `value`, as `String(value)`. */
 	readonly properties: () => ReadonlyArray<readonly [node: string, name: 'value', value: string]>;
+	/** Every `<dialog>` and whether it is open in the top layer. */
+	readonly dialogs: () => ReadonlyArray<readonly [node: string, open: boolean]>;
 	/** Every shown branch's chosen arm (null: none). */
 	readonly arms: () => ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Every shown list's row keys, in order. */
@@ -190,6 +194,12 @@ export function createNativeRuntime(
 		payload.cells.flatMap((cell) => (cell.storage ? [[cell.id, cell.storage.key] as const] : [])),
 	);
 	const handlers = new Map(payload.handlers.map((handler) => [handler.id, handler.ops]));
+	/** Each `<dialog>`'s top-layer state; every dialog mounts closed. */
+	const dialogs = new Map<string, boolean>(
+		payload.nodes.flatMap((node): [string, boolean][] =>
+			node.kind === 'element' && node.element === 'dialog' ? [[node.id, false]] : [],
+		),
+	);
 	const branches = new Map(
 		payload.nodes.flatMap((node) => (node.kind === 'branch' ? [[node.id, node] as const] : [])),
 	);
@@ -291,10 +301,15 @@ export function createNativeRuntime(
 		attributes,
 		properties,
 		arms,
+		dialogs: () => [...dialogs],
 		rows,
 		dispatch(action) {
 			const event = payload.events.find((candidate) => candidate.host === action.host && candidate.event === action.event);
-			if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
+			if (action.event === 'cancel') {
+				if (dialogs.get(action.host) !== true) throw new Error(`${action.host} is not an open dialog`);
+			} else if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
+			const dialogsBefore = new Map(dialogs);
+			if (action.event === 'cancel') dialogs.set(action.host, false);
 			const eventValue = action.event === 'input' ? action.value : undefined;
 			const cellsBefore = new Map(values);
 			const beforeTexts = new Map(texts());
@@ -308,6 +323,11 @@ export function createNativeRuntime(
 				for (const op of ops) {
 					if (op.op === 'navigate')
 						return { op: 'navigate', route: op.route, params: op.params };
+					if (op.op === 'dialog') {
+						if (!dialogs.has(op.node)) throw new Error(`${op.node} is not a dialog`);
+						dialogs.set(op.node, op.method === 'showModal');
+						continue;
+					}
 					if (op.op === 'if') {
 						const taken = run(
 							evaluate(op.test, eventValue) ? op.whenTrue : op.whenFalse,
@@ -322,7 +342,7 @@ export function createNativeRuntime(
 				}
 				return undefined;
 			};
-			const navigated = run(handlers.get(event.handler) ?? []);
+			const navigated = event ? run(handlers.get(event.handler) ?? []) : undefined;
 			if (navigated) return [navigated];
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());
@@ -349,6 +369,9 @@ export function createNativeRuntime(
 						: [];
 				}
 				const ids = instances(node).map((instance) => instance.id);
+				const opened = node.kind === 'element' ? dialogs.get(node.id) : undefined;
+				const dialog: NativeJournalEntry[] =
+					opened !== undefined && opened !== dialogsBefore.get(node.id) ? [{ op: 'dialog', node: node.id, open: opened }] : [];
 				if (node.kind === 'text') {
 					return ids.flatMap((id): NativeJournalEntry[] => {
 						const before = beforeTexts.get(id);
@@ -358,7 +381,7 @@ export function createNativeRuntime(
 							: [];
 					});
 				}
-				return ids.flatMap((id) =>
+				return dialog.concat(ids.flatMap((id) =>
 					(node.bindings ?? []).flatMap((binding): NativeJournalEntry[] => {
 						const name = 'attribute' in binding ? binding.attribute : binding.property;
 						const key = `${id}\0${name}`;
@@ -369,7 +392,7 @@ export function createNativeRuntime(
 							? [{ op: 'attribute', node: id, name, value: afterAttributes.get(key)! }]
 							: [{ op: 'property', node: id, name: 'value', value: afterProperties.get(key)! }];
 					}),
-				);
+				));
 			});
 			return [...styles, ...nodes];
 		},

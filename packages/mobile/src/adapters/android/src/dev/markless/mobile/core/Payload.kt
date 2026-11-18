@@ -81,7 +81,7 @@ sealed interface Node {
 	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 }
 
-enum class EventName(val wire: String) { Activate("activate"), Input("input") }
+enum class EventName(val wire: String) { Activate("activate"), Input("input"), Cancel("cancel") }
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
@@ -90,6 +90,8 @@ sealed interface Op {
 	data class Navigate(val route: String, val params: Map<String, String>) : Op
 	/** Runs [then] when [test] is truthy, else [otherwise]; the test is evaluated once, before either. */
 	data class If(val test: Expr, val then: List<Op>, val otherwise: List<Op>) : Op
+	/** `showModal()` ([open] true) or `close()` on a `<dialog>`: the host puts it in its top layer or takes it out. */
+	data class Dialog(val node: String, val open: Boolean) : Op
 }
 
 /** A page's route as the router spells it (`/[fruit]`) and its param names. */
@@ -354,6 +356,12 @@ data class Payload(
 				o.only(setOf("op", "route", "params"), what)
 				val params = o.field("params", what).obj("$what.params").entries.associateTo(LinkedHashMap()) { (k, v) -> k to v.str("$what.params.$k") }
 				return Op.Navigate(o.field("route", what).str("$what.route"), params)
+			}
+			if (name == "dialog") {
+				o.only(setOf("op", "node", "method"), what)
+				val method = o.field("method", what).str("$what.method")
+				if (method != "showModal" && method != "close") throw MarklessDecodeError("$what has unknown dialog method \"$method\"")
+				return Op.Dialog(o.field("node", what).str("$what.node"), method == "showModal")
 			}
 			if (name == "if") {
 				o.only(setOf("op", "test", "whenTrue", "whenFalse"), what)

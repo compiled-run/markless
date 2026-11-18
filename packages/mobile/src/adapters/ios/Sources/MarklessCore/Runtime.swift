@@ -27,6 +27,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case arm(node: String, index: Int?)
 	/// Leave this page: the host builds the page at `route` from scratch with `params`.
 	case navigate(route: String, params: [NativeRouteParam])
+	/// A `<dialog>` put in the top layer (`open`) or taken out.
+	case dialog(node: String, open: Bool)
 
 	public var json: JSONValue {
 		switch self {
@@ -43,6 +45,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("arm")), ("node", .string(node)), ("index", index.map { .number(Double($0)) } ?? .null)])
 		case let .navigate(route, params):
 			return .object([("op", .string("navigate")), ("route", .string(route)), ("params", .object(params.map { ($0.name, .string($0.value)) }))])
+		case let .dialog(node, open):
+			return .object([("op", .string("dialog")), ("node", .string(node)), ("open", .bool(open))])
 		}
 	}
 }
@@ -88,6 +92,8 @@ public final class NativeRuntime {
 	private let nodesById: [String: NativeNode]
 	private let params: [NativeRouteParam]
 	private var eventValue: String?
+	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
+	public private(set) var dialogs: [String: Bool]
 
 	/// `params`: the route params the page opened with.
 	public init(payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = []) {
@@ -100,6 +106,10 @@ public final class NativeRuntime {
 		storageKeys = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.storageKey.map { (cell.id, $0) } })
 		handlers = Dictionary(uniqueKeysWithValues: payload.handlers.map { ($0.id, $0.ops) })
 		nodesById = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
+		dialogs = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
+			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
+			return nil
+		})
 	}
 
 	private func read(_ cell: String) throws -> NativeValue {
@@ -280,9 +290,14 @@ public final class NativeRuntime {
 
 	/// Runs the handler bound to the action and returns the journal the host applies.
 	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
-		guard let bound = payload.events.first(where: { $0.host == action.host && $0.event == action.event }) else {
+		let bound = payload.events.first(where: { $0.host == action.host && $0.event == action.event })
+		if action.event == .cancel {
+			guard dialogs[action.host] == true else { throw RuntimeError(reason: "\(action.host) is not an open dialog") }
+		} else if bound == nil {
 			throw RuntimeError(reason: "no \(action.event.rawValue) handler on \(action.host)")
 		}
+		let dialogsBefore = dialogs
+		if action.event == .cancel { dialogs[action.host] = false }
 		eventValue = action.event == .input ? action.value ?? "" : nil
 		defer { eventValue = nil }
 		let keyed = { (list: [(node: String, name: String, value: String?)]) in
@@ -305,11 +320,14 @@ public final class NativeRuntime {
 					if let key = storageKeys[cell] { store.write(key, value) }
 				case let .when(test, then, otherwise):
 					if let taken = try run(try evaluate(test).isTruthy ? then : otherwise) { return taken }
+				case let .dialog(node, open):
+					guard dialogs[node] != nil else { throw RuntimeError(reason: "\(node) is not a dialog") }
+					dialogs[node] = open
 				}
 			}
 			return nil
 		}
-		if let navigated = try run(handlers[bound.handler] ?? []) { return [navigated] }
+		if let bound, let navigated = try run(handlers[bound.handler] ?? []) { return [navigated] }
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let afterAttributes = keyed(try attributes())
 		let afterProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
@@ -333,7 +351,8 @@ public final class NativeRuntime {
 					return .text(node: instance.id, value: after)
 				}
 			case let .element(_, _, bindings):
-				return try instances(of: node).flatMap { instance in
+				let opened: [NativeJournalEntry] = dialogs[node.id].flatMap { open in open != dialogsBefore[node.id] ? [.dialog(node: node.id, open: open)] : nil } ?? []
+				return try opened + instances(of: node).flatMap { instance in
 					bindings.compactMap { binding -> NativeJournalEntry? in
 						let key = "\(instance.id)\u{0}\(binding.name)"
 						let (before, after) = binding.isProperty ? (beforeProperties, afterProperties) : (beforeAttributes, afterAttributes)

@@ -63,6 +63,7 @@ const PORTABLE_ELEMENTS = new Set([
 	'input',
 	'a',
 	'label',
+	'dialog',
 ]);
 
 const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][number]['event']>> = {
@@ -1019,6 +1020,7 @@ export function createNativeViewPayload(
 		return binding ? `${scope.prefix}${graphNodeId}` : undefined;
 	};
 	const boundHandles = new Map<string, string[]>();
+	const dialogOps: { op: 'dialog'; node: string; method: 'showModal' | 'close' }[] = [];
 	const handleReferences: {
 		readonly node: string;
 		readonly attribute: string;
@@ -1232,6 +1234,8 @@ export function createNativeViewPayload(
 						.map((attribute) => [attribute.name, attribute.value]),
 				);
 				const attributes = { ...restAttributes, ...staticAttributes };
+				if (element === 'dialog' && ('open' in attributes || (scope.module.readsByHost.get(item.id) ?? []).some((read) => read.target.kind === 'attribute' && read.target.name === 'open')))
+					refuse('<dialog open>, which the web shows in the page flow as a non-modal dialog; open it with `showModal()`');
 				const handleAttrs = handleAttributes(chunk, item.path);
 				const own = bindingsOf(
 					item.id,
@@ -1618,6 +1622,13 @@ export function createNativeViewPayload(
 				| undefined;
 			let absent = false;
 			const path = statement.path ?? [];
+			const handle = path.length === 1 ? scope.module.elementBindings.get(`${scope.component}#${statement.name}`) : undefined;
+			if (handle && (path[0] === 'showModal' || path[0] === 'close') && (statement.arguments ?? []).length === 0) {
+				// The node is the element the handle is bound to, known once the whole tree is lowered.
+				const op = { op: 'dialog' as const, node: `${scope.prefix}${handle}`, method: path[0] as 'showModal' | 'close' };
+				dialogOps.push(op);
+				return [op];
+			}
 			if (path.length === 0) {
 				const prop = propOf(statement.name, scope);
 				if (prop?.kind === 'callback') body = prop;
@@ -1728,6 +1739,15 @@ export function createNativeViewPayload(
 	for (const event of graph.events)
 		if (!loweredEvents.has(event.id)) refuse(`the ${event.eventName} handler on an element this build does not show`);
 
+	for (const op of dialogOps) {
+		const bound = boundHandles.get(op.node) ?? [];
+		const element = bound.length === 1 ? nodes.find((node) => node.id === bound[0]) : undefined;
+		if (element?.kind !== 'element' || element.element !== 'dialog' || element.arm || element.row) {
+			refuse(`\`.${op.method}()\` on a handle that is not bound to exactly one <dialog> outside @if and @for`);
+			continue;
+		}
+		op.node = element.id;
+	}
 	for (const reference of handleReferences) {
 		const ids = reference.keys.flatMap((key) =>
 			key === undefined ? [] : (boundHandles.get(key) ?? []),

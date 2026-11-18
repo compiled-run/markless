@@ -4,7 +4,7 @@ import UIKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"audio", "canvas", "details", "dialog", "embed", "form", "iframe", "img", "object", "option",
+	"audio", "canvas", "details", "embed", "form", "iframe", "img", "object", "option",
 	"picture", "select", "summary", "svg", "textarea", "video",
 ]
 
@@ -40,6 +40,9 @@ final class ViewTree {
 	private var assignment: Int
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 	private var forwards: [LabelForward] = []
+	private var dialogIds = Set<String>()
+	/// The open dialog's top layer and the place in the page its view returns to.
+	private var topLayer: (layer: TopLayerView, home: UIView, index: Int)?
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void
@@ -108,6 +111,8 @@ final class ViewTree {
 				applyAttributes(node, view)
 			case .navigate:
 				throw HostError("a navigate entry reaches the page's controller, not its views")
+			case let .dialog(node, open):
+				try present(node, open: open)
 			case let .state(cell, value):
 				guard let layout else { continue }
 				assignment = try layout.next(from: assignment, cell: cell, value: value)
@@ -148,6 +153,55 @@ final class ViewTree {
 			}
 		}
 		refreshRelations()
+	}
+
+	/// The top layer: a full-screen view above the page and the bars holding the dialog's own view (styled by its CSS, not a
+	/// system sheet). VoiceOver treats the page behind as inert, and its escape gesture closes the dialog as a cancel.
+	private func present(_ node: String, open: Bool) throws {
+		guard let view = elements[node] else { throw HostError("journal names dialog \(node), which is not shown") }
+		if open {
+			guard topLayer == nil else { throw HostError("a second dialog over \(node) has no top layer yet") }
+			guard let screen = root.superview, let home = view.superview, let index = home.subviews.firstIndex(of: view) else {
+				throw HostError("dialog \(node) opened before the page was mounted")
+			}
+			view.removeFromSuperview()
+			let layer = TopLayerView()
+			let onAction = onAction
+			layer.onEscape = { onAction(NativeAction(event: .cancel, host: node)) }
+			// Chrome's ::backdrop default, rgba(0, 0, 0, 0.1).
+			layer.backgroundColor = UIColor(white: 0, alpha: 0.1)
+			layer.accessibilityViewIsModal = true
+			layer.translatesAutoresizingMaskIntoConstraints = false
+			screen.addSubview(layer)
+			view.isHidden = false
+			view.backgroundColor = .white
+			view.translatesAutoresizingMaskIntoConstraints = false
+			layer.addSubview(view)
+			let guide = layer.safeAreaLayoutGuide
+			NSLayoutConstraint.activate([
+				layer.topAnchor.constraint(equalTo: screen.topAnchor),
+				layer.bottomAnchor.constraint(equalTo: screen.bottomAnchor),
+				layer.leadingAnchor.constraint(equalTo: screen.leadingAnchor),
+				layer.trailingAnchor.constraint(equalTo: screen.trailingAnchor),
+				view.centerXAnchor.constraint(equalTo: guide.centerXAnchor),
+				view.centerYAnchor.constraint(equalTo: guide.centerYAnchor),
+				view.widthAnchor.constraint(lessThanOrEqualTo: guide.widthAnchor, constant: -32),
+			])
+			root.accessibilityElementsHidden = true
+			topLayer = (layer, home, index)
+			UIAccessibility.post(notification: .screenChanged, argument: view)
+		} else {
+			guard let top = topLayer else { return }
+			view.removeFromSuperview()
+			top.layer.removeFromSuperview()
+			view.isHidden = true
+			view.backgroundColor = .clear
+			top.home.insertSubview(view, at: min(top.index, top.home.subviews.count))
+			root.accessibilityElementsHidden = false
+			if layout == nil { stack(top.home) }
+			topLayer = nil
+			UIAccessibility.post(notification: .screenChanged, argument: nil)
+		}
 	}
 
 	/// The text an element shows, in view order: what `aria-labelledby` and `aria-describedby` read from it.
@@ -239,6 +293,11 @@ final class ViewTree {
 				inner.heading = context.heading || headings.contains(element)
 				view.accessibilityIdentifier = id
 				elements[id] = view
+				if element == "dialog" {
+					// A dialog shows nothing until showModal() puts it in the top layer (the UA's dialog:not([open]) { display: none }).
+					dialogIds.insert(id)
+					view.isHidden = true
+				}
 				if let style = style(of: id) { try paint(view, style, faces: faces) }
 				container.insertSubview(view, at: index)
 				index += 1
@@ -372,7 +431,7 @@ final class ViewTree {
 		view.accessibilityValue = current["aria-expanded"].map { $0 == "true" ? "expanded" : "collapsed" }
 		view.accessibilityElementsHidden = current["aria-hidden"] == "true"
 		// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
-		if layout == nil {
+		if layout == nil, !dialogIds.contains(id) {
 			let hidden = current["hidden"] != nil
 			if view.isHidden != hidden {
 				view.isHidden = hidden
@@ -419,6 +478,15 @@ final class ViewTree {
 		constraints.append(above.constraint(equalTo: container.bottomAnchor))
 		NSLayoutConstraint.activate(constraints)
 		stackConstraints[ObjectIdentifier(container)] = constraints
+	}
+}
+
+/// The top layer's view: VoiceOver's escape gesture (two-finger scrub) on it closes the dialog.
+final class TopLayerView: UIView {
+	var onEscape: (() -> Void)?
+	override func accessibilityPerformEscape() -> Bool {
+		onEscape?()
+		return onEscape != nil
 	}
 }
 

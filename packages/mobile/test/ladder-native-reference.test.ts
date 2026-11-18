@@ -36,6 +36,8 @@ function walk(
 		for (const [node, , value] of runtime.properties()) properties.set(node, value);
 	};
 	const nodeOf = new Map(payload.nodes.map((node) => [node.id, node]));
+	// A closed <dialog> shows nothing (the UA's dialog:not([open]) rule); the journal opens and closes it.
+	const openDialogs = new Map(runtime.dialogs());
 	const chosen = new Map(runtime.arms());
 	const shownNode = (id: string): boolean => {
 		const place = nodeOf.get(id)?.arm;
@@ -53,6 +55,7 @@ function walk(
 		const node = nodeOf.get(at < 0 ? id : id.slice(0, at));
 		if (!node) return false;
 		if (node.kind === 'element') {
+			if (openDialogs.get(id) === false) return true;
 			const bound = attributes.get(`${id}\0hidden`);
 			if ((bound !== undefined ? bound : (node.attributes?.['hidden'] ?? null)) !== null)
 				return true;
@@ -117,6 +120,7 @@ function walk(
 					: runtime.dispatch({ event: 'input', host, value: action.type.text });
 			for (const entry of dispatched) {
 				if (entry.op === 'text') texts.set(entry.node, entry.value);
+				else if (entry.op === 'dialog') openDialogs.set(entry.node, entry.open);
 				else if (entry.op === 'attribute')
 					attributes.set(`${entry.node}\0${entry.name}`, entry.value);
 				else if (entry.op === 'property') properties.set(entry.node, entry.value);

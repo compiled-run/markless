@@ -1,6 +1,11 @@
 package dev.markless.mobile.view
 
+import android.app.Activity
 import android.content.Context
+import android.view.WindowInsets
+import android.widget.FrameLayout
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
@@ -121,6 +126,7 @@ class MarklessHost(
 					for (inst in built.values.sortedBy { order.getValue(it.node.id) }) place(inst, views.getValue(inst.id), st)
 					root.requestLayout()
 				}
+				is JournalEntry.Dialog -> dialog(entry.node, entry.open)
 				is JournalEntry.Arm -> {
 					if (runtime.node(entry.node) !is Node.Branch) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
 					rebuild()
@@ -263,6 +269,7 @@ class MarklessHost(
 		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(e.host, EventName.Activate)) }
+			EventName.Cancel -> {}
 			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -274,6 +281,8 @@ class MarklessHost(
 				}
 			})
 		}
+		// A dialog shows nothing until showModal() puts it in the top layer (the UA's dialog:not([open]) { display: none }).
+		if (node.element == "dialog") view.visibility = View.GONE
 		for ((name, value) in node.attributes) if (name != "class") attribute(inst.id, name, value)
 		for (b in node.bindings) if (!b.property) attribute(inst.id, b.name, runtime.attribute(b, inst.scope))
 		return view
@@ -313,6 +322,55 @@ class MarklessHost(
 			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
 			// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
 			"hidden" -> if (style == null) view.visibility = if (value != null) View.GONE else View.VISIBLE
+		}
+	}
+
+	/** The open dialog's top layer, its view's place in the page to return it to, and the back callback that cancels it. */
+	private var topLayer: Triple<FrameLayout, Pair<ViewGroup, Int>, OnBackInvokedCallback>? = null
+
+	/**
+	 * The top layer: a full-screen layer above the page and the bars, holding the dialog's own view (styled by its CSS,
+	 * not a system sheet). The page behind is hidden from TalkBack, and the back gesture closes the dialog as a cancel.
+	 */
+	private fun dialog(id: String, open: Boolean) {
+		val view = view(id)
+		val activity = context as? Activity ?: throw MarklessHostError("a dialog needs an Activity for its top layer")
+		val content = activity.findViewById<ViewGroup>(android.R.id.content)
+		if (open) {
+			if (topLayer != null) throw MarklessHostError("a second dialog over \"$id\" has no top layer yet")
+			val parent = view.parent as ViewGroup
+			val index = parent.indexOfChild(view)
+			parent.removeView(view)
+			val layer = FrameLayout(context).apply {
+				// Chrome's ::backdrop default, rgba(0, 0, 0, 0.1); a press on it is the page's, so it is consumed here.
+				setBackgroundColor(0x1A000000)
+				isClickable = true
+				setOnApplyWindowInsetsListener { v, insets ->
+					val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
+					v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+					insets
+				}
+			}
+			view.visibility = View.VISIBLE
+			view.setBackgroundColor(0xFFFFFFFF.toInt())
+			val pad = (16 * dpr).roundToInt()
+			view.setPadding(pad, pad, pad, pad)
+			layer.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+			content.addView(layer, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+			for (i in 0 until content.childCount) content.getChildAt(i).takeIf { it !== layer }?.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+			val back = OnBackInvokedCallback { apply(runtime.dispatch(id, EventName.Cancel)) }
+			activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, back)
+			topLayer = Triple(layer, parent to index, back)
+			layer.requestApplyInsets()
+		} else {
+			val (layer, place, back) = topLayer ?: return
+			activity.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(back)
+			layer.removeView(view)
+			content.removeView(layer)
+			for (i in 0 until content.childCount) content.getChildAt(i).importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+			view.visibility = View.GONE
+			place.first.addView(view, minOf(place.second, place.first.childCount))
+			topLayer = null
 		}
 	}
 

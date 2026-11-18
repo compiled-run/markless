@@ -129,7 +129,7 @@ export type NativeNode = NativePlace &
 	);
 
 /** Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click). */
-export type NativeEventName = 'activate' | 'input';
+export type NativeEventName = 'activate' | 'input' | 'cancel';
 
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
 export type NativeOp =
@@ -141,6 +141,11 @@ export type NativeOp =
 			readonly whenTrue: ReadonlyArray<NativeOp>;
 			readonly whenFalse: ReadonlyArray<NativeOp>;
 	  }
+	/**
+	 * `dialog.showModal()` or `dialog.close()` on a `<dialog>`'s handle: the host shows the dialog in its top layer, above the
+	 * page, with the page behind inert, or takes it out again.
+	 */
+	| { readonly op: 'dialog'; readonly node: string; readonly method: 'showModal' | 'close' }
 	/** Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. */
 	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
 
@@ -171,6 +176,8 @@ export type NativeViewPayload = {
 /** One change a host applies to its retained views after a handler runs. */
 export type NativeJournalEntry =
 	| { readonly op: 'text'; readonly node: string; readonly value: string }
+	/** A `<dialog>` opened in the top layer or closed (by an op, or by the host's back gesture as a `cancel`). */
+	| { readonly op: 'dialog'; readonly node: string; readonly open: boolean }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
 	| { readonly op: 'attribute'; readonly node: string; readonly name: string; readonly value: string | null }
 	/** An input's text, as `String(value)`; never sent for the field whose edit caused it while it already shows that text. */

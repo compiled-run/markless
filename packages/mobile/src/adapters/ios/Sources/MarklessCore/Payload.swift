@@ -112,6 +112,8 @@ public struct NativeNode: Equatable, Sendable {
 public enum NativeEventName: String, Sendable {
 	case activate
 	case input
+	/// The host's back gesture or Escape on an open `<dialog>`: it closes, as the browser's cancel does.
+	case cancel
 }
 
 public enum NativeOp: Equatable, Sendable {
@@ -121,6 +123,8 @@ public enum NativeOp: Equatable, Sendable {
 	case navigate(route: String, params: [NativeRouteParam])
 	/// Runs `then` when `test` is truthy, else `otherwise`; the test is evaluated once, before either.
 	indirect case when(test: NativeExpr, then: [NativeOp], otherwise: [NativeOp])
+	/// `showModal()` (`open`) or `close()` on a `<dialog>`: the host puts it in its top layer or takes it out.
+	case dialog(node: String, open: Bool)
 }
 
 public struct NativeRouteParam: Equatable, Sendable {
@@ -287,6 +291,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 				case "navigate":
 					let opField = try op.object(["op", "route", "params"])
 					return .navigate(route: try opField["route"].string(), params: try decodeParams(try opField["params"]))
+				case "dialog":
+					let opField = try op.object(["op", "node", "method"])
+					let method = try opField["method"].string()
+					guard method == "showModal" || method == "close" else {
+						throw PayloadError(path: op.path + ".method", reason: "unknown dialog method \"\(method)\"")
+					}
+					return .dialog(node: try opField["node"].string(), open: method == "showModal")
 				case "if":
 					let opField = try op.object(["op", "test", "whenTrue", "whenFalse"])
 					return .when(

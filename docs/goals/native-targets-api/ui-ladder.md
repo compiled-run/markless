@@ -14,7 +14,9 @@ simulator and the emulator through the proof harness). No family source was chan
 | u1 | `base`: button (toggle and disabled), separator, label | pass | pass | pass | pass | none: `base.button` cannot take a class (below) |
 | u2 | `collapsible`: root, trigger, content | pass | pass | pass | pass | Dragon: `.trigger[ui-open]` and `[hidden]` per state |
 | u3 | `tabs`: three triggers, three panels | pass | pass | pass | pass | none: the selected value is a string (below) |
-| u4 | overlay (`popover`) | stopped | stopped | stopped | stopped | Dragon refuses it (below) |
+| u4 | plain `<dialog>` (`showModal()`/`close()`) | pass | pass | pass | pass | none: Dragon has no `<dialog>` (below) |
+| u4b | `modal` | stopped | stopped | stopped | stopped | |
+| u4c | `drawer` (the bottom sheet) | stopped | stopped | stopped | stopped | |
 | u5 | `toggle`: label, switch, thumb, description | pass | pass | pass | pass | none |
 
 Receipts: one harness run of the fourteen core rungs and u1, u2, u3 and u5, both platforms, `proof passed on iOS and Android`,
@@ -58,14 +60,46 @@ arrow keys, select on focus) are left out with a `MARKLESS_NATIVE_KEYBOARD_ONLY`
 hardware keyboard raises them, and hosts have none yet. Dragon: the selected value is a string, and Dragon's per-state
 styles take true/false states only, so the panels' `hidden` could not follow it under Dragon; u3 runs on the stacking layout.
 
-**u4 overlay (stopped).** `popover` is refused by name: its `dismiss` handler reads `document.activeElement`, calls
-`surface.contains(...)` and reads `event.detail.pressTarget`, and its close part calls `popover.triggerEl.focus()`; no host
-has the overlay primitive (`dismiss` from Escape, the back gesture or an outside press). Dragon refuses the family's own
-defaults: the `overlay` attribute (not proven rendering-neutral), `anchor-name`/`position-anchor`/`anchor-scope` ("Dragon
-implements no anchor positioning yet") and `position: absolute` beside text (`POSX-IFC`). What each phone gesture should
-mean, from this evidence: Escape → Android back and the iOS escape gesture map to `dismiss` reason `escape`; outside press →
-kept (a tap outside the surface); focus trapping → `aria-modal` maps to `accessibilityViewIsModal` / hiding siblings from
-TalkBack. None of this is built.
+**Overlays: what modal and drawer are built on.** Neither uses `<dialog>` or `popover`. Each is an ordinary `<div>` backdrop
+carrying the bare `overlay` attribute, which `@markless/web` enlists (Escape and outside presses reported as `dismiss`,
+`aria-modal` read off the subtree to make the page inert and lock scroll), wrapping a `role="dialog"` content element
+(`modal/note.md`). There is no `sheet` family: the bottom sheet is `drawer` (parts root, trigger, backdrop, content,
+title, description, close; `orientation` defaults to vertical), which adds swipe-to-close and snap points over modal.
+
+**u4 plain `<dialog>`.** An author's `<dialog el={dialog}>` opened with `dialog?.showModal()` and closed with
+`dialog?.close()`. Compiler: `showModal()`/`close()` on a handle bound to exactly one `<dialog>` lower to a `dialog` op;
+`<dialog open>` is refused by name (the web shows it non-modal, in the page flow). Payload, reference runtime and both
+hosts: the `dialog` op, a `{ op: 'dialog', node, open }` journal entry and a `cancel` action that closes it (vector
+`dialog.json`). Hosts: a top layer above the page and the bars holding the dialog's own views (not a system sheet), on
+Chrome's default `::backdrop` tint; the page behind is inert to the screen reader (iOS `accessibilityViewIsModal`,
+Android `IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS`); safe-area and keyboard insets pad the layer; Android's back
+gesture (`OnBackInvokedDispatcher`) and VoiceOver's escape gesture close it as a cancel. Proven: the flow on both phones,
+and an extra Android-only Maestro flow (open, `back`, closed with nothing deleted, app still open). Not proven on a device:
+the VoiceOver escape gesture, which Maestro cannot perform. Dragon refuses `<dialog>` (`DRAGON_UNSUPPORTED_ELEMENT`:
+"renders in the top layer with a ::backdrop") and its `open` attribute, so u4 runs on the stacking layout; styling a top
+layer and `::backdrop` through Dragon is Dragon work.
+
+**u4b modal (stopped).** Refused for five things. Buildable without a decision: the `dismiss` event from the host's top
+layer (back gesture and Escape as reason `escape`, `event.detail.reason` as an expression) and `const` locals in the
+dismiss handler. Not buildable without a decision: `focusBackToOpener` (`modal-focus.ts`) reads the overlay's focus origin
+from a browser property (`__marklessOverlayFocusOrigin`, `instanceof HTMLElement`, `ownerDocument.body`), so a phone needs
+a portable read of "who had focus when this opened", which is new `@markless/core` API; and the backdrop press guard
+(`modal-press.ts`) keeps its armed state in a module-level `WeakSet` across `pointerdown` and `pointerup`, outside graph
+state on purpose (its note: a state write lands too late on the web), which is not data. Recognising that pair as a native
+tap on the backdrop would mean matching the family's code, which the architecture forbids. The family's public API does
+not need to change; these two internals, or the overlay primitive (a reason for a press on the layer itself), do.
+
+**u4c drawer (stopped).** Everything modal needs, plus: its shared state's first value is not known at build time (an
+analyzer gap that cascades into most of its refusals), `style={drawer.offset}` (a `style` binding), and the drag.
+**The drag cannot be expressed as data today.** The rest positions and thresholds are already data the family declares
+(`snapPoints`, `closeThreshold`, `orientation`, `start`, as root props seeded into shared state). But nothing declares that
+an element is draggable: the gesture is `pointerdown`/`pointermove`/`pointerup` handlers that measure the surface
+(`getBoundingClientRect`), compute velocity from timestamps and decide the release in `decideRelease` (`drawer-swipe.ts`),
+writing `--offset` each frame. What I tried: the native probe above, and reading the handlers for a fact a host could
+run. A host could only run the drag natively by re-implementing `decideRelease` itself (the behaviour would then live in
+two places) or by recognising these handlers (forbidden). Making it data needs a declaration the family writes, for
+example a framework attribute like `overlay` that names the axis, the rest positions and the close threshold, with the
+release rule owned by the framework on every target. That is a new authoring primitive: an owner decision.
 
 **u5 toggle.** The trigger reads `toolbarState()` from another file; the build now analyzes each module with the interfaces
 of the modules it imports, as the web build links them. `aria-labelledby`, `aria-describedby` and `<label for>` lower to node

@@ -35,6 +35,11 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"navigate\",\"route\":${jsonString(node)},\"params\":${params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}}"
 	}
 
+	/** A `<dialog>` put in the top layer ([open]) or taken out. */
+	data class Dialog(override val node: String, val open: Boolean) : JournalEntry {
+		override fun toJson() = "{\"op\":\"dialog\",\"node\":${jsonString(node)},\"open\":$open}"
+	}
+
 	/** Shows arm [index] of a branch (null: none). */
 	data class Arm(override val node: String, val index: Int?) : JournalEntry {
 		override fun toJson() = "{\"op\":\"arm\",\"node\":${jsonString(node)},\"index\":${index ?: "null"}}"
@@ -207,13 +212,27 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 	/** Every shown list's row keys, in order. */
 	fun rows(): List<Pair<String, List<String>>> = payload.nodes.filterIsInstance<Node.Repeat>().filter { isShown(it) }.map { r -> r.id to rowsOf(r).map { it.key } }
 
+	/** Each `<dialog>`'s top-layer state; every dialog mounts closed. */
+	private val dialogs = LinkedHashMap<String, Boolean>().apply {
+		for (n in payload.nodes) if (n is Node.Element && n.element == "dialog") put(n.id, false)
+	}
+
+	fun dialogs(): List<Pair<String, Boolean>> = dialogs.entries.map { it.key to it.value }
+
+	fun isDialogOpen(id: String): Boolean = dialogs[id] == true
+
 	fun handlerFor(host: String, event: EventName): String? = payload.events.firstOrNull { it.host == host && it.event == event }?.handler
 
 	/** Runs the handler for [event] on [host]; an `input` event carries the field's whole text as [value]. */
 	fun dispatch(host: String, event: EventName, value: String? = null): List<JournalEntry> {
 		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
-		val handlerId = handlerFor(host, event) ?: throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
-		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
+		val handlerId = handlerFor(host, event)
+		if (event == EventName.Cancel) {
+			if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
+		} else if (handlerId == null) throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
+		val handler = handlerId?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
+		val dialogsBefore = HashMap(dialogs)
+		if (event == EventName.Cancel) dialogs[host] = false
 		val cellsBefore = HashMap(values)
 		val beforeTexts = texts().toMap()
 		val beforeAttributes = attributes().associate { (n, a, v) -> (n to a) to v }
@@ -232,11 +251,15 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 					storageKeys[op.cell]?.let { store.set(it, v) }
 				}
 				is Op.If -> run(if (Js.truthy(evaluate(op.test))) op.then else op.otherwise)?.let { return it }
+				is Op.Dialog -> {
+					if (op.node !in dialogs) throw MarklessRuntimeError("\"${op.node}\" is not a dialog")
+					dialogs[op.node] = op.open
+				}
 			}
 			return null
 		}
 		try {
-			run(handler.ops)?.let { return listOf(it) }
+			handler?.let { h -> run(h.ops)?.let { return listOf(it) } }
 		} finally {
 			eventValue = null
 		}
@@ -257,11 +280,14 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				val b = beforeTexts[inst.id]; val a = afterTexts[inst.id]
 				if (b != null && a != null && a != b) journal.add(JournalEntry.Text(inst.id, a))
 			}
-			is Node.Element -> for (inst in instances(node)) for (binding in node.bindings) {
+			is Node.Element -> for (inst in instances(node)) {
+				dialogs[node.id]?.let { open -> if (open != dialogsBefore[node.id]) journal.add(JournalEntry.Dialog(node.id, open)) }
+				for (binding in node.bindings) {
 				val key = inst.id to binding.name
 				if (binding.property) {
 					if (key in beforeProperties && key in afterProperties && beforeProperties[key] != afterProperties[key]) journal.add(JournalEntry.Property(inst.id, binding.name, afterProperties.getValue(key)))
 				} else if (key in beforeAttributes && key in afterAttributes && beforeAttributes[key] != afterAttributes[key]) journal.add(JournalEntry.Attribute(inst.id, binding.name, afterAttributes[key]))
+				}
 			}
 		}
 		return journal

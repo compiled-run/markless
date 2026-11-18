@@ -1,0 +1,34 @@
+appId: ${APP_ID}
+name: u4-dialog
+---
+- launchApp:
+    clearState: true
+- assertVisible: Dialog
+- assertVisible: Delete draft
+- assertVisible: Deleted 0
+- assertNotVisible: Delete this draft\?
+- assertNotVisible: Keep
+- tapOn: Delete draft
+- assertVisible: Delete this draft\?
+- assertVisible: Keep
+- assertVisible: Delete this draft\?
+- assertVisible: Delete
+- assertVisible: Keep
+- tapOn: Delete
+- assertNotVisible: Delete this draft\?
+- assertNotVisible: Keep
+- assertVisible: Delete draft
+- assertVisible: Deleted 1
+- assertNotVisible: Delete this draft\?
+- assertNotVisible: Keep
+- tapOn: Delete draft
+- assertVisible: Delete this draft\?
+- assertVisible: Keep
+- assertVisible: Delete this draft\?
+- assertVisible: Keep
+- tapOn: Keep
+- assertNotVisible: Delete this draft\?
+- assertNotVisible: Keep
+- assertVisible: Deleted 1
+- assertNotVisible: Delete this draft\?
+- assertNotVisible: Keep

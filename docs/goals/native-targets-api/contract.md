@@ -261,6 +261,10 @@ export function Counter() @{
 - **Left out, not refused:** `beforematch` handlers (no find-in-page on a phone); `keydown`/`keyup`, and
   `focus`/`blur`/`focusin`/`focusout` on anything but a text field, with a `MARKLESS_NATIVE_KEYBOARD_ONLY` warning (only a
   hardware keyboard raises them; hosts have none yet).
+- **Dialogs:** `dialog` is portable. `showModal()`/`close()` on a handle bound to one `<dialog>` lower to
+  `{ op: 'dialog', node, method }`; the journal says `{ op: 'dialog', node, open }`; the action `{ event: 'cancel', host }`
+  closes an open dialog (the host raises it from Android back and the VoiceOver escape gesture). Hosts show an open
+  dialog's own views in a top layer above the page with the page behind inert. Vector `dialog.json`.
 - **Styled cells:** a true/false cell some handler writes is `styled` when any attribute binding reads it, not only `class`;
   the style input carries those attributes per state (`attributesByState`).
 
