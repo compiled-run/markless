@@ -348,8 +348,14 @@ sheet, or an unstyled sheet, carries nothing new: no `sheets` field, no extra Dr
   a sheet had no presenter and the sheet waited for a window it already had. This branch sets the presenter when the
   page is built. The UIKit test that covers it already existed and fails without the fix
   (`aSystemSheetKeepsItsContentOffThePageAndPresentsAPageSheet`: "the sheet did not present" on `deee0dc85`, passes on
-  this branch); it runs only under `xcodebuild test` on a simulator, which no CI job and no harness step runs, so the
-  regression went unseen. With the fix, Y1 to Y3 and Z1 to Z6 pass on iOS.
+  this branch). It ran only under `xcodebuild test` on a simulator, which no CI job and no harness step ran, so the
+  regression went unseen. Now it runs in both: the `mobile-hosts` workflow (`.github/workflows/mobile-hosts.yml`, every pull
+  request that touches the hosts, the vectors or the harness, whatever its base) runs the iOS package's tests on a
+  simulator and the Kotlin host's JVM test, through `node src/harness/cli.ts host-tests`; the proof harness runs the same
+  tests before any rung and stops when they fail. Evidence: the job on `deee0dc85` (draft #828, run 44280089236)
+  fails `ios-host` on that test; on this branch both jobs pass (run 44285417785, after two fixes for CI's older Xcode:
+  the iOS 26 content swipe-back is compiled only by Swift 6.2, and `paintSides` runs on the main actor). The Android host has no view-level tests to run (its JVM test
+  covers the interpreter core and the style decoder only); its sheet is covered by the rungs on the emulator alone. With the fix, Y1 to Y3 and Z1 to Z6 pass on iOS.
 - **Android:** with #809's screen stack beside the sheet branch's `singleTask` shell, every pushed screen reused the first
   (S3 failed on Android at "Open settings"). The shell is back to the standard launch mode, and the test build's device
   links (`markless-proof://device/...`) go to a `DeviceLinkActivity` that sets the value on the screen on top and
