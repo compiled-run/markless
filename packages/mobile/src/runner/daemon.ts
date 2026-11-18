@@ -14,7 +14,7 @@ import {
 	stopPhone,
 	withAdmission,
 } from './phones.ts';
-import { phoneId, type PhoneSpec, type PhoneState, transitionPhone } from './pool.ts';
+import { parsePhone, phoneId, type PhoneSpec, type PhoneState, transitionPhone } from './pool.ts';
 import {
 	chunkFile,
 	chunkLog,
@@ -32,6 +32,7 @@ import {
 	resultDir,
 	type RungResult,
 	runningDaemon,
+	rungsOn,
 	type Summary,
 	transitionChunk,
 	writeJson,
@@ -54,6 +55,8 @@ type Phone = {
 const log = (line: string) => appendFileSync(daemonLog(), `${new Date().toISOString()} ${line}\n`);
 const pool = JSON.parse(process.argv[2] ?? '[]') as PhoneSpec[];
 if (pool.length === 0) throw new Error('usage: daemon.ts <pool json>');
+for (const spec of pool)
+	if (spec.platform === 'android') parsePhone('android', `${spec.avd}@${spec.port}`);
 const other = runningDaemon();
 if (other) {
 	console.error(`a runner already runs (pid ${other.pid}); stop it first`);
@@ -224,7 +227,7 @@ async function run(phone: Phone, job: string, name: string, queued: Chunk): Prom
 				attempt: 1,
 			} satisfies Chunk);
 		log(
-			`${id} finished ${job} ${name}: ${results.filter((r) => !r.failure).length} of ${results.length} passed${answers ? '' : `; the phone stopped answering, ${again.length} rung(s) run again`}`,
+			`${id} finished ${job} ${name}: ${results.filter((r) => !r.failure).length} of ${results.length} passed${answers ? '' : '; the phone stopped answering'}${again.length > 0 ? `; ${again.length} rung(s) that did not reach the phone run again` : ''}`,
 		);
 		if (answers) move(phone, { type: 'release' });
 		else await restart(phone, `during ${name}`);
@@ -275,23 +278,24 @@ function finishJobs(): void {
 			return {
 				version: PROOF_REPORT_VERSION,
 				platform,
-				rungs: spec.rungs.map((name) => latest.get(name)!),
+				rungs: rungsOn(spec, platform).map((name) => latest.get(name)!),
 			};
 		});
 		for (const report of reports)
 			writeJson(join(resultDir(job), `${report.platform}.json`), report);
 		const verdict = proofVerdict(reports);
 		const own = reports.every((report) => report.rungs.every((rung) => !rung.failure));
+		// Only a job that ran every rung on both platforms is a proof; any other passes on its own reports.
+		const proof = spec.platforms.length === 2 && !spec.onlyOn;
 		const summary: Summary = {
-			passed: spec.platforms.length === 2 ? verdict.passed : own,
-			problems:
-				spec.platforms.length === 2
-					? verdict.problems
-					: reports.flatMap((r) =>
-							r.rungs
-								.filter((g) => g.failure)
-								.map((g) => `${g.name} failed on ${r.platform}`),
-						),
+			passed: proof ? verdict.passed : own,
+			problems: proof
+				? verdict.problems
+				: reports.flatMap((r) =>
+						r.rungs
+							.filter((g) => g.failure)
+							.map((g) => `${g.name} failed on ${r.platform}`),
+					),
 			seconds: (Date.now() - spec.createdAt) / 1000,
 			rerun: [...rerun],
 		};
@@ -350,8 +354,12 @@ process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
 publish();
-await Promise.all(phones.map((phone) => boot(phone, false)));
 const busy = new Set<Phone>();
+// Each phone takes chunks as soon as it is up: one phone waiting for the machine queue never holds back another.
+for (const phone of phones) {
+	busy.add(phone);
+	void boot(phone, false).finally(() => busy.delete(phone));
+}
 for (;;) {
 	for (const phone of phones) {
 		if (busy.has(phone)) continue;

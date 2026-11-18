@@ -13,14 +13,23 @@ export function parsePhone(platform: ProofPlatform, text: string): PhoneSpec {
 	if (platform === 'ios') return { platform, name: text };
 	const at = text.lastIndexOf('@');
 	const port = Number(text.slice(at + 1));
-	if (at <= 0 || !Number.isInteger(port) || port % 2 !== 0)
-		throw new Error(`--android is <avd>@<even console port>, not ${text}`);
+	if (at <= 0 || !Number.isInteger(port))
+		throw new Error(`--android is <avd>@<console port>, not ${text}`);
+	if (port % 2 !== 0 || port < EMULATOR_PORTS.first || port > EMULATOR_PORTS.last)
+		throw new Error(
+			`console port ${port} is outside adb's range: an even port from ${EMULATOR_PORTS.first} to ${EMULATOR_PORTS.last}, so its adb port (console + 1) is at most 5585`,
+		);
 	return { platform, avd: text.slice(0, at), port };
 }
 
+/**
+ * adb supports emulators whose adb port (console + 1) is in [5555, 5586]; outside it the emulator warns "ADB may not
+ * function properly" and runs dropped the device (5620 here: 7 of 87 Android rungs "not connected", 2026-11-18).
+ */
+export const EMULATOR_PORTS = { first: 5554, last: 5584 } as const;
+
 export const DEFAULT_POOL: ReadonlyArray<PhoneSpec> = [
 	{ platform: 'ios', name: 'markless-runner' },
-	// Maestro finds emulators by adb port 5555-5585: on console port 5620 it lost the emulator in 7 of 48 rungs (2026-11-18).
 	{ platform: 'android', avd: 'markless_runner', port: 5570 },
 ];
 

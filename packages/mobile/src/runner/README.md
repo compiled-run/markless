@@ -9,7 +9,7 @@ while you wait.
 heavy pnpm --filter @markless/mobile phones submit --affected            # the rungs your change can affect; prints a job id
 heavy pnpm --filter @markless/mobile phones submit 03-counter n2-orders  # named rungs
 heavy pnpm --filter @markless/mobile phones submit --all                 # the whole ladder
-heavy pnpm --filter @markless/mobile phones submit --failed <job>        # only the rungs that failed in <job>, rebuilt from your checkout
+heavy pnpm --filter @markless/mobile phones submit --failed <job>        # each failed rung of <job>, only on the phone it failed on, rebuilt from your checkout
 pnpm --filter @markless/mobile phones wait <job>                         # exits 0 only if the job passed
 pnpm --filter @markless/mobile phones status                              # phones, and jobs not finished yet
 pnpm --filter @markless/mobile phones result <job> --copy-screenshots     # report again; copy screenshots into your rung folders
@@ -39,8 +39,10 @@ pnpm --filter @markless/mobile phones affected [--base <rev>]             # whic
 6. Before a phone takes a chunk, the runner checks that the phone answers (the simulator reads Booted; the emulator is
    an adb `device` with `sys.boot_completed` 1). A phone that does not answer is restarted first, so a job never starts
    on a dead phone. Idle phones are checked every 30 s as well.
-7. If a phone stops answering during a chunk, the runner restarts it and runs that chunk's failed rungs once more. The
-   result lists those rungs under "ran again after its phone restarted". A rung that fails twice is a failure.
+7. A rung whose flow never reached the phone (Maestro exited without recording one command, as with "Device emulator-5570
+   was requested, but it is not connected") runs once more. If the phone also stops answering, the runner restarts it
+   and runs every failed rung of that chunk once more. The result lists those rungs under "ran again because its phone was
+   unreachable"; a rung that fails twice is a failure.
 
 A rung that does not compile fails at `build` on every platform it was asked for, and never reaches a phone. A host whose
 own tests fail fails every rung of that chunk at `host-tests`.

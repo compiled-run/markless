@@ -21,6 +21,7 @@ import {
 	resultDir,
 	runnerHome,
 	runningDaemon,
+	rungsOn,
 	screenshotsDir,
 	type Summary,
 	writeJson,
@@ -33,8 +34,8 @@ const USAGE = `usage: phones <command>
   stop [--phones]        stop the runner (and shut its phones down)
   status                 the phones and every job that has not finished
   submit [--platform ios|android] [--chunk <n>] [--wait] (--all | --affected [--base <rev>] | --failed <job> | <rung>...)
-                         compile the rungs in this checkout, queue them, print the job id; --failed reruns only the
-                         rungs that failed in <job>, on the platforms they failed on
+                         compile the rungs in this checkout, queue them, print the job id; --failed reruns each rung that
+                         failed in <job> only on the phone it failed on (not a proof by itself)
   wait <job>             wait for a job; exits 0 only if it passed
   result <job> [--copy-screenshots]
                          print a finished job's results; copy its screenshots into this checkout's rung folders
@@ -152,6 +153,7 @@ async function submit(argv: string[]): Promise<number> {
 	if (values.host !== 'adapters' && values.host !== 'stub')
 		throw new Error(`--host is adapters or stub, not ${values.host}`);
 	let names: string[];
+	let onlyOn: JobSpec['onlyOn'];
 	if (values.failed) {
 		const failed = failedRungs(values.failed);
 		if (failed.rungs.length === 0) {
@@ -159,10 +161,18 @@ async function submit(argv: string[]): Promise<number> {
 			return 0;
 		}
 		names = failed.rungs;
-		if (!values.platform) platforms.splice(0, platforms.length, ...failed.platforms);
-		console.log(
-			`rerunning ${names.length} rung(s) that failed in ${values.failed} on ${platforms.join(', ')}: ${names.join(' ')}`,
+		platforms.splice(
+			0,
+			platforms.length,
+			...platforms.filter((platform) => (failed.byPlatform[platform] ?? []).length > 0),
 		);
+		onlyOn = Object.fromEntries(
+			platforms.map((platform) => [platform, failed.byPlatform[platform]!]),
+		);
+		for (const platform of platforms)
+			console.log(
+				`rerunning on ${platform} the rungs that failed there in ${values.failed}: ${failed.byPlatform[platform]!.join(' ')}`,
+			);
 	} else if (values.all) names = ladder();
 	else if (values.affected) {
 		const selection = await affectedRungs(changedPaths(values.base ?? defaultBase()), ladder());
@@ -196,15 +206,18 @@ async function submit(argv: string[]): Promise<number> {
 		rmSync(job, { recursive: true, force: true });
 		throw error;
 	}
+	if (onlyOn) spec = { ...spec, onlyOn };
 	const size = Math.max(1, Number(values.chunk));
-	for (const platform of platforms)
-		for (let at = 0; at * size < spec.rungs.length; at++)
+	for (const platform of platforms) {
+		const rungs = rungsOn(spec, platform);
+		for (let at = 0; at * size < rungs.length; at++)
 			writeJson(chunkFile(job, `${platform}-${String(at).padStart(3, '0')}`), {
 				state: 'queued',
 				platform,
-				rungs: spec.rungs.slice(at * size, (at + 1) * size),
+				rungs: rungs.slice(at * size, (at + 1) * size),
 				attempt: 0,
 			} satisfies Chunk);
+	}
 	// The spec goes last: the runner takes a job only once its bundle and chunks are complete.
 	writeJson(join(job, 'job.json'), spec);
 	if (!runningDaemon()) start(DEFAULT_POOL);
@@ -214,22 +227,24 @@ async function submit(argv: string[]): Promise<number> {
 	return values.wait ? wait(id) : 0;
 }
 
-/** The rungs that failed in a finished job, and the platforms they failed on. */
-function failedRungs(id: string): { rungs: string[]; platforms: ProofPlatform[] } {
+/** The rungs that failed in a finished job: all of them in the job's order, and those that failed on each platform. */
+function failedRungs(id: string): {
+	rungs: string[];
+	byPlatform: Partial<Record<ProofPlatform, string[]>>;
+} {
 	const job = jobDir(id);
 	const spec = readJson<JobSpec>(join(job, 'job.json'));
 	if (!spec) throw new Error(`no job ${id}`);
 	if (!existsSync(join(resultDir(job), 'summary.json')))
 		throw new Error(`job ${id} has not finished`);
-	const rungs = new Set<string>();
-	const platforms: ProofPlatform[] = [];
+	const byPlatform: Partial<Record<ProofPlatform, string[]>> = {};
 	for (const platform of spec.platforms) {
 		const report = readJson<ProofReport>(join(resultDir(job), `${platform}.json`))!;
 		const failed = report.rungs.filter((rung) => rung.failure).map((rung) => rung.name);
-		if (failed.length > 0) platforms.push(platform);
-		for (const name of failed) rungs.add(name);
+		if (failed.length > 0) byPlatform[platform] = failed;
 	}
-	return { rungs: spec.rungs.filter((name) => rungs.has(name)), platforms };
+	const all = new Set(Object.values(byPlatform).flat());
+	return { rungs: spec.rungs.filter((name) => all.has(name)), byPlatform };
 }
 
 function printResult(id: string): Summary | undefined {
@@ -248,7 +263,7 @@ function printResult(id: string): Summary | undefined {
 				);
 		}
 	}
-	for (const rung of summary.rerun) console.log(`ran again after its phone restarted: ${rung}`);
+	for (const rung of summary.rerun) console.log(`ran again because its phone was unreachable: ${rung}`);
 	for (const problem of summary.problems) console.log(`FAIL ${problem}`);
 	console.log(
 		`job ${id} ${summary.passed ? 'passed' : 'failed'} in ${summary.seconds.toFixed(0)} s; reports in ${resultDir(job)}, screenshots in ${join(job, 'screenshots')}`,

@@ -72,6 +72,32 @@ describe('a chunk', () => {
 		expect(rerunAfterPhoneLoss(finish(0, false))).toEqual([]);
 		expect(rerunAfterPhoneLoss(finish(1, true))).toEqual([]);
 	});
+
+	it('runs a rung once more when Maestro never reached the phone, though the phone still answers', () => {
+		const unreached = {
+			name: '03-counter',
+			failure: {
+				step: -1,
+				action: 'unknown',
+				role: 'unknown' as const,
+				message: 'maestro exited 1',
+			},
+			installSeconds: 1,
+			flowSeconds: 1,
+		};
+		const done = (attempt: number) =>
+			transitionChunk(
+				transitionChunk({ ...queued, attempt }, { type: 'claim', phone: 'p', at: 0 }),
+				{
+					type: 'finish',
+					results: [unreached],
+					phoneLost: false,
+					at: 0,
+				},
+			);
+		expect(rerunAfterPhoneLoss(done(0))).toEqual(['03-counter']);
+		expect(rerunAfterPhoneLoss(done(1))).toEqual([]);
+	});
 });
 
 describe('a phone', () => {
@@ -113,13 +139,17 @@ describe('a phone', () => {
 	});
 
 	it('reads an emulator as <avd>@<even console port>', () => {
-		expect(parsePhone('android', 'markless_runner@5620')).toEqual({
+		expect(parsePhone('android', 'markless_runner@5570')).toEqual({
 			platform: 'android',
 			avd: 'markless_runner',
-			port: 5620,
+			port: 5570,
 		});
 		expect(() => parsePhone('android', 'markless_runner')).toThrow();
-		expect(() => parsePhone('android', 'markless_runner@5621')).toThrow();
+		expect(() => parsePhone('android', 'markless_runner@5571')).toThrow();
+		expect(() => parsePhone('android', 'markless_runner@5620')).toThrow(
+			"console port 5620 is outside adb's range",
+		);
+		expect(() => parsePhone('android', 'markless_runner@5584')).not.toThrow();
 	});
 });
 

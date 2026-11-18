@@ -41,7 +41,13 @@ export type JobSpec = {
 	readonly rungs: ReadonlyArray<string>;
 	readonly platforms: ReadonlyArray<ProofPlatform>;
 	readonly host: 'adapters' | 'stub';
+	/** A rerun of failures: each platform runs only the rungs that failed on it, so the job is not a proof by itself. */
+	readonly onlyOn?: Readonly<Partial<Record<ProofPlatform, ReadonlyArray<string>>>>;
 };
+
+/** The rungs a job runs on one platform, in the order it named them. */
+export const rungsOn = (spec: JobSpec, platform: ProofPlatform): ReadonlyArray<string> =>
+	spec.onlyOn?.[platform] ?? spec.rungs;
 
 /** Inside `<job>/bundle/`: the mobile package's hosts, shells and conformance vectors at the paths the harness reads. */
 export const bundleMobile = (job: string) => join(job, 'bundle', 'mobile');
@@ -122,10 +128,21 @@ export function transitionChunk(chunk: Chunk, event: ChunkEvent): Chunk {
 	throw new Error(`a ${chunk.state} chunk cannot take ${event.type}`);
 }
 
-/** The rungs whose result is final: a chunk that lost its phone gives its failures one more attempt. */
+/** Maestro exited without recording one command of the flow: it never reached the phone, so the app was not tested. */
+export const neverReachedPhone = (result: RungResult): boolean =>
+	result.failure !== null && result.failure.step === -1 && result.failure.action === 'unknown';
+
+/**
+ * The rungs that get one more attempt, on the first attempt only: every failure of a chunk whose phone stopped answering,
+ * and any rung whose flow never reached the phone. Every other failure is final.
+ */
 export const rerunAfterPhoneLoss = (chunk: Chunk): ReadonlyArray<string> =>
-	chunk.state === 'done' && chunk.phoneLost && chunk.attempt === 0
-		? chunk.results.filter((result) => result.failure).map((result) => result.name)
+	chunk.state === 'done' && chunk.attempt === 0
+		? chunk.results
+				.filter(
+					(result) => result.failure && (chunk.phoneLost || neverReachedPhone(result)),
+				)
+				.map((result) => result.name)
 		: [];
 
 /** The runner that owns the phones: one per machine, found through this file. */

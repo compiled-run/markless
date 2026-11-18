@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildAndroidShell, installProofApk } from '../harness/android.ts';
 import { iosHostTests, androidHostTests, describeHostTests } from '../harness/host-tests.ts';
+import { exec } from '../harness/exec.ts';
 import { buildIosShell, installProofApp } from '../harness/ios.ts';
 import { runFlow } from '../harness/maestro.ts';
 import type { ProofPlatform } from '../harness/proof-app.ts';
@@ -116,6 +117,11 @@ try {
 			const installStarted = performance.now();
 			let installError: string | undefined;
 			try {
+				// A rung that switched to dark leaves the phone dark for the next job's rungs: each starts light.
+				if (platform === 'ios')
+					await exec('xcrun', ['simctl', 'ui', device, 'appearance', 'light']);
+				else
+					await exec(tools!.adb, ['-s', device, 'shell', 'cmd', 'uimode', 'night', 'no']);
 				await install(rung, dir);
 			} catch (error) {
 				installError = error instanceof Error ? error.message : String(error);
