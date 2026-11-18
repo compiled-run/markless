@@ -342,8 +342,11 @@ script-only body (`takeReturn`) and keyboard handlers.
 never installed. The resume runtime reads `globalThis.__marklessOverlay` once at its start, and the app module that
 assigns it initializes later; on the u21 page the loader is defined but no element carries `__marklessOverlayInstalled`,
 and a press outside the open popover raises `pointerdown` but no `dismiss`. So on the web, popover's outside press and
-Escape, and modal's Escape, did nothing on router-built pages. Fixed (a root that starts first waits in
-`__marklessOverlayPending`; +144 B rendered `resume-runtime-start`, recorded in `cw-ui-overlay.json`).
+Escape, and modal's Escape, did nothing on router-built pages. Fixed in its own pull request against `main`
+(`cw/overlay-late-install`): the analyzer records `overlayRecords` on the module graph interface and a page's resume
+module names the installer when it renders an overlay anywhere below it; the resume runtime is unchanged, so a page
+with no overlay loads nothing new. #834 carries that commit until it reaches this branch; u20 and u21 on the web
+depend on it.
 
 Family probe: on `cw/native-integration`, 5 of 46 families built a payload before this port, 7 after (modal and popover
 moved to "works"; none moved back).

@@ -29,3 +29,24 @@ export function componentsWithIdleRecords(
 	}
 	return idle;
 }
+
+/** Components that carry an `overlay` mark themselves, or render a component that does. */
+export function componentsWithOverlays(
+	graph: Pick<SemanticGraphArtifact, 'overlays' | 'componentEdges'>,
+	importedModuleInterfaces: ImportedInterfaces,
+): ReadonlySet<string> {
+	const marked = new Set(graph.overlays.flatMap((overlay) => (overlay.componentName ? [overlay.componentName] : [])));
+	for (let grew = true; grew; ) {
+		grew = false;
+		for (const edge of graph.componentEdges) {
+			if (marked.has(edge.parentComponentName)) continue;
+			const childMarked = edge.importSource
+				? importedEdgeComponent(edge, importedModuleInterfaces?.[edge.importSource])?.overlayRecords === true
+				: marked.has(edge.childComponentName);
+			if (!childMarked) continue;
+			marked.add(edge.parentComponentName);
+			grew = true;
+		}
+	}
+	return marked;
+}

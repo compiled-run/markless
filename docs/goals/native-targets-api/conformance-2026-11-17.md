@@ -429,9 +429,12 @@ phones) on this branch's #816 shapes instead of merging it. #819 stays open and 
 - Module set: the analyzer's module-constant facts keep an empty `new Set()`/`new WeakSet()` though its methods write it;
   #819's separate `sets` collection is not needed.
 - Ladder: #819's `back: true` (Escape) is `escape: true`, because this branch's `back` is navigation.
-- Docs size: #819's record of +611 B on the docs pages is dropped; all new compiler code is behind the native entry and the
-  injected collectors (`website/tooling/compile-worker-graph.test.ts` passes). The web fix's resume-runtime entries
-  (+144 B rendered) are kept.
+- Docs size: no size record. #819's +611 B docs record is dropped; the new compiler code is behind the native entry and
+  the injected collectors (the compile worker grows 89 B minified, from the web fix's emitted line, none from native code;
+  `website/tooling/compile-worker-graph.test.ts` passes). The docs pages' growth CI measured (+590 B on `/`) was #819's
+  web fix, not native code: a build of the base with only that fix grows the site's JS by 4,778 B gzip. By the planner's
+  ruling that fix is replaced by its own pull request against `main` (`cw/overlay-late-install`: the page's resume module
+  names the installer when it renders an overlay; the runtime is unchanged), carried here as one commit until it lands.
 
 **Ladder** (83 folders: round two's 81 plus u20 and u21; `11-async` and `y4` refused by name as before), simulator
 `markless-overlay-port` (iPhone 17, iOS 27.2), AVD `markless_overlay_port` (port 5612), Dragon at `e3a0bde12b` (round
@@ -443,6 +446,12 @@ two's merge of dragoncss#590 to #593):
 | Android | 80 of 81 (rung 17 since fixed: 81) | 79 of 83 in the full run; the 4 failures (f3, r136, y1, s4) failed at launch or in Maestro before any step, and all 4 pass on a rerun: 83 of 83 |
 
 Receipts: `receipts/2026-11-18-overlay-port-{ios,android}-83-rungs.json`, `-android-rerun-4-rungs.json`, `-verdict.txt`.
+
+After merging round three's `cw/native-integration` (89 folders; Dragon `compiled-run/dragoncss` `cw/native-integration`
+at `3312b9e420`): **iOS 89 of 89**; **Android 69 of 89** in the full run, then the 20 that failed all pass on a rerun
+(the emulator went away during u21: it stopped mid-step at "Tap on Done" and every later rung failed at install), so
+89 of 89. Receipts: `receipts/2026-11-18-overlay-port-merged-{ios,android}-89-rungs.json`,
+`-merged-android-rerun-20-rungs.json`.
 
 **Vectors:** 31 one-screen and 3 navigation files (overlay.json and popover.json new). Reference: every file equals a
 fresh build. Swift: 32 tests pass. Kotlin JVM: 684 of 684 checks over 35 files (the vectors and the scroll vectors).
