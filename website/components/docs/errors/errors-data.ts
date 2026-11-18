@@ -3445,6 +3445,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CLIENT_BUILD_STALLED',
+		title: 'The browser build stopped making progress',
+		area: 'build',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
