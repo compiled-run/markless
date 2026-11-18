@@ -4788,15 +4788,15 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'A native element does not exist on the web: a Markless build error.',
 		printed: [
-			"MARKLESS_DEVICE_WEB_ABSENT: `<<name>>` is the platform's own piece and does not exist on the web; put it inside a `platform` check, such as `@if (!platform.web)`, in the component that renders it, and use `drawer`, `modal` or `<dialog>` for the web",
+			"MARKLESS_DEVICE_WEB_ABSENT: `<<name>>` does not exist on the web: everything under `native.*` is drawn by iOS or Android. Guard it in the component that renders it, and draw the web's version with `drawer` from @markless/ui:",
 			'Everything under native.* is drawn by iOS or Android; a web build removes a guarded use and has nothing to draw for any other.',
-			'Wrap it in @if (!platform.web) { ... } @else { ... } and draw the web version with drawer, modal or <dialog> from @markless/ui.',
+			'Wrap it in @if (!platform.web) { … } @else { <drawer.root …>…</drawer.root> }, with platform imported from @markless/device.',
 			'https://markless.dev/errors/MARKLESS_DEVICE_WEB_ABSENT',
 		],
 		structured: true,
 		why: 'Everything under native.* is drawn by iOS or Android; a web build removes a guarded use and has nothing to draw for any other.',
 		suggestion:
-			'Wrap it in @if (!platform.web) { ... } @else { ... } and draw the web version with drawer, modal or <dialog> from @markless/ui.',
+			'Wrap it in @if (!platform.web) { … } @else { <drawer.root …>…</drawer.root> }, with platform imported from @markless/device.',
 		sources: [
 			{
 				id: 'f0',
