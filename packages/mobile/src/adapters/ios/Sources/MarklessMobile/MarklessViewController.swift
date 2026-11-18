@@ -104,7 +104,8 @@ public final class MarklessViewController: UIViewController {
 
 	public override func loadView() {
 		let screen = UIView()
-		screen.backgroundColor = .systemBackground
+		// A styled page is the web document Dragon laid out, whose canvas is white in either colour scheme.
+		screen.backgroundColor = style == nil ? .systemBackground : .white
 		view = screen
 		tree?.mount(in: screen)
 	}
