@@ -2,13 +2,13 @@ appId: dev.markless.shell.ioshost
 ---
 - launchApp
 - assertNotVisible:
-    id: "markless-error"
+      id: 'markless-error'
 - assertVisible:
-    text: "Release notes"
-    id: "h1:text0"
+      text: 'Release notes'
+      id: 'h1:text0'
 - assertVisible:
-    text: "Retained views, built once."
-    id: "h2:text0"
+      text: 'Retained views, built once.'
+      id: 'h2:text0'
 - assertVisible:
-    text: "Nested text stays in order."
-    id: "h4:text0"
+      text: 'Nested text stays in order.'
+      id: 'h4:text0'

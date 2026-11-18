@@ -54,7 +54,9 @@ async function download(artifact: LockedArtifact): Promise<string> {
 	const bytes = new Uint8Array(await response.arrayBuffer());
 	const digest = sha256(bytes);
 	if (digest !== artifact.sha256)
-		throw new Error(`${artifact.coordinate} from ${artifact.url} is sha256 ${digest}, not the lock's ${artifact.sha256}`);
+		throw new Error(
+			`${artifact.coordinate} from ${artifact.url} is sha256 ${digest}, not the lock's ${artifact.sha256}`,
+		);
 	mkdirSync(dirname(file), { recursive: true });
 	writeFileSync(`${file}.part`, bytes);
 	renameSync(`${file}.part`, file);
@@ -63,32 +65,51 @@ async function download(artifact: LockedArtifact): Promise<string> {
 
 /** Unpacks an AAR once (classes.jar, libs/*.jar, res/) and compiles its resources with aapt2. */
 async function unpackAar(tools: AndroidTools, aar: string, artifact: LockedArtifact) {
-	const root = join(cacheRoot(), 'android-libraries', `${artifact.sha256}-${sha256(Buffer.from(tools.buildTools)).slice(0, 8)}`);
+	const root = join(
+		cacheRoot(),
+		'android-libraries',
+		`${artifact.sha256}-${sha256(Buffer.from(tools.buildTools)).slice(0, 8)}`,
+	);
 	const done = join(root, 'done');
 	const compiled = join(root, 'res.zip');
 	if (!existsSync(done)) {
 		rmSync(root, { recursive: true, force: true });
 		mkdirSync(root, { recursive: true });
-		await exec('unzip', ['-q', '-o', aar, 'classes.jar', 'libs/*', 'res/*', '-d', join(root, 'aar')], {
-			allowFailure: true,
-		}).then((r) => {
+		await exec(
+			'unzip',
+			['-q', '-o', aar, 'classes.jar', 'libs/*', 'res/*', '-d', join(root, 'aar')],
+			{
+				allowFailure: true,
+			},
+		).then((r) => {
 			// unzip exits 11 when a named pattern (libs/*, res/*) matches nothing.
-			if (r.code !== 0 && r.code !== 11) throw new Error(`unzip ${aar} exited ${r.code}\n${r.stderr}`);
+			if (r.code !== 0 && r.code !== 11)
+				throw new Error(`unzip ${aar} exited ${r.code}\n${r.stderr}`);
 		});
 		if (artifact.resources)
-			await exec(join(tools.buildTools, 'aapt2'), ['compile', '--dir', join(root, 'aar', 'res'), '-o', compiled]);
+			await exec(join(tools.buildTools, 'aapt2'), [
+				'compile',
+				'--dir',
+				join(root, 'aar', 'res'),
+				'-o',
+				compiled,
+			]);
 		writeFileSync(done, '');
 	}
 	return {
-		jars: [join(root, 'aar', 'classes.jar'), ...filesUnder(join(root, 'aar', 'libs'), '.jar')].filter((jar) =>
-			existsSync(jar),
-		),
+		jars: [
+			join(root, 'aar', 'classes.jar'),
+			...filesUnder(join(root, 'aar', 'libs'), '.jar'),
+		].filter((jar) => existsSync(jar)),
 		resources: artifact.resources ? compiled : undefined,
 	};
 }
 
 /** Downloads every locked artifact into the harness cache (checking its sha256) and prepares it for kotlinc, aapt2 and d8. */
-export async function androidLibraries(tools: AndroidTools, lockPath = ANDROID_LIBRARIES_LOCK): Promise<AndroidLibraries> {
+export async function androidLibraries(
+	tools: AndroidTools,
+	lockPath = ANDROID_LIBRARIES_LOCK,
+): Promise<AndroidLibraries> {
 	const artifacts = readLock(lockPath).filter((artifact) => !artifact.toolchain);
 	const files = await Promise.all(artifacts.map(download));
 	const jars: string[] = [];

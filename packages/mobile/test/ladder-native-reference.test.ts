@@ -20,6 +20,7 @@ import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harne
 import {
 	looksOnly,
 	navRungFolders,
+	sheetStyleRungFolders,
 	styleRungFolders,
 	proofsDir,
 	readRung,
@@ -48,6 +49,8 @@ function mirror(
 	const properties = new Map<string, string>();
 	const chosen = new Map<string, number | null>();
 	let title: string | null = null;
+	// What the platform's sheets show: changed only by `sheet` entries.
+	const sheetOpen = new Map<string, boolean>();
 	const mount = (next: NativeRuntime) => {
 		runtime = next;
 		texts.clear();
@@ -60,11 +63,22 @@ function mirror(
 		for (const [node, index] of runtime.arms()) chosen.set(node, index);
 		for (const [node, , value] of runtime.properties()) properties.set(node, value);
 		title = runtime.title();
+		sheetOpen.clear();
+		for (const [node, open] of runtime.sheets()) sheetOpen.set(node, open);
 	};
 	mount(opened);
 	const nodeOf = new Map(payload.nodes.map((node) => [node.id, node]));
 	const baseOf = (id: string) => (id.includes('@') ? id.slice(0, id.indexOf('@')) : id);
+	const inClosedSheet = (id: string): boolean => {
+		const parent = nodeOf.get(baseOf(id))?.parent;
+		if (!parent) return false;
+		return (
+			(nodeOf.get(parent)?.kind === 'sheet' && !sheetOpen.get(parent)) ||
+			inClosedSheet(parent)
+		);
+	};
 	const shownNode = (id: string): boolean => {
+		if (inClosedSheet(id)) return false;
 		const place = nodeOf.get(id)?.arm;
 		return !place || (shownNode(place.branch) && chosen.get(place.branch) === place.index);
 	};
@@ -85,7 +99,7 @@ function mirror(
 	const elementReading = (text: string) => {
 		const labelled = labels().find(([, label]) => label === text)?.[0];
 		if (labelled) return labelled;
-		const node = [...texts].find(([, shown]) => shown === text)?.[0];
+		const node = [...texts].find(([id, shown]) => shown === text && !inClosedSheet(id))?.[0];
 		if (!node) return undefined;
 		const parent = nodeOf.get(baseOf(node))?.parent ?? undefined;
 		return parent && node.includes('@') && nodeOf.get(parent)?.row
@@ -94,6 +108,7 @@ function mirror(
 	};
 	const apply = (entry: NativeJournalEntry, index: number) => {
 		if (entry.op === 'text') texts.set(entry.node, entry.value);
+		else if (entry.op === 'sheet') sheetOpen.set(entry.node, entry.open);
 		else if (entry.op === 'title') title = entry.value;
 		else if (entry.op === 'attribute')
 			attributes.set(`${entry.node}\0${entry.name}`, entry.value);
@@ -148,7 +163,8 @@ function mirror(
 				);
 			}
 			// Without a style export a host flows text as the browser's default stylesheet does; with one, Dragon lays it out.
-			const read = styled ? [...texts.values()] : nativeShownTexts(payload, texts);
+			const open = new Map([...texts].filter(([id]) => !inClosedSheet(id)));
+			const read = styled ? [...open.values()] : nativeShownTexts(payload, open);
 			const shown = [...read, ...labels().map(([, label]) => label)];
 			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 			for (const text of step.absent ?? [])
@@ -208,8 +224,8 @@ function walkApp(
 				`step ${index}: Back journals nothing`,
 			).toEqual([]);
 			stack.pop();
-		} else if (looksOnly(action)) {
-			// The appearance changes no state: the screens' texts stay as they are; the hosts restyle from the band table.
+		} else if (looksOnly(action) || (action && ('swipe' in action || 'scrollTo' in action))) {
+			// Neither the appearance nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
 		} else if (action) {
 			const top = stack.at(-1)!;
 			const host = top.elementReading(
@@ -916,7 +932,7 @@ test.each(
 	},
 );
 
-test.each([...navRungFolders(), ...styleRungFolders()])(
+test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders()])(
 	'%s: the app payload walks the steps as a stack of screens',
 	async (folder) => {
 		const rung = readRung(folder);

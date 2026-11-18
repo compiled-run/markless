@@ -1,0 +1,37 @@
+{
+	"rung": "Z5",
+	"name": "A ui-* attribute that follows state on a control inside a system sheet",
+	"steps": [
+		{
+			"visible": ["Delivery", "Delivery options"],
+			"absent": ["Express off"]
+		},
+		{
+			"do": { "tap": "Delivery options" },
+			"visible": ["Express off"]
+		},
+		{
+			"do": { "tap": "Express off" },
+			"visible": ["Express on"],
+			"absent": ["Express off"]
+		},
+		{
+			"do": { "tap": "Express on" },
+			"visible": ["Express off"],
+			"absent": ["Express on"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": [
+					"Delivery",
+					"Delivery options",
+					"On the web, the options open in a drawer"
+				],
+				"absent": ["Express off"]
+			}
+		],
+		"absentFromOutput": ["Express off", "@markless/device"]
+	}
+}

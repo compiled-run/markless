@@ -42,6 +42,7 @@ import type {
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
 import type { StyleConstResolver } from './style-object.ts';
+import { NATIVE_FACTS, nativeFactsHandle, type NativeFactsHandle } from './native-facts-flag.ts';
 import { moduleSemantics, type ModuleSemantics } from './shared-ast.ts';
 
 export type ArmGuard =
@@ -162,7 +163,7 @@ export type WalkState = {
 	readonly importedFunctionWrites: Readonly<Record<string, ModuleFunctionWrites>>;
 	/** The router renders this module's default export as a page, so that component's props never change in the browser. */
 	readonly routeRoot: boolean;
-	readonly nativeFacts: NativeFactCollectors | null;
+	readonly nativeFacts: NativeFactsHandle | null;
 	/** What this build compiles for; `@markless/device` and `platform` fold to its constants. */
 	readonly target: BuildTarget;
 	/** `@if` chains the target's constants decide, and the arm each keeps (null: none). */
@@ -359,7 +360,7 @@ export function createWalkState(input: {
 		importedFunctionWrites: input.importedFunctionWrites ?? {},
 		serverOnlyProps: input.serverOnlyProps ?? [],
 		routeRoot: input.routeRoot === true,
-		nativeFacts: input.nativeFacts ?? null,
+		nativeFacts: NATIVE_FACTS ? nativeFactsHandle(input.nativeFacts) : null,
 		target: input.target ?? 'web',
 		foldedIfs: new Map(),
 		deviceTarget: input.deviceTargetFacts ?? null,

@@ -58,6 +58,7 @@ import { ownedModuleAst, type ModuleSemantics } from './shared-ast.ts';
 import type { WalkState } from './types.ts';
 import { collectSharedInstance, resolveSharedCall } from './collect-shared.ts';
 import { collectStorageBinding } from './collect-storage.ts';
+import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 export function collectVariableDeclaration(node: AnyNode, state: WalkState): void {
 	const declarationKind = variableDeclarationKind(node);
@@ -443,7 +444,7 @@ export function collectComputedBinding(input: {
 		dependencies,
 		functionSource:
 			inlined?.source ?? (body ? expressionSource(body, state.source) : undefined),
-		...nativeComputed(body, state),
+		...(NATIVE_FACTS ? nativeComputed(body, state) : {}),
 	};
 	state.graph.graphBindings.push(binding);
 	for (const read of [body, ...definitions])
@@ -2047,6 +2048,6 @@ function objectPropertyKey(node: AnyNode | undefined): string | null {
 }
 
 function nativeComputed(fn: AnyNode | undefined, state: WalkState): Pick<SemanticGraphBinding, 'nativeExpression'> {
-	const nativeExpression = fn && state.nativeFacts?.computedValue(fn as never);
+	const nativeExpression = fn && state.nativeFacts && nativeCollectors(state.nativeFacts).computedValue(fn as never);
 	return nativeExpression ? { nativeExpression } : {};
 }

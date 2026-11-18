@@ -35,8 +35,10 @@ export {
 export {
 	NATIVE_STYLE_INPUT_VERSION,
 	nativeStyleInput,
+	nativeStyleInputs,
 	type NativeStyleInput,
 } from './style-input.ts';
+export { SHEET_AREAS } from './sheet-areas.ts';
 export {
 	NATIVE_APP_STYLE_VERSION,
 	nativeAppStyle,

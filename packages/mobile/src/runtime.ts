@@ -1113,7 +1113,9 @@ export function createNativeRuntime(
 				}
 				if (node.kind === 'sheet') {
 					const open = afterSheets.get(node.id)!;
-					return beforeSheets.get(node.id) !== open ? [{ op: 'sheet', node: node.id, open }] : [];
+					return beforeSheets.get(node.id) !== open
+						? [{ op: 'sheet', node: node.id, open }]
+						: [];
 				}
 				if (node.kind === 'branch') {
 					return beforeArms.has(node.id) &&

@@ -111,6 +111,9 @@ function frameFonts(url: (font: (typeof FRAME_FONTS)[number]) => string): FrameF
 	return Object.fromEntries(FRAME_FONTS.map((font) => [font, url(font)])) as FrameFonts;
 }
 
+/** The in-browser compiler never passes native collectors, so their call sites in the analyzer fold away from its build. */
+export const COMPILE_WORKER_DEFINE: Readonly<Record<string, string>> = { __MARKLESS_NATIVE_FACTS__: 'false' };
+
 /** Answers the bundler's Node-only imports with in-memory stand-ins, for the worker only. */
 export function codeCompilerSwaps(): Plugin {
 	return {
@@ -162,6 +165,7 @@ export function codeClient(): Plugin[] {
 			name: 'compiled-website:code-frame',
 			config() {
 				return {
+					define: COMPILE_WORKER_DEFINE,
 					worker: { format: 'es' as const, plugins: () => [codeCompilerSwaps()] },
 				};
 			},

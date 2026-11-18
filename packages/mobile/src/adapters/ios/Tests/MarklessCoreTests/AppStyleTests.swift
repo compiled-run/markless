@@ -83,3 +83,47 @@ private func settings() throws -> (StyleExport, NativeViewPayload) {
 	let changed = try JSONSerialization.data(withJSONObject: root)
 	#expect { try StyleExport.decodeApp(changed) } throws: { ($0 as? PayloadError)?.reason == "the canvas is not opaque" }
 }
+
+// The Z3 and Z5 rungs' app styles and payloads (proofs/z3-sheet-size, proofs/z5-sheet-state-style): a system sheet's content
+// laid out as its own document at each resting height.
+private func styledSheet(_ rung: String) throws -> (StyleExport, NativeViewPayload) {
+	let styles = try StyleExport.decodeApp(try fixture("\(rung).native-app-style"))
+	guard case let .app(app) = try NativePayload.decode(try fixture("\(rung).payload")) else { throw PayloadError(path: "fixture", reason: "not an app") }
+	return (try #require(styles["/"]), try #require(app.routes.first).page)
+}
+
+@Test func aSheetIsLaidOutAtEachRestingHeight() throws {
+	let (style, page) = try styledSheet("z3-sheet-size")
+	let sheet = try #require(style.sheets.first)
+	#expect(sheet.node == "sheet:component-edge:0")
+	#expect(sheet.heights.map(\.snapPoint) == [0.5, 1])
+	#expect(sheet.heights.map { [$0.style.viewport.width, $0.style.viewport.height] } == [[402, 435], [402, 778]])
+	let runtime = NativeRuntime(payload: page)
+	let heights = try style.resolveSheet(sheet.node, for: page, initialTexts: try runtime.texts(), value: runtime.value(of:))
+	let footer = try heights.map { try #require($0.layout.styles["h9"]?.frame) }
+	#expect(footer[0] != footer[1])
+	#expect(footer[0].y + footer[0].height < 435)
+	#expect(footer[1].y + footer[1].height > 435)
+	let cell = try heights.map { try #require($0.layout.styles["h5"]?.frame).width }
+	#expect(cell[0] == cell[1])
+	let pageLayout = try style.resolve(for: page, initialTexts: try runtime.texts(), value: runtime.value(of:))
+	#expect(pageLayout.styles["h3"] == nil)
+	#expect(pageLayout.styles["h0"] != nil)
+}
+
+@Test func aUiAttributeInsideASheetFollowsItsCell() throws {
+	let (style, page) = try styledSheet("z5-sheet-state-style")
+	let runtime = NativeRuntime(payload: page)
+	let layout = try #require(try style.resolveSheet("sheet:component-edge:0", for: page, initialTexts: try runtime.texts(), value: runtime.value(of:)).first).layout
+	let on = try layout.next(from: layout.start, cell: "state:express", value: .bool(true))
+	#expect(layout.assignments[layout.start]["h4"]?.background == RGBA(r: 255, g: 255, b: 255, alpha: 255))
+	#expect(layout.assignments[on]["h4"]?.background == RGBA(r: 42, g: 157, b: 143, alpha: 255))
+}
+
+@Test func aStyledPageRefusesASheetWithoutStyles() throws {
+	let (styled, page) = try styledSheet("z5-sheet-state-style")
+	var style = styled
+	style.sheets = []
+	let runtime = NativeRuntime(payload: page)
+	#expect(throws: PayloadError.self) { try style.resolve(for: page, initialTexts: try runtime.texts(), value: runtime.value(of:)) }
+}

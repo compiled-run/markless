@@ -1,6 +1,7 @@
 package dev.markless.mobile.view
 
 import android.content.Context
+import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
@@ -15,13 +16,21 @@ import dev.markless.mobile.core.Node
  * One `<native.sheet>`: Material's [BottomSheetDialog] around the sheet's content views, which the host builds at mount and
  * keeps while it is closed. The dialog is themed with Material 3's light bottom sheet theme over the host's context.
  */
-internal class SystemSheet(context: Context, private val node: Node.Sheet, content: MarklessBox, private val closedByPlatform: () -> Unit) {
+internal class SystemSheet(
+	context: Context,
+	private val node: Node.Sheet,
+	content: MarklessBox,
+	/** The sheet came to rest at a snap point, its scroll view [width] by [height] device px. */
+	private val onRest: (snapPoint: Double, width: Int, height: Int) -> Unit,
+	private val closedByPlatform: () -> Unit,
+) {
 	private val dialog = BottomSheetDialog(context, com.google.android.material.R.style.Theme_Material3_Light_BottomSheetDialog)
 	private val twoHeights = node.snapPoints.size == 2
+	private lateinit var scrollView: NestedScrollView
 
 	init {
 		if (!node.modal) throw MarklessHostError("\"${node.id}\" is a sheet with modal false; Android builds modal sheets only")
-		val scroll = NestedScrollView(dialog.context).apply {
+		val scroll = NestedScrollView(dialog.context).also { scrollView = it }.apply {
 			isFillViewport = true
 			addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 		}
@@ -44,8 +53,29 @@ internal class SystemSheet(context: Context, private val node: Node.Sheet, conte
 			}
 		}
 		dialog.window!!.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-		dialog.setOnShowListener { dialog.behavior.state = if (twoHeights) BottomSheetBehavior.STATE_HALF_EXPANDED else BottomSheetBehavior.STATE_EXPANDED }
+		dialog.setOnShowListener {
+			dialog.behavior.state = if (twoHeights) BottomSheetBehavior.STATE_HALF_EXPANDED else BottomSheetBehavior.STATE_EXPANDED
+			rest(dialog.behavior.state)
+		}
+		dialog.behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
+			override fun onStateChanged(sheet: View, state: Int) = rest(state)
+			override fun onSlide(sheet: View, offset: Float) {}
+		})
 		dialog.setOnCancelListener { closedByPlatform() }
+	}
+
+	private fun rest(state: Int) {
+		val snapPoint = when (state) {
+			BottomSheetBehavior.STATE_HALF_EXPANDED -> node.snapPoints.first()
+			BottomSheetBehavior.STATE_EXPANDED -> node.snapPoints.last()
+			else -> return
+		}
+		// At half height Material moves the screen-tall sheet down: only its visible part is the content area.
+		scrollView.post {
+			val visible = android.graphics.Rect()
+			scrollView.getGlobalVisibleRect(visible)
+			onRest(snapPoint, visible.width(), visible.height())
+		}
 	}
 
 	val showing: Boolean get() = dialog.isShowing

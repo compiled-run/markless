@@ -1,0 +1,12 @@
+Styled content inside <native.sheet>: the whole phone ladder (39 rungs: 01-10 with 5b and 7b-7d, D1-D7 with D4b, P1, Y1-Y3, N1-N4, S1-S4, Z1-Z5), one harness run per platform.
+Not run: 11-async and Y4, which the compiler refuses by name on phones (unchanged by this branch).
+
+iOS: tree 31486aaef, simulator markless-sheet-st (iPhone 17, iOS 27.2), 39 of 39 passed.
+Android: tree 7db6b5fb4, AVD markless_sheet_st (Pixel 7, API 36, port 5596), 39 of 39 passed.
+Between the two trees only Android code changed (Device.kt: Settings opens in its own task) plus screenshots; the iOS report stands for 7db6b5fb4.
+Dragon: ~/wt/dragon/sheet-styled-content at c8da721573 (viewports) / d94ee6d285 (compare screenshots), compiled-run/dragoncss#594.
+
+Earlier run on 31486aaef, Android: 38 of 39, D7 failed at step 3 ("Access granted" not visible: Settings stayed on top after coming back). Cause and fix in native-contract.md, "Found on the way"; D7 then passed alone and in this run.
+
+$ node src/harness/cli.ts verdict ios.json android.json
+proof passed on iOS and Android

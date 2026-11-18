@@ -219,11 +219,19 @@ export const styleRungFolders = (): string[] =>
 		.map((entry) => entry.name)
 		.sort();
 
-/** Every proof folder the flows are written for: the one-screen ladder, the navigation ladder, then the styles ladder. */
+/** The styled-sheet ladder: each folder an app whose page opens a system sheet with styled content. */
+export const sheetStyleRungFolders = (): string[] =>
+	readdirSync(proofsDir, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory() && /^z\d+-/.test(entry.name))
+		.map((entry) => entry.name)
+		.sort();
+
+/** Every proof folder the flows are written for: the one-screen ladder, the navigation, styles and styled-sheet ladders. */
 export const allRungFolders = (): string[] => [
 	...rungFolders(),
 	...navRungFolders(),
 	...styleRungFolders(),
+	...sheetStyleRungFolders(),
 ];
 
 /** An action that changes only how the screen looks, so no text can witness it; the screenshots after it do. */
@@ -390,7 +398,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 		return action.dismissSheet === 'swipe'
 			? [pullDown()]
 			: [onPlatform('Android', [backGesture]), onPlatform('iOS', [pullDown()])];
-	if ('swipe' in action && action.swipe === 'up') return [pullUp];
+	// The screenshot after the step records the height it came to rest at.
+	if ('swipe' in action && action.swipe === 'up') return [pullUp, { waitForAnimationToEnd: { timeout: 5000 } }];
 	if ('scrollTo' in action)
 		return [
 			{
@@ -401,7 +410,11 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			},
 		];
 	if ('appearance' in action)
-		return [{ setDarkMode: action.appearance === 'dark' ? 'enabled' : 'disabled' }];
+		// iOS cross-fades to the new appearance; the screenshot after the step is its only record.
+		return [
+			{ setDarkMode: action.appearance === 'dark' ? 'enabled' : 'disabled' },
+			{ waitForAnimationToEnd: { timeout: 5000 } },
+		];
 	if ('back' in action)
 		return action.back === 'gesture'
 			? [EDGE_SWIPE]
@@ -464,7 +477,14 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 	return rung.steps.map((step, index) => {
 		const commands = [
 		...(index === 0 && visitsSettings
-			? [{ runFlow: { when: { platform: 'iOS' }, commands: [{ stopApp: 'com.apple.Preferences' }] } }]
+			? [
+					{
+						runFlow: {
+							when: { platform: 'iOS' },
+							commands: [{ stopApp: 'com.apple.Preferences' }],
+						},
+					},
+				]
 			: []),
 		...(index === 0 && rung.location ? [{ setLocation: rung.location }] : []),
 		...(index === 0 ? [...launch, ...appearance] : []),

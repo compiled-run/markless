@@ -125,6 +125,7 @@ import type {
 	SemanticGraphWalk,
 	WalkState,
 } from './types.ts';
+import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 /**
  * What every template position - attribute value, conditional class test, text -
@@ -164,7 +165,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	if (isHostElement) {
 		hostNodeId = `h${state.nextHostId++}`;
 		state.hostIds.set(node, hostNodeId);
-		const hostSpan = sourceSpan(node, state.filename);
+		const hostSpan = NATIVE_FACTS && state.nativeFacts ? sourceSpan(node, state.filename) : undefined;
 		state.graph.hostNodes.push({
 			id: hostNodeId,
 			tagName: tagName ?? '*',
@@ -279,7 +280,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		...rowScope(state),
 		hostNodeId: state.currentHostNodeId,
 		...(joined ? { source: joined.source } : templateReadSource(composite, expression, state)),
-		...expressionField(joined ? undefined : expression, state),
+		...(NATIVE_FACTS ? expressionField(joined ? undefined : expression, state) : {}),
 		sourceSpan: sourceSpan(expression, state.filename),
 		target: armText ?? state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -1347,10 +1348,9 @@ function collectAttribute(
 						: [],
 				hasSyncPolicyCandidate,
 				syncPolicy,
-				...handlerStatementsField(
-					handler && !factoryCall ? handler.node : undefined,
-					state,
-				),
+				...(NATIVE_FACTS
+					? handlerStatementsField(handler && !factoryCall ? handler.node : undefined, state)
+					: {}),
 			});
 		}
 		collectExpressionReads(expressionValue, state);
@@ -1392,8 +1392,8 @@ function collectAttribute(
 					componentName: state.currentComponentName ?? undefined,
 					sourceSpan: sourceSpan(entry, state.filename),
 					keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
-					...(state.nativeFacts
-						? { nativeHandle: state.nativeFacts.expression(entry as never) }
+					...(NATIVE_FACTS && state.nativeFacts
+						? { nativeHandle: nativeCollectors(state.nativeFacts).expression(entry as never) }
 						: {}),
 				});
 		}
@@ -1460,7 +1460,7 @@ function collectAttribute(
 			...rowScope(state),
 			hostNodeId,
 			source: expressionSource(conditionalClass.test, state.source),
-			...expressionField(conditionalClass.test, state),
+			...(NATIVE_FACTS ? expressionField(conditionalClass.test, state) : {}),
 			sourceSpan: sourceSpan(conditionalClass.test, state.filename),
 			target: conditionalClass.target,
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -1537,7 +1537,7 @@ function collectAttribute(
 			...rowScope(state),
 			hostNodeId,
 			...templateReadSource(composite, expressionValue, state),
-			...expressionField(expressionValue, state),
+			...(NATIVE_FACTS ? expressionField(expressionValue, state) : {}),
 			sourceSpan: sourceSpan(expressionValue, state.filename),
 			target: bindingTargetForAttribute(attributeName, state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -2413,7 +2413,7 @@ function expressionField(
 	state: WalkState,
 ): Pick<SemanticTemplateRead, 'expression'> {
 	return expression && state.nativeFacts
-		? { expression: state.nativeFacts.expression(expression as never) }
+		? { expression: nativeCollectors(state.nativeFacts).expression(expression as never) }
 		: {};
 }
 
@@ -2421,7 +2421,7 @@ function handlerStatementsField(
 	node: AnyNode | undefined,
 	state: WalkState,
 ): Pick<SemanticEvent, 'handlerStatements'> {
-	const handlerStatements = node && state.nativeFacts?.handlerStatements(node as never);
+	const handlerStatements = node && state.nativeFacts && nativeCollectors(state.nativeFacts).handlerStatements(node as never);
 	return handlerStatements ? { handlerStatements } : {};
 }
 

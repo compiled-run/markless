@@ -1,0 +1,133 @@
+{
+ "gateDevicePx": 1,
+ "compared": 18,
+ "failed": 0,
+ "rows": [
+  {
+   "target": "ios",
+   "values": {},
+   "id": "html",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "body",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h3",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h4",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h4:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "component-edge:2/h0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "component-edge:2/h0:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "component-edge:3/h0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "component-edge:3/h0:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "html",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "body",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h3",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h4",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h4:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "component-edge:2/h0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "component-edge:2/h0:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "component-edge:3/h0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "component-edge:3/h0:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  }
+ ]
+}
