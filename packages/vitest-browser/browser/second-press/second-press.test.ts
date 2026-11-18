@@ -110,9 +110,7 @@ for (const mode of ['CSR', 'SSR'] as const)
 				expect(server.contact.favorite).toBe(true);
 			};
 			test(`${mode} ${name}: the first save fails after the second press acted (${order}): the page settles on the second press`, run);
-			// A handler's failure that reaches @catch while another save is out is lost once that save's reload lands; true on main before this change.
-			const failure = name === 'form' && order === 'first save fails first' ? test.fails : test;
-			failure(`${mode} ${name}: the first save fails after the second press acted (${order}): the failure is shown`, async () => {
+			test(`${mode} ${name}: the first save fails after the second press acted (${order}): the failure is shown`, async () => {
 				await run();
 				await expect.poll(() => text(shape.failure), poll).toBe(shape.failed);
 			});
