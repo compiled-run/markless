@@ -1,6 +1,5 @@
 import { hasLiveSharedDefinitions } from '../../serializer/src/protocol-shared-instances.ts';
 import { markupNodes } from './markup-nodes.ts';
-import { rowEventRepeats } from './row-event-repeats.ts';
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
 	PROTOCOL_VISIBLE_EVENT_NAME,
@@ -237,13 +236,8 @@ export async function renderCsrRuntime(input: {
 		);
 	for (const hostNodeId of new Set(graphBehaviors.map((behavior) => behavior.hostNodeId)))
 		await (await demandRuntime()).activateBehaviors(hostNodeId);
-	// Set only by an app module with an `onIdle` record; it starts the runtime at idle only for a mount holding one.
-	(globalThis as MarklessIdleHost).__mIdle?.wake(
-		output.root,
-		demandRuntime,
-		view,
-		claimPaintedArm?.eventNames,
-	);
+	// Set only by an app module with an `onIdle` record; the runtime it starts at idle queues the hosts.
+	(globalThis as MarklessIdleHost).__mIdle?.wake(output.root, demandRuntime);
 	if (hasLiveSharedDefinitions(state))
 		(
 			await (globalThis as SharedInstancesHost).__marklessSharedInstances?.()
@@ -595,6 +589,13 @@ function installDelegatedTriggers(
 			for (const release of releases.splice(0)) release();
 		},
 	};
+}
+
+function rowEventRepeats(view: ProtocolViewPayload) {
+	return [
+		...(view.keyedRepeats ?? []),
+		...(view.branches ?? []).flatMap((branch) => branch.servedArmRecords?.keyedRepeats ?? []),
+	];
 }
 
 // A record matched the element but its action kind names no route: the payload

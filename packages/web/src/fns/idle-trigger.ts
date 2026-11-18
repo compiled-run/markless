@@ -1,7 +1,5 @@
 import { PROTOCOL_IDLE_EVENT_NAME } from '../../../serializer/src/protocol-event-names.ts';
-import type { ProtocolViewPayload } from '@markless/serializer/protocol';
 import { marklessDefer } from '../inline/defer.ts';
-import { rowEventRepeats } from '../row-event-repeats.ts';
 
 type IdleRoot = {
 	__mIdleQueue?: Set<Element>;
@@ -49,25 +47,9 @@ export function startMarklessIdleWake(root: Element, start: () => unknown): void
 	marklessDefer().idle(root, () => void start());
 }
 
-/** Whether a client mount holds an idle record: top level, in a painted arm, or in a row. */
-const mountHasIdleRecord = (
-	view: ProtocolViewPayload,
-	paintedArmEventNames: ReadonlyArray<string> = [],
-) =>
-	view.events.some((record) => record.eventName === PROTOCOL_IDLE_EVENT_NAME) ||
-	paintedArmEventNames.includes(PROTOCOL_IDLE_EVENT_NAME) ||
-	rowEventRepeats(view).some((repeat) =>
-		repeat.rowEvents.some((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME),
-	);
-
 export type MarklessIdleHost = typeof globalThis & {
 	__mIdle?: {
-		readonly wake: (
-			root: unknown,
-			start: () => unknown,
-			view: ProtocolViewPayload,
-			paintedArmEventNames?: ReadonlyArray<string>,
-		) => void;
+		readonly wake: (root: unknown, start: () => unknown) => void;
 		readonly queue: (root: unknown, host: unknown) => void;
 	};
 };
@@ -75,9 +57,7 @@ export type MarklessIdleHost = typeof globalThis & {
 /** Run by an app or resume module that has an `onIdle` record; the runtime and a client mount reach the queue only through it. */
 export function installMarklessIdle(): void {
 	(globalThis as MarklessIdleHost).__mIdle ??= {
-		// The hook is page-wide, so a mount without an idle record is left for its first event.
-		wake: (root, start, view, paintedArmEventNames) =>
-			mountHasIdleRecord(view, paintedArmEventNames) && startMarklessIdleWake(root as Element, start),
+		wake: (root, start) => startMarklessIdleWake(root as Element, start),
 		queue: (root, host) => queueMarklessIdleHost(root as Element, host as Element),
 	};
 }
