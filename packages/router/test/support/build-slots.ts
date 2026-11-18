@@ -100,40 +100,9 @@ export async function holdBuildSlot(): Promise<() => Promise<void>> {
 	return () => rm(slot, { recursive: true, force: true });
 }
 
-let builds = false;
-let reserved: string | null = null;
-
-/** Called by the fixture-build module as it loads: this test file builds fixtures. */
-export const noteFixtureBuilds = () => {
-	builds = true;
-};
-
-/**
- * Before the file's own hooks (setup file, long timeout): a file that builds fixtures waits its turn here, so a hook's
- * timeout measures its builds and not its place in the queue. Every build of the file's setup hooks uses this slot; it is
- * freed when the first test starts.
- */
-export async function reserveBuildSlot(): Promise<void> {
-	if (builds && !reserved && !(await heldByThisFile())) reserved = await acquireSlot();
-}
-
-export async function releaseReservedSlot(): Promise<void> {
-	if (reserved) await rm(reserved, { recursive: true, force: true });
-	reserved = null;
-}
-
-let lending: Promise<void> = Promise.resolve();
-
-/** A slot for one build, released by the returned function: the file's reservation (one build at a time), else one in turn. */
+/** A slot for one build, released by the returned function: none when the file holds one, else one in turn. */
 export async function takeBuildSlot(): Promise<() => Promise<void>> {
 	if (await heldByThisFile()) return async () => {};
-	if (reserved) {
-		const previous = lending;
-		let returned = () => {};
-		lending = new Promise((done) => (returned = done));
-		await previous;
-		return async () => returned();
-	}
 	const slot = await acquireSlot();
 	return () => rm(slot, { recursive: true, force: true });
 }
