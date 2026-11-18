@@ -10,6 +10,7 @@ import { marklessSourceAliases } from './helpers.ts';
 
 type OverlayHost = typeof globalThis & {
 	__marklessOverlay?: (root: unknown) => unknown;
+	__marklessOverlayPending?: Array<() => void>;
 	__overlayEvaluations?: number;
 };
 const host = globalThis as OverlayHost;
@@ -92,8 +93,14 @@ export default function ${shape.name}() @{
 				import(pathToFileURL(join(root, 'out', file)).href + suffix);
 			await load(plain.fileName);
 			expect(host.__marklessOverlay).toBeUndefined();
+			// A root the runtime started before this module evaluated is installed when the installer arrives.
+			let waited = 0;
+			host.__marklessOverlayPending = [() => waited++];
 			await load(entry.fileName);
 			expect(typeof host.__marklessOverlay).toBe('function');
+			expect(waited).toBe(1);
+			expect(host.__marklessOverlayPending).toEqual([]);
+			delete host.__marklessOverlayPending;
 			expect(host.__overlayEvaluations).toBeUndefined();
 			const unmarked = { querySelector: () => null };
 			expect(host.__marklessOverlay!(unmarked)).toBeUndefined();

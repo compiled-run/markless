@@ -174,7 +174,7 @@ function emitMdxClientRoute(route: MdxRoute, id: string, resume: boolean): strin
 }
 
 function renderOverlayLoader(): string {
-	return "globalThis.__marklessOverlay ??= (root) => root.querySelector('[overlay]') ? import('@markless/web/fns/overlay').then((m) => m.installOverlayBehavior(root)) : undefined;";
+	return "globalThis.__marklessOverlay ??= (root) => root.querySelector('[overlay]') ? import('@markless/web/fns/overlay').then((m) => m.installOverlayBehavior(root)) : undefined; for (const install of globalThis.__marklessOverlayPending?.splice(0) ?? []) install();";
 }
 
 function emitComposedMdxRoute(route: MdxRoute, id: string): string {
