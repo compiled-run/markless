@@ -111,7 +111,21 @@
 			"kind": "text",
 			"id": "h6:text0",
 			"parent": "h6",
-			"text": "Send is open"
+			"text": "Send is open",
+			"textByState": [
+				{
+					"when": {
+						"state:locked": false
+					},
+					"value": "Send is open"
+				},
+				{
+					"when": {
+						"state:locked": true
+					},
+					"value": "Send is locked"
+				}
+			]
 		}
 	],
 	"css": ".row.mk-1m9j6sq {\n\t\t\t\tdisplay: flex;\n\t\t\t\tgap: 8px;\n\t\t\t\tpadding: 8px 0;\n\t\t\t}\n\t\t\t.btn.mk-1m9j6sq {\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #e9ecef;\n\t\t\t}\n\t\t\t.btn.mk-1m9j6sq:disabled {\n\t\t\t\tborder-color: #adb5bd;\n\t\t\t}",

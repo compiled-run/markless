@@ -251,6 +251,34 @@ means the build stops naming Dragon's reason; nothing is dropped silently.
 G1, G3 and G7 hinge on one question: whether the Markless hosts carry Dragon's generated on-device code (its layout engine,
 hit test and interaction runtime) rather than only the JSON export.
 
+## 6c. Dragon fixes for the gaps above (branch `cw/dragon-bugs`, Dragon `cw/dragon-bugs`)
+
+Status 2026-11-18. Owner direction: bugs Dragon has are fixed in Dragon. Base: this branch starts at `cw/native-integration`
+(`4af2ffeb8`), the one tree holding both the style rungs and the `@markless/ui` rungs; Dragon's branch merges
+`cw/native-style-gaps`, `cw/sheet-styled-content` and `cw/native-ui`. Every row's Dragon check compares with Chrome 145 by
+numbers; "iOS" and "Android" are the rung's flow on the simulator and emulator, with screenshots read beside Chrome's
+rendering of the same assignment (`screenshots/chrome*/`, from Dragon's `markless:style-compare --screenshots`).
+
+| Item                                                          | Dragon (check against Chrome)                                                                                                                              | Rung     | iOS     | Android                                                                        | Still refused                                                                                                                                                                  |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| States that are strings (tabs' selected value)                | `markless-string-states.test.ts`: one assignment per value, every box within 1 device px                                                                   | u15      | passing | passing                                                                        | a string cell whose values are not all known at build time (stays unstyled, as before)                                                                                         |
+| A text that follows such a state                              | same test: each string laid out where it shows                                                                                                             | u15, u20 | passing | passing                                                                        | text over an unbounded value (`Sent {count}`) keeps its first string's frame                                                                                                   |
+| `body` background under `html`'s; see-through page background | `markless-root-paint.test.ts`: canvas and body box equal Chrome's screenshot pixels                                                                        | S6       | passing | passing                                                                        | a see-through page background in a dark band (Chrome's dark base, below); a border or other paint on `html`/`body`                                                             |
+| `:disabled`, the `disabled` attribute                         | `markless-disabled.test.ts`: text and border colours equal Chrome's computed values, boxes within 1 device px; Chrome's `button[disabled]` UA row captured | u20      | passing | passing                                                                        | a button with no author background or border (platform theme, FORM-b), inline-level controls (RF-INL), the UA control font Arial                                               |
+| Dashed and dotted borders                                     | `markless-dashed-borders.test.ts`: every crisp border-band pixel equals Chrome's at both phones' ratios                                                    | u17      | passing | passing (the Tap button's label is cut to "Ta", a host text-fit defect, below) | rounded dashed or dotted borders (PNT1b)                                                                                                                                       |
+| `<dialog>` and `::backdrop`                                   | `top-layer-dialog.test.ts`: dialog and contents within 1 device px after `showModal()`, backdrop in Chrome's colour                                        | none     | not run | not run                                                                        | every Markless dialog: Chrome forces `overflow: auto` on a modal dialog, and the export has no scroll containers until `cw/native-scroll` is integrated; `:modal`, `[popover]` |
+| The default link underline                                    | groundwork only (Dragon `cw/dragon-bugs-underline`, not merged): Skia's glyph intercepts ported, 47 of 55,694 underline pixels still differ from Chrome    | none     | not run | not run                                                                        | `skip-ink-intercepts` on every real face; and Dragon's state runtime draws no decoration at all (TDEC-b)                                                                       |
+
+Found on the way:
+
+- **Android button labels.** The u17 "Tap" button draws "Ta" on Android: Dragon gives the label 82.5 device px, the host's
+  `Button` gets 83, and Android measures the word a hair wider and wraps the last letter out of view. Not fixed here.
+- **The dark-mode page base.** Chrome 145 under an emulated dark preference paints a page with no background over
+  rgb(18, 18, 18), whatever its `color-scheme`; the hosts paint white there (S5's decision). Open for the owner; see
+  `deferred-styles.md`.
+- Pressed, `:focus-visible`, width `@media` and the system font are not built; what each would take is in
+  `deferred-styles.md`.
+
 ## 7. Receipts
 
 One harness run per platform on tree `4c090f387` (mini-2; simulator `markless-app-styles`, iPhone 17 on iOS 27.2; AVD
