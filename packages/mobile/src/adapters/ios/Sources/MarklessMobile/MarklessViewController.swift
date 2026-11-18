@@ -198,7 +198,10 @@ public final class MarklessViewController: UIViewController {
 		}
 		applyBand()
 		var pops = [navigationController?.interactivePopGestureRecognizer]
+		// The content swipe-back is iOS 26 API: Swift 6.2 (Xcode 26) is the first toolchain whose SDK declares it.
+		#if compiler(>=6.2)
 		if #available(iOS 26, *) { pops.append(navigationController?.interactiveContentPopGestureRecognizer) }
+		#endif
 		for pop in pops.compactMap({ $0 }) {
 			for gesture in tree?.dismissGestures ?? [] { gesture.require(toFail: pop) }
 		}
