@@ -151,19 +151,7 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 			armTests: literalArmTests ?? asNodes(node.cases).map((_, index) => index),
 			...(state.nativeFacts && discriminant
-				? {
-						armTestExpressions: asNodes(node.cases).map((switchCase) => {
-							const test = switchCase.test as AnyNode | undefined;
-							return test
-								? {
-										kind: 'binary' as const,
-										operator: '===' as const,
-										left: state.nativeFacts!.expression(discriminant as never),
-										right: state.nativeFacts!.expression(test as never),
-									}
-								: null;
-						}),
-					}
+				? { armTestExpressions: state.nativeFacts.switchArmTests(discriminant as never, node.cases as never) }
 				: {}),
 			...branchKeywordSpan(node, '@switch', state),
 			...branchAsyncBoundary(state),
@@ -196,10 +184,10 @@ function collectIfChainSite(node: AnyNode, state: WalkState): void {
 		armTests: chain.arms.map((_, index) => index),
 		...(state.nativeFacts
 			? {
-					armTestExpressions: [
-						...chain.tests.map((test) => state.nativeFacts!.expression(test as never)),
-						...(chain.arms[chain.arms.length - 1] ? [null] : []),
-					],
+					armTestExpressions: state.nativeFacts.ifArmTests(
+						chain.tests as never,
+						Boolean(chain.arms[chain.arms.length - 1]),
+					),
 				}
 			: {}),
 		anchorOrder: state.nextAnchorOrder++,

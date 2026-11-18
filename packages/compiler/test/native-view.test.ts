@@ -3,7 +3,7 @@ import {
 	createNativeViewPayload,
 	NATIVE_FACT_COLLECTORS,
 	NATIVE_UNSUPPORTED_CODE,
-} from '../src/index.ts';
+} from '../src/native.ts';
 import { buildSemanticGraph } from '../src/passes/semantic-graph/index.ts';
 
 const nativeView = async (source: string) =>

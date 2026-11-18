@@ -2,14 +2,16 @@ import {
 	collectTsrxModuleDiagnostics,
 	compileTsrxModule,
 	buildSemanticGraph,
-	createNativeViewPayload,
-	NATIVE_FACT_COLLECTORS,
-	DEVICE_TARGET_FACTS,
 	type SemanticGraphArtifact,
 	type CompilerDiagnostic,
-	type NativeViewArtifact,
 	type ModuleGraphInterfaceArtifact,
 } from '@markless/compiler';
+import {
+	createNativeViewPayload,
+	DEVICE_TARGET_FACTS,
+	NATIVE_FACT_COLLECTORS,
+	type NativeViewArtifact,
+} from '@markless/compiler/native';
 import {
 	buildRouteManifestFromFileIds,
 	matchRouteManifest,

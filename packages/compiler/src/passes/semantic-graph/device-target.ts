@@ -5,6 +5,7 @@ import { isEventAttribute } from '../../ast/events.ts';
 import { expressionSource } from '../../ast/source.ts';
 import { resolvedSymbolAt } from './collect-expressions.ts';
 import { ifChainOf } from './if-chain.ts';
+import { applyWebDeviceEdits } from './web-device-edits.ts';
 import type { DeviceTargetFacts } from '../../artifacts.ts';
 import type { WalkState } from './types.ts';
 
@@ -481,6 +482,19 @@ export function componentsAbsentOnTarget(
 }
 
 /** What a Node build passes as `deviceTargetFacts`; the browser's in-page compiler does not, so it never bundles this. */
+/** True when an assignment target is a field of a device object a component made (`cam.facing`). */
+function writesDeviceObject(target: AnyNode, state: WalkState): boolean {
+	const objects = state.graph.deviceObjects;
+	if (!objects?.length || target.type !== 'MemberExpression') return false;
+	let root = target.object as AnyNode | undefined;
+	while (root?.type === 'MemberExpression') root = root.object as AnyNode | undefined;
+	if (root?.type !== 'Identifier' || typeof root.start !== 'number') return false;
+	const semantic = state.semantic();
+	const symbol = resolvedSymbolAt(semantic, root.start);
+	const declared = symbol === null ? undefined : semantic.bindings[symbol]?.declarations[0]?.start;
+	return declared !== undefined && objects.some((object) => object.bindingStart === declared);
+}
+
 export const DEVICE_TARGET_FACTS: DeviceTargetFacts = {
 	foldedIfArm: foldedIfArm as DeviceTargetFacts['foldedIfArm'],
 	foldedText: ((node: AnyNode, state: WalkState) => {
@@ -499,6 +513,8 @@ export const DEVICE_TARGET_FACTS: DeviceTargetFacts = {
 		collectWebDeviceAbsence as DeviceTargetFacts['collectWebDeviceAbsence'],
 	deviceObjectOf: deviceObjectOf as DeviceTargetFacts['deviceObjectOf'],
 	collectDeviceObjects: collectDeviceObjects as DeviceTargetFacts['collectDeviceObjects'],
+	writesDeviceObject: writesDeviceObject as DeviceTargetFacts['writesDeviceObject'],
+	applyWebDeviceEdits,
 };
 
 /** A device object a component makes (`const cam = camera()`): owned by that component, never rebuilt by a handler. */

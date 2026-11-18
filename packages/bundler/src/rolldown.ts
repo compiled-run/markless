@@ -1,4 +1,4 @@
-import { DEVICE_TARGET_FACTS } from '@markless/compiler';
+import { DEVICE_TARGET_FACTS } from '@markless/compiler/native';
 import type { LiteralComponentInstance } from './prop-flow.ts';
 import type { InputOptions, Plugin } from 'rolldown';
 import {
