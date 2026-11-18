@@ -55,10 +55,11 @@ with every handler a script can run forced into the engine (`all`); the screens 
 (the clock vector is left out: it fixes the data path's clock, and the engine reads the device's own). J1's own handler is
 outside the data vocabulary: a data-only build refuses it with four named reasons.
 
-**A web defect J3 found.** When an async handler's await rejects inside `@try`, the web shows the `@catch` arm after the
-`@try` arm's content and leaves that content on screen; an async value's rejection replaces it. Phones replace it (as
-the data path already does for a failed device call). The rung records the web's difference in `onWeb`; the web runtime
-is not changed here.
+**Where phones and the web differ (J3).** When an async handler's await rejects inside `@try`, the web keeps the `@try`
+content and shows the `@catch` arm after it. That is the specified behaviour (`specs/framework/12-arm-rendering.md`,
+"Handler rejection", #540), pinned by the router's `child-async-catch` tests; an earlier draft of this report called it
+a web defect, which was wrong. Phones replace the content, as the data path already does for a failed device call. The
+rung records the difference in `onWeb`; which way phones should go is an open question.
 
 ## Size and first-interaction delay
 

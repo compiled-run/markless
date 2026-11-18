@@ -33,7 +33,7 @@
 			"visible": ["Failed: No entry for missing"],
 			"absent": ["Result: FOUND", "Steps: 3"],
 			"onWeb": {
-				"why": "the web shows the @catch arm after the @try arm's content and leaves that content on screen when a handler's await rejects (a web runtime defect: an async value's rejection replaces it); phones replace it, as the data path does for a failed device call",
+				"why": "the web keeps the @try content and shows the @catch arm after it when a handler's await rejects, as the spec says (12-arm-rendering, Handler rejection, #540); phones replace the content, as the data path does for a failed device call, until that difference is decided",
 				"visible": ["Failed: No entry for missing", "Result: FOUND", "Steps: 3"]
 			}
 		}
