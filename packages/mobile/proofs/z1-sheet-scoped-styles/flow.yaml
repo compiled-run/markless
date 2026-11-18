@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+name: z1-sheet-scoped-styles
+---
+- launchApp:
+    clearState: true
+- assertVisible: Ship to nowhere yet
+- assertVisible: Choose city
+- assertNotVisible: Choose a city
+- assertNotVisible: Osaka
+- tapOn: Choose city
+- assertVisible: Choose a city
+- assertVisible: Osaka
+- assertVisible: Choose a city
+- assertVisible: Osaka
+- assertVisible: Porto
+- tapOn: Porto
+- assertNotVisible: Choose a city
+- assertVisible: Ship to Porto
+- assertVisible: Choose city
+- assertNotVisible: Choose a city
+- assertNotVisible: Ship to nowhere yet

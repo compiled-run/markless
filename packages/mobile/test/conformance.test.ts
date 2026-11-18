@@ -72,11 +72,24 @@ describe('native conformance vectors', () => {
 			['/orders'],
 			['/orders', '/orders/108'],
 		]);
-		expect(orders.steps.map((step) => step.title)).toEqual(['Orders', 'Order 42', 'Orders', 'Order 108']);
+		expect(orders.steps.map((step) => step.title)).toEqual([
+			'Orders',
+			'Order 42',
+			'Orders',
+			'Order 108',
+		]);
 		expect(orders.steps[2]!.journal).toEqual([]);
-		const replaced = committed('navigation-replace.json') as ReturnType<typeof nativeAppConformance>;
-		expect(replaced.steps.map((step) => step.stack)).toEqual([['/', '/welcome'], ['/', '/dashboard'], ['/']]);
-		const deep = committed('navigation-deep-link.json') as ReturnType<typeof nativeAppConformance>;
+		const replaced = committed('navigation-replace.json') as ReturnType<
+			typeof nativeAppConformance
+		>;
+		expect(replaced.steps.map((step) => step.stack)).toEqual([
+			['/', '/welcome'],
+			['/', '/dashboard'],
+			['/'],
+		]);
+		const deep = committed('navigation-deep-link.json') as ReturnType<
+			typeof nativeAppConformance
+		>;
 		expect(deep.initial.stack).toEqual(['/', '/orders', '/orders/42']);
 	});
 

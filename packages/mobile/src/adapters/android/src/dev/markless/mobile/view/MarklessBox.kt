@@ -13,7 +13,7 @@ import android.widget.TextView
 /** The element view: children stack vertically until a style export assigns frames, then each child sits at its frame. */
 class MarklessBox(context: Context) : FrameLayout(context) {
 	internal val frames = HashMap<View, Rect>()
-	/** A scroll container's content box: its size in px whatever its scroll view offers, so the scroll view has a range. */
+	/** A scroll container's content box, or a sheet's styled content: its size in px whatever its parent offers. */
 	internal var fixedSize: Pair<Int, Int>? = null
 
 	/** Without a style export: a `table` lines its rows' cells up in columns; a `row` lays its cells side by side. */
@@ -32,11 +32,6 @@ class MarklessBox(context: Context) : FrameLayout(context) {
 	}
 
 	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-		fixedSize?.let { (w, h) ->
-			for ((child, f) in frames) child.measure(MeasureSpec.makeMeasureSpec(f.width(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(f.height(), MeasureSpec.EXACTLY))
-			setMeasuredDimension(w, h)
-			return
-		}
 		if (frames.isNotEmpty()) {
 			for (i in 0 until childCount) {
 				val child = getChildAt(i)
@@ -44,7 +39,9 @@ class MarklessBox(context: Context) : FrameLayout(context) {
 				val f = frames[child] ?: throw IllegalStateException("a child of a framed box has no frame")
 				child.measure(MeasureSpec.makeMeasureSpec(f.width(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(f.height(), MeasureSpec.EXACTLY))
 			}
-			setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.getSize(heightMeasureSpec))
+			val fixed = fixedSize
+			if (fixed != null) setMeasuredDimension(fixed.first, fixed.second)
+			else setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.getSize(heightMeasureSpec))
 			return
 		}
 		val width = MeasureSpec.getSize(widthMeasureSpec) - paddingLeft - paddingRight

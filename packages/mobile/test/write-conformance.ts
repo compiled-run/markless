@@ -25,7 +25,9 @@ for (const entry of CONFORMANCE_CASES) {
 }
 
 for (const entry of APP_CONFORMANCE_CASES) {
-	const { payload, diagnostics } = await compileRungApp(join(import.meta.dirname, '..', entry.app));
+	const { payload, diagnostics } = await compileRungApp(
+		join(import.meta.dirname, '..', entry.app),
+	);
 	if (!payload) throw new Error(`${entry.app}: ${diagnostics.map((d) => d.message).join('; ')}`);
 	writeFileSync(
 		new URL(`../conformance/${entry.name}.json`, import.meta.url),

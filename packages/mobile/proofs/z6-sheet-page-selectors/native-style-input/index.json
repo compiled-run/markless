@@ -1,0 +1,56 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Index",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-83p6k8"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-83p6k8"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Spices"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "section",
+			"parent": "h0",
+			"attributes": {
+				"class": "panel mk-83p6k8"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "button",
+			"parent": "h2",
+			"attributes": {
+				"class": "open mk-83p6k8"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Pick a spice"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.page.mk-83p6k8 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #fff3e6;\n\t\t\t\tcolor: #6a040f;\n\t\t\t\tfont-size: 19px;\n\t\t\t}\n\t\t\t.panel.mk-83p6k8 {\n\t\t\t\tpadding: 12px;\n\t\t\t\tborder: 3px solid #6a040f;\n\t\t\t\tborder-radius: 10px;\n\t\t\t}\n\t\t\t.open.mk-83p6k8 {\n\t\t\t\tdisplay: block;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder: 2px solid #6a040f;\n\t\t\t\tborder-radius: 8px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: inherit;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: inherit;\n\t\t\t}\n\t\t\t.sheet.mk-83p6k8 {\n\t\t\t\tpadding: 20px;\n\t\t\t}\n\t\t\t.panel .pick.mk-83p6k8 {\n\t\t\t\tpadding: 10px 14px;\n\t\t\t\tborder-radius: 8px;\n\t\t\t\tbackground: #ffba08;\n\t\t\t\tcolor: #370617;\n\t\t\t}",
+	"states": []
+}

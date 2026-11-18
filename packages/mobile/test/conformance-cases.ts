@@ -412,6 +412,10 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		name: 'navigation-deep-link',
 		app: 'proofs/n4-deep-link',
 		open: '/orders/42',
-		actions: [{ event: 'back' }, { event: 'back' }, { event: 'activate', host: 'component-edge:0' }],
+		actions: [
+			{ event: 'back' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'component-edge:0' },
+		],
 	},
 ];

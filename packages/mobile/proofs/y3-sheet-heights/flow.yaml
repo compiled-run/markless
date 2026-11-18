@@ -16,6 +16,8 @@ name: y3-sheet-heights
       start: 50%, 56%
       end: 50%, 20%
       duration: 600
+- waitForAnimationToEnd:
+      timeout: 5000
 - assertVisible: All items
 - assertVisible: Item 1
 - scrollUntilVisible:

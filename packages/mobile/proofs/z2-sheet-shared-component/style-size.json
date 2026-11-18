@@ -1,0 +1,18 @@
+{
+	"perPage": {
+		"/": 13781,
+		"/ sheet:component-edge:1 at 1": 13340
+	},
+	"perPageTotal": 27121,
+	"app": 16896,
+	"targets": {
+		"ios": {
+			"writeLists": 7,
+			"writeListReferences": 18
+		},
+		"android": {
+			"writeLists": 7,
+			"writeListReferences": 18
+		}
+	}
+}
