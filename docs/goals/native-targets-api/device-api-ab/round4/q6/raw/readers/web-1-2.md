@@ -1,0 +1,10 @@
+A: Rule 2, though only partly. Rule 3 gives the same result for this page, because nothing on it uses `adaptive`. I predicted a centered box for Edit name and a bottom sheet for Comments, and both rules agree. For Share I guessed a box drawn inside the page with no backdrop, not a true centered box, so no rule matches that one exactly. Rule 1 doesn't match my prediction: under it, both Share and Edit name would become bottom sheets on iPhone.
+
+B: Rule 3, because what I write is what I get on every platform, and turning a dialog into a phone sheet is one visible word in the code. As a web developer, I'd guess `modal` means a centered box and `drawer` means a bottom sheet, and Rule 3 keeps that guess correct. Rule 1 changes my layout silently, and whether my CSS counts as "overriding" the placement is hard to predict. With Rule 3 I can still get a native-feeling sheet just by adding `adaptive`. Rule 2 is clear too, but it gives me no simple way to get a phone sheet that stays a centered box on the website.
+
+C:
+Rule 1: My plain `<dialog>` and my Edit name modal would show up on iPhone as bottom sheets with grab handles, and my `border-radius: 12px` on all four corners would look wrong on a panel attached to the bottom edge. I would also be unsure which CSS counts as overriding the placement. Would `padding` or `border-radius` count, or only `margin` and `inset`? I'd also be surprised that adding `margin: auto` for some other reason quietly turns the sheet back into a centered box.
+Rule 2: On an iPhone, the Edit name modal would be a centered, web-style box that doesn't feel native. There's no swipe-to-close, and I'd have to switch to `drawer` to get a sheet, which would then also be a bottom sheet on the website.
+Rule 3: If I forgot `adaptive`, I'd ship centered boxes on phones without noticing. I'd also be surprised that a made-up `adaptive` attribute works on a standard HTML `<dialog>`, and I'd wonder whether browsers or my HTML tools would complain about it.
+
+Tools used: none

@@ -8,6 +8,10 @@
 
 **Element origin, phase 2 (the owner's platform-specific names, for a camera and a system-drawn sheet).** Readers ranked the per-platform `ios.*`/`android.*`/`web.*` version clearest (first for 15 of 18). None of the 18 would write it. Asked which name best says "the platform draws this", 12 of 18 said `native` and 6 said `system`. 12 of 18 would rather write `native` and 6 `system`. 18 of 18 said `platform.ios` next to `platform.sheet` could be confused. 3 of 5 `native` writers imported `native` from `@markless/device`, the wrong package.
 
+**Name reading, phase 3 (`system`, `native`, `os`; 15 readers).** Cold, the names did not split readers. All 15 read their name as "whatever the platform the app runs on draws itself", all 15 said it could "somewhat" be read as a design system, and all 15 leaned "yes" on the elements existing in the website build. Shown all three together, readers ranked `system` first 13 times and `native` first twice. For `native`, 0 of 15 took it first as the browser's built-in element: 6 said mainly the phone's own UI, and 9 said both, 8 of them with the phone first. Data only; the name is decided elsewhere.
+
+**Dialog or sheet on phones (10 readers, 5 framed as web developers and 5 as mobile developers; 20 writers).** For a page with a plain `<dialog>`, a `modal` and a `drawer` and no platform code, 9 of 10 readers predicted the `modal` stays a centered box on iPhone (5 of 5 web, 4 of 5 mobile). 10 of 10 predicted the `drawer` becomes a bottom sheet. Asked which rule they had expected, 9 of 10 said rule 2 (literal); the tenth, a mobile reader, said none, with rule 1 closest. Asked which they want, 10 of 10 chose rule 3 (literal plus an explicit opt-in), in both framings. Blind writers spelled the opt-in `<modal.root adaptive>` (6 of 6). Writers under every rule made 0 surprises (20 of 20 answers): what they said the phone shows always matched their rule.
+
 ### Phase 2: platform-specific namespace for a camera preview and a system sheet
 
 | Spelling | Writers who imported it from the right package (5) | Writers whose code type-checks (5) | Lines (writers) | Readers' mean rank (18; 1 = clearest) | Ranked first | Would rather write (18) |
@@ -43,21 +47,84 @@ How to read it:
 - **Where the points went.** Readers lost them on two questions: "does the camera tag carry behaviour of its own" (22 of 24 said yes, against the key) and "is it an HTML element" (mostly "can't tell"). Both scorers agreed on 156 of 156 marks.
 - **Phase 1 had no ranking turn.** The owner changed the candidates while it ran, so phase 2 holds the ranking.
 
-## Recommendations
+### Phase 3: how readers take `system`, `native` and `os`
 
-**Element origin: `native.camera` / `native.sheet`, with the website behaviour written into the API docs, and consider exporting `native` from `@markless/device`.**
+One page used `<X.camera>`, `<X.sheet>` and `<X.pdf>` from `@markless/ui` next to a `drawer`, with 5 cold readers per name. Each then compared all three names.
 
-- **Why `native`.** It was named best by 12 of 18 readers and chosen to write by 12 of 18. Readers ranked it below the per-platform version only because per-platform shows the website branch in the code, and every one of those readers called the triplication a cost.
-- **Where `native` comes from.** Writers looked for `native` in the device package (3 of 5 imported it from there). Blind writers put these elements in `@markless/device` (6 of 8). So the import location is the risk, not the name.
-- **What `native` does not say.** The name does not say what the website gets. Every `native` reader guessed a browser fallback at 2 of 5 confidence, and "native" reads as "app only" to some. If that matters more than familiarity, `system` is the runner-up (6 of 18). Its readers' reason: "it stays true on the web, where the browser is the system".
+| Name | Cold: "what X means" (5) | Cold: could be a design system (5) | Comparison: exists on the website (15) | Comparison: could be a design system (15) | Comparison: ranked first (15) | Mean rank |
+| --- | --- | --- | --- | --- | --- | --- |
+| `system` | 5 of 5: what the platform draws itself | 5 somewhat | yes 11, can't tell 4 | yes 3, somewhat 12 | 13 | 1.1 |
+| `native` | 5 of 5: what the platform draws itself | 5 somewhat | can't tell 14, no 1 | somewhat 10, no 5 | 2 | 2.1 |
+| `os` | 5 of 5: what the platform draws itself | 5 somewhat | no 7, can't tell 7, unclear 1 | no 8, somewhat 5, unclear 2 | 0 | 2.7 |
 
-**Do not use `platform.camera` / `platform.sheet`.** 18 of 18 readers said `platform.ios` next to `platform.sheet` can be confused: "a yes/no value and a component on the same object". Writers had no trouble (5 of 5 right, 0 mistakes). The cost is to readers, so this result is a reading one, not a writing one.
+**What `native` means (comparison turn, 15).** 0 took it first as the browser's built-in element. 6 said mainly the phone's own UI. 9 said both; 8 of those 9 put the phone's own UI first.
 
-**Keep per-platform namespaces (`ios.sheet`) as an escape hatch only.** Readers ranked them clearest, but 0 of 18 would write them. Writers avoided the triplication by factoring the content into a component; the wrappers still repeat.
+The comparison-turn columns were tallied by `check/tally-q5.py` from the raw answers, and I spot-checked them by hand. One answer each for `os` could not be classified.
 
-**Do not ship a bare lowercase tag or a lowercase import** (`<camera>`, `<cameraview>`). Today `isHostTagName` (`packages/compiler/src/ast/tsrx.ts:136`) treats every undotted lowercase tag as an HTML element. The checker rejects them as well; a probe shows even `const cameraview = CameraView; <cameraview/>` fails. Making them work means new compiler and checker rules, and `<camera>` also clashes with the imported `camera()` function (6 of 6 bare-tag readers, across both phases, paused on it). For future names, `map`, `menu`, `video`, `audio`, `canvas`, `search` and `dialog` are already HTML elements and `image`, `view` and `switch` are SVG elements. The list comes from TypeScript's DOM library tag maps, via `check/html-clash.mjs`.
+### Dialog or sheet: what readers expect on a phone, and what writers do
 
-**`<video src={cam}>`: the owner's reaction was not shared.** 3 of 3 cold readers said it only shows the live picture and does not record, and none objected to `<video>` showing a camera. One wrote: "`video` just means a moving image here, not recording". The owner had already dropped it.
+Readers saw `q6/solutions/page.tsrx`: a plain `<dialog open>` (Share), a `modal` (Edit name) and a `drawer` (Comments), with ordinary CSS and no platform code.
+
+**What an iPhone user sees, predicted cold:**
+
+| Piece | Web-developer framing (5) | Mobile-developer framing (5) |
+| --- | --- | --- |
+| Share (plain `<dialog open>`) | a box in the page, not a sheet: 5 | a box in the page: 4; centered box: 1 |
+| Edit name (`modal`) | centered box: 5 | centered box: 4; iOS sheet: 1 |
+| Comments (`drawer`) | bottom sheet: 5 | bottom sheet: 5 |
+
+**Expected versus wanted, after seeing the three rules:**
+
+| | Web (5) | Mobile (5) |
+| --- | --- | --- |
+| The rule that matches what they predicted | rule 2 (literal): 5 | rule 2: 4; none, with rule 1 closest: 1 |
+| The rule they would want | rule 3 (literal plus opt-in): 5 | rule 3: 5 |
+
+The three rules:
+
+- **Rule 1 (automatic).** `dialog` and `modal` become bottom sheets on phones; author CSS overrides; alerts stay centered.
+- **Rule 2 (literal).** `dialog` and `modal` are centered everywhere; `drawer` is a bottom sheet everywhere.
+- **Rule 3.** Rule 2 plus an opt-in, `<modal.root adaptive>`, chosen by 6 of 6 blind writers.
+
+Readers' main worry about rule 1, unprompted: CSS set for other reasons, such as `margin: auto`, silently flips placement. 10 of 10 raised it. Their main worry about rule 3: the name `adaptive` could mean "responsive size". 6 of 10 raised it.
+
+**Writers (5 per rule; both graders agreed on every field):**
+
+| Rule | Filters panel | Delete confirmation | Address picker | Phone surprises | Website surprises |
+| --- | --- | --- | --- | --- | --- |
+| 1, automatic | `drawer` 5 | `modal alert` 5 | plain `modal` 5 (a sheet on phones by the rule) | 0 | 0 |
+| 2, literal | `drawer` 5 | `modal alert` 5 | `drawer` 5 (so a bottom sheet on the website too) | 0 | 0 |
+| 3, `adaptive` | `drawer` 5 | `modal alert` 5 | `modal adaptive` 5 | 0 | 0 |
+| 3, `presentation="adaptive"` | `drawer` 5 | `modal alert` 5 | `modal presentation="adaptive"` 5 | 0 | 0 |
+
+A surprise is a place where what the writer said the phone shows differs from the rule.
+
+- **Rule 3.** Writers put the opt-in on exactly one piece, the address picker. Several said they would rather not give laptop visitors a bottom sheet.
+- **Rule 2.** Every writer accepted a bottom-sheet address picker on the website, and 2 flagged it as a cost.
+- **Delete confirmation.** Every writer, under every rule, kept it a centered alert.
+
+
+## Naming data (no recommendation)
+
+The namespace name is decided in a separate session, which commits under `naming/`. This section reports the naming data only.
+
+**Phase 2 (camera and sheet, 6 spellings, 18 readers, 30 writers).**
+
+- **Best name for "drawn by the platform":** `native` 12 of 18, `system` 6.
+- **Would rather write:** `native` 12, `system` 6, per-platform 0.
+- **Clearest to read:** per-platform first for 15 of 18.
+- **`platform.ios` next to `platform.sheet`:** 18 of 18 readers said the two can be confused. Writers made no mistakes with `platform` (5 of 5).
+- **Import mistakes:** 3 of 5 `native` writers imported `native` from `@markless/device`. 1 of 5 `system` writers did the same with `system`.
+
+**Phase 3 (`system`, `native`, `os` for a camera, a sheet and a PDF view; 15 readers, 5 per name; see the table below).**
+
+**`<video src={cam}>` (phase 1, before the owner dropped it).** 3 of 3 cold readers said it only shows the live picture and does not record. None objected to `<video>` showing a camera.
+
+## Findings that are not about the name
+
+**A bare lowercase tag or a lowercase import (`<camera>`, `<cameraview>`) does not work today.** `isHostTagName` (`packages/compiler/src/ast/tsrx.ts:136`) treats every undotted lowercase tag as an HTML element. The checker rejects them as well; a probe shows even `const cameraview = CameraView; <cameraview/>` fails. `<camera>` also clashes with the imported `camera()` function: 6 of 6 bare-tag readers, across both phases, paused on it. Names already taken by HTML are `map`, `menu`, `video`, `audio`, `canvas`, `search` and `dialog`; names taken by SVG are `image`, `view` and `switch`. The list comes from `check/html-clash.mjs`.
+
+**Per-platform namespaces triplicate the wrappers.** All 5 per-platform writers factored the sheet content into one shared component, but repeated the camera tag and sheet wrapper three times (8 extra lines each).
 
 ## What confused readers and writers, quoted
 
@@ -88,6 +155,10 @@ How to read it:
   - **Two added versions.** The HTML-element and `View` versions were added after the first six had run. Their answer-key addendum was written after the first HTML-element reader started but before any answer was read.
   - **HTML-element version dropped.** The owner dropped it after it had run; its results are reported but carry no recommendation.
   - **Phase 2.** It replaced phase 1's planned ranking turn, which was not run.
+- **Phases 3 and 4.** I added them at the owner's request after phase 2 ran.
+  - **Phase 3 (name reading)** is readers only. No new writers took part, because phase 2 had measured writing `system` and `native`.
+  - **Phase 4 (dialog or sheet).** The framing is a role sentence in the prompt for the same model, not a different population. In rule 3 the opt-in is described in the prose but missing from the typed props of `modal.root`; 10 of 10 rule 3 writers noted that and used it anyway.
+  - **My slip.** One writer was launched with a placeholder path. I stopped it before it did anything; it is not counted.
 - **Scorer leniency in phase 2.** Readers who wrote "probably a browser fallback" were scored right on the website question, as the key allowed. The low confidence numbers (2 of 5) are the better signal there.
 - **Concurrency.** At most 8 agents ran at once. `check/extract.py` confirms each participant read only its own prompt file, once per turn: problems [] across 141 transcript rows.
 
@@ -104,6 +175,8 @@ How to read it:
 All paths are relative to `round4/`.
 
 - **Blind sheet and tabs phase:** `blind.md`, `q1/`, `q2/`.
+- **Name reading (phase 3):** `q5/` (`answer-key.md`, `solutions/`, `prompts/`, `raw/`), tallied by `check/tally-q5.py`.
+- **Dialog or sheet (phase 4):** `q6/` (`sheets/rules.json`, `sheets/spellings.json`, `solutions/page.tsrx`, `prompts/`, `raw/`), tallied by `check/tally-q6.py`. The writer scores are `scores/q6w-s1.json` and `scores/q6w-s2.json`.
 - **Element-origin phases:**
   - Phase 1: `q3/` (`answer-key.md` with its addendum, `sheets/`, `solutions/`, `prompts/`, `raw/`).
   - Phase 2: `q4/`.
