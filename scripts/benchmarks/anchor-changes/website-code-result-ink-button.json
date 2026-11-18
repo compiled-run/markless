@@ -1,0 +1,52 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 162,
+			"reason": "Code results draw buttons as ink on paper: the shared result stylesheet gains paper, hover and pressed colours, and each <Code> block carries that sheet as its style.css tab (file text, pane text and highlighted runs); CI run 44272691577 against merge-queue run 44253578749 (69fa705bc)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs / playground",
+				"jsGzipBytes"
+			],
+			"delta": -1,
+			"reason": "Code results draw buttons as ink on paper: the shared result stylesheet gains paper, hover and pressed colours, and each <Code> block carries that sheet as its style.css tab (file text, pane text and highlighted runs); CI run 44272691577 against merge-queue run 44253578749 (69fa705bc)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 671,
+			"reason": "Code results draw buttons as ink on paper: the shared result stylesheet gains paper, hover and pressed colours, and each of the page's <Code> blocks carries that sheet as its style.css tab (file text, pane text and highlighted runs); the playground prefetch also regroups so one more chunk of block modules (10 more sheet copies) is listed, measured locally on both trees; CI run 44272691577 against merge-queue run 44253578749 (69fa705bc)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state playground",
+				"jsGzipBytes"
+			],
+			"delta": 15133,
+			"reason": "Code results draw buttons as ink on paper: the shared result stylesheet gains paper, hover and pressed colours, and each of the page's <Code> blocks carries that sheet as its style.css tab (file text, pane text and highlighted runs); the playground prefetch also regroups so one more chunk of block modules (10 more sheet copies) is listed, measured locally on both trees; CI run 44272691577 against merge-queue run 44253578749 (69fa705bc)",
+			"date": "2026-11-18"
+		}
+	]
+}

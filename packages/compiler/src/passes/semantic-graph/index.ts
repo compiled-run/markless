@@ -27,10 +27,11 @@ import {
 	getFrameworkApiForCall,
 } from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
-import { componentsWithIdleRecords } from './idle-records.ts';
+import { componentsWithIdleRecords, componentsWithLiveShared } from './idle-records.ts';
 import { collectComponentPropSpends, collectElementRosterCounts } from './roster-count.ts';
 import { collectElementRosterPositions } from './roster-position.ts';
 import { spreadHostsField } from './spread-hosts.ts';
+import { moduleRelayedProps, relayCancelDiagnostics } from './relayed-props.ts';
 import { callbackSlotPropsField, relayWidgetCallbackProps } from './widget-callback-relays.ts';
 import { elementOnlyAttributeDiagnostics } from './element-only-attributes.ts';
 import { armMaterialField } from './arm-material.ts';
@@ -101,6 +102,7 @@ import {
 import { collectSubmitHoldFacts } from './submit-hold-marks.ts';
 import { collectInPlaceForms } from './in-place-forms.ts';
 import { chunkRootIsOneElement } from '../row-range.ts';
+import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
@@ -135,7 +137,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		importedFunctionWrites: input.importedFunctionWrites,
 		serverOnlyProps: input.serverOnlyProps,
 		routeRoot: input.routeRoot,
-		...(input.nativeFacts ? { nativeFacts: input.nativeFacts } : {}),
+		...(NATIVE_FACTS && input.nativeFacts ? { nativeFacts: input.nativeFacts } : {}),
 		...(input.target ? { target: input.target } : {}),
 		...(input.deviceTargetFacts ? { deviceTargetFacts: input.deviceTargetFacts } : {}),
 	});
@@ -151,9 +153,10 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		const name = getIdentifierName(declaration.id as AnyNode | undefined);
 		if (name) state.helperFunctions.set(name, declaration);
 	}
-	if (state.nativeFacts) {
-		graph.moduleFunctions = state.nativeFacts.moduleFunctions(statements as never, state.helperFunctions as never);
-		graph.moduleConstants = state.nativeFacts.moduleConstants(
+	if (NATIVE_FACTS && state.nativeFacts) {
+		const facts = nativeCollectors(state.nativeFacts);
+		graph.moduleFunctions = facts.moduleFunctions(statements as never, state.helperFunctions as never);
+		graph.moduleConstants = facts.moduleConstants(
 			statements as never,
 			namesMutatedInModule(ownedModuleAst(state, state.source, state.filename)),
 			state.filename,
@@ -182,9 +185,9 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		graph.components.push({
 			name: componentFunction.name,
 			...(exportName ? { exportName } : {}),
-			...(state.nativeFacts
+			...(NATIVE_FACTS && state.nativeFacts
 				? {
-						native: state.nativeFacts.component(
+						native: nativeCollectors(state.nativeFacts).component(
 							componentFunction.node as never,
 							((call: AnyNode, api: 'state') =>
 								getFrameworkApiForCall(call, state.frameworkApiImports) ===
@@ -251,7 +254,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectElementRosterPositions(state);
 	collectElementRosterCounts(state);
 	collectElementHandleDiagnostics(graph, state.pendingElementHandleIdrefs);
-	collectAsyncBoundaryDiagnostics(graph);
+	collectAsyncBoundaryDiagnostics(graph, state.repeatCollectionSpans);
 	collectAsyncInputBesideValueDiagnostics(graph);
 	markControlWrittenInputs(graph, state.hostParents);
 	collectManagedAriaBusyDiagnostics(graph, state.authoredAriaBusy);
@@ -269,7 +272,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		graph,
 		hostIds: state.hostIds,
 		nestedLocalSource: (expression) => inlineNestedTemplateLocals(expression, state),
-		nativeFacts: state.nativeFacts,
+		nativeFacts: NATIVE_FACTS ? state.nativeFacts : null,
 		foldedIfs: state.foldedIfs,
 		foldedTexts: state.foldedTexts,
 		absentComponents,
@@ -298,6 +301,9 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		moduleId,
 		sharedDefinitions: graph.sharedDefinitions,
 		graphBindings: graph.graphBindings,
+		aliases: graph.aliases,
+		stateReads: graph.stateReads,
+		stateWrites: graph.stateWrites,
 	});
 	// Answered here, where this module's chunks and its own imported interfaces
 	// are both in hand; an importer has neither.
@@ -320,11 +326,26 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	const rejectingHandlers = componentsWithRejectingHandlers(graph, input.importedModuleInterfaces);
 	const planes = moduleAsyncPlanes(graph, input.importedModuleInterfaces);
 	const idleComponents = componentsWithIdleRecords(graph, input.importedModuleInterfaces);
+	const liveSharedComponents = componentsWithLiveShared(graph, input.importedModuleInterfaces);
+	const relayedProps = moduleRelayedProps({
+		componentNames: graph.components.map((component) => component.name),
+		events: graph.events,
+		componentEdges: graph.componentEdges,
+		importedModuleInterfaces: input.importedModuleInterfaces ?? {},
+	});
+	graph.diagnostics.push(
+		...relayCancelDiagnostics(
+			state.relayCancelRefusals,
+			relayedProps,
+			input.importedModuleInterfaces ?? {},
+		),
+	);
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
 		...(planes ? { asyncPlanes: planes } : {}),
 		...(idleComponents.size > 0 ? { idleRecords: true as const } : {}),
+		...(liveSharedComponents.size > 0 ? { liveShared: true as const } : {}),
 		render: {
 			version: 1,
 			components: graph.components.flatMap((component) => {
@@ -372,6 +393,9 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 							? { rootBoundary: true as const }
 							: {}),
 						...spreadHostsField(chunks),
+						...(relayedProps.get(component.name)?.size
+							? { relayedProps: [...relayedProps.get(component.name)!].sort() }
+							: {}),
 						...callbackSlotPropsField(graph.sharedCallbackBindings, component.name),
 						...projectionPlacementFields({
 							chunks: graph.markup.chunks,
@@ -382,6 +406,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 						...armMaterialField(graph, component.name, chunks),
 						...(rejectingHandlers.has(component.name) ? { rejectingHandlers: true as const } : {}),
 						...(idleComponents.has(component.name) ? { idleRecords: true as const } : {}),
+						...(liveSharedComponents.has(component.name) ? { liveShared: true as const } : {}),
 						...(containerRepeats.has(component.name)
 							? { containerRepeat: true as const }
 							: {}),

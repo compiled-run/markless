@@ -172,7 +172,36 @@ describe('routed first uses', () => {
 					primed.page.locator('[data-toggle]').click(),
 				);
 
-				for (const visit of [index, list, primed]) {
+				// Imported art is in the code the page loads, so the payload carries none of it.
+				const drawing = await open(browser, `${origin}/drawing`);
+				const payload = await drawing.page.evaluate(() =>
+					Array.from(
+						document.querySelectorAll('script[type="markless/state"], script[type="markless/view"]'),
+						(script) => script.textContent ?? '',
+					).join(''),
+				);
+				for (const art of ['M10 10L20 20', 'M1 1L2 2', 'M11 11L12 12'])
+					expect(payload).not.toContain(art);
+				await drawing.page.locator('[data-piece="b"]').click();
+				await drawing.page.locator('output', { hasText: 'b' }).waitFor();
+				await drawing.page.locator('[data-flip]').click();
+				await drawing.page.locator('main > svg.open').waitFor();
+				const drawingFlips = [
+					await flip(drawing.page, 'main > p.closed', true, () =>
+						drawing.page.locator('[data-flip]').click(),
+					),
+					await flip(drawing.page, 'main > svg.open', true, () =>
+						drawing.page.locator('[data-flip]').click(),
+					),
+				];
+				expect(await drawing.page.locator('main > svg.open path.ink').getAttribute('d')).toBe(
+					'M10 10L20 20L30 10L40 20L50 10L60 20L70 10L80 20L90 10L100 20Z',
+				);
+				await drawing.page.locator('[data-piece="a"]').click();
+				await drawing.page.locator('output', { hasText: 'a' }).waitFor();
+				expect(drawingFlips).toEqual([true, true]);
+
+				for (const visit of [index, list, primed, drawing]) {
 					expect(visit.errors).toEqual([]);
 					expect(visit.scripts).toEqual([]);
 				}

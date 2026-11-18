@@ -9,10 +9,6 @@ type DirectJournalTarget = {
 	readonly [name: string]: unknown;
 };
 
-export function isDirectJournalEntry(entry: DomJournalEntry): boolean {
-	return entry.type === 'setText' || entry.type === 'setAttr' || entry.type === 'setProp';
-}
-
 /**
  * Writes the entries that touch one element where they stand, with no module to
  * load first, and hands back the range work it leaves for the full journal.

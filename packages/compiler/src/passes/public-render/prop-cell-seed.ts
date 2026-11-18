@@ -257,8 +257,12 @@ function samePath(left: ReadonlyArray<string>, right: ReadonlyArray<string>): bo
 }
 
 // The props read back after resume whatever their value: a row template's expression
-// slots, read by a row minted later, and an attach factory's arguments, read when it runs.
-function rowTemplatePropKeys(input: PublicRenderModuleInput, componentName: string): Set<string> {
+// slots, read by a row minted later, and what a handler or attach reads when it runs.
+function rowTemplatePropKeys(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	symbolReads: boolean,
+): Set<string> {
 	const keys = new Set<string>();
 	const addKey = (read: PropRead): void => {
 		if (!read.graphNodeId.startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX)) return;
@@ -282,6 +286,13 @@ function rowTemplatePropKeys(input: PublicRenderModuleInput, componentName: stri
 	for (const behavior of input.protocolView.behaviors)
 		if (componentHostIds.has(behavior.hostNodeId))
 			for (const read of behavior.inputGraphReads ?? []) addKey(read);
+	// A handler or attach body reads its props off the graph when it runs, long after the render.
+	for (const symbol of symbolReads ? input.symbolResolver.symbols : []) {
+		if (symbol.kind === 'event-handler' && componentHostIds.has(symbol.hostNodeId))
+			for (const read of symbol.reads ?? []) addKey(read);
+		else if (symbol.kind === 'behavior' && componentHostIds.has(symbol.hostNodeId))
+			for (const read of symbol.graphAccess?.reads ?? []) addKey(read);
+	}
 	return keys;
 }
 
@@ -335,11 +346,13 @@ export function ssrPropCellSeedsForCell(
 	input: PublicRenderModuleInput,
 	bagCellId: string | null,
 	componentName: string,
+	symbolReads = true,
 ): ReadonlyArray<SsrPropCellSeed> {
 	const { armKeysByCell, deriveKeysByCell, rowKeysByCell } = propCellKeys(
 		input,
 		bagCellId,
 		componentName,
+		symbolReads,
 	);
 	return [
 		...new Set([...armKeysByCell.keys(), ...deriveKeysByCell.keys(), ...rowKeysByCell.keys()]),
@@ -375,6 +388,7 @@ function propCellKeys(
 	input: PublicRenderModuleInput,
 	bagCellId: string | null,
 	componentName: string,
+	symbolReads: boolean,
 ) {
 	const armKeysByCell = new Map<string, Set<string> | null>();
 	for (const { graphNodeId, path } of armRebuildPropReads(input, componentName)) {
@@ -407,7 +421,7 @@ function propCellKeys(
 	const rowKeysByCell = new Map<string, Set<string>>();
 	const rowKeys = bagCellId
 		? new Set([
-				...rowTemplatePropKeys(input, componentName),
+				...rowTemplatePropKeys(input, componentName, symbolReads),
 				...repeatCollectionPropKeys(input, componentName, bagCellId),
 			])
 		: new Set<string>();

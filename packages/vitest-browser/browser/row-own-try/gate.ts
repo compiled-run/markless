@@ -45,3 +45,12 @@ export async function getStock(round: number) {
 		80,
 	);
 }
+
+// The rows' own value alone, refetched while the list stays as it is.
+export async function getRestock(round: number) {
+	return ask(
+		`restock:${round}`,
+		[1, 2, 3, 4].map((id) => ({ id, count: id * 10 + round })),
+		80,
+	);
+}

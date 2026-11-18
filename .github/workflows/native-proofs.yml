@@ -3,17 +3,15 @@ name: Native proofs
 # The native ladder on devices: each rung's App.tsrx built by the real compiler, installed in the iOS and Android proof
 # shells, and its one Maestro flow run on an iOS simulator (macOS runner) and an Android emulator (Linux runner with KVM;
 # GitHub's Apple silicon runners cannot run the Android emulator). Each platform job writes a report; the verdict job
-# fails unless both reports exist and every rung passed on both. Proposal: runs on pull requests into cw/native-targets
-# and by hand, not on main.
+# fails unless both reports exist and every rung passed on both. Runs on pull requests into main that change the phone
+# package, and by hand.
 
 on:
     workflow_dispatch:
     pull_request:
-        branches: [cw/native-targets]
+        branches: [main]
         paths:
             - packages/mobile/**
-            - packages/compiler/**
-            - packages/serializer/**
             - .github/workflows/native-proofs.yml
 
 concurrency:

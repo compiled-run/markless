@@ -10,8 +10,9 @@ import {
 	type StructureToken,
 } from '../ssr-data/renderer.ts';
 import type { SsrRenderable, SsrRenderOutput } from '../render-to-string.ts';
-import type { ResumeArmRecordSet } from '../resume-types.ts';
-import type { RuntimeGraph } from '@markless/runtime';
+import type { ResumeArmRecordSet, ShownAsyncArm } from '../resume-types.ts';
+import type { RuntimeGraph, RuntimeGraphAsyncSnapshot } from '@markless/runtime';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
 import type { ComposedBranchGraph } from '../resume-branches.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import { SERIALIZED_NULL_GRAPH_PAYLOAD } from '../../../serializer/src/value-constants.ts';
@@ -33,6 +34,7 @@ import { childEdgeSurface } from './owning-surface.ts';
 import { marklessBoundSymbolId, marklessReboundSymbolId } from '../fns/bound-symbol.ts';
 import {
 	marklessInstancePath,
+	marklessInstanceSegments,
 	marklessRecordRowScope,
 	marklessRowFreeSymbolId,
 	marklessRowPath,
@@ -357,7 +359,6 @@ export async function renderPrerenderBoundary(
 	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
 	readonly moduleRootPath?: string;
 }> {
-	const drawnAt = pagePrefix(pageBoundaryId, boundaryId);
 	if (isPrerenderDataSurface(page)) {
 		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
@@ -366,6 +367,10 @@ export async function renderPrerenderBoundary(
 		const ownerName = Object.keys(page.components).find(
 			(name) => !!page.components[name]?.boundaries?.some((boundary) => boundary.boundaryId === boundaryId),
 		);
+		// A @try inside its owner's keyed rows is named by those rows; the owner stands before them.
+		const prefix = marklessInstanceSegments(pagePrefix(pageBoundaryId, boundaryId));
+		const rows = prefix.slice(prefix.length - ownRowDepth(page.renderData.chunks, boundaryId)).join('');
+		const drawnAt = pagePrefix(pageBoundaryId, rows + boundaryId);
 		const owner = branchOwnerPlacement(page, ownerName, graph);
 		if (!owner && ownerName && ownerName !== page.rootComponentName) throw unplacedOwnerError(pageBoundaryId ?? boundaryId);
 		const output = await evaluatePrerenderDataSurface(
@@ -383,7 +388,7 @@ export async function renderPrerenderBoundary(
 				...(pageBoundaryId && { settling: boundaryId }),
 			},
 		);
-		const settled = await settledBoundaryResult(output, drawnAt + boundaryId, boundaryId);
+		const settled = await settledBoundaryResult(output, drawnAt + rows + boundaryId, rows + boundaryId);
 		const cells = freshArmCells(output, freshCellIds);
 		return { ...settled, ...(cells.length > 0 && { cells }), ...(owner && { moduleRootPath: owner.moduleRootPath }) };
 	}
@@ -401,6 +406,33 @@ function pagePrefix(pageId: string | undefined, localId: string): string {
 	return pageId?.endsWith(localId) ? pageId.slice(0, pageId.length - localId.length) : '';
 }
 
+// How many keyed rows of its owner's own template enclose a @try, read off the render data.
+function ownRowDepth(chunks: PrerenderRenderData['chunks'], boundaryId: string): number {
+	const parents = new Map<string, { readonly chunkId: string; readonly row: boolean }>();
+	let holder: string | undefined;
+	for (const chunk of chunks)
+		for (const slot of chunk.slots) {
+			if (slot.kind === 'async' && slot.boundaryId === boundaryId) holder = chunk.id;
+			const nested =
+				slot.kind === 'repeat'
+					? [slot.rowTemplateId, slot.emptyTemplateId]
+					: slot.kind === 'branch'
+						? slot.armTemplateIds
+						: slot.kind === 'async'
+							? Object.values(slot.armTemplateIds)
+							: slot.kind === 'dynamic-host'
+								? [slot.childChunkId]
+								: slot.kind === 'child-component'
+									? [slot.projectionChunkId]
+									: [];
+			for (const id of nested)
+				if (id) parents.set(id, { chunkId: chunk.id, row: slot.kind === 'repeat' && id === slot.rowTemplateId });
+		}
+	let depth = 0;
+	for (let at = holder && parents.get(holder); at; at = parents.get(at.chunkId)) if (at.row) depth++;
+	return depth;
+}
+
 /**
  * Re-render the page and hand back one branch's markup with arm-relative
  * records. The graph the flip already wrote decides the arm, so the render
@@ -414,6 +446,7 @@ export async function renderPrerenderBranch(
 	graph: RuntimeGraph,
 	propsOrLoadSymbol?: unknown | PrerenderLoadSymbol,
 	pageBranchId?: string,
+	shownAsyncArm?: (boundaryId: string) => ShownAsyncArm | undefined,
 ): Promise<{
 	readonly html: string;
 	readonly armRecords: ResumeArmRecordSet;
@@ -441,7 +474,7 @@ export async function renderPrerenderBranch(
 			graph,
 			true,
 			servedPageProps(graph, page, ownerName),
-			{ branchSiteId, cellIds: freshCellIds, drawnAt, ...(owner && { owner }) },
+			{ branchSiteId, cellIds: freshCellIds, drawnAt, ...(owner && { owner }), shownAsyncArm },
 		);
 	} else {
 		output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
@@ -545,10 +578,10 @@ function armBranchRange(
 			},
 		}));
 	// Branches the range's markup holds flip inside it, so the commit wires them again.
-	const branches = (set.branches ?? []).filter(
-		(branch) =>
-			branch.id !== branchSiteId && range.html.includes(`<!--markless:arm-branch:${drawnAt + branch.id}-->`),
-	);
+	const outer = new Map(anchors.map((anchor) => [anchor.id, anchor.outer]));
+	const inRange = (id: string | undefined): boolean =>
+		id !== undefined && (outer.get(id) === range.id || inRange(outer.get(id)));
+	const branches = (set.branches ?? []).filter((branch) => inRange(drawnAt + branch.id));
 	return {
 		...arm,
 		armRecords: {
@@ -640,6 +673,7 @@ async function evaluatePrerenderDataSurface(
 		readonly drawnAt?: string;
 		// A @catch drawn after shown @try content: the instances that content placed stay on the page.
 		readonly keepsShown?: true;
+		readonly shownAsyncArm?: (boundaryId: string) => ShownAsyncArm | undefined;
 	},
 ): Promise<SsrRenderOutput & { readonly structure?: SsrDataStructure }> {
 	const rootName =
@@ -674,6 +708,7 @@ async function evaluatePrerenderDataSurface(
 			: {}),
 		...(fresh ? { freshCellIds: fresh.cellIds, mountedInstances: mountedNow } : {}),
 		...(fresh?.settling && { settling: fresh.settling }),
+		...(fresh?.shownAsyncArm && { shownAsyncArm: fresh.shownAsyncArm }),
 	});
 	if (fresh && graph) {
 		const shown = mountedInstances.get(graph);
@@ -971,6 +1006,8 @@ export function evaluatePrerenderDataComponent(input: {
 	readonly placingBranchSiteId?: string;
 	// Set on a render rooted at a flip's owner its own file places.
 	readonly placedAbove?: OwnerRootedRender['placedAbove'];
+	// The arm the live page shows for a @try, by its page id.
+	readonly shownAsyncArm?: (boundaryId: string) => ShownAsyncArm | undefined;
 }): Awaitable<
 	SsrRenderOutput & {
 		// The render-data path emits the full ssr-data structure, not just anchors.
@@ -1053,11 +1090,13 @@ export function evaluatePrerenderDataComponent(input: {
 			)
 				? ['value', ...path]
 				: path;
-		if (input.graph)
-			return input.graph.read(
-				instanceCellIds?.has(graphNodeId) ? input.symbolPrefix + graphNodeId : graphNodeId,
-				graphPath,
-			);
+		const graph = input.graph;
+		if (graph) {
+			const id = instanceCellIds?.has(graphNodeId) ? input.symbolPrefix + graphNodeId : graphNodeId;
+			// Markup lands on the page, so it reads a state a save's hold shows as the page paints it.
+			const hold = graph.paintHold?.();
+			return hold ? hold.asShown(() => graph.read(id, graphPath)) : graph.read(id, graphPath);
+		}
 		if (input.boundGraphValues?.has(graphNodeId))
 			return readPath(input.boundGraphValues.get(graphNodeId), path);
 		return readPath(values.get(graphNodeId), path);
@@ -1330,6 +1369,7 @@ export function evaluatePrerenderDataComponent(input: {
 						attributeName: definition.attributeName,
 						idPrefix: input.idPrefix,
 						projectionSegment: definition.rowHosts?.segment,
+						rowSegment: marklessRowPath,
 						...(input.freshBranchSiteId
 							? { freshBranchSiteId: input.freshBranchSiteId }
 							: {}),
@@ -1395,13 +1435,21 @@ export function evaluatePrerenderDataComponent(input: {
 							});
 							return arm;
 						},
-						selectAsyncArm: (slot) => {
+						selectAsyncArm: (slot, context) => {
 							const boundary = (definition.boundaries ?? []).find(
 								(candidate) => candidate.boundaryId === slot.boundaryId,
 							);
-							const status = boundary?.runnerGraphNodeId
-								? runnerStatus(boundary.runnerGraphNodeId, state.computed)
-								: undefined;
+							const runner = boundary?.runnerGraphNodeId;
+							let status = runner ? runnerStatus(runner, state.computed) : undefined;
+							// While its value loads, a @try already on the page draws the arm the page shows; one this render brings in shows an answer kept for its key.
+							if (status === 'pending') {
+								const shown =
+									input.freshInstance || context.freshInstances
+										? undefined
+										: input.shownAsyncArm?.(input.idPrefix + slot.boundaryId);
+								if (shown !== undefined) return shown;
+								status = runnerStatus(runner!, state.computed, true);
+							}
 							if (status === 'rejected') {
 								const error = runnerError(boundary!.runnerGraphNodeId!, state.computed);
 								const shown = boundary!.errorGraphNodeId;
@@ -1410,9 +1458,11 @@ export function evaluatePrerenderDataComponent(input: {
 									fresh.add(input.symbolPrefix + shown);
 									caughtErrors.set(fresh, (caughtErrors.get(fresh) ?? new Map()).set(input.symbolPrefix + shown, error));
 								}
-								return { arm: 2, error };
+								return { arm: ASYNC_BOUNDARY_ARM.catch, error };
 							}
-							return status === 'fulfilled' ? 0 : 1;
+							return status === 'fulfilled' || boundary?.initiallyServedArm === ASYNC_BOUNDARY_ARM.try
+								? ASYNC_BOUNDARY_ARM.try
+								: ASYNC_BOUNDARY_ARM.pending;
 						},
 						seedChild: (slot, context) =>
 							marklessRosterSeedPass(context.sharedSeeds, () =>
@@ -1587,6 +1637,7 @@ export function evaluatePrerenderDataComponent(input: {
 									...(input.placingBranchSiteId && {
 										placingBranchSiteId: input.placingBranchSiteId,
 									}),
+									...(input.shownAsyncArm && { shownAsyncArm: input.shownAsyncArm }),
 									...(input.mountedInstances
 										? { mountedInstances: input.mountedInstances }
 										: {}),
@@ -1663,17 +1714,20 @@ export function evaluatePrerenderDataComponent(input: {
 function runnerStatus(
 	graphNodeId: string,
 	computed: ProtocolStatePayload['computed'],
+	keptShows?: boolean,
 	visited = new Set<string>(),
 ): unknown {
 	visited.add(graphNodeId);
 	const record = computed.find((candidate) => candidate.graphNodeId === graphNodeId);
-	if (!record || record.async) return record?.snapshot?.status;
+	const snapshot = record?.snapshot as RuntimeGraphAsyncSnapshot | undefined;
+	if (!record || record.async)
+		return keptShows && asyncPlanes.showsKept?.(snapshot) ? 'fulfilled' : snapshot?.status;
 	let status = 'fulfilled';
 	for (const dependency of record.dependencies ?? []) {
 		if (visited.has(dependency.graphNodeId)) continue;
 		if (!computed.some((candidate) => candidate.graphNodeId === dependency.graphNodeId))
 			continue;
-		const settled = runnerStatus(dependency.graphNodeId, computed, visited);
+		const settled = runnerStatus(dependency.graphNodeId, computed, keptShows, visited);
 		if (settled === 'rejected') return settled;
 		if (settled !== 'fulfilled') status = 'pending';
 	}
@@ -1689,7 +1743,7 @@ function runnerError(
 	const record = computed.find((candidate) => candidate.graphNodeId === graphNodeId);
 	if (record?.async) return (record.snapshot as { readonly error?: unknown } | undefined)?.error;
 	for (const { graphNodeId: next } of record?.dependencies ?? [])
-		if (!visited.has(next) && runnerStatus(next, computed, new Set(visited)) === 'rejected')
+		if (!visited.has(next) && runnerStatus(next, computed, false, new Set(visited)) === 'rejected')
 			return runnerError(next, computed, visited);
 }
 

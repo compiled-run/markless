@@ -149,6 +149,30 @@ test('events queued behind the boot keep their arrival order on the live runtime
 	expect(order).toEqual(['a', 'b', 'c']);
 });
 
+test('a sync computed that reads no element binding derives without the roster module', async () => {
+	const host = globalThis as { __marklessRosterResume?: () => Promise<unknown> };
+	let rosterImports = 0;
+	host.__marklessRosterResume = () => (rosterImports++, new Promise(() => {}));
+	const written: unknown[] = [];
+	try {
+		await refreshSyncComputed({
+			computed: {
+				graphNodeId: 'computed:count',
+				deriveSymbolId: 'symbol:count',
+				dependencies: [{ graphNodeId: 'state:hand', path: [] }],
+			},
+			graph: { read: () => 3, write: (update: { value: unknown }) => written.push(update.value) },
+			root: element('SECTION') as never,
+			loadSymbol: () => () => 3,
+			elementHandles: { get: () => undefined },
+		} as never);
+		expect(written).toEqual([3]);
+		expect(rosterImports).toBe(0);
+	} finally {
+		delete host.__marklessRosterResume;
+	}
+});
+
 test('a sync computed refresh imports the roster module once and retries a failed import', async () => {
 	const host = globalThis as { __marklessRosterResume?: () => Promise<unknown> };
 	let rosterImports = 0;
@@ -166,7 +190,11 @@ test('a sync computed refresh imports the roster module once and retries a faile
 	const written: unknown[] = [];
 	const refresh = () =>
 		refreshSyncComputed({
-			computed: { graphNodeId: 'computed:count', deriveSymbolId: 'symbol:count' },
+			computed: {
+				graphNodeId: 'computed:count',
+				deriveSymbolId: 'symbol:count',
+				dependencies: [{ graphNodeId: 'c0:/element:items', path: [] }],
+			},
 			graph: {
 				read: () => 2,
 				write: (update: { value: unknown }) => written.push(update.value),

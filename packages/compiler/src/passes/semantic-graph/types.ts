@@ -42,6 +42,7 @@ import type {
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
 import type { StyleConstResolver } from './style-object.ts';
+import { NATIVE_FACTS, nativeFactsHandle, type NativeFactsHandle } from './native-facts-flag.ts';
 import { moduleSemantics, type ModuleSemantics } from './shared-ast.ts';
 
 export type ArmGuard =
@@ -162,7 +163,7 @@ export type WalkState = {
 	readonly importedFunctionWrites: Readonly<Record<string, ModuleFunctionWrites>>;
 	/** The router renders this module's default export as a page, so that component's props never change in the browser. */
 	readonly routeRoot: boolean;
-	readonly nativeFacts: NativeFactCollectors | null;
+	readonly nativeFacts: NativeFactsHandle | null;
 	/** What this build compiles for; `@markless/device` and `platform` fold to its constants. */
 	readonly target: BuildTarget;
 	/** `@if` chains the target's constants decide, and the arm each keeps (null: none). */
@@ -177,6 +178,13 @@ export type WalkState = {
 		readonly propName: string;
 	}>;
 	readonly hostIds: WeakMap<object, string>;
+	/** Cancels in event callback props the compiler cannot place, refused once the walk knows the child hands that prop to an event. */
+	readonly relayCancelRefusals: Array<{
+		readonly childComponentName: string;
+		readonly importSource?: string;
+		readonly propName: string;
+		readonly diagnostic: SemanticGraphDiagnostic;
+	}>;
 	/** The host element each host sits directly inside, in its component's own markup. */
 	readonly hostParents: Map<string, string>;
 	/** Template values already refused at their use site; the walk must not treat them as markup again. */
@@ -221,6 +229,7 @@ export type WalkState = {
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
+	repeatCollectionSpans: Map<string, SourceSpan>;
 	authoredAriaBusy: AuthoredAriaBusy[];
 	// aria-disabled written on a control that submits its form.
 	authoredSubmitAriaDisabled: AuthoredAriaBusy[];
@@ -359,12 +368,13 @@ export function createWalkState(input: {
 		importedFunctionWrites: input.importedFunctionWrites ?? {},
 		serverOnlyProps: input.serverOnlyProps ?? [],
 		routeRoot: input.routeRoot === true,
-		nativeFacts: input.nativeFacts ?? null,
+		nativeFacts: NATIVE_FACTS ? nativeFactsHandle(input.nativeFacts) : null,
 		target: input.target ?? 'web',
 		foldedIfs: new Map(),
 		deviceTarget: input.deviceTargetFacts ?? null,
 		foldedTexts: new Map(),
 		hostIds: new WeakMap<object, string>(),
+		relayCancelRefusals: [],
 		hostParents: new Map(),
 		handledTemplateValues: new WeakSet<object>(),
 		currentComponentName: null,
@@ -390,6 +400,7 @@ export function createWalkState(input: {
 		currentFunctionSite: null,
 		deferredComputedWrites: [],
 		pendingElementHandleIdrefs: [],
+		repeatCollectionSpans: new Map(),
 		authoredAriaBusy: [],
 		authoredSubmitAriaDisabled: [],
 		postForms: [],

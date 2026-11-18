@@ -41,6 +41,7 @@ import {
 	rowBoundNames,
 } from './repeat-item-binding.ts';
 import type { WalkState } from './types.ts';
+import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | null {
 	const binding = repeatItemBinding(node);
@@ -241,6 +242,8 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 	}
 
 	const repeatIndex = state.graph.keyedRepeats.length;
+	const collectionSpan = collectionNode && sourceSpan(collectionNode, state.filename);
+	if (collectionSpan) state.repeatCollectionSpans.set(`repeat:${repeatIndex}`, collectionSpan);
 	state.graph.keyedRepeats.push({
 		id: `repeat:${repeatIndex}`,
 		// Projected repeats are retargeted after markup collection; top-level rows live in the container.
@@ -258,8 +261,8 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 			: {}),
 		...(indexName ? { indexName } : {}),
 		collectionSource,
-		...(state.nativeFacts
-			? { collectionExpression: state.nativeFacts.expression(collectionNode as never) }
+		...(NATIVE_FACTS && state.nativeFacts
+			? { collectionExpression: nativeCollectors(state.nativeFacts).expression(collectionNode as never) }
 			: {}),
 		...(collection
 			? {

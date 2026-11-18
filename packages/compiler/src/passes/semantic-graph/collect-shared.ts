@@ -6,6 +6,7 @@ import type {
 	ModuleGraphInterfaceSharedDefinition,
 	SemanticGraphAlias,
 	SemanticGraphBinding,
+	SemanticGraphArtifact,
 	SemanticGraphDiagnostic,
 	SemanticModuleImport,
 	SemanticSharedDefinition,
@@ -14,6 +15,9 @@ import type {
 	SemanticSharedModuleDeclaration,
 	SemanticSharedReturnProperty,
 	SemanticSharedScope,
+	SemanticStateRead,
+	SemanticStateWrite,
+	SourceSpan,
 } from '../../artifacts.ts';
 import {
 	graphBindingMap,
@@ -39,6 +43,7 @@ import { getCallName, getFrameworkApiForCall, isFrameworkApiName } from './impor
 import { ownedModuleAst } from './shared-ast.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
+import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 export function collectSharedDefinition(input: {
 	readonly name: string;
@@ -448,6 +453,15 @@ function adoptSharedDefinition(
 		if (state.graph.graphBindings.some((item) => item.id === binding.id)) continue;
 		state.graph.graphBindings.push(binding);
 	}
+	for (const alias of published.methodAliases ?? []) {
+		if (!state.graph.aliases.includes(alias)) state.graph.aliases.push(alias);
+	}
+	for (const read of published.methodStateReads ?? []) {
+		if (!state.graph.stateReads.includes(read)) state.graph.stateReads.push(read);
+	}
+	for (const write of published.methodStateWrites ?? []) {
+		if (!state.graph.stateWrites.includes(write)) state.graph.stateWrites.push(write);
+	}
 }
 
 /**
@@ -607,6 +621,9 @@ export function moduleInterfaceSharedDefinitions(input: {
 	readonly moduleId: string;
 	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
+	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
+	readonly stateReads: ReadonlyArray<SemanticStateRead>;
+	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
 }): ReadonlyArray<ModuleGraphInterfaceSharedDefinition> {
 	const exportNames = exportedLocalNames(input.statements);
 
@@ -616,14 +633,70 @@ export function moduleInterfaceSharedDefinitions(input: {
 		if (definition.id !== sharedDefinitionId(input.moduleId, definition.exportedName))
 			return [];
 
+		const inMethod = methodSpanTest(definition);
+		const ownState = ownStateTest(input, definition.id);
+		const methodAliases = input.aliases.filter(
+			(alias) => alias.sharedDefinitionId === definition.id && inMethod(alias.sourceSpan),
+		);
+		const methodStateReads = input.stateReads.filter(
+			(read) =>
+				read.sharedDefinitionId === definition.id &&
+				inMethod(read.sourceSpan) &&
+				ownState(read.source),
+		);
+		// A write to a method's own local stays plain JavaScript in the copy, so only state writes travel.
+		const methodStateWrites = input.stateWrites.filter(
+			(write) =>
+				write.sharedDefinitionId === definition.id &&
+				inMethod(write.targetSpan) &&
+				ownState(writtenStateSource(write)),
+		);
 		return (exportNames.get(definition.name) ?? []).map((exportName) => ({
 			exportName,
 			definition,
 			graphBindings: input.graphBindings.filter(
 				(binding) => binding.sharedDefinitionId === definition.id,
 			),
+			...(methodAliases.length > 0 ? { methodAliases } : {}),
+			...(methodStateReads.length > 0 ? { methodStateReads } : {}),
+			...(methodStateWrites.length > 0 ? { methodStateWrites } : {}),
 		}));
 	});
+}
+
+function ownStateTest(
+	graph: Pick<SemanticGraphArtifact, 'graphBindings' | 'aliases'>,
+	definitionId: string,
+): (source: string | null) => boolean {
+	const bindings = graphBindingMap(graph, definitionId);
+	const aliases = semanticAliasMap(graph, definitionId);
+	return (source) =>
+		source !== null &&
+		resolveGraphPath(source, bindings, aliases)?.binding.sharedDefinitionId === definitionId;
+}
+
+function writtenStateSource(write: SemanticStateWrite): string | null {
+	const through = write.through;
+	if (!through) return write.target;
+	if (through.kind === 'path') return through.target;
+	if (through.kind === 'element') return through.collection;
+	return null;
+}
+
+function methodSpanTest(
+	definition: SemanticSharedDefinition,
+): (span: SourceSpan | undefined) => boolean {
+	const methodSpans = (definition.returnProperties ?? []).flatMap((property) =>
+		property.kind === 'method' && property.sourceSpan ? [property.sourceSpan] : [],
+	);
+	return (span) =>
+		span !== undefined &&
+		methodSpans.some(
+			(method) =>
+				method.filename === span.filename &&
+				span.start >= method.start &&
+				span.end <= method.end,
+		);
 }
 
 // `export const pnl = ...` and `export { pnl as state }` — the names this
@@ -728,11 +801,38 @@ export function collectSharedFactoryGraph(
 		const index = state.graph.sharedDefinitions.findIndex((item) => item.id === definition.id);
 		if (index === -1) continue;
 
+		const instanceGraphNodeId = wholeStateReturn(returnProperties, state.graph.graphBindings);
 		state.graph.sharedDefinitions[index] = {
 			...state.graph.sharedDefinitions[index],
 			returnProperties,
+			...(instanceGraphNodeId ? { instanceGraphNodeId } : {}),
 		};
 	}
+}
+
+// `return box` and `return { ...box }`: every field of one state object, each under its own name.
+function wholeStateReturn(
+	properties: ReadonlyArray<SemanticSharedReturnProperty>,
+	bindings: ReadonlyArray<SemanticGraphBinding>,
+): string | undefined {
+	const first = properties[0];
+	if (first?.kind !== 'graph') return undefined;
+	const binding = bindings.find((item) => item.id === first.graphNodeId);
+	if (binding?.kind !== 'state' || binding.valueKind !== 'object') return undefined;
+	if (binding.initialValueKnown !== true) return undefined;
+	const initial = binding.initialValue;
+	if (typeof initial !== 'object' || initial === null || Array.isArray(initial)) return undefined;
+
+	const names = new Set<string>();
+	for (const property of properties) {
+		if (property.kind !== 'graph' || property.graphNodeId !== binding.id) return undefined;
+		if (property.path.length !== 1 || property.path[0] !== property.name) return undefined;
+		names.add(property.name);
+	}
+	const fields = Object.keys(initial);
+	return fields.length === names.size && fields.every((field) => names.has(field))
+		? binding.id
+		: undefined;
 }
 
 /**
@@ -1015,7 +1115,13 @@ export function resolveSharedInstanceGraphPath(
 			componentName,
 		);
 	}
-	if (segments.length < 2) return null;
+	if (segments.length === 1) {
+		if (source !== segments[0]) return null;
+		const nodeId = findSharedInstance(segments[0]!, graph, componentName)?.definition
+			.instanceGraphNodeId;
+		const binding = nodeId ? graph.graphBindings.find((item) => item.id === nodeId) : undefined;
+		return binding ? { binding, path: [] } : null;
+	}
 
 	const [localName, propertyName, ...propertyPath] = segments;
 	if (!localName || !propertyName) return null;
@@ -1373,14 +1479,15 @@ function collectReturnedObjectProperties(input: {
 			// records reads at assignment sites, which leaves a method local
 			// (`const next = s.checked !== true`) closing over the factory local.
 			collectExpressionReads(value.body as AnyNode | undefined, input.state);
-			const nativeStatements = input.state.nativeFacts?.handlerStatements(value as never);
+			const facts = NATIVE_FACTS ? input.state.nativeFacts : null;
+			const nativeStatements = facts ? nativeCollectors(facts).handlerStatements(value as never) : undefined;
 			properties.push({
 				kind: 'method',
 				name,
 				source: propertySource,
 				sourceSpan: sourceSpan(property, input.state.filename),
 				...(nativeStatements
-					? { nativeStatements, parameters: input.state.nativeFacts!.parameterNames(value as never) }
+					? { nativeStatements, parameters: nativeCollectors(facts!).parameterNames(value as never) }
 					: {}),
 			});
 			continue;

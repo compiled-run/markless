@@ -1,6 +1,6 @@
 import { componentExportPath, linkedComponentTarget } from '../link/component-target.ts';
 import { isEventAttribute } from '../../ast/events.ts';
-import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, getIdentifierName, unwrapTypeAssertion, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
 import type {
 	SemanticAsyncArmPlacement,
@@ -13,6 +13,7 @@ import {
 	getComponentFunction,
 	getElementAttributes,
 	getElementTagName,
+	getElementTagNode,
 	isHostTagName,
 	isIgnorableJsxTextNode,
 	isMemberTagName,
@@ -31,6 +32,7 @@ import { collectObjectPatternAliases } from './collect-aliases.ts';
 import { constantPropValue } from './constant-props.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { rowItemRead } from './row-item-read.ts';
+import { tagRenderedProp } from './prop-tag.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	type GraphReadScope,
@@ -51,6 +53,7 @@ import {
 	memberTagNestedPartDiagnostic,
 	memberTagPartMissingDiagnostic,
 	memberTagUnresolvedDiagnostic,
+	componentPropTagDiagnostic,
 } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
@@ -72,6 +75,7 @@ import {
 	uncoveredSyncPolicyCall,
 	unextractableSyncPolicyDiagnostic,
 } from './collect-sync-policy.ts';
+import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 export function collectComponentProps(component: AnyNode, state: WalkState): void {
 	const firstParam = asNodes(component.params)[0];
@@ -176,6 +180,18 @@ export function collectComponentEdge(
 		);
 	}
 
+	const renderedProp = importSource.importSource ? undefined : tagRenderedProp(getElementTagNode(node), state);
+	if (renderedProp?.[0] !== undefined)
+		state.graph.diagnostics.push(
+			componentPropTagDiagnostic({
+				tagName,
+				componentName: state.currentComponentName,
+				propName: renderedProp[0],
+				node,
+				filename: state.filename,
+			}),
+		);
+
 	const props = componentPropBindings(node, state, tagName, {
 		childComponentName,
 		importSource: importSource.importSource,
@@ -232,7 +248,8 @@ function componentPropBindings(
 		if (!name) continue;
 
 		const value = attribute.value as AnyNode | undefined;
-		const expression = unwrapExpressionContainer(value);
+		// `id={selected!}` hands the child the same value as `id={selected}`.
+		const expression = unwrapTypeAssertion(unwrapExpressionContainer(value));
 		const source = expression
 			? expressionSource(expression, state.source)
 			: expressionSourceOrFallback(value, state.source, 'true');
@@ -329,21 +346,22 @@ function componentPropBindings(
 				? hasSyncEventPolicyCandidate(callback) ||
 					Boolean(firstDetachedSyncPolicyReference(callback))
 				: false;
-			if (
-				hasSyncPolicyCandidate &&
-				!syncPolicy &&
-				spreadForwardsProp(name, link, state, childComponentName)
-			) {
-				state.graph.diagnostics.push(
-					unextractableSyncPolicyDiagnostic(name, callback, [callback], state),
-				);
-			}
 			const strayCancel = syncPolicy ? uncoveredSyncPolicyCall(callback, state) : null;
-			if (strayCancel && spreadForwardsProp(name, link, state, childComponentName)) {
-				state.graph.diagnostics.push(
-					secondSyncPolicyCancelDiagnostic(name, strayCancel, state),
-				);
-			}
+			const misplacedCancel =
+				hasSyncPolicyCandidate && !syncPolicy
+					? unextractableSyncPolicyDiagnostic(name, callback, [callback], state)
+					: strayCancel
+						? secondSyncPolicyCancelDiagnostic(name, strayCancel, state)
+						: null;
+			if (misplacedCancel && spreadForwardsProp(name, link, state, childComponentName))
+				state.graph.diagnostics.push(misplacedCancel);
+			else if (misplacedCancel)
+				state.relayCancelRefusals.push({
+					childComponentName: link?.childComponentName || childComponentName,
+					...(link?.importSource ? { importSource: link.importSource } : {}),
+					propName: name,
+					diagnostic: misplacedCancel,
+				});
 
 			const factory = factoryCall
 				? factoryHandlerSource(factoryCall, parameterNodes.length, state, name)
@@ -356,7 +374,7 @@ function componentPropBindings(
 				name,
 				source: inlined?.source ?? expressionSource(callback, state.source),
 				kind: 'callback',
-				...nativeStatementsOf(factoryCall ? undefined : callback, state),
+				...(NATIVE_FACTS ? nativeStatementsOf(factoryCall ? undefined : callback, state) : {}),
 				...(inlined?.definitionSpans.length
 					? { definitionSpans: inlined.definitionSpans }
 					: {}),
@@ -485,6 +503,8 @@ function componentPropBindings(
 					scope: propScope,
 					methodCalls: true,
 					unaryOperators: true,
+					// A scoped class joins its value with the scope, so an array or object there stays opaque.
+					literalBranches: !(name === 'class' && state.currentStyleScopeClass),
 				})
 			: null;
 		if (composite) {
@@ -574,12 +594,9 @@ function componentPropBindings(
 			source: opaqueSource,
 			kind: 'opaque',
 			sourceSpan: span,
-			...(expression && state.nativeFacts
-				? { nativeExpression: state.nativeFacts.expression(expression as never) }
-				: {}),
 			...(rowRead ? { rowRead } : {}),
 			...(fixedValue ? { fixedValue: true as const } : {}),
-			...nativeExpressionOf(expression, state),
+			...(NATIVE_FACTS ? nativeExpressionOf(expression, state) : {}),
 			...(constant?.value.ok ? { buildTimeValue: { value: constant.value.value } } : {}),
 			...(constant && constant.importedConstants.length > 0
 				? { importedConstants: constant.importedConstants }
@@ -805,7 +822,7 @@ function spreadForwardsProp(
 export function receivedHandlerRelay(
 	expression: AnyNode,
 	state: WalkState,
-): { readonly source: string; readonly parameter: string } | undefined {
+): { readonly source: string; readonly parameter: string; readonly propName: string } | undefined {
 	return relayedHandlerSource(expression, componentBodyScope(state), state);
 }
 
@@ -828,7 +845,7 @@ function relayedHandlerSource(
 	expression: AnyNode,
 	scope: GraphReadScope,
 	state: WalkState,
-): { readonly source: string; readonly parameter: string } | undefined {
+): { readonly source: string; readonly parameter: string; readonly propName: string } | undefined {
 	const source =
 		expression.type === 'Identifier'
 			? getIdentifierName(expression)
@@ -839,7 +856,11 @@ function relayedHandlerSource(
 	const graph = resolveGraphPath(source, scope.bindings, scope.aliases);
 	if (graph?.binding.kind !== 'prop' || graph.path.length !== 1) return undefined;
 	const parameter = source === 'event' ? 'domEvent' : 'event';
-	return { source: `(${parameter}) => ${source}?.(${parameter})`, parameter };
+	return {
+		source: `(${parameter}) => ${source}?.(${parameter})`,
+		parameter,
+		propName: graph.path[0]!,
+	};
 }
 
 /** `props.onClick`: one static member read off an identifier, the props object read without destructuring. */
@@ -936,7 +957,7 @@ function nativeExpressionOf(
 	expression: AnyNode | undefined,
 	state: WalkState,
 ): { nativeExpression?: SemanticExpression } {
-	const nativeExpression = expression && state.nativeFacts?.expression(expression as never);
+	const nativeExpression = expression && state.nativeFacts && nativeCollectors(state.nativeFacts).expression(expression as never);
 	return nativeExpression ? { nativeExpression } : {};
 }
 
@@ -944,6 +965,6 @@ function nativeStatementsOf(
 	callback: AnyNode | undefined,
 	state: WalkState,
 ): { nativeStatements?: ReadonlyArray<SemanticHandlerStatement> } {
-	const nativeStatements = callback && state.nativeFacts?.handlerStatements(callback as never);
+	const nativeStatements = callback && state.nativeFacts && nativeCollectors(state.nativeFacts).handlerStatements(callback as never);
 	return nativeStatements ? { nativeStatements } : {};
 }

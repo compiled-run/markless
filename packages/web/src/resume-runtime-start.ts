@@ -2,6 +2,7 @@ import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../serializer/src/protocol-event
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 // Only resume.ts loads this module, and it imports the locators statically already.
 import { elementsBetweenAnchors, hostIdsInsideRemovedElements } from './resume-locators.ts';
+import { withRangeJournalCode } from './dom-journal-load.ts';
 import type { AsyncBoundarySettleTracker, AsyncBoundaryWiring } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type { OverlayHiddenBoundRoot } from './overlay-handoff.ts';
@@ -133,7 +134,7 @@ export async function startResumeRuntime(input: {
 	await events.prepareSyncPolicy(runtimeInput.view.events, [...rowEvents, ...armEvents]);
 	if (runtimeInput.applyDomJournal) {
 		storeContainerSubscription(
-			runtimeInput.graph.subscribeJournal(async (entries) => {
+			runtimeInput.graph.subscribeJournal(withRangeJournalCode(async (entries) => {
 				await disposeRemovedAsyncRangeHosts(runtimeInput, prepared, entries, disposeHost);
 				const branchRuntime = input.branchRuntime();
 				if (branchRuntime) {
@@ -150,7 +151,7 @@ export async function startResumeRuntime(input: {
 					?.materializeFlippedBranchArms(entries, (hostNodeId) =>
 						input.behaviorRuntime()!.activateBehaviors(hostNodeId, { flush: false }),
 					);
-			}),
+			})),
 		);
 	}
 	if ((runtimeInput.view.keyedRepeats ?? []).length > 0) {

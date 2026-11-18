@@ -1,4 +1,5 @@
 import type { DomJournalEntry, DomJournalResult, RuntimeGraph } from '@markless/runtime';
+import { loadRangeJournal } from './dom-journal-load.ts';
 import { marklessElementAt, pageCommentCensus } from './resume-anchor-census.ts';
 import { composedArmRecordQualifier } from './resume-handle-qualifier.ts';
 import type {
@@ -13,8 +14,6 @@ import type {
 } from './resume-types.ts';
 
 type Hosted<T> = T & { readonly hostPath: ReadonlyArray<number> };
-// Even an evaluated module's import() costs a task.
-let journal: typeof import('./dom-journal.ts') | undefined;
 type RegisteredResumeBranch = ResumeBranchRecord & {
 	readonly armBoundaryId?: string;
 	readonly armLists?: ReadonlyArray<ResumeKeyedRepeatRecord>;
@@ -85,7 +84,7 @@ export function wireBranches(input: any) {
 		>,
 	): Promise<void> {
 		if (!entries.some((entry) => entry.type === 'removeRange')) return;
-		const { hostIdsInsideRange } = (journal ??= await import('./dom-journal.ts'));
+		const { hostIdsInsideRange } = await loadRangeJournal();
 		for (const entry of entries) {
 			if (entry.type !== 'removeRange') continue;
 			const branch = entry.locator.startsWith('branch:')
@@ -192,7 +191,13 @@ function createBranchRegistration(
 					html,
 				};
 				const commit = await input.prepareArmCommit(branch, armUpdate);
-				return () => commit().then(() => wireArmLists(input, branch, update.arm, armUpdate.armRecords?.keyedRepeats));
+				return () =>
+					commit().then(async () => {
+						// A @try arm's own markup records ride the branch, not the re-render.
+						if (branch.armBoundaryId)
+							for (const id of materializeBranchArmRecords(input, branch, update.arm)) await input.activateBehaviors(id);
+						return wireArmLists(input, branch, update.arm, armUpdate.armRecords?.keyedRepeats);
+					});
 			}
 			const fragment = input.renderBranchHtml
 				? input.renderBranchHtml(
@@ -209,7 +214,7 @@ function createBranchRegistration(
 				throw branchArmEmptyError(branch, update.arm);
 			// Replaying the arm already in place splices and announces nothing.
 			if (update.arm === painted) {
-				const { domRangeMatchesFragment } = (journal ??= await import('./dom-journal.ts'));
+				const { domRangeMatchesFragment } = await loadRangeJournal();
 				if (domRangeMatchesFragment(branch.startAnchor, branch.endAnchor, fragment)) return;
 			}
 			return [

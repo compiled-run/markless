@@ -142,25 +142,22 @@ export function findKeyedRepeatRowEventMatch(input: {
 				(rowEvent) => rowEvent.eventName === input.eventName,
 			);
 			if (rowEvents.length === 0) continue;
-			validateOneRepeat(input.graph, repeat);
+			if (element === input.target) validateOneRepeat(input.graph, repeat);
 			const parent =
 				input.elementsByHostId.get(repeat.parentHostNodeId) ??
 				input.materializeHost(repeat.parentHostNodeId);
 			if (!parent) continue;
 			if (repeat.branchArm && armRows?.hiddenBranchArm(parent, repeat)) continue;
-			const items = readKeyedRepeatCollection(input.graph, repeat);
-			for (const [rowIndex, rowRoot] of repeatRowElements(
-				parent,
-				repeat,
-				items.length,
-			).entries()) {
-				const rowKey = repeatItemKey(items[rowIndex], repeat, rowIndex);
-				for (const rowEvent of rowEvents) {
-					if (marklessElementAt(rowRoot, rowEvent.hostPath) === element) {
-						return { element, match: { repeat, parent, rowRoot, rowKey, rowEvent } };
-					}
+			let rowRoot: ResumeDomElement | null | undefined = element;
+			while (rowRoot && rowRoot.parentElement !== parent) rowRoot = rowRoot.parentElement;
+			for (const rowEvent of rowRoot ? rowEvents : [])
+				if (marklessElementAt(rowRoot, rowEvent.hostPath) === element) {
+					const items = readKeyedRepeatCollection(input.graph, repeat);
+					const rowIndex = repeatRowElements(parent, repeat, items.length).indexOf(rowRoot!);
+					if (rowIndex < 0) break;
+					const rowKey = repeatItemKey(items[rowIndex], repeat, rowIndex);
+					return { element, match: { repeat, parent, rowRoot: rowRoot!, rowKey, rowEvent } };
 				}
-			}
 		}
 	}
 }

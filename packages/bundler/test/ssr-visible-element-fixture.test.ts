@@ -49,29 +49,28 @@ test.each([false, true])(
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(error.message));
 			await page.goto(`http://127.0.0.1:${port}/`);
-			const hosts = page.locator('[data-case]');
-			await page.waitForTimeout(500);
-			await hosts.last().scrollIntoViewIfNeeded();
-			await page.waitForTimeout(500);
+			const cases = () =>
+				page
+					.locator('[data-case]')
+					.evaluateAll((elements) =>
+						elements.map(
+							(element) =>
+								`${element.getAttribute('data-case')}: ${element.getAttribute('data-visible') ?? element.getAttribute('data-attached')}`,
+						),
+					);
+			const visible = ['visible-event: yes', 'attach-prop: 2', 'attach-constant: 2'];
+			const once = [...visible, 'attach-click: 2'];
+			const settled = { timeout: 30_000 };
+			// The first instance scrolls out of view next, so its onVisible must have run first.
+			await expect
+				.poll(async () => (await cases()).slice(0, 4), settled)
+				.toEqual(['root-constant: 3', ...visible]);
+			await page.locator('[data-case]').last().scrollIntoViewIfNeeded();
+			await expect.poll(async () => (await cases()).slice(5, 8), settled).toEqual(visible);
 			for (const button of await page.locator('button[data-case]').all())
 				await button.click();
-			await page.waitForTimeout(300);
-			const seen = await hosts.evaluateAll((elements) =>
-				elements.map(
-					(element) =>
-						`${element.getAttribute('data-case')}: ${element.getAttribute('data-visible') ?? element.getAttribute('data-attached')}`,
-				),
-			);
-			const once = [
-				'visible-event: yes',
-				'attach-prop: 2',
-				'attach-constant: 2',
-				'attach-click: 2',
-			];
-			expect({ seen, errors }).toEqual({
-				seen: ['root-constant: 3', ...once, ...once],
-				errors: [],
-			});
+			await expect.poll(cases, settled).toEqual(['root-constant: 3', ...once, ...once]);
+			expect(errors).toEqual([]);
 		} finally {
 			await browser.close();
 			await new Promise((done) => server.close(done));

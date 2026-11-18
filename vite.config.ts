@@ -122,6 +122,7 @@ const buildOrder: PackUserConfig[] = [
 			'graph-async-load': './src/graph-async-load.ts',
 			'graph-async-refresh': './src/graph-async-refresh.ts',
 			'graph-held': './src/graph-held.ts',
+			'graph-kept': './src/graph-kept.ts',
 		},
 	}),
 	marklessPack({

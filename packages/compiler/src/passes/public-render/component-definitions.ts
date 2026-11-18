@@ -134,7 +134,10 @@ export function collectPublicRenderComponentDefinitions(
 						...('excludeNames' in prop ? { excludeNames: prop.excludeNames } : {}),
 						...('value' in prop ? { value: prop.value } : {}),
 						...(prop.kind === 'callback'
-							? { symbolId: callbacks.get(`${edge.id}:${prop.name}`) }
+							? {
+									symbolId: callbacks.get(`${edge.id}:${prop.name}`),
+									...(prop.syncPolicy ? { syncPolicy: prop.syncPolicy } : {}),
+								}
 							: {}),
 						...(prop.kind === 'callback' ? {} : { source: prop.source }),
 					})),

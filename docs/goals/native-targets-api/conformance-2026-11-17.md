@@ -1,9 +1,9 @@
 # Native integration: conformance report, 2026-11-17
 
-Branch `cw/native-integration` (draft PR #820, base `cw/native-targets`) holds today's navigation, styles, device, sheet,
-headless-UI, scrolling, forms, element and value branches together. Latest full run (round two, below): 77 of 81 buildable
-rungs pass on the iPhone simulator and 80 of 81 on the Android emulator. Rung 17 failed on both and is fixed and proven since;
-the 3 iOS failures are the system sheet (Y1 to Y3), fixed on #822, which is not merged yet. The table below is round one's.
+Branch `cw/native-integration` (PR #820) holds today's navigation, styles, device, sheet, headless-UI, scrolling, forms,
+element, value and styled-sheet branches together. **Final full run** (below): all 87 rungs that build pass on the iPhone
+simulator and on the Android emulator, with the hosts' own tests passing first on both; 2 rungs (11-async, y4) are refused
+by name and run on the web only. The table below is round one's; the rounds after it say what changed.
 
 | Area | Rungs | iOS | Android | What is missing |
 |---|---|---|---|---|
@@ -252,7 +252,7 @@ branch's Dragon side). Receipts: `receipts/2026-11-18-integration-round2-{ios,an
 | Failed | Phones | Why | Now |
 |---|---|---|---|
 | 17-into-view | iOS and Android | Only together. Neither host routed an element command (`scrollIntoView()`, `focus()`) to the scroll branch's Chrome-style alignment; they scrolled the least distance, so the target ended at the bottom. #821 proved rung 17 only on a local merge with #816 whose wiring was not pushed. | Fixed (`65f70b4a1`): `scrollIntoView()` aligns to the start, `focus()` brings the element into view unless `preventScroll`, a blocked submit's field scrolls as `focus()` does. Rerun of 16, 17, F1 to F7 and U11 to U14: all 13 pass on both phones (`receipts/2026-11-18-integration-round2-*-focus-scroll-13-rungs.json`). |
-| Y1, Y2, Y3 | iOS | The iOS system sheet does not present (fixed on #822, not merged yet). | Waits for #822. |
+| Y1, Y2, Y3 | iOS | The iOS system sheet does not present (fixed on #822). | Fixed: pass on both phones after #822's merge (round three). |
 
 All other rungs pass on both phones, the new ones included: 12 to 16 (scrolling), F1 to F7 (forms), R101 to R115 (elements)
 and R131 to R138 (values). Reference ladder and web ladder: pass (`vitest`, 453 files, 4,036 tests).
@@ -280,10 +280,133 @@ native-only module in the docs' compiler.
 | Style sizes S1 to S5 | as the harness wrote them (+102 B per page) | — | Dragon #593 adds the page's scroll range to every export. |
 | Proof screenshots | the branches' own | this run's 1,000+ changed images | As in round one: results are in the receipts. |
 
+## Round three (2026-11-18): styled sheet content (#822)
+
+Merged on the planner's directive before #822's CI was green: its two red checks are unit tests it does not touch
+(`first-write-sync`, known flaky, and the migration-defects fixture build timing out). Merge commit `7f2bef3ff`.
+
+**How.** #822 carries its own merge of navigation and app styles (#809), resolved differently from round one at the same
+seams. So for the files that conflicted, this branch's version stayed and only #822's own commits were applied on top
+(styled sheet content, sheet content inheriting from its markup ancestors, the hosts' tests before every proof run, the
+simulator runtime choice, two CI-Xcode compile fixes). Left out, each a second implementation of something this branch
+already has: an Android `DeviceLinkActivity` for device links (this branch routes one link scheme by host, proven by D1 and
+N4), and a `leave()` call on a replaced screen that this branch's view controller does not have. The first-write-sync
+quarantine entry in `docs/ci-process.md` is left out, as directed. #822's re-measured unit budget (CI run 44251003560, with
+its reason) came in with the merge.
+
+**Decisions (reversible).** A box with a fixed size is one property on Android (`MarklessBox.fixedSize`), shared by sheet
+content and scroll containers; the scroll branch's measuring (it skips hidden children) is kept. Android styling moves to
+#822's per-document `Layout` (the page, and each sheet at each resting height), and the page canvas, scroll containers, the
+page scroll range and hidden inputs now read the page's `Layout`. iOS restyles through `place` (which keeps scroll
+containers right), not only `paint`. A tap on the page dismisses the keyboard; a drag scrolls (#821's rule, over #822's
+tap-and-drag). Dragon: my Dragon branch (`compiled-run/dragoncss` `cw/native-integration`, pushed, no pull request) also merges dragoncss#594 (#822's Dragon side: boxless markup ancestors and a
+per-target viewport on the style input), ported onto #590's reversible id encoding, which round one kept over the
+`dragonElementIds` renaming; the export Markless uses keeps the light and dark bands. The Z3 and Z5 host-test fixtures are
+rebuilt from the harness's own build of those rungs with this Dragon (it adds the page canvas, which their committed copies
+lacked).
+
+**Results.** Y1 to Y3 and Z1 to Z6: all 9 pass on iOS and Android, after the hosts' own tests pass on both (the harness's
+pre-flight: the iOS package's tests with the UIKit ones on the simulator, and the Kotlin JVM conformance test). Receipts:
+`receipts/2026-11-18-integration-round3-{ios,android}-y1-y3-z1-z6.json` and `-y-z-verdict.txt`. Swift host 34 tests, Kotlin
+642 checks, `vitest` 630 files and 5,442 tests (mobile, compiler, serializer, bundler, website tooling), typecheck: pass.
+
+## The docs page's bytes over `main`, by module (705 B, now 685 B)
+
+G16 measures the docs page's whole download; the build's own size facts per module are Rolldown's chunk modules of the
+playground compile worker (built with the site's config), each minified alone, against `main` at `710c44d48`. Bytes are
+minified, before gzip (one module's gzip does not add up; the page figure is CI's).
+
+| Module | Minified bytes over `main` | What it is |
+|---|---|---|
+| `compiler/.../semantic-graph/index.ts` | +1,406 | Hook call sites: native facts for components, module functions and constants; device-target folding of `@if` arms and `{expr}` text, components a target never renders, web device edits; the option plumbing into the walk |
+| `compiler/.../semantic-graph/collect-markup.ts` | +1,287 | Native facts in the markup walk: each text slot's expression, static texts and attributes per chunk (kept as `null` on web), folded arms and texts |
+| `compiler/.../semantic-graph/collect-elements.ts` | +699 | Native facts per element: binding expressions, handler statements, element handles, a host's source position |
+| `compiler/.../semantic-graph/collect-components.ts` | +639 | Native facts per component edge: prop expressions, callback statements; the imported member path of `<ui.part>` tags |
+| `compiler/.../semantic-graph/collect-branches.ts` | +320 | `@if` and `@switch` arm tests as native trees |
+| `compiler/.../semantic-graph/collect-state.ts`, `collect-shared.ts` | +172, +170 | A computed's tree; a shared callback's statements and parameter names |
+| `compiler/.../semantic-graph/types.ts` | +144 | The walk state's native and device-target fields |
+| `compiler/.../semantic-graph/render-local-inline.ts`, `collect-repeat.ts`, `collect-expressions.ts` | +108, +92, +54 | Device objects kept by their component; a list's collection tree; a write to a device object is no state write |
+| `compiler/src/compile-module.ts`, `compile-cache.ts`, `bundler/src/transform.ts`, `hooks/transform-request.ts` | +91, +80, +74, +104 | Passing `nativeFacts`, `target` and `deviceTargetFacts` through, and keying the compile cache on them |
+| `website/.../worker-sources.ts`, `headless/components/package.json` | +118, +33 | The playground's `@markless/ui` sources: `base.camera` and the package's new `@markless/device` dependency |
+
+No native module is in the worker (the compile-worker test still passes). Of these bytes, the native-fact call sites run
+only for phone builds; the device-target folding and the option plumbing also serve web builds (a web build folds
+`platform` and drops device parts), so they are not phone-only. One piece was phone-only work that web compiles also did:
+#826 recorded every host element's source position on web too and then stripped it in `render-data`. Fixed here
+(`743b2d7c1`): the position is recorded only for native builds and `render-data` is `main`'s code again (−85 B in
+`render-data`, +25 B for the condition); web output is byte-identical to `main` for all 3,419 shared `.tsrx` files. CI's
+docs figure after it: 1,709,247 B gzip at load (G16 passes; anchor 1,709,376 B), 20 B less than before, so 685 B over `main`. What remains are call sites inside the shared analyzer; removing them needs the owner's
+choice between a `browser` export condition with no-op hooks and a separate native walk (above, unchanged).
+
+## Native facts fold out of the docs' in-browser compiler (2026-11-18, owner decision)
+
+Decision: one analysis, used everywhere; no separate native walk. The single walk still collects native facts, but every
+call of the native collectors in the shared analyzer goes through one module,
+`compiler/src/passes/semantic-graph/native-facts-flag.ts`, behind its constant `NATIVE_FACTS`: true wherever
+`__MARKLESS_NATIVE_FACTS__` is undefined (Node, tests, every bundler build), false where a build defines it, as
+`__MARKLESS_DEV_ENABLED__` already works for web builds. The website defines it false for the compile worker
+(`COMPILE_WORKER_DEFINE` in `website/tooling/code-client.ts`), so the minifier drops each guarded call site there. The walk
+holds the collectors as an opaque handle, so a call that skips the module does not typecheck. Native builds are unchanged:
+the flag is true there, and the native tests (5,442) pass.
+
+**Test.** `website/tooling/compile-worker-graph.test.ts` builds the compile worker as the site ships it (minified, with the
+site's swaps and define) and reads its source maps: the native-facts module accounts for 0 bytes of the shipped worker, and
+for more than 0 in the same build without the define (so the test can fail). Checked both ways: with one call site's guard
+removed (`collect-repeat.ts`), the module came back with 12 bytes and the test failed; restored, it passes.
+
+**Per module, against `main`** (`710c44d48`): minified bytes each source module accounts for in the shipped worker chunk,
+read from its source maps, so the figures add up to the chunk. 224 of the 240 modules are byte-for-byte the size they are on
+`main`; the worker is 3,587,044 B against 3,585,416 B, +1,628 B minified.
+
+| Module | Over `main` | What remains |
+|---|---|---|
+| `compiler/.../semantic-graph/index.ts` | +628 | Device-target folding (`@if` arms and `{expr}` texts decided by `platform`, components a target never renders, web device edits) and the option plumbing |
+| `compiler/.../semantic-graph/collect-markup.ts` | +311 | Device-target folding in the markup walk (folded arms and texts, absent components) |
+| `website/.../code/worker-sources.ts` | +128 | The playground's `@markless/ui` sources: `base.camera` |
+| `compiler/.../semantic-graph/types.ts` | +117 | The walk state's target fields |
+| `compiler/.../semantic-graph/render-local-inline.ts`, `collect-expressions.ts` | +80, +41 | Device objects belong to their component; a write to one is no state write |
+| `bundler/src/hooks/transform-request.ts`, `bundler/src/transform.ts`, `compiler/src/compile-cache.ts`, `compile-module.ts` | +76, +66, +68, +61 | Passing `target` and `deviceTargetFacts` through, and keying the compile cache on them |
+| `compiler/.../semantic-graph/collect-components.ts` | +48 | The imported member path of `<ui.part>` tags (web builds use it) |
+| five more | +2, +2, +1, +1, -2 | Minifier naming |
+
+What is native-only and still there, named rather than rounded to zero: a `nativeFacts: null` field in three state objects,
+the compile cache's flag for it, a `false` argument at the seven places a markup chunk is created, and a small helper that
+writes a static attribute (it also records the attribute for native builds, folded here). Their bytes are part of the
+`index.ts`, `types.ts`, `collect-markup.ts` and `compile-cache.ts` rows above; I did not measure them on their own. `collect-elements.ts`, `collect-branches.ts`, `collect-repeat.ts`, `collect-state.ts` and `collect-shared.ts` now
+measure as on `main`.
+
+**CI** (`db0e62d53`): docs `/` downloads 1,708,624 B gzip at load, **62 B over `main`** (1,708,562 B), down from 685 B; G16
+passes against its anchor (1,709,376 B) and no record was raised. The anchor still holds the two records the native
+branches accepted earlier (`cw-native-targets.json` +584 B, `cw-device-slice.json` +230 B on the docs pages); without them
+the limit is `main` + 48 B, so docs `/` would fail by 14 B. Those 62 B are what web builds use (device-target folding,
+option passing, `base.camera`). Web output: byte-identical to `main` for all 3,418 shared `.tsrx` files that compile (one
+fails to parse identically on both), hashed over the render module, payload scripts, protocol payloads, render plan, symbol
+modules and symbol resolver module.
+
+## Final full run (2026-11-18)
+
+One harness run over every rung that builds, on the final tree (`db0e62d53` plus this report): 87 rungs, iOS
+(`markless-integ`, iPhone 17, iOS 27.2) and Android (`markless_integ`, API 36, port 5598), Dragon from
+`compiled-run/dragoncss` `cw/native-integration` (`3312b9e420`). The hosts' own tests ran first and passed on both.
+
+| | Rungs | iOS | Android |
+|---|---|---|---|
+| Built for the phones | 87 | 87 pass | 87 pass |
+| Refused by name (web only) | 2: `11-async`, `y4-sheet-beside-drawer` | refused | refused |
+| Failures | | 0 | 0 |
+
+By group (each on both phones): one-screen basics 01 to 10 (14), scrolling 12 to 17 (6), device D1 to D7, D4b and P1 (9),
+forms F1 to F7 (7), elements R101 to R115 (15), values R131 to R138 (8), headless UI U1 to U6 and U11 to U14 (10), system
+sheet Y1 to Y3 (3), navigation N1 to N4 (4), styled apps S1 to S5 (5), styled sheets Z1 to Z6 (6). Receipts:
+`receipts/2026-11-18-integration-final-{ios,android}-87-rungs.json` and `-final-verdict.txt`.
+
 ## 7. Contact sheet
 
-`docs/goals/native-targets-api/contact-sheet/index.html`: every rung at its launch screen, web (Chromium at 402×778, 3×) beside
-iOS and Android, with the visible differences listed at the top.
+`docs/goals/native-targets-api/contact-sheet/index.html`, regenerated from the final run: every rung at its launch screen,
+web (Chromium at 402×778, 3×, built as the web ladder builds it) beside iOS and Android, with the visible differences listed
+at the top. New findings there: the harness does not reset the phone's appearance for a rung that does not set it (this
+run's unstyled iOS screens are dark, left so by the run before), and an unstyled native page follows the system's dark
+mode while the web's does not; unstyled phone pages now have the browser's heading sizes and emphasis but no block margins.
 
 
 ## Conflicts
@@ -335,13 +458,9 @@ UI rows. Every resolution below is in a merge commit on `cw/native-integration`;
 
 - `cw/native-handlers` (#807): 19 conflicting files (`native-view.ts`, `expression-tree.ts`, `artifacts.ts`, both hosts'
   runtimes and payload decoders, the harness). Study branch; not merged.
-- `cw/sheet-styled-content` (#822): not merged; its CI is red (see round two). Y1 to Y3 on iOS wait for it.
-- `cw/ui-overlay` (#819): not merged, although its CI is green. It branched before #816 and implements the same things
-  differently: it calls any named helper as `call` and inlines it, where #816 (on this branch) has `apply` plus the collected
-  module functions that #825 extends; it whitelists `METHODS`, where #816 lowers method calls as `invoke`. Its element values,
-  `contains`, `activeElement`, `instanceof`, pointer events and the overlay stack would have to be rebuilt on #816's shapes
-  across the analyzer, three runtimes and both hosts (about 130 conflicting hunks), which is a port, not a merge.
-  **Overlay owner:** rebase `cw/ui-overlay` onto `cw/native-integration` (or #816). Also, its size record
-  (`scripts/benchmarks/anchor-changes/cw-ui-overlay.json`) accepts +611 B on the docs pages for the compile worker; with
-  the native entry, that growth should not be needed, so that entry should go when it is rebased (its web runtime
-  entries, +144 B for the overlay install fix, are a real web change).
+- `cw/ui-overlay` (#819): not merged here. It branched before #816 and implements the same things differently (a named
+  helper as an inlined `call` where #816 has `apply` plus collected module functions; a `METHODS` list where #816 lowers
+  method calls as `invoke`), about 130 conflicting hunks: a port, not a merge. It is being ported onto this branch by a
+  separate worker (overlay-port). Its size record (`scripts/benchmarks/anchor-changes/cw-ui-overlay.json`) accepts +611 B on
+  the docs pages for the compile worker; with the native entry that entry should not be needed (its web runtime entries,
+  +144 B for the overlay install fix, are a real web change).

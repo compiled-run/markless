@@ -37,6 +37,7 @@ import {
 	staticProjectionChildren,
 	sharedSeedConsumeLine,
 	sharedInstanceValuesConsumeLine,
+	sharedInstanceValuesOpenLine,
 	sharedSeedMarkerLine,
 	adoptedWidgetDefinitionIds,
 	sharedSeedPassLines,
@@ -81,6 +82,7 @@ import {
 	objectPropertyName,
 	ssrComposedPayloadView,
 	projectsElementsIntoRows,
+	rendersTryInRows,
 	spreadsAttributes,
 } from './shared.ts';
 import { ssrComposeStateExpression } from './prop-cell-seed.ts';
@@ -336,6 +338,7 @@ export function emitPublicSsrRenderModule(
 			'marklessSsrRenderStateValues',
 			'marklessSsrPayloadState',
 		),
+		sharedInstanceValuesOpenLine(input, rootInfo.componentName),
 		...rootDataLines.carriedSeed,
 		...renderBodyLines(
 			input,
@@ -905,7 +908,7 @@ function emitSsrDataLines(
 		.filter((boundary) => boundaryIds.has(boundary.boundaryId))
 		.flatMap((boundary) => {
 			const runner = asyncRunners.get(boundary.boundaryId);
-			if (!runner) return [`case ${JSON.stringify(boundary.boundaryId)}:return {arm:marklessSsrAsyncArm()};`];
+			if (!runner) return [`case ${JSON.stringify(boundary.boundaryId)}:return {arm:${boundary.initiallyServedArm}};`];
 			const extra = collectSsrAsyncRunnerDefinitions(input).size > 0
 				? ',marklessSsrAsyncRunnerDefinitions,marklessSsrAsyncRuns'
 				: '';
@@ -1527,7 +1530,7 @@ function emitSsrDataLines(
 		// its own template, and their seed pass reads this context, not the values map.
 		`const marklessSsrRendered=await renderSsrData({renderData:{...marklessRenderData,root:{componentName:${JSON.stringify(componentName)},templateId:${JSON.stringify(`template:${componentName}`)}}},idPrefix:marklessSsrIdPrefix,${
 			childCases.length > 0 ? 'sharedSeeds:marklessSsrRenderContext?.sharedSeeds,' : ''
-		}${projectsElementsIntoRows(chunks) ? 'projectionSegment:marklessRowProjectionSegment,' : ''}${spreadsAttributes(input.renderData.chunks) ? 'attributeName:marklessAttributeName,' : ''}read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.branchSiteId){${branchCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},${
+		}${projectsElementsIntoRows(chunks) ? 'projectionSegment:marklessRowProjectionSegment,' : ''}${rendersTryInRows(chunks) ? 'rowSegment:marklessSsrRowSegment,' : ''}${spreadsAttributes(input.renderData.chunks) ? 'attributeName:marklessAttributeName,' : ''}read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.branchSiteId){${branchCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},${
 			repeatCases.length > 0
 				? `repeatItems:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.repeatId){${repeatCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_REPEAT_MISSING: '+marklessSsrDataSlot.repeatId);}},`
 				: ''
