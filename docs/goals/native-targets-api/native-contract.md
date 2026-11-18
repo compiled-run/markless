@@ -2,14 +2,16 @@
 
 Branch `cw/system-sheet` (base `cw/native-targets`; the branch keeps its first working name). Owner direction, 2026-11-17: "The consumer should be able to choose
 between their own level of control or native." This file is the contract for the second choice. Status: working name,
-draft. Name: the planner's ruling from the naming test (`cw/device-api-ab`, `naming/report.md`): `import { native } from '@markless/ui'`, 12 of 12 readers read it correctly; the owner may still overrule it.
+draft. Name and home, the owner's decision (2026-11-18): `import { native } from '@markless/device'`, with `<native.camera>`
+to follow; the name `native` is the naming test's (`cw/device-api-ab`, `naming/report.md`). Stacked on `cw/device-slice`,
+which adds `@markless/device`.
 
 ## The two choices
 
 | You want | Write | Who draws the frame | Same on every platform? |
 |---|---|---|---|
 | Your own control: your frame, your motion, your look | `modal`, `drawer` from `@markless/ui`, or a plain `<dialog>` | You (the headless family's markup and your CSS) | Yes |
-| The platform's own sheet | `<native.sheet>` from `@markless/ui` | The platform: iOS `UISheetPresentationController`, Android Material `BottomSheetDialog`, web a modal panel on the page's overlay layer | No: each platform's real sheet |
+| The platform's own sheet | `<native.sheet>` from `@markless/device` | The platform: iOS `UISheetPresentationController`, Android Material `BottomSheetDialog`, web a modal panel on the page's overlay layer | No: each platform's real sheet |
 
 One sentence for an author: **use `drawer` when the sheet must look and move the way your design says on every platform;
 use `native.sheet` when it should be the sheet people already know on their phone, with the platform's drag, heights,
@@ -19,7 +21,7 @@ dimming, keyboard and back behaviour, and you style only what is inside it.**
 
 ```tsrx
 import { state } from '@markless/core';
-import { native } from '@markless/ui';
+import { native } from '@markless/device';
 
 export default function Checkout() @{
 	let picking = state(false);
@@ -96,15 +98,35 @@ height (with `fitToContents` off); an iOS custom detent below full has no Androi
 
 ## Where it is imported from, and the name
 
-`@markless/ui`, as the namespace `native` beside the headless families (`packages/headless/components/src/native/`).
-Readers in the naming test took a package of its own to also hold device calls. The name lives in one place for the
-compiler, `PLATFORM_PIECES_PACKAGE` and `PLATFORM_PIECES_NAMESPACE` in `@markless/serializer/native-view`; changing it is
-those two constants and the one `export * as native` line in `@markless/ui`'s `src/index.ts`. The compiler recognises the
-element from the analyzer's component edge (`importSource`, `importedName`) and the module's import of it, so
-`import { native as platformUi }` works too. Two things to know: `packages/headless/components/SPEC.md` lists the
-established part names, and `sheet` under a `native` namespace is a planner ruling, not an established role; and spec
-`11-platform-organization.md` keeps `native` off package and import names, which this is not (it is an export inside
-`@markless/ui`), but a reader of that spec may trip on it.
+`@markless/device`, as the namespace `native` (`packages/device/src/native/`), beside the device calls: the owner's rule
+is that a page pays for the sheet only if it renders it, and it is not a headless `@markless/ui` family. The name lives in
+one place for the compiler, `PLATFORM_PIECES_PACKAGE` (which is `DEVICE_MODULE`) and `PLATFORM_PIECES_NAMESPACE` in
+`@markless/serializer/native-view`; the package exports it with one `export * as native` line. The compiler recognises the
+element from the analyzer's component edge (`importSource`, `importedName`, `importedMemberPath`), so `import { native as
+platformUi }` works too. Spec `11-platform-organization.md` keeps `native` off package and import names; this is an export
+inside a package, which a reader of that spec may still trip on.
+
+## What a page pays (measured, local production builds, gzip of the JS a page downloads at load)
+
+| Page | Files | Bytes |
+|---|---|---|
+| Imports `{ location }` from `@markless/device` (the `d3-location` rung), with `native` exported | 1 | 2,215 |
+| The same page, `native` not exported | 1 | 2,215 |
+| A page that renders `<native.sheet>` (a button and the sheet) | 5 | 42,575 |
+| The same page with a plain `<div hidden>` toggled instead of the sheet | 6 | 18,598 |
+
+No client file of the location page names the sheet. A page that renders the sheet pays about 24 KB more than a plain
+toggle: its module's overlay mark asks for the full resume tier at load (the compiler's runtime demand map).
+
+**Why the first version made every importer pay.** Not the barrel by itself (a `drawer` page built from the same
+`@markless/ui` barrel was byte-identical with and without the family) but `onIdle`: with the same module and the same
+barrel, removing only `onIdle` removed the cost (docs `/concepts/state`: 124 files and 2,759,153 B with it, 119 and
+2,728,165 B without it or without the family). `onIdle` installs a page-wide hook (`globalThis.__mIdle`), and a
+client-rendered mount calls that hook's wake whether or not it holds an idle record; once installed, every client-rendered
+mount on the page started its runtime at idle. The five extra files were the idle runtime and four resume-runtime chunks,
+and the sheet's own code was not in that page's client output at all. The same wake started the slider's never-pressed
+mount in the screen-reader lane, where a latent resume error surfaced. Traced: the idle chunk is imported by runtime
+chunks the page preloads; not traced: which module made the install call on that page.
 
 ## Questions this contract does not settle (each one platform only, or not both)
 
@@ -125,17 +147,14 @@ established part names, and `sheet` under a `native` namespace is a planner ruli
 
 A modal `<dialog>` opens only through `showModal()`, a call. Markless runs calls on an element only from an `attach`
 behaviour, and on a server-rendered page a behaviour starts only after an event on or inside its element, `onVisible` or
-`onIdle`. The first version used `onIdle`; because `@markless/ui`'s barrel links every family into a page that imports
-it, that cost every such page about 31 KB gzip of runtime at load (docs `/concepts/state`: 124 files and 2,759,153 B
-against 119 and 2,728,165 B without it, local builds; perf-guards G16 on CI) and woke unrelated mounts (the slider's
-screen-reader lane). The web sheet therefore uses the mechanism `modal` and `drawer` open from state with: a `<div
+`onIdle`. The first version used `onIdle`, which made pages that never render the sheet pay (below). The web sheet therefore uses the mechanism `modal` and `drawer` open from state with: a `<div
 overlay>` backdrop whose `hidden` follows `open`, holding a `role="dialog"` `aria-modal` panel styled like the browser's
 dialog. Measured load cost on the same page: 119 files, 2,728,147 B (none).
 
 ## Rungs (2026-11-17)
 
 **Web stopped (Y1, Y4).** A page that opens `<native.sheet>` from its own state does not start the overlay runtime the
-sheet's module needs: the overlay mark is in the linked `@markless/ui` module's demand map, the page's click runs on its
+sheet's module needs: the overlay mark is in the linked `@markless/device` module's demand map, the page's click runs on its
 lean path, so the overlay never enlists. The sheet opens and closes from state (Y2, Y3 pass), but Escape and a press
 outside never report `dismiss` and the page behind is not made inert. `modal` and `drawer` do not hit this because their
 own trigger part opens them. The rungs carry `webStopped` and their web check runs as an expected failure that turns red
@@ -235,11 +254,16 @@ HTML (`<input type="date">` shows the native picker on phones).
 ## Found on the way
 
 - **Fixed here, `@markless/web`:** a client-rendered `attach` whose input reads state ran once with `undefined` and never
-  again (`attach-state-input.test.ts`); a page-wide `onIdle` hook started every client mount at idle, including mounts with
-  no idle record (`on-idle-many.test.ts`).
+  again (`attach-state-input.test.ts`).
+- **Not fixed (reverted from this PR, it needed a new runtime module):** a page-wide `onIdle` hook starts every
+  client-rendered mount at idle, including mounts with no idle record (above). The fix (wake only a mount holding an idle
+  record) was 6ed81993c; it moved a 334 B helper into its own module, which the size guards count as new.
 - An `attach` factory argument written as an expression (`presentDialog(open === true)`) reaches the behaviour as
-  `undefined` on a server-rendered page, with no build error. Not fixed.
+  `undefined` on a server-rendered page, with no build error.
 - A child component may not render live `{children}` inside an `@if` it controls (`MARKLESS_PROJECTION_LIVE_IN_BRANCH`).
+- The web test `packages/vitest-browser/browser/native-sheet/` passes Escape as a dismissal (server-rendered and
+  client-rendered); the production router build (rungs Y1, Y4) does not. The gap is in how a router page's lean press
+  path demands the linked overlay runtime.
 
 ## Proposal (owner): a behaviour starts when its inputs change
 

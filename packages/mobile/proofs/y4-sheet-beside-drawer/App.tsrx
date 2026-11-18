@@ -1,5 +1,6 @@
 import { state } from '@markless/core';
-import { drawer, native } from '@markless/ui';
+import { native } from '@markless/device';
+import { drawer } from '@markless/ui';
 
 export default function App() @{
 	let ownOpen = state(false);

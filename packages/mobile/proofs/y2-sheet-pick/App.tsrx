@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import { native } from '@markless/ui';
+import { native } from '@markless/device';
 
 export default function App() @{
 	let picking = state(false);

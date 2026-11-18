@@ -1,0 +1,52 @@
+{
+	"rung": "D3",
+	"name": "A one-time device ask in an async computed: pending, value, refused",
+	"location": {
+		"latitude": 51.5,
+		"longitude": -0.125
+	},
+	"permissions": {
+		"location": "unset"
+	},
+	"steps": [
+		{
+			"prompt": "location",
+			"visible": ["Location", "Access unknown", "Locating"],
+			"absent": ["51.5, -0.125", "NotAllowedError"]
+		},
+		{
+			"do": {
+				"answer": "allow"
+			},
+			"visible": ["Access granted", "51.5, -0.125"],
+			"absent": ["Locating", "Access unknown", "NotAllowedError"]
+		},
+		{
+			"do": {
+				"relaunch": true,
+				"permissions": {
+					"location": "unset"
+				}
+			},
+			"prompt": "location",
+			"visible": ["Access unknown", "Locating"],
+			"absent": ["51.5, -0.125", "Access granted", "NotAllowedError"]
+		},
+		{
+			"do": {
+				"answer": "deny"
+			},
+			"visible": ["NotAllowedError"],
+			"absent": ["Locating", "Access unknown", "Access granted", "51.5, -0.125"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Location", "Location is not available here"],
+				"absent": ["Locating", "Access unknown"]
+			}
+		],
+		"absentFromOutput": ["Locating", "geolocation", "@markless/device"]
+	}
+}

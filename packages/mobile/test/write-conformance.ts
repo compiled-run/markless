@@ -8,7 +8,8 @@ for (const entry of CONFORMANCE_CASES) {
 	const source = readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8');
 	const { payload, diagnostics } = await compileNativeComponent({
 		filename: `src/${entry.name}.tsrx`,
-				...(entry.page ? { page: entry.page } : {}),
+		...(entry.page ? { page: entry.page } : {}),
+		...(entry.device ? { device: entry.device } : {}),
 		source,
 	});
 	if (!payload)

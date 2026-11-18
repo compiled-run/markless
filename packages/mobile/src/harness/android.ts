@@ -1,10 +1,16 @@
 import { spawn } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { androidLibraries } from './android-libraries.ts';
 import { exec } from './exec.ts';
-import { ANDROID_SHELL_ACTIVITY, PROOF_APP_ID, PROOF_APP_NAME } from './proof-app.ts';
+import {
+	ANDROID_SHELL_ACTIVITY,
+	PROOF_APP_ID,
+	PROOF_APP_NAME,
+	PROOF_LINK_SCHEME,
+} from './proof-app.ts';
+import type { DeviceManifest } from '../permissions.ts';
 import type { ProofAssets } from './rung.ts';
 import { type AndroidTools, cacheRoot, contentKey, filesUnder } from './tools.ts';
 
@@ -110,7 +116,14 @@ export async function stopEmulator(tools: AndroidTools, emulator: BootedEmulator
 }
 
 /** The shell built once per source set: its dex files and the linked resources (the libraries' with the manifest) every rung's APK starts from. */
-export type AndroidShell = { readonly dex: ReadonlyArray<string>; readonly resources: string };
+export type AndroidShell = {
+	readonly dex: ReadonlyArray<string>;
+	/** The libraries' compiled resources and their R packages, linked again per rung with that rung's manifest. */
+	readonly libraryResources: ReadonlyArray<string>;
+	readonly rPackages: ReadonlyArray<string>;
+	/** The resource ids the shell's R classes were compiled against; every rung's link keeps them. */
+	readonly ids: string;
+};
 
 /** Links the libraries' resources, compiles their R classes and the host's Kotlin sources with the shell activity, and dexes it all. */
 export async function buildAndroidShell(
@@ -125,19 +138,25 @@ export async function buildAndroidShell(
 		tools.androidJar,
 		tools.kotlinStdlib,
 		libraries.key,
-		manifest(),
+		androidManifest([]),
 	]);
 	const root = join(cacheRoot(), 'android-shell', key);
 	const dexDir = join(root, 'dex');
 	const resources = join(root, 'resources.apk');
-	if (existsSync(join(root, 'done')))
-		return { dex: filesUnder(dexDir, '.dex'), resources };
+	const ids = join(root, 'resource-ids.txt');
+	const shell = () => ({
+		dex: filesUnder(dexDir, '.dex'),
+		libraryResources: libraries.resources,
+		rPackages: libraries.rPackages,
+		ids,
+	});
+	if (existsSync(join(root, 'done'))) return shell();
 
 	rmSync(root, { recursive: true, force: true });
 	const classes = join(root, 'classes');
 	const generated = join(root, 'r-java');
 	mkdirSync(dexDir, { recursive: true });
-	writeFileSync(join(root, 'AndroidManifest.xml'), manifest());
+	writeFileSync(join(root, 'AndroidManifest.xml'), androidManifest([]));
 	await exec(join(tools.buildTools, 'aapt2'), [
 		'link',
 		'-o',
@@ -152,6 +171,8 @@ export async function buildAndroidShell(
 		libraries.rPackages.join(':'),
 		'--java',
 		generated,
+		'--emit-ids',
+		ids,
 	]);
 	await exec('javac', [
 		'--release',
@@ -175,17 +196,26 @@ export async function buildAndroidShell(
 		...libraries.jars,
 	]);
 	writeFileSync(join(root, 'done'), '');
-	return { dex: filesUnder(dexDir, '.dex'), resources };
+	return shell();
 }
 
-const manifest = () => `<?xml version="1.0" encoding="utf-8"?>
+const androidManifest = (
+	permissions: ReadonlyArray<string>,
+) => `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="${PROOF_APP_ID}" android:versionCode="1" android:versionName="1.0">
 	<uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
+${permissions.map((name) => `\t<uses-permission android:name="${name}" />\n`).join('')}
 	<application android:label="${PROOF_APP_NAME}" android:hasCode="true">
-		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:launchMode="singleTask" android:theme="@android:style/Theme.Material.Light.NoActionBar">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+				<data android:scheme="${PROOF_LINK_SCHEME}" />
 			</intent-filter>
 		</activity>
 	</application>
@@ -223,6 +253,7 @@ export async function packProofApk(
 	tools: AndroidTools,
 	shell: AndroidShell,
 	assets: ProofAssets,
+	manifest: DeviceManifest,
 	workDir: string,
 ): Promise<string> {
 	const assetDir = join(workDir, 'assets');
@@ -232,11 +263,27 @@ export async function packProofApk(
 		mkdirSync(join(assetDir, path, '..'), { recursive: true });
 		writeFileSync(join(assetDir, path), bytes);
 	}
+	writeFileSync(join(workDir, 'AndroidManifest.xml'), androidManifest(manifest.android));
 	const unsigned = join(workDir, 'unsigned.apk');
 	const aligned = join(workDir, 'aligned.apk');
 	const apk = join(workDir, `${PROOF_APP_NAME}.apk`);
-	copyFileSync(shell.resources, unsigned);
-	await exec('zip', ['-q', '-r', '-0', unsigned, 'assets'], { cwd: workDir });
+	await exec(join(tools.buildTools, 'aapt2'), [
+		'link',
+		'-o',
+		unsigned,
+		'-I',
+		tools.androidJar,
+		'--manifest',
+		join(workDir, 'AndroidManifest.xml'),
+		'--auto-add-overlay',
+		...shell.libraryResources.flatMap((archive) => ['-R', archive]),
+		'--extra-packages',
+		shell.rPackages.join(':'),
+		'--stable-ids',
+		shell.ids,
+		'-A',
+		assetDir,
+	]);
 	await exec('zip', ['-q', '-j', unsigned, ...shell.dex]);
 	await exec(join(tools.buildTools, 'zipalign'), ['-f', '4', unsigned, aligned]);
 	await exec(join(tools.buildTools, 'apksigner'), [
@@ -258,9 +305,10 @@ export async function installProofApk(
 	emulator: BootedEmulator,
 	shell: AndroidShell,
 	assets: ProofAssets,
+	manifest: DeviceManifest,
 	workDir: string,
 ) {
-	const apk = await packProofApk(tools, shell, assets, workDir);
+	const apk = await packProofApk(tools, shell, assets, manifest, workDir);
 	await exec(tools.adb, ['-s', emulator.serial, 'uninstall', PROOF_APP_ID], {
 		allowFailure: true,
 	});

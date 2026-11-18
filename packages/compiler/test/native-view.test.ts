@@ -435,7 +435,7 @@ export function Toggle() @{
 
 	it('lowers <native.sheet> to a sheet node whose content is the markup between its tags, under any import name', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
-import { native as platformUi } from '@markless/ui';
+import { native as platformUi } from '@markless/device';
 export function Picker() @{
 	let choosing = state(false);
 	let fruit = state('none');
@@ -468,7 +468,7 @@ export function Picker() @{
 		const refusal = async (props: string) =>
 			(
 				await nativeView(`import { state } from '@markless/core';
-import { native } from '@markless/ui';
+import { native } from '@markless/device';
 export function App() @{
 	let open = state(false);
 	<main>

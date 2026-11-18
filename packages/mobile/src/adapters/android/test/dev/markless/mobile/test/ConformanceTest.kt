@@ -66,10 +66,33 @@ private fun runVector(file: File) {
 	val sheets = runtime.sheets().joinToString(",", "[", "]") { (n, open) -> "[${jsonString(n)},$open]" }
 	val initialSheets = vector["initialSheets"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialSheets", sheets == initialSheets) { "expected $initialSheets\n  actual   $sheets" }
+	val tasks = runtime.tasks().joinToString(",", "[", "]") { it.toJson() }
+	val initialTasks = vector["tasks"]?.let(::canonical) ?: "[]"
+	check("${file.name} tasks", tasks == initialTasks) { "expected $initialTasks\n  actual   $tasks" }
 	for ((n, step) in field(vector, "steps", file.name).arr("steps").withIndex()) {
 		val s = step.obj("steps[$n]")
 		val action = field(s, "action", "steps[$n]").obj("action")
 		val event = field(action, "event", "action").str("event")
+		if (event == "resume") {
+			val journal = runtime.resume(field(action, "continuation", "action").str("action.continuation"), JsValue.fromJson(field(action, "value", "action")))
+			val expected = canonical(field(s, "journal", "steps[$n]"))
+			val actual = journal.joinToString(",", "[", "]") { it.toJson() }
+			check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
+			continue
+		}
+		if (event == "device" || event == "settle") {
+			val cell = field(action, "cell", "action").str("action.cell")
+			val error = action["error"]?.obj("action.error")
+			val journal = when {
+				event == "device" -> runtime.device(cell, JsValue.fromJson(field(action, "value", "action")))
+				error != null -> runtime.settleError(cell, field(error, "name", "error").str("name"), field(error, "message", "error").str("message"))
+				else -> runtime.settle(cell, JsValue.fromJson(field(action, "value", "action")))
+			}
+			val expected = canonical(field(s, "journal", "steps[$n]"))
+			val actual = journal.joinToString(",", "[", "]") { it.toJson() }
+			check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
+			continue
+		}
 		val name = EventName.entries.firstOrNull { it.wire == event } ?: throw IllegalStateException("steps[$n] has unknown event $event")
 		val value = action["value"]?.str("action.value")
 		val actual = runtime.dispatch(field(action, "host", "action").str("host"), name, value).joinToString(",", "[", "]") { it.toJson() }

@@ -245,7 +245,6 @@ private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) 
 	let swapped = Dictionary(uniqueKeysWithValues: zip(fonts.keys, fonts.values.reversed()))
 	#expect(throws: HostError.self) { try MarklessViewController(payload: counterPayload(), style: style, fonts: swapped) }
 }
-#endif
 
 @MainActor @Test func aSystemSheetKeepsItsContentOffThePageAndPresentsAPageSheet() throws {
 	let controller = try MarklessViewController(payload: vectorPayload("sheet"), store: MemoryStore())
@@ -300,3 +299,4 @@ private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) 
 	controller.viewDidAppear(false)
 	guard case .shown = sheet.state else { Issue.record("the sheet did not present when its page appeared"); return }
 }
+#endif

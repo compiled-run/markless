@@ -101,6 +101,9 @@ type CollectionContext = {
 	restName: string | null;
 	readonly nestedLocalSource: ((expression: AnyNode) => string | null) | null;
 	readonly nativeFacts: NativeFactCollectors | null;
+	/** `@if` chains the build's target constants decide: the kept arm is emitted in place, the others not at all. */
+	readonly foldedIfs: ReadonlyMap<AnyNode, number | null>;
+	readonly foldedTexts: ReadonlyMap<AnyNode, string>;
 };
 
 type ChunkBuilder = {
@@ -136,6 +139,10 @@ export function collectSemanticMarkup(input: {
 	readonly hostIds: WeakMap<object, string>;
 	readonly nestedLocalSource?: (expression: AnyNode) => string | null;
 	readonly nativeFacts?: NativeFactCollectors | null;
+	readonly foldedIfs?: ReadonlyMap<AnyNode, number | null>;
+	readonly foldedTexts?: ReadonlyMap<AnyNode, string>;
+	/** Components the build's target never renders (named only by removed arms): not collected. */
+	readonly absentComponents?: ReadonlySet<string>;
 }): SemanticMarkupArtifact {
 	const chunks: SemanticMarkupChunk[] = [];
 	const context: CollectionContext = {
@@ -153,6 +160,8 @@ export function collectSemanticMarkup(input: {
 		restName: null,
 		nestedLocalSource: input.nestedLocalSource ?? null,
 		nativeFacts: input.nativeFacts ?? null,
+		foldedIfs: input.foldedIfs ?? new Map(),
+		foldedTexts: input.foldedTexts ?? new Map(),
 	};
 	const components: Array<{
 		readonly name: string;
@@ -165,7 +174,7 @@ export function collectSemanticMarkup(input: {
 
 	for (const statement of asNodes(input.ast.body)) {
 		const component = getComponentFunction(statement);
-		if (!component) continue;
+		if (!component || input.absentComponents?.has(component.name)) continue;
 		const root = componentMarkupRoot(component.node);
 		if (!root) continue;
 		components.push({
@@ -339,7 +348,7 @@ function emitNode(
 		return 1;
 	}
 
-	const literal = literalContainerText(node);
+	const literal = context.foldedTexts.get(node) ?? literalContainerText(node);
 	if (literal !== null) {
 		if (!literal) return 0;
 		append(builder, escapeHtml(literal));
@@ -358,6 +367,17 @@ function emitNode(
 		return emitNodes(asNodes(node.children), path, builder, context, repeat);
 	}
 
+	const folded = node.type === 'JSXIfExpression' ? context.foldedIfs.get(node) : undefined;
+	if (folded !== undefined)
+		return folded === null
+			? 0
+			: emitNodes(
+					armStatements(ifChainOf(node).arms[folded]),
+					path,
+					builder,
+					context,
+					repeat,
+				);
 	if (node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression') {
 		const branchSiteId = `branch-site:${context.branchIndex++}`;
 		const armTemplateIds = branchArms(node).map((arm, armIndex) => {

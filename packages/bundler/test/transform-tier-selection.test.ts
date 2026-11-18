@@ -26,6 +26,7 @@ vi.mock('@markless/compiler', async (importOriginal) => {
 	// tier selection is still judged by the same predicates.
 	const actual = await importOriginal<typeof import('@markless/compiler')>();
 	return {
+		DEVICE_TARGET_FACTS: actual.DEVICE_TARGET_FACTS,
 		artifactChildCandidates: actual.artifactChildCandidates,
 		componentEdgeSymbolRoutes: actual.componentEdgeSymbolRoutes,
 		importedRowSlotReaders: actual.importedRowSlotReaders,

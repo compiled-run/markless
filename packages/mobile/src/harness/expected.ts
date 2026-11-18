@@ -22,10 +22,12 @@ export function readProofExpected(json: unknown, source: string): LadderRung {
 			return fail(`step ${index} is not an object`);
 		const fields = step as Record<string, unknown>;
 		if (!isStringList(fields.visible)) fail(`step ${index} has no "visible" text list`);
-		for (const key of ['absent', 'disabled', 'order'] as const) {
+		for (const key of ['absent', 'disabled', 'order', 'calls'] as const) {
 			if (fields[key] !== undefined && !isStringList(fields[key]))
 				fail(`step ${index} "${key}" is not a text list`);
 		}
+		if (fields.prompt !== undefined && fields.prompt !== 'location' && fields.prompt !== 'camera')
+			fail(`step ${index} "prompt" names no known permission`);
 		if (index === 0 && fields.do !== undefined) fail('step 0 is the launch and takes no "do"');
 		if (index > 0 && (typeof fields.do !== 'object' || fields.do === null))
 			fail(`step ${index} has no "do" action`);

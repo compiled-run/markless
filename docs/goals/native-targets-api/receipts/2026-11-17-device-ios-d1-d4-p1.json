@@ -1,0 +1,36 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "d1-network",
+			"failure": null,
+			"installSeconds": 16.244433292,
+			"flowSeconds": 36.10816425
+		},
+		{
+			"name": "d2-haptics",
+			"failure": null,
+			"installSeconds": 0.24708433300000615,
+			"flowSeconds": 15.937061333000004
+		},
+		{
+			"name": "d3-location",
+			"failure": null,
+			"installSeconds": 0.25289845799999605,
+			"flowSeconds": 24.687216334
+		},
+		{
+			"name": "d4-camera",
+			"failure": null,
+			"installSeconds": 0.2394303340000042,
+			"flowSeconds": 22.537838458
+		},
+		{
+			"name": "p1-platform",
+			"failure": null,
+			"installSeconds": 0.2277990839999984,
+			"flowSeconds": 11.107515333000004
+		}
+	]
+}

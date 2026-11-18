@@ -46,7 +46,6 @@
 		"./menu": "./src/menu/index.ts",
 		"./menubar": "./src/menubar/index.ts",
 		"./modal": "./src/modal/index.ts",
-		"./native": "./src/native/index.ts",
 		"./otp": "./src/otp/index.ts",
 		"./pad": "./src/pad/index.ts",
 		"./navbar": "./src/navbar/index.ts",
@@ -99,7 +98,6 @@
 			"./menu": "./src/menu/index.ts",
 			"./menubar": "./src/menubar/index.ts",
 			"./modal": "./src/modal/index.ts",
-			"./native": "./src/native/index.ts",
 			"./otp": "./src/otp/index.ts",
 			"./pad": "./src/pad/index.ts",
 			"./navbar": "./src/navbar/index.ts",
@@ -138,11 +136,11 @@
 	},
 	"dependencies": {
 		"@markless/core": "workspace:*",
+		"@markless/device": "workspace:*",
 		"@markless/icons": "workspace:*",
 		"@markless/ui-tools": "workspace:*"
 	},
 	"devDependencies": {
-		"@markless/serializer": "workspace:*",
 		"@markless/vitest-browser": "workspace:*",
 		"axe-core": "4.13.0",
 		"@tsrx/yuku": "0.8.0",

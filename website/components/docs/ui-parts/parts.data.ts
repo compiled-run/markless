@@ -70,6 +70,16 @@ export const parts: Readonly<Record<string, readonly PartFacts[]>> = {
 			]
 		},
 		{
+			"part": "camera",
+			"role": "",
+			"element": "div",
+			"ariaRole": "",
+			"hidden": false,
+			"hooks": [
+				"ui-camera"
+			]
+		},
+		{
 			"part": "label",
 			"role": "label",
 			"element": "label",
@@ -1592,20 +1602,6 @@ export const parts: Readonly<Record<string, readonly PartFacts[]>> = {
 			"ariaRole": "",
 			"hidden": false,
 			"hooks": []
-		}
-	],
-	"native": [
-		{
-			"part": "sheet",
-			"role": "",
-			"element": "div",
-			"ariaRole": "",
-			"hidden": false,
-			"hooks": [
-				"ui-backdrop",
-				"ui-content",
-				"ui-open"
-			]
 		}
 	],
 	"navbar": [

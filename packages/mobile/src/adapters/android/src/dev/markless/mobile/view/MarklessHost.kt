@@ -57,6 +57,8 @@ class MarklessHost(
 	store: Store = PreferencesStore(context),
 	/** The route params the page opens with. */
 	params: Map<String, String> = emptyMap(),
+	/** Where device values come from and device calls go; required for a payload that names device features. */
+	private val device: NativeDevice? = null,
 ) {
 	val payload: Payload = Payload.decode(payloadBytes)
 	val runtime = Runtime(payload, store, params)
@@ -97,9 +99,34 @@ class MarklessHost(
 			views[sheet.id] = content
 			sheets[sheet.id] = SystemSheet(context, sheet, content) { closedByPlatform(sheet.id) }
 		}
+		for (cell in payload.cells) cell.device?.let { runtime.device(cell.id, needDevice().read(it, cell.obj)) }
 		buildShown()
 		root = views.getValue(top.id)
 		for ((id, open) in runtime.sheets()) if (open) root.post { sheets.getValue(id).open() }
+		for (cell in payload.cells) cell.device?.let { name -> needDevice().watch(name, cell.obj) { if (!released) apply(runtime.device(cell.id, it)) } }
+		for (call in runtime.tasks()) runCall(call)
+	}
+
+	/** Set when another page replaces this one: device answers that arrive later change nothing. */
+	var released = false
+
+	private fun needDevice(): NativeDevice = device ?: throw MarklessHostError("the payload names device features and this host was given no device")
+
+	private fun runCall(call: JournalEntry.Call) {
+		val cell = call.result
+		val continuation = call.resume
+		val settle: ((DeviceOutcome) -> Unit)? = when {
+			cell != null -> { outcome ->
+				if (!released) apply(when (outcome) {
+					is DeviceOutcome.Value -> runtime.settle(cell, outcome.value)
+					is DeviceOutcome.Error -> runtime.settleError(cell, outcome.name, outcome.message)
+				})
+			}
+			// An awaited call from a handler: the rest of the handler runs with the answer; a refusal ends it.
+			continuation != null -> { outcome -> if (!released && outcome is DeviceOutcome.Value) apply(runtime.resume(continuation, outcome.value)) }
+			else -> null
+		}
+		needDevice().call(call.node, call.obj, call.arguments, settle)
 	}
 
 	fun view(id: String): View = views[id] ?: throw MarklessHostError("no view for \"$id\"")
@@ -145,6 +172,7 @@ class MarklessHost(
 					return
 				}
 				is JournalEntry.Sheet -> (sheets[entry.node] ?: throw MarklessHostError("journal names \"${entry.node}\", which is not a sheet")).let { if (entry.open) it.open() else it.close() }
+				is JournalEntry.Call -> runCall(entry)
 				is JournalEntry.Rows -> {
 					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
 					rebuild()
@@ -254,6 +282,12 @@ class MarklessHost(
 				gravity = Gravity.TOP or Gravity.START
 				named(this, inst.id)
 			}
+			"camera" -> {
+				val obj = node.obj ?: throw MarklessHostError("<camera> \"${node.id}\" shows no device object")
+				val device = payload.objects.firstOrNull { it.id == obj }?.device ?: throw MarklessHostError("<camera> \"${node.id}\" names unknown object \"$obj\"")
+				needDevice().view(obj, device).also { named(it, inst.id) }
+			}
+			"img" -> SizedImage(context).also { named(it, inst.id) }
 			"input" -> EditText(context).apply {
 				isSingleLine = true
 				includeFontPadding = false
@@ -304,6 +338,8 @@ class MarklessHost(
 		val view = view(id)
 		when (name) {
 			"aria-label" -> view.contentDescription = value
+			"alt" -> if (view is SizedImage) view.contentDescription = value
+			"src" -> (view as? SizedImage)?.show(value)
 			"disabled" -> view.isEnabled = value == null
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }

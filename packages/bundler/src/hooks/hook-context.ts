@@ -21,6 +21,8 @@ export type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	documentStylesheets?: boolean;
 	serverOnlyProps?: (moduleId: string) => SemanticGraphInput['serverOnlyProps'];
 	elementOnlyAttributes?: SemanticGraphInput['elementOnlyAttributes'];
+	/** The target-constant analysis for `@markless/device`; set by the build plugin, left out by the docs pages' compiler. */
+	deviceTargetFacts?: SemanticGraphInput['deviceTargetFacts'];
 	routeModules?: (moduleId: string) => boolean;
 	// Set per build: a page no file imports, so only the router renders it and its props never change.
 	unimportedRouteModule?: (moduleId: string) => boolean;

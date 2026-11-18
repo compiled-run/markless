@@ -13,8 +13,6 @@ export type LadderAction =
 				readonly keepKeyboard?: true;
 			};
 	  }
-	| { readonly relaunch: true }
-	| { readonly wait: number }
 	/**
 	 * Close the open system sheet the platform's way: `swipe` pulls it down; `back` is Android's back gesture (an edge
 	 * swipe). iOS has no back for a sheet, so there `back` is the pull down too; on the web both are Escape, the
@@ -24,7 +22,26 @@ export type LadderAction =
 	/** Pull the open system sheet up to its next resting height. The web's dialog has none, so there it does nothing. */
 	| { readonly swipe: 'up' }
 	/** Scroll until this text is on screen. */
-	| { readonly scrollTo: string };
+	| { readonly scrollTo: string }
+	| { readonly relaunch: true; readonly permissions?: Readonly<Record<'location', 'unset'>> }
+	| { readonly wait: number }
+	/** Answers the system's permission prompt, as a person does. */
+	| { readonly answer: 'allow' | 'deny' }
+	/**
+	 * The device's live value changes. The test builds' devices take it from a `PROOF_LINK` link (a simulator cannot go
+	 * offline by itself); the web test fires the browser's own event.
+	 */
+	| { readonly device: Readonly<Record<'network.online', boolean>> };
+
+/** The link a phone test build answers by setting a live device value (both shells: `markless-proof://device/<name>?value=<json>`). */
+export const deviceLink = (name: string, value: unknown): string =>
+	`markless-proof://device/${name}?value=${encodeURIComponent(JSON.stringify(value))}`;
+
+/** The prompt button each answer taps, as Maestro text patterns matching iOS's and Android's own wording. */
+export const PERMISSION_BUTTONS = {
+	allow: 'Allow While Using App|While using the app|Allow',
+	deny: 'Don.t Allow|Don.t allow',
+} as const;
 
 /** What the screen shows after a step's action (or at launch, for the first step). */
 export type LadderStep = {
@@ -39,10 +56,39 @@ export type LadderStep = {
 	readonly order?: readonly string[];
 	/** Text fields, by accessible name, and the value each holds. */
 	readonly fields?: Readonly<Record<string, string>>;
+	/**
+	 * Every device call the app has made since launch, in order (`haptics.tap`). Web tests record them from the
+	 * browser APIs `@markless/device` calls; phone test builds show them in the label `DEVICE_CALLS_ID`.
+	 */
+	readonly calls?: readonly string[];
+	/**
+	 * The system is asking the person for this permission. Phones show the app under the prompt but Maestro reads only
+	 * the prompt's window, so on phones the step asserts the prompt and its screenshot shows the rest; the web and the
+	 * reference runtime check every expectation.
+	 */
+	readonly prompt?: 'location' | 'camera';
+	/** Phones only: whether the page's camera session runs, from the test build's label `CAMERA_STATE_ID`. */
+	readonly camera?: 'on' | 'off';
+	/** Texts on screen on one platform only: a `platform` check shows a different arm on each. */
+	readonly visibleOn?: Readonly<Partial<Record<'ios' | 'android' | 'web', readonly string[]>>>;
 };
 
+/** Each system prompt's title, as a Maestro text pattern matching iOS's and Android's wording. */
+export const PERMISSION_PROMPTS = {
+	location: 'Allow .?Proof.? to (use your|access this device.s) location\\?',
+	camera: 'Allow .?Proof.? to (access your camera|take pictures and record video)\\?',
+} as const;
+
+/** The test-build label where a phone shell lists the device calls it received; its text is `callsText(calls)`. */
+export const DEVICE_CALLS_ID = 'markless-device-calls';
+/** The test-build label where a phone shell shows whether a camera session runs: `camera on` or `camera off`. */
+export const CAMERA_STATE_ID = 'markless-camera';
+export const callsText = (calls: readonly string[]): string =>
+	`calls: ${calls.length === 0 ? 'none' : calls.join(', ')}`;
+
 export type LadderRung = {
-	readonly rung: number;
+	/** A number on the view ladder; `D<n>` on the device ladder. */
+	readonly rung: number | string;
 	readonly name: string;
 	/** The route pattern App.tsrx is the page for, relative to the app root; the index route when absent. */
 	readonly route?: string;
@@ -50,6 +96,15 @@ export type LadderRung = {
 	readonly start?: string;
 	/** Why the web build cannot pass this rung yet; its web check is then expected to fail, and turns red once it passes. */
 	readonly webStopped?: string;
+	/** Where the device says it is, set before launch (Maestro `setLocation`; the web test's geolocation). */
+	readonly location?: { readonly latitude: number; readonly longitude: number };
+	/** Permissions at the first launch; `unset` leaves the system to ask (Maestro grants every permission otherwise). */
+	readonly permissions?: Readonly<Partial<Record<'location' | 'camera', 'allow' | 'deny' | 'unset'>>>;
+	/**
+	 * The web build, where `@markless/device` is absent: the steps it shows instead (a device action has nothing to
+	 * act on there), and texts that must not appear in any file of the built output (removed at build time).
+	 */
+	readonly web?: { readonly steps?: readonly LadderStep[]; readonly absentFromOutput?: readonly string[] };
 	readonly steps: readonly LadderStep[];
 };
 
@@ -57,7 +112,7 @@ export const proofsDir = import.meta.dirname;
 
 export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && /^(\d\d[a-z]?|y\d+)-/.test(entry.name))
+		.filter((entry) => entry.isDirectory() && /^(\d\d[a-z]?|[dp]\d|y\d+)-/.test(entry.name))
 		.map((entry) => entry.name)
 		.sort();
 
@@ -81,11 +136,15 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 			([name, value]) => previous.fields?.[name] !== value,
 		),
 	);
+	const calls =
+		step.calls && step.calls.join('\n') !== previous.calls?.join('\n') ? step.calls : undefined;
 	return {
 		visible: step.visible.filter((text) => wasAbsent.has(text)),
 		absent: (step.absent ?? []).filter((text) => wasShown.has(text)),
 		...(order && { order }),
 		...(Object.keys(fields).length > 0 && { fields }),
+		...(calls && { calls }),
+		...(step.camera && step.camera !== previous.camera && { camera: step.camera }),
 	};
 }
 
@@ -93,9 +152,33 @@ export const witnessCount = (witness: LadderStep): number =>
 	witness.visible.length +
 	(witness.absent?.length ?? 0) +
 	(witness.order ? 1 : 0) +
-	Object.keys(witness.fields ?? {}).length;
+	Object.keys(witness.fields ?? {}).length +
+	(witness.calls ? 1 : 0) +
+	(witness.camera ? 1 : 0);
 
-const assertions = (step: LadderStep): unknown[] => [
+const assertions = (step: LadderStep): unknown[] =>
+	step.prompt
+		? [{ assertVisible: { text: PERMISSION_PROMPTS[step.prompt] } }]
+		: [...screenAssertions(step), ...platformAssertions(step)];
+
+const MAESTRO_PLATFORM = { ios: 'iOS', android: 'Android' } as const;
+
+const platformAssertions = (step: LadderStep): unknown[] =>
+	(['ios', 'android'] as const).flatMap((platform) => {
+		const texts = step.visibleOn?.[platform];
+		return texts
+			? [
+					{
+						runFlow: {
+							when: { platform: MAESTRO_PLATFORM[platform] },
+							commands: texts.map((text) => ({ assertVisible: selector(text) })),
+						},
+					},
+				]
+			: [];
+	});
+
+const screenAssertions = (step: LadderStep): unknown[] => [
 	...step.visible.map((text) => ({ assertVisible: selector(text) })),
 	...(step.absent ?? []).map((text) => ({ assertNotVisible: selector(text) })),
 	...(step.disabled ?? []).map((text) => ({
@@ -105,6 +188,10 @@ const assertions = (step: LadderStep): unknown[] => [
 		assertVisible: { text: selector(text), below: selector(step.order![index]!) },
 	})),
 	...Object.values(step.fields ?? {}).map((value) => ({ assertVisible: selector(value) })),
+	...(step.calls
+		? [{ assertVisible: { id: DEVICE_CALLS_ID, text: selector(callsText(step.calls)) } }]
+		: []),
+	...(step.camera ? [{ assertVisible: { id: CAMERA_STATE_ID, text: `camera ${step.camera}` } }] : []),
 ];
 
 // Inside the sheet at either resting height on both phones. iOS springs a slow pull back, and hands a pull past full height to the content's scroll.
@@ -125,7 +212,18 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			{ inputText: action.type.text },
 			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];
-	if ('relaunch' in action) return ['stopApp', 'launchApp'];
+	if ('relaunch' in action)
+		return [
+			'stopApp',
+			action.permissions ? { launchApp: { permissions: action.permissions } } : 'launchApp',
+		];
+	if ('answer' in action) return [{ tapOn: { text: PERMISSION_BUTTONS[action.answer] } }];
+	if ('device' in action)
+		// iOS confirms a custom-scheme link with "Open in “Proof”?"; Android opens it at once.
+		return Object.entries(action.device).flatMap(([name, value]) => [
+			{ openLink: deviceLink(name, value) },
+			{ tapOn: { text: 'Open', optional: true } },
+		]);
 	if ('dismiss' in action)
 		return action.dismiss === 'swipe'
 			? [pullDown()]
@@ -156,12 +254,19 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 		launchApp: {
 			clearState: true,
 			...(rung.start && { arguments: { route: rung.start } }),
+			...(rung.permissions && { permissions: rung.permissions }),
 		},
 	};
 	return rung.steps.map((step, index) => [
+		...(index === 0 && rung.location ? [{ setLocation: rung.location }] : []),
 		...(index === 0 ? [launch] : []),
 		...(step.do ? actionCommands(step.do, step) : []),
-		...(index > 0 ? assertions(changeWitness(rung.steps[index - 1]!, step)) : []),
+		...(index > 0
+			? assertions({
+					...changeWitness(rung.steps[index - 1]!, step),
+					...(step.prompt && { prompt: step.prompt }),
+				})
+			: []),
 		...assertions(step),
 	]);
 }
