@@ -73,6 +73,13 @@ export type DeviceTargetFacts = {
 	) => ReadonlyArray<{ readonly start: number; readonly end: number; readonly text: string }>;
 	readonly deviceObjectOf: (init: never, state: never) => string | null;
 	readonly collectDeviceObjects: (statements: never, state: never) => ReadonlyArray<SemanticDeviceObject>;
+	/** Whether an assignment target is a field of a device object a component made (`cam.facing`): the device owns it. */
+	readonly writesDeviceObject: (target: never, state: never) => boolean;
+	/** Writes the analysis's web device edits into each event handler's code. */
+	readonly applyWebDeviceEdits: (
+		symbols: ReadonlyArray<PlannedSymbol>,
+		semanticGraph: SemanticGraphArtifact,
+	) => void;
 };
 
 /** A device object a component makes (`const cam = camera()`): owned by that component instance. */
@@ -88,10 +95,18 @@ export type SemanticDeviceObject = {
 /** The collectors a native build passes to the analysis; their nodes are the parser's ESTree nodes. */
 export type NativeFactCollectors = {
 	readonly expression: (node: never) => SemanticExpression;
-	/** A computed's block body (its statements) as one tree. */
-	readonly computedBody: (node: never) => SemanticExpression;
+	/** A computed's function as one tree: its block's statements, or its expression body; none without a body. */
+	readonly computedValue: (fn: never) => SemanticExpression | undefined;
 	/** A module-level function's parameters and body as one tree. */
 	readonly functionBody: (node: never) => SemanticModuleFunction['native'];
+	/** Each top-level function that is not a component, with the names it is exported by. */
+	readonly moduleFunctions: (statements: never, functions: never) => SemanticModuleFunction[];
+	/** A `@switch`'s arm tests as `discriminant === test`, null for `@default`. */
+	readonly switchArmTests: (discriminant: never, cases: never) => ReadonlyArray<SemanticExpression | null>;
+	/** An `@if` chain's arm tests, then null for its `@else` when it has one. */
+	readonly ifArmTests: (tests: never, hasElse: boolean) => ReadonlyArray<SemanticExpression | null>;
+	/** A callback's parameter names in order; a destructured one is `''`. */
+	readonly parameterNames: (node: never) => ReadonlyArray<string>;
 	readonly handlerStatements: (
 		node: never,
 	) => ReadonlyArray<SemanticHandlerStatement> | undefined;

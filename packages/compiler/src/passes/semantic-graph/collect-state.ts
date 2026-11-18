@@ -443,7 +443,7 @@ export function collectComputedBinding(input: {
 		dependencies,
 		functionSource:
 			inlined?.source ?? (body ? expressionSource(body, state.source) : undefined),
-		...computedNativeExpression(body, state),
+		...nativeComputed(body, state),
 	};
 	state.graph.graphBindings.push(binding);
 	for (const read of [body, ...definitions])
@@ -2046,18 +2046,7 @@ function objectPropertyKey(node: AnyNode | undefined): string | null {
 	return null;
 }
 
-// For native builds: a computed's body as a tree.
-function computedNativeExpression(
-	body: AnyNode | undefined,
-	state: WalkState,
-): Pick<SemanticGraphBinding, 'nativeExpression'> {
-	if (!state.nativeFacts || !body) return {};
-	const inner = body.body as AnyNode | undefined;
-	if (!inner) return {};
-	return {
-		nativeExpression:
-			inner.type === 'BlockStatement'
-				? state.nativeFacts.computedBody(inner as never)
-				: state.nativeFacts.expression(inner as never),
-	};
+function nativeComputed(fn: AnyNode | undefined, state: WalkState): Pick<SemanticGraphBinding, 'nativeExpression'> {
+	const nativeExpression = fn && state.nativeFacts?.computedValue(fn as never);
+	return nativeExpression ? { nativeExpression } : {};
 }

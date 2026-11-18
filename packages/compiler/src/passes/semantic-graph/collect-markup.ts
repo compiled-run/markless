@@ -113,8 +113,9 @@ type ChunkBuilder = {
 	readonly statics: string[];
 	readonly hosts: SemanticMarkupChunk['hosts'][number][];
 	readonly slots: SemanticMarkupSlot[];
-	readonly texts: NonNullable<SemanticMarkupChunk['texts']>[number][];
-	readonly attributes: NonNullable<SemanticMarkupChunk['attributes']>[number][];
+	/** Static texts and attributes by position, kept for native builds only (null otherwise). */
+	readonly texts: NonNullable<SemanticMarkupChunk['texts']>[number][] | null;
+	readonly attributes: NonNullable<SemanticMarkupChunk['attributes']>[number][] | null;
 };
 
 type WithoutStaticIndex<Slot> = Slot extends unknown ? Omit<Slot, 'staticIndex'> : never;
@@ -196,7 +197,12 @@ export function collectSemanticMarkup(input: {
 		const restSignature = propsRestSignature(component.node);
 		context.destructuredNames = [...(restSignature?.destructuredNames ?? [])];
 		context.restName = restSignature?.restName ?? null;
-		const builder = createChunk(`template:${component.name}`, 'template', component.name);
+		const builder = createChunk(
+			`template:${component.name}`,
+			'template',
+			component.name,
+			context.nativeFacts !== null,
+		);
 		emitNode(component.root, [0], builder, context, null);
 		chunks.push(finishChunk(builder));
 	}
@@ -218,6 +224,7 @@ function createChunk(
 	id: string,
 	kind: SemanticMarkupChunk['kind'],
 	componentName: string,
+	native: boolean,
 ): ChunkBuilder {
 	return {
 		id,
@@ -226,8 +233,8 @@ function createChunk(
 		statics: [''],
 		hosts: [],
 		slots: [],
-		texts: [],
-		attributes: [],
+		texts: native ? [] : null,
+		attributes: native ? [] : null,
 	};
 }
 
@@ -235,8 +242,8 @@ function finishChunk(builder: ChunkBuilder): SemanticMarkupChunk {
 	const { texts, attributes, ...chunk } = builder;
 	return {
 		...chunk,
-		...(texts.length > 0 ? { texts } : {}),
-		...(attributes.length > 0 ? { attributes } : {}),
+		...(texts?.length ? { texts } : {}),
+		...(attributes?.length ? { attributes } : {}),
 	};
 }
 
@@ -247,7 +254,7 @@ function appendStaticAttribute(
 	value: string,
 ): void {
 	append(builder, ` ${name}="${escapeAttribute(value)}"`);
-	builder.attributes.push({ coordinate: { kind: 'child-index', path }, name, value });
+	builder.attributes?.push({ coordinate: { kind: 'child-index', path }, name, value });
 }
 
 function append(builder: ChunkBuilder, value: string): void {
@@ -344,7 +351,7 @@ function emitNode(
 		const text = staticTextValue(node);
 		if (!text) return 0;
 		append(builder, escapeHtml(text));
-		builder.texts.push({ coordinate: { kind: 'child-index', path }, text });
+		builder.texts?.push({ coordinate: { kind: 'child-index', path }, text });
 		return 1;
 	}
 
@@ -352,7 +359,7 @@ function emitNode(
 	if (literal !== null) {
 		if (!literal) return 0;
 		append(builder, escapeHtml(literal));
-		builder.texts.push({ coordinate: { kind: 'child-index', path }, text: literal });
+		builder.texts?.push({ coordinate: { kind: 'child-index', path }, text: literal });
 		return 1;
 	}
 
@@ -382,7 +389,7 @@ function emitNode(
 		const branchSiteId = `branch-site:${context.branchIndex++}`;
 		const armTemplateIds = branchArms(node).map((arm, armIndex) => {
 			const id = `branch:${branchSiteId}:arm:${armIndex}`;
-			const armBuilder = createChunk(id, 'branch-arm', builder.componentName);
+			const armBuilder = createChunk(id, 'branch-arm', builder.componentName, builder.texts !== null);
 			emitNodes(arm, [0], armBuilder, context, repeat);
 			context.chunks.push(finishChunk(armBuilder));
 			return id;
@@ -407,7 +414,7 @@ function emitNode(
 		if (semanticRepeat) context.usedRepeatIds.add(semanticRepeat.id);
 		const repeatId = semanticRepeat?.id ?? `markup-repeat:${node.start ?? 'unknown'}`;
 		const rowTemplateId = `repeat:${repeatId}:row`;
-		const rowBuilder = createChunk(rowTemplateId, 'repeat-row', builder.componentName);
+		const rowBuilder = createChunk(rowTemplateId, 'repeat-row', builder.componentName, builder.texts !== null);
 		const row: RowNames = { id: repeatId, itemName, aliases: binding?.aliases ?? [] };
 		emitNodes(asNodes((node.body as AnyNode | undefined)?.body), [0], rowBuilder, context, row);
 		context.chunks.push(finishChunk(rowBuilder));
@@ -419,6 +426,7 @@ function emitNode(
 				emptyTemplateId,
 				'repeat-empty',
 				builder.componentName,
+				builder.texts !== null,
 			);
 			emitNodes(emptyNodes, [0], emptyBuilder, context, repeat);
 			context.chunks.push(finishChunk(emptyBuilder));
@@ -495,6 +503,7 @@ function emitNode(
 				projectionChunkId,
 				'component-projection',
 				builder.componentName,
+				builder.texts !== null,
 			);
 			emitNodes(projected, [0], projection, context, repeat);
 			context.chunks.push(finishChunk(projection));
@@ -1070,7 +1079,12 @@ function emitDynamicHost(
 	}
 
 	const childChunkId = `dynamic-host:${builder.id}:${builder.slots.length}:children`;
-	const childBuilder = createChunk(childChunkId, 'dynamic-host-children', builder.componentName);
+	const childBuilder = createChunk(
+		childChunkId,
+		'dynamic-host-children',
+		builder.componentName,
+		builder.texts !== null,
+	);
 	emitNodes(asNodes(node.children), [0], childBuilder, context, repeat);
 	context.chunks.push(finishChunk(childBuilder));
 	const hostNodeId = context.hostIds.get(node);
@@ -1171,7 +1185,7 @@ function emitAsyncArm(
 	repeat: { readonly id: string; readonly itemName: string } | null,
 ): string {
 	const id = `async:${boundaryId}:arm:${name}`;
-	const builder = createChunk(id, 'async-arm', componentName);
+	const builder = createChunk(id, 'async-arm', componentName, context.nativeFacts !== null);
 	emitNodes(nodes, [0], builder, context, repeat);
 	context.chunks.push(finishChunk(builder));
 	return id;

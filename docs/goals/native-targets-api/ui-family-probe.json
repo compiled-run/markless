@@ -8,8 +8,11 @@
 		]
 	},
 	"base": {
-		"payload": true,
-		"diagnostics": []
+		"payload": false,
+		"diagnostics": [
+			"MARKLESS_NATIVE_UNSUPPORTED: <base.camera> needs el={…} naming a camera the component made, and no other props",
+			"MARKLESS_NATIVE_UNSUPPORTED: markup outside the root template, its @if arms and its @for rows"
+		]
 	},
 	"buttongroup": {
 		"payload": false,
@@ -327,7 +330,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the pointerup event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the pointercancel event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <svg> component-edge:1/h5 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: a @for over something other than a state list keyed by a path of its item",
+			"MARKLESS_NATIVE_UNSUPPORTED: inkState.rows reads `pad`, which is not state of this component",
 			"MARKLESS_NATIVE_UNSUPPORTED: the <path> element",
 			"MARKLESS_NATIVE_UNSUPPORTED: inkState.current reads `pad`, which is not state of this component",
 			"MARKLESS_NATIVE_UNSUPPORTED: InkError while rendering writes `pad.invalid`, which is not state",
@@ -634,7 +637,6 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:7/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: <select.itemstate>, a component from another module",
 			"MARKLESS_NATIVE_UNSUPPORTED: markup outside the root template, its @if arms and its @for rows",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler calls `select.triggerEl.focus()` with options, which no native host takes yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `focusOpeningOption`, which needs a script engine"
 		]
 	},
@@ -679,7 +681,6 @@
 		"payload": false,
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: the <output> element",
-			"MARKLESS_NATIVE_UNSUPPORTED: a @for over something other than a state list keyed by a path of its item",
 			"MARKLESS_NATIVE_UNSUPPORTED: the paste event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:5/h4 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
@@ -851,7 +852,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the compositionend event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keyup handler on <div> component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <div> component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: a @for over something other than a state list keyed by a path of its item",
+			"MARKLESS_NATIVE_UNSUPPORTED: a @for keyed by its index; a native list keys each row by its item",
 			"MARKLESS_NATIVE_UNSUPPORTED: the @if test reads the callback `children` as a value",
 			"MARKLESS_NATIVE_UNSUPPORTED: <tokenbox.itemstate>, a component from another module",
 			"MARKLESS_NATIVE_UNSUPPORTED: markup outside the root template, its @if arms and its @for rows",

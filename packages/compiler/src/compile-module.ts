@@ -65,7 +65,6 @@ import {
 } from './passes/symbol-resolver-module.ts';
 import { planBoundSymbolResolver, planSymbolResolver } from './passes/symbol-resolver.ts';
 import { stripExtractedSyncPolicyCalls } from './passes/semantic-graph/strip-sync-policy-calls.ts';
-import { applyWebDeviceEdits } from './passes/semantic-graph/web-device-edits.ts';
 
 export function compileTsrxModule(input: CompileTsrxModuleInput): Promise<CompileTsrxModuleResult> {
 	return memoizedCompile(input, () => runCompile(input));
@@ -318,7 +317,10 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 					// Every later pass reads this symbol list, so the eager sync policy's
 					// calls must already be lifted out of it here.
 					stripExtractedSyncPolicyCalls(symbolResolver.symbols, semanticGraph);
-					applyWebDeviceEdits(symbolResolver.symbols, semanticGraph);
+					(inputs.source as CompileTsrxModuleInput).deviceTargetFacts?.applyWebDeviceEdits(
+						symbolResolver.symbols,
+						semanticGraph,
+					);
 					return { symbolResolver };
 				},
 			};

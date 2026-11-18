@@ -45,7 +45,37 @@
 					},
 					"value": "like on mk-4pe35k"
 				}
-			]
+			],
+			"attributesByState": {
+				"aria-label": [
+					{
+						"when": {
+							"state:liked": false
+						},
+						"value": "Like"
+					},
+					{
+						"when": {
+							"state:liked": true
+						},
+						"value": "Unlike"
+					}
+				],
+				"aria-pressed": [
+					{
+						"when": {
+							"state:liked": false
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:liked": true
+						},
+						"value": "true"
+					}
+				]
+			}
 		},
 		{
 			"kind": "text",

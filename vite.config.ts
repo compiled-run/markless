@@ -152,6 +152,7 @@ const buildOrder: PackUserConfig[] = [
 		packageName: 'compiler',
 		entry: {
 			index: './src/index.ts',
+			native: './src/native.ts',
 			'type-service': './src/type-service.ts',
 		},
 	}),

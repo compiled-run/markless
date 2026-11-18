@@ -1380,13 +1380,7 @@ function collectReturnedObjectProperties(input: {
 				source: propertySource,
 				sourceSpan: sourceSpan(property, input.state.filename),
 				...(nativeStatements
-					? {
-							nativeStatements,
-							parameters: asNodes(value.params).map((parameter) => {
-								const named = parameter.type === 'AssignmentPattern' ? (parameter.left as AnyNode) : parameter;
-								return named.type === 'Identifier' ? String(named.name) : '';
-							}),
-						}
+					? { nativeStatements, parameters: input.state.nativeFacts!.parameterNames(value as never) }
 					: {}),
 			});
 			continue;

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { compileTsrxModule, DEVICE_TARGET_FACTS } from '@markless/compiler';
+import { compileTsrxModule } from '@markless/compiler';
+import { DEVICE_TARGET_FACTS } from '@markless/compiler/native';
 import { describe, expect, it } from 'vitest';
 
 // Web absence of `@markless/device`: a use that needs an answer builds only inside a `platform` check the build can

@@ -1,11 +1,12 @@
 import type { AnyNode } from '../../ast/nodes.ts';
-import { asNodes } from '../../ast/nodes.ts';
+import { asNodes, getIdentifierName } from '../../ast/nodes.ts';
 import type {
 	NativeFactCollectors,
 	SemanticComponentNativeFacts,
 	SemanticExpression,
 	SemanticFunctionStatement,
 	SemanticHandlerStatement,
+	SemanticModuleFunction,
 } from '../../artifacts.ts';
 
 const UNARY = new Set(['!', '-', '+', 'typeof']);
@@ -634,10 +635,68 @@ export function componentNativeFactsOf(
 }
 
 /** What a native build passes as `nativeFacts`; nothing else imports this module. */
+/** Each top-level function that is not a component, with the names it is exported by, for a native build to inline. */
+function moduleFunctionsOf(
+	statements: ReadonlyArray<AnyNode>,
+	functions: ReadonlyMap<string, AnyNode>,
+): SemanticModuleFunction[] {
+	const exportNames = new Map<string, string[]>();
+	for (const statement of statements) {
+		if (statement.type !== 'ExportNamedDeclaration' || statement.source) continue;
+		const declared = getIdentifierName((statement.declaration as AnyNode | undefined)?.id as AnyNode | undefined);
+		if (declared) exportNames.set(declared, [...(exportNames.get(declared) ?? []), declared]);
+		for (const specifier of asNodes(statement.specifiers)) {
+			const local = getIdentifierName(specifier.local as AnyNode | undefined);
+			const exported = specifier.exported as AnyNode | undefined;
+			const name = getIdentifierName(exported) ?? (typeof exported?.value === 'string' ? exported.value : undefined);
+			if (local && name) exportNames.set(local, [...(exportNames.get(local) ?? []), name]);
+		}
+	}
+	return [...functions].map(([name, node]) => ({
+		name,
+		exportNames: exportNames.get(name) ?? [],
+		native: functionBodyOf(node),
+	}));
+}
+
+/** A computed's function as one tree: its block's statements, or its expression body; none without a body. */
+function computedValueOf(fn: AnyNode): SemanticExpression | undefined {
+	const body = fn.body as AnyNode | undefined;
+	if (!body) return undefined;
+	return body.type === 'BlockStatement' ? computedBodyOf(body) : expressionTreeOf(body);
+}
+
+/** A `@switch`'s arm tests as `discriminant === test`; the `@default` arm has none. */
+function switchArmTestsOf(discriminant: AnyNode, cases: AnyNode): ReadonlyArray<SemanticExpression | null> {
+	return asNodes(cases).map((switchCase) => {
+		const test = switchCase.test as AnyNode | undefined;
+		return test
+			? { kind: 'binary', operator: '===', left: expressionTreeOf(discriminant), right: expressionTreeOf(test) }
+			: null;
+	});
+}
+
+/** An `@if` chain's arm tests in order, then none for its `@else` when it has one. */
+function ifArmTestsOf(tests: ReadonlyArray<AnyNode>, hasElse: boolean): ReadonlyArray<SemanticExpression | null> {
+	return [...tests.map(expressionTreeOf), ...(hasElse ? [null] : [])];
+}
+
+/** A callback's parameter names in order; a destructured one is `''`. */
+function parameterNamesOf(node: AnyNode): ReadonlyArray<string> {
+	return asNodes(node.params).map((parameter) => {
+		const named = parameter.type === 'AssignmentPattern' ? (parameter.left as AnyNode) : parameter;
+		return named.type === 'Identifier' ? String(named.name) : '';
+	});
+}
+
 export const NATIVE_FACT_COLLECTORS: NativeFactCollectors = {
 	expression: expressionTreeOf as NativeFactCollectors['expression'],
-	computedBody: computedBodyOf as NativeFactCollectors['computedBody'],
+	computedValue: computedValueOf as NativeFactCollectors['computedValue'],
 	functionBody: functionBodyOf as NativeFactCollectors['functionBody'],
+	moduleFunctions: moduleFunctionsOf as NativeFactCollectors['moduleFunctions'],
+	switchArmTests: switchArmTestsOf as NativeFactCollectors['switchArmTests'],
+	ifArmTests: ifArmTestsOf as NativeFactCollectors['ifArmTests'],
+	parameterNames: parameterNamesOf as NativeFactCollectors['parameterNames'],
 	handlerStatements: handlerStatementsOf as NativeFactCollectors['handlerStatements'],
 	component: componentNativeFactsOf as unknown as NativeFactCollectors['component'],
 };

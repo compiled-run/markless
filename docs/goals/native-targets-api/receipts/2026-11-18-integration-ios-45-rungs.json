@@ -1,0 +1,294 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 6.449776916000003,
+			"flowSeconds": 20.000291165999997
+		},
+		{
+			"name": "02-styles",
+			"failure": null,
+			"installSeconds": 0.3709570419999945,
+			"flowSeconds": 18.55583879199998
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.28121045800001593,
+			"flowSeconds": 16.702992333
+		},
+		{
+			"name": "04-attributes",
+			"failure": null,
+			"installSeconds": 0.3026962919999787,
+			"flowSeconds": 18.388358416000003
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 0.24655704200000036,
+			"flowSeconds": 20.686683541000004
+		},
+		{
+			"name": "05b-choices",
+			"failure": null,
+			"installSeconds": 0.27297537499998,
+			"flowSeconds": 24.229168624999993
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 0.23553504200000316,
+			"flowSeconds": 21.677862709000006
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 0.5125075840000063,
+			"flowSeconds": 25.490826207999955
+		},
+		{
+			"name": "07b-imported-component",
+			"failure": null,
+			"installSeconds": 0.3447116249999963,
+			"flowSeconds": 18.93206716700003
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 0.31505725000001256,
+			"flowSeconds": 17.761208125000003
+		},
+		{
+			"name": "07d-children",
+			"failure": null,
+			"installSeconds": 0.22812012500001583,
+			"flowSeconds": 16.974682708000007
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.26189012499997627,
+			"flowSeconds": 27.179696624999984
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 0.2401777090000105,
+			"flowSeconds": 25.221094416999957
+		},
+		{
+			"name": "10-url-route",
+			"failure": null,
+			"installSeconds": 0.2603117079999647,
+			"flowSeconds": 14.461641000000004
+		},
+		{
+			"name": "d1-network",
+			"failure": null,
+			"installSeconds": 0.24841224999999395,
+			"flowSeconds": 26.592281667000034
+		},
+		{
+			"name": "d2-haptics",
+			"failure": null,
+			"installSeconds": 0.2448595840000198,
+			"flowSeconds": 16.61280933399999
+		},
+		{
+			"name": "d3-location",
+			"failure": null,
+			"installSeconds": 0.2403806249999907,
+			"flowSeconds": 25.757603500000027
+		},
+		{
+			"name": "d4-camera",
+			"failure": null,
+			"installSeconds": 0.2473786249999539,
+			"flowSeconds": 24.666501666999945
+		},
+		{
+			"name": "d4b-photo-refused",
+			"failure": null,
+			"installSeconds": 0.2522311670000199,
+			"flowSeconds": 19.55197866699996
+		},
+		{
+			"name": "d5-recorder",
+			"failure": null,
+			"installSeconds": 0.26748595799994657,
+			"flowSeconds": 54.939511833
+		},
+		{
+			"name": "d6-sharesheet",
+			"failure": null,
+			"installSeconds": 0.24002854199998547,
+			"flowSeconds": 17.725663499999907
+		},
+		{
+			"name": "d7-settings",
+			"failure": null,
+			"installSeconds": 0.2393865419999929,
+			"flowSeconds": 41.25045474999992
+		},
+		{
+			"name": "p1-platform",
+			"failure": null,
+			"installSeconds": 0.29214400000008756,
+			"flowSeconds": 13.460959625000017
+		},
+		{
+			"name": "u1-base",
+			"failure": null,
+			"installSeconds": 0.3149949169999454,
+			"flowSeconds": 17.242412833000067
+		},
+		{
+			"name": "u2-collapsible",
+			"failure": null,
+			"installSeconds": 0.2940309589999961,
+			"flowSeconds": 18.09270345899998
+		},
+		{
+			"name": "u3-tabs",
+			"failure": null,
+			"installSeconds": 0.23814458300010302,
+			"flowSeconds": 20.88248087500001
+		},
+		{
+			"name": "u4-dialog",
+			"failure": null,
+			"installSeconds": 0.24378637500002515,
+			"flowSeconds": 30.516287624999997
+		},
+		{
+			"name": "u5-toggle",
+			"failure": null,
+			"installSeconds": 0.24738670799997636,
+			"flowSeconds": 16.45742891600006
+		},
+		{
+			"name": "u6-base-rows",
+			"failure": null,
+			"installSeconds": 0.23611304199998268,
+			"flowSeconds": 31.996140832999956
+		},
+		{
+			"name": "u11-pagination",
+			"failure": null,
+			"installSeconds": 0.24338912499998697,
+			"flowSeconds": 21.58738300000003
+		},
+		{
+			"name": "u12-buttongroup",
+			"failure": null,
+			"installSeconds": 0.24221258400008083,
+			"flowSeconds": 42.50628904199996
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 0.2369487080000108,
+			"flowSeconds": 41.73971800000011
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 0.24450541599991266,
+			"flowSeconds": 20.91675629199995
+		},
+		{
+			"name": "y1-sheet-open-close",
+			"failure": {
+				"step": 1,
+				"action": "tap",
+				"role": "flow",
+				"command": "assertConditionCommand",
+				"message": "Assertion is false: \"Filters\" is visible"
+			},
+			"installSeconds": 0.25160558299999686,
+			"flowSeconds": 38.22870287499996
+		},
+		{
+			"name": "y2-sheet-pick",
+			"failure": {
+				"step": 1,
+				"action": "tap",
+				"role": "flow",
+				"command": "assertConditionCommand",
+				"message": "Assertion is false: \"Choose a city\" is visible"
+			},
+			"installSeconds": 0.39040545900003054,
+			"flowSeconds": 32.86900012500002
+		},
+		{
+			"name": "y3-sheet-heights",
+			"failure": {
+				"step": 1,
+				"action": "tap",
+				"role": "flow",
+				"command": "assertConditionCommand",
+				"message": "Assertion is false: \"All items\" is visible"
+			},
+			"installSeconds": 0.31026316699991,
+			"flowSeconds": 31.885284875000128
+		},
+		{
+			"name": "n1-two-routes",
+			"failure": null,
+			"installSeconds": 0.27836187500017695,
+			"flowSeconds": 35.83421508300002
+		},
+		{
+			"name": "n2-orders",
+			"failure": null,
+			"installSeconds": 0.40442204199987464,
+			"flowSeconds": 32.78791758299992
+		},
+		{
+			"name": "n3-navigate",
+			"failure": null,
+			"installSeconds": 0.38412804100010545,
+			"flowSeconds": 27.776709666999988
+		},
+		{
+			"name": "n4-deep-link",
+			"failure": null,
+			"installSeconds": 0.5798493340001442,
+			"flowSeconds": 39.725380707999925
+		},
+		{
+			"name": "s1-page-styles",
+			"failure": null,
+			"installSeconds": 0.5162952079998795,
+			"flowSeconds": 28.367043499999912
+		},
+		{
+			"name": "s2-shared-component",
+			"failure": null,
+			"installSeconds": 0.47746658300003036,
+			"flowSeconds": 30.015582792000146
+		},
+		{
+			"name": "s3-state-styles",
+			"failure": null,
+			"installSeconds": 0.4679900409998372,
+			"flowSeconds": 38.02424904099991
+		},
+		{
+			"name": "s4-global-tokens",
+			"failure": null,
+			"installSeconds": 0.3776984170000069,
+			"flowSeconds": 20.47193491599988
+		},
+		{
+			"name": "s5-page-canvas",
+			"failure": null,
+			"installSeconds": 0.24988554100017063,
+			"flowSeconds": 23.059425792000024
+		}
+	]
+}
