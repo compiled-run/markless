@@ -129,7 +129,9 @@ export function targetConstants(
 	};
 }
 
-/** Elements that show a device object, by the `@markless/ui` part authors write: `<base.camera el={cam} />`. */
+/** Elements that show a device object, by the `@markless/ui` part authors write: `<native.camera el={cam} />`. */
 export const DEVICE_ELEMENTS = [
+	{ module: '@markless/ui', export: 'native', member: 'camera', element: 'camera', device: 'camera' },
+	/** The earlier spelling, kept as an alias while code moves to `native.camera`. */
 	{ module: '@markless/ui', export: 'base', member: 'camera', element: 'camera', device: 'camera' },
 ] as const;

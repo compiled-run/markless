@@ -84,11 +84,11 @@ export default function App() @{
 
 describe('W2: a device element renders nothing on the web', () => {
 	const part = readFileSync(
-		new URL('../../headless/components/src/base/camera.tsrx', import.meta.url),
+		new URL('../../headless/components/src/native/camera.tsrx', import.meta.url),
 		'utf8',
 	);
 
-	it('base.camera compiles to no markup on a web build, and keeps it for a phone', async () => {
+	it('native.camera compiles to no markup on a web build, and keeps it for a phone', async () => {
 		const onWeb = await web(part);
 		expect(codes(onWeb)).toEqual([]);
 		expect(

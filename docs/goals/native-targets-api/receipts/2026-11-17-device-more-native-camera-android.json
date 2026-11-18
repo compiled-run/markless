@@ -1,0 +1,18 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "d4-camera",
+			"failure": null,
+			"installSeconds": 1.6211662080000004,
+			"flowSeconds": 28.895356167
+		},
+		{
+			"name": "d4b-photo-refused",
+			"failure": null,
+			"installSeconds": 0.7883100420000047,
+			"flowSeconds": 14.671047958000003
+		}
+	]
+}

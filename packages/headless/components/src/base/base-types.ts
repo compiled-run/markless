@@ -56,7 +56,7 @@ export type SeparatorProps = {
  */
 export type VisuallyHiddenProps = Pick<PropsOf<'span'>, 'children'>;
 
-/** The props of `base.camera`. */
+/** The props of `native.camera` (and its alias `base.camera`). */
 export type CameraProps = {
 	/** The device object whose picture this shows: `const cam = camera()`. */
 	readonly el?: object;

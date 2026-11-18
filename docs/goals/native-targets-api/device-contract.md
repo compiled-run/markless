@@ -8,13 +8,13 @@ Status 2026-11-17: working direction from the owner, with the planner's four dec
 
 ```tsrx
 import { camera, haptics, location, network, platform, recorder, settings, sharesheet } from '@markless/device';
-import { base } from '@markless/ui';
+import { native } from '@markless/ui';
 
 <p>{network.online ? 'Online' : 'Offline'}</p>                 // a free live value: a property on the import
 <button onClick={() => haptics.tap()}>Tap</button>              // a call in a handler
 const here = computed(async () => location.current());          // a one-time ask, awaited, read inside @try
 const cam = camera();                                           // a device object, owned by this component
-<base.camera el={cam} />                                        // bound to its picture with `el`
+<native.camera el={cam} />                                      // bound to its picture with `el`
 <button onClick={async () => (photo = await cam.takePhoto())}>Take</button>
 const rec = recorder();                                         // a device object with no picture
 <button onClick={() => (rec.active = !rec.active)}>{rec.active ? 'Stop' : 'Record'}</button>
@@ -34,6 +34,11 @@ const rec = recorder();                                         // a device obje
   shown. Writable fields are settings (`cam.facing = 'front'`, `rec.active = true`), live fields are what it knows
   (`cam.ready`, `rec.seconds`, `rec.clip`). A setting the device cannot honour snaps back to the value in use (decision
   3): a refused microphone puts `rec.active` back to false, so a Record/Stop label reading it reads "Record" again.
+- **Platform-provided views** live in the `native` namespace of `@markless/ui` (planner ruling, 2026-11-17: `base`
+  reads as headless, and the camera's picture is a box the platform draws). `<base.camera el={cam} />` still works as an
+  alias; both spellings lower to the same payload (`device-build.test.ts`). The part's source is
+  `packages/headless/components/src/native/camera.tsrx`; `native/index.ts` is the one namespace object, which other
+  platform views (`native.sheet`, from `cw/system-sheet`) join with one export line each.
 - **Permission**: no request call. Using a feature asks. Each feature that needs permission has the live field `access`
   (`location.access`, `camera.access`, `recorder.access`: `'unknown' | 'granted' | 'limited' | 'denied' | 'blocked'`);
   reading it never prompts. `settings.open()` opens the app's own page in the system Settings app; `access` follows what
@@ -52,7 +57,7 @@ from `@markless/device`); nothing matches names as text. Hosts gain no new expre
 | `computed(async () => location.current())`                       | a **task cell** `{ id, name, initial: { state: 'pending' }, task: { call: 'location.current', arguments } }`                                                                             | starts the call at mount; dispatches `{ event: 'settle', cell, value }` or `{ event: 'settle', cell, error: { name, message } }` |
 | `@try { a } @pending { b } @catch (e) { c }` reading a task cell | a `branch` with `tests` over the task's `state` (`'value'`, `'pending'`, `'error'`); `{answer}` reads `{ member: { cell }, property: 'value' }`, `e.message` reads the error's `message` | nothing new: branches and arms as today                                                                                          |
 | `const cam = camera()`, `const rec = recorder()`                 | a **device object** `{ id: 'object:cam', device: 'camera', owner }` in the payload list `objects`; `owner` is the first node of the component instance that made it                     | creates it on first use; on a `release` entry (its owner stopped being shown) or when the page goes, stops it and lets it go      |
-| `<base.camera el={cam} />`                                       | an element node `{ element: 'camera', object: 'device:cam' }`                                                                                                                            | builds the platform preview view (iOS `AVCaptureVideoPreviewLayer` host view, Android `PreviewView`-like `TextureView`)          |
+| `<native.camera el={cam} />`                                       | an element node `{ element: 'camera', object: 'device:cam' }`                                                                                                                            | builds the platform preview view (iOS `AVCaptureVideoPreviewLayer` host view, Android `PreviewView`-like `TextureView`)          |
 | `cam.ready`                                                      | a device cell `{ device: 'camera.ready', object: 'device:cam' }`                                                                                                                         | as for free values                                                                                                               |
 | `photo = (await cam.takePhoto()).url; …`                         | op `{ op: 'call', call: 'camera.takePhoto', object, arguments: [], after: { id, as, ops, catch? } }`: the statements after the `await` are `ops`, the answer reads as `{ local: as }`    | captures, then dispatches `{ event: 'resume', continuation, value }`, or `{ event: 'reject', continuation, error }` if it fails   |
 | a failed awaited call inside a `@try` with a `@catch`            | `after.catch` names a cell (`<boundary>:catch`, initial null); the `@try` branch shows its `@catch` arm while that cell is not null, and `e` reads it                                    | dispatches `reject`; with no `catch` the rest of the handler simply does not run                                                 |
@@ -105,7 +110,7 @@ On the web every feature is absent:
 | Use                                                | Web build                                                                        | Rung                                                                                    |
 | -------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | a call whose result nothing uses (`haptics.tap()`) | removed from the handler; the module is never imported                           | D2 (W1): no `haptics.tap`, `vibrate` or `@markless/device` in any built file            |
-| `<base.camera el={cam} />`                         | the part's markup sits behind `@if (!platform.web)`, so the web build removes it | W2: the part compiles to no markup on web (unit test); D4's web page has no camera node |
+| `<native.camera el={cam} />`                         | the part's markup sits behind `@if (!platform.web)`, so the web build removes it | W2: the part compiles to no markup on web (unit test); D4's web page has no camera node |
 | a value read (`network.online`)                    | the constant below; branches it decides are removed                              | D1 (W3): banner text and "Offline" absent from every built file                         |
 | a use that needs an answer                         | refused unless a `platform` check in the same component rules it out (decision 1, candidate c) | D3 to D7 web pages; `device-web-absence.test.ts`                              |
 
@@ -174,12 +179,13 @@ Receipts: `receipts/2026-11-17-device-{ios,android}-d1-d4-p1.json` (#794), and f
 D4b to D7 included, `receipts/2026-11-17-device-more-{ios,android}.json` with the verdict in
 `receipts/2026-11-17-device-more-verdict.txt`. The phone-proof workflow runs only on pull requests into
 `cw/native-targets`, so for this branch the receipts are local runs (simulator `markless-device-more`, AVD
-`markless_device_more`).
+`markless_device_more`). After the move to `native.camera`, D4 and D4b were proved again on both phones:
+`receipts/2026-11-17-device-more-native-camera-*`.
 
 D4, per behaviour, all as data, no engine:
 
 - `const cam = camera()`: a device object (`objects` in the payload), one per component instance, an analyzer fact.
-- `<base.camera el={cam} />`: an element `{ element: 'camera', object }`; the host asks its device for the view.
+- `<native.camera el={cam} />`: an element `{ element: 'camera', object }`; the host asks its device for the view.
 - `cam.ready`, `cam.facing`: device cells tied to the object.
 - `cam.facing = …`: an `assign` to that cell, then a `call` to `camera.facing` the host applies. A camera the device
   does not have snaps the field back (the Android emulator has no front camera: "Facing back" after Flip).
@@ -241,7 +247,7 @@ the API an app author sees:
 
 1. **`access` after a refusal** differs by platform: Android reports `blocked` where iOS reports `denied`, and after
    the permission is cleared Android still reads `denied` where iOS reads `unknown`.
-2. **A device object never bound to an element** (`camera()` with no `<base.camera>`): made but never started, so
+2. **A device object never bound to an element** (`camera()` with no `<native.camera>`): made but never started, so
    `ready` stays false.
 3. **`@markless/ui` depends on `@markless/device`** (the camera part reads `platform`); `@markless/device` is private
    and must be published before `@markless/ui` can release with this part.

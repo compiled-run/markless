@@ -113,7 +113,7 @@
 			{
 				"part": "camera",
 				"component": "Camera",
-				"doc": "The props of `base.camera`.",
+				"doc": "The props of `native.camera` (and its alias `base.camera`).",
 				"props": [
 					{
 						"name": "el",
@@ -2440,6 +2440,23 @@
 				"component": "ModalTrigger",
 				"doc": "A consumer's `onClick` runs after the dialog has opened.",
 				"props": []
+			}
+		]
+	},
+	"native": {
+		"parts": [
+			{
+				"part": "camera",
+				"component": "Camera",
+				"doc": "The props of `native.camera` (and its alias `base.camera`).",
+				"props": [
+					{
+						"name": "el",
+						"type": "object",
+						"required": false,
+						"doc": "The device object whose picture this shows: `const cam = camera()`."
+					}
+				]
 			}
 		]
 	},

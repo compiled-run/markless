@@ -67,7 +67,7 @@ async function serveRung(
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router', 'device'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	// `base.camera` comes from the headless parts, which the camera rung imports.
+	// `native.camera` comes from the headless parts, which the camera rung imports.
 	await symlink(join(packagesRoot, 'headless/components'), join(root, 'node_modules/@markless/ui'), 'dir');
 	const nodeEnv = process.env.NODE_ENV;
 	// Vitest's NODE_ENV=test leaves import.meta.env.DEV true in a build.
