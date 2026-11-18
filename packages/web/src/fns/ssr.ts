@@ -1132,7 +1132,10 @@ function marklessSsrComposedView(
 		...(view.branches ?? []).filter((branch) => renderedAnchorIds.has(idPrefix + branch.id)),
 		...(view.asyncBoundaries ?? []).flatMap((boundary) =>
 			renderedAnchorIds.has(idPrefix + boundary.id)
-				? [boundary.armRecords ?? []].flat().flatMap((set) => set.branches ?? [])
+				? [boundary.armRecords ?? []].flat().flatMap((set) =>
+						// A list under an @if the boundary did not draw reached no served byte; the commit that renders the @if brings its own record.
+						(set.branches ?? []).filter((branch) => renderedAnchorIds.has(idPrefix + branch.id)),
+					)
 				: [],
 		),
 	]))
@@ -1195,14 +1198,13 @@ function marklessSsrComposedView(
 	const renderedArmBranchIds = new Set(
 		structure.anchors.filter((anchor) => anchor.kind === 'arm-branch').map((anchor) => anchor.id),
 	);
-	const undrawn: SsrBranchRecord[] = [];
 	const boundariesWithComposedBranches = renderedBoundaries.map((boundary) => {
 		if (!Array.isArray(boundary.armRecords)) return boundary;
 		const composed = boundaryArmBranches.get(boundary.id);
 		return {
 			...boundary,
 			armRecords: boundary.armRecords.map((arm: SsrArmRecordSet, index) => {
-				const own = arm.branches?.filter((branch) => renderedArmBranchIds.has(idPrefix + branch.id) || !undrawn.push(branch));
+				const own = arm.branches?.filter((branch) => renderedArmBranchIds.has(idPrefix + branch.id));
 				const armBranches = composed?.get(index);
 				return own === undefined && !armBranches
 					? arm
@@ -1210,9 +1212,6 @@ function marklessSsrComposedView(
 			}),
 		};
 	});
-	// A list under an undrawn branch reached no served byte; the commit that renders the branch brings its own record.
-	const undrawnLists = marklessSsrArmListIds(undrawn);
-	for (let i = keyedRepeats.length; i--; ) if (undrawnLists.includes(keyedRepeats[i].id)) keyedRepeats.splice(i, 1);
 	const armizedBoundaries = marklessSsrArmizeBoundaries(
 		structure,
 		marklessSsrResolveAnchorRecords(
