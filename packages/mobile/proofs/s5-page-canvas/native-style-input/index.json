@@ -1,0 +1,48 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Garden",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "garden mk-bbw84c"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-bbw84c"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Seed tray"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0",
+			"element": "a",
+			"parent": "h0",
+			"attributes": {
+				"class": "next mk-bbw84c",
+				"href": "/notes"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0:text0",
+			"parent": "component-edge:0",
+			"text": "Open notes"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n\tbackground: #f4efe6;\n}\n\n@media (prefers-color-scheme: dark) {\n\tbody {\n\t\tbackground: #1d1b16;\n\t}\n}\n\n.garden.mk-bbw84c {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.heading.mk-bbw84c {\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #3d405b;\n\t\t\t}\n\t\t\t.next.mk-bbw84c {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #81b29a;\n\t\t\t\tcolor: #1d1b16;\n\t\t\t\tfont-size: 17px;\n\t\t\t\ttext-decoration: none;\n\t\t\t}\n\t\t\t@media (prefers-color-scheme: dark) {\n\t\t\t\t.heading.mk-bbw84c {\n\t\t\t\t\tcolor: #f4efe6;\n\t\t\t\t}\n\t\t\t}",
+	"states": []
+}
