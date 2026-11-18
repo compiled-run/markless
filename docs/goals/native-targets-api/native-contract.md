@@ -9,7 +9,7 @@ draft. Name: the planner's ruling from the naming test (`cw/device-api-ab`, `nam
 | You want | Write | Who draws the frame | Same on every platform? |
 |---|---|---|---|
 | Your own control: your frame, your motion, your look | `modal`, `drawer` from `@markless/ui`, or a plain `<dialog>` | You (the headless family's markup and your CSS) | Yes |
-| The platform's own sheet | `<native.sheet>` from `@markless/ui` | The platform: iOS `UISheetPresentationController`, Android Material `BottomSheetDialog`, web a modal `<dialog>` | No: each platform's real sheet |
+| The platform's own sheet | `<native.sheet>` from `@markless/ui` | The platform: iOS `UISheetPresentationController`, Android Material `BottomSheetDialog`, web a modal panel on the page's overlay layer | No: each platform's real sheet |
 
 One sentence for an author: **use `drawer` when the sheet must look and move the way your design says on every platform;
 use `native.sheet` when it should be the sheet people already know on their phone, with the platform's drag, heights,
@@ -51,11 +51,11 @@ Kept to what both phones have. Each must be fixed at build time in this draft (s
 
 | Option | Default | Meaning | iOS | Android | Web |
 |---|---|---|---|---|---|
-| `open` | `false` | Shows the sheet while true | present / dismiss | `show()` / `dismiss()` | `@if (open)` around a `<dialog>` opened with `showModal()` (or `show()`) |
-| `onChange` | none | The platform closed it | `presentationControllerDidDismiss` | `setOnCancelListener` | the dialog's `close` event, unless the page closed it |
+| `open` | `false` | Shows the sheet while true | present / dismiss | `show()` / `dismiss()` | the backdrop's `hidden` follows it |
+| `onChange` | none | The platform closed it | `presentationControllerDidDismiss` | `setOnCancelListener` | the overlay's `dismiss` (Escape, a press outside); stopped, see Rungs |
 | `snapPoints` | `[1]` | Resting heights, as fractions of the screen's height: one value, or two with the larger `1` | detents: `1` is `.large()`, `0.5` is `.medium()`, any other a custom detent | `1` alone: expanded, skip collapsed; `[x, 1]`: `halfExpandedRatio = x`, starts half expanded | no meaning: a browser dialog has no resting heights; it is as tall as its content, up to the viewport |
-| `dismissible` | `true` | The person can close it the platform's way | `isModalInPresentation = !dismissible` | `setCancelable(dismissible)` (back, outside tap, swipe) | `closedby="any"`, or `closedby="none"` with Escape's `cancel` prevented |
-| `modal` | `true` | The page behind is dimmed and cannot be reached | `largestUndimmedDetentIdentifier` unset; when `false`, set to the largest detent | `BottomSheetDialog` when true; a standard bottom sheet in the page when false (not built yet, refused on phones) | `showModal()`; `show()` when false |
+| `dismissible` | `true` | The person can close it the platform's way | `isModalInPresentation = !dismissible` | `setCancelable(dismissible)` (back, outside tap, swipe) | `dismiss` is ignored when false |
+| `modal` | `true` | The page behind is dimmed and cannot be reached | `largestUndimmedDetentIdentifier` unset; when `false`, set to the largest detent | `BottomSheetDialog` when true; a standard bottom sheet in the page when false (not built yet, refused on phones) | `aria-modal="true"`, which the overlay layer reads to make the page inert |
 
 `snapPoints` and `modal` are `drawer`'s words for the same ideas (drawer measures fractions of its own size; a system
 sheet's are of the screen, because that is what both platforms take). `dismissible` has no headless counterpart: `modal`'s
@@ -69,7 +69,7 @@ height (with `fitToContents` off); an iOS custom detent below full has no Androi
 
 | | iOS (UIKit) | Android (Views) | Web |
 |---|---|---|---|
-| What is presented | A `UIViewController` holding the content's views in a `UIScrollView`, presented with `.pageSheet` | `com.google.android.material.bottomsheet.BottomSheetDialog` holding the content's views in a `NestedScrollView` | `<dialog>` in the top layer |
+| What is presented | A `UIViewController` holding the content's views in a `UIScrollView`, presented with `.pageSheet` | `com.google.android.material.bottomsheet.BottomSheetDialog` holding the content's views in a `NestedScrollView` | a `role="dialog"` `aria-modal` panel inside a `<div overlay>` backdrop, styled like the browser's dialog under `@layer markless` |
 | Grabber / drag handle | `prefersGrabberVisible = true` when there are two heights | the Material 3 drag handle view when there are two heights | none |
 | Drag between heights, swipe to close | the system's | `BottomSheetBehavior`'s | none |
 | Back | no back for a sheet on iOS (VoiceOver's escape gesture is the system's close request) | the system back gesture or button (predictive back from Material) | Escape, and Android Chrome's back through the dialog's close watcher |
@@ -121,7 +121,26 @@ established part names, and `sheet` under a `native` namespace is a planner ruli
 - **Styling content inside the sheet through Dragon**: Dragon lays out one page box tree; the sheet's content is a second
   root, the same open question as `<dialog>` on `cw/native-ui`.
 
+## Why the web is not a `<dialog>`
+
+A modal `<dialog>` opens only through `showModal()`, a call. Markless runs calls on an element only from an `attach`
+behaviour, and on a server-rendered page a behaviour starts only after an event on or inside its element, `onVisible` or
+`onIdle`. The first version used `onIdle`; because `@markless/ui`'s barrel links every family into a page that imports
+it, that cost every such page about 31 KB gzip of runtime at load (docs `/concepts/state`: 124 files and 2,759,153 B
+against 119 and 2,728,165 B without it, local builds; perf-guards G16 on CI) and woke unrelated mounts (the slider's
+screen-reader lane). The web sheet therefore uses the mechanism `modal` and `drawer` open from state with: a `<div
+overlay>` backdrop whose `hidden` follows `open`, holding a `role="dialog"` `aria-modal` panel styled like the browser's
+dialog. Measured load cost on the same page: 119 files, 2,728,147 B (none).
+
 ## Rungs (2026-11-17)
+
+**Web stopped (Y1, Y4).** A page that opens `<native.sheet>` from its own state does not start the overlay runtime the
+sheet's module needs: the overlay mark is in the linked `@markless/ui` module's demand map, the page's click runs on its
+lean path, so the overlay never enlists. The sheet opens and closes from state (Y2, Y3 pass), but Escape and a press
+outside never report `dismiss` and the page behind is not made inert. `modal` and `drawer` do not hit this because their
+own trigger part opens them. The rungs carry `webStopped` and their web check runs as an expected failure that turns red
+once it passes. Fix: the page's action whose write reaches a linked module's overlay `hidden` must demand the overlay
+runtime (compiler, runtime demand map and linking); not done here.
 
 Columns as in `contract.md` section 5: **Web** is `packages/mobile/test/ladder-web.test.ts` (a real router app in
 Chromium; the web's "swipe" and "back" are Escape, its "pull up" does nothing because a browser dialog has no resting
@@ -133,10 +152,10 @@ one-off Playwright script driving the same steps, not by the test).
 
 | Rung | What | Web | Reference | iOS | Android |
 |---|---|---|---|---|---|
-| Y1 `y1-sheet-open-close` | open from a button; close by swipe, by back, and by the page's own button; a counter of platform closes on the page | pass | pass | **pass** | **pass** |
+| Y1 `y1-sheet-open-close` | open from a button; close by swipe, by back, and by the page's own button; a counter of platform closes on the page | **stopped** (below) | pass | **pass** | **pass** |
 | Y2 `y2-sheet-pick` | a list and a text input inside; the pick lands on the page; keyboard up (`keepKeyboard`) while typing | pass | pass | **pass** | **pass** |
 | Y3 `y3-sheet-heights` | `snapPoints={[0.5, 1]}`: opens at half, pulled to full, 70 items scrolled to the last | pass | pass | **pass** | **pass** |
-| Y4 `y4-sheet-beside-drawer` | the same page with the headless `drawer` | pass | **refused by name** (`<drawer.root>, a component from another module`) | not run | not run |
+| Y4 `y4-sheet-beside-drawer` | the same page with the headless `drawer` | **stopped** (below) | **refused by name** (`<drawer.root>, a component from another module`) | not run | not run |
 | Y5 confirmation | report only, below | | | | |
 
 What each rung needed and what is real:
@@ -153,8 +172,8 @@ What each rung needed and what is real:
   drag handle. The pull-up gesture ends at 20% of the screen: past full height iOS hands the drag to the content's
   scroll (measured). The scroll step proves scrolling only with content taller than full height (40 items fit on the
   Pixel 7, so the rung has 70).
-- **Y4.** The page builds and runs on the web (both the drawer and the native sheet open and close; the drawer's frame is
-  the author's CSS, the sheet's is the browser's: `screenshots/web/01-tap-after.png` and `03-tap-after.png`). On phones
+- **Y4.** On the web both open (the drawer's frame is the author's CSS, the sheet's the browser's dialog look:
+  `screenshots/web/01-tap-after.png` and `03-tap-after.png`); closing the native sheet by Escape is the stopped step. On phones
   the compiler refuses it because the headless `drawer` does not build for phones yet (`cw/native-ui`, u4c: its drag is
   pointer handlers, not data). This rung is a failure on phones, not a pass; it turns green when `drawer` lowers.
   The phone side of the pair is Y1's sheet screenshots.
@@ -215,8 +234,32 @@ HTML (`<input type="date">` shows the native picker on phones).
 
 ## Found on the way
 
-- An `attach` factory argument written as an expression (`attach={presentDialog(open === true)}`) reaches the behaviour
-  as `undefined`, with no build error; plain prop reads work. Not fixed here (compiler, behaviour inputs).
-- A child component may not render live `{children}` inside an `@if` it controls (`MARKLESS_PROJECTION_LIVE_IN_BRANCH`),
-  so the web sheet keeps its `<dialog>` in the page and opens it from an `attach` behaviour that follows `open`; on a
-  server-rendered page that behaviour starts at `onIdle`, so a press before the page is idle opens the sheet at idle.
+- **Fixed here, `@markless/web`:** a client-rendered `attach` whose input reads state ran once with `undefined` and never
+  again (`attach-state-input.test.ts`); a page-wide `onIdle` hook started every client mount at idle, including mounts with
+  no idle record (`on-idle-many.test.ts`).
+- An `attach` factory argument written as an expression (`presentDialog(open === true)`) reaches the behaviour as
+  `undefined` on a server-rendered page, with no build error. Not fixed.
+- A child component may not render live `{children}` inside an `@if` it controls (`MARKLESS_PROJECTION_LIVE_IN_BRANCH`).
+
+## Proposal (owner): a behaviour starts when its inputs change
+
+**What changes.** Today a server-rendered `attach` starts only on an event on or inside its element, `onVisible` or
+`onIdle` (spec `04-events-symbols-behaviors.md`, the list after "On a server-rendered host the behavior symbol is imported
+only when one of these triggers activates it"). Add one trigger: "a write to state one of its inputs reads". The line
+"When behavior inputs change, v1 cleans up the existing behavior and runs it again" would then hold for a behaviour that
+has not started yet.
+
+**What it fixes.** Any element whose imperative state follows page state from a server-rendered page, with no load cost:
+a `<dialog>` opened by `showModal()` (so `native.sheet` on the web could be the browser's real top-layer dialog), video
+`play()`, a chart's redraw. Today each needs `onIdle` (a runtime at load) or an event inside the element.
+
+**What it costs.** The behaviour's symbol and its runtime load on the first write that reaches its inputs, a press-time
+cost, not a load-time one. The compiler already routes such a write away from the scalar lean path (runtime demand map,
+behaviour `inputGraphReads`), but on the page tried here the press was handled before `resume-behaviors.ts` was
+constructed, so the subscription that would start it was never made: the runtime that handles that press must build the
+behaviour subscriptions (or the demand map must route the press to the full runtime). Size: one more condition in the demand
+map and the start path; the behaviour runtime module (`web/resume-behaviors`) on the press.
+
+**Evidence.** `packages/vitest-browser` server-rendered test (not committed): flipping state from a button outside the
+element left a state-reading `attach` unstarted; making `resume-behaviors.ts` start an inactive host on input change was
+not enough, because neither `resume-behaviors.ts` nor `event-only-resume.ts` ran for that press (instrumented).

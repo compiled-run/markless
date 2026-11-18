@@ -1,6 +1,7 @@
 {
 	"rung": 101,
 	"name": "A system sheet opens from a button and closes by the platform's swipe and back",
+	"webStopped": "a page that opens <native.sheet> from its own state does not start the overlay runtime its linked module needs, so Escape and an outside press never report dismiss and the page behind is not made inert",
 	"steps": [
 		{
 			"visible": ["Shop", "Show filters", "Closed by the platform: 0"],

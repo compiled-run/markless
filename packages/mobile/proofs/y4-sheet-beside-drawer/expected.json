@@ -1,6 +1,7 @@
 {
 	"rung": 104,
 	"name": "A system sheet and the headless drawer on one page",
+	"webStopped": "a page that opens <native.sheet> from its own state does not start the overlay runtime its linked module needs, so Escape and an outside press never report dismiss and the page behind is not made inert",
 	"steps": [
 		{
 			"visible": [

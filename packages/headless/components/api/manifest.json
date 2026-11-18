@@ -2435,7 +2435,7 @@
 			{
 				"part": "sheet",
 				"component": "NativeSheet",
-				"doc": "The platform's own sheet: iOS's system sheet, Android's Material bottom sheet, the browser's modal `<dialog>`. The\nplatform draws the frame, its motion and its dimming; the markup between the tags is the content, styled by you.",
+				"doc": "The platform's own sheet: iOS's system sheet, Android's Material bottom sheet, on the web a modal panel in the page's overlay layer. The\nplatform draws the frame, its motion and its dimming; the markup between the tags is the content, styled by you.",
 				"props": [
 					{
 						"name": "open",

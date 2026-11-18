@@ -130,7 +130,7 @@ export type NativeNode = NativePlace &
 				/**
 				 * The platform's own sheet (`<native.sheet>`): its content is the nodes whose parent is this id, built at mount
 				 * and kept; the host presents them in its system sheet while `open` is truthy (iOS `UISheetPresentationController`,
-				 * Android Material `BottomSheetDialog`, web a `<dialog>`).
+				 * Android Material `BottomSheetDialog`, web a modal panel on the overlay layer).
 				 */
 				readonly kind: 'sheet';
 				readonly id: string;

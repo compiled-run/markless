@@ -1,7 +1,7 @@
 import type { Children } from '@markless/core';
 
 /**
- * The platform's own sheet: iOS's system sheet, Android's Material bottom sheet, the browser's modal `<dialog>`. The
+ * The platform's own sheet: iOS's system sheet, Android's Material bottom sheet, on the web a modal panel in the page's overlay layer. The
  * platform draws the frame, its motion and its dimming; the markup between the tags is the content, styled by you.
  */
 export type SheetProps = {

@@ -48,6 +48,8 @@ export type LadderRung = {
 	readonly route?: string;
 	/** The path the app opens at; `/` when absent. */
 	readonly start?: string;
+	/** Why the web build cannot pass this rung yet; its web check is then expected to fail, and turns red once it passes. */
+	readonly webStopped?: string;
 	readonly steps: readonly LadderStep[];
 };
 

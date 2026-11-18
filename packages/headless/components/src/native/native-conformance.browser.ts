@@ -22,17 +22,18 @@ runMultiEmbedConformance({
 
 for (const mode of ['ssr', 'csr'] as const) {
 	describe(`native.sheet multi-embed (${mode})`, () => {
-		test("one embed's opener shows its own dialog in the top layer and leaves the other's closed", async () => {
+		test("one embed's opener shows its own sheet, modal, and leaves the other's hidden; Escape closes it through onChange", async () => {
 			if (mode === 'ssr') await renderSSRIslands([MultiEmbed, MultiEmbed]);
 			else await renderCsrIslands([MultiEmbed, MultiEmbed]);
-			const dialogs = Array.from(document.querySelectorAll('dialog'));
-			expect(dialogs).toHaveLength(2);
+			const sheets = Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]'));
+			expect(sheets).toHaveLength(2);
 			await userEvent.click(document.querySelectorAll<HTMLElement>('[data-testid="opener"]')[0]!);
-			await expect.poll(() => dialogs[0]!.matches(':modal')).toBe(true);
-			expect(dialogs[1]!.open).toBe(false);
+			await expect.poll(() => sheets[0]!.checkVisibility()).toBe(true);
+			expect(sheets[0]!.getAttribute('aria-modal')).toBe('true');
+			expect(sheets[1]!.checkVisibility()).toBe(false);
 
 			await userEvent.keyboard('{Escape}');
-			await expect.poll(() => dialogs[0]!.open).toBe(false);
+			await expect.poll(() => sheets[0]!.checkVisibility()).toBe(false);
 			const openers = document.querySelectorAll<HTMLElement>('[data-testid="opener"]');
 			await expect.poll(() => openers[0]!.getAttribute('aria-expanded')).toBe('false');
 		});

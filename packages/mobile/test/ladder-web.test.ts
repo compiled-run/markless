@@ -125,8 +125,8 @@ describe.each(rungFolders())('%s', (folder) => {
 		for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 	}, 60_000);
 
-	test(
-		`${rung.name}: the web build shows every step's expected texts`,
+	(rung.webStopped ? test.fails : test)(
+		`${rung.name}: the web build shows every step's expected texts${rung.webStopped ? ` (stopped: ${rung.webStopped})` : ''}`,
 		{ timeout: 60_000 },
 		async () => {
 			const context = await browser.newContext();
