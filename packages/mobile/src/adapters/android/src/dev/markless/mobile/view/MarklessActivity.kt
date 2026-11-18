@@ -38,6 +38,14 @@ abstract class MarklessActivity : Activity() {
 
 	open fun styleExportBytes(): ByteArray? = null
 
+	/** Whether a screen whose page has a script starts the engine once its first frame is up and the main loop is idle. */
+	open val warmsScriptEngine: Boolean get() = true
+
+	override fun onDestroy() {
+		if (::host.isInitialized) host.stopTimersAndRequests()
+		super.onDestroy()
+	}
+
 	/** Where device values come from and device calls go; the phone's own by default. */
 	open val device: NativeDevice by lazy { PlatformDevice(this) }
 
@@ -200,6 +208,7 @@ abstract class MarklessActivity : Activity() {
 		host.canvasColor?.let(page::setBackgroundColor)
 		host.onCanvas = page::setBackgroundColor
 		setContentView(FrameLayout(this).apply { addView(page, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)) })
+		if (warmsScriptEngine) host.warmScriptWhenIdle()
 		if (host.style != null) page.post { android.util.Log.i(MarklessHost.TAG, "frames max gap ${host.frameDeviation()} device px") }
 	}
 

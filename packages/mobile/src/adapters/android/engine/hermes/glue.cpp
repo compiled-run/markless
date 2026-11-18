@@ -37,7 +37,11 @@ struct Engine {
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_dev_markless_mobile_engine_HermesEngine_nativeCreate(JNIEnv *, jobject) {
-  auto config = ::hermes::vm::RuntimeConfig::Builder().withMicrotaskQueue(true).build();
+  // Lazy compilation (the default for larger sources) refuses async functions: "async functions are unsupported".
+  auto config = ::hermes::vm::RuntimeConfig::Builder()
+                    .withMicrotaskQueue(true)
+                    .withCompilationMode(::hermes::vm::ForceEagerCompilation)
+                    .build();
   return reinterpret_cast<jlong>(new Engine(facebook::hermes::makeHermesRuntime(config)));
 }
 

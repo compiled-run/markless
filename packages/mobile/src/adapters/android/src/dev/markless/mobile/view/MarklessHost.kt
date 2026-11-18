@@ -104,7 +104,11 @@ class MarklessHost(
 		preferredLanguages: List<String> = LocaleList.getDefault().let { list -> (0 until list.size()).map { list[it].toLanguageTag() } },
 	) : this(context, Payload.decode(payloadBytes), styleExportBytes?.let { StyleExport.decode(it) }, fonts, store, params, device, preferredLanguages)
 
-	val runtime = Runtime(payload, store, params, preferredLanguages, now)
+	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
+		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
+		onScriptEntry = AppScriptEngine::entryRan
+	}
+	private val scriptServices = ScriptServices()
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val events = payload.events.groupBy { it.host }
 	private val views = HashMap<String, View>()
@@ -150,8 +154,18 @@ class MarklessHost(
 
 	/** Runs a `timer` entry's action after its delay; by default on the main looper, applying its journal. */
 	var scheduleTimer: (timer: String, ms: Double) -> Unit = { timer, ms ->
-		if (ms.isFinite()) timers.postDelayed({ apply(runtime.timer(timer)) }, ms.toLong())
+		if (ms.isFinite()) {
+			val due = Runnable {
+				pendingTimers.remove(timer)
+				if (!released) apply(runtime.timer(timer))
+			}
+			pendingTimers.put(timer, due)?.let(timers::removeCallbacks)
+			timers.postDelayed(due, ms.toLong())
+		}
 	}
+
+	/** Each scheduled timer's runnable by timer id, so a `clearTimer` entry can drop it. */
+	private val pendingTimers = HashMap<String, Runnable>()
 
 	/** Inputs with no visible view (a checkbox or hidden input): GONE and outside the accessibility tree. */
 	private val inert = HashSet<String>()
@@ -254,7 +268,35 @@ class MarklessHost(
 	/** Another page replaces this one: its device objects end, and device answers that arrive later change nothing. */
 	fun release() {
 		released = true
+		stopTimersAndRequests()
 		for (o in payload.objects) device?.release(o.id)
+	}
+
+	/** The screen is gone: no timer fires and no pending request answers after this. */
+	fun stopTimersAndRequests() {
+		timers.removeCallbacksAndMessages(null)
+		pendingTimers.clear()
+		scriptServices.stop()
+	}
+
+	/** Starts the engine and loads this page's script once the first frame is drawn and the main loop is idle. */
+	fun warmScriptWhenIdle() {
+		if (payload.script == null || !AppScriptEngine.available) return
+		val drawn = object : android.view.ViewTreeObserver.OnDrawListener {
+			var seen = false
+			override fun onDraw() {
+				if (seen) return
+				seen = true
+				// A draw listener cannot remove itself while the draw runs.
+				root.post { root.viewTreeObserver.takeIf { it.isAlive }?.removeOnDrawListener(this) }
+				android.os.Looper.myQueue().addIdleHandler {
+					// Warming only saves time; a failure here shows again, and throws, at the first entry.
+					if (!released) runCatching { AppScriptEngine.warm(runtime) }.onFailure { Log.e(AppScriptEngine.TAG, "engine warm failed", it) }
+					false
+				}
+			}
+		}
+		root.viewTreeObserver.addOnDrawListener(drawn)
 	}
 
 	private fun needDevice(): NativeDevice = device ?: throw MarklessHostError("the payload names device features and this host was given no device")
@@ -361,6 +403,8 @@ class MarklessHost(
 				is JournalEntry.Sheet -> (sheets[entry.node] ?: throw MarklessHostError("journal names \"${entry.node}\", which is not a sheet")).let { if (entry.open) it.open() else it.close() }
 				is JournalEntry.Call -> runCall(entry)
 				is JournalEntry.Release -> needDevice().release(entry.node)
+				is JournalEntry.ClearTimer -> pendingTimers.remove(entry.node)?.let(timers::removeCallbacks)
+				is JournalEntry.Fetch -> scriptServices.fetch(entry.request) { if (!released) apply(runtime.response(entry.id, it)) }
 				is JournalEntry.Rows -> {
 					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
 					rebuild()
