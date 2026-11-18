@@ -2430,6 +2430,52 @@
 			}
 		]
 	},
+	"native": {
+		"parts": [
+			{
+				"part": "sheet",
+				"component": "NativeSheet",
+				"doc": "The platform's own sheet: iOS's system sheet, Android's Material bottom sheet, the browser's modal `<dialog>`. The\nplatform draws the frame, its motion and its dimming; the markup between the tags is the content, styled by you.",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"doc": "Whether the sheet shows. Your page's own state."
+					},
+					{
+						"name": "onChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called with `false` when the platform closes the sheet (a swipe, back, a tap outside, Escape), never when you do."
+					},
+					{
+						"name": "snapPoints",
+						"type": "readonly number[]",
+						"required": false,
+						"doc": "Resting heights as fractions of the screen's height: `[1]` (the default), or two with the larger `1`, such as\n`[0.5, 1]`. A browser dialog has no resting heights, so the web ignores this."
+					},
+					{
+						"name": "dismissible",
+						"type": "boolean",
+						"required": false,
+						"doc": "The person can close it the platform's way. Defaults to true."
+					},
+					{
+						"name": "modal",
+						"type": "boolean",
+						"required": false,
+						"doc": "The page behind is dimmed and cannot be reached. Defaults to true."
+					},
+					{
+						"name": "children",
+						"type": "Children",
+						"required": false
+					}
+				]
+			}
+		]
+	},
 	"navbar": {
 		"parts": [
 			{

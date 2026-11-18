@@ -79,7 +79,10 @@ export async function renderCsrRuntime(input: {
 		view,
 	);
 
-	const graphBehaviors = view.behaviors.filter((behavior) => behavior.usesGraph);
+	// A behaviour whose inputs read state runs through the runtime, which re-runs it when they change.
+	const graphBehaviors = view.behaviors.filter(
+		(behavior) => behavior.usesGraph || behavior.inputGraphReads?.length,
+	);
 	let graph: RuntimeGraph | undefined;
 	let runtime: ResumeRuntime | undefined;
 	let starting: Promise<ResumeRuntime> | undefined;
@@ -314,7 +317,7 @@ async function activateAuthoredBehaviors(
 ): Promise<Array<() => void>> {
 	const cleanup: Array<() => void> = [];
 	for (const behavior of view.behaviors) {
-		if (!behavior.symbolId || behavior.usesGraph) continue;
+		if (!behavior.symbolId || behavior.usesGraph || behavior.inputGraphReads?.length) continue;
 		const element =
 			output.liveHostNodes?.get(behavior.hostNodeId) ??
 			(view.locators.length === 1 && view.locators[0]?.hostNodeId === behavior.hostNodeId
