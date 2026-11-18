@@ -10,6 +10,7 @@ import UIKit
 /// and a photo is that pattern written to a file. Its recorder is a test double too: the Mac running the simulator may
 /// have no microphone. The microphone prompt and `recorder.access` are real; while recording, seconds tick from a timer,
 /// and the clip is a generated tone written to a file the real player plays. `markless-microphone` shows whether one records.
+/// `markless-engine-starts` shows how many times the app started its script engine.
 @MainActor
 final class ProofDevice: NativeDevice {
 	static let shared = ProofDevice()
@@ -17,6 +18,7 @@ final class ProofDevice: NativeDevice {
 	let label = UILabel()
 	let cameraLabel = UILabel()
 	let microphoneLabel = UILabel()
+	let engineLabel = UILabel()
 	private var calls: [String] = []
 	private var faked: [String: NativeValue] = [:]
 	private var watchers: [String: [@MainActor (NativeValue) -> Void]] = [:]
@@ -28,12 +30,13 @@ final class ProofDevice: NativeDevice {
 	private var ticking: Timer?
 
 	init() {
-		for (view, id, text) in [(label, "markless-device-calls", "calls: none"), (cameraLabel, "markless-camera", "camera off"), (microphoneLabel, "markless-microphone", "microphone off")] {
+		for (view, id, text) in [(label, "markless-device-calls", "calls: none"), (cameraLabel, "markless-camera", "camera off"), (microphoneLabel, "markless-microphone", "microphone off"), (engineLabel, "markless-engine-starts", "engine starts: 0")] {
 			view.accessibilityIdentifier = id
 			view.font = .systemFont(ofSize: 12)
 			view.textColor = .secondaryLabel
 			view.text = text
 		}
+		MarklessScripting.shared.engineStarted = { [engineLabel] starts in engineLabel.text = "engine starts: \(starts)" }
 	}
 
 	private func key(_ name: String, _ object: String?) -> String { object.map { "\($0)#\(name)" } ?? name }
@@ -223,7 +226,8 @@ final class ShellSceneDelegate: UIResponder, UIWindowSceneDelegate {
 		let label = ProofDevice.shared.label
 		let cameraLabel = ProofDevice.shared.cameraLabel
 		let microphoneLabel = ProofDevice.shared.microphoneLabel
-		for view in [label, cameraLabel, microphoneLabel] {
+		let engineLabel = ProofDevice.shared.engineLabel
+		for view in [label, cameraLabel, microphoneLabel, engineLabel] {
 			view.translatesAutoresizingMaskIntoConstraints = false
 			window.addSubview(view)
 		}
@@ -234,6 +238,8 @@ final class ShellSceneDelegate: UIResponder, UIWindowSceneDelegate {
 			cameraLabel.bottomAnchor.constraint(equalTo: label.topAnchor, constant: -4),
 			microphoneLabel.leadingAnchor.constraint(equalTo: label.leadingAnchor),
 			microphoneLabel.bottomAnchor.constraint(equalTo: cameraLabel.topAnchor, constant: -4),
+			engineLabel.leadingAnchor.constraint(equalTo: label.leadingAnchor),
+			engineLabel.bottomAnchor.constraint(equalTo: microphoneLabel.topAnchor, constant: -4),
 		])
 		self.window = window
 		for context in options.urlContexts where context.url.host == "device" { ProofDevice.shared.open(context.url) }

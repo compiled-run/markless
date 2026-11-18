@@ -113,7 +113,7 @@ export async function buildIosShell(hostPackage: string, shellDir: string): Prom
 		await exec('xcrun', ['--sdk', 'iphonesimulator', '--show-sdk-path'])
 	).stdout.trim();
 	const inputs = [...filesUnder(hostPackage, '.swift'), ...filesUnder(shellDir, '.swift')];
-	const key = contentKey(hostPackage, inputs, [sdk, PROOF_APP_ID]);
+	const key = contentKey(hostPackage, inputs, [sdk, PROOF_APP_ID, infoPlist('')]);
 	const root = join(cacheRoot(), 'ios-shell', key);
 	const app = join(root, `${PROOF_APP_NAME}.app`);
 	if (existsSync(join(app, PROOF_APP_NAME))) return app;
@@ -181,6 +181,7 @@ const infoPlist = (minimumOs: string) => `<?xml version="1.0" encoding="UTF-8"?>
 <key>UILaunchScreen</key><dict/>
 <key>CFBundleSupportedPlatforms</key><array><string>iPhoneSimulator</string></array>
 <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
+<key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/><key>NSExceptionDomains</key><dict><key>127.0.0.1</key><dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict></dict></dict>
 <key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>${PROOF_APP_ID}</string><key>CFBundleURLSchemes</key><array><string>${PROOF_LINK_SCHEME}</string></array></dict></array>
 </dict></plist>
 `;
@@ -198,6 +199,9 @@ export async function installProofApp(
 	cpSync(shellApp, app, { recursive: true });
 	for (const { key, text } of manifest.ios)
 		await exec('plutil', ['-insert', key, '-string', text, join(app, 'Info.plist')]);
+	// MARKLESS_PROOF_ENGINE_WARM=0 builds an app whose script engine starts on first use only, to measure a cold start.
+	if (process.env.MARKLESS_PROOF_ENGINE_WARM === '0')
+		await exec('plutil', ['-insert', 'MarklessEngineWarm', '-bool', 'NO', join(app, 'Info.plist')]);
 	for (const [path, bytes] of assets) {
 		mkdirSync(join(app, path, '..'), { recursive: true });
 		writeFileSync(join(app, path), bytes);
