@@ -29,6 +29,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case navigate(route: String, params: [NativeRouteParam])
 	/// A `<dialog>` put in the top layer (`open`) or taken out.
 	case dialog(node: String, open: Bool)
+	/// A `command` op the handler ran, after every other entry, in order.
+	case command(node: String, command: String)
 
 	public var json: JSONValue {
 		switch self {
@@ -47,6 +49,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("navigate")), ("route", .string(route)), ("params", .object(params.map { ($0.name, .string($0.value)) }))])
 		case let .dialog(node, open):
 			return .object([("op", .string("dialog")), ("node", .string(node)), ("open", .bool(open))])
+		case let .command(node, command):
+			return .object([("op", .string("command")), ("node", .string(node)), ("command", .string(command))])
 		}
 	}
 }
@@ -194,6 +198,10 @@ public final class NativeRuntime {
 			}
 			throw RuntimeError(reason: ".\(property) of a value that has none")
 		case let .call(builtin, arguments): return evaluateCall(builtin, try arguments.map(evaluate))
+		case let .at(index, list):
+			guard case let .array(array) = try evaluate(list) else { throw RuntimeError(reason: "an index into a value that is not an array") }
+			guard case let .number(at) = try evaluate(index), at >= 0, at.rounded() == at, at < Double(array.items.count) else { return .null }
+			return array.items[Int(at)]
 		}
 	}
 
@@ -314,6 +322,7 @@ public final class NativeRuntime {
 		if let eventValue { beforeProperties["\(action.host)\u{0}value"] = eventValue }
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
+		var commands: [NativeJournalEntry] = []
 		func run(_ ops: [NativeOp]) throws -> NativeJournalEntry? {
 			for op in ops {
 				switch op {
@@ -327,6 +336,8 @@ public final class NativeRuntime {
 				case let .dialog(node, open):
 					guard dialogs[node] != nil else { throw RuntimeError(reason: "\(node) is not a dialog") }
 					dialogs[node] = open
+				case let .command(node, command):
+					commands.append(.command(node: node, command: command))
 				}
 			}
 			return nil
@@ -366,6 +377,6 @@ public final class NativeRuntime {
 				}
 			}
 		}
-		return styles + entries
+		return styles + entries + commands
 	}
 }

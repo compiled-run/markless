@@ -1217,10 +1217,42 @@ export type SemanticModuleFunction = {
 	readonly exportNames: ReadonlyArray<string>;
 	readonly native: {
 		readonly parameters: ReadonlyArray<string>;
-		/** Its return value as a tree over its parameters: `const` is a `let`, `if` a conditional, falling off the end `undefined`. */
-		readonly body: SemanticExpression;
+		/** Its body; a defaulted parameter `p = d` starts it as `let p = p ?? d`. */
+		readonly statements: ReadonlyArray<SemanticFunctionStatement>;
 	};
 };
+
+/** One statement of a module function's body, as a native build evaluates it where the function is called. */
+export type SemanticFunctionStatement =
+	/** `const name = value` or `let name = value` (`let name;` is `undefined`). */
+	| { readonly kind: 'let'; readonly name: string; readonly value: SemanticExpression }
+	/** `name = value`, `name += value`, `name++`: a write to a local of the function. */
+	| { readonly kind: 'set'; readonly name: string; readonly value: SemanticExpression }
+	/** `name.push(value)` on a local array. */
+	| { readonly kind: 'push'; readonly name: string; readonly value: SemanticExpression }
+	| {
+			readonly kind: 'if';
+			readonly test: SemanticExpression;
+			readonly whenTrue: ReadonlyArray<SemanticFunctionStatement>;
+			readonly whenFalse: ReadonlyArray<SemanticFunctionStatement>;
+	  }
+	/** `for (const name of list)`. */
+	| {
+			readonly kind: 'each';
+			readonly name: string;
+			readonly list: SemanticExpression;
+			readonly body: ReadonlyArray<SemanticFunctionStatement>;
+	  }
+	/** `for (let name = 0; name < over.length; name++)`: a loop over an array's indices. */
+	| {
+			readonly kind: 'count';
+			readonly name: string;
+			readonly over: SemanticExpression;
+			readonly body: ReadonlyArray<SemanticFunctionStatement>;
+	  }
+	/** `return value` (`return;` is `undefined`). */
+	| { readonly kind: 'return'; readonly value: SemanticExpression }
+	| { readonly kind: 'unsupported'; readonly construct: string };
 
 /** A value as a tree a native host evaluates with JavaScript meaning; names are the component's bindings. */
 export type SemanticExpression =
@@ -1247,6 +1279,8 @@ export type SemanticExpression =
 	  }
 	| { readonly kind: 'template'; readonly parts: ReadonlyArray<string | SemanticExpression> }
 	| { readonly kind: 'member'; readonly object: SemanticExpression; readonly property: string }
+	/** `object[index]` with an index that is not a literal. */
+	| { readonly kind: 'index'; readonly object: SemanticExpression; readonly index: SemanticExpression }
 	| { readonly kind: 'call'; readonly callee: string; readonly arguments: ReadonlyArray<SemanticExpression> }
 	/** A call to a function by its bare name that is not a builtin: a module-level function, this module's or an imported one. */
 	| { readonly kind: 'apply'; readonly callee: string; readonly arguments: ReadonlyArray<SemanticExpression> }
@@ -1255,7 +1289,7 @@ export type SemanticExpression =
 			readonly items: ReadonlyArray<{ readonly spread: boolean; readonly value: SemanticExpression }>;
 	  }
 	| { readonly kind: 'object'; readonly entries: ReadonlyArray<readonly [string, SemanticExpression]> }
-	/** A method of an array or string value, called with JavaScript's meaning. */
+	/** A method called on a value: an array's or string's (with JavaScript's meaning), or an element's, which a native build resolves itself. */
 	| {
 			readonly kind: 'method';
 			readonly method: string;

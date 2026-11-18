@@ -690,6 +690,11 @@ function total(list: readonly number[]): number {
 	for (const item of list) sum += item;
 	return sum;
 }
+function sumWhile(list: readonly number[]): number {
+	let sum = 0;
+	while (sum < 3) sum += list.length;
+	return sum;
+}
 function again(count: number): number {
 	return count > 0 ? again(count - 1) : 0;
 }
@@ -698,14 +703,16 @@ function Badge({ format }: { readonly format: number }) @{
 }
 export function Odd() @{
 	let held = state<unknown>(null);
+	let numbers = state<readonly number[]>([]);
 	<main>
-		<p>{total([1])} {again(1)} {typeof held === 'undefined' ? 'none' : 'some'}</p>
+		<p>{total(numbers)} {sumWhile(numbers)} {total([1, 2])} {again(1)} {typeof held === 'undefined' ? 'none' : 'some'}</p>
 		<Badge format={2} />
 	</main>
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
-			'the function `total` uses a `let` declaration, which needs a script engine',
+			'the function `total` loops over a list known only while the app runs',
+			'the function `sumWhile` uses a WhileStatement, which needs a script engine',
 			'the function `again` calls `again` inside itself',
 			"a text expression uses `typeof` other than compared with 'string', 'number' or 'boolean'; a native value does not tell undefined from null",
 			'a text expression calls `format`, a value the build cannot call',
@@ -728,5 +735,79 @@ export function App() @{
 			attributes: { 'aria-label': 'Group' },
 			bindings: [{ attribute: 'data-tone', value: { literal: 'calm' } }],
 		});
+	});
+
+	it('runs a handler that reads where a tap landed once per element a handle names inside its host', async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, shared, state } from '@markless/core';
+const listState = shared(() => {
+	const list = state({ picked: '' });
+	const rowEls = element<HTMLDivElement[]>();
+	return { ...list, rowEls };
+}, { scope: 'subtree' });
+function rowAt(rows: readonly HTMLElement[], target: Node): HTMLElement | null {
+	for (const row of rows) if (row.contains(target)) return row;
+	return null;
+}
+function Row({ value, children }: { readonly value: string; readonly children?: unknown }) @{
+	const list = listState();
+	<div el={list.rowEls} data-value={value}><span>{children}</span></div>
+}
+export function List() @{
+	const list = listState();
+	<main
+		onClick={(event) => {
+			if (event.shiftKey) return;
+			const row = rowAt(list.rowEls, event.target as HTMLElement);
+			if (row === null) return;
+			list.picked = row.getAttribute('data-value') ?? '';
+		}}
+	>
+		<Row value="a">A</Row>
+		<Row value="b">B</Row>
+		<p>{list.picked}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const picked = 'shared:src/App.tsrx#listState/state:list.picked';
+		expect(payload?.events).toEqual([
+			{ host: 'component-edge:0/h0', event: 'activate', handler: 'handler:event:0@component-edge:0/h0' },
+			{ host: 'component-edge:1/h0', event: 'activate', handler: 'handler:event:0@component-edge:1/h0' },
+		]);
+		expect(payload?.handlers.map((handler) => handler.ops)).toEqual([
+			[{ op: 'assign', cell: picked, value: { logical: '??', left: { literal: 'a' }, right: { literal: '' } } }],
+			[{ op: 'assign', cell: picked, value: { logical: '??', left: { literal: 'b' }, right: { literal: '' } } }],
+		]);
+	});
+
+	it('lowers focus() and scrollIntoView() on an element handle to command ops, and names event fields a tap lacks', async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+export function Find() @{
+	let count = state(0);
+	const field = element<HTMLInputElement>();
+	const missing = element<HTMLElement>();
+	<main>
+		<input el={field} />
+		<button onClick={() => { count++; field.focus(); missing?.scrollIntoView(); }}>Go</button>
+		<button onClick={(event) => (count = event.clientX)}>Where</button>
+	</main>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the click handler reads `event.clientX`, which a tap on a phone does not have',
+		]);
+		const { payload: ok } = await nativeView(`import { element, state } from '@markless/core';
+export function Find() @{
+	let count = state(0);
+	const field = element<HTMLInputElement>();
+	<main>
+		<input el={field} />
+		<button onClick={() => { count++; field.scrollIntoView(); field.focus(); }}>Go</button>
+	</main>
+}`);
+		expect(ok?.handlers[0]?.ops).toEqual([
+			{ op: 'assign', cell: 'state:count', value: expect.anything() },
+			{ op: 'command', node: 'h1', command: 'scrollIntoView' },
+			{ op: 'command', node: 'h1', command: 'focus' },
+		]);
 	});
 });

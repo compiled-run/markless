@@ -65,6 +65,8 @@ export type NativeExpr =
 	 * the web), or an own property of an object; anything else is a runtime error.
 	 */
 	| { readonly member: NativeExpr; readonly property: string }
+	/** An array's element at an index computed while the app runs: null when it is not an integer inside the array. */
+	| { readonly at: NativeExpr; readonly of: NativeExpr }
 	| { readonly array: ReadonlyArray<{ readonly spread: boolean; readonly value: NativeExpr }> }
 	| { readonly object: ReadonlyArray<readonly [string, NativeExpr]> }
 	| { readonly method: NativeMethod; readonly target: NativeExpr; readonly arguments: ReadonlyArray<NativeExpr> }
@@ -154,8 +156,16 @@ export type NativeOp =
 	 * page, with the page behind inert, or takes it out again.
 	 */
 	| { readonly op: 'dialog'; readonly node: string; readonly method: 'showModal' | 'close' }
+	/**
+	 * `element.focus()` or `element.scrollIntoView()`: the host moves focus (a text field takes the keyboard; anything else
+	 * the screen reader's cursor) or scrolls the element into view, after the handler's writes have reached the views.
+	 */
+	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand }
 	/** Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. */
 	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
+
+/** Element commands a host runs. */
+export type NativeCommand = 'focus' | 'scrollIntoView';
 
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;
@@ -184,6 +194,8 @@ export type NativeViewPayload = {
 /** One change a host applies to its retained views after a handler runs. */
 export type NativeJournalEntry =
 	| { readonly op: 'text'; readonly node: string; readonly value: string }
+	/** A `command` op the handler ran, in order, after every other entry: the views show the new state first. */
+	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand }
 	/** A `<dialog>` opened in the top layer or closed (by an op, or by the host's back gesture as a `cancel`). */
 	| { readonly op: 'dialog'; readonly node: string; readonly open: boolean }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */

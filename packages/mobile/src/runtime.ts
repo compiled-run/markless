@@ -111,6 +111,12 @@ export function evaluateNativeExpr(
 		if (result === undefined) throw new Error(`.${expr.method}() gave undefined`);
 		return result;
 	}
+	if ('at' in expr) {
+		const list = evaluate(expr.of);
+		if (!Array.isArray(list)) throw new Error('an index into a value that is not an array');
+		const at = evaluate(expr.at);
+		return typeof at === 'number' && Number.isInteger(at) && at >= 0 && at < list.length ? list[at]! : null;
+	}
 	if ('cell' in expr) return read(expr.cell);
 	if ('literal' in expr) return expr.literal;
 	if ('event' in expr) {
@@ -323,8 +329,13 @@ export function createNativeRuntime(
 			if (eventValue !== undefined) beforeProperties.set(`${action.host}\0value`, eventValue);
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
+			const commands: NativeJournalEntry[] = [];
 			const run = (ops: ReadonlyArray<NativeOp>): NativeJournalEntry | undefined => {
 				for (const op of ops) {
+					if (op.op === 'command') {
+						commands.push({ op: 'command', node: op.node, command: op.command });
+						continue;
+					}
 					if (op.op === 'navigate')
 						return { op: 'navigate', route: op.route, params: op.params };
 					if (op.op === 'dialog') {
@@ -398,7 +409,7 @@ export function createNativeRuntime(
 					}),
 				));
 			});
-			return [...styles, ...nodes];
+			return [...styles, ...nodes, ...commands];
 		},
 	};
 }

@@ -40,6 +40,8 @@ sealed interface Expr {
 	data class Template(val parts: List<Any>) : Expr
 	/** `length` of a string or array, or an own property of an object. */
 	data class Member(val value: Expr, val property: String) : Expr
+	/** An array's element at an index computed while the app runs; null when it is not an integer inside the array. */
+	data class At(val index: Expr, val list: Expr) : Expr
 	/** Each item, spread when [spread] (its value must be an array). */
 	data class ArrayLit(val items: List<Pair<Boolean, Expr>>) : Expr
 	data class ObjectLit(val entries: List<Pair<String, Expr>>) : Expr
@@ -92,6 +94,8 @@ sealed interface Op {
 	data class If(val test: Expr, val then: List<Op>, val otherwise: List<Op>) : Op
 	/** `showModal()` ([open] true) or `close()` on a `<dialog>`: the host puts it in its top layer or takes it out. */
 	data class Dialog(val node: String, val open: Boolean) : Op
+	/** `focus()` or `scrollIntoView()` on an element, run once the views show the handler's writes. */
+	data class Command(val node: String, val command: String) : Op
 }
 
 /** A page's route as the router spells it (`/[fruit]`) and its param names. */
@@ -180,6 +184,7 @@ data class Payload(
 			is Expr.If -> cellsOf(e.test) + cellsOf(e.whenTrue) + cellsOf(e.whenFalse)
 			is Expr.Template -> e.parts.filterIsInstance<Expr>().flatMap(::cellsOf)
 			is Expr.Member -> cellsOf(e.value)
+			is Expr.At -> cellsOf(e.index) + cellsOf(e.list)
 			is Expr.ArrayLit -> e.items.flatMap { cellsOf(it.second) }
 			is Expr.ObjectLit -> e.entries.flatMap { cellsOf(it.second) }
 			is Expr.Method -> cellsOf(e.target) + e.arguments.flatMap(::cellsOf)
@@ -215,6 +220,7 @@ data class Payload(
 					o.only(setOf("template"), what)
 					Expr.Template(o.field("template", what).arr("$what.template").mapIndexed { n, p -> if (p is Json.Str) p.value else expr(p, "$what.template[$n]") })
 				}
+				o.containsKey("at") -> { o.only(setOf("at", "of"), what); Expr.At(sub("at"), sub("of")) }
 				o.containsKey("member") -> { o.only(setOf("member", "property"), what); Expr.Member(sub("member"), o.field("property", what).str("$what.property")) }
 				o.containsKey("array") -> {
 					o.only(setOf("array"), what)
@@ -362,6 +368,12 @@ data class Payload(
 				val method = o.field("method", what).str("$what.method")
 				if (method != "showModal" && method != "close") throw MarklessDecodeError("$what has unknown dialog method \"$method\"")
 				return Op.Dialog(o.field("node", what).str("$what.node"), method == "showModal")
+			}
+			if (name == "command") {
+				o.only(setOf("op", "node", "command"), what)
+				val command = o.field("command", what).str("$what.command")
+				if (command != "focus" && command != "scrollIntoView") throw MarklessDecodeError("$what has unknown command \"$command\"")
+				return Op.Command(o.field("node", what).str("$what.node"), command)
 			}
 			if (name == "if") {
 				o.only(setOf("op", "test", "whenTrue", "whenFalse"), what)

@@ -113,6 +113,19 @@ final class ViewTree {
 				throw HostError("a navigate entry reaches the page's controller, not its views")
 			case let .dialog(node, open):
 				try present(node, open: open)
+			case let .command(node, command):
+				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
+				root.layoutIfNeeded()
+				if command == "scrollIntoView" {
+					// Only a scrolling ancestor can bring it into view; a page that does not scroll already shows it.
+					var ancestor = view.superview
+					while let candidate = ancestor, !(candidate is UIScrollView) { ancestor = candidate.superview }
+					if let scroll = ancestor as? UIScrollView { scroll.scrollRectToVisible(view.convert(view.bounds, to: scroll), animated: false) }
+				} else if view is UITextField {
+					view.becomeFirstResponder()
+				} else {
+					UIAccessibility.post(notification: .layoutChanged, argument: view)
+				}
 			case let .state(cell, value):
 				guard let layout else { continue }
 				assignment = try layout.next(from: assignment, cell: cell, value: value)

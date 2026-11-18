@@ -11,6 +11,7 @@ import type {
 	NativeViewPayload,
 } from '@markless/serializer';
 import { isNativeStyleStateAttribute, NATIVE_VIEW_VERSION } from '@markless/serializer/native-view';
+import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type {
 	CompilerDiagnostic,
 	SemanticEvent,
@@ -18,6 +19,7 @@ import type {
 	SemanticMarkupChunk,
 	SemanticExpression,
 	SemanticHandlerStatement,
+	SemanticFunctionStatement,
 	SemanticModuleFunction,
 	SemanticSharedDefinition,
 	SourceSpan,
@@ -140,7 +142,7 @@ type SharedInstance = {
 /** What `instance.name` is. */
 type Field =
 	| { readonly kind: 'cell'; readonly cell: string }
-	| { readonly kind: 'handle'; readonly key: string }
+	| { readonly kind: 'handle'; readonly key: string; readonly plural: boolean }
 	| {
 			readonly kind: 'method';
 			readonly statements: ReadonlyArray<SemanticHandlerStatement> | undefined;
@@ -171,8 +173,10 @@ type Scope = {
 	/** Prefix of every id this component instance emits (`component-edge:0/` inside a child, empty at the root). */
 	readonly prefix: string;
 	readonly event?: string;
-	/** A click handler's event parameter: nothing may read it. */
+	/** A click handler's event parameter: only the fields a tap has (`pressed`) may be read. */
 	readonly opaque?: string;
+	/** The element a tap landed on (`event.target`) and the one whose handler runs (`event.currentTarget`). */
+	readonly pressed?: { readonly target: string; readonly currentTarget: string };
 	readonly locals: ReadonlySet<string>;
 	readonly items: ReadonlyMap<string, string>;
 	readonly props: ReadonlyMap<string, Prop>;
@@ -191,6 +195,68 @@ const METHODS = new Set<string>([
 	'filter', 'map', 'findIndex', 'some', 'every', 'includes', 'indexOf', 'join', 'concat', 'slice',
 	'reverse', 'toReversed', 'toUpperCase', 'toLowerCase', 'trim',
 ]);
+
+/**
+ * An element as a value while a handler is lowered (a handle, `event.target`): known when the app is built, so element
+ * methods (`contains`, `getAttribute`) are answered then. It never reaches a payload.
+ */
+type ElementValue = { readonly element: string };
+const elementValue = (node: string): NativeExpr => ({ element: node }) as unknown as NativeExpr;
+const elementOf = (expr: NativeExpr | null | undefined): string | undefined =>
+	expr && 'element' in expr ? (expr as unknown as ElementValue).element : undefined;
+/** Elements as JavaScript values while folding, so `===`, `??` and truthiness have their meaning. */
+const ELEMENT_TOKENS = new Map<string, object>();
+const elementToken = (node: string): object => {
+	let token = ELEMENT_TOKENS.get(node);
+	if (!token) ELEMENT_TOKENS.set(node, (token = { node }));
+	return token;
+};
+const tokenElement = new WeakMap<object, string>();
+/** Whether an expression holds an element value anywhere. */
+function mentionsElement(expr: unknown): boolean {
+	if (!expr || typeof expr !== 'object') return false;
+	if ('element' in expr && typeof (expr as ElementValue).element === 'string') return true;
+	return Object.values(expr).some((child) =>
+		Array.isArray(child) ? child.some(mentionsElement) : mentionsElement(child),
+	);
+}
+
+/** The passes of a `for...of` still to run, and the statements after it. */
+type LoopPass = {
+	readonly items: ReadonlyArray<unknown>;
+	readonly name: string;
+	readonly body: ReadonlyArray<SemanticFunctionStatement>;
+	readonly after: ReadonlyArray<SemanticFunctionStatement>;
+};
+
+/** A folded value as an expression again: an element, or JSON as a literal, array or object. */
+function expressionOfValue(value: unknown): NativeExpr | undefined {
+	if (value && typeof value === 'object' && tokenElement.has(value)) return elementValue(tokenElement.get(value)!);
+	if (isScalar(value)) return { literal: value };
+	if (Array.isArray(value)) {
+		const items = value.map(expressionOfValue);
+		return items.every(Boolean) ? { array: items.map((item) => ({ spread: false, value: item! })) } : undefined;
+	}
+	if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+		const entries = Object.entries(value).map(([key, inner]) => [key, expressionOfValue(inner)] as const);
+		return entries.every(([, inner]) => inner) ? { object: entries as (readonly [string, NativeExpr])[] } : undefined;
+	}
+	return undefined;
+}
+
+/** Where a pass of a loop over indices falls off its body without returning: on to the next index. */
+const NEXT_PASS = { literal: null } as NativeExpr;
+
+/** Modifier keys: a tap holds none. */
+const TOUCH_MODIFIERS = new Set(['shiftKey', 'altKey', 'ctrlKey', 'metaKey']);
+
+/** `a.b.c` as written, for naming a call the build refuses. */
+const calleeText = (expression: SemanticExpression): string =>
+	expression.kind === 'read'
+		? expression.name
+		: expression.kind === 'member'
+			? `${calleeText(expression.object)}.${expression.property}`
+			: '(value)';
 
 /** Types whose `typeof` a native value answers exactly; `undefined` and `object` cannot be told apart from null. */
 const EXACT_TYPES = new Set(['string', 'number', 'boolean']);
@@ -344,6 +410,12 @@ function foldConstant(
 ): { readonly value: unknown } | undefined {
 	const fold = (inner: NativeExpr) => foldConstant(inner, initial);
 	if ('literal' in expr) return { value: expr.literal };
+	const element = elementOf(expr);
+	if (element !== undefined) {
+		const token = elementToken(element);
+		tokenElement.set(token, element);
+		return { value: token };
+	}
 	if ('cell' in expr) {
 		const value = initial(expr.cell);
 		return value === undefined ? undefined : { value };
@@ -425,6 +497,7 @@ function foldConstant(
 		const object = fold(expr.member);
 		if (!object) return undefined;
 		const holder = object.value;
+		if (holder && typeof holder === 'object' && tokenElement.has(holder)) return undefined;
 		if (expr.property === 'length' && (typeof holder === 'string' || Array.isArray(holder)))
 			return { value: holder.length };
 		return holder && typeof holder === 'object' && Object.hasOwn(holder, expr.property)
@@ -681,6 +754,7 @@ export function createNativeViewPayload(
 					instance.fields.set(property.name, {
 						kind: 'handle',
 						key: `${prefix}${binding.id}`,
+						plural: binding.plural === true,
 					});
 				else if (fields && property.path.length === 1 && fields.has(property.path[0]!))
 					instance.fields.set(property.name, {
@@ -892,6 +966,198 @@ export function createNativeViewPayload(
 			...(scope.event === name ? { event: undefined } : {}),
 		};
 	};
+	/** Set while handlers are lowered, after the whole tree: only then does every handle know the elements it is bound to. */
+	let lateLowering = false;
+	/** Whether the handler being lowered read the element a tap landed on. */
+	let pressedTargetRead = false;
+	const nodeById = () => new Map(nodes.map((node) => [node.id, node]));
+
+	/** A handle read as a value in a handler: its element (null when unbound), or its elements in order when plural. */
+	const handleValue = (key: string, plural: boolean, what: string): NativeExpr | null => {
+		if (!lateLowering) return refuse(`${what} as a value outside a handler`);
+		const bound = boundHandles.get(key) ?? [];
+		const byId = nodeById();
+		if (bound.some((id) => byId.get(id)?.row))
+			return refuse(`${what}, a handle bound inside a @for row`);
+		if (plural) return { array: bound.map((id) => ({ spread: false, value: elementValue(id) })) };
+		if (bound.length > 1) return refuse(`${what}, a handle bound to more than one element`);
+		return bound[0] ? elementValue(bound[0]) : { literal: null };
+	};
+
+	/** Whether `inner` is `outer` or inside it. */
+	const isWithin = (inner: string, outer: string): boolean => {
+		const byId = nodeById();
+		for (let at: string | null | undefined = inner; at; at = byId.get(at)?.parent) if (at === outer) return true;
+		return false;
+	};
+
+	/** An element's attribute as the web writes it (null when absent), from what it was built with or a binding. */
+	const attributeOf = (element: string, name: string): NativeExpr => {
+		const node = nodeById().get(element);
+		if (node?.kind !== 'element') return { literal: null };
+		const binding = node.bindings?.find((one) => 'attribute' in one && one.attribute === name);
+		if (!binding) return { literal: node.attributes?.[name] ?? null };
+		const value = binding.value;
+		const known = buildTime(value);
+		if (known && (isScalar(known.value) || known.value === undefined)) return { literal: marklessAttributeValue(name, known.value) };
+		const spelled = (flag: boolean): NativeExpr => ({ literal: marklessAttributeValue(name, flag) });
+		return {
+			if: { binary: '===', left: value, right: { literal: null } },
+			whenTrue: { literal: null },
+			whenFalse: {
+				if: { binary: '===', left: value, right: { literal: true } },
+				whenTrue: spelled(true),
+				whenFalse: {
+					if: { binary: '===', left: value, right: { literal: false } },
+					whenTrue: spelled(false),
+					whenFalse: { call: 'String', arguments: [value] },
+				},
+			},
+		};
+	};
+
+	/** `contains`, `getAttribute` and `hasAttribute` on an element known when the app is built. */
+	const elementMethod = (
+		element: string,
+		method: string,
+		args: ReadonlyArray<SemanticExpression>,
+		what: string,
+		scope: Scope,
+	): NativeExpr | null => {
+		const [first, ...more] = args;
+		if (method === 'contains' && first && more.length === 0) {
+			const other = exprOf(first, what, scope);
+			if (!other) return null;
+			const inner = elementOf(other);
+			if (inner !== undefined) return { literal: isWithin(inner, element) };
+			if ('literal' in other && other.literal === null) return { literal: false };
+			return refuse(`${what} asks whether an element contains something other than an element`);
+		}
+		if ((method === 'getAttribute' || method === 'hasAttribute') && first?.kind === 'literal' && typeof first.value === 'string' && more.length === 0) {
+			const value = attributeOf(element, first.value);
+			return method === 'getAttribute' ? value : { binary: '!==', left: value, right: { literal: null } };
+		}
+		return refuse(`${what} calls \`.${method}()\` on an element, which has no native meaning yet`);
+	};
+
+	/** Whether `expr` is known when the app is built (no cell, row item or event read), and what it is then. */
+	const buildTime = (expr: NativeExpr): { readonly value: unknown } | undefined =>
+		cellsOf(expr).size === 0 ? foldConstant(expr, () => undefined) : undefined;
+
+	/**
+	 * A module function's return value where it is called: each statement runs with the values of its locals so far, an
+	 * `if` whose test is known when the app is built takes its branch (else both, joined by a conditional), and a loop over
+	 * a list known then runs its body once per item. `loops` holds the passes still to run of the loops being run.
+	 */
+	function evaluateFunction(
+		statements: ReadonlyArray<SemanticFunctionStatement>,
+		what: string,
+		scope: Scope,
+		locals: ReadonlySet<string>,
+		loops: ReadonlyArray<LoopPass> = [],
+		end: NativeExpr = { literal: null },
+	): NativeExpr | null {
+		const [first, ...rest] = statements;
+		if (!first) {
+			const [loop, ...outer] = loops;
+			if (!loop) return end;
+			return runLoop(loop, what, scope, locals, outer, end);
+		}
+		const next = (inner: Scope, names = locals) => evaluateFunction(rest, what, inner, names, loops, end);
+		switch (first.kind) {
+			case 'unsupported':
+				return refuse(`${what} uses ${first.construct}, which needs a script engine`);
+			case 'return':
+				return exprOf(first.value, what, scope);
+			case 'let':
+			case 'set': {
+				if (first.kind === 'set' && !locals.has(first.name))
+					return refuse(`${what} writes \`${first.name}\`, which is not one of its own names`);
+				const value = exprOf(first.value, what, scope);
+				return value && next(bindName(scope, first.name, value), new Set([...locals, first.name]));
+			}
+			case 'push': {
+				const list = locals.has(first.name) ? scope.args.get(first.name) : undefined;
+				if (!list) return refuse(`${what} pushes onto \`${first.name}\`, which is not one of its own names`);
+				const value = exprOf(first.value, what, scope);
+				if (!value) return null;
+				const grown: NativeExpr =
+					'array' in list
+						? { array: [...list.array, { spread: false, value }] }
+						: { array: [{ spread: true, value: list }, { spread: false, value }] };
+				return next(bindName(scope, first.name, grown));
+			}
+			case 'if': {
+				const test = exprOf(first.test, `${what}'s \`if\` test`, scope);
+				if (!test) return null;
+				const known = buildTime(test);
+				if (known)
+					return evaluateFunction([...(known.value ? first.whenTrue : first.whenFalse), ...rest], what, scope, locals, loops, end);
+				const whenTrue = evaluateFunction([...first.whenTrue, ...rest], what, scope, locals, loops, end);
+				const whenFalse = evaluateFunction([...first.whenFalse, ...rest], what, scope, locals, loops, end);
+				return whenTrue && whenFalse && { if: test, whenTrue, whenFalse };
+			}
+			case 'each': {
+				const list = exprOf(first.list, what, scope);
+				if (!list) return null;
+				const known = buildTime(list);
+				if (!known || !Array.isArray(known.value))
+					return refuse(`${what} loops over a list known only while the app runs`);
+				const loop: LoopPass = { items: known.value, name: first.name, body: first.body, after: rest };
+				return runLoop(loop, what, scope, locals, loops, end);
+			}
+			case 'count': {
+				// Over a list known only while the app runs: a body that only returns one value is `some` over the indices.
+				const over = exprOf(first.over, what, scope);
+				if (!over) return null;
+				const index: NativeExpr = { local: first.name };
+				const passes = evaluateFunction(first.body, what, bindName(scope, first.name, index), new Set(), [], NEXT_PASS);
+				if (!passes) return null;
+				const returned = new Set<string>();
+				const exits = (tree: NativeExpr): NativeExpr => {
+					if (tree === NEXT_PASS) return { literal: false };
+					if ('if' in tree && tree !== NEXT_PASS) return { if: tree.if, whenTrue: exits(tree.whenTrue), whenFalse: exits(tree.whenFalse) };
+					returned.add(JSON.stringify(tree));
+					return { literal: true };
+				};
+				const test = exits(passes);
+				const after = next(scope);
+				if (returned.size === 0 || !after) return after;
+				const [value] = [...returned];
+				if (returned.size > 1 || value!.includes(JSON.stringify(index)))
+					return refuse(`${what} returns from a loop over indices a value that depends on where it stopped`);
+				return {
+					if: { method: 'some', target: over, arguments: [{ lambda: [`${first.name}:item`, first.name], body: test }] },
+					whenTrue: JSON.parse(value!) as NativeExpr,
+					whenFalse: after,
+				};
+			}
+		}
+	}
+
+	/** The next pass of a loop (its name bound to the next item), or what follows the loop once no item is left. */
+	function runLoop(
+		loop: LoopPass,
+		what: string,
+		scope: Scope,
+		locals: ReadonlySet<string>,
+		outer: ReadonlyArray<LoopPass>,
+		end: NativeExpr,
+	): NativeExpr | null {
+		const [item, ...more] = loop.items;
+		if (loop.items.length === 0) return evaluateFunction(loop.after, what, scope, locals, outer, end);
+		const value = expressionOfValue(item);
+		if (!value) return refuse(`${what} loops over a list whose items are not JSON or elements`);
+		return evaluateFunction(
+			loop.body,
+			what,
+			bindName(scope, loop.name, value),
+			new Set([...locals, loop.name]),
+			[{ ...loop, items: more }, ...outer],
+			end,
+		);
+	}
+
 	/** Where a module-level function's body is lowered: only its parameters (bound by the caller) and other functions. */
 	const helperScope = (module: ModuleFacts, caller: Scope): Scope => ({
 		module,
@@ -947,6 +1213,11 @@ export function createNativeViewPayload(
 				}
 				const cell = cellOf(expression.name, scope);
 				if (cell) return { cell };
+				const ownHandle = scope.module.elementBindings.get(`${scope.component}#${expression.name}`);
+				if (ownHandle) {
+					const binding = scope.module.bindingsById.get(ownHandle);
+					return handleValue(`${scope.prefix}${ownHandle}`, binding?.plural === true, `${what} reads \`${expression.name}\``);
+				}
 				if (scope.objects.has(expression.name))
 					return refuse(
 						`${what} reads \`${expression.name}\` whole; a native build reads its fields`,
@@ -1021,9 +1292,19 @@ export function createNativeViewPayload(
 							`${object.instance.definition.name}.${expression.property}`,
 							object.instance.scope,
 						);
+					if (field?.kind === 'handle')
+						return handleValue(field.key, field.plural, `${what} reads \`${holder.name}.${expression.property}\``);
 					return refuse(
 						`${what} reads \`${holder.name}.${expression.property}\` as a value`,
 					);
+				}
+				if (holder.kind === 'read' && holder.name === scope.opaque && !scope.args.has(holder.name)) {
+					if (TOUCH_MODIFIERS.has(expression.property)) return { literal: false };
+					if (scope.pressed && (expression.property === 'target' || expression.property === 'currentTarget')) {
+						if (expression.property === 'target') pressedTargetRead = true;
+						return elementValue(scope.pressed[expression.property]);
+					}
+					return refuse(`${what} reads \`${holder.name}.${expression.property}\`, which a tap on a phone does not have`);
 				}
 				if (
 					scope.event !== undefined &&
@@ -1040,6 +1321,11 @@ export function createNativeViewPayload(
 			case 'call': {
 				const args = all(expression.arguments);
 				return args && { call: expression.callee as NativeBuiltin, arguments: args };
+			}
+			case 'index': {
+				const of = exprOf(expression.object, what, scope);
+				const at = exprOf(expression.index, what, scope);
+				return of && at && { at, of };
 			}
 			case 'apply': {
 				const name = expression.callee;
@@ -1058,14 +1344,14 @@ export function createNativeViewPayload(
 				if (inlining.has(key)) return refuse(`${what} calls \`${name}\` inside itself`);
 				const args = all(expression.arguments);
 				if (!args) return null;
-				const { parameters, body } = found.fn.native;
+				const { parameters, statements } = found.fn.native;
 				const inner = parameters.reduce<Scope>(
 					(bound, parameter, index) => bindName(bound, parameter, args[index] ?? { literal: null }),
 					helperScope(found.module, scope),
 				);
 				inlining.add(key);
 				try {
-					return exprOf(body, `the function \`${found.fn.name}\``, inner);
+					return evaluateFunction(statements, `the function \`${found.fn.name}\``, inner, new Set(parameters));
 				} finally {
 					inlining.delete(key);
 				}
@@ -1089,7 +1375,16 @@ export function createNativeViewPayload(
 					: null;
 			}
 			case 'method': {
-				if (!METHODS.has(expression.method)) return refuse(`${what} calls \`.${expression.method}()\``);
+				if (!METHODS.has(expression.method)) {
+					const mark = diagnostics.length;
+					const holder = exprOf(expression.object, what, scope);
+					const element = elementOf(holder);
+					if (element === undefined) {
+						diagnostics.length = mark;
+						return refuse(`${what} uses a call to \`${calleeText(expression.object)}.${expression.method}\`, which needs a script engine`);
+					}
+					return elementMethod(element, expression.method, expression.arguments, what, scope);
+				}
 				if (expression.method === 'reverse' && expression.object.kind !== 'array')
 					return refuse(`${what} reverses an array in place; reverse a copy (\`[...list].reverse()\`)`);
 				const target = exprOf(expression.object, what, scope);
@@ -1158,6 +1453,11 @@ export function createNativeViewPayload(
 			const target = read.target;
 			if (target.kind === 'text') return [];
 			if (target.kind === 'attribute' && skip.has(target.name)) return [];
+			// A button's `value` is the form value its `value` attribute reflects; only a text field shows one.
+			if (target.kind === 'property' && target.name === 'value' && !TEXT_ENTRY.has(scope.module.tagOf.get(host) ?? '')) {
+				const value = exprOf(read.expression, 'the `value` attribute', scope);
+				return value ? [{ attribute: 'value', value }] : [];
+			}
 			if (target.kind === 'property' && target.name === 'value') {
 				const value = exprOf(read.expression, 'the `value` property', scope);
 				return value ? [{ property: 'value' as const, value }] : [];
@@ -1205,7 +1505,13 @@ export function createNativeViewPayload(
 	const lowered = new Set<string>();
 
 	const events: NativeViewPayload['events'][number][] = [];
-	const handlers: NativeViewPayload['handlers'][number][] = [];
+	const handlers: { readonly id: string; ops: NativeOp[] }[] = [];
+	const pendingHandlers: {
+		readonly handler: { readonly id: string; ops: NativeOp[] };
+		readonly event: SemanticEvent;
+		readonly scope: Scope;
+		readonly host: string;
+	}[] = [];
 	const loweredEvents = new Set<string>();
 	const lowerChunk = (
 		chunk: SemanticMarkupChunk,
@@ -1432,9 +1738,10 @@ export function createNativeViewPayload(
 						refuse(`the ${event.eventName} handler inside a @for row`, event.handlerSpan);
 						continue;
 					}
-					const handler = `handler:${scope.prefix}${event.id}`;
-					events.push({ host: id, event: semantic, handler });
-					handlers.push({ id: handler, ops: handlerOps(event, scope, handler) });
+					const handler = { id: `handler:${scope.prefix}${event.id}`, ops: [] as NativeOp[] };
+					events.push({ host: id, event: semantic, handler: handler.id });
+					handlers.push(handler);
+					pendingHandlers.push({ handler, event, scope, host: id });
 				}
 				continue;
 			}
@@ -1654,7 +1961,12 @@ export function createNativeViewPayload(
 		}
 		close();
 	};
-	function handlerOps(event: SemanticEvent, scope: Scope, handler: string): NativeOp[] {
+	function handlerOps(
+		event: SemanticEvent,
+		scope: Scope,
+		handler: string,
+		pressed?: NonNullable<Scope['pressed']>,
+	): NativeOp[] {
 		const what = `the ${event.eventName} handler`;
 		const [parameter, ...more] = event.handlerParameters;
 		if (more.length > 0) {
@@ -1670,7 +1982,7 @@ export function createNativeViewPayload(
 				? scope
 				: event.eventName === 'input'
 					? { ...scope, event: parameter }
-					: { ...scope, opaque: parameter };
+					: { ...scope, opaque: parameter, ...(pressed ? { pressed } : {}) };
 		snapshots = { handler, count: 0 };
 		return lowerStatements(event.handlerStatements, inner, what, event.handlerSpan, 0).ops;
 	}
@@ -1748,10 +2060,18 @@ export function createNativeViewPayload(
 				return { ops, returns: after.returns };
 			}
 			if (statement.kind === 'if') {
-				const then = lowerStatements(statement.whenTrue, scope, what, span, depth);
-				const otherwise = lowerStatements(statement.whenFalse, scope, what, span, depth);
 				const test = exprOf(statement.test, `${what}'s \`if\` test`, scope);
 				if (!test) return { ops, returns: true };
+				// A test about elements or a tap's modifier keys is answered when the app is built: only its branch is lowered.
+				const known = mentionsElement(test) || lateLowering ? foldConstant(test, () => undefined) : undefined;
+				if (known) {
+					const taken = [...(known.value ? statement.whenTrue : statement.whenFalse), ...statements.slice(index + 1)];
+					const rest = lowerStatements(taken, scope, what, span, depth);
+					ops.push(...rest.ops);
+					return { ops, returns: rest.returns };
+				}
+				const then = lowerStatements(statement.whenTrue, scope, what, span, depth);
+				const otherwise = lowerStatements(statement.whenFalse, scope, what, span, depth);
 				// A branch that returns takes nothing after the `if`; the other branch runs the rest.
 				const rest =
 					then.returns !== otherwise.returns
@@ -1793,6 +2113,20 @@ export function createNativeViewPayload(
 				return [];
 			};
 			if (depth > 8) return notCallable();
+			const command = statement.path?.at(-1);
+			if ((command === 'focus' || command === 'scrollIntoView') && (statement.arguments ?? []).length === 0) {
+				const holder = statement.path!.slice(0, -1).reduce<SemanticExpression>(
+					(object, property) => ({ kind: 'member', object, property }),
+					{ kind: 'read', name: statement.name },
+				);
+				const mark = diagnostics.length;
+				const target = exprOf(holder, `${what}'s call to \`${callee}\``, scope);
+				const element = elementOf(target);
+				if (element !== undefined) return [{ op: 'command', node: element, command }];
+				if (target && 'literal' in target && target.literal === null && statement.optional) return [];
+				if (diagnostics.length > mark) return [];
+				return notCallable();
+			}
 			let body:
 				| {
 						statements: ReadonlyArray<SemanticHandlerStatement> | undefined;
@@ -1907,15 +2241,6 @@ export function createNativeViewPayload(
 	for (const event of graph.events)
 		if (!loweredEvents.has(event.id)) refuse(`the ${event.eventName} handler on an element this build does not show`);
 
-	for (const op of dialogOps) {
-		const bound = boundHandles.get(op.node) ?? [];
-		const element = bound.length === 1 ? nodes.find((node) => node.id === bound[0]) : undefined;
-		if (element?.kind !== 'element' || element.element !== 'dialog' || element.arm || element.row) {
-			refuse(`\`.${op.method}()\` on a handle that is not bound to exactly one <dialog> outside @if and @for`);
-			continue;
-		}
-		op.node = element.id;
-	}
 	for (const reference of handleReferences) {
 		const ids = reference.keys.flatMap((key) =>
 			key === undefined ? [] : (boundHandles.get(key) ?? []),
@@ -1932,6 +2257,71 @@ export function createNativeViewPayload(
 				{ attribute: reference.attribute, value: { literal: ids.join(' ') } },
 			],
 		};
+	}
+
+	// A tap lands on the innermost element that handles it, so a handler that reads `event.target` runs once per element a
+	// part names inside its host (rows, triggers): the containment it asks about is the same for every element within one.
+	lateLowering = true;
+	for (const { handler, event, scope, host } of pendingHandlers) {
+		pressedTargetRead = false;
+		handler.ops = handlerOps(event, scope, handler.id, { target: host, currentTarget: host });
+		if (!pressedTargetRead || SEMANTIC_EVENTS[event.eventName] !== 'activate') continue;
+		const named = new Set([...boundHandles.values()].flat());
+		// What a tap on each element runs; a tap on an element with no handler of its own reaches the nearest one around it.
+		const runs = new Map<string, { readonly id: string; readonly spelled: string }>([
+			[host, { id: handler.id, spelled: JSON.stringify(handler.ops) }],
+		]);
+		const reached = (node: string) => {
+			const byId = nodeById();
+			for (let at = byId.get(node)?.parent; at; at = byId.get(at)?.parent) if (runs.has(at)) return runs.get(at);
+			return undefined;
+		};
+		for (const node of nodes) {
+			if (node.kind !== 'element' || node.id === host || !named.has(node.id) || node.row || !isWithin(node.id, host)) continue;
+			if (events.some((other) => other.host === node.id && other.event === 'activate')) {
+				refuse(`a press on ${node.id} is handled by its own click handler and by the one on ${host}, which reads where it landed`, event.handlerSpan);
+				continue;
+			}
+			const pressed = { target: node.id, currentTarget: host };
+			const marks = { diagnostics: diagnostics.length, cells: cells.length };
+			const rollBack = () => {
+				diagnostics.length = marks.diagnostics;
+				for (const dropped of cells.splice(marks.cells)) cellIndex.delete(dropped.id);
+			};
+			// Lowered as the run it would reach, kept values and all: the same ops mean it needs no handler of its own.
+			const around = reached(node.id);
+			if (around) {
+				const same = JSON.stringify(handlerOps(event, scope, around.id, pressed)) === around.spelled;
+				rollBack();
+				if (same) continue;
+			}
+			const id = `${handler.id}@${node.id}`;
+			const ops = handlerOps(event, scope, id, pressed);
+			// The same refusal once per tapped element says nothing new.
+			const seen = new Set(diagnostics.slice(0, marks.diagnostics).map((diagnostic) => diagnostic.message));
+			diagnostics.splice(marks.diagnostics, diagnostics.length - marks.diagnostics, ...diagnostics.slice(marks.diagnostics).filter((diagnostic) => !seen.has(diagnostic.message)));
+			runs.set(node.id, { id, spelled: JSON.stringify(ops) });
+			events.push({ host: node.id, event: 'activate', handler: id });
+			handlers.push({ id, ops });
+		}
+		// The host's own run does nothing once the elements in it have theirs: it is not a control then.
+		if (handler.ops.length === 0 && runs.size > 1) {
+			events.splice(events.findIndex((entry) => entry.handler === handler.id), 1);
+			handlers.splice(handlers.indexOf(handler), 1);
+		}
+	}
+	for (const handler of handlers)
+		if (mentionsElement(handler.ops)) refuse(`${handler.id} keeps an element as a value, which a native host has no use for yet`);
+	lateLowering = false;
+
+	for (const op of dialogOps) {
+		const bound = boundHandles.get(op.node) ?? [];
+		const element = bound.length === 1 ? nodes.find((node) => node.id === bound[0]) : undefined;
+		if (element?.kind !== 'element' || element.element !== 'dialog' || element.arm || element.row) {
+			refuse(`\`.${op.method}()\` on a handle that is not bound to exactly one <dialog> outside @if and @for`);
+			continue;
+		}
+		op.node = element.id;
 	}
 
 	// Dragon lays out one style assignment per combination of these: every cell a class reads, and every true/false cell

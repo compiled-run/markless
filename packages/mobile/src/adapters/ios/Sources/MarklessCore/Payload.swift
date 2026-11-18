@@ -23,6 +23,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case template([NativeTemplatePart])
 	/// `length` of a string or array, or an own property of an object.
 	case member(NativeExpr, String)
+	/// An array's element at an index computed while the app runs; null when it is not an integer inside the array.
+	case at(NativeExpr, of: NativeExpr)
 	case array([NativeArrayItem])
 	case object([NativeObjectField])
 	case method(NativeMethod, target: NativeExpr, arguments: [NativeExpr])
@@ -45,7 +47,7 @@ public indirect enum NativeExpr: Equatable, Sendable {
 		case let .array(items): return items.flatMap(\.value.cells)
 		case let .object(fields): return fields.flatMap(\.value.cells)
 		case let .method(_, target, arguments): return target.cells + arguments.flatMap(\.cells)
-		case let .binary(_, a, b), let .logical(_, a, b): return a.cells + b.cells
+		case let .binary(_, a, b), let .logical(_, a, b), let .at(a, b): return a.cells + b.cells
 		case let .conditional(test, whenTrue, whenFalse): return test.cells + whenTrue.cells + whenFalse.cells
 		case let .template(parts): return parts.flatMap { if case let .expr(e) = $0 { e.cells } else { [String]() } }
 		case let .call(_, arguments): return arguments.flatMap(\.cells)
@@ -125,6 +127,8 @@ public enum NativeOp: Equatable, Sendable {
 	indirect case when(test: NativeExpr, then: [NativeOp], otherwise: [NativeOp])
 	/// `showModal()` (`open`) or `close()` on a `<dialog>`: the host puts it in its top layer or takes it out.
 	case dialog(node: String, open: Bool)
+	/// `focus()` or `scrollIntoView()` on an element, run once the views show the handler's writes.
+	case command(node: String, command: String)
 }
 
 public struct NativeRouteParam: Equatable, Sendable {
@@ -298,6 +302,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 						throw PayloadError(path: op.path + ".method", reason: "unknown dialog method \"\(method)\"")
 					}
 					return .dialog(node: try opField["node"].string(), open: method == "showModal")
+				case "command":
+					let opField = try op.object(["op", "node", "command"])
+					let command = try opField["command"].string()
+					guard command == "focus" || command == "scrollIntoView" else {
+						throw PayloadError(path: op.path + ".command", reason: "unknown command \"\(command)\"")
+					}
+					return .command(node: try opField["node"].string(), command: command)
 				case "if":
 					let opField = try op.object(["op", "test", "whenTrue", "whenFalse"])
 					return .when(
@@ -371,6 +382,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 				return .expr(try decodeExpr(part))
 			})
 		case ["member", "property"]: return .member(try decodeExpr(try field("member")), try field("property").string())
+		case ["at", "of"]: return .at(try decodeExpr(try field("at")), of: try decodeExpr(try field("of")))
 		case ["array"]:
 			return .array(try field("array").array().map { item in
 				let f = try item.object(["spread", "value"])

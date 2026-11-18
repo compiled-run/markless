@@ -40,6 +40,11 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"dialog\",\"node\":${jsonString(node)},\"open\":$open}"
 	}
 
+	/** A `command` op the handler ran, after every other entry, in order. */
+	data class Command(override val node: String, val command: String) : JournalEntry {
+		override fun toJson() = "{\"op\":\"command\",\"node\":${jsonString(node)},\"command\":${jsonString(command)}}"
+	}
+
 	/** Shows arm [index] of a branch (null: none). */
 	data class Arm(override val node: String, val index: Int?) : JournalEntry {
 		override fun toJson() = "{\"op\":\"arm\",\"node\":${jsonString(node)},\"index\":${index ?: "null"}}"
@@ -113,6 +118,11 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 			}
 			is Expr.If -> if (Js.truthy(eval(e.test))) eval(e.whenTrue) else eval(e.whenFalse)
 			is Expr.Template -> JsValue.Str(e.parts.joinToString("") { if (it is String) it else Js.toStr(eval(it as Expr)) })
+			is Expr.At -> {
+				val list = eval(e.list) as? JsValue.Arr ?: throw MarklessRuntimeError("an index into a value that is not an array")
+				val at = (eval(e.index) as? JsValue.Num)?.value
+				if (at == null || at < 0 || at != Math.floor(at) || at >= list.items.size) JsValue.Null else list.items[at.toInt()]
+			}
 			is Expr.Member -> {
 				val v = eval(e.value)
 				when {
@@ -243,6 +253,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		val beforeArms = arms().toMap()
 		val beforeRows = rows().toMap()
 		eventValue = value
+		val commands = ArrayList<JournalEntry>()
 		fun run(ops: List<Op>): JournalEntry.Navigate? {
 			for (op in ops) when (op) {
 				is Op.Navigate -> return JournalEntry.Navigate(op.route, op.params)
@@ -256,6 +267,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 					if (op.node !in dialogs) throw MarklessRuntimeError("\"${op.node}\" is not a dialog")
 					dialogs[op.node] = op.open
 				}
+				is Op.Command -> commands.add(JournalEntry.Command(op.node, op.command))
 			}
 			return null
 		}
@@ -291,6 +303,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				}
 			}
 		}
+		journal.addAll(commands)
 		return journal
 	}
 }

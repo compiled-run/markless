@@ -114,9 +114,13 @@ function walk(
 				throw new Error(`step ${index}: "${name}" is disabled`);
 			// Typing shows the text in the field at once; the input event then runs the handler.
 			if ('type' in action) properties.set(host, action.type.text);
+			// A touch reaches the nearest element around it that handles a press, as on a phone.
+			let pressed: string | null | undefined = host;
+			while (pressed && !payload.events.some((event) => event.host === pressed && event.event === 'activate'))
+				pressed = nodeOf.get(pressed)?.parent;
 			const dispatched =
 				'tap' in action
-					? runtime.dispatch({ event: 'activate', host })
+					? runtime.dispatch({ event: 'activate', host: pressed ?? host })
 					: runtime.dispatch({ event: 'input', host, value: action.type.text });
 			for (const entry of dispatched) {
 				if (entry.op === 'text') texts.set(entry.node, entry.value);
