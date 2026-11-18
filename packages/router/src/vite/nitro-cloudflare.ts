@@ -39,7 +39,7 @@ interface CloudflareNitro {
 }
 
 /** The binding the Worker reads its deployed version from, so a cached answer never outlives its deploy. */
-export const CLOUDFLARE_VERSION_BINDING = 'MARKLESS_VERSION';
+export const CLOUDFLARE_VERSION_BINDING = 'CF_VERSION_METADATA';
 
 // An app's own version_metadata binding, from Nitro's cloudflare.wrangler option or the wrangler config Nitro merges, is the one read.
 async function versionBinding(nitro: CloudflareNitro): Promise<string> {
