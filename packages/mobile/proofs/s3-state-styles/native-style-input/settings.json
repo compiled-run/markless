@@ -105,7 +105,10 @@
 	"states": [
 		{
 			"cell": "state:on",
-			"domain": [false, true],
+			"domain": [
+				false,
+				true
+			],
 			"initial": false
 		}
 	]
