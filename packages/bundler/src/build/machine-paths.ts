@@ -1,6 +1,5 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join, normalize } from 'pathe';
-import { rootRelativeId } from '../module-id.ts';
 
 const rootsByBuildRoot = new Map<string, string[]>();
 
@@ -83,21 +82,5 @@ function realpathOrSelf(path: string): string {
 		return normalize(realpathSync(path));
 	} catch {
 		return normalize(path);
-	}
-}
-
-// Unminified output names each module in a `//#region <id>` comment; virtual ids there embed the source path.
-export function rootRelativeRegionComments(
-	bundle: Readonly<Record<string, unknown>>,
-	root: string | undefined,
-): void {
-	if (!root) return;
-	for (const output of Object.values(bundle)) {
-		const chunk = output as { type?: string; code?: string };
-		if (chunk.type !== 'chunk' || !chunk.code?.includes('//#region ')) continue;
-		chunk.code = chunk.code.replace(
-			/^(\/\/#region (?:\\0)?)(.+)$/gm,
-			(_, prefix: string, id: string) => `${prefix}${rootRelativeId(id, root)}`,
-		);
 	}
 }
