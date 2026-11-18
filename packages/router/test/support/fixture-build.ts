@@ -5,7 +5,6 @@ import { takeBuildSlot } from './build-slots.ts';
 
 export { holdBuildSlot } from './build-slots.ts';
 
-
 /** The JSON-serializable part of a fixture's `createBuilder` config. */
 export type FixtureBuild = {
 	readonly root: string;
@@ -64,13 +63,6 @@ export async function buildFixture(build: FixtureBuild): Promise<void> {
 			proc.stdout!.on('data', (chunk: Buffer) => (output += chunk));
 			proc.stderr!.on('data', (chunk: Buffer) => (output += chunk));
 			(proc.stdio[3] as NodeJS.ReadableStream).on('data', (chunk: Buffer) => (report += chunk));
-			// A build still running after a minute prints what it has written so far: a stalled build names where it stopped.
-			const started = Date.now();
-			const slow = setInterval(() => {
-				console.error(
-					`[fixture-build] ${build.root} still building after ${Math.round((Date.now() - started) / 1000)} s; its output so far:\n${output.slice(-2000)}`,
-				);
-			}, 60_000);
 			const stall =
 				build.stallMs === undefined
 					? undefined
@@ -81,7 +73,6 @@ export async function buildFixture(build: FixtureBuild): Promise<void> {
 			proc.once('error', fail);
 			proc.once('close', (code, signal) => {
 				clearTimeout(stall);
-				clearInterval(slow);
 				if (code === 0) done();
 				else fail(failure(build, report, output, String(code ?? signal)));
 			});
