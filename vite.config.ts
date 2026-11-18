@@ -6,8 +6,11 @@ import type { PackUserConfig } from 'vite-plus/pack';
 
 import { vitestInstallCacheKey } from './scripts/test-utils/vitest-install-cache-key.ts';
 
-// Tests that build router apps and drive Chromium for the native ladder: their own lane (mobile-hosts.yml), not the unit shards.
-const NATIVE_WEB_TESTS = ['packages/mobile/test/ladder-web.test.ts'];
+// Tests that build router apps and drive Chromium for the native ladder and the yardstick apps: their own lane (mobile-hosts.yml), not the unit shards.
+const NATIVE_WEB_TESTS = [
+	'packages/mobile/test/ladder-web.test.ts',
+	'packages/mobile/test/apps-web.test.ts',
+];
 
 // Per-package pack configs (QDS buildOrder shape): each package builds from
 // its own directory into its own ./dist so publishConfig.exports can target
