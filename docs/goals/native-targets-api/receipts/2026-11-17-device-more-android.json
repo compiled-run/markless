@@ -1,0 +1,144 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 4.363241000000002,
+			"flowSeconds": 19.377240957999998
+		},
+		{
+			"name": "02-styles",
+			"failure": null,
+			"installSeconds": 1.3500324159999946,
+			"flowSeconds": 12.907778624999999
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 1.9224800410000025,
+			"flowSeconds": 22.583487709000007
+		},
+		{
+			"name": "04-attributes",
+			"failure": null,
+			"installSeconds": 2.3570212080000057,
+			"flowSeconds": 23.298883791999994
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 2.3163702499999927,
+			"flowSeconds": 24.673845749999995
+		},
+		{
+			"name": "05b-choices",
+			"failure": null,
+			"installSeconds": 2.4352666659999813,
+			"flowSeconds": 32.609713667
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 1.925462292000011,
+			"flowSeconds": 25.237447208
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 2.615426999999996,
+			"flowSeconds": 21.801072583
+		},
+		{
+			"name": "07b-imported-component",
+			"failure": null,
+			"installSeconds": 2.531701624999987,
+			"flowSeconds": 21.654566749999997
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 2.452442958,
+			"flowSeconds": 21.09726258300003
+		},
+		{
+			"name": "07d-children",
+			"failure": null,
+			"installSeconds": 2.483997792000009,
+			"flowSeconds": 19.921932458000025
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 1.712944084000017,
+			"flowSeconds": 27.43321325000003
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 1.6374890840000007,
+			"flowSeconds": 22.564056250000025
+		},
+		{
+			"name": "10-url-route",
+			"failure": null,
+			"installSeconds": 0.8137993750000023,
+			"flowSeconds": 9.559315292000013
+		},
+		{
+			"name": "d1-network",
+			"failure": null,
+			"installSeconds": 0.7399050000000279,
+			"flowSeconds": 27.38123337500001
+		},
+		{
+			"name": "d2-haptics",
+			"failure": null,
+			"installSeconds": 0.7287598749999888,
+			"flowSeconds": 12.325681374999986
+		},
+		{
+			"name": "d3-location",
+			"failure": null,
+			"installSeconds": 0.7891597499999916,
+			"flowSeconds": 19.120915916999977
+		},
+		{
+			"name": "d4-camera",
+			"failure": null,
+			"installSeconds": 0.8503192500000004,
+			"flowSeconds": 29.06278266699996
+		},
+		{
+			"name": "d4b-photo-refused",
+			"failure": null,
+			"installSeconds": 1.3116248749999795,
+			"flowSeconds": 15.720840749999974
+		},
+		{
+			"name": "d5-recorder",
+			"failure": null,
+			"installSeconds": 1.106507249999966,
+			"flowSeconds": 59.469821666
+		},
+		{
+			"name": "d6-sharesheet",
+			"failure": null,
+			"installSeconds": 1.8130103329999838,
+			"flowSeconds": 15.138669375000056
+		},
+		{
+			"name": "d7-settings",
+			"failure": null,
+			"installSeconds": 1.435575959000038,
+			"flowSeconds": 31.839721416999936
+		},
+		{
+			"name": "p1-platform",
+			"failure": null,
+			"installSeconds": 2.2142427500000923,
+			"flowSeconds": 11.871089000000037
+		}
+	]
+}

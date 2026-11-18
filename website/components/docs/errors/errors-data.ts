@@ -4762,7 +4762,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'A device feature has no usage text: a Markless runtime error.',
 		printed: [
-			'MARKLESS_DEVICE_USAGE_MISSING: <key> has no usage text; add device.usage.<feature> to the app config',
+			'MARKLESS_DEVICE_USAGE_MISSING: <feature> needs usage text for <key>; add device.usage.<feature> to the app config',
 			'The app uses <feature>, and iOS refuses to ask for it without a sentence saying why.',
 			'Set device.usage.<feature> to the sentence the person sees when asked.',
 			'https://markless.dev/errors/MARKLESS_DEVICE_USAGE_MISSING',
@@ -4788,15 +4788,15 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'A device feature is absent on the web: a Markless build error.',
 		printed: [
-			'MARKLESS_DEVICE_WEB_ABSENT: `<expressionSource>` needs an answer from `<name>`, which a web build does not have; <state>',
+			'MARKLESS_DEVICE_WEB_ABSENT: `<expressionSource>` needs an answer from `<name>`, which a web build does not have; put it inside a `platform` check, such as `@if (!platform.web)`, in the component that uses it (a check in a parent in another file does not cover it)',
 			'On the web, @markless/device features are absent: there is no value to show or wait for.',
-			'Wrap it in @if (<name>.supported) { ... } in markup, or start the handler with if (!<name>.supported) return;',
+			'Wrap the use in @if (!platform.web) { ... } in the markup of the component that uses it, or start the handler with if (platform.web) return;',
 			'https://markless.dev/errors/MARKLESS_DEVICE_WEB_ABSENT',
 		],
 		structured: true,
 		why: 'On the web, @markless/device features are absent: there is no value to show or wait for.',
 		suggestion:
-			'Wrap it in @if (<name>.supported) { ... } in markup, or start the handler with if (!<name>.supported) return;',
+			'Wrap the use in @if (!platform.web) { ... } in the markup of the component that uses it, or start the handler with if (platform.web) return;',
 		sources: [
 			{
 				id: 'f0',

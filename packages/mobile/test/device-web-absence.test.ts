@@ -2,22 +2,18 @@ import { readFileSync } from 'node:fs';
 import { compileTsrxModule, DEVICE_TARGET_FACTS } from '@markless/compiler';
 import { describe, expect, it } from 'vitest';
 
-// Web absence of `@markless/device`, compiled for the web under each candidate for a use that needs an answer:
-// (a) `build-error` refuses it unless a `supported` check rules it out; (b) `reject` leaves it to the web module.
+// Web absence of `@markless/device`: a use that needs an answer builds only inside a `platform` check the build can
+// see in the same component; anything else is refused naming that check.
 const fixture = (name: string) =>
-	readFileSync(new URL(`./fixtures/w4/${name}.tsrx`, import.meta.url), 'utf8');
+	readFileSync(new URL(`./fixtures/web-guard/${name}.tsrx`, import.meta.url), 'utf8');
 
-const web = (
-	source: string,
-	deviceWebAnswers: 'build-error' | 'platform-only' | 'reject' = 'build-error',
-) =>
+const web = (source: string) =>
 	compileTsrxModule({
 		filename: 'src/App.tsrx',
 		source,
 		symbols: [],
 		deviceTargetFacts: DEVICE_TARGET_FACTS,
 		target: 'web',
-		deviceWebAnswers,
 	});
 
 const clientCode = (compiled: Awaited<ReturnType<typeof web>>) =>
@@ -29,8 +25,8 @@ const clientCode = (compiled: Awaited<ReturnType<typeof web>>) =>
 const codes = (compiled: Awaited<ReturnType<typeof web>>) =>
 	compiled.semanticGraph.diagnostics.map((diagnostic) => diagnostic.code);
 
-describe('candidate a: a use that needs an answer must sit behind a check the build can see', () => {
-	it.each(['location-a', 'photo-a'])(
+describe('a use that needs an answer sits behind a platform check in its own component', () => {
+	it.each(['location-guarded', 'photo-guarded', 'location-parent-guard'])(
 		'%s builds, and its client code never names @markless/device',
 		async (name) => {
 			const compiled = await web(fixture(name));
@@ -41,60 +37,49 @@ describe('candidate a: a use that needs an answer must sit behind a check the bu
 		},
 	);
 
-	it.each(['location-b', 'photo-b'])('%s, unguarded, is refused naming the use', async (name) => {
-		const compiled = await web(fixture(name));
-		expect(codes(compiled)).toContain('MARKLESS_DEVICE_WEB_ABSENT');
-		expect(compiled.semanticGraph.diagnostics[0]!.message).toMatch(
-			/needs an answer from `(location|camera)`/,
+	it.each(['location-unguarded', 'photo-unguarded'])(
+		'%s, unguarded, is refused naming the use and a platform check',
+		async (name) => {
+			const compiled = await web(fixture(name));
+			expect(codes(compiled)).toContain('MARKLESS_DEVICE_WEB_ABSENT');
+			expect(compiled.semanticGraph.diagnostics[0]!.message).toMatch(
+				/needs an answer from `(location|camera)`.*put it inside a `platform` check/,
+			);
+		},
+	);
+
+	it("a child in another file is not covered by its parent's check, and the message says where the check goes", async () => {
+		const compiled = await web(fixture('location-child'));
+		expect(codes(compiled)).toEqual(['MARKLESS_DEVICE_WEB_ABSENT']);
+		expect(compiled.semanticGraph.diagnostics[0]!.message).toContain(
+			'in the component that uses it (a check in a parent in another file does not cover it)',
 		);
+	});
+
+	it('a `supported` field is no check: the build refuses it as a use', async () => {
+		const compiled = await web(`import { location } from '@markless/device';
+export default function App() @{
+	<main>
+		@if (location.supported) {
+			<p>Here</p>
+		}
+	</main>
+}
+`);
+		expect(codes(compiled)).toEqual(['MARKLESS_DEVICE_WEB_ABSENT']);
 	});
 
 	it('removes a guarded early return and what follows it in a handler', async () => {
 		const compiled = await web(`import { state } from '@markless/core';
-import { camera } from '@markless/device';
+import { location, platform } from '@markless/device';
 export default function App() @{
-	let photo = state('');
-	<button onClick={async () => { if (!camera.supported) return; photo = (await camera.takePhoto()).url; }}>Take</button>
+	let where = state(0);
+	<button onClick={async () => { if (platform.web) return; where = (await location.current()).latitude; }}>Where</button>
 }
 `);
 		expect(codes(compiled)).toEqual([]);
 		expect(clientCode(compiled)).toContain('if (true) return');
 	});
-});
-
-describe('candidate b: the web module rejects, and the build says nothing', () => {
-	it.each(['location-b', 'photo-b'])(
-		'%s builds and its client code keeps the call',
-		async (name) => {
-			const compiled = await web(fixture(name), 'reject');
-			expect(codes(compiled)).toEqual([]);
-			expect(clientCode(compiled) + compiled.publicRenderModule.ssrModuleSource).toContain(
-				'@markless/device',
-			);
-		},
-	);
-});
-
-describe('candidate c: only a platform check rules a use out on the web', () => {
-	it.each(['location-c', 'photo-c'])(
-		'%s, behind a platform check, builds with no device code',
-		async (name) => {
-			const compiled = await web(fixture(name), 'platform-only');
-			expect(codes(compiled)).toEqual([]);
-			expect(clientCode(compiled)).not.toContain('@markless/device');
-		},
-	);
-
-	it.each(['location-a', 'photo-a'])(
-		'%s, behind a supported check, is refused naming a platform check',
-		async (name) => {
-			const compiled = await web(fixture(name), 'platform-only');
-			expect(codes(compiled)).toContain('MARKLESS_DEVICE_WEB_ABSENT');
-			expect(compiled.semanticGraph.diagnostics[0]!.message).toContain(
-				'put it inside a `platform` check',
-			);
-		},
-	);
 });
 
 describe('W2: a device element renders nothing on the web', () => {

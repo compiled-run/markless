@@ -1,0 +1,9 @@
+{
+	"device": {
+		"usage": {
+			"location": "Shows where you are on this screen.",
+			"camera": "Takes the photo you ask for on this screen.",
+			"microphone": "Records the clip you ask for on this screen."
+		}
+	}
+}

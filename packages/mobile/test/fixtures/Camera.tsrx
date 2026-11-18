@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import { camera } from '@markless/device';
+import { camera, platform } from '@markless/device';
 import { base } from '@markless/ui';
 
 function Shooter() @{
@@ -34,7 +34,7 @@ export default function App() @{
 	<main>
 		<h1>Camera</h1>
 		<p>Access {camera.access}</p>
-		@if (camera.supported) {
+		@if (!platform.web) {
 			<Shooter />
 		} @else {
 			<p>No camera here</p>

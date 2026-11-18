@@ -1,0 +1,558 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:open",
+				"name": "open",
+				"initial": true
+			},
+			{
+				"id": "device:recorder.access",
+				"name": "recorder.access",
+				"initial": "unknown",
+				"device": "recorder.access"
+			},
+			{
+				"id": "object:component-edge:0/rec:active",
+				"name": "rec.active",
+				"initial": false,
+				"device": "recorder.active",
+				"object": "object:component-edge:0/rec"
+			},
+			{
+				"id": "object:component-edge:0/rec:seconds",
+				"name": "rec.seconds",
+				"initial": 0,
+				"device": "recorder.seconds",
+				"object": "object:component-edge:0/rec"
+			},
+			{
+				"id": "object:component-edge:0/rec:clip",
+				"name": "rec.clip",
+				"initial": null,
+				"device": "recorder.clip",
+				"object": "object:component-edge:0/rec"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "h1",
+				"parent": "h6"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Recorder"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "div",
+				"parent": "h6"
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "button",
+				"parent": "h8"
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "state:open"
+							},
+							"whenTrue": {
+								"literal": "Close recorder"
+							},
+							"whenFalse": {
+								"literal": "Open recorder"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:1",
+				"parent": "h8",
+				"test": {
+					"cell": "state:open"
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "section",
+				"parent": "h8",
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h1",
+				"element": "p",
+				"parent": "component-edge:0/h0",
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h1:text0",
+				"parent": "component-edge:0/h1",
+				"parts": [
+					{
+						"text": "Access "
+					},
+					{
+						"cell": "device:recorder.access"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h2",
+				"element": "button",
+				"parent": "component-edge:0/h0",
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h2:text0",
+				"parent": "component-edge:0/h2",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "object:component-edge:0/rec:active"
+							},
+							"whenTrue": {
+								"literal": "Stop"
+							},
+							"whenFalse": {
+								"literal": "Record"
+							}
+						}
+					}
+				],
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h3",
+				"element": "p",
+				"parent": "component-edge:0/h0",
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h3:text0",
+				"parent": "component-edge:0/h3",
+				"parts": [
+					{
+						"text": "Seconds "
+					},
+					{
+						"cell": "object:component-edge:0/rec:seconds"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h4",
+				"element": "p",
+				"parent": "component-edge:0/h0",
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h4:text0",
+				"parent": "component-edge:0/h4",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"binary": ">=",
+								"left": {
+									"cell": "object:component-edge:0/rec:seconds"
+								},
+								"right": {
+									"literal": 8
+								}
+							},
+							"whenTrue": {
+								"literal": "Long enough"
+							},
+							"whenFalse": {
+								"literal": "Too short"
+							}
+						}
+					}
+				],
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "branch",
+				"id": "component-edge:0/branch-site:0",
+				"parent": "component-edge:0/h0",
+				"test": {
+					"binary": "!==",
+					"left": {
+						"cell": "object:component-edge:0/rec:clip"
+					},
+					"right": {
+						"literal": null
+					}
+				},
+				"arms": 2,
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h5",
+				"element": "audio",
+				"parent": "component-edge:0/h0",
+				"attributes": {
+					"controls": ""
+				},
+				"bindings": [
+					{
+						"attribute": "src",
+						"value": {
+							"cell": "object:component-edge:0/rec:clip"
+						}
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			}
+		],
+		"events": [
+			{
+				"host": "h9",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "component-edge:0/h2",
+				"event": "activate",
+				"handler": "handler:component-edge:0/event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:open",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:open"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:0/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "object:component-edge:0/rec:active",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "object:component-edge:0/rec:active"
+							}
+						}
+					},
+					{
+						"op": "call",
+						"call": "recorder.active",
+						"object": "object:component-edge:0/rec",
+						"arguments": [
+							{
+								"cell": "object:component-edge:0/rec:active"
+							}
+						]
+					}
+				]
+			}
+		],
+		"objects": [
+			{
+				"id": "object:component-edge:0/rec",
+				"device": "recorder",
+				"owner": "component-edge:0/h0"
+			}
+		]
+	},
+	"initial": [
+		["h7:text0", "Recorder"],
+		["h9:text0", "Close recorder"],
+		["component-edge:0/h1:text0", "Access unknown"],
+		["component-edge:0/h2:text0", "Record"],
+		["component-edge:0/h3:text0", "Seconds 0"],
+		["component-edge:0/h4:text0", "Too short"]
+	],
+	"initialArms": [
+		["branch-site:1", 0],
+		["component-edge:0/branch-site:0", 1]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h2:text0",
+					"value": "Stop"
+				},
+				{
+					"op": "call",
+					"call": "recorder.active",
+					"object": "object:component-edge:0/rec",
+					"arguments": [true]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "device",
+				"cell": "device:recorder.access",
+				"value": "denied"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h1:text0",
+					"value": "Access denied"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "device",
+				"cell": "object:component-edge:0/rec:active",
+				"value": false
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h2:text0",
+					"value": "Record"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "device",
+				"cell": "device:recorder.access",
+				"value": "granted"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h1:text0",
+					"value": "Access granted"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h2:text0",
+					"value": "Stop"
+				},
+				{
+					"op": "call",
+					"call": "recorder.active",
+					"object": "object:component-edge:0/rec",
+					"arguments": [true]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "device",
+				"cell": "object:component-edge:0/rec:seconds",
+				"value": 8
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h3:text0",
+					"value": "Seconds 8"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h4:text0",
+					"value": "Long enough"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h2:text0",
+					"value": "Record"
+				},
+				{
+					"op": "call",
+					"call": "recorder.active",
+					"object": "object:component-edge:0/rec",
+					"arguments": [false]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "device",
+				"cell": "object:component-edge:0/rec:clip",
+				"value": "file:///clip.m4a"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h2:text0",
+					"value": "Stop"
+				},
+				{
+					"op": "call",
+					"call": "recorder.active",
+					"object": "object:component-edge:0/rec",
+					"arguments": [true]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h9"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h9:text0",
+					"value": "Open recorder"
+				},
+				{
+					"op": "arm",
+					"node": "branch-site:1",
+					"index": 1
+				},
+				{
+					"op": "release",
+					"object": "object:component-edge:0/rec"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "device",
+				"cell": "object:component-edge:0/rec:active",
+				"value": false
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h9"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h9:text0",
+					"value": "Close recorder"
+				},
+				{
+					"op": "arm",
+					"node": "branch-site:1",
+					"index": 0
+				}
+			]
+		}
+	]
+}

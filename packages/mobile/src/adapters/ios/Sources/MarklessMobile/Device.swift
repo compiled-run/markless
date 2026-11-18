@@ -2,6 +2,7 @@
 import AVFoundation
 import CoreLocation
 import Foundation
+import LinkPresentation
 import MarklessCore
 import Network
 import UIKit
@@ -25,6 +26,8 @@ public protocol NativeDevice: AnyObject {
 	/// The view that shows a device object (a camera's preview). It runs while it is in a window and releases the device
 	/// when it leaves one.
 	func view(for object: String, device: String) throws -> UIView
+	/// The device object's owner left the screen: stop it (a recorder keeps no clip) and reset its fields.
+	func release(_ object: String)
 }
 
 /// A camera's picture: an `AVCaptureVideoPreviewLayer`. Its session runs while the view is in a window.
@@ -110,6 +113,7 @@ final class CameraObject: NSObject, AVCapturePhotoCaptureDelegate {
 
 	/// The photo from this camera's own session, once it is ready: written to a file, answered as `{ url, width, height }`.
 	func takePhoto(_ answer: @escaping (DeviceOutcome) -> Void) {
+		if cameraRefused() { return answer(.error(name: "NotAllowedError", message: "The camera was refused")) }
 		guard ready else {
 			waitingForReady.append { [weak self] in self?.takePhoto(answer) }
 			return
@@ -145,12 +149,130 @@ public func savePhoto(_ data: Data, size: CGSize) -> DeviceOutcome {
 	]))
 }
 
+/// Whether the person (or a device policy) has refused the camera.
+public func cameraRefused() -> Bool {
+	[.denied, .restricted].contains(AVCaptureDevice.authorizationStatus(for: .video))
+}
+
 private func cameraAccess() -> String {
 	switch AVCaptureDevice.authorizationStatus(for: .video) {
 	case .notDetermined: return "unknown"
 	case .restricted: return "blocked"
 	case .denied: return "denied"
 	default: return "granted"
+	}
+}
+
+/// One recorder object: an `AVAudioRecorder` writing a temporary AAC file while `active`.
+@MainActor
+final class RecorderObject {
+	private var recorder: AVAudioRecorder?
+	private var timer: Timer?
+	private var wanted = false
+	private(set) var seconds = 0
+	private(set) var clip: NativeValue = .null
+	var changed: (_ field: String, _ value: NativeValue) -> Void = { _, _ in }
+
+	var active: Bool { recorder != nil }
+
+	/// A writable field: `active`. Asks for the microphone when needed; a refusal or a failed start snaps it back to false.
+	func set(active now: Bool) {
+		wanted = now
+		guard now else { return stop(keep: true) }
+		guard recorder == nil else { return }
+		switch AVAudioApplication.shared.recordPermission {
+		case .granted: start()
+		case .undetermined:
+			Task {
+				let granted = await AVAudioApplication.requestRecordPermission()
+				self.changed("access", .string(recorderAccess()))
+				if !granted { return self.changed("active", .bool(false)) }
+				if self.wanted, self.recorder == nil { self.start() }
+			}
+		default: changed("active", .bool(false))
+		}
+	}
+
+	private func start() {
+		let url = FileManager.default.temporaryDirectory.appending(path: "markless-clip-\(UUID().uuidString).m4a")
+		let settings: [String: Any] = [AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 44_100, AVNumberOfChannelsKey: 1]
+		do {
+			let session = AVAudioSession.sharedInstance()
+			try session.setCategory(.playAndRecord, options: [.defaultToSpeaker])
+			try session.setActive(true)
+			let made = try AVAudioRecorder(url: url, settings: settings)
+			guard made.record() else { return changed("active", .bool(false)) }
+			recorder = made
+		} catch {
+			return changed("active", .bool(false))
+		}
+		seconds = 0
+		changed("active", .bool(true))
+		changed("seconds", .number(0))
+		timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+			MainActor.assumeIsolated {
+				guard let self, self.recorder != nil else { return }
+				self.seconds += 1
+				self.changed("seconds", .number(Double(self.seconds)))
+			}
+		}
+	}
+
+	/// Stops recording; with `keep`, `clip` becomes the file's URL, otherwise the file is deleted.
+	private func stop(keep: Bool) {
+		timer?.invalidate()
+		timer = nil
+		guard let recorder else { return }
+		self.recorder = nil
+		recorder.stop()
+		try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+		if keep {
+			clip = .string(recorder.url.absoluteString)
+			changed("clip", clip)
+		} else {
+			recorder.deleteRecording()
+		}
+	}
+
+	func release() {
+		wanted = false
+		stop(keep: false)
+		seconds = 0
+		clip = .null
+		changed("active", .bool(false))
+		changed("seconds", .number(0))
+		changed("clip", .null)
+	}
+}
+
+private func recorderAccess() -> String {
+	switch AVAudioApplication.shared.recordPermission {
+	case .undetermined: return "unknown"
+	case .denied: return "denied"
+	default: return "granted"
+	}
+}
+
+/// Gives the share sheet the link and its title, so the sheet's header shows the title.
+final class ShareItem: NSObject, UIActivityItemSource {
+	let url: URL
+	let title: String?
+
+	init(url: URL, title: String?) {
+		self.url = url
+		self.title = title
+	}
+
+	func activityViewControllerPlaceholderItem(_ controller: UIActivityViewController) -> Any { url }
+
+	func activityViewController(_ controller: UIActivityViewController, itemForActivityType type: UIActivity.ActivityType?) -> Any? { url }
+
+	func activityViewControllerLinkMetadata(_ controller: UIActivityViewController) -> LPLinkMetadata? {
+		let metadata = LPLinkMetadata()
+		metadata.originalURL = url
+		metadata.url = url
+		metadata.title = title
+		return metadata
 	}
 }
 
@@ -164,6 +286,7 @@ public final class PlatformDevice: NSObject, NativeDevice, CLLocationManagerDele
 	private var waitingForAccess: [@MainActor () -> Void] = []
 	private var waitingForPosition: [@MainActor (DeviceOutcome) -> Void] = []
 	private var cameras: [String: CameraObject] = [:]
+	private var recorders: [String: RecorderObject] = [:]
 
 	public override init() {
 		online = path.currentPath.status == .satisfied
@@ -187,6 +310,21 @@ public final class PlatformDevice: NSObject, NativeDevice, CLLocationManagerDele
 		return made
 	}
 
+	private func recorder(_ object: String) -> RecorderObject {
+		if let known = recorders[object] { return known }
+		let made = RecorderObject()
+		made.changed = { [weak self] field, value in
+			self?.set(field == "access" ? "recorder.access" : self?.key("recorder.\(field)", object) ?? "", value)
+		}
+		recorders[object] = made
+		return made
+	}
+
+	public func release(_ object: String) {
+		cameras[object]?.release()
+		recorders[object]?.release()
+	}
+
 	public func read(_ name: String, object: String?) throws -> NativeValue {
 		switch (name, object) {
 		case ("network.online", nil): return .bool(online)
@@ -194,6 +332,10 @@ public final class PlatformDevice: NSObject, NativeDevice, CLLocationManagerDele
 		case ("camera.access", nil): return .string(cameraAccess())
 		case let ("camera.ready", object?): return .bool(camera(object).ready)
 		case let ("camera.facing", object?): return .string(camera(object).facing)
+		case ("recorder.access", nil): return .string(recorderAccess())
+		case let ("recorder.active", object?): return .bool(recorder(object).active)
+		case let ("recorder.seconds", object?): return .number(Double(recorder(object).seconds))
+		case let ("recorder.clip", object?): return recorder(object).clip
 		default: throw HostError("this device has no live value \(name)")
 		}
 	}
@@ -232,6 +374,19 @@ public final class PlatformDevice: NSObject, NativeDevice, CLLocationManagerDele
 		case let ("camera.facing", object?):
 			guard case let .string(wanted)? = arguments.first else { throw HostError("camera.facing takes one string") }
 			camera(object).set(facing: wanted)
+		case let ("recorder.active", object?):
+			guard case let .bool(now)? = arguments.first else { throw HostError("recorder.active takes one boolean") }
+			recorder(object).set(active: now)
+		case ("sharesheet.open", nil):
+			guard case let .object(fields)? = arguments.first, case let .string(link)? = fields.get("url"), let url = URL(string: link) else {
+				throw HostError("sharesheet.open takes { title?, url }")
+			}
+			let title: String? = if case let .string(text)? = fields.get("title") { text } else { nil }
+			share(ShareItem(url: url, title: title)) { settle?($0) }
+		case ("settings.open", nil):
+			guard let url = URL(string: UIApplication.openSettingsURLString) else { throw HostError("this device has no Settings link") }
+			UIApplication.shared.open(url)
+			settle?(.value(.null))
 		case ("location.current", nil):
 			let answer = settle ?? { _ in }
 			locations.delegate = self
@@ -247,6 +402,20 @@ public final class PlatformDevice: NSObject, NativeDevice, CLLocationManagerDele
 		default:
 			throw HostError("this device has no call \(name)")
 		}
+	}
+
+	/// Shows the share sheet over the key window's top-most screen; answers null once it closes, shared or not.
+	private func share(_ item: ShareItem, _ answer: @escaping @MainActor (DeviceOutcome) -> Void) {
+		let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first(where: \.isKeyWindow)
+		guard var top = window?.rootViewController else { return answer(.error(name: "Error", message: "There is no screen to show the share sheet on")) }
+		while let presented = top.presentedViewController { top = presented }
+		let sheet = UIActivityViewController(activityItems: [item], applicationActivities: nil)
+		sheet.completionWithItemsHandler = { _, _, _, _ in answer(.value(.null)) }
+		if let popover = sheet.popoverPresentationController {
+			popover.sourceView = top.view
+			popover.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
+		}
+		top.present(sheet, animated: true)
 	}
 
 	private func locate(_ answer: @escaping @MainActor (DeviceOutcome) -> Void) {

@@ -1,0 +1,133 @@
+{
+	"rung": "D5",
+	"name": "A recorder object: active turns recording on and off, seconds live, a playable clip, a refusal snaps back, release",
+	"permissions": {
+		"microphone": "unset"
+	},
+	"steps": [
+		{
+			"visible": [
+				"Recorder",
+				"Close recorder",
+				"Access unknown",
+				"Record",
+				"Seconds 0",
+				"Too short"
+			],
+			"absent": ["Stop", "Play"],
+			"calls": [],
+			"microphone": "off"
+		},
+		{
+			"do": {
+				"tap": "Record"
+			},
+			"prompt": "microphone",
+			"visible": ["Stop", "Access unknown"],
+			"absent": ["Record"]
+		},
+		{
+			"do": {
+				"answer": "deny"
+			},
+			"visible": ["Record", "Access denied", "Seconds 0"],
+			"absent": ["Stop", "Access unknown", "Play"],
+			"calls": ["recorder.active"],
+			"microphone": "off"
+		},
+		{
+			"do": {
+				"relaunch": true,
+				"permissions": {
+					"microphone": "unset"
+				}
+			},
+			"visible": ["Record"],
+			"absent": ["Stop"],
+			"calls": [],
+			"visibleOn": {
+				"ios": ["Access unknown"],
+				"android": ["Access denied"]
+			}
+		},
+		{
+			"do": {
+				"tap": "Record"
+			},
+			"prompt": "microphone",
+			"visible": ["Stop"],
+			"absent": ["Record"],
+			"visibleOn": {
+				"ios": ["Access unknown"],
+				"android": ["Access denied"]
+			}
+		},
+		{
+			"do": {
+				"answer": "allow"
+			},
+			"visible": ["Stop", "Access granted", "Too short"],
+			"absent": ["Record", "Access unknown", "Access denied", "Long enough"],
+			"calls": ["recorder.active"],
+			"microphone": "on"
+		},
+		{
+			"do": {
+				"wait": 9000
+			},
+			"visible": ["Long enough", "Stop"],
+			"absent": ["Too short", "Seconds 0"],
+			"microphone": "on"
+		},
+		{
+			"do": {
+				"tap": "Stop"
+			},
+			"visible": ["Record", "Play", "Long enough"],
+			"absent": ["Stop"],
+			"calls": ["recorder.active", "recorder.active"],
+			"microphone": "off"
+		},
+		{
+			"do": {
+				"tap": "Play"
+			},
+			"visible": ["Pause", "Record"],
+			"absent": ["Play"]
+		},
+		{
+			"do": {
+				"tap": "Record"
+			},
+			"visible": ["Stop"],
+			"absent": ["Record"],
+			"calls": ["recorder.active", "recorder.active", "recorder.active"],
+			"microphone": "on"
+		},
+		{
+			"do": {
+				"tap": "Close recorder"
+			},
+			"visible": ["Open recorder"],
+			"absent": ["Close recorder", "Stop", "Record", "Access granted"],
+			"microphone": "off"
+		},
+		{
+			"do": {
+				"tap": "Open recorder"
+			},
+			"visible": ["Close recorder", "Record", "Seconds 0", "Too short", "Access granted"],
+			"absent": ["Open recorder", "Stop", "Play", "Pause"],
+			"microphone": "off"
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Recorder", "No microphone here"],
+				"absent": ["Record", "Close recorder"]
+			}
+		],
+		"absentFromOutput": ["Close recorder", "Too short", "Long enough", "@markless/device"]
+	}
+}

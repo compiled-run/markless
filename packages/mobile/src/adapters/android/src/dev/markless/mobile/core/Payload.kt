@@ -119,11 +119,11 @@ data class Cell(val id: String, val name: String, val initial: JsValue, val stor
 data class Event(val host: String, val event: EventName, val handler: String)
 data class Handler(val id: String, val ops: List<Op>)
 
-/** What a handler does once a device call it awaited answers: [ops] with the answer read as `{ local: as }`. */
-data class Continuation(val id: String, val local: String, val ops: List<Op>)
+/** What a handler does once a device call it awaited answers: [ops] with the answer read as `{ local: as }`; when the call fails, [catch] (the nearest `@catch`'s cell) takes the error. */
+data class Continuation(val id: String, val local: String, val ops: List<Op>, val catch: String? = null)
 
-/** A device object a component makes (`const cam = camera()`). */
-data class DeviceObject(val id: String, val device: String)
+/** A device object a component makes (`const cam = camera()`); it lives while its [owner] node is shown. */
+data class DeviceObject(val id: String, val device: String, val owner: String)
 
 data class Payload(
 	val component: String,
@@ -181,8 +181,10 @@ data class Payload(
 			}
 			val objects = root["objects"]?.arr("payload.objects")?.mapIndexed { n, v ->
 				val o = v.obj("objects[$n]")
-				o.only(setOf("id", "device"), "objects[$n]")
-				DeviceObject(o.field("id", "objects[$n]").str("objects[$n].id"), o.field("device", "objects[$n]").str("objects[$n].device"))
+				o.only(setOf("id", "device", "owner"), "objects[$n]")
+				val owner = o.field("owner", "objects[$n]").str("objects[$n].owner")
+				if (owner !in seen) throw MarklessDecodeError("objects[$n] is owned by unknown node \"$owner\"")
+				DeviceObject(o.field("id", "objects[$n]").str("objects[$n].id"), o.field("device", "objects[$n]").str("objects[$n].device"), owner)
 			} ?: emptyList()
 			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, objects)
 		}
@@ -384,8 +386,10 @@ data class Payload(
 				val result = o["result"]?.str("$what.result")
 				if (result != null && result !in cells) throw MarklessDecodeError("$what settles unknown cell \"$result\"")
 				val after = o["after"]?.obj("$what.after")?.let { t ->
-					t.only(setOf("id", "as", "ops"), "$what.after")
-					Continuation(t.field("id", what).str("$what.after.id"), t.field("as", what).str("$what.after.as"), t.field("ops", what).arr("$what.after.ops").mapIndexed { n, inner -> op(inner, "$what.after.ops[$n]", cells) })
+					t.only(setOf("id", "as", "ops", "catch"), "$what.after")
+					val catch = t["catch"]?.str("$what.after.catch")
+					if (catch != null && catch !in cells) throw MarklessDecodeError("$what.after catches into unknown cell \"$catch\"")
+					Continuation(t.field("id", what).str("$what.after.id"), t.field("as", what).str("$what.after.as"), t.field("ops", what).arr("$what.after.ops").mapIndexed { n, inner -> op(inner, "$what.after.ops[$n]", cells) }, catch)
 				}
 				return Op.Call(o.field("call", what).str("$what.call"), args, result, o["object"]?.str("$what.object"), after)
 			}

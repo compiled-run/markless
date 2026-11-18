@@ -131,6 +131,8 @@ public struct NativeContinuation: Equatable, Sendable {
 	public let id: String
 	public let `as`: String
 	public let ops: [NativeOp]
+	/// The cell of the nearest `@catch` around the handler's element: it takes the error when the call fails.
+	public var `catch`: String? = nil
 }
 
 /// A device call a task cell starts at mount.
@@ -313,8 +315,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 			return NativeHandler(id: try field["id"].string(), ops: ops)
 		}
 		let objects = fields.has("objects") ? try fields["objects"].array().map { object -> NativeDeviceObject in
-			let f = try object.object(["id", "device"])
-			return NativeDeviceObject(id: try f["id"].string(), device: try f["device"].string())
+			let f = try object.object(["id", "device", "owner"])
+			return NativeDeviceObject(id: try f["id"].string(), device: try f["device"].string(), owner: try f["owner"].string())
 		} : []
 		func decodeOp(_ op: Reader) throws -> NativeOp {
 				let name = try op.field("op").string()
@@ -328,8 +330,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 				case "call":
 					let opField = try op.object(required: ["op", "call", "arguments"], optional: ["result", "object", "after"])
 					let then: NativeContinuation? = opField.has("after") ? try {
-						let t = try opField["after"].object(["id", "as", "ops"])
-						return NativeContinuation(id: try t["id"].string(), as: try t["as"].string(), ops: try t["ops"].array().map(decodeOp))
+						let t = try opField["after"].object(required: ["id", "as", "ops"], optional: ["catch"])
+						return NativeContinuation(
+							id: try t["id"].string(), as: try t["as"].string(), ops: try t["ops"].array().map(decodeOp),
+							catch: t.has("catch") ? try t["catch"].string() : nil)
 					}() : nil
 					return .call(
 						call: try opField["call"].string(), object: opField.has("object") ? try opField["object"].string() : nil,
@@ -594,8 +598,10 @@ struct Fields {
 	func has(_ key: String) -> Bool { (try? reader.keys().contains(key)) ?? false }
 }
 
-/// A device object a component makes (`const cam = camera()`), by its payload id.
+/// A device object a component makes (`const cam = camera()`), by its payload id. It lives while `owner` is shown.
 public struct NativeDeviceObject: Equatable, Sendable {
 	public let id: String
 	public let device: String
+	/// The first node of the component instance that made it.
+	public let owner: String
 }

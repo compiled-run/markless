@@ -29,13 +29,13 @@ describe('device features in a native build', () => {
 		});
 	});
 
-	it('fails the build naming the Info.plist key when the usage text is missing', async () => {
+	it('fails the build naming the feature and the Info.plist key when the usage text is missing', async () => {
 		const result = await build(locationApp);
 		expect(result.payload).toBeNull();
 		expect(result.diagnostics.map((d) => [d.code, d.message])).toEqual([
 			[
 				DEVICE_USAGE_MISSING_CODE,
-				'NSLocationWhenInUseUsageDescription has no usage text; add device.usage.location to the app config',
+				'location needs usage text for NSLocationWhenInUseUsageDescription; add device.usage.location to the app config',
 			],
 		]);
 	});
@@ -164,5 +164,27 @@ export default function App() @{
 		expect(result.diagnostics.map((d) => d.message)).toContain(
 			'a text expression reads the async value `here` outside a @try',
 		);
+	});
+
+	it('lowers <native.camera>, ready for the native namespace, and <base.camera> to the same camera element', async () => {
+		const shooter = (namespace: string) => `import { camera } from '@markless/device';
+import { ${namespace} } from '@markless/ui';
+export default function App() @{
+	const cam = camera();
+	<main>
+		<${namespace}.camera el={cam} />
+		<p>{cam.ready ? 'ready' : 'starting'}</p>
+	</main>
+}
+`;
+		const usage = { camera: 'Takes the photo you ask for.' };
+		const preferred = await build(shooter('native'), usage);
+		const alias = await build(shooter('base'), usage);
+		expect(preferred.diagnostics).toEqual([]);
+		expect(preferred.payload?.nodes).toContainEqual(
+			expect.objectContaining({ element: 'camera', object: 'object:cam' }),
+		);
+		expect(alias.payload).toEqual(preferred.payload);
+		expect(preferred.features).toEqual(['camera']);
 	});
 });

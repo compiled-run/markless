@@ -113,7 +113,7 @@
 			{
 				"part": "camera",
 				"component": "Camera",
-				"doc": "The props of `base.camera`.",
+				"doc": "The props of `base.camera`, which becomes `native.camera` once `@markless/ui` exports the `native` namespace.",
 				"props": [
 					{
 						"name": "el",

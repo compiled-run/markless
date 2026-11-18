@@ -30,8 +30,16 @@ export type ProofRung = {
 	readonly manifest: DeviceManifest;
 };
 
-/** A rung's app config, when it has one: `{ "device": { "usage": { "<feature>": "<text>" } } }`. */
+/** The app config, one per app, beside the app's rung folders: `{ "device": { "usage": { "<feature>": "<text>" } } }`. */
 const APP_CONFIG = 'app.json';
+
+/** The config of the app a rung folder belongs to; empty when the app has none. */
+export function readAppConfig(rungDir: string): { readonly device?: DeviceAppConfig } {
+	const file = join(dirname(rungDir), APP_CONFIG);
+	return existsSync(file)
+		? (JSON.parse(readFileSync(file, 'utf8')) as { readonly device?: DeviceAppConfig })
+		: {};
+}
 
 const COMPONENT_FILE = 'App.tsrx';
 const repoRoot = resolve(import.meta.dirname, '..', '..', '..', '..');
@@ -99,11 +107,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 	const component = join(dir, COMPONENT_FILE);
 	const assets: Record<ProofPlatform, Array<[string, Uint8Array]>> = { ios: [], android: [] };
 	let manifest: DeviceManifest = { ios: [], android: [] };
-	const appConfig = existsSync(join(dir, APP_CONFIG))
-		? (JSON.parse(readFileSync(join(dir, APP_CONFIG), 'utf8')) as {
-				readonly device?: DeviceAppConfig;
-			})
-		: {};
+	const appConfig = readAppConfig(dir);
 	if (existsSync(component)) {
 		const payloads: Partial<Record<ProofPlatform, string>> = {};
 		for (const platform of PROOF_PLATFORMS) {
