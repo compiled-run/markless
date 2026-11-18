@@ -88,6 +88,7 @@ type Value = NativeValue;
 /** What a host reports of a touch. */
 export type NativeTouch = 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel';
 const TOUCHES: ReadonlySet<string> = new Set<NativeTouch>(['pointerdown', 'pointermove', 'pointerup', 'pointercancel']);
+const RAISED: ReadonlySet<string> = new Set(['pointerover', 'pointerout', 'pointerenter', 'pointerleave']);
 
 /** What the event running a handler carries, by the field a `{ event }` expression names. */
 export type NativeEventFields = {
@@ -1066,6 +1067,7 @@ export function createNativeRuntime(
 					dismiss ? run(handlers.get(dismiss.handler) ?? [], fields, base) : [],
 				);
 			}
+			if (RAISED.has(action.event)) throw new Error(`${action.event} is raised by the runtime, not sent by a host`);
 			if (TOUCHES.has(action.event) && 'host' in action) {
 				const touch = action as Extract<NativeAction, { readonly event: NativeTouch }>;
 				const scope = scopeOf(touch.host);

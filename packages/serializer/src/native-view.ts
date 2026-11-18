@@ -529,12 +529,6 @@ export type NativeOp =
 	 */
 	| { readonly op: 'dialog'; readonly node: string; readonly method: 'showModal' | 'close' }
 	/**
-	 * `element.focus()` or `element.scrollIntoView()`, after the handler's writes have reached the views. Focus moves as on
-	 * the web (a text field takes the keyboard; anything else the screen reader's cursor) and scrolls the element into view
-	 * unless `preventScroll` (`focus({ preventScroll: true })`). `node` is an element fixed at build time, or an expression
-	 * evaluated when the op runs (modal's "back to the trigger or the opener"); one that gives null or the body does nothing.
-	 */
-	/**
 	 * `node.setPointerCapture(pointer)`, or with `release` `node.releasePointerCapture(pointer)`: the runtime sends that touch's
 	 * later pointer events to `node` wherever the finger goes, or again to the element under it. A pointer that is not down,
 	 * or (to release) not captured by `node`, changes nothing.
@@ -545,6 +539,12 @@ export type NativeOp =
 			readonly pointer: NativeExpr;
 			readonly release?: true;
 	  }
+	/**
+	 * `element.focus()` or `element.scrollIntoView()`, after the handler's writes have reached the views. Focus moves as on
+	 * the web (a text field takes the keyboard; anything else the screen reader's cursor) and scrolls the element into view
+	 * unless `preventScroll` (`focus({ preventScroll: true })`). `node` is an element fixed at build time, or an expression
+	 * evaluated when the op runs (modal's "back to the trigger or the opener"); one that gives null or the body does nothing.
+	 */
 	| {
 			readonly op: 'command';
 			readonly node: string | NativeExpr;

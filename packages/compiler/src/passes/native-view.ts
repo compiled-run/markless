@@ -4331,7 +4331,8 @@ export function createNativeViewPayload(
 			);
 			if (known) continue;
 			readsMissing = true;
-			const doing = SEMANTIC_EVENTS[event.eventName] === 'input' ? 'a text edit' : 'a tap';
+			const semantic = SEMANTIC_EVENTS[event.eventName];
+			const doing = semantic === 'input' ? 'a text edit' : POINTER_EVENTS.has(semantic ?? '') ? 'a touch' : 'a tap';
 			refuseScript(`${what} reads \`event.${read.path.join('.')}\`, which ${doing} on a phone does not have`, read.span);
 		}
 		const fn = scriptFunctionId(fact, scope.module, what);
