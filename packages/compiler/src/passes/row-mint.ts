@@ -133,6 +133,15 @@ export function rowComponentReadsIndex(
 	);
 }
 
+/** A text or attribute slot reads the row it renders in, its item or a name bound beside it. */
+export function slotReadsRow(slot: SemanticMarkupSlot, rowNames: ReadonlySet<string>): boolean {
+	if (slot.kind !== 'text' && slot.kind !== 'attribute') return false;
+	if (slot.residue.kind === 'repeat-item') return true;
+	if (slot.residue.kind !== 'authored-expression') return false;
+	const names = readResidueNames(slot.residue.source, 'expression');
+	return [...rowNames].some((name) => residueReferences(names, name));
+}
+
 /**
  * A row whose markup an @if or @switch picks from the row item, rendered whole
  * by the client the way the server rendered it.
