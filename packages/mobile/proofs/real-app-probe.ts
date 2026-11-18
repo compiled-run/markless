@@ -67,7 +67,7 @@ function readerFor(appRoot: string): ReadModule {
 				file = undefined;
 			}
 		}
-		if (!file || !/\.(tsrx|ts|tsx|js|mjs)$/.test(file)) return undefined;
+		if (!file || !/\.(tsrx|ts|tsx|js|mjs|json)$/.test(file)) return undefined;
 		return { filename: file, source: readFileSync(file, 'utf8') };
 	};
 }

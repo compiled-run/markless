@@ -134,8 +134,8 @@ data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boo
 /** An inline `<svg>` compiled to shapes. */
 data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
 
-/** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. */
-enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit") }
+/** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
+enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible") }
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
@@ -180,7 +180,8 @@ data class Route(val pattern: String, val params: List<String>) {
 }
 
 /** [device]: a live device value the host fills at mount and on change. [task]: an async device call started at mount. [row]: state of a component a list row renders, one value per row of that `repeat`, [initial] when the row is built. */
-data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null)
+/** [clock]: the clock when the screen opened, written at mount before the first build. */
+data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null, val clock: Boolean = false)
 data class Event(val host: String, val event: EventName, val handler: String)
 data class Handler(val id: String, val ops: List<Op>)
 
@@ -307,7 +308,7 @@ data class Payload(
 		private val BINARY = setOf("+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=")
 		private val LOGICAL = setOf("&&", "||", "??")
 		private val METHODS = setOf("filter", "map", "findIndex", "some", "every", "includes", "indexOf", "join", "concat", "slice", "reverse", "toReversed", "toUpperCase", "toLowerCase", "trim")
-		private val BUILTINS = setOf("String", "Number", "Boolean", "Math.abs", "Math.floor", "Math.max", "Math.min", "Math.round")
+		private val BUILTINS = setOf("String", "Number", "Boolean", "Math.abs", "Math.floor", "Math.max", "Math.min", "Math.round", "Date.now", "Date.toISOString")
 
 		private fun oneOf(o: Map<String, Json>, key: String, allowed: Set<String>, what: String): String {
 			val v = o.field(key, what).str("$what.$key")
@@ -388,14 +389,15 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled", "device", "task", "object", "row"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled", "device", "task", "object", "row", "clock"), what)
+			val clock = o["clock"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.clock must be true when present"); true } ?: false
 			val styled = o["styled"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.styled must be true when present"); true } ?: false
 			val storage = o["storage"]?.obj("$what.storage")?.let { it.only(setOf("key"), "$what.storage"); it.field("key", what).str("$what.storage.key") }
 			val task = o["task"]?.obj("$what.task")?.let { t ->
 				t.only(setOf("call", "arguments"), "$what.task")
 				Task(t.field("call", what).str("$what.task.call"), t.field("arguments", what).arr("$what.task.arguments").mapIndexed { n, a -> expr(a, "$what.task.arguments[$n]") })
 			}
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"))
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock)
 		}
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {

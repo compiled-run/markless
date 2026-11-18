@@ -303,7 +303,12 @@ function emitTextSlot(
 			kind: 'text',
 			residue,
 			...(raw ? { raw: true } : {}),
-			...(context.nativeFacts ? { nativeExpression: context.nativeFacts.expression(expression as never) } : {}),
+			...(context.nativeFacts
+				? {
+						nativeExpression: context.nativeFacts.expression(expression as never),
+						nativeSpan: sourceSpan(expression, context.filename),
+					}
+				: {}),
 		},
 		path,
 	);

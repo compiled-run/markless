@@ -1,3 +1,5 @@
+import Foundation
+
 /// What a person does to a retained view.
 public struct NativeAction: Equatable, Sendable {
 	public let event: NativeEventName
@@ -178,16 +180,24 @@ public final class NativeRuntime {
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
 
-	/// `params`: the route params the page opened with.
+	/// The device's clock, in milliseconds since 1970 (UTC).
+	private let now: () -> Double
+	/// `idle` and `visible` handlers that ran, by `<event>\0<instance>`; an instance that leaves the screen is forgotten.
+	private var fired = Set<String>()
+
+	/// `params`: the route params the page opened with; `now`: the clock (a conformance run fixes it).
 	/// `preferredLanguages`: the device's, most preferred first; the web's messages are shown in the first one the payload has.
 	public init(
-		payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = [], preferredLanguages: [String] = ["en"]
+		payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = [], preferredLanguages: [String] = ["en"],
+		now: @escaping () -> Double = { (Date().timeIntervalSince1970 * 1000).rounded(.down) }
 	) {
 		self.payload = payload
 		self.params = params
 		self.store = store
+		self.now = now
+		let opened = now()
 		values = Dictionary(uniqueKeysWithValues: payload.cells.map { cell in
-			(cell.id, cell.storageKey.flatMap(store.read) ?? cell.initial)
+			(cell.id, cell.clock ? .number(opened) : cell.storageKey.flatMap(store.read) ?? cell.initial)
 		})
 		storageKeys = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.storageKey.map { (cell.id, $0) } })
 		handlers = Dictionary(uniqueKeysWithValues: payload.handlers.map { ($0.id, $0.ops) })
@@ -310,7 +320,7 @@ public final class NativeRuntime {
 			default: break
 			}
 			throw RuntimeError(reason: ".\(property) of a value that has none")
-		case let .call(builtin, arguments): return evaluateCall(builtin, try arguments.map(evaluate))
+		case let .call(builtin, arguments): return try evaluateCall(builtin, try arguments.map(evaluate), now: now)
 		case let .at(index, list):
 			guard case let .array(array) = try evaluate(list) else { throw RuntimeError(reason: "an index into a value that is not an array") }
 			guard case let .number(at) = try evaluate(index), at >= 0, at.rounded() == at, at < Double(array.items.count) else { return .null }
@@ -561,6 +571,11 @@ public final class NativeRuntime {
 				return try cancel.map { try self.run(self.handlers[$0.handler] ?? [], in: .empty) } ?? []
 			}
 		}
+		if action.event == .idle || action.event == .visible {
+			let key = "\(action.event.rawValue)\u{0}\(action.host)"
+			guard !fired.contains(key), try due(action.event).contains(action.host) else { return [] }
+			fired.insert(key)
+		}
 		// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 		let host = action.host.firstIndex(of: "@").map { String(action.host[..<$0]) } ?? action.host
 		guard let bound = payload.events.first(where: { $0.host == host && $0.event == action.event }), let node = nodesById[host] else {
@@ -573,6 +588,23 @@ public final class NativeRuntime {
 		eventValue = action.event == .input ? action.value ?? "" : nil
 		defer { eventValue = nil }
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
+	}
+
+	/// The shown instances with an `idle` (or `visible`) handler that has not run for them, in document order.
+	public func due(_ event: NativeEventName) throws -> [String] {
+		try payload.events.flatMap { bound -> [String] in
+			guard bound.event == event, let node = nodesById[bound.host] else { return [] }
+			return try instances(of: node).map(\.id).filter { !fired.contains("\(event.rawValue)\u{0}\($0)") }
+		}
+	}
+
+	private func forgetHidden() throws {
+		for key in fired {
+			let id = String(key[key.index(after: key.firstIndex(of: "\u{0}")!)...])
+			let template = id.firstIndex(of: "@").map { String(id[..<$0]) } ?? id
+			let shown = try nodesById[template].map { node in try instances(of: node).contains { $0.id == id } } ?? false
+			if !shown { fired.remove(key) }
+		}
 	}
 
 	/// A device call a handler awaited answered: its continuation runs with the answer as its local.
@@ -746,6 +778,7 @@ public final class NativeRuntime {
 			guard let at = slot.firstIndex(of: "@"), let list = rowOfCell[String(slot[..<at])] else { continue }
 			if !kept.contains("\(list)\u{0}\(slot[slot.index(after: at)...])") { values.removeValue(forKey: slot) }
 		}
+		try forgetHidden()
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let afterAttributes = keyed(try boundAttributes())
 		let afterProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })

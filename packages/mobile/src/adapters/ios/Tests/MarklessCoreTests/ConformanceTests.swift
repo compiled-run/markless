@@ -72,13 +72,15 @@ func reproducesConformanceVector(file: URL) throws {
 	let vector = try JSONValue.parse(Data(contentsOf: file))
 	guard case let .object(fields) = vector else { Issue.record("vector is not an object"); return }
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
-	let known = ["version", "payload", "params", "preferredLanguages", "initial", "initialChecks", "initialAttributes", "initialProperties", "initialArms", "initialRows", "initialSheets", "tasks", "steps"]
+	let known = ["version", "payload", "params", "preferredLanguages", "now", "initial", "initialChecks", "initialAttributes", "initialProperties", "initialArms", "initialRows", "initialSheets", "tasks", "steps"]
 	#expect(fields.map(\.0).allSatisfy(known.contains), "unknown vector fields \(fields.map(\.0))")
 	#expect(field("version") == .string("markless.native-conformance/0"))
 	let params = try field("params").map { try NativeViewPayload.decodeParams(try Reader($0, at: "params")) } ?? []
 	let languages = try field("preferredLanguages").map { try Reader($0, at: "preferredLanguages").array().map { try $0.string() } } ?? ["en"]
+	let now: Double? = if case let .number(time)? = field("now") { time } else { nil }
 	let runtime = NativeRuntime(
-		payload: try NativeViewPayload.decode(try #require(field("payload"))), params: params, preferredLanguages: languages)
+		payload: try NativeViewPayload.decode(try #require(field("payload"))), params: params, preferredLanguages: languages,
+		now: { now ?? (Date().timeIntervalSince1970 * 1000).rounded(.down) })
 
 	let initial = JSONValue.array(try runtime.texts().map { .array([.string($0.node), .string($0.text)]) })
 	#expect(initial.jsonText == field("initial")?.jsonText)

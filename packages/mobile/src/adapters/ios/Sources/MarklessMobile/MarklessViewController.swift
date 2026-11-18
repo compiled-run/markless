@@ -24,6 +24,13 @@ public final class MarklessViewController: UIViewController {
 	/// The `@media` band the views show; nil without bands.
 	private var band: Int?
 	private(set) var tree: ViewTree?
+	/// Set once the page's first frame is on screen: `idle` and `visible` wait for it, as the web waits for load.
+	private var appeared = false
+	/// The one-shot run-loop observer that raises `idle` when the main run loop next goes idle.
+	private var idleObserver: CFRunLoopObserver?
+	private var raisingVisible = false
+	/// Scroll views around a due `visible` element: each scroll looks again.
+	private var scrollWatches: [ObjectIdentifier: NSKeyValueObservation] = [:]
 	/// In an app: opens the page a `navigate` entry names, pushed or in this screen's place.
 	var navigator: ((_ route: String, _ params: [NativeRouteParam], _ replace: Bool) throws -> Void)?
 
@@ -169,6 +176,56 @@ public final class MarklessViewController: UIViewController {
 			fatalError("Markless iOS host: \(error)")
 		}
 		tree?.presenter = self
+		scheduleLoadEvents()
+	}
+
+	/// After the first frame and after every journal: `idle` for the elements due one, `visible` for those on screen.
+	private func scheduleLoadEvents() {
+		guard appeared else { return }
+		if idleObserver == nil, !((try? runtime.due(.idle)) ?? []).isEmpty {
+			let observer = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.beforeWaiting.rawValue, false, 0) { [weak self] _, _ in
+				MainActor.assumeIsolated { self?.raiseIdle() }
+			}
+			CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
+			idleObserver = observer
+		}
+		raiseVisible()
+	}
+
+	private func raiseIdle() {
+		if let idleObserver { CFRunLoopRemoveObserver(CFRunLoopGetMain(), idleObserver, .commonModes) }
+		idleObserver = nil
+		for host in (try? runtime.due(.idle)) ?? [] { perform(NativeAction(event: .idle, host: host)) }
+	}
+
+	/// Raises `visible` for each element due one that has any of its box inside the page's part of the screen.
+	private func raiseVisible() {
+		guard appeared, !raisingVisible, let tree, viewIfLoaded?.window != nil else { return }
+		raisingVisible = true
+		defer { raisingVisible = false }
+		view.layoutIfNeeded()
+		let screen = view.safeAreaLayoutGuide.layoutFrame
+		for host in (try? runtime.due(.visible)) ?? [] {
+			guard let element = tree.elements[host] else { continue }
+			if tree.isOnScreen(element, within: screen, of: view) {
+				perform(NativeAction(event: .visible, host: host))
+				continue
+			}
+			var ancestor = element.superview
+			while let candidate = ancestor {
+				if let scroll = candidate as? UIScrollView, scrollWatches[ObjectIdentifier(scroll)] == nil {
+					scrollWatches[ObjectIdentifier(scroll)] = scroll.observe(\.contentOffset) { [weak self] _, _ in
+						MainActor.assumeIsolated { self?.raiseVisible() }
+					}
+				}
+				ancestor = candidate.superview
+			}
+		}
+	}
+
+	public override func viewDidLayoutSubviews() {
+		super.viewDidLayoutSubviews()
+		raiseVisible()
 	}
 
 	@available(*, unavailable)
@@ -218,6 +275,8 @@ public final class MarklessViewController: UIViewController {
 	public override func viewDidAppear(_ animated: Bool) {
 		super.viewDidAppear(animated)
 		tree?.pageAppeared(self)
+		appeared = true
+		scheduleLoadEvents()
 	}
 
 	/// Runs the handler for an action and applies its journal, exactly as a tap does.
@@ -236,6 +295,7 @@ public final class MarklessViewController: UIViewController {
 		} catch {
 			fatalError("Markless iOS host: \(error)")
 		}
+		scheduleLoadEvents()
 	}
 
 	/// Builds the page at `route` from scratch with `params`; its state starts over.
@@ -243,11 +303,13 @@ public final class MarklessViewController: UIViewController {
 		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
 		for object in payload.objects { device.release(object.id) }
 		runtime = NativeRuntime(payload: payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages)
+		scrollWatches = [:]
 		tree?.unmount()
 		try buildPage()
 		paintCanvas()
 		if isViewLoaded { tree?.mount(in: view) }
 		if viewIfLoaded?.window != nil { tree?.pageAppeared(self) }
+		scheduleLoadEvents()
 	}
 }
 

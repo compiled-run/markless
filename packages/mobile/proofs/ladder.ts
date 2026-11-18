@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { PROOF_URL_SCHEME } from '../src/harness/proof-app.ts';
@@ -164,6 +164,11 @@ export type LadderRung = {
 	readonly route?: string;
 	/** The path the app opens at; `/` when absent. */
 	readonly start?: string;
+	/**
+	 * The text of the first element the screens and the browser leave below the first screen. The reference runtime has no
+	 * layout, so it raises `visible` only for elements before that one in document order.
+	 */
+	readonly belowFold?: string;
 	/** How the app opens at `start`: a launch argument (the default) or a deep link the system hands the app. */
 	readonly open?: 'launch' | 'link';
 	/** Where the device says it is, set before launch (Maestro `setLocation`; the web test's geolocation). */
@@ -186,13 +191,17 @@ export const proofsDir = import.meta.dirname;
 export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
 		.filter((entry) => entry.isDirectory() && /^((\d\d|[dp]\d)[a-z]?|[fruy]\d+)-/.test(entry.name))
+		.filter((entry) => !isApp(entry.name))
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
-/** The navigation ladder: each folder an app (`pages/`) of several routes. */
+/** A rung that is an app of several routes (`pages/`) rather than one screen (`App.tsrx`). */
+const isApp = (folder: string): boolean => existsSync(join(proofsDir, folder, 'pages'));
+
+/** The navigation ladder: each folder an app (`pages/`) of several routes; an `r<n>` rung with `pages/` too. */
 export const navRungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && /^n\d+-/.test(entry.name))
+		.filter((entry) => entry.isDirectory() && (/^n\d+-/.test(entry.name) || (/^r\d+-/.test(entry.name) && isApp(entry.name))))
 		.map((entry) => entry.name)
 		.sort();
 

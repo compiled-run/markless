@@ -6,24 +6,18 @@ import type {
 	SemanticExpression,
 	SemanticFunctionStatement,
 	SemanticHandlerStatement,
+	SemanticModuleConstant,
 	SemanticModuleFunction,
 } from '../../artifacts.ts';
+import { sourceSpan } from '../../ast/source.ts';
+import type { SourceSpan } from '../../diagnostics.ts';
 
 const UNARY = new Set(['!', '-', '+', 'typeof']);
 const BINARY = new Set(['+', '-', '*', '/', '%', '===', '!==', '<', '<=', '>', '>=']);
 const LOGICAL = new Set(['&&', '||', '??']);
 const COMPOUND = new Set(['+=', '-=', '*=', '/=', '%=']);
 /** Calls with exact JavaScript meaning that a native host implements; any other call needs a script engine. */
-const BUILTINS = new Set([
-	'String',
-	'Number',
-	'Boolean',
-	'Math.abs',
-	'Math.floor',
-	'Math.max',
-	'Math.min',
-	'Math.round',
-]);
+const BUILTINS = new Set(['String', 'Number', 'Boolean', 'Math.abs', 'Math.floor', 'Math.max', 'Math.min', 'Math.round', 'Date.now']);
 
 const lambdaOf = (node: AnyNode): SemanticExpression => {
 	const parameters = asNodes(node.params);
@@ -223,6 +217,9 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 				asNodes(node.arguments).some((argument) => argument.type === 'SpreadElement')
 			)
 				return unsupported('a `new` of something other than a name');
+			// `new Date()` is a call the native build answers by name.
+			if (callee.name === 'Date')
+				return { kind: 'call', callee: 'new Date', arguments: asNodes(node.arguments).map(expressionTreeOf) };
 			return { kind: 'new', callee: callee.name, arguments: callArgumentsOf(node) };
 		}
 		case 'ArrowFunctionExpression':
@@ -858,15 +855,29 @@ export function componentNativeFactsOf(
 	}
 	const stateInitializers: Record<string, SemanticExpression> = {};
 	const renderStatements: SemanticHandlerStatement[] = [];
+	const locals: Record<string, SemanticExpression> = {};
 	const body = node.body as AnyNode | undefined;
 	for (const statement of asNodes(body?.body)) {
 		if (statement.type === 'VariableDeclaration') {
 			for (const declarator of asNodes(statement.declarations)) {
 				const id = declarator.id as AnyNode | undefined;
 				const init = declarator.init as AnyNode | undefined;
-				if (id?.type !== 'Identifier' || typeof id.name !== 'string' || !init) continue;
+				if (!init) continue;
+				if (id?.type === 'ObjectPattern' && statement.kind === 'const') {
+					const value = expressionTreeOf(init);
+					for (const property of asNodes(id.properties)) {
+						const key = property.key as AnyNode | undefined;
+						const local = property.value as AnyNode | undefined;
+						if (property.type !== 'Property' || property.computed || key?.type !== 'Identifier' || local?.type !== 'Identifier')
+							continue;
+						locals[String(local.name)] = { kind: 'member', object: value, property: String(key.name) };
+					}
+					continue;
+				}
+				if (id?.type !== 'Identifier' || typeof id.name !== 'string') continue;
 				if (init.type === 'CallExpression' && isFrameworkCall(init, 'state'))
 					stateInitializers[id.name] = expressionTreeOf(asNodes(init.arguments)[0]);
+				else if (statement.kind === 'const') locals[id.name] = expressionTreeOf(init);
 			}
 			continue;
 		}
@@ -875,17 +886,24 @@ export function componentNativeFactsOf(
 		if (expression?.type?.startsWith('JSX')) continue;
 		renderStatements.push(statementOf(expression ?? null));
 	}
-	return { propDefaults, ...(restProp ? { restProp } : {}), stateInitializers, renderStatements };
+	return {
+		propDefaults,
+		...(restProp ? { restProp } : {}),
+		stateInitializers,
+		renderStatements,
+		...(Object.keys(locals).length > 0 ? { locals } : {}),
+	};
 }
 
 /** What a native build passes as `nativeFacts`; nothing else imports this module. */
-/** Each top-level function that is not a component, with the names it is exported by, for a native build to inline. */
-function moduleFunctionsOf(
-	statements: ReadonlyArray<AnyNode>,
-	functions: ReadonlyMap<string, AnyNode>,
-): SemanticModuleFunction[] {
+/** The names each top-level declaration is exported by (`export const`, `export function`, `export { name as alias }`). */
+function localExportNames(statements: ReadonlyArray<AnyNode>): Map<string, string[]> {
 	const exportNames = new Map<string, string[]>();
 	for (const statement of statements) {
+		if (statement.type === 'ExportDefaultDeclaration') {
+			const local = getIdentifierName(statement.declaration as AnyNode | undefined);
+			if (local) exportNames.set(local, [...(exportNames.get(local) ?? []), 'default']);
+		}
 		if (statement.type !== 'ExportNamedDeclaration' || statement.source) continue;
 		const declared = getIdentifierName((statement.declaration as AnyNode | undefined)?.id as AnyNode | undefined);
 		if (declared) exportNames.set(declared, [...(exportNames.get(declared) ?? []), declared]);
@@ -895,12 +913,81 @@ function moduleFunctionsOf(
 			const name = getIdentifierName(exported) ?? (typeof exported?.value === 'string' ? exported.value : undefined);
 			if (local && name) exportNames.set(local, [...(exportNames.get(local) ?? []), name]);
 		}
+		const declaration = statement.declaration as AnyNode | undefined;
+		if (declaration?.type === 'VariableDeclaration')
+			for (const declarator of asNodes(declaration.declarations)) {
+				const declared = getIdentifierName(declarator.id as AnyNode | undefined);
+				if (declared) exportNames.set(declared, [...(exportNames.get(declared) ?? []), declared]);
+			}
 	}
+	return exportNames;
+}
+
+/** Each top-level function that is not a component, with the names it is exported by, for a native build to inline. */
+function moduleFunctionsOf(
+	statements: ReadonlyArray<AnyNode>,
+	functions: ReadonlyMap<string, AnyNode>,
+): SemanticModuleFunction[] {
+	const exportNames = localExportNames(statements);
 	return [...functions].map(([name, node]) => ({
 		name,
 		exportNames: exportNames.get(name) ?? [],
 		native: functionBodyOf(node),
 	}));
+}
+
+const spanOf = (node: AnyNode, filename: string): { span?: SourceSpan } => {
+	const span = sourceSpan(node, filename);
+	return span ? { span } : {};
+};
+
+/** Each top-level `const` no statement of the module writes through, as a tree, for a native build to read by name. */
+function moduleConstantsOf(
+	statements: ReadonlyArray<AnyNode>,
+	mutated: ReadonlySet<string>,
+	filename: string,
+): SemanticModuleConstant[] {
+	const exportNames = localExportNames(statements);
+	const constants: SemanticModuleConstant[] = [];
+	for (const statement of statements) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ? (statement.declaration as AnyNode | undefined) : statement;
+		if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		for (const declarator of asNodes(declaration.declarations)) {
+			const id = declarator.id as AnyNode | undefined;
+			const init = declarator.init as AnyNode | undefined;
+			if (!init) continue;
+			const value = expressionTreeOf(init);
+			// `const [a, b] = list` and `const { a, b: c } = object` read those members of the value.
+			const names: [string, SemanticExpression][] = [];
+			if (id?.type === 'ArrayPattern')
+				asNodes(id.elements).forEach((element, index) => {
+					const name = element?.type === 'Identifier' ? getIdentifierName(element) : undefined;
+					if (name) names.push([name, { kind: 'member', object: value, property: String(index) }]);
+				});
+			else if (id?.type === 'ObjectPattern')
+				for (const property of asNodes(id.properties)) {
+					const key = property.key as AnyNode | undefined;
+					const local = getIdentifierName(property.value as AnyNode | undefined);
+					if (property.type === 'Property' && !property.computed && key?.type === 'Identifier' && local)
+						names.push([local, { kind: 'member', object: value, property: String(key.name) }]);
+				}
+			else {
+				const name = getIdentifierName(id);
+				if (name) names.push([name, value]);
+			}
+			for (const [name, read] of names) {
+				if (mutated.has(name)) continue;
+				constants.push({
+					name,
+					exportNames: exportNames.get(name) ?? [],
+					value: read,
+					...spanOf(declarator, filename),
+				});
+			}
+		}
+	}
+	return constants;
 }
 
 /** A computed's function as one tree: its block's statements, or its expression body; none without a body. */
@@ -938,6 +1025,7 @@ export const NATIVE_FACT_COLLECTORS: NativeFactCollectors = {
 	computedValue: computedValueOf as NativeFactCollectors['computedValue'],
 	functionBody: functionBodyOf as NativeFactCollectors['functionBody'],
 	moduleFunctions: moduleFunctionsOf as NativeFactCollectors['moduleFunctions'],
+	moduleConstants: moduleConstantsOf as NativeFactCollectors['moduleConstants'],
 	switchArmTests: switchArmTestsOf as NativeFactCollectors['switchArmTests'],
 	ifArmTests: ifArmTestsOf as NativeFactCollectors['ifArmTests'],
 	parameterNames: parameterNamesOf as NativeFactCollectors['parameterNames'],

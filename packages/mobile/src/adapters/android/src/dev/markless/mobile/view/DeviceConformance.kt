@@ -7,6 +7,7 @@ import dev.markless.mobile.core.Json
 import dev.markless.mobile.core.JournalEntry
 import dev.markless.mobile.core.JsString
 import dev.markless.mobile.core.Node
+import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.field
 import dev.markless.mobile.core.jsonString
@@ -17,7 +18,12 @@ import dev.markless.mobile.core.str
 object DeviceConformance {
 	fun run(context: Context, vectorBytes: ByteArray): List<String> {
 		val vector = Json.parse(vectorBytes).obj("vector")
-		val host = MarklessHost(context, canonical(vector.field("payload", "vector")).toByteArray(), store = dev.markless.mobile.core.MemoryStore(), params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap(), preferredLanguages = vector["preferredLanguages"]?.arr("preferredLanguages")?.map { it.str("preferredLanguages[]") } ?: listOf("en"))
+		val fixed = (vector["now"] as? Json.Num)?.value
+		val payload = Payload.decode(canonical(vector.field("payload", "vector")).toByteArray())
+		val params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap()
+		val languages = vector["preferredLanguages"]?.arr("preferredLanguages")?.map { it.str("preferredLanguages[]") } ?: listOf("en")
+		val host = if (fixed == null) MarklessHost(context, payload, null, store = dev.markless.mobile.core.MemoryStore(), params = params, preferredLanguages = languages)
+			else MarklessHost(context, payload, null, store = dev.markless.mobile.core.MemoryStore(), params = params, preferredLanguages = languages, now = { fixed })
 		val failures = ArrayList<String>()
 		fun shownTexts(): String = host.runtime.texts().joinToString(",", "[", "]") { (id, _) -> "[${jsonString(id)},${jsonString(if (host.hasView(id)) host.shownText(id) else "<no view>")}]" }
 		fun structure(where: String) {
@@ -67,6 +73,8 @@ object DeviceConformance {
 				"dismiss" -> host.closedByPlatform(action.field("host", "action").str("host"))
 				"enter" -> (target as? EditText ?: throw MarklessHostError("steps[$n] presses return in a view that is not an input")).onEditorAction(EditorInfo.IME_ACTION_GO)
 				"timer" -> host.apply(host.runtime.timer(action.field("timer", "action").str("timer")))
+				"idle" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Idle))
+				"visible" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Visible))
 				else -> throw MarklessHostError("steps[$n] has an action this check cannot perform: $event")
 			}
 			val actual = journal.joinToString(",", "[", "]") { it.toJson() }

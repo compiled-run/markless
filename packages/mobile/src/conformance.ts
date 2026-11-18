@@ -12,6 +12,8 @@ export type NativeConformance = {
 	readonly params?: Readonly<Record<string, string>>;
 	/** Present when the device's preferred languages matter (the web's messages); otherwise `['en']`. */
 	readonly preferredLanguages?: ReadonlyArray<string>;
+	/** Present when the payload reads the clock: what the device's clock reads throughout, in ms since 1970 (UTC). */
+	readonly now?: number;
 	readonly initial: ReadonlyArray<readonly [node: string, text: string]>;
 	/** Present when the payload binds attributes: `[node, name, value]`, value null when absent. */
 	readonly initialAttributes?: ReadonlyArray<
@@ -42,8 +44,9 @@ export function nativeConformance(
 	actions: ReadonlyArray<NativeAction>,
 	params?: Readonly<Record<string, string>>,
 	preferredLanguages?: ReadonlyArray<string>,
+	now?: number,
 ): NativeConformance {
-	const runtime = createNativeRuntime(payload, new Map(), params, preferredLanguages);
+	const runtime = createNativeRuntime(payload, new Map(), params, preferredLanguages, now === undefined ? undefined : () => now);
 	const initial = runtime.texts();
 	const initialAttributes = runtime.attributes();
 	const initialArms = runtime.arms();
@@ -57,6 +60,7 @@ export function nativeConformance(
 		payload,
 		...(params ? { params } : {}),
 		...(preferredLanguages ? { preferredLanguages } : {}),
+		...(now === undefined ? {} : { now }),
 		initial,
 		...(initialAttributes.length > 0 ? { initialAttributes } : {}),
 		...(initialProperties.length > 0 ? { initialProperties } : {}),

@@ -9,6 +9,8 @@ import type {
 	SemanticGraphInput,
 	SemanticLocalDeclaration,
 } from '../../artifacts.ts';
+import { namesMutatedInModule } from './constant-values.ts';
+import { ownedModuleAst } from './shared-ast.ts';
 import { applyMarklessAllowDirectives, type SourceSpan } from '../../diagnostics.ts';
 import {
 	collectAsyncBoundary,
@@ -149,8 +151,14 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		const name = getIdentifierName(declaration.id as AnyNode | undefined);
 		if (name) state.helperFunctions.set(name, declaration);
 	}
-	if (state.nativeFacts)
+	if (state.nativeFacts) {
 		graph.moduleFunctions = state.nativeFacts.moduleFunctions(statements as never, state.helperFunctions as never);
+		graph.moduleConstants = state.nativeFacts.moduleConstants(
+			statements as never,
+			namesMutatedInModule(ownedModuleAst(state, state.source, state.filename)),
+			state.filename,
+		);
+	}
 	graph.moduleGraphInterface = collectModuleGraphInterface({ statements, state });
 
 	for (const statement of statements) {

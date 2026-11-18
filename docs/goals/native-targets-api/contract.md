@@ -394,6 +394,30 @@ the browser's render-data module).
   in-app behind a launch flag. `packages/mobile/test/conformance.test.ts` fails if the committed vectors drift from what the
   compiler and the reference runtime produce.
 
+### Values that are not state, `idle` and `visible`, and the clock (`cw/real-values`, 2026-11-18)
+
+- **Values.** The analyzer records a module's top-level `const`s (`moduleConstants`: own, `export`ed, destructured from an
+  object or array) and a component body's `const`s (`native.locals`), as trees. A read by name inlines the definition. A
+  body `const` read where the web renders once (a text or attribute that is not a computed, a test or list that is not
+  one) is folded to the value it has with every cell at its first value; where the web re-derives it (a computed, a
+  handler, a template that reads state) it follows state. A JSON file imports as a module whose default export is its
+  value. Data indexed by a key known at build time (`data.byId[id]`) folds to the member. An object or array prop, and an
+  opaque prop (a constant, an item's field, a body `const`), lowers from its expression. Nothing new for hosts.
+- **Events.** `NativeEventName` gains `idle` and `visible` with the web's meaning: once for each shown instance (shown
+  again after it left, it is a new one). `idle` runs when the host's main loop is idle after the frame that shows the
+  element (iOS: a `beforeWaiting` run-loop observer after `viewDidAppear`; Android: a `MessageQueue` idle handler after the
+  first draw); `visible` runs the first time any of the element's box is inside the page's part of the screen (edges
+  count, as an IntersectionObserver with no threshold reports them). The runtime owns "once": `due(event)` lists the
+  instances still to fire, and a second dispatch journals nothing (`load-events.json`).
+- **Clock.** A cell may carry `clock: true`: the host writes the clock (ms since 1970, UTC) at mount, before the first
+  build, as a server render reads it when the page is served. `Date.now()` and `new Date()` read in a render lower to
+  that cell; in a handler or computed to the builtin `Date.now`, read when it runs. `state(Date.now())` is a clock cell.
+  `Date.toISOString` formats a time as `toISOString` does. Anything that formats a date in a time zone or locale
+  (`toTimeString`, `toLocaleString`, a date shown as text) is refused by name: the web formats it with the server's
+  zone. Vectors carry `now`, which a host's test clock returns (`clock.json`).
+- **Links.** A `<Link href>` that is not a route pattern is matched with the router's `matchRouteManifest`, as a URL is,
+  so `/about/` reaches `/about`.
+
 ### Element to view (per platform, rungs 1 to 3)
 
 | Element | iOS (UIKit) | Android (Views) |

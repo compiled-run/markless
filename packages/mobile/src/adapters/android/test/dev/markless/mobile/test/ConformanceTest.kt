@@ -63,7 +63,8 @@ private fun runVector(file: File) {
 	val payload = Payload.decode(field(vector, "payload", file.name))
 	val params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap()
 	val languages = vector["preferredLanguages"]?.arr("preferredLanguages")?.map { it.str("preferredLanguages[]") } ?: listOf("en")
-	val runtime = Runtime(payload, params = params, preferredLanguages = languages)
+	val now = (vector["now"] as? Json.Num)?.value
+	val runtime = if (now == null) Runtime(payload, params = params, preferredLanguages = languages) else Runtime(payload, params = params, preferredLanguages = languages, now = { now })
 	val mounted = runtime.texts().joinToString(",", "[", "]") { (n, t) -> "[${jsonString(n)},${jsonString(t)}]" }
 	val initial = canonical(field(vector, "initial", file.name))
 	check("${file.name} initial", mounted == initial) { "expected $initial\n  actual   $mounted" }

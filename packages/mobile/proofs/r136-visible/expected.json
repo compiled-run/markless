@@ -1,0 +1,13 @@
+{
+	"rung": 136,
+	"name": "visible: once for each element the first time any of it is on the screen; one below the fold has not been",
+	"belowFold": "Bottom line",
+	"steps": [
+		{ "visible": ["Seen T", "Top line", "Reveal"], "absent": ["Seen nothing", "Seen TB"] },
+		{
+			"do": { "tap": "Reveal" },
+			"visible": ["Seen TR", "Revealed line"],
+			"absent": ["Seen T", "Seen TRB"]
+		}
+	]
+}

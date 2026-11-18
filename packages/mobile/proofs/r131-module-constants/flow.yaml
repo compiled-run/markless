@@ -1,0 +1,20 @@
+appId: ${APP_ID}
+name: r131-module-constants
+---
+- launchApp:
+      clearState: true
+- assertVisible: Plans
+- assertVisible: Basic \$5
+- assertVisible: Team \$12\.5
+- assertVisible: Scale \$40\.05
+- assertVisible: Picked Basic
+- assertNotVisible: Picked Team
+- tapOn: Team \$12\.5
+- assertVisible: Picked Team
+- assertNotVisible: Picked Basic
+- assertVisible: Picked Team
+- assertNotVisible: Picked Basic
+- tapOn: Scale \$40\.05
+- assertNotVisible: Picked Team
+- assertVisible: Picked Scale
+- assertNotVisible: Picked Team
