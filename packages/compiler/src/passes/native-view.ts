@@ -1475,12 +1475,20 @@ export function createNativeViewPayload(
 					refuse('@for inside an @if arm or another @for');
 					continue;
 				}
-				if (!repeat || !rowChunk || repeat.collectionGraphNodeId === undefined || !scope.cells.byBinding.has(repeat.collectionGraphNodeId) || (repeat.collectionPath?.length ?? 0) > 0 || !repeat.keyPath) {
-					refuse('a @for over something other than a state list keyed by a path of its item');
+				if (repeat?.indexKey) {
+					refuse('a @for keyed by its index; a native list keys each row by its item');
+					continue;
+				}
+				const list = repeat?.collectionExpression
+					? exprOf(repeat.collectionExpression, 'the @for list', scope)
+					: repeat?.collectionGraphNodeId !== undefined && scope.cells.byBinding.has(repeat.collectionGraphNodeId) && (repeat.collectionPath?.length ?? 0) === 0
+						? { cell: scope.cells.byBinding.get(repeat.collectionGraphNodeId)! }
+						: null;
+				if (!repeat || !rowChunk || !list) {
+					if (!repeat?.collectionExpression) refuse('a @for over something other than a state list keyed by a path of its item');
 					continue;
 				}
 				const repeatId = scope.prefix + item.id;
-				const list: NativeExpr = { cell: scope.cells.byBinding.get(repeat.collectionGraphNodeId)! };
 				nodes.push({ kind: 'repeat', id: repeatId, parent, list, key: repeat.keyPath });
 				rowKeys.set(repeatId, repeat.keyPath.reduce<NativeExpr>((object, property) => ({ member: object, property }), { item: repeatId }));
 				lowerChunk(rowChunk, parent, { row: repeatId }, { ...scope, items: new Map([...scope.items, [repeat.itemName, repeatId]]) });

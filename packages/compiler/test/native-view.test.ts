@@ -585,4 +585,49 @@ export function Entries() @{
 			'the `aria-controls` attribute of component-edge:1/h1 names an element inside a @for row it is not in',
 		]);
 	});
+
+	it('lowers a @for over a shared() field or a computed to a list of that expression', async () => {
+		const { payload, diagnostics } = await nativeView(`import { computed, shared, state } from '@markless/core';
+const listState = shared(() => {
+	const list = state({ tags: ['a', 'b'] });
+	return { ...list };
+}, { scope: 'subtree' });
+export function Tags() @{
+	const list = listState();
+	let extra = state(['c']);
+	const all = computed(() => [...list.tags, ...extra]);
+	<div>
+		<ul>@for (const tag of list.tags; key tag) { <li>{tag}</li> }</ul>
+		<ol>@for (const tag of all; key tag) { <li>{tag}</li> }</ol>
+	</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		const tags = payload!.cells.find((cell) => cell.name === 'list.tags')!;
+		expect(
+			payload?.nodes.flatMap((node) => (node.kind === 'repeat' ? [[node.list, node.key]] : [])),
+		).toEqual([
+			[{ cell: tags.id }, []],
+			[
+				{
+					array: [
+						{ spread: true, value: { cell: tags.id } },
+						{ spread: true, value: { cell: 'state:extra' } },
+					],
+				},
+				[],
+			],
+		]);
+	});
+
+	it('refuses a @for keyed by its index by name', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Words() @{
+	let words = state(['a', 'b']);
+	<ul>@for (const word of words; index at; key at) { <li>{word}</li> }</ul>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toContain(
+			'a @for keyed by its index; a native list keys each row by its item',
+		);
+	});
 });
