@@ -343,7 +343,6 @@ class MarklessHost(
 	}
 
 	private fun element(node: Node.Element, inst: Instance): View {
-		if (node.row != null && events[node.id].orEmpty().any { it.event == EventName.Input }) throw MarklessHostError("\"${node.id}\" handles input inside a list row, which this host does not implement")
 		// A Button holds one text run; a button with an element inside (a switch's thumb) is a box that reads as a Button.
 		val holdsElements = payload.nodes.any { it.parent == node.id && it is Node.Element }
 		val view = when (if (node.element == "button" && holdsElements) "box-button" else node.element) {
@@ -388,8 +387,8 @@ class MarklessHost(
 				override fun afterTextChanged(s: Editable) {
 					val text = s.toString()
 					// A property entry the applier just wrote reads back as the runtime's own value: not an edit.
-					if (node.bindings.any { it.property && it.name == "value" } && runtime.property(node.id, "value") == text) return
-					apply(runtime.dispatch(e.host, EventName.Input, text))
+					if (node.bindings.firstOrNull { it.property && it.name == "value" }?.let { runtime.property(it, inst.scope) } == text) return
+					apply(runtime.dispatch(inst.id, EventName.Input, text))
 				}
 			})
 		}

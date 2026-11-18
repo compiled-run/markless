@@ -875,4 +875,202 @@ export function Find() @{
 			{ op: 'command', node: 'h1', command: 'focus', preventScroll: true },
 		]);
 	});
+
+	it('lowers @empty to a branch shown while the list has no rows', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function List() @{
+	let items = state([{ id: 1, name: 'a' }]);
+	<ul>
+		@for (const row of items; key row.id) { <li>{row.name}</li> } @empty { <li>Nothing</li> }
+	</ul>
+}`);
+		expect(diagnostics).toEqual([]);
+		const repeat = payload?.nodes.find((node) => node.kind === 'repeat');
+		const empty = payload?.nodes.find((node) => node.kind === 'branch');
+		expect(empty).toEqual({
+			kind: 'branch',
+			id: `${repeat?.id}:empty`,
+			parent: 'h0',
+			test: {
+				binary: '===',
+				left: { member: { cell: 'state:items' }, property: 'length' },
+				right: { literal: 0 },
+			},
+			arms: 1,
+		});
+		const nothing = payload?.nodes.filter((node) => node.arm?.branch === empty?.id);
+		expect(nothing?.map((node) => node.kind)).toEqual(['element', 'text']);
+		expect(nothing?.every((node) => !node.row)).toBe(true);
+	});
+
+	it('runs a handler inside a row with that row item', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Basket() @{
+	let fruits = state([{ id: 'a', name: 'Apple' }]);
+	<ul>
+		@for (const fruit of fruits; key fruit.id) {
+			<li><button onClick={() => (fruits = fruits.filter((other) => other.id !== fruit.id))}>Drop {fruit.name}</button></li>
+		}
+	</ul>
+}`);
+		expect(diagnostics).toEqual([]);
+		const button = payload?.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'button',
+		);
+		expect(button?.row).toBe('repeat:0');
+		const event = payload?.events.find((candidate) => candidate.host === button?.id);
+		expect(payload?.handlers.find((handler) => handler.id === event?.handler)?.ops).toEqual([
+			{
+				op: 'assign',
+				cell: 'state:fruits',
+				value: {
+					method: 'filter',
+					target: { cell: 'state:fruits' },
+					arguments: [
+						{
+							lambda: ['other'],
+							body: {
+								binary: '!==',
+								left: { member: { local: 'other' }, property: 'id' },
+								right: { member: { item: 'repeat:0' }, property: 'id' },
+							},
+						},
+					],
+				},
+			},
+		]);
+	});
+
+	it('gives a component rendered in a row its own state per row, and its props from the row item', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function Line({ label }) @{
+	let picked = state(false);
+	<button aria-pressed={picked} onClick={() => (picked = !picked)}>{label}</button>
+}
+export function Lines() @{
+	let lines = state([{ id: 'x', title: 'X' }]);
+	<div>
+		@for (const line of lines; key line.id) { <Line label={line.title} /> }
+	</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		const repeat = payload!.nodes.find((node) => node.kind === 'repeat')!;
+		const rowCell = payload?.cells.find((cell) => cell.name === 'picked');
+		expect(rowCell).toMatchObject({ initial: false, row: repeat.id });
+		expect(payload?.cells.find((cell) => cell.name === 'lines')?.row).toBeUndefined();
+		expect(payload?.nodes.find((node) => node.kind === 'text')).toMatchObject({
+			row: repeat.id,
+			parts: [{ expr: { member: { item: repeat.id }, property: 'title' } }],
+		});
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{ op: 'assign', cell: rowCell!.id, value: { unary: '!', value: { cell: rowCell!.id } } },
+		]);
+	});
+
+	it("points an element's id reference inside a row at the same row's copy", async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+function Entry({ title }) @{
+	const heading = element();
+	<section aria-labelledby={heading}>
+		<h2 el={heading}>{title}</h2>
+	</section>
+}
+export function Entries() @{
+	let entries = state([{ slug: 'a', title: 'A' }]);
+	<div>
+		@for (const entry of entries; key entry.slug) { <Entry title={entry.title} /> }
+	</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		const section = payload?.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'section',
+		);
+		const heading = payload?.nodes.find((node) => node.kind === 'element' && node.element === 'h2');
+		expect(section?.kind === 'element' && section.bindings).toEqual([
+			{
+				attribute: 'aria-labelledby',
+				value: {
+					template: [`${heading?.id}@`, { member: { item: 'repeat:0' }, property: 'slug' }],
+				},
+			},
+		]);
+	});
+
+	it('refuses an id reference from outside a row to an element inside one', async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, shared, state } from '@markless/core';
+const panel = shared(() => {
+	const contentEl = element();
+	return { contentEl };
+}, { scope: 'subtree' });
+function Root({ children }) @{
+	const own = panel();
+	<div>{children}</div>
+}
+function Trigger() @{
+	const own = panel();
+	<button aria-controls={own.contentEl}>Show</button>
+}
+function Content({ children }) @{
+	const own = panel();
+	<section el={own.contentEl}>{children}</section>
+}
+export function Entries() @{
+	let entries = state([{ slug: 'a', title: 'A' }]);
+	<Root>
+		<Trigger />
+		<ul>
+			@for (const entry of entries; key entry.slug) { <Content>{entry.title}</Content> }
+		</ul>
+	</Root>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the `aria-controls` attribute of component-edge:1/h1 names an element inside a @for row it is not in',
+		]);
+	});
+
+	it('lowers a @for over a shared() field or a computed to a list of that expression', async () => {
+		const { payload, diagnostics } = await nativeView(`import { computed, shared, state } from '@markless/core';
+const listState = shared(() => {
+	const list = state({ tags: ['a', 'b'] });
+	return { ...list };
+}, { scope: 'subtree' });
+export function Tags() @{
+	const list = listState();
+	let extra = state(['c']);
+	const all = computed(() => [...list.tags, ...extra]);
+	<div>
+		<ul>@for (const tag of list.tags; key tag) { <li>{tag}</li> }</ul>
+		<ol>@for (const tag of all; key tag) { <li>{tag}</li> }</ol>
+	</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		const tags = payload!.cells.find((cell) => cell.name === 'list.tags')!;
+		expect(
+			payload?.nodes.flatMap((node) => (node.kind === 'repeat' ? [[node.list, node.key]] : [])),
+		).toEqual([
+			[{ cell: tags.id }, []],
+			[
+				{
+					array: [
+						{ spread: true, value: { cell: tags.id } },
+						{ spread: true, value: { cell: 'state:extra' } },
+					],
+				},
+				[],
+			],
+		]);
+	});
+
+	it('refuses a @for keyed by its index by name', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Words() @{
+	let words = state(['a', 'b']);
+	<ul>@for (const word of words; index at; key at) { <li>{word}</li> }</ul>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toContain(
+			'a @for keyed by its index; a native list keys each row by its item',
+		);
+	});
 });

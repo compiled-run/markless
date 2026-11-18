@@ -258,6 +258,9 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 			: {}),
 		...(indexName ? { indexName } : {}),
 		collectionSource,
+		...(state.nativeFacts
+			? { collectionExpression: state.nativeFacts.expression(collectionNode as never) }
+			: {}),
 		...(collection
 			? {
 					collectionGraphNodeId: collection.graphNodeId,

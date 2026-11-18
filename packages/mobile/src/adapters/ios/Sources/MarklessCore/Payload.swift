@@ -208,6 +208,8 @@ public struct NativeCell: Equatable, Sendable {
 	public var object: String? = nil
 	/// An async device call started at mount; the cell holds `{ state: 'pending' | 'value' | 'error', ... }`.
 	public var task: NativeTask? = nil
+	/// State of a component a list row renders: one value per row of this `repeat`, `initial` when the row is built.
+	public var row: String? = nil
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -246,7 +248,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object", "row"])
 			let initial = NativeValue(json: try field["initial"].value)
 			var styled = false
 			if field.has("styled") {
@@ -261,7 +263,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 				task: field.has("task") ? try {
 					let task = try field["task"].object(["call", "arguments"])
 					return NativeTask(call: try task["call"].string(), arguments: try task["arguments"].array().map(decodeExpr))
-				}() : nil)
+				}() : nil,
+				row: field.has("row") ? try field["row"].string() : nil)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()
@@ -579,6 +582,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 			for case let .call(_, _, arguments, result, _) in handler.ops
 			where !arguments.flatMap(\.cells).allSatisfy(cellIds.contains) || !(result.map { id in cells.contains { $0.id == id && $0.task != nil } } ?? true) {
 				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) calls the device with an unknown cell or a result cell that is not a task")
+			}
+		}
+		for cell in cells {
+			if let row = cell.row, !repeats.contains(row) {
+				throw PayloadError(path: "payload.cells", reason: "\(cell.id) is state of rows of \(row), which is not a list")
 			}
 		}
 		for event in events {

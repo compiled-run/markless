@@ -355,42 +355,63 @@ function walk(
 			hiddenWithin(`${node.parent}${nodeOf.get(node.parent)?.row ? suffix : ''}`)
 		);
 	};
+	/** A shown copy's node and its row suffix (`@<key>`, empty outside rows). */
+	const instanceOf = (id: string) => {
+		const at = id.indexOf('@');
+		return at < 0 ? { node: id, suffix: '' } : { node: id.slice(0, at), suffix: id.slice(at) };
+	};
+	/** The element a shown node sits in, as the copy in the same row. */
+	const parentOf = (id: string): string | undefined => {
+		const { node, suffix } = instanceOf(id);
+		const parent = nodeOf.get(node)?.parent;
+		if (parent == null) return undefined;
+		return nodeOf.get(parent)?.row ? `${parent}${suffix}` : parent;
+	};
 	// What a flow can see or tap: shown text, and each shown element's accessible name (aria-label, bound or static).
 	const labels = () =>
 		payload.nodes.flatMap((node) => {
 			if (node.kind !== 'element') return [];
-			const attribute = (name: string) => {
-				const bound = attributes.get(`${node.id}\0${name}`);
-				return bound !== undefined ? bound : (node.attributes?.[name] ?? null);
-			};
-			// A host shows an <audio controls> with a clip as one control named for what it does next.
-			if (node.element === 'audio')
-				return shownNode(node.id) && attributes.get(`${node.id}\0src`) != null
-					? [[node.id, playing ? 'Pause' : 'Play'] as const]
-					: [];
-			// aria-labelledby names an element by the text of the elements it lists, as the hosts read it.
-			const labelledBy = attribute('aria-labelledby');
-			const label =
-				attribute('aria-label') ??
-				(node.element === 'img' ? (node.attributes?.alt ?? null) : null) ??
-				(labelledBy === null
-					? null
-					: labelledBy
-							.split(' ')
-							.map((id) =>
-								[...texts]
-									.filter(([text]) => nodeOf.get(text)?.parent === id)
-									.map(([, shown]) => shown)
-									.join(' '),
-							)
-							.join(' '));
-			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
+			const ids = node.row
+				? (new Map(runtime.rows()).get(node.row) ?? []).map((key) => `${node.id}@${key}`)
+				: [node.id];
+			return ids.flatMap((id) => labelOf(node, id));
 		});
+	const labelOf = (
+		node: Extract<NativeViewPayload['nodes'][number], { kind: 'element' }>,
+		id: string,
+	): (readonly [string, string])[] => {
+		const attribute = (name: string) => {
+			const bound = attributes.get(`${id}\0${name}`);
+			return bound !== undefined ? bound : (node.attributes?.[name] ?? null);
+		};
+		// A host shows an <audio controls> with a clip as one control named for what it does next.
+		if (node.element === 'audio')
+			return shownNode(node.id) && attributes.get(`${id}\0src`) != null
+				? [[id, playing ? 'Pause' : 'Play'] as const]
+				: [];
+		// aria-labelledby names an element by the text of the elements it lists, as the hosts read it.
+		const labelledBy = attribute('aria-labelledby');
+		const label =
+			attribute('aria-label') ??
+			(node.element === 'img' ? (node.attributes?.alt ?? null) : null) ??
+			(labelledBy === null
+				? null
+				: labelledBy
+						.split(' ')
+						.map((target) =>
+							[...texts]
+								.filter(([text]) => parentOf(text) === target)
+								.map(([, shown]) => shown)
+								.join(' '),
+						)
+						.join(' '));
+		return label !== null && shownNode(node.id) ? [[id, label] as const] : [];
+	};
 	const elementReading = (text: string) => {
 		const labelled = labels().find(([, label]) => label === text)?.[0];
 		if (labelled) return labelled;
-		const node = shownTexts().find(([, shown]) => shown === text)?.[0];
-		return node ? (nodeOf.get(node)?.parent ?? undefined) : undefined;
+		const node = shownTexts().find(([id, shown]) => shown === text && !hiddenWithin(id))?.[0];
+		return node ? parentOf(node) : undefined;
 	};
 	function apply(dispatched: ReadonlyArray<NativeJournalEntry>, index: number) {
 		const answered: Array<() => ReadonlyArray<NativeJournalEntry>> = [];
@@ -478,19 +499,13 @@ function walk(
 				runtime = createNativeRuntime(payload, store, entry.params);
 				mount();
 			} else if (entry.op === 'rows') {
-				const rowNodes = payload.nodes
-					.filter((node) => node.row === entry.node)
-					.map((node) => node.id);
-				const instanceOf = (id: string) => {
-					const at = id.indexOf('@');
-					return at < 0 ? null : { node: id.slice(0, at), key: id.slice(at + 1) };
-				};
+				const rowNodes = payload.nodes.filter((node) => node.row === entry.node).map((node) => node.id);
 				const kept = new Map<string, string>();
 				for (const [id, text] of texts) {
 					const instance = instanceOf(id);
-					if (!instance || !rowNodes.includes(instance.node)) continue;
+					if (!instance.suffix || !rowNodes.includes(instance.node)) continue;
 					texts.delete(id);
-					if (entry.keys.includes(instance.key)) kept.set(id, text);
+					if (entry.keys.includes(instance.suffix.slice(1))) kept.set(id, text);
 				}
 				const fresh = new Map(runtime.texts());
 				for (const key of entry.keys)
@@ -499,6 +514,20 @@ function walk(
 						const text = kept.get(id) ?? fresh.get(id);
 						if (text !== undefined) texts.set(id, text);
 					}
+				// A row that stays keeps its attributes; a new row's are built from current values.
+				const keptAttributes = new Map<string, string | null>();
+				for (const [key, value] of attributes) {
+					const instance = instanceOf(key.split('\0')[0]!);
+					if (!instance.suffix || !rowNodes.includes(instance.node)) continue;
+					attributes.delete(key);
+					if (entry.keys.includes(instance.suffix.slice(1))) keptAttributes.set(key, value);
+				}
+				for (const [node, name, value] of runtime.attributes()) {
+					const instance = instanceOf(node);
+					if (!instance.suffix || !rowNodes.includes(instance.node)) continue;
+					const key = `${node}\0${name}`;
+					attributes.set(key, keptAttributes.has(key) ? keptAttributes.get(key)! : value);
+				}
 			} else if (entry.op === 'arm') {
 				chosen.set(entry.node, entry.index);
 				for (const id of texts.keys()) if (inArm(id, entry.node)) texts.delete(id);

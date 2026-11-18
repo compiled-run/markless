@@ -23,6 +23,7 @@ simulator and the emulator through the proof harness). No family source was chan
 | u13 | `accordion`: a single accordion and a `multiple` one whose value is a string, then a list (`typeof`) | pass | pass | pass | pass | none |
 | u14 | `gridlist`: three rows (one disabled), a tap picks the row it landed on (`event.target`) | pass | pass | pass | pass | none |
 | u15 | `popover` (trigger, content, title, close): `close` hands focus back with `triggerEl.focus()` | stopped | stopped | stopped | stopped | |
+| u6 | `base.button` toggles in `@for` rows, a remove button per row, `@empty` | pass | pass | pass | pass | none: Dragon has no rows (below) |
 
 Receipts: one harness run of the fourteen core rungs and u1 to u5, both platforms, `proof passed on iOS and Android`,
 19 of 19 on each
@@ -194,6 +195,25 @@ lowers (`popover.triggerEl?.focus()` is a `command`), but the rung is stopped: `
 the overlay primitive's (worker ui-overlay holds those files), and that is the only thing the app is refused for. select and
 menu stop on `dismiss` too, and on `<select>`/`<option>` and pointer events. Not provable with Maestro: where screen-reader
 focus is.
+
+**u6 rows (branch `cw/ui-rows`).** A component a `@for` row renders, family parts included, gets one value per row for
+each of its cells and of the `shared()` instances it creates: payload cells gain `row` (the `repeat` id), each row starts
+at the cell's first value and its state goes when the row leaves, so a row added again under the same key starts over. A
+handler on an element in a row runs as that row's copy (`<node>@<key>`, the id the hosts already gave row views), reading
+the row's item and state, in the reference runtime and both hosts. An id reference inside a row (`aria-controls`,
+`aria-labelledby`) names the same row's copy; one from outside a row into a row is refused by name. `@empty` lowers to a
+branch on the list's length, with no payload change. A `@for` lists any expression the pass lowers (`collect-repeat`
+records the collection as a tree), so rows over a `shared()` field or a computed lower; a `@for` keyed by its index was
+lowered as if keyed by its item and is now refused by name. Vector `rows.json` pins row state, row handlers, a row
+re-added fresh and `@empty` for both hosts. Not built: a `@for` inside a row or an `@if` arm, an `@if` in a row, rows
+under Dragon (the style input has no rows, and row state is left out of Dragon's per-state assignments).
+Receipt: the fourteen core rungs and u1 to u6, `proof passed on iOS and Android`, 20 of 20 on each
+(`receipts/2026-11-17-ui-rows-{ios,android}-20-rungs.json`; simulator `markless-ui-rows`, AVD `markless_ui_rows`, the
+Android run alone after another session's emulator took the first run's emulator down).
+Web defect found, not fixed here (it is web compiler and runtime code, reproduced on `main`): a family root in a `@for`
+row that fills a `shared()` callback slot (`collapsible.onChange`) never runs the app's callback from the row's trigger,
+and every press logs `MARKLESS_CALLBACK_SLOT_UNRESOLVED`. So collapsible, tabs and toggle in rows cannot pass the web
+column yet; u6 uses `base.button`, whose callback is a plain prop. The native build runs collapsible rows.
 
 ## Handler gaps each proved family hit (against draft #807's handler-boundary study)
 

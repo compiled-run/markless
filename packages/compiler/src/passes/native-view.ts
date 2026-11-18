@@ -120,6 +120,7 @@ type Item =
 			readonly kind: 'repeat';
 			readonly id: string;
 			readonly row: string;
+			readonly empty?: string;
 			readonly path: ReadonlyArray<number>;
 	  }
 	| {
@@ -787,11 +788,12 @@ export function createNativeViewPayload(
 		id: string,
 		name: string,
 		value: Record<string, NativeValue>,
+		row: string | undefined,
 	): Map<string, string> => {
 		const fields = new Map<string, string>();
 		for (const [field, initial] of Object.entries(value)) {
 			fields.set(field, `${id}.${field}`);
-			addCell({ id: `${id}.${field}`, name: `${name}.${field}`, initial });
+			addCell({ id: `${id}.${field}`, name: `${name}.${field}`, initial, ...(row ? { row } : {}) });
 		}
 		return fields;
 	};
@@ -806,6 +808,7 @@ export function createNativeViewPayload(
 		definition: SemanticSharedDefinition,
 		module: ModuleFacts,
 		prefix: string,
+		row: string | undefined,
 	): SharedInstance => {
 		const owner =
 			[module, ...moduleFactsByFile.values()].find((facts) =>
@@ -836,11 +839,11 @@ export function createNativeViewPayload(
 				continue;
 			}
 			if (isPlainObject(value)) {
-				const fields = splitCells(id, binding.name, value);
+				const fields = splitCells(id, binding.name, value, row);
 				objectFields.set(binding.id, fields);
 				objects.set(binding.name, { kind: 'fields', cells: fields, instance });
 			} else {
-				addCell({ id, name: binding.name, initial: value });
+				addCell({ id, name: binding.name, initial: value, ...(row ? { row } : {}) });
 				byName.set(binding.name, id);
 				byBinding.set(binding.id, id);
 			}
@@ -908,6 +911,8 @@ export function createNativeViewPayload(
 		props: ReadonlyMap<string, Prop>,
 		shared: ReadonlyMap<string, SharedInstance>,
 		includeModuleState: boolean,
+		/** The list whose rows this instance renders in: its state is per row. */
+		row?: string,
 	): Scope => {
 		const byName = new Map<string, string>();
 		const byBinding = new Map<string, string>();
@@ -943,7 +948,7 @@ export function createNativeViewPayload(
 				continue;
 			}
 			const instance =
-				subtree.get(definition.id) ?? createInstance(definition, module, prefix);
+				subtree.get(definition.id) ?? createInstance(definition, module, prefix, row);
 			subtree.set(definition.id, instance);
 			objects.set(use.localName, { kind: 'instance', instance });
 		}
@@ -982,10 +987,14 @@ export function createNativeViewPayload(
 				refuse(`state \`${binding.name}\` needs a JSON initial value known at build time`);
 				continue;
 			}
+			if (row && binding.storage) {
+				refuse(`storage \`${binding.name}\` of ${component}, which renders in a @for row`);
+				continue;
+			}
 			if (isPlainObject(value) && !binding.storage) {
 				objects.set(binding.name, {
 					kind: 'fields',
-					cells: splitCells(id, binding.name, value),
+					cells: splitCells(id, binding.name, value, row),
 				});
 				continue;
 			}
@@ -996,6 +1005,7 @@ export function createNativeViewPayload(
 				name: binding.name,
 				initial: value,
 				...(binding.storage ? { storage: { key: binding.storage.key } } : {}),
+				...(row ? { row } : {}),
 			});
 		}
 		for (const statement of native?.renderStatements ?? []) seed(statement, scope);
@@ -1901,6 +1911,8 @@ export function createNativeViewPayload(
 	};
 
 	const nodes: NativeNode[] = [];
+	/** Each list's row key as an expression of its row item: how a row's instance ids are spelt (`<node>@<key>`). */
+	const rowKeys = new Map<string, NativeExpr>();
 	const textRuns = new Map<string, number>();
 	const lowered = new Set<string>();
 
@@ -1949,9 +1961,9 @@ export function createNativeViewPayload(
 					kind: 'repeat',
 					id: slot.repeatId,
 					row: slot.rowTemplateId,
+					...(slot.emptyTemplateId ? { empty: slot.emptyTemplateId } : {}),
 					path: slot.coordinate.path,
 				});
-				if (slot.emptyTemplateId) refuse('@empty');
 				continue;
 			}
 			if (slot.kind === 'branch') {
@@ -2169,13 +2181,6 @@ export function createNativeViewPayload(
 						);
 						continue;
 					}
-					if (place.row) {
-						refuse(
-							`the ${event.eventName} handler inside a @for row`,
-							event.handlerSpan,
-						);
-						continue;
-					}
 					const handler = { id: `handler:${scope.prefix}${event.id}`, ops: [] as NativeOp[] };
 					events.push({ host: id, event: semantic, handler: handler.id });
 					handlers.push(handler);
@@ -2353,6 +2358,16 @@ export function createNativeViewPayload(
 							);
 							continue;
 						}
+					} else if (prop.kind === 'opaque' && prop.rowRead && !prop.rowRead.index) {
+						const repeatId = `${scope.prefix}${prop.rowRead.repeatId}`;
+						if (![...scope.items.values()].includes(repeatId)) {
+							refuse(`the \`${prop.name}\` prop of <${edge.childComponentName}> reads a row this build does not render`);
+							continue;
+						}
+						value = {
+							kind: 'value',
+							expr: prop.rowRead.path.reduce<NativeExpr>((object, property) => ({ member: object, property }), { item: repeatId }),
+						};
 					} else if (
 						prop.kind === 'graph-reference' &&
 						scope.cells.byBinding.has(prop.graphNodeId) &&
@@ -2383,6 +2398,7 @@ export function createNativeViewPayload(
 					props,
 					scope.shared,
 					target.module === rootModule,
+					place.row,
 				);
 				lowerChunk(template, parent, place, {
 					...childScope,
@@ -2401,33 +2417,40 @@ export function createNativeViewPayload(
 					refuse('@for inside an @if arm or another @for');
 					continue;
 				}
-				if (
-					!repeat ||
-					!rowChunk ||
-					repeat.collectionGraphNodeId === undefined ||
-					!scope.cells.byBinding.has(repeat.collectionGraphNodeId) ||
-					(repeat.collectionPath?.length ?? 0) > 0 ||
-					!repeat.keyPath
-				) {
-					refuse(
-						'a @for over something other than a state list keyed by a path of its item',
-					);
+				if (repeat?.indexKey) {
+					refuse('a @for keyed by its index; a native list keys each row by its item');
+					continue;
+				}
+				const list = repeat?.collectionExpression
+					? exprOf(repeat.collectionExpression, 'the @for list', scope)
+					: repeat?.collectionGraphNodeId !== undefined && scope.cells.byBinding.has(repeat.collectionGraphNodeId) && (repeat.collectionPath?.length ?? 0) === 0
+						? { cell: scope.cells.byBinding.get(repeat.collectionGraphNodeId)! }
+						: null;
+				if (!repeat || !rowChunk || !list) {
+					if (!repeat?.collectionExpression) refuse('a @for over something other than a state list keyed by a path of its item');
 					continue;
 				}
 				const repeatId = scope.prefix + item.id;
-				nodes.push({
-					kind: 'repeat',
-					id: repeatId,
-					parent,
-					list: { cell: scope.cells.byBinding.get(repeat.collectionGraphNodeId)! },
-					key: repeat.keyPath,
-				});
-				lowerChunk(
-					rowChunk,
-					parent,
-					{ row: repeatId },
-					{ ...scope, items: new Map([...scope.items, [repeat.itemName, repeatId]]) },
-				);
+				nodes.push({ kind: 'repeat', id: repeatId, parent, list, key: repeat.keyPath });
+				rowKeys.set(repeatId, repeat.keyPath.reduce<NativeExpr>((object, property) => ({ member: object, property }), { item: repeatId }));
+				lowerChunk(rowChunk, parent, { row: repeatId }, { ...scope, items: new Map([...scope.items, [repeat.itemName, repeatId]]) });
+				if (item.empty) {
+					const emptyChunk = scope.module.chunks.get(item.empty);
+					if (!emptyChunk) {
+						refuse(`the @empty block of ${item.id} has no markup`);
+						continue;
+					}
+					// `@empty` is a branch whose one arm shows while the list has no rows.
+					const branchId = `${repeatId}:empty`;
+					nodes.push({
+						kind: 'branch',
+						id: branchId,
+						parent,
+						test: { binary: '===', left: { member: list, property: 'length' }, right: { literal: 0 } },
+						arms: 1,
+					});
+					lowerChunk(emptyChunk, parent, { arm: { branch: branchId, index: 0 } }, scope);
+				}
 				continue;
 			}
 			if (item.kind === 'boundary') {
@@ -3260,6 +3283,7 @@ export function createNativeViewPayload(
 		if (!loweredEvents.has(event.id))
 			refuse(`the ${event.eventName} handler on an element this build does not show`);
 
+	const rowOfNode = new Map(nodes.map((node) => [node.id, node.row]));
 	for (const reference of handleReferences) {
 		const ids = reference.keys.flatMap((key) =>
 			key === undefined ? [] : (boundHandles.get(key) ?? []),
@@ -3269,12 +3293,23 @@ export function createNativeViewPayload(
 			(node) => node.id === reference.node && node.kind === 'element',
 		);
 		const node = nodes[index] as Extract<NativeNode, { kind: 'element' }>;
+		// An element in a row names the same row's copy (`<id>@<key>`), as each web row mints its own ids.
+		const parts: (string | NativeExpr)[] = [];
+		for (const [position, id] of ids.entries()) {
+			const row = rowOfNode.get(id);
+			if (row && row !== node.row) {
+				refuse(`the \`${reference.attribute}\` attribute of ${node.id} names an element inside a @for row it is not in`);
+				continue;
+			}
+			parts.push(`${position > 0 ? ' ' : ''}${id}${row ? '@' : ''}`);
+			if (row) parts.push(rowKeys.get(row)!);
+		}
+		const value: NativeExpr = parts.every((part) => typeof part === 'string')
+			? { literal: parts.join('') }
+			: { template: parts };
 		nodes[index] = {
 			...node,
-			bindings: [
-				...(node.bindings ?? []),
-				{ attribute: reference.attribute, value: { literal: ids.join(' ') } },
-			],
+			bindings: [...(node.bindings ?? []), { attribute: reference.attribute, value }],
 		};
 	}
 
@@ -3348,6 +3383,8 @@ export function createNativeViewPayload(
 	// A cell no handler writes keeps its first value, so it adds no assignment.
 	const written = writesOf(handlers.flatMap((handler) => handler.ops));
 	const styledCells = new Set<string>();
+	// A row's state has a value per row, which one style assignment per combination of states cannot follow.
+	const rowCells = new Set(cells.flatMap((cell) => (cell.row ? [cell.id] : [])));
 	for (const node of nodes)
 		if (node.kind === 'element')
 			for (const binding of node.bindings ?? []) {
@@ -3366,7 +3403,7 @@ export function createNativeViewPayload(
 			? { route: { pattern: options.route.pattern, params: options.route.params } }
 			: {}),
 		cells: cells.map((cell) =>
-			styledCells.has(cell.id) ? { ...cell, styled: true as const } : cell,
+			styledCells.has(cell.id) && !rowCells.has(cell.id) ? { ...cell, styled: true as const } : cell,
 		),
 		nodes,
 		events,

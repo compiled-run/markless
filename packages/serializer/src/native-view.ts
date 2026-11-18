@@ -266,9 +266,18 @@ export type NativeViewPayload = {
 			readonly call: NativeDeviceCall;
 			readonly arguments: ReadonlyArray<NativeExpr>;
 		};
+		/**
+		 * State of a component a list row renders (`repeat` node id): one value per row, `initial` when the row is built and
+		 * gone with it. A read or write inside the row reaches that row's value.
+		 */
+		readonly row?: string;
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;
+	/**
+	 * `host` is a node id; on a node inside a list row the host fires it as that row's instance (`<node>@<key>`), and its
+	 * handler reads that row's item and state.
+	 */
 	readonly events: ReadonlyArray<{
 		readonly host: string;
 		readonly event: NativeEventName;

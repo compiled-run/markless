@@ -1,0 +1,60 @@
+appId: ${APP_ID}
+name: u6-base-rows
+---
+- launchApp:
+      clearState: true
+- assertVisible: Tasks
+- assertVisible: Milk
+- assertVisible: Bread
+- assertVisible: Remove Milk
+- assertVisible: Remove Bread
+- assertVisible: Done 0
+- assertNotVisible: No tasks
+- assertNotVisible: Eggs
+- assertVisible:
+      text: Bread
+      below: Milk
+- tapOn: Milk
+- assertNotVisible: Done 0
+- assertVisible: Done 1
+- assertNotVisible: Done 0
+- tapOn: Bread
+- assertNotVisible: Done 1
+- assertVisible: Done 2
+- assertNotVisible: Done 1
+- tapOn: Milk
+- assertVisible: Done 1
+- assertNotVisible: Done 2
+- assertVisible: Milk
+- assertVisible: Remove Milk
+- assertVisible: Done 1
+- assertNotVisible: Done 2
+- tapOn: Remove Milk
+- assertNotVisible: Milk
+- assertNotVisible: Remove Milk
+- assertVisible: Bread
+- assertVisible: Done 1
+- assertNotVisible: Milk
+- assertNotVisible: Remove Milk
+- assertNotVisible: No tasks
+- tapOn: Bread
+- assertNotVisible: Done 1
+- assertVisible: Bread
+- assertVisible: Done 0
+- assertNotVisible: Done 1
+- tapOn: Remove Bread
+- assertNotVisible: Bread
+- assertVisible: No tasks
+- assertVisible: Done 0
+- assertNotVisible: Bread
+- tapOn: Add eggs
+- assertNotVisible: No tasks
+- assertVisible: Eggs
+- assertVisible: Remove Eggs
+- assertVisible: Done 0
+- assertNotVisible: No tasks
+- tapOn: Eggs
+- assertNotVisible: Done 0
+- assertVisible: Eggs
+- assertVisible: Done 1
+- assertNotVisible: Done 0

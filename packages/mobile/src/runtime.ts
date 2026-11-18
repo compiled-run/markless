@@ -42,6 +42,8 @@ type Value = NativeValue;
 /** What names mean inside a list row or an arrow function: the row items by repeat id, the function's parameters. */
 export type NativeScope = {
 	readonly items: ReadonlyMap<string, Value>;
+	/** The row keys by repeat id, where a row's own state is read. */
+	readonly keys?: ReadonlyMap<string, string>;
 	readonly locals: ReadonlyMap<string, Value>;
 	/** The page's route params. */
 	readonly params?: Readonly<Record<string, string>>;
@@ -91,7 +93,7 @@ const BUILTINS: { readonly [name in NativeBuiltin]: (...args: Value[]) => Value 
 /** The meaning of an expression: JavaScript's own, run here so the hosts have one definition to match. */
 export function evaluateNativeExpr(
 	expr: NativeExpr,
-	read: (cell: string) => Value,
+	read: (cell: string, scope: NativeScope) => Value,
 	eventValue?: string,
 	scope: NativeScope = EMPTY_SCOPE,
 ): Value {
@@ -152,7 +154,7 @@ export function evaluateNativeExpr(
 		const at = evaluate(expr.at);
 		return typeof at === 'number' && Number.isInteger(at) && at >= 0 && at < list.length ? list[at]! : null;
 	}
-	if ('cell' in expr) return read(expr.cell);
+	if ('cell' in expr) return read(expr.cell, scope);
 	if ('literal' in expr) return expr.literal;
 	if ('event' in expr) {
 		if (eventValue === undefined)
@@ -268,9 +270,20 @@ export function createNativeRuntime(
 	const repeats = new Map(
 		payload.nodes.flatMap((node) => (node.kind === 'repeat' ? [[node.id, node] as const] : [])),
 	);
-	const read = (cell: string): Value => {
+	const rowOfCell = new Map(payload.cells.flatMap((cell) => (cell.row ? [[cell.id, cell.row] as const] : [])));
+	/** Where a cell's value is kept: its id, or `<id>@<key>` for a row's own state, read in that row. */
+	const slotOf = (cell: string, scope: NativeScope): string => {
+		const row = rowOfCell.get(cell);
+		if (row === undefined) return cell;
+		const key = scope.keys?.get(row);
+		if (key === undefined) throw new Error(`the row state ${cell} read outside its row`);
+		return `${cell}@${key}`;
+	};
+	/** A row's state reads its first value until the row writes it. */
+	const read = (cell: string, scope: NativeScope = base): Value => {
 		if (!values.has(cell)) throw new Error(`unknown cell ${cell}`);
-		return values.get(cell)!;
+		const slot = slotOf(cell, scope);
+		return values.has(slot) ? values.get(slot)! : values.get(cell)!;
 	};
 	const evaluate = (expr: NativeExpr, eventValue?: string, scope?: NativeScope): Value =>
 		evaluateNativeExpr(expr, read, eventValue, scope ?? base);
@@ -325,7 +338,7 @@ export function createNativeRuntime(
 		if (!repeat || !shown(repeat)) return [];
 		return rowsOf(repeat).map(({ key, item }) => ({
 			id: `${node.id}@${key}`,
-			scope: { ...base, items: new Map([[repeat.id, item]]) },
+			scope: { ...base, items: new Map([[repeat.id, item]]), keys: new Map([[repeat.id, key]]) },
 		}));
 	};
 	const render = (parts: ReadonlyArray<NativeTextPart>, scope: NativeScope): string =>
@@ -333,11 +346,7 @@ export function createNativeRuntime(
 			.map((part) =>
 				'text' in part
 					? part.text
-					: formatNativeValue(
-							'cell' in part
-								? read(part.cell)
-								: evaluate(part.expr, undefined, scope),
-						),
+					: formatNativeValue('cell' in part ? read(part.cell, scope) : evaluate(part.expr, undefined, scope)),
 			)
 			.join('');
 
@@ -395,19 +404,6 @@ export function createNativeRuntime(
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));
 
 	const title = () => (payload.title ? render(payload.title, base) : null);
-	/** The scope an action's element runs in: a row instance (`h6@42`) reads its row's item. */
-	const scopeOf = (host: string): { node: string; scope: NativeScope } => {
-		const at = host.indexOf('@');
-		if (at < 0) return { node: host, scope: base };
-		const node = host.slice(0, at);
-		const key = host.slice(at + 1);
-		const row = payload.nodes.find((candidate) => candidate.id === node)?.row;
-		const repeat = row ? repeats.get(row) : undefined;
-		const found =
-			repeat && shown(repeat) ? rowsOf(repeat).find((entry) => entry.key === key) : undefined;
-		if (!repeat || !found) throw new Error(`${host} is not a shown row instance`);
-		return { node, scope: { ...base, items: new Map([[repeat.id, found.item]]) } };
-	};
 
 	return {
 		texts,
@@ -467,11 +463,18 @@ export function createNativeRuntime(
 					return cancel ? run(handlers.get(cancel.handler) ?? [], undefined, base) : [];
 				});
 			}
-			const { node: host, scope } = scopeOf(action.host);
+			// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
+			const at = action.host.indexOf('@');
+			const host = at < 0 ? action.host : action.host.slice(0, at);
 			const event = payload.events.find(
 				(candidate) => candidate.host === host && candidate.event === action.event,
 			);
 			if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
+			const instance = payload.nodes
+				.flatMap((node) => (node.id === host ? instances(node) : []))
+				.find((shown) => shown.id === action.host);
+			if (!instance) throw new Error(`${action.host} is not shown`);
+			const scope = instance.scope;
 			const eventValue = action.event === 'input' ? action.value : undefined;
 			return change(action.host, eventValue, () =>
 				run(handlers.get(event.handler) ?? [], eventValue, scope),
@@ -556,7 +559,7 @@ export function createNativeRuntime(
 				continue;
 			}
 			const value = evaluate(op.value, eventValue, scope);
-			values.set(op.cell, value);
+			values.set(slotOf(op.cell, scope), value);
 			const key = storageKeys.get(op.cell);
 			if (key !== undefined) store.set(key, value);
 		}
@@ -588,6 +591,13 @@ export function createNativeRuntime(
 			const ownedBefore = new Set(liveObjects());
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
+			// A row that left takes its state with it; a later row with the same key starts from the first values.
+			const kept = new Set(rows().flatMap(([list, keys]) => keys.map((key) => `${list}\0${key}`)));
+			for (const slot of values.keys()) {
+				const at = slot.indexOf('@');
+				const list = at < 0 ? undefined : rowOfCell.get(slot.slice(0, at));
+				if (list !== undefined && !kept.has(`${list}\0${slot.slice(at + 1)}`)) values.delete(slot);
+			}
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());
 			const afterProperties = keyed(properties());

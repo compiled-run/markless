@@ -97,6 +97,8 @@ public final class MemoryStore: NativeStore {
 /// What names mean inside a list row or a lambda: row items by `repeat` id, lambda parameters by name.
 public struct NativeScope: Sendable {
 	public var items: [String: NativeValue] = [:]
+	/// The row keys by `repeat` id, where a row's own state is read.
+	public var keys: [String: String] = [:]
 	public var locals: [String: NativeValue] = [:]
 	public static let empty = NativeScope()
 }
@@ -117,6 +119,8 @@ public final class NativeRuntime {
 	private let continuations: [String: NativeContinuation]
 	private let nodesById: [String: NativeNode]
 	private let params: [NativeRouteParam]
+	/// Row state's list by cell id: its values are kept as `<cell>@<key>`.
+	private let rowOfCell: [String: String]
 	private var eventValue: String?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
@@ -140,6 +144,7 @@ public final class NativeRuntime {
 		}
 		for handler in payload.handlers { collect(handler.ops) }
 		self.continuations = continuations
+		rowOfCell = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.row.map { (cell.id, $0) } })
 		nodesById = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
 		dialogs = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
@@ -147,9 +152,17 @@ public final class NativeRuntime {
 		})
 	}
 
-	private func read(_ cell: String) throws -> NativeValue {
+	/// Where a cell's value is kept: its id, or `<id>@<key>` for a row's own state, read in that row.
+	private func slot(of cell: String, in scope: NativeScope) throws -> String {
+		guard let row = rowOfCell[cell] else { return cell }
+		guard let key = scope.keys[row] else { throw RuntimeError(reason: "the row state \(cell) read outside its row") }
+		return "\(cell)@\(key)"
+	}
+
+	/// A row's state reads its first value until the row writes it.
+	private func read(_ cell: String, in scope: NativeScope = .empty) throws -> NativeValue {
 		guard let value = values[cell] else { throw RuntimeError(reason: "unknown cell \(cell)") }
-		return value
+		return values[try slot(of: cell, in: scope)] ?? value
 	}
 
 	/// The current value of a cell.
@@ -158,7 +171,7 @@ public final class NativeRuntime {
 	public func evaluate(_ expr: NativeExpr, in scope: NativeScope = .empty) throws -> NativeValue {
 		let evaluate = { (inner: NativeExpr) throws -> NativeValue in try self.evaluate(inner, in: scope) }
 		switch expr {
-		case let .cell(cell): return try read(cell)
+		case let .cell(cell): return try read(cell, in: scope)
 		case let .literal(value): return value
 		case let .item(repeatId):
 			guard let item = scope.items[repeatId] else { throw RuntimeError(reason: "the row item of \(repeatId) read outside its row") }
@@ -272,14 +285,14 @@ public final class NativeRuntime {
 		guard try isShown(node.arm) else { return [] }
 		guard let row = node.row else { return [NativeInstance(id: node.id, scope: .empty)] }
 		guard let list = nodesById[row], try isShown(list.arm) else { return [] }
-		return try rows(of: row).map { NativeInstance(id: "\(node.id)@\($0.key)", scope: NativeScope(items: [row: $0.item])) }
+		return try rows(of: row).map { NativeInstance(id: "\(node.id)@\($0.key)", scope: NativeScope(items: [row: $0.item], keys: [row: $0.key])) }
 	}
 
 	public func text(of parts: [NativeTextPart], in scope: NativeScope = .empty) throws -> String {
 		try parts.map { part in
 			switch part {
 			case let .text(text): return text
-			case let .cell(cell): return textOf(try read(cell))
+			case let .cell(cell): return textOf(try read(cell, in: scope))
 			case let .expr(expr): return textOf(try evaluate(expr, in: scope))
 			}
 		}.joined()
@@ -334,19 +347,6 @@ public final class NativeRuntime {
 	/// The page's `<title>` text, nil when it has none.
 	public func title() throws -> String? { try payload.title.map { try text(of: $0) } }
 
-	/// The element an action names and the scope it runs in: a row instance (`h6@42`) reads its row's item.
-	private func target(_ host: String) throws -> (node: String, scope: NativeScope) {
-		guard let at = host.firstIndex(of: "@") else { return (host, .empty) }
-		let node = String(host[..<at])
-		let key = String(host[host.index(after: at)...])
-		guard let repeatId = nodesById[node]?.row, let repeatNode = nodesById[repeatId], try isShown(repeatNode.arm),
-			let row = try rows(of: repeatId).first(where: { $0.key == key })
-		else { throw RuntimeError(reason: "\(host) is not a shown row instance") }
-		var scope = NativeScope()
-		scope.items[repeatId] = row.item
-		return (node, scope)
-	}
-
 	/// Every system sheet and whether its `open` is truthy.
 	public func sheets() throws -> [(node: String, open: Bool)] {
 		try payload.nodes.compactMap { node in
@@ -365,10 +365,15 @@ public final class NativeRuntime {
 				return try cancel.map { try self.run(self.handlers[$0.handler] ?? [], in: .empty) } ?? []
 			}
 		}
-		let (host, scope) = try target(action.host)
-		guard let bound = payload.events.first(where: { $0.host == host && $0.event == action.event }) else {
+		// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
+		let host = action.host.firstIndex(of: "@").map { String(action.host[..<$0]) } ?? action.host
+		guard let bound = payload.events.first(where: { $0.host == host && $0.event == action.event }), let node = nodesById[host] else {
 			throw RuntimeError(reason: "no \(action.event.rawValue) handler on \(action.host)")
 		}
+		guard let instance = try instances(of: node).first(where: { $0.id == action.host }) else {
+			throw RuntimeError(reason: "\(action.host) is not shown")
+		}
+		let scope = instance.scope
 		eventValue = action.event == .input ? action.value ?? "" : nil
 		defer { eventValue = nil }
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
@@ -415,7 +420,7 @@ public final class NativeRuntime {
 				return [.navigate(route: route, params: resolved, replace: replace)]
 			case let .assign(cell, expr):
 				let value = try evaluate(expr, in: scope)
-				values[cell] = value
+				values[try slot(of: cell, in: scope)] = value
 				if let key = storageKeys[cell] { store.write(key, value) }
 			case let .when(test, then, otherwise):
 				let taken = try run(try evaluate(test, in: scope).isTruthy ? then : otherwise, in: scope)
@@ -481,6 +486,12 @@ public final class NativeRuntime {
 		let ownedBefore = Set(try liveObjects())
 		let calls = try apply()
 		if case .navigate? = calls.first { return calls }
+		// A row that left takes its state with it; a later row with the same key starts from the first values.
+		let kept = Set(try rows().flatMap { list in list.keys.map { "\(list.node)\u{0}\($0)" } })
+		for slot in values.keys {
+			guard let at = slot.firstIndex(of: "@"), let list = rowOfCell[String(slot[..<at])] else { continue }
+			if !kept.contains("\(list)\u{0}\(slot[slot.index(after: at)...])") { values.removeValue(forKey: slot) }
+		}
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let afterAttributes = keyed(try attributes())
 		let afterProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })

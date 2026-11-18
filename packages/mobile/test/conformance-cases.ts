@@ -279,6 +279,22 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h4' },
 		],
 	},
+	{
+		name: 'rows',
+		fixture: 'test/fixtures/Rows.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h1@a' },
+			{ event: 'activate', host: 'component-edge:0/h1@b' },
+			{ event: 'activate', host: 'component-edge:0/h1@a' },
+			{ event: 'activate', host: 'h7@a' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'component-edge:0/h1@c' },
+			{ event: 'activate', host: 'h7@c' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h7@b' },
+			{ event: 'activate', host: 'h7@c' },
+		],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */
