@@ -135,6 +135,20 @@ test('a compile a runner hands back is compiled here, once', async () => {
 	expect(left).toEqual(here);
 });
 
+test('jobs queued behind one that cannot be sent still reach a worker or come back', async () => {
+	const pool = await onlinePool({ size: 1 });
+	const unsendable = (name: string) =>
+		({ ...input(name), unsendable: () => name }) as unknown as ReturnType<typeof input>;
+	const sent = pool.run(input('Sent'), 'sent');
+	const queued = ['First', 'Second', 'Third'].map((name) => pool.run(unsendable(name), name));
+	const queuedAfter = pool.run(input('After'), 'after');
+	const [sentResult, ...rest] = await Promise.all([sent, ...queued, queuedAfter]);
+	await pool.close();
+	expect(sentResult).toEqual(await compileTsrxModule(input('Sent')));
+	expect(rest.slice(0, 3)).toEqual([undefined, undefined, undefined]);
+	expect(rest[3]).toEqual(await compileTsrxModule(input('After')));
+});
+
 const alive = (pid: number) => {
 	try {
 		process.kill(pid, 0);
