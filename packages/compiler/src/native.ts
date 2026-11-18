@@ -12,3 +12,4 @@ export {
 	type NativeViewArtifact,
 	type NativeViewOptions,
 } from './passes/native-view.ts';
+export { fontFaceSources } from './passes/public-render/style-scopes.ts';

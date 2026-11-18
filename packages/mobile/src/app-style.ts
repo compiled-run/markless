@@ -35,6 +35,9 @@ type DragonTarget = {
 	readonly bands?: Json;
 };
 
+/** A face by its `sha256:` id: `file` is in the Dragon checkout, or with `from: 'input'` beside the style input. */
+export type StyleFont = { readonly id: string; readonly file: string; readonly from?: 'input' };
+
 /** `dragon.native-style-export/1`, as Dragon's `markless:style-export` writes it for one page. */
 export type DragonStyleExport = {
 	readonly schema: string;
@@ -42,7 +45,7 @@ export type DragonStyleExport = {
 	readonly compiler: string;
 	readonly component: string;
 	readonly warnings: ReadonlyArray<{ readonly code: string; readonly message: string }>;
-	readonly fonts: ReadonlyArray<{ readonly id: string; readonly file: string }>;
+	readonly fonts: ReadonlyArray<StyleFont>;
 	readonly targets: Readonly<Record<string, DragonTarget>>;
 };
 
@@ -94,6 +97,7 @@ export type NativeAppStyle = {
 		readonly code: string;
 		readonly message: string;
 	}>;
+	/** Each face by id, and where its file was at build time; the hosts load a face by its id. */
 	readonly fonts: ReadonlyArray<{ readonly id: string; readonly file: string }>;
 	readonly targets: Readonly<
 		Record<
@@ -118,7 +122,6 @@ export type NativeAppStyle = {
 export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): NativeAppStyle {
 	if (pages.length === 0) throw new Error('an app style needs at least one styled page');
 	const first = pages[0]!.exported;
-	const fonts = new Map<string, string>();
 	const targets: Record<string, NativeAppStyle['targets'][string]> = {};
 	const exports = pages.flatMap(({ pattern, exported, sheets }) => [
 		{ pattern, exported },
@@ -141,11 +144,6 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 			throw new Error(
 				`${pattern}: style export targets ${names} differ from the other pages'`,
 			);
-		for (const font of exported.fonts) {
-			if ((fonts.get(font.id) ?? font.file) !== font.file)
-				throw new Error(`font ${font.id} names two files`);
-			fonts.set(font.id, font.file);
-		}
 	}
 	for (const name of Object.keys(first.targets)) {
 		const { backend, viewport, dpr } = first.targets[name]!;
@@ -225,9 +223,22 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 		warnings: exports.flatMap(({ pattern, exported }) =>
 			exported.warnings.map((warning) => ({ pattern, ...warning })),
 		),
-		fonts: [...fonts].sort(([a], [b]) => (a < b ? -1 : 1)).map(([id, file]) => ({ id, file })),
+		fonts: appStyleFonts(pages).map(({ id, file }) => ({ id, file })),
 		targets,
 	};
+}
+
+/** Every face the pages' exports name, once each by id, with where its file is. */
+export function appStyleFonts(pages: ReadonlyArray<NativeAppStylePage>): StyleFont[] {
+	const fonts = new Map<string, StyleFont>();
+	for (const { exported, sheets } of pages)
+		for (const font of [exported, ...(sheets ?? []).map((sheet) => sheet.exported)].flatMap((e) => e.fonts)) {
+			const seen = fonts.get(font.id) ?? font;
+			if (seen.file !== font.file || seen.from !== font.from)
+				throw new Error(`font ${font.id} names two files`);
+			fonts.set(font.id, font);
+		}
+	return [...fonts.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
 }
 
 /** Bytes of the app style beside the per-page (and per-sheet-height) exports it replaces, both as compact JSON. */

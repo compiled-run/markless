@@ -1,4 +1,5 @@
 import type { NativeArmPlace, NativeViewPayload } from '@markless/serializer';
+import { fontFaceSources } from '@markless/compiler/native';
 import { isNativeStyleStateAttribute, nativeExprCells } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeBuild, NativeStylesheet } from './compile.ts';
@@ -66,7 +67,47 @@ export type NativeStyleInput = {
 	}>;
 	/** A system sheet's content at one resting height: the content area's size per target, in CSS px. */
 	readonly viewports?: ReturnType<typeof sheetViewports>;
+	/**
+	 * Each relative `@font-face` src url of the stylesheets, as `css` spells it, and the font file it names, resolved against its
+	 * stylesheet's file. Written to disk with `file` relative to the input file (`nativeStyleInputAt`).
+	 */
+	readonly fonts?: ReadonlyArray<{ readonly url: string; readonly file: string }>;
 };
+
+const URL_ROOT = 'https://markless.invalid/';
+
+/** The font files the stylesheets' `@font-face` rules name by a relative url, resolved as the web resolves a stylesheet's url(). */
+export function stylesheetFonts(
+	stylesheets: ReadonlyArray<NativeStylesheet>,
+): NonNullable<NativeStyleInput['fonts']> {
+	const fonts = new Map<string, { readonly url: string; readonly file: string; readonly sheet: string }>();
+	for (const sheet of stylesheets) {
+		const absolute = sheet.file.startsWith('/');
+		const base = new URL(sheet.file.split('/').map(encodeURIComponent).join('/'), URL_ROOT);
+		for (const url of fontFaceSources(sheet.cssText)) {
+			if (URL.canParse(url) || url.startsWith('/')) continue;
+			const path = decodeURIComponent(new URL(url, base).pathname);
+			const file = absolute ? path : path.slice(1);
+			const seen = fonts.get(url);
+			if (seen && seen.file !== file)
+				throw new Error(
+					`${sheet.file} and ${seen.sheet} both name the font url ${url}, for ${file} and ${seen.file}; the joined CSS cannot tell them apart`,
+				);
+			fonts.set(url, { url, file, sheet: sheet.file });
+		}
+	}
+	return [...fonts.values()].map(({ url, file }) => ({ url, file }));
+}
+
+/** The input as written at a path: each font file given relative to the input file by `relativeFile`. */
+export function nativeStyleInputAt(
+	input: NativeStyleInput,
+	relativeFile: (file: string) => string,
+): NativeStyleInput {
+	return input.fonts
+		? { ...input, fonts: input.fonts.map(({ url, file }) => ({ url, file: relativeFile(file) })) }
+		: input;
+}
 
 type PayloadNode = NativeViewPayload['nodes'][number];
 
@@ -176,6 +217,7 @@ export function nativeStyleInput(
 	},
 	cells?: ReadonlySet<string>,
 ): NativeStyleInput {
+	const fonts = stylesheetFonts(stylesheets);
 	const initial = new Map(createNativeRuntime(payload).texts());
 	const states = payload.cells.flatMap((cell): NativeStyleInput['states'][number][] => {
 		if (!cell.styled || (cells && !cells.has(cell.id))) return [];
@@ -324,5 +366,6 @@ export function nativeStyleInput(
 		}),
 		css: [...stylesheets, ...styles].map((style) => style.cssText).join('\n'),
 		states,
+		...(fonts.length > 0 ? { fonts } : {}),
 	};
 }

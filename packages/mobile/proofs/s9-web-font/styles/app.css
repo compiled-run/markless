@@ -1,0 +1,16 @@
+@font-face {
+	font-family: 'Harbour Lato';
+	src: url('./fonts/Lato-Regular.ttf') format('truetype');
+	font-weight: 400;
+}
+
+@font-face {
+	font-family: 'Harbour Lato';
+	src: url('./fonts/Lato-Bold.ttf') format('truetype');
+	font-weight: 700;
+}
+
+body {
+	margin: 0;
+	font-family: 'Harbour Lato', sans-serif;
+}
