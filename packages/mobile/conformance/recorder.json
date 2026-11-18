@@ -7,7 +7,8 @@
 			{
 				"id": "state:open",
 				"name": "open",
-				"initial": true
+				"initial": true,
+				"styled": true
 			},
 			{
 				"id": "device:recorder.access",
@@ -20,7 +21,8 @@
 				"name": "rec.active",
 				"initial": false,
 				"device": "recorder.active",
-				"object": "object:component-edge:0/rec"
+				"object": "object:component-edge:0/rec",
+				"styled": true
 			},
 			{
 				"id": "object:component-edge:0/rec:seconds",
@@ -343,16 +345,40 @@
 		]
 	},
 	"initial": [
-		["h7:text0", "Recorder"],
-		["h9:text0", "Close recorder"],
-		["component-edge:0/h1:text0", "Access unknown"],
-		["component-edge:0/h2:text0", "Record"],
-		["component-edge:0/h3:text0", "Seconds 0"],
-		["component-edge:0/h4:text0", "Too short"]
+		[
+			"h7:text0",
+			"Recorder"
+		],
+		[
+			"h9:text0",
+			"Close recorder"
+		],
+		[
+			"component-edge:0/h1:text0",
+			"Access unknown"
+		],
+		[
+			"component-edge:0/h2:text0",
+			"Record"
+		],
+		[
+			"component-edge:0/h3:text0",
+			"Seconds 0"
+		],
+		[
+			"component-edge:0/h4:text0",
+			"Too short"
+		]
 	],
 	"initialArms": [
-		["branch-site:1", 0],
-		["component-edge:0/branch-site:0", 1]
+		[
+			"branch-site:1",
+			0
+		],
+		[
+			"component-edge:0/branch-site:0",
+			1
+		]
 	],
 	"steps": [
 		{
@@ -362,6 +388,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "object:component-edge:0/rec:active",
+					"value": true
+				},
+				{
 					"op": "text",
 					"node": "component-edge:0/h2:text0",
 					"value": "Stop"
@@ -370,7 +401,9 @@
 					"op": "call",
 					"call": "recorder.active",
 					"object": "object:component-edge:0/rec",
-					"arguments": [true]
+					"arguments": [
+						true
+					]
 				}
 			]
 		},
@@ -395,6 +428,11 @@
 				"value": false
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "object:component-edge:0/rec:active",
+					"value": false
+				},
 				{
 					"op": "text",
 					"node": "component-edge:0/h2:text0",
@@ -423,6 +461,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "object:component-edge:0/rec:active",
+					"value": true
+				},
+				{
 					"op": "text",
 					"node": "component-edge:0/h2:text0",
 					"value": "Stop"
@@ -431,7 +474,9 @@
 					"op": "call",
 					"call": "recorder.active",
 					"object": "object:component-edge:0/rec",
-					"arguments": [true]
+					"arguments": [
+						true
+					]
 				}
 			]
 		},
@@ -461,6 +506,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "object:component-edge:0/rec:active",
+					"value": false
+				},
+				{
 					"op": "text",
 					"node": "component-edge:0/h2:text0",
 					"value": "Record"
@@ -469,7 +519,9 @@
 					"op": "call",
 					"call": "recorder.active",
 					"object": "object:component-edge:0/rec",
-					"arguments": [false]
+					"arguments": [
+						false
+					]
 				}
 			]
 		},
@@ -494,6 +546,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "object:component-edge:0/rec:active",
+					"value": true
+				},
+				{
 					"op": "text",
 					"node": "component-edge:0/h2:text0",
 					"value": "Stop"
@@ -502,7 +559,9 @@
 					"op": "call",
 					"call": "recorder.active",
 					"object": "object:component-edge:0/rec",
-					"arguments": [true]
+					"arguments": [
+						true
+					]
 				}
 			]
 		},
@@ -512,6 +571,11 @@
 				"host": "h9"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:open",
+					"value": false
+				},
 				{
 					"op": "text",
 					"node": "h9:text0",
@@ -534,7 +598,13 @@
 				"cell": "object:component-edge:0/rec:active",
 				"value": false
 			},
-			"journal": []
+			"journal": [
+				{
+					"op": "state",
+					"cell": "object:component-edge:0/rec:active",
+					"value": false
+				}
+			]
 		},
 		{
 			"action": {
@@ -542,6 +612,11 @@
 				"host": "h9"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:open",
+					"value": true
+				},
 				{
 					"op": "text",
 					"node": "h9:text0",

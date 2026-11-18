@@ -103,6 +103,19 @@ export type NativeExpr =
 	/** In an `input` handler: the field's text after the edit (`event.currentTarget.value`). */
 	| { readonly event: 'value' };
 
+/** Every cell an expression reads. */
+export function nativeExprCells(expr: NativeExpr, into = new Set<string>()): Set<string> {
+	if ('cell' in expr) into.add(expr.cell);
+	for (const child of Object.values(expr)) {
+		if (Array.isArray(child)) {
+			for (const item of child)
+				if (item && typeof item === 'object')
+					nativeExprCells((Array.isArray(item) ? item[1] : item) as NativeExpr, into);
+		} else if (child && typeof child === 'object') nativeExprCells(child as NativeExpr, into);
+	}
+	return into;
+}
+
 export type NativeTextPart =
 	| { readonly text: string }
 	| { readonly cell: string }
@@ -225,7 +238,12 @@ export type NativeOp =
 	 * the web (a text field takes the keyboard; anything else the screen reader's cursor) and scrolls the element into view
 	 * unless `preventScroll` (`focus({ preventScroll: true })`).
 	 */
-	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand; readonly preventScroll?: true }
+	| {
+			readonly op: 'command';
+			readonly node: string;
+			readonly command: NativeCommand;
+			readonly preventScroll?: true;
+	  }
 	/**
 	 * Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. A param
 	 * is a string fixed at build time or an expression evaluated when the op runs (a row's item inside a list row).
@@ -318,7 +336,12 @@ export type NativeAppPayload = {
 export type NativeJournalEntry =
 	| { readonly op: 'text'; readonly node: string; readonly value: string }
 	/** A `command` op the handler ran, in order, after every other entry: the views show the new state first. */
-	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand; readonly preventScroll?: true }
+	| {
+			readonly op: 'command';
+			readonly node: string;
+			readonly command: NativeCommand;
+			readonly preventScroll?: true;
+	  }
 	/** A `<dialog>` opened in the top layer or closed (by an op, or by the host's back gesture as a `cancel`). */
 	| { readonly op: 'dialog'; readonly node: string; readonly open: boolean }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
@@ -378,8 +401,9 @@ export const PLATFORM_PIECES_NAMESPACE = 'native';
 
 /**
  * Bound attributes that reach Dragon in every combination of the styled states, besides `class`: the ones a selector keys
- * state off (`[ui-open]`, `[aria-expanded]`) and `hidden`, whose UA rule Dragon applies. Others (`disabled`, `value`) stay
- * out of the style input, since Dragon does not model their rendering effect.
+ * state off (`[ui-open]`, `[aria-expanded]`), `hidden`, whose UA rule Dragon applies, and `disabled`, which selects `:disabled`
+ * and Chrome's disabled colours in Dragon. Others (`value`) stay out of the style input, since Dragon does not model their
+ * rendering effect.
  */
 export const isNativeStyleStateAttribute = (name: string): boolean =>
-	name === 'hidden' || name === 'role' || /^(ui|aria|data)-/.test(name);
+	name === 'hidden' || name === 'disabled' || name === 'role' || /^(ui|aria|data)-/.test(name);

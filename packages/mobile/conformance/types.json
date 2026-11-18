@@ -393,14 +393,38 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Held text"],
-		["h2:text0", "is text"],
-		["h3:text0", "First none, second none"],
-		["h4:text0", "Number"],
-		["h5:text0", "Flag"],
-		["h6:text0", "List"],
-		["h7:text0", "Nothing"],
-		["h8:text0", "Add"]
+		[
+			"h1:text0",
+			"Held text"
+		],
+		[
+			"h2:text0",
+			"is text"
+		],
+		[
+			"h3:text0",
+			"First none, second none"
+		],
+		[
+			"h4:text0",
+			"Number"
+		],
+		[
+			"h5:text0",
+			"Flag"
+		],
+		[
+			"h6:text0",
+			"List"
+		],
+		[
+			"h7:text0",
+			"Nothing"
+		],
+		[
+			"h8:text0",
+			"Add"
+		]
 	],
 	"steps": [
 		{

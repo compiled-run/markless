@@ -7,7 +7,9 @@
 			{
 				"id": "state:list",
 				"name": "list",
-				"initial": ["a"]
+				"initial": [
+					"a"
+				]
 			},
 			{
 				"id": "state:note",
@@ -83,7 +85,10 @@
 										},
 										"arguments": [
 											{
-												"lambda": ["at:item", "at"],
+												"lambda": [
+													"at:item",
+													"at"
+												],
 												"body": {
 													"if": {
 														"binary": "!==",
@@ -265,11 +270,26 @@
 		]
 	},
 	"initial": [
-		["h2:text0", "Same"],
-		["h3:text0", "Grow"],
-		["h4:text0", "Reset"]
+		[
+			"h2:text0",
+			"Same"
+		],
+		[
+			"h3:text0",
+			"Grow"
+		],
+		[
+			"h4:text0",
+			"Reset"
+		]
 	],
-	"initialProperties": [["h1", "value", ""]],
+	"initialProperties": [
+		[
+			"h1",
+			"value",
+			""
+		]
+	],
 	"steps": [
 		{
 			"action": {

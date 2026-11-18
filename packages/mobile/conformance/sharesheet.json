@@ -135,9 +135,18 @@
 		]
 	},
 	"initial": [
-		["h4:text0", "Share"],
-		["component-edge:0/h1:text0", "Share link"],
-		["component-edge:0/h2:text0", "Closed 0"]
+		[
+			"h4:text0",
+			"Share"
+		],
+		[
+			"component-edge:0/h1:text0",
+			"Share link"
+		],
+		[
+			"component-edge:0/h2:text0",
+			"Closed 0"
+		]
 	],
 	"steps": [
 		{
