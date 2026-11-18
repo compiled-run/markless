@@ -95,6 +95,19 @@ final class ViewTree {
 		refreshRelations()
 	}
 
+	/// Whether any of `view`'s box is inside `frame` (in `screen`'s space): an IntersectionObserver with no threshold, where a
+	/// hidden view or one under a hidden ancestor has no box, and an edge touching the frame counts.
+	func isOnScreen(_ view: UIView, within frame: CGRect, of screen: UIView) -> Bool {
+		var at: UIView? = view
+		while let current = at, current !== screen {
+			if current.isHidden { return false }
+			at = current.superview
+		}
+		guard at === screen else { return false }
+		let box = view.convert(view.bounds, to: screen)
+		return box.minX <= frame.maxX && box.maxX >= frame.minX && box.minY <= frame.maxY && box.maxY >= frame.minY
+	}
+
 	func pageAppeared(_ host: UIViewController) {
 		for sheet in sheets.values { sheet.hostAppeared(host) }
 	}

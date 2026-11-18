@@ -1,0 +1,13 @@
+{
+	"rung": 138,
+	"name": "A link whose href ends in a slash opens the route the router matches it to",
+	"steps": [
+		{ "visible": ["Start here", "Open about"], "absent": ["About this app"], "title": "Home" },
+		{
+			"do": { "tap": "Open about" },
+			"visible": ["About this app"],
+			"absent": ["Start here"],
+			"title": "About"
+		}
+	]
+}

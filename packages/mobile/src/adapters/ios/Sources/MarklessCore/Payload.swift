@@ -5,6 +5,10 @@ public let nativeViewVersion = "markless.native-view/0"
 public enum NativeBuiltin: String, Sendable {
 	case string = "String", number = "Number", boolean = "Boolean"
 	case abs = "Math.abs", floor = "Math.floor", max = "Math.max", min = "Math.min", round = "Math.round"
+	/// The device's clock, in milliseconds since 1970 (UTC).
+	case dateNow = "Date.now"
+	/// `new Date(ms).toISOString()`.
+	case dateISOString = "Date.toISOString"
 }
 
 /// A value computed from cells, with JavaScript's meaning (see `JavaScript.swift`).
@@ -122,6 +126,10 @@ public enum NativeEventName: String, Sendable {
 	case dismiss
 	/// The host's back gesture or Escape on an open `<dialog>`: it closes, as the browser's cancel does.
 	case cancel
+	/// The host is idle after the element appeared; once for each shown instance.
+	case idle
+	/// Some of the element is on the screen; once for each shown instance.
+	case visible
 }
 
 public enum NativeOp: Equatable, Sendable {
@@ -210,6 +218,8 @@ public struct NativeCell: Equatable, Sendable {
 	public var task: NativeTask? = nil
 	/// State of a component a list row renders: one value per row of this `repeat`, `initial` when the row is built.
 	public var row: String? = nil
+	/// The clock when the screen opened: written at mount, before the first build.
+	public var clock = false
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -248,7 +258,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object", "row"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object", "row", "clock"])
+			if field.has("clock"), try !field["clock"].bool() {
+				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
+			}
 			let initial = NativeValue(json: try field["initial"].value)
 			var styled = false
 			if field.has("styled") {
@@ -264,7 +277,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 					let task = try field["task"].object(["call", "arguments"])
 					return NativeTask(call: try task["call"].string(), arguments: try task["arguments"].array().map(decodeExpr))
 				}() : nil,
-				row: field.has("row") ? try field["row"].string() : nil)
+				row: field.has("row") ? try field["row"].string() : nil,
+				clock: field.has("clock"))
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()

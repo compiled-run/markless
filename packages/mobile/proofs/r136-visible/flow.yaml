@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+name: r136-visible
+---
+- launchApp:
+      clearState: true
+- assertVisible: Seen T
+- assertVisible: Top line
+- assertVisible: Reveal
+- assertNotVisible: Seen nothing
+- assertNotVisible: Seen TB
+- tapOn: Reveal
+- assertNotVisible: Seen T
+- assertVisible: Seen TR
+- assertVisible: Revealed line
+- assertNotVisible: Seen T
+- assertNotVisible: Seen TRB

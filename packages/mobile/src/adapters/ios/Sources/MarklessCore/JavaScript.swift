@@ -124,9 +124,11 @@ func evaluateBinary(_ op: String, _ leftOperand: NativeValue, _ rightOperand: Na
 	}
 }
 
-func evaluateCall(_ builtin: NativeBuiltin, _ arguments: [NativeValue]) -> NativeValue {
+func evaluateCall(_ builtin: NativeBuiltin, _ arguments: [NativeValue], now: () -> Double) throws -> NativeValue {
 	let first = arguments.first
 	switch builtin {
+	case .dateNow: return .number(now())
+	case .dateISOString: return .string(try javaScriptISOString(first?.number ?? .nan))
 	case .string: return .string(first?.text ?? "undefined")
 	case .number: return .number(first?.number ?? .nan)
 	case .boolean: return .bool(first?.isTruthy ?? false)
@@ -262,4 +264,30 @@ func callMethod(_ method: NativeMethod, on target: NativeValue, _ arguments: [Me
 		}
 	default: throw refuse
 	}
+}
+
+/// `Date.prototype.toISOString` of a time value: UTC, `YYYY-MM-DDTHH:mm:ss.sssZ`, six digits and a sign outside 0 to 9999.
+func javaScriptISOString(_ time: Double) throws -> String {
+	guard time.isFinite, abs(time) <= 8.64e15 else { throw RuntimeError(reason: "RangeError: Invalid time value") }
+	let ms = Int64(time.rounded(.towardZero))
+	let dayMs: Int64 = 86_400_000
+	var days = ms / dayMs
+	var inDay = ms % dayMs
+	if inDay < 0 { inDay += dayMs; days -= 1 }
+	// Civil date from days since 1970-01-01 (proleptic Gregorian).
+	let z = days + 719_468
+	let era = (z >= 0 ? z : z - 146_096) / 146_097
+	let dayOfEra = z - era * 146_097
+	let yearOfEra = (dayOfEra - dayOfEra / 1460 + dayOfEra / 36524 - dayOfEra / 146_096) / 365
+	let dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100)
+	let monthIndex = (5 * dayOfYear + 2) / 153
+	let day = dayOfYear - (153 * monthIndex + 2) / 5 + 1
+	let month = monthIndex < 10 ? monthIndex + 3 : monthIndex - 9
+	let year = yearOfEra + era * 400 + (month <= 2 ? 1 : 0)
+	func pad(_ value: Int64, _ width: Int) -> String {
+		let digits = String(value)
+		return String(repeating: "0", count: max(0, width - digits.count)) + digits
+	}
+	let yearText = (0...9999).contains(year) ? pad(year, 4) : (year < 0 ? "-" : "+") + pad(abs(year), 6)
+	return "\(yearText)-\(pad(month, 2))-\(pad(day, 2))T\(pad(inDay / 3_600_000, 2)):\(pad(inDay / 60_000 % 60, 2)):\(pad(inDay / 1000 % 60, 2)).\(pad(inDay % 1000, 3))Z"
 }

@@ -234,6 +234,7 @@ function walk(
 	params: Readonly<Record<string, string>>,
 	position: LadderRung['location'],
 	target: 'ios' | 'android',
+	belowFold?: string,
 ) {
 	const store = new Map<string, NativeValue>();
 	let calls: string[] = [];
@@ -275,8 +276,10 @@ function walk(
 					cell,
 					error: { name: 'NotAllowedError', message: 'Location was refused' },
 				});
+	// The device's clock: a second passes between a person's actions.
+	let clock = Date.now();
 	const start = () => {
-		const r = createNativeRuntime(payload, store, params);
+		const r = createNativeRuntime(payload, store, params, () => clock);
 		for (const cell of payload.cells)
 			if (cell.device)
 				r.dispatch({ event: 'device', cell: cell.id, value: deviceValue(cell.device) });
@@ -653,7 +656,23 @@ function walk(
 					: runtime.dispatch({ event: 'input', host, value: action.type.text });
 			apply(dispatched, index);
 		}
+		raiseLoadEvents(index);
 		check(index, step);
+		clock += 1000;
+	}
+	// What a host raises once the screen is drawn: `idle` for every element due one, `visible` for each above the fold.
+	function raiseLoadEvents(index: number) {
+		const foldText = belowFold === undefined ? undefined : [...texts].find(([, text]) => text === belowFold)?.[0];
+		const foldNode = foldText === undefined ? -1 : payload.nodes.findIndex((node) => node.id === nodeOf.get(foldText.split('@')[0]!)?.parent);
+		const aboveFold = (instance: string) =>
+			foldNode < 0 || payload.nodes.findIndex((node) => node.id === instance.split('@')[0]) < foldNode;
+		for (;;) {
+			const idle = runtime.due('idle')[0];
+			const visible = runtime.due('visible').find(aboveFold);
+			const host = idle ?? visible;
+			if (host === undefined) return;
+			apply(runtime.dispatch({ event: idle === undefined ? 'visible' : 'idle', host }), index);
+		}
 	}
 	function check(index: number, step: LadderStep) {
 		for (const [field, value] of Object.entries(step.fields ?? {})) {
@@ -758,7 +777,7 @@ test.each(
 			...step,
 			visible: [...step.visible, ...(step.visibleOn?.[target] ?? [])],
 		}));
-		walk(build.payload, steps, opened?.params ?? {}, rung.location, target);
+		walk(build.payload, steps, opened?.params ?? {}, rung.location, target, rung.belowFold);
 	},
 );
 

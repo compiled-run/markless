@@ -1,0 +1,22 @@
+{
+	"rung": 134,
+	"name": "Calls into the app's own functions: a helper of the page, imported helpers with a loop, in markup and in a handler",
+	"steps": [
+		{ "visible": ["Basic at $5.00", "Team at $12.50", "Scale at $40.05", "Over budget 2"] },
+		{
+			"do": { "tap": "Double" },
+			"visible": ["Over budget 1", "Budget $20.00"],
+			"absent": ["Over budget 2"]
+		},
+		{
+			"do": { "tap": "Double" },
+			"visible": ["Over budget 1", "Budget $40.00"],
+			"absent": ["Budget $20.00"]
+		},
+		{
+			"do": { "tap": "Double" },
+			"visible": ["Over budget 0", "Budget $80.00"],
+			"absent": ["Over budget 1"]
+		}
+	]
+}

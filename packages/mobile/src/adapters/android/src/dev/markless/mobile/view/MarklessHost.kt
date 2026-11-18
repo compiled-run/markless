@@ -72,6 +72,8 @@ class MarklessHost(
 	params: Map<String, String> = emptyMap(),
 	/** Where device values come from and device calls go; required for a payload that names device features. */
 	private val device: NativeDevice? = null,
+	/** The device's clock, in ms since 1970 (UTC); a conformance run fixes it. */
+	now: () -> Double = { System.currentTimeMillis().toDouble() },
 ) {
 	constructor(
 		context: Context,
@@ -83,7 +85,7 @@ class MarklessHost(
 		device: NativeDevice? = null,
 	) : this(context, Payload.decode(payloadBytes), styleExportBytes?.let { StyleExport.decode(it) }, fonts, store, params, device)
 
-	val runtime = Runtime(payload, store, params)
+	val runtime = Runtime(payload, store, params, now)
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val events = payload.events.groupBy { it.host }
 	private val views = HashMap<String, View>()
@@ -132,6 +134,71 @@ class MarklessHost(
 		for (cell in payload.cells) cell.device?.let { name -> needDevice().watch(name, cell.obj) { if (!released) apply(runtime.device(cell.id, it)) } }
 		for (call in runtime.tasks()) runCall(call)
 		refreshRelations()
+		root.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+			override fun onViewAttachedToWindow(view: View) = startLoadEvents()
+			override fun onViewDetachedFromWindow(view: View) = stopLoadEvents()
+		})
+	}
+
+	private val onLayout = android.view.ViewTreeObserver.OnGlobalLayoutListener { raiseVisible() }
+	private val onScroll = android.view.ViewTreeObserver.OnScrollChangedListener { raiseVisible() }
+	private var drawn = false
+	private var idleQueued = false
+	private var raisingVisible = false
+
+	/** `idle` waits for the first frame, then for the main thread's queue to go idle, as the web waits for an idle period after load. */
+	private fun startLoadEvents() {
+		root.viewTreeObserver.addOnGlobalLayoutListener(onLayout)
+		root.viewTreeObserver.addOnScrollChangedListener(onScroll)
+		if (drawn) return scheduleLoadEvents()
+		root.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
+			override fun onPreDraw(): Boolean {
+				root.viewTreeObserver.removeOnPreDrawListener(this)
+				drawn = true
+				scheduleLoadEvents()
+				return true
+			}
+		})
+	}
+
+	private fun stopLoadEvents() {
+		root.viewTreeObserver.removeOnGlobalLayoutListener(onLayout)
+		root.viewTreeObserver.removeOnScrollChangedListener(onScroll)
+	}
+
+	private fun scheduleLoadEvents() {
+		if (!drawn || released) return
+		if (!idleQueued && runtime.due(EventName.Idle).isNotEmpty()) {
+			idleQueued = true
+			android.os.Looper.myQueue().addIdleHandler {
+				idleQueued = false
+				if (!released) for (host in runtime.due(EventName.Idle)) apply(runtime.dispatch(host, EventName.Idle))
+				false
+			}
+		}
+		raiseVisible()
+	}
+
+	/** Raises `visible` for each instance due one that has any of its box inside the page's part of the screen. */
+	private fun raiseVisible() {
+		if (!drawn || released || raisingVisible || root.windowVisibility != View.VISIBLE) return
+		val viewport = root.parent as? View ?: return
+		val screen = Rect()
+		if (!viewport.getGlobalVisibleRect(screen)) return
+		screen.set(screen.left + viewport.paddingLeft, screen.top + viewport.paddingTop, screen.right - viewport.paddingRight, screen.bottom - viewport.paddingBottom)
+		raisingVisible = true
+		try {
+			for (host in runtime.due(EventName.Visible)) {
+				val view = views[host] ?: continue
+				if (!view.isShown) continue
+				val at = IntArray(2).also(view::getLocationInWindow)
+				// Edge-adjacent counts, as an IntersectionObserver with no threshold reports it.
+				if (at[0] <= screen.right && at[0] + view.width >= screen.left && at[1] <= screen.bottom && at[1] + view.height >= screen.top)
+					apply(runtime.dispatch(host, EventName.Visible))
+			}
+		} finally {
+			raisingVisible = false
+		}
 	}
 
 	/** Set when another page replaces this one: device answers that arrive later change nothing. */
@@ -224,6 +291,7 @@ class MarklessHost(
 		}
 		refreshRelations()
 		onJournal?.invoke(journal)
+		scheduleLoadEvents()
 	}
 
 	/** The colour behind the page in the current assignment (the export's canvas, else the web canvas's white); null unstyled. */
@@ -380,7 +448,7 @@ class MarklessHost(
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
 			EventName.Dismiss -> throw MarklessHostError("dismiss event on \"${node.id}\", which is not a sheet")
-			EventName.Cancel -> {}
+			EventName.Cancel, EventName.Idle, EventName.Visible -> {}
 			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}

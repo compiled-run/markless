@@ -109,8 +109,12 @@ data class Instance(val id: String, val node: Node, val scope: Scope, val rowKey
 data class Row(val key: String, val item: JsValue)
 
 /** Runs handler ops on cells and reports what changed on shown nodes as journal entries, in document order. Free of android.*. */
-class Runtime(val payload: Payload, private val store: Store = MemoryStore(), val params: Map<String, String> = emptyMap()) {
-	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, c.storageKey?.let(store::get) ?: c.initial) }
+/** [now]: the device's clock, in ms since 1970 (UTC); a conformance run fixes it. */
+class Runtime(val payload: Payload, private val store: Store = MemoryStore(), val params: Map<String, String> = emptyMap(), private val now: () -> Double = { System.currentTimeMillis().toDouble() }) {
+	private val opened = now()
+	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, if (c.clock) JsValue.Num(opened) else c.storageKey?.let(store::get) ?: c.initial) }
+	/** `idle` and `visible` handlers that ran, by `<event>\u0000<instance>`; an instance that leaves the screen is forgotten. */
+	private val fired = HashSet<String>()
 	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
 	private val handlers = payload.handlers.associateBy { it.id }
 	private val continuations = HashMap<String, Continuation>().also { found ->
@@ -193,7 +197,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				}
 				Js.method(e.name, target, args)
 			}
-			is Expr.Call -> Js.call(e.name, e.arguments.map(::eval))
+			is Expr.Call -> Js.call(e.name, e.arguments.map(::eval), now)
 		}
 	}
 
@@ -297,6 +301,11 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				cancel?.let { run(it.ops, Scope.EMPTY) } ?: emptyList()
 			}
 		}
+		if (event == EventName.Idle || event == EventName.Visible) {
+			val key = "${event.wire}\u0000$host"
+			if (key in fired || host !in due(event)) return emptyList()
+			fired.add(key)
+		}
 		// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 		val template = host.substringBefore('@')
 		val handlerId = handlerFor(template, event) ?: throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
@@ -309,6 +318,20 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 			} finally {
 				eventValue = null
 			}
+		}
+	}
+
+	/** The shown instances with an `idle` (or `visible`) handler that has not run for them, in document order. */
+	fun due(event: EventName): List<String> = payload.events.filter { it.event == event }.flatMap { bound ->
+		val node = byId[bound.host] ?: return@flatMap emptyList()
+		instances(node).map { it.id }.filter { "${event.wire}\u0000$it" !in fired }
+	}
+
+	private fun forgetHidden() {
+		fired.removeAll { key ->
+			val id = key.substringAfter('\u0000')
+			val node = byId[id.substringBefore('@')]
+			node == null || instances(node).none { it.id == id }
 		}
 	}
 
@@ -400,6 +423,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 			val list = rowOfCell[slot.substringBefore('@')]
 			list != null && '@' in slot && "$list\u0000${slot.substringAfter('@')}" !in kept
 		}
+		forgetHidden()
 		val afterTexts = texts().toMap()
 		val afterAttributes = attributes().associate { (n, a, v) -> (n to a) to v }
 		val afterProperties = properties().associate { (n, a, v) -> (n to a) to v }

@@ -2565,18 +2565,12 @@ export function createNativeViewPayload(
 							scope,
 						};
 					} else if (prop.kind === 'serializable' && isNativeValue(prop.value)) {
-						value = {
-							kind: 'value',
-							expr: {
-								literal: (isScalar(prop.value) ? prop.value : null) as NativeScalar,
-							},
-						};
-						if (!isScalar(prop.value)) {
-							refuse(
-								`the \`${prop.name}\` prop of <${edge.childComponentName}> is an object or array`,
-							);
+						const expr = expressionOfValue(prop.value);
+						if (!expr) {
+							refuse(`the \`${prop.name}\` prop of <${edge.childComponentName}> is not JSON`, prop.sourceSpan ?? edge.sourceSpan);
 							continue;
 						}
+						value = { kind: 'value', expr };
 					} else if (prop.kind === 'opaque' && prop.rowRead && !prop.rowRead.index) {
 						const repeatId = `${scope.prefix}${prop.rowRead.repeatId}`;
 						if (![...scope.items.values()].includes(repeatId)) {
@@ -2596,8 +2590,16 @@ export function createNativeViewPayload(
 							kind: 'value',
 							expr: { cell: scope.cells.byBinding.get(prop.graphNodeId)! },
 						};
+					} else if (prop.kind === 'opaque' && prop.nativeExpression) {
+						// A value the page renders the child with (a constant, a body const, an item's field): lowered where it is written.
+						const expr = exprOf(prop.nativeExpression, `the \`${prop.name}\` prop of <${edge.childComponentName}>`, {
+							...scope,
+							...((prop.sourceSpan ?? edge.sourceSpan) ? { span: prop.sourceSpan ?? edge.sourceSpan } : {}),
+						});
+						if (!expr) continue;
+						value = { kind: 'value', expr };
 					} else {
-						refuse(`the \`${prop.name}\` prop of <${edge.childComponentName}>`);
+						refuse(`the \`${prop.name}\` prop of <${edge.childComponentName}>`, prop.sourceSpan ?? edge.sourceSpan);
 						continue;
 					}
 					if (declared.has(prop.name)) props.set(prop.name, value);

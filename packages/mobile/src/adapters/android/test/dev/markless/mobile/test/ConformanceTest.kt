@@ -54,7 +54,8 @@ private fun runVector(file: File) {
 	check("${file.name} version", version == CONFORMANCE_VERSION) { "vector version is $version, this test reads $CONFORMANCE_VERSION" }
 	val payload = Payload.decode(field(vector, "payload", file.name))
 	val params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap()
-	val runtime = Runtime(payload, params = params)
+	val now = (vector["now"] as? Json.Num)?.value
+	val runtime = if (now == null) Runtime(payload, params = params) else Runtime(payload, params = params, now = { now })
 	val mounted = runtime.texts().joinToString(",", "[", "]") { (n, t) -> "[${jsonString(n)},${jsonString(t)}]" }
 	val initial = canonical(field(vector, "initial", file.name))
 	check("${file.name} initial", mounted == initial) { "expected $initial\n  actual   $mounted" }

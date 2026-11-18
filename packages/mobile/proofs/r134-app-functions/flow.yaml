@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: r134-app-functions
+---
+- launchApp:
+      clearState: true
+- assertVisible: Basic at \$5\.00
+- assertVisible: Team at \$12\.50
+- assertVisible: Scale at \$40\.05
+- assertVisible: Over budget 2
+- tapOn: Double
+- assertNotVisible: Over budget 2
+- assertVisible: Over budget 1
+- assertVisible: Budget \$20\.00
+- assertNotVisible: Over budget 2
+- tapOn: Double
+- assertNotVisible: Budget \$20\.00
+- assertVisible: Over budget 1
+- assertVisible: Budget \$40\.00
+- assertNotVisible: Budget \$20\.00
+- tapOn: Double
+- assertNotVisible: Over budget 1
+- assertVisible: Over budget 0
+- assertVisible: Budget \$80\.00
+- assertNotVisible: Over budget 1
