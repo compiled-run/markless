@@ -22,6 +22,8 @@ export type BoundaryRunnerResolution = {
 	// Joined template values and @if/@switch tests the settled block reads, computed once its gate settles.
 	readonly derivedGraphNodeIds: ReadonlyArray<string>;
 	readonly unresolvedSources: ReadonlyArray<string>;
+	// No async value to wait for: the @try is settled when it first renders.
+	readonly waitsOnNothing: boolean;
 };
 
 export const ASYNC_GATE_GRAPH_NODE_PREFIX = 'computed:asyncGate:';
@@ -30,6 +32,7 @@ type BoundaryGateReads = {
 	readonly reads: ReadonlyArray<BoundaryRunnerRead>;
 	readonly derivedGraphNodeIds: ReadonlyArray<string>;
 	readonly unresolvedSources: ReadonlyArray<string>;
+	readonly unresolvedInTryArm: boolean;
 };
 
 // Async boundary runner identity is a semantic-graph fact. Emitters must not
@@ -44,7 +47,7 @@ export function resolveBoundaryRunners(
 	const gateReads = collectBoundaryGateReads(semanticGraph);
 	return new Map(
 		semanticGraph.asyncBoundaries.map((boundary) => {
-			const { reads, derivedGraphNodeIds, unresolvedSources } = gateReads.get(boundary.id)!;
+			const { reads, derivedGraphNodeIds, unresolvedSources, unresolvedInTryArm } = gateReads.get(boundary.id)!;
 			const joined = boundary.gateGraphNodeId
 				? bindingsById.get(boundary.gateGraphNodeId)
 				: undefined;
@@ -60,6 +63,7 @@ export function resolveBoundaryRunners(
 					reads: joined?.async ? [...reads, authored!] : reads,
 					derivedGraphNodeIds,
 					unresolvedSources,
+					waitsOnNothing: reads.length === 0 && !unresolvedInTryArm,
 				},
 			] as const;
 		}),
@@ -179,6 +183,7 @@ function collectBoundaryGateReads(
 		readonly branchTest?: true;
 		// A read inside an attach function: a name that is not a graph value is the function's own JS.
 		readonly attachRead?: true;
+		readonly hostNodeId?: string;
 	};
 	// attach on a @try arm element runs once the block settles, so its async reads gate the block.
 	const tryArmHosts = new Map(
@@ -201,6 +206,7 @@ function collectBoundaryGateReads(
 						asyncBoundaryId: read.asyncBoundaryId,
 						graphNodeId: gate.graphNodeId,
 						path: [],
+						hostNodeId: read.hostNodeId,
 					}))
 				: [read],
 		),
@@ -249,11 +255,13 @@ function collectBoundaryGateReads(
 		),
 	];
 
+	const hostArm = new Map(semanticGraph.hostNodes.map((host) => [host.id, host.asyncBoundaryArm]));
 	return new Map(
 		semanticGraph.asyncBoundaries.map((boundary) => {
 			const { bindings, aliases } = scoped(boundary.componentName);
 			const reads: BoundaryRunnerRead[] = [];
 			const unresolvedSources: string[] = [];
+			let unresolvedInTryArm = false;
 			const seenGraphNodeIds = new Set<string>();
 			const derivedGraphNodeIds = new Set<string>();
 			for (const read of boundaryReads) {
@@ -269,6 +277,9 @@ function collectBoundaryGateReads(
 						: resolveGraphPath(templateReadPath(read), bindings, aliases);
 				if (!resolved) {
 					if (!read.branchTest && !read.attachRead) unresolvedSources.push(read.source);
+					// A @pending or @catch read waits on nothing the @try arm shows.
+					const arm = read.hostNodeId ? hostArm.get(read.hostNodeId) : undefined;
+					if (!read.branchTest && !read.attachRead && (arm === undefined || arm === 0)) unresolvedInTryArm = true;
 					continue;
 				}
 				if (resolved.binding.kind !== 'computed' || resolved.binding.asyncCapable !== true)
@@ -310,7 +321,7 @@ function collectBoundaryGateReads(
 
 			return [
 				boundary.id,
-				{ reads, derivedGraphNodeIds: [...derivedGraphNodeIds], unresolvedSources },
+				{ reads, derivedGraphNodeIds: [...derivedGraphNodeIds], unresolvedSources, unresolvedInTryArm },
 			] as const;
 		}),
 	);
