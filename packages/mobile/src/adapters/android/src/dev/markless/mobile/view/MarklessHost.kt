@@ -229,6 +229,14 @@ class MarklessHost(
 	/** The colour behind the page in the current assignment (the export's canvas, else the web canvas's white); null unstyled. */
 	val canvasColor: Int? get() = style?.let { it.assignments[assignment].canvas?.argb ?: Color.WHITE }
 
+	/** body's own box and colour in the current assignment, in the page's pixels as [rootFrame]; null when body paints none. */
+	val bodyBox: Pair<Rect, Int>? get() = style?.let { st ->
+		val color = st.assignments[assignment].body ?: return@let null
+		val origin = absolutes[assignment]["body"] ?: throw MarklessHostError("body paints a background, but the style export gives it no box")
+		val frame = st.assignments[assignment].byId.getValue("body").frame!!
+		Rect(origin.first.roundToInt(), origin.second.roundToInt(), (origin.first + frame.width).roundToInt(), (origin.second + frame.height).roundToInt()) to color.argb
+	}
+
 	/** Called with [canvasColor] whenever the assignment changes. */
 	var onCanvas: ((Int) -> Unit)? = null
 

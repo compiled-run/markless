@@ -27,6 +27,8 @@ public struct StyleLayout: Sendable {
 	public let assignments: [[String: ResolvedStyle]]
 	/// Each assignment's canvas: the colour behind the page and the system bars; nil when the export names none (white).
 	public let canvases: [RGBA?]
+	/// Each assignment's body box in points, when body paints its own background there (under an html background).
+	public let bodies: [(frame: Frame, color: RGBA)?]
 	/// The assignment matching the cells' values at mount.
 	public let start: Int
 	/// For each export state, the payload cell it follows, or `@env#band` for the `@media` band.
@@ -86,6 +88,15 @@ extension StyleExport {
 				try resolveNodes(assignments[index].nodes, for: payload, initialTexts: index == start ? initialTexts : nil)
 			},
 			canvases: assignments.map(\.canvas),
+			bodies: try assignments.map { assignment in
+				guard let color = assignment.body else { return nil }
+				let frame = { (id: String) throws -> Frame in
+					guard let frame = assignment.nodes.first(where: { $0.id == id })?.frame else { throw styleError("body paints a background, but the export gives \(id) no box") }
+					return frame
+				}
+				let html = try frame("html"), body = try frame("body")
+				return (Frame(x: (html.x + body.x) / dpr, y: (html.y + body.y) / dpr, width: body.width / dpr, height: body.height / dpr), color)
+			},
 			start: start, stateCells: stateCells, domains: states.map(\.domain), next: next,
 			viewport: viewport, dpr: dpr, fontFiles: fonts, bands: bands)
 	}

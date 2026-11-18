@@ -3,46 +3,22 @@
 	"name": "@markless/ui tabs styled through Dragon: the selected tab and the shown panel follow a string state",
 	"steps": [
 		{
-			"visible": [
-				"Tabs",
-				"Apple",
-				"Banana",
-				"Cherry",
-				"Apples are red",
-				"Showing a"
-			],
-			"absent": [
-				"Bananas are yellow",
-				"Cherries are dark"
-			]
+			"visible": ["Tabs", "Apple", "Banana", "Cherry", "Apples are red", "Showing a"],
+			"absent": ["Bananas are yellow", "Cherries are dark"]
 		},
 		{
 			"do": {
 				"tap": "Banana"
 			},
-			"visible": [
-				"Bananas are yellow",
-				"Showing b"
-			],
-			"absent": [
-				"Apples are red",
-				"Cherries are dark",
-				"Showing a"
-			]
+			"visible": ["Bananas are yellow", "Showing b"],
+			"absent": ["Apples are red", "Cherries are dark", "Showing a"]
 		},
 		{
 			"do": {
 				"tap": "Cherry"
 			},
-			"visible": [
-				"Cherries are dark",
-				"Showing c"
-			],
-			"absent": [
-				"Apples are red",
-				"Bananas are yellow",
-				"Showing b"
-			]
+			"visible": ["Cherries are dark", "Showing c"],
+			"absent": ["Apples are red", "Bananas are yellow", "Showing b"]
 		}
 	]
 }

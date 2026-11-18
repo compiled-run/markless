@@ -171,6 +171,17 @@ abstract class MarklessActivity : Activity() {
 				else host.root.layout(paddingLeft + f.left, paddingTop + f.top, paddingLeft + f.right, paddingTop + f.bottom)
 			}
 
+			private val bodyPaint = android.graphics.Paint()
+
+			// body's own background, under the page, where the assignment gives it one.
+			override fun dispatchDraw(canvas: android.graphics.Canvas) {
+				host.bodyBox?.let { (rect, color) ->
+					bodyPaint.color = color
+					canvas.drawRect((paddingLeft + rect.left).toFloat(), (paddingTop + rect.top).toFloat(), (paddingLeft + rect.right).toFloat(), (paddingTop + rect.bottom).toFloat(), bodyPaint)
+				}
+				super.dispatchDraw(canvas)
+			}
+
 			override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
 				super.onMeasure(widthMeasureSpec, heightMeasureSpec)
 				host.rootFrame?.let { host.root.measure(MeasureSpec.makeMeasureSpec(it.width(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(it.height(), MeasureSpec.EXACTLY)) }
@@ -183,7 +194,10 @@ abstract class MarklessActivity : Activity() {
 		}
 		viewport.addView(host.root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 		host.canvasColor?.let(viewport::setBackgroundColor)
-		host.onCanvas = viewport::setBackgroundColor
+		host.onCanvas = { color ->
+			viewport.setBackgroundColor(color)
+			viewport.invalidate()
+		}
 		setContentView(viewport)
 		if (host.style != null) viewport.post { android.util.Log.i(MarklessHost.TAG, "frames max gap ${host.frameDeviation()} device px") }
 	}

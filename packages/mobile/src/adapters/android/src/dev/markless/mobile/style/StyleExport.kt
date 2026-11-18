@@ -40,8 +40,11 @@ sealed interface StyleWrite {
 
 data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>)
 
-/** One reachable combination of style states: every node's frame and writes, complete, and the canvas behind the page (null: white). */
-data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>, val canvas: Rgba? = null) {
+/**
+ * One reachable combination of style states: every node's frame and writes, complete, the canvas behind the page (null: white)
+ * and body's own background in its box, when html's background is the canvas (null: body paints none).
+ */
+data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>, val canvas: Rgba? = null, val body: Rgba? = null) {
 	val byId: Map<String, StyledNode> = nodes.associateBy { it.id }
 }
 
@@ -151,7 +154,9 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				val values = o.field("values", "assignments[$a]").obj("values").mapValues { (k, x) -> scalar(x, "assignments[$a].values.$k") }
 				val canvas = o["canvas"]?.let { color(it, "assignments[$a].canvas") }
 				if (canvas != null && canvas.alpha != 255) throw MarklessDecodeError("assignments[$a].canvas is not opaque")
-				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]", writesOf) }, canvas)
+				val body = o["bodyBackground"]?.takeIf { it != Json.Null }?.let { color(it, "assignments[$a].bodyBackground") }
+				if (body != null && body.alpha != 255) throw MarklessDecodeError("assignments[$a].bodyBackground is not opaque")
+				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]", writesOf) }, canvas, body)
 			}
 			val initial = t.field("initial", target).num("initial").toInt()
 			val next = t.field("next", target).arr("next").map { row -> row.arr("next[]").map { col -> col.arr("next[][]").map { it.num("next[][][]").toInt() } } }

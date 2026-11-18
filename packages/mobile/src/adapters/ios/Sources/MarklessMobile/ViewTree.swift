@@ -44,6 +44,7 @@ final class ViewTree {
 	weak var presenter: UIViewController?
 	private var anchors = Set<ObjectIdentifier>()
 	private var assignment: Int
+	private let bodyLayer = CALayer()
 	/// Taps and drags on the page dismiss the keyboard; a stack makes them wait for its edge-swipe Back.
 	let dismissGestures: [UIGestureRecognizer] = [UITapGestureRecognizer(), UIPanGestureRecognizer()]
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
@@ -93,6 +94,10 @@ final class ViewTree {
 			for sheet in sheets.values { stackTree(sheet.content) }
 		}
 		refreshRelations()
+		if layout != nil {
+			root.layer.insertSublayer(bodyLayer, at: 0)
+			paintBody()
+		}
 	}
 
 	func pageAppeared(_ host: UIViewController) {
@@ -118,6 +123,21 @@ final class ViewTree {
 
 	/// The colour behind the page in the current assignment: the export's canvas, else the web canvas's white.
 	var canvas: UIColor? { layout.map { $0.canvases[assignment].map(uiColor) ?? .white } }
+
+	/// body's own background, under every view of the page, where the current assignment gives it one.
+	private func paintBody() {
+		CATransaction.begin()
+		CATransaction.setDisableActions(true)
+		defer { CATransaction.commit() }
+		guard let body = layout?.bodies[assignment] else {
+			bodyLayer.isHidden = true
+			return
+		}
+		bodyLayer.zPosition = -1
+		bodyLayer.frame = CGRect(x: body.frame.x, y: body.frame.y, width: body.frame.width, height: body.frame.height)
+		bodyLayer.backgroundColor = uiColor(body.color).cgColor
+		bodyLayer.isHidden = false
+	}
 
 	/// The journal applier: the only code that changes a retained view after the first build.
 	func apply(_ journal: [NativeJournalEntry]) throws {
@@ -161,6 +181,7 @@ final class ViewTree {
 			case let .state(cell, value):
 				guard let layout else { continue }
 				assignment = try layout.next(from: assignment, cell: cell, value: value)
+				paintBody()
 				for (id, view) in elements.map({ ($0.key, $0.value as UIView) }) + labels.map({ ($0.key, $0.value as UIView) }) {
 					if let style = style(of: id) { try paint(view, style, faces: faces) }
 				}

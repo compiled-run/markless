@@ -1,0 +1,18 @@
+{
+	"perPage": {
+		"/": 20416,
+		"/boats": 19102
+	},
+	"perPageTotal": 39518,
+	"app": 27433,
+	"targets": {
+		"ios": {
+			"writeLists": 15,
+			"writeListReferences": 28
+		},
+		"android": {
+			"writeLists": 15,
+			"writeListReferences": 28
+		}
+	}
+}
