@@ -1,6 +1,13 @@
 // The target-neutral view a native host builds retained views from: no HTML, no DOM positions, no script.
 export const NATIVE_VIEW_VERSION = 'markless.native-view/0';
 
+/** A bound attribute named with this prefix (`ui-open`, `ui-disabled`) is a style hook: CSS selects it, so Dragon compiles its states. */
+export const NATIVE_STYLE_ATTRIBUTE_PREFIX = 'ui-';
+
+/** Whether a bound attribute decides styles on native: the class, or a `ui-*` attribute. */
+export const nativeStyleAttribute = (name: string): boolean =>
+	name === 'class' || name.startsWith(NATIVE_STYLE_ATTRIBUTE_PREFIX);
+
 export type NativeScalar = number | string | boolean;
 
 /** A cell's value: JSON. */
@@ -165,7 +172,7 @@ export type NativeViewPayload = {
 		readonly name: string;
 		readonly initial: NativeValue;
 		readonly storage?: { readonly key: string };
-		/** A class binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
+		/** A class or `ui-*` attribute binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
 		readonly styled?: true;
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */

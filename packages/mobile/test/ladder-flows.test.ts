@@ -5,11 +5,13 @@ import { parseAllDocuments } from 'yaml';
 import {
 	allRungFolders,
 	changeWitness,
+	looksOnly,
 	navRungFolders,
 	proofsDir,
 	readRung,
 	renderFlow,
 	rungFolders,
+	styleRungFolders,
 	witnessCount,
 } from '../proofs/ladder.ts';
 
@@ -44,12 +46,23 @@ test('the navigation ladder has one app folder per rung, in rung order', () => {
 		expect(existsSync(join(proofsDir, folder, 'pages'))).toBe(true);
 });
 
+test('the styles ladder has one app folder per rung, in rung order', () => {
+	expect(styleRungFolders().map((folder) => readRung(folder).rung)).toEqual([
+		'S1',
+		'S2',
+		'S3',
+		'S4',
+	]);
+	for (const folder of styleRungFolders())
+		expect(existsSync(join(proofsDir, folder, 'pages'))).toBe(true);
+});
+
 test.each(allRungFolders())(
 	'%s: every action step expects something the screen before it contradicts',
 	(folder) => {
 		const { steps } = readRung(folder);
 		for (const [index, step] of steps.entries()) {
-			if (index === 0 || (step.do && 'relaunch' in step.do)) continue;
+			if (index === 0 || (step.do && 'relaunch' in step.do) || looksOnly(step.do)) continue;
 			expect(
 				witnessCount(changeWitness(steps[index - 1]!, step)),
 				`step ${index}`,

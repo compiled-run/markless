@@ -1,0 +1,63 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Inbox",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "panel mk-19m2fp9"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-19m2fp9"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Inbox"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "note mk-19m2fp9"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Two messages wait."
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0",
+			"element": "a",
+			"parent": "h0",
+			"attributes": {
+				"class": "chip mk-19m2fp9",
+				"href": "/team"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0:text0",
+			"parent": "component-edge:0",
+			"text": "Open team"
+		}
+	],
+	"css": ":root {\n\t--ink: #2b2d42;\n\t--paper: #edf2f4;\n\t--accent: #d90429;\n\t--gap: 20px;\n}\n\nbody {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\nh1 {\n\tfont-size: 26px;\n\tfont-weight: 700;\n\tcolor: var(--ink);\n}\n\n.panel {\n\tpadding: var(--gap);\n\tbackground: var(--paper);\n}\n\n.chip {\n\tdisplay: block;\n\tmargin-top: 12px;\n\tpadding: 8px 12px;\n\tborder-radius: 8px;\n\tbackground: var(--accent);\n\tcolor: #ffffff;\n\tfont-size: 16px;\n\ttext-decoration: none;\n}\n\n.note.mk-19m2fp9 {\n\t\t\t\tmargin-top: var(--gap);\n\t\t\t\tpadding: 8px 12px;\n\t\t\t\tborder-left: 4px solid var(--accent);\n\t\t\t\tcolor: var(--ink);\n\t\t\t\tfont-size: 16px;\n\t\t\t}",
+	"states": []
+}

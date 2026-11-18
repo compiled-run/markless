@@ -1,0 +1,78 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Shelf",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "shelf mk-vzuoc1"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-vzuoc1"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Seed shelf"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h0",
+			"element": "span",
+			"parent": "h0",
+			"attributes": {
+				"class": "tag mk-1ghyv7t"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0/h0:text0",
+			"parent": "component-edge:0/h0",
+			"text": "Basil, in stock"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:1/h0",
+			"element": "span",
+			"parent": "h0",
+			"attributes": {
+				"class": "tag mk-1ghyv7t"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:1/h0:text0",
+			"parent": "component-edge:1/h0",
+			"text": "Thyme, low"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:2",
+			"element": "a",
+			"parent": "h0",
+			"attributes": {
+				"class": "next mk-vzuoc1",
+				"href": "/basil"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:2:text0",
+			"parent": "component-edge:2",
+			"text": "Open basil"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.tag.mk-1ghyv7t {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 6px 10px;\n\t\t\t\tborder: 2px solid #1b4332;\n\t\t\t\tborder-radius: 8px;\n\t\t\t\tbackground: #d8f3dc;\n\t\t\t\tcolor: #1b4332;\n\t\t\t\tfont-size: 15px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n.shelf.mk-vzuoc1 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #fefae0;\n\t\t\t}\n\t\t\t.heading.mk-vzuoc1 {\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #283618;\n\t\t\t}\n\t\t\t.next.mk-vzuoc1 {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 20px;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #283618;\n\t\t\t\tcolor: #fefae0;\n\t\t\t\tfont-size: 17px;\n\t\t\t\ttext-decoration: none;\n\t\t\t}",
+	"states": []
+}

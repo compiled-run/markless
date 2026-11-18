@@ -1,6 +1,7 @@
 package dev.markless.mobile.view
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
@@ -20,16 +21,21 @@ import android.widget.TextView
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Instance
 import dev.markless.mobile.core.JournalEntry
+import dev.markless.mobile.core.JsValue
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.Store
+import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.StyledNode
 import kotlin.math.roundToInt
 
 class MarklessHostError(message: String) : RuntimeException(message)
+
+private fun isDark(configuration: Configuration): Boolean =
+	configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
 /** Looks up a font face by the id a style export names it with (`sha256:<hex>` of the font file). */
 fun interface FontSource {
@@ -52,7 +58,8 @@ class AssetFonts(private val context: Context) : FontSource {
 class MarklessHost(
 	private val context: Context,
 	val payload: Payload,
-	styleExportBytes: ByteArray? = null,
+	/** This page's styles: a page's own export, or its route's styles from an app style file. */
+	val style: StyleExport?,
 	private val fonts: FontSource = AssetFonts(context),
 	store: Store = PreferencesStore(context),
 	/** The route params the page opens with. */
@@ -65,16 +72,15 @@ class MarklessHost(
 		fonts: FontSource = AssetFonts(context),
 		store: Store = PreferencesStore(context),
 		params: Map<String, String> = emptyMap(),
-	) : this(context, Payload.decode(payloadBytes), styleExportBytes, fonts, store, params)
+	) : this(context, Payload.decode(payloadBytes), styleExportBytes?.let { StyleExport.decode(it) }, fonts, store, params)
 
 	val runtime = Runtime(payload, store, params)
-	val style: StyleExport? = styleExportBytes?.let { StyleExport.decode(it) }
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val events = payload.events.groupBy { it.host }
 	private val views = HashMap<String, View>()
 	private val built = HashMap<String, Instance>()
 	private val textViews = HashMap<String, TextView>()
-	private var assignment = style?.initial ?: 0
+	private var assignment = style?.start(payload.cells.filter { it.styled }.map { it.id }, runtime::value, isDark(context.resources.configuration)) ?: 0
 	private val expanded = HashMap<View, Boolean?>()
 	private val dpr = context.resources.displayMetrics.density.toDouble()
 	private val absolutes: List<Map<String, Pair<Double, Double>>> = style?.let {
@@ -126,8 +132,7 @@ class MarklessHost(
 				}
 				is JournalEntry.State -> style?.let { st ->
 					assignment = st.next(assignment, st.stateFor(entry.node), entry.value)
-					for (inst in built.values.sortedBy { order.getValue(it.node.id) }) place(inst, views.getValue(inst.id), st)
-					root.requestLayout()
+					repaint(st)
 				}
 				is JournalEntry.Arm -> {
 					if (runtime.node(entry.node) !is Node.Branch) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
@@ -148,6 +153,22 @@ class MarklessHost(
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
 		onJournal?.invoke(journal)
+	}
+
+	/** The device's appearance changed: move to the @media band it selects, as a cell's `state` entry moves to its assignment. */
+	fun configurationChanged(configuration: Configuration) {
+		val st = style ?: return
+		if (st.bandState < 0) return
+		val band = st.band(isDark(configuration))
+		if (st.assignments[assignment].values[BAND_KEY] == JsValue.Num(band.toDouble())) return
+		assignment = st.next(assignment, st.bandState, JsValue.Num(band.toDouble()))
+		repaint(st)
+		Log.i(TAG, "band $band (${if (isDark(configuration)) "dark" else "light"}), style assignment $assignment")
+	}
+
+	private fun repaint(st: StyleExport) {
+		for (inst in built.values.sortedBy { order.getValue(it.node.id) }) place(inst, views.getValue(inst.id), st)
+		root.requestLayout()
 	}
 
 	/** After an arm or rows entry: drop instances no longer shown, build the new ones from current values, then put each parent's children in order. */
@@ -399,8 +420,12 @@ class MarklessHost(
 		for (x in st) if (x != "none" && x != "hidden" && x != "solid") throw MarklessHostError("\"${s.id}\" has border style \"$x\"; Android draws solid borders only")
 		val widths = listOf(bw.top, bw.right, bw.bottom, bw.left).mapIndexed { i, w -> if (st[i] == "solid") w else 0.0 }
 		val anyBorder = widths.any { it > 0 }
-		if (anyBorder && (widths.distinct().size != 1 || colors?.distinct()?.size != 1)) throw MarklessHostError("\"${s.id}\" has unequal border sides; not implemented on Android")
 		if ((fill == null || (fill ushr 24) == 0) && !anyBorder) { view.background = null; return }
+		if (anyBorder && (widths.distinct().size != 1 || colors?.distinct()?.size != 1)) {
+			if (radii?.any { it != 0.0 } == true) throw MarklessHostError("\"${s.id}\" has unequal border sides with rounded corners; not implemented on Android")
+			view.background = SideBorders(fill ?: 0, widths.map { it.toFloat() }, colors ?: throw MarklessHostError("\"${s.id}\" has border sides but no colours"))
+			return
+		}
 		view.background = GradientDrawable().apply {
 			setColor(fill ?: 0)
 			if (anyBorder) setStroke(widths[0].roundToInt(), colors!![0])

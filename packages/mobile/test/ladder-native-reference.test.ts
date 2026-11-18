@@ -16,7 +16,9 @@ import {
 } from '../src/index.ts';
 import { compileRungApp, readRelativeModule } from '../src/harness/rung.ts';
 import {
+	looksOnly,
 	navRungFolders,
+	styleRungFolders,
 	proofsDir,
 	readRung,
 	rungFolders,
@@ -228,6 +230,8 @@ function walkApp(app: NativeAppPayload, steps: readonly LadderStep[], start: str
 				`step ${index}: Back journals nothing`,
 			).toEqual([]);
 			stack.pop();
+		} else if (looksOnly(action)) {
+			// The appearance changes no state: the screens' texts stay as they are; the hosts restyle from the band table.
 		} else if (action) {
 			const top = stack.at(-1)!;
 			const host = top.elementReading(
@@ -284,7 +288,7 @@ test.each(rungFolders())(
 	},
 );
 
-test.each(navRungFolders())(
+test.each([...navRungFolders(), ...styleRungFolders()])(
 	'%s: the app payload walks the steps as a stack of screens',
 	async (folder) => {
 		const rung = readRung(folder);

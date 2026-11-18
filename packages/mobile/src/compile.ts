@@ -3,7 +3,6 @@ import {
 	compileTsrxModule,
 	buildSemanticGraph,
 	createNativeViewPayload,
-	nativeUnsupported,
 	NATIVE_FACT_COLLECTORS,
 	type SemanticGraphArtifact,
 	type CompilerDiagnostic,
@@ -16,13 +15,39 @@ import {
 } from '@markless/router';
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
 import { NATIVE_APP_VERSION } from '@markless/serializer/native-view';
+import { nativeStyleInput, type NativeStyleInput } from './style-input.ts';
 
 export type NativeBuild = {
 	readonly payload: NativeViewPayload | null;
-	/** The component's scoped CSS as the compiler compiled it for web; Dragon compiles the same text for each platform. */
+	/**
+	 * The scoped CSS as the compiler compiled it for web, of every component the payload shows: the components it imports
+	 * first, then its own. Dragon compiles the same text for each platform.
+	 */
 	readonly styles: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
+	/** Stylesheets imported for their effect (`import './app.css'`) by the module or a module it imports, in import order. */
+	readonly stylesheets: ReadonlyArray<NativeStylesheet>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
+
+/** A stylesheet's text as the web build ships it, unscoped: its rules reach every page that imports it. */
+export type NativeStylesheet = { readonly file: string; readonly cssText: string };
+
+/** Reads a stylesheet a module imports for its effect (`./app.css`); the caller owns file access. */
+export type ReadStylesheet = (specifier: string, importer: string) => NativeStylesheet | undefined;
+
+const stylesheetsOf = (
+	requests: ReadonlyArray<string>,
+	importer: string,
+	read: ReadStylesheet | undefined,
+): NativeStylesheet[] =>
+	requests.map((request) => {
+		const sheet = read?.(request, importer);
+		if (!sheet)
+			throw new Error(
+				`${importer} imports the stylesheet ${request}, which could not be read`,
+			);
+		return sheet;
+	});
 
 /** Compiles one `.tsrx` module through the real compiler, then lowers its analysis to the native view payload. */
 export async function compileNativeComponent(input: {
@@ -40,6 +65,7 @@ export async function compileNativeComponent(input: {
 	) => { readonly filename: string; readonly source: string } | undefined;
 	/** In an app build: every page's route, so links and `navigate()` are checked and resolved against them. */
 	readonly manifest?: RouteManifest;
+	readonly readStylesheet?: ReadStylesheet;
 }): Promise<NativeBuild> {
 	const manifest =
 		input.manifest ?? (input.page ? buildRouteManifestFromFileIds([input.page]) : undefined);
@@ -54,15 +80,26 @@ export async function compileNativeComponent(input: {
 		nativeFacts: NATIVE_FACT_COLLECTORS,
 	});
 	const importedModules: Record<string, SemanticGraphArtifact> = {};
+	const importedStyles: NativeBuild['styles'][number][] = [];
+	const stylesheets = stylesheetsOf(
+		compiled.publicRenderPlan.stylesheetImports,
+		input.filename,
+		input.readStylesheet,
+	);
 	for (const entry of compiled.semanticGraph.moduleImports) {
 		if (entry.typeOnly || !entry.source.startsWith('.') || importedModules[entry.source])
 			continue;
 		const module = input.readModule?.(entry.source, input.filename);
-		if (module)
-			importedModules[entry.source] = await buildSemanticGraph({
-				...module,
-				nativeFacts: NATIVE_FACT_COLLECTORS,
-			});
+		if (!module) continue;
+		importedModules[entry.source] = await buildSemanticGraph({
+			...module,
+			nativeFacts: NATIVE_FACT_COLLECTORS,
+		});
+		const plan = (await compileTsrxModule({ ...module, symbols: [] })).publicRenderPlan;
+		importedStyles.push(...plan.styleScopes);
+		stylesheets.push(
+			...stylesheetsOf(plan.stylesheetImports, module.filename, input.readStylesheet),
+		);
 	}
 	const native: NativeViewArtifact = createNativeViewPayload(compiled.semanticGraph, {
 		...(route
@@ -89,19 +126,32 @@ export async function compileNativeComponent(input: {
 	);
 	return {
 		payload: errors.length > 0 ? null : native.payload,
-		styles: compiled.publicRenderPlan.styleScopes,
+		styles: [...importedStyles, ...compiled.publicRenderPlan.styleScopes].filter(
+			(style, index, all) =>
+				all.findIndex((other) => other.scopeId === style.scopeId) === index,
+		),
+		stylesheets: stylesheets.filter(
+			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
+		),
 		diagnostics: [...errors, ...native.diagnostics],
 	};
 }
 
 export type NativeAppBuild = {
 	readonly payload: NativeAppPayload | null;
+	/** Each styled route's style input for Dragon, in the payload's route order; a route with no CSS has none. */
+	readonly styleInputs: ReadonlyArray<{
+		readonly pattern: string;
+		readonly page: string;
+		readonly input: NativeStyleInput;
+	}>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic & { readonly page: string }>;
 };
 
 /**
  * Compiles every page of an app (`pages/index.tsrx`, `pages/orders/[id].tsrx`...) into one payload: the router's own
- * manifest gives each page's route and the match order, and each page's links are checked against it.
+ * manifest gives each page's route and the match order, and each page's links are checked against it. A page's styles are
+ * the app document's stylesheets, then its own and its components'; Dragon compiles each styled page once.
  */
 export async function compileNativeApp(input: {
 	readonly pages: ReadonlyArray<{
@@ -109,35 +159,58 @@ export async function compileNativeApp(input: {
 		readonly filename: string;
 		readonly source: string;
 	}>;
+	/** The app's `document.tsrx`: the stylesheets it imports reach every page, as on the web. */
+	readonly document?: { readonly filename: string; readonly source: string };
 	readonly readModule?: Parameters<typeof compileNativeComponent>[0]['readModule'];
+	readonly readStylesheet?: ReadStylesheet;
 }): Promise<NativeAppBuild> {
 	const manifest = buildRouteManifestFromFileIds(input.pages.map((page) => page.page));
 	const routes: NativeAppPayload['routes'][number][] = [];
+	const styleInputs: NativeAppBuild['styleInputs'][number][] = [];
 	const diagnostics: (CompilerDiagnostic & { readonly page: string })[] = [];
+	const documentSheets = input.document
+		? stylesheetsOf(
+				(
+					await compileTsrxModule({
+						filename: input.document.filename,
+						source: input.document.source,
+						symbols: [],
+					})
+				).publicRenderPlan.stylesheetImports,
+				input.document.filename,
+				input.readStylesheet,
+			)
+		: [];
 	for (const route of manifest.routes) {
 		const page = input.pages.find((candidate) => candidate.page === route.file)!;
 		const build = await compileNativeComponent({
 			...page,
 			manifest,
 			...(input.readModule ? { readModule: input.readModule } : {}),
+			...(input.readStylesheet ? { readStylesheet: input.readStylesheet } : {}),
 		});
-		if (build.styles.some((style) => style.cssText.length > 0))
-			diagnostics.push({
-				...nativeUnsupported('styles in an app of several pages (one Dragon style export covers one component today)'),
-				page: page.page,
-			});
 		diagnostics.push(
 			...build.diagnostics.map((diagnostic) => ({ ...diagnostic, page: page.page })),
 		);
-		if (build.payload)
-			routes.push({
+		if (!build.payload) continue;
+		routes.push({
+			pattern: route.pattern,
+			params: route.params.map((param) => param.name),
+			page: build.payload,
+		});
+		const sheets = [...documentSheets, ...build.stylesheets].filter(
+			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
+		);
+		if (sheets.length > 0 || build.styles.some((style) => style.cssText.length > 0))
+			styleInputs.push({
 				pattern: route.pattern,
-				params: route.params.map((param) => param.name),
-				page: build.payload,
+				page: page.page,
+				input: nativeStyleInput(build.payload, build.styles, sheets),
 			});
 	}
 	return {
 		payload: diagnostics.length > 0 ? null : { version: NATIVE_APP_VERSION, routes },
+		styleInputs: diagnostics.length > 0 ? [] : styleInputs,
 		diagnostics,
 	};
 }

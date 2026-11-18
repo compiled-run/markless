@@ -38,6 +38,8 @@ final class ViewTree {
 	private var lists: [String: (anchor: UIView, keys: [String], built: [String: [String]])] = [:]
 	private var anchors = Set<ObjectIdentifier>()
 	private var assignment: Int
+	/// Taps and drags on the page dismiss the keyboard; a stack makes them wait for its edge-swipe Back.
+	let dismissGestures: [UIGestureRecognizer] = [UITapGestureRecognizer(), UIPanGestureRecognizer()]
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 
 	init(
@@ -69,7 +71,7 @@ final class ViewTree {
 		events = Dictionary(grouping: payload.events, by: \.host)
 		var index = 0
 		_ = try build("", in: root, at: &index, Context())
-		for gesture in [UITapGestureRecognizer(), UIPanGestureRecognizer()] as [UIGestureRecognizer] {
+		for gesture in dismissGestures {
 			gesture.cancelsTouchesInView = false
 			gesture.addTarget(keyboard, action: #selector(KeyboardDismisser.dismiss))
 			root.addGestureRecognizer(gesture)
@@ -385,6 +387,7 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	view.layer.borderWidth = style.borderWidth
 	view.layer.borderColor = style.borderColor.map(uiColor)?.cgColor
 	view.layer.cornerRadius = style.cornerRadius
+	paintSides(view, style.sides)
 	guard let label = view as? UILabel else {
 		if style.font != nil || style.textColor != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") has text styles but is not text") }
 		return
@@ -398,5 +401,25 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 
 private func uiColor(_ color: RGBA) -> UIColor {
 	UIColor(red: color.r / 255, green: color.g / 255, blue: color.b / 255, alpha: color.alpha / 255)
+}
+/// One sublayer per side, for borders whose sides differ; Chrome's diagonal corner joins are not drawn.
+private func paintSides(_ view: UIView, _ sides: [ResolvedStyle.Side]?) {
+	let name = "markless-border-side"
+	view.layer.sublayers?.filter { $0.name == name }.forEach { $0.removeFromSuperlayer() }
+	guard let sides else { return }
+	let b = view.bounds
+	let rects = [
+		CGRect(x: 0, y: 0, width: b.width, height: sides[0].width),
+		CGRect(x: b.width - sides[1].width, y: 0, width: sides[1].width, height: b.height),
+		CGRect(x: 0, y: b.height - sides[2].width, width: b.width, height: sides[2].width),
+		CGRect(x: 0, y: 0, width: sides[3].width, height: b.height),
+	]
+	for (side, rect) in zip(sides, rects) where side.width > 0 {
+		let layer = CALayer()
+		layer.name = name
+		layer.frame = rect
+		layer.backgroundColor = uiColor(side.color).cgColor
+		view.layer.addSublayer(layer)
+	}
 }
 #endif

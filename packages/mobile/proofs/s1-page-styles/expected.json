@@ -1,0 +1,27 @@
+{
+	"rung": "S1",
+	"name": "Two pages, each with its own scoped styles",
+	"steps": [
+		{
+			"visible": ["Your plants", "Three need water today.", "Open care guide"],
+			"absent": ["Watering"],
+			"title": "Plants"
+		},
+		{
+			"do": {
+				"tap": "Open care guide"
+			},
+			"visible": ["Watering", "Soak the soil, then let it dry."],
+			"absent": ["Your plants"],
+			"title": "Care"
+		},
+		{
+			"do": {
+				"back": "button"
+			},
+			"visible": ["Your plants", "Open care guide"],
+			"absent": ["Watering"],
+			"title": "Plants"
+		}
+	]
+}

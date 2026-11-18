@@ -1,0 +1,64 @@
+{
+	"rung": "S3",
+	"name": "State styles (a class and a ui-* attribute) and a dark-mode variant on a pushed screen, switched while it is in the back stack",
+	"steps": [
+		{
+			"visible": ["Account", "Open settings"],
+			"title": "Home"
+		},
+		{
+			"do": {
+				"tap": "Open settings"
+			},
+			"visible": ["Notifications", "Alerts off", "Daily summary", "Open help"],
+			"absent": ["Account"],
+			"title": "Settings"
+		},
+		{
+			"do": {
+				"tap": "Alerts off"
+			},
+			"visible": ["Alerts on", "Daily summary"],
+			"absent": ["Alerts off"]
+		},
+		{
+			"do": {
+				"tap": "Open help"
+			},
+			"visible": ["How alerts work"],
+			"absent": ["Notifications"],
+			"title": "Help"
+		},
+		{
+			"do": {
+				"appearance": "dark"
+			},
+			"visible": ["How alerts work"],
+			"title": "Help"
+		},
+		{
+			"do": {
+				"back": "button"
+			},
+			"visible": ["Notifications", "Alerts on", "Daily summary"],
+			"absent": ["How alerts work"],
+			"title": "Settings",
+			"onWeb": {
+				"why": "the web restores a page on Back from the server HTML it cached, so the page's state starts over; a native stack keeps the screen as it was left",
+				"visible": ["Notifications", "Alerts off", "Daily summary"],
+				"absent": ["How alerts work", "Alerts on"]
+			}
+		},
+		{
+			"do": {
+				"appearance": "light"
+			},
+			"visible": ["Notifications", "Alerts on"],
+			"title": "Settings",
+			"onWeb": {
+				"why": "the web restores a page on Back from the server HTML it cached, so the page's state starts over; a native stack keeps the screen as it was left",
+				"visible": ["Notifications", "Alerts off"]
+			}
+		}
+	]
+}

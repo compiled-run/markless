@@ -1,0 +1,27 @@
+{
+	"rung": "S4",
+	"name": "Global styles and tokens (:root custom properties) imported by the document and shared by the pages",
+	"steps": [
+		{
+			"visible": ["Inbox", "Two messages wait.", "Open team"],
+			"absent": ["Ada, design"],
+			"title": "Inbox"
+		},
+		{
+			"do": {
+				"tap": "Open team"
+			},
+			"visible": ["Team", "Ada, design", "Two online"],
+			"absent": ["Two messages wait."],
+			"title": "Team"
+		},
+		{
+			"do": {
+				"back": "button"
+			},
+			"visible": ["Inbox", "Two messages wait."],
+			"absent": ["Ada, design"],
+			"title": "Inbox"
+		}
+	]
+}

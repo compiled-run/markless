@@ -10,7 +10,9 @@ export type LadderAction =
 	| { readonly relaunch: true }
 	| { readonly wait: number }
 	/** The platform's own way back: the edge-swipe gesture, or the back button (iOS navigation bar, Android system back). */
-	| { readonly back: 'gesture' | 'button' };
+	| { readonly back: 'gesture' | 'button' }
+	/** The device's light or dark appearance, switched in the system while the app runs (`prefers-color-scheme` on the web). */
+	| { readonly appearance: 'light' | 'dark' };
 
 /** What the screen shows after a step's action (or at launch, for the first step). */
 export type LadderStep = {
@@ -68,8 +70,23 @@ export const navRungFolders = (): string[] =>
 		.map((entry) => entry.name)
 		.sort();
 
-/** Every proof folder the flows are written for: the one-screen ladder, then the navigation ladder. */
-export const allRungFolders = (): string[] => [...rungFolders(), ...navRungFolders()];
+/** The styles ladder: each folder an app of several pages whose styles reach the phone through Dragon. */
+export const styleRungFolders = (): string[] =>
+	readdirSync(proofsDir, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory() && /^s\d+-/.test(entry.name))
+		.map((entry) => entry.name)
+		.sort();
+
+/** Every proof folder the flows are written for: the one-screen ladder, the navigation ladder, then the styles ladder. */
+export const allRungFolders = (): string[] => [
+	...rungFolders(),
+	...navRungFolders(),
+	...styleRungFolders(),
+];
+
+/** An action that changes only how the screen looks, so no text can witness it; the screenshots after it do. */
+export const looksOnly = (action: LadderAction | undefined): boolean =>
+	action !== undefined && 'appearance' in action;
 
 export const readRung = (folder: string): LadderRung =>
 	JSON.parse(readFileSync(join(proofsDir, folder, 'expected.json'), 'utf8')) as LadderRung;
@@ -137,6 +154,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			'hideKeyboard',
 		];
 	if ('relaunch' in action) return ['stopApp', 'launchApp'];
+	if ('appearance' in action)
+		return [{ setDarkMode: action.appearance === 'dark' ? 'enabled' : 'disabled' }];
 	if ('back' in action)
 		return action.back === 'gesture'
 			? [EDGE_SWIPE]
@@ -173,8 +192,12 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 						},
 					},
 				];
+	// A rung that switches the appearance starts in light, whatever the device was left in.
+	const appearance = rung.steps.some((step) => looksOnly(step.do))
+		? [{ setDarkMode: 'disabled' }]
+		: [];
 	return rung.steps.map((step, index) => [
-		...(index === 0 ? launch : []),
+		...(index === 0 ? [...launch, ...appearance] : []),
 		...(step.do ? actionCommands(step.do, step) : []),
 		...(index > 0 ? assertions(changeWitness(rung.steps[index - 1]!, step)) : []),
 		...assertions(step),

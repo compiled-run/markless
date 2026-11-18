@@ -8,10 +8,15 @@ import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.field
 import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
+import dev.markless.mobile.core.only
 import dev.markless.mobile.core.str
 
 const val STYLE_EXPORT_SCHEMA_0 = "dragon.native-style-export/0"
 const val STYLE_EXPORT_SCHEMA = "dragon.native-style-export/1"
+const val APP_STYLE_VERSION = "markless.native-app-style/0"
+
+/** The export state that holds the @media band; the host sets it from the device, never from a payload cell. */
+const val BAND_KEY = "@env#band"
 
 data class Rgba(val r: Int, val g: Int, val b: Int, val alpha: Int) {
 	val argb: Int get() = (alpha shl 24) or (r shl 16) or (g shl 8) or b
@@ -42,11 +47,61 @@ data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNo
 
 data class StyleState(val key: String, val domain: List<JsValue>)
 
+/** One media feature the host evaluates; only `prefers-color-scheme` is implemented. */
+data class BandAtom(val feature: String, val keyword: String) {
+	fun holds(dark: Boolean): Boolean = when (keyword) {
+		"any" -> true
+		"dark" -> dark
+		"light" -> !dark
+		else -> throw MarklessDecodeError("prefers-color-scheme has no keyword \"$keyword\"")
+	}
+}
+
+/** The sheet's @media bands: per band, the truth value of every atom. */
+data class Bands(val atoms: List<BandAtom>, val bands: List<List<Boolean>>) {
+	/** The band whose truth vector is the device's. */
+	fun band(dark: Boolean): Int {
+		val reading = atoms.map { it.holds(dark) }
+		val at = bands.indexOf(reading)
+		if (at < 0) throw MarklessDecodeError("no @media band holds the device's reading $reading")
+		return at
+	}
+}
+
 /**
  * One platform's slice of a Dragon style export: per state assignment, frames (device px, relative to the parent box) and
  * lowered writes per node id; [next] is `next[a][s][v]`, the assignment reached by setting state s to its v-th value (-1: none).
  */
-data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>) {
+data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val bands: Bands? = null) {
+
+	/** The index of [BAND_KEY] among [states], or -1 for an export without @media. */
+	val bandState: Int = states.indexOfFirst { it.key == BAND_KEY }
+
+	init {
+		if ((bandState >= 0) != (bands != null)) throw MarklessDecodeError("style export has ${if (bands == null) "no band table" else "a band table"} but ${if (bandState >= 0) "a" else "no"} $BAND_KEY state")
+		if (bands != null && states[bandState].domain != bands.bands.indices.map { JsValue.Num(it.toDouble()) }) throw MarklessDecodeError("$BAND_KEY's domain does not name every band")
+	}
+
+	/** The band for the device's appearance; 0 without @media. */
+	fun band(dark: Boolean): Int = bands?.band(dark) ?: 0
+
+	/**
+	 * The assignment matching the cells' values at mount and the device's band, [initial] when it matches. Every state but the
+	 * band must follow exactly one of [cells] (the payload's styled cells), and every styled cell must have a state.
+	 */
+	fun start(cells: List<String>, value: (String) -> JsValue, dark: Boolean): Int {
+		val wanted = states.mapIndexed { s, st -> if (s == bandState) JsValue.Num(band(dark).toDouble()) else value(cellOf(st, cells)) }
+		for (c in cells) stateFor(c)
+		fun matches(a: Int) = states.withIndex().all { (s, st) -> assignments[a].values[st.key]?.let { Js.strictEquals(it, wanted[s]) } == true }
+		if (matches(initial)) return initial
+		return assignments.indices.firstOrNull(::matches) ?: throw MarklessDecodeError("no style assignment matches the values ${states.map { it.key }.zip(wanted)}")
+	}
+
+	private fun cellOf(state: StyleState, cells: List<String>): String {
+		val named = cells.filter { state.key == it || state.key.endsWith("#$it") }
+		if (named.size != 1) throw MarklessDecodeError("style state \"${state.key}\" follows ${named.size} styled cells of the payload")
+		return named[0]
+	}
 
 	/** The export state for a payload cell: its key is the cell id, or ends in `#<cell id>`. */
 	fun stateFor(cell: String): Int {
@@ -79,9 +134,14 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val width = viewport.field("width", "viewport").num("width")
 			val height = viewport.field("height", "viewport").num("height")
 			if (schema == STYLE_EXPORT_SCHEMA_0) {
-				val nodes = t.field("nodes", target).arr("nodes").mapIndexed { n, v -> node(v, "nodes[$n]") }
+				val nodes = t.field("nodes", target).arr("nodes").mapIndexed { n, v -> node(v, "nodes[$n]") { w, what -> writes(w, what) } }
 				return StyleExport(dpr, width, height, emptyList(), 0, listOf(Assignment(emptyMap(), nodes)), listOf(emptyList()))
 			}
+			return program(t, target, dpr, width, height) { w, what -> writes(w, what) }
+		}
+
+		/** One target's states, assignments and next table; [writesOf] reads a node's `writes` field. */
+		private fun program(t: Map<String, Json>, target: String, dpr: Double, width: Double, height: Double, writesOf: (Json, String) -> List<StyleWrite>): StyleExport {
 			val states = t.field("states", target).arr("states").mapIndexed { n, v ->
 				val o = v.obj("states[$n]")
 				StyleState(o.field("key", "states[$n]").str("key"), o.field("domain", "states[$n]").arr("domain").map { scalar(it, "states[$n].domain[]") })
@@ -89,16 +149,68 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val assignments = t.field("assignments", target).arr("assignments").mapIndexed { a, v ->
 				val o = v.obj("assignments[$a]")
 				val values = o.field("values", "assignments[$a]").obj("values").mapValues { (k, x) -> scalar(x, "assignments[$a].values.$k") }
-				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]") })
+				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]", writesOf) })
 			}
 			val initial = t.field("initial", target).num("initial").toInt()
 			val next = t.field("next", target).arr("next").map { row -> row.arr("next[]").map { col -> col.arr("next[][]").map { it.num("next[][][]").toInt() } } }
 			if (initial !in assignments.indices) throw MarklessDecodeError("style export initial $initial names no assignment")
 			if (next.size != assignments.size || next.any { r -> r.size != states.size || r.withIndex().any { (si, c) -> c.size != states[si].domain.size || c.any { it != -1 && it !in assignments.indices } } }) throw MarklessDecodeError("style export next table does not match its assignments and states")
-			return StyleExport(dpr, width, height, states, initial, assignments, next)
+			return StyleExport(dpr, width, height, states, initial, assignments, next, t["bands"]?.let { bands(it, "$target.bands") })
 		}
 
-		private fun node(v: Json, what: String): StyledNode {
+		private fun bands(v: Json, what: String): Bands {
+			val o = v.obj(what)
+			o.only(setOf("atoms", "bands", "conditions"), what)
+			val atoms = o.field("atoms", what).arr("$what.atoms").mapIndexed { n, a ->
+				val f = a.obj("$what.atoms[$n]")
+				f.only(setOf("feature", "comparisons", "keyword"), "$what.atoms[$n]")
+				val feature = f.field("feature", what).str("feature")
+				if (feature != "prefers-color-scheme") throw MarklessDecodeError("$what.atoms[$n]: @media ($feature) is not implemented on Android; this host reads prefers-color-scheme only")
+				if (f.field("comparisons", what).arr("comparisons").isNotEmpty()) throw MarklessDecodeError("$what.atoms[$n]: prefers-color-scheme with comparisons")
+				BandAtom(feature, f.field("keyword", what).str("keyword")).also { it.holds(false) }
+			}
+			val table = o.field("bands", what).arr("$what.bands").mapIndexed { n, b -> b.arr("$what.bands[$n]").map { (it as? Json.Bool)?.value ?: throw MarklessDecodeError("$what.bands[$n] holds a non-boolean") } }
+			if (table.isEmpty() || table.any { it.size != atoms.size }) throw MarklessDecodeError("$what: every band needs one truth value per atom")
+			o.field("conditions", what).arr("$what.conditions").forEach { it.str("$what.conditions[]") }
+			return Bands(atoms, table)
+		}
+
+		/**
+		 * Every route's styles in a `markless.native-app-style/0` file, by route pattern, each expanded to the export Dragon wrote
+		 * for that page (a node's `writes` index replaced by the list it names). A route absent from the file has no styles.
+		 */
+		fun decodeApp(bytes: ByteArray, target: String = "android"): Map<String, StyleExport> {
+			val root = Json.parse(bytes).obj("app style")
+			root.only(setOf("version", "units", "warnings", "fonts", "targets"), "app style")
+			val version = root.field("version", "app style").str("version")
+			if (version != APP_STYLE_VERSION) throw MarklessDecodeError("unknown app style version \"$version\" (this host reads $APP_STYLE_VERSION)")
+			val t = root.field("targets", "app style").obj("targets").field(target, "targets").obj("targets.$target")
+			t.only(setOf("backend", "viewport", "dpr", "writes", "routes"), "targets.$target")
+			val backend = t.field("backend", target).str("backend")
+			if (backend != ANDROID_BACKEND) throw MarklessDecodeError("app style backend is \"$backend\", not $ANDROID_BACKEND")
+			val viewport = t.field("viewport", target).obj("viewport")
+			val dpr = t.field("dpr", target).num("dpr")
+			val width = viewport.field("width", "viewport").num("width")
+			val height = viewport.field("height", "viewport").num("height")
+			val lists = t.field("writes", target).arr("writes").mapIndexed { n, w -> writes(w, "writes[$n]") }
+			val routes = LinkedHashMap<String, StyleExport>()
+			for ((n, r) in t.field("routes", target).arr("routes").withIndex()) {
+				val o = r.obj("routes[$n]")
+				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments"), "routes[$n]")
+				val pattern = o.field("pattern", "routes[$n]").str("pattern")
+				if (pattern in routes) throw MarklessDecodeError("app style lists route $pattern twice")
+				routes[pattern] = program(o, "routes[$n] ($pattern)", dpr, width, height) { w, what ->
+					val i = w.num("$what.writes")
+					if (i != Math.floor(i) || i.toInt() !in lists.indices) throw MarklessDecodeError("$what.writes is $i, not an index of the app's write lists")
+					lists[i.toInt()]
+				}
+			}
+			return routes
+		}
+
+		private fun writes(v: Json, what: String): List<StyleWrite> = v.arr(what).mapIndexed { n, w -> write(w, "$what[$n]") }
+
+		private fun node(v: Json, what: String, writesOf: (Json, String) -> List<StyleWrite>): StyledNode {
 			val o = v.obj(what)
 			val id = o.field("id", what).str("$what.id")
 			val parent = o.field("parent", what).let { if (it == Json.Null) null else it.str("$what.parent") }
@@ -106,8 +218,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val kind = o.field("kind", what).str("$what.kind")
 			if (kind !in setOf("element", "text", "anonymous")) throw MarklessDecodeError("$what has unknown node kind \"$kind\"")
 			val bw = o["borderWidths"]?.takeIf { it != Json.Null }?.obj("$what.borderWidths")?.let { Edges(it.field("top", what).num("top"), it.field("right", what).num("right"), it.field("bottom", what).num("bottom"), it.field("left", what).num("left")) }
-			val writes = o.field("writes", what).arr("$what.writes").mapIndexed { n, w -> write(w, "$id writes[$n]") }
-			return StyledNode(id, parent, kind, frame, bw, writes)
+			return StyledNode(id, parent, kind, frame, bw, writesOf(o.field("writes", what), id))
 		}
 
 		private fun scalar(v: Json, what: String): JsValue = when (v) {

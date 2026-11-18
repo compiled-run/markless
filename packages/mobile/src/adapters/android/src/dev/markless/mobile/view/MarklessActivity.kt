@@ -2,6 +2,7 @@ package dev.markless.mobile.view
 
 import android.app.Activity
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
@@ -10,9 +11,11 @@ import android.view.WindowInsets
 import android.widget.FrameLayout
 import dev.markless.mobile.core.AppPayload
 import dev.markless.mobile.core.Payload
+import dev.markless.mobile.style.StyleExport
 
 /**
- * An Activity that shows one Markless component: override [payloadBytes], and [styleExportBytes] to apply Dragon's styles.
+ * An Activity that shows one Markless component: override [payloadBytes], and [styleExportBytes] to apply Dragon's styles
+ * (a page's own export, or for an app payload the app's `markless.native-app-style/0` file).
  * For an app payload (`markless.native-app/0`) each instance is one screen of the task's back stack: links start the next
  * screen's activity, and the system back button and gesture finish this one, so the screen below shows as it was left.
  */
@@ -59,7 +62,9 @@ abstract class MarklessActivity : Activity() {
 			return
 		}
 		val (route, params) = app.match(path) ?: throw MarklessHostError("$path is not a route of this app")
-		show(MarklessHost(this, route.page, styleExportBytes(), params = params))
+		val styles = styleExportBytes()?.let { StyleExport.decodeApp(it) } ?: emptyMap()
+		for (pattern in styles.keys) if (app.routes.none { it.route.pattern == pattern }) throw MarklessHostError("the app style has styles for $pattern, which is not a route of this app")
+		show(MarklessHost(this, route.page, styles[route.route.pattern], params = params))
 		title = host.runtime.title() ?: ""
 		host.onTitle = { title = it }
 		host.onNavigate = { entry ->
@@ -67,6 +72,11 @@ abstract class MarklessActivity : Activity() {
 			if (entry.replace) finish()
 		}
 		actionBar?.setDisplayHomeAsUpEnabled(depth > 0)
+	}
+
+	override fun onConfigurationChanged(newConfig: Configuration) {
+		super.onConfigurationChanged(newConfig)
+		if (::host.isInitialized) host.configurationChanged(newConfig)
 	}
 
 	override fun onOptionsItemSelected(item: MenuItem): Boolean {

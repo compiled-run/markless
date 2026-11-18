@@ -1,0 +1,213 @@
+{
+	"version": "markless.native-app/0",
+	"routes": [
+		{
+			"pattern": "/",
+			"params": [],
+			"page": {
+				"version": "markless.native-view/0",
+				"component": "Home",
+				"route": { "pattern": "/", "params": [] },
+				"cells": [],
+				"nodes": [
+					{
+						"kind": "element",
+						"id": "h0",
+						"element": "main",
+						"parent": null,
+						"attributes": { "class": "home mk-1fmt85k" }
+					},
+					{
+						"kind": "element",
+						"id": "h2",
+						"element": "h1",
+						"parent": "h0",
+						"attributes": { "class": "heading mk-1fmt85k" }
+					},
+					{
+						"kind": "text",
+						"id": "h2:text0",
+						"parent": "h2",
+						"parts": [{ "text": "Account" }]
+					},
+					{
+						"kind": "element",
+						"id": "component-edge:0",
+						"element": "a",
+						"parent": "h0",
+						"attributes": { "class": "next mk-1fmt85k", "href": "/settings" }
+					},
+					{
+						"kind": "text",
+						"id": "component-edge:0:text0",
+						"parent": "component-edge:0",
+						"parts": [{ "text": "Open settings" }]
+					}
+				],
+				"events": [
+					{
+						"host": "component-edge:0",
+						"event": "activate",
+						"handler": "handler:component-edge:0"
+					}
+				],
+				"handlers": [
+					{
+						"id": "handler:component-edge:0",
+						"ops": [{ "op": "navigate", "route": "/settings", "params": {} }]
+					}
+				],
+				"title": [{ "text": "Home" }]
+			}
+		},
+		{
+			"pattern": "/help",
+			"params": [],
+			"page": {
+				"version": "markless.native-view/0",
+				"component": "Help",
+				"route": { "pattern": "/help", "params": [] },
+				"cells": [],
+				"nodes": [
+					{
+						"kind": "element",
+						"id": "h0",
+						"element": "main",
+						"parent": null,
+						"attributes": { "class": "help mk-9jjfh3" }
+					},
+					{
+						"kind": "element",
+						"id": "h2",
+						"element": "h1",
+						"parent": "h0",
+						"attributes": { "class": "heading mk-9jjfh3" }
+					},
+					{
+						"kind": "text",
+						"id": "h2:text0",
+						"parent": "h2",
+						"parts": [{ "text": "How alerts work" }]
+					}
+				],
+				"events": [],
+				"handlers": [],
+				"title": [{ "text": "Help" }]
+			}
+		},
+		{
+			"pattern": "/settings",
+			"params": [],
+			"page": {
+				"version": "markless.native-view/0",
+				"component": "Settings",
+				"route": { "pattern": "/settings", "params": [] },
+				"cells": [{ "id": "state:on", "name": "on", "initial": false, "styled": true }],
+				"nodes": [
+					{
+						"kind": "element",
+						"id": "h0",
+						"element": "main",
+						"parent": null,
+						"attributes": { "class": "settings mk-1pv9424" }
+					},
+					{
+						"kind": "element",
+						"id": "h2",
+						"element": "h1",
+						"parent": "h0",
+						"attributes": { "class": "heading mk-1pv9424" }
+					},
+					{
+						"kind": "text",
+						"id": "h2:text0",
+						"parent": "h2",
+						"parts": [{ "text": "Notifications" }]
+					},
+					{
+						"kind": "element",
+						"id": "h3",
+						"element": "button",
+						"parent": "h0",
+						"bindings": [
+							{
+								"attribute": "class",
+								"value": {
+									"if": { "cell": "state:on" },
+									"whenTrue": { "literal": "toggle on mk-1pv9424" },
+									"whenFalse": { "literal": "toggle mk-1pv9424" }
+								}
+							}
+						]
+					},
+					{
+						"kind": "text",
+						"id": "h3:text0",
+						"parent": "h3",
+						"parts": [
+							{
+								"expr": {
+									"if": { "cell": "state:on" },
+									"whenTrue": { "literal": "Alerts on" },
+									"whenFalse": { "literal": "Alerts off" }
+								}
+							}
+						]
+					},
+					{
+						"kind": "element",
+						"id": "h4",
+						"element": "p",
+						"parent": "h0",
+						"attributes": { "class": "status mk-1pv9424" },
+						"bindings": [{ "attribute": "ui-active", "value": { "cell": "state:on" } }]
+					},
+					{
+						"kind": "text",
+						"id": "h4:text0",
+						"parent": "h4",
+						"parts": [{ "text": "Daily summary" }]
+					},
+					{
+						"kind": "element",
+						"id": "component-edge:0",
+						"element": "a",
+						"parent": "h0",
+						"attributes": { "class": "next mk-1pv9424", "href": "/help" }
+					},
+					{
+						"kind": "text",
+						"id": "component-edge:0:text0",
+						"parent": "component-edge:0",
+						"parts": [{ "text": "Open help" }]
+					}
+				],
+				"events": [
+					{ "host": "h3", "event": "activate", "handler": "handler:event:0" },
+					{
+						"host": "component-edge:0",
+						"event": "activate",
+						"handler": "handler:component-edge:0"
+					}
+				],
+				"handlers": [
+					{
+						"id": "handler:event:0",
+						"ops": [
+							{
+								"op": "assign",
+								"cell": "state:on",
+								"value": { "unary": "!", "value": { "cell": "state:on" } }
+							}
+						]
+					},
+					{
+						"id": "handler:component-edge:0",
+						"ops": [{ "op": "navigate", "route": "/help", "params": {} }]
+					}
+				],
+				"title": [{ "text": "Settings" }]
+			}
+		}
+	]
+}

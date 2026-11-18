@@ -1,0 +1,138 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 1.326923458000001,
+			"flowSeconds": 8.533995875
+		},
+		{
+			"name": "02-styles",
+			"failure": null,
+			"installSeconds": 0.8417340420000037,
+			"flowSeconds": 8.523028375
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.6303450000000012,
+			"flowSeconds": 11.614190959
+		},
+		{
+			"name": "04-attributes",
+			"failure": null,
+			"installSeconds": 0.6667174999999989,
+			"flowSeconds": 12.737482292000001
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 0.5938993750000081,
+			"flowSeconds": 13.746020791999996
+		},
+		{
+			"name": "05b-choices",
+			"failure": null,
+			"installSeconds": 0.6618960419999931,
+			"flowSeconds": 23.31630200000001
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 0.6391506660000014,
+			"flowSeconds": 14.550350209000012
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 0.594109209000002,
+			"flowSeconds": 11.942661999999997
+		},
+		{
+			"name": "07b-imported-component",
+			"failure": null,
+			"installSeconds": 0.5983322499999777,
+			"flowSeconds": 12.750417999999977
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 0.5923040420000034,
+			"flowSeconds": 13.001927166999987
+		},
+		{
+			"name": "07d-children",
+			"failure": null,
+			"installSeconds": 0.588830707999994,
+			"flowSeconds": 12.478322707999993
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.5781430840000102,
+			"flowSeconds": 17.657512750000024
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 0.5951321659999957,
+			"flowSeconds": 20.22091541700001
+		},
+		{
+			"name": "10-url-route",
+			"failure": null,
+			"installSeconds": 0.5581100420000148,
+			"flowSeconds": 8.967999333000014
+		},
+		{
+			"name": "n1-two-routes",
+			"failure": null,
+			"installSeconds": 0.5880062499999767,
+			"flowSeconds": 28.494341832999986
+		},
+		{
+			"name": "n2-orders",
+			"failure": null,
+			"installSeconds": 0.7228458749999991,
+			"flowSeconds": 21.258186000000016
+		},
+		{
+			"name": "n3-navigate",
+			"failure": null,
+			"installSeconds": 0.5706038340000087,
+			"flowSeconds": 17.32400516599999
+		},
+		{
+			"name": "n4-deep-link",
+			"failure": null,
+			"installSeconds": 0.6101291250000359,
+			"flowSeconds": 15.97012850000005
+		},
+		{
+			"name": "s1-page-styles",
+			"failure": null,
+			"installSeconds": 0.7240738750000019,
+			"flowSeconds": 13.00590970900003
+		},
+		{
+			"name": "s2-shared-component",
+			"failure": null,
+			"installSeconds": 0.6266059580000001,
+			"flowSeconds": 14.22344512499997
+		},
+		{
+			"name": "s3-state-styles",
+			"failure": null,
+			"installSeconds": 0.6099216669999878,
+			"flowSeconds": 20.932320958999973
+		},
+		{
+			"name": "s4-global-tokens",
+			"failure": null,
+			"installSeconds": 0.7351417500000098,
+			"flowSeconds": 12.92591520799999
+		}
+	]
+}

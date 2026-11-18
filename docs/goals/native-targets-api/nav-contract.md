@@ -1,7 +1,8 @@
 # Native navigation: routes are screens (the contract)
 
 Owner: native-nav (branch `cw/native-nav`, base `cw/native-targets`). Read `contract.md` first; this file adds navigation
-to it and changes nothing there for a payload of one page. Status 2026-11-17.
+to it and changes nothing there for a payload of one page. Status 2026-11-17. Styles for an app of several pages:
+`styles-contract.md`.
 
 ## The rule in one paragraph
 
@@ -19,11 +20,15 @@ file ids, compiles every page with `compileNativeComponent({ ..., manifest })`, 
 
 ```json
 {
-  "version": "markless.native-app/0",
-  "routes": [
-    { "pattern": "/orders", "params": [], "page": { "version": "markless.native-view/0", "...": "" } },
-    { "pattern": "/orders/[id]", "params": ["id"], "page": { "...": "" } }
-  ]
+	"version": "markless.native-app/0",
+	"routes": [
+		{
+			"pattern": "/orders",
+			"params": [],
+			"page": { "version": "markless.native-view/0", "...": "" }
+		},
+		{ "pattern": "/orders/[id]", "params": ["id"], "page": { "...": "" } }
+	]
 }
 ```
 
@@ -110,13 +115,13 @@ the system kills while in the background starts its screens over (saving runtime
 Folders `packages/mobile/proofs/n<n>-<name>/`, each an app (`pages/`), `expected.json`, `flow.yaml` (written from it),
 screenshots. Columns as in `contract.md` section 5.
 
-| # | Rung | Web | Native reference | iOS | Android | Ran as data |
-|---|---|---|---|---|---|---|
-| N1 | Two routes; a link pushes; back gesture and back button return; first screen's state as left | passing, with Back measured as different: the counter reads `Taps 0` after Back (`onWeb`) | passing | **passing** | **passing** | the counter's ops and the link's `navigate` op; push and Back are the platform's stack, no data needed |
-| N2 | `/orders/[id]` from a keyed list after reversing it; title in the navigation bar | passing (`document.title`); Back restores the list in its server order (`onWeb`) | passing | **passing** | **passing** | the reverse is an `assign` op; the row link's param is an expression over the row item, evaluated on tap; the title is text parts over `params` |
-| N3 | `navigate()` from a handler: push, then `{ replace: true }` | passing | passing | **passing** | **passing** | `navigate(path)` resolved at build time to `route` + `params`; `replace` is a flag on the op |
-| N4 | Opening at a deep link (`markless-proof://app/orders/42`): `Order 42` with Orders and Shop below it | passing up to Back, which leaves the site as a browser does (`onWeb`, `leaves`) | passing | **passing** | **passing** | the stack is derived from route facts; iOS shows its own "Open in Proof?" confirmation the first time a scheme is opened, which the flow taps when shown |
-| N5 | A modal sheet | not built: owner decision (section 6) | | | | |
+| #   | Rung                                                                                                | Web                                                                                       | Native reference | iOS         | Android     | Ran as data                                                                                                                                              |
+| --- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------- | ----------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| N1  | Two routes; a link pushes; back gesture and back button return; first screen's state as left        | passing, with Back measured as different: the counter reads `Taps 0` after Back (`onWeb`) | passing          | **passing** | **passing** | the counter's ops and the link's `navigate` op; push and Back are the platform's stack, no data needed                                                   |
+| N2  | `/orders/[id]` from a keyed list after reversing it; title in the navigation bar                    | passing (`document.title`); Back restores the list in its server order (`onWeb`)          | passing          | **passing** | **passing** | the reverse is an `assign` op; the row link's param is an expression over the row item, evaluated on tap; the title is text parts over `params`          |
+| N3  | `navigate()` from a handler: push, then `{ replace: true }`                                         | passing                                                                                   | passing          | **passing** | **passing** | `navigate(path)` resolved at build time to `route` + `params`; `replace` is a flag on the op                                                             |
+| N4  | Opening at a deep link (`markless-proof://app/orders/42`): `Order 42` with Orders and Shop below it | passing up to Back, which leaves the site as a browser does (`onWeb`, `leaves`)           | passing          | **passing** | **passing** | the stack is derived from route facts; iOS shows its own "Open in Proof?" confirmation the first time a scheme is opened, which the flow taps when shown |
+| N5  | A modal sheet                                                                                       | not built: owner decision (section 6)                                                     |                  |             |             |                                                                                                                                                          |
 
 Vectors both hosts pass headless: `navigation.json` (N2's app), `navigation-replace.json` (N3), `navigation-deep-link.json` (N4):
 Swift `swift test` 22 tests (3 navigation vectors, 10 one-page vectors); Kotlin `test-jvm.sh` 254 checks, 0 failed.
@@ -134,22 +139,22 @@ already say, and per the brief this stops here. The smallest options, each in co
 
 1. **A `<Link>` / `navigate()` option, as `replace` already is.** One new value on an existing call; the route stays a
    plain page; the web ignores it (a normal navigation) or opens a `<dialog>`.
-   ```tsrx
-   <Link href="/orders/[id]/edit" params={{ id }} present="sheet">Edit</Link>
-   navigate(`/orders/${id}/edit`, { present: 'sheet' });
-   ```
+    ```tsrx
+    <Link href="/orders/[id]/edit" params={{ id }} present="sheet">Edit</Link>
+    navigate(`/orders/${id}/edit`, { present: 'sheet' });
+    ```
 2. **A page that is a sheet wherever it is opened**: one route-file export the router reads.
-   ```tsrx
-   export const presentation = 'sheet';
-   export default function EditOrder({ params }: PageProps<{ id: string }>) @{ ... }
-   ```
+    ```tsrx
+    export const presentation = 'sheet';
+    export default function EditOrder({ params }: PageProps<{ id: string }>) @{ ... }
+    ```
 3. **No route at all: the HTML `<dialog>` the page already can render**, which a native host presents as a sheet
    (`UISheetPresentationController`, an Android `Dialog`). Needs `dialog` as a portable element and its open state as
    a cell; nothing new for routes.
-   ```tsrx
-   let editing = state(false);
-   @if (editing) { <dialog open><EditForm onDone={() => (editing = false)} /></dialog> }
-   ```
+    ```tsrx
+    let editing = state(false);
+    @if (editing) { <dialog open><EditForm onDone={() => (editing = false)} /></dialog> }
+    ```
 
 ### Tabs
 
@@ -162,12 +167,12 @@ are tabs, so like a sheet it needs one owner decision. Options:
    keeps its links.
 2. **A tab bar is markup**: the document renders `<nav>` with `<Link>`s the native build recognises as the tab bar
    (one per top-level route), so the web's nav bar and the phone's tab bar are the same source.
-   ```tsrx
-   <nav>
-   	<Link href="/">Shop</Link>
-   	<Link href="/orders">Orders</Link>
-   </nav>
-   ```
+    ```tsrx
+    <nav>
+    	<Link href="/">Shop</Link>
+    	<Link href="/orders">Orders</Link>
+    </nav>
+    ```
 3. **A route-file export per tab root** (`export const tab = { label: 'Orders', icon: 'bag' }`), the same kind of
    route metadata as sheet option 2.
 
