@@ -1,5 +1,9 @@
 import type { NativeAction, NativeAppAction } from '../src/index.ts';
 import type { DeviceAppConfig } from '../src/permissions.ts';
+import { nodeScriptHost } from '../src/node-engine.ts';
+
+/** The engine the vectors are written with; `crypto` draws from all-zero seed bytes, which a host's test passes too. */
+export const CONFORMANCE_SCRIPT_HOST = () => nodeScriptHost('00'.repeat(32));
 
 /** Each committed vector file: its component (a path inside packages/mobile) and the actions it records. */
 export const CONFORMANCE_CASES: ReadonlyArray<{
@@ -10,6 +14,8 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	readonly params?: Readonly<Record<string, string>>;
 	/** The app config's usage text, for a component that uses a device feature that asks. */
 	readonly device?: DeviceAppConfig;
+	/** Built at its own path with the modules it imports read from the workspace (app modules and packages). */
+	readonly modules?: true;
 	readonly actions: ReadonlyArray<NativeAction>;
 }> = [
 	{
@@ -295,6 +301,72 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h7@c' },
 		],
 	},
+	{
+		name: 'script-loop',
+		fixture: 'proofs/j1-loop-local/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'script-modules',
+		fixture: 'proofs/j2-app-and-library/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'script-async',
+		fixture: 'proofs/j3-await-catch/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'timer', id: 1 },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'timer', id: 2 },
+		],
+	},
+	{
+		name: 'script-network',
+		fixture: 'proofs/j4-timers-fetch/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'POST /j4/echo?word=native text/plain hello',
+				},
+			},
+			{ event: 'activate', host: 'h5' },
+			{ event: 'response', id: 2, response: { error: 'The network connection was lost.' } },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'timer', id: 1 },
+			{ event: 'timer', id: 1 },
+			{ event: 'timer', id: 1 },
+			{ event: 'timer', id: 1 },
+		],
+	},
+	{
+		name: 'script-computed',
+		fixture: 'proofs/j5-engine-computed/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */
@@ -323,6 +395,16 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h3' },
 			{ event: 'activate', host: 'h3' },
 			{ event: 'back' },
+		],
+	},
+	{
+		name: 'script-app',
+		app: 'proofs/j6-engine-on-demand',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'component-edge:0' },
+			{ event: 'activate', host: 'h4' },
 		],
 	},
 	{

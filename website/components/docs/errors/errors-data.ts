@@ -7900,6 +7900,30 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_NATIVE_SCRIPT',
+		title: 'This JavaScript cannot run on a phone',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'This JavaScript cannot run on a phone: a Markless build error.',
+		printed: [
+			'MARKLESS_NATIVE_SCRIPT: This JavaScript cannot run on a phone',
+			"A handler that is not data runs in the phone's JavaScript engine, which has the language, timers, fetch and console, but no web page.",
+			'https://markless.dev/errors/MARKLESS_NATIVE_SCRIPT',
+		],
+		structured: true,
+		why: "A handler that is not data runs in the phone's JavaScript engine, which has the language, timers, fetch and console, but no web page.",
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/native-view.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_NATIVE_UNSUPPORTED',
 		title: 'This component cannot be built for a native target yet',
 		area: 'internal',

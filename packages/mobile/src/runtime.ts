@@ -84,7 +84,7 @@ export type NativeRuntime = {
 	readonly title: () => string | null;
 	/** The calls a host starts at mount, one per task cell, each settling its cell. */
 	readonly tasks: () => ReadonlyArray<Extract<NativeJournalEntry, { op: 'call' }>>;
-	/** How many times this runtime started a script engine: 0 for a page whose handlers all ran as data. */
+	/** Whether this screen asked its host for the script engine: 0 for a page whose handlers all ran as data, else 1. */
 	readonly engineStarts: () => number;
 	/** What the script wrote to `console`, in order, as `[level, text]`. */
 	readonly logs: () => ReadonlyArray<readonly [level: string, text: string]>;
@@ -92,6 +92,7 @@ export type NativeRuntime = {
 
 /** How the runtime gets a script engine and the bytes `crypto` draws from; a host owns both. */
 export type NativeScriptHost = {
+	/** The app's engine, started the first time any screen asks; later asks give the same one. */
 	readonly start: () => NativeScriptEngine;
 	/** 32 random bytes as hex for one engine entry; only asked for when the script uses `crypto`. */
 	readonly seed?: () => string;
@@ -324,6 +325,7 @@ export function createNativeRuntime(
 			if (!scriptHost) throw new Error('a script op with no script engine to run it');
 			engine = scriptHost.start();
 			engineStarts++;
+			// A shared engine may hold this script already, from another screen of the same page.
 			engine.evaluate(script.source);
 		}
 		const target = `globalThis.__markless[${JSON.stringify(script.id)}].${method}`;

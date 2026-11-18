@@ -29,6 +29,7 @@
 	},
 	"devDependencies": {
 		"@markless/core": "workspace:*",
-		"@markless/ui": "workspace:*"
+		"@markless/ui": "workspace:*",
+		"scule": "1.3.0"
 	}
 }

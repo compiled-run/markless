@@ -8,8 +8,8 @@ import {
 	nativeConformance,
 	nativeStyleInput,
 } from '../src/index.ts';
-import { compileRungApp } from '../src/harness/rung.ts';
-import { APP_CONFORMANCE_CASES, CONFORMANCE_CASES } from './conformance-cases.ts';
+import { compileRungApp, readWorkspaceModule } from '../src/harness/rung.ts';
+import { APP_CONFORMANCE_CASES, CONFORMANCE_CASES, CONFORMANCE_SCRIPT_HOST } from './conformance-cases.ts';
 
 const fixture = (name: string) =>
 	readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -38,13 +38,14 @@ describe('native conformance vectors', () => {
 	it('every committed vector file matches a fresh build (rewrite with test/write-conformance.ts)', async () => {
 		for (const entry of CONFORMANCE_CASES) {
 			const { payload } = await compileNativeComponent({
-				filename: `src/${entry.name}.tsrx`,
+				filename: entry.modules ? `packages/mobile/${entry.fixture}` : `src/${entry.name}.tsrx`,
 				...(entry.page ? { page: entry.page } : {}),
 				...(entry.device ? { device: entry.device } : {}),
+				...(entry.modules ? { readModule: readWorkspaceModule } : {}),
 				source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
 			});
 			expect(committed(`${entry.name}.json`), entry.name).toEqual(
-				nativeConformance(payload!, entry.actions, entry.params),
+				nativeConformance(payload!, entry.actions, entry.params, CONFORMANCE_SCRIPT_HOST()),
 			);
 		}
 	});
@@ -53,7 +54,7 @@ describe('native conformance vectors', () => {
 		for (const entry of APP_CONFORMANCE_CASES) {
 			const { payload } = await compileRungApp(join(import.meta.dirname, '..', entry.app));
 			expect(committed(`${entry.name}.json`), entry.name).toEqual(
-				nativeAppConformance(payload!, entry.open, entry.actions),
+				nativeAppConformance(payload!, entry.open, entry.actions, CONFORMANCE_SCRIPT_HOST()),
 			);
 		}
 	});

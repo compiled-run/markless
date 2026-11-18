@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 321,
+	total: 322,
 	guided: 51,
 	groups: [
 		{
@@ -2602,6 +2602,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime warning',
 					guided: false,
 					words: 'this container was already resumed markless_resume_already_resumed this container was already resumed: a markless runtime warning.',
+				},
+				{
+					code: 'MARKLESS_NATIVE_SCRIPT',
+					title: 'This JavaScript cannot run on a phone',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'this javascript cannot run on a phone markless_native_script this javascript cannot run on a phone: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_PRERENDER_WAKE_ROUTE_INELIGIBLE',

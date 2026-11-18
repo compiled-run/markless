@@ -40,6 +40,12 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		'D5',
 		'D6',
 		'D7',
+		'J1',
+		'J2',
+		'J3',
+		'J4',
+		'J5',
+		'J7',
 		'P1',
 		101,
 		102,
@@ -91,6 +97,7 @@ test.each(allRungFolders())('%s: flow.yaml is the flow its expected.json describ
 
 test('the navigation ladder has one app folder per rung, in rung order', () => {
 	expect(navRungFolders().map((folder) => readRung(folder).rung)).toEqual([
+		'J6',
 		'N1',
 		'N2',
 		'N3',

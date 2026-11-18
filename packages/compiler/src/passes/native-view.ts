@@ -2771,19 +2771,18 @@ export function createNativeViewPayload(
 				const at = nodes.length;
 				const tasks = new Set<string>();
 				const catchCell = `${branchId}:catch`;
-				let caught = false;
+				// Made the first time a handler needs it; a lowering that is rolled back takes it away again.
 				const catches: HandlerCatch = {
 					cell: () => {
-						if (!caught)
+						if (!cellIndex.has(catchCell))
 							addCell({
 								id: catchCell,
 								name: boundary?.errorName ?? 'error',
 								initial: null,
 							});
-						caught = true;
 						return catchCell;
 					},
-					used: () => caught,
+					used: () => cellIndex.has(catchCell),
 				};
 				(['try', 'pending', 'catch'] as const).forEach((arm, index) => {
 					const armId = item.arms[arm];
@@ -2812,11 +2811,12 @@ export function createNativeViewPayload(
 						for (const { handler, event, scope: at, host } of pendingHandlers.splice(deferredBefore))
 							handler.ops = handlerOps(event, at, handler.id, { target: host, currentTarget: host });
 				});
+				const caught = catches.used();
 				if (tasks.size > 1 || (tasks.size === 0 && !caught)) {
 					refuse(
 						tasks.size > 1
 							? `a @try that waits on ${tasks.size} device values; one is supported`
-							: 'a @try that neither reads a device value nor holds a handler that awaits a device call',
+							: 'a @try that neither reads a device value nor holds a handler that awaits (a device call, or JavaScript)',
 					);
 					continue;
 				}
@@ -3059,16 +3059,10 @@ export function createNativeViewPayload(
 		}
 		const data = attempt(() => dataHandlerOps(event, scope, handler, pressed));
 		if (!data.failed) return data.value;
-		const scripted = attempt(() => scriptOp(event, scope));
-		if (scripted.value && !scripted.failed) {
-			data.rollBack();
-			return [scripted.value];
-		}
-		// Neither path runs it: what stops the script names what a phone lacks, so it is the refusal kept.
-		const refusals = scripted.refusals();
 		data.rollBack();
-		diagnostics.push(...refusals);
-		return [];
+		// When the script cannot run it either, what stops the script names what a phone lacks: those refusals stay.
+		const scripted = scriptOp(event, scope);
+		return scripted ? [scripted] : [];
 	}
 
 	/** Runs `run`, then says whether it refused, and can undo what it added (refusals, cells, dialog ops, features). */

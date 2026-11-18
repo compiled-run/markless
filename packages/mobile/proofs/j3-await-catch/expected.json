@@ -1,0 +1,41 @@
+{
+	"rung": "J3",
+	"name": "await with code after it, and an error that lands in @catch",
+	"steps": [
+		{
+			"visible": ["Lookup", "Result: none", "Steps: 0"]
+		},
+		{
+			"do": {
+				"tap": "Look up"
+			},
+			"visible": ["Result: none", "Steps: 1"],
+			"absent": ["Steps: 0"]
+		},
+		{
+			"do": {
+				"wait": 4000
+			},
+			"visible": ["Result: FOUND", "Steps: 2"],
+			"absent": ["Result: none"]
+		},
+		{
+			"do": {
+				"tap": "Look up a missing word"
+			},
+			"visible": ["Result: FOUND", "Steps: 3"],
+			"absent": ["Steps: 2"]
+		},
+		{
+			"do": {
+				"wait": 4000
+			},
+			"visible": ["Failed: No entry for missing"],
+			"absent": ["Result: FOUND", "Steps: 3"],
+			"onWeb": {
+				"why": "the web shows the @catch arm after the @try arm's content and leaves that content on screen when a handler's await rejects (a web runtime defect: an async value's rejection replaces it); phones replace it, as the data path does for a failed device call",
+				"visible": ["Failed: No entry for missing", "Result: FOUND", "Steps: 3"]
+			}
+		}
+	]
+}

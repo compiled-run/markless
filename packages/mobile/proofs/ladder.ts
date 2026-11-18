@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { PROOF_URL_SCHEME } from '../src/harness/proof-app.ts';
@@ -108,6 +108,11 @@ export type LadderStep = {
 	readonly microphone?: 'on' | 'off';
 	/** Texts on screen on one platform only: a `platform` check shows a different arm on each. */
 	readonly visibleOn?: Readonly<Partial<Record<'ios' | 'android' | 'web', readonly string[]>>>;
+	/**
+	 * Phones and the reference runtime: how many times the app has started its script engine since launch, from the test
+	 * build's label `ENGINE_STARTS_ID`. A page whose handlers are all data never starts one.
+	 */
+	readonly engineStarts?: number;
 };
 
 /** Each system prompt's title, as a Maestro text pattern matching iOS's and Android's wording. */
@@ -130,6 +135,11 @@ export const DEVICE_CALLS_ID = 'markless-device-calls';
 export const CAMERA_STATE_ID = 'markless-camera';
 /** The test-build label where a phone shell shows whether a recorder holds the microphone: `microphone on` or `off`. */
 export const MICROPHONE_STATE_ID = 'markless-microphone';
+/** The test-build label where a phone shell shows how many times the app started its script engine: `engine starts: <n>`. */
+export const ENGINE_STARTS_ID = 'markless-engine-starts';
+export const engineStartsText = (starts: number): string => `engine starts: ${starts}`;
+/** The port of the test's echo server, which a rung with `server: 'echo'` fetches from (`echo-server.ts`). */
+export const ECHO_SERVER_PORT = 47608;
 export const callsText = (calls: readonly string[]): string =>
 	`calls: ${calls.length === 0 ? 'none' : calls.join(', ')}`;
 
@@ -155,6 +165,8 @@ export type LadderRung = {
 		readonly steps?: readonly LadderStep[];
 		readonly absentFromOutput?: readonly string[];
 	};
+	/** The test runs the echo server (`ECHO_SERVER_PORT`) while the rung runs, on the web and on phones. */
+	readonly server?: 'echo';
 	readonly steps: readonly LadderStep[];
 };
 
@@ -162,16 +174,29 @@ export const proofsDir = import.meta.dirname;
 
 export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && /^((\d\d|[dp]\d)[a-z]?|[uy]\d+)-/.test(entry.name))
+		.filter(
+			(entry) =>
+				entry.isDirectory() &&
+				(/^((\d\d|[dp]\d)[a-z]?|[uy]\d+)-/.test(entry.name) ||
+					(isScriptRung(entry.name) && !isApp(entry.name))),
+		)
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
+
+/** The script ladder (`j<n>-`): handlers that run as JavaScript; one-screen rungs and apps both. */
+const isScriptRung = (name: string): boolean => /^j\d+-/.test(name);
+const isApp = (name: string): boolean => existsSync(join(proofsDir, name, 'pages'));
 
 /** The navigation ladder: each folder an app (`pages/`) of several routes. */
 export const navRungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && /^n\d+-/.test(entry.name))
+		.filter(
+			(entry) =>
+				entry.isDirectory() &&
+				(/^n\d+-/.test(entry.name) || (isScriptRung(entry.name) && isApp(entry.name))),
+		)
 		.map((entry) => entry.name)
-		.sort();
+		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
 /** The styles ladder: each folder an app of several pages whose styles reach the phone through Dragon. */
 export const styleRungFolders = (): string[] =>
@@ -223,6 +248,8 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 		...(step.camera && step.camera !== previous.camera && { camera: step.camera }),
 		...(step.microphone &&
 			step.microphone !== previous.microphone && { microphone: step.microphone }),
+		...(step.engineStarts !== undefined &&
+			step.engineStarts !== previous.engineStarts && { engineStarts: step.engineStarts }),
 	};
 }
 
@@ -234,6 +261,7 @@ export const witnessCount = (witness: LadderStep): number =>
 	(witness.calls ? 1 : 0) +
 	(witness.camera ? 1 : 0) +
 	(witness.microphone ? 1 : 0) +
+	(witness.engineStarts === undefined ? 0 : 1) +
 	(witness.title === undefined ? 0 : 1);
 
 const assertions = (step: LadderStep): unknown[] =>
@@ -280,6 +308,9 @@ const screenAssertions = (step: LadderStep): unknown[] => [
 	...(step.microphone
 		? [{ assertVisible: { id: MICROPHONE_STATE_ID, text: `microphone ${step.microphone}` } }]
 		: []),
+	...(step.engineStarts === undefined
+		? []
+		: [{ assertVisible: { id: ENGINE_STARTS_ID, text: engineStartsText(step.engineStarts) } }]),
 ];
 
 const onPlatform = (platform: 'iOS' | 'Android', commands: unknown[]) => ({
@@ -397,7 +428,14 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 	const visitsSettings = rung.steps.some((step) => step.do && 'settings' in step.do);
 	return rung.steps.map((step, index) => [
 		...(index === 0 && visitsSettings
-			? [{ runFlow: { when: { platform: 'iOS' }, commands: [{ stopApp: 'com.apple.Preferences' }] } }]
+			? [
+					{
+						runFlow: {
+							when: { platform: 'iOS' },
+							commands: [{ stopApp: 'com.apple.Preferences' }],
+						},
+					},
+				]
 			: []),
 		...(index === 0 && rung.location ? [{ setLocation: rung.location }] : []),
 		...(index === 0 ? [...launch, ...appearance] : []),

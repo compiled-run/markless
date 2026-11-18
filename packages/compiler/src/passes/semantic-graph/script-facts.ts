@@ -20,7 +20,9 @@ const FRAMEWORK_PREFIX = '@markless/';
 const GLOBAL_OBJECTS = new Set(['window', 'globalThis', 'self']);
 
 const isNode = (value: unknown): value is AnyNode =>
-	value !== null && typeof value === 'object' && typeof (value as { type?: unknown }).type === 'string';
+	value !== null &&
+	typeof value === 'object' &&
+	typeof (value as { type?: unknown }).type === 'string';
 
 const spanOf = (node: { start: number; end: number }, filename: string): SourceSpan => ({
 	filename,
@@ -41,7 +43,13 @@ const member = (object: AnyNode, property: string | number): AnyNode =>
 		optional: false,
 	}) as unknown as AnyNode;
 const stateName = (name: string): AnyNode =>
-	({ type: 'MemberExpression', object: identifier('__s'), property: identifier(name), computed: false, optional: false }) as unknown as AnyNode;
+	({
+		type: 'MemberExpression',
+		object: identifier('__s'),
+		property: identifier(name),
+		computed: false,
+		optional: false,
+	}) as unknown as AnyNode;
 
 /** A copy of `node` with each node `replace` answers swapped for its answer. */
 function cloneWith(node: AnyNode, replace: (node: AnyNode) => AnyNode | undefined): AnyNode {
@@ -49,11 +57,13 @@ function cloneWith(node: AnyNode, replace: (node: AnyNode) => AnyNode | undefine
 	if (swapped) return swapped;
 	const copy: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(node)) {
-		if (Array.isArray(value)) copy[key] = value.map((item) => (isNode(item) ? cloneWith(item, replace) : item));
+		if (Array.isArray(value))
+			copy[key] = value.map((item) => (isNode(item) ? cloneWith(item, replace) : item));
 		else copy[key] = isNode(value) ? cloneWith(value, replace) : value;
 	}
 	// `{ count }` reads `count`; once `count` is spelled `__s.count`, the property says so.
-	if (copy.type === 'Property' && copy.shorthand === true && copy.value !== node.value) copy.shorthand = false;
+	if (copy.type === 'Property' && copy.shorthand === true && copy.value !== node.value)
+		copy.shorthand = false;
 	return copy as AnyNode;
 }
 
@@ -63,7 +73,8 @@ function semanticNodeOf(semantic: ModuleSemantics, node: AnyNode): AnyNode | und
 	const at = semantic.nodeAt(start);
 	if (!at) return undefined;
 	for (const candidate of semantic.ancestors(at) as Iterable<AnyNode>)
-		if (candidate.start === start && candidate.end === node.end && candidate.type === node.type) return candidate;
+		if (candidate.start === start && candidate.end === node.end && candidate.type === node.type)
+			return candidate;
 	return undefined;
 }
 
@@ -77,7 +88,11 @@ function importOf(semantic: ModuleSemantics, binding: Binding) {
 function declaringNode(semantic: ModuleSemantics, binding: Binding): AnyNode | undefined {
 	const name = binding.declarations[0] as AnyNode | undefined;
 	if (!name) return undefined;
-	for (let at = semantic.parentOf(name as never) as AnyNode | null; at; at = semantic.parentOf(at as never) as AnyNode | null) {
+	for (
+		let at = semantic.parentOf(name as never) as AnyNode | null;
+		at;
+		at = semantic.parentOf(at as never) as AnyNode | null
+	) {
 		if (
 			at.type === 'VariableDeclarator' ||
 			at.type === 'FunctionDeclaration' ||
@@ -85,7 +100,13 @@ function declaringNode(semantic: ModuleSemantics, binding: Binding): AnyNode | u
 			at.type === 'ImportDeclaration'
 		)
 			return at;
-		if (at.type !== 'ObjectPattern' && at.type !== 'ArrayPattern' && at.type !== 'Property' && at.type !== 'AssignmentPattern' && at.type !== 'RestElement')
+		if (
+			at.type !== 'ObjectPattern' &&
+			at.type !== 'ArrayPattern' &&
+			at.type !== 'Property' &&
+			at.type !== 'AssignmentPattern' &&
+			at.type !== 'RestElement'
+		)
 			return undefined;
 	}
 	return undefined;
@@ -104,7 +125,8 @@ function isFrameworkCall(semantic: ModuleSemantics, init: AnyNode | null | undef
 
 /** A component in TSRX: a function whose body is a template (`function App() @{ ... }`). */
 const isComponent = (node: AnyNode | undefined): boolean =>
-	node?.type === 'FunctionDeclaration' && (node.body as AnyNode | undefined)?.type === 'JSXCodeBlock';
+	node?.type === 'FunctionDeclaration' &&
+	(node.body as AnyNode | undefined)?.type === 'JSXCodeBlock';
 
 /** How the emitted code reaches each import binding: `__i[n].name`, or `__i[n]` for a namespace. */
 function importSlots(semantic: ModuleSemantics) {
@@ -118,9 +140,13 @@ function importSlots(semantic: ModuleSemantics) {
 		}
 		return index;
 	};
-	const byBinding = new Map<number, { readonly index: number; readonly name: string | null; readonly specifier: string }>();
+	const byBinding = new Map<
+		number,
+		{ readonly index: number; readonly name: string | null; readonly specifier: string }
+	>();
 	for (const entry of semantic.imports) {
-		if (entry.typeOnly || !entry.local || entry.specifier.startsWith(FRAMEWORK_PREFIX)) continue;
+		if (entry.typeOnly || !entry.local || entry.specifier.startsWith(FRAMEWORK_PREFIX))
+			continue;
 		if (entry.kind !== 'named' && entry.kind !== 'namespace') continue;
 		byBinding.set(entry.local.id, {
 			index: slot(entry.specifier, entry.node as AnyNode),
@@ -129,7 +155,8 @@ function importSlots(semantic: ModuleSemantics) {
 		});
 	}
 	for (const entry of semantic.exports)
-		if (!entry.typeOnly && entry.specifier && !entry.specifier.startsWith(FRAMEWORK_PREFIX)) slot(entry.specifier, entry.node as AnyNode);
+		if (!entry.typeOnly && entry.specifier && !entry.specifier.startsWith(FRAMEWORK_PREFIX))
+			slot(entry.specifier, entry.node as AnyNode);
 	const record = (binding: Binding) => byBinding.get(binding.id);
 	const reach = (binding: Binding): AnyNode | undefined => {
 		const found = byBinding.get(binding.id);
@@ -140,7 +167,11 @@ function importSlots(semantic: ModuleSemantics) {
 	return { specifiers, spans, reach, slot, record };
 }
 
-function globalOf(semantic: ModuleSemantics, reference: Reference, filename: string): SemanticScriptGlobal {
+function globalOf(
+	semantic: ModuleSemantics,
+	reference: Reference,
+	filename: string,
+): SemanticScriptGlobal {
 	const node = reference.node as unknown as AnyNode;
 	const parent = semantic.parentOf(node as never) as AnyNode | null;
 	const typeofOnly = parent?.type === 'UnaryExpression' && parent.operator === 'typeof';
@@ -152,19 +183,32 @@ function globalOf(semantic: ModuleSemantics, reference: Reference, filename: str
 		typeof (parent.property as AnyNode | undefined)?.name === 'string'
 			? String((parent.property as AnyNode).name)
 			: undefined;
-	return { name: reference.name, span: spanOf(node as never, filename), typeofOnly, ...(property ? { property } : {}) };
+	return {
+		name: reference.name,
+		span: spanOf(node as never, filename),
+		typeofOnly,
+		...(property ? { property } : {}),
+	};
 }
 
 /** Constructs type erasure cannot keep (`enum`, `namespace`), and markup, which no script runs. */
-function unsupportedIn(node: AnyNode, filename: string, into: { construct: string; span: SourceSpan }[]): void {
+function unsupportedIn(
+	node: AnyNode,
+	filename: string,
+	into: { construct: string; span: SourceSpan }[],
+): void {
 	if (String(node.type).startsWith('JSX')) {
 		into.push({ construct: 'markup', span: spanOf(node as never, filename) });
 		return;
 	}
 	if (node.type === 'TSEnumDeclaration' || node.type === 'TSModuleDeclaration')
-		into.push({ construct: node.type === 'TSEnumDeclaration' ? 'an `enum`' : 'a `namespace`', span: spanOf(node as never, filename) });
+		into.push({
+			construct: node.type === 'TSEnumDeclaration' ? 'an `enum`' : 'a `namespace`',
+			span: spanOf(node as never, filename),
+		});
 	for (const value of Object.values(node)) {
-		if (Array.isArray(value)) for (const item of value) if (isNode(item)) unsupportedIn(item, filename, into);
+		if (Array.isArray(value))
+			for (const item of value) if (isNode(item)) unsupportedIn(item, filename, into);
 		if (isNode(value)) unsupportedIn(value, filename, into);
 	}
 }
@@ -203,22 +247,37 @@ export function scriptFunctionOf(
 				continue;
 			}
 			const declared = binding.declarations[0] as unknown as AnyNode | undefined;
-			if (declared && parts.some((other) => within(declared as never, other as never))) continue;
+			if (declared && parts.some((other) => within(declared as never, other as never)))
+				continue;
 			const entry = importOf(semantic, binding);
 			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
-				framework.push({ name: reference.name, source: entry.specifier, span: spanOf(node as never, filename) });
+				framework.push({
+					name: reference.name,
+					source: entry.specifier,
+					span: spanOf(node as never, filename),
+				});
 				continue;
 			}
 			const imported = imports.reach(binding);
 			if (imported) {
 				replaced.set(node, imported);
 				const slot = imports.record(binding)!;
-				usedImports.set(`${slot.index}\0${slot.name}`, { slot: slot.index, name: slot.name });
+				usedImports.set(`${slot.index}\0${slot.name}`, {
+					slot: slot.index,
+					name: slot.name,
+				});
 				continue;
 			}
 			const declaring = declaringNode(semantic, binding);
 			const moduleLevel = binding.scope.id === rootScope.id;
-			if (moduleLevel && !isComponent(declaring) && !(declaring?.type === 'VariableDeclarator' && isFrameworkCall(semantic, declaring.init as AnyNode))) {
+			if (
+				moduleLevel &&
+				!isComponent(declaring) &&
+				!(
+					declaring?.type === 'VariableDeclarator' &&
+					isFrameworkCall(semantic, declaring.init as AnyNode)
+				)
+			) {
 				moduleNames.add(binding.name);
 				continue;
 			}
@@ -228,7 +287,9 @@ export function scriptFunctionOf(
 				!isComponent(declaring) &&
 				(declaring?.type === 'FunctionDeclaration' ||
 					declaring?.type === 'ClassDeclaration' ||
-					(declaring?.type === 'VariableDeclarator' && !!declaring.init && !isFrameworkCall(semantic, declaring.init as AnyNode)));
+					(declaring?.type === 'VariableDeclarator' &&
+						!!declaring.init &&
+						!isFrameworkCall(semantic, declaring.init as AnyNode)));
 			if (inline && declaring) {
 				if (!inlined.has(declaring)) {
 					inlined.add(declaring);
@@ -248,14 +309,21 @@ export function scriptFunctionOf(
 	}
 	const eventReads: { path: string[]; span: SourceSpan }[] = [];
 	const [parameter] = (root.params as AnyNode[] | undefined) ?? [];
-	const eventBinding = parameter?.type === 'Identifier' ? semantic.bindingOf(parameter as never) : null;
+	const eventBinding =
+		parameter?.type === 'Identifier' ? semantic.bindingOf(parameter as never) : null;
 	for (const reference of eventBinding?.references ?? []) {
 		let at = reference.node as unknown as AnyNode;
 		const path: string[] = [];
 		for (;;) {
 			const parent = semantic.parentOf(at as never) as AnyNode | null;
 			const property = parent?.property as AnyNode | undefined;
-			if (parent?.type !== 'MemberExpression' || parent.object !== at || parent.computed || typeof property?.name !== 'string') break;
+			if (
+				parent?.type !== 'MemberExpression' ||
+				parent.object !== at ||
+				parent.computed ||
+				typeof property?.name !== 'string'
+			)
+				break;
 			path.push(property.name);
 			at = parent;
 		}
@@ -263,15 +331,23 @@ export function scriptFunctionOf(
 	}
 	const print = (node: AnyNode): string => {
 		unsupportedIn(node, filename, unsupported);
-		return generate(cloneWith(node, (candidate) => replaced.get(candidate)) as never, PRINT).code.trim();
+		return generate(
+			cloneWith(node, (candidate) => replaced.get(candidate)) as never,
+			PRINT,
+		).code.trim();
 	};
 	const declarations = [...inlined]
 		.sort((a, b) => (a.start as number) - (b.start as number))
 		.map((node) => {
 			if (node.type !== 'VariableDeclarator') return print(node);
 			const declaration = semantic.parentOf(node as never) as AnyNode | null;
-			const kind = declaration?.type === 'VariableDeclaration' ? String(declaration.kind) : 'const';
-			return print({ type: 'VariableDeclaration', kind, declarations: [node] } as unknown as AnyNode);
+			const kind =
+				declaration?.type === 'VariableDeclaration' ? String(declaration.kind) : 'const';
+			return print({
+				type: 'VariableDeclaration',
+				kind,
+				declarations: [node],
+			} as unknown as AnyNode);
 		});
 	return {
 		code: [...declarations, `return (${print(root)});`].join('\n'),
@@ -298,7 +374,11 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 	for (const binding of semantic.bindings) {
 		if (binding.scope.id !== rootScope.id) continue;
 		const declaring = declaringNode(semantic, binding);
-		if (isComponent(declaring) || (declaring?.type === 'VariableDeclarator' && isFrameworkCall(semantic, declaring.init as AnyNode)))
+		if (
+			isComponent(declaring) ||
+			(declaring?.type === 'VariableDeclarator' &&
+				isFrameworkCall(semantic, declaring.init as AnyNode))
+		)
 			droppedBindings.add(binding.id);
 	}
 	const statements: SemanticScriptStatement[] = [];
@@ -321,7 +401,11 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 			}
 			const entry = importOf(semantic, binding);
 			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
-				framework.push({ name: reference.name, source: entry.specifier, span: spanOf(at as never, filename) });
+				framework.push({
+					name: reference.name,
+					source: entry.specifier,
+					span: spanOf(at as never, filename),
+				});
 				continue;
 			}
 			const imported = imports.reach(binding);
@@ -329,12 +413,17 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 				replaced.set(at, imported);
 				const slot = imports.record(binding)!;
 				used.set(`${slot.index}\0${slot.name}`, { slot: slot.index, name: slot.name });
-			} else if (droppedBindings.has(binding.id)) dropped.push({ name: reference.name, span: spanOf(at as never, filename) });
-			else if (binding.scope.id === rootScope.id && !declares.includes(binding.name)) uses.add(binding.name);
+			} else if (droppedBindings.has(binding.id))
+				dropped.push({ name: reference.name, span: spanOf(at as never, filename) });
+			else if (binding.scope.id === rootScope.id && !declares.includes(binding.name))
+				uses.add(binding.name);
 		}
 		unsupportedIn(node, filename, unsupported);
 		statements.push({
-			code: generate(cloneWith(node, (candidate) => replaced.get(candidate)) as never, PRINT).code.trim(),
+			code: generate(
+				cloneWith(node, (candidate) => replaced.get(candidate)) as never,
+				PRINT,
+			).code.trim(),
 			declares,
 			uses: [...uses],
 			imports: [...used.values()],
@@ -347,34 +436,59 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 	};
 	const declaredNames = (node: AnyNode): string[] =>
 		semantic.bindings
-			.filter((binding) => binding.scope.id === rootScope.id && binding.declarations.some((name) => within(name as never, node as never)))
+			.filter(
+				(binding) =>
+					binding.scope.id === rootScope.id &&
+					binding.declarations.some((name) => within(name as never, node as never)),
+			)
 			.map((binding) => binding.name);
 	for (const statement of (semantic.ast as unknown as { body: AnyNode[] }).body) {
 		if (statement.type === 'ImportDeclaration') continue;
-		if (statement.type === 'ExportAllDeclaration' || (statement.type === 'ExportNamedDeclaration' && statement.source)) continue;
+		if (
+			statement.type === 'ExportAllDeclaration' ||
+			(statement.type === 'ExportNamedDeclaration' && statement.source)
+		)
+			continue;
 		if (statement.type === 'ExportNamedDeclaration' && !statement.declaration) continue;
 		const declaration =
-			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+			statement.type === 'ExportNamedDeclaration' ||
+			statement.type === 'ExportDefaultDeclaration'
 				? (statement.declaration as AnyNode)
 				: statement;
 		if (isComponent(declaration) || String(declaration.type).startsWith('TS')) continue;
 		if (declaration.type === 'VariableDeclaration') {
 			for (const declarator of declaration.declarations as AnyNode[]) {
 				if (isFrameworkCall(semantic, declarator.init as AnyNode | undefined)) continue;
-				describe({ ...declaration, declarations: [declarator] } as AnyNode, declaredNames(declarator), false);
+				describe(
+					{ ...declaration, declarations: [declarator] } as AnyNode,
+					declaredNames(declarator),
+					false,
+				);
 			}
 			continue;
 		}
-		if (statement.type === 'ExportDefaultDeclaration' && !(String(declaration.type).endsWith('Declaration') && declaration.id)) {
+		if (
+			statement.type === 'ExportDefaultDeclaration' &&
+			!(String(declaration.type).endsWith('Declaration') && declaration.id)
+		) {
 			const value =
-				declaration.type === 'FunctionDeclaration' || declaration.type === 'ClassDeclaration'
-					? { ...declaration, type: declaration.type === 'FunctionDeclaration' ? 'FunctionExpression' : 'ClassExpression' }
+				declaration.type === 'FunctionDeclaration' ||
+				declaration.type === 'ClassDeclaration'
+					? {
+							...declaration,
+							type:
+								declaration.type === 'FunctionDeclaration'
+									? 'FunctionExpression'
+									: 'ClassExpression',
+						}
 					: declaration;
 			describe(
 				{
 					type: 'VariableDeclaration',
 					kind: 'var',
-					declarations: [{ type: 'VariableDeclarator', id: identifier('__default'), init: value }],
+					declarations: [
+						{ type: 'VariableDeclarator', id: identifier('__default'), init: value },
+					],
 				} as unknown as AnyNode,
 				['__default'],
 				false,
@@ -388,20 +502,43 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 	for (const entry of semantic.exports) {
 		if (entry.typeOnly || entry.specifier?.startsWith(FRAMEWORK_PREFIX)) continue;
 		if (entry.kind === 'named') {
-			if (!entry.local || droppedBindings.has(entry.local.id) || !entry.local.has(BindingFlags.ValueSpace)) continue;
-			if (entry.name === 'default' && exports.some((known) => 'name' in known && known.name === 'default')) continue;
+			if (
+				!entry.local ||
+				droppedBindings.has(entry.local.id) ||
+				!entry.local.has(BindingFlags.ValueSpace)
+			)
+				continue;
+			if (
+				entry.name === 'default' &&
+				exports.some((known) => 'name' in known && known.name === 'default')
+			)
+				continue;
 			exports.push({ name: entry.name ?? 'default', local: entry.local.name });
 		} else if (entry.kind === 'reExport' && entry.specifier)
-			exports.push({ name: entry.name ?? 'default', slot: imports.slot(entry.specifier, entry.node as AnyNode), from: entry.fromName ?? 'default' });
+			exports.push({
+				name: entry.name ?? 'default',
+				slot: imports.slot(entry.specifier, entry.node as AnyNode),
+				from: entry.fromName ?? 'default',
+			});
 		else if (entry.kind === 'namespace' && entry.specifier)
-			exports.push({ name: entry.name ?? '', slot: imports.slot(entry.specifier, entry.node as AnyNode), from: null });
-		else if (entry.kind === 'star' && entry.specifier) exports.push({ star: imports.slot(entry.specifier, entry.node as AnyNode) });
+			exports.push({
+				name: entry.name ?? '',
+				slot: imports.slot(entry.specifier, entry.node as AnyNode),
+				from: null,
+			});
+		else if (entry.kind === 'star' && entry.specifier)
+			exports.push({ star: imports.slot(entry.specifier, entry.node as AnyNode) });
 	}
 	const flags = semantic.moduleFlags;
 	return {
-		imports: imports.specifiers.map((specifier) => ({ specifier, span: spanOf(imports.spans.get(specifier) as never, filename) })),
+		imports: imports.specifiers.map((specifier) => ({
+			specifier,
+			span: spanOf(imports.spans.get(specifier) as never, filename),
+		})),
 		statements,
 		exports,
-		...(flags.usesRequire || flags.usesModule || flags.usesExports ? { commonjs: true as const } : {}),
+		...(flags.usesRequire || flags.usesModule || flags.usesExports
+			? { commonjs: true as const }
+			: {}),
 	};
 }

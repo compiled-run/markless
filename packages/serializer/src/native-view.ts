@@ -252,7 +252,12 @@ export type NativeOp =
 	 * the web (a text field takes the keyboard; anything else the screen reader's cursor) and scrolls the element into view
 	 * unless `preventScroll` (`focus({ preventScroll: true })`).
 	 */
-	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand; readonly preventScroll?: true }
+	| {
+			readonly op: 'command';
+			readonly node: string;
+			readonly command: NativeCommand;
+			readonly preventScroll?: true;
+	  }
 	/**
 	 * Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. A param
 	 * is a string fixed at build time or an expression evaluated when the op runs (a row's item inside a list row).
@@ -356,7 +361,12 @@ export type NativeAppPayload = {
 export type NativeJournalEntry =
 	| { readonly op: 'text'; readonly node: string; readonly value: string }
 	/** A `command` op the handler ran, in order, after every other entry: the views show the new state first. */
-	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand; readonly preventScroll?: true }
+	| {
+			readonly op: 'command';
+			readonly node: string;
+			readonly command: NativeCommand;
+			readonly preventScroll?: true;
+	  }
 	/** A `<dialog>` opened in the top layer or closed (by an op, or by the host's back gesture as a `cancel`). */
 	| { readonly op: 'dialog'; readonly node: string; readonly open: boolean }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
@@ -448,25 +458,73 @@ export const isNativeStyleStateAttribute = (name: string): boolean =>
 
 /** ECMAScript's own globals, which every engine a host runs has (JavaScriptCore, Hermes); `eval` is left out. */
 export const NATIVE_SCRIPT_LANGUAGE_GLOBALS: ReadonlyArray<string> = [
-	'Object', 'Function', 'Array', 'Number', 'Boolean', 'String', 'Symbol', 'BigInt', 'Date', 'Promise', 'RegExp', 'JSON',
-	'Math', 'Intl', 'Reflect', 'Proxy', 'Map', 'Set', 'WeakMap', 'WeakSet', 'ArrayBuffer', 'DataView', 'Int8Array',
-	'Uint8Array', 'Uint8ClampedArray', 'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array', 'Float32Array',
-	'Float64Array', 'BigInt64Array', 'BigUint64Array', 'Error', 'AggregateError', 'EvalError', 'RangeError',
-	'ReferenceError', 'SyntaxError', 'TypeError', 'URIError', 'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'NaN',
-	'Infinity', 'undefined', 'encodeURI', 'encodeURIComponent', 'decodeURI', 'decodeURIComponent', 'globalThis',
+	'Object',
+	'Function',
+	'Array',
+	'Number',
+	'Boolean',
+	'String',
+	'Symbol',
+	'BigInt',
+	'Date',
+	'Promise',
+	'RegExp',
+	'JSON',
+	'Math',
+	'Intl',
+	'Reflect',
+	'Proxy',
+	'Map',
+	'Set',
+	'WeakMap',
+	'WeakSet',
+	'ArrayBuffer',
+	'DataView',
+	'Int8Array',
+	'Uint8Array',
+	'Uint8ClampedArray',
+	'Int16Array',
+	'Uint16Array',
+	'Int32Array',
+	'Uint32Array',
+	'Float32Array',
+	'Float64Array',
+	'BigInt64Array',
+	'BigUint64Array',
+	'Error',
+	'AggregateError',
+	'EvalError',
+	'RangeError',
+	'ReferenceError',
+	'SyntaxError',
+	'TypeError',
+	'URIError',
+	'parseInt',
+	'parseFloat',
+	'isNaN',
+	'isFinite',
+	'NaN',
+	'Infinity',
+	'undefined',
+	'encodeURI',
+	'encodeURIComponent',
+	'decodeURI',
+	'decodeURIComponent',
+	'globalThis',
 ];
 
 /** Globals a host provides to scripts, by the service that backs each. */
-export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptService | 'engine'>> = {
-	setTimeout: 'timers',
-	clearTimeout: 'timers',
-	setInterval: 'timers',
-	clearInterval: 'timers',
-	queueMicrotask: 'engine',
-	console: 'console',
-	fetch: 'fetch',
-	crypto: 'crypto',
-};
+export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptService | 'engine'>> =
+	{
+		setTimeout: 'timers',
+		clearTimeout: 'timers',
+		setInterval: 'timers',
+		clearInterval: 'timers',
+		queueMicrotask: 'engine',
+		console: 'console',
+		fetch: 'fetch',
+		crypto: 'crypto',
+	};
 
 /**
  * What a script handler's event has on a phone, as member paths: a deeper read below `target.value` is a string's. Any
@@ -497,10 +555,12 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	document: 'the web page, which a phone does not have',
 	window: 'the browser window, which a phone does not have',
 	navigator: 'the browser, which a phone does not have',
-	location: "the page's address, which a phone does not have; use the router's `navigate` and route params",
+	location:
+		"the page's address, which a phone does not have; use the router's `navigate` and route params",
 	history: "the browser's history, which a phone does not have; use the router's `navigate`",
 	localStorage: "the browser's storage; use `storage()` from @markless/core, which a phone keeps",
-	sessionStorage: "the browser's storage; use `storage()` from @markless/core, which a phone keeps",
+	sessionStorage:
+		"the browser's storage; use `storage()` from @markless/core, which a phone keeps",
 	matchMedia: 'a CSS media query, which a phone answers in its styles, not in a handler',
 	getComputedStyle: 'computed CSS, which a phone does not have at run time',
 	requestAnimationFrame: 'a browser frame, which a phone does not hand to handlers',

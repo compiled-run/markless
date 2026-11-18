@@ -45,7 +45,11 @@ if (!host) {
 	g.clearTimeout = g.clearInterval = function (id) {
 		if (!host.timers[id]) return;
 		delete host.timers[id];
-		output().clears.push(id);
+		var out = output();
+		var set = out.timers.filter(function (timer) { return timer[0] !== id; });
+		// A timer set (or set again) in this same entry never reached the host: dropping it is the whole clear.
+		if (set.length !== out.timers.length) out.timers = set;
+		else out.clears.push(id);
 	};
 	if (typeof g.queueMicrotask !== 'function') g.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
 	var Headers = function (pairs) {
@@ -287,7 +291,9 @@ export function nativeScriptOf(
 			'"use strict";',
 			`var __i = [${module.imports.map((target) => (target === null ? 'null' : `load(${target})`)).join(', ')}];`,
 			module.code,
-			...module.functions.map((fn) => `functions[${JSON.stringify(fn.id)}] = function (__s) {\n${fn.code}\n};`),
+			...module.functions.map(
+				(fn) => `functions[${JSON.stringify(fn.id)}] = function (__s) {\n${fn.code}\n};`,
+			),
 			'};',
 		].join('\n');
 	});
