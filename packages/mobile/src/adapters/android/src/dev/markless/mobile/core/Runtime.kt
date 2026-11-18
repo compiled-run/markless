@@ -86,6 +86,22 @@ sealed interface JournalEntry {
 	data class Sheet(override val node: String, val open: Boolean) : JournalEntry {
 		override fun toJson() = "{\"op\":\"sheet\",\"node\":${jsonString(node)},\"open\":$open}"
 	}
+
+	/** The script cleared the timer [node] (`script:<n>`) it set: the host drops it. */
+	data class ClearTimer(override val node: String) : JournalEntry {
+		override fun toJson() = "{\"op\":\"clearTimer\",\"timer\":${jsonString(node)}}"
+	}
+
+	/** The script called `fetch`: the host sends [request] and answers with [Runtime.response]. */
+	data class Fetch(val id: Int, val request: FetchRequest) : JournalEntry {
+		override val node get() = ""
+		override fun toJson() = "{\"op\":\"fetch\",\"id\":$id,\"request\":${request.toJson()}}"
+	}
+}
+
+/** A request as the script made it: an absolute [url], and a text [body] or none. */
+data class FetchRequest(val url: String, val method: String, val headers: List<Pair<String, String>>, val body: String?) {
+	fun toJson() = "{\"url\":${jsonString(url)},\"method\":${jsonString(method)},\"headers\":${headers.joinToString(",", "[", "]") { "[${jsonString(it.first)},${jsonString(it.second)}]" }},\"body\":${body?.let(::jsonString) ?: "null"}}"
 }
 
 /** `JSON.stringify` of a value: non-finite numbers are `null`. */
@@ -147,6 +163,8 @@ class Runtime(
 	/** The device's preferred languages, most preferred first: the web's messages show in the first one the payload has. */
 	preferredLanguages: List<String> = listOf("en"),
 	private val now: () -> Double = { System.currentTimeMillis().toDouble() },
+	/** Where a page with a script gets the app's engine; never asked for a page without one. */
+	private val scriptHost: ScriptHost? = null,
 ) {
 	private val opened = now()
 	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, if (c.clock) JsValue.Num(opened) else c.storageKey?.let(store::get) ?: c.initial) }
@@ -237,8 +255,114 @@ class Runtime(
 				Js.method(e.name, target, args)
 			}
 			is Expr.Call -> Js.call(e.name, e.arguments.map(::eval), now)
+			is Expr.Script -> {
+				val entry = "{\"kind\":\"compute\",\"fn\":${jsonString(e.fn)},\"frame\":${frameOf(e.bindings, scope)}${entryCells()}}"
+				val started = System.nanoTime()
+				val value = JsValue.fromJson(Json.parse(scriptCall("enter", entry)))
+				onScriptEntry?.invoke(System.nanoTime() - started)
+				value
+			}
 		}
 	}
+
+	/** The engine this screen's script runs in: none until a script op or script computed first needs it. */
+	private var engine: ScriptEngine? = null
+
+	/** How many times this screen asked its host for the engine: 0 for a page whose handlers all ran as data, else 1. */
+	var engineStarts = 0
+		private set
+
+	/** What the script wrote to `console`, in order, as `level to text`. */
+	val logs = ArrayList<Pair<String, String>>()
+
+	/** Called with each line the script logs. */
+	var onScriptLog: ((level: String, text: String) -> Unit)? = null
+
+	/** Called with each engine entry's duration in nanoseconds, including starting the engine when the entry had to. */
+	var onScriptEntry: ((nanos: Long) -> Unit)? = null
+
+	/** Starts the engine and loads this screen's script ahead of its first entry; nothing for a payload without a script. */
+	fun warm() {
+		val script = payload.script ?: return
+		if (engine == null) load(script)
+	}
+
+	private fun load(script: ScriptSource): ScriptEngine {
+		val host = scriptHost ?: throw MarklessRuntimeError("a script op with no script engine to run it")
+		val started = host.start()
+		engineStarts++
+		// A shared engine may hold this script already, from another screen of the same page.
+		started.evaluate(script.source)
+		engine = started
+		return started
+	}
+
+	private fun scriptCall(method: String, argument: String?): String {
+		val script = payload.script ?: throw MarklessRuntimeError("a script op in a payload with no script")
+		val target = "globalThis.__markless[${jsonString(script.id)}].$method"
+		return (engine ?: load(script)).evaluate(if (argument == null) "$target()" else "$target(${jsonString(argument)})")
+	}
+
+	/** The names a script function reads, as its engine entry spells them: slots of this scope's cells, and values. */
+	private fun frameOf(bindings: Map<String, ScriptBinding>, scope: Scope): String = bindings.entries.joinToString(",", "{", "}") { (name, b) ->
+		jsonString(name) + ":" + when (b) {
+			is ScriptBinding.Cell -> "{\"slot\":${jsonString(slot(b.cell, scope))}}"
+			is ScriptBinding.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(slot(it.value, scope))}" }}}"
+			is ScriptBinding.Value -> "{\"value\":${jsonValue(evaluate(b.value, scope))}}"
+		}
+	}
+
+	/** Every current value by slot, and the seed `crypto` draws from when the script uses it. */
+	private fun entryCells(): String = buildString {
+		append(",\"cells\":")
+		append(values.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" })
+		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
+	}
+
+	/** One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries, in that order. */
+	private fun enter(fields: String): List<JournalEntry> {
+		val entry = "{$fields${entryCells()}}"
+		val started = System.nanoTime()
+		scriptCall("enter", entry)
+		val result = Json.parse(scriptCall("leave", null)).obj("leave()")
+		onScriptEntry?.invoke(System.nanoTime() - started)
+		fun list(name: String) = result.field(name, "leave()").arr("leave().$name")
+		fun id(j: Json) = j.num("an id").toInt()
+		for (w in list("writes")) {
+			val pair = w.arr("leave().writes[]")
+			val slot = pair[0].str("leave().writes[][0]")
+			val cell = slot.substringBefore('@')
+			if (payload.cells.none { it.id == cell }) throw MarklessRuntimeError("the script wrote unknown cell $cell")
+			val v = JsValue.fromJson(pair[1])
+			values[slot] = v
+			storageKeys[cell]?.let { store.set(it, v) }
+		}
+		for (l in list("logs")) {
+			val pair = l.arr("leave().logs[]")
+			val level = pair[0].str("leave().logs[][0]")
+			val text = pair[1].str("leave().logs[][1]")
+			logs.add(level to text)
+			onScriptLog?.invoke(level, text)
+		}
+		return list("clears").map { JournalEntry.ClearTimer("$SCRIPT_TIMER${id(it)}") } +
+			list("timers").map { t -> t.arr("leave().timers[]").let { JournalEntry.Timer("$SCRIPT_TIMER${id(it[0])}", it[1].num("leave().timers[][1]")) } } +
+			list("requests").map { r ->
+				val o = r.obj("leave().requests[]")
+				val q = o.field("request", "leave().requests[]").obj("request")
+				val request = FetchRequest(
+					q.field("url", "request").str("request.url"),
+					q.field("method", "request").str("request.method"),
+					q.field("headers", "request").arr("request.headers").map { h -> h.arr("request.headers[]").let { it[0].str("a header name") to it[1].str("a header value") } },
+					q.field("body", "request").let { if (it == Json.Null) null else it.str("request.body") },
+				)
+				JournalEntry.Fetch(id(o.field("id", "leave().requests[]")), request)
+			}
+	}
+
+
+	/** The host's answer to a `fetch` entry: `{ status, statusText, headers, body }`, or `{ error }` for a network failure. */
+	fun response(id: Int, response: JsValue): List<JournalEntry> =
+		change(null, null) { enter("\"kind\":\"response\",\"request\":$id,\"response\":${jsonValue(response)}") }
 
 	fun armOf(branch: Node.Branch): Int? {
 		val tests = branch.tests ?: return if (Js.truthy(evaluate(branch.test!!))) 0 else if (branch.arms > 1) 1 else null
@@ -457,8 +581,12 @@ class Runtime(
 		}
 	}
 
-	/** Runs the ops of the `after` that the `timer` entry [timer] scheduled, with the values it captured. */
+	/** Runs the ops of the `after` that the `timer` entry [timer] scheduled, with the values it captured, or fires the script's timer (`script:<n>`). */
 	fun timer(timer: String): List<JournalEntry> {
+		if (timer.startsWith(SCRIPT_TIMER)) {
+			val id = timer.removePrefix(SCRIPT_TIMER).toIntOrNull() ?: throw MarklessRuntimeError("no timer $timer is set")
+			return change(null, null) { enter("\"kind\":\"timer\",\"timer\":$id") }
+		}
 		val pending = timers.remove(timer) ?: throw MarklessRuntimeError("no timer $timer is set")
 		return change(null, null) {
 			val taken = run(pending.ops, Scope(locals = pending.locals), pending.submission)
@@ -544,6 +672,11 @@ class Runtime(
 				dialogs[op.node] = op.open
 			}
 			is Op.Command -> calls.add(JournalEntry.Command(op.node, op.command, op.preventScroll))
+			is Op.Script -> {
+				val event = "{\"type\":${jsonString(op.type)}${eventValue?.let { ",\"value\":${jsonString(it)}" } ?: ""}}"
+				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
+				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"event\":$event$catch"))
+			}
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)
 				values[slot(op.cell, scope)] = v
