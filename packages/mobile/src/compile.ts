@@ -19,7 +19,7 @@ import {
 } from '@markless/router';
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
 import { NATIVE_APP_VERSION } from '@markless/serializer/native-view';
-import { nativeStyleInput, type NativeStyleInput } from './style-input.ts';
+import { nativeStyleInputs, type NativeStyleInput } from './style-input.ts';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
 
@@ -36,6 +36,8 @@ export type NativeBuild = {
 	readonly features: ReadonlyArray<NativeDeviceFeature>;
 	readonly manifest: DeviceManifest;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+	/** Each payload element's tag and where it is written, by node id, for build errors that name an element. */
+	readonly elementSources: NativeViewArtifact['elementSources'];
 };
 
 /** A stylesheet's text as the web build ships it, unscoped: its rules reach every page that imports it. */
@@ -56,6 +58,26 @@ const stylesheetsOf = (
 				`${importer} imports the stylesheet ${request}, which could not be read`,
 			);
 		return sheet;
+	});
+
+type ReadModule = (
+	specifier: string,
+	importer: string,
+) => { readonly filename: string; readonly source: string } | undefined;
+
+/** A JSON file imports as a module whose default export is its value, as the web build loads it. */
+const withJsonModules =
+	(read: ReadModule | undefined): ReadModule | undefined =>
+	read &&
+	((specifier, importer) => {
+		const module = read(specifier, importer);
+		if (!module?.filename.endsWith('.json')) return module;
+		try {
+			JSON.parse(module.source);
+		} catch {
+			return undefined;
+		}
+		return { filename: module.filename, source: `const json = ${module.source};\nexport default json;\n` };
 	});
 
 /** Compiles one `.tsrx` module through the real compiler, then lowers its analysis to the native view payload. */
@@ -86,6 +108,7 @@ export async function compileNativeComponent(input: {
 		? manifest?.routes.find((candidate) => candidate.file === input.page)
 		: undefined;
 	if (input.page && !route) throw new Error(`${input.page} is not a page the router routes`);
+	const readModule = withJsonModules(input.readModule);
 	const compiled = await compileTsrxModule({
 		filename: input.filename,
 		source: input.source,
@@ -102,7 +125,7 @@ export async function compileNativeComponent(input: {
 	);
 	for (const entry of compiled.semanticGraph.moduleImports) {
 		if (entry.typeOnly || !entry.source.startsWith('.')) continue;
-		const module = input.readModule?.(entry.source, input.filename);
+		const module = readModule?.(entry.source, input.filename);
 		if (!module) continue;
 		const plan = (await compileTsrxModule({ ...module, symbols: [] })).publicRenderPlan;
 		importedStyles.push(...plan.styleScopes);
@@ -121,7 +144,7 @@ export async function compileNativeComponent(input: {
 	]);
 	const read = new Map<string, { readonly filename: string; readonly source: string }>();
 	const resolve = (specifier: string, importer: string): string | undefined => {
-		const module = input.readModule?.(specifier, importer);
+		const module = readModule?.(specifier, importer);
 		if (module) read.set(module.filename, module);
 		return module?.filename;
 	};
@@ -202,6 +225,7 @@ export async function compileNativeComponent(input: {
 		),
 		features: native.features,
 		manifest: deviceEntries,
+		elementSources: native.elementSources,
 		diagnostics: [...errors, ...native.diagnostics, ...usage],
 	};
 }
@@ -213,6 +237,12 @@ export type NativeAppBuild = {
 		readonly pattern: string;
 		readonly page: string;
 		readonly input: NativeStyleInput;
+		/** Each system sheet's content, laid out once per resting height. */
+		readonly sheets: ReadonlyArray<{
+			readonly node: string;
+			readonly snapPoint: number;
+			readonly input: NativeStyleInput;
+		}>;
 	}>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic & { readonly page: string }>;
 };
@@ -270,12 +300,15 @@ export async function compileNativeApp(input: {
 		const sheets = [...documentSheets, ...build.stylesheets].filter(
 			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 		);
-		if (sheets.length > 0 || build.styles.some((style) => style.cssText.length > 0))
+		if (sheets.length > 0 || build.styles.some((style) => style.cssText.length > 0)) {
+			const inputs = nativeStyleInputs(build.payload, build.styles, sheets);
 			styleInputs.push({
 				pattern: route.pattern,
 				page: page.page,
-				input: nativeStyleInput(build.payload, build.styles, sheets),
+				input: inputs.page,
+				sheets: inputs.sheets,
 			});
+		}
 	}
 	return {
 		payload: diagnostics.length > 0 ? null : { version: NATIVE_APP_VERSION, routes },

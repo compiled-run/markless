@@ -63,7 +63,11 @@
 				"kind": "element",
 				"id": "h5",
 				"element": "ul",
-				"parent": "h3"
+				"parent": "h3",
+				"defaultStyle": {
+					"indent": 40,
+					"marker": "disc"
+				}
 			},
 			{
 				"kind": "repeat",

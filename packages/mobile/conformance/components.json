@@ -26,7 +26,11 @@
 				"kind": "element",
 				"id": "h4",
 				"element": "h1",
-				"parent": "h3"
+				"parent": "h3",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
 			},
 			{
 				"kind": "text",

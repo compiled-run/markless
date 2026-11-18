@@ -24,8 +24,14 @@ public enum StyleWrite: Sendable {
 	case font(family: String, size: Double)
 	case textColor(RGBA)
 	case syntheticBold
-	/// Overflow other than visible: the children are clipped to the padding box.
+	/// `overflow-x` / `overflow-y` `auto` or `scroll`: the box hosts its children in a scroll view over its padding box.
+	case scrollContainer(x: Bool, y: Bool)
+	/// `scrollbar-width: none`.
+	case scrollIndicatorsHidden
+	/// Children clipped to the padding box (`overflow` other than visible); a scroll container's scroll view is that clip.
 	case paddingBoxClip
+	/// `overscroll-behavior: none` on an axis.
+	case scrollBounce(x: Bool, y: Bool)
 	/// clip-path: inset(): the box and everything in it are clipped to its border box inset by each edge (top, right, bottom, left).
 	case clipPathInset([(value: Double, percent: Bool)])
 	/// The text a clip-path leaves exposed to the screen reader; a clip does not change accessibility, so nothing to apply.
@@ -59,6 +65,8 @@ public struct StyleNode: Sendable {
 	public let borderWidths: (top: Double, right: Double, bottom: Double, left: Double)?
 	public let writes: [StyleWrite]
 	public let borderOps: BorderOps?
+	/// Only on a scroll container: its offset range in device px.
+	public let scrollRange: ScrollOffsetRange?
 }
 
 /// A style state of Dragon's export: the cell it follows (by key) and the values it can take.
@@ -105,6 +113,12 @@ public struct StyleBands: Sendable {
 	}
 }
 
+/// A system sheet's styles: one export per resting height, each laid out in that height's content area.
+public struct SheetStyle: Sendable {
+	public let node: String
+	public let heights: [(snapPoint: Double, style: StyleExport)]
+}
+
 /// One target of a decoded `dragon.native-style-export/0` or `/1` file; `/0` reads as one assignment and no states.
 public struct StyleExport: Sendable {
 	public let fonts: [(id: String, file: String)]
@@ -120,6 +134,12 @@ public struct StyleExport: Sendable {
 	public let notReady: String?
 	/// Only for a sheet with `@media`: its bands, selected by the state `@env#band`.
 	public let bands: StyleBands?
+	/// Each assignment's page scroll range in device px; nil when Dragon does not decide it (see `pageScrollUndecided`).
+	public let pageScrolls: [ScrollOffsetRange?]
+	/// Dragon's reason, for this target, when it leaves a page scroll range undecided.
+	public let pageScrollUndecided: String?
+	/// Each system sheet's content, laid out as its own document at every resting height (app style files only).
+	public var sheets: [SheetStyle] = []
 
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
@@ -132,7 +152,20 @@ public struct StyleExport: Sendable {
 		let perState = schema == dragonStyleExportSchemas[1]
 		let units = try fields["units"].string()
 		guard dragonStyleExportUnits.contains(units) else { throw PayloadError(path: "style.units", reason: "unsupported units \"\(units)\"") }
-		return try decodeTarget(try fields["targets"].field(target), perState: perState, fonts: try decodeFonts(fields["fonts"]), backend: backend)
+		// Dragon's reason, for this target, when it leaves the page's scroll range undecided.
+		var pageScrollUndecided: String?
+		if fields.has("warnings") {
+			for warning in try fields["warnings"].array() {
+				let w = try warning.object(["code", "message"])
+				let message = try w["message"].string()
+				if try w["code"].string() == "DRAGON_PAGE_SCROLL_UNDECIDED", message.hasPrefix("\(target): ") {
+					pageScrollUndecided = String(message.dropFirst(target.count + 2))
+				}
+			}
+		}
+		return try decodeTarget(
+			try fields["targets"].field(target), perState: perState, fonts: try decodeFonts(fields["fonts"]), backend: backend,
+			pageScrollUndecided: pageScrollUndecided)
 	}
 
 	/// Reads an app's `markless.native-app-style/0` for one target: each styled route's styles, by route pattern.
@@ -154,11 +187,8 @@ public struct StyleExport: Sendable {
 		let targetFields = try chosen.object(["backend", "viewport", "dpr", "writes", "routes"])
 		let writes = try targetFields["writes"].array().map { list in _ = try list.array(); return list.value }
 		var routes: [String: StyleExport] = [:]
-		for route in try targetFields["routes"].array() {
-			let f = try route.object(
-				required: ["pattern", "component", "compiler", "readiness", "states", "initial", "next", "assignments"], optional: ["bands"])
-			let pattern = try f["pattern"].string()
-			_ = (try f["component"].string(), try f["compiler"].string())
+		let raw = { (fields: Fields, key: String) throws -> (String, JSONValue) in (key, try fields[key].value) }
+		let expanded = { (reader: Reader, f: Fields, viewport: (String, JSONValue)) throws -> StyleExport in
 			let assignments: [JSONValue] = try f["assignments"].array().map { assignment in
 				let a = try assignment.object(required: ["values", "nodes", "canvas"], optional: ["bodyBackground"])
 				let nodes: [JSONValue] = try a["nodes"].array().map { node in
@@ -170,14 +200,33 @@ public struct StyleExport: Sendable {
 				let body: [(String, JSONValue)] = a.has("bodyBackground") ? [("bodyBackground", try a["bodyBackground"].value)] : []
 				return .object([("values", try a["values"].value), ("nodes", .array(nodes)), ("canvas", try a["canvas"].value)] + body)
 			}
-			let raw = { (fields: Fields, key: String) throws -> (String, JSONValue) in (key, try fields[key].value) }
 			var page: [(String, JSONValue)] = [
-				try raw(targetFields, "backend"), try raw(targetFields, "viewport"), try raw(targetFields, "dpr"),
+				try raw(targetFields, "backend"), viewport, try raw(targetFields, "dpr"),
 				try raw(f, "readiness"), try raw(f, "states"), try raw(f, "initial"), ("assignments", .array(assignments)), try raw(f, "next"),
 			]
 			if f.has("bands") { page.append(("bands", try f["bands"].value)) }
+			return try decodeTarget(try Reader(.object(page), at: reader.path), perState: true, fonts: fonts, backend: backend)
+		}
+		for route in try targetFields["routes"].array() {
+			let f = try route.object(
+				required: ["pattern", "component", "compiler", "readiness", "states", "initial", "next", "assignments"], optional: ["bands", "sheets"])
+			let pattern = try f["pattern"].string()
+			_ = (try f["component"].string(), try f["compiler"].string())
 			guard routes[pattern] == nil else { throw route.fail("route \(pattern) is listed twice") }
-			routes[pattern] = try decodeTarget(try Reader(.object(page), at: route.path), perState: true, fonts: fonts, backend: backend)
+			var style = try expanded(route, f, try raw(targetFields, "viewport"))
+			if f.has("sheets") {
+				style.sheets = try f["sheets"].array().map { sheet in
+					let s = try sheet.object(["node", "heights"])
+					let heights = try s["heights"].array().map { height in
+						let h = try height.object(
+							required: ["snapPoint", "viewport", "readiness", "states", "initial", "next", "assignments"], optional: ["bands"])
+						return (snapPoint: try h["snapPoint"].number(), style: try expanded(height, h, try raw(h, "viewport")))
+					}
+					guard !heights.isEmpty else { throw sheet.fail("a sheet's styles need at least one resting height") }
+					return SheetStyle(node: try s["node"].string(), heights: heights)
+				}
+			}
+			routes[pattern] = style
 		}
 		return routes
 	}
@@ -189,7 +238,9 @@ public struct StyleExport: Sendable {
 		}
 	}
 
-	private static func decodeTarget(_ chosen: Reader, perState: Bool, fonts: [(id: String, file: String)], backend: String) throws -> StyleExport {
+	private static func decodeTarget(
+		_ chosen: Reader, perState: Bool, fonts: [(id: String, file: String)], backend: String, pageScrollUndecided: String? = nil
+	) throws -> StyleExport {
 		let targetFields = try chosen.object(
 			required: perState ? ["backend", "viewport", "dpr", "states", "initial", "assignments", "next"] : ["backend", "viewport", "dpr", "nodes"],
 			optional: perState ? ["readiness", "bands"] : [])
@@ -222,13 +273,15 @@ public struct StyleExport: Sendable {
 		var initial = 0
 		var assignments: [(values: [String: NativeValue], nodes: [StyleNode], canvas: RGBA?, body: RGBA?)]
 		var next: [[[Int]]] = [[]]
+		var pageScrolls: [ScrollOffsetRange?] = []
 		if perState {
 			states = try targetFields["states"].array().map { state in
 				let f = try state.object(["key", "domain"])
 				return StyleState(key: try f["key"].string(), domain: try f["domain"].array().map { NativeValue(json: $0.value) })
 			}
 			assignments = try targetFields["assignments"].array().map { assignment in
-				let f = try assignment.object(required: ["values", "nodes"], optional: ["canvas", "bodyBackground"])
+				let f = try assignment.object(required: ["values", "nodes"], optional: ["canvas", "bodyBackground", "pageScroll"])
+				pageScrolls.append(f.has("pageScroll") ? try decodeRange(try f["pageScroll"]) : nil)
 				let valuesReader = try f["values"]
 				var values: [String: NativeValue] = [:]
 				for key in try valuesReader.keys() { values[key] = NativeValue(json: try valuesReader.field(key).value) }
@@ -253,6 +306,7 @@ public struct StyleExport: Sendable {
 			}
 		} else {
 			assignments = [([:], try checkedNodes(try targetFields["nodes"]), nil, nil)]
+			pageScrolls = [nil]
 		}
 		var bands: StyleBands?
 		if targetFields.has("bands") {
@@ -274,11 +328,18 @@ public struct StyleExport: Sendable {
 		return StyleExport(
 			fonts: fonts, viewport: (try viewport["width"].number(), try viewport["height"].number()),
 			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: assignments, next: next, notReady: notReady,
-			bands: bands)
+			bands: bands, pageScrolls: pageScrolls, pageScrollUndecided: pageScrollUndecided)
+	}
+
+	/// A scroll range, or nil for JSON null.
+	private static func decodeRange(_ reader: Reader) throws -> ScrollOffsetRange? {
+		if reader.isNull { return nil }
+		let r = try reader.object(["minX", "maxX", "minY", "maxY"])
+		return ScrollOffsetRange(minX: try r["minX"].number(), maxX: try r["maxX"].number(), minY: try r["minY"].number(), maxY: try r["maxY"].number())
 	}
 
 	private static func decodeNode(_ node: Reader) throws -> StyleNode {
-		let field = try node.object(required: ["id", "parent", "kind", "native", "text", "frame", "borderWidths", "writes"], optional: ["borderOps"])
+		let field = try node.object(required: ["id", "parent", "kind", "native", "text", "frame", "borderWidths", "writes"], optional: ["borderOps", "scrollRange"])
 		let kind = try field["kind"].string()
 		let native = try field["native"].string()
 		var isText = false
@@ -304,7 +365,8 @@ public struct StyleExport: Sendable {
 			id: try field["id"].string(), parent: try field["parent"].optionalString(), isText: isText, isAnonymous: isAnonymous,
 			text: textReader.isNull ? nil : try textReader.string(), frame: frame, borderWidths: borderWidths,
 			writes: try field["writes"].array().map(decodeWrite),
-			borderOps: field.has("borderOps") ? try decodeBorderOps(try field["borderOps"]) : nil)
+			borderOps: field.has("borderOps") ? try decodeBorderOps(try field["borderOps"]) : nil,
+			scrollRange: field.has("scrollRange") ? try decodeRange(try field["scrollRange"]) : nil)
 	}
 
 	private static func decodeBorderOps(_ reader: Reader) throws -> BorderOps {
@@ -376,9 +438,20 @@ public struct StyleExport: Sendable {
 			_ = try f["keys"].array().map { try $0.number() }
 			_ = try f["values"].array().map { try $0.number() }
 			return .syntheticBold
+		case "scroll-container":
+			let f = try write.object(["kind", "x", "y", "key"])
+			try expectKey(f, "dragonScroll.range")
+			return .scrollContainer(x: try f["x"].bool(), y: try f["y"].bool())
 		case "padding-box-clip":
 			try expectKey(try write.object(["kind", "key"]), "dragonClip.frame")
 			return .paddingBoxClip
+		case "scroll-indicators-hidden":
+			try expectKey(try write.object(["kind", "key"]), "dragonScroll.indicators")
+			return .scrollIndicatorsHidden
+		case "scroll-bounce":
+			let f = try write.object(["kind", "bounceX", "bounceY", "key"])
+			try expectKey(f, "dragonScroll.bounce")
+			return .scrollBounce(x: try f["bounceX"].bool(), y: try f["bounceY"].bool())
 		case "clip-path-inset":
 			let f = try write.object(["kind", "edges", "key"])
 			try expectKey(f, "dragonClipPath.frame")

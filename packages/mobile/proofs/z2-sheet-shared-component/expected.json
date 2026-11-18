@@ -1,0 +1,28 @@
+{
+	"rung": "Z2",
+	"name": "A styled component used on the page and inside a system sheet",
+	"steps": [
+		{
+			"visible": ["Basil", "In season", "More about basil"],
+			"absent": ["Sweet basil", "Grown nearby"]
+		},
+		{
+			"do": { "tap": "More about basil" },
+			"visible": ["Sweet basil", "Grown nearby"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": [
+					"Basil",
+					"In season",
+					"More about basil",
+					"On the web, the details open in a drawer"
+				],
+				"absent": ["Sweet basil", "Grown nearby"]
+			}
+		],
+		"absentFromOutput": ["Sweet basil", "Grown nearby", "@markless/device"]
+	}
+}

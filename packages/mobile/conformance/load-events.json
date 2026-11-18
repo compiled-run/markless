@@ -1,0 +1,373 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "LoadEvents",
+		"cells": [
+			{
+				"id": "state:idles",
+				"name": "idles",
+				"initial": 0
+			},
+			{
+				"id": "state:seen",
+				"name": "seen",
+				"initial": ""
+			},
+			{
+				"id": "state:shown",
+				"name": "shown",
+				"initial": true
+			},
+			{
+				"id": "state:rows",
+				"name": "rows",
+				"initial": [
+					{
+						"id": "a"
+					},
+					{
+						"id": "b"
+					}
+				]
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:0",
+				"parent": "h0",
+				"test": {
+					"cell": "state:shown"
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "p",
+				"parent": "h0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Idle ",
+								{
+									"cell": "state:idles"
+								},
+								""
+							]
+						}
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Seen ",
+								{
+									"cell": "state:seen"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "repeat",
+				"id": "repeat:0",
+				"parent": "h0",
+				"list": {
+					"cell": "state:rows"
+				},
+				"key": [
+					"id"
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0",
+				"row": "repeat:0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"member": {
+								"item": "repeat:0"
+							},
+							"property": "id"
+						}
+					}
+				],
+				"row": "repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Toggle"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "idle",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "visible",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:idles",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "state:idles"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:seen",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:seen"
+							},
+							"right": {
+								"member": {
+									"item": "repeat:0"
+								},
+								"property": "id"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:shown",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:shown"
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Idle 0"
+		],
+		[
+			"h2:text0",
+			"Seen "
+		],
+		[
+			"h3:text0@a",
+			"a"
+		],
+		[
+			"h3:text0@b",
+			"b"
+		],
+		[
+			"h4:text0",
+			"Toggle"
+		]
+	],
+	"initialArms": [
+		[
+			"branch-site:0",
+			0
+		]
+	],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"a",
+				"b"
+			]
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "idle",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "Idle 1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "idle",
+				"host": "h1"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "visible",
+				"host": "h3@b"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Seen b"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "visible",
+				"host": "h3@b"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 1
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "idle",
+				"host": "h1"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 0
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "idle",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "Idle 2"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "visible",
+				"host": "h3@a"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Seen ba"
+				}
+			]
+		}
+	]
+}

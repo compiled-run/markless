@@ -303,7 +303,12 @@ function emitTextSlot(
 			kind: 'text',
 			residue,
 			...(raw ? { raw: true } : {}),
-			...(context.nativeFacts ? { nativeExpression: context.nativeFacts.expression(expression as never) } : {}),
+			...(context.nativeFacts
+				? {
+						nativeExpression: context.nativeFacts.expression(expression as never),
+						nativeSpan: sourceSpan(expression, context.filename),
+					}
+				: {}),
 		},
 		path,
 	);
@@ -525,10 +530,12 @@ function emitNode(
 	}
 	const hostNodeId = context.hostIds.get(node);
 	if (hostNodeId) {
+		const hostSpan = context.nativeFacts ? sourceSpan(node, context.filename) : undefined;
 		builder.hosts.push({
 			hostNodeId,
 			tagName,
 			coordinate: { kind: 'child-index', path },
+			...(hostSpan ? { sourceSpan: hostSpan } : {}),
 		});
 	}
 

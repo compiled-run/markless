@@ -18,11 +18,13 @@ public struct ResolvedStyle: Equatable, Sendable {
 	/// Painted in a stacking context's layer order (a positioned or z-index box): its bucket (-1 below the flow, 1 auto or 0, 2 above)
 	/// and its rank there; the host orders it among its view's siblings, after (or, for -1, before) the boxes in flow.
 	public var paintOrder: (bucket: Int, rank: Int)?
+	/// Set on a scroll container: the axes CSS lets scroll, its offset range in points, and its scroll view's look.
+	public var scroll: ResolvedScroll?
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
-			&& a.textColor == b.textColor && a.sides == b.sides && a.dashedBorder == b.dashedBorder
+			&& a.textColor == b.textColor && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll
 			&& a.clipsChildren == b.clipsChildren && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank
 	}
@@ -36,6 +38,23 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public struct Side: Equatable, Sendable {
 		public let width: Double
 		public let color: RGBA
+	}
+}
+
+public struct ResolvedScroll: Equatable, Sendable {
+	public var x: Bool
+	public var y: Bool
+	/// Points; a scroll view's content is its padding box grown by `maxX` and `maxY`.
+	public var range: ScrollOffsetRange
+	/// The padding box inside the border box, in points: top, left, bottom, right border widths.
+	public var inset: (top: Double, left: Double, bottom: Double, right: Double)
+	public var indicators = true
+	public var bounceX = true
+	public var bounceY = true
+
+	public static func == (a: ResolvedScroll, b: ResolvedScroll) -> Bool {
+		a.x == b.x && a.y == b.y && a.range == b.range && a.inset == b.inset && a.indicators == b.indicators
+			&& a.bounceX == b.bounceX && a.bounceY == b.bounceY
 	}
 }
 
@@ -54,10 +73,16 @@ public struct StyleLayout: Sendable {
 	public let next: [[[Int]]]
 	public var styles: [String: ResolvedStyle] { assignments[start] }
 	public let viewport: (width: Double, height: Double)
+	/// Each assignment's page scroll range in points; nil when Dragon left it undecided.
+	public let pageScrolls: [ScrollOffsetRange?]
+	/// Why Dragon left the page scroll range undecided, when it says.
+	public let pageScrollUndecided: String?
 	/// Device pixels per point the frames were laid out for; a screen with another scale is refused.
 	public let dpr: Double
 	public let fontFiles: [(id: String, file: String)]
 	public let bands: StyleBands?
+	/// Each assignment's document height in points: how far the laid-out content reaches down.
+	public let extents: [Double]
 }
 
 extension StyleLayout {
@@ -81,6 +106,42 @@ extension StyleExport {
 		for payload: NativeViewPayload, initialTexts: [(node: String, text: String)], value: (String) throws -> NativeValue,
 		dark: Bool = false
 	) throws -> StyleLayout {
+		let roots = sheetRoots(of: payload)
+		for node in payload.nodes where roots[node.id] == node.id && !sheets.contains(where: { $0.node == node.id }) {
+			throw styleError("\(node.id): the style export has no styles for this system sheet's content")
+		}
+		return try layout(
+			for: payload, nodes: payload.nodes.filter { roots[$0.id] == nil }, root: nil, everyStyledCell: true,
+			initialTexts: initialTexts, value: value, dark: dark)
+	}
+
+	/// The layout of each resting height of the sheet `node`, in its `heights` order.
+	public func resolveSheet(
+		_ node: String, for payload: NativeViewPayload, initialTexts: [(node: String, text: String)],
+		value: (String) throws -> NativeValue, dark: Bool = false
+	) throws -> [(snapPoint: Double, layout: StyleLayout)] {
+		guard let sheet = sheets.first(where: { $0.node == node }) else { throw styleError("\(node): the style export has no styles for this system sheet") }
+		let roots = sheetRoots(of: payload)
+		let content = payload.nodes.filter { roots[$0.id] == node && $0.id != node }
+		return try sheet.heights.map { height in
+			(height.snapPoint, try height.style.layout(
+				for: payload, nodes: content, root: node, everyStyledCell: false, initialTexts: initialTexts, value: value, dark: dark))
+		}
+	}
+
+	/// Each node inside a system sheet (and the sheet itself) names that sheet.
+	private func sheetRoots(of payload: NativeViewPayload) -> [String: String] {
+		var roots: [String: String] = [:]
+		for node in payload.nodes {
+			if case .sheet = node.kind { roots[node.id] = node.id } else if let parent = node.parent, let root = roots[parent] { roots[node.id] = root }
+		}
+		return roots
+	}
+
+	private func layout(
+		for payload: NativeViewPayload, nodes: [NativeNode], root: String?, everyStyledCell: Bool,
+		initialTexts: [(node: String, text: String)], value: (String) throws -> NativeValue, dark: Bool
+	) throws -> StyleLayout {
 		let styledCells = payload.cells.filter(\.styled).map(\.id)
 		let stateCells = try states.map { state in
 			if state.key == StyleBands.state { return state.key }
@@ -88,7 +149,7 @@ extension StyleExport {
 			guard named.count == 1 else { throw styleError("style state \(state.key) names \(named.count) styled cells of the payload") }
 			return named[0]
 		}
-		if let unstyled = styledCells.first(where: { !stateCells.contains($0) }) {
+		if everyStyledCell, let unstyled = styledCells.first(where: { !stateCells.contains($0) }) {
 			throw styleError("the payload's styled cell \(unstyled) has no state in the style export")
 		}
 		let current = try stateCells.map { cell in
@@ -102,7 +163,7 @@ extension StyleExport {
 		}
 		return StyleLayout(
 			assignments: try assignments.indices.map { index in
-				try resolveNodes(assignments[index].nodes, for: payload, initialTexts: index == start ? initialTexts : nil)
+				try resolveNodes(assignments[index].nodes, for: nodes, root: root, initialTexts: index == start ? initialTexts : nil)
 			},
 			canvases: assignments.map(\.canvas),
 			bodies: try assignments.map { assignment in
@@ -115,20 +176,29 @@ extension StyleExport {
 				return (Frame(x: (html.x + body.x) / dpr, y: (html.y + body.y) / dpr, width: body.width / dpr, height: body.height / dpr), color)
 			},
 			start: start, stateCells: stateCells, domains: states.map(\.domain), next: next,
-			viewport: viewport, dpr: dpr, fontFiles: fonts, bands: bands)
+			viewport: viewport, pageScrolls: try pageScrolls.map { try $0.map(points) }, pageScrollUndecided: pageScrollUndecided,
+			dpr: dpr, fontFiles: fonts, bands: bands,
+			extents: assignments.map { assignment in
+				let byId = Dictionary(uniqueKeysWithValues: assignment.nodes.map { ($0.id, $0) })
+				func top(_ id: String?) -> Double {
+					guard let id, let node = byId[id] else { return 0 }
+					return (node.frame?.y ?? 0) + top(node.parent)
+				}
+				return (assignment.nodes.compactMap { node in node.frame.map { top(node.parent) + $0.y + $0.height } }.max() ?? 0) / dpr
+			})
 	}
 
 	private func resolveNodes(
-		_ nodes: [StyleNode], for payload: NativeViewPayload, initialTexts: [(node: String, text: String)]?
+		_ nodes: [StyleNode], for payloadNodes: [NativeNode], root: String?, initialTexts: [(node: String, text: String)]?
 	) throws -> [String: ResolvedStyle] {
 		let byId = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
-		let payloadIds = Set(payload.nodes.map(\.id))
+		let payloadIds = Set(payloadNodes.map(\.id))
 		let texts = initialTexts.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.node, $0.text) }) }
 		var styles: [String: ResolvedStyle] = [:]
-		for node in payload.nodes {
+		for node in payloadNodes {
 			if case .branch = node.kind { throw styleError("\(node.id): @if is not styled on iOS yet, the style export lays out one state") }
 			if case .repeat = node.kind { throw styleError("\(node.id): @for is not styled on iOS yet, the style export lays out one state") }
-			if case .sheet = node.kind { throw styleError("\(node.id): a system sheet's content is not styled on iOS yet, the style export lays out one page") }
+			if case .sheet = node.kind { throw styleError("\(node.id): a system sheet inside another sheet's content is not styled on iOS") }
 			guard let styled = byId[node.id] else { throw styleError("no style export node for \(node.id)") }
 			switch node.kind {
 			case .element:
@@ -148,7 +218,7 @@ extension StyleExport {
 				offset.y += skipped.frame?.y ?? 0
 				cursor = skipped.parent
 			}
-			guard cursor == node.parent else {
+			guard cursor == (node.parent == root ? nil : node.parent) else {
 				throw styleError("\(node.id)'s parent is \(node.parent ?? "none") in the payload, \(cursor ?? "none") in the style export")
 			}
 			var style = try resolve(styled, styled.writes)
@@ -188,8 +258,18 @@ extension StyleExport {
 		if cursor == nil { throw styleError("\(node.id)'s stacking context \(host) is not an ancestor") }
 	}
 
+	/// A device px range in points; a range that starts before 0 (right to left, a reversed flex box) is not implemented.
+	private func points(_ range: ScrollOffsetRange) throws -> ScrollOffsetRange {
+		guard range.minX == 0, range.minY == 0 else { throw styleError("a scroll range starting before 0 (\(range.minX), \(range.minY)) is not implemented on iOS") }
+		return ScrollOffsetRange(minX: 0, maxX: range.maxX / dpr, minY: 0, maxY: range.maxY / dpr)
+	}
+
 	private func resolve(_ node: StyleNode, _ writes: [StyleWrite]) throws -> ResolvedStyle {
 		var style = ResolvedStyle()
+		var scrollAxes: (x: Bool, y: Bool)?
+		var indicators = true
+		var bounce = (x: true, y: true)
+		var clips = false
 		style.frame = node.frame.map { Frame(x: $0.x / dpr, y: $0.y / dpr, width: $0.width / dpr, height: $0.height / dpr) }
 		var borderStyles: [String] = []
 		var borderColors: [RGBA] = []
@@ -207,7 +287,10 @@ extension StyleExport {
 			case let .font(family, size): style.font = (family, size)
 			case let .textColor(color): style.textColor = color
 			case .syntheticBold: throw styleError("\(node.id): synthetic-bold is not implemented on iOS")
-			case .paddingBoxClip: style.clipsChildren = true
+			case let .scrollContainer(x, y): scrollAxes = (x, y)
+			case .scrollIndicatorsHidden: indicators = false
+			case .paddingBoxClip: clips = true
+			case let .scrollBounce(x, y): bounce = (x, y)
 			case let .clipPathInset(edges):
 				guard let frame = style.frame else { throw styleError("\(node.id): clip-path on a box with no frame") }
 				let edge = { (k: Int, size: Double) in edges[k].percent ? edges[k].value / 100 * size : edges[k].value }
@@ -217,6 +300,18 @@ extension StyleExport {
 			case .clipText: break
 			case let .paintOrder(_, bucket, rank): style.paintOrder = (bucket, rank)
 			}
+		}
+		// A scroll view clips its own content; any other box clips its children.
+		style.clipsChildren = clips && scrollAxes == nil
+		if let axes = scrollAxes {
+			guard let range = node.scrollRange else { throw styleError("\(node.id) is a scroll container with no scroll range") }
+			guard let widths = node.borderWidths else { throw styleError("\(node.id) is a scroll container with no border widths") }
+			style.scroll = ResolvedScroll(
+				x: axes.x, y: axes.y, range: try points(range),
+				inset: (widths.top / dpr, widths.left / dpr, widths.bottom / dpr, widths.right / dpr),
+				indicators: indicators, bounceX: bounce.x, bounceY: bounce.y)
+		} else if node.scrollRange != nil || !indicators || bounce != (true, true) {
+			throw styleError("\(node.id) has scroll view writes but no scroll-container write")
 		}
 		if let ops = node.borderOps {
 			guard borderColors.count == 4, style.cornerRadius == 0, !style.clipsChildren else {

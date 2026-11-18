@@ -3,6 +3,7 @@ import { isNativeStyleStateAttribute, nativeExprCells } from '@markless/serializ
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeBuild, NativeStylesheet } from './compile.ts';
 import { createNativeRuntime, evaluateNativeExpr, formatNativeValue } from './runtime.ts';
+import { isMeasuredSnapPoint, SHEET_AREAS, sheetViewports } from './sheet-areas.ts';
 
 export const NATIVE_STYLE_INPUT_VERSION = 'markless.native-style-input/0';
 
@@ -38,6 +39,8 @@ export type NativeStyleInput = {
 						}>
 					>
 				>;
+				/** A markup ancestor of a sheet's content: there for its selectors and inheritance, with no box of its own. */
+				readonly boxless?: true;
 				readonly arm?: NativeArmPlace;
 		  }
 		| {
@@ -61,16 +64,121 @@ export type NativeStyleInput = {
 		readonly domain: ReadonlyArray<NativeStyleValue>;
 		readonly initial: NativeStyleValue;
 	}>;
+	/** A system sheet's content at one resting height: the content area's size per target, in CSS px. */
+	readonly viewports?: ReturnType<typeof sheetViewports>;
 };
 
+type PayloadNode = NativeViewPayload['nodes'][number];
+
+/** The cells an expression reads. */
+const cellsOf = (expr: unknown, into: Set<string>): Set<string> => {
+	if (Array.isArray(expr)) for (const item of expr) cellsOf(item, into);
+	else if (expr && typeof expr === 'object') {
+		if ('cell' in expr && typeof expr.cell === 'string') into.add(expr.cell);
+		for (const value of Object.values(expr)) cellsOf(value, into);
+	}
+	return into;
+};
+
+/**
+ * A page's style inputs: the page without its system sheets, then each sheet's content once per resting height. Each
+ * sheet's content is laid out as a document of its own, the size of the sheet's content area, with the page's CSS: the
+ * frame around it is the platform's, and the page's elements are not its ancestors.
+ */
+export function nativeStyleInputs(
+	payload: NativeViewPayload,
+	styles: NativeBuild['styles'],
+	stylesheets: ReadonlyArray<NativeStylesheet> = [],
+): {
+	readonly page: NativeStyleInput;
+	readonly sheets: ReadonlyArray<{
+		readonly node: string;
+		readonly snapPoint: number;
+		readonly input: NativeStyleInput;
+	}>;
+} {
+	const byId = new Map(payload.nodes.map((node) => [node.id, node]));
+	const sheetOf = (node: PayloadNode): string | null => {
+		for (let at = node.parent; at !== null; at = byId.get(at)?.parent ?? null)
+			if (byId.get(at)?.kind === 'sheet') return at;
+		return null;
+	};
+	const rootOf = new Map(payload.nodes.map((node) => [node.id, sheetOf(node)]));
+	const page = nativeStyleInput(
+		payload,
+		styles,
+		stylesheets,
+		payload.nodes.filter((node) => node.kind !== 'sheet' && rootOf.get(node.id) === null),
+	);
+	const sheets = payload.nodes.flatMap((sheet) => {
+		if (sheet.kind !== 'sheet') return [];
+		const content = payload.nodes.filter((node) => rootOf.get(node.id) === sheet.id);
+		// The content is written as a child in the page's markup: its ancestors match selectors and pass inherited values.
+		const ancestors: PayloadNode[] = [];
+		for (let at = sheet.parent; at !== null; at = byId.get(at)?.parent ?? null)
+			ancestors.unshift(byId.get(at)!);
+		const unmeasured = sheet.snapPoints.filter((point) => !isMeasuredSnapPoint(point));
+		if (unmeasured.length > 0)
+			throw new Error(
+				`${payload.component}: a styled system sheet rests at ${unmeasured.join(' and ')}, but its content is laid out only at the heights measured on both phones (${Object.keys(
+					SHEET_AREAS.ios,
+				)
+					.map(Number)
+					.sort((a, b) => a - b)
+					.join(' and ')})`,
+			);
+		const read = cellsOf(
+			[...ancestors, ...content].flatMap((node) =>
+				node.kind === 'element' ? (node.bindings ?? []) : [],
+			),
+			new Set(),
+		);
+		return sheet.snapPoints.map((snapPoint) => {
+			const input = nativeStyleInput(
+				payload,
+				styles,
+				stylesheets,
+				[...ancestors, ...content],
+				{
+					id: sheet.id,
+					parent: sheet.parent,
+					boxless: new Set(ancestors.map((node) => node.id)),
+				},
+				read,
+			);
+			return {
+				node: sheet.id,
+				snapPoint,
+				input: {
+					...input,
+					component: `${payload.component}Sheet${payload.nodes.filter((node) => node.kind === 'sheet').indexOf(sheet)}`,
+					viewports: sheetViewports(snapPoint as keyof typeof SHEET_AREAS.ios),
+				},
+			};
+		});
+	});
+	return { page, sheets };
+}
+
+/**
+ * One document for Dragon: `nodes` (the whole payload by default) with `root`'s children at the top, and the styled cells
+ * among `cells` (all of them by default) as its states.
+ */
 export function nativeStyleInput(
 	payload: NativeViewPayload,
 	styles: NativeBuild['styles'],
 	stylesheets: ReadonlyArray<NativeStylesheet> = [],
+	nodes: ReadonlyArray<PayloadNode> = payload.nodes,
+	sheet?: {
+		readonly id: string;
+		readonly parent: string | null;
+		readonly boxless: ReadonlySet<string>;
+	},
+	cells?: ReadonlySet<string>,
 ): NativeStyleInput {
 	const initial = new Map(createNativeRuntime(payload).texts());
 	const states = payload.cells.flatMap((cell): NativeStyleInput['states'][number][] => {
-		if (!cell.styled) return [];
+		if (!cell.styled || (cells && !cells.has(cell.id))) return [];
 		if (typeof cell.initial === 'boolean')
 			return [{ cell: cell.id, domain: [false, true], initial: cell.initial }];
 		if (typeof cell.initial === 'string' && cell.domain)
@@ -105,14 +213,19 @@ export function nativeStyleInput(
 	return {
 		version: NATIVE_STYLE_INPUT_VERSION,
 		component: payload.component,
-		nodes: payload.nodes.flatMap((node): NativeStyleInput['nodes'][number][] => {
+		nodes: nodes.flatMap((node): NativeStyleInput['nodes'][number][] => {
 			const place = node.arm ? { arm: node.arm } : {};
 			if (node.kind === 'branch' || node.kind === 'repeat') return [];
 			if (node.kind === 'sheet')
 				throw new Error(
-					`${payload.component}: styles reach Dragon as one page; a system sheet's content is a second root it does not lay out yet`,
+					`${node.id}: a styled system sheet's content is laid out as its own document, which only the app style file carries (an app's pages/ folder)`,
 				);
 			if (node.kind === 'text') {
+				const parent = node.parent;
+				if (parent === null)
+					throw new Error(
+						`${payload.component}: text outside any element reaches Dragon with no box to lay it out in`,
+					);
 				const stateCells = new Set(states.map((state) => state.cell));
 				const reads = node.parts.flatMap((part) =>
 					'text' in part
@@ -146,7 +259,7 @@ export function nativeStyleInput(
 					{
 						kind: 'text',
 						id: node.id,
-						parent: node.parent,
+						parent: sheet && parent === sheet.id ? sheet.parent! : parent,
 						text: initial.get(node.id) ?? unshownText(node.parts),
 						...(textByState.some((entry) => entry.value !== textByState[0]!.value)
 							? { textByState }
@@ -200,10 +313,11 @@ export function nativeStyleInput(
 					kind: 'element',
 					id: node.id,
 					element: node.element,
-					parent: node.parent,
+					parent: sheet && node.parent === sheet.id ? sheet.parent : node.parent,
 					attributes,
 					...(classByState ? { classByState } : {}),
 					...(Object.keys(attributesByState).length > 0 ? { attributesByState } : {}),
+					...(sheet?.boxless.has(node.id) ? { boxless: true as const } : {}),
 					...place,
 				},
 			];

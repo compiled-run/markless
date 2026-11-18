@@ -4,8 +4,14 @@ import { createRequire } from 'node:module';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
 import { nativeAppStyle, nativeAppStyleSize, type DragonStyleExport } from '../app-style.ts';
-import { compileNativeApp, compileNativeComponent, type NativeAppBuild } from '../compile.ts';
+import {
+	compileNativeApp,
+	compileNativeComponent,
+	type NativeAppBuild,
+	type NativeBuild,
+} from '../compile.ts';
 import type { DeviceAppConfig, DeviceManifest } from '../permissions.ts';
+import { pageScrollDiagnostics } from '../page-scroll.ts';
 import { dragonDir, dragonStyleExport } from '../style-export.ts';
 import { nativeStyleInput } from '../style-input.ts';
 import { readProofExpected } from './expected.ts';
@@ -139,18 +145,27 @@ const APP_STYLE_INPUTS = 'native-style-input';
 /** Runs Dragon once per styled page and joins the exports into the app's one style file. */
 function appStyle(dir: string, name: string, inputs: NativeAppBuild['styleInputs']) {
 	rmSync(join(dir, APP_STYLE_INPUTS), { recursive: true, force: true });
-	const pages = inputs.map(({ pattern, page, input }) => {
-		const file = join(
-			dir,
-			APP_STYLE_INPUTS,
-			`${relative('pages', page).slice(0, -'.tsrx'.length)}.json`,
-		);
+	const exportOf = (file: string, input: unknown): DragonStyleExport => {
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, `${JSON.stringify(input, null, '\t')}\n`);
-		const exported = JSON.parse(
-			new TextDecoder().decode(styleExport(file, name)),
-		) as DragonStyleExport;
-		return { pattern, exported };
+		return JSON.parse(new TextDecoder().decode(styleExport(file, name))) as DragonStyleExport;
+	};
+	const pages = inputs.map(({ pattern, page, input, sheets }) => {
+		const base = join(dir, APP_STYLE_INPUTS, relative('pages', page).slice(0, -'.tsrx'.length));
+		const sheetNodes = [...new Set(sheets.map((sheet) => sheet.node))];
+		return {
+			pattern,
+			exported: exportOf(`${base}.json`, input),
+			sheets: sheets.map((sheet) => ({
+				node: sheet.node,
+				snapPoint: sheet.snapPoint,
+				// One input per sheet and resting height: `index.sheet0-0.5.json`.
+				exported: exportOf(
+					`${base}.sheet${sheetNodes.indexOf(sheet.node)}-${sheet.snapPoint}.json`,
+					sheet.input,
+				),
+			})),
+		};
 	});
 	const style = nativeAppStyle(pages);
 	writeFileSync(
@@ -158,6 +173,17 @@ function appStyle(dir: string, name: string, inputs: NativeAppBuild['styleInputs
 		`${JSON.stringify(nativeAppStyleSize(pages, style), null, '\t')}\n`,
 	);
 	return new TextEncoder().encode(JSON.stringify(style));
+}
+
+/** A styled page whose scroll range Dragon cannot decide is a build error naming the file and the element. */
+function checkPageScroll(bytes: Uint8Array, build: NativeBuild, filename: string, name: string): Uint8Array {
+	const exported = JSON.parse(new TextDecoder().decode(bytes)) as Parameters<typeof pageScrollDiagnostics>[0];
+	const unscrollable = pageScrollDiagnostics(exported, build, filename);
+	if (unscrollable.length > 0)
+		throw new Error(
+			`${name}: ${COMPONENT_FILE} has no native build\n${unscrollable.map((d) => `  ${d.code}: ${d.message}`).join('\n')}`,
+		);
+	return bytes;
 }
 
 /** The style file and every font face it names, checked against the face's `sha256:` id. */
@@ -242,7 +268,15 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 					`${JSON.stringify(nativeStyleInput(build.payload, build.styles), null, '\t')}\n`,
 				);
 				if (platform === 'android') {
-					const styled = styleAssets(styleExport(join(dir, STYLE_INPUT), name), name);
+					const styled = styleAssets(
+						checkPageScroll(
+							styleExport(join(dir, STYLE_INPUT), name),
+							build,
+							relative(repoRoot, component),
+							name,
+						),
+						name,
+					);
 					assets.ios.push(...styled);
 					assets.android.push(...styled);
 				}

@@ -1,0 +1,36 @@
+appId: ${APP_ID}
+name: f6-disabled
+---
+- launchApp:
+    clearState: true
+- assertVisible: Notes
+- assertVisible: Sending not allowed
+- assertVisible: Nothing sent
+- assertVisible:
+    text: Send
+    enabled: false
+- assertVisible:
+    text: Code
+    enabled: false
+- assertVisible: A1
+- tapOn: Note
+- eraseText
+- inputText: hi
+- hideKeyboard
+- assertVisible: hi
+- assertVisible: Nothing sent
+- assertNotVisible: Sending allowed
+- assertVisible:
+    text: Send
+    enabled: false
+- assertVisible: hi
+- tapOn: Allow sending
+- assertVisible: Sending allowed
+- assertVisible: Sending allowed
+- assertVisible: Send
+- assertNotVisible: Sending not allowed
+- assertNotVisible: Sent hi, code null
+- tapOn: Send
+- assertVisible: Sent hi, code null
+- assertVisible: Sent hi, code null
+- assertNotVisible: Nothing sent

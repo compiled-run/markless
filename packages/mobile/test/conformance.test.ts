@@ -10,6 +10,8 @@ import {
 } from '../src/index.ts';
 import { compileRungApp } from '../src/harness/rung.ts';
 import { APP_CONFORMANCE_CASES, CONFORMANCE_CASES } from './conformance-cases.ts';
+import { scrollVectors } from '../src/scroll.ts';
+import { SCROLL_CASES } from './scroll-cases.ts';
 
 const fixture = (name: string) =>
 	readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -17,6 +19,10 @@ const committed = (name: string) =>
 	JSON.parse(readFileSync(new URL(`../conformance/${name}`, import.meta.url), 'utf8')) as unknown;
 
 describe('native conformance vectors', () => {
+	it('the committed scroll-into-view vectors are what the reference computes (ladder-web checks them against Chrome)', () => {
+		expect(committed('scroll/scroll-into-view.json')).toEqual(scrollVectors(SCROLL_CASES));
+	});
+
 	it('the committed counter vectors are what the compiler and the reference runtime produce today', async () => {
 		const { payload, diagnostics } = await compileNativeComponent({
 			filename: 'src/counter.tsrx',
@@ -44,7 +50,7 @@ describe('native conformance vectors', () => {
 				source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
 			});
 			expect(committed(`${entry.name}.json`), entry.name).toEqual(
-				nativeConformance(payload!, entry.actions, entry.params),
+				nativeConformance(payload!, entry.actions, entry.params, entry.preferredLanguages, entry.now),
 			);
 		}
 	});
@@ -66,11 +72,24 @@ describe('native conformance vectors', () => {
 			['/orders'],
 			['/orders', '/orders/108'],
 		]);
-		expect(orders.steps.map((step) => step.title)).toEqual(['Orders', 'Order 42', 'Orders', 'Order 108']);
+		expect(orders.steps.map((step) => step.title)).toEqual([
+			'Orders',
+			'Order 42',
+			'Orders',
+			'Order 108',
+		]);
 		expect(orders.steps[2]!.journal).toEqual([]);
-		const replaced = committed('navigation-replace.json') as ReturnType<typeof nativeAppConformance>;
-		expect(replaced.steps.map((step) => step.stack)).toEqual([['/', '/welcome'], ['/', '/dashboard'], ['/']]);
-		const deep = committed('navigation-deep-link.json') as ReturnType<typeof nativeAppConformance>;
+		const replaced = committed('navigation-replace.json') as ReturnType<
+			typeof nativeAppConformance
+		>;
+		expect(replaced.steps.map((step) => step.stack)).toEqual([
+			['/', '/welcome'],
+			['/', '/dashboard'],
+			['/'],
+		]);
+		const deep = committed('navigation-deep-link.json') as ReturnType<
+			typeof nativeAppConformance
+		>;
 		expect(deep.initial.stack).toEqual(['/', '/orders', '/orders/42']);
 	});
 

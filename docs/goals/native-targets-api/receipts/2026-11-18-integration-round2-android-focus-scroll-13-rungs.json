@@ -1,0 +1,84 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "16-keyboard",
+			"failure": null,
+			"installSeconds": 3.2865017080000034,
+			"flowSeconds": 23.954373041
+		},
+		{
+			"name": "17-into-view",
+			"failure": null,
+			"installSeconds": 1.399906375000006,
+			"flowSeconds": 32.24583095900002
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 1.3387490830000024,
+			"flowSeconds": 27.70845537500002
+		},
+		{
+			"name": "f2-return-key",
+			"failure": null,
+			"installSeconds": 1.4135463330000058,
+			"flowSeconds": 41.09152925000002
+		},
+		{
+			"name": "f3-families",
+			"failure": null,
+			"installSeconds": 1.2941765000000014,
+			"flowSeconds": 22.78161708299996
+		},
+		{
+			"name": "f4-required",
+			"failure": null,
+			"installSeconds": 1.352905541999964,
+			"flowSeconds": 26.187484666999953
+		},
+		{
+			"name": "f5-async",
+			"failure": null,
+			"installSeconds": 1.4150135409999638,
+			"flowSeconds": 42.60416045800003
+		},
+		{
+			"name": "f6-disabled",
+			"failure": null,
+			"installSeconds": 1.3340335000000196,
+			"flowSeconds": 19.595696166999986
+		},
+		{
+			"name": "f7-tick",
+			"failure": null,
+			"installSeconds": 1.3180053329999792,
+			"flowSeconds": 29.44493983399996
+		},
+		{
+			"name": "u11-pagination",
+			"failure": null,
+			"installSeconds": 1.371623416999937,
+			"flowSeconds": 20.47397333399998
+		},
+		{
+			"name": "u12-buttongroup",
+			"failure": null,
+			"installSeconds": 1.3705353749999776,
+			"flowSeconds": 44.55907799999998
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 1.369433292000089,
+			"flowSeconds": 43.72298804099997
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 1.3329429579999996,
+			"flowSeconds": 18.374245624999983
+		}
+	]
+}

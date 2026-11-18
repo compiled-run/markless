@@ -15,6 +15,8 @@ name: s6-page-body
 - assertNotVisible: Tide table
 - assertVisible: Boats
 - setDarkMode: enabled
+- waitForAnimationToEnd:
+      timeout: 5000
 - assertVisible: Moorings
 - assertVisible: Three boats are out
 - assertVisible: Boats
@@ -36,6 +38,8 @@ name: s6-page-body
 - assertNotVisible: Moorings
 - assertVisible: Harbour
 - setDarkMode: disabled
+- waitForAnimationToEnd:
+      timeout: 5000
 - assertVisible: Tide table
 - assertVisible: Open boats
 - assertVisible: Harbour

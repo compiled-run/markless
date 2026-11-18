@@ -1,0 +1,17 @@
+{
+	"rung": 137,
+	"name": "The clock: read when the page renders (when the screen opens) and when a handler runs",
+	"steps": [
+		{ "visible": ["Opened in 20xx", "Opened ISO 24", "Not pressed", "Clock moved not yet"] },
+		{
+			"do": { "tap": "Press" },
+			"visible": ["Pressed ISO 24", "Clock moved not yet"],
+			"absent": ["Not pressed"]
+		},
+		{
+			"do": { "tap": "Press" },
+			"visible": ["Pressed ISO 24", "Clock moved forward"],
+			"absent": ["Clock moved not yet"]
+		}
+	]
+}

@@ -1,0 +1,92 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "IndexSheet0",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-83p6k8"
+			},
+			"boxless": true
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "section",
+			"parent": "h0",
+			"attributes": {
+				"class": "panel mk-83p6k8"
+			},
+			"boxless": true
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "div",
+			"parent": "h2",
+			"attributes": {
+				"class": "sheet mk-83p6k8"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "h2",
+			"parent": "h4",
+			"attributes": {
+				"class": "mk-83p6k8"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Pick a spice"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "p",
+			"parent": "h4",
+			"attributes": {
+				"class": "pick mk-83p6k8"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Saffron"
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "p",
+			"parent": "h4",
+			"attributes": {
+				"class": "mk-83p6k8"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "Coloured by the page"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.page.mk-83p6k8 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #fff3e6;\n\t\t\t\tcolor: #6a040f;\n\t\t\t\tfont-size: 19px;\n\t\t\t}\n\t\t\t.panel.mk-83p6k8 {\n\t\t\t\tpadding: 12px;\n\t\t\t\tborder: 3px solid #6a040f;\n\t\t\t\tborder-radius: 10px;\n\t\t\t}\n\t\t\t.open.mk-83p6k8 {\n\t\t\t\tdisplay: block;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder: 2px solid #6a040f;\n\t\t\t\tborder-radius: 8px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: inherit;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: inherit;\n\t\t\t}\n\t\t\t.sheet.mk-83p6k8 {\n\t\t\t\tpadding: 20px;\n\t\t\t}\n\t\t\t.panel .pick.mk-83p6k8 {\n\t\t\t\tpadding: 10px 14px;\n\t\t\t\tborder-radius: 8px;\n\t\t\t\tbackground: #ffba08;\n\t\t\t\tcolor: #370617;\n\t\t\t}",
+	"states": [],
+	"viewports": {
+		"ios": {
+			"width": 402,
+			"height": 778
+		},
+		"android": {
+			"width": 411,
+			"height": 790
+		}
+	}
+}

@@ -14,6 +14,14 @@ import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.arr
+import dev.markless.mobile.core.field
+import dev.markless.mobile.core.num
+import dev.markless.mobile.core.ScrollAlign
+import dev.markless.mobile.core.ScrollAlignment
+import dev.markless.mobile.core.ScrollBox
+import dev.markless.mobile.core.ScrollRange
+import dev.markless.mobile.core.ScrollRect
+import dev.markless.mobile.core.scrollIntoView
 import dev.markless.mobile.core.jsonString
 import dev.markless.mobile.core.jsonValue
 import dev.markless.mobile.core.num
@@ -22,6 +30,7 @@ import dev.markless.mobile.core.str
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.Rgba
 import dev.markless.mobile.style.StyleExport
+import dev.markless.mobile.style.StyleWrite
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -54,7 +63,9 @@ private fun runVector(file: File) {
 	check("${file.name} version", version == CONFORMANCE_VERSION) { "vector version is $version, this test reads $CONFORMANCE_VERSION" }
 	val payload = Payload.decode(field(vector, "payload", file.name))
 	val params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap()
-	val runtime = Runtime(payload, params = params)
+	val languages = vector["preferredLanguages"]?.arr("preferredLanguages")?.map { it.str("preferredLanguages[]") } ?: listOf("en")
+	val now = (vector["now"] as? Json.Num)?.value
+	val runtime = if (now == null) Runtime(payload, params = params, preferredLanguages = languages) else Runtime(payload, params = params, preferredLanguages = languages, now = { now })
 	val mounted = runtime.texts().joinToString(",", "[", "]") { (n, t) -> "[${jsonString(n)},${jsonString(t)}]" }
 	val initial = canonical(field(vector, "initial", file.name))
 	check("${file.name} initial", mounted == initial) { "expected $initial\n  actual   $mounted" }
@@ -67,6 +78,9 @@ private fun runVector(file: File) {
 	val rows = runtime.rows().joinToString(",", "[", "]") { (n, keys) -> "[${jsonString(n)},${keys.joinToString(",", "[", "]", transform = ::jsonString)}]" }
 	val initialRows = vector["initialRows"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialRows", rows == initialRows) { "expected $initialRows\n  actual   $rows" }
+	val checks = runtime.checks().joinToString(",", "[", "]") { (n, c) -> "[${jsonString(n)},$c]" }
+	val initialChecks = vector["initialChecks"]?.let(::canonical) ?: "[]"
+	check("${file.name} initialChecks", checks == initialChecks) { "expected $initialChecks\n  actual   $checks" }
 	val arms = runtime.arms().joinToString(",", "[", "]") { (n, i) -> "[${jsonString(n)},${i ?: "null"}]" }
 	val initialArms = vector["initialArms"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialArms", arms == initialArms) { "expected $initialArms\n  actual   $arms" }
@@ -103,6 +117,13 @@ private fun runVector(file: File) {
 				error != null -> runtime.settleError(cell, field(error, "name", "error").str("name"), field(error, "message", "error").str("message"))
 				else -> runtime.settle(cell, JsValue.fromJson(field(action, "value", "action")))
 			}
+			val expected = canonical(field(s, "journal", "steps[$n]"))
+			val actual = journal.joinToString(",", "[", "]") { it.toJson() }
+			check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
+			continue
+		}
+		if (event == "timer") {
+			val journal = runtime.timer(field(action, "timer", "action").str("timer"))
 			val expected = canonical(field(s, "journal", "steps[$n]"))
 			val actual = journal.joinToString(",", "[", "]") { it.toJson() }
 			check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
@@ -379,10 +400,64 @@ private fun appStyle(fixtures: File) {
 		val err = try { StyleExport.decodeApp(changed.toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
 		check("app style refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
 	}
-	refusesApp("an atom of another media feature", text.replace("\"feature\":\"prefers-color-scheme\"", "\"feature\":\"width\""), "@media (width) is not implemented on Android")
+	// The fixture may be compact or formatted: each edit allows whitespace after a colon.
+	refusesApp("an atom of another media feature", text.replace(Regex("\"feature\":\\s*\"prefers-color-scheme\""), "\"feature\":\"width\""), "@media (width) is not implemented on Android")
 	refusesApp("an unknown version", text.replace("markless.native-app-style/0", "markless.native-app-style/9"), "unknown app style version")
-	refusesApp("a write index out of range", text.replace(Regex("\"writes\":\\d+}"), "\"writes\":99999}"), "not an index of the app's write lists")
-	refusesApp("an unknown route field", text.replace("\"pattern\":\"/help\"", "\"pattern\":\"/help\",\"extra\":1"), "unknown field \"extra\"")
+	refusesApp("a write index out of range", text.replace(Regex("\"writes\":\\s*\\d+(\\s*)}"), "\"writes\":99999$1}"), "not an index of the app's write lists")
+	refusesApp("an unknown route field", text.replace(Regex("\"pattern\":\\s*\"/help\""), "\"pattern\":\"/help\",\"extra\":1"), "unknown field \"extra\"")
+}
+
+/** A system sheet's styled content: its own layout per resting height, and state that reaches it. */
+private fun sheetStyles(fixtures: File) {
+	val sheet = "sheet:component-edge:0"
+	val z3 = runCatching { StyleExport.decodeApp(File(fixtures, "z3-sheet-size.native-app-style.json").readBytes()).getValue("/") }
+	check("decodes Z3's app style with its sheet", z3.isSuccess) { z3.exceptionOrNull().toString() }
+	val page = z3.getOrNull() ?: return
+	val heights = runCatching { page.sheetHeights(sheet, listOf(0.5, 1.0)) }
+	check("Z3's sheet has a layout per resting height", heights.getOrNull()?.size == 2) { heights.exceptionOrNull().toString() }
+	val (half, full) = heights.getOrNull() ?: return
+	check("half height is laid out in the measured 411 x 371 dp", Math.abs(half.viewportWidth - 411.43) < 1 && Math.abs(half.viewportHeight - 371.43) < 1) { "${half.viewportWidth}x${half.viewportHeight}" }
+	check("full height is laid out in the measured 411 x 790 dp", Math.abs(full.viewportWidth - 411.43) < 1 && Math.abs(full.viewportHeight - 790.48) < 1) { "${full.viewportWidth}x${full.viewportHeight}" }
+	check("the page's export holds no sheet content", page.assignments.all { a -> a.byId["h9"] == null && a.byId[sheet] == null }) { "" }
+	val footer = { st: StyleExport -> st.assignments[st.start(emptyList(), { JsValue.Null }, false, everyCell = false)].byId.getValue("h9").frame }
+	check("the footer sits lower at full height than at half", (footer(full)?.y ?: 0.0) > (footer(half)?.y ?: 0.0)) { "${footer(half)} vs ${footer(full)}" }
+	val refused = try { page.sheetHeights(sheet, listOf(1.0)); null } catch (e: MarklessDecodeError) { e.message }
+	check("a sheet resting elsewhere than its layouts is refused", refused?.contains("rests at [1.0]") == true) { "$refused" }
+	val missing = try { page.copy(sheets = emptyMap()).sheetHeights(sheet, listOf(0.5, 1.0)); null } catch (e: MarklessDecodeError) { e.message }
+	check("a styled page with an unstyled sheet is refused by name", missing?.contains("no styles for the content of system sheet \"$sheet\"") == true) { "$missing" }
+
+	val z5 = StyleExport.decodeApp(File(fixtures, "z5-sheet-state-style.native-app-style.json").readBytes()).getValue("/")
+	val options = z5.sheetHeights(sheet, listOf(1.0)).single()
+	val cells = listOf("state:express")
+	val off = options.start(cells, { JsValue.Bool(false) }, false, everyCell = false)
+	val on = options.next(off, options.stateFor("state:express"), JsValue.Bool(true))
+	val fill = { a: Int -> options.assignments[a].byId.getValue("h4").writes.filterIsInstance<StyleWrite.BackgroundColor>().singleOrNull()?.color }
+	check("express on paints the toggle teal", fill(on) == Rgba(42, 157, 143, 255) && fill(off) == Rgba(255, 255, 255, 255)) { "${fill(off)} -> ${fill(on)}" }
+	check("a sheet's export lists only the cells its content reads", z3.getOrThrow().sheetHeights(sheet, listOf(0.5, 1.0)).all { it.states.isEmpty() } && options.stateOrNone("state:choosing") == -1) { "" }
+}
+
+/** The scroll-into-view vectors (`conformance/scroll/`), which ladder-web checks against Chrome. */
+private fun scrollVectors(dir: File) {
+	val file = File(dir, "scroll/scroll-into-view.json")
+	val root = Json.parse(file.readBytes()).obj("scroll vectors")
+	check("scroll vectors version", root.field("version", "scroll").str("version") == "markless.native-scroll/0") { "" }
+	val rect = { v: Json -> v.obj("rect").let { ScrollRect(it.field("x", "rect").num("x"), it.field("y", "rect").num("y"), it.field("width", "rect").num("width"), it.field("height", "rect").num("height")) } }
+	val cases = root.field("cases", "scroll").arr("cases")
+	check("scroll vectors have cases", cases.isNotEmpty()) { "" }
+	for (c in cases) {
+		val o = c.obj("case")
+		val name = o.field("name", "case").str("name")
+		val chain = o.field("chain", name).arr("chain").map { b ->
+			val box = b.obj("box")
+			val offset = box.field("offset", name).obj("offset")
+			val range = box.field("range", name).obj("range")
+			ScrollBox(rect(box.field("port", name)), offset.field("x", name).num("x"), offset.field("y", name).num("y"), ScrollRange(range.field("minX", name).num("minX"), range.field("maxX", name).num("maxX"), range.field("minY", name).num("minY"), range.field("maxY", name).num("maxY")))
+		}
+		val align = o.field("align", name).obj("align")
+		val got = scrollIntoView(chain, rect(o.field("target", name)), ScrollAlignment(ScrollAlign.of(align.field("block", name).str("block")), ScrollAlign.of(align.field("inline", name).str("inline"))))
+		val want = o.field("offsets", name).arr("offsets").map { it.obj("offset").let { p -> p.field("x", name).num("x") to p.field("y", name).num("y") } }
+		check("scroll: $name", got == want) { "$got, expected $want" }
+	}
 }
 
 fun main(args: Array<String>) {
@@ -396,8 +471,10 @@ fun main(args: Array<String>) {
 	appStyle(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appCanvas(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	dashedBorders(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)
+	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)
 	val files = dirs.flatMap { d -> d.listFiles { f -> f.name.endsWith(".json") }?.sortedBy { it.name } ?: error("no vector directory $d") }
 	if (files.isEmpty()) { println("FAIL no conformance vectors in ${args.joinToString()}"); failures++ }
 	for (f in files) try { runVector(f) } catch (e: Exception) { failures++; println("FAIL ${f.name}: $e") }

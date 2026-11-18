@@ -1,0 +1,8 @@
+appId: ${APP_ID}
+name: r115-svg-em
+---
+- launchApp:
+      clearState: true
+- assertVisible: Heading star
+- assertVisible: Text star
+- assertVisible: Stars sized in ems

@@ -50,7 +50,11 @@
 				"kind": "element",
 				"id": "h7",
 				"element": "h1",
-				"parent": "h6"
+				"parent": "h6",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
 			},
 			{
 				"kind": "text",

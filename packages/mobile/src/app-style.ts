@@ -46,19 +46,43 @@ export type DragonStyleExport = {
 	readonly targets: Readonly<Record<string, DragonTarget>>;
 };
 
-/** A page's styles inside the app file: Dragon's target fields, each node's `writes` an index into the target's `writes`. */
-export type NativeAppStyleRoute = Omit<
-	DragonTarget,
-	'backend' | 'viewport' | 'dpr' | 'assignments'
-> & {
-	readonly pattern: string;
-	readonly component: string;
-	readonly compiler: string;
+type InternedTarget = Omit<DragonTarget, 'backend' | 'viewport' | 'dpr' | 'assignments'> & {
 	readonly assignments: ReadonlyArray<{
 		readonly values: Json;
 		readonly nodes: ReadonlyArray<Omit<DragonNode, 'writes'> & { readonly writes: number }>;
 		readonly canvas: Json;
 		readonly bodyBackground?: Json;
+	}>;
+};
+
+/** A page's styles inside the app file: Dragon's target fields, each node's `writes` an index into the target's `writes`. */
+export type NativeAppStyleRoute = InternedTarget & {
+	readonly pattern: string;
+	readonly component: string;
+	readonly compiler: string;
+	/**
+	 * Each system sheet's content, laid out as its own document at every resting height it takes (`snapPoint`), in the
+	 * content area measured for it (`viewport`); its writes share the target's lists with the page's.
+	 */
+	readonly sheets?: ReadonlyArray<{
+		readonly node: string;
+		readonly heights: ReadonlyArray<
+			InternedTarget & {
+				readonly snapPoint: number;
+				readonly viewport: DragonTarget['viewport'];
+			}
+		>;
+	}>;
+};
+
+/** One styled page's Dragon exports: the page's, and each sheet's per resting height. */
+export type NativeAppStylePage = {
+	readonly pattern: string;
+	readonly exported: DragonStyleExport;
+	readonly sheets?: ReadonlyArray<{
+		readonly node: string;
+		readonly snapPoint: number;
+		readonly exported: DragonStyleExport;
 	}>;
 };
 
@@ -91,14 +115,19 @@ export type NativeAppStyle = {
  * One style file for the app. Frames stay per page (layout depends on where a component sits); the writes, which are the
  * component's look, are stored once per distinct list and named by index.
  */
-export function nativeAppStyle(
-	pages: ReadonlyArray<{ readonly pattern: string; readonly exported: DragonStyleExport }>,
-): NativeAppStyle {
+export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): NativeAppStyle {
 	if (pages.length === 0) throw new Error('an app style needs at least one styled page');
 	const first = pages[0]!.exported;
 	const fonts = new Map<string, string>();
 	const targets: Record<string, NativeAppStyle['targets'][string]> = {};
-	for (const { pattern, exported } of pages) {
+	const exports = pages.flatMap(({ pattern, exported, sheets }) => [
+		{ pattern, exported },
+		...(sheets ?? []).map((sheet) => ({
+			pattern: `${pattern} ${sheet.node} at ${sheet.snapPoint}`,
+			exported: sheet.exported,
+		})),
+	]);
+	for (const { pattern, exported } of exports) {
 		if (exported.schema !== DRAGON_STYLE_EXPORT_SCHEMA)
 			throw new Error(
 				`${pattern}: style export is ${exported.schema}, not ${DRAGON_STYLE_EXPORT_SCHEMA}`,
@@ -131,7 +160,24 @@ export function nativeAppStyle(
 			}
 			return index;
 		};
-		const routes = pages.map(({ pattern, exported }): NativeAppStyleRoute => {
+		const interned = (target: DragonTarget, what: string): InternedTarget => {
+			const { backend: _b, viewport: _v, dpr: _d, assignments, ...rest } = target;
+			return {
+				...rest,
+				assignments: assignments.map((assignment, index) => ({
+					values: assignment.values,
+					canvas: assignment.canvas ?? fail(`${what}'s assignment ${index} has no canvas`),
+					...(assignment.bodyBackground === undefined
+						? {}
+						: { bodyBackground: assignment.bodyBackground }),
+					nodes: assignment.nodes.map((node) => ({
+						...node,
+						writes: intern(node.writes),
+					})),
+				})),
+			};
+		};
+		const routes = pages.map(({ pattern, exported, sheets }): NativeAppStyleRoute => {
 			const target = exported.targets[name]!;
 			if (
 				target.backend !== backend ||
@@ -142,25 +188,33 @@ export function nativeAppStyle(
 				throw new Error(
 					`${pattern}: the ${name} export was laid out for another device than the other pages'`,
 				);
-			const { backend: _b, viewport: _v, dpr: _d, assignments, ...rest } = target;
+			const nodes = [...new Set((sheets ?? []).map((sheet) => sheet.node))];
 			return {
 				pattern,
 				component: exported.component,
 				compiler: exported.compiler,
-				...rest,
-				assignments: assignments.map((assignment, index) => ({
-					values: assignment.values,
-					canvas:
-						assignment.canvas ??
-						fail(`${pattern}: the ${name} export's assignment ${index} has no canvas`),
-					...(assignment.bodyBackground === undefined
-						? {}
-						: { bodyBackground: assignment.bodyBackground }),
-					nodes: assignment.nodes.map((node) => ({
-						...node,
-						writes: intern(node.writes),
-					})),
-				})),
+				...interned(target, `${pattern}: the ${name} export`),
+				...(nodes.length > 0
+					? {
+							sheets: nodes.map((node) => ({
+								node,
+								heights: sheets!
+									.filter((sheet) => sheet.node === node)
+									.map((sheet) => {
+										const height = sheet.exported.targets[name]!;
+										if (height.backend !== backend || height.dpr !== dpr)
+											throw new Error(
+												`${pattern}: ${node}'s ${name} export at ${sheet.snapPoint} was laid out for another device than the page's`,
+											);
+										return {
+											snapPoint: sheet.snapPoint,
+											viewport: height.viewport,
+											...interned(height, `${pattern}: ${node}'s ${name} export at ${sheet.snapPoint}`),
+										};
+									}),
+							})),
+						}
+					: {}),
 			};
 		});
 		targets[name] = { backend, viewport, dpr, writes: lists, routes };
@@ -168,7 +222,7 @@ export function nativeAppStyle(
 	return {
 		version: NATIVE_APP_STYLE_VERSION,
 		units: first.units,
-		warnings: pages.flatMap(({ pattern, exported }) =>
+		warnings: exports.flatMap(({ pattern, exported }) =>
 			exported.warnings.map((warning) => ({ pattern, ...warning })),
 		),
 		fonts: [...fonts].sort(([a], [b]) => (a < b ? -1 : 1)).map(([id, file]) => ({ id, file })),
@@ -176,17 +230,23 @@ export function nativeAppStyle(
 	};
 }
 
-/** Bytes of the app style beside the per-page exports it replaces, both as compact JSON. */
+/** Bytes of the app style beside the per-page (and per-sheet-height) exports it replaces, both as compact JSON. */
 export function nativeAppStyleSize(
-	pages: ReadonlyArray<{ readonly pattern: string; readonly exported: DragonStyleExport }>,
+	pages: ReadonlyArray<NativeAppStylePage>,
 	style: NativeAppStyle,
 ) {
 	const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
-	return {
-		perPage: Object.fromEntries(
-			pages.map(({ pattern, exported }) => [pattern, bytes(exported)]),
+	const exports = pages.flatMap(({ pattern, exported, sheets }) => [
+		[pattern, exported] as const,
+		...(sheets ?? []).map(
+			(sheet) => [`${pattern} ${sheet.node} at ${sheet.snapPoint}`, sheet.exported] as const,
 		),
-		perPageTotal: pages.reduce((sum, { exported }) => sum + bytes(exported), 0),
+	]);
+	const references = (target: InternedTarget) =>
+		target.assignments.reduce((n, assignment) => n + assignment.nodes.length, 0);
+	return {
+		perPage: Object.fromEntries(exports.map(([name, exported]) => [name, bytes(exported)])),
+		perPageTotal: exports.reduce((sum, [, exported]) => sum + bytes(exported), 0),
 		app: bytes(style),
 		targets: Object.fromEntries(
 			Object.entries(style.targets).map(([name, target]) => [
@@ -196,8 +256,11 @@ export function nativeAppStyleSize(
 					writeListReferences: target.routes.reduce(
 						(sum, route) =>
 							sum +
-							route.assignments.reduce(
-								(n, assignment) => n + assignment.nodes.length,
+							references(route) +
+							(route.sheets ?? []).reduce(
+								(n, sheet) =>
+									n +
+									sheet.heights.reduce((m, height) => m + references(height), 0),
 								0,
 							),
 						0,

@@ -1,0 +1,29 @@
+{
+	"rung": "R106",
+	"name": "Headings, quotes, figures, rules and addresses stack as blocks",
+	"steps": [
+		{
+			"visible": [
+				"Blocks",
+				"Quotes, figures and rules",
+				"Second level",
+				"Third level",
+				"Fourth level",
+				"Fifth level",
+				"Sixth level",
+				"Simple things should be simple.",
+				"A figure's content",
+				"Its caption",
+				"Contact the author"
+			],
+			"order": [
+				"Blocks",
+				"Sixth level",
+				"Simple things should be simple.",
+				"A figure's content",
+				"Its caption",
+				"Contact the author"
+			]
+		}
+	]
+}

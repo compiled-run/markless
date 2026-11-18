@@ -21,9 +21,17 @@ public final class MarklessViewController: UIViewController {
 	private let device: NativeDevice
 	private var runtime: NativeRuntime
 	private var layout: StyleLayout?
-	/// The `@media` band the views show; nil without bands.
+	/// The `@media` band the views show, and the bands it is picked from; nil without bands.
 	private var band: Int?
+	private var bands: StyleBands?
 	private(set) var tree: ViewTree?
+	/// Set once the page's first frame is on screen: `idle` and `visible` wait for it, as the web waits for load.
+	private var appeared = false
+	/// The one-shot run-loop observer that raises `idle` when the main run loop next goes idle.
+	private var idleObserver: CFRunLoopObserver?
+	private var raisingVisible = false
+	/// Scroll views around a due `visible` element: each scroll looks again.
+	private var scrollWatches: [ObjectIdentifier: NSKeyValueObservation] = [:]
 	/// In an app: opens the page a `navigate` entry names, pushed or in this screen's place.
 	var navigator: ((_ route: String, _ params: [NativeRouteParam], _ replace: Bool) throws -> Void)?
 
@@ -46,7 +54,7 @@ public final class MarklessViewController: UIViewController {
 		} else if let page = self.payload.route, !page.params.isEmpty {
 			throw HostError("\(page.pattern) needs a route to open at, and none was given")
 		}
-		runtime = NativeRuntime(payload: self.payload, store: store, params: params)
+		runtime = NativeRuntime(payload: self.payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages)
 		super.init(nibName: nil, bundle: nil)
 		try buildPage()
 		try watchDevice()
@@ -78,7 +86,7 @@ public final class MarklessViewController: UIViewController {
 	}
 
 	private func applyBand() {
-		guard let bands = layout?.bands, let band else { return }
+		guard let bands, let band else { return }
 		do {
 			let now = try bands.band(dark: traitCollection.userInterfaceStyle == .dark)
 			guard now != band else { return }
@@ -114,13 +122,21 @@ public final class MarklessViewController: UIViewController {
 			if let name = cell.device { _ = try runtime.device(cell.id, try device.read(name, object: cell.object)) }
 		}
 		let dark = traitCollection.userInterfaceStyle == .dark
-		layout = try style.map { try $0.resolve(for: payload, initialTexts: try runtime.texts(), value: runtime.value(of:), dark: dark) }
-		band = try layout?.bands?.band(dark: dark)
+		let texts = try runtime.texts()
+		layout = try style.map { try $0.resolve(for: payload, initialTexts: texts, value: runtime.value(of:), dark: dark) }
+		var sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:]
+		for sheet in style?.sheets ?? [] {
+			sheetLayouts[sheet.node] = try style!.resolveSheet(sheet.node, for: payload, initialTexts: texts, value: runtime.value(of:), dark: dark)
+		}
+		bands = layout?.bands ?? sheetLayouts.values.joined().lazy.compactMap(\.layout.bands).first
+		band = try bands?.band(dark: dark)
 		let faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts)
 		let device = self.device
 		tree = try ViewTree(
-			runtime: runtime, layout: layout, faces: faces, onAction: { [weak self] action in self?.perform(action) },
+			runtime: runtime, layout: layout, sheetLayouts: sheetLayouts, faces: faces,
+			onAction: { [weak self] action in self?.perform(action) },
 			objectView: { object, kind in try device.view(for: object, device: kind) })
+		tree?.presenter = self
 		navigationItem.title = try runtime.title()
 		try runCalls(try runtime.tasks())
 	}
@@ -169,6 +185,56 @@ public final class MarklessViewController: UIViewController {
 			fatalError("Markless iOS host: \(error)")
 		}
 		tree?.presenter = self
+		scheduleLoadEvents()
+	}
+
+	/// After the first frame and after every journal: `idle` for the elements due one, `visible` for those on screen.
+	private func scheduleLoadEvents() {
+		guard appeared else { return }
+		if idleObserver == nil, !((try? runtime.due(.idle)) ?? []).isEmpty {
+			let observer = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.beforeWaiting.rawValue, false, 0) { [weak self] _, _ in
+				MainActor.assumeIsolated { self?.raiseIdle() }
+			}
+			CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
+			idleObserver = observer
+		}
+		raiseVisible()
+	}
+
+	private func raiseIdle() {
+		if let idleObserver { CFRunLoopRemoveObserver(CFRunLoopGetMain(), idleObserver, .commonModes) }
+		idleObserver = nil
+		for host in (try? runtime.due(.idle)) ?? [] { perform(NativeAction(event: .idle, host: host)) }
+	}
+
+	/// Raises `visible` for each element due one that has any of its box inside the page's part of the screen.
+	private func raiseVisible() {
+		guard appeared, !raisingVisible, let tree, viewIfLoaded?.window != nil else { return }
+		raisingVisible = true
+		defer { raisingVisible = false }
+		view.layoutIfNeeded()
+		let screen = view.safeAreaLayoutGuide.layoutFrame
+		for host in (try? runtime.due(.visible)) ?? [] {
+			guard let element = tree.elements[host] else { continue }
+			if tree.isOnScreen(element, within: screen, of: view) {
+				perform(NativeAction(event: .visible, host: host))
+				continue
+			}
+			var ancestor = element.superview
+			while let candidate = ancestor {
+				if let scroll = candidate as? UIScrollView, scrollWatches[ObjectIdentifier(scroll)] == nil {
+					scrollWatches[ObjectIdentifier(scroll)] = scroll.observe(\.contentOffset) { [weak self] _, _ in
+						MainActor.assumeIsolated { self?.raiseVisible() }
+					}
+				}
+				ancestor = candidate.superview
+			}
+		}
+	}
+
+	public override func viewDidLayoutSubviews() {
+		super.viewDidLayoutSubviews()
+		raiseVisible()
 	}
 
 	@available(*, unavailable)
@@ -186,6 +252,19 @@ public final class MarklessViewController: UIViewController {
 		view.backgroundColor = tree?.canvas ?? .systemBackground
 	}
 
+	public override func viewDidLoad() {
+		super.viewDidLoad()
+		// As a phone browser does once the keyboard is up: the focused field is scrolled into what the keyboard leaves shown.
+		NotificationCenter.default.addObserver(forName: UIResponder.keyboardDidShowNotification, object: nil, queue: .main) { [weak self] _ in
+			MainActor.assumeIsolated { self?.revealFocusedField() }
+		}
+	}
+
+	private func revealFocusedField() {
+		guard let tree, let field = tree.focusedField else { return }
+		tree.bringIntoView(field, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
+	}
+
 	public override func viewIsAppearing(_ animated: Bool) {
 		super.viewIsAppearing(animated)
 		if let layout, abs(traitCollection.displayScale - layout.dpr) > 0.001 {
@@ -193,7 +272,7 @@ public final class MarklessViewController: UIViewController {
 		}
 		applyBand()
 		var pops = [navigationController?.interactivePopGestureRecognizer]
-		// The content pop gesture exists only in the iOS 26 SDK (Swift 6.2); older Xcodes build without it.
+		// The content swipe-back is iOS 26 API: Swift 6.2 (Xcode 26) is the first toolchain whose SDK declares it.
 		#if compiler(>=6.2)
 		if #available(iOS 26, *) { pops.append(navigationController?.interactiveContentPopGestureRecognizer) }
 		#endif
@@ -205,10 +284,13 @@ public final class MarklessViewController: UIViewController {
 	public override func viewDidAppear(_ animated: Bool) {
 		super.viewDidAppear(animated)
 		tree?.pageAppeared(self)
+		appeared = true
+		scheduleLoadEvents()
 	}
 
 	/// Runs the handler for an action and applies its journal, exactly as a tap does.
 	public func perform(_ action: NativeAction) {
+		tree?.dismissMessage()
 		do {
 			let journal = try runtime.dispatch(action)
 			if case let .navigate(route, params, replace)? = journal.last {
@@ -222,19 +304,21 @@ public final class MarklessViewController: UIViewController {
 		} catch {
 			fatalError("Markless iOS host: \(error)")
 		}
+		scheduleLoadEvents()
 	}
 
 	/// Builds the page at `route` from scratch with `params`; its state starts over.
 	private func navigate(_ route: String, _ params: [NativeRouteParam]) throws {
 		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
 		for object in payload.objects { device.release(object.id) }
-		runtime = NativeRuntime(payload: payload, store: store, params: params)
-		tree?.closeSheets()
-		tree?.root.removeFromSuperview()
+		runtime = NativeRuntime(payload: payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages)
+		scrollWatches = [:]
+		tree?.unmount()
 		try buildPage()
 		paintCanvas()
 		if isViewLoaded { tree?.mount(in: view) }
 		if viewIfLoaded?.window != nil { tree?.pageAppeared(self) }
+		scheduleLoadEvents()
 	}
 }
 

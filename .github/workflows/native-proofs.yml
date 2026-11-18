@@ -26,7 +26,7 @@ permissions:
 env:
     # The rungs green on both CI devices; a rung joins in the change that makes both hosts pass it there. 08-text-input passes
     # on iOS 27.2 but not on this runner's simulator, where Maestro's hideKeyboard finds no dismiss action (run 44068173427).
-    RUNGS: proofs/01-static-text proofs/03-counter proofs/05-if proofs/09-storage
+    RUNGS: proofs/01-static-text proofs/03-counter proofs/05-if proofs/09-storage proofs/12-long-page proofs/15-long-list
     MAESTRO_VERSION: 2.12.1
 
 jobs:

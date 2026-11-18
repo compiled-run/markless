@@ -164,9 +164,11 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	if (isHostElement) {
 		hostNodeId = `h${state.nextHostId++}`;
 		state.hostIds.set(node, hostNodeId);
+		const hostSpan = state.nativeFacts ? sourceSpan(node, state.filename) : undefined;
 		state.graph.hostNodes.push({
 			id: hostNodeId,
 			tagName: tagName ?? '*',
+			...(hostSpan ? { sourceSpan: hostSpan } : {}),
 			...(state.currentAsyncBoundaryId
 				? {
 						asyncBoundaryId: state.currentAsyncBoundaryId,

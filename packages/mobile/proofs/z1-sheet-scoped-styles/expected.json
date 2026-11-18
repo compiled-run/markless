@@ -1,0 +1,32 @@
+{
+	"rung": "Z1",
+	"name": "Scoped styles on the content of a system sheet",
+	"steps": [
+		{
+			"visible": ["Ship to nowhere yet", "Choose city"],
+			"absent": ["Choose a city", "Osaka"]
+		},
+		{
+			"do": { "tap": "Choose city" },
+			"visible": ["Choose a city", "Osaka", "Porto"]
+		},
+		{
+			"do": { "tap": "Porto" },
+			"visible": ["Ship to Porto", "Choose city"],
+			"absent": ["Choose a city", "Ship to nowhere yet"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": [
+					"Ship to nowhere yet",
+					"Choose city",
+					"On the web, the cities open in a drawer"
+				],
+				"absent": ["Choose a city", "Osaka"]
+			}
+		],
+		"absentFromOutput": ["Choose a city", "@markless/device"]
+	}
+}

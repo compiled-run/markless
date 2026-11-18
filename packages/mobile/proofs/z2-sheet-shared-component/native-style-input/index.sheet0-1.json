@@ -1,0 +1,82 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "IndexSheet0",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "shelf mk-1cmrpqe"
+			},
+			"boxless": true
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "detail mk-1cmrpqe"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "h2",
+			"parent": "h3",
+			"attributes": {
+				"class": "name mk-1cmrpqe"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Sweet basil"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:2/h0",
+			"element": "span",
+			"parent": "h3",
+			"attributes": {
+				"class": "tag mk-1ee9xe8"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:2/h0:text0",
+			"parent": "component-edge:2/h0",
+			"text": "In season"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:3/h0",
+			"element": "span",
+			"parent": "h3",
+			"attributes": {
+				"class": "tag mk-1ee9xe8"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:3/h0:text0",
+			"parent": "component-edge:3/h0",
+			"text": "Grown nearby"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.tag.mk-1ee9xe8 {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 6px 10px;\n\t\t\t\tborder: 2px solid #1b4332;\n\t\t\t\tborder-radius: 8px;\n\t\t\t\tbackground: #d8f3dc;\n\t\t\t\tcolor: #1b4332;\n\t\t\t\tfont-size: 15px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n.shelf.mk-1cmrpqe {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.name.mk-1cmrpqe {\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #1b4332;\n\t\t\t}\n\t\t\t.more.mk-1cmrpqe {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 12px 20px;\n\t\t\t\tborder: 2px solid #1b4332;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #1b4332;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.detail.mk-1cmrpqe {\n\t\t\t\tpadding: 24px;\n\t\t\t}",
+	"states": [],
+	"viewports": {
+		"ios": {
+			"width": 402,
+			"height": 778
+		},
+		"android": {
+			"width": 411,
+			"height": 790
+		}
+	}
+}

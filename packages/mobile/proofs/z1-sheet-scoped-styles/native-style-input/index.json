@@ -1,0 +1,47 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Index",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-187dy12"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "title mk-187dy12"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Ship to nowhere yet"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "open mk-187dy12"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Choose city"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.page.mk-187dy12 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f4f1ea;\n\t\t\t}\n\t\t\t.title.mk-187dy12 {\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #1d1b16;\n\t\t\t}\n\t\t\t.open.mk-187dy12 {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 12px 20px;\n\t\t\t\tborder: 2px solid #1d1b16;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #1d1b16;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.picker.mk-187dy12 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #e9f5f2;\n\t\t\t}\n\t\t\t.heading.mk-187dy12 {\n\t\t\t\tfont-size: 24px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #1b4332;\n\t\t\t}\n\t\t\t.city.mk-187dy12 {\n\t\t\t\tdisplay: block;\n\t\t\t\twidth: 100%;\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 14px 16px;\n\t\t\t\tborder: 2px solid #1b4332;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #1b4332;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\ttext-align: left;\n\t\t\t}",
+	"states": []
+}

@@ -52,7 +52,11 @@
 				"kind": "element",
 				"id": "h9",
 				"element": "h1",
-				"parent": "h8"
+				"parent": "h8",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
 			},
 			{
 				"kind": "text",

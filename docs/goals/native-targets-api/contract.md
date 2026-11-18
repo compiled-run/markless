@@ -53,6 +53,28 @@ is the platform's and journals nothing, and a page's `<title>` is its navigation
   either adopt it or replace it with a `compileNativeStyles`-based reader of `markless.native-style-input/0` that writes the
   same `/1` shape, and say which here.
 
+## 0c. Element vocabulary (2026-11-18, `cw/real-elements`, rungs R101 to R114)
+
+Real pages are refused first for plain HTML (`real-app-probe.md`); these additions are in the payload, both hosts and the
+reference. Notes and the before and after probe: `element-vocabulary.md`.
+
+- **`defaultStyle`** on an element node: its look under Chrome's default stylesheet (`NativeDefaultStyle`): `flow`
+  (`inline`: its text flows on in its parent's text; `break`: `<br>`), `bold`, `italic`, `monospace`, `size` (a multiple
+  of the parent's), `line`, `shift`, `highlight`, `quotes`, `preformatted`, `indent` (CSS px), `rule`, `marker` (on
+  `ul`/`ol`), `table` (`table`, `row`, `cell`). Hosts apply it only without a style export; with one, Dragon decides.
+- **Paragraphs:** among one parent's children in one place, each run of text nodes and flowing elements is one text
+  view (`nativeParagraphs`, `nativeShownTexts` in `packages/mobile/src/paragraphs.ts`). Its text collapses whitespace as
+  CSS `white-space: normal`, except inside a `preformatted` element; a `text` journal entry re-renders the whole
+  paragraph. The compiler gives `flow` only to an element with no handler, no handle, no `hidden` and only text and
+  flowing elements inside, so a flowing element never needs a view.
+- **`drawing`** on an `<svg>` node (`NativeDrawing`): viewBox, size and shapes compiled when the app is built (path verbs
+  0 move, 1 line, 3 cubic, 4 close, as Dragon codes them; `width`/`height` in CSS px, or in ems with `em`; arcs and quadratics arrive as cubics; `<use>` of a `<symbol>` in
+  the same svg is inlined with its transform). The svg's descendants are not nodes. Its `<title>` becomes its
+  `aria-label`. What a drawing cannot hold is refused as `MARKLESS_NATIVE_SVG` at the shape.
+- **Text at the top of a page** is a text node with `parent: null`, id `text<n>`.
+- **`<title>`**: the page's first `<title>` in document order, in any component, is the screen's title (as
+  `document.title` reads the first); no `<title>` shows in the page.
+
 ## 1. What I found before building (the owner's picture is weeks old)
 
 - **`docs/goals/native-targets-api/` was not in the repo.** The research board lives only on the planner's machine (copy read
@@ -372,6 +394,30 @@ the browser's render-data module).
   in-app behind a launch flag. `packages/mobile/test/conformance.test.ts` fails if the committed vectors drift from what the
   compiler and the reference runtime produce.
 
+### Values that are not state, `idle` and `visible`, and the clock (`cw/real-values`, 2026-11-18)
+
+- **Values.** The analyzer records a module's top-level `const`s (`moduleConstants`: own, `export`ed, destructured from an
+  object or array) and a component body's `const`s (`native.locals`), as trees. A read by name inlines the definition. A
+  body `const` read where the web renders once (a text or attribute that is not a computed, a test or list that is not
+  one) is folded to the value it has with every cell at its first value; where the web re-derives it (a computed, a
+  handler, a template that reads state) it follows state. A JSON file imports as a module whose default export is its
+  value. Data indexed by a key known at build time (`data.byId[id]`) folds to the member. An object or array prop, and an
+  opaque prop (a constant, an item's field, a body `const`), lowers from its expression. Nothing new for hosts.
+- **Events.** `NativeEventName` gains `idle` and `visible` with the web's meaning: once for each shown instance (shown
+  again after it left, it is a new one). `idle` runs when the host's main loop is idle after the frame that shows the
+  element (iOS: a `beforeWaiting` run-loop observer after `viewDidAppear`; Android: a `MessageQueue` idle handler after the
+  first draw); `visible` runs the first time any of the element's box is inside the page's part of the screen (edges
+  count, as an IntersectionObserver with no threshold reports them). The runtime owns "once": `due(event)` lists the
+  instances still to fire, and a second dispatch journals nothing (`load-events.json`).
+- **Clock.** A cell may carry `clock: true`: the host writes the clock (ms since 1970, UTC) at mount, before the first
+  build, as a server render reads it when the page is served. `Date.now()` and `new Date()` read in a render lower to
+  that cell; in a handler or computed to the builtin `Date.now`, read when it runs. `state(Date.now())` is a clock cell.
+  `Date.toISOString` formats a time as `toISOString` does. Anything that formats a date in a time zone or locale
+  (`toTimeString`, `toLocaleString`, a date shown as text) is refused by name: the web formats it with the server's
+  zone. Vectors carry `now`, which a host's test clock returns (`clock.json`).
+- **Links.** A `<Link href>` that is not a route pattern is matched with the router's `matchRouteManifest`, as a URL is,
+  so `/about/` reaches `/about`.
+
 ### Element to view (per platform, rungs 1 to 3)
 
 | Element | iOS (UIKit) | Android (Views) |
@@ -423,9 +469,12 @@ points it calls (`MarklessViewController(payload:style:fonts:)`, `MarklessActivi
 relative to the root of the Dragon checkout it came from (`vendor/fonts/...`); the harness's SHA-256 check stays. **6**
 routes at launch arrive with rung 10. **7** rung screenshots are committed under `proofs/<rung>/screenshots/{ios,android}/`.
 
-**Portable elements (compiler-checked).** A native build accepts `main`, `div`, `section`, `article`, `header`, `footer`,
-`nav`, `aside`, `h1`-`h6`, `p`, `span`, `b`, `strong`, `em`, `i`, `ul`, `ol`, `li` and `button`; any other element is
-refused with `MARKLESS_NATIVE_UNSUPPORTED` naming it. Rungs add to this list (`input` with rung 8).
+**Portable elements (compiler-checked).** The list is `NATIVE_ELEMENTS` in `@markless/serializer/native-view`, with each
+element's look under Chrome's default stylesheet as data (`defaultStyle`, below). `NATIVE_UNSHOWN_ELEMENTS` (`meta`,
+`link`, `template`, `noscript`) and data scripts (`NATIVE_DATA_SCRIPT_TYPES`) show nothing, as on the web, and are left
+out of the payload. Anything else is refused with its own code and the element's place: `MARKLESS_NATIVE_ELEMENT`,
+`MARKLESS_NATIVE_SCRIPT` (a script that runs code), `MARKLESS_NATIVE_STYLESHEET` (`<link rel="stylesheet">`). See
+"Element vocabulary" in section 0c.
 
 Rungs 1 and 3 run without Dragon: hosts stack children vertically (start-aligned, system font, platform default size). This
 is a temporary layout so the state rungs do not wait on styling; rung 2 replaces it with Dragon frames.
@@ -479,6 +528,34 @@ compares Dragon's build-time layout with Chrome, not the device's pixels.
    (absolute), scaling device pixels by the screen scale (iOS points = px / 3 on the proof device, Android uses px); refuse
    to run if the device's scale differs from the target's `dpr`. Text keeps Dragon's frame; after a journal entry the
    frame is not recomputed yet (on-device layout is a later rung), which is visible only when text width changes.
+
+### Scrolling (pushed 2026-11-17, branch `cw/native-scroll`)
+
+- **The page** is the platform's scroll view: iOS `UIScrollView` with `contentInsetAdjustmentBehavior = .always`, and
+  Android `ScrollView` padded by the system bars with `clipToPadding = false`. Content starts inside the safe area and
+  scrolls under the bars, as a phone browser's page does. Its bottom follows the keyboard (`keyboardLayoutGuide`; Android
+  IME insets). Unstyled pages size it from native layout. Styled pages use Dragon's `pageScroll`, the viewport's offset range in
+  device px per assignment. When Dragon leaves that range undecided (a range control, or a control that scrolls; block
+  buttons are decided since dragoncss#593), the build fails with `MARKLESS_NATIVE_UNSUPPORTED`, naming the file, the element
+  (with its source span, an analyzer fact collected for native builds) and Dragon's reason from `pageScrollUndecided`
+  (`pageScrollDiagnostics`, `packages/mobile/src/page-scroll.ts`). An app never refuses to open over it and never loses its
+  scrolling. The hosts' own check for this case stays only as an invariant for exports that did not come through the build.
+- **A box with `overflow-x`/`overflow-y` `auto` or `scroll`** has a `scroll-container` write and a `scrollRange`. The host puts
+  a scroll view over its padding box and hosts the children there, at their frames less the border:
+  - iOS: a `UIScrollView`;
+  - Android: a `ScrollView` for the block axis, a `HorizontalScrollView` for the inline axis, nested when both have a range.
+
+  A drag belongs to the box it starts in while the box can scroll that way, and otherwise to the page. This is decided once,
+  when the drag starts, as Chrome latches a gesture. `scroll-indicators-hidden`, `scroll-bounce` and `padding-box-clip`
+  (only together with a scroll container) are read. A padding-box clip without scrolling, and a range starting before 0
+  (right to left), are host errors.
+- **scrollIntoView() and focus()**: `packages/mobile/src/scroll.ts` is the reference. Its vectors are in
+  `conformance/scroll/scroll-into-view.json`, which `ladder-web.test.ts` checks against Chrome and which both hosts reproduce
+  (`ScrollIntoViewTests.swift`, `test-jvm.sh`). scrollIntoView() is `{ block: start, inline: nearest }`. focus() is Chrome's
+  "if needed": no scroll when fully shown, the closest edge when partly shown, centred when hidden. Every scrolling ancestor
+  scrolls, innermost first. A focused text field is brought into view the same way when the keyboard comes up.
+- **Ladder rungs 12 to 17**. 17 needs `element()` and the `command` op from #816. On this branch the compiler refuses it by
+  name; it passes on both phones on a local merge with `cw/ui-next-blockers`.
 
 ## 5. The ladder
 

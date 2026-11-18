@@ -1,0 +1,20 @@
+{
+	"rung": "R107",
+	"name": "Lists show their items in order, and description lists their terms and details",
+	"steps": [
+		{
+			"visible": [
+				"Lists",
+				"Seeds",
+				"Soil",
+				"Sow",
+				"Water",
+				"Basil",
+				"Likes sun",
+				"Mint",
+				"Likes shade"
+			],
+			"order": ["Seeds", "Soil", "Sow", "Water", "Basil", "Likes sun", "Mint", "Likes shade"]
+		}
+	]
+}

@@ -1,0 +1,9 @@
+{
+	"rung": 132,
+	"name": "Body constants: read alone in markup they keep the value the page rendered with; a template or handler that reads state follows them",
+	"steps": [
+		{ "visible": ["Count", "2", "Now 2", "Grow"] },
+		{ "do": { "tap": "Grow" }, "visible": ["2", "Now 6"], "absent": ["Now 2"] },
+		{ "do": { "tap": "Grow" }, "visible": ["2", "Now 14"], "absent": ["Now 6"] }
+	]
+}

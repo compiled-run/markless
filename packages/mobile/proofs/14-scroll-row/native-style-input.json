@@ -1,0 +1,236 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "title mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Scroll row"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "row mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Card 1"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Card 2"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Card 3"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Card 4"
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "Card 5"
+		},
+		{
+			"kind": "element",
+			"id": "h8",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h8:text0",
+			"parent": "h8",
+			"text": "Card 6"
+		},
+		{
+			"kind": "element",
+			"id": "h9",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h9:text0",
+			"parent": "h9",
+			"text": "Card 7"
+		},
+		{
+			"kind": "element",
+			"id": "h10",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h10:text0",
+			"parent": "h10",
+			"text": "Card 8"
+		},
+		{
+			"kind": "element",
+			"id": "h11",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h11:text0",
+			"parent": "h11",
+			"text": "Card 9"
+		},
+		{
+			"kind": "element",
+			"id": "h12",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h12:text0",
+			"parent": "h12",
+			"text": "Card 10"
+		},
+		{
+			"kind": "element",
+			"id": "h13",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h13:text0",
+			"parent": "h13",
+			"text": "Card 11"
+		},
+		{
+			"kind": "element",
+			"id": "h14",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h14:text0",
+			"parent": "h14",
+			"text": "Card 12"
+		},
+		{
+			"kind": "element",
+			"id": "h15",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-gpp6ya"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h15:text0",
+			"parent": "h15",
+			"text": "Below the row"
+		}
+	],
+	"css": ".page.mk-gpp6ya {\n\t\t\t\tpadding: 16px;\n\t\t\t}\n\t\t\t.title.mk-gpp6ya {\n\t\t\t\tmargin: 0 0 12px;\n\t\t\t\theight: 40px;\n\t\t\t\tfont-size: 24px;\n\t\t\t}\n\t\t\t.row.mk-gpp6ya {\n\t\t\t\tdisplay: flex;\n\t\t\t\tgap: 12px;\n\t\t\t\theight: 200px;\n\t\t\t\toverflow-x: auto;\n\t\t\t\tborder: 2px solid #1d1b16;\n\t\t\t}\n\t\t\t.card.mk-gpp6ya {\n\t\t\t\tflex: 0 0 160px;\n\t\t\t\tmargin: 0;\n\t\t\t\tpadding: 12px;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t}",
+	"states": []
+}

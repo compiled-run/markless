@@ -8,8 +8,12 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	/** For a page: its page file (the router derives the route) and the params it opens with. */
 	readonly page?: string;
 	readonly params?: Readonly<Record<string, string>>;
+	/** What the device's clock reads, for a component that reads it. */
+	readonly now?: number;
 	/** The app config's usage text, for a component that uses a device feature that asks. */
 	readonly device?: DeviceAppConfig;
+	/** The device's preferred languages, when the vector shows a message in one. */
+	readonly preferredLanguages?: ReadonlyArray<string>;
 	readonly actions: ReadonlyArray<NativeAction>;
 }> = [
 	{
@@ -271,6 +275,56 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'forms',
+		fixture: 'test/fixtures/Forms.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h9' },
+			{ event: 'activate', host: 'h11' },
+			{ event: 'input', host: 'h2', value: '' },
+			{ event: 'activate', host: 'h9' },
+			{ event: 'activate', host: 'h10' },
+			{ event: 'input', host: 'h2', value: 'Grace' },
+			{ event: 'input', host: 'h3', value: 'Cy' },
+			{ event: 'enter', host: 'h2' },
+			{ event: 'enter', host: 'h15' },
+			{ event: 'input', host: 'h20', value: 'Lu' },
+			{ event: 'activate', host: 'h21' },
+			{ event: 'activate', host: 'h21' },
+			{ event: 'input', host: 'h20', value: '' },
+			{ event: 'enter', host: 'h20' },
+			{ event: 'timer', timer: 'timer:0' },
+			{ event: 'timer', timer: 'timer:1' },
+			{ event: 'activate', host: 'h24' },
+			{ event: 'timer', timer: 'timer:2' },
+		],
+	},
+	{
+		name: 'form-return',
+		fixture: 'test/fixtures/FormReturn.tsrx',
+		actions: [
+			{ event: 'input', host: 'h2', value: 'hi' },
+			{ event: 'enter', host: 'h2' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'enter', host: 'h2' },
+		],
+	},
+	{
+		name: 'ticks',
+		fixture: 'test/fixtures/Ticks.tsrx',
+		preferredLanguages: ['fr-CA', 'en'],
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [
@@ -293,6 +347,35 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h4' },
 			{ event: 'activate', host: 'h7@b' },
 			{ event: 'activate', host: 'h7@c' },
+		],
+	},
+	{
+		name: 'values',
+		fixture: 'test/fixtures/Values.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'clock',
+		fixture: 'test/fixtures/Clock.tsrx',
+		now: 1795046400123,
+		actions: [{ event: 'activate', host: 'h5' }],
+	},
+	{
+		name: 'load-events',
+		fixture: 'test/fixtures/LoadEvents.tsrx',
+		actions: [
+			{ event: 'idle', host: 'h1' },
+			{ event: 'idle', host: 'h1' },
+			{ event: 'visible', host: 'h3@b' },
+			{ event: 'visible', host: 'h3@b' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'idle', host: 'h1' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'idle', host: 'h1' },
+			{ event: 'visible', host: 'h3@a' },
 		],
 	},
 ];
@@ -329,6 +412,10 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		name: 'navigation-deep-link',
 		app: 'proofs/n4-deep-link',
 		open: '/orders/42',
-		actions: [{ event: 'back' }, { event: 'back' }, { event: 'activate', host: 'component-edge:0' }],
+		actions: [
+			{ event: 'back' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'component-edge:0' },
+		],
 	},
 ];

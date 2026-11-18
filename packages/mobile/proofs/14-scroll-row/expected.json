@@ -1,0 +1,21 @@
+{
+	"rung": 14,
+	"name": "A row with overflow-x auto scrolls sideways",
+	"steps": [
+		{
+			"visible": ["Scroll row", "Card 1", "Below the row"],
+			"offScreen": ["Card 12"]
+		},
+		{
+			"do": {
+				"swipe": {
+					"from": [85, 25],
+					"to": [15, 25],
+					"until": "Card 12"
+				}
+			},
+			"visible": ["Card 12", "Scroll row", "Below the row"],
+			"offScreen": ["Card 1"]
+		}
+	]
+}

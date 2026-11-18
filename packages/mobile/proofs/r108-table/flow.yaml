@@ -1,0 +1,51 @@
+appId: ${APP_ID}
+name: r108-table
+---
+- launchApp:
+      clearState: true
+- assertVisible: Table
+- assertVisible: Seed stock
+- assertVisible: Plant
+- assertVisible: Packets
+- assertVisible: Basil
+- assertVisible: '3'
+- assertVisible: Mint
+- assertVisible: '12'
+- assertVisible: Kinds
+- assertVisible: '2'
+- assertNotVisible: Thyme
+- assertVisible:
+      text: Plant
+      below: Seed stock
+- assertVisible:
+      text: Basil
+      below: Plant
+- assertVisible:
+      text: Mint
+      below: Basil
+- assertVisible:
+      text: Kinds
+      below: Mint
+- tapOn: Add thyme
+- assertVisible: Thyme
+- assertVisible:
+      text: Basil
+      below: Plant
+- assertVisible:
+      text: Mint
+      below: Basil
+- assertVisible:
+      text: Thyme
+      below: Mint
+- assertVisible: Thyme
+- assertVisible: '7'
+- assertVisible: '3'
+- assertVisible:
+      text: Basil
+      below: Plant
+- assertVisible:
+      text: Mint
+      below: Basil
+- assertVisible:
+      text: Thyme
+      below: Mint

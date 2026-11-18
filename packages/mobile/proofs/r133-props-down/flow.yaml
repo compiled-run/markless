@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+name: r133-props-down
+---
+- launchApp:
+      clearState: true
+- assertVisible: Basic plan 0
+- assertVisible: Team plan 0
+- assertVisible: Scale plan 0
+- assertVisible: x plan 0
+- tapOn: Pick
+- assertNotVisible: Basic plan 0
+- assertVisible: Basic plan 1
+- assertVisible: Team plan 1
+- assertVisible: Scale plan 1
+- assertVisible: x plan 1
+- assertNotVisible: Basic plan 0

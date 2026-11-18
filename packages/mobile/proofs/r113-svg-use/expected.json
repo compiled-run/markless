@@ -1,0 +1,5 @@
+{
+	"rung": "R113",
+	"name": "A <symbol> drawn by each <use> that names it",
+	"steps": [{ "visible": ["Symbols", "Three stars", "A symbol used three times"] }]
+}

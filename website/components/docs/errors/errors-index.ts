@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 321,
+	total: 326,
 	guided: 51,
 	groups: [
 		{
@@ -1492,6 +1492,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a @catch reset has no graph to re-run values in markless_catch_reset_graph_missing a markless runtime error from @markless/web.',
 				},
 				{
+					code: 'MARKLESS_NATIVE_SCRIPT',
+					title: 'A <script> cannot run in a native app',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'a <script> cannot run in a native app markless_native_script a <script> cannot run in a native app: a markless build error.',
+				},
+				{
 					code: 'MARKLESS_CSR_BEHAVIOR_HOST_MISSING',
 					title: 'A behavior’s element is missing',
 					chip: 'error',
@@ -1996,6 +2004,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a streamed @try rendered nothing markless_stream_arm_render_missing a markless runtime error from @markless/web.',
 				},
 				{
+					code: 'MARKLESS_NATIVE_STYLESHEET',
+					title: 'A stylesheet loaded by a <link> does not reach a native app',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'a stylesheet loaded by a <link> does not reach a native app markless_native_stylesheet a stylesheet loaded by a <link> does not reach a native app: a markless build error.',
+				},
+				{
 					code: 'MARKLESS_TEXT_UPDATE_RECORD_MISSING',
 					title: 'A text update has no record',
 					chip: 'error',
@@ -2274,6 +2290,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: false,
 					words: 'only the name and message of a caught error reach the browser markless_catch_error_field_lost only the name and message of a caught error reach the browser: a markless build error.',
+				},
+				{
+					code: 'MARKLESS_NATIVE_SVG',
+					title: 'Part of this <svg> is not drawn natively yet',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'part of this <svg> is not drawn natively yet markless_native_svg part of this <svg> is not drawn natively yet: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_PRERENDER_DATA_COMPONENT_MISSING',
@@ -2588,6 +2612,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'the server sent an @if branch that does not exist markless_ssr_data_served_arm_invalid a markless runtime error from @markless/web.',
 				},
 				{
+					code: 'MARKLESS_NATIVE_TITLE',
+					title: 'This <title> cannot be the screen title',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'this <title> cannot be the screen title markless_native_title this <title> cannot be the screen title: a markless build error.',
+				},
+				{
 					code: 'MARKLESS_NATIVE_UNSUPPORTED',
 					title: 'This component cannot be built for a native target yet',
 					chip: 'error',
@@ -2602,6 +2634,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime warning',
 					guided: false,
 					words: 'this container was already resumed markless_resume_already_resumed this container was already resumed: a markless runtime warning.',
+				},
+				{
+					code: 'MARKLESS_NATIVE_ELEMENT',
+					title: 'This element has no native view yet',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'this element has no native view yet markless_native_element this element has no native view yet: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_PRERENDER_WAKE_ROUTE_INELIGIBLE',

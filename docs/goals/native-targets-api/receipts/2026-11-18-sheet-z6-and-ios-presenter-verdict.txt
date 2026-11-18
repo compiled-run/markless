@@ -1,0 +1,14 @@
+Z1-Z6 and Y1-Y3 on both phones, one harness run per platform, on branch cw/sheet-styled-content at a8c23e54d plus the uncommitted
+change it was run with (boxless sheet ancestors, rung Z6, the harness runtime choice; committed right after this receipt).
+Simulator markless-sheet-st (iPhone 17, iOS 27.2 runtime iOS-27-2 24B8117, Xcode 27.2 27B52); AVD markless_sheet_st
+(Pixel 7, API 36, port 5596). Dragon: ~/wt/dragon/sheet-styled-content at a1325806f8 (compiled-run/dragoncss#594).
+
+iOS: 9 of 9 passed. Android: 9 of 9 passed.
+
+The same Y1-Y3 on a clean checkout of cw/system-sheet at deee0dc85, same simulator, same day: 0 of 3 on iOS, each failing
+at step 1 (tap): the sheet does not present. Cause and fix: native-contract.md, "Found on the way".
+UIKit test aSystemSheetKeepsItsContentOffThePageAndPresentsAPageSheet (xcodebuild test on the same simulator): fails on
+deee0dc85 ("the sheet did not present"), passes on this branch; all 13 UIKit and 31 core tests pass on this branch.
+
+$ node src/harness/cli.ts verdict ios.json android.json
+proof passed on iOS and Android
