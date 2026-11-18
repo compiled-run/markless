@@ -425,10 +425,10 @@ class MarklessHost(
 	val canvasColor: Int? get() = page?.let { it.export.assignments[it.assignment].canvas?.argb ?: Color.WHITE }
 
 	/** body's own box and colour in the current assignment, in the page's pixels as [rootFrame]; null when body paints none. */
-	val bodyBox: Pair<Rect, Int>? get() = style?.let { st ->
-		val color = st.assignments[assignment].body ?: return@let null
-		val origin = absolutes[assignment]["body"] ?: throw MarklessHostError("body paints a background, but the style export gives it no box")
-		val frame = st.assignments[assignment].byId.getValue("body").frame!!
+	val bodyBox: Pair<Rect, Int>? get() = page?.let { p ->
+		val color = p.export.assignments[p.assignment].body ?: return@let null
+		val origin = p.absolutes[p.assignment]["body"] ?: throw MarklessHostError("body paints a background, but the style export gives it no box")
+		val frame = p.export.assignments[p.assignment].byId.getValue("body").frame!!
 		Rect(origin.first.roundToInt(), origin.second.roundToInt(), (origin.first + frame.width).roundToInt(), (origin.second + frame.height).roundToInt()) to color.argb
 	}
 
@@ -1010,7 +1010,11 @@ class MarklessHost(
 		if (node is Node.Text && view is Button) {
 			val (bx, by) = absolute.getValue(parentId!!)
 			val box = styled.byId.getValue(parentId).frame!!
-			view.setPadding((ax - bx).roundToInt(), (ay - by).roundToInt(), (bx + box.width).roundToInt() - (ax + frame.width).roundToInt(), (by + box.height).roundToInt() - (ay + frame.height).roundToInt())
+			// The label rounds outward inside the button's rounded box, as other text does: a narrower content box wraps the run.
+			view.setPadding(
+				maxOf(0, Math.floor(ax).toInt() - bx.roundToInt()), maxOf(0, Math.floor(ay).toInt() - by.roundToInt()),
+				maxOf(0, (bx + box.width).roundToInt() - Math.ceil(ax + frame.width).toInt()), maxOf(0, (by + box.height).roundToInt() - Math.ceil(ay + frame.height).toInt()),
+			)
 		} else {
 			// A sheet's top-level content sits in the sheet's content box, which is its document's origin.
 			var (ox, oy) = parentId?.takeIf { it != sheet }?.let { absolute.getValue(it) }?.let { it.first.roundToInt() to it.second.roundToInt() } ?: (0 to 0)
