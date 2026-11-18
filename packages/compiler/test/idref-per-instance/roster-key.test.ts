@@ -20,7 +20,7 @@ export const barState = shared(
 		const barEl = element();
 		return { ...bar, barEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export const itemState = shared(
@@ -30,7 +30,7 @@ export const itemState = shared(
 		const contentEl = element();
 		return { ...item, itemEl, contentEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Bar({ children }) @{

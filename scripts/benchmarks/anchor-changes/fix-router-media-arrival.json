@@ -1,0 +1,98 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 77,
+			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 77,
+			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 77,
+			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 70,
+			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 70,
+			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 70,
+			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"router/vite/entries/fragment-entry"
+			],
+			"delta": 463,
+			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load, and replaces a changed media element whole",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1,
+			"reason": "The v0.12.0 release commit (95774bb06) changed version strings in the accordion page bundle by +1 B gzip, red on main since",
+			"date": "2026-11-07"
+		}
+	]
+}

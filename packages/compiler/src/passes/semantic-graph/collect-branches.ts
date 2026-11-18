@@ -1,11 +1,26 @@
-import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, childNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
+	graphBindingMap,
+	resolveGraphPath,
+	semanticAliasMap,
+} from '../../artifact-helpers/graph-paths.ts';
+import {
+	arrowReadSources,
 	type CompositeReadOptions,
 	collectCompositeTemplateExpression,
+	freeReadSources,
+	mintTemplateExpressionComputed,
+	pureCompositeReadSources,
+	type GraphReadSource,
 } from './composite-reads.ts';
 import { readsShadowingRowItem } from './collect-repeat.ts';
-import { stateWriteInTemplateDiagnostic } from './diagnostics.ts';
+import { ifChainOf, isElseIfLink } from './if-chain.ts';
+import { propTestOf } from './prop-test.ts';
+import {
+	stateWriteInTemplateDiagnostic,
+	templateExpressionUnsupportedDiagnostic,
+} from './diagnostics.ts';
 import type { WalkState } from './types.ts';
 
 /**
@@ -21,11 +36,15 @@ import type { WalkState } from './types.ts';
  * A condition over PROPS alone mints too, unlike an attribute or an edge prop: a
  * parent can pass a live graph reference, and with no minted node the site had an
  * empty wake set, so the served payload dropped the branch and the child's arm
- * never re-decided when the parent's cell moved.
+ * never re-decided when the parent's cell moved. That holds for a condition reading
+ * into an object or array prop (`opened.includes(post.id)`) too: the derive reads
+ * through the parent's routes, not the child's scalar-only prop cell.
  */
 const BRANCH_CONDITION_READ_OPTIONS: CompositeReadOptions = {
 	unaryOperators: true,
 	methodCalls: true,
+	readsIntoProps: true,
+	arrowArguments: true,
 };
 
 /**
@@ -55,9 +74,73 @@ function branchTest(
 		state,
 		BRANCH_CONDITION_READ_OPTIONS,
 	);
-	return composite
-		? { testSource, testComputedGraphNodeId: composite.graphNodeId }
-		: { testSource };
+	if (composite) return { testSource, testComputedGraphNodeId: composite.graphNodeId };
+	refuseUnreadableFunctionCondition([test], state);
+	return { testSource };
+}
+
+// A function the condition passes whose body hides its reads would leave a condition over state that never updates.
+function refuseUnreadableFunctionCondition(tests: ReadonlyArray<AnyNode>, state: WalkState): void {
+	// A row of a keyed @for decides its own branches when it renders, as text in a row does.
+	if (state.currentKeyedRepeatScopeIds.length > 0) return;
+	for (const test of tests) {
+		const functions: AnyNode[] = [];
+		walkNode(test, (node) => {
+			if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression')
+				functions.push(node);
+		});
+		const unreadable = functions.find(
+			(node) =>
+				!functions.some(
+					(outer) => outer !== node && outer.start! <= node.start! && node.end! <= outer.end!,
+				) &&
+				(node.type === 'FunctionExpression' ||
+					arrowReadSources(node, state, BRANCH_CONDITION_READ_OPTIONS) === null),
+		);
+		if (!unreadable || !readsGraphValue(test, state)) continue;
+		state.graph.diagnostics.push(
+			templateExpressionUnsupportedDiagnostic({
+				target: 'This branch condition',
+				source: expressionSource(test, state.source),
+				node: unreadable,
+				filename: state.filename,
+			}),
+		);
+	}
+}
+
+function readsGraphValue(test: AnyNode, state: WalkState): boolean {
+	const bindings = graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName ?? undefined);
+	const aliases = semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName ?? undefined);
+	return freeReadSources(test, state, true).some((source) => {
+		const kind = resolveGraphPath(source, bindings, aliases)?.binding.kind;
+		return kind === 'state' || kind === 'computed' || kind === 'prop';
+	});
+}
+
+// A branch in a row of a repeat inside the same @try belongs to the row, which flips it per row.
+function branchAsyncBoundary(
+	state: WalkState,
+): { readonly asyncBoundaryId?: string; readonly asyncBoundaryArm?: number } {
+	if (!state.currentAsyncBoundaryId) return {};
+	const rowId = state.currentKeyedRepeatScopeIds.at(-1);
+	const row = rowId ? state.graph.keyedRepeats.find((repeat) => repeat.id === rowId) : undefined;
+	if (row?.asyncBoundaryId === state.currentAsyncBoundaryId) return {};
+	return {
+		asyncBoundaryId: state.currentAsyncBoundaryId,
+		asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
+	};
+}
+
+function branchRow(state: WalkState): { readonly keyedRepeatId?: string } {
+	const keyedRepeatId = state.currentKeyedRepeatScopeIds.at(-1);
+	return keyedRepeatId ? { keyedRepeatId } : {};
+}
+
+function branchKeywordSpan(node: AnyNode, keyword: string, state: WalkState) {
+	return typeof node.start === 'number'
+		? { keywordSpan: { filename: state.filename, start: node.start, end: node.start + keyword.length } }
+		: {};
 }
 
 // Records @if/@switch sites as first-class branch records sharing the unified
@@ -67,25 +150,28 @@ function branchTest(
 export function collectBranchSite(node: AnyNode, state: WalkState): void {
 	if (node.type === 'JSXIfExpression') {
 		const test = node.test as AnyNode | undefined;
+		if (isElseIfLink(node.alternate as AnyNode | undefined)) {
+			collectIfChainSite(node, state);
+			return;
+		}
 		collectBranchConditionAssignments(
 			test,
 			`@if (${test ? expressionSource(test, state.source) : ''})`,
 			state,
 		);
 		const ifTest = branchTest(test, state);
+		const ifPropTest = ifTest.testReadsRowItem ? undefined : propTestOf(test, state);
 		state.graph.branchSites.push({
 			id: `branch-site:${state.nextBranchSiteId++}`,
 			kind: 'if',
 			armCount: (node.consequent ? 1 : 0) + (node.alternate ? 1 : 0),
 			...ifTest,
+			...(ifPropTest ? { propTest: ifPropTest } : {}),
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
-			...(state.currentAsyncBoundaryId
-				? {
-						asyncBoundaryId: state.currentAsyncBoundaryId,
-						asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
-					}
-				: {}),
+			...branchKeywordSpan(node, '@if', state),
+			...branchAsyncBoundary(state),
+			...branchRow(state),
 		});
 		return;
 	}
@@ -97,23 +183,125 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			`@switch (${discriminant ? expressionSource(discriminant, state.source) : ''})`,
 			state,
 		);
-		const switchTest = branchTest(discriminant, state);
+		const literalArmTests = switchArmTests(node);
+		const switchTest = literalArmTests
+			? branchTest(discriminant, state)
+			: switchArmIndexTest(node, state);
+		const switchPropTest =
+			switchTest.testReadsRowItem || !literalArmTests
+				? undefined
+				: propTestOf(discriminant, state);
 		state.graph.branchSites.push({
 			id: `branch-site:${state.nextBranchSiteId++}`,
 			kind: 'switch',
 			armCount: asNodes(node.cases).length,
 			...switchTest,
+			...(switchPropTest ? { propTest: switchPropTest } : {}),
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
-			...(switchArmTests(node) ? { armTests: switchArmTests(node)! } : {}),
-			...(state.currentAsyncBoundaryId
-				? {
-						asyncBoundaryId: state.currentAsyncBoundaryId,
-						asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
-					}
-				: {}),
+			armTests: literalArmTests ?? asNodes(node.cases).map((_, index) => index),
+			...branchKeywordSpan(node, '@switch', state),
+			...branchAsyncBoundary(state),
+			...branchRow(state),
 		});
 	}
+}
+
+// An `@else if` chain is one site picked by index; a missing final `@else` is an empty last arm.
+function collectIfChainSite(node: AnyNode, state: WalkState): void {
+	const chain = ifChainOf(node);
+	for (const test of chain.tests)
+		collectBranchConditionAssignments(
+			test,
+			`@if (${expressionSource(test, state.source)})`,
+			state,
+		);
+	const sources = chain.tests.map((test) => expressionSource(test, state.source));
+	const indexSource = sources
+		.map((source, index) => `(${source}) ? ${index} : `)
+		.join('')
+		.concat(String(chain.tests.length));
+	state.graph.branchSites.push({
+		id: `branch-site:${state.nextBranchSiteId++}`,
+		kind: 'if',
+		armCount: chain.tests.length + (chain.arms[chain.arms.length - 1] ? 1 : 0),
+		testSource: sources.join(', '),
+		armIndexSource: indexSource,
+		...armIndexTest(chain.tests, indexSource, state),
+		armTests: chain.arms.map((_, index) => index),
+		anchorOrder: state.nextAnchorOrder++,
+		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
+		...branchKeywordSpan(node, '@if', state),
+		...branchAsyncBoundary(state),
+		...branchRow(state),
+	});
+}
+
+// A `@switch` with non-literal case tests is picked by index, comparing like `switch`; no match answers the `@default` arm or one past the last.
+function switchArmIndexTest(
+	node: AnyNode,
+	state: WalkState,
+): {
+	readonly testSource: string;
+	readonly armIndexSource: string;
+	readonly testComputedGraphNodeId?: string;
+	readonly testReadsRowItem?: true;
+} {
+	const discriminant = node.discriminant as AnyNode | undefined;
+	const discriminantSource = discriminant ? expressionSource(discriminant, state.source) : '';
+	const cases = asNodes(node.cases);
+	const defaultIndex = cases.findIndex((switchCase) => !switchCase.test);
+	const fallback = defaultIndex === -1 ? cases.length : defaultIndex;
+	const tests = cases.flatMap((switchCase, index) =>
+		switchCase.test ? [{ index, test: switchCase.test as AnyNode }] : [],
+	);
+	const indexSource = tests
+		.map(
+			({ index, test }) =>
+				`(${discriminantSource}) === (${expressionSource(test, state.source)}) ? ${index} : `,
+		)
+		.join('')
+		.concat(String(fallback));
+	return {
+		testSource: discriminantSource,
+		armIndexSource: indexSource,
+		...armIndexTest(
+			[...(discriminant ? [discriminant] : []), ...tests.map(({ test }) => test)],
+			indexSource,
+			state,
+		),
+	};
+}
+
+// The index computed over every read the arm decision makes, or the row-item mark when a test reads the row.
+function armIndexTest(
+	reads: ReadonlyArray<AnyNode>,
+	indexSource: string,
+	state: WalkState,
+): { readonly testComputedGraphNodeId?: string; readonly testReadsRowItem?: true } {
+	if (reads.some((read) => readsShadowingRowItem(read, state))) return { testReadsRowItem: true };
+	const readSources: GraphReadSource[] = [];
+	for (const read of reads) {
+		const sources = pureCompositeReadSources(read, state, BRANCH_CONDITION_READ_OPTIONS);
+		if (!sources) {
+			refuseUnreadableFunctionCondition(reads, state);
+			return {};
+		}
+		readSources.push(...sources);
+	}
+	const minted = mintTemplateExpressionComputed(
+		`() => ${indexSource}`,
+		readSources,
+		state,
+		undefined,
+		false,
+		undefined,
+		false,
+		BRANCH_CONDITION_READ_OPTIONS.readsIntoProps,
+	);
+	if (minted) return { testComputedGraphNodeId: minted.graphNodeId };
+	refuseUnreadableFunctionCondition(reads, state);
+	return {};
 }
 
 function switchArmTests(node: AnyNode): ReadonlyArray<unknown> | null {

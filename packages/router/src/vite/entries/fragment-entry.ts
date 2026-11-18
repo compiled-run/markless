@@ -11,12 +11,25 @@ export interface FragmentNavigationConfig {
 	readonly routeScriptType: string;
 	readonly servedHtmlAttributesProperty: string;
 	readonly servedBodyAttributesProperty: string;
+	// Names the stylesheet a head <style> or <link> carries: a document keeps the one it has, inline or linked.
+	readonly stylesheetKeyAttribute: string;
 	readonly retireProperty: string;
+	// Where a container holds the events it received and has not yet handled, each entry's promise settling once it has.
+	readonly handlingProperty: string;
+	// Set on a container Back or Forward shows again as it was left, so its async values re-ask once its runtime wires.
+	readonly reaskProperty: string;
+	// Where the document (or a container element) holds its live shared() instances, which the swap keeps,
+	// and the resumer script attribute naming the module that binds the next page to them.
+	readonly sharedInstances: readonly [property: string, resumeModuleAttribute: string];
 	readonly streamExecutorGlobal: string;
 	readonly streamedArmSelector: string;
 	readonly streamOpenProperty: string;
 	// The leaving page stays up this long after the click while the next one still streams its @pending arms.
 	readonly pendingDeadlineMs: number;
+	// The swap waits at most this long for the destination's code and stylesheets and the leaving page's handlers.
+	readonly swapDeadlineMs: number;
+	// Dispatched on the document once the page the user ends up on is in place.
+	readonly renderedEvent: string;
 	readonly requestPrefix: string;
 	readonly regionEndMarker: string;
 	readonly appendMarker: string;
@@ -25,7 +38,14 @@ export interface FragmentNavigationConfig {
 	readonly pageStartComment: string;
 	// The container's own attributes, never carried from the leaving page's element to the next one.
 	readonly containerAttributes: readonly [container: string, paths: string];
-	readonly keepAttributes: readonly [keep: string, own: string];
+	// The keep, own, vary and instance marks, and the vary mark's name for an element's own text.
+	readonly keepAttributes: readonly [
+		keep: string,
+		own: string,
+		vary: string,
+		instance: string,
+		text: string,
+	];
 	// 'document' apps swap the whole body: their shell renders from the request URL.
 	readonly documentLoads: boolean;
 	// A mouse fetches after resting this long on a link; press, focus and touch fetch at once.
@@ -89,6 +109,8 @@ export type FragmentNavigationState = {
 	readonly idleDownloads: boolean;
 	// Schedules the idle tier: at idle, fetch a few page fragments of the links in view; their code waits for intent.
 	readonly rescan: () => void;
+	// Bumped by Back, Forward, a hash link and a click on the page shown: each cancels a navigation whose page has not swapped in.
+	stops?: number;
 	readonly scrolled: Set<Element>;
 	// Code the intent started preloading, by absolute href, settling once each file has arrived.
 	readonly arriving: Map<string, Promise<unknown>>;
@@ -105,6 +127,10 @@ export type FragmentEntryModule = {
 		url: URL,
 		mode: 'push' | 'replace' | 'traverse',
 		scroll: FragmentScroll,
+		// The state's stops when the navigation was asked for: any since cancel it.
+		stops?: number,
+		// When the click asked for it: a page fetched ahead is judged fresh as of then, not once this code arrived.
+		askedAt?: number,
 	) => Promise<void>;
 };
 
@@ -114,8 +140,6 @@ type Session = {
 	streaming?: AbortController;
 	// The history entry on screen, and the last scroll offset seen for every entry this tab visited.
 	current?: string;
-	// An entry a navigation pushed whose page has not swapped in yet: the next navigation replaces it.
-	unshown?: string;
 	readonly positions: Map<string, { readonly x: number; readonly y: number }>;
 };
 
@@ -137,6 +161,7 @@ function sessionFor(d: Document): Session {
 		{ passive: true },
 	);
 	w.addEventListener('pagehide', () => {
+		created.navigation++;
 		if (created.current) saveScroll(w, created.current);
 		w.history.scrollRestoration = 'auto';
 	});
@@ -216,6 +241,22 @@ function retire(state: FragmentNavigationState, root: Element): void {
 	}
 }
 
+async function handled(state: FragmentNavigationState, root: Element): Promise<void> {
+	for (let pending = unhandled(state, root); pending.length > 0; pending = unhandled(state, root))
+		await Promise.all(pending);
+}
+
+function unhandled(state: FragmentNavigationState, root: Element): Promise<unknown>[] {
+	return [root, ...root.querySelectorAll(`[${state.config.containerAttributes[0]}]`)].flatMap(
+		(container) => {
+			const handling = (container as unknown as Record<string, unknown>)[
+				state.config.handlingProperty
+			] as ReadonlyMap<object, readonly [Promise<unknown>, unknown]> | undefined;
+			return handling ? [...handling.values()].map(([handled]) => handled) : [];
+		},
+	);
+}
+
 function reportAsync(error: unknown): void {
 	setTimeout(() => {
 		throw error;
@@ -284,7 +325,8 @@ function captureLoadListeners(d: Document, w: Window, into: LoadListener[]): () 
 		) {
 			// A bare call has no receiver; one for the event that already fired is kept off the target, which would hold it and its page for good.
 			const self = this ?? w;
-			if (kind === type && listener && self === target) return void into.push({ target, type, listener });
+			if (kind === type && listener && self === target)
+				return void into.push({ target, type, listener });
 			return add.call(self, kind, listener, options);
 		};
 		return () => {
@@ -377,7 +419,7 @@ async function runScripts(
 	}
 }
 
-function loaded(w: Window, links: readonly HTMLLinkElement[]): Promise<unknown> {
+function loaded(w: Window, links: readonly HTMLLinkElement[], deadlineMs: number): Promise<unknown> {
 	if (links.length === 0) return Promise.resolve();
 	return Promise.race([
 		Promise.all(
@@ -389,52 +431,79 @@ function loaded(w: Window, links: readonly HTMLLinkElement[]): Promise<unknown> 
 					}),
 			),
 		),
-		new Promise((resolve) => w.setTimeout(resolve, 3000)),
+		new Promise((resolve) => w.setTimeout(resolve, deadlineMs)),
 	]);
 }
 
+// A stylesheet an abandoned navigation hid keeps its served media here, so the navigation that reuses it shows it.
+const servedMedia = new WeakMap<Element, string | null>();
+
 // Existing head nodes stay where they are (moving a stylesheet re-applies it); new ones go in the destination's order.
-async function mergeHead(d: Document, next: Document) {
+export async function mergeHead(
+	d: Document,
+	next: Document,
+	stylesheetKey: string,
+	deadlineMs: number,
+) {
+	// A stylesheet's name is a URL and outerHTML starts with "<", so the two never collide.
+	const key = (element: Element) => element.getAttribute(stylesheetKey) ?? element.outerHTML;
 	const current = new Map<string, Element[]>();
 	for (const element of d.head.children) {
-		const list = current.get(element.outerHTML);
+		const list = current.get(key(element));
 		if (list) list.push(element);
-		else current.set(element.outerHTML, [element]);
+		else current.set(key(element), [element]);
 	}
 	const stylesheets: HTMLLinkElement[] = [];
 	const hidden: [Element, string | null][] = [];
 	const scripts: HTMLScriptElement[] = [];
+	// Only stylesheets (unapplied) and preloads go in ahead of the swap, so they load; the rest of the head changes with the page.
+	const later: [Element, Element | null][] = [];
 	let cursor: Element | null = null;
+	let placed: Element | null = null;
 	for (const element of Array.from(next.head.children)) {
-		const reused = current.get(element.outerHTML)?.shift();
+		const reused = current.get(key(element))?.shift();
 		const node = reused ?? d.adoptNode(element);
+		if (reused && servedMedia.has(reused)) hidden.push([reused, servedMedia.get(reused)!]);
 		if (!reused) {
 			// An arriving stylesheet applies only with its page: applied before, it restyles the leaving page for nothing.
+			const rel = node.localName === 'link' ? (node as HTMLLinkElement).rel : '';
 			if (isStyleNode(node)) {
 				hidden.push([node, node.getAttribute('media')]);
+				servedMedia.set(node, node.getAttribute('media'));
 				node.setAttribute('media', 'not all');
 			}
-			if (cursor) cursor.after(node);
-			else d.head.prepend(node);
+			if (isStyleNode(node) || rel === 'modulepreload' || rel === 'preload') {
+				if (placed) placed.after(node);
+				else d.head.prepend(node);
+				placed = node;
+			} else later.push([node, cursor]);
 			if (node.localName === 'link' && (node as HTMLLinkElement).rel === 'stylesheet')
 				stylesheets.push(node as HTMLLinkElement);
 			// A kept head script already ran on this document; only one the destination adds runs.
 			if (node.localName === 'script') scripts.push(node as HTMLScriptElement);
-		}
+		} else placed = node;
 		cursor = node;
 	}
 	const stale: Element[] = [];
+	const leaving: Element[] = [];
 	for (const element of [...current.values()].flat()) {
 		const rel = element.localName === 'link' ? (element as HTMLLinkElement).rel : '';
 		if (rel === 'modulepreload' || rel === 'preload') continue;
 		if (rel === 'stylesheet' || element.localName === 'style') stale.push(element);
-		else if ((element as HTMLScriptElement).type !== 'importmap') element.remove();
+		else if ((element as HTMLScriptElement).type !== 'importmap') leaving.push(element);
 	}
-	await loaded(d.defaultView!, stylesheets);
+	await loaded(d.defaultView!, stylesheets, deadlineMs);
 	const show = () => {
-		for (const [node, media] of hidden)
+		for (const element of leaving) element.remove();
+		for (const [node, after] of later) {
+			if (after) after.after(node);
+			else d.head.prepend(node);
+		}
+		for (const [node, media] of hidden) {
+			servedMedia.delete(node);
 			if (media === null) node.removeAttribute('media');
 			else node.setAttribute('media', media);
+		}
 	};
 	return { stale, scripts, show };
 }
@@ -594,6 +663,20 @@ function nodesBetween(parent: Node, after: Node | undefined, before: Node | null
 const scriptsIn = (element: Element): Element[] =>
 	element.localName === 'script' ? [element] : [...element.querySelectorAll('script')];
 
+const isMedia = (element: Element): boolean =>
+	element.localName === 'video' || element.localName === 'audio';
+
+// A media element starts loading where it is parsed, and the parsed page has no window to load into: the live document makes each one anew.
+function adoptArriving<T extends ChildNode>(d: Document, node: T): T {
+	const adopted = d.adoptNode(node);
+	if (adopted.nodeType !== 1) return adopted;
+	const element = adopted as unknown as Element;
+	if (isMedia(element)) return d.importNode(element, true) as unknown as T;
+	for (const media of element.querySelectorAll('video, audio'))
+		media.replaceWith(d.importNode(media, true));
+	return adopted;
+}
+
 const serverHostAttributes = new WeakMap<Document, Set<string>>();
 
 // A container kept in place takes the server's attributes; one a script set on it, and the server never served, stays.
@@ -644,6 +727,10 @@ function morphRange(
 			if (after && after !== stop && sameKind(after, next)) {
 				cursor.remove();
 				cursor = after;
+				if (kept(d, cursor, next, fresh)) {
+					cursor = cursor.nextSibling;
+					continue;
+				}
 			}
 		}
 		if (cursor && cursor !== stop && sameKind(cursor, next)) {
@@ -652,7 +739,7 @@ function morphRange(
 			cursor = after;
 			continue;
 		}
-		const node = d.adoptNode(next);
+		const node = adoptArriving(d, next);
 		parent.insertBefore(node, cursor && cursor !== stop ? cursor : stop);
 		if (node.nodeType === 1) fresh.push(node as Element);
 	}
@@ -663,28 +750,154 @@ function morphRange(
 	}
 }
 
-let keepAttributes: readonly [keep: string, own: string] = ['', ''];
+let keepAttributes: FragmentNavigationConfig['keepAttributes'] = ['', '', '', '', ''];
+// Loaded by a navigation that leaves a kept part with state; without it such a part is morphed.
+let keptSwap: typeof import('@markless/web/kept-swap') | undefined;
 
-// Both pages render this element byte for byte: it stays, with what scripts did to it; only the page's own children inside are replaced.
-function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): boolean {
-	const [keep, own] = keepAttributes;
+// Both pages render this element byte for byte but for its vary-marked attributes: it stays, with what scripts did to it.
+function keptSlots(
+	from: ChildNode,
+	to: ChildNode,
+): [Element[], Element[], Element[][]] | undefined {
+	const [keep, own, vary, instance] = keepAttributes;
 	const hash = keep && from.nodeType === 1 && (from as Element).getAttribute(keep);
-	if (!hash || to.nodeType !== 1 || hash !== (to as Element).getAttribute(keep)) return false;
+	if (!hash || to.nodeType !== 1 || hash !== (to as Element).getAttribute(keep)) return undefined;
+	if ((from as Element).hasAttribute(instance) && !keptSwap?.sameShape(from, to, own))
+		return undefined;
 	const slots = (root: Element) =>
 		root.hasAttribute(own)
 			? [root]
 			: [...root.querySelectorAll(`[${own}]`)].filter(
 					(slot) => !root.contains(slot.parentElement!.closest(`[${own}]`)),
 				);
+	// Vary marks outside the page's own elements pair up in document order, unless a script added or removed one.
+	const varied = (root: Element, slots: Element[]) =>
+		[root, ...root.querySelectorAll(`[${vary}]`)].filter(
+			(element) =>
+				element.hasAttribute(vary) &&
+				!slots.some((slot) => slot !== element && slot.contains(element)),
+		);
 	const leaving = slots(from as Element);
 	const arriving = slots(to as Element);
-	if (leaving.length !== arriving.length) return false;
+	if (leaving.length !== arriving.length) return undefined;
+	const before = varied(from as Element, leaving);
+	const after = varied(to as Element, arriving);
+	return before.length === after.length ? [leaving, arriving, [before, after]] : undefined;
+}
+
+// Each kept part with state on the leaving page, and the next page's part of the same hash the swap keeps it as.
+function keptPairs(
+	outgoing: Element,
+	incoming: Element,
+	keep: string,
+	instance: string,
+): Array<{ readonly from: string; readonly to: string }> {
+	const arriving = [...incoming.querySelectorAll(`[${instance}]`)];
+	const pairs: Array<{ readonly from: string; readonly to: string }> = [];
+	for (const element of outgoing.querySelectorAll(`[${instance}]`)) {
+		const at = arriving.findIndex(
+			(next) => next.getAttribute(keep) === element.getAttribute(keep) && !!keptSlots(element, next),
+		);
+		if (at === -1) continue;
+		const [next] = arriving.splice(at, 1);
+		pairs.push({ from: element.getAttribute(instance)!, to: next!.getAttribute(instance)! });
+	}
+	return pairs.filter((pair) => pair.from && pair.to);
+}
+
+function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): boolean {
+	const slots = keptSlots(from, to);
+	if (!slots) return false;
+	const [leaving, arriving, [before, after]] = slots;
+	const [, , vary, instance, text] = keepAttributes;
+	// The next page may place the part at another instance path; its next swap reads the cells under this one.
+	const path = (to as Element).getAttribute(instance);
+	if (path !== null) (from as Element).setAttribute(instance, path);
+	before.forEach((element, index) => {
+		const next = after[index]!;
+		for (const name of next.getAttribute(vary)!.split(' ')) {
+			if (name === text) {
+				keptSwap?.keptText(d, element, next);
+				continue;
+			}
+			const value = next.getAttribute(name);
+			if (value === null) element.removeAttribute(name);
+			else if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+		}
+	});
 	leaving.forEach((slot, index) => {
-		const nodes = [...arriving[index]!.childNodes].map((node) => d.adoptNode(node));
+		const nodes = [...arriving[index]!.childNodes].map((node) => adoptArriving(d, node));
 		slot.replaceChildren(...nodes);
 		for (const node of nodes) if (node.nodeType === 1) fresh.push(node as Element);
 	});
 	return true;
+}
+
+// A template's content is not its children, so a morph cannot see it; a custom element owns its own state; a media element picks its source once.
+const replacedWhole = (element: Element, incoming: Element, page: boolean): boolean =>
+	element.localName === 'template' ||
+	(element.localName === 'script' && (page || !element.isEqualNode(incoming))) ||
+	((element.localName.includes('-') || isMedia(element)) && !element.isEqualNode(incoming));
+
+type MorphRange = readonly [
+	parent: Node,
+	cursor: ChildNode | null,
+	stop: Node | null,
+	incoming: readonly ChildNode[],
+	page: boolean,
+];
+
+// Whether morphing `range` removes `node`, pairing nodes exactly as morphRange does, without changing anything.
+function morphDrops([parent, start, stop, incoming, page]: MorphRange, node: Node): boolean {
+	let own: Node | null = node;
+	while (own && own.parentNode !== parent) own = own.parentNode;
+	if (!own) return false;
+	let cursor = start;
+	for (const next of incoming) {
+		if (!cursor || cursor === stop) return false;
+		const slots = keptSlots(cursor, next);
+		if (slots) {
+			if (cursor === own)
+				return slots[0].some((slot) => slot !== node && slot.contains(node));
+			cursor = cursor.nextSibling;
+			continue;
+		}
+		if (!sameKind(cursor, next)) {
+			const after = cursor.nextSibling;
+			if (after && after !== stop && sameKind(after, next)) {
+				if (cursor === own) return true;
+				cursor = after;
+				const slots = keptSlots(cursor, next);
+				if (slots) {
+					if (cursor === own)
+						return slots[0].some((slot) => slot !== node && slot.contains(node));
+					cursor = cursor.nextSibling;
+					continue;
+				}
+			}
+		}
+		if (sameKind(cursor, next)) {
+			if (cursor === own) {
+				if (own.nodeType !== 1) return false;
+				const element = own as Element;
+				const inPage = page || isContainer(element);
+				if (replacedWhole(element, next as Element, inPage)) return true;
+				if (
+					own === node ||
+					(!inPage && element.isEqualNode(next)) ||
+					element.localName === 'script'
+				)
+					return false;
+				return morphDrops(
+					[element, element.firstChild, null, Array.from(next.childNodes), inPage],
+					node,
+				);
+			}
+			cursor = cursor.nextSibling;
+		}
+	}
+	for (; cursor && cursor !== stop; cursor = cursor.nextSibling) if (cursor === own) return true;
+	return false;
 }
 
 function morphNode(
@@ -703,13 +916,8 @@ function morphNode(
 	const incoming = to as Element;
 	const name = element.localName;
 	page ||= isContainer(element);
-	// A template's content is not its children, so a morph cannot see it; a custom element owns its own state.
-	if (
-		name === 'template' ||
-		(name === 'script' && (page || !element.isEqualNode(incoming))) ||
-		(name.includes('-') && !element.isEqualNode(incoming))
-	) {
-		const node = d.adoptNode(incoming);
+	if (replacedWhole(element, incoming, page)) {
+		const node = adoptArriving(d, incoming);
 		element.replaceWith(node);
 		fresh.push(node);
 		return;
@@ -751,7 +959,8 @@ function withoutTransitions(d: Document): () => void {
 			const observer = new w.ResizeObserver(() => {
 				observer.disconnect();
 				for (const animation of d.getAnimations())
-					if (!running.has(animation) && animation instanceof w.CSSTransition) animation.cancel();
+					if (!running.has(animation) && animation instanceof w.CSSTransition)
+						animation.cancel();
 				if (frames > 1) w.requestAnimationFrame(() => beforePaint(frames - 1));
 			});
 			observer.observe(d.documentElement);
@@ -770,10 +979,11 @@ function withoutTransitions(d: Document): () => void {
 }
 
 // Drops the leaving page's runtime state (the framework names its own `__m*`) and gives each container a new page lifetime.
-function forgetRuntimeState(root: Element): void {
+function forgetRuntimeState(root: Element, kept: string): void {
 	const forget = (node: Node) => {
 		for (const key of Object.keys(node))
-			if (key.startsWith('__m')) delete (node as unknown as Record<string, unknown>)[key];
+			if (key.startsWith('__m') && key !== kept)
+				delete (node as unknown as Record<string, unknown>)[key];
 		if (isContainer(node)) (node as unknown as Record<string, unknown>).__mL = {};
 	};
 	forget(root);
@@ -924,51 +1134,64 @@ export async function navigate(
 	url: URL,
 	mode: 'push' | 'replace' | 'traverse',
 	scroll: FragmentScroll,
+	stops?: number,
+	askedAt?: number,
 ): Promise<void> {
 	const state = (d as FragmentHost).__marklessFragmentNav;
 	const w = d.defaultView;
 	if (!state || !w) return;
 	containerAttribute = state.config.containerAttributes[0];
+	keepAttributes = state.config.keepAttributes ?? ['', '', '', '', ''];
 	const session = sessionFor(d);
 	const id = ++session.navigation;
-	// The address follows the click at once, so Back before the page arrives returns to the page still shown.
-	const entryNow = () =>
-		(w.history.state as { __marklessFragment?: { id?: string } } | null)?.__marklessFragment
-			?.id;
-	let entered: string | undefined;
-	if (mode !== 'traverse') {
-		const unshown = session.unshown !== undefined && session.unshown === entryNow();
-		if (!unshown)
-			session.positions.set(session.current ?? entryNow() ?? LANDING_ENTRY, {
-				x: w.scrollX,
-				y: w.scrollY,
-			});
-		w.history.scrollRestoration = 'manual';
-		session.unshown = entered = entryId();
-		const entry = { __marklessFragment: { id: entered, x: 0, y: 0 } };
-		if (mode === 'push' && !unshown) w.history.pushState(entry, '', url.href);
-		else w.history.replaceState(entry, '', url.href);
-	}
-	const left = () => entered !== undefined && entryNow() !== entered;
-	const stale = () => id !== session.navigation || left();
+	// The address and history entry change only when the page swaps in, so Back before then goes back from the page still shown.
+	const stale = () => id !== session.navigation || (mode !== 'traverse' && stops !== state.stops);
+	if (stale()) return;
 	const fallback = (href: string) => {
 		if (mode === 'traverse') w.location.reload();
-		else w.location.replace(href);
+		else if (mode === 'replace') w.location.replace(href);
+		else w.location.assign(href);
 	};
 	const started = w.performance.now();
-	const taken = take(state, url, mode === 'traverse', started);
-	const abandon = () => {
-		if (session.unshown === entered) session.unshown = undefined;
-		taken.abort();
-	};
+	const restored = mode === 'traverse' && state.visited.has(pageKey(url));
+	let taken = take(state, url, mode === 'traverse', askedAt ?? started);
+	// The next page is served with shared() defaults; once a runtime has bound an instance it takes the
+	// live values before it is shown. A document whose instances hold no values swaps in this task.
+	const [sharedProperty, resumeAttribute] = state.config.sharedInstances;
+	const sharedSwap = [d, d.querySelector(`[${containerAttribute}]`)].some((place) =>
+		Object.values(
+			(place as { [key: string]: { instances?: Record<string, { shape?: string }> } } | null)?.[
+				sharedProperty
+			]?.instances ?? {},
+		).some((instance) => instance.shape),
+	)
+		? import('@markless/web/shared-swap')
+		: undefined;
+	sharedSwap?.catch(() => {});
+	// A kept part with state hands its live values to the next page's instance, which only the swap binder knows how to read.
+	const [keepAttribute, , , instanceAttribute] = state.config.keepAttributes;
+	keptSwap = undefined;
+	const keptSwapping =
+		instanceAttribute && d.querySelector(`[${instanceAttribute}]`)
+			? import('@markless/web/kept-swap')
+			: undefined;
+	keptSwapping?.catch(() => {});
+	const abandon = () => taken.abort();
 	let fetched: FragmentFetched;
-	try {
-		fetched = await taken.result;
-	} catch {
-		if (!stale()) fallback(url.href);
-		return;
+	for (let again = false; ; again = true) {
+		try {
+			fetched = await taken.result;
+		} catch {
+			// Leaving the document aborts the fetch a few ms before pagehide, which makes this navigation stale.
+			w.setTimeout(() => stale() || fallback(url.href), state.config.pendingDeadlineMs);
+			return;
+		}
+		if (stale()) return abandon();
+		// A write since the fetch began may change the page: fetch it once more, never in a loop.
+		if (again || taken.writes === state.writes) break;
+		abandon();
+		taken = state.request(url, false);
 	}
-	if (stale()) return abandon();
 	let arrived = !fetched.rest;
 	if (fetched.rest) {
 		const held = await holdStream(
@@ -1004,30 +1227,78 @@ export async function navigate(
 		);
 	const ranFiles = filesRan(d);
 	const leaving = { key: state.shown, name: pageName(d) };
-	const head = await mergeHead(d, next);
-	await Promise.race([Promise.all(code), new Promise((resolve) => w.setTimeout(resolve, 3000))]);
+	const head = await mergeHead(
+		d,
+		next,
+		state.config.stylesheetKeyAttribute,
+		state.config.swapDeadlineMs,
+	);
+	// The leaving page retires once it has handled the events it received, so a late handler writes before the carry reads.
+	await Promise.race([
+		Promise.all([...code, handled(state, outgoing)]),
+		new Promise((resolve) => w.setTimeout(resolve, state.config.swapDeadlineMs)),
+	]);
 	if (stale()) return abandon();
-	let restore = scroll;
-	if (mode === 'traverse') {
-		const key = (typeof scroll === 'object' ? scroll.id : undefined) ?? LANDING_ENTRY;
-		const saved = session.positions.get(key);
-		if (saved) restore = saved;
-		session.current = key;
-	} else {
-		session.current = entered;
-		session.unshown = undefined;
-		if (landed.href !== w.location.href)
-			w.history.replaceState(w.history.state, '', landed.href);
+	let wakeShared: (() => void) | undefined;
+	if (sharedSwap) {
+		try {
+			wakeShared = await (
+				await sharedSwap
+			).bindSharedSwap({ document: d, outgoing, incoming, containerAttribute, resumeAttribute });
+		} catch (error) {
+			reportAsync(error);
+		}
+		if (stale()) return abandon();
 	}
+	let adoptKept: import('@markless/web/kept-swap').KeptCarry | undefined;
+	const swapping = await keptSwapping?.catch(() => undefined);
+	if (stale()) return abandon();
+	keptSwap = swapping;
+	const pairs = keptSwap ? keptPairs(outgoing, incoming, keepAttribute, instanceAttribute) : [];
+	if (keptSwap && pairs.length > 0) {
+		try {
+			for (let tries = 0; tries < 3; tries++) {
+				adoptKept?.restore();
+				adoptKept = await keptSwap.carryKeptParts({
+					outgoing,
+					incoming,
+					containerAttribute,
+					resumeAttribute,
+					pairs,
+				});
+				if (stale()) return abandon();
+				if (!adoptKept?.moved()) break;
+			}
+		} catch (error) {
+			reportAsync(error);
+		}
+		if (stale()) return abandon();
+		keptSwap = swapping;
+	}
+	let restore = scroll;
 	let region!: Element;
 	let end!: Comment;
 	let scripts: Element[] = [];
 	const commit = (): boolean => {
-		if (id !== session.navigation) return false;
+		if (stale()) return false;
+		if (mode === 'traverse') {
+			const key = (typeof scroll === 'object' ? scroll.id : undefined) ?? LANDING_ENTRY;
+			const saved = session.positions.get(key);
+			if (saved) restore = saved;
+			session.current = key;
+		} else {
+			const leaving =
+				(w.history.state as { __marklessFragment?: { id?: string } } | null)
+					?.__marklessFragment?.id ?? LANDING_ENTRY;
+			session.positions.set(session.current ?? leaving, { x: w.scrollX, y: w.scrollY });
+			w.history.scrollRestoration = 'manual';
+			const entry = { __marklessFragment: { id: (session.current = entryId()), x: 0, y: 0 } };
+			if (mode === 'push') w.history.pushState(entry, '', landed.href);
+			else w.history.replaceState(entry, '', landed.href);
+		}
 		// The leaving page keeps its stream until now: closed early, its unanswered @try runs the recipe in the browser.
 		session.streaming?.abort();
 		const settle = withoutTransitions(d);
-		keepAttributes = state.config.keepAttributes ?? ['', ''];
 		const offsets: ScrolledBox[] = [];
 		for (const element of state.scrolled) {
 			if (!element.isConnected || !scope.contains(element)) continue;
@@ -1043,88 +1314,86 @@ export async function navigate(
 		}
 		state.scrolled.clear();
 		retire(state, outgoing);
-		forgetRuntimeState(outgoing);
+		forgetRuntimeState(outgoing, sharedProperty);
 		(w as unknown as Record<string, unknown>)[state.config.streamExecutorGlobal] = undefined;
 		for (const element of d.querySelectorAll(state.config.streamedArmSelector))
 			element.remove();
 		state.shown = pageKey(new URL(w.location.href));
+		const wholeBody = documentLoads && !isContainer(d.body);
+		const leavingEnd = wholeBody ? undefined : pageEnd(outgoing, state.config.pageEndComment);
+		const ranges: MorphRange[] = [];
+		if (leavingEnd) {
+			const arrivingEnd = pageEnd(incoming, state.config.pageEndComment) ?? null;
+			const arrivingStart = pageStart(incoming, state.config.pageStartComment);
+			let leavingStart = pageStart(outgoing, state.config.pageStartComment);
+			if (!leavingStart && arrivingStart)
+				leavingStart = outgoing.insertBefore(
+					d.createComment(state.config.pageStartComment),
+					outgoing.firstChild,
+				);
+			ranges.push([
+				outgoing,
+				leavingStart ? leavingStart.nextSibling : outgoing.firstChild,
+				leavingEnd,
+				nodesBetween(incoming, arrivingStart, arrivingEnd),
+				true,
+			]);
+			// The document's own nodes around the page stay; a document app morphs them to its next shell.
+			if (documentLoads) {
+				ranges.push([
+					outgoing,
+					leavingEnd.nextSibling,
+					null,
+					arrivingEnd ? nodesBetween(incoming, arrivingEnd, null) : [],
+					false,
+				]);
+				if (leavingStart)
+					ranges.push([
+						outgoing,
+						outgoing.firstChild,
+						leavingStart,
+						arrivingStart ? nodesBetween(incoming, undefined, arrivingStart) : [],
+						false,
+					]);
+			}
+		} else
+			ranges.push([
+				outgoing,
+				outgoing.firstChild,
+				null,
+				Array.from(incoming.childNodes),
+				!wholeBody,
+			]);
+		// Removing the focused element mid-swap forces a style recalculation of the half-built page; on a clean document a blur costs nothing.
+		const focused = d.activeElement as HTMLElement | null;
+		if (focused && ranges.some((range) => morphDrops(range, focused))) focused.blur();
 		if (documentLoads) syncHtmlAttributes(d, next, state.config.servedHtmlAttributesProperty);
+		const own = state.config.containerAttributes;
+		if (wholeBody) syncBodyAttributes(d, next.body, state.config.servedBodyAttributesProperty);
+		else if (outgoing === d.body)
+			syncBodyAttributes(d, incoming, state.config.servedBodyAttributesProperty, own);
+		else syncHostAttributes(d, outgoing, incoming, own);
 		const fresh: Element[] = [];
 		region = outgoing;
-		if (documentLoads && !isContainer(d.body)) {
-			syncBodyAttributes(d, next.body, state.config.servedBodyAttributesProperty);
-			morphChildren(d, region, incoming, fresh);
-			region.append((end = d.createComment('')));
-		} else {
-			const own = state.config.containerAttributes;
-			if (outgoing === d.body)
-				syncBodyAttributes(d, incoming, state.config.servedBodyAttributesProperty, own);
-			else syncHostAttributes(d, outgoing, incoming, own);
-			const leavingEnd = pageEnd(outgoing, state.config.pageEndComment);
-			if (leavingEnd) {
-				const arrivingEnd = pageEnd(incoming, state.config.pageEndComment) ?? null;
-				const arrivingStart = pageStart(incoming, state.config.pageStartComment);
-				let leavingStart = pageStart(outgoing, state.config.pageStartComment);
-				if (!leavingStart && arrivingStart)
-					leavingStart = outgoing.insertBefore(
-						d.createComment(state.config.pageStartComment),
-						outgoing.firstChild,
-					);
-				morphRange(
-					d,
-					outgoing,
-					leavingStart ? leavingStart.nextSibling : outgoing.firstChild,
-					leavingEnd,
-					nodesBetween(incoming, arrivingStart, arrivingEnd),
-					fresh,
-					true,
-				);
-				end = leavingEnd;
-				// The document's own nodes around the page stay; a document app morphs them to its next shell.
-				if (documentLoads) {
-					morphRange(
-						d,
-						outgoing,
-						leavingEnd.nextSibling,
-						null,
-						arrivingEnd ? nodesBetween(incoming, arrivingEnd, null) : [],
-						fresh,
-						false,
-					);
-					if (leavingStart)
-						morphRange(
-							d,
-							outgoing,
-							outgoing.firstChild,
-							leavingStart,
-							arrivingStart ? nodesBetween(incoming, undefined, arrivingStart) : [],
-							fresh,
-							false,
-						);
-				}
-			} else {
-				morphRange(
-					d,
-					outgoing,
-					outgoing.firstChild,
-					null,
-					Array.from(incoming.childNodes),
-					fresh,
-					true,
-				);
-				outgoing.after((end = d.createComment('')));
-			}
-		}
+		for (const [parent, cursor, stop, nodes, page] of ranges)
+			morphRange(d, parent, cursor, stop, nodes, fresh, page);
+		const container = isContainer(outgoing)
+			? outgoing
+			: outgoing.querySelector(`[${containerAttribute}]`);
+		if (adoptKept && container) adoptKept.install(container);
+		if (leavingEnd) end = leavingEnd;
+		else if (wholeBody) region.append((end = d.createComment('')));
+		else outgoing.after((end = d.createComment('')));
 		scripts = fresh.flatMap(scriptsIn);
 		// A box the swap kept still has its offset; scrolling it again would lay out the page before it paints.
 		// 'instant': a `scroll-behavior: smooth` page would otherwise animate every landing.
-		for (const box of offsets)
-			if (!box.element.isConnected)
-				sameBox(scope, box)?.scrollTo({
-					top: box.top,
-					left: box.left,
-					behavior: 'instant',
-				});
+		for (const box of offsets) {
+			const kept = box.element.isConnected;
+			const placed = kept ? box.element : sameBox(scope, box);
+			if (!kept) placed?.scrollTo({ top: box.top, left: box.left, behavior: 'instant' });
+			// No scroll event says so before the next navigation may need it.
+			if (placed) state.scrolled.add(placed);
+		}
 		head.show();
 		for (const element of head.stale) element.remove();
 		if (next.title && d.title !== next.title) d.title = next.title;
@@ -1133,6 +1402,10 @@ export async function navigate(
 	};
 	const committed = commit();
 	if (!committed) return;
+	if (restored)
+		for (const container of [region, ...region.querySelectorAll(`[${containerAttribute}]`)])
+			if (isContainer(container))
+				(container as unknown as Record<string, unknown>)[state.config.reaskProperty] = true;
 	const controller = new AbortController();
 	session.streaming = controller;
 	const host = d as unknown as Record<string, unknown>;
@@ -1154,6 +1427,7 @@ export async function navigate(
 		ranFiles,
 		() => id === session.navigation,
 	);
+	wakeShared?.();
 	const active = d.activeElement as HTMLElement | null;
 	if (active && active !== d.body && !region.contains(active)) active.blur?.();
 	(region.querySelector('[autofocus]') as HTMLElement | null)?.focus();
@@ -1164,7 +1438,7 @@ export async function navigate(
 	} else if (restore !== 'manual')
 		w.scrollTo({ top: restore.y, left: restore.x, behavior: 'instant' });
 	if (state.shown !== leaving.key) announcePage(d, leaving.name);
-	d.dispatchEvent(new CustomEvent('marklessrouterrendered'));
+	d.dispatchEvent(new CustomEvent(state.config.renderedEvent));
 	state.rescan();
 	const key = state.shown;
 	void streamAppends(d, state, fetched, end, controller.signal, arrived).then(

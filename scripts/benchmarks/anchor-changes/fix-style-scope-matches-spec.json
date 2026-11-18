@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 428,
+			"reason": "style scope per component (PR #685): measured on CI run 43496595402; per chunk against main 73cb34fdc: the navbar chunk +152 B and other component chunks +5 to +35 B each carry one mk- class per component instead of one per file (same template bytes, worse compression), the playground compile worker +51 B for the compiler change, and on /concepts/state the styling page's rewritten examples +255 B",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 941,
+			"reason": "style scope per component (PR #685): measured on CI run 43496595402; per chunk against main 73cb34fdc: the navbar chunk +152 B and other component chunks +5 to +35 B each carry one mk- class per component instead of one per file (same template bytes, worse compression), the playground compile worker +51 B for the compiler change, and on /concepts/state the styling page's rewritten examples +255 B",
+			"date": "2026-11-13"
+		}
+	]
+}

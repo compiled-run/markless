@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": -8697,
+			"reason": "self-wake and return-wake inline scripts ship minified like the main resumer; the docs playground's in-browser bundler drops the inline-resumer compile it never calls",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -8697,
+			"reason": "self-wake and return-wake inline scripts ship minified like the main resumer; the docs playground's in-browser bundler drops the inline-resumer compile it never calls",
+			"date": "2026-11-10"
+		}
+	]
+}

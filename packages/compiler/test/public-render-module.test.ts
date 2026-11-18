@@ -290,7 +290,7 @@ import { shared, state } from '@markless/core';
 export const listBox = shared(() => {
 	const box = state({ items: [{ id: 'a', label: 'A' }] });
 	return { ...box };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function List() @{
 	const box = listBox();
 	<ul>@for (const item of box.items; key item.id) { <li>{item.label}</li> }</ul>

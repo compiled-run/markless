@@ -520,7 +520,7 @@ export const cropState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function CropRoot({

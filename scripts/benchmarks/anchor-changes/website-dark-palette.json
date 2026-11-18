@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1602,
+			"reason": "dark mode: code blocks paint dark tokens with the site's own syntax colours and the navbar icons gain a dark over-wash layer; the added bytes are render data and highlighter data, and nothing more runs at load",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 5248,
+			"reason": "dark mode: code blocks paint dark tokens with the site's own syntax colours and the navbar icons gain a dark over-wash layer; the added bytes are render data and highlighter data, and nothing more runs at load",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 321,
+			"reason": "dark mode: code blocks paint dark tokens with the site's own syntax colours and the navbar icons gain a dark over-wash layer; the added bytes are render data and highlighter data, and nothing more runs at load",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 679,
+			"reason": "dark mode: code blocks paint dark tokens with the site's own syntax colours and the navbar icons gain a dark over-wash layer; the added bytes are render data and highlighter data, and nothing more runs at load",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 5320,
+			"reason": "dark mode: code blocks paint dark tokens with the site's own syntax colours and the navbar icons gain a dark over-wash layer; the added bytes are render data and highlighter data, and nothing more runs at load",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 319,
+			"reason": "dark mode: code blocks paint dark tokens with the site's own syntax colours and the navbar icons gain a dark over-wash layer; the added bytes are render data and highlighter data, and nothing more runs at load",
+			"date": "2026-11-10"
+		}
+	]
+}

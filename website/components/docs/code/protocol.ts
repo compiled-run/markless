@@ -16,6 +16,8 @@ export type CompiledModule = {
 	readonly kind: 'script' | 'style';
 	readonly code: string;
 	readonly imports: readonly ImportSite[];
+	/** The compiler wrote it, as a component's handler or update code; the frame runs it before the component mounts, as a build ships it with the component. */
+	readonly generated?: true;
 };
 
 /** A problem in the reader's code; `line` and `column` are 1-based, and 0 when it has no place in a file. */

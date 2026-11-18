@@ -53,7 +53,7 @@ export const boxState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 export function BoxRoot({ onChange, children }) @{
 	const box = boxState();

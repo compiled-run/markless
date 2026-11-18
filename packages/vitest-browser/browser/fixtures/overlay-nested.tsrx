@@ -22,7 +22,7 @@ export const outer = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export const inner = shared(
@@ -39,7 +39,7 @@ export const inner = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function OuterRoot({ children }) @{

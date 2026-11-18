@@ -1,0 +1,86 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 192,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 28,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: bench / 93273 -> 93301 B gzip at load; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 28,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: bench /records 93273 -> 93301 B gzip at load; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 28,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: bench /settings 93273 -> 93301 B gzip at load; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 446,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: docs / 1694547 -> 1694993 B gzip at load; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 446,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: docs /concepts/state 2238665 -> 2239111 B gzip at load; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 411,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: docs /ui/accordion 498709 -> 499120 B gzip at load; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
+			"date": "2026-11-13"
+		}
+	]
+}

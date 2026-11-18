@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 381,
+			"reason": "row slot reads, shared() member reads in rows and an @if render's live owner props (PR #444): the docs playground compile worker carries the compiler change and prerender/evaluator the flip-time props read, fetched at load and none of it executed then; measured on CI run 41728241995 against queue run 41720739647",
+			"date": "2026-11-03"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 381,
+			"reason": "row slot reads, shared() member reads in rows and an @if render's live owner props (PR #444): the docs playground compile worker carries the compiler change and prerender/evaluator the flip-time props read, fetched at load and none of it executed then; measured on CI run 41728241995 against queue run 41720739647",
+			"date": "2026-11-03"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 72,
+			"reason": "row slot reads, shared() member reads in rows and an @if render's live owner props (PR #444): the docs playground compile worker carries the compiler change and prerender/evaluator the flip-time props read, fetched at load and none of it executed then; measured on CI run 41728241995 against queue run 41720739647",
+			"date": "2026-11-03"
+		}
+	]
+}

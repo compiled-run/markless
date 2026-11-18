@@ -4,6 +4,9 @@ import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
 	plugins: [markless(), router()],
+	lint: {
+		ignorePatterns: ['markless-router-env.d.ts'],
+	},
 	fmt: {
 		useTabs: true,
 		tabWidth: 4,

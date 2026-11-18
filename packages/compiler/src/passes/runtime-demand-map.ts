@@ -20,7 +20,9 @@ import type {
 	SemanticComponent,
 	SemanticComponentEdge,
 	SemanticComponentPropBinding,
+	SemanticEvent,
 	SemanticGraphBinding,
+	SemanticKeyedRepeat,
 	SemanticSharedCallbackBinding,
 	SymbolModulesArtifact,
 	SymbolResolverPlan,
@@ -29,6 +31,7 @@ import {
 	PROTOCOL_EVENT_ACTION_KIND,
 	PROTOCOL_PAGE_SPACE_ID_PREFIXES,
 	PROTOCOL_VISIBLE_EVENT_NAME,
+	hasLiveSharedDefinitions,
 	protocolEventActionKind,
 	type ProtocolArmBranchRecord,
 	type ProtocolArmRecordSet,
@@ -47,6 +50,8 @@ import {
 	sharedCallbackSlotGraphNodeId,
 } from './semantic-graph/collect-shared.ts';
 
+// Every emitted symbol loader reads code already on the page through it.
+const SYMBOL_LOAD = ['web/fns/resident-load'];
 const DISPATCH_CORE_COMMON = [
 	'web/resume-runtime',
 	'web/resume-runtime-shared',
@@ -60,12 +65,14 @@ const DISPATCH_CORE_COMMON = [
 	'web/runtime-error-reporting',
 	// Payload resume applies every dispatch's DOM writes through the journal.
 	'web/dom-journal',
+	...SYMBOL_LOAD,
 ];
 const SCALAR_LEAN_DISPATCH_CORE = [
 	'web/fns/dom-order',
 	'web/fns/write-scalar',
 	'web/fns/update-text',
 	'web/runtime-error-reporting',
+	...SYMBOL_LOAD,
 	// Tiny generic helpers for emitted scalar dispatchers: DOM-order lookup,
 	// scalar-cell decode/validation, and fail-closed error creation.
 	...LEAN_DISPATCH_MARKER_MODULES.scalar,
@@ -73,6 +80,7 @@ const SCALAR_LEAN_DISPATCH_CORE = [
 const ROW_LEAN_DISPATCH_CORE = [
 	...LEAN_DISPATCH_MARKER_MODULES.row,
 	'web/event-only-lean/lean-shared',
+	...SYMBOL_LOAD,
 ];
 const CLOSURE_DISPATCH_CORE = [...SCALAR_LEAN_DISPATCH_CORE, 'web/fns/closure-action'];
 const SYNC_POLICY = ['web/inline/sync-policy-core'];
@@ -81,18 +89,38 @@ const KEYED_REPEAT = ['web/repeat-runtime', 'web/resume-keyed-repeats'];
 // Arm range commits and served-arm registration load only for records that own an arm.
 const ARM_COMMIT = ['web/resume-commit-arm'];
 const BRANCH = ['web/resume-branches', ...ARM_COMMIT];
-// Settle tracking, the re-settle hold and streamed-arm adoption load only for async boundaries.
+// Stops what an arm's components own once the arm closes; only a branch naming such components loads it.
+const ARM_GATE = ['web/fns/arm-gate'];
+// Stands in for what is above an owner its own file places, when the browser draws that owner's arm.
+const OWNER_PLACEMENT = ['web/prerender/owner-rooted'];
+// Settle tracking and streamed-arm adoption load only for async boundaries.
 const ASYNC_BOUNDARY = [
 	'web/resume-async-boundaries',
 	'web/resume-async-wiring',
-	'web/resume-resettle-hold',
 	'web/resume-stream-patches',
+	'web/resume-refresh-busy',
+	'web/fns/async-plane',
 ];
+// Per-element busy marks, their announcement and an async value's refresh half: no record demands them, so they load on the first refresh.
+const REFRESH_MARKS = ['web/fns/busy-elements', 'web/fns/refresh-announcer', 'web/fns/async-refresh'];
+// Matched values load only where a reader pairs an async value with an input of its key.
+const HELD_INPUTS = ['web/fns/held-inputs-plane'];
 const BEHAVIOR = ['web/resume-behaviors'];
+// A shared() instance that outlives the page: its binding at wake.
+const SHARED_INSTANCES = ['web/fns/shared-instances'];
+// A form's busy mark and repeat guard, for a submit whose handler may return a promise; a form sent in place also needs its sender.
+const SUBMIT_HOLD = ['web/submit-hold'];
+const IN_PLACE_SUBMIT = ['web/form-send', ...SUBMIT_HOLD];
+// The router's swap binders: no record demands them, so they stay off every page until a navigation imports them.
+const SHARED_SWAP = ['web/shared-swap', 'web/kept-swap'];
 // Capabilities whose demand `capabilityModuleIds` enumerates for the whole module, arms and rows included.
 export const RUNTIME_CAPABILITY_MODULE_IDS: ReadonlyArray<string> = [
 	...BEHAVIOR,
 	...ASYNC_BOUNDARY,
+	...HELD_INPUTS,
+	...SHARED_INSTANCES,
+	...ARM_GATE,
+	...OWNER_PLACEMENT,
 ];
 // The overlay behaviour. Recording the demand here is what makes it emittable at
 // all: no module the runtime always loads may write the `import()` specifier, or
@@ -114,6 +142,13 @@ const ROW_SLOT_MINT = ['web/fns/row-slot-mint'];
 const NESTED_REPEATS = ['web/fns/nested-repeats'];
 // The per-row @if flip, folded only into a repeat whose row template carries one.
 const ROW_BRANCH_MINT = ['web/fns/row-branch-mint'];
+// Rows that are comment ranges, and rows an @if arm renders, each wired only for a repeat that has them.
+const ROW_RANGES = ['web/fns/served-row-ranges'];
+const ARM_ROWS = ['web/resume-repeat-branch-arm'];
+// The wiring of a list whose parent element an @if or @switch arm renders, folded only into a branch whose arms hold one.
+const ARM_LISTS = ['web/resume-arm-lists'];
+const armsHoldLists = (branches: ReadonlyArray<Pick<ProtocolArmBranchRecord, 'armRecords'>>) =>
+	branches.some((branch) => branch.armRecords?.some((arm) => arm.repeatParents));
 const FULL_RESUME_CORE = ['web/resume-locators'];
 const FULL_TIER_COMMON = [
 	'web/resume-runtime',
@@ -123,6 +158,7 @@ const FULL_TIER_COMMON = [
 	'web/payload-resume',
 	'web/payload-graph-construct',
 	'web/dom-journal',
+	...SYMBOL_LOAD,
 ];
 
 function payloadResumeModules(storageFree: boolean): string[] {
@@ -181,6 +217,8 @@ export function createRuntimeDemandMap(
 		// This module's own components, so a same-module edge can name its child.
 		readonly components?: ReadonlyArray<SemanticComponent>;
 		readonly sharedCallbackBindings?: ReadonlyArray<SemanticSharedCallbackBinding>;
+		readonly keyedRepeats?: ReadonlyArray<SemanticKeyedRepeat>;
+		readonly events?: ReadonlyArray<SemanticEvent>;
 	},
 	demandClass: RuntimeDemandClass,
 ): RuntimeDemandMapArtifact {
@@ -201,10 +239,20 @@ export function createRuntimeDemandMap(
 		input.publicRenderModule.moduleSource,
 		input.publicRenderModule.ssrModuleSource,
 	]);
+	const heldSubmits = new Set(
+		(input.events ?? [])
+			.filter((event) => event.eventName === 'submit' && (event.handlerReturnsPromise || event.handlerMayReject))
+			.map((event) => eventKey(event.hostNodeId, event.eventName)),
+	);
 	const symbols = input.symbolResolver.symbols.map((symbol) => ({
 		symbolId: symbol.id,
 		kind: symbol.kind,
-		runtimeModuleIds: runtimeModuleIdsForSymbol(symbol, emittedModules.get(symbol.id)),
+		runtimeModuleIds: unique([
+			...runtimeModuleIdsForSymbol(symbol, emittedModules.get(symbol.id)),
+			...(symbol.kind === 'event-handler' && heldSubmits.has(eventKey(symbol.hostNodeId, symbol.eventName))
+				? SUBMIT_HOLD
+				: []),
+		]),
 	}));
 	const symbolDemand = new Map(
 		symbols.map((symbol) => [symbol.symbolId, symbol.runtimeModuleIds]),
@@ -232,7 +280,12 @@ export function createRuntimeDemandMap(
 	const scalarRows =
 		classRouting.scalarRows &&
 		!storageRequiresFullResume &&
-		isScalarOnlyKeyedRepeatModule(input.symbolResolver, input.protocolView);
+		isScalarOnlyKeyedRepeatModule(
+			input.symbolResolver,
+			input.protocolView,
+			input.protocolState,
+			input.componentEdges,
+		);
 	const payloadRecords = payloadDemandRecords(
 		input.protocolView,
 		closedSymbolDemand,
@@ -245,6 +298,7 @@ export function createRuntimeDemandMap(
 		dispatchCore,
 		fullTier,
 		input.overlays ?? [],
+		fixedBranchSymbolIds(input.symbolModules),
 	);
 	const scope: FirstUseScope = {
 		resolver: input.symbolResolver,
@@ -268,7 +322,19 @@ export function createRuntimeDemandMap(
 			closurePlans,
 		),
 		armActions: armActionDemandRecords(scope, dispatchCore),
-		capabilityModuleIds: capabilityModuleIds(input.symbolResolver, input.protocolView),
+		capabilityModuleIds: [
+			...capabilityModuleIds(input.symbolResolver, input.protocolView, input.protocolState),
+			// A cancel passed as a prop lands on a child's record only when the page composes it.
+			...((Array.isArray(input.componentEdges)
+				? (input.componentEdges as ReadonlyArray<SemanticComponentEdge>)
+				: []
+			).some((edge) => edge.props.some((prop) => prop.kind === 'callback' && prop.syncPolicy))
+				? SYNC_POLICY
+				: []),
+			...((input.publicRenderModule.componentDefinitions ?? []).some((definition) => definition.placements)
+				? OWNER_PLACEMENT
+				: []),
+		],
 		...nestedRecordDemand(
 			input.protocolView,
 			closedSymbolDemand,
@@ -285,9 +351,19 @@ export function createRuntimeDemandMap(
 			'web/dom-update',
 			'web/dom-journal',
 			...KEYED_REPEAT,
+			...ROW_RANGES,
+			...ARM_ROWS,
+			...ARM_LISTS,
 			...BRANCH,
+			...ARM_GATE,
+			...OWNER_PLACEMENT,
 			...ASYNC_BOUNDARY,
+			...HELD_INPUTS,
 			...BEHAVIOR,
+			...SHARED_INSTANCES,
+			...SHARED_SWAP,
+			...REFRESH_MARKS,
+			...IN_PLACE_SUBMIT,
 			// Conditional, unlike the kinds above: the overlay behaviour is only
 			// reachable in an app that compiled a mark, so listing it unconditionally
 			// would let the execution oracle excuse it everywhere.
@@ -308,6 +384,8 @@ function firstUseComposition(
 	| 'importedModuleInterfaces'
 	| 'components'
 	| 'sharedCallbackBindings'
+	| 'fixedBranchSymbolIds'
+	| 'staticRepeatIds'
 > {
 	return {
 		componentEdges: Array.isArray(input.componentEdges)
@@ -317,7 +395,24 @@ function firstUseComposition(
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		components: input.components ?? [],
 		sharedCallbackBindings: input.sharedCallbackBindings ?? [],
+		fixedBranchSymbolIds: fixedBranchSymbolIds(input.symbolModules),
+		staticRepeatIds: staticRepeatIds(input.keyedRepeats ?? []),
 	};
+}
+
+// A @for over a value no graph node holds renders its rows once, as does one over such a row's own items.
+function staticRepeatIds(repeats: ReadonlyArray<SemanticKeyedRepeat>): ReadonlySet<string> {
+	const byId = new Map(repeats.map((repeat) => [repeat.id, repeat]));
+	const isStatic = (repeat: SemanticKeyedRepeat | undefined): boolean =>
+		!!repeat &&
+		repeat.collectionGraphNodeId === undefined &&
+		(repeat.enclosingRepeatId === undefined || isStatic(byId.get(repeat.enclosingRepeatId)));
+	return new Set(repeats.filter(isStatic).map((repeat) => repeat.id));
+}
+
+// The build refuses every caller that can change a prop-decided branch's props, so its flip, which ships no code, never runs.
+function fixedBranchSymbolIds(symbolModules: SymbolModulesArtifact): ReadonlySet<string> {
+	return new Set((symbolModules.propDecidedBranches ?? []).map((branch) => branch.symbolId));
 }
 
 /** The scope a module's own first-use answers are computed in, for publishing on its interface. */
@@ -378,6 +473,7 @@ function closureEventPlans(
 function capabilityModuleIds(
 	resolver: SymbolResolverPlan,
 	view: ProtocolViewPayload,
+	state: ProtocolStatePayload,
 ): ReadonlyArray<string> {
 	const symbols = resolver.symbols;
 	const behavior =
@@ -393,12 +489,32 @@ function capabilityModuleIds(
 			(symbol) =>
 				symbol.kind === 'async-computed-runner' || symbol.kind === 'async-boundary-update',
 		);
-	return [...(behavior ? BEHAVIOR : []), ...(asyncBoundary ? ASYNC_BOUNDARY : [])];
+	return [
+		...(behavior ? BEHAVIOR : []),
+		...(asyncBoundary ? ASYNC_BOUNDARY : []),
+		...(state.computed.some((computed) => computed.holds) ? HELD_INPUTS : []),
+		...(hasLiveSharedDefinitions(state) ? SHARED_INSTANCES : []),
+		...(viewGatesArms(view) ? ARM_GATE : []),
+	];
 }
 
-// Records served inside arms and rows ride outside the flat payload streams. Every one the compiler
-// plans is enumerated here; an arm it does not plan (an escalating branch, a component-rooted row)
-// leaves the answer undefined, so consumers keep treating those records as unlisted.
+function viewGatesArms(view: ProtocolViewPayload): boolean {
+	type Arm = ProtocolArmRecordSet | NonNullable<ProtocolArmBranchRecord['armRecords']>[number];
+	const armGates = (arm: Arm): boolean =>
+		(('branches' in arm && arm.branches) || []).some(
+			(branch) => !!branch.armComponents || (branch.armRecords ?? []).some(armGates),
+		);
+	return (
+		(view.branches ?? []).some(
+			(branch) =>
+				!!branch.armComponents ||
+				(branch.armRecords ?? []).some(armGates) ||
+				(!!branch.servedArmRecords && armGates(branch.servedArmRecords)),
+		) || (view.asyncBoundaries ?? []).some((boundary) => [boundary.armRecords ?? []].flat().some(armGates))
+	);
+}
+
+// Component rows and arms that run a component render records this view declares; an imported child's are in its own map.
 function nestedRecordDemand(
 	view: ProtocolViewPayload,
 	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
@@ -414,13 +530,13 @@ function nestedRecordDemand(
 		behaviors: [] as object[],
 		elementHandles: [] as object[],
 		keyedRepeats: [] as Repeat[],
-		branches: [] as ProtocolArmBranchRecord[],
-		asyncBoundaries: [],
+		branches: [] as object[],
+		asyncBoundaries: [] as object[],
 	};
-	let enumerable = true;
+	let rendersComponents = false;
 	const hostNodeId = 'nested';
 	const visitRepeat = (repeat: Repeat) => {
-		if (repeat.rowComponent) enumerable = false;
+		if (repeat.rowComponent) rendersComponents = true;
 		for (const event of repeat.rowEvents) nested.events.push({ ...event, hostNodeId });
 		for (const handle of repeat.rowElementHandles ?? [])
 			nested.elementHandles.push({ ...handle, hostNodeId });
@@ -441,13 +557,21 @@ function nestedRecordDemand(
 	};
 	for (const repeat of view.keyedRepeats ?? []) visitRepeat(repeat);
 	for (const branch of view.branches ?? []) {
-		if (branch.escalates) enumerable = false;
+		if (branch.escalates) rendersComponents = true;
 		for (const arm of branch.armRecords ?? []) visitArm(arm);
 		if (branch.servedArmRecords) visitArm(branch.servedArmRecords);
 	}
 	for (const boundary of view.asyncBoundaries ?? [])
 		for (const arm of [boundary.armRecords ?? []].flat()) visitArm(arm);
-	if (!enumerable) return {};
+	if (rendersComponents) {
+		for (const event of view.events ?? []) nested.events.push({ ...event, hostNodeId });
+		nested.domUpdates.push(...(view.domUpdates ?? []));
+		nested.behaviors.push(...(view.behaviors ?? []));
+		nested.elementHandles.push(...(view.elementHandles ?? []));
+		nested.keyedRepeats.push(...(view.keyedRepeats ?? []));
+		nested.branches.push(...(view.branches ?? []));
+		nested.asyncBoundaries.push(...(view.asyncBoundaries ?? []));
+	}
 	const records = payloadDemandRecords(
 		nested as unknown as ProtocolViewPayload,
 		symbolDemand,
@@ -562,6 +686,8 @@ function referencesValue(value: unknown, id: string): boolean {
 function isScalarOnlyKeyedRepeatModule(
 	resolver: SymbolResolverPlan,
 	view: ProtocolViewPayload,
+	state: ProtocolStatePayload,
+	componentEdges: unknown,
 ): boolean {
 	if ((view.keyedRepeats?.length ?? 0) === 0 || (view.domUpdates?.length ?? 0) === 0)
 		return false;
@@ -595,6 +721,12 @@ function isScalarOnlyKeyedRepeatModule(
 		);
 		if (writes.length === 0) return false;
 		if (writesDemandNonTextRuntime(writes, view)) return false;
+		if (
+			writes.some((write) =>
+				cellReadOutsideTextUpdates(write.graphNodeId, view, state, componentEdges),
+			)
+		)
+			return false;
 		const domUpdateSymbolIds = textDomUpdatesForWrites(writes, view).map(
 			(update) => update.symbolId,
 		);
@@ -680,7 +812,6 @@ function eventHandlerBodyAllowsScalarLeaf(
 		Extract<PlannedSymbol, { readonly kind: 'event-handler' }>['writes']
 	>[number],
 ): boolean {
-	const authoredWrite = authoredWriteSource(write);
 	const prefix = 'const __marklessHandler = ';
 	const wrapped = `${prefix}${symbol.source};`;
 	let program: AnyNode;
@@ -691,7 +822,7 @@ function eventHandlerBodyAllowsScalarLeaf(
 	}
 	const declarator = asNodes(asNodes(program.body)[0]?.declarations)[0];
 	const fn = declarator?.init as AnyNode | undefined;
-	if (!authoredWrite || !fn || !isNode(fn.body)) return false;
+	if (!fn || !isNode(fn.body)) return false;
 	const body = fn.body as AnyNode;
 	const statements = body.type === 'BlockStatement' ? asNodes(body.body) : [body];
 	const parameters = new Set(
@@ -710,8 +841,7 @@ function eventHandlerBodyAllowsScalarLeaf(
 						? undefined
 						: statement;
 		if (!expression) return false;
-		if (!wrote && wrapped.slice(expression.start, expression.end) === authoredWrite)
-			return (wrote = true);
+		if (!wrote && isAuthoredWrite(expression, write)) return (wrote = true);
 		return parameterCancel(expression, parameters);
 	});
 }
@@ -730,24 +860,36 @@ function parameterCancel(node: AnyNode, parameters: ReadonlySet<string>): boolea
 	);
 }
 
-function authoredWriteSource(
+// The handler's one recorded write, as the assignment or update node itself: the semantic pass already proved its target is the state cell.
+function isAuthoredWrite(
+	node: AnyNode,
 	write: NonNullable<
 		Extract<PlannedSymbol, { readonly kind: 'event-handler' }>['writes']
 	>[number],
-): string | null {
+): boolean {
+	let current = node;
+	while (current.type === 'ParenthesizedExpression' && isNode(current.expression))
+		current = current.expression as AnyNode;
 	if (write.operation === 'assign') {
-		const operator = write.assignmentOperator ?? '=';
-		if (!write.valueSource) return null;
-		return `${write.source} ${operator} ${write.valueSource}`;
+		return (
+			current.type === 'AssignmentExpression' &&
+			current.operator === (write.assignmentOperator ?? '=') &&
+			isIdentifierNamed(current.left, write.source)
+		);
 	}
+	return (
+		write.operation === 'update' &&
+		current.type === 'UpdateExpression' &&
+		current.operator === write.updateOperator &&
+		current.prefix === (write.prefix === true) &&
+		isIdentifierNamed(current.argument, write.source)
+	);
+}
 
-	if (write.operation === 'update' && write.updateOperator) {
-		return write.prefix
-			? `${write.updateOperator}${write.source}`
-			: `${write.source}${write.updateOperator}`;
-	}
-
-	return null;
+function isIdentifierNamed(node: unknown, name: string): boolean {
+	return (
+		isNode(node) && (node as AnyNode).type === 'Identifier' && (node as AnyNode).name === name
+	);
 }
 
 function literalValueSource(source: string | undefined): string | null {
@@ -890,6 +1032,7 @@ function payloadDemandRecords(
 	dispatchCore: ReadonlyArray<string>,
 	fullTier: ReadonlyArray<string>,
 	overlays: ReadonlyArray<{ readonly hostNodeId: string }>,
+	fixedBranchSymbolIds: ReadonlySet<string> = new Set(),
 ): RuntimeDemandMapArtifact['payloadRecords'] {
 	const rowDispatchCore = replacement.scalarRows ? ROW_LEAN_DISPATCH_CORE : fullTier;
 	return [
@@ -914,6 +1057,7 @@ function payloadDemandRecords(
 									? CLOSURE_DISPATCH_CORE
 									: dispatchCore),
 							...(event.syncPolicy ? SYNC_POLICY : []),
+							...(event.inPlaceSubmit ? IN_PLACE_SUBMIT : []),
 							// The resume runtime installs the visibility observer at startup.
 							...(event.eventName === PROTOCOL_VISIBLE_EVENT_NAME ? BEHAVIOR : []),
 							...symbolIdsDemand(event.symbolIds ?? [], symbolDemand),
@@ -943,13 +1087,17 @@ function payloadDemandRecords(
 				...(!record.rowComponent && record.rowTemplate?.componentName ? ROW_SLOT_MINT : []),
 				...(record.rowTemplate?.branchSlots ? ROW_BRANCH_MINT : []),
 				...(record.enclosingRow ? NESTED_REPEATS : []),
+				...(record.rowRange ? ROW_RANGES : []),
+				...(record.branchArm ? ARM_ROWS : []),
 				...(replacement.scalarRows || record.fixed ? [] : renderRuntimeModuleIds),
 			]),
 		})),
 		...(view.branches ?? []).map((record): RuntimeDemandMapRecord => {
 			// A branch whose test reads nothing never flips, so nothing ever loads its flip symbol.
 			const flipSymbolIds =
-				record.symbolId && (record.testReads?.length || record.contentReads?.length)
+				record.symbolId &&
+				!fixedBranchSymbolIds.has(record.symbolId) &&
+				(record.testReads?.length || record.contentReads?.length)
 					? [record.symbolId]
 					: [];
 			return {
@@ -958,6 +1106,8 @@ function payloadDemandRecords(
 				symbolIds: flipSymbolIds,
 				runtimeModuleIds: unique([
 					...BRANCH,
+					...(armsHoldLists([record]) ? ARM_LISTS : []),
+					...(record.armComponents ? ARM_GATE : []),
 					...symbolIdsDemand(flipSymbolIds, symbolDemand),
 				]),
 			};
@@ -975,6 +1125,9 @@ function payloadDemandRecords(
 				...fullTier,
 				...ASYNC_BOUNDARY,
 				...ARM_COMMIT,
+				...(armsHoldLists([record.armRecords ?? []].flat().flatMap((arm) => arm.branches ?? []))
+					? ARM_LISTS
+					: []),
 				...symbolIdsDemand(
 					[
 						record.updateSymbolId,
@@ -1068,6 +1221,7 @@ function actionDemandRecords(
 					),
 					...branchDemand,
 					...subscriberRecords.flatMap((record) => record.runtimeModuleIds),
+					...(refreshesAsync(scope, event.symbolIds ?? []) ? REFRESH_MARKS : []),
 				]),
 				...(plan ? { plan } : {}),
 				firstUse: reach,
@@ -1106,6 +1260,7 @@ function actionDemandRecords(
 						...symbolIdsDemand(event.symbolIds ?? [], symbolDemand),
 						...eagerBranchDemand,
 						...subscriberRecords.flatMap((record) => record.runtimeModuleIds),
+						...(refreshesAsync(scope, event.symbolIds ?? []) ? REFRESH_MARKS : []),
 					]),
 					...(plan ? { plan } : {}),
 					firstUse: reach,
@@ -1129,7 +1284,11 @@ function armActionDemandRecords(
 		containerId: string,
 		containerKind: RuntimeDemandMapRecordKind,
 		hostNodeId: string,
-		event: { readonly eventName: string; readonly symbolIds?: ReadonlyArray<string> },
+		event: {
+			readonly eventName: string;
+			readonly symbolIds?: ReadonlyArray<string>;
+			readonly inPlaceSubmit?: unknown;
+		},
 		recordKind: RuntimeDemandMapAction['recordKind'],
 	) => {
 		const symbolIds = event.symbolIds ?? [];
@@ -1146,6 +1305,9 @@ function armActionDemandRecords(
 				...dispatchCore,
 				...recordModules(records, containerId),
 				...symbolIdsDemand(symbolIds, symbolDemand),
+				...(event.inPlaceSubmit ? IN_PLACE_SUBMIT : []),
+				// A handler in a @try's arm can reset it or reject into its @catch, which both load the refresh half.
+				...(containerKind === 'async-boundary' || refreshesAsync(scope, symbolIds) ? REFRESH_MARKS : []),
 			]),
 			firstUse: firstUseDemand(scope, symbolIds, [containerId]),
 		});
@@ -1311,6 +1473,30 @@ function planWriteShape(
 	};
 }
 
+// A handler whose writes reach an async value starts its refresh, which loads the refresh half: its first use must find it preloaded.
+function refreshesAsync(scope: FirstUseScope, symbolIds: ReadonlyArray<string>): boolean {
+	const reached = new Set(transitiveSymbolIds(symbolIds, scope.captureAnalysis));
+	const written = new Set(
+		scope.resolver.symbols.flatMap((symbol) =>
+			reached.has(symbol.id) &&
+			(symbol.kind === 'event-handler' || symbol.kind === 'callback-prop')
+				? (symbol.writes ?? []).map((write) => write.graphNodeId)
+				: [],
+		),
+	);
+	if (written.size === 0) return false;
+	const computed = new Map(scope.state.computed.map((node) => [node.graphNodeId, node]));
+	const reaches = (graphNodeId: string, seen: Set<string>): boolean => {
+		if (written.has(graphNodeId)) return true;
+		if (seen.has(graphNodeId)) return false;
+		seen.add(graphNodeId);
+		return (computed.get(graphNodeId)?.dependencies ?? []).some((dependency) =>
+			reaches(dependency.graphNodeId, seen),
+		);
+	};
+	return scope.state.computed.some((node) => node.async === true && reaches(node.graphNodeId, new Set()));
+}
+
 function writeSubscriberRecords(
 	resolver: SymbolResolverPlan,
 	symbolIds: ReadonlyArray<string>,
@@ -1388,6 +1574,9 @@ export type FirstUseScope = {
 		| undefined;
 	readonly components: ReadonlyArray<SemanticComponent>;
 	readonly sharedCallbackBindings: ReadonlyArray<SemanticSharedCallbackBinding>;
+	// Flip symbols of branches that never flip once built.
+	readonly fixedBranchSymbolIds: ReadonlySet<string>;
+	readonly staticRepeatIds: ReadonlySet<string>;
 };
 
 // Written paths per graph node; null when the whole node may have changed.
@@ -1430,7 +1619,7 @@ function firstUseDemand(
 			if (!read.graphNodeId.startsWith('prop:')) continue;
 			const prop = read.path[0];
 			if (prop === undefined) return 'unknown';
-			calls.push({ prop });
+			if (!rowDataRead(symbolId, read, scope.captureAnalysis)) calls.push({ prop });
 		}
 		const slots = composerSlotCalls(symbolId, scope.captureAnalysis);
 		if (slots === 'unknown') return 'unknown';
@@ -1442,6 +1631,30 @@ function firstUseDemand(
 		}
 	}
 	return consequenceReach(scope, symbolIds, new Set(ownRecordIds), affected, calls);
+}
+
+// A field of a row the page serves as data, never code a composing module passes.
+function rowDataRead(
+	symbolId: string,
+	read: { readonly componentName?: string; readonly path: ReadonlyArray<string> },
+	captureAnalysis: CaptureAnalysisArtifact | undefined,
+): boolean {
+	const slots = (
+		captureAnalysis?.extractedSymbols.find((symbol) => symbol.symbolId === symbolId)
+			?.captureSlots ?? []
+	).filter(
+		(slot) =>
+			slot.propName === read.path[0] &&
+			slot.owner.componentName === read.componentName &&
+			slot.path.join('\0') === read.path.slice(1).join('\0'),
+	);
+	return (
+		slots.length > 0 &&
+		slots.every(
+			(slot) =>
+				slot.routes.length > 0 && slot.routes.every((route) => route.kind === 'row-local'),
+		)
+	);
 }
 
 // Resume start derives every served repeat's unserved computed collection, whichever action woke
@@ -1577,8 +1790,10 @@ function consequenceReach(
 				(written) => startsWithPath(path, written) || startsWithPath(written, path),
 			);
 		});
+	const fixed = (branch: { readonly symbolId?: string }) =>
+		branch.symbolId !== undefined && scope.fixedBranchSymbolIds.has(branch.symbolId);
 	const branchFlips = (branch: NonNullable<ProtocolViewPayload['branches']>[number]) =>
-		reads(branch.testReads) || reads(branch.contentReads);
+		!fixed(branch) && (reads(branch.testReads) || reads(branch.contentReads));
 	const repeatMoves = (repeat: NonNullable<ProtocolViewPayload['keyedRepeats']>[number]) => {
 		const branches = repeat.rowTemplate?.branchSlots ?? [];
 		const slotReads = [
@@ -1611,6 +1826,7 @@ function consequenceReach(
 			return !branch || branchFlips(branch);
 		}) ||
 		edge.keyedRepeatScopeIds.some((id) => {
+			if (scope.staticRepeatIds.has(id)) return false;
 			const repeat = view.keyedRepeats?.find((candidate) => candidate.id === id);
 			return !repeat || repeatMoves(repeat);
 		}) ||
@@ -1618,6 +1834,10 @@ function consequenceReach(
 			(view.asyncBoundaries ?? []).some(
 				(boundary) => boundary.id === edge.asyncBoundaryId && reads(boundary.asyncReads),
 			));
+	// Rows a static @for renders once take constant props: the compiler refuses a reactive read in them.
+	const staticRow = (edge: SemanticComponentEdge) =>
+		edge.keyedRepeatScopeIds.length > 0 &&
+		edge.keyedRepeatScopeIds.every((id) => scope.staticRepeatIds.has(id));
 	let mountsLocalChild = false;
 	if (affected.size > 0) {
 		for (let grew = true; grew;) {
@@ -1634,6 +1854,7 @@ function consequenceReach(
 					mountsLocalChild = true;
 					continue;
 				}
+				if (staticRow(edge)) continue;
 				const names = changedPropNames(edge, affected, reads);
 				if (names.size === 0) continue;
 				for (const binding of scope.graphBindings) {
@@ -1660,7 +1881,8 @@ function consequenceReach(
 	for (const edge of scope.componentEdges) {
 		if (edge.importSource === undefined) continue;
 		const mounts = edgeMounts(edge);
-		const names = mounts ? new Set<string>() : changedPropNames(edge, affected, reads);
+		const names =
+			mounts || staticRow(edge) ? new Set<string>() : changedPropNames(edge, affected, reads);
 		if (!mounts && names.size === 0) continue;
 		const child = importedChildReach(scope, edge);
 		if (!child) return 'unknown';
@@ -1698,15 +1920,16 @@ function consequenceReach(
 				for (const id of event.symbolIds ?? []) symbolIds.add(id);
 		for (const branch of set.branches ?? []) {
 			if (!branch.symbolId) return false;
-			symbolIds.add(branch.symbolId);
+			if (!fixed(branch)) symbolIds.add(branch.symbolId);
 			for (const arm of branch.armRecords ?? []) if (!armSymbols(arm)) return false;
 		}
 		return true;
 	};
 	const readsNothing = (branch: {
+		readonly symbolId?: string;
 		readonly testReads?: ReadonlyArray<unknown>;
 		readonly contentReads?: ReadonlyArray<unknown>;
-	}) => !branch.testReads?.length && !branch.contentReads?.length;
+	}) => fixed(branch) || (!branch.testReads?.length && !branch.contentReads?.length);
 	// A branch that reads nothing never flips, so its served arm stays wired and a write reaches that arm's records like the page's own.
 	const liveArmReach = (set: ArmRecordSetLike | undefined): boolean => {
 		if (!set) return true;
@@ -1724,7 +1947,7 @@ function consequenceReach(
 				for (const id of event.symbolIds ?? []) symbolIds.add(id);
 		}
 		for (const branch of set.branches ?? []) {
-			if (!(reads(branch.testReads) || reads(branch.contentReads))) {
+			if (fixed(branch) || !(reads(branch.testReads) || reads(branch.contentReads))) {
 				if (readsNothing(branch))
 					for (const arm of branch.armRecords ?? []) if (!liveArmReach(arm)) return false;
 				continue;
@@ -1815,7 +2038,8 @@ function moduleMountReach(
 	scope: FirstUseScope,
 	parts: ReachParts = emptyParts(),
 ): RuntimeDemandMapFirstUseReach {
-	for (const symbol of scope.resolver.symbols) parts.symbolIds.add(symbol.id);
+	for (const symbol of scope.resolver.symbols)
+		if (!scope.fixedBranchSymbolIds.has(symbol.id)) parts.symbolIds.add(symbol.id);
 	for (const record of scope.records) parts.recordIds.add(record.recordId);
 	// A new instance seeds its shared state, which every reader of those cells sees.
 	for (const seed of scope.state.sharedSeeds ?? [])

@@ -189,7 +189,7 @@ test('CSR: a message never takes focus away from what a person was doing', async
 });
 
 // The one wall the shipped row mint does not clear. Every clock in this family is
-// started inside `toast()`, a method on the page-scoped shared instance that a
+// started inside `toast()`, a method on the app-scoped shared instance that a
 // consumer module cannot call - and `expire`, `hasExpired`, `holdAll` and
 // `releaseAll` are not on the family's public surface either, so a queue written
 // through `toaster.say(...)` is handed to no ticker and `duration` means nothing.
@@ -264,7 +264,7 @@ test('CSR: the parts written out render the message they were given', async () =
 });
 
 // The second wall. A minted row evaluates its own `computed()` cells before the
-// page-scoped queue they read is live, so `positionOf(queue, item.id)` answers
+// app-scoped queue they read is live, so `positionOf(queue, item.id)` answers
 // -1: `stackingStyle` clamps that to `--index: 0`, which hides it, and `ui-front`
 // is left off the row that IS at the front. The cells correct themselves one
 // graph flush later, by which time the row minted in that flush is stale in turn.

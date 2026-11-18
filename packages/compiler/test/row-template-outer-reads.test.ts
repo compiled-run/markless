@@ -158,9 +158,11 @@ test('a row name binds the innermost row that declares it, by repeat', () => {
 		repeat('repeat:1', 'entry', { enclosingRepeatId: 'repeat:0' }),
 		repeat('repeat:2', 'entry'),
 	];
-	expect(repeatLocalSource(repeats, 'entry', 'repeatItem', 'ctx')).toBe('ctx.repeatItem');
-	const group = repeatLocalSource(repeats, 'group', 'repeatItem', 'ctx');
-	const at = repeatLocalSource(repeats, 'at', 'repeatIndex', 'ctx');
+	expect(repeatLocalSource(repeats, { name: 'entry', field: 'repeatItem' }, 'ctx')).toBe(
+		'ctx.repeatItem',
+	);
+	const group = repeatLocalSource(repeats, { name: 'group', field: 'repeatItem' }, 'ctx');
+	const at = repeatLocalSource(repeats, { name: 'at', field: 'repeatIndex' }, 'ctx');
 	const outer = { repeatId: 'repeat:0', repeatItem: 'g', repeatIndex: 4 };
 	const read = (source: string, ctx: object) => new Function('ctx', `return ${source}`)(ctx);
 	expect(read(group, { repeatId: 'repeat:1', repeatItem: 'e', repeatOuter: outer })).toBe('g');

@@ -28,11 +28,16 @@ declare module 'virtual:markless-router/route-preloads' {
 	// emits `undefined` when preloads were not persisted.
 	export const routeStylesheets: AssetRoutes['styles'] | undefined;
 	export const documentImportMap: string;
+	// Server lane only: the text of each stylesheet a page carries inline.
+	export const stylesheetSources: Readonly<Record<string, string>>;
+	// Server lane only: route stylesheets whose text the page modules carry.
+	export const inlineStylesheets: readonly string[];
 	// Server lane only.
 	export const routeResumeModules: Readonly<Record<string, readonly string[]>>;
 
 	// Appends missing `<link rel="modulepreload">` tags, returning the hrefs added.
 	export function preloadRouteModule(file: string, document?: Document): string[];
+	export function loadRouteStylesheets(file: string, document?: Document): Promise<unknown>;
 }
 
 declare module 'virtual:markless-router/dev-resume-modules' {

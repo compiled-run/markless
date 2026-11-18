@@ -109,7 +109,7 @@ export function App() @{
 	]);
 });
 
-test('analyzeCaptures reports unsupported local function aliases captured in lazy symbols', async () => {
+test('a const alias of a local function read by a lazy symbol is spliced as the function it names', async () => {
 	const invalidSource = `
 import { state } from '@markless/core';
 
@@ -144,16 +144,8 @@ export function App() @{
 			kind: 'function',
 		}),
 	]);
-	expect(captureAnalysis.diagnostics).toEqual([
-		expect.objectContaining({
-			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
-			severity: 'error',
-			phase: 'capture-analysis',
-			passId: 'capture-analysis',
-			symbolId: 'symbol:0',
-			source: '() => render()',
-		}),
-	]);
+	expect(captureAnalysis.diagnostics).toEqual([]);
+	expect(semanticGraph.events[0]?.handlerSource).toBe('() => ((() => count + 1))()');
 });
 
 test('analyzeCaptures reports non-serializable local constant captures in lazy symbols', async () => {

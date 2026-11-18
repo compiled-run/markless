@@ -106,11 +106,21 @@ export default function LinkCheck() @{
 			.pattern {
 				padding: 0 0.1em;
 				border-radius: 3px;
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.board[data-shown='renamed'] .pattern {
-				background: color-mix(in srgb, var(--pink) 22%, var(--paper));
+				background: color-mix(in srgb, var(--pink) 22%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.board[data-shown='no params'] .params {
@@ -133,11 +143,21 @@ export default function LinkCheck() @{
 			}
 
 			.board:is([data-shown='right'], [data-shown='no params']) .route {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.board:not([data-shown='right']) .result {
-				background: color-mix(in srgb, var(--pink) 18%, var(--paper));
+				background: color-mix(in srgb, var(--pink) 18%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			@media (max-width: 40rem) {

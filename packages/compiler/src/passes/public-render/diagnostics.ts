@@ -84,38 +84,6 @@ export function asyncArmRenderUnsupportedDiagnostic(input: {
 	};
 }
 
-// D2/D4: a toggle inside @try/@catch content whose branch cannot flip on its
-// own (it needs component execution) still WORKS — the whole @try content
-// re-renders — but the cost is never silent, and the wording stays in the
-// author's vocabulary (never compiler internals).
-export function tryBlockToggleRerenderDiagnostic(input: {
-	readonly branchLabel: '@if' | '@switch';
-	readonly componentName: string | null;
-	readonly node: AnyNode;
-	readonly filename: string;
-}): CompilerDiagnostic {
-	const message = input.componentName
-		? `this ${input.branchLabel} contains <${input.componentName}>, so toggling it re-renders the whole @try block — move the component outside the ${input.branchLabel} to keep the toggle cheap.`
-		: `this ${input.branchLabel} contains content the toggle cannot rebuild on its own, so toggling it re-renders the whole @try block — simplify the ${input.branchLabel} content to plain elements, text, and state reads to keep the toggle cheap.`;
-	return {
-		code: 'MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
-		severity: 'warning',
-		phase: 'public-render',
-		title: `Toggling this ${input.branchLabel} re-renders the whole @try block`,
-		message,
-		why: 'Content with a component cannot be rebuilt from static parts and value slots, so the toggle falls back to re-rendering the whole @try block. That works, but it re-runs the component and replaces DOM the toggle did not touch.',
-		primarySpan: sourceSpan(input.node, input.filename),
-		passId: 'public-render-plan',
-		artifactKeys: ['publicRenderPlan'],
-		suggestions: [
-			{
-				message: `Move the component outside the ${input.branchLabel}, or keep the ${input.branchLabel} content to plain elements, text, and state reads.`,
-			},
-		],
-		docsUrl: 'https://markless.dev/errors/MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
-	};
-}
-
 // A list that renders its served rows but can never grow still ships, and the
 // set of shapes that reach this shrinks as row growth covers more of them, so
 // this warns rather than blocks. Change this one constant to move it.
@@ -135,9 +103,12 @@ export const KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE =
  */
 export type KeyedRepeatRowMintRefusal =
 	| { readonly kind: 'component'; readonly componentName: string }
+	| { readonly kind: 'component-content'; readonly componentName: string }
+	| { readonly kind: 'component-root-boundary'; readonly componentName: string }
 	| { readonly kind: 'nested-construct'; readonly label: string }
 	| { readonly kind: 'attribute'; readonly attributeName: string }
 	| { readonly kind: 'style-object' }
+	| { readonly kind: 'between-lists' }
 	| {
 			readonly kind: 'unfillable-read';
 			/** The read in the author's own words, so the clause names it, not its category. */
@@ -164,6 +135,49 @@ export function keyedRepeatRowMintUnsupportedDiagnostic(input: {
 		artifactKeys: ['publicRenderPlan'],
 		suggestions: [{ message: cause.suggestion }],
 		docsUrl: `https://markless.dev/errors/${KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE}`,
+	};
+}
+
+export const KEYED_REPEAT_ROW_VALUE_UNPAINTED_CODE =
+	'MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED' as const;
+
+export type KeyedRepeatRowValueUnpaintedCause =
+	| { readonly kind: 'between-lists' }
+	| { readonly kind: 'served-only-list'; readonly listSource: string };
+
+// A row value reading page state with no row markup to patch it would keep the served value forever.
+export function keyedRepeatRowValueUnpaintedDiagnostic(input: {
+	readonly itemName: string;
+	readonly source: string;
+	readonly attributeName?: string;
+	readonly cause: KeyedRepeatRowValueUnpaintedCause;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
+	const value = input.attributeName
+		? `sets ${input.attributeName} from \`${input.source}\``
+		: `renders \`${input.source}\``;
+	const between = input.cause.kind === 'between-lists';
+	return {
+		code: KEYED_REPEAT_ROW_VALUE_UNPAINTED_CODE,
+		severity: 'error',
+		phase: PUBLIC_RENDER_PHASE,
+		title: 'This value in a @for row never updates in the browser',
+		message: between
+			? `This @for row over ${input.itemName} ${value}, which reads page state, but the row has a value on an element that stands between two nested @for lists in one parent element. After the page loads, the browser finds that element by counting from one end of its parent, and the nested lists' rows on both sides leave no count, so the row ships no markup to patch and keeps every value the server rendered.`
+			: `This @for row over ${input.itemName} ${value}, which reads page state, but the row also holds a nested @for over \`${input.cause.listSource}\`, which only the server renders. The browser can neither rebuild the row without losing those inner rows nor patch it in place, so the row would keep the value the server rendered.`,
+		why: 'The browser updates a @for row from one row of markup the payload carries. A row this cannot address or rebuild ships no markup, so every value in it stays as the server rendered it.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: PUBLIC_RENDER_PLAN_PASS_ID,
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [
+			{
+				message: between
+					? 'Wrap one of the two nested @for lists in its own element, so every element with a value in the row has nested rows on one side only.'
+					: `Build the inner list from ${input.itemName} or from a computed, for example put the list on each item before the @for, so the browser holds it; or move the value that reads page state out of the row.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${KEYED_REPEAT_ROW_VALUE_UNPAINTED_CODE}`,
 	};
 }
 
@@ -222,6 +236,7 @@ export function keyedRepeatRowsUnplacedDiagnostic(input: {
 export function keyedRepeatRowNotOneElementDiagnostic(input: {
 	readonly itemName: string;
 	readonly rowShape: string;
+	readonly reason: string;
 	readonly node: AnyNode;
 	readonly filename: string;
 }): CompilerDiagnostic {
@@ -230,8 +245,8 @@ export function keyedRepeatRowNotOneElementDiagnostic(input: {
 		severity: 'error',
 		phase: PUBLIC_RENDER_PHASE,
 		title: 'Each row of this list must be one element',
-		message: `Each row of this @for over ${input.itemName} renders ${input.rowShape}. After the page loads, the browser adds, moves and removes a list’s rows as single elements, so it would build only part of each new row and lose track of the rest.`,
-		why: 'The browser finds a list’s rows by counting the parent’s child elements, one element per row, and builds a new row from that one element’s markup. Text beside it, or a second element, has no place in that count.',
+		message: `Each row of this @for over ${input.itemName} renders ${input.rowShape}, and this list ${input.reason}. After the page loads, the browser follows a row that is not one element as everything between two comment markers, but not in a list like this one, so it would lose track of part of each row.`,
+		why: 'A row that is not one element is tracked between two comment markers. A list inside another row, a row holding a nested @for, an @if or @switch, an element() handle, a behavior or an event that cancels before code loads, a list passed as children, and a list standing straight in an @if or @try arm still find their part of a row by counting elements, which a row of several nodes breaks.',
 		primarySpan: sourceSpan(input.node, input.filename),
 		passId: PUBLIC_RENDER_PLAN_PASS_ID,
 		artifactKeys: ['publicRenderPlan'],
@@ -284,8 +299,18 @@ function refusalCause(
 	switch (refusal.kind) {
 		case 'component':
 			return {
-				message: `This @for row renders <${refusal.componentName}>, and what <${refusal.componentName}> renders either reaches a @try or could not be seen from here - and a @try settles against bookkeeping the page took only for the rows the server sent.`,
-				suggestion: `Keep <${refusal.componentName}> and everything it renders free of @try - and make sure the module declaring it is part of this build - or move <${refusal.componentName}> outside the @for and keep the row to plain elements and text read off ${itemName}.`,
+				message: `This @for row renders <${refusal.componentName}>, and what <${refusal.componentName}> renders could not be seen from here, so a row built in the browser would not know what to register.`,
+				suggestion: `Make sure the module declaring <${refusal.componentName}> is part of this build, or move <${refusal.componentName}> outside the @for and keep the row to plain elements and text read off ${itemName}.`,
+			};
+		case 'component-content':
+			return {
+				message: `This @for row renders <${refusal.componentName}>, and something <${refusal.componentName}> renders cannot be built in the browser for a new row.`,
+				suggestion: `Keep <${refusal.componentName}> to elements, text, attributes and components that read only its props, or move <${refusal.componentName}> outside the @for.`,
+			};
+		case 'component-root-boundary':
+			return {
+				message: `This @for row is <${refusal.componentName}>, and <${refusal.componentName}> renders a @try at its top level, outside every element. The browser adds and moves a row as one element, so the @try's place in the page would be left behind.`,
+				suggestion: `Put the @try inside an element in <${refusal.componentName}>, such as \`<li>@try { ... } @pending { ... }</li>\`, or wrap <${refusal.componentName}> in an element in the row.`,
 			};
 		case 'nested-construct':
 			return {
@@ -304,6 +329,12 @@ function refusalCause(
 			return {
 				message: `This @for row over ${itemName} sets style from a style object that reads page state. The browser computes that object's CSS text only once the state it reads changes, so a row built before then would have no style to write.`,
 				suggestion: `Write the style as a string expression over the same values, such as style={\`color: \${color}\`}.`,
+			};
+		case 'between-lists':
+			return {
+				message: `This @for row over ${itemName} has a value on an element that stands between two nested @for lists in one parent element, and the browser finds that element by counting from one end of its parent.`,
+				suggestion:
+					'Wrap one of the two nested @for lists in its own element, so the element holding the value has nested rows on one side only.',
 			};
 		case 'unfillable-read':
 			return {
@@ -352,8 +383,8 @@ export function repeatBindingNameConflictDiagnostic(input: {
 		severity: 'error',
 		phase: 'public-render',
 		title: 'Two @for loops give the same name two different meanings',
-		message: `"${input.name}" is one @for loop's item and another @for loop's index in the same file. Rename one of them.`,
-		why: 'Every @for expression in a file is compiled into readers that share one set of row bindings, so a name can bind to the row item or the row index, never to both.',
+		message: `"${input.name}" is one @for loop's item and another @for loop's index in the same component. Rename one of them.`,
+		why: 'Every @for expression in a component is compiled into readers that share one set of row bindings, so a name can bind to the row item or the row index, never to both.',
 		primarySpan: sourceSpan(input.node, input.filename),
 		passId: 'public-render-plan',
 		artifactKeys: ['publicRenderPlan'],

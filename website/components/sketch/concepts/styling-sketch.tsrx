@@ -103,8 +103,8 @@ export default function StylingSketch() @{
 				that, so the chalk card stays the same.
 			</span>
 			<span hidden={last !== 'reveal' || !reveal}>
-				On the page, each card also carries its file's class: <code class="id">{paperAdded}</code> and{' '}
-				<code class="id">{chalkAdded}</code>. Each file's <Mono>.card</Mono> rule asks for its own.
+				On the page, each card also carries its component's class: <code class="id">{paperAdded}</code> and{' '}
+				<code class="id">{chalkAdded}</code>. Each component's <Mono>.card</Mono> rule asks for its own.
 			</span>
 			<span hidden={restHidden}>
 				Both cards say <Mono>class="card"</Mono>, and both files style <Mono>.card</Mono>. Each card keeps its

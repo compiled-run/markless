@@ -13,3 +13,6 @@ export function installDerivedReconcilePlane(factory: DerivedReconcilePlaneFacto
 export function derivedReconcilePlane(): DerivedReconcilePlaneFactory | undefined {
 	return installedPlane;
 }
+
+// Async values, and values a reader pairs, install the same way from `fns/async-plane` and `fns/held-inputs-plane`.
+export const asyncPlanes: import('./fns/async-plane.ts').AsyncPlaneSlot = {};

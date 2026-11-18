@@ -363,7 +363,7 @@ export const colorpickerState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // One instance per rendered rail: the channel it carries, and its own element,
@@ -376,7 +376,7 @@ export const colorpickerRailState = shared(
 
 		return { ...rail, el };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function ColorpickerRoot({
@@ -418,25 +418,31 @@ export function ColorpickerRoot({
 		return rootStyleText(held, on);
 	});
 
-	<div
-		{...rest}
-		style={rootPainted}
-		ui-picker={true}
-		ui-disabled={picker.disabled}
-		ui-readonly={picker.readonly}
-		ui-required={picker.required}
-		ui-invalid={picker.invalid}
-		ui-alpha={picker.withAlpha}
-		ui-dragging={picker.dragging}
-		ui-popup={picker.popup}
-		ui-open={rootShowing}
-		ui-closed={rootShowing !== true}
-	>
+	<>
 		<style>
-			@layer markless { [ui-picker] { anchor-scope: --ui-colorpicker; } }
+			@layer markless {
+				[ui-picker] { anchor-scope: --ui-colorpicker; }
+				/* A popup picker leaves the page flow, so the content after it keeps its place. */
+				[ui-picker][ui-popup] { position: absolute; position-anchor: --ui-colorpicker; }
+			}
 		</style>
-		{children}
-	</div>
+		<div
+			{...rest}
+			style={rootPainted}
+			ui-picker={true}
+			ui-disabled={picker.disabled}
+			ui-readonly={picker.readonly}
+			ui-required={picker.required}
+			ui-invalid={picker.invalid}
+			ui-alpha={picker.withAlpha}
+			ui-dragging={picker.dragging}
+			ui-popup={picker.popup}
+			ui-open={rootShowing}
+			ui-closed={rootShowing !== true}
+		>
+			{children}
+		</div>
+	</>
 }
 
 // One surface, both shapes. Inline it renders in place; with `popup` the same

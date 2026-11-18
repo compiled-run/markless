@@ -38,7 +38,7 @@ const qrCodeRoot = `import { shared, state } from '@markless/core';
 export const qrState = shared(() => {
 	const qr = state({ value: '' });
 	return { ...qr };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Root({ value, recovery = 'medium', children, ...rest }) @{
 	const qr = qrState();
 	qr.value = value;
@@ -52,7 +52,7 @@ const progressRoot = `import { shared, state } from '@markless/core';
 export const barState = shared(() => {
 	const bar = state({ amount: 0 });
 	return { ...bar };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Bar({ min, max, amount, kids, ...others }) @{
 	const bar = barState();
 	bar.amount = amount;
@@ -105,7 +105,7 @@ test('a spread of the author own object keeps the names the signature destructur
 export const boxState = shared(() => {
 	const box = state({ on: false });
 	return { ...box };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Root({ value, children, ...rest }) @{
 	const box = boxState();
 	const mine = { value: 'kept', title: 'kept' };

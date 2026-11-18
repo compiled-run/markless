@@ -37,7 +37,7 @@ export const toolbarState = shared(
 
 		return { ...toolbar, barEl, labelEl, itemEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export const toolbarItemState = shared(
@@ -47,7 +47,7 @@ export const toolbarItemState = shared(
 
 		return { ...item, el };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function ToolbarRoot({ orientation = 'horizontal', children, ...rest }: ToolbarRootProps) @{

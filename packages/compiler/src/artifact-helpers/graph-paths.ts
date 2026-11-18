@@ -6,10 +6,12 @@ import type {
 
 const asyncSnapshotKeys = new Set(['status', 'version', 'key', 'error', 'value']);
 
-// `a?.b` in markup reads the same path as `a.b`: a graph read through a missing value is already undefined.
-export function optionalMemberReadSource(source: string): string {
-	const plain = source.replaceAll('?.', '.');
-	return plain !== source && /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+$/.test(plain) ? plain : source;
+// The graph path a markup read names; `a?.b` and `a!.b` read `a.b`.
+export function templateReadPath(read: {
+	readonly source: string;
+	readonly pathSource?: string;
+}): string {
+	return read.pathSource ?? read.source;
 }
 
 export function resolveGraphPath(
@@ -67,6 +69,33 @@ export function runtimeGraphReadPath(
 // `x.value` / `x.status` are resolved-value fields; the runtime unwraps only non-meta heads itself.
 export function asyncComputedReadPath(path: ReadonlyArray<string>): ReadonlyArray<string> {
 	return path.length === 0 || asyncSnapshotKeys.has(path[0]) ? ['value', ...path] : path;
+}
+
+export function asyncComputedGraphNodeIds(
+	graph: Pick<SemanticGraphArtifact, 'graphBindings'> | undefined,
+): ReadonlySet<string> {
+	return new Set(
+		(graph?.graphBindings ?? []).flatMap((binding) =>
+			binding.kind === 'computed' && binding.async === true ? [binding.id] : [],
+		),
+	);
+}
+
+// The one path browser code reads a graph node under: an async computed's is its snapshot's value.
+export function browserReadPath(
+	graphNodeId: string,
+	path: ReadonlyArray<string>,
+	asyncComputedIds: ReadonlySet<string>,
+): ReadonlyArray<string> {
+	return asyncComputedIds.has(graphNodeId) ? asyncComputedReadPath(path) : path;
+}
+
+// Render data keeps a test's authored path; the browser reads an async computed's snapshot value.
+export function browserGraphReads<Read extends { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>(
+	reads: ReadonlyArray<Read>,
+	asyncComputedIds: ReadonlySet<string>,
+): ReadonlyArray<Read> {
+	return reads.map((read) => ({ ...read, path: browserReadPath(read.graphNodeId, read.path, asyncComputedIds) }));
 }
 
 // A computed runner needs the upstream resolved object before its authored

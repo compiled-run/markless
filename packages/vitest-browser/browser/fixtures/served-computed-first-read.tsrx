@@ -13,7 +13,7 @@ export const track = shared(
 
 		return { ...s, percent };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Thumb() @{

@@ -18,7 +18,7 @@ export const select = shared(() => {
 	const s = state({ open: false });
 	const triggerEl = element<HTMLButtonElement>();
 	return { ...s, triggerEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ open = false, children }) @{
 	const sel = select();

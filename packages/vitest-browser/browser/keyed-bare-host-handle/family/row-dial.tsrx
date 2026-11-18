@@ -12,7 +12,7 @@ export const rowDial = shared(
 
 		return { ...d, markEls, rows };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function RowMark({ value }) @{

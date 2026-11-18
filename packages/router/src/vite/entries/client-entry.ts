@@ -9,7 +9,7 @@ import {
 	matchRouteManifest,
 	startRouteUpdateRenderer,
 } from '@markless/router';
-import { preloadRouteModule } from 'virtual:markless-router/route-preloads';
+import { loadRouteStylesheets, preloadRouteModule } from 'virtual:markless-router/route-preloads';
 import { documentNavigation, startLinkIntentPreloading } from 'virtual:markless-router/options';
 
 const routeDiscovery = createRouteDiscovery(
@@ -18,7 +18,12 @@ const routeDiscovery = createRouteDiscovery(
 	}),
 );
 
-export const pageModules = routeDiscovery.pageModuleLoaders;
+export const pageModules = Object.fromEntries(
+	Object.entries(routeDiscovery.pageModuleLoaders).map(([file, load]) => [
+		file,
+		() => Promise.all([load(), loadRouteStylesheets(file)]).then(([module]) => module),
+	]),
+);
 export const routeFileIds = routeDiscovery.routeFileIds;
 const routeManifest = buildRouteManifestFromFileIds(routeFileIds);
 if (__MARKLESS_ROUTER_LINK_INTENT__ && documentNavigation === 'client') {

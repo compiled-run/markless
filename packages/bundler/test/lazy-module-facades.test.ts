@@ -254,6 +254,76 @@ test.each(['external', 'internal', 'internal-await'])(
 	},
 );
 
+test('a packed import of code in its own chunk hands its loader to a caller that can take the module now', async () => {
+	const chunk = (fileName: string, code: string, imports: string[], exports: string[]) => ({
+		type: 'chunk' as const,
+		fileName,
+		code,
+		imports,
+		dynamicImports: [] as string[],
+		moduleIds: [] as string[],
+		exports,
+		isEntry: false,
+	});
+	const bundle = {
+		'entry.mjs': {
+			...chunk('entry.mjs', 'export {first,fault} from "./pack.mjs";', ['pack.mjs'], []),
+			isEntry: true,
+		},
+		'pack.mjs': {
+			...chunk(
+				'pack.mjs',
+				'let count;function start(){globalThis.trace.push("first");count=1}function fail(){globalThis.trace.push("fault");throw new Error("boom")}export{start,fail,count};export const first=()=>import("./first.mjs");export const fault=()=>import("./fault.mjs");',
+				[],
+				['start', 'fail', 'count', 'first', 'fault'],
+			),
+			moduleIds: ['body'],
+			dynamicImports: ['first.mjs', 'fault.mjs'],
+		},
+		'first.mjs': chunk(
+			'first.mjs',
+			'import{start as go,count as value}from"./pack.mjs";go();export{value};',
+			['pack.mjs'],
+			['value'],
+		),
+		'fault.mjs': chunk(
+			'fault.mjs',
+			'import{fail as go,count as value}from"./pack.mjs";go();export{value};',
+			['pack.mjs'],
+			['value'],
+		),
+	};
+	expect(collapseLazyModuleFacades(bundle).removed).toHaveLength(2);
+	const directory = await mkdtemp(join(tmpdir(), 'markless-resident-facades-'));
+	try {
+		for (const item of Object.values(bundle))
+			await writeFile(join(directory, item.fileName), item.code);
+		const url = pathToFileURL(join(directory, 'entry.mjs')).href;
+		const proof = JSON.parse(
+			execFileSync(
+				process.execPath,
+				[
+					'--input-type=module',
+					'-e',
+					`globalThis.trace=[];const entry=await import(${JSON.stringify(url)});const loading=entry.first();const beforeRead=[...trace];const now=loading.$mlNow();const afterRead=[...trace];const same=now===await loading;const faulty=entry.fault();let thrown,rejected;try{faulty.$mlNow()}catch(e){thrown=e}try{await faulty}catch(e){rejected=e}console.log(JSON.stringify({beforeRead,afterRead,value:now.value,same,sameError:thrown===rejected,error:rejected.message,trace}));`,
+				],
+				{ encoding: 'utf8' },
+			),
+		);
+		expect(proof).toEqual({
+			beforeRead: [],
+			afterRead: ['first'],
+			value: 1,
+			same: true,
+			sameError: true,
+			error: 'boom',
+			trace: ['first', 'fault'],
+		});
+	} finally {
+		await rm(directory, { recursive: true, force: true });
+	}
+});
+
 test.each([
 	['bare', 'common.js', true],
 	['named', 'common.js', true],

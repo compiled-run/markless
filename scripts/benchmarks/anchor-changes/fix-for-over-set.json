@@ -1,0 +1,14 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/ssr-data/renderer"
+			],
+			"delta": 116,
+			"reason": "a @for straight over a Set or Map renders its rows on first render: the renderer spreads any iterable collection into rows instead of treating non-arrays as empty",
+			"date": "2026-11-05"
+		}
+	]
+}

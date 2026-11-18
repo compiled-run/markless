@@ -15,7 +15,7 @@ export const famState = shared(
 		const tones = state({ tone: 'plain', note: 'n' });
 		return ${returned};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function FamRoot({ children }) @{

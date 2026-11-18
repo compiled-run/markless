@@ -128,7 +128,7 @@ const TSRX_INPUT_FILE = /\.tsrx(?:[?#].*)?$/;
 export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	let command: 'build' | 'serve' = 'build';
 	const bundleGraphAdders = new Set<BundleGraphAdder>();
-	const transformedTsrxSources = new Map<string, string>();
+	const acceptedTsrxSources = new Map<string, AcceptedTsrxSource>();
 	const prerenderRecordsBySource = new Map<string, BuiltPrerenderRecords>();
 	const { experimentalNativePacking: _deprecatedPacking, ...rest } = options;
 	const rolldownOptions: InternalMarklessRolldownOptions = {
@@ -199,6 +199,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			adoptClientBuildHandoff: MarklessRolldownPluginApi['adoptClientBuildHandoff'];
 			runtimeDemandSources: MarklessRolldownPluginApi['runtimeDemandSources'];
 			directCsrOnly: MarklessRolldownPluginApi['directCsrOnly'];
+			unreachableChildren: MarklessRolldownPluginApi['unreachableChildren'];
+			recordLiteralComponentInstances: MarklessRolldownPluginApi['recordLiteralComponentInstances'];
 		};
 	};
 	const packingPlugins = nativePackingEnabled(options)
@@ -208,6 +210,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				() => basePlugin.api.runtimeDemandSources(),
 				() => basePlugin.api.directCsrOnly(),
 				() => chunkSizeWarningBytes,
+				(files, roots, importers) =>
+					basePlugin.api.unreachableChildren(files, roots, importers),
 			)
 		: undefined;
 	const packOwnership = packingPlugins?.[0]?.api;
@@ -250,7 +254,12 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				await prepareClientBuild();
 				const client = builder.environments[viteEnvironmentName('client', options)];
 				if (!client) throw new Error('The reloaded config has no client environment.');
-				await builder.build(client);
+				try {
+					await builder.build(client);
+				} catch (error) {
+					await flushCompileCache().catch(() => {});
+					throw error;
+				}
 				await flushCompileCache();
 				writeFileSync(handoffFile, JSON.stringify(basePlugin.api.clientBuildHandoff()));
 			},
@@ -303,6 +312,12 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				prerenderEntry = ssrTsrxInput(config, options);
 				rolldownOptions.prerender = prerender && prerenderEntry !== null;
 			}
+		},
+		async buildEnd(error) {
+			const hook = basePlugin.buildEnd;
+			await (typeof hook === 'function' ? hook : hook?.handler)?.call(this, error);
+			// A build Vite runs without `buildApp`, such as `build()`, never flushes the store, so it settles here.
+			await compileCache?.settle();
 		},
 		configResolved(resolvedConfig) {
 			if (options.experimentalNativePacking !== undefined)
@@ -383,17 +398,23 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			order: 'pre',
 			async handler(builder) {
 				const clientEnvironment = viteEnvironmentName('client', options);
-				const childRequest = clientBuildRequest(builder, clientEnvironment);
-				const handoff = childRequest && (await buildClientInChildProcess(childRequest));
-				if (childRequest && !handoff)
-					builder.config.logger.warn(
-						'markless: the client builds in this process, because a child process resolved this config differently.',
-					);
-				if (handoff) {
-					basePlugin.api.adoptClientBuildHandoff(handoff);
-					builder.environments[clientEnvironment]!.isBuilt = true;
-				} else await prepareClientBuild();
-				await buildMarklessEnvironments(builder, options);
+				try {
+					const childRequest = clientBuildRequest(builder, clientEnvironment);
+					const handoff = childRequest && (await buildClientInChildProcess(childRequest));
+					if (childRequest && !handoff)
+						builder.config.logger.warn(
+							'markless: the client builds in this process, because a child process resolved this config differently.',
+						);
+					if (handoff) {
+						basePlugin.api.adoptClientBuildHandoff(handoff);
+						builder.environments[clientEnvironment]!.isBuilt = true;
+					} else await prepareClientBuild();
+					await buildMarklessEnvironments(builder, options);
+				} catch (error) {
+					// A failed build still has compile results landing in the store; resolving first races whoever removes it.
+					await flushCompileCache().catch(() => {});
+					throw error;
+				}
 				await flushCompileCache();
 				if (prerender && prerenderEntry) {
 					const source = resolve(resolvedRoot, prerenderEntry);
@@ -482,8 +503,15 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		},
 		transform: {
 			async handler(code, id, transformOptions) {
-				if (rolldownOptions.dev === true && TSRX_INPUT_FILE.test(id) && !STRING_EXPORT_QUERY.test(id)) {
-					transformedTsrxSources.set(parsePath(id).pathname, code);
+				if (
+					rolldownOptions.dev === true &&
+					TSRX_INPUT_FILE.test(id) &&
+					!STRING_EXPORT_QUERY.test(id)
+				) {
+					const path = parsePath(id).pathname;
+					if (acceptedTsrxSources.get(path)?.source !== code) {
+						acceptedTsrxSources.set(path, { source: code });
+					}
 				}
 				try {
 					const context =
@@ -506,7 +534,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			// Watcher events for content-identical writes (e.g. editor saves without
 			// changes, or delayed FSEvents for a restored file) must not invalidate
 			// generated virtual modules or trigger a full reload.
-			if (await matchesTransformedTsrxSource(ctx, transformedTsrxSources)) {
+			if (await repeatsAcceptedTsrxSource(ctx, acceptedTsrxSources)) {
 				return [];
 			}
 			return hmr.hotUpdate(this.environment, ctx);
@@ -775,22 +803,35 @@ function configEnvironmentKind(
 	return null;
 }
 
-async function matchesTransformedTsrxSource(
-	ctx: { file?: string; type?: string; read?: () => string | Promise<string> },
-	transformedSources: ReadonlyMap<string, string>,
+// The latest source each .tsrx file was transformed from or hot-updated to; Vite gives every
+// environment pass of one edit the same timestamp, so only a later edit counts as a repeat.
+type AcceptedTsrxSource = { readonly source: string; readonly timestamp?: number };
+
+async function repeatsAcceptedTsrxSource(
+	ctx: {
+		file?: string;
+		type?: string;
+		timestamp?: number;
+		read?: () => string | Promise<string>;
+	},
+	acceptedSources: Map<string, AcceptedTsrxSource>,
 ): Promise<boolean> {
-	if (!ctx.file || ctx.type === 'delete' || typeof ctx.read !== 'function') {
+	if (!ctx.file || !TSRX_INPUT_FILE.test(ctx.file)) return false;
+	if (ctx.type === 'delete' || typeof ctx.read !== 'function') {
+		acceptedSources.delete(ctx.file);
 		return false;
 	}
-	const transformedSource = transformedSources.get(ctx.file);
-	if (transformedSource === undefined) {
-		return false;
-	}
+	let source: string;
 	try {
-		return (await ctx.read()) === transformedSource;
+		source = await ctx.read();
 	} catch {
+		acceptedSources.delete(ctx.file);
 		return false;
 	}
+	const accepted = acceptedSources.get(ctx.file);
+	if (accepted?.source === source && accepted.timestamp !== ctx.timestamp) return true;
+	acceptedSources.set(ctx.file, { source, timestamp: ctx.timestamp });
+	return false;
 }
 
 function runHook(hook: unknown, context: unknown, ...args: unknown[]) {
@@ -805,6 +846,7 @@ type MarklessVitePluginApi = {
 	runtimeDemandMaps: MarklessRolldownPluginApi['runtimeDemandMaps'];
 	runtimeDemandSources: MarklessRolldownPluginApi['runtimeDemandSources'];
 	declareRouteModules: MarklessRolldownPluginApi['declareRouteModules'];
+	recordLiteralComponentInstances: MarklessRolldownPluginApi['recordLiteralComponentInstances'];
 	/** A host plugin names the root-relative page module it renders at a URL, so a dev edit reloads only the open pages it reached. */
 	declarePageForUrl: (pageForUrl: (url: string) => string | undefined) => void;
 	registerBundleGraphAdder?: (adder: BundleGraphAdder) => void;
@@ -820,4 +862,3 @@ function getBuildEnvironment(context: unknown): MarklessEnvironment {
 }
 
 export type MarklessVitePlugin = ReturnType<typeof markless>[number];
-

@@ -3,6 +3,7 @@ import {
 	PROTOCOL_CONTAINER_HOST_NODE_ID,
 	serializeRuntimeAsyncSnapshots,
 	serializeRuntimeStateCells,
+	type ProtocolArmRecordSet,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
@@ -23,6 +24,33 @@ export async function prepareSsrResumeRecords(
 			await import('../repeat-runtime.ts')
 		).validateKeyedRepeatPayloadKeys({ state, view });
 	return { state, view };
+}
+
+// @try blocks inside a range, re-addressed from its start anchor so the commit can wire them.
+export function boundariesInside(
+	view: Pick<ProtocolViewPayload, 'asyncBoundaries'>,
+	range: {
+		readonly startAnchor: { readonly index: number };
+		readonly endAnchor: { readonly index: number };
+	},
+): NonNullable<ProtocolArmRecordSet['asyncBoundaries']> {
+	const start = range.startAnchor.index;
+	const armIndex = <A extends { readonly index: number }>(anchor: A): A => ({
+		...anchor,
+		index: anchor.index - start - 1,
+	});
+	return view.asyncBoundaries
+		.filter(
+			(candidate) =>
+				candidate.startAnchor.index > start &&
+				candidate.endAnchor.index < range.endAnchor.index,
+		)
+		.map(({ armRecords: served, ...candidate }) => ({
+			...candidate,
+			...(served && !Array.isArray(served) && { armRecords: served as ProtocolArmRecordSet }),
+			startAnchor: armIndex(candidate.startAnchor),
+			endAnchor: armIndex(candidate.endAnchor),
+		}));
 }
 
 function containerScopedView(view: ProtocolViewPayload): ProtocolViewPayload {

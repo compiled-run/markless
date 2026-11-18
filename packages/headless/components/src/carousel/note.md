@@ -42,7 +42,7 @@ DOM traversal anywhere in the family: no `querySelector*`, no `closest()`.
 2. **A same-module helper returning an object built from graph reads** is
    `MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED`. The navigation helpers were rewritten to
    take plain values and return plain values.
-3. **A widget-scoped `shared()` rooted by a part inside a keyed `@for`** is
+3. **A subtree-scoped `shared()` rooted by a part inside a keyed `@for`** is
    `MARKLESS_CAPTURE_OPAQUE_PROP`: the part's seed cannot reach the handler module from
    a loop row. `carousel.item` and `carousel.navtrigger` therefore hold their own value
    in a component-local `state({ value })`, which is the shape `checklist.item` already

@@ -17,7 +17,7 @@ export const grp = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function GrpRoot({ name, children }) @{

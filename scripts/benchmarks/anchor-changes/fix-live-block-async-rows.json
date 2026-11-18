@@ -1,0 +1,16 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1487,
+			"reason": "bound row ids take their prefix from the composing module and MDX children are filed by slot (PR #620): the web runtime modules the docs playground's result frame and compile worker carry change, downloaded at load on pages with live blocks and not executed then (25858 chars run, unchanged); measured on CI run 43064375427 against queue run 43030566580",
+			"date": "2026-11-11"
+		}
+	]
+}

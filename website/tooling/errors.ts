@@ -6,6 +6,8 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Plugin } from 'vite';
 import { guides, type GuideSource } from '../components/docs/errors/guides.ts';
+import { DARK_THEME, LIGHT_THEME } from './shiki-surface.ts';
+import { AREA_ORDER, AREAS, areaOf, TITLES } from '../components/docs/errors/titles.ts';
 import type {
 	CodeLine,
 	ErrorData,
@@ -284,6 +286,8 @@ type Site = {
 	readonly message?: string | null;
 	readonly why?: string | null;
 	readonly suggestion?: string | null;
+	/** The other arms of a ternary message, why or suggestion, in source order. */
+	readonly alternates?: Readonly<Partial<Record<'message' | 'why' | 'suggestion', readonly string[]>>>;
 };
 
 /** What the scan knows about one code before it becomes page data. */
@@ -297,6 +301,8 @@ export type ScannedCode = {
 	readonly message: string | null;
 	readonly why: string | null;
 	readonly suggestion: string | null;
+	/** Each further arm of a message chosen by a ternary, printed as its own block. */
+	readonly variants?: ReadonlyArray<{ readonly message: string; readonly why: string | null; readonly suggestion: string | null }>;
 	readonly printsDocsLink: boolean;
 	readonly structured: boolean;
 	readonly referenceOnly: boolean;
@@ -473,25 +479,40 @@ export function scanCodes(files: readonly SourceFile[]): ScannedCode[] {
 		return tokens.length - 1;
 	}
 
-	// First string literal of a property value, stopping at the next depth-0 comma.
-	function firstString(tokens: Token[], k: number, b: number): string | null {
+	// The first string literal of a property value, then, when the value is a ternary, every other arm's string at depth 0.
+	function valueStrings(tokens: Token[], k: number, b: number): string[] {
+		const strings: string[] = [];
 		let depth = 0;
+		let ternary = false;
 		for (; k < b; k++) {
 			const t = tokens[k]!;
 			if (t.type === 'punct' && '([{'.includes(t.value)) depth++;
 			if (t.type === 'punct' && ')]}'.includes(t.value)) {
-				if (depth === 0) return null;
+				if (depth === 0) break;
 				depth--;
 			}
-			if (depth === 0 && t.type === 'punct' && t.value === ',') return null;
-			if (t.type === 'str') return t.template ? renderTemplate(t) : t.value;
+			if (depth === 0 && t.type === 'punct' && t.value === ',') break;
+			if (depth === 0 && t.type === 'punct' && t.value === '?') ternary = true;
+			if (t.type === 'str' && (depth === 0 || strings.length === 0)) {
+				strings.push(t.template ? renderTemplate(t) : t.value);
+				if (!ternary && depth === 0) break;
+			}
 		}
-		return null;
+		return ternary ? strings : strings.slice(0, 1);
 	}
 
-	// `key: <first string>` at depth 0 of the object literal spanning tokens[a..b].
-	function objectProps(tokens: Token[], a: number, b: number): Record<string, string> {
-		const props: Record<string, string> = {};
+	// `key: <first string>` at depth 0 of the object literal spanning tokens[a..b]; a ternary's other arms go to `alternates`.
+	function objectProps(
+		tokens: Token[],
+		a: number,
+		b: number,
+	): Record<string, string> & { alternates?: Record<string, string[]> } {
+		const props: Record<string, string> & { alternates?: Record<string, string[]> } = {};
+		const keep = (key: string, strings: string[]) => {
+			if (!strings[0]) return;
+			props[key] = strings[0];
+			if (strings.length > 1) (props.alternates ??= {})[key] = strings.slice(1);
+		};
 		let depth = 0;
 		for (let k = a + 1; k < b; k++) {
 			const t = tokens[k]!;
@@ -507,15 +528,13 @@ export function scanCodes(files: readonly SourceFile[]): ScannedCode[] {
 						tokens[m]!.value === 'message' &&
 						tokens[m + 1]?.value === ':'
 					) {
-						const s = firstString(tokens, m + 2, b);
-						if (s) props.suggestion = s;
+						keep('suggestion', valueStrings(tokens, m + 2, b));
 						break;
 					}
 				}
 				continue;
 			}
-			const s = firstString(tokens, k + 2, b);
-			if (s) props[key] = s;
+			keep(key, valueStrings(tokens, k + 2, b));
 		}
 		return props;
 	}
@@ -648,6 +667,7 @@ export function scanCodes(files: readonly SourceFile[]): ScannedCode[] {
 					message: props.message ?? null,
 					why: props.why ?? null,
 					suggestion: props.suggestion ?? null,
+					...(props.alternates ? { alternates: props.alternates } : {}),
 				});
 				return;
 			}
@@ -756,6 +776,7 @@ export function scanCodes(files: readonly SourceFile[]): ScannedCode[] {
 				message: pick('message'),
 				why: pick('why'),
 				suggestion: pick('suggestion'),
+				...variantsOf(sites.find((s) => s.message)),
 				printsDocsLink: sites.some((s) => s.context === 'docs-link'),
 				structured: sites.some((s) => s.context === 'diagnostic'),
 				referenceOnly: !sites.some((s) => s.context !== 'reference'),
@@ -798,19 +819,6 @@ function stageOf(site: Site, sites: readonly Site[]): ErrorStage {
 	return 'runtime';
 }
 
-const PACKAGE_ORDER = [
-	'@markless/compiler',
-	'@markless/core',
-	'@markless/bundler',
-	'@markless/router',
-	'@markless/web',
-	'@markless/serializer',
-	'@markless/runtime',
-	'@markless/typescript-plugin',
-	'@markless/analyzer',
-	'create-markless',
-	'@markless/vitest-browser',
-];
 const MAX_SOURCES = 6;
 
 const oneLine = (s: string) => s.replace(/\s*\n\s*/g, ' ').trim();
@@ -827,14 +835,39 @@ export function segments(text: string): Segment[] {
 	return out;
 }
 
+// A message chosen by a ternary prints once per arm; the why and suggestion pair with the arm in the same position.
+function variantsOf(site: Site | undefined): Pick<ScannedCode, 'variants'> {
+	const messages = site?.alternates?.message ?? [];
+	if (!site || messages.length === 0) return {};
+	const pair = (key: 'why' | 'suggestion', at: number) =>
+		site.alternates?.[key]?.[at] ?? site[key] ?? null;
+	return {
+		variants: messages.map((message, at) => ({
+			message,
+			why: pair('why', at),
+			suggestion: pair('suggestion', at),
+		})),
+	};
+}
+
 export function printedLines(e: ScannedCode): string[] {
 	const lines: string[] = [];
-	const head = e.message ?? e.title;
-	lines.push(head ? `${e.code}: ${oneLine(head)}` : e.code);
-	if (e.why) lines.push(oneLine(e.why));
-	if (e.suggestion) lines.push(oneLine(e.suggestion));
+	const block = (message: string | null, why: string | null, suggestion: string | null) => {
+		const head = message ?? e.title;
+		lines.push(head ? `${e.code}: ${oneLine(head)}` : e.code);
+		if (why) lines.push(oneLine(why));
+		if (suggestion) lines.push(oneLine(suggestion));
+	};
+	block(e.message, e.why, e.suggestion);
+	for (const variant of e.variants ?? []) block(variant.message, variant.why, variant.suggestion);
 	if (e.printsDocsLink) lines.push(`${DOCS_URL}${e.code}`);
 	return lines;
+}
+
+/** The reader's title: a hand-written one, else the diagnostic's own, else none (the titles test fails). */
+function plainTitle(e: ScannedCode, guide: GuideSource | undefined): string {
+	const own = e.title ? oneLine(e.title).replace(/[.]$/, '') : '';
+	return TITLES[e.code] ?? (own ? own.charAt(0).toUpperCase() + own.slice(1) : guide ? guide.summary.replace(/[.]$/, '') : '');
 }
 
 function description(e: ScannedCode, guide: GuideSource | undefined): string {
@@ -855,12 +888,12 @@ export type Highlight = (code: string) => Promise<CodeLine[]>;
 export async function shikiHighlight(): Promise<Highlight> {
 	const { getHighlighter } = await import('./highlight-code.ts');
 	const highlighter = await getHighlighter();
-	const light = highlighter.getTheme('github-light').fg.toLowerCase();
-	const dark = highlighter.getTheme('github-dark').fg.toLowerCase();
+	const light = highlighter.getTheme(LIGHT_THEME).fg.toLowerCase();
+	const dark = highlighter.getTheme(DARK_THEME).fg.toLowerCase();
 	return async (code) => {
 		const lines = highlighter.codeToTokens(code, {
 			lang: 'tsrx',
-			themes: { light: 'github-light', dark: 'github-dark' },
+			themes: { light: LIGHT_THEME, dark: DARK_THEME },
 			defaultColor: 'light',
 		}).tokens;
 		return lines.map((tokens, li) => ({
@@ -889,6 +922,7 @@ export async function buildErrorData(
 	for (const e of scanned) {
 		const guide = written[e.code];
 		const example = guide?.example ? await highlight(guide.example.join('\n')) : [];
+		const before = guide?.before ? await highlight(guide.before.join('\n')) : [];
 		const warns = e.stage === 'compile' && e.severities.includes('warning');
 		const exampleAllows =
 			guide?.example?.some((line) => line.includes('markless-allow')) ?? false;
@@ -899,12 +933,16 @@ export async function buildErrorData(
 		}));
 		entries.push({
 			code: e.code,
+			title: plainTitle(e, guide),
+			area: areaOf(e.code, e.stage, Boolean(guide)),
 			packageName: e.pkg,
 			stage: e.stage,
 			severity: e.severity,
 			description: description(e, guide),
 			printed: e.message || e.title ? printedLines(e) : [],
 			structured: e.structured,
+			...(e.why ? { why: oneLine(e.why) } : {}),
+			...(e.suggestion ? { suggestion: oneLine(e.suggestion) } : {}),
 			...(guide
 				? {
 						guide: {
@@ -912,6 +950,7 @@ export async function buildErrorData(
 							what: segments(guide.what),
 							how: segments(guide.how),
 							example,
+							before,
 						},
 					}
 				: {}),
@@ -926,22 +965,23 @@ export async function buildErrorData(
 			moreSources: Math.max(0, e.sourceFiles.length - MAX_SOURCES),
 		});
 	}
-	const byPackage = new Map<string, ErrorEntry[]>();
-	for (const entry of entries) {
-		const list = byPackage.get(entry.packageName) ?? [];
-		byPackage.set(entry.packageName, list);
-		list.push(entry);
-	}
-	const rank = (name: string) => PACKAGE_ORDER.indexOf(name) + 1 || 99;
-	const groups: ErrorGroup[] = [...byPackage]
-		.sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
-		.map(([packageName, list]) => ({
-			packageName,
-			codes: list.map((entry) => ({
-				code: entry.code,
-				kind: kindLabel(entry.stage, entry.severity),
-				guided: Boolean(entry.guide),
-			})),
+	const groups: ErrorGroup[] = AREA_ORDER.map((area) => ({ area, list: entries.filter((entry) => entry.area === area) }))
+		.filter(({ list }) => list.length > 0)
+		.map(({ area, list }) => ({
+			area,
+			label: AREAS[area].label,
+			icon: AREAS[area].icon,
+			blurb: AREAS[area].blurb,
+			codes: [...list]
+				.sort((x, y) => Number(Boolean(y.guide)) - Number(Boolean(x.guide)) || x.title.localeCompare(y.title))
+				.map((entry) => ({
+					code: entry.code,
+					title: entry.title,
+					chip: entry.severity === 'warning' ? 'warning' : entry.severity === 'info' ? 'info' : 'error',
+					kind: kindLabel(entry.stage, entry.severity),
+					guided: Boolean(entry.guide),
+					words: (entry.title + ' ' + entry.code + ' ' + entry.description).toLowerCase(),
+				})),
 		}));
 	return {
 		entries,

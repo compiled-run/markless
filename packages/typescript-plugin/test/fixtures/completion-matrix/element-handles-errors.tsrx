@@ -6,7 +6,7 @@ const ehErrors = shared(
 
 		return { optionEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function EhErrorProbe() @{

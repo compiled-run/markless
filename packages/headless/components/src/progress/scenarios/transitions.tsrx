@@ -11,7 +11,7 @@ export default function Transitions() @{
 	</progress.root>
 }
 
-// Inside the root: the widget scope hands a component under the root the same bar.
+// Inside the root: the subtree scope hands a component under the root the same bar.
 function Amounts() @{
 	const bar = progress.state();
 

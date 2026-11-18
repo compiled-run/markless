@@ -124,6 +124,8 @@ test('alternate-shaped scalar action retains artifacts on the generic records pa
 		'core/web/resume-storage-free',
 		'web/dom-journal',
 		'web/dom-journal-direct',
+		'web/dom-journal-load',
+		'web/fns/resident-load',
 		'web/fns/write-scalar',
 		'web/inline/resume-errors',
 		'web/payload-document-common',

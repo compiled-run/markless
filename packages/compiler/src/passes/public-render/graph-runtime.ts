@@ -1,6 +1,6 @@
 import type { SymbolResolverPlan } from '../../artifacts.ts';
 
-type PublicGraphMethod = 'call' | 'delete';
+type PublicGraphMethod = 'call' | 'delete' | 'changed';
 
 export function publicGraphMethods(
 	symbolResolver: SymbolResolverPlan,
@@ -11,6 +11,7 @@ export function publicGraphMethods(
 		for (const write of symbol.writes ?? []) {
 			if (write.operation === 'call') methods.add('call');
 			if (write.operation === 'delete') methods.add('delete');
+			if (write.passedTo) methods.add('changed');
 		}
 	}
 	return methods;
@@ -24,10 +25,13 @@ export function emitCreatePublicGraph(
 	const trackDirtyArrayIndexes = options.trackArrayIndexes;
 	const optionalMethods = [
 		methods.has('call')
-			? `\t\tcall(call) { const target = readMarklessPublicPath(cells.get(call.graphNodeId), call.path ?? []); const method = target?.[call.method]; if (typeof method !== "function") throw new TypeError("Unsupported Markless public graph call."); dirtyGraphNodeIds.add(call.graphNodeId); ${trackDirtyArrayIndexes ? 'dirtyArrayIndexes.delete(call.graphNodeId); ' : ''}return method.apply(target, call.args ?? []); },`
+			? `\t\tcall(call) { const target = readMarklessPublicPath(cells.get(call.graphNodeId), call.path ?? []); const method = target?.[call.method]; if (typeof method !== "function") throw new TypeError("Unsupported Markless public graph call."); dirtyGraphNodeIds.add(call.graphNodeId); ${trackDirtyArrayIndexes ? 'dirtyArrayIndexes.delete(call.graphNodeId); ' : ''}const result = method.apply(target, call.args ?? []); written?.(); return result; },`
 			: null,
 		methods.has('delete')
-			? `\t\tdelete(deletion) { const path = deletion.path ?? []; if (path.length === 0) return false; const parent = readMarklessPublicPath(cells.get(deletion.graphNodeId), path.slice(0, -1)); if (!parent || typeof parent !== "object") return true; dirtyGraphNodeIds.add(deletion.graphNodeId); ${trackDirtyArrayIndexes ? 'dirtyArrayIndexes.delete(deletion.graphNodeId); ' : ''}return delete parent[path[path.length - 1]]; },`
+			? `\t\tdelete(deletion) { const path = deletion.path ?? []; if (path.length === 0) return false; const parent = readMarklessPublicPath(cells.get(deletion.graphNodeId), path.slice(0, -1)); if (!parent || typeof parent !== "object") return true; dirtyGraphNodeIds.add(deletion.graphNodeId); ${trackDirtyArrayIndexes ? 'dirtyArrayIndexes.delete(deletion.graphNodeId); ' : ''}const deleted = delete parent[path[path.length - 1]]; written?.(); return deleted; },`
+			: null,
+		methods.has('changed')
+			? `\t\tchanged(change) { dirtyGraphNodeIds.add(change.graphNodeId); ${trackDirtyArrayIndexes ? 'dirtyArrayIndexes.delete(change.graphNodeId); ' : ''}written?.(); },`
 			: null,
 	].filter((method): method is string => method !== null);
 	const trackDirtyArrayIndexesDeclaration = trackDirtyArrayIndexes
@@ -48,14 +52,16 @@ export function emitCreatePublicGraph(
 		'function createMarklessPublicGraph() {',
 		`\tconst cells = new Map(${stateEntries});`,
 		'\tconst dirtyGraphNodeIds = new Set();',
+		'\tlet written;',
 		...trackDirtyArrayIndexesDeclaration,
 		'\treturn {',
 		'\t\tread(graphNodeId, path = []) { return readMarklessPublicPath(cells.get(graphNodeId), path); },',
-		`\t\twrite(write) { const path = write.path ?? []; const previousValue = cells.get(write.graphNodeId); dirtyGraphNodeIds.add(write.graphNodeId); ${trackDirtyArrayIndexesWrite}cells.set(write.graphNodeId, writeMarklessPublicPath(previousValue, path, write.value)); return write.value; },`,
-		`\t\tupdate(update) { const path = update.path ?? []; const previousValue = cells.get(update.graphNodeId); const currentValue = readMarklessPublicPath(previousValue, path); const nextValue = update.update(currentValue); dirtyGraphNodeIds.add(update.graphNodeId); ${trackDirtyArrayIndexesUpdate}cells.set(update.graphNodeId, writeMarklessPublicPath(previousValue, path, nextValue)); if (update.returnValue === "previous") return currentValue; if (update.returnValue === "next") return nextValue; },`,
+		`\t\twrite(write) { const path = write.path ?? []; const previousValue = cells.get(write.graphNodeId); dirtyGraphNodeIds.add(write.graphNodeId); ${trackDirtyArrayIndexesWrite}cells.set(write.graphNodeId, writeMarklessPublicPath(previousValue, path, write.value)); written?.(); return write.value; },`,
+		`\t\tupdate(update) { const path = update.path ?? []; const previousValue = cells.get(update.graphNodeId); const currentValue = readMarklessPublicPath(previousValue, path); const nextValue = update.update(currentValue); dirtyGraphNodeIds.add(update.graphNodeId); ${trackDirtyArrayIndexesUpdate}cells.set(update.graphNodeId, writeMarklessPublicPath(previousValue, path, nextValue)); written?.(); if (update.returnValue === "previous") return currentValue; if (update.returnValue === "next") return nextValue; },`,
 		...optionalMethods,
 		'\t\tisDirty(graphNodeId) { return dirtyGraphNodeIds.has(graphNodeId); },',
 		...trackDirtyArrayIndexesMethods,
+		'\t\tonWrite(listener) { written = listener; },',
 		`\t\tflush() { dirtyGraphNodeIds.clear();${trackDirtyArrayIndexesFlush} },`,
 		'\t};',
 		'}',

@@ -6,7 +6,7 @@ import OwnTemplatePage from './own-template-page.tsrx';
 import OwnTemplateSiblingsPage from './own-template-siblings-page.tsrx';
 import SiblingsPage from './siblings-page.tsrx';
 
-// A component that ROOTS one widget-scoped family is still an ordinary part of
+// A component that ROOTS one subtree-scoped family is still an ordinary part of
 // the enclosing instance of every OTHER family it resolves: its write lands in
 // that enclosing instance, not in a private copy of its own.
 afterEach(() => cleanup());

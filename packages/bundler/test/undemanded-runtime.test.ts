@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '@markless/compiler';
 import { PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
@@ -224,8 +226,10 @@ test('a map that enumerates its arm and row records lets every feature module be
 	expect(repeatInArm.nestedRecordModuleIds).toEqual(
 		expect.arrayContaining(['web/resume-events']),
 	);
-	// Rows rooted by a component carry that component's records, which this map does not plan.
-	expect(componentRows.nestedRecordModuleIds).toBeUndefined();
+	// Rows rooted by a component carry that component's records, which this module's view declares.
+	expect(componentRows.nestedRecordModuleIds).toEqual(
+		expect.arrayContaining(['web/resume-keyed-repeats']),
+	);
 
 	const ids = [...moduleIds, repeats];
 	// Before arms and rows were enumerated, a branch record left only capabilities judgeable.
@@ -236,4 +240,36 @@ test('a map that enumerates its arm and row records lets every feature module be
 	expect(
 		undemandedRuntimeModules({ demandMaps: [armOnly, componentRows], moduleIds: ids }),
 	).not.toContain(repeats);
+});
+
+// The converted TanStack Query playground's shapes: rows that are components holding async lists, an @if
+// that runs a component with its own async value, a form that saves and a poll.
+test('a page whose rows are components lets every feature module be judged', async () => {
+	const source = await readFile(
+		resolve(import.meta.dirname, 'fixtures/component-row-demand/src/root.tsrx'),
+		'utf8',
+	);
+	const maps = (
+		await compileTsrxModule({ filename: '/workspace/src/root.tsrx', symbols: [], source })
+	).runtimeDemandMaps;
+	const web = (id: string) => `/repo/packages/web/src/${id}.ts`;
+	const unused = web('shared-swap');
+	const used = [
+		'resume-events',
+		'resume-branches',
+		'resume-commit-arm',
+		'resume-keyed-repeats',
+		'repeat-runtime',
+		'resume-async-wiring',
+		'resume-stream-patches',
+		'fns/async-plane',
+	].map(web);
+	for (const map of Object.values(maps)) {
+		const undemanded = undemandedRuntimeModules({
+			demandMaps: [map],
+			moduleIds: [...moduleIds, unused, ...used],
+		});
+		expect(undemanded).toContain(unused);
+		for (const id of used) expect(undemanded).not.toContain(id);
+	}
 });

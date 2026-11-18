@@ -12,7 +12,7 @@ export const pairState = shared(
 
 		return { ...pair, contentEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // One level below the root, rooted by every `PairItem`, so an item written
@@ -24,7 +24,7 @@ export const pairLevelState = shared(
 
 		return { ...level, contentEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function PairRoot({ children }) @{

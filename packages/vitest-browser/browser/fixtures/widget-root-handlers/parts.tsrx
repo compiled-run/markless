@@ -19,7 +19,7 @@ export const outerState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // Inner family: rooted by `Inner`, which is written INSIDE an `Outer`. Its root
@@ -38,7 +38,7 @@ export const innerState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // Defect 57 shape: a widget-root element carrying TWO handlers. The click was

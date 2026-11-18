@@ -5,7 +5,7 @@ export const wrappedState = shared(
 		const tones = state({ tone: 'plain', note: 'wrapped' });
 		return { ...tones, mark() { tones.tone = 'marked'; } };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function WrappedRoot({ children }) @{

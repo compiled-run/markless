@@ -1,6 +1,7 @@
 // The Markless runtime modules compiled code imports, served from the frame's own copy:
 // each specifier becomes a small module that re-exports the frame's instance, so the
 // result and the frame share one runtime.
+import * as core from '@markless/core';
 import corePackage from '../../../../packages/core/package.json' with { type: 'json' };
 import { exportTarget, packageFile } from './package-exports.ts';
 import { runtimePackages } from './source-packages.ts';
@@ -28,7 +29,8 @@ const namespaces: Map<string, Namespace> = ((globalThis as Record<string, unknow
 const packages = runtimePackages(PACKAGES);
 
 function loaderFor(specifier: string): Loader | undefined {
-	if (specifier === corePackage.name) return () => import('@markless/core');
+	// The frame imports this package statically, so an import() of it would load nothing more.
+	if (specifier === corePackage.name) return () => Promise.resolve(core as Namespace);
 	const file = packageFile(packages, specifier);
 	return file ? sources[file] : undefined;
 }

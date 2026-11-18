@@ -89,7 +89,7 @@ export const toasterState = shared(
 			},
 		};
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );
 
 export const toasterItemState = shared(
@@ -104,10 +104,10 @@ export const toasterItemState = shared(
 
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
-// No attach= on this root: a behavior on a page-scoped root crashes the render.
+// No attach= on this root: a behavior on an app-scoped root crashes the render.
 // The region is not an <ol> and a row is not an <li>: a consumer's repeat has to
 // sit inside a wrapper element, and <ol> may hold nothing but <li>.
 export function ToasterRoot({

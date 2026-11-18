@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { emitSymbolModules } from '../src/passes/symbol-modules.ts';
 import { compileTsrxModule } from '../src/compile-module.ts';
+import { collectTsrxModuleDiagnostics } from '../src/collect-diagnostics.ts';
 
 test('state initializer symbols carry referenced same-module helpers', async () => {
 	const result = await compileTsrxModule({
@@ -43,12 +44,12 @@ test('symbol modules carry authoredSource unless the build asks for it to be omi
 		omitAuthoredSource: true,
 	});
 
-	expect(kept.symbolModules.modules.some((module) => module.source.includes('authoredSource'))).toBe(
-		true,
-	);
-	expect(cut.symbolModules.modules.some((module) => module.source.includes('authoredSource'))).toBe(
-		false,
-	);
+	expect(
+		kept.symbolModules.modules.some((module) => module.source.includes('authoredSource')),
+	).toBe(true);
+	expect(
+		cut.symbolModules.modules.some((module) => module.source.includes('authoredSource')),
+	).toBe(false);
 	// Only the dead string leaves: same symbols, same exports, same executable bodies.
 	expect(cut.symbolModules.modules.map((module) => module.symbolId)).toEqual(
 		kept.symbolModules.modules.map((module) => module.symbolId),
@@ -58,9 +59,11 @@ test('symbol modules carry authoredSource unless the build asks for it to be omi
 	);
 	for (const [index, module] of cut.symbolModules.modules.entries()) {
 		const keptSource = kept.symbolModules.modules[index]!.source;
-		expect(keptSource.split('\n').filter((line) => !line.startsWith('export const authoredSource ='))).toEqual(
-			module.source.split('\n'),
-		);
+		expect(
+			keptSource
+				.split('\n')
+				.filter((line) => !line.startsWith('export const authoredSource =')),
+		).toEqual(module.source.split('\n'));
 	}
 });
 
@@ -350,11 +353,13 @@ function emitSelectAssignmentSymbol(valueSource: string, renderData?: any) {
 function repeatLocalRenderData() {
 	return {
 		repeats: [{ repeatId: 'repeat:0', rowChunkId: 'repeat:repeat:0:row', itemName: 'entry' }],
-		chunks: [{
-			id: 'repeat:repeat:0:row',
-			hosts: [{ hostNodeId: 'h2' }],
-			slots: [],
-		}],
+		chunks: [
+			{
+				id: 'repeat:repeat:0:row',
+				hosts: [{ hostNodeId: 'h2' }],
+				slots: [],
+			},
+		],
 		interactions: [{ hostNodeId: 'h2', symbolIds: ['symbol:select'] }],
 	};
 }
@@ -618,6 +623,7 @@ test('emitSymbolModules emits async computed runner modules from planned sources
 							source: 'query',
 							graphNodeId: 'state:query',
 							path: [],
+							local: { name: 'query', members: [] },
 						},
 					],
 				},
@@ -704,8 +710,7 @@ test('emitSymbolModules keeps dependency-like string values literal in sync comp
 					kind: 'sync-computed-derive',
 					graphNodeId: 'computed:status',
 					name: 'status',
-					source:
-						"() => alpha === 'alpha' || alpha === 'alpha-applied' || alpha === 'alphaapplied'",
+					source: "() => alpha === 'alpha' || alpha === 'alpha-applied' || alpha === 'alphaapplied'",
 					dependencies: [
 						{
 							source: 'alpha',
@@ -726,7 +731,7 @@ test('emitSymbolModules keeps dependency-like string values literal in sync comp
 	});
 
 	expect(artifact.modules[0].source).toContain(
-		"return context.graph.read(\"state:alpha\") === 'alpha' || context.graph.read(\"state:alpha\") === 'alpha-applied' || context.graph.read(\"state:alpha\") === 'alphaapplied';",
+		'return context.graph.read("state:alpha") === \'alpha\' || context.graph.read("state:alpha") === \'alpha-applied\' || context.graph.read("state:alpha") === \'alphaapplied\';',
 	);
 });
 
@@ -1237,11 +1242,11 @@ test('emitSymbolModules emits binary graph-read assignment values for event hand
 		kind: 'event-handler',
 		exportName: 'symbol_add',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: context.graph.read("state:total") + context.graph.read("state:profile", ["step"])',
+		'return value + context.graph.read("state:profile", ["step"])',
 	);
 });
 
@@ -1303,11 +1308,11 @@ test('emitSymbolModules emits nested parenthesized graph-read assignment values 
 		kind: 'event-handler',
 		exportName: 'symbol_scale',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: (context.graph.read("state:total") + context.graph.read("state:profile", ["step"])) * context.graph.read("state:profile", ["scale"])',
+		'return (value + context.graph.read("state:profile", ["step"])) * context.graph.read("state:profile", ["scale"])',
 	);
 });
 
@@ -1369,11 +1374,11 @@ test('emitSymbolModules emits conditional graph-read assignment values for event
 		kind: 'event-handler',
 		exportName: 'symbol_choose',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: context.graph.read("state:menu", ["open"]) ? context.graph.read("state:profile", ["step"]) : context.graph.read("state:total")',
+		'return context.graph.read("state:menu", ["open"]) ? context.graph.read("state:profile", ["step"]) : value',
 	);
 });
 
@@ -1662,11 +1667,11 @@ test('emitSymbolModules emits object spread assignment values for event handler 
 		kind: 'event-handler',
 		exportName: 'symbol_replace',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:settings"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: { ...context.graph.read("state:settings"), title: context.graph.read("state:menu", ["title"]) }',
+		'return { ...value, title: context.graph.read("state:menu", ["title"]) }',
 	);
 });
 
@@ -1901,8 +1906,8 @@ export function App() @{
 `,
 		symbols: [],
 	});
-	const child = result.symbolModules.modules.find((module) =>
-		module.kind === 'event-handler' && module.source.includes('capture.invoke'),
+	const child = result.symbolModules.modules.find(
+		(module) => module.kind === 'event-handler' && module.source.includes('capture.invoke'),
 	);
 	const callback = result.symbolModules.modules.find((module) => module.kind === 'callback-prop');
 	expect(child?.source).toContain('context.capture.read(');
@@ -1914,13 +1919,22 @@ export function App() @{
 
 	const multiArgumentCallback = emitSymbolModules({
 		symbolResolver: {
-			passId: 'symbol-resolver', dynamicImportOwner: 'generated-symbol-resolver',
-			symbols: [{
-				id: 'symbol:callback', kind: 'callback-prop', componentEdgeId: 'edge:0',
-				propName: 'onTrace', source: '(payload, reason) => console.log(payload, reason)',
-				parameters: ['payload', 'reason'], reads: [], writes: [],
-			}],
-			syncPolicies: [], diagnostics: [],
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [
+				{
+					id: 'symbol:callback',
+					kind: 'callback-prop',
+					componentEdgeId: 'edge:0',
+					propName: 'onTrace',
+					source: '(payload, reason) => console.log(payload, reason)',
+					parameters: ['payload', 'reason'],
+					reads: [],
+					writes: [],
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
 		},
 		captureAnalysis: { passId: 'capture-analysis', extractedSymbols: [], diagnostics: [] },
 	}).modules[0]?.source;
@@ -1928,7 +1942,7 @@ export function App() @{
 	expect(multiArgumentCallback).toContain('const reason = context.args?.[1];');
 });
 
-test('a direct callback prop event reference invokes its graph-routable prop', async () => {
+test('a direct callback prop event reference invokes its graph-routable prop with the event, or nothing when absent', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Controls.tsrx',
 		source: `
@@ -1941,8 +1955,9 @@ export function Controls({ onActivate }) @{
 	const directHandler = result.symbolModules.modules.find(
 		(module) => module.kind === 'event-handler',
 	);
+	expect(directHandler?.source).toContain('const event = context.event;');
 	expect(directHandler?.source).toContain(
-		'return context.graph.read("prop:props", ["onActivate"])(context.event);',
+		'return context.graph.read("prop:props", ["onActivate"])?.(event);',
 	);
 });
 
@@ -1973,7 +1988,8 @@ export function App() @{
 	const pattern = handlers.find((module) => module.source.includes('"pattern"'));
 	const loop = handlers.find((module) => module.source.includes('"loop"'));
 	const prop = handlers.find(
-		(module) => module.source.includes('capture.invoke') && module.source.includes('capture.read'),
+		(module) =>
+			module.source.includes('capture.invoke') && module.source.includes('capture.read'),
 	);
 
 	expect(local?.source).toContain('const label = "local";');
@@ -2009,9 +2025,7 @@ export function App() @{
 `,
 		symbols: [],
 	});
-	const child = result.symbolModules.modules.find(
-		(module) => module.kind === 'event-handler',
-	);
+	const child = result.symbolModules.modules.find((module) => module.kind === 'event-handler');
 	const childRow = result.boundSymbolResolver.rows.find(
 		(row) => row.baseSymbolId === child?.symbolId,
 	);
@@ -2047,9 +2061,9 @@ export function App() @{
 	expect(result.captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({ code: 'MARKLESS_CAPTURE_OPAQUE_PROP' }),
 	]);
-	expect(
-		result.symbolModules.modules.some((module) => module.kind === 'event-handler'),
-	).toBe(false);
+	expect(result.symbolModules.modules.some((module) => module.kind === 'event-handler')).toBe(
+		false,
+	);
 });
 
 test('B908 preserves setTimeout deferral while splicing nested writes', () => {
@@ -2487,11 +2501,11 @@ test('emitSymbolModules emits logical graph-read assignment values for event han
 		kind: 'event-handler',
 		exportName: 'symbol_enable',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:menu"');
 	expect(artifact.modules[0].source).toContain('path: ["open"]');
 	expect(artifact.modules[0].source).toContain(
-		'value: context.graph.read("state:menu", ["open"]) && context.graph.read("state:profile", ["enabled"])',
+		'return value && context.graph.read("state:profile", ["enabled"])',
 	);
 });
 
@@ -2543,11 +2557,11 @@ test('emitSymbolModules emits unary graph-read assignment values for event handl
 		kind: 'event-handler',
 		exportName: 'symbol_toggle',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:menu"');
 	expect(artifact.modules[0].source).toContain('path: ["open"]');
 	expect(artifact.modules[0].source).toContain(
-		'value: !context.graph.read("state:menu", ["open"])',
+		'return !value',
 	);
 });
 
@@ -2933,11 +2947,15 @@ export function App() @{
 				: undefined,
 	};
 	// Fulfilled renders the @try arm from graph reads; rejected renders @catch.
+	// `details` re-runs when `query` changes, so each arm carries the records a refresh updates in place.
 	expect(run({ graph, status: 'fulfilled' })).toEqual({
 		arm: 0,
 		html: '<p>Result: markless</p>',
+		armRecords: expect.objectContaining({ domUpdates: [expect.objectContaining({ hostNodeId: 'h1' })] }),
 	});
-	expect(run({ graph, status: 'rejected' })).toEqual({ arm: 1, html: '<p>Broken</p>' });
+	expect(run({ graph, status: 'rejected' })).toEqual(
+		expect.objectContaining({ arm: 1, html: '<p>Broken</p>' }),
+	);
 });
 
 test('plain-content @try arms keep the cheap parts-based update module (no component machinery)', async () => {
@@ -2965,11 +2983,7 @@ export function App() @{
 	expect(update!.source).not.toContain('marklessCsrRenderChild');
 });
 
-// D4: when the arm-render tier cannot support a shape, the diagnostic speaks
-// the author's words — never "arm", "tier", "boundary", or "anchor".
-
-
-test('same-module helper components containing @try diagnose the dropped content in author vocabulary', async () => {
+test('a same-module helper holding @try settles through its own compiled arms', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Widgets.tsrx',
 		source: `
@@ -2992,17 +3006,13 @@ export function Widget() @{
 		symbols: [],
 	});
 
-	const diagnostic = result.publicRenderPlan.diagnostics.find(
-		(candidate) => candidate.code === 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-	);
-	expect(diagnostic?.message).toBe(
-		'<Widget> contains an @try block, but <Widget> is a helper component in the same file as the page. Its @try/@pending/@catch content is dropped from the rendered HTML. markless debugging playbook: run the doctor script (npm run doctor), or read agent/markless.md in the installed @markless/core package',
-	);
-	expect(diagnostic?.suggestions?.[0]?.message).toBe(
-		'Move <Widget> into its own .tsrx file and import it, or move the @try block into the page component.',
-	);
+	expect(
+		collectTsrxModuleDiagnostics(result).filter((diagnostic) => diagnostic.severity === 'error'),
+	).toEqual([]);
+	expect(
+		result.symbolModules.modules.find((module) => module.kind === 'async-boundary-update')?.source,
+	).toContain('marklessBoundaryArms');
 });
-
 
 test('branch-update modules defer to the runtime-computed arm when provided', async () => {
 	const result = await compileTsrxModule({
@@ -3081,7 +3091,8 @@ export function App() @{
 			if (graphNodeId === 'state:expanded') return expanded;
 			return path && path.length > 0
 				? path.reduce<unknown>(
-						(value, key) => (value == null ? value : (value as Record<string, unknown>)[key]),
+						(value, key) =>
+							value == null ? value : (value as Record<string, unknown>)[key],
 						snapshot,
 					)
 				: snapshot;

@@ -11,7 +11,7 @@ export const staticDial = shared(
 
 		return { ...d, markEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function StaticDial({ tag }) @{

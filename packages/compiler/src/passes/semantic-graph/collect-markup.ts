@@ -1,3 +1,7 @@
+import {
+	ENUMERATED_BOOLEAN_ATTRIBUTE,
+	marklessAttributeValue as attributeText,
+} from '@markless/web/dom-attribute';
 import { isEventAttribute } from '../../ast/events.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
@@ -20,7 +24,6 @@ import {
 } from '../../ast/tsrx.ts';
 import {
 	graphBindingMap,
-	optionalMemberReadSource,
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
@@ -33,10 +36,13 @@ import type {
 } from '../../artifacts.ts';
 import { resolveSharedInstanceGraphPath, sharedInstanceVisibleFrom } from './collect-shared.ts';
 import {
+	asyncArmOrderDiagnostic,
+	asyncCatchWithoutTryDiagnostic,
 	branchElseSpellingDiagnostic,
 	idrefElementHandleIdConflictDiagnostic,
 } from './diagnostics.ts';
 import { isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
+import { armStatements, ifChainOf } from './if-chain.ts';
 import { OVERLAY_DOM_ATTRIBUTE, overlayLiteralValue } from './overlay-attribute.ts';
 import {
 	createStyleConstResolver,
@@ -44,14 +50,16 @@ import {
 	type StyleConstResolver,
 } from './style-object.ts';
 import { componentMarkupRoot } from '../public-render/component-markup-root.ts';
-import { collectStyleScopes } from '../public-render/style-scopes.ts';
+import { collectStyleScopes, takesStyleScopeClass } from '../public-render/style-scopes.ts';
 import { PROJECTION_PROP_NAME } from '../public-render/shared-seed-pass.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
 import { rawElementText } from '../../ast/raw-text.ts';
+import { aliasedItemPath, repeatItemBinding, type RepeatItemAlias } from './repeat-item-binding.ts';
+import { memberReadPath } from './composite-reads.ts';
 
 // HTML void elements: a closing tag for one is parsed as a second element (`</br>` is another `<br>`).
-const VOID_TAG_NAMES: ReadonlySet<string> = new Set([
+export const VOID_TAG_NAMES: ReadonlySet<string> = new Set([
 	'area',
 	'base',
 	'br',
@@ -66,6 +74,12 @@ const VOID_TAG_NAMES: ReadonlySet<string> = new Set([
 	'track',
 	'wbr',
 ]);
+
+type RowNames = {
+	readonly id: string;
+	readonly itemName: string;
+	readonly aliases: ReadonlyArray<RepeatItemAlias>;
+};
 
 type CollectionContext = {
 	readonly source: string;
@@ -317,7 +331,8 @@ function emitNode(
 	}
 
 	if (node.type === 'JSXForExpression') {
-		const itemName = repeatItemName(node) ?? 'item';
+		const binding = repeatItemBinding(node);
+		const itemName = binding?.itemName ?? 'item';
 		const collection = node.right as AnyNode | undefined;
 		const key = node.key as AnyNode | undefined;
 		const semanticRepeat = context.graph.keyedRepeats.find(
@@ -332,10 +347,8 @@ function emitNode(
 		const repeatId = semanticRepeat?.id ?? `markup-repeat:${node.start ?? 'unknown'}`;
 		const rowTemplateId = `repeat:${repeatId}:row`;
 		const rowBuilder = createChunk(rowTemplateId, 'repeat-row', builder.componentName);
-		emitNodes(asNodes((node.body as AnyNode | undefined)?.body), [0], rowBuilder, context, {
-			id: repeatId,
-			itemName,
-		});
+		const row: RowNames = { id: repeatId, itemName, aliases: binding?.aliases ?? [] };
+		emitNodes(asNodes((node.body as AnyNode | undefined)?.body), [0], rowBuilder, context, row);
 		context.chunks.push(finishChunk(rowBuilder));
 
 		const emptyNodes = asNodes((node.empty as AnyNode | undefined)?.body);
@@ -449,6 +462,8 @@ function emitNode(
 		});
 	}
 
+	const componentScopeClass = context.styleScopeClass;
+	if (!takesStyleScopeClass(tagName)) context.styleScopeClass = null;
 	append(builder, `<${tagName}`);
 	let classSeen = false;
 	const elementAttributes = getElementAttributes(node);
@@ -513,6 +528,7 @@ function emitNode(
 					coordinate: { kind: 'child-index', path },
 					residue,
 					excludeNames,
+					...(spreadsRestBinding ? { carriesProps: true as const } : {}),
 					...(context.destructuredNames.length > 0
 						? { destructuredNames: context.destructuredNames }
 						: {}),
@@ -572,9 +588,9 @@ function emitNode(
 			if (styleCss !== '') append(builder, ` style="${escapeAttribute(styleCss)}"`);
 			continue;
 		}
-		const literal = staticAttributeValue(value, expression);
+		const literal = staticAttributeValue(name, value, expression);
 		if (literal) {
-			const text = staticAttributeText(name, literal.value);
+			const text = attributeText(name, literal.value);
 			if (text !== null)
 				append(
 					builder,
@@ -623,6 +639,7 @@ function emitNode(
 			append(builder, '"');
 		} else append(builder, ` class="${context.styleScopeClass}"`);
 	}
+	context.styleScopeClass = componentScopeClass;
 	append(builder, '>');
 	if (textareaValue) emitTextareaValue(textareaValue, path, builder, context, repeat);
 	else if (tagName === 'script') emitScriptBody(node, path, builder, context, repeat);
@@ -640,9 +657,9 @@ function emitTextareaValue(
 ): void {
 	const value = attribute.value as AnyNode | undefined;
 	const expression = unwrapExpressionContainer(value);
-	const literal = staticAttributeValue(value, expression);
+	const literal = staticAttributeValue('value', value, expression);
 	if (literal) {
-		const text = staticAttributeText('value', literal.value);
+		const text = attributeText('value', literal.value);
 		if (text !== null) append(builder, escapeHtml(text));
 		return;
 	}
@@ -955,9 +972,9 @@ function emitDynamicHost(
 			if (styleCss !== '') staticAttributes[name] = styleCss;
 			continue;
 		}
-		const literal = staticAttributeValue(value, expression);
+		const literal = staticAttributeValue(name, value, expression);
 		if (literal) {
-			const text = staticAttributeText(name, literal.value);
+			const text = attributeText(name, literal.value);
 			if (text !== null) staticAttributes[name] = text;
 			continue;
 		}
@@ -1024,11 +1041,21 @@ function emitNodes(
 	const startIndex = startPath[startPath.length - 1] ?? 0;
 	let childIndex = startIndex;
 	let previous: AnyNode | null = null;
-	for (const node of nodes) {
+	for (const [at, node] of nodes.entries()) {
 		if (isIgnorableStaticTextNode(node)) continue;
+		if (isCatchWithoutTry(node, nodes[at + 1])) {
+			context.graph.diagnostics.push(
+				asyncCatchWithoutTryDiagnostic({ node, filename: context.filename }),
+			);
+		}
 		if (isPlainElseSpelling(previous, node)) {
 			context.graph.diagnostics.push(
 				branchElseSpellingDiagnostic({ node, filename: context.filename }),
+			);
+		}
+		if (isPendingAfterCatch(previous, node)) {
+			context.graph.diagnostics.push(
+				asyncArmOrderDiagnostic({ node, filename: context.filename }),
 			);
 		}
 		previous = node;
@@ -1054,6 +1081,22 @@ const PLAIN_ELSE_TEXT = /^else$|^else\s+if\s*\(/;
 function isPlainElseSpelling(previous: AnyNode | null, node: AnyNode): boolean {
 	if (!previous || previous.type !== 'JSXIfExpression') return false;
 	return isStaticTextNode(node) && PLAIN_ELSE_TEXT.test(staticTextValue(node).trim());
+}
+
+function isPendingAfterCatch(previous: AnyNode | null, node: AnyNode): boolean {
+	if (!previous || previous.type !== 'JSXTryExpression' || !previous.handler) return false;
+	return isStaticTextNode(node) && staticTextValue(node).trim() === '@pending';
+}
+
+// A `@catch` not attached to an @try parses as this text, and its block as the expression after it.
+const CATCH_AS_TEXT = /^@catch(?:\s*\([^)]*\))?$/;
+
+function isCatchWithoutTry(node: AnyNode, next: AnyNode | undefined): boolean {
+	return (
+		next?.type === 'JSXExpressionContainer' &&
+		isStaticTextNode(node) &&
+		CATCH_AS_TEXT.test(staticTextValue(node).trim())
+	);
 }
 
 function emitAsyncArm(
@@ -1087,10 +1130,12 @@ function expressionResidue(
 		componentName,
 		attributeName === 'style' &&
 			(expression.type === 'ObjectExpression' || expression.type === 'Identifier'),
+		memberReadPath(expression) ?? source,
 	);
 	if (residue.kind !== 'authored-expression' || residue.source !== source) return residue;
 	// No computed stands behind it, so the render writes the object's CSS text itself.
-	const styleSource = attributeName === 'style' ? styleObjectCssSource(expression, context) : null;
+	const styleSource =
+		attributeName === 'style' ? styleObjectCssSource(expression, context) : null;
 	if (styleSource !== null) return { kind: 'authored-expression', source: styleSource };
 	const inlined = context.nestedLocalSource?.(expression);
 	return inlined ? { kind: 'authored-expression', source: inlined } : residue;
@@ -1100,9 +1145,10 @@ function sourceResidue(
 	source: string,
 	span: SourceSpan | undefined,
 	context: CollectionContext,
-	repeat: { readonly id: string; readonly itemName: string } | null,
+	repeat: RowNames | { readonly id: string; readonly itemName: string } | null,
 	componentName: string,
 	loweredStyle = false,
+	memberPath = source,
 ): SemanticMarkupResidue {
 	if (repeat && (source === repeat.itemName || source.startsWith(`${repeat.itemName}.`))) {
 		const path =
@@ -1111,7 +1157,9 @@ function sourceResidue(
 			return { kind: 'repeat-item', repeatId: repeat.id, path };
 		}
 	}
-	const memberPath = optionalMemberReadSource(source);
+	const aliased = repeat && 'aliases' in repeat ? aliasedItemPath(repeat.aliases, source) : null;
+	if (repeat && aliased && aliased.every((part) => /^[\w$]+$/.test(part)))
+		return { kind: 'repeat-item', repeatId: repeat.id, path: aliased };
 	const resolved = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(memberPath)
 		? // Component scope only: a factory local and a component's shared-instance
 			// local routinely share a name, and the instance is what markup names.
@@ -1138,10 +1186,20 @@ function sourceResidue(
 	// wakes the update once the count is a live number.
 	// A row minted in the browser reads its slots before any synthetic computed has
 	// derived, so a row keeps the expression - unless only the computed can answer it.
-	return computedRead?.computedGraphNodeId &&
+	if (
+		computedRead?.computedGraphNodeId &&
 		(!repeat || loweredStyle || readsSharedInstance(context, componentName, source)) &&
 		!spendsRosterCount(context, componentName, source)
-		? { kind: 'graph-read', graphNodeId: computedRead.computedGraphNodeId, path: [] }
+	)
+		return { kind: 'graph-read', graphNodeId: computedRead.computedGraphNodeId, path: [] };
+	const armHole =
+		repeat || spendsRosterCount(context, componentName, source)
+			? undefined
+			: context.graph.templateReads
+					.flatMap((read) => read.armHoles ?? [])
+					.find((hole) => hole.sourceSpan.start === span?.start);
+	return armHole
+		? { kind: 'graph-read', graphNodeId: armHole.computedGraphNodeId, path: [] }
 		: { kind: 'authored-expression', source };
 }
 
@@ -1279,22 +1337,8 @@ function isFunctionNode(node: AnyNode): boolean {
 }
 
 function branchArms(node: AnyNode): AnyNode[][] {
-	if (node.type === 'JSXIfExpression') {
-		return [node.consequent, node.alternate].map((arm) => {
-			const candidate = arm as AnyNode | undefined;
-			if (!candidate) return [];
-			return candidate.type === 'BlockStatement' ? asNodes(candidate.body) : [candidate];
-		});
-	}
+	if (node.type === 'JSXIfExpression') return ifChainOf(node).arms.map(armStatements);
 	return asNodes(node.cases).map((switchCase) => asNodes(switchCase.consequent));
-}
-
-function repeatItemName(node: AnyNode): string | null {
-	const left = node.left as AnyNode | undefined;
-	if (!left) return null;
-	if (left.type !== 'VariableDeclaration') return getIdentifierName(left);
-	const [declaration] = asNodes(left.declarations);
-	return getIdentifierName(declaration?.id as AnyNode | undefined);
 }
 
 // A literal-only style object owes the browser nothing: its CSS text is known
@@ -1351,11 +1395,13 @@ function markupStyleConstResolver(context: CollectionContext): StyleConstResolve
 
 // A bare attribute is already the present-with-no-value form, so it reports the
 // empty string rather than the boolean a `{true}` value would.
+// A bare attribute is true; names that do not spell their booleans keep the empty value pages already select on.
 function staticAttributeValue(
+	name: string,
 	value: AnyNode | undefined,
 	expression: AnyNode | undefined,
 ): { readonly value: unknown } | null {
-	if (!value) return { value: '' };
+	if (!value) return { value: ENUMERATED_BOOLEAN_ATTRIBUTE.test(name) ? true : '' };
 	if (value.type === 'Literal' && typeof value.value !== 'object') return { value: value.value };
 	if (expression?.type === 'Literal' && typeof expression.value !== 'object') {
 		return { value: expression.value };
@@ -1374,12 +1420,4 @@ function isAlwaysPresentValue(expression: AnyNode): boolean {
 			(typeof node.value === 'string' || typeof node.value === 'number')
 		);
 	});
-}
-
-// The compile-time half of the presence rule marklessAttributeValue owns for
-// values only the runtime sees; both halves must agree.
-export function staticAttributeText(name: string, value: unknown): string | null {
-	if (value === null || value === undefined || value === false) return null;
-	if (value === true) return name.startsWith('aria-') || name.startsWith('data-') ? 'true' : '';
-	return String(value);
 }

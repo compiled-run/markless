@@ -1,0 +1,156 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/payload-resume"
+			],
+			"delta": 72,
+			"reason": "stale container boots no longer wire listeners, the retire hook or __mAdopted onto the next page (4 lifetime checks)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-stream-patches"
+			],
+			"delta": 59,
+			"reason": "stale container boots no longer wire listeners, the retire hook or __mAdopted onto the next page (4 lifetime checks)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 3,
+			"reason": "stale container boots no longer wire listeners, the retire hook or __mAdopted onto the next page (4 lifetime checks)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "stale container boots no longer wire listeners, the retire hook or __mAdopted onto the next page (4 lifetime checks)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 3,
+			"reason": "stale container boots no longer wire listeners, the retire hook or __mAdopted onto the next page (4 lifetime checks)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "stale container boots no longer wire listeners, the retire hook or __mAdopted onto the next page (4 lifetime checks)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 3,
+			"reason": "stale container boots no longer wire listeners, the retire hook or __mAdopted onto the next page (4 lifetime checks)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "stale container boots no longer wire listeners, the retire hook or __mAdopted onto the next page (4 lifetime checks)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 85,
+			"reason": "stale container boots no longer wire listeners, the retire hook or __mAdopted onto the next page (4 lifetime checks)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "stale container boots no longer wire listeners, the retire hook or __mAdopted onto the next page (4 lifetime checks)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 85,
+			"reason": "stale container boots no longer wire listeners, the retire hook or __mAdopted onto the next page (4 lifetime checks)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "stale container boots no longer wire listeners, the retire hook or __mAdopted onto the next page (4 lifetime checks)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 85,
+			"reason": "stale container boots no longer wire listeners, the retire hook or __mAdopted onto the next page (4 lifetime checks)",
+			"date": "2026-11-09"
+		}
+	]
+}

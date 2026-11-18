@@ -8,7 +8,7 @@ const REGION = 'min-block-size: 40px; min-inline-size: 160px';
 // One embed's worth of page, mounted twice as two separate islands by the
 // multi-embed battery. Unlike every other family wired to this battery, the two
 // embeds are SUPPOSED to move together: the queue and the pause flag both live
-// in one page-scoped cell, so a message raised anywhere reaches every region and
+// in one app-scoped cell, so a message raised anywhere reaches every region and
 // tabbing into either region stops both clocks. `duration: Infinity` keeps the
 // row from expiring underneath a check.
 export default function MultiEmbed() @{

@@ -27,7 +27,7 @@ ${options.imports ?? ''}
 export const gate = shared(() => {
 	const g = state({ minWidth: 1, maxWidth: ${options.seedValue}, x: 2 });
 	return { ...g, grow() { g.x = g.x + 1; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ cap = ${options.capDefault} }) @{
 	const g = gate();

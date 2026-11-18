@@ -1,3 +1,5 @@
+import type { ErrorArea } from './titles.ts';
+
 /** One piece of a sentence: plain text, inline code, or a link. */
 export type Segment = {
 	readonly id: string;
@@ -21,12 +23,17 @@ export type ErrorGuide = {
 	readonly what: readonly Segment[];
 	readonly how: readonly Segment[];
 	readonly example: readonly CodeLine[];
+	/** A file that raises the code, shown above the fix. */
+	readonly before: readonly CodeLine[];
 };
 
 export type ErrorSource = { readonly id: string; readonly file: string; readonly url: string };
 
 export type ErrorEntry = {
 	readonly code: string;
+	/** A plain title a reader can scan, leading with what went wrong. */
+	readonly title: string;
+	readonly area: ErrorArea;
 	readonly packageName: string;
 	readonly stage: ErrorStage;
 	readonly severity: ErrorSeverity;
@@ -34,6 +41,10 @@ export type ErrorEntry = {
 	/** The lines Markless prints for this code, with case-specific words as `<name>`. */
 	readonly printed: readonly string[];
 	readonly structured: boolean;
+	/** Why Markless raises it, as the diagnostic says, when it says. */
+	readonly why?: string;
+	/** The diagnostic's own first suggestion, when it has one. */
+	readonly suggestion?: string;
 	readonly guide?: ErrorGuide;
 	/** The `markless-allow` line a compile warning can be silenced with. */
 	readonly allow?: readonly CodeLine[];
@@ -42,11 +53,19 @@ export type ErrorEntry = {
 };
 
 export type ErrorGroup = {
-	readonly packageName: string;
+	readonly area: ErrorArea;
+	readonly label: string;
+	readonly icon: string;
+	readonly blurb: string;
 	readonly codes: readonly {
 		readonly code: string;
+		readonly title: string;
+		/** `error` or `warning`, for the card's chip. */
+		readonly chip: string;
 		readonly kind: string;
 		readonly guided: boolean;
+		/** The words the filter box matches, lower-cased. */
+		readonly words: string;
 	}[];
 };
 

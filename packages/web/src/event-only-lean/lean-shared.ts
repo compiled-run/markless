@@ -1,3 +1,4 @@
+import { dispatchSpans, runAsDispatchOwn, type DispatchSpan } from '../event-current-target.ts';
 import type {
 	ProtocolStatePayload,
 	ProtocolSyncPolicyCondition,
@@ -233,11 +234,13 @@ export async function resumeFullEventOnly(
 		loadSymbol: input.loadSymbol,
 		handoffDispatchOptions: (handoff) => ({
 			syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
+			propagationStopped: handoff.propagationStopped === true,
 			ignoreUnmatched: handoff.eventRecord == null,
 		}),
 	});
 	await runtime.dispatch(input.event, {
 		syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true,
+		propagationStopped: input.propagationStopped === true,
 		// Escalation reaches here for a record-less forward too, which is the entry
 		// capture's broad sweep and passes through the live listener the same way.
 		ignoreUnmatched: input.eventRecord == null,
@@ -460,4 +463,27 @@ function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
 		(typeof value === 'object' || typeof value === 'function') &&
 		typeof (value as { readonly then?: unknown }).then === 'function'
 	);
+}
+
+/** Runs a lean dispatch's handlers as a dispatch the write watch sees: a save they send marks `control` and reloads the page. */
+export async function runAsDispatch(
+	event: { readonly type: string },
+	control: unknown,
+	run: (own: <T>(handler: () => T) => T) => Promise<void>,
+	flush: () => Promise<void>,
+): Promise<void> {
+	const span: DispatchSpan = { open: true, control: event.type === 'submit' ? undefined : (control as Element) };
+	const own = <T>(handler: () => T): T => runAsDispatchOwn(span, handler);
+	dispatchSpans().add(span);
+	try {
+		await run(own);
+	} finally {
+		span.open = false;
+		try {
+			await flush();
+		} finally {
+			dispatchSpans().delete(span);
+			span.closed?.();
+		}
+	}
 }

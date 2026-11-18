@@ -103,7 +103,12 @@ export default function ComboboxBasic() @{
 			}
 
 			.show:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.show-icon {
@@ -146,11 +151,21 @@ export default function ComboboxBasic() @{
 			}
 
 			.option[ui-highlighted] {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.option[ui-selected] {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.option[ui-disabled] {
@@ -175,7 +190,12 @@ export default function ComboboxBasic() @{
 
 			.field:has(.input[aria-invalid='true']) {
 				border-color: var(--pink);
-				background: color-mix(in srgb, var(--pink) 14%, var(--paper));
+				background: color-mix(in srgb, var(--pink) 14%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			@media (prefers-reduced-motion: reduce) {

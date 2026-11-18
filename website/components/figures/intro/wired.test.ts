@@ -39,10 +39,15 @@ describe('the Beanshop cup', () => {
 		expect(say(0, true)).toBe('A fresh cup. The label now says 0 extra shots.');
 	});
 
-	it('runs no idle tour: the barista writing the name is the only thing that plays by itself', () => {
+	it('runs no idle tour: the barista writing the name is the only thing that plays by itself, and CSS alone plays it', () => {
 		expect(piece).not.toContain('setInterval');
-		expect(piece).toContain("written = 'yes';");
-		expect(piece).toMatch(/@media \(prefers-reduced-motion: no-preference\) \{\s*\.scene\[data-written='no'\] \.name \{\s*opacity: 0;/);
+		expect(piece).not.toContain('onVisible');
+		expect(piece).not.toContain('written');
+		const motion = between('@media (prefers-reduced-motion: no-preference)', '@keyframes write-in');
+		expect(motion).toMatch(/\.write \{[^}]*animation: write-in 420ms var\(--d\) ease-out both;/);
+		expect(motion).toMatch(/\.draw \{[^}]*animation: draw-on 300ms var\(--d\) ease-out both;/);
+		expect(motion).toMatch(/animation-timeline: view\(\)/);
+		expect(motion).toMatch(/@container style\(--seen: 0\) \{[^}]*\.write,[^}]*\.draw,[^}]*\.eyes \{\s*animation-play-state: paused;/);
 	});
 
 	it('never ties the name or the product line to the count', () => {

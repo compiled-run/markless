@@ -1,115 +1,136 @@
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import MarkedList from '../../components/docs/marked-list.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import SessionFigure from '../../components/figures/cli/session-figure.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
-# CLI
+# The create-markless CLI
 
-<PageMeta time="3 min" assumes="nothing" />
+<PageMeta time="5 min" assumes="nothing" />
 
-<ThemeToggle />
+<Subtitle text="create-markless is the command that writes a new Markless app into a folder, asking a few questions unless flags answer them first." />
 
-The glossary defined the words. This page lists the commands.
-
-## Create an app
-
-```bash
-npm create markless@latest my-app
+```txt title="Usage"
+create-markless <target> [options]
+create-markless agents <add|remove> [--agents <list|none>]
 ```
 
-With no flags, the CLI asks you questions. With `--yes`, it takes the defaults, and you must give a folder name.
+**`<target>`** is the folder to create, and **options** answer the questions ahead of time. The **`agents`** command adds or removes a coding agent's skill file in an app you already have. For a walkthrough, see [Create an app](/start/new-app).
 
-```bash
-npm create markless@latest my-app -- --yes --starter app --no-git
-```
+## Every option
 
-With npm, put the flags after `--`. Without it, npm reads them as its own options: it keeps `--yes` and `--editor` for itself, and stops on `--no-install`. pnpm, yarn and bun pass flags through without `--`.
-
-## Flags
-
-This is the real `--help` output of `create-markless` 0.5.0.
-
-```txt
-create-markless
-
-Create Markless apps
-
-Usage:
-  create-markless <target> [--yes]
-
-Options:
-  --yes, -y          Use defaults
-  --format <name>   node or bun
-  --starter <name>  minimal, app, docs, or full-stack
-  --editor <name>   vscode, zed, or none
-  --agents <list>   claude-code, codex, gemini-cli, github-copilot, or none
-  --no-install      Skip dependency installation
-  --no-git          Skip git initialization
-  --workspace       Add the app to the enclosing workspace, if there is one
-  --no-workspace    Keep the app separate from the enclosing workspace
-  --force           Write into a non-empty directory
-```
-
-With `--yes`, the format is `node` and the starter is `minimal`. The CLI also installs the packages and runs `git init`. The target folder must be empty unless you pass `--force`.
-
-If the folder sits inside an existing workspace, the CLI keeps the app separate by default. Pass `--workspace` to add it to that workspace.
-
-## Starters
-
-All four starters are multi-page apps built on `@markless/router` and Nitro. That is a choice of the starters. Markless itself does not need a server: `render()` from `@markless/core` mounts an app in the browser alone.
-
-| `--starter` | Prompt label | What you get |
+| Option | Default | What it does |
 | --- | --- | --- |
-| `minimal` | Learn Markless | A small TSRX counter app in `pages/index.tsrx`. |
-| `app` | Build an app | The `minimal` files plus `document.tsrx` and `404` and `500` pages. |
-| `docs` | Write docs | An MDX docs site with a layout and sidebar components. |
-| `full-stack` | Full-stack app | The `app` files plus `api/` and `middleware/` folders. |
+| `--yes`, `-y` | off | Asks nothing and takes every default. Needs a `<target>`. |
+| `--starter <name>` | `minimal` | The starter to copy: `minimal`, `app`, `docs` or `full-stack`. |
+| `--format <name>` | `node` | A `package.json` set up for `node` or `bun`. |
+| `--editor <name>` | your terminal's editor, else `vscode` | Which settings folder to write: `vscode`, `zed` or `none`. |
+| `--agents <list>` | the agent running it, if any | Comma-separated `claude-code`, `codex`, `gemini-cli`, `github-copilot`, or `none`. |
+| `--no-install` | install | Skips the package manager's `install`. `--install` forces it. |
+| `--no-git` | `git init` | Skips `git init`. `--git` forces it. |
+| `--workspace` | kept separate | Joins the app to a workspace around the folder. `--no-workspace` keeps it out. |
+| `--force` | off | Writes into a folder that isn't empty. |
+| `--help`, `-h` | | Prints the usage and options. |
+| `--version`, `-v` | | Prints the CLI's version. |
 
-A `minimal` app made with `--yes --no-install --no-git --agents none --editor vscode` holds these files (`--editor zed` writes `.zed/settings.json` instead of the `.vscode` files, and `--editor none` writes neither):
+Options take a value as `--starter app` or `--starter=app`. An unknown option stops the CLI, and a value it doesn't know gets an error naming the choices.
 
-```txt
-.gitignore
-.vscode/extensions.json
-.vscode/settings.json
-README.md
-package.json
+## Every prompt has an option
+
+A *flag* is a word starting with `--` that answers a prompt before it's asked. The figure runs `npm create markless@latest my-app -- --yes --starter app --no-git`. Press the terminal to run it bare, then press a flag; tear off the `--` and try again:
+
+<SessionFigure />
+
+| Prompt | Answers | Option |
+| --- | --- | --- |
+| What are you building today? | Learn Markless, Build an app, Write docs or Full-stack app | `--starter` |
+| What should we call it? | a folder name, `my-markless-app` by default | `<target>` |
+| Where should it run? | Node, Bun | `--format` |
+| Which editor do you use? | VS Code, Zed, Other | `--editor` |
+| Add Markless to your agents? | the agents found on this machine | `--agents` |
+| Install dependencies now? | Yes, No | `--install`, `--no-install` |
+| Initialize git? | Yes, No | `--git`, `--no-git` |
+| Ready to create? | Create app, Cancel | `--yes` skips it |
+
+Inside an existing workspace it also asks "How should my-app be installed?", which `--workspace` or `--no-workspace` answers. In CI, or from a coding agent, pass every answer at once:
+
+```bash title="Terminal"
+npm create markless@latest my-app -- --yes --starter app \
+  --format node --editor none --agents none --no-git
+```
+
+With npm, everything after **`--`** goes to the CLI. Without it, npm reads `--yes` as its own option and stops on flags it doesn't know.
+
+## Each starter's files
+
+Every starter is an app with pages, built on `@markless/router` and Nitro. Each also gets `package.json`, `tsconfig.json`, `vite.config.ts`, `README.md`, `.gitignore`, `public/` and `scripts/markless-doctor.mjs`, plus `.vscode/` or `.zed/` for the editor you pick.
+
+```txt title="minimal"
+document.tsrx
 pages/index.tsrx
-public/.gitkeep
-scripts/markless-doctor.mjs
-tsconfig.json
-vite.config.ts
 ```
 
-## Coding agent skills
-
-The CLI can write a Markless skill file for a coding agent. The file goes into the agent's folder in your home folder, like `~/.claude/skills/markless/SKILL.md`. A subcommand adds or removes it later.
-
-```txt
-Usage: create-markless agents <add|remove> [--agents <list|none>]
+```txt title="app"
+document.tsrx
+pages/index.tsrx
+pages/404.tsrx
+pages/500.tsrx
 ```
 
-Cursor shows in the list, but you can't pick it. Its User Rules apply to every project, so the CLI does not write one.
+```txt title="full-stack"
+document.tsrx
+pages/index.tsrx, pages/404.tsrx, pages/500.tsrx
+api/health.ts
+middleware/request.ts
+```
 
-## Scripts in a new app
+```txt title="docs"
+document.tsrx
+pages/index.mdx
+pages/docs/index.mdx
+pages/docs/[...slug].mdx
+components/docs/Sidebar.tsrx
+components/layouts/DocsLayout.tsrx
+```
 
-- `npm run dev` runs `vp dev`. Starts the dev server on `http://localhost:3000`.
-- `npm run build` runs `vp build`. Builds the app and its server into `.output/`.
-- `npm run preview` runs `vp preview`. Serves the build.
-- `npm run check` runs `vp check`. Runs the Vite+ checks.
-- `npm run doctor` runs `node scripts/markless-doctor.mjs`. Checks the Markless packages and `tsconfig.json`, then runs `vp build`. Add `-- --no-build` to skip the build.
-- `npm run fmt` runs `vp fmt`. Formats the code.
-- `npm run test` runs `vp test`. Runs Vitest.
+## A new app's scripts
 
-Run Vite commands through `vp`, as these scripts do: `vp build -c other.config.ts`, not `vite build`. The app lists `vite` as an alias for `@voidzero-dev/vite-plus-core`, so that plugins asking for `vite` get Vite+, and that package has no `vite` command.
+| Script | Runs | What it does |
+| --- | --- | --- |
+| `dev` | `vp dev` | Starts the dev server on `http://localhost:3000`. |
+| `build` | `vp build` | Builds the app and its server into `.output/`. |
+| `preview` | `vp preview` | Serves the build. |
+| `check` | `vp check && markless-tsc` | Checks formatting and lint, then type-checks `.tsrx` files (from the next release). |
+| `doctor` | `node scripts/markless-doctor.mjs` | Checks the Markless packages and `tsconfig.json`, then builds. Add `-- --no-build` to skip the build. |
+| `fmt` | `vp fmt` | Formats the code. |
+| `test` | `vp test` | Runs Vitest. |
 
-To run the built server without Vite, use `node .output/server/index.mjs`. It reads the `PORT` variable.
+`vp` is the Vite+ command line, so run `vp build`, not `vite build`. `node .output/server/index.mjs` runs the built server and reads the `PORT` variable.
 
-<Callout
-	sprite="cross"
-	title="Why does npm dev fail?"
-	text="When you create the app with npm, the CLI prints npm dev as the next step. npm answers Unknown command: dev. Type npm run dev instead."
-/>
+## Exit codes and the environment
 
-Next: [error codes](/errors).
+- **Exit code 0:** the app was created, or you pressed Ctrl+C at a prompt.
+- **Exit code 1:** anything else. The CLI prints one line saying why: a Node.js it can't run on (it needs 22.18+, 24.11+ or 26+), an unknown option, a folder that isn't empty, a failed `install` or `git init`, or choosing Cancel.
+- **`npm_config_user_agent`:** the package manager that ran the CLI sets it. It decides which one installs the app.
+- **`TERM_PROGRAM`:** `vscode` or `zed` picks the default editor.
+
+## Package managers
+
+- **npm:** `npm create markless@latest my-app -- --yes`. Options go after `--`.
+- **pnpm:** `pnpm create markless my-app --yes`.
+- **Yarn:** `yarn create markless my-app --yes`.
+- **Bun:** `bun create markless my-app --yes`. Add `--format bun` for a Bun app.
+
+Whichever one runs the CLI also installs the app. Run with `--yes` inside a workspace, the app stays out unless you pass `--workspace`. Bun and Yarn 1 can't install a member of their own workspace on its own, so if you keep a declared member out, the CLI skips the install and says so.
+
+## Coding agents
+
+`--agents` puts a Markless skill file in each agent's folder, like `~/.claude/skills/markless/SKILL.md`, for:
+
+<MarkedList items="claude:Claude Code|codex:Codex|gemini:Gemini CLI|copilot:GitHub Copilot" />
+
+Cursor's rules apply to every project, so the CLI doesn't write one.

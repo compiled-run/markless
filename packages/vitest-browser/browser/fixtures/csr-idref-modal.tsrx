@@ -1,6 +1,6 @@
 import { element, shared, state } from '@markless/core';
 
-// The modal shape defect 65 was found in: one widget-scoped family whose `Root`
+// The modal shape defect 65 was found in: one subtree-scoped family whose `Root`
 // seeds it, a `Content` part that READS the shared element() handle as an IDREF
 // and projects its own children, and a `Title` part nested INSIDE that
 // projection that BINDS the handle. Content is a part, not a root.
@@ -10,7 +10,7 @@ export const modal = shared(
 		const titleEl = element<HTMLHeadingElement>();
 		return { ...s, titleEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Root({ open = false, children }) @{

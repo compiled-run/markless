@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import { ASYNC_PROTOCOL_VERSION, STORAGE_PROTOCOL_VERSION } from '@markless/serializer';
 import { marklessWriteScalar } from '../../web/src/fns/write-scalar.ts';
 import { marklessUpdateText } from '../../web/src/fns/update-text.ts';
+import { marklessWhenLoaded } from '../../web/src/fns/resident-load.ts';
 import {
 	marklessDecodeScalarCell,
 	marklessReadScalarCell,
@@ -91,6 +92,41 @@ test('a full-resume wake whose page an in-place navigation swapped while its cod
 	expect(await wake()).toEqual({ resumed: 1, adopted: 1 });
 	expect(await wake('@markless/core/web/resume')).toEqual({ resumed: 0, adopted: 1 });
 	expect(await wake('@markless/web/fns/streamed-arms')).toEqual({ resumed: 0, adopted: 0 });
+});
+
+// The execution log forwards a click that leaves the page only to record it; booting the runtime then fetches its code for a page about to go.
+test.each([
+	['a page that needs full resume', { needsFullResume: true }],
+	['a row page', { runtimeDemandMap: { recordKinds: [{ kind: 'keyed-repeat', replaced: true }, { kind: 'dom-update', replaced: true }] } }],
+	['a mixed scalar and row page', { runtimeDemandMap: { recordKinds: [{ kind: 'event', replaced: true }, { kind: 'keyed-repeat', replaced: true }, { kind: 'dom-update', replaced: true }] } }],
+	['a plain full page', {}],
+])('%s records a log-only event without loading the runtime', async (_name, mode) => {
+	const run = async (executionLog: 'auto' | 'never', input: Record<string, unknown>) => {
+		const source = emitResumeModule({ ...baseInput, ...mode, executionLog })
+			.replace(/^import .*;$/gm, '')
+			.replace(/export /g, '')
+			.replace(/\bimport\(/g, 'loadModule(')
+			.replace(/\bimport\.meta\b/g, '({ env: {} })');
+		const loaded: string[] = [];
+		const loadModule = async (id: string) => {
+			loaded.push(id);
+			const resumeExport = async () => ({ runtime: { dispatch: async () => undefined } });
+			return new Proxy({}, { get: (_target, name) => (name === 'then' ? undefined : resumeExport) });
+		};
+		const resume = new Function(
+			'loadModule',
+			'globalThis',
+			'payloadRuntimeDemandMap',
+			`${source}\nreturn resumeContainerEvent;`,
+		)(loadModule, {}, {}) as (input: unknown) => Promise<void>;
+		await resume({ root: { __mL: {}, querySelector: () => null }, event: { type: 'click' }, ...input });
+		return loaded;
+	};
+	expect(await run('auto', { logOnly: true, eventRecord: null })).toEqual([]);
+	expect(await run('auto', { eventRecord: null })).not.toEqual([]);
+	expect(emitResumeModule({ ...baseInput, ...mode, executionLog: 'never' })).not.toContain(
+		'input.logOnly && !input.root.__asyncResumeRuntimeStarted',
+	);
 });
 
 test('server source module carries the prerender wake URL beside the regular resume URL', () => {
@@ -444,6 +480,7 @@ test('specialized scalar dispatch preserves a suffix on first and repeated write
 		'marklessScalarSpecializedError',
 		'marklessFindElementAtDomOrderIndex',
 		'loadModule',
+		'readMarklessSourceSymbolWhenLoaded',
 		source + '\nreturn resumeContainerEvent;',
 	)(
 		marklessWriteScalar,
@@ -453,6 +490,7 @@ test('specialized scalar dispatch preserves a suffix on first and repeated write
 		marklessScalarSpecializedError,
 		(_root: unknown, index: number) => (index === 3 ? host : label),
 		async () => ({ onClick: () => undefined }),
+		marklessWhenLoaded,
 	);
 	for (let value = 1; value <= 2; value++) {
 		await resume({ root, event: { type: 'click', target: host } });
@@ -643,7 +681,7 @@ test('specialized scalar dispatcher carries sync policy state through full fallb
 		'await marklessFullResumeHandoff({ ...input, document: input.root, syncPolicyAlreadyApplied });',
 	);
 	expect(resumeCode).toContain(
-		'await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+		'await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });',
 	);
 	expect(resumeCode).not.toContain('__marklessCsrBootstrapReplayed');
 });
@@ -693,6 +731,8 @@ test('emitResumeModule keeps row actions behind the row lean entry', () => {
 	);
 	expect(resumeCode).not.toContain('@markless/web/event-only-lean/scalar-core');
 	expect(resumeCode).not.toContain('resumeEventOnlyFromPayloadDocument');
+	// Its full-resume fallback walks after dispatch has reset the event's stop flag.
+	expect(resumeCode).toContain('propagationStopped: input.propagationStopped === true,');
 });
 
 test('emitResumeModule branches only for mixed scalar and row lean routes', () => {

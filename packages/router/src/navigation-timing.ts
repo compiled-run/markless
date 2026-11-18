@@ -17,3 +17,6 @@ export {
 	MARKLESS_PENDING_SETTLE_DEADLINE_MS as MARKLESS_NAV_SETTLE_DEADLINE_MS,
 	MARKLESS_PENDING_MIN_VISIBLE_MS as MARKLESS_NAV_PENDING_MIN_MS,
 } from '@markless/web/fns/pending-timing';
+
+// The longest an in-place swap waits for what it needs before it commits: the destination's code and stylesheets, and the leaving page's handlers.
+export const MARKLESS_NAV_SWAP_DEADLINE_MS = 3000;

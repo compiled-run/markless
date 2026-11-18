@@ -1,0 +1,14 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 16,
+			"reason": "a row waiting for its reader keeps a copy of the item it was painted from, so an in-place write before the reader arrives repaints",
+			"date": "2026-11-16"
+		}
+	]
+}

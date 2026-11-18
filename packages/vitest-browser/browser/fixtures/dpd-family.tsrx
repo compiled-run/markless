@@ -1,6 +1,6 @@
 import { element, shared, state } from '@markless/core';
 
-// Defect 72's shape: a widget-scoped family whose interactive part sits three
+// Defect 72's shape: a subtree-scoped family whose interactive part sits three
 // projections under the root (`Root > Layer > Surface > Close`). Every part
 // projects its children, so the click record's host is deeper than any part the
 // family's own root can see directly.
@@ -10,7 +10,7 @@ export const deep = shared(
 		const closeEl = element<HTMLButtonElement>();
 		return { ...s, closeEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Root({ children }) @{

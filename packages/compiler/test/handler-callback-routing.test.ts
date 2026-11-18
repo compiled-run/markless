@@ -56,7 +56,7 @@ export const modalState = shared(() => {
 		dismissed() { modal.open = false; },
 		dismissRoute() { return () => { modal.open = false; }; },
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 `;
 
 /**
@@ -86,7 +86,7 @@ export const modalState = shared(() => {
 			modal.onChange?.(false);
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 `;
 
 const GRAPH_NODE = 'shared:src/Modal.tsrx#modalState/state:modal';

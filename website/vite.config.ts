@@ -14,8 +14,10 @@ import { keyboard } from './tooling/keyboard.ts';
 import { codeBlocks } from './tooling/code-blocks.ts';
 import { codeClient } from './tooling/code-client.ts';
 import { seoFiles } from './tooling/seo-files.ts';
+import { docsSearch } from './tooling/docs-search.ts';
 import { siteBase } from './site-base.ts';
 import { flatNav } from './nav.ts';
+import tooling from './vitest.tooling.config.ts';
 
 // On Cloudflare every page and its fragment URL is a static file, so a page view never runs the Worker.
 const cloudflare = (process.env.NITRO_PRESET ?? '').startsWith('cloudflare');
@@ -26,14 +28,32 @@ const prerendered = Object.fromEntries(
 	]),
 );
 
+// Tooling tests run on their own config: under router(), Nitro's wasm resolve condition hands shiki's raw onig.wasm to Node.
+const tests = {
+	projects: [
+		'./vitest.tooling.config.ts',
+		{
+			extends: true,
+			test: {
+				name: 'website',
+				exclude: [
+					...tooling.test.include.map((glob) => glob.replace('components/figures/**', 'components/figures/!(kit)/**')),
+					'**/node_modules/**',
+				],
+			},
+		},
+	],
+};
+
 export default {
 	base: siteBase,
+	test: tests,
 	nitro: {
 		baseURL: siteBase,
 		...(cloudflare ? { routeRules: prerendered, compressPublicAssets: false } : {}),
 	},
 	// pageProps, codeBlocks and uiDemos run before router(): they rewrite the .mdx source router() parses.
-	// highlightMdx runs after router(): it rewrites the module router() emits.
+	// highlightMdx runs after router(): it rewrites the module router() emits. docsSearch reads what highlightMdx wrote.
 	lint: {
 		rules: {
 			'no-restricted-imports': [
@@ -71,6 +91,7 @@ export default {
 		markless(),
 		router(),
 		highlightMdx(),
+		...docsSearch(),
 		seoFiles(),
 	],
-} satisfies UserConfig & { nitro: NitroConfig; lint: OxlintConfig };
+} satisfies UserConfig & { nitro: NitroConfig; lint: OxlintConfig; test: typeof tests };

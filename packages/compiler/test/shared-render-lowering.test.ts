@@ -103,7 +103,7 @@ export const session = shared(() => {
 export const theme = shared(() => {
 	const data = state({ mode: 'light' });
 	return { ...data };
-}, { scope: 'page' });
+}, { scope: 'app' });
 
 export function App() @{
 	const currentSession = session();
@@ -120,7 +120,7 @@ export function App() @{
 	expect(
 		(compiled.protocolState.sharedDefinitions ?? []).map((definition) => definition.id),
 	).toEqual(['shared:src/two.tsrx#session', 'shared:src/two.tsrx#theme']);
-	expect((compiled.protocolState.sharedDefinitions ?? [])[1]?.scope).toBe('page');
+	expect((compiled.protocolState.sharedDefinitions ?? [])[1]?.scope).toBe('app');
 	expect(
 		compiled.renderData.chunks
 			.flatMap((chunk) => chunk.slots)

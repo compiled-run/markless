@@ -51,7 +51,7 @@ export const calendarState = shared(() => {
 	const s = state({ picked: ['a'] as readonly string[] });
 	const label = computed(() => s.picked.join(', '));
 	return { ...s, label };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function DayList() @{
 	const cal = calendarState();

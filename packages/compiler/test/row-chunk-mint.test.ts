@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
+import { UNLINKED_RENDER } from './support/unlinked-render.ts';
 
 const ROW_MINT_UNSUPPORTED = 'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED';
 
@@ -86,10 +87,11 @@ export function Lists() @{
 	expect(inner?.rowComponent).toEqual({ componentName: 'Lists', rowChunkId: 'repeat:repeat:1:row' });
 });
 
-test('a nested @for whose rows hold an @if inside an @if arm is refused, not dropped', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/Page.tsrx',
-		source: `
+test('a nested @for whose rows hold an @if inside an @if arm runs in the browser, or is refused, never dropped', async () => {
+	const compilePage = (unlinked: string) =>
+		compileTsrxModule({
+			filename: 'src/Page.tsrx',
+			source: `
 import { state } from '@markless/core';
 
 export function Lists() @{
@@ -103,11 +105,21 @@ export function Lists() @{
 		}
 	</section>
 }
-`,
-		symbols: [],
-	});
+${unlinked}`,
+			symbols: [],
+		});
+	const shipped = await compilePage('');
+	expect(shipped.symbolModules.armEscalationCandidates ?? []).toHaveLength(1);
+	expect(shipped.symbolModules.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
+		expect.arrayContaining(['MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER']),
+	);
 	expect(
-		result.symbolModules.diagnostics.filter(
+		shipped.symbolModules.diagnostics.filter(
+			(diagnostic) => diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		),
+	).toEqual([]);
+	expect(
+		(await compilePage(UNLINKED_RENDER)).symbolModules.diagnostics.filter(
 			(diagnostic) => diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 		),
 	).toEqual([expect.objectContaining({ severity: 'error' })]);
@@ -200,5 +212,50 @@ export function App() @{
 	expect(repeat?.rowEvents).toEqual([
 		expect.objectContaining({ hostPath: [0], eventName: 'click', arm: { slot: 0, arm: 0 } }),
 	]);
+	expect(rowMintCodes).toEqual([]);
+});
+
+test.each([
+	`
+function Count({ label }) @{
+	let seen = state(0);
+	<button onClick={() => seen++}>{label}</button>
+}
+
+export function App() @{
+	let views = state([{ id: 1, label: 'A' }]);
+	<section>
+		@for (const view of views; key view.id) {
+			<div data-row={view.id}><Count label={view.label} /><Count label={view.label} /></div>
+		}
+	</section>
+}
+`,
+	`
+function Tag({ text }) @{
+	<b>{text}</b>
+}
+
+function Note({ text }) @{
+	let open = state(false);
+	<small onClick={() => (open = !open)}>{text}</small>
+}
+
+export function Board() @{
+	let entries = state([{ key: 'a', text: 'A' }]);
+	<ul>
+		@for (const entry of entries; key entry.key) {
+			<li><Tag text={entry.text} /><em>and</em><Note text={entry.text} /><Tag text="x" /></li>
+		}
+	</ul>
+}
+`,
+])('a row element holding sibling components renders the row chunk whole', async (body) => {
+	const { repeat, rowMintCodes } = await compile(`import { state } from '@markless/core';\n${body}`);
+	expect(repeat?.rowComponent).toEqual({
+		componentName: body.includes('Board') ? 'Board' : 'App',
+		rowChunkId: 'repeat:repeat:0:row',
+	});
+	expect(repeat?.rowTemplate).toBeUndefined();
 	expect(rowMintCodes).toEqual([]);
 });

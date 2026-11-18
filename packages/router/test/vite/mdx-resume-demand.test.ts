@@ -1,8 +1,9 @@
 import { parseSync } from 'rolldown/experimental';
 import { expect, test, vi } from 'vitest';
 import { transformMdxRoute } from '../../src/vite/mdx.ts';
+import { mdxSymbolLoader } from '../../src/vite/runtime/mdx-route.ts';
 
-type Input = { root: Record<string, unknown>; event: object; scalar?: boolean };
+type Input = { root: Record<string, unknown>; event: object; scalar?: boolean; logOnly?: boolean };
 type RuntimeModule = { resumeFromPayloadDocument(input: unknown): unknown };
 
 async function entry(source: string, load: (specifier: string) => Promise<RuntimeModule>) {
@@ -23,8 +24,9 @@ async function entry(source: string, load: (specifier: string) => Promise<Runtim
 		'tryResumeMdxScalar',
 		'load',
 		'globalThis',
+		'mdxSymbolLoader',
 		`${executable}; return resumeContainerEvent;`,
-	)((input: Input) => input.scalar === true, load, {}) as (input: Input) => Promise<void>;
+	)((input: Input) => input.scalar === true, load, {}, mdxSymbolLoader) as (input: Input) => Promise<void>;
 }
 
 test.each([
@@ -75,4 +77,50 @@ test('MDX retries a rejected fallback import and retains it after a dispatch err
 	await resume({ root, event: {} });
 	expect(load).toHaveBeenCalledTimes(2);
 	expect(dispatch).toHaveBeenCalledTimes(2);
+});
+
+// The boot applies only the policies it can read off served markup; content the browser built carries none.
+test('MDX dispatches with the policy and the stop the boot actually applied', async () => {
+	const dispatch = vi.fn();
+	let handoffOptions: ((handoff: object) => unknown) | undefined;
+	const load = vi.fn().mockResolvedValue({
+		resumeFromPayloadDocument: (input: {
+			handoffDispatchOptions: (handoff: object) => unknown;
+		}) => {
+			handoffOptions = input.handoffDispatchOptions;
+			return { runtime: { dispatch } };
+		},
+	});
+	const resume = await entry("import Control from './Control.tsrx';\n\n<Control />", load);
+	const event = {};
+	await resume({
+		root: {},
+		event,
+		syncPolicyAlreadyApplied: false,
+		propagationStopped: false,
+	} as never);
+	expect(dispatch).toHaveBeenCalledWith(
+		event,
+		expect.objectContaining({ syncPolicyAlreadyApplied: false, propagationStopped: false }),
+	);
+	expect(
+		handoffOptions?.({ event, syncPolicyAlreadyApplied: true, propagationStopped: true }),
+	).toEqual(
+		expect.objectContaining({ syncPolicyAlreadyApplied: true, propagationStopped: true }),
+	);
+});
+
+// The execution log forwards a click that leaves the page only to record it; booting the runtime then fetches its code for a page about to go.
+test('MDX records a log-only event without loading the runtime until the runtime has started', async () => {
+	const dispatch = vi.fn();
+	const load = vi.fn().mockResolvedValue({ resumeFromPayloadDocument: () => ({ runtime: { dispatch } }) });
+	const resume = await entry("import Control from './Control.tsrx';\n\n<Control />", load);
+	const root: Record<string, unknown> = {};
+	await resume({ root, event: {}, logOnly: true });
+	expect(load).not.toHaveBeenCalled();
+	expect(root.__asyncResumeRuntimeStarted).toBeUndefined();
+	root.__asyncResumeRuntimeStarted = true;
+	await resume({ root, event: {}, logOnly: true });
+	expect(load).toHaveBeenCalledTimes(1);
+	expect(dispatch).toHaveBeenCalledTimes(1);
 });

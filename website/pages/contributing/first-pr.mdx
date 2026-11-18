@@ -1,93 +1,69 @@
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
+import ReviewFigure from '../../components/figures/first-pr/review-figure.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
-# Your first pull request
+# Your first PR
 
 <PageMeta time="2 min" assumes="nothing" />
 
-<ThemeToggle />
+<Subtitle text="A pull request is a branch you ask to merge into main, and it is done when its CI run is green and every review finding has an answer." />
 
-Last page, `pnpm install` turned on the git hooks. Now put them to work on a real change.
-
-A green CI run does not finish a Markless PR. An answer to every review finding finishes it.
-
-## 1. Read the rules for your area
-
-Read `AGENTS.md` first. Then read `specs/framework-design.md` and the one spec in `specs/framework/` that covers your change. For a UI component, also read `packages/headless/components/SPEC.md`.
-
-## 2. Make a branch
-
-Do not commit to `main`.
-
-```bash
-git switch -c fix/counter-text
+```bash title="terminal"
+git switch -c fix/chat-timestamps
+pnpm run typecheck
+pnpm ci:local --fast
+git commit -m "Show the time on each chat message"
 ```
 
-## 3. Write the failing test first
+**`git switch -c`** starts your own branch. The two **checks** run before you commit, and the **commit** runs them again through the hook.
 
-Add or update the closest focused test. Run it, and make sure that it fails for the reason you expect.
+## The rules for your area come first
+
+Read `AGENTS.md`, then `specs/framework-design.md` and the one spec in `specs/framework/` for your change. For a UI component, also read `packages/headless/components/SPEC.md`.
+
+## A change starts with a failing test
+
+Add or update the closest focused test, and check that it fails for the reason you expect:
 
 ```bash
 pnpm exec vp test packages/compiler/test/semantic-graph.test.ts
 ```
 
-Compiler tests assert pass artifacts and diagnostics where they can. Use Vitest browser mode for component and browser behavior.
+- Compiler tests check pass artifacts and diagnostics where they can.
+- Component and browser behavior gets a Vitest browser-mode test.
+- Then change only what the test needs.
 
-## 4. Make the smallest change
+## Two checks run before you commit
 
-Change only what the test needs. Then run the focused test again until it passes.
+`pnpm run typecheck` reads `.tsrx` files, which plain `tsc` can't. `pnpm ci:local --fast` runs CI's fast jobs with the commands from `ci.yml`.
 
-## 5. Typecheck
+- Touched the bundler, router, web, runtime, compiler or demos? Run the matching jobs too, like `pnpm ci:local --job browser --job boxes-router`.
+- The `pre-commit` hook runs `vp lint --deny-warnings`, then the fast jobs with `--bail`.
+- When lint fails, it prints the fix: `pnpm exec vp lint --fix --fix-suggestions --fix-dangerously`.
 
-This checker reads `.tsrx` files. Plain `tsc` does not.
+## Every finding needs an answer
 
-```bash
-pnpm run typecheck
-```
+A *finding* is a review comment on one line, from a person or from Macroscope, the review bot this repo runs. Step through a pull request from open to merged:
 
-## 6. Run CI's fast jobs
+<ReviewFigure />
 
-This runs the `agent-files`, `typecheck` and `unit` jobs with the commands from `ci.yml`.
+- Fix the findings that are right, and reply with your reason on the ones that are stale or wrong.
+- In the pull request, say which `ci:local` mode you ran, on which commit, and the result line it printed.
+- A merge or a push to a shared branch needs the owner's go-ahead for that one change set.
 
-```bash
-pnpm ci:local --fast
-```
-
-If you touched the bundler, router, web, runtime, compiler or demos, run the matching jobs too. For example: `pnpm ci:local --job browser --job boxes-router`.
-
-## 7. Commit and let the hook run
-
-The `pre-commit` hook runs `vp lint --deny-warnings`, then the fast jobs with `--bail`. If you staged a file in `.ruler/`, it also checks that the generated agent files match.
-
-If lint fails, the hook prints the fix command: `pnpm exec vp lint --fix --fix-suggestions --fix-dangerously`.
-
-## 8. Push your branch and open a PR
-
-Push your own branch. Pushing to `main`, or to a branch other people share, needs the owner's explicit go-ahead. That go-ahead covers one change set only.
-
-In the PR, say which `ci:local` mode you ran, on which commit, and the result line it printed.
-
-## 9. Answer every review finding
-
-Read every finding from people and from the CodeRabbit bot. Fix the ones that are right. Reply with your reason on the ones that are stale or wrong.
-
-<MugSpot mood="bow" from="left" />
-
-<Callout
-	sprite="cross"
-	title="Why did my push to main fail?"
-	text="The pre-push hook asks GitHub, through gh, for the last CI run on main. If that run failed, the hook blocks the push. Only the fix can go onto a red main, and it needs MARKLESS_FIXES_RED_MAIN=1."
-/>
+<MugSpot mood="bow" at="perch" from="left" />
 
 <Callout
 	sprite="thought-bubble"
-	title="What if a check fails that I did not touch?"
-	text="Find out why before you change it. It can be environment drift, your regression, an older failure or a flaky test. Fix the cause, and never weaken the check."
+	title="What if a check fails that I didn't touch?"
+	text="Find out why before you change it: environment drift, your regression, an older failure, or a flaky test. Fix the cause, and never weaken the check."
 />
 
-Next: [CI and the checks you run at home](/contributing/ci).
+[CI and checks](/contributing/ci) lists every job and how to run it at home.

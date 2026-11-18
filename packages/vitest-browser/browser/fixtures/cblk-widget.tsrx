@@ -70,7 +70,7 @@ export const cblk = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function CblkRoot({

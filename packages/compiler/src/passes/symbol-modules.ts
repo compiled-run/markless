@@ -34,9 +34,9 @@ import {
 	PROTOCOL_PROPS_GRAPH_NODE_ID,
 	protocolElementHandleReadId,
 } from '@markless/serializer';
+import { marklessAttributeValue as attributeText } from '@markless/web/dom-attribute';
 import { unaddressableElementDiagnostics } from './element-address-diagnostics.ts';
 import type { SourceSpan } from '../diagnostics.ts';
-import { staticAttributeText } from './semantic-graph/collect-markup.ts';
 import { boundarySettleRecords, type BoundarySettleRecords } from './boundary-settle-records.ts';
 import {
 	armChildDescent,
@@ -44,9 +44,13 @@ import {
 	type ArmChildProp,
 	type ArmImportedInterfaces,
 } from './arm-child-content.ts';
-import { asNodes, isNode, type AnyNode } from '../ast/nodes.ts';
+import { asNodes, getIdentifierName, isNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
-import { asyncComputedReadPath } from '../artifact-helpers/graph-paths.ts';
+import {
+	asyncComputedGraphNodeIds,
+	browserGraphReads,
+	browserReadPath,
+} from '../artifact-helpers/graph-paths.ts';
 import { moduleIdOf } from '../module-id.ts';
 import {
 	bindingOrigins,
@@ -58,7 +62,7 @@ import {
 	type ForeignScopeRefusal,
 } from './foreign-scope.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
-import { createSourceMemo, ownedModuleAstOrNull } from './semantic-graph/shared-ast.ts';
+import { createSourceMemo, moduleSemantics, ownedModuleAstOrNull } from './semantic-graph/shared-ast.ts';
 import { valueModuleImports } from './semantic-graph/imports.ts';
 import {
 	arrayNode,
@@ -114,6 +118,8 @@ import {
 	SSR_CALLBACKS_PROP_NAME,
 } from './public-render/shared.ts';
 import { captureSlotFoldsToConstant } from './symbol-resolver.ts';
+import { captureSlotReadInContext } from './capture-analysis.ts';
+import { prerenderInterfacesComplete } from './link/interfaces-complete.ts';
 
 /**
  * The branch sites whose every arm refusal a page re-render can answer. The
@@ -122,10 +128,7 @@ import { captureSlotFoldsToConstant } from './symbol-resolver.ts';
  * without walking anything.
  */
 export function armEscalationCandidateSiteIds(input: SymbolModulesInput): ReadonlySet<string> {
-	const flippable = (input.renderData?.branches ?? []).some(
-		(branch) => branch.update !== 'boundary',
-	);
-	if (!flippable) return new Set();
+	if (!input.renderData?.branches?.length) return new Set();
 	return new Set(
 		renderBranchArms(
 			input,
@@ -136,6 +139,7 @@ export function armEscalationCandidateSiteIds(input: SymbolModulesInput): Readon
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	const moduleDeclarations = sourceModuleScopeLines(input.source);
+	const liveSettledReads = valuesChangingBetweenSettles(input.semanticGraph);
 	const localNamesBySymbol = rowLocalNamesBySymbol(
 		input.renderData,
 		input.semanticGraph,
@@ -148,16 +152,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				: [
 						[
 							symbol.symbolId,
-							symbol.captureSlots.filter((slot) =>
-								slot.routes.some(
-									(route) =>
-										route.componentEdgeId !== undefined ||
-										// A composing module supplies this slot's edge.
-										route.kind === 'widget-callback-route' ||
-										// This module already resolved the slot itself.
-										route.kind === 'callback-slot-route',
-								),
-							),
+							symbol.captureSlots.filter(captureSlotReadInContext),
 						] as const,
 					],
 		),
@@ -210,10 +205,16 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	);
 
 	const asyncComputedNodeIds = asyncComputedGraphNodeIds(input.semanticGraph);
+	const refreshingGraphNodeIds = new Set(
+		(input.semanticGraph?.graphBindings ?? []).flatMap((binding) =>
+			binding.kind === 'computed' && binding.dependencies?.length ? [binding.id] : [],
+		),
+	);
 	const branchArms = renderBranchArms(input, asyncComputedNodeIds);
 	const boundaryArmsById = renderBoundaryArms(input.renderData, asyncComputedNodeIds);
 	const sourceFileName = input.source?.filename ?? 'markless-module.tsrx';
 	const authoredSource = input.source?.source ?? '';
+	const timerGlobals = repeatingTimerGlobals(input.source);
 	const emittedModules: GeneratedSymbolModule[] = input.symbolResolver.symbols.flatMap(
 		(symbol) => {
 			if (unsupportedCaptureSymbolIds.has(symbol.id)) return [];
@@ -246,6 +247,8 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 							repeatPartCounts: arms.arms.map(
 								(arm) => arm.filter((part) => 'repeat' in part).length,
 							),
+							liveSettledReads,
+							refreshingGraphNodeIds,
 						})
 					: null;
 				return [
@@ -274,6 +277,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				input.renderData,
 				input.omitAuthoredSource === true,
 				sourceFileName,
+				timerGlobals,
 			);
 		},
 	);
@@ -288,10 +292,12 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 		...(branchArms.escalationCandidates.length > 0
 			? { armEscalationCandidates: branchArms.escalationCandidates }
 			: {}),
-		...(branchArms.propDecided.length > 0 ? { propDecidedBranches: branchArms.propDecided } : {}),
+		...(branchArms.propDecided.length > 0
+			? { propDecidedBranches: branchArms.propDecided }
+			: {}),
 		diagnostics: [
 			...input.captureAnalysis.diagnostics,
-			...branchArms.diagnostics,
+			...withoutAcceptedArmRefusals(input, branchArms, modules),
 			...unaddressableElementDiagnostics(input),
 			...foreignScope.diagnostics,
 			...divergentModuleInstanceCarries(modules).map(divergentModuleInstanceDiagnostic),
@@ -1206,6 +1212,9 @@ function sharedInstanceReferenceDiagnostic(
 			{
 				message: `Do not hoist the method into a local first (\`const handler = ${reference.name}.<method>;\`). That is the same read one line earlier and fails the same way.`,
 			},
+			{
+				message: `To pass "${reference.name}" itself to a function, have its definition return only one state object (\`return { ...box }\`) with no methods. Then "${reference.name}" is that object, and the function's changes reach the page.`,
+			},
 		],
 		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
 	};
@@ -1342,31 +1351,24 @@ function sourceModuleScopeLines(source: SymbolModulesInput['source']): string[] 
 	}
 }
 
-function asyncComputedGraphNodeIds(
-	semanticGraph: SymbolModulesInput['semanticGraph'],
-): ReadonlySet<string> {
-	return new Set(
-		(semanticGraph?.graphBindings ?? []).flatMap((binding) =>
-			binding.kind === 'computed' && binding.async === true ? [binding.id] : [],
-		),
-	);
-}
-
-function armPartReadPath(
-	graphNodeId: string,
-	path: ReadonlyArray<string>,
+function withAsyncValueReads<Symbol extends { readonly reads?: ReadonlyArray<LoweredStateRead> }>(
+	symbol: Symbol,
 	asyncComputedNodeIds: ReadonlySet<string>,
-): ReadonlyArray<string> {
-	return asyncComputedNodeIds.has(graphNodeId) ? asyncComputedReadPath(path) : path;
+): Symbol {
+	return symbol.reads && asyncComputedNodeIds.size > 0
+		? { ...symbol, reads: browserGraphReads(symbol.reads, asyncComputedNodeIds) }
+		: symbol;
 }
 
 // The first refusal recorded for a branch is the one its diagnostic reports.
 type ArmRefusal = {
 	readonly detail: string;
 	readonly span?: SourceSpan;
-	// A same-module component that has to run: the one refusal a re-render of the
-	// page through the prerender evaluator can answer.
+	// A component that has to run, or content a flip cannot rebuild: what a
+	// re-render of the page through the prerender evaluator can answer.
 	readonly escalatable?: boolean;
+	// What the browser runs instead, in the author's words: "the @try block it holds".
+	readonly runs?: string;
 };
 
 type ArmPartsContext = {
@@ -1383,6 +1385,40 @@ type ArmPartsContext = {
 	readonly refusals?: ArmRefusal[];
 };
 
+// An arm a page re-render answers ships, so its refusal goes; the warning that it renders in the browser stays.
+function withoutAcceptedArmRefusals(
+	input: SymbolModulesInput,
+	branchArms: Pick<ReturnType<typeof renderBranchArms>, 'diagnostics' | 'escalationCandidates'>,
+	modules: ReadonlyArray<GeneratedSymbolModule>,
+): ReadonlyArray<SymbolModulesDiagnostic> {
+	// A render module withheld for the render plan's own error leaves that error as the one to fix.
+	const planRefused =
+		input.publicRenderPlan?.diagnostics.some((diagnostic) => diagnostic.severity === 'error') ??
+		false;
+	if (
+		branchArms.escalationCandidates.length === 0 ||
+		(!input.publicRenderModule?.renderDataModuleSource && !planRefused) ||
+		!input.semanticGraph ||
+		!prerenderInterfacesComplete({ semanticGraph: input.semanticGraph }, input.source ?? {})
+	)
+		return branchArms.diagnostics;
+	const emitted = new Set(modules.map((module) => module.symbolId));
+	const accepted = new Set(
+		branchArms.escalationCandidates
+			.filter((candidate) => !emitted.has(candidate.symbolId))
+			.map((candidate) => candidate.symbolId),
+	);
+	return branchArms.diagnostics.filter(
+		(diagnostic) =>
+			!(
+				diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED' &&
+				diagnostic.severity === 'error' &&
+				typeof diagnostic.symbolId === 'string' &&
+				accepted.has(diagnostic.symbolId)
+			),
+	);
+}
+
 function renderBranchArms(
 	input: SymbolModulesInput,
 	asyncComputedNodeIds: ReadonlySet<string>,
@@ -1394,7 +1430,12 @@ function renderBranchArms(
 } {
 	const renderData = input.renderData;
 	if (!renderData)
-		return { armsBySite: new Map(), diagnostics: [], escalationCandidates: [], propDecided: [] };
+		return {
+			armsBySite: new Map(),
+			diagnostics: [],
+			escalationCandidates: [],
+			propDecided: [],
+		};
 	const armsBySite = new Map<string, PublicRenderPlanBranchArms>();
 	const diagnostics: SymbolModulesDiagnostic[] = [];
 	const escalationCandidates: ArmEscalationCandidate[] = [];
@@ -1406,7 +1447,32 @@ function renderBranchArms(
 		),
 	);
 	for (const branch of renderData.branches ?? []) {
-		if (branch.update === 'boundary' || rowFlipped.has(branch.branchSiteId)) continue;
+		if (rowFlipped.has(branch.branchSiteId) || branch.update === 'row-arm') continue;
+		// A @try arm's branch holding a component flips its own range from a render of the page.
+		if (branch.update === 'boundary') {
+			const symbol =
+				branch.testReads.length > 0
+					? input.symbolResolver.symbols.find(
+							(candidate) =>
+								candidate.kind === 'branch-update' &&
+								candidate.branchSiteId === branch.branchSiteId,
+						)
+					: undefined;
+			if (symbol) {
+				escalationCandidates.push({
+					branchSiteId: branch.branchSiteId,
+					symbolId: symbol.id,
+				});
+				diagnostics.push(
+					branchArmRendersInBrowserDiagnostic(
+						branch,
+						armComponentNames(input, branch).map((name) => ({ detail: `<${name}>` })),
+						symbol.id,
+					),
+				);
+			}
+			continue;
+		}
 		const refusals: ArmRefusal[] = [];
 		const context: ArmPartsContext = {
 			renderData,
@@ -1476,14 +1542,16 @@ function renderBranchArms(
 						branchSiteId: branch.branchSiteId,
 						symbolId: symbol.id,
 					});
-					diagnostics.push(branchArmRendersInBrowserDiagnostic(branch, refusals, symbol.id));
+					diagnostics.push(
+						branchArmRendersInBrowserDiagnostic(branch, refusals, symbol.id),
+					);
 				}
 			}
 			continue;
 		}
 		armsBySite.set(branch.branchSiteId, {
 			branchSiteId: branch.branchSiteId,
-			testRead: branch.testReads[0] ?? null,
+			testRead: browserGraphReads(branch.testReads, asyncComputedNodeIds)[0] ?? null,
 			arms: arms as PublicRenderPlanBranchArms['arms'],
 			...(branch.armTests ? { armTests: branch.armTests } : {}),
 			...(branch.declaredEmptyArms ? { declaredEmptyArms: branch.declaredEmptyArms } : {}),
@@ -1517,7 +1585,9 @@ function rowListDeciders(
 	const row = semanticGraph.markup.chunks.find(
 		(chunk) =>
 			/^repeat:.*:row$/.test(chunk.id) &&
-			chunk.slots.some((slot) => slot.kind === 'branch' && slot.branchSiteId === branch.branchSiteId),
+			chunk.slots.some(
+				(slot) => slot.kind === 'branch' && slot.branchSiteId === branch.branchSiteId,
+			),
 	);
 	const repeat = row
 		? semanticGraph.keyedRepeats.find((candidate) => row.id === `repeat:${candidate.id}:row`)
@@ -1543,6 +1613,19 @@ function readPropNames(
 
 const BRANCH_ARM_RENDERS_IN_BROWSER_CODE = 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER' as const;
 
+function armComponentNames(input: SymbolModulesInput, branch: RenderDataBranch): string[] {
+	const edges = input.semanticGraph?.componentEdges ?? [];
+	return branch.armChunkIds.flatMap((chunkId) =>
+		(input.renderData?.chunks.find((chunk) => chunk.id === chunkId)?.slots ?? []).flatMap(
+			(slot) =>
+				slot.kind === 'child-component'
+					? (edges.find((edge) => edge.id === slot.componentEdgeId)?.childComponentName ??
+						[])
+					: [],
+		),
+	);
+}
+
 // Spec 12 D2: an arm the browser renders by running its components says so, with the restructure that avoids it.
 function branchArmRendersInBrowserDiagnostic(
 	branch: RenderDataBranch,
@@ -1553,6 +1636,7 @@ function branchArmRendersInBrowserDiagnostic(
 	const names = [
 		...new Set(refusals.flatMap((refusal) => /^<([^>]+)>/.exec(refusal.detail)?.[1] ?? [])),
 	].map((name) => `<${name}>`);
+	names.push(...new Set(refusals.flatMap((refusal) => refusal.runs ?? [])));
 	const shown = names.length > 0 ? names.join(', ') : 'its components';
 	return {
 		code: BRANCH_ARM_RENDERS_IN_BROWSER_CODE,
@@ -1594,7 +1678,7 @@ function branchArmUnsupportedDiagnostic(
 		phase: 'public-render',
 		title: `Changing this ${label} cannot rebuild what it shows`,
 		message: `this ${label} (${branch.testSource}) cannot be rebuilt when ${branch.testSource} changes because ${detail}.`,
-		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own, shows a function it was handed, or — when it comes from another file — shows a value that keeps changing while it is shown has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
+		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own or shows a function it was handed, and cannot be run in the browser instead, has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
 		...(refusal?.span ? { primarySpan: refusal.span } : {}),
 		passId: 'symbol-modules',
 		artifactKeys: ['renderData', 'symbolResolver', 'symbolModules'],
@@ -1602,7 +1686,7 @@ function branchArmUnsupportedDiagnostic(
 		source: branch.testSource,
 		suggestions: [
 			{
-				message: `Move the component outside the ${label} and hide it with an attribute, lift its state up to the component that owns the ${label}, or keep the ${label} content to plain elements, text, and state reads.`,
+				message: `Render the component outside the ${label} and hide it with the \`hidden\` attribute instead of the ${label}; or declare what it keeps in the component that owns the ${label} and read it inside the ${label}; or keep the ${label} content to plain elements, text, and state reads. Moving the ${label} into the component does not help: there it tests a prop, and a prop that changes is refused the same way.`,
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
@@ -1620,7 +1704,10 @@ function renderBoundaryArms(
 				(candidate): candidate is string => candidate !== undefined,
 			);
 			const arms = chunkIds.map((chunkId) =>
-				renderChunkParts({ renderData, asyncComputedNodeIds, rowAttributes: true }, chunkId),
+				renderChunkParts(
+					{ renderData, asyncComputedNodeIds, rowAttributes: true },
+					chunkId,
+				),
 			);
 			if (arms.some((arm) => arm === null)) return [];
 			return [
@@ -1648,8 +1735,15 @@ function renderChunkParts(
 		context.refusals?.push({
 			detail,
 			...(span ? { span } : {}),
-			...(escalatable ? { escalatable: true } : {}),
+			// An imported child renders in its own module when the browser runs it.
+			...(escalatable || child?.imported ? { escalatable: true } : {}),
 		});
+		return null;
+	};
+	// This module's own render answers it; an imported child's content keeps refuse()'s answer.
+	const renderedHere = (detail: string, runs: string) => {
+		if (!context.inline || child?.imported) return refuse(detail);
+		context.refusals?.push({ detail, escalatable: true, runs });
 		return null;
 	};
 	const chunk = (child?.chunks ?? renderData.chunks).find(
@@ -1673,9 +1767,7 @@ function renderChunkParts(
 				const scoped = scopedPropPart(scope, slot.residue.graphNodeId, slot.residue.path);
 				if (scoped === 'unsupported')
 					return refuse('a value it shows comes from a prop the flip cannot recompute');
-				// A value inside an imported child refreshes through records that
-				// module owns, and this module cannot address them, so only a value
-				// that is already decided may be shown there.
+				// An imported child's changing value refreshes through records its own module owns.
 				if (child?.imported && (!scoped || 'read' in scoped))
 					return refuse(
 						`<${child.componentName}> shows a value that changes after it is shown`,
@@ -1691,7 +1783,7 @@ function renderChunkParts(
 				parts.push({
 					read: {
 						graphNodeId: slot.residue.graphNodeId,
-						path: armPartReadPath(
+						path: browserReadPath(
 							slot.residue.graphNodeId,
 							slot.residue.path,
 							asyncComputedNodeIds,
@@ -1754,7 +1846,8 @@ function renderChunkParts(
 							rowAttributes &&
 							rowSlot.kind === 'attribute' &&
 							!rowSlot.directClassMatch &&
-							(rowSlot.residue.kind === 'repeat-item' || rowSlot.residue.kind === 'graph-read')
+							(rowSlot.residue.kind === 'repeat-item' ||
+								rowSlot.residue.kind === 'graph-read')
 						) {
 							rowParts.push({
 								attribute: {
@@ -1764,21 +1857,26 @@ function renderChunkParts(
 										: {
 												read: {
 													graphNodeId: rowSlot.residue.graphNodeId,
-													path: armPartReadPath(
+													path: browserReadPath(
 														rowSlot.residue.graphNodeId,
 														rowSlot.residue.path,
 														asyncComputedNodeIds,
 													),
 												},
 											}),
-									...(rowSlot.alwaysPresent ? { alwaysPresent: true as const } : {}),
+									...(rowSlot.alwaysPresent
+										? { alwaysPresent: true as const }
+										: {}),
 								},
 							});
 							continue;
 						}
 						if (rowSlot.kind !== 'text')
-							return refuse(
-								`a repeated row inside it holds a ${rowSlot.kind} binding`,
+							return renderedHere(
+								`a repeated row inside it holds ${rowSlot.kind === 'attribute' ? 'an' : 'a'} ${
+									rowSlot.kind
+								} binding`,
+								'the @for block it holds',
 							);
 						if (rowSlot.residue.kind === 'repeat-item')
 							rowParts.push({ itemPath: rowSlot.residue.path });
@@ -1786,7 +1884,7 @@ function renderChunkParts(
 							rowParts.push({
 								read: {
 									graphNodeId: rowSlot.residue.graphNodeId,
-									path: armPartReadPath(
+									path: browserReadPath(
 										rowSlot.residue.graphNodeId,
 										rowSlot.residue.path,
 										asyncComputedNodeIds,
@@ -1794,8 +1892,9 @@ function renderChunkParts(
 								},
 							});
 						else
-							return refuse(
+							return renderedHere(
 								'a repeated row inside it reads a value that cannot be recomputed',
+								'the @for block it holds',
 							);
 					}
 				}
@@ -1809,7 +1908,7 @@ function renderChunkParts(
 					repeat: {
 						read: {
 							graphNodeId: repeat.collectionGraphNodeId,
-							path: armPartReadPath(
+							path: browserReadPath(
 								repeat.collectionGraphNodeId,
 								repeat.collectionPath,
 								asyncComputedNodeIds,
@@ -1879,7 +1978,7 @@ function renderChunkParts(
 				const read = scoped ?? {
 					read: {
 						graphNodeId: slot.residue.graphNodeId,
-						path: armPartReadPath(
+						path: browserReadPath(
 							slot.residue.graphNodeId,
 							slot.residue.path,
 							asyncComputedNodeIds,
@@ -1895,6 +1994,23 @@ function renderChunkParts(
 				});
 				continue;
 			}
+			if (slot.kind === 'async') {
+				context.refusals?.push({
+					detail: armSlotRefusalDetail(slot),
+					escalatable: true,
+					runs: 'the @try block it holds',
+				});
+				return null;
+			}
+			if (slot.kind === 'branch') {
+				const nested = renderData.branches?.find(
+					(candidate) => candidate.branchSiteId === slot.branchSiteId,
+				);
+				return renderedHere(
+					armSlotRefusalDetail(slot),
+					`the ${nested?.kind === 'switch' ? '@switch' : '@if'} it holds`,
+				);
+			}
 			return refuse(armSlotRefusalDetail(slot));
 		}
 	}
@@ -1909,7 +2025,8 @@ function armSlotRefusalDetail(slot: SemanticMarkupSlot): string {
 		return 'an element() handle it binds is named by an IDREF, and that id is minted for the rendered widget, which a flip has no way to mint again';
 	if ('residue' in slot && slot.residue.kind === 'element-handle-id-list')
 		return 'an element() handle it binds is named by an IDREF list, and those ids are minted for the rendered widget, which a flip has no way to mint again';
-	return `it holds ${slot.kind === 'attribute' || slot.kind === 'async' ? 'an' : 'a'} ${slot.kind} binding`;
+	if (slot.kind === 'async') return 'it holds a @try block';
+	return `it holds ${slot.kind === 'attribute' ? 'an' : 'a'} ${slot.kind} binding`;
 }
 
 // One prop name to the value a flip rebuilds the child's markup with.
@@ -1978,7 +2095,7 @@ function scopedPropConstant(
 }
 
 function constantAttributeHtml(name: string, value: unknown, alwaysPresent: boolean): string {
-	const text = staticAttributeText(name, value);
+	const text = attributeText(name, value);
 	if (text === null) return '';
 	const escaped = armTextEscape(text).replaceAll('"', '&quot;');
 	return alwaysPresent ? escaped : ` ${name}="${escaped}"`;
@@ -2070,10 +2187,8 @@ function staticChildComponentMarkup(
 	return wired ? null : chunk.statics.join('');
 }
 
-// Names the one value that kept the flip out; falls back to the shape-level
-// refusal for a child this descent cannot express for any other reason. Only a
-// same-module child's own value is escalatable: an imported child's markup and
-// records belong to a module this one cannot address.
+// Names the one value that kept the flip out. A child given only constants, or
+// one from another file without projected children, renders in the browser by running it.
 function childRefusalReason(
 	context: ArmPartsContext,
 	slot: Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>,
@@ -2086,14 +2201,16 @@ function childRefusalReason(
 		semanticGraph && edge && !edge.importSource
 			? armChildOwnValueRefusal(semanticGraph, edge.childComponentName)
 			: undefined;
-	// A child given only constants renders the same in the browser as on the server, whichever module it lives in.
-	const constantProps =
-		edge !== undefined &&
-		edge.children.childCount === 0 &&
-		edge.props.every((prop) => prop.kind === 'serializable');
 	return own
 		? { detail: own, escalatable: true }
-		: { detail: 'has to run to produce its content', escalatable: constantProps };
+		: {
+				detail: 'has to run to produce its content',
+				escalatable:
+					edge !== undefined &&
+					edge.children.childCount === 0 &&
+					(edge.importSource !== undefined ||
+						edge.props.every((prop) => prop.kind === 'serializable')),
+			};
 }
 
 function componentEdgeSpan(
@@ -2107,43 +2224,74 @@ function componentEdgeSpan(
 
 const emptyLocalNames = new Set<string>();
 
+// A name a destructured @for binds is a row local read at its path on the row item.
+type RowLocalNames = ReadonlySet<string> & {
+	readonly itemPaths?: ReadonlyMap<string, ReadonlyArray<string>>;
+};
+
+function rowLocalPath(localNames: ReadonlySet<string>, name: string): ReadonlyArray<string> {
+	return (localNames as RowLocalNames).itemPaths?.get(name) ?? [name];
+}
+
 function rowLocalNamesBySymbol(
 	renderData: RenderDataArtifact | undefined,
 	semanticGraph?: SemanticGraphArtifact,
 	symbolResolver?: SymbolResolverPlan,
 ): ReadonlyMap<string, ReadonlySet<string>> {
-	const localNamesBySymbol = new Map<string, Set<string>>();
-	const addLocal = (symbolId: string, itemName: string): void => {
+	const localNamesBySymbol = new Map<
+		string,
+		Set<string> & { itemPaths?: Map<string, ReadonlyArray<string>> }
+	>();
+	const addLocal = (
+		symbolId: string,
+		itemName: string,
+		aliases: SemanticGraphArtifact['keyedRepeats'][number]['itemAliases'] = [],
+	): void => {
 		let localNames = localNamesBySymbol.get(symbolId);
 		if (!localNames) {
 			localNames = new Set();
 			localNamesBySymbol.set(symbolId, localNames);
 		}
 		localNames.add(itemName);
+		localNames.itemPaths?.delete(itemName);
+		for (const alias of aliases) {
+			localNames.add(alias.name);
+			(localNames.itemPaths ??= new Map()).set(alias.name, [itemName, ...alias.path]);
+		}
+	};
+	// Outer rows first, so an inner row's names win over an outer row's of the same spelling.
+	const depth = (repeatId: string): number => {
+		const repeat = semanticGraph?.keyedRepeats.find((candidate) => candidate.id === repeatId);
+		return repeat?.enclosingRepeatId ? 1 + depth(repeat.enclosingRepeatId) : 0;
 	};
 	if (renderData) {
-		for (const repeat of renderData.repeats) {
+		for (const repeat of [...renderData.repeats].sort(
+			(left, right) => depth(left.repeatId) - depth(right.repeatId),
+		)) {
 			const rowHostIds = renderChunkHostIds(renderData, repeat.rowChunkId);
-			const indexName = semanticGraph?.keyedRepeats.find(
+			const semanticRepeat = semanticGraph?.keyedRepeats.find(
 				(candidate) => candidate.id === repeat.repeatId,
-			)?.indexName;
+			);
 			for (const interaction of renderData.interactions) {
 				if (!rowHostIds.has(interaction.hostNodeId)) continue;
 				for (const symbolId of interaction.symbolIds) {
-					addLocal(symbolId, repeat.itemName);
-					if (indexName) addLocal(symbolId, indexName);
+					addLocal(symbolId, repeat.itemName, semanticRepeat?.itemAliases);
+					if (semanticRepeat?.indexName) addLocal(symbolId, semanticRepeat.indexName);
 				}
 			}
 		}
 	}
-	// A callback a row passes its child closes over the row's item, which the child's dispatch supplies.
+	// A callback a row passes its child closes over the row's item and index, which the child's dispatch supplies.
 	for (const symbol of symbolResolver?.symbols ?? []) {
 		if (symbol.kind !== 'callback-prop') continue;
 		const edge = semanticGraph?.componentEdges.find(
 			(candidate) => candidate.id === symbol.componentEdgeId,
 		);
 		for (const repeat of semanticGraph?.keyedRepeats ?? [])
-			if (edge?.keyedRepeatScopeIds.includes(repeat.id)) addLocal(symbol.id, repeat.itemName);
+			if (edge?.keyedRepeatScopeIds.includes(repeat.id)) {
+				addLocal(symbol.id, repeat.itemName, repeat.itemAliases);
+				if (repeat.indexName) addLocal(symbol.id, repeat.indexName);
+			}
 	}
 	return localNamesBySymbol;
 }
@@ -2195,6 +2343,7 @@ function emitSymbolModule(
 	renderData: SymbolModulesInput['renderData'],
 	omitAuthoredSource: boolean,
 	sourceFileName: string,
+	repeatingTimerGlobals: ReadonlySet<string>,
 ): GeneratedSymbolModule[] {
 	if (symbol.kind === 'sync-computed-derive') {
 		return [
@@ -2224,6 +2373,7 @@ function emitSymbolModule(
 		sourceFileName,
 		localNames,
 		usesArgumentVector,
+		repeatingTimerGlobals,
 	});
 	if (!emitted) return [];
 
@@ -3233,6 +3383,19 @@ function stateInitializerPropReadStatements(
  * drops the wrapper and the printer re-derives whatever parentheses the
  * position actually needs.
  */
+// `__MARKLESS_DEV_ENABLED__` folds to false in a production build, so the branch it guards ships no code.
+function devEnabledNode(): EmissionNode {
+	return logicalNode(
+		'||',
+		binaryNode(
+			'===',
+			unaryNode('typeof', identifierNode('__MARKLESS_DEV_ENABLED__')),
+			literalNode('undefined'),
+		),
+		identifierNode('__MARKLESS_DEV_ENABLED__'),
+	);
+}
+
 function expressionFromSource(source: string, filename: string): EmissionNode {
 	const { program, errors } = parseEmissionSource(`(${source});`, filename, 'ts');
 	const statements = asNodes((program as unknown as AnyNode).body);
@@ -4228,71 +4391,106 @@ function asyncRunnerReadBindingStatement(): EmissionNode {
 	);
 }
 
-/**
- * One `const <name> = ...;` per dependency the runner closes over, in dependency
- * order, first binding wins.
- *
- * The AST twin of `asyncRunnerDependencyDeclarations`. A dependency covered by a
- * capture slot reads through the capture table; every other one reads through
- * the bound `read` above.
- */
+// A prop or slotted name read only through members (`account.name`) is rebuilt from those reads, so a bound row's slot answers each one.
 function asyncRunnerDependencyStatements(
 	dependencies: ReadonlyArray<SemanticGraphDependency>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
 ): EmissionNode[] {
-	const statements: EmissionNode[] = [];
-	const seenNames = new Set<string>();
-
+	const byName = new Map<
+		string,
+		Array<{
+			readonly binding: ReturnType<typeof asyncRunnerDependencyBinding>;
+			readonly dependency: SemanticGraphDependency;
+			readonly slot: CaptureSlot | undefined;
+		}>
+	>();
 	for (const dependency of dependencies) {
 		const binding = asyncRunnerDependencyBinding(dependency);
-		if (!binding || seenNames.has(binding.name)) continue;
-
-		seenNames.add(binding.name);
 		const slot = captureSlots.find((candidate) =>
 			captureSlotMatchesRead(candidate, dependency),
 		);
-		statements.push(
-			constDeclarationNode(
-				binding.name,
-				slot
-					? callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)])
-					: graphReadCall({
-							callee: 'read',
-							graphNodeId: binding.graphNodeId,
-							path: binding.path,
-						}),
-			),
-		);
+		byName.set(binding.name, [
+			...(byName.get(binding.name) ?? []),
+			{ binding, dependency, slot },
+		]);
 	}
 
-	return statements;
+	return [...byName].map(([name, reads]) => {
+		const whole = reads.find((read) => read.binding.memberPath.length === 0);
+		const answered = reads.some(
+			(read) =>
+				read.binding.memberPath.length > 0 &&
+				(read.slot ||
+					read.dependency.graphNodeId.startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX) ||
+					// A shared instance's member resolves to that member's own node, not the instance's.
+					read.binding.memberPath.length > read.dependency.path.length),
+		);
+		if (whole || !answered) return constDeclarationNode(name, asyncRunnerRootRead(whole ?? reads[0]!));
+		return constDeclarationNode(
+			name,
+			memberReadsObjectNode(
+				reads.map((read) => ({
+					path: read.binding.memberPath,
+					value: read.slot
+						? captureSlotReadNode(read.slot)
+						: graphReadCall({
+								callee: 'read',
+								graphNodeId: read.dependency.graphNodeId,
+								path: read.dependency.path,
+							}),
+				})),
+			),
+		);
+	});
 }
 
-/** Matches `isIdentifierObjectKey`, which sits inside the scanner band. */
-const ASYNC_RUNNER_IDENTIFIER = /^[$A-Z_a-z][$0-9A-Z_a-z]*$/;
+function asyncRunnerRootRead(read: {
+	readonly binding: ReturnType<typeof asyncRunnerDependencyBinding>;
+	readonly slot: CaptureSlot | undefined;
+}): EmissionNode {
+	return read.slot && read.binding.memberPath.length === 0
+		? captureSlotReadNode(read.slot)
+		: graphReadCall({
+				callee: 'read',
+				graphNodeId: read.binding.graphNodeId,
+				path: read.binding.path,
+			});
+}
 
-/**
- * The local name a dependency binds and the graph path it reads, or `null` when
- * the dependency source is not a plain dotted name.
- *
- * The band-free twin of `asyncRunnerDependencyDeclaration`: same trailing-member
- * arithmetic, with the identifier test inlined so this site reaches no scanner.
- */
+// `{ name: <a>, owner: { id: <b> } }` from member reads; a shorter path already holds the longer ones under it.
+function memberReadsObjectNode(
+	reads: ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly value: EmissionNode }>,
+): EmissionNode {
+	const keys = [...new Set(reads.flatMap((read) => read.path.slice(0, 1)))];
+	return objectNode(
+		keys.map((key) => {
+			const under = reads.filter((read) => read.path[0] === key);
+			const own = under.find((read) => read.path.length === 1);
+			return stringKeyPropertyNode(
+				key,
+				own
+					? own.value
+					: memberReadsObjectNode(
+							under.map((read) => ({ path: read.path.slice(1), value: read.value })),
+						),
+			);
+		}),
+	);
+}
+
+/** The local name a dependency binds, the member reads on it, and the graph path the name itself stands for. */
 function asyncRunnerDependencyBinding(dependency: SemanticGraphDependency): {
 	readonly name: string;
+	readonly memberPath: ReadonlyArray<string>;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
-} | null {
-	const parts = dependency.source.split('.');
-	if (parts.some((part) => !ASYNC_RUNNER_IDENTIFIER.test(part))) return null;
-
-	const [name, ...memberPath] = parts;
-	if (!name) return null;
-
+} {
+	const { name, members } = dependency.local;
 	return {
 		name,
+		memberPath: members,
 		graphNodeId: dependency.graphNodeId,
-		path: dependency.path.slice(0, Math.max(0, dependency.path.length - memberPath.length)),
+		path: dependency.path.slice(0, Math.max(0, dependency.path.length - members.length)),
 	};
 }
 
@@ -4609,7 +4807,13 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 		),
 		armTextEscaperFunctionNode('marklessBranchText'),
 		...(hasRepeatParts
-			? [branchRowsFunctionNode('marklessBranchText', hasEmptyRepeatParts, hasRowAttributeParts)]
+			? [
+					branchRowsFunctionNode(
+						'marklessBranchText',
+						hasEmptyRepeatParts,
+						hasRowAttributeParts,
+					),
+				]
 			: []),
 	];
 
@@ -4704,6 +4908,19 @@ export function buildAsyncBoundaryUpdateEmission(
 				exportName,
 				['context'],
 				[
+					// Dev only: a waiting block asks for its arms' records alone, to fetch their code beside its data.
+					...(records
+						? [
+								ifStatementNode(
+									logicalNode(
+										'&&',
+										devEnabledNode(),
+										memberChainNode('context.armRecordsOnly'),
+									),
+									returnStatementNode(identifierNode('marklessBoundaryRecords')),
+								),
+							]
+						: []),
 					// The runtime passes the settled status; arm 1 is @catch, arm 0 is @try.
 					constDeclarationNode(
 						'arm',
@@ -4749,7 +4966,13 @@ export function buildAsyncBoundaryUpdateEmission(
 		),
 		armTextEscaperFunctionNode('marklessBoundaryText'),
 		...(hasRepeatParts
-			? [branchRowsFunctionNode('marklessBoundaryText', hasEmptyRepeatParts, hasRowAttributeParts)]
+			? [
+					branchRowsFunctionNode(
+						'marklessBoundaryText',
+						hasEmptyRepeatParts,
+						hasRowAttributeParts,
+					),
+				]
 			: []),
 		...(records && rowsShiftLocators ? [boundaryArmRecordsFunctionNode()] : []),
 	];
@@ -4890,7 +5113,9 @@ function armsHaveRowAttributeParts(
 	arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArms['arms'][number][number]>>,
 ): boolean {
 	return arms.some((arm) =>
-		arm.some((part) => 'repeat' in part && part.repeat.rowParts.some((row) => 'attribute' in row)),
+		arm.some(
+			(part) => 'repeat' in part && part.repeat.rowParts.some((row) => 'attribute' in row),
+		),
 	);
 }
 
@@ -5102,7 +5327,11 @@ function branchRowsFunctionNode(
 				callNode(identifierNode('marklessAttributeHtml'), [
 					memberChainNode('row.attribute.name'),
 					conditionalNode(
-						binaryNode('!==', memberChainNode('row.attribute.itemPath'), identifierNode('undefined')),
+						binaryNode(
+							'!==',
+							memberChainNode('row.attribute.itemPath'),
+							identifierNode('undefined'),
+						),
 						walkItem('row.attribute.itemPath'),
 						callNode(memberChainNode('graph.read'), [
 							memberChainNode('row.attribute.read.graphNodeId'),
@@ -5267,6 +5496,8 @@ export type ValueExpressionEmissionInput = {
 	 * `undefined`.
 	 */
 	readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
+	/** The read an update's parameter stands in for: the state and path the assignment replaces. */
+	readonly updaterRead?: { readonly graphNodeId: string; readonly path: ReadonlyArray<string>; readonly name: string };
 	/** A handler's value captures: a prop read one of them routes is read through it, not the graph. */
 	readonly captureSlots?: ReadonlyArray<CaptureSlot>;
 	/** The authored file the value came from; names the map at the print site. */
@@ -5404,7 +5635,7 @@ function valueExpressionNode(
 	if (handle) return handle.kind === 'lowered' ? handle.node : null;
 
 	const leaf =
-		graphReadValueNode(text, input.graphReads, input.captureSlots) ??
+		graphReadValueNode(text, input.graphReads, input.captureSlots, input.updaterRead) ??
 		localValueNode(text, input.localNames);
 	if (leaf) return leaf;
 
@@ -5470,11 +5701,13 @@ function graphReadValueNode(
 	text: string,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	captureSlots: ReadonlyArray<CaptureSlot> = [],
+	updaterRead?: ValueExpressionEmissionInput['updaterRead'],
 ): EmissionNode | null {
 	const graphRead = graphReads.find((read) => read.source === text);
 	if (!graphRead) return null;
 	const slot = captureSlots.find((candidate) => captureSlotMatchesRead(candidate, graphRead));
 	if (slot) return callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)]);
+	if (updaterRead && readsUpdated(graphRead, updaterRead)) return identifierNode(updaterRead.name);
 
 	return graphReadCall({
 		callee: 'context.graph.read',
@@ -5489,7 +5722,10 @@ function localValueNode(text: string, localNames: ReadonlySet<string>): Emission
 	if (!path || path.length < 2) return null;
 	if (!localNames.has(path[0] ?? '')) return null;
 
-	return optionalPathNode(memberChainNode('context.locals'), path);
+	return optionalPathNode(memberChainNode('context.locals'), [
+		...rowLocalPath(localNames, path[0]!),
+		...path.slice(1),
+	]);
 }
 
 /** The band-local twin of `staticSourcePath`, which reaches the scanner band. */
@@ -5512,11 +5748,12 @@ function staticDottedPath(text: string): ReadonlyArray<string> | null {
 function optionalPathNode(base: EmissionNode, path: ReadonlyArray<string>): EmissionNode {
 	let expression = base;
 	for (const part of path) {
+		const named = VALUE_IDENTIFIER_PATTERN.test(part);
 		expression = {
 			type: 'MemberExpression',
 			object: expression,
-			property: identifierNode(part),
-			computed: false,
+			property: named ? identifierNode(part) : literalNode(part),
+			computed: !named,
 			optional: true,
 		};
 	}
@@ -5786,6 +6023,8 @@ function rewriteGraphReadsAndLocals(
 		: undefined;
 	if (graphSlot)
 		return callNode(memberChainNode('context.capture.read'), [literalNode(graphSlot.id)]);
+	if (graphRead && input.updaterRead && readsUpdated(graphRead, input.updaterRead))
+		return identifierNode(input.updaterRead.name);
 	if (graphRead) {
 		return graphReadCall({
 			callee: 'context.graph.read',
@@ -5799,7 +6038,10 @@ function rewriteGraphReadsAndLocals(
 		typeof node.name === 'string' &&
 		input.localNames.has(node.name)
 	) {
-		return optionalPathNode(memberChainNode('context.locals'), [node.name]);
+		return optionalPathNode(
+			memberChainNode('context.locals'),
+			rowLocalPath(input.localNames, node.name),
+		);
 	}
 
 	if (node.type === 'MemberExpression' && node.computed !== true && isNode(node.object)) {
@@ -5924,6 +6166,8 @@ export type EventHandlerEmissionInput = {
 	readonly moduleImports?: readonly SemanticModuleImport[];
 	/** An attach behavior's parameter is its element, not an event. */
 	readonly parametersFrom?: 'element';
+	/** `repeatingTimerGlobals`: names a `setInterval` call reaches the browser's timer through; omitted means none. */
+	readonly repeatingTimerGlobals?: ReadonlySet<string>;
 };
 
 /** The body of the `/* scalar leaf marker: ... *\/` comment, delimiters excluded. */
@@ -6003,8 +6247,11 @@ export function buildEventHandlerEmission(
 	// the print site hands the printer as its `source` (invariant 3).
 	const source = projection?.source ?? symbol.source;
 
+	const shownReads = symbol.kind === 'event-handler' ? symbol.shownReads : undefined;
+	const entryMarks = symbol.entryMarks;
+	const catchRunner = symbol.catchRunnerGraphNodeId;
 	const scalarLeaf =
-		input.captureSlots.length === 0
+		input.captureSlots.length === 0 && !shownReads && !entryMarks && !catchRunner
 			? eventHandlerScalarLeafStatements(input, projection)
 			: null;
 	if (scalarLeaf) {
@@ -6038,8 +6285,20 @@ export function buildEventHandlerEmission(
 	// The string path decides which imports survive by scanning the emitted
 	// *body* text only, so this reads the same statements and no others.
 	const carried = eventHandlerModuleScopeCarry(input, symbol, projection, source, statementsFor);
-	const { bodyStatements, declarationStatements } = carried;
-	const referenced = carried.referenced;
+	const { declarationStatements } = carried;
+	const isAsync =
+		!importedReference &&
+		(symbol.source.trimStart().startsWith('async ') ||
+			input.captureSlots.some(callbackCaptureSlot));
+	const bodyStatements = !catchRunner
+		? carried.bodyStatements
+		: isAsync
+			? [handlerCatchNode(carried.bodyStatements, catchRunner)]
+			: carried.bodyStatements.map((statement) =>
+					catchReturnedPromises(statement, catchRunner),
+				);
+	const catchFn = isAsync ? HANDLER_CATCH_FN : HANDLER_CATCH_RETURNED_FN;
+	const referenced = catchRunner ? new Set([...carried.referenced, catchFn]) : carried.referenced;
 	const imports = uniqueModuleImports(
 		[
 			...(symbol.moduleImports ?? []),
@@ -6047,11 +6306,6 @@ export function buildEventHandlerEmission(
 			...(declarationStatements.length === 0 ? [] : (input.moduleImports ?? [])),
 		].filter((moduleImport) => referenced.has(moduleImport.localName)),
 	);
-
-	const isAsync =
-		!importedReference &&
-		(symbol.source.trimStart().startsWith('async ') ||
-			input.captureSlots.some(callbackCaptureSlot));
 
 	return {
 		program: moduleProgramNode([
@@ -6075,12 +6329,71 @@ export function buildEventHandlerEmission(
 						source: '@markless/web/fns/write-through',
 					}),
 				),
+			...(referenced.has(CHANGED_FN)
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: CHANGED_FN,
+							source: '@markless/web/fns/changed',
+						}),
+					]
+				: []),
 			...(referenced.has(CALLBACK_SLOT_FN)
 				? [
 						moduleImportNode({
 							kind: 'named' as const,
 							localName: CALLBACK_SLOT_FN,
 							source: '@markless/web/fns/callback-slot',
+						}),
+					]
+				: []),
+			...(referenced.has(CATCH_RESET_FN)
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: CATCH_RESET_FN,
+							source: '@markless/web/fns/catch-reset',
+						}),
+					]
+				: []),
+			...(referenced.has(REPEATING_TIMER_FN)
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: REPEATING_TIMER_FN,
+							source: '@markless/web/fns/repeating-timer',
+						}),
+					]
+				: []),
+			...(catchRunner
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: catchFn,
+							source: '@markless/web/fns/handler-catch',
+						}),
+					]
+				: []),
+			...(shownReads
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: SHOWN_READS_FN,
+							source: '@markless/web/fns/shown-reads',
+						}),
+					]
+				: []),
+			...(entryMarks
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: ENTRY_MARK_START_FN,
+							source: '@markless/web/fns/async-plane',
+						}),
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: ENTRY_MARK_END_FN,
+							source: '@markless/web/fns/async-plane',
 						}),
 					]
 				: []),
@@ -6095,8 +6408,16 @@ export function buildEventHandlerEmission(
 			...declarationStatements,
 			exportNamedDeclarationNode(
 				eventHandlerFunctionNode(exportName, isAsync, [
+					...(shownReads ? [shownReadsStatement(shownReads)] : []),
 					...(importedReference ? [] : eventHandlerParameterStatements(input)),
-					...bodyStatements,
+					...(entryMarks
+						? [
+								entryMarkCallStatement(ENTRY_MARK_START_FN, entryMarks),
+								tryFinallyNode(bodyStatements, [
+									entryMarkCallStatement(ENTRY_MARK_END_FN, entryMarks),
+								]),
+							]
+						: bodyStatements),
 				]),
 			),
 		]),
@@ -6501,6 +6822,12 @@ function eventHandlerAuthoredStatements(
 		];
 	}
 
+	const directReset =
+		symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'
+			? symbol.catchResets?.find((reset) => reset.name === trimmed)
+			: undefined;
+	if (directReset) return [returnStatementNode(catchResetCall(directReset))];
+
 	const directReferenceRead = (symbol.reads ?? []).find((read) => read.source.trim() === trimmed);
 	if (directReferenceRead && VALUE_IDENTIFIER_PATTERN.test(trimmed)) {
 		return [
@@ -6548,6 +6875,7 @@ type EventHandlerRewrite = {
 	readonly claimedWrites: Set<LoweredStateWrite>;
 	readonly claimedHandleCalls: Set<EventElementHandleCall>;
 	readonly boundHandleNames: ReadonlySet<string>;
+	readonly repeatingTimerGlobals: ReadonlySet<string>;
 };
 
 function eventHandlerRewrite(
@@ -6591,6 +6919,7 @@ function eventHandlerRewrite(
 		claimedWrites: new Set(),
 		claimedHandleCalls: new Set(),
 		boundHandleNames: new Set(),
+		repeatingTimerGlobals: input.repeatingTimerGlobals ?? new Set(),
 	};
 }
 
@@ -6650,10 +6979,12 @@ function localNamesVisibleIn(fn: AnyNode, localNames: ReadonlySet<string>): Read
 	if (isNode(fn.body)) collectOwnScopeBindingNames(fn.body, bound);
 	if (bound.size === 0) return localNames;
 
-	const visible = new Set<string>();
+	const visible: Set<string> & { itemPaths?: RowLocalNames['itemPaths'] } = new Set<string>();
 	for (const name of localNames) {
 		if (!bound.has(name)) visible.add(name);
 	}
+	const itemPaths = (localNames as RowLocalNames).itemPaths;
+	if (itemPaths) visible.itemPaths = itemPaths;
 
 	return visible.size === localNames.size ? localNames : visible;
 }
@@ -6727,17 +7058,26 @@ function rewriteEventHandlerNode(
 	const unfilled = unfilledCallbackSlotNode(node, rewrite);
 	if (unfilled) return carryEventHandlerComments(node, unfilled);
 
+	const passed = passedStateCallNode(node, rewrite);
+	if (passed) return carryEventHandlerComments(node, passed);
+
 	const write = eventWriteNode(node, rewrite);
 	if (write) return carryEventHandlerComments(node, write);
 
 	const handleCall = elementHandleCallNode(node, text, rewrite);
 	if (handleCall) return carryEventHandlerComments(node, handleCall);
 
+	const reset = catchResetNode(node, rewrite);
+	if (reset) return carryEventHandlerComments(node, reset);
+
 	const read = eventReadNode(node, parent, text, rewrite);
 	if (read) return carryEventHandlerComments(node, read);
 
 	const unclaimedWrite = unclaimedWriteNode(node, rewrite);
 	if (unclaimedWrite) return carryEventHandlerComments(node, unclaimedWrite);
+
+	const timer = repeatingTimerCallNode(node, rewrite);
+	if (timer) return carryEventHandlerComments(node, timer);
 
 	if (node.type === 'ChainExpression' && isNode(node.expression)) {
 		return chainExpressionNode(node, rewriteEventHandlerNode(node.expression, node, rewrite));
@@ -6840,6 +7180,47 @@ function containsOwnAwait(node: unknown): boolean {
 	}
 
 	return false;
+}
+
+// The call runs as authored, then each path it wrote is marked changed before the handler reads on.
+function passedStateCallNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode | null {
+	const chain = node.type === 'ChainExpression' && isNode(node.expression) ? node : null;
+	const call = chain ? (chain.expression as AnyNode) : node;
+	if (call.type !== 'CallExpression') return null;
+	const args = asNodes(call.arguments);
+	const claimed = new Set<string>();
+	const writes = (rewrite.symbol.writes ?? []).filter((write) => {
+		const passedTo = write.passedTo;
+		if (!passedTo || rewrite.claimedWrites.has(write)) return false;
+		const argument = args[passedTo.argumentIndex];
+		if (!argument || valueNodeText(argument, rewrite.source) !== passedTo.argument)
+			return false;
+		if (!isNode(call.callee) || valueNodeText(call.callee, rewrite.source) !== passedTo.callee)
+			return false;
+		const key = `${passedTo.argumentIndex}:${write.graphNodeId}:${JSON.stringify(write.path)}:${JSON.stringify(write.row?.itemPath ?? null)}`;
+		if (claimed.has(key)) return false;
+		claimed.add(key);
+		return true;
+	});
+	if (writes.length === 0) return null;
+	for (const write of writes) rewrite.claimedWrites.add(write);
+
+	const rewritten = rewriteEventHandlerChildren(call, (child) =>
+		rewriteEventHandlerNode(child, call, rewrite),
+	);
+	// The paths are found before the call runs: a row the call removes has no path after it.
+	return callNode(identifierNode(CHANGED_FN), [
+		memberChainNode('context.graph'),
+		arrayNode(
+			writes.map((write) =>
+				arrayNode([
+					literalNode(write.graphNodeId),
+					rowItemPathNode(write) ?? stringArrayNode(write.path),
+				]),
+			),
+		),
+		chain ? chainExpressionNode(chain, rewritten) : rewritten,
+	]);
 }
 
 /**
@@ -7151,12 +7532,206 @@ function eventReadNode(
 
 	const slot = rewrite.valueSlots.find((candidate) => captureSlotMatchesRead(candidate, read));
 	if (slot) return callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)]);
+	const updaterRead = rewrite.writeValueInput.updaterRead;
+	if (updaterRead && readsUpdated(read, updaterRead)) return identifierNode(updaterRead.name);
 
 	return graphReadCall({
 		callee: 'context.graph.read',
 		graphNodeId: read.graphNodeId,
 		path: read.path,
 	});
+}
+
+const readsUpdated = (
+	read: LoweredStateRead,
+	target: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+): boolean =>
+	read.graphNodeId === target.graphNodeId &&
+	read.path.length === target.path.length &&
+	read.path.every((segment, index) => segment === target.path[index]);
+
+// An `await` or `yield` in the value itself, not in a function inside it: the read before it runs earlier than the write.
+function pausesOutsideFunctions(node: AnyNode): boolean {
+	if (node.type === 'AwaitExpression' || node.type === 'YieldExpression') return true;
+	if (isFunctionLikeNode(node)) return false;
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+		if (Array.isArray(child)) {
+			if (child.some((item) => isNode(item) && pausesOutsideFunctions(item))) return true;
+		} else if (isNode(child) && pausesOutsideFunctions(child)) return true;
+	}
+	return false;
+}
+
+// Whether a node is, by the state lowering's own reads, exactly the state and path an assignment replaces.
+function isAssignedStateRead(
+	node: AnyNode,
+	target: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+	rewrite: EventHandlerRewrite,
+): boolean {
+	const text = valueNodeText(node, rewrite.source);
+	if (!text) return false;
+	const read =
+		rewrite.reads.find((candidate) => candidate.source === text) ??
+		rewrite.writeValueInput.graphReads.find((candidate) => candidate.source === text);
+	return (
+		!!read &&
+		readsUpdated(read, target) &&
+		!rewrite.valueSlots.some((candidate) => captureSlotMatchesRead(candidate, read))
+	);
+}
+
+// `pending.filter(...)`, `pending.filter(...).map(...)`: a method on the assigned state's own value.
+function callsAssignedStateMethod(
+	node: AnyNode,
+	target: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+	rewrite: EventHandlerRewrite,
+): boolean {
+	const callee = node.callee as AnyNode | undefined;
+	if (node.optional === true || callee?.type !== 'MemberExpression' || callee.computed === true) return false;
+	const receiver = callee.object as AnyNode | undefined;
+	if (!receiver) return false;
+	return receiver.type === 'CallExpression'
+		? callsAssignedStateMethod(receiver, target, rewrite)
+		: isAssignedStateRead(receiver, target, rewrite);
+}
+
+type AssignedTarget = { readonly graphNodeId: string; readonly path: ReadonlyArray<string> };
+// A part of an update's value that must run once, before the update: a call, or the copy of what a spread iterates.
+type OncePart = { readonly node: AnyNode; readonly spread: boolean };
+
+// An update runs again on the value a page still shows, so its value repeats only reads; a call, `new` or spread of
+// something else runs once ahead of it and the replay reuses its result. `null` when that cannot keep the value's
+// meaning: the part reads the assigned state, sits in a function or a branch that may skip it, or is a `delete`.
+function replayedValueParts(
+	node: AnyNode,
+	target: AssignedTarget,
+	rewrite: EventHandlerRewrite,
+	branch = false,
+	insideFunction = false,
+	parts: OncePart[] = [],
+): OncePart[] | null {
+	const once = (part: AnyNode, spread: boolean): OncePart[] | null =>
+		insideFunction || branch || readsAssignedNode(part, target, rewrite) ? null : (parts.push({ node: part, spread }), parts);
+	if (isAssignedStateRead(node, target, rewrite)) return insideFunction ? null : parts;
+	if (node.type === 'UnaryExpression' && node.operator === 'delete') return null;
+	if (
+		node.type === 'NewExpression' ||
+		node.type === 'TaggedTemplateExpression' ||
+		node.type === 'ImportExpression' ||
+		(node.type === 'CallExpression' && !callsAssignedStateMethod(node, target, rewrite))
+	)
+		return once(node, false);
+	const inside = insideFunction || isFunctionLikeNode(node);
+	const iterated = node.type === 'ArrayExpression' || node.type === 'CallExpression' ? asNodes(node.type === 'ArrayExpression' ? node.elements : node.arguments) : [];
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+		if (key === 'property' && node.type === 'MemberExpression' && node.computed !== true) continue;
+		const skippable =
+			branch ||
+			node.type === 'ChainExpression' ||
+			(node.type === 'LogicalExpression' && key === 'right') ||
+			(node.type === 'ConditionalExpression' && key !== 'test');
+		for (const item of Array.isArray(child) ? child : [child]) {
+			if (!isNode(item)) continue;
+			const spread = item.type === 'SpreadElement' && iterated.includes(item) && isNode(item.argument) ? item.argument : undefined;
+			const ownValue =
+				spread && (spread.type === 'CallExpression' ? callsAssignedStateMethod(spread, target, rewrite) : isAssignedStateRead(spread, target, rewrite));
+			const walked =
+				spread && !ownValue
+					? once(spread, true)
+					: replayedValueParts(item, target, rewrite, skippable, inside, parts);
+			if (!walked) return null;
+		}
+	}
+	return parts;
+}
+
+// Whether a node reads the assigned state's graph node at any path, inside functions too.
+function readsAssignedNode(node: AnyNode, target: AssignedTarget, rewrite: EventHandlerRewrite): boolean {
+	const text = valueNodeText(node, rewrite.source);
+	const read =
+		text &&
+		(rewrite.reads.find((candidate) => candidate.source === text) ??
+			rewrite.writeValueInput.graphReads.find((candidate) => candidate.source === text));
+	if (read && read.graphNodeId === target.graphNodeId) return true;
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+		if (key === 'property' && node.type === 'MemberExpression' && node.computed !== true) continue;
+		for (const item of Array.isArray(child) ? child : [child])
+			if (isNode(item) && readsAssignedNode(item, target, rewrite)) return true;
+	}
+	return false;
+}
+
+// Whether the handler writes the assigned path, or a path holding or inside it, anywhere but this assignment: a once
+// part run ahead of the update could reach that write, which JavaScript runs after reading the value it replaces.
+function writesOverlapElsewhere(authored: LoweredStateWrite, target: AssignedTarget, rewrite: EventHandlerRewrite): boolean {
+	return (rewrite.symbol.writes ?? []).some((other) => {
+		if (other === authored || other.graphNodeId !== target.graphNodeId) return false;
+		const path = other.through ? other.through.path : other.path;
+		const shared = Math.min(path.length, target.path.length);
+		return path.slice(0, shared).every((segment, index) => segment === target.path[index]);
+	});
+}
+
+// The value with each once part standing as the parameter that carries its result.
+function withOnceParameters(node: AnyNode, parts: ReadonlyArray<OncePart>, names: ReadonlyArray<string>): AnyNode {
+	const index = parts.findIndex((part) => part.node === node);
+	if (index >= 0) return { type: 'Identifier', name: names[index] } as AnyNode;
+	const copy: Record<string, unknown> = { ...(node as Record<string, unknown>) };
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+		if (Array.isArray(child)) copy[key] = child.map((item) => (isNode(item) ? withOnceParameters(item, parts, names) : item));
+		else if (isNode(child)) copy[key] = withOnceParameters(child, parts, names);
+	}
+	return copy as AnyNode;
+}
+
+// `((once) => <update>)(<part>)`: each part runs once, ahead of the update, and the replay reuses it.
+function onceAheadOfUpdate(
+	update: EmissionNode,
+	parts: ReadonlyArray<OncePart>,
+	names: ReadonlyArray<string>,
+	rewrite: EventHandlerRewrite,
+): EmissionNode {
+	if (parts.length === 0) return update;
+	return callNode(
+		arrowFunctionNode(names, update),
+		parts.map(({ node, spread }) => {
+			const value = eventWriteValueNode(node, rewrite);
+			return spread ? arrayNode([spreadNode(value)]) : value;
+		}),
+	);
+}
+
+function onceParameterNames(node: AnyNode, count: number): string[] {
+	const taken = new Set<string>();
+	collectIdentifierNames(node, taken);
+	const names: string[] = [];
+	for (let index = 0; names.length < count; index++) {
+		const name = index === 0 ? 'once' : `once${index}`;
+		if (!taken.has(name)) names.push(name);
+	}
+	return names;
+}
+
+// Whether a value reads the assigned state outside any function inside it.
+function readsAssignedState(
+	node: AnyNode,
+	target: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+	rewrite: EventHandlerRewrite,
+): boolean {
+	if (isAssignedStateRead(node, target, rewrite)) return true;
+	if (isFunctionLikeNode(node)) return false;
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+		if (key === 'property' && node.type === 'MemberExpression' && node.computed !== true) continue;
+		if (Array.isArray(child)) {
+			if (child.some((item) => isNode(item) && readsAssignedState(item, target, rewrite))) return true;
+		} else if (isNode(child) && readsAssignedState(child, target, rewrite)) return true;
+	}
+	return false;
 }
 
 /**
@@ -7305,34 +7880,65 @@ function loweredEventWriteNode(
 			? memberNode(writeThroughCall(authored.through, authored.graphNodeId), method)
 			: undefined;
 	if (write.operation === 'assign') {
-		const value = isNode(node.right) ? eventWriteValueNode(node.right, rewrite) : null;
+		if (!isNode(node.right)) return null;
+		const right = node.right;
+		const logical = write.assignmentOperator === '&&=' || write.assignmentOperator === '||=' || write.assignmentOperator === '??=';
+		const replayable = !containsWriteExpression(right) && !pausesOutsideFunctions(right);
+		// A plain assignment whose value reads exactly what it replaces is an update, so a page still showing an earlier value applies it there too.
+		const onceParts = !replayable
+			? null
+			: write.assignmentOperator
+				? replayedValueParts(right, write, rewrite, logical)
+				: !write.row && !write.through && readsAssignedState(right, write, rewrite)
+					? replayedValueParts(right, write, rewrite)
+					: null;
+		const parts = !onceParts || (onceParts.length > 0 && writesOverlapElsewhere(authored, write, rewrite)) ? null : onceParts;
+		const names = parts ? onceParameterNames(right, parts.length) : [];
+		const replayed = parts && parts.length > 0 ? withOnceParameters(right, parts, names) : right;
+		const updaterRead =
+			parts && !write.assignmentOperator
+				? { graphNodeId: write.graphNodeId, path: write.path, name: freshUpdaterParameter(right as unknown as EmissionNode) }
+				: undefined;
+		const value = eventWriteValueNode(
+			parts ? replayed : right,
+			updaterRead ? { ...rewrite, writeValueInput: { ...rewrite.writeValueInput, updaterRead } } : rewrite,
+		);
 		if (!value) return null;
+		const operator = write.assignmentOperator ? EVENT_COMPOUND_ASSIGNMENT_OPERATORS.get(write.assignmentOperator) : undefined;
+		if (write.assignmentOperator && !operator) return null;
+		const combined = (current: EmissionNode) =>
+			!operator
+				? value
+				: operator === '&&' || operator === '||' || operator === '??'
+					? logicalNode(operator, current, value)
+					: binaryNode(operator, current, value);
 
-		if (!write.assignmentOperator) {
-			return graphWriteCall({
-				calleeNode: throughCallee('write'),
-				graphNodeId: write.graphNodeId,
-				path: write.path,
-				pathNode,
-				value,
-			});
+		if (parts) {
+			const parameterName = updaterRead?.name ?? freshUpdaterParameter(value);
+			return onceAheadOfUpdate(
+				graphUpdateCall({
+					calleeNode: throughCallee('update'),
+					graphNodeId: write.graphNodeId,
+					path: write.path,
+					pathNode,
+					returnValue: 'next',
+					parameterName,
+					updateExpression: combined(identifierNode(parameterName)),
+				}),
+				parts,
+				names,
+				rewrite,
+			);
 		}
-
-		const operator = EVENT_COMPOUND_ASSIGNMENT_OPERATORS.get(write.assignmentOperator);
-		if (!operator) return null;
-
-		const parameterName = freshUpdaterParameter(value);
-		return graphUpdateCall({
-			calleeNode: throughCallee('update'),
+		// A compound right side that cannot replay is read and written once, in JavaScript's order.
+		const current = operator && isNode(node.left) ? eventWriteValueNode(node.left, rewrite) : undefined;
+		if (operator && !current) return null;
+		return graphWriteCall({
+			calleeNode: throughCallee('write'),
 			graphNodeId: write.graphNodeId,
 			path: write.path,
 			pathNode,
-			returnValue: 'next',
-			parameterName,
-			updateExpression:
-				operator === '&&' || operator === '||' || operator === '??'
-					? logicalNode(operator, identifierNode(parameterName), value)
-					: binaryNode(operator, identifierNode(parameterName), value),
+			value: current ? combined(current) : value,
 		});
 	}
 
@@ -7415,6 +8021,249 @@ function collectIdentifierNames(node: unknown, names: Set<string>): void {
 const ROW_ITEM_PATH_FN = 'marklessRowItemPath';
 const WRITE_THROUGH_FN = 'marklessWriteThrough';
 const OBJECT_ASSIGN_FN = 'marklessObjectAssign';
+const CHANGED_FN = 'marklessChanged';
+const CATCH_RESET_FN = 'marklessCatchReset';
+const REPEATING_TIMER_FN = 'marklessRepeatingTimer';
+// The browser's `setInterval`, called bare or through one of these globals.
+const REPEATING_TIMER_ROOTS = ['setInterval', 'window', 'globalThis', 'self'] as const;
+
+/** The timer roots the authored module binds nowhere, so the analyzer resolves each use to the browser's global. */
+function repeatingTimerGlobals(source: SymbolModulesInput['source']): ReadonlySet<string> {
+	if (!source) return new Set();
+	try {
+		const bound = new Set(moduleSemantics(source.source, source.filename).bindings.map((binding) => binding.name));
+		return new Set(REPEATING_TIMER_ROOTS.filter((name) => !bound.has(name)));
+	} catch {
+		// The semantic pass owns parse diagnostics; an unreadable module wraps nothing.
+		return new Set();
+	}
+}
+
+function reachesRepeatingTimer(callee: AnyNode, rewrite: EventHandlerRewrite): boolean {
+	const global = (node: AnyNode, name?: string) => {
+		const found = getIdentifierName(node);
+		return (
+			node.type === 'Identifier' &&
+			!!found &&
+			(name === undefined || found === name) &&
+			rewrite.repeatingTimerGlobals.has(found) &&
+			!rewrite.boundHandleNames.has(found) &&
+			!rewrite.localNames.has(found)
+		);
+	};
+	if (callee.type === 'Identifier') return global(callee, 'setInterval');
+	return (
+		callee.type === 'MemberExpression' &&
+		callee.computed !== true &&
+		isNode(callee.object) &&
+		isNode(callee.property) &&
+		getIdentifierName(callee.property) === 'setInterval' &&
+		callee.object.type === 'Identifier' &&
+		getIdentifierName(callee.object) !== 'setInterval' &&
+		global(callee.object)
+	);
+}
+
+// `setInterval(tick, ms)` keeps its shape; the tick runs as a repeating timer's turn, so the poll it drives refreshes quietly.
+function repeatingTimerCallNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode | null {
+	if (node.type !== 'CallExpression' || node.optional === true || !isNode(node.callee)) return null;
+	if (!reachesRepeatingTimer(node.callee, rewrite)) return null;
+	const [tick, ...rest] = asNodes(node.arguments);
+	if (!tick || tick.type === 'SpreadElement') return null;
+	const walk = (child: AnyNode) => rewriteEventHandlerNode(child, node, rewrite);
+	return {
+		...(node as unknown as EmissionNode),
+		callee: walk(node.callee),
+		arguments: [
+			callNode(identifierNode(REPEATING_TIMER_FN), [identifierNode('context'), walk(tick)]),
+			...rest.map(walk),
+		],
+	};
+}
+const HANDLER_CATCH_FN = 'marklessHandlerCatch';
+const HANDLER_CATCH_RETURNED_FN = 'marklessHandlerCatchReturned';
+const HANDLER_CATCH_ERROR_NAME = '__marklessHandlerError';
+
+// A value that reads an input beside async values changes in place between settles.
+function valuesChangingBetweenSettles(
+	semanticGraph: SymbolModulesInput['semanticGraph'],
+): ReadonlySet<string> {
+	const graphBindings = semanticGraph?.graphBindings ?? [];
+	const bindings = new Map(graphBindings.map((binding) => [binding.id, binding]));
+	const asyncBacked = (graphNodeId: string) => {
+		const binding = bindings.get(graphNodeId);
+		return binding?.kind === 'computed' && binding.asyncCapable === true;
+	};
+	return new Set(
+		graphBindings
+			.filter((binding) => {
+				if (binding.kind !== 'computed') return false;
+				const dependencies = binding.dependencies ?? [];
+				const readsInput = dependencies.some(
+					(dependency) => !asyncBacked(dependency.graphNodeId),
+				);
+				return binding.async === true
+					? readsInput &&
+							dependencies.some((dependency) => asyncBacked(dependency.graphNodeId))
+					: readsInput;
+			})
+			.map((binding) => binding.id),
+	);
+}
+const SHOWN_READS_FN = 'marklessShownReads';
+const ENTRY_MARK_START_FN = 'marklessEntryMarkStart';
+const ENTRY_MARK_END_FN = 'marklessEntryMarkEnd';
+
+function shownReadsStatement(
+	reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>,
+): EmissionNode {
+	return {
+		type: 'ExpressionStatement',
+		expression: {
+			type: 'AssignmentExpression',
+			operator: '=',
+			left: identifierNode('context'),
+			right: callNode(identifierNode(SHOWN_READS_FN), [
+				identifierNode('context'),
+				jsonValueNode(reads.map(({ graphNodeId, path }) => ({ graphNodeId, path }))),
+			]),
+		},
+	};
+}
+
+function entryMarkCallStatement(fnName: string, graphNodeIds: ReadonlyArray<string>): EmissionNode {
+	return {
+		type: 'ExpressionStatement',
+		expression: callNode(identifierNode(fnName), [
+			identifierNode('context'),
+			stringArrayNode(graphNodeIds),
+		]),
+	};
+}
+
+function tryFinallyNode(
+	body: ReadonlyArray<EmissionNode>,
+	finalizer: ReadonlyArray<EmissionNode>,
+): EmissionNode {
+	return {
+		type: 'TryStatement',
+		block: { type: 'BlockStatement', body: [...body] },
+		handler: null,
+		finalizer: { type: 'BlockStatement', body: [...finalizer] },
+	};
+}
+
+function catchResetCall(reset: {
+	readonly resets: ReadonlyArray<ReadonlyArray<string>>;
+}): EmissionNode {
+	return callNode(identifierNode(CATCH_RESET_FN), [
+		memberChainNode('context.graph'),
+		jsonValueNode(reset.resets),
+	]);
+}
+
+// An async handler's rejection renders in its nearest `@catch` instead of reaching the page uncaught.
+function handlerCatchNode(
+	body: ReadonlyArray<EmissionNode>,
+	runnerGraphNodeId: string,
+): EmissionNode {
+	return {
+		type: 'TryStatement',
+		block: { type: 'BlockStatement', body: body.map(awaitReturns) },
+		handler: {
+			type: 'CatchClause',
+			param: identifierNode(HANDLER_CATCH_ERROR_NAME),
+			body: {
+				type: 'BlockStatement',
+				body: [
+					{
+						type: 'ExpressionStatement',
+						expression: callNode(identifierNode(HANDLER_CATCH_FN), [
+							identifierNode('context'),
+							literalNode(runnerGraphNodeId),
+							identifierNode(HANDLER_CATCH_ERROR_NAME),
+						]),
+					},
+				],
+			},
+		},
+		finalizer: null,
+	};
+}
+
+// A plain handler's returned promise rejects into its nearest `@catch`; one it only starts does not.
+function catchReturnedPromises(node: EmissionNode, runnerGraphNodeId: string): EmissionNode {
+	if (FUNCTION_NODE_TYPES.has(node.type)) return node;
+	if (node.type === 'ReturnStatement' && node.argument)
+		return {
+			...node,
+			argument: callNode(identifierNode(HANDLER_CATCH_RETURNED_FN), [
+				identifierNode('context'),
+				literalNode(runnerGraphNodeId),
+				node.argument as EmissionNode,
+			]),
+		};
+	const next: Record<string, unknown> = { ...node };
+	for (const [key, value] of Object.entries(node)) {
+		if (Array.isArray(value))
+			next[key] = value.map((item) =>
+				isEmissionNode(item) ? catchReturnedPromises(item, runnerGraphNodeId) : item,
+			);
+		else if (isEmissionNode(value)) next[key] = catchReturnedPromises(value, runnerGraphNodeId);
+	}
+	return next as EmissionNode;
+}
+
+// A returned promise rejects after the `try` it sits in has exited unless the return awaits it.
+function awaitReturns(node: EmissionNode): EmissionNode {
+	if (FUNCTION_NODE_TYPES.has(node.type)) return node;
+	if (node.type === 'ReturnStatement')
+		return node.argument
+			? { ...node, argument: { type: 'AwaitExpression', argument: node.argument } }
+			: node;
+	const next: Record<string, unknown> = { ...node };
+	for (const [key, value] of Object.entries(node)) {
+		if (Array.isArray(value))
+			next[key] = value.map((item) => (isEmissionNode(item) ? awaitReturns(item) : item));
+		else if (isEmissionNode(value)) next[key] = awaitReturns(value);
+	}
+	return next as EmissionNode;
+}
+
+const FUNCTION_NODE_TYPES = new Set([
+	'FunctionDeclaration',
+	'FunctionExpression',
+	'ArrowFunctionExpression',
+]);
+
+function isEmissionNode(value: unknown): value is EmissionNode {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		typeof (value as { type?: unknown }).type === 'string'
+	);
+}
+
+// A `@catch (error, reset)` reset the handler names, unless one of its own bindings shadows it.
+function catchResetNamed(node: AnyNode, rewrite: EventHandlerRewrite) {
+	if (
+		node.type !== 'Identifier' ||
+		(rewrite.symbol.kind !== 'event-handler' && rewrite.symbol.kind !== 'callback-prop')
+	)
+		return undefined;
+	const name = getIdentifierName(node);
+	if (!name || rewrite.boundHandleNames.has(name)) return undefined;
+	return rewrite.symbol.catchResets?.find((reset) => reset.name === name);
+}
+
+function catchResetNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode | null {
+	if (node.type === 'CallExpression' && isNode(node.callee)) {
+		const reset = catchResetNamed(node.callee, rewrite);
+		return reset ? catchResetCall(reset) : null;
+	}
+	const reset = catchResetNamed(node, rewrite);
+	return reset ? arrowFunctionNode([], catchResetCall(reset)) : null;
+}
 
 // The graph a write through a handler local lands on: where the local's value lives, found at dispatch.
 function writeThroughCall(through: LoweredWriteThrough, graphNodeId: string): EmissionNode {
@@ -7904,6 +8753,8 @@ export type SymbolModuleEmissionInput = {
 	readonly localNames?: ReadonlySet<string>;
 	/** Whether some other symbol binds this one as a callback route. */
 	readonly usesArgumentVector?: boolean;
+	/** `repeatingTimerGlobals`: names a `setInterval` call reaches the browser's timer through. */
+	readonly repeatingTimerGlobals?: ReadonlySet<string>;
 };
 
 /** The symbol kinds `buildSymbolModuleEmission` can print from nodes today. */
@@ -7988,8 +8839,12 @@ export function buildSymbolModuleEmission(
 						? { moduleImports: symbol.graphAccess.moduleImports }
 						: {}),
 					order: symbol.order,
-					reads: symbol.graphAccess.reads,
+					reads: browserGraphReads(
+						symbol.graphAccess.reads ?? [],
+						asyncComputedGraphNodeIds(input.semanticGraph),
+					),
 					writes: symbol.graphAccess.writes,
+					...(symbol.graphAccess.catchResets ? { catchResets: symbol.graphAccess.catchResets } : {}),
 				},
 				localNames: input.localNames ?? emptyLocalNames,
 				captureSlots: [],
@@ -7998,6 +8853,7 @@ export function buildSymbolModuleEmission(
 				moduleDeclarations: input.moduleDeclarations,
 				moduleImports: input.moduleImports,
 				parametersFrom: 'element',
+				...(input.repeatingTimerGlobals ? { repeatingTimerGlobals: input.repeatingTimerGlobals } : {}),
 			});
 		if (!canEmitBehaviorModule(symbol)) return null;
 
@@ -8027,7 +8883,7 @@ export function buildSymbolModuleEmission(
 
 	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') {
 		return buildEventHandlerEmission({
-			symbol,
+			symbol: withAsyncValueReads(symbol, asyncComputedGraphNodeIds(input.semanticGraph)),
 			localNames: input.localNames ?? emptyLocalNames,
 			captureSlots: input.captureSlots,
 			unfilledCallbackSlotSources: unfilledCallbackSlotSources(input.semanticGraph),
@@ -8035,6 +8891,7 @@ export function buildSymbolModuleEmission(
 			sourceFileName: input.sourceFileName,
 			moduleDeclarations: input.moduleDeclarations,
 			moduleImports: input.moduleImports,
+			...(input.repeatingTimerGlobals ? { repeatingTimerGlobals: input.repeatingTimerGlobals } : {}),
 		});
 	}
 

@@ -1,0 +1,52 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 32,
+			"reason": "framework: a @try gate's own re-run no longer marks the block busy (append-only handlers under @catch stopped announcing Updated); JS run at load moves +32 chars on / and -1 on /concepts/state; the +86 B gzip is that line plus the runtime chunk's renamed hash in the files that import it. Linux numbers from PR #651 run 43356661433 against merge-base 0bc92b471's merge-queue run 43344585225",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 86,
+			"reason": "framework: a @try gate's own re-run no longer marks the block busy (append-only handlers under @catch stopped announcing Updated); JS run at load moves +32 chars on / and -1 on /concepts/state; the +86 B gzip is that line plus the runtime chunk's renamed hash in the files that import it. Linux numbers from PR #651 run 43356661433 against merge-base 0bc92b471's merge-queue run 43344585225",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "framework: a @try gate's own re-run no longer marks the block busy (append-only handlers under @catch stopped announcing Updated); JS run at load moves +32 chars on / and -1 on /concepts/state; the +86 B gzip is that line plus the runtime chunk's renamed hash in the files that import it. Linux numbers from PR #651 run 43356661433 against merge-base 0bc92b471's merge-queue run 43344585225",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 86,
+			"reason": "framework: a @try gate's own re-run no longer marks the block busy (append-only handlers under @catch stopped announcing Updated); JS run at load moves +32 chars on / and -1 on /concepts/state; the +86 B gzip is that line plus the runtime chunk's renamed hash in the files that import it. Linux numbers from PR #651 run 43356661433 against merge-base 0bc92b471's merge-queue run 43344585225",
+			"date": "2026-11-13"
+		}
+	]
+}

@@ -180,6 +180,7 @@ export default box(
 				try {
 					await expect.page.text(early.page, TALLY, 'Logged 1', WAIT);
 					await expect.page.text(early.page, HEARD, 'Heard 1', WAIT);
+					await expectArmAdopted(early.page, '/harbor');
 					await early.page.click('[data-harbor-tug="kestrel"]', WAIT);
 					await expect.page.text(early.page, HEARD, 'Heard 2', WAIT);
 					await expect.page.text(early.page, TALLY, 'Logged 2', WAIT);
@@ -569,11 +570,15 @@ async function visitWithEarlyClick<Page extends EarlyClickPage>(
 		fail(
 			`A click during streaming on ${input.path} must update the shell before the settled arm arrives; the proxy released the arm on its timeout instead.`,
 		);
-	if (/<template[^>]*m:arm/.test(dom))
-		fail(
-			`The arm streamed after an early click on ${input.path} must be adopted, not left unflushed behind a browser render.`,
-		);
 	return { page, close: proxy.close };
+}
+
+// Adoption finishes after the load event, so read the template only once the arm shows the click.
+async function expectArmAdopted(page: EarlyClickPage, path: string): Promise<void> {
+	if (/<template[^>]*m:arm/.test(await page.content()))
+		throw new Error(
+			`The arm streamed after an early click on ${path} must be adopted, not left unflushed behind a browser render.`,
+		);
 }
 
 async function expectOnlyPreloadedCode(page: EarlyClickPage): Promise<void> {

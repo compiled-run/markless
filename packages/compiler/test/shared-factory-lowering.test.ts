@@ -28,7 +28,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: false as boolean | 'mixed', name: '' as string });
 	return { ...s, toggle() { s.checked = true; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Box() @{
 	const s = spike();
@@ -75,7 +75,7 @@ import { shared, state } from '@markless/core';
 export const gate = shared(() => {
 	const cell = state({ open: (false satisfies boolean), tone: 'calm' as 'calm' | 'loud' });
 	return { ...cell, flip() { cell.open = true; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel() @{
 	const cell = gate();
@@ -108,7 +108,7 @@ export const spike = shared(() => {
 			s.changes = s.changes + 1;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Box() @{
 	const s = spike();
@@ -144,8 +144,9 @@ test('a second statement in the same factory method also lowers its reads', asyn
 	);
 
 	expect(module?.source).toContain(
-		'value: context.graph.read("shared:src/spike.tsrx#spike/state:s", ["changes"]) + 1',
+		'context.graph.update({ graphNodeId: "shared:src/spike.tsrx#spike/state:s"',
 	);
+	expect(module?.source).toContain('return value + 1');
 });
 
 // Alternate shape: a method whose local feeds a callback the factory holds.
@@ -164,7 +165,7 @@ export const gate = shared(() => {
 			cell.open = wanted;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel() @{
 	const cell = gate();
@@ -192,7 +193,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: false, disabled: false });
 	return { ...s, toggle() { s.checked = true; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Box({ disabled }) @{
 	const s = spike();
@@ -212,9 +213,7 @@ test('a composite over a shared read binds the instance in the client residue re
 	const compiled = await compile('src/spike.tsrx', compositeSource);
 	const clientSource = compiled.publicRenderModule.renderDataModuleSource ?? '';
 
-	expect(clientSource).toContain(
-		'"shared:src/spike.tsrx#spike/state:s"',
-	);
+	expect(clientSource).toContain('"shared:src/spike.tsrx#spike/state:s"');
 	expect(errors(compiled)).toEqual([]);
 });
 
@@ -241,7 +240,7 @@ export const spike = shared(() => {
 	const s = state({ checked: false });
 	const triggerEl = element();
 	return { ...s, triggerEl, toggle() { s.checked = true; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Trigger() @{
 	const s = spike();
@@ -274,7 +273,7 @@ export const gate = shared(() => {
 	const cell = state({ open: false });
 	const panelEl = element();
 	return { ...cell, panelEl, flip() { cell.open = true; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel() @{
 	const cell = gate();
@@ -303,7 +302,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: true });
 	return { ...s, toggle() { s.checked = false; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ checked, children }) @{
 	const s = spike();
@@ -317,7 +316,7 @@ export function Root({ checked, children }) @{
 // signature, so an omitted prop seeds the default instead of undefined.
 const defaultedSeedSource = omittedSeedSource.replace(
 	'Root({ checked, children })',
-	"Root({ checked = false, children })",
+	'Root({ checked = false, children })',
 );
 
 test('a seed with no destructuring default writes unconditionally during SSR', async () => {
@@ -410,9 +409,7 @@ test('the projected-child seed pass writes the seed unconditionally too', async 
 		'marklessSharedSeeds',
 	)[2];
 
-	expect(seedPass).toContain(
-		'{ const marklessSharedSeed = (checked); marklessSsrSeeds.set(',
-	);
+	expect(seedPass).toContain('{ const marklessSharedSeed = (checked); marklessSsrSeeds.set(');
 });
 
 test('a defaulted prop read outside a body assignment fails closed', async () => {
@@ -424,7 +421,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: true });
 	return { ...s, toggle() { s.checked = false; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ checked = false, children }) @{
 	const s = spike();
@@ -436,9 +433,7 @@ export function Root({ checked = false, children }) @{
 	);
 
 	expect(
-		compiled.stateLowering.diagnostics.filter(
-			(diagnostic) => diagnostic.severity === 'error',
-		),
+		compiled.stateLowering.diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
 	).toEqual([
 		expect.objectContaining({
 			code: 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
@@ -448,7 +443,7 @@ export function Root({ checked = false, children }) @{
 	]);
 });
 
-// B6 (owner ruling) — a family shape that is page-scoped only by omission.
+// B6 (owner ruling) — a family shape that is app-scoped only by omission.
 test('a multi-component family with no declared scope warns and names both fixes', async () => {
 	const compiled = await compile(
 		'src/spike.tsrx',
@@ -481,12 +476,12 @@ export function Trigger() @{
 	expect(warning?.message).toContain('spike');
 	expect(warning?.message).toContain('Root');
 	expect(warning?.message).toContain('Trigger');
-	expect(JSON.stringify(warning)).toContain("{ scope: 'widget' }");
-	expect(JSON.stringify(warning)).toContain("{ scope: 'page' }");
+	expect(JSON.stringify(warning)).toContain("{ scope: 'subtree' }");
+	expect(JSON.stringify(warning)).toContain("{ scope: 'app' }");
 	expect(errors(compiled)).toEqual([]);
 });
 
-test('an explicit page scope on the same family shape silences the warning', async () => {
+test('an explicit app scope on the same family shape silences the warning', async () => {
 	const compiled = await compile(
 		'src/spike.tsrx',
 		`
@@ -495,7 +490,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: false });
 	return { ...s, toggle() { s.checked = true; } };
-}, { scope: 'page' });
+}, { scope: 'app' });
 
 export function Root({ children }) @{
 	const s = spike();
@@ -554,7 +549,7 @@ import { shared, state } from '@markless/core';
 export const gate = shared(() => {
 	const cell = state({ locked: false });
 	return { ...cell, release() { cell.locked = false; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Latch() @{
 	const cell = gate();
@@ -570,13 +565,11 @@ export function Panel({ locked = false, children }) @{
 }
 `;
 
-test('a widget-scoped cell is owned by the component that seeds it, not the first one', async () => {
+test('a subtree-scoped cell is owned by the component that seeds it, not the first one', async () => {
 	const compiled = await compile('src/gate.tsrx', partFirstSeedSource);
 	const source = compiled.publicRenderModule.ssrModuleSource ?? '';
 	const seeding = source.slice(source.indexOf('async function marklessRenderSsrPanel'));
-	const part = source.slice(
-		source.indexOf('async function marklessRenderSsr('),
-	);
+	const part = source.slice(source.indexOf('async function marklessRenderSsr('));
 
 	// The trailing list is the seeds: only the component whose body seeds the cell carries them.
 	expect(seeding).toContain(
@@ -588,6 +581,42 @@ test('a widget-scoped cell is owned by the component that seeds it, not the firs
 	expect(seeding).toContain(
 		'marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, ' +
 			'"shared:src/gate.tsrx#gate/state:cell",',
+	);
+	expect(errors(compiled)).toEqual([]);
+});
+
+const secondComponentReaderSource = `
+import { shared, state } from '@markless/core';
+
+export const theme = shared(() => {
+	const value = state({ name: 'paper' });
+	return value;
+});
+
+export function First() @{
+	let count = state(0);
+
+	<button type="button" onClick={() => count++}>{count}</button>
+}
+
+export function Themed() @{
+	const look = theme();
+
+	<p data-theme>Theme {look.name}</p>
+}
+`;
+
+test('a component that is not the module root carries the app-scoped cell it reads', async () => {
+	const compiled = await compile('src/theme.tsrx', secondComponentReaderSource);
+	const source = compiled.publicRenderModule.ssrModuleSource ?? '';
+	const themed = source.slice(source.indexOf('async function marklessRenderSsrThemed'));
+	const cell = compiled.payloadScripts.state.cells.findIndex(
+		(entry) => entry.graphNodeId === 'shared:src/theme.tsrx#theme/state:value',
+	);
+
+	expect(cell).toBeGreaterThanOrEqual(0);
+	expect(themed).toContain(
+		`marklessSelectStateNodes(marklessCloneState(payloadState), [${cell}], [])`,
 	);
 	expect(errors(compiled)).toEqual([]);
 });

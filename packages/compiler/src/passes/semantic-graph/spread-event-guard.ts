@@ -11,9 +11,9 @@ import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 
 /**
  * The props signature a spread can carry consumer props through: the component's
- * first parameter written as an object pattern with a rest binding. The rest
- * name is what an element spreads, and the named properties are what the author
- * already took out of it.
+ * first parameter written as an object pattern with a rest binding, or bound whole
+ * (`props`). The rest name is what an element spreads, and the named properties
+ * are what the author already took out of it.
  */
 export type PropsRestSignature = {
 	readonly restName: string;
@@ -22,6 +22,8 @@ export type PropsRestSignature = {
 
 export function propsRestSignature(component: AnyNode): PropsRestSignature | undefined {
 	const firstParam = asNodes(component.params)[0];
+	const wholeName = firstParam?.type === 'Identifier' ? getIdentifierName(firstParam) : null;
+	if (wholeName) return { restName: wholeName, destructuredNames: new Set() };
 	if (!firstParam || firstParam.type !== 'ObjectPattern') return undefined;
 
 	const destructuredNames = new Set<string>();

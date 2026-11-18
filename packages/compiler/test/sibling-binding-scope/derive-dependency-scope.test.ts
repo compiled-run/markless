@@ -99,7 +99,7 @@ export const widget = shared(
 		const w = state({ theme: 'light' });
 		return { ...w };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 function Reader() @{

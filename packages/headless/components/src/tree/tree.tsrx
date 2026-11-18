@@ -28,7 +28,7 @@ export const treeState = shared(
 
 		return { ...tree, rootEl, rowEls, groupEls, triggerEls, labelEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // Rooted by every `tree.item`, so a node written inside another item's content gets its own instance.
@@ -54,7 +54,7 @@ export const treeItemState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function TreeRoot({

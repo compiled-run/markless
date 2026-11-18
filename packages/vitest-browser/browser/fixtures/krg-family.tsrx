@@ -13,7 +13,7 @@ export const krgItem = shared(
 
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function KrgItem({ value, children, ...rest }) @{

@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { buildSemanticGraph } from '../../src/index.ts';
 
 // The element that CARRIES a family's role is routinely the component that roots
-// that family's widget-scoped factory - a recursive `menu.item`. Both ends of an
+// that family's subtree-scoped factory - a recursive `menu.item`. Both ends of an
 // IDREF between that root element and a part it seeds have to resolve, because
 // the rooting component is the first thing that can know the instance token.
 
@@ -28,7 +28,7 @@ export const wid = shared(() => {
 	const rootEl = element<HTMLDivElement>();
 	const panelEl = element<HTMLDivElement>();
 	return { ...w, rootEl, panelEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Root({ children }: { children?: unknown }) @{
 	const s = wid();
 	<div role="button" el={s.rootEl} aria-controls={s.panelEl}>{children}</div>
@@ -88,7 +88,7 @@ export const wid = shared(() => {
 	const w = state({ open: false });
 	const panelEl = element<HTMLDivElement>();
 	return { ...w, panelEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Root({ children }: { children?: unknown }) @{
 	const s = wid();
 	<div role="button" aria-controls={s.panelEl}>{children}</div>

@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 81,
+			"reason": "runtime async value: one named phase with a single transition point replaces gate 0/1/2 (+81 B gzip where the async plane ships; nothing more runs at load)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 81,
+			"reason": "runtime async value: one named phase with a single transition point replaces gate 0/1/2 (+81 B gzip where the async plane ships; nothing more runs at load)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 81,
+			"reason": "runtime async value: one named phase with a single transition point replaces gate 0/1/2 (+81 B gzip where the async plane ships; nothing more runs at load)",
+			"date": "2026-11-09"
+		}
+	]
+}

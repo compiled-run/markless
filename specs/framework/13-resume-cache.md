@@ -1,13 +1,27 @@
 # 13. Resume Cache: Refresh-Stable Boundaries via Persisted Settled Snapshots
 
-Status: SPECIFIED, NOT IMPLEMENTED (POC-validated 2026-07-08 — goal
-`snapshot-resume-poc`, commit `196da51` on branch `snapshot-resume-poc`;
-measured matrix: `goals/snapshot-resume-poc/notes/comparison.md`;
-adversarially reviewed 2026-07-09 via two cross-model critique lanes +
-owner talk-out — the boot contract, failure table, and observability
-sections below reflect that adjudication).
-Charter after the scoped-errors tranche clears: rejected-revalidation
-containment (`@catch` fallthrough) is a hard dependency.
+Status: Parked (owner, 2026-11-07). The implementation lives only on branch
+`proto/resume-cache` (f9b058637); no main-line code ships it.
+
+Why parked: measured, the cache only wins on reloads of pages with slow data,
+on client-rendered reloads, and on Back to a landing page or to a page reached
+after a POST. The browser's back/forward cache and ordinary HTTP caching
+already cover the other returns, and the cache adds lasting complexity across
+the runtime, web, router, bundler and compiler (session scoping, build keys,
+seeding and revalidation). Research:
+[`goals/async-error-states/resume-cache-research.md`](../../goals/async-error-states/resume-cache-research.md).
+The text below is the design as built on that branch, kept for a later revival.
+
+Prior status: IMPLEMENTED BEHIND A FAIL-CLOSED SCOPE (2026-11-06, branch
+`proto/resume-cache`): capture, keying, CSR and streamed-SSR seeding,
+revalidation, failure table, exclude diagnostics and observability are built
+and tested; the router mints NO scope token yet, so no served page keeps a
+cache until the owner ratifies the default scope derivation (see "Session
+scoping" and "Decided in implementation"). POC-validated 2026-07-08 (goal
+`snapshot-resume-poc`, commit `196da51`; measured matrix:
+`goals/snapshot-resume-poc/notes/comparison.md`); adversarially reviewed
+2026-07-09; scope-token research in `goals/continuity/notes/T005`, `T019`,
+`T020`, `T022`.
 
 ## Motivation
 
@@ -197,9 +211,12 @@ Boot sequence for both paths:
    demand-at-start is already the rule, so a seeded CSR mount is simply
    "demand at start with a starting value".
 3. While the re-run is pending, the re-settle hold keeps the seeded content
-   visible and marked busy (no `@pending` flash — the D8 hold behavior for boundaries whose
+   visible (no `@pending` flash — the D8 hold behavior for boundaries whose
    `@pending` arm was never shipped is the CONTRACT here, not a gap; a pinning
-   test must protect it). COMPATIBILITY INVARIANT: any future
+   test must protect it). The re-run is a QUIET refresh
+   (12-arm-rendering.md D8 "Quiet re-settle"): nobody asked for it, so the
+   content is not marked busy and nothing is announced; `data-markless-seeded`
+   is its only mark. A quiet failure still announces "Update failed". COMPATIBILITY INVARIANT: any future
    compiler-emitted pending renderer (the D8 server-rendered stall-fallback
    gap) MUST exempt boundaries that already show settled
    content — seeded or server-settled — so this contract survives that fix.
@@ -211,6 +228,70 @@ Boot sequence for both paths:
    (`event.persisted === true`) re-runs step 2's revalidator selection —
    "revalidation is unconditional" must hold on the browser-controlled
    restore path too.
+
+## Decided in implementation (2026-11-06)
+
+- VALUES A USER ACTION FETCHED ARE NEVER KEPT. A run that starts inside a user
+  action (an event handler's own turn, 12-arm-rendering.md "Quiet re-settle"),
+  and every run of a value whose FIRST run started inside one (a row a click
+  created, such as an optimistic save), is marked `action` on its snapshot;
+  capture skips it. A reload therefore never seeds, and never revalidates, a
+  value a click asked for: a save recipe is never replayed. A later quiet
+  refresh of a page-loaded value is capturable again; the entry keeps what the
+  page loaded with until then.
+- REVALIDATION IS `graph.rerun(id, revalidate = true)`: a fulfilled value
+  re-runs with the key it has, as a quiet run, whatever context calls it.
+- `buildHash` is a per-module compile hash of the module source, its protocol
+  state, and the interfaces of the components it links. A module without async
+  values carries none. It is the same in server and client compiles of one
+  build, so an SSR capture and a client-path capture of one page share keys.
+  Edits that change a linked component's interface miss; a static-text-only
+  edit inside a linked child can show the old text in a seeded arm until the
+  next capture rewrites the entry. Dev uses the same hash (no separate stamp).
+- ENTRY SHAPE: `{ k: dependency key, s: { cells: [], computed: [fulfilled
+  snapshots] }, h?: settled @try HTML, a?: its arm records }`, key
+  `markless:resume:<scope>:<buildHash>:<route>:<boundaryId>`. `<route>` is
+  `location.pathname` when the container first keys an entry, so a capture that
+  lands after navigating away still keys the page it came from. The bare
+  `markless:resume` key holds the least-recently-written index for eviction.
+  Caps: 64 KiB characters per entry, 1 MiB characters total. Only boundaries
+  whose async reads are page-state computeds, and whose settled @try arm is
+  plain markup over them, are kept: a value fetched from another async value,
+  an arm composed from a parent, and an arm holding async blocks or state of
+  its own (a list whose rows each have a @try) are skipped, and the dev log
+  names why. Seeding such arms is unproven (a client-path seed of a list with
+  per-row @try lost its seeded rows' settles) and is a follow-up.
+- STREAMED SSR SEED: the shell carries a small inline seed script inside the
+  container (only when a pending block is keyable). It commits each hit's
+  settled arm synchronously through the stream executor before first paint,
+  marks the seed's scripts `data-seeded`, and then wakes the runtime at once.
+  The woken runtime's streamed-arm adoption ignores `data-seeded` scripts, so
+  the stream's own patch is the one revalidator and lands in place (identity
+  and focus kept). The "deadline fallback" is the stream's end: a stream that
+  closes without the block hands its revalidation to the browser's own fetch.
+  A non-streaming served-pending document revalidates through the browser.
+- CSR SEED: `render()` asks the installed cache before the runtime starts;
+  hits patch the computed snapshots in the graph-construction input, mark the
+  boundaries `seeded`, and the mount waits for the seeded @try arm before
+  mounting (navigation hold not engaged). The client reads the scope token
+  from the document; a mount after the token-carrying container left keeps the
+  document's last seen token.
+- bfcache: a `pageshow` with `persisted` re-runs every live, connected seeded
+  page's async reads quietly.
+- SCOPE (UNRESOLVED, OWNER): the router's server entry passes no
+  `resumeScope`, so served pages carry no `data-markless-scope` and the cache
+  is off everywhere (fail closed). Because no page could keep anything, the
+  router also declares the cache off to the bundler (`SERVER_MINTS_RESUME_SCOPE`
+  in the router plugin), so router apps ship none of its code; flipping that
+  one constant together with minting a token turns the default-on posture on. `renderToString`/`renderToStream` accept an
+  internal `resumeScope` option, which the tests use. A cookieless request is
+  NOT treated as sessionless: bearer-token and gateway-identity apps have
+  empty or constant cookie headers across users (T020). The researched
+  candidate awaiting ratification is the T022 model: page-session store +
+  `Cache-Control: no-store` route gate + `Clear-Site-Data` transition wipe.
+- `exclude` is matched at capture and at client seeding; the inline streamed
+  seed does not read it, so an entry kept before an exclude was added can seed
+  one streamed reload in that tab (it is never re-captured).
 
 ## Failure contract
 
@@ -225,7 +306,8 @@ Every failure path is a cache miss, never a new failure mode:
 | Storage unavailable/full | Capture and lookup silently no-op |
 | Excluded boundary | Never persisted, never seeded |
 | Scope token rotated (login/logout/user switch) | All prior entries unreachable -> normal behavior |
-| Revalidation rejects | `@catch` arm (never stale-forever) |
+| Revalidation rejects | `@catch` arm after the kept content (failed-refresh rule), entry dropped (never stale-forever) |
+| Value fetched by a user action | Never captured, so never seeded or replayed |
 
 ## Observability (the 2am contract)
 

@@ -1,5 +1,6 @@
 import {
 	INLINE_RESUMER_PAGE_TOKEN,
+	authoredInlineWakeSources,
 	PRERENDER_INLINE_EVENT_NAMES_TOKEN,
 	createInlineResumerDebugRegistrationSource,
 	createInlineResumerSelfWakeSource,
@@ -9,6 +10,7 @@ import {
 	renderPrerenderInlineResumerSource,
 	type InlineResumerBuildOptions,
 	type InlineResumerSourceVariants,
+	type InlineWakeSources,
 } from '@markless/web/inline/resumer';
 import { __marklessDebugBootstrapSource } from '../../web/src/debug-channel.ts';
 import { createMarklessDefer } from '../../web/src/inline/defer.ts';
@@ -62,19 +64,42 @@ async function compileInlineResumerSourceVariants(options: {
 		}),
 	]);
 	const defer = await compileDeferFactorySource();
-	return { ...shared, event, syncPolicy, graphSyncPolicyOwner, graphSyncPolicyConsumer, defer };
+	const wakes = compileInlineWakeSources();
+	return {
+		...shared,
+		event,
+		syncPolicy,
+		graphSyncPolicyOwner,
+		graphSyncPolicyConsumer,
+		defer,
+		wakes,
+	};
 }
 
-// The factory is an expression, so it is minified as a named binding the mangler must keep and then unwrapped.
 export async function compileDeferFactorySource(): Promise<string> {
-	const binding = 'var __marklessDeferFactory=';
-	const transformed = transformSync(
-		'markless-defer.js',
-		`${binding}${createMarklessDefer.toString()};`,
-		{ lang: 'js', sourceType: 'script', target: 'es2020' },
-	);
+	return compileExpressionSource('markless-defer.js', createMarklessDefer.toString());
+}
+
+export function compileInlineWakeSources(): InlineWakeSources {
+	const authored = authoredInlineWakeSources();
+	return {
+		selfWake: compileExpressionSource('markless-self-wake.js', authored.selfWake),
+		returnWake: compileExpressionSource('markless-return-wake.js', authored.returnWake),
+		storageWake: compileExpressionSource('markless-storage-wake.js', authored.storageWake),
+		moduleLoader: compileExpressionSource('markless-module-loader.js', authored.moduleLoader),
+	};
+}
+
+// An expression is minified as a named binding the mangler must keep and then unwrapped.
+function compileExpressionSource(fileName: string, expression: string): string {
+	const binding = 'var __marklessExpression=';
+	const transformed = transformSync(fileName, `${binding}${expression};`, {
+		lang: 'js',
+		sourceType: 'script',
+		target: 'es2020',
+	});
 	assertOxcResult('transform', transformed.errors);
-	const minified = minifySync('markless-defer.js', transformed.code, {
+	const minified = minifySync(fileName, transformed.code, {
 		compress: true,
 		mangle: { toplevel: false },
 		module: false,

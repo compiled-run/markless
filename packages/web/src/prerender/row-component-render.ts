@@ -24,11 +24,14 @@ import {
 	marklessWithEnclosingWidgetRoots,
 } from '../fns/instance-scope.ts';
 import { marklessThen, type Awaitable } from '../ssr-data/awaitable.ts';
+export { marklessNoteMintedRow } from './evaluator.ts';
 import { marklessRosterSeedPass, sharedSeedPass } from './shared-seed-slot.ts';
 import {
+	childEdgeSurface,
 	evaluatePrerenderDataComponent,
 	marklessBoundGraphValues,
 	readPath,
+	runtimeEdgeProps,
 	type PrerenderDataDefinition,
 	type PrerenderDataSurface,
 	type PrerenderLoadSymbol,
@@ -52,11 +55,11 @@ const SHARED_INSTANCE_NODE = /^(?:shared|storage):/;
  * The page's own shared instances, read live for a row born after the page was.
  *
  * A minted row renders without the live graph because its own cells do not exist
- * in it yet, but a page-scoped `shared()` instance is not the row's - it is state
+ * in it yet, but an app-scoped `shared()` instance is not the row's - it is state
  * the page has been writing since load. Left to its compile-time factory the row
  * paints from an empty queue and joins the DOM wrong, with a follow-up refresh to
- * correct it. A widget-scoped id is instance-prefixed in page space, so only a
- * page-scoped instance answers here; what the graph lacks keeps its factory.
+ * correct it. A subtree-scoped id is instance-prefixed in page space, so only a
+ * app-scoped instance answers here; what the graph lacks keeps its factory.
  */
 function liveSharedInstanceSeeds(
 	surface: PrerenderDataSurface,
@@ -242,9 +245,7 @@ function renderRowComponentEdge(
 		);
 		if (!projectedEdge)
 			throw new Error(`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`);
-		const partSurface = input.surface.components[projectedEdge.childComponentName]
-			? input.surface
-			: input.surface.imports[projectedEdge.childComponentName];
+		const partSurface = childEdgeSurface(input.surface, projectedEdge);
 		if (!partSurface)
 			throw new Error(
 				`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${projectedEdge.childComponentName}`,
@@ -269,7 +270,7 @@ function renderRowComponentEdge(
 				symbolPrefix: ownerSymbolPrefix + rowSegment + projectedEdge.symbolPrefix,
 				boundSymbols: projectedEdge.boundSymbols,
 				composer: { symbolPrefix: ownerSymbolPrefix, read },
-				graphProps: projectedEdge.props,
+				graphProps: runtimeEdgeProps(projectedEdge.props, definition.state.computed),
 				loadSymbol: input.loadSymbol,
 				graph: undefined,
 				requireHtml: true,
@@ -287,8 +288,7 @@ function renderRowComponentEdge(
 					output: partOutput as SsrComposableChildOutput,
 					hostPrefix: rowSegment + projectedEdge.hostPrefix,
 					symbolPrefix: ownerSymbolPrefix + rowSegment + projectedEdge.symbolPrefix,
-					graphProps: projectedEdge.props,
-					asyncBoundaryId: projectedEdge.asyncBoundaryId,
+					graphProps: runtimeEdgeProps(projectedEdge.props, definition.state.computed),
 					boundSymbols: projectedEdge.boundSymbols ?? {},
 					callbackProps: part.callbacks,
 					childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
@@ -374,9 +374,7 @@ function renderRowComponentEdge(
 		undefined,
 		input.itemPropName,
 	);
-	const childSurface = input.surface.components[edge.childComponentName]
-		? input.surface
-		: input.surface.imports[edge.childComponentName];
+	const childSurface = childEdgeSurface(input.surface, edge);
 	if (!childSurface)
 		throw new Error(`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${edge.childComponentName}`);
 	return marklessThen(
@@ -412,6 +410,7 @@ function renderRowComponentEdge(
 						},
 						idPrefix: ownerIdPrefix,
 						projectionSegment: definition.rowHosts?.segment,
+						attributeName: definition.attributeName,
 						...(sharedSeeds ? { sharedSeeds } : {}),
 						rootContext: {
 							item: input.item,
@@ -434,7 +433,7 @@ function renderRowComponentEdge(
 					symbolPrefix: ownerSymbolPrefix + symbolPrefix,
 					boundSymbols: edge.boundSymbols,
 					composer: { symbolPrefix: ownerSymbolPrefix, read },
-					graphProps: edge.props,
+					graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 					loadSymbol: input.loadSymbol,
 					graph: undefined,
 					requireHtml: true,
@@ -461,14 +460,14 @@ function renderRowComponentEdge(
 							)
 						: renderRowChild(),
 					(output) => {
+					// No asyncBoundaryId here or on a part: the @try around the row is outside this render, so its @if records stay the row's own.
 					const child: MarklessSsrComposedChild = {
 						output: output as SsrComposableChildOutput,
 						hostPrefix,
 						// Host ids take the owner's prefix through composition's own
 						// argument; symbol ids have no such channel and take it here.
 						symbolPrefix: ownerSymbolPrefix + symbolPrefix,
-						graphProps: edge.props,
-						asyncBoundaryId: edge.asyncBoundaryId,
+						graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 						boundSymbols: edge.boundSymbols ?? {},
 						callbackProps: callbacks,
 						childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
@@ -555,6 +554,8 @@ function renderRowChunk(
 			},
 			idPrefix: scope.ownerIdPrefix,
 			projectionSegment: definition.rowHosts?.segment,
+			rowSegment: () => scope.rowSegment,
+			attributeName: definition.attributeName,
 			rootContext: { item: input.item, index: input.rowIndex, key: input.rowKey },
 			read: scope.readRow,
 			seedChild: scope.seedPart,
@@ -563,7 +564,10 @@ function renderRowChunk(
 				const branch = (definition.branches ?? []).find(
 					(candidate) => candidate.branchSiteId === slot.branchSiteId,
 				);
-				const value = scope.readDecision(branch?.testSource, context);
+				const value = scope.readDecision(
+					branch?.armIndexSource ?? branch?.testSource,
+					context,
+				);
 				if (!branch?.armTests) return value ? 0 : 1;
 				const match = branch.armTests.findIndex(
 					(candidate) => candidate !== null && Object.is(candidate, value),
@@ -579,9 +583,13 @@ function renderRowChunk(
 						: [],
 				),
 			);
+			// The owner's @try records, named by the row each one renders in.
 			const composition = marklessSsrComposeView(
 				rendered.structure,
-				emptyRowView() as unknown as SsrComposableView,
+				{
+					...emptyRowView(),
+					asyncBoundaries: definition.view.asyncBoundaries,
+				} as unknown as SsrComposableView,
 				scope.projected,
 				asyncSnapshots,
 				scope.ownerIdPrefix,

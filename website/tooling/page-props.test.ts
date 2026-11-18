@@ -21,6 +21,12 @@ describe('fillPageProps', () => {
 		);
 	});
 
+	it('reads the route from the site pages folder when the checkout path also has a pages folder', () => {
+		expect(fillPageProps('<Sidebar />', '/tmp/pages/site/pages/start/new-app.mdx')).toBe(
+			'<Sidebar pathname="/start/new-app" />',
+		);
+	});
+
 	it('gives the line under the title the route path, so it can show the page mark', () => {
 		expect(fillPageProps('<PageMeta time="4 min" assumes="nothing" />', page('/concepts/state.mdx'))).toBe(
 			'<PageMeta pathname="/concepts/state" time="4 min" assumes="nothing" />',

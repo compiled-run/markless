@@ -1,0 +1,21 @@
+import { computed } from '@markless/core';
+import { loadPerson, save } from '../../../../../vitest-browser/browser/failed-save-keeps-typed/api.ts';
+
+export default function Page() @{
+	const person = computed(async () => loadPerson('a1'));
+	<main>
+		@try {
+			<form
+				onSubmit={async (event) => {
+					event.preventDefault();
+					await save(String(new FormData(event.currentTarget).get('first')));
+				}}
+			>
+				<input name="first" value={person.first} />
+				<button type="submit" data-submit>Save</button>
+			</form>
+		} @catch (error) {
+			<p data-caught>{error.message}</p>
+		}
+	</main>
+}

@@ -23,7 +23,7 @@ test('a module’s own widget family is not adopted', async () => {
 	const result = await compile(
 		'src/bar.tsrx',
 		`import { element, shared, state } from '@markless/core';
-export const barState = shared(() => { const bar = state({ label: '' }); const itemEls = element(); return { ...bar, itemEls }; }, { scope: 'widget' });
+export const barState = shared(() => { const bar = state({ label: '' }); const itemEls = element(); return { ...bar, itemEls }; }, { scope: 'subtree' });
 export function Bar({ children }) @{ const bar = barState(); <div role="toolbar" data-label={bar.label}>{children}</div> }`,
 	);
 	expect(

@@ -17,7 +17,7 @@ export default function CommandStrip({ command }: { readonly command: string }) 
 			<span class="torn-band torn-lower"></span>
 			<span class="torn-ends"></span>
 		</span>
-		<pre data-lang="bash" class="shiki shiki-themes github-light github-dark" tabindex="0">
+		<pre data-lang="bash" class="shiki shiki-themes github-light markless-dark" tabindex="0">
 			<code>
 				<span class="line">
 					@for (const run of line.runs; key run.id) {

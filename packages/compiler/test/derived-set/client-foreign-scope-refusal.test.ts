@@ -27,7 +27,7 @@ export const box = shared(() => {
 	const loud = computed(() => shout(s.label));
 	const banged = computed(() => s.label + SUFFIX);
 	return { ...s, loud, banged };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Family() @{
 	const b = box();
@@ -130,7 +130,7 @@ export const dial = shared(() => {
 	const s = state({ n: 1 });
 	const named = computed(() => s.n + Dial.length);
 	return { ...s, named };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Dial() @{
 	const d = dial();

@@ -14,7 +14,7 @@ export const gauge = shared(
 
 		return { ...g, loud, marks };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // The component that ROOTS the family at render. It is declared beside the

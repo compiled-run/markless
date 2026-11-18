@@ -6,7 +6,7 @@ const tally = shared(
 		const cell = state({ step: 1 });
 		return { ...cell };
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );
 
 export default function SharedSyncPage() @{

@@ -8,12 +8,19 @@ Agent rules, skills, and MCP config for this repo are generated from `.ruler/` b
 
 A change known to affect a consuming application must pass that application's checks before it lands; the framework's own suite passing is not sufficient evidence.
 Every write-task verify array must include `pnpm run typecheck`, the Markless-aware TypeScript checker; type red or test red blocks task completion, so never report a write task complete on a tree that does not typecheck or whose tests fail.
-Every write-task verify array must also include `pnpm ci:local --fast`, which runs CI's fast jobs with the exact commands from `.github/workflows/ci.yml` (the pre-commit hook runs them too). Everything heavier (browser, boxes-*, build-scale, perf-guards, benchmark, demo and website boxes, migrate checks) runs on GitHub Actions: the pull request's green CI run is the receipt, and no task is reported done before that run is green. Run a heavy job locally (`pnpm ci:local --job <id>`) only to debug a specific failure. Passing only the tests for your own change is not verification.
+Every write-task verify array must also include `pnpm ci:local --fast`, which runs CI's fast jobs with the exact commands from `.github/workflows/ci.yml`; the pre-commit hook runs lint, both typechecks and the agent-file check in full, plus the unit tests the yuku module graph selects for the staged change; a config, lockfile, workspace manifest or unclassified change runs every unit test. The hook is a fast guard, not the receipt: `pnpm ci:local --fast` and green CI remain required. Everything heavier (browser, boxes-*, build-scale, perf-guards, benchmark, demo and website boxes, migrate checks) runs on GitHub Actions: the pull request's green CI run is the receipt, and no task is reported done before that run is green. Run a heavy job locally (`pnpm ci:local --job <id>`) only to debug a specific failure. Passing only the tests for your own change is not verification.
 When your PR merges or your task ends, remove your git worktree (`git worktree remove`) and your /tmp scratch, and stop any servers you started.
+Before adding a boolean, nullable field, timer or promise that tracks a lifecycle, or another flag beside an existing one, read `docs/rules/one-state.md`.
+
+## One analysis, used everywhere
+
+The yuku analyzer analyzes the whole project once: modules, imports and exports, scopes, bindings, references and the semantic graph. That analysis is the single source of truth. Every later stage (compiler, bundler, router, migrator, editor tooling) consumes those facts and never re-derives them by scanning text, matching regexes or re-parsing its own output. Emit correct output from the facts rather than editing output afterwards. If a stage needs a fact the analysis lacks, add it to the analyzer once so every stage gets it.
+Agents: before writing any check, scan, probe or rewrite over code or build output, name the analyzer or build fact that answers it and use that. A regex, string search or ad hoc parse over code is an architecture violation, not a shortcut; if the fact is missing, add it to the analyzer or return blocked.
 
 ## CI discipline
 
 CI exists to catch real defects. Never make a check pass by weakening it: no skipping, deleting, loosening assertions, adding retries, or raising a budget without a measured, stated reason. When a check fails, classify it before touching it (environment or config drift, a regression you introduced, a failure that was already there, or nondeterminism) and fix the root cause; a flaky test gets its nondeterminism fixed (random ports, awaited readiness, no wall-clock races), or is quarantined in `docs/ci-process.md` with an owner and an expiry date.
+A unit test that builds an app or launches a browser is declared in scripts/ci/heavy-tests.json; the placement check and the CI unit CPU budget fail otherwise, and raising a budget needs a measured reason.
 Never commit with `--no-verify` or bypass `.githooks`. Never push onto a red `main` except the change that makes it green. Before reporting work done, the pull request's CI run on your tree must be green; a local pass of an ad hoc subset is not a receipt. See `docs/ci-process.md`.
 
 Protocol and config facts are imported from their owning package, never restated as literals.
@@ -79,7 +86,7 @@ Family CSS defaults (anchor positioning, hidden-until-open, stacking) live in a 
 
 ## Website CSS lives with its component
 
-A rule whose subject element is rendered by exactly one component belongs in a `<style>` block inside that component's `.tsrx` (the compiler scopes it with a per-module hash class), not in `website/styles/global.css` or `brand.css`. The global stylesheets keep only what one component cannot own: tokens on `:root`/`html`, typography for MDX prose, markup emitted by tooling or generated playground modules, and classes several components share. Before adding a global rule, name the file that renders its subject; if there is one, put the rule there.
+A rule whose subject element is rendered by exactly one component belongs in a `<style>` block inside that component's `.tsrx` (its rules reach only that component's elements, never another component's, even in the same file), not in `website/styles/global.css` or `brand.css`. The global stylesheets keep only what one component cannot own: tokens on `:root`/`html`, typography for MDX prose, markup emitted by tooling or generated playground modules, and classes several components share. Before adding a global rule, name the file that renders its subject; if there is one, put the rule there.
 
 ## @markless/ui timing
 

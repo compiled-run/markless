@@ -8,7 +8,7 @@ export const groupState = shared(
 
 		return { ...group, rootEl, thumbEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // Rooted by every thumb, and nothing but an element() handle: no cell to own.
@@ -18,7 +18,7 @@ export const thumbState = shared(
 
 		return { labelEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // The same, carrying a cell beside the handle.
@@ -29,7 +29,7 @@ export const cellThumbState = shared(
 
 		return { ...thumb, labelEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Group({ children }) @{

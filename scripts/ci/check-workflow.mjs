@@ -73,10 +73,14 @@ const PLAYWRIGHT_JOB = 'prepare-playwright';
 
 // The analyzer receipt set is checked inside the gate, after its result step.
 const RECEIPTS_JOB = GATE_JOB;
-const BROWSER_CACHE_KEY = 'playwright-${{ runner.os }}-chromium-webkit-';
+const IMAGE_KEY = '${{ needs.lanes.outputs.image_os }}';
+const BROWSER_CACHE_KEY = 'playwright-${{ runner.os }}-' + IMAGE_KEY + '-chromium-webkit-';
 
 // Jobs the gate depends on that are wiring rather than a content-hashed lane.
 const GATE_INFRASTRUCTURE = new Set([LANES_JOB]);
+
+// Checks that share their lane's content hash: the lane's marker waits for them, or a re-run skips both.
+const LANE_CHECKS = new Map([['unit-budget', 'unit']]);
 
 // Jobs whose failure skips a lane. The gate reads `skipped` as a content-hash
 // hit, so each of these has to reach the gate under its own name.
@@ -301,6 +305,7 @@ if (jobNames.includes(GATE_JOB) && !jobNames.includes(LANES_JOB)) {
 			jobNames.includes(name) &&
 			name !== GATE_JOB &&
 			!GATE_INFRASTRUCTURE.has(name) &&
+			!LANE_CHECKS.has(name) &&
 			!NON_TEST_JOBS.has(name),
 	);
 	if (hashedLanes.length === 0) fail('The gate depends on no content-hashed lane.');
@@ -359,6 +364,31 @@ if (jobNames.includes(GATE_JOB) && !jobNames.includes(LANES_JOB)) {
 		fail(`Job \`${LANES_JOB}\` writes a cache; a lane's key may only be marked green by the lane that ran.`);
 }
 
+// 7b. A lane check gates on its lane's success, and every save of that lane's marker waits for the check.
+if (isCiSuite) {
+	for (const [check, lane] of LANE_CHECKS) {
+		if (!jobNames.includes(check)) {
+			fail(`There is no \`${check}\` job; nothing checks lane \`${lane}\`'s measurements.`);
+			continue;
+		}
+		if (!needsOf(check).includes(lane))
+			fail(`Job \`${check}\` does not need \`${lane}\`, so it can run before the lane it checks.`);
+		if (!new RegExp(`needs\\.${lane}\\.result\\s*==\\s*'success'`).test(ifOf(check)))
+			fail(`Job \`${check}\` does not gate on \`needs.${lane}.result == 'success'\`, so it could skip while its lane ran.`);
+		const laneKey = new RegExp(`needs\\.lanes\\.outputs\\.key_${slugOf(lane)}${wordEnd}`);
+		const checkPassed = new RegExp(`needs\\.${check}\\.result\\s*==\\s*'success'`);
+		for (const name of jobNames) {
+			// A merge-queue run that concluded green already passed every check, so its markers carry over whole.
+			if (/needs\.lanes\.outputs\.queue_run(?![A-Za-z0-9_])/.test(ifOf(name))) continue;
+			for (const step of stepsOf(name)) {
+				if (!usesAction(step, 'actions/cache/save') || !laneKey.test(String(withOf(step).key ?? ''))) continue;
+				if (!needsOf(name).includes(check) || !checkPassed.test(String(step.if ?? '')))
+					fail(`\`${step.name ?? 'a cache save'}\` in \`${name}\` saves lane \`${lane}\`'s marker without waiting for \`${check}\` to pass, so a re-run after a red \`${check}\` skips both.`);
+			}
+		}
+	}
+}
+
 // 8. A sharded lane must not save its own marker: one green shard next to a red
 // one would let the whole lane skip on the next identical tree.
 for (const name of jobNames) {
@@ -399,7 +429,18 @@ if (isCiSuite && !jobNames.includes(PLAYWRIGHT_JOB)) {
 			const cachePath = withOf(step).path;
 			if (typeof cachePath === 'string' && cachePath.includes('ms-playwright') && cachePath !== browsersPath)
 				fail(`Step \`${step.name ?? step.id ?? 'unnamed'}\` in \`${name}\` caches \`${cachePath}\`, not the job's \`PLAYWRIGHT_BROWSERS_PATH\` \`${browsersPath}\`.`);
+			const keys = [withOf(step).key, ...String(withOf(step)['restore-keys'] ?? '').split('\n')].map((key) => String(key ?? '').trim()).filter(Boolean);
+			if (typeof cachePath === 'string' && /ms-playwright|playwright-apt/.test(cachePath) && keys.some((key) => !key.includes(IMAGE_KEY)))
+				fail(`Step \`${step.name ?? step.id ?? 'unnamed'}\` in \`${name}\` keys \`${cachePath}\` without the runner image; WebKit and its system packages differ per Ubuntu release.`);
 		}
+	}
+	// The lanes job names the image for every job's cache key, so that image has to be the one each job runs on.
+	const lanesRunner = jobs[LANES_JOB]?.['runs-on'];
+	if (lanesRunner === 'ubuntu-latest')
+		fail(`Job \`${LANES_JOB}\` runs on \`ubuntu-latest\`, which moves between Ubuntu releases mid-rollout; pin the release.`);
+	for (const name of jobNames) {
+		if (jobText(name).includes(IMAGE_KEY) && jobs[name]?.['runs-on'] !== lanesRunner)
+			fail(`Job \`${name}\` keys a cache on \`${LANES_JOB}\`'s runner image but runs on \`${jobs[name]?.['runs-on']}\`, not \`${lanesRunner}\`.`);
 	}
 	const launchers = nodeTestsLaunchingBrowsers();
 	if (launchers.length > 0 && jobNames.includes('unit')) {

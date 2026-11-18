@@ -37,8 +37,7 @@ export function firstReactiveRowRead(
 ): ReactiveRowRead | null {
 	const scan: Scan = {
 		state,
-		bindings: graphBindingMap(state.graph, state.currentSharedDefinitionId ?? null),
-		aliases: semanticAliasMap(state.graph, state.currentSharedDefinitionId ?? null),
+		...rowScopeMaps(state),
 		found: null,
 	};
 	scanRowNode(forNode.body as AnyNode | undefined, rowNames, scan);
@@ -46,9 +45,27 @@ export function firstReactiveRowRead(
 	return scan.found;
 }
 
-/** The names a row owns: the item and the index this `@for` declares. */
-export function repeatRowNames(itemName: string, indexName: string | null): ReadonlySet<string> {
-	return new Set(indexName ? [itemName, indexName] : [itemName]);
+/** The first read in a `@for` collection expression that a later write can move. */
+export function firstReactiveCollectionRead(
+	collectionNode: AnyNode,
+	state: WalkState,
+): ReactiveRowRead | null {
+	const scan: Scan = {
+		state,
+		...rowScopeMaps(state),
+		found: null,
+	};
+	scanRowNode(collectionNode, new Set(), scan);
+	return scan.found;
+}
+
+function rowScopeMaps(state: WalkState): Pick<Scan, 'bindings' | 'aliases'> {
+	const shared = state.currentSharedDefinitionId ?? null;
+	const component = state.currentComponentName ?? undefined;
+	return {
+		bindings: graphBindingMap(state.graph, shared, component),
+		aliases: semanticAliasMap(state.graph, shared, component),
+	};
 }
 
 type Scan = {
@@ -95,7 +112,7 @@ function scanRowNode(node: AnyNode | undefined, rowNames: ReadonlySet<string>, s
 
 	const sources = pureCompositeReadSources(node, scan.state, ROW_READ_OPTIONS);
 	if (sources) {
-		for (const source of sources) classifyRowRead(source, rowNames, scan);
+		for (const { source } of sources) classifyRowRead(source, rowNames, scan);
 		return;
 	}
 

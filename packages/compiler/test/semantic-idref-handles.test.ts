@@ -520,7 +520,7 @@ export const wid = shared(() => {
 	const w = state({ open: false });
 	const triggerEl = element<HTMLButtonElement>();
 	return { ...w, triggerEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Root({ children }: { children?: unknown }) @{
 	const s = wid();
 	<div>{children}</div>

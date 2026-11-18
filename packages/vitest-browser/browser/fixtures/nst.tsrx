@@ -12,7 +12,7 @@ export const nst = shared(() => {
 			s.open = !s.open;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ label, children }) @{
 	const s = nst();

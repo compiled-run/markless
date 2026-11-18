@@ -25,25 +25,32 @@ const refusals = (compiled: Awaited<ReturnType<typeof compileList>>) =>
 		.filter((entry) => entry.code === NOT_ONE_ELEMENT)
 		.map((entry) => ({ severity: entry.severity, message: entry.message.split('.')[0] }));
 
-test('a row of two elements fails the build instead of keeping only its first element', async () => {
+const reasons = (compiled: Awaited<ReturnType<typeof compileList>>) =>
+	compiled.publicRenderPlan.diagnostics
+		.filter((entry) => entry.code === NOT_ONE_ELEMENT)
+		.map((entry) => entry.message.split('. ')[0]);
+
+test('a row of two elements builds, and the browser tracks it between row comments', async () => {
 	const compiled = await compileList(`<p>
 		@for (const part of parts; key part.k) {
-			<><span>{part.text}</span><mark>{part.mark}</mark></>
+			<><span onClick={() => part.k}>{part.text}</span><mark>{part.mark}</mark></>
 		}
 	</p>`);
-	expect(refusals(compiled)).toEqual([
-		{
-			severity: 'error',
-			message: 'Each row of this @for over part renders 2 nodes side by side',
-		},
-	]);
-	expect(compiled.protocolView.keyedRepeats ?? []).toEqual([]);
+	expect(refusals(compiled)).toEqual([]);
+	const [repeat] = compiled.protocolView.keyedRepeats ?? [];
+	expect(repeat?.rowRange).toBe(true);
+	expect(compiled.renderData.repeats[0]?.rowRange).toBe(true);
+	expect(repeat?.rowTemplate?.html).toBe(
+		'<span><!--markless-slot:0--></span><mark><!--markless-slot:1--></mark>',
+	);
+	// Addresses start at the first node inside the row's comments, so the second element is step 1.
+	expect(repeat?.rowEvents.map((event) => event.hostPath)).toEqual([[0]]);
 });
 
-test('a row of text beside an element, or of text alone, fails the build', async () => {
+test('a row of text beside an element, or of text alone, builds as a ranged row', async () => {
 	const beside = await compileList(`<p>
 		@for (const part of parts; key part.k) {
-			<>{part.text}<mark>{part.mark}</mark></>
+			<>{part.text}<mark onClick={() => part.k}>{part.mark}</mark></>
 		}
 	</p>`);
 	const alone = await compileList(`<p>
@@ -51,33 +58,41 @@ test('a row of text beside an element, or of text alone, fails the build', async
 			{part.text}
 		}
 	</p>`);
-	expect(refusals(beside)).toEqual([
-		{
-			severity: 'error',
-			message: 'Each row of this @for over part renders 2 nodes side by side, 1 of them text',
-		},
+	expect(refusals(beside)).toEqual([]);
+	expect(refusals(alone)).toEqual([]);
+	expect(beside.protocolView.keyedRepeats?.[0]?.rowRange).toBe(true);
+	expect(beside.protocolView.keyedRepeats?.[0]?.rowEvents.map((event) => event.hostPath)).toEqual([
+		[0],
 	]);
-	expect(refusals(alone)).toEqual([
-		{ severity: 'error', message: 'Each row of this @for over part renders only text' },
+	expect(alone.protocolView.keyedRepeats?.[0]?.rowRange).toBe(true);
+	expect(alone.protocolView.keyedRepeats?.[0]?.rowTemplate?.textSlots).toEqual([
+		{ path: [0], itemPath: ['text'] },
 	]);
 });
 
-test('a row that is an @if whose arm holds two elements fails the build', async () => {
+test('a one-element row pays nothing: no rowRange in its record or its render data', async () => {
+	const compiled = await compileList(`<ul>
+		@for (const part of parts; key part.k) { <li>{part.text}</li> }
+	</ul>`);
+	expect(compiled.protocolView.keyedRepeats?.[0]).not.toHaveProperty('rowRange');
+	expect(compiled.renderData.repeats[0]).not.toHaveProperty('rowRange');
+});
+
+test('a row that is not one element and holds an @if still fails the build, naming why', async () => {
 	const compiled = await compileList(`<p>
 		@for (const part of parts; key part.k) {
 			@if (part.mark) { <><b>{part.text}</b><i>{part.mark}</i></> } @else { <span>{part.text}</span> }
 		}
 	</p>`);
-	expect(refusals(compiled)).toEqual([
-		{
-			severity: 'error',
-			message:
-				'Each row of this @for over part renders one @if with an arm of 2 nodes side by side',
-		},
+	expect(reasons(compiled)).toEqual([
+		'Each row of this @for over part renders one @if with an arm of 2 nodes side by side, and this list has rows that hold an @if or @switch',
 	]);
+	expect(compiled.publicRenderPlan.diagnostics.find((entry) => entry.code === NOT_ONE_ELEMENT)?.suggestions?.[0]?.message).toBe(
+		'Wrap each row in one element, such as `<span>...</span>`, so every row of part is a single element.',
+	);
 });
 
-test('a nested row of two elements fails the build inside an outer row', async () => {
+test('a nested row of two elements still fails the build inside an outer row', async () => {
 	const compiled = await compileList(`<ul>
 		@for (const group of groups; key group.id) {
 			<li>
@@ -87,11 +102,29 @@ test('a nested row of two elements fails the build inside an outer row', async (
 			</li>
 		}
 	</ul>`);
-	expect(refusals(compiled)).toEqual([
-		{
-			severity: 'error',
-			message: 'Each row of this @for over part renders 2 nodes side by side',
-		},
+	expect(reasons(compiled)).toEqual([
+		'Each row of this @for over part renders 2 nodes side by side, and this list sits inside the row of another @for',
+	]);
+});
+
+test('a row of two elements that binds an element() handle or cancels before code loads still fails the build', async () => {
+	const handle = await compileTsrxModule({
+		filename: 'src/Lists.tsrx',
+		source: `import { element, state } from '@markless/core';
+export function Lists() @{
+	let parts = state([{ k: 0, text: 'x' }]);
+	const marks = element<HTMLElement[]>();
+	<p>
+		@for (const part of parts; key part.k) {
+			<><b>{part.text}</b><mark el={marks}>{part.text}</mark></>
+		}
+	</p>
+}
+`,
+		symbols: [],
+	});
+	expect(reasons(handle)).toEqual([
+		'Each row of this @for over part renders 2 nodes side by side, and this list has rows that bind an element() handle',
 	]);
 });
 

@@ -1,6 +1,7 @@
 import { createProtocolStatePayload, protocolInstanceQualifies } from '@markless/serializer';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import type { ProtocolStatePayloadInput, SemanticSharedReturnProperty } from '../artifacts.ts';
+import { asyncReach, componentEdgeReads, pairedAsyncValues } from './paired-async-values.ts';
 import { sharedCallbackSlotGraphNodeId } from './semantic-graph/collect-shared.ts';
 import { componentPropReads } from './symbol-modules.ts';
 import { planSymbolResolver } from './symbol-resolver.ts';
@@ -20,6 +21,14 @@ export function createProtocolStatePayloadFromArena(
 			payloadArena: input.payloadArena,
 		});
 	const deriveSymbolIds = syncDeriveSymbolIds(symbolResolver);
+	const readOnlyBySubscriptions = deriveOnReadGraphNodeIds(input, symbolResolver);
+	const held = heldAsyncGraphNodeIds(input, symbolResolver);
+	const asyncFrom = asyncAncestors(input.payloadArena.state.computed);
+	const boundaryGates = new Set(
+		input.semanticGraph.asyncBoundaries.flatMap((boundary) =>
+			boundary.gateGraphNodeId ? [boundary.gateGraphNodeId] : [],
+		),
+	);
 	const computed = input.payloadArena.state.computed.map((computed) => ({
 		graphNodeId: computed.graphNodeId,
 		name: computed.name,
@@ -32,8 +41,19 @@ export function createProtocolStatePayloadFromArena(
 					dependencies: computed.dependencies.map((dependency) => ({
 						graphNodeId: dependency.graphNodeId,
 						path: dependency.path,
+						...(dependency.writtenByControl ? { writtenByControl: true as const } : {}),
 					})),
 				}
+			: {}),
+		...(readOnlyBySubscriptions.has(computed.graphNodeId)
+			? { deriveOnRead: true as const }
+			: {}),
+		...(held.has(computed.graphNodeId) ? { holds: true as const } : {}),
+		...(computed.async && boundaryGates.has(computed.graphNodeId)
+			? { boundaryGate: true as const }
+			: {}),
+		...(asyncFrom.get(computed.graphNodeId)?.length
+			? { asyncFrom: asyncFrom.get(computed.graphNodeId)! }
 			: {}),
 	}));
 	const callbackSlots = callbackSlotNodes(input);
@@ -127,6 +147,82 @@ function assertClassifiable(graphNodeId: string): void {
 		),
 		{ code: 'MARKLESS_COMPOSED_GRAPH_NODE_UNCLASSIFIED', graphNodeId },
 	);
+}
+
+/**
+ * The sync computeds resume may re-derive when read instead of on every
+ * dependency write (spec 03). A handler, a behavior or another module reads its
+ * value synchronously, so a computed any of them can reach stays current, and so
+ * does everything such a computed derives from.
+ */
+function deriveOnReadGraphNodeIds(
+	input: ProtocolStatePayloadInput,
+	symbolResolver: NonNullable<ProtocolStatePayloadInput['symbolResolver']>,
+): ReadonlySet<string> {
+	const { computed, sharedDefinitions } = input.payloadArena.state;
+	const current = new Set<string>([
+		...symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'
+				? (symbol.reads ?? []).map((read) => read.graphNodeId)
+				: symbol.kind === 'behavior'
+					? (symbol.graphAccess?.reads ?? []).map((read) => read.graphNodeId)
+					: [],
+		),
+		...input.payloadArena.view.behaviors.flatMap((behavior) =>
+			(behavior.inputGraphReads ?? []).map((read) => read.graphNodeId),
+		),
+		...input.payloadArena.view.keyedRepeats.map((repeat) => repeat.collectionGraphNodeId),
+		...input.semanticGraph.componentEdges.flatMap((edge) =>
+			edge.props.flatMap((prop) =>
+				prop.kind === 'graph-reference' ? [prop.graphNodeId] : [],
+			),
+		),
+		...sharedDefinitions.flatMap((definition) => definition.graphNodeIds),
+		...input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.componentName ? [] : [binding.id],
+		),
+		...computed.flatMap((node) =>
+			node.async ? (node.dependencies ?? []).map((dependency) => dependency.graphNodeId) : [],
+		),
+	]);
+	for (let size = -1; size !== current.size;) {
+		size = current.size;
+		for (const node of computed)
+			if (current.has(node.graphNodeId))
+				for (const dependency of node.dependencies ?? [])
+					current.add(dependency.graphNodeId);
+	}
+	return new Set(
+		computed.flatMap((node) =>
+			node.async || current.has(node.graphNodeId) ? [] : [node.graphNodeId],
+		),
+	);
+}
+
+// For each sync computed, the nearest async values it derives from through other sync computeds.
+function asyncAncestors(
+	computed: ProtocolStatePayloadInput['payloadArena']['state']['computed'],
+): ReadonlyMap<string, ReadonlyArray<string>> {
+	const { asyncInputs } = asyncReach(new Map(computed.map((node) => [node.graphNodeId, node])));
+	return new Map(
+		computed.flatMap((node) => (node.async ? [] : [[node.graphNodeId, asyncInputs(node.graphNodeId)]])),
+	);
+}
+
+function heldAsyncGraphNodeIds(
+	input: ProtocolStatePayloadInput,
+	symbolResolver: NonNullable<ProtocolStatePayloadInput['symbolResolver']>,
+): ReadonlySet<string> {
+	const { computed } = input.payloadArena.state;
+	return pairedAsyncValues(new Map(computed.map((node) => [node.graphNodeId, node])), [
+		...computed.map((node) => (node.dependencies ?? []).map((read) => read.graphNodeId)),
+		...symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'event-handler' && symbol.shownReads
+				? [symbol.shownReads.map((read) => read.graphNodeId)]
+				: [],
+		),
+		...componentEdgeReads(input.semanticGraph.componentEdges),
+	]);
 }
 
 function syncDeriveSymbolIds(

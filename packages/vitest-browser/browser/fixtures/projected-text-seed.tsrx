@@ -4,7 +4,7 @@ import { shared, state } from '@markless/core';
 const meter = shared(() => {
 	const reading = state({ own: '' as Children });
 	return reading;
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function MeterRoot({ children }: { readonly children?: Children }) @{
 	const m = meter();

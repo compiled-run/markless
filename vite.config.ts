@@ -111,24 +111,23 @@ const buildOrder: PackUserConfig[] = [
 		},
 	}),
 	marklessPack({
-		packageName: 'compiler',
-		entry: {
-			index: './src/index.ts',
-			'type-service': './src/type-service.ts',
-		},
-	}),
-	marklessPack({
 		packageName: 'runtime',
 		entry: {
 			index: './src/index.ts',
 			graph: './src/graph.ts',
 			'graph-reconcile': './src/graph-reconcile.ts',
+			'graph-async': './src/graph-async.ts',
+			'graph-async-load': './src/graph-async-load.ts',
+			'graph-async-refresh': './src/graph-async-refresh.ts',
+			'graph-held': './src/graph-held.ts',
+			'graph-kept': './src/graph-kept.ts',
 		},
 	}),
 	marklessPack({
 		packageName: 'web',
 		entry: {
 			index: './src/index.ts',
+			'dom-attribute': './src/dom-attribute.ts',
 			'dom-journal': './src/dom-journal.ts',
 			'dom-update': './src/dom-update.ts',
 			'event-only-resume': './src/event-only-resume.ts',
@@ -144,6 +143,15 @@ const buildOrder: PackUserConfig[] = [
 			resume: './src/payload-full.ts',
 			...webFnsEntries,
 			'resume-storage-free': './src/payload-full-storage-free.ts',
+			'kept-swap': './src/kept-swap.ts',
+			'shared-swap': './src/shared-swap.ts',
+		},
+	}),
+	marklessPack({
+		packageName: 'compiler',
+		entry: {
+			index: './src/index.ts',
+			'type-service': './src/type-service.ts',
 		},
 	}),
 	marklessPack({
@@ -170,6 +178,7 @@ const buildOrder: PackUserConfig[] = [
 			'vite/runtime/mdx-route': './src/vite/runtime/mdx-route.ts',
 			'vite/runtime/create-server-entry': './src/vite/runtime/create-server-entry.ts',
 			'vite/route-href': './src/vite/entries/route-href.ts',
+			'vite/route-types': './src/vite/route-typegen.ts',
 			'typescript-plugin': './src/typescript-plugin/index.ts',
 		},
 	}),
@@ -278,6 +287,13 @@ export default defineConfig({
 					// One id per run: the typescript-plugin test files build the same
 					// dist/ from separate workers and lock on it to build it once.
 					env: { MARKLESS_TSPLUGIN_CJS_BUILD_RUN: randomUUID() },
+					setupFiles: [
+						'scripts/ci/in-worker-build-slot.ts',
+						// CI's unit budget splits its memory peak by test file.
+						...(process.env.MARKLESS_UNIT_BUDGET_FILES
+							? ['scripts/ci/unit-budget-attribution.ts']
+							: []),
+					],
 				},
 			},
 			'packages/vitest-browser/vitest.config.ts',
@@ -299,6 +315,7 @@ export default defineConfig({
 			// Editor-completion probes and deliberately unparsable inputs, not source.
 			'packages/typescript-plugin/test/fixtures/**',
 			'demos/chained-async-comparison/**/routeTree.gen.ts',
+			'packages/typescript-plugin/src/element-attribute-names.generated.d.ts',
 		],
 		rules: {
 			'no-restricted-imports': [

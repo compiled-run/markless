@@ -33,7 +33,7 @@ export const tabsState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // The trigger's own value as a graph cell: compared against its prop instead, the trigger stops refreshing once the page has resumed.
@@ -44,7 +44,7 @@ export const tabsPartState = shared(
 
 		return { ...part, el };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function TabsRoot({

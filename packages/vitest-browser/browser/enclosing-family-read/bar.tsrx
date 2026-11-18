@@ -11,7 +11,7 @@ export const barState = shared(
 
 		return { ...bar, itemEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Bar({ role = 'toolbar', label = '', children }) @{

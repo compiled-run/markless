@@ -51,7 +51,7 @@ export function materializeDomLocators(
 	return byHostId;
 }
 
-// The instance path a composed widget-scoped handle id carries, restated here
+// The instance path a composed subtree-scoped handle id carries, restated here
 // for the reason fns/instance-scope.ts restates the serializer's grammar: the
 // lean resume chunk strips one prefix rather than taking an import edge for it.
 // No `m` here on purpose: the bare key is the module-space alias, and stripping
@@ -62,7 +62,7 @@ const HOST_SCOPE = /r:[^:]*:|[cm]\d+:/g;
 /**
  * One element per key, and a loud refusal when a key names more than one.
  *
- * A widget-scoped handle is one element PER RENDERED WIDGET, so composition
+ * A subtree-scoped handle is one element PER RENDERED WIDGET, so composition
  * qualifies its id with the rendered widget's own root path and the reading
  * handler asks with the same path. Every registration is filed under three keys
  * all the same: that qualified id, the id exactly as the module compiled it, and
@@ -73,6 +73,7 @@ const HOST_SCOPE = /r:[^:]*:|[cm]\d+:/g;
  * rendered widgets file the same compiled id and the same name; handing back
  * whichever registered last is the defect this registry exists to end, and it is
  * silent — the handler runs, touches a real element, and the wrong one moves.
+ * A reader naming its host scope gets the one filing made from that scope.
  */
 export function materializeElementHandles(
 	root: ResumeDomElement,
@@ -87,6 +88,7 @@ export function materializeElementHandles(
 		readonly handleId: string;
 		readonly keys: ReadonlyArray<string>;
 		readonly element: ResumeDomElement;
+		readonly scope: string;
 	};
 	// One element routinely carries more than one handle - a library part binds
 	// its family's own, and the consumer binds theirs onto the same tag - so a
@@ -110,7 +112,7 @@ export function materializeElementHandles(
 	}
 	function register(
 		hostNodeId: string,
-		handle: { readonly handleId: string; readonly name: string },
+		handle: { readonly handleId: string; readonly name: string; readonly plural?: boolean },
 		element: ResumeDomElement,
 		// The record that filed this handle, when its id is what names the rendered
 		// widget: an arm's handles reach resume in module space, so the qualified key
@@ -134,13 +136,13 @@ export function materializeElementHandles(
 		const keys = [...new Set([handleId, bare, handle.name, scope + handleId])];
 		// An array handle declares its plural-ness on the record, never on the key,
 		// so a key minted here inherits it from the id it was minted from.
-		if (pluralKeys.has(handle.handleId)) for (const key of keys) pluralKeys.add(key);
+		if (handle.plural || pluralKeys.has(handle.handleId)) for (const key of keys) pluralKeys.add(key);
 		for (const key of keys) {
 			const filed = byKey.get(key);
 			if (filed) filed.push(element);
 			else byKey.set(key, [element]);
 		}
-		held.push({ handleId, keys, element });
+		held.push({ handleId, keys, element, scope });
 		heldByHostId.set(hostNodeId, held);
 	}
 	// The keys that answer as a SET, declared at `element<T[]>()` and stamped on
@@ -180,12 +182,16 @@ export function materializeElementHandles(
 		// One key, one answer, and the DECLARATION decides which kind: an array
 		// handle answers its live members in document order, every other handle
 		// answers the one element and still refuses when a key names two.
-		get(id) {
+		get(id, ownScope = '') {
 			if (!pluralKeys.has(id)) {
 				const filed = byKey.get(id);
 				if (!filed?.length) return undefined;
-				if (filed.length > 1) throw ambiguousElementHandleError(id, filed.length);
-				return connectedElement(root, filed[0]);
+				if (filed.length === 1) return connectedElement(root, filed[0]);
+				const own = [...heldByHostId.values()]
+					.flat()
+					.filter((held) => held.scope === ownScope && held.keys.includes(id));
+				if (own.length !== 1) throw ambiguousElementHandleError(id, filed.length);
+				return connectedElement(root, own[0]!.element);
 			}
 			const live = new Set<ResumeDomElement>();
 			for (const element of [...(byKey.get(id) ?? []), ...rowMembers(id)]) {

@@ -16,7 +16,7 @@ export const boxState = shared(() => {
 			box.checked = !box.checked;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function BoxRoot({ checked = false, disabled = false, children }: { checked?: boolean; disabled?: boolean; children?: unknown }) @{
 	const box = boxState();
@@ -40,7 +40,7 @@ export const listState = shared(() => {
 			list.value = on ? [...list.value, itemValue] : list.value.filter((held) => held !== itemValue);
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function ListItem({ value, disabled, children }: { value: string; disabled?: boolean; children?: unknown }) @{
 	const list = listState();
@@ -250,7 +250,7 @@ import { shared, state } from '@markless/core';
 export const panelState = shared(() => {
 	const panel = state({ open: false });
 	return { ...panel };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function PanelRoot({ open = false, children }: { open?: boolean; children?: unknown }) @{
 	const panel = panelState();
@@ -270,7 +270,7 @@ import { PanelRoot } from './panel.tsrx';
 export const tabsState = shared(() => {
 	const tabs = state({ opened: [] as readonly string[] });
 	return { ...tabs };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function TabsPanel({ id, children }: { id: string; children?: unknown }) @{
 	const tabs = tabsState();

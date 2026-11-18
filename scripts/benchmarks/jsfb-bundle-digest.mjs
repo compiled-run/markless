@@ -1,43 +1,124 @@
 #!/usr/bin/env node
 // Whether the benchmark app built from the baseline checkout and from the current one serve the same
 // bytes. Both sides build the same fixture, so when every emitted file matches, once the checkout's
-// own location is written out of the build reports, no benchmark can measure a difference.
+// own location and the content hashes in chunk file names are written out, no benchmark can measure a
+// difference.
 //
 // Usage: node scripts/benchmarks/jsfb-bundle-digest.mjs digest <dist dir> <markless root> > side.json
 //        node scripts/benchmarks/jsfb-bundle-digest.mjs compare <baseline.json> <current.json>
 import { createHash } from 'node:crypto';
-import { appendFileSync, readdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { marklessBuildManifestPath } from '../../packages/bundler/src/build/build-manifests.ts';
+import {
+	MARKLESS_BUILD_PREFIX,
+	MARKLESS_BYTE_ATTRIBUTION,
+} from '../../packages/bundler/src/build/chunking.ts';
 
 const ROOT_PLACEHOLDER = '<markless-root>';
 
-/** sha256 of every file under `dist`, with `root` (absolute, and relative to the app) replaced. */
+const sha256 = (text) => createHash('sha256').update(text, 'latin1').digest('hex');
+
+/** sha256 of every file under `dist`, with `root` replaced and content-hashed chunk names made stable. */
 export function bundleDigest(dist, root) {
 	const app = path.dirname(path.resolve(dist));
 	const spellings = [path.resolve(root), path.relative(app, path.resolve(root))]
 		.filter((spelling) => spelling !== '' && spelling !== '.')
 		.toSorted((left, right) => right.length - left.length);
-	const files = {};
+	const texts = new Map();
+	const sizes = new Map();
 	const walk = (directory) => {
 		for (const entry of readdirSync(directory, { withFileTypes: true })) {
 			const full = path.join(directory, entry.name);
 			if (entry.isDirectory()) walk(full);
 			else if (entry.isFile()) {
-				let text = readFileSync(full).toString('latin1');
+				const bytes = readFileSync(full);
+				let text = bytes.toString('latin1');
 				for (const spelling of spellings)
 					text = text.replaceAll(spelling, ROOT_PLACEHOLDER);
-				files[path.relative(dist, full).split(path.sep).join('/')] = createHash('sha256')
-					.update(text, 'latin1')
-					.digest('hex');
+				const file = path.relative(dist, full).split(path.sep).join('/');
+				texts.set(file, text);
+				sizes.set(file, bytes.length);
 			}
 		}
 	};
 	walk(dist);
+	const stable = stableChunkNames(dist, texts, sizes);
+	const files = {};
+	for (const [file, text] of texts) {
+		const name = path.posix.basename(file);
+		const key = stable.has(name)
+			? path.posix.join(path.posix.dirname(file), stable.get(name))
+			: file;
+		files[key] = sha256(renamed(text, stable));
+	}
 	return Object.fromEntries(
 		Object.entries(files).toSorted(([left], [right]) => (left < right ? -1 : 1)),
 	);
+}
+
+function renamed(text, stable) {
+	for (const [from, to] of [...stable].toSorted(([left], [right]) => right.length - left.length))
+		text = text.replaceAll(from, to);
+	return text;
+}
+
+// A module ships in one chunk, so the bundler's per-chunk module list names it without its hash, even
+// across import cycles; a module-free facade is named by its bytes. Unnameable chunks keep the hash.
+function stableChunkNames(dist, texts, sizes) {
+	const metadata = marklessBuildManifestPath(path.resolve(dist), MARKLESS_BYTE_ATTRIBUTION);
+	if (!existsSync(metadata)) return new Map();
+	const chunks = new Map();
+	for (const [name, chunk] of Object.entries(
+		JSON.parse(readFileSync(metadata, 'utf8')).chunks ?? {},
+	)) {
+		const files = [`${MARKLESS_BUILD_PREFIX}${name}`, name].filter((file) => texts.has(file));
+		// Metadata left by an earlier build names other files or sizes: trust none of it.
+		if (files.length !== 1 || sizes.get(files[0]) !== chunk.bytes) return new Map();
+		chunks.set(path.posix.basename(files[0]), {
+			text: texts.get(files[0]),
+			modules: chunk.modules,
+		});
+	}
+	const stable = new Map();
+	const claim = (ids) => {
+		const taken = [...ids.values()];
+		for (const [name, id] of ids)
+			if (taken.indexOf(id) === taken.lastIndexOf(id)) stable.set(name, id);
+	};
+	const carriers = [...chunks].filter(([, chunk]) => chunk.modules.length > 0);
+	claim(
+		new Map(
+			carriers.map(([name, { modules }]) => {
+				const keys = modules.map(([category, key]) => `${category}:${key}`);
+				return [name, `[${keys[0]} ${sha256(keys.join('\n')).slice(0, 12)}].js`];
+			}),
+		),
+	);
+	let facades = [...chunks.keys()].filter(
+		(name) => !stable.has(name) && chunks.get(name).modules.length === 0,
+	);
+	while (facades.length > 0) {
+		const ready = facades.filter((name) =>
+			[...chunks.keys()].every(
+				(other) =>
+					other === name || stable.has(other) || !chunks.get(name).text.includes(other),
+			),
+		);
+		if (ready.length === 0) break;
+		claim(
+			new Map(
+				ready.map((name) => [
+					name,
+					`[facade ${sha256(renamed(chunks.get(name).text, stable)).slice(0, 12)}].js`,
+				]),
+			),
+		);
+		facades = facades.filter((name) => !ready.includes(name));
+	}
+	return stable;
 }
 
 /** The files whose bytes differ between two digests, or that only one side emitted. */

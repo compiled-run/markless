@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { writeHeapSnapshot } from 'node:v8';
 import { createBuilder } from 'vite';
+import { compileRuns } from '../../../packages/compiler/src/compile-cache.ts';
 import { markless } from '../../../packages/core/src/vite.ts';
 import { router } from '../../../packages/router/src/vite/index.ts';
 import { generateBuildScaleApp } from './generate.mjs';
@@ -57,6 +58,11 @@ const retainedHeapPlugin = {
 		phases.map((phase) => [phase, { order: 'post', handler: retainedAt(phase) }]),
 	),
 };
+// The end of the module graph, before Markless releases the compiles it held for it: the peak the phases above miss.
+const graphEndHeapPlugin = {
+	name: 'build-scale-graph-end-heap',
+	buildEnd: { order: 'pre', handler: retainedAt('graphEnd') },
+};
 // Modules in each environment's graph: Rolldown's memory and time grow with this count, and unlike memory it does not vary between runs.
 const modules = {};
 const moduleCountPlugin = {
@@ -74,7 +80,7 @@ const builder = await createBuilder({
 	root: app.dir,
 	configFile: false,
 	logLevel: 'silent',
-	plugins: [markless(), router(), retainedHeapPlugin, moduleCountPlugin],
+	plugins: [graphEndHeapPlugin, markless(), router(), retainedHeapPlugin, moduleCountPlugin],
 });
 await builder.buildApp();
 const seconds = (performance.now() - started) / 1000;
@@ -111,6 +117,8 @@ console.log(
 		peakExternalBytes: peakExternal,
 		...(retained.length ? { retained } : {}),
 		modules,
+		// Whole-module compiles the memo did not answer: like the module count, the same on every run.
+		compiles: compileRuns(),
 		largestServerChunk: largest(
 			output,
 			(path) => isCode(path) && path.startsWith('.output/server/'),

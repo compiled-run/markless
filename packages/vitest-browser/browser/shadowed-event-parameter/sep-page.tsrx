@@ -13,7 +13,7 @@ export const pickState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 function PickRoot({ onPick }: { readonly onPick: (value: string) => void }) @{

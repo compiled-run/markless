@@ -585,3 +585,21 @@ test('a hole-bearing materialized child without a filler fails closed', () => {
 	expect(isSettleKernelUnsupported(thrown)).toBe(true);
 	expect(String((thrown as Error).message)).toContain('materialized child hole needs a hole filler');
 });
+
+test('a state cell reads what a handler wrote, not its initial value', async () => {
+	const surface = feedSurface() as ReturnType<typeof feedSurface> & Record<string, never>;
+	const arm = surface.renderData.chunks.find((chunk) => chunk.id === 'arm:try')!;
+	(arm.slots[0] as { residue: unknown }).residue = { kind: 'graph-read', graphNodeId: 'cell:note', path: [] };
+	const feed = surface.components.Feed as { state: { cells: unknown[] }; initialValues: unknown[] };
+	feed.state.cells = [{ graphNodeId: 'cell:note', name: 'note', value: 'idle' }];
+	feed.initialValues = [{ graphNodeId: 'cell:note', value: { kind: 'constant', value: 'idle' } }];
+	const feedGraph = fulfilledGraph({ source: 'live', updates: [] });
+	const graph = {
+		read: (graphNodeId: string, path: ReadonlyArray<string> = []) =>
+			graphNodeId === 'cell:note' ? 'saving' : feedGraph.read(graphNodeId, path),
+	};
+	const { kernel, full } = await bothPaths(surface, graph);
+
+	expect(kernel.html).toContain('data-source="saving"');
+	expect(kernel.html).toBe(full.html);
+});

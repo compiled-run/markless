@@ -7,6 +7,7 @@ type DirectGraph = {
 	readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
 	readonly flush: () => void;
 	readonly isDirty?: (graphNodeId: string) => boolean;
+	readonly onWrite?: (listener: () => void) => void;
 };
 type DirectSymbolContext = {
 	readonly graph: DirectGraph;
@@ -216,7 +217,9 @@ export function createMarklessDirectChunkRenderer(renderData: DirectRenderData) 
 			return loaded;
 		};
 
+		let syncOwed = false;
 		const sync = () => {
+			syncOwed = false;
 			patchChunkTextSlots(rootTextTargets, graph, true);
 			for (let index = 0; index < renderData.repeats.length; index++) {
 				syncDirectRepeat(
@@ -232,6 +235,15 @@ export function createMarklessDirectChunkRenderer(renderData: DirectRenderData) 
 			}
 		};
 
+		graph.onWrite?.(() => {
+			if (syncOwed) return;
+			syncOwed = true;
+			queueMicrotask(() => {
+				if (!syncOwed) return;
+				sync();
+				graph.flush();
+			});
+		});
 		attachDirectChunkEvents(root, graph, loadDirectSymbol, renderData.events, sync);
 		sync();
 		graph.flush();

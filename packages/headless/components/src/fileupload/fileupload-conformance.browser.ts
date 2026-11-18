@@ -14,7 +14,7 @@ runMultiEmbedConformance({
 	// is the consumer's own row list, which is a second call site of
 	// `#fileuploadState` per embed, so "one definition per embed" is not the
 	// shape this family renders. The family-agnostic half of the check — no
-	// widget-scoped id repeating across embeds — still runs.
+	// subtree-scoped id repeating across embeds — still runs.
 	widgetDefinitionSuffixes: [],
 	// One file chosen on one upload. The row list reports its own length, which
 	// is the whole of what a merged file cell would smear across both embeds.

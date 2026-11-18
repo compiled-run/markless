@@ -17,13 +17,14 @@
 //
 // Usage:
 //   node scripts/release/release-notes.mjs [--from <ref>] [--to <ref>] [--out <path>]
-//   node scripts/release/release-notes.mjs --changelog --version <v> [--from] [--to] [--out]
+//   node scripts/release/release-notes.mjs --changelog --version <v> [--from] [--since] [--to] [--out]
 //
 //   --changelog  print the CHANGELOG.md section for <v> instead: user-facing commits only,
 //                grouped by released package, internal ids stripped, no changelogen.
 //
 //   --from  defaults to the most recent tag reachable from --to, and to the
 //           repository's first commit when no tag exists yet.
+//   --since names the last release in the changelog's "since" line; defaults to --from.
 //   --to    defaults to HEAD. Relative refs such as HEAD~1 are resolved to a
 //           concrete SHA before they are handed to changelogen: changelogen
 //           interpolates --to into the compare URL verbatim, and GitHub cannot
@@ -59,7 +60,14 @@ function git(args) {
 }
 
 function parseArguments(argv) {
-	const options = { from: null, to: 'HEAD', out: null, changelog: false, version: null };
+	const options = {
+		from: null,
+		since: null,
+		to: 'HEAD',
+		out: null,
+		changelog: false,
+		version: null,
+	};
 	for (let index = 0; index < argv.length; index += 1) {
 		const flag = argv[index];
 		const value = argv[index + 1];
@@ -68,6 +76,7 @@ function parseArguments(argv) {
 				options.changelog = true;
 				break;
 			case '--from':
+			case '--since':
 			case '--to':
 			case '--version':
 			case '--out': {
@@ -317,7 +326,7 @@ function areaOf(scopes, packages) {
 	return internal ? null : 'Other changes';
 }
 
-function changelogSection({ commits, from, version, url }) {
+function changelogSection({ commits, from, since, version, url }) {
 	const packages = releaseAreas();
 	const breaking = [];
 	const areas = new Map();
@@ -353,8 +362,8 @@ function changelogSection({ commits, from, version, url }) {
 	const plural = commits.length === 1 ? 'commit' : 'commits';
 	blocks.push(
 		url
-			? `[All ${commits.length} ${plural} since ${from}](${url}/compare/${from}...v${version})`
-			: `${commits.length} ${plural} since ${from}.`,
+			? `[All ${commits.length} ${plural} since ${since}](${url}/compare/${from}...v${version})`
+			: `${commits.length} ${plural} since ${since}.`,
 	);
 	return `${blocks.join('\n\n')}\n`;
 }
@@ -391,6 +400,7 @@ async function main(argv) {
 		const section = changelogSection({
 			commits: commitsInRange(fromResolved, toResolved, { merges: false }),
 			from,
+			since: options.since ?? from,
 			version: options.version,
 			url,
 		});

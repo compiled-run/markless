@@ -1,16 +1,30 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+	cp,
+	mkdir,
+	mkdtemp,
+	readdir,
+	readFile,
+	realpath,
+	rm,
+	symlink,
+	writeFile,
+} from 'node:fs/promises';
 import { createServer, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
-import { pruneRenderedPages, workerFirstPatterns } from '../../src/vite/nitro-cloudflare.ts';
+import {
+	cloudflareModule,
+	cloudflareNodeBuildsPlugin,
+	cloudflareWorkerTrimPlugin,
+	pruneRenderedPages,
+	workerFirstPatterns,
+} from '../../src/vite/nitro-cloudflare.ts';
 import { FRAGMENT_PATH_PREFIX } from '../../src/vite/fragment-navigation.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // A Nitro `cloudflare-module` build served by wrangler's local workerd, which applies Workers static
 // assets routing: a request that names an asset file never runs the Worker, so it is free.
@@ -23,6 +37,13 @@ const SERVED_FROM_ASSETS = '<!--served from the uploaded file-->';
 let root = '';
 let origin = '';
 let worker: ChildProcess | undefined;
+
+// Stylesheets the pages import: intro's only a prerendered page uses, held's only a runtime page, shared both kinds.
+const SHEET_MARKS = {
+	intro: 'prerendered-intro-sheet',
+	held: 'runtime-held-sheet',
+	shared: 'runtime-shared-sheet',
+};
 
 const heldAnswers: ServerResponse[] = [];
 let holding = false;
@@ -41,14 +62,24 @@ beforeAll(async () => {
 	await new Promise<void>((listening) => gate.listen(0, '127.0.0.1', listening));
 	const gateUrl = `http://127.0.0.1:${(gate.address() as AddressInfo).port}/`;
 	await mkdir(join(root, 'pages/docs'), { recursive: true });
+	await mkdir(join(root, 'styles'), { recursive: true });
+	for (const [name, mark] of Object.entries(SHEET_MARKS))
+		await writeFile(join(root, `styles/${name}.css`), `.${name} { --sheet: ${mark}; }\n`);
 	await writeFile(
 		join(root, 'pages/docs/intro.tsrx'),
-		'export default function Intro() @{\n\t<main data-page="intro">Prerendered intro</main>\n}\n',
+		'import \'../../styles/intro.css\';\nimport \'../../styles/shared.css\';\n\nexport default function Intro() @{\n\t<main data-page="intro" class="intro shared">Prerendered intro</main>\n}\n',
+	);
+	await mkdir(join(root, 'pages/live'), { recursive: true });
+	await writeFile(
+		join(root, 'pages/live/[id].tsrx'),
+		'import \'../../styles/shared.css\';\n\nexport default function Live() @{\n\t<main data-page="live" class="shared">Live page</main>\n}\n',
 	);
 	await writeFile(
 		join(root, 'pages/held.tsrx'),
 		[
 			"import { computed } from '@markless/core';",
+			"import '../styles/held.css';",
+			"import '../styles/shared.css';",
 			'',
 			'export default function Held() @{',
 			'\tconst report = computed(async () => {',
@@ -56,7 +87,7 @@ beforeAll(async () => {
 			"\t\treturn { text: 'report ready' };",
 			'\t});',
 			'',
-			'\t<main data-page="held">',
+			'\t<main data-page="held" class="held shared">',
 			'\t\t@try {',
 			'\t\t\t<p data-settled>{report.text}</p>',
 			'\t\t} @pending {',
@@ -72,14 +103,54 @@ beforeAll(async () => {
 		join(root, 'package.json'),
 		'{ "name": "markless-cloudflare-test", "private": true }\n',
 	);
+	// Like unicorn-magic: its default build, for runtimes without Node's APIs, lacks what its Node build exports.
+	const nodeOnly = join(root, 'node_modules/node-build-only');
+	await mkdir(nodeOnly, { recursive: true });
+	await writeFile(
+		join(nodeOnly, 'package.json'),
+		JSON.stringify({
+			name: 'node-build-only',
+			type: 'module',
+			exports: { node: { import: './node.js' }, default: { import: './default.js' } },
+		}),
+	);
+	await writeFile(
+		join(nodeOnly, 'node.js'),
+		"import { fileURLToPath } from 'node:url';\nexport const toPath = (url) => fileURLToPath(url);\n",
+	);
+	await writeFile(join(nodeOnly, 'default.js'), 'export const other = 1;\n');
+	await mkdir(join(root, 'api'), { recursive: true });
+	// Like typescript.js inside ts-morph: CommonJS that reads __filename as it loads.
+	const commonjs = join(root, 'node_modules/reads-filename');
+	await mkdir(commonjs, { recursive: true });
+	await writeFile(
+		join(commonjs, 'package.json'),
+		JSON.stringify({ name: 'reads-filename', main: 'index.js' }),
+	);
+	await writeFile(
+		join(commonjs, 'index.js'),
+		'exports.where = typeof __filename + ":" + typeof __dirname;\n',
+	);
+	await writeFile(
+		join(root, 'api/where.ts'),
+		"import { where } from 'reads-filename';\nexport default () => Response.json({ where });\n",
+	);
+	await mkdir(join(root, 'api'), { recursive: true });
+	await writeFile(
+		join(root, 'api/path.ts'),
+		"import { toPath } from 'node-build-only';\nexport default () => Response.json({ path: toPath('file:///a/b') });\n",
+	);
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
+	await symlink(
+		resolve(packagesRoot, 'router/node_modules/nitro'),
+		join(root, 'node_modules/nitro'),
+		'dir',
+	);
 	const prerendered = ['/', '/guide', '/docs/intro'];
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
 		nitro: {
 			preset: 'cloudflare-module',
 			// Nitro defaults to today's date, which the pinned wrangler's workerd refuses once UTC passes its release day.
@@ -92,9 +163,7 @@ beforeAll(async () => {
 				]),
 			),
 		},
-		plugins: [markless(), router()],
-	} as Parameters<typeof createBuilder>[0]);
-	await builder.buildApp();
+	});
 	// A response carrying this comment came from the uploaded file, not from the Worker rendering the page again.
 	for (const file of await htmlFiles())
 		await writeFile(file, (await readFile(file, 'utf8')) + SERVED_FROM_ASSETS);
@@ -224,6 +293,33 @@ test('the Worker leaves out the modules of pages it never renders, because every
 	expect(missing.status).toBe(404);
 });
 
+test('the Worker carries the text of only the stylesheets its runtime pages use, each once, and renders them inline', async () => {
+	const serverDir = join(root, '.output/server');
+	const code = (
+		await Promise.all(
+			(await readdir(serverDir, { recursive: true }))
+				.filter((file) => file.endsWith('.mjs'))
+				.map((file) => readFile(join(serverDir, file), 'utf8')),
+		)
+	).join('\n');
+	const copies = (text: string) => code.split(text).length - 1;
+	expect(copies(SHEET_MARKS.intro)).toBe(0);
+	expect(copies(SHEET_MARKS.held)).toBe(1);
+	expect(copies(SHEET_MARKS.shared)).toBe(1);
+	releaseGate();
+	for (const path of ['/held', '/live/one']) {
+		const html = await (await get(path)).text();
+		const head = html.slice(0, html.indexOf('</head>'));
+		expect(head, path).toMatch(
+			new RegExp(`<style data-markless-css="[^"]+">[^<]*${SHEET_MARKS.shared}`),
+		);
+		expect(head, path).not.toContain('rel="stylesheet"');
+	}
+	expect(await (await get('/held')).text()).toMatch(
+		new RegExp(`<style data-markless-css="[^"]+">[^<]*${SHEET_MARKS.held}`),
+	);
+});
+
 test('a page whose URL, in either spelling, run_worker_first sends to the Worker keeps its module', async () => {
 	const dir = await mkdtemp(join(tmpdir(), 'markless-cloudflare-prune-'));
 	try {
@@ -281,4 +377,140 @@ test('pages are left out only when every environment serves prerendered URLs fro
 	expect(
 		workerFirstPatterns({ main: 'index.mjs', pages_build_output_dir: '..' }),
 	).toBeUndefined();
+});
+
+test('a dependency with only a Node build and a default one runs its Node build in the Worker', async () => {
+	const response = await get('/api/path');
+	expect(response.status).toBe(200);
+	expect(await response.json()).toEqual({ path: '/a/b' });
+});
+
+test('a require of such a package gets its Node require build, an import its Node import build', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'markless-cloudflare-node-'));
+	try {
+		const pkg = join(dir, 'node_modules/dual');
+		await mkdir(pkg, { recursive: true });
+		await writeFile(
+			join(pkg, 'package.json'),
+			JSON.stringify({
+				name: 'dual',
+				exports: {
+					node: { import: './node.mjs', require: './node.cjs' },
+					default: './default.js',
+				},
+			}),
+		);
+		const hook = cloudflareNodeBuildsPlugin().resolveId as {
+			handler: (
+				source: string,
+				importer: string,
+				options: { kind: string },
+			) => Promise<string | undefined>;
+		};
+		const importer = join(dir, 'api.ts');
+		const real = await realpath(pkg);
+		expect(await hook.handler('dual', importer, { kind: 'import-statement' })).toBe(
+			join(real, 'node.mjs'),
+		);
+		expect(await hook.handler('dual', importer, { kind: 'require-call' })).toBe(
+			join(real, 'node.cjs'),
+		);
+		await writeFile(
+			join(dir, 'package.json'),
+			JSON.stringify({ name: 'app', exports: { node: './x.js' } }),
+		);
+		const nested = join(dir, 'node_modules/nested');
+		await mkdir(nested, { recursive: true });
+		await writeFile(
+			join(nested, 'package.json'),
+			JSON.stringify({
+				name: 'nested',
+				exports: {
+					node: './node.js',
+					import: { workerd: './worker.js', default: './default.js' },
+				},
+			}),
+		);
+		expect(
+			await hook.handler('nested', importer, { kind: 'import-statement' }),
+		).toBeUndefined();
+		const split = join(dir, 'node_modules/split');
+		await mkdir(split, { recursive: true });
+		await writeFile(
+			join(split, 'package.json'),
+			JSON.stringify({
+				name: 'split',
+				exports: {
+					node: { require: './node.cjs' },
+					import: { workerd: './worker.mjs' },
+					default: './default.js',
+				},
+			}),
+		);
+		expect(await hook.handler('split', importer, { kind: 'require-call' })).toBe(
+			join(await realpath(split), 'node.cjs'),
+		);
+		expect(await hook.handler('split', importer, { kind: 'import-statement' })).toBeUndefined();
+		for (const relative of ['./dual', '../dual', '..', '.'])
+			expect(
+				await hook.handler(relative, join(dir, 'src/api.ts'), { kind: 'import-statement' }),
+				relative,
+			).toBeUndefined();
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test('CommonJS code that reads __filename as it loads runs in the Worker', async () => {
+	const response = await get('/api/where');
+	expect(response.status).toBe(200);
+	expect(await response.json()).toEqual({ where: 'string:string' });
+});
+
+test('the Worker carries no list of the uploaded files, which Cloudflare serves before it runs', async () => {
+	const serverDir = join(root, '.output/server');
+	const code = await Promise.all(
+		(await readdir(serverDir, { recursive: true }))
+			.filter((file) => file.endsWith('.mjs'))
+			.map((file) => readFile(join(serverDir, file), 'utf8')),
+	);
+	expect(code.some((source) => source.includes('../public/guide.html'))).toBe(false);
+	expect((await get('/guide')).status).toBe(200);
+	expect((await get('/no-such-page')).status).toBe(404);
+});
+
+test('a Pages build, or one whose run_worker_first sends files to the Worker, keeps the list', async () => {
+	const plugin = cloudflareWorkerTrimPlugin();
+	const resolve = (plugin.resolveId as { handler: (source: string) => string | undefined })
+		.handler;
+	const setup = (preset: string) =>
+		cloudflareModule({ autoSubfolderIndex: false }).setup({
+			options: { preset, prerender: {}, output: { serverDir: '/tmp/none' } },
+		} as never);
+	await setup('cloudflare-pages');
+	expect(resolve('#nitro/virtual/public-assets-data')).toBeUndefined();
+	await setup('cloudflare-module');
+	expect(resolve('#nitro/virtual/public-assets-data')).toBeDefined();
+	await cloudflareModule({ autoSubfolderIndex: false }).setup({
+		options: {
+			preset: 'cloudflare-module',
+			prerender: {},
+			output: { serverDir: '/tmp/none' },
+			cloudflare: { wrangler: { assets: { run_worker_first: ['/*'] } } },
+		},
+	} as never);
+	expect(resolve('#nitro/virtual/public-assets-data')).toBeUndefined();
+	const above = await mkdtemp(join(tmpdir(), 'markless-wrangler-above-'));
+	await writeFile(join(above, 'wrangler.jsonc'), '{ "assets": { "run_worker_first": true } }');
+	await mkdir(join(above, 'app'));
+	await cloudflareModule({ autoSubfolderIndex: false }).setup({
+		options: {
+			preset: 'cloudflare-module',
+			rootDir: join(above, 'app'),
+			prerender: {},
+			output: { serverDir: '/tmp/none' },
+		},
+	} as never);
+	expect(resolve('#nitro/virtual/public-assets-data')).toBeUndefined();
+	await rm(above, { recursive: true, force: true });
 });

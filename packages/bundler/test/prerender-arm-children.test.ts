@@ -88,6 +88,86 @@ for (const { page, env } of statefulChildPages) {
 	}, 120_000);
 }
 
+test('a component row added to a list on a page woken from prerender records renders and keeps its own state', async () => {
+	await withBuiltPage('arm-children/AddComponentRow.tsrx', { MARKLESS_PRERENDER_WAKE: '1' }, async (tab) => {
+		const tracks = tab.locator('[data-track]');
+		await tab.locator('[data-add]').click();
+		await expect.poll(() => tracks.allTextContents()).toEqual(['intro 0', 'verse 0', 'chorus2 0']);
+		await tracks.nth(2).click();
+		await tracks.nth(2).click();
+		await expect.poll(() => tracks.allTextContents()).toEqual(['intro 0', 'verse 0', 'chorus2 2']);
+	});
+}, 120_000);
+
+// Elements an arm commit replaced are held by nothing once the page lets go: no runtime keeps a binding on them.
+async function trackReplacedElements(tab: Page): Promise<() => Promise<number>> {
+	await tab.evaluate(() => {
+		const refs: WeakRef<Element>[] = [];
+		const seen = new WeakSet<Element>();
+		const record = () => {
+			for (const element of document.querySelectorAll('[data-chip], h4'))
+				if (!seen.has(element)) {
+					seen.add(element);
+					refs.push(new WeakRef(element));
+				}
+		};
+		record();
+		new MutationObserver(record).observe(document.body, { subtree: true, childList: true });
+		Object.assign(window, {
+			retainedDetached: () => refs.filter((ref) => ref.deref() && !ref.deref()!.isConnected).length,
+		});
+	});
+	const session = await tab.context().newCDPSession(tab);
+	return async () => {
+		await session.send('HeapProfiler.collectGarbage');
+		return tab.evaluate(() => (window as unknown as { retainedDetached: () => number }).retainedDetached());
+	};
+}
+
+const refetchPages = [
+	{ page: 'arm-children/SettledSameModuleChild.tsrx', again: undefined },
+	{ page: 'arm-children/RefetchBesideChild.tsrx', again: '[data-again]' },
+] as const;
+
+for (const { page, again } of refetchPages) {
+	test(`${page}: an element an arm commit replaced keeps no binding`, async () => {
+		await withBuiltPage(page, {}, async (tab) => {
+			const chip = tab.locator('[data-chip]');
+			const retainedDetached = await trackReplacedElements(tab);
+			await tab.locator('[data-open]').click();
+			await expect.poll(() => chip.textContent()).toBe('chip 0');
+			await chip.click();
+			await expect.poll(() => chip.textContent()).toBe('chip 1');
+			for (const round of again ? [1, 2] : []) {
+				await tab.locator(again!).click();
+				await expect.poll(() => tab.locator('h4').textContent()).toBe(`Loaded#${round}`);
+				await chip.click();
+				await expect.poll(() => chip.textContent()).toBe(`chip ${round + 1}`);
+			}
+			await expect.poll(retainedDetached).toBe(0);
+		});
+	}, 120_000);
+}
+
+test('arm-children/ListInArmChild.tsrx: a list method call in a child an arm opens acts on the child\'s own list', async () => {
+	await withBuiltPage('arm-children/ListInArmChild.tsrx', {}, async (tab) => {
+		const chip = tab.locator('[data-chip]');
+		const open = tab.locator('[data-open]');
+		await open.click();
+		await expect.poll(() => chip.textContent()).toBe('marks 0');
+		await chip.click();
+		await expect.poll(() => chip.textContent()).toBe('marks 1');
+		await chip.click();
+		await expect.poll(() => chip.textContent()).toBe('marks 2');
+		await open.click();
+		await expect.poll(() => chip.count()).toBe(0);
+		await open.click();
+		await expect.poll(() => chip.textContent()).toBe('marks 0');
+		await chip.click();
+		await expect.poll(() => chip.textContent()).toBe('marks 1');
+	});
+}, 120_000);
+
 for (const page of ['arm-children/TemplateHole.tsrx', 'arm-children/NamedComputed.tsrx']) {
 	test(`${page}: computed text in an arm closed at render shows its value on first open`, async () => {
 		await withBuiltPage(page, {}, async (tab) => {

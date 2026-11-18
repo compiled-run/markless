@@ -13,16 +13,20 @@ import {
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
 	PROTOCOL_EVENT_HOST_ATTRIBUTE,
+	PROTOCOL_STATE_PATCH_SCRIPT_TYPE,
+	PROTOCOL_STREAMED_ARM_SCRIPT_TYPE,
 	type ProtocolArmRecordSet,
 } from '@markless/serializer/protocol';
 import {
 	MARKLESS_PENDING_MIN_VISIBLE_MS,
 	MARKLESS_REVEAL_TRAIN_CADENCE_MS,
 } from './pending-timing.ts';
+import { createInlineInPlaceCheckSource, IN_PLACE_CHECK } from './inline/resumer.ts';
 import {
 	artifactResumeModuleUrl,
 	assembleSsrContainer,
 	renderSsrOutput,
+	sendsFormInPlace,
 	storageRenderContext,
 	type RenderToStringOptions,
 	type SsrRenderable,
@@ -30,6 +34,8 @@ import {
 	withArmEventHostMarks,
 } from './render-to-string.ts';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
+import { RESUME_MODULE_ATTRIBUTE } from './fns/container-region.ts';
+import { boundariesInside } from './prerender/records.ts';
 
 // D5/D6 out-of-order streaming (T107, owner-ratified three-layer semantics):
 // the shell flushes with @pending arms in place of unsettled boundaries and
@@ -54,8 +60,7 @@ export const MARKLESS_STREAM_FIRST_FLUSH_DEADLINE_MS = 10;
 
 // A navigation that swaps the page out clears this global, retiring the old executor and its queue.
 export const STREAM_ARM_EXECUTOR_GLOBAL = '__mArm';
-export const STREAMED_ARM_SELECTOR =
-	'template[m\\:arm],script[type="markless/arm"],script[type="markless/state-patch"]';
+export const STREAMED_ARM_SELECTOR = `template[m\\:arm],script[type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}"],script[type="${PROTOCOL_STATE_PATCH_SCRIPT_TYPE}"]`;
 
 export type RenderToStreamOptions = RenderToStringOptions;
 
@@ -86,6 +91,8 @@ type StreamRenderContext = ReturnType<typeof storageRenderContext> & {
 		readonly signal: AbortSignal;
 		readonly deadline?: Promise<void>;
 		readonly prestart?: boolean;
+		// The cell each @catch this render showed writes its error to, by page boundary id.
+		readonly caughtErrors?: Map<string, string>;
 	};
 };
 
@@ -127,7 +134,7 @@ export async function renderToStream(
 	} satisfies StreamRenderContext);
 	const renderContext: StreamRenderContext = {
 		...storage,
-		streaming: { runs, signal: settleController.signal, deadline },
+		streaming: { runs, signal: settleController.signal, deadline, caughtErrors: new Map() },
 	};
 	let output = discoveryOutput;
 	if (runs.size > 0) {
@@ -212,6 +219,8 @@ async function* streamArmAppends(input: {
 	readonly shellState: ProtocolStatePayload | undefined;
 }): AsyncGenerator<string, void, void> {
 	const remaining = new Map(input.pendingArms.map((arm) => [arm.boundaryId, arm]));
+	const streamed = new Set(remaining.keys());
+	const runs = input.renderContext.streaming.runs;
 	const signal = input.renderContext.streaming.signal;
 	if (signal.aborted) return;
 	let cancelAppends!: () => void;
@@ -221,22 +230,22 @@ async function* streamArmAppends(input: {
 	const onCancel = () => cancelAppends();
 	signal.addEventListener('abort', onCancel, { once: true });
 	let executorEmitted = false;
-	const settledRuns = new Set<PendingArm>();
-	for (const arm of remaining.values())
-		arm.entry.promise.then(
-			() => settledRuns.add(arm),
-			() => settledRuns.add(arm),
-		);
+	// An arm whose nested @try can never settle is set aside; the stream fails once every other arm has gone out.
+	const failures: Error[] = [];
+	// The nested values a settled arm still waits on before it streams.
+	const holds = new Map<PendingArm, ReadonlyArray<StreamRunEntry>>();
 	// A wave that starts after an arm's value settled must stream it, or every later wave re-renders forever.
 	const missedWaves = new Map<PendingArm, number>();
 	try {
 		while (remaining.size > 0) {
 			await Promise.race([
-				...[...remaining.values()].map((arm) => arm.entry.promise),
+				...[...remaining.values()].flatMap((arm) =>
+					(holds.get(arm) ?? [arm.entry]).map((entry) => entry.promise),
+				),
 				cancelled,
 			]);
 			if (signal.aborted) return;
-			const settledBeforeWave = [...remaining.values()].filter((arm) => settledRuns.has(arm));
+			const settledBeforeWave = new Set([...runs.values()].filter((entry) => entry.settled));
 			// One re-render pass per settle wave: settled runners resolve from the
 			// per-request registry (no run() re-execution), so the pass renders the
 			// settled arm html + armized records for every boundary that just
@@ -267,33 +276,116 @@ async function* streamArmAppends(input: {
 						: [],
 				),
 			);
+			holds.clear();
 			const parts: string[] = [];
-			// Deleting the visited entry during Map iteration is safe in JS.
 			for (const arm of remaining.values()) {
-				if (
-					!settledInWave.has(arm.graphNodeId) &&
-					!(arm.entry.async === false && armTakenInWave.has(arm.boundaryId))
-				)
+				const ready =
+					settledInWave.has(arm.graphNodeId) ||
+					(arm.entry.async === false && armTakenInWave.has(arm.boundaryId));
+				if (!ready) {
+					if (!settledBeforeWave.has(arm.entry)) continue;
+					const missed = (missedWaves.get(arm) ?? 0) + 1;
+					if (missed > 1)
+						throw streamArmError(arm.boundaryId, '@try or @catch arm', 'boundary record');
+					missedWaves.set(arm, missed);
 					continue;
+				}
+				const nested = nestedHolds(output, arm, runs, streamed, settledBeforeWave);
+				if ('stuck' in nested) {
+					remaining.delete(arm.boundaryId);
+					failures.push(nested.stuck);
+					continue;
+				}
+				if (nested.waits.length > 0) {
+					holds.set(arm, nested.waits);
+					continue;
+				}
 				remaining.delete(arm.boundaryId);
 				if (!executorEmitted) {
 					parts.push(armExecutorScript(input.resumeModuleUrl, input.options.nonce));
 					executorEmitted = true;
 				}
-				parts.push(renderArmAppend(output, arm, input.options.nonce, input.shellState));
-			}
-			for (const arm of settledBeforeWave) {
-				if (!remaining.has(arm.boundaryId)) continue;
-				const missed = (missedWaves.get(arm) ?? 0) + 1;
-				if (missed > 1)
-					throw streamArmError(arm.boundaryId, '@try or @catch arm', 'boundary record');
-				missedWaves.set(arm, missed);
+				parts.push(
+					renderArmAppend(
+						output,
+						arm,
+						input.options.nonce,
+						input.shellState,
+						input.renderContext.streaming.caughtErrors?.get(arm.boundaryId),
+					),
+				);
 			}
 			if (parts.length > 0) yield parts.join('');
 		}
+		if (failures[0]) throw failures[0];
 	} finally {
 		signal.removeEventListener('abort', onCancel);
 	}
+}
+
+// Only the shell's boundaries stream their own arm, so a @try first rendered inside a settled arm settles with it.
+function nestedHolds(
+	output: SsrRenderOutput,
+	arm: PendingArm,
+	runs: ReadonlyMap<string, StreamRunEntry>,
+	streamed: ReadonlySet<string>,
+	settledBeforeWave: ReadonlySet<StreamRunEntry>,
+): { readonly waits: ReadonlyArray<StreamRunEntry> } | { readonly stuck: Error } {
+	const anchors = (output.structure?.anchors ?? []).filter((anchor) => anchor.kind === 'async');
+	const range = anchors.find((anchor) => anchor.id === arm.boundaryId);
+	const waits = new Set<StreamRunEntry>();
+	for (const boundary of output.view?.asyncBoundaries ?? []) {
+		const anchor = anchors.find((candidate) => candidate.id === boundary.id);
+		if (
+			!range ||
+			!anchor ||
+			streamed.has(boundary.id) ||
+			boundary.initiallyServedArm !== ASYNC_BOUNDARY_ARM.pending ||
+			anchor.elementStart < range.elementStart ||
+			anchor.elementEnd > range.elementEnd
+		)
+			continue;
+		const behind = runsBehind(output, boundary, runs);
+		// Nothing the server is loading can settle it, or everything it reads had settled before this render.
+		if (behind.every((entry) => settledBeforeWave.has(entry)))
+			return { stuck: nestedArmError(boundary.id, arm.boundaryId) };
+		for (const entry of behind) if (!entry.settled) waits.add(entry);
+		// Settled during this render: the next wave renders it settled.
+		if (behind.every((entry) => entry.settled)) for (const entry of behind) waits.add(entry);
+	}
+	return { waits: [...waits] };
+}
+
+// Every request run a boundary's reads stand on, through the sync derives between them.
+function runsBehind(
+	output: SsrRenderOutput,
+	boundary: StreamedBoundary,
+	runs: ReadonlyMap<string, StreamRunEntry>,
+): StreamRunEntry[] {
+	const definitions = new Map(
+		(output.state?.computed ?? []).map((definition) => [definition.graphNodeId, definition]),
+	);
+	const reads = new Set(
+		[boundary.runnerGraphNodeId, ...boundary.asyncReads.map((read) => read.graphNodeId)].filter(
+			(id): id is string => typeof id === 'string' && id !== '',
+		),
+	);
+	const entries = new Set<StreamRunEntry>();
+	for (const id of reads) {
+		const entry = runs.get(id);
+		if (entry) entries.add(entry);
+		const definition = definitions.get(id) as
+			| { readonly dependencies?: ReadonlyArray<{ readonly graphNodeId: string }> }
+			| undefined;
+		for (const dependency of definition?.dependencies ?? []) reads.add(dependency.graphNodeId);
+	}
+	return [...entries];
+}
+
+function nestedArmError(boundaryId: string, armId: string): Error {
+	const error = streamArmError(armId, '@try or @catch arm', `nested boundary ${boundaryId}`);
+	(error as Error & Record<string, unknown>).nestedBoundaryId = boundaryId;
+	return error;
 }
 
 // Settled content that cannot render fails its own boundary: it takes @catch, so the page never stays on @pending.
@@ -360,6 +452,7 @@ function renderArmAppend(
 	arm: PendingArm,
 	nonce: string | undefined,
 	shellState: ProtocolStatePayload | undefined,
+	caughtError: string | undefined,
 ): string {
 	const renderedAnchor = output.structure?.anchors.find(
 		(candidate) => candidate.kind === 'async' && candidate.id === arm.boundaryId,
@@ -368,11 +461,10 @@ function renderArmAppend(
 		throw streamArmError(arm.boundaryId, 'renderData boundary record', 'structure');
 	const armHtml = renderedAnchor.html;
 
-	const boundary = (output.view?.asyncBoundaries ?? []).find(
-		(candidate) => candidate.id === arm.boundaryId,
-	) as StreamedBoundary & { readonly armRecords?: unknown };
+	const view = output.view;
+	const boundary = view?.asyncBoundaries.find((candidate) => candidate.id === arm.boundaryId);
 	const armRecords = boundary?.armRecords;
-	if (!armRecords || Array.isArray(armRecords)) {
+	if (!view || !armRecords || !('locators' in armRecords)) {
 		throw streamArmError(arm.boundaryId, 'an armized record set', 'view payload');
 	}
 	const computed = (output.state?.computed ?? []).find(
@@ -383,10 +475,22 @@ function renderArmAppend(
 		...(shellState?.cells ?? []).map((cell) => cell.graphNodeId),
 		...(shellState?.computed ?? []).map((definition) => definition.graphNodeId),
 	]);
+	// The shell served the @catch error cell empty; this arm's own error rides its patch.
 	const cells = serializeRuntimeStateCells(
-		(output.state?.cells ?? []).filter((cell) => !shellGraphNodeIds.has(cell.graphNodeId)),
+		(output.state?.cells ?? []).filter(
+			(cell) => !shellGraphNodeIds.has(cell.graphNodeId) || cell.graphNodeId === caughtError,
+		),
 	);
-	const armGraphNodeIds = armDependencyClosure(output, arm.graphNodeId);
+	const nested = boundariesInside(view, boundary);
+	// A @try inside the arm served settled shows values the shell sent pending, so they ride this patch too.
+	const armGraphNodeIds = new Set(
+		[
+			arm.graphNodeId,
+			...nested.flatMap((inner) =>
+				inner.initiallyServedArm === ASYNC_BOUNDARY_ARM.pending ? [] : inner.asyncReads.map((read) => read.graphNodeId),
+			),
+		].flatMap((id) => [...armDependencyClosure(output, id)]),
+	);
 	const computedById = new Map(
 		(output.state?.computed ?? [])
 			.filter(
@@ -400,7 +504,16 @@ function renderArmAppend(
 		'markless/state',
 		{ cells, computed: serializeRuntimeAsyncSnapshots([...computedById.values()]) },
 	);
-	const servedArmRecords = withPaintedBranchArms(armRecords, output) as ProtocolArmRecordSet;
+	const armEvents = withPaintedBlockEvents(
+		armRecords,
+		nested,
+		renderedAnchor.elementStart,
+		output.structure?.anchors ?? [],
+	);
+	const servedArmRecords = withPaintedBranchArms(
+		nested.length > 0 ? ({ ...armEvents, asyncBoundaries: nested } satisfies ProtocolArmRecordSet) : armEvents,
+		output,
+	) as ProtocolArmRecordSet;
 	// The debug boot registers each arm event against its locator, so a debug page serves both plain.
 	const armPatch: ProtocolStreamedArmPatch = [
 		boundary.initiallyServedArm,
@@ -415,11 +528,59 @@ function renderArmAppend(
 		: JSON.stringify(arm.boundaryId);
 
 	return (
-		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armRecords as ProtocolArmRecordSet, armHtml)}</template>` +
-		`<script type="markless/arm" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
-		`<script type="markless/state-patch" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
-		`<script${nonceAttribute}>__mArm(${escapeScriptJson(revealArguments)})</script>`
+		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armEvents, armHtml)}</template>` +
+		`<script type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
+		`<script type="${PROTOCOL_STATE_PATCH_SCRIPT_TYPE}" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
+		`<script${nonceAttribute}>${sendsFormInPlace(servedArmRecords) ? escapeInlineScript(createInlineInPlaceCheckSource()) : ''}__mArm(${escapeScriptJson(revealArguments)})</script>`
 	);
+}
+
+type ServedBranch = NonNullable<ProtocolArmRecordSet['branches']>[number] & {
+	readonly servedArmRecords?: ProtocolArmRecordSet;
+};
+
+// The stream boot reads only the arm's own events, so every block painted inside the arm (an @if's served arm, a
+// nested @try's arm) lends its events and their hosts to the arm, placed where the render put the block.
+function withPaintedBlockEvents(
+	armRecords: ProtocolArmRecordSet,
+	nested: NonNullable<ProtocolArmRecordSet['asyncBoundaries']>,
+	armStart: number,
+	anchors: NonNullable<SsrRenderOutput['structure']>['anchors'],
+): ProtocolArmRecordSet {
+	const branchBlocks = (records: ProtocolArmRecordSet | undefined) =>
+		((records?.branches ?? []) as ReadonlyArray<ServedBranch>).map((branch) => ({
+			kind: 'branch',
+			id: branch.id,
+			records: branch.servedArmRecords,
+		}));
+	const blocks = [
+		...branchBlocks(armRecords),
+		...nested.flatMap((boundary) => {
+			const records = boundary.armRecords as ProtocolArmRecordSet | undefined;
+			return [{ kind: 'async', id: boundary.id, records }, ...branchBlocks(records)];
+		}),
+	];
+	if (!blocks.some((block) => block.records?.events.length)) return armRecords;
+	const locators = [...armRecords.locators];
+	const events = [...armRecords.events];
+	for (const block of blocks) {
+		const anchor = anchors.find(
+			(candidate) => candidate.kind === block.kind && candidate.id === block.id,
+		);
+		if (!block.records?.events.length || !anchor) continue;
+		const placed = new Map(block.records.locators.map((locator) => [locator.hostNodeId, locator]));
+		for (const event of block.records.events) {
+			const locator = placed.get(event.hostNodeId);
+			if (!locator) continue;
+			if (!locators.some((held) => held.hostNodeId === locator.hostNodeId))
+				locators.push({
+					...locator,
+					index: anchor.elementStart - armStart + locator.index,
+				});
+			events.push(event);
+		}
+	}
+	return { ...armRecords, locators, events };
 }
 
 // A streamed arm can land after the page changed state, so its branches name the arm this render painted.
@@ -452,7 +613,14 @@ function applyStreamedArmSyncPolicy(
 	policy: ProtocolSyncPolicy,
 	event: Event,
 	root: Element,
+	inPlaceCheck: ((event: Event, later: true) => unknown) | undefined,
 ): boolean {
+	// Run here, before the dispatch below: a trusted press lets that dispatch read the kept submit before any later listener.
+	if (!('branches' in policy) && policy.when.type === 'submits-in-place') {
+		if (!inPlaceCheck) return false;
+		inPlaceCheck(event, true);
+		return true;
+	}
 	const branches = 'branches' in policy ? policy.branches : [policy];
 	const readsGraph = (condition: ProtocolSyncPolicyCondition): boolean =>
 		condition.type === 'graph-truthy' ||
@@ -539,9 +707,10 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		}`
 		: '';
 	const debugActivate = debugEnabled ? 'if (md) try { md.activate(); } catch {}' : '';
+	// One executor serves every streamed page in the document, so a boot imports the arm's own root's module.
 	const wake = resumeModuleUrl
 		? `
-		const rec = d.querySelector('script[type="markless/arm"][data-boundary="' + id + '"]');
+		const rec = d.querySelector('script[type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}"][data-boundary="' + id + '"]');
 		const r = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
 		if (!rec || !r) return;
 			const records = (JSON.parse(rec.textContent || 'null') || [])[1] || {};
@@ -560,14 +729,18 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 					for (const entry of (el.getAttribute(${JSON.stringify(PROTOCOL_EVENT_HOST_ATTRIBUTE)}) || '').split(';')) {
 						const [name, ref] = entry.split('!')[0].split(':');
 						const x = name === t && ref && (records.events || [])[ref];
-						if (x && x.syncPolicy && applyPolicy(x.syncPolicy, e, r)) applied = true;
+						if (x && x.syncPolicy && applyPolicy(x.syncPolicy, e, r, self[${JSON.stringify(IN_PLACE_CHECK)}])) applied = true;
 					}
 				}
-				const input = { root: r, event: e, element: e.target, eventRecord: null, ...(applied ? { syncPolicyAlreadyApplied: true } : {}) };
+				const input = { root: r, event: e, element: e.target, eventRecord: null, propagationStopped: e.cancelBubble, ...(applied ? { syncPolicyAlreadyApplied: true } : {}) };
 				if (r.__marklessDispatch) return r.__marklessDispatch(input);
 				if (r.__asyncResumeRuntimeStarted) return;
 				r.__marklessDelegatedDispatch = true;
-				const mod = await import(${JSON.stringify(resumeModuleUrl)});
+				const own = r.querySelector('script[${RESUME_MODULE_ATTRIBUTE}]');
+				// Shared with the boot, so a kept submit falls back to the browser if this load fails.
+				const mod = await (r.__mResume ||= import((own && own.getAttribute(${JSON.stringify(RESUME_MODULE_ATTRIBUTE)})) || ${JSON.stringify(resumeModuleUrl)}).catch((error) => {
+					throw ((r.__mResume = undefined), error);
+				}));
 				await mod.resumeContainerEvent(input);
 			};
 			r.__marklessListen ||= (t) => r.addEventListener(t, forward, true);

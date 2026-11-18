@@ -8,10 +8,10 @@ import {
 } from 'shiki/core';
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
 import css from 'shiki/langs/css.mjs';
-import githubDark from 'shiki/themes/github-dark.mjs';
 import githubLight from 'shiki/themes/github-light.mjs';
+// Kept beside github-light: it brings github-dark, and the two themes gzip well only when adjacent in the chunk.
+import { DARK_THEME, LIGHT_THEME, siteDarkTheme, useSiteSurface } from '../../../tooling/shiki-surface.ts';
 import tsrxGrammar from '../../../tooling/tsrx.tmLanguage.json';
-import { DARK_THEME, LIGHT_THEME, useSiteSurface } from '../../../tooling/shiki-surface.ts';
 import { languageOf } from './languages.ts';
 
 type ShikiInternal = Awaited<ReturnType<typeof createShikiInternal>>;
@@ -89,7 +89,7 @@ let typescript: Promise<void> | undefined;
 /** The highlighter for a block's files; the TypeScript grammar loads only when one of them needs it. */
 export async function loadHighlighter(files: readonly string[]): Promise<Highlighter> {
 	internal ??= createShikiInternal({
-		themes: [githubLight, githubDark],
+		themes: [githubLight, siteDarkTheme],
 		langs: [
 			css,
 			{

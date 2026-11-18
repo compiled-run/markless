@@ -11,7 +11,7 @@ export const firstBox = shared(
 
 		return { ...box };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function FirstField() @{

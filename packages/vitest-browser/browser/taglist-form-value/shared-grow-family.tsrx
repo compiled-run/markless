@@ -20,7 +20,7 @@ export const listBox = shared(
 
 		return { ...box };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function BoxSeededRoot({ value = [], name = '', children }) @{

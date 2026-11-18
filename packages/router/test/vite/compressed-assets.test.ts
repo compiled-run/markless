@@ -11,17 +11,15 @@ import {
 	gunzipSync,
 } from 'node:zlib';
 import { join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import {
 	compressedAssetsModule,
 	compressedAssetsState,
 	PUBLIC_BROTLI_QUALITY,
 } from '../../src/vite/nitro-compressed-assets.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -81,13 +79,9 @@ beforeAll(async () => {
 	const nodeEnv = process.env.NODE_ENV;
 	process.env.NODE_ENV = 'production';
 	try {
-		const builder = await createBuilder({
+		await buildFixture({
 			root,
-			configFile: false,
-			logLevel: 'silent',
-			plugins: [markless(), router()],
 		});
-		await builder.buildApp();
 	} finally {
 		if (nodeEnv === undefined) delete process.env.NODE_ENV;
 		else process.env.NODE_ENV = nodeEnv;

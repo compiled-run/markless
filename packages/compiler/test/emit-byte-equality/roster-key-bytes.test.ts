@@ -9,8 +9,8 @@ import { MARKLESS_ELEMENT_BOUND_KEY_PREFIX } from '../../src/passes/public-rende
 // emit it anywhere.
 const factories = `
 import { element, shared, state } from '@markless/core';
-export const barState = shared(() => { const bar = state({ label: '' }); const barEl = element(); return { ...bar, barEl }; }, { scope: 'widget' });
-export const itemState = shared(() => { const item = state({ label: '' }); const itemEl = element(); const contentEl = element(); return { ...item, itemEl, contentEl }; }, { scope: 'widget' });
+export const barState = shared(() => { const bar = state({ label: '' }); const barEl = element(); return { ...bar, barEl }; }, { scope: 'subtree' });
+export const itemState = shared(() => { const item = state({ label: '' }); const itemEl = element(); const contentEl = element(); return { ...item, itemEl, contentEl }; }, { scope: 'subtree' });
 export function Bar({ children }) @{ const bar = barState(); <div el={bar.barEl} role="menu">{children}</div> }
 export function Item({ label = '', children }) @{ const item = itemState(); item.label = label; <div el={item.itemEl} aria-controls={item.contentEl}>{children}</div> }
 export function Content({ children }) @{ const item = itemState(); <div el={item.contentEl}>{children}</div> }

@@ -5,6 +5,7 @@ import type {
 	SemanticGraphAlias,
 	SemanticGraphBinding,
 	SemanticGraphDependency,
+	SemanticGraphReadLocal,
 } from '../../artifacts.ts';
 import {
 	graphBindingMap,
@@ -12,6 +13,7 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import {
+	expressionReadNames,
 	hasOptionalLink,
 	rootBindsInsideRegion,
 	rootIdentifierOffset,
@@ -55,7 +57,21 @@ export type GraphReadScope = {
 export type CompositeReadOptions = {
 	readonly methodCalls?: boolean;
 	readonly unaryOperators?: boolean;
+	/** A component prop says yes: `rows ?? []` falls back to a literal that reads only what it is built from. */
+	readonly literalBranches?: boolean;
+	/** The derive's reads into a prop follow the caller's value, so an object or array prop is lowered too. */
+	readonly readsIntoProps?: boolean;
+	/** A call may take an expression-bodied arrow, `opened.some((id) => id === post.id)`; names it binds are not reads. */
+	readonly arrowArguments?: boolean;
 };
+
+type ArrowReadOptions = CompositeReadOptions & {
+	readonly arrowRegions?: ReadonlyArray<{ readonly start: number; readonly end: number }>;
+};
+
+function bindsInsideArrow(node: AnyNode, state: WalkState, options: ArrowReadOptions): boolean {
+	return (options.arrowRegions ?? []).some((region) => rootBindsInsideRegion(node, state, region));
+}
 
 export function isCompositeTemplateExpression(
 	node: AnyNode,
@@ -81,14 +97,76 @@ export function isCompositeTemplateExpression(
 	);
 }
 
-// `a?.b.c` is the plain graph read `a.b.c` (optionalMemberReadSource); only other chains need a computed.
-function isDottedPath(node: AnyNode | undefined): boolean {
+// `a?.b.c` is the plain graph read `a.b.c` (memberReadPath); only other chains need a computed.
+export function isDottedPath(node: AnyNode | undefined): boolean {
 	if (node?.type === 'Identifier') return true;
+	if (node?.type === 'TSNonNullExpression') return isDottedPath(node.expression as AnyNode);
 	return (
 		node?.type === 'MemberExpression' &&
 		node.computed !== true &&
 		isDottedPath(node.object as AnyNode | undefined)
 	);
+}
+
+/** The graph path `a.b.c` that `a?.b.c`, `a!.b.c` or `(a).b.c` reads: a graph read through a missing value is already undefined. */
+export function memberReadPath(node: AnyNode | undefined): string | null {
+	const segments: string[] = [];
+	let cursor = node;
+	while (cursor) {
+		if (
+			cursor.type === 'ChainExpression' ||
+			cursor.type === 'TSNonNullExpression' ||
+			cursor.type === 'ParenthesizedExpression'
+		) {
+			cursor = cursor.expression as AnyNode | undefined;
+			continue;
+		}
+		if (cursor.type === 'MemberExpression' && cursor.computed !== true) {
+			const property = cursor.property as AnyNode | undefined;
+			const name = property?.type === 'Identifier' ? getIdentifierName(property) : null;
+			if (!name) return null;
+			segments.unshift(name);
+			cursor = cursor.object as AnyNode | undefined;
+			continue;
+		}
+		const root = cursor.type === 'Identifier' ? getIdentifierName(cursor) : null;
+		return root ? [root, ...segments].join('.') : null;
+	}
+	return null;
+}
+
+/** The name a static read starts from and the member names it reads on it: `a?.b['c'][0]` is `a` with `b`, `c`, `0`. */
+export function readLocal(node: AnyNode | undefined): SemanticGraphReadLocal | null {
+	const members: string[] = [];
+	let cursor = node;
+	while (cursor) {
+		if (
+			cursor.type === 'ChainExpression' ||
+			cursor.type === 'TSNonNullExpression' ||
+			cursor.type === 'ParenthesizedExpression'
+		) {
+			cursor = cursor.expression as AnyNode | undefined;
+			continue;
+		}
+		if (cursor.type === 'MemberExpression') {
+			const member = staticMemberName(cursor);
+			if (member === null) return null;
+			members.unshift(member);
+			cursor = cursor.object as AnyNode | undefined;
+			continue;
+		}
+		const name = cursor.type === 'Identifier' ? getIdentifierName(cursor) : null;
+		return name ? { name, members } : null;
+	}
+	return null;
+}
+
+function staticMemberName(node: AnyNode): string | null {
+	const property = node.property as AnyNode | undefined;
+	if (node.computed !== true)
+		return property?.type === 'Identifier' ? getIdentifierName(property) : null;
+	const value = property?.value;
+	return typeof value === 'string' || typeof value === 'number' ? String(value) : null;
 }
 
 // A call belongs to a read only when it is a method ON a read value, the way
@@ -109,18 +187,25 @@ function isNamedFunctionCall(node: AnyNode): boolean {
 export function pureCompositeReadSources(
 	node: AnyNode | undefined,
 	state: WalkState,
-	options: CompositeReadOptions = {},
-): ReadonlyArray<string> | null {
+	options: ArrowReadOptions = {},
+): ReadonlyArray<GraphReadSource> | null {
 	if (!node) return [];
 	if (node.type === 'ChainExpression' || node.type === 'ParenthesizedExpression') {
 		return pureCompositeReadSources(node.expression as AnyNode | undefined, state, options);
 	}
 	if (isLiteralExpression(node)) return [];
+	if (
+		(node.type === 'Identifier' || node.type === 'MemberExpression') &&
+		bindsInsideArrow(node, state, options)
+	)
+		return [];
 	if (node.type === 'Identifier') {
 		// `undefined` is an Identifier to the parser but a value here, like false
 		// or null; reporting it as a read source kills the computed mint.
 		const source = expressionSource(node, state.source);
-		return source === 'undefined' || readsModuleValue(node, source, state) ? [] : [source];
+		return source === 'undefined' || readsModuleValue(node, source, state)
+			? []
+			: [graphReadSource(node, source)];
 	}
 	if (node.type === 'MemberExpression') return memberReadSources(node, state, options);
 	if (node.type === 'CallExpression') {
@@ -129,11 +214,17 @@ export function pureCompositeReadSources(
 	if (node.type === 'ConditionalExpression') {
 		return joinReadSources([
 			pureCompositeReadSources(node.test as AnyNode | undefined, state, options),
-			pureCompositeReadSources(node.consequent as AnyNode | undefined, state, options),
-			pureCompositeReadSources(node.alternate as AnyNode | undefined, state, options),
+			branchReadSources(node.consequent as AnyNode | undefined, state, options),
+			branchReadSources(node.alternate as AnyNode | undefined, state, options),
 		]);
 	}
-	if (node.type === 'BinaryExpression' || node.type === 'LogicalExpression') {
+	if (node.type === 'LogicalExpression') {
+		return joinReadSources([
+			branchReadSources(node.left as AnyNode | undefined, state, options),
+			branchReadSources(node.right as AnyNode | undefined, state, options),
+		]);
+	}
+	if (node.type === 'BinaryExpression') {
 		return joinReadSources([
 			pureCompositeReadSources(node.left as AnyNode | undefined, state, options),
 			pureCompositeReadSources(node.right as AnyNode | undefined, state, options),
@@ -145,12 +236,21 @@ export function pureCompositeReadSources(
 	}
 	if (node.type === 'TemplateLiteral') {
 		return joinReadSources(
-			asNodes(node.expressions).map((part) =>
-				pureCompositeReadSources(part, state, options),
-			),
+			asNodes(node.expressions).map((part) => pureCompositeReadSources(part, state, options)),
 		);
 	}
 	return null;
+}
+
+function branchReadSources(
+	node: AnyNode | undefined,
+	state: WalkState,
+	options: CompositeReadOptions,
+): ReadonlyArray<GraphReadSource> | null {
+	return options.literalBranches === true &&
+		(node?.type === 'ArrayExpression' || node?.type === 'ObjectExpression')
+		? callOperandReadSources(node, state, options)
+		: pureCompositeReadSources(node, state, options);
 }
 
 // The receiver and the arguments are the whole dependency set of a method call:
@@ -159,7 +259,7 @@ function methodCallReadSources(
 	node: AnyNode,
 	state: WalkState,
 	options: CompositeReadOptions,
-): ReadonlyArray<string> | null {
+): ReadonlyArray<GraphReadSource> | null {
 	const callee = node.callee as AnyNode;
 	// A function this file imports or declares at module scope sees only its arguments,
 	// exactly as `ns.fn(arg)` does; a body-local one can close over state, and a
@@ -169,15 +269,75 @@ function methodCallReadSources(
 	if (offset === null && !isMethodCallExpression(node)) return null;
 	const receiver =
 		offset === null
-			? pureCompositeReadSources(callee.object as AnyNode | undefined, state, options)
+			? callOperandReadSources(callee.object as AnyNode | undefined, state, options)
 			: [];
 	if (!receiver) return null;
 	return joinReadSources([
 		receiver,
 		...asNodes(node.arguments).map((argument) =>
-			pureCompositeReadSources(argument, state, options),
+			callOperandReadSources(argument, state, options),
 		),
 	]);
+}
+
+// A call's receiver or argument may be an object or array literal built from reads (`hrefFor('/a/[id]', { id: item.id })`); elsewhere a literal is a value the caller would stringify wrongly.
+function callOperandReadSources(
+	node: AnyNode | undefined,
+	state: WalkState,
+	options: CompositeReadOptions,
+): ReadonlyArray<GraphReadSource> | null {
+	if (node?.type === 'ObjectExpression') {
+		return joinReadSources(
+			asNodes(node.properties).map((property) => {
+				if (property.type === 'SpreadElement')
+					return callOperandReadSources(property.argument as AnyNode | undefined, state, options);
+				if (property.type !== 'Property' || property.kind !== 'init' || property.method === true)
+					return null;
+				return joinReadSources([
+					property.computed === true
+						? pureCompositeReadSources(property.key as AnyNode | undefined, state, options)
+						: [],
+					callOperandReadSources(property.value as AnyNode | undefined, state, options),
+				]);
+			}),
+		);
+	}
+	if (node?.type === 'ArrayExpression') {
+		return joinReadSources(
+			asNodes(node.elements).map((element) =>
+				callOperandReadSources(
+					element.type === 'SpreadElement' ? (element.argument as AnyNode | undefined) : element,
+					state,
+					options,
+				),
+			),
+		);
+	}
+	if (node?.type === 'ArrowFunctionExpression') return arrowReadSources(node, state, options);
+	return pureCompositeReadSources(node, state, options);
+}
+
+/** The reads an arrow argument makes, or null when its body is not one expression this collector can read. */
+export function arrowReadSources(
+	node: AnyNode,
+	state: WalkState,
+	options: ArrowReadOptions,
+): ReadonlyArray<GraphReadSource> | null {
+	const body = node.body as AnyNode | undefined;
+	if (
+		options.arrowArguments !== true ||
+		node.async === true ||
+		!body ||
+		body.type === 'BlockStatement' ||
+		typeof node.start !== 'number' ||
+		typeof node.end !== 'number'
+	)
+		return null;
+	const region = { start: node.start, end: node.end };
+	return pureCompositeReadSources(body, state, {
+		...options,
+		arrowRegions: [...(options.arrowRegions ?? []), region],
+	});
 }
 
 function callsModuleFunction(callee: AnyNode, offset: number, state: WalkState): boolean {
@@ -206,7 +366,7 @@ function memberReadSources(
 	node: AnyNode,
 	state: WalkState,
 	options: CompositeReadOptions,
-): ReadonlyArray<string> | null {
+): ReadonlyArray<GraphReadSource> | null {
 	const object = node.object as AnyNode | undefined;
 	// An optional link can short-circuit, so the read stops at the value before it, as a computed() body's does.
 	if (hasOptionalLink(node)) {
@@ -226,10 +386,13 @@ function memberReadSources(
 		]);
 	}
 	if (readsThroughDynamicKey(object)) return pureCompositeReadSources(object, state, options);
+	// `opened.filter((id) => id <= post.id).length`: a member of a call's answer reads what the call reads.
+	if (object?.type === 'CallExpression' && options.arrowArguments === true)
+		return pureCompositeReadSources(object, state, options);
 	if (object?.type === 'CallExpression' || object?.type === 'NewExpression') return null;
 	const source = expressionSource(node, state.source);
 	if (!source) return null;
-	return readsModuleValue(node, source, state) ? [] : [source];
+	return readsModuleValue(node, source, state) ? [] : [graphReadSource(node, source)];
 }
 
 // A module binding or a global is the same value for every render: the derive
@@ -240,7 +403,10 @@ function readsModuleValue(node: AnyNode, source: string, state: WalkState): bool
 	if (offset === null) return false;
 	const semantic = state.semantic();
 	const symbolId = resolvedSymbolAt(semantic, offset);
-	if (symbolId !== null && semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind !== 'module')
+	if (
+		symbolId !== null &&
+		semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind !== 'module'
+	)
 		return false;
 	if (repeatRowBindsName(source, state)) return false;
 	return (
@@ -253,14 +419,24 @@ function readsModuleValue(node: AnyNode, source: string, state: WalkState): bool
 }
 
 export function joinReadSources(
-	parts: ReadonlyArray<ReadonlyArray<string> | null>,
-): ReadonlyArray<string> | null {
-	const joined: string[] = [];
+	parts: ReadonlyArray<ReadonlyArray<GraphReadSource> | null>,
+): ReadonlyArray<GraphReadSource> | null {
+	const joined = new Map<string, GraphReadSource>();
 	for (const part of parts) {
 		if (!part) return null;
-		joined.push(...part);
+		for (const read of part) if (!joined.has(read.source)) joined.set(read.source, read);
 	}
-	return [...new Set(joined)];
+	return [...joined.values()];
+}
+
+/** A graph read's source, and the name and members its syntax reads; `local` is null when the read is not a static member chain. */
+export type GraphReadSource = {
+	readonly source: string;
+	readonly local: SemanticGraphReadLocal | null;
+};
+
+export function graphReadSource(node: AnyNode, source: string): GraphReadSource {
+	return { source, local: readLocal(node) };
 }
 
 function isLiteralExpression(node: AnyNode | undefined): boolean {
@@ -292,6 +468,8 @@ export function collectCompositeTemplateExpression(
 		options.scope,
 		false,
 		memberRoots(node),
+		false,
+		options.readsIntoProps,
 	);
 }
 
@@ -335,46 +513,24 @@ export function liftArmModuleValue(
  */
 export function mintTemplateExpressionComputed(
 	functionSource: string,
-	readSources: ReadonlyArray<string>,
+	readSources: ReadonlyArray<GraphReadSource>,
 	state: WalkState,
 	scope?: GraphReadScope,
 	// A collection lifted for its row handlers is a graph node even when nothing moves it.
 	allowConstant = false,
 	// A prop cell carries only scalars, so a derive reading into an object prop would see undefined.
 	propObjectRoots?: ReadonlySet<string>,
+	joinsText = false,
+	readsIntoProps = false,
 ): { readonly graphNodeId: string } | null {
-	const bindings = scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId);
-	const aliases = scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId);
-	const dependencies: SemanticGraphDependency[] = [];
-	for (const source of readSources) {
-		// Component scope first: a factory local and the instance local routinely collide.
-		// An enclosing row binding outranks both - it is the name's real declaration.
-		// ...and only THIS component's instance locals; a sibling component's
-		// same-named local is not in scope here (defect 46).
-		const resolved = repeatRowBindsName(source, state)
-			? null
-			: (resolveGraphPath(source, bindings, aliases) ??
-				resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName));
-		if (!resolved) return null;
-		if (
-			resolved.binding.kind !== 'state' &&
-			resolved.binding.kind !== 'computed' &&
-			resolved.binding.kind !== 'prop'
-		) {
-			return null;
-		}
-		dependencies.push({ source, graphNodeId: resolved.binding.id, path: resolved.path });
-	}
+	const dependencies = graphReadDependencies(readSources, state, scope);
+	if (!dependencies) return null;
 	if (dependencies.length === 0 && !allowConstant) return null;
 	if (
 		!allowConstant &&
+		!readsIntoProps &&
 		!armRebuildsFromGraph(state) &&
-		dependencies.every((dependency) => dependency.graphNodeId.startsWith('prop:')) &&
-		dependencies.some(
-			(dependency) =>
-				propObjectRoots?.has(dependency.source) ||
-				dependency.path.length > (dependency.graphNodeId === 'prop:props' ? 1 : 0),
-		)
+		propMemberReads(dependencies, propObjectRoots).length > 0
 	)
 		return null;
 
@@ -391,8 +547,82 @@ export function mintTemplateExpressionComputed(
 		asyncCapable: false,
 		functionSource,
 		dependencies: uniqueDependencies(dependencies),
+		...(joinsText ? { joinsText: true as const } : {}),
+		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 	});
 	return { graphNodeId };
+}
+
+function graphReadDependencies(
+	readSources: ReadonlyArray<GraphReadSource>,
+	state: WalkState,
+	scope?: GraphReadScope,
+): SemanticGraphDependency[] | null {
+	const component = state.currentComponentName ?? undefined;
+	const bindings =
+		scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId, component);
+	const aliases =
+		scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId, component);
+	const dependencies: SemanticGraphDependency[] = [];
+	for (const { source, local } of readSources) {
+		// Component scope first: a factory local and the instance local routinely collide.
+		// An enclosing row binding outranks both - it is the name's real declaration.
+		// ...and only THIS component's instance locals; a sibling component's
+		// same-named local is not in scope here.
+		const resolved = repeatRowBindsName(source, state)
+			? null
+			: (resolveGraphPath(source, bindings, aliases) ??
+				resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName));
+		if (!resolved) return null;
+		if (
+			resolved.binding.kind !== 'state' &&
+			resolved.binding.kind !== 'computed' &&
+			resolved.binding.kind !== 'prop'
+		) {
+			return null;
+		}
+		if (!local)
+			throw new Error(
+				`A graph read of ${source} resolved to ${resolved.binding.id} without a static name and members.`,
+			);
+		dependencies.push({ source, graphNodeId: resolved.binding.id, path: resolved.path, local });
+	}
+	return dependencies;
+}
+
+// A prop cell carries only scalars, so a derive reading into a prop would see undefined when the caller passes an object.
+function propMemberReads(
+	dependencies: ReadonlyArray<SemanticGraphDependency>,
+	propObjectRoots?: ReadonlySet<string>,
+): ReadonlyArray<string> {
+	if (!dependencies.every((dependency) => dependency.graphNodeId.startsWith('prop:'))) return [];
+	return dependencies
+		.filter(
+			(dependency) =>
+				propObjectRoots?.has(dependency.source) ||
+				dependency.path.length > (dependency.graphNodeId === 'prop:props' ? 1 : 0),
+		)
+		.map((dependency) => dependency.source);
+}
+
+/** The props whose members an expression reads, when that alone kept it from becoming a computed. */
+export function refusedPropMemberReads(
+	expression: AnyNode,
+	state: WalkState,
+	options: CompositeReadOptions,
+): ReadonlyArray<string> {
+	if (armRebuildsFromGraph(state) || !isCompositeTemplateExpression(expression, options)) return [];
+	const readSources = pureCompositeReadSources(expression, state, options);
+	const dependencies = readSources && graphReadDependencies(readSources, state);
+	if (!dependencies?.length) return [];
+	const members = new Set(propMemberReads(dependencies, memberRoots(expression)));
+	return [
+		...new Set(
+			dependencies.flatMap((dependency) =>
+				members.has(dependency.source) && dependency.local ? [dependency.local.name] : [],
+			),
+		),
+	];
 }
 
 /**
@@ -441,7 +671,21 @@ export function readsUnroutedGraphCell(
 	identifiers = false,
 ): boolean {
 	const readSources = pureCompositeReadSources(expression, state, options);
-	if (readSources) return readsWritableGraphCell(readSources, state, scope);
+	if (readSources)
+		return readsWritableGraphCell(
+			readSources.map(({ source }) => source),
+			state,
+			scope,
+		);
+	return readsWritableGraphCell(freeReadSources(expression, state, identifiers), state, scope);
+}
+
+// Every member chain (and, when asked, bare name) in an expression that is not bound inside it.
+export function freeReadSources(
+	expression: AnyNode,
+	state: WalkState,
+	identifiers: boolean,
+): ReadonlyArray<string> {
 	const region =
 		typeof expression.start === 'number' && typeof expression.end === 'number'
 			? { start: expression.start, end: expression.end }
@@ -450,19 +694,17 @@ export function readsUnroutedGraphCell(
 	const visit = (node: AnyNode, parent: AnyNode | null): void => {
 		const isName =
 			parent &&
-			((parent.type === 'MemberExpression' && parent.property === node && parent.computed !== true) ||
+			((parent.type === 'MemberExpression' &&
+				parent.property === node &&
+				parent.computed !== true) ||
 				((parent.type === 'Property' || parent.type === 'ObjectProperty') &&
 					parent.key === node &&
 					parent.computed !== true));
-		if (
-			!isName &&
-			(node.type === 'MemberExpression' || (identifiers && node.type === 'Identifier'))
-		) {
-			if (!rootBindsInsideRegion(node, state, region))
-				sources.push(expressionSource(node, state.source));
-		}
+		if (!isName && node.type === 'MemberExpression' && !rootBindsInsideRegion(node, state, region))
+			sources.push(expressionSource(node, state.source));
 		for (const child of childNodes(node)) visit(child, node);
 	};
 	visit(expression, null);
-	return readsWritableGraphCell(sources, state, scope);
+	if (identifiers) sources.push(...expressionReadNames(expression, state));
+	return sources;
 }

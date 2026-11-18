@@ -6,7 +6,7 @@ const armShared = shared(
 
 		return { ...s };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 function Root({ children }) @{

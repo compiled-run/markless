@@ -29,13 +29,13 @@ export const alpha = shared(() => {
 	const cell = state({ label: 'alpha' });
 
 	return { ...cell };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export const beta = shared(() => {
 	const cell = state({ label: 'beta' });
 
 	return { ...cell };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Alpha({ label }) @{
 	const ${alphaLocal} = alpha();
@@ -99,7 +99,7 @@ export const beta = shared(() => {
 	const cell = state({ label: 'beta' });
 
 	return { ...cell };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Beta({ label }) @{
 	const w = beta();
@@ -156,14 +156,14 @@ export const alpha = shared(() => {
 	const markEl = element();
 
 	return { ...cell, markEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export const beta = shared(() => {
 	const cell = state({ label: 'beta' });
 	const spotEl = element();
 
 	return { ...cell, spotEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Alpha({ label }) @{
 	const ${alphaLocal} = alpha();
@@ -273,13 +273,13 @@ export const alpha = shared(() => {
 	const cell = state({ label: 'alpha', open: true });
 
 	return { ...cell };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export const beta = shared(() => {
 	const cell = state({ label: 'beta', open: false });
 
 	return { ...cell };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Alpha({ label }) @{
 	const ${alphaLocal} = alpha();

@@ -11,7 +11,7 @@ export const emptyBox = shared(
 
 		return { ...box };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function EmptyRoot({ children }) @{

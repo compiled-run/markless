@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { join, resolve } from 'pathe';
@@ -24,6 +24,7 @@ afterEach(async () => {
 const linkedDependencies = [
 	['@markless/core', join(repoRoot, 'packages/core')],
 	['@markless/router', join(repoRoot, 'packages/router')],
+	['@markless/typescript-plugin', join(repoRoot, 'packages/typescript-plugin')],
 	['vite-plus', join(repoRoot, 'node_modules/vite-plus')],
 	['vite', join(repoRoot, 'node_modules/vite')],
 	['nitro', join(repoRoot, 'packages/router/node_modules/nitro')],
@@ -67,6 +68,13 @@ async function scaffold(starter: Starter, printed: string[] = []): Promise<strin
 		const link = join(appRoot, 'node_modules', name);
 		await mkdir(resolve(link, '..'), { recursive: true });
 		await symlink(target, link, 'dir');
+		const manifest = JSON.parse(await readFile(join(target, 'package.json'), 'utf8')) as {
+			bin?: Record<string, string>;
+		};
+		for (const [bin, file] of Object.entries(manifest.bin ?? {})) {
+			await mkdir(join(appRoot, 'node_modules/.bin'), { recursive: true });
+			await symlink(join(target, file), join(appRoot, 'node_modules/.bin', bin));
+		}
 	}
 	return appRoot;
 }
@@ -79,13 +87,14 @@ function startDevServer(appRoot: string) {
 	});
 }
 
-// The scaffold's own `check` script: formatting under its vite config's fmt settings, then lint.
+// The scaffold's own `check` script: format and lint under its vite config, then the .tsrx-aware type check.
 async function check(appRoot: string): Promise<string> {
-	const result = await execFileAsync(join(repoRoot, 'node_modules/.bin/vp'), ['check'], {
+	const bins = `${join(appRoot, 'node_modules/.bin')}:${join(repoRoot, 'node_modules/.bin')}`;
+	const result = await execFileAsync(join(repoRoot, 'node_modules/.bin/vp'), ['run', 'check'], {
 		cwd: appRoot,
-		env: { ...process.env, NO_COLOR: '1' },
+		env: { ...process.env, NO_COLOR: '1', PATH: `${bins}:${process.env.PATH}` },
 	}).catch((error: { stdout?: string; stderr?: string }) => {
-		throw new Error(`vp check failed:\n${error.stdout ?? ''}${error.stderr ?? ''}`);
+		throw new Error(`vp run check failed:\n${error.stdout ?? ''}${error.stderr ?? ''}`);
 	});
 	return result.stdout + result.stderr;
 }
@@ -146,7 +155,7 @@ test.each(STARTER_CHOICES.map((choice) => choice.value))(
 		await check(appRoot);
 		expect(await build(appRoot)).toEqual([]);
 		expect(scanBrowserOutput(clientOutputDir(appRoot), appRoot)).toEqual([]);
-		await check(appRoot);
+		expect(await check(appRoot)).not.toContain('triple-slash-reference');
 
 		const server = await startBuiltServer(join(appRoot, '.output/server/index.mjs'), {
 			cwd: appRoot,
@@ -165,3 +174,42 @@ test.each(STARTER_CHOICES.map((choice) => choice.value))(
 	},
 	180_000,
 );
+
+test('a type error in a .tsrx fails the scaffold check at its file, line and column, and passes once fixed', async () => {
+	const appRoot = await scaffold('minimal');
+	await mkdir(join(appRoot, 'components'));
+	await writeFile(
+		join(appRoot, 'components/Badge.tsrx'),
+		`export default function Badge(props: { label: string; total: number }) @{
+	<span>
+		{props.label}: {props.total}
+	</span>
+}
+`,
+	);
+	const page = (total: string, shown: string) => `import { state } from '@markless/core';
+import Badge from '../components/Badge.tsrx';
+
+export default function Home() @{
+	let visits = state(0);
+
+	<main>
+		<Badge label="Visits" total=${total} />
+		<button onClick={() => visits++}>Count {${shown}}</button>
+	</main>
+}
+`;
+	await writeFile(join(appRoot, 'pages/index.tsrx'), page('"many"', 'visit'));
+
+	const failure = await check(appRoot).then(
+		() => '',
+		(error: Error) => error.message,
+	);
+	expect(failure).toContain(
+		"pages/index.tsrx(8,25): error TS2322: Type 'string' is not assignable to type 'number'.",
+	);
+	expect(failure).toContain("pages/index.tsrx(9,43): error TS2552: Cannot find name 'visit'.");
+
+	await writeFile(join(appRoot, 'pages/index.tsrx'), page('{3}', 'visits'));
+	await check(appRoot);
+}, 60_000);

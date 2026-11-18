@@ -9,7 +9,7 @@ export const levelState = shared(
 
 		return { ...level, contentEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function LevelItem({ name = '', children }) @{

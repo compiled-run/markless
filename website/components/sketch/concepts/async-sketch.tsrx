@@ -170,7 +170,11 @@ export default function AsyncSketch() @{
 			}
 
 			.block:is([data-on='true'], [data-on='held']) {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.block:is([data-on='true'], [data-on='held'])::after {

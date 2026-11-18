@@ -12,7 +12,7 @@ export const gate = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Root({ children }) @{

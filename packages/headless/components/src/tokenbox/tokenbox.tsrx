@@ -166,7 +166,7 @@ export const tokenboxState = shared(
 
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 /** One instance per rendered `tokenbox.itemtrigger`. */
@@ -176,7 +176,7 @@ export const tokenboxItemState = shared(
 
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // No role on the root. The surface below is the textbox, so a group here would

@@ -9,6 +9,7 @@ export default defineConfig({
 		environment: 'node',
 		fileParallelism: false,
 		testTimeout: 60_000,
-		hookTimeout: 600_000,
+		// Measuring took 7.6 min (run 43455257900), then up to 10 min waiting for the queue entry ahead and ~1 min of downloads: 18.6, so 25 leaves 6.4.
+		hookTimeout: 1_500_000,
 	},
 });

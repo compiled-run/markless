@@ -9,7 +9,7 @@ export const meterState = shared(
 		const meter = state({ value: 0, ownLabel: '' });
 		return { ...meter };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function MeterRoot({ children }) @{

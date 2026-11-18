@@ -1,21 +1,27 @@
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { expect, test } from 'vitest';
+import { emitSymbolRouteTable } from '../src/rebound-symbol-route.ts';
 import { markless } from '../src/vite/index.ts';
+import { marklessWhenLoaded } from '../../web/src/fns/resident-load.ts';
 
 // The page composes RelayRow twice; each RelayRow hands its Row an arrow that calls
 // RelayRow's own `onPicked` prop. Row invokes that arrow by instance path, so the
 // page's route must answer it with the bound row carrying that edge's captures.
 const fixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route', import.meta.url));
+// Page places Board, Board places Editor, all in one module; Editor's bound row is spelled from the module root.
+const nestedFixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route-nested', import.meta.url));
+// Page places Panel three times, Panel places Picker: each copy's Picker callback has its own bound row.
+const copiesFixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route-copies', import.meta.url));
 
 const ROUTE_FUNCTION =
-	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId\) \{[\s\S]*?\n\}/;
+	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId, consumed = ""\) \{[\s\S]*?\n\}/;
 const REBOUND_IMPORT =
 	/import \{ marklessReboundSymbol as marklessSsrLoadSymbolRouteRebound \} from "[^"]*rebound-symbol[^"]*";/;
 
-async function pageCode(): Promise<string> {
+async function pageCode(root = fixtureRoot): Promise<string> {
 	const server = await createServer({
-		root: fixtureRoot,
+		root,
 		configFile: false,
 		logLevel: 'error',
 		appType: 'custom',
@@ -37,6 +43,7 @@ function runRoute(source: string) {
 		'__mxImport',
 		'marklessLoadLocalSymbol',
 		'marklessSsrLoadSymbolRouteRebound',
+		'marklessSsrLoadSymbolRouteWhenLoaded',
 		`${source.replace(/\bimport\(/g, '__mxImport(')}\nreturn marklessSsrLoadSymbolRoute;`,
 	)(
 		async (specifier: string) => ({
@@ -54,6 +61,7 @@ function runRoute(source: string) {
 			prefix,
 			loadUnbound,
 		}),
+		marklessWhenLoaded,
 	) as (symbolId: string) => unknown;
 	return { route, calls };
 }
@@ -84,4 +92,81 @@ test('a child symbol its edge binds is answered by that edge bound row, under th
 	expect(calls.at(-1)).toBe(
 		'import /relay-row.tsrx?import&markless-symbols -> bound:symbol%3A0:0',
 	);
+});
+
+test('a same-module child two levels down is rebound under every prefix the table consumed', async () => {
+	const code = await pageCode(nestedFixtureRoot);
+	const routeSource = ROUTE_FUNCTION.exec(code)?.[0];
+	if (!routeSource) throw new Error('page.tsrx emitted no symbol route function');
+	const { route } = runRoute(routeSource);
+
+	const routed = (await route('c0:c1:symbol:1')) as { loaded: unknown; prefix: string };
+	expect(routed.prefix).toBe('c0:c1:');
+	expect(routed.loaded).toMatch(/^local bound:symbol%3A1:0\/1\[/);
+});
+
+test('each copy of a same-module owner reaches the bound row of its own instance path', async () => {
+	const code = await pageCode(copiesFixtureRoot);
+	const routeSource = ROUTE_FUNCTION.exec(code)?.[0];
+	if (!routeSource) throw new Error('page.tsrx emitted no symbol route function');
+	const { route } = runRoute(routeSource);
+
+	for (const copy of [0, 1, 2]) {
+		const routed = (await route(`c${copy}:c3:symbol:1`)) as { loaded: unknown; prefix: string };
+		expect(routed.prefix).toBe(`c${copy}:c3:`);
+		expect(routed.loaded).toMatch(new RegExp(`^local bound:symbol%3A1:${copy}/3\\[`));
+	}
+});
+
+test("a child's answer goes through the table's forwarded rows, and a bound row names the id it stands for", async () => {
+	const source = emitSymbolRouteTable({
+		routes: [
+			{
+				prefix: 'c1:',
+				importSource: '/own.tsrx',
+				boundSymbols: { 'symbol:0': 'bound:symbol%3A0:1' },
+			},
+			{
+				prefix: 'c0:',
+				importSource: '/list.tsrx',
+				forwardedSymbols: { 'bound:symbol%3A0:0': 'bound:(bound:symbol%3A0:0):0' },
+			},
+		],
+		functionName: 'route',
+		fallbackName: 'local',
+		reboundName: 'rebound',
+	})
+		.split('\n')
+		.filter((line) => !line.startsWith('import '))
+		.join('\n');
+	const route = new Function(
+		'__mxImport',
+		'local',
+		'rebound',
+		'reboundForwarded',
+		'routeWhenLoaded',
+		`${source.replace(/\bimport\(/g, '__mxImport(')}\nreturn route;`,
+	)(
+		async (specifier: string) => ({
+			loadSymbol: (symbolId: string) => `${specifier} ${symbolId}`,
+		}),
+		(symbolId: string) => `local ${symbolId}`,
+		(...args: unknown[]) => ({ rebound: args.filter((arg) => typeof arg === 'string') }),
+		async (loaded: unknown, forwarded: unknown, prefix: string) => ({
+			forwarded,
+			prefix,
+			child: await loaded,
+		}),
+		marklessWhenLoaded,
+	) as (symbolId: string) => unknown;
+
+	expect(await route('c0:c0:symbol:0')).toEqual({
+		forwarded: '0',
+		prefix: 'c0:',
+		child: '/list.tsrx c0:symbol:0',
+	});
+	expect(await route('c1:symbol:0')).toEqual({
+		rebound: ['local bound:symbol%3A0:1', 'c1:', 'bound:symbol%3A0:1'],
+	});
+	expect(await route('c1:symbol:4')).toBe('/own.tsrx symbol:4');
 });

@@ -51,7 +51,7 @@ export const picker = shared(() => {
 	const cell = state({ value: 'a', open: false });
 
 	return { ...cell };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel() @{
 	const p = picker();
@@ -72,7 +72,7 @@ export const pickerState = shared(() => {
 	const picker = state({ value: 'a', open: false });
 
 	return { ...picker };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel() @{
 	const picker = pickerState();
@@ -131,7 +131,7 @@ export const row = shared(() => {
 			cell.value = cell.value === 'b' ? 'a' : 'b';
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Page() @{
 	let value = state('a');
@@ -280,7 +280,7 @@ export const checkboxState = shared(() => {
 			checkbox.checked = !checkbox.checked;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function CheckboxIndicator() @{
 	const checkbox = checkboxState();

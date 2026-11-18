@@ -106,11 +106,19 @@ export default function PayloadCard() @{
 			}
 
 			.ln:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.ln[aria-pressed='true'] {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.ln:focus-visible {
@@ -171,7 +179,11 @@ export default function PayloadCard() @{
 
 			.board:is([data-part='early'], [data-part='container'], [data-part='resumer']) .box,
 			.board:is([data-part='button'], [data-part='view']) .btn {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.board[data-part='state'] .value {

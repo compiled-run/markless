@@ -16,7 +16,7 @@ One widget family, `selectState`, rooted by `select.root`: `value`, `open`,
 `choose()` / `setOpen()`. It is exported as `state` beside the parts, per the
 owner's namespace ruling.
 
-`selectItemState` is a second widget-scoped family rooted by each `select.item`,
+`selectItemState` is a second subtree-scoped family rooted by each `select.item`,
 holding that option's `value` and `disabled`. It is exported as `itemstate` for
 a consumer whose own part sits inside an option, matching radio group.
 
@@ -198,7 +198,7 @@ diagnostic and emit `context.getElementHandle("shared:…/element:contentEl")`.
 What the read did not do, before the per-instance keying landed, is answer per
 widget instance.
 `ProtocolViewPayload['elementHandles']` records `{hostNodeId, handleId, name}`,
-and the `handleId` of a widget-scoped handle is one module-level string shared by
+and the `handleId` of a subtree-scoped handle is one module-level string shared by
 every instance of that widget. `materializeElementHandles`
 (`packages/web/src/resume-locators.ts`) files those records in a flat
 `byHandleId` map, which `resume-events.ts` hands to event symbols as
@@ -219,8 +219,8 @@ walking one — the same handler code, only the registration order changed —
 returned all 54. That is the flat map, not the walk.
 
 **Re-measured 2026-08-23 against the landed per-instance fix, and it is still one
-row red — for a new reason.** `widget-scoped element() handle reads resolve per
-instance` (`packages/web/src/fns/instance-scope.ts` qualifying a widget-scoped
+row red — for a new reason.** `subtree-scoped element() handle reads resolve per
+instance` (`packages/web/src/fns/instance-scope.ts` qualifying a subtree-scoped
 handle id with the rendered widget's root path, `resume-locators.ts` filing per
 key and refusing an ambiguous one) is on this tip, and its own suite,
 `packages/vitest-browser/browser/handle-instance.test.ts`, is 9/9 here. The

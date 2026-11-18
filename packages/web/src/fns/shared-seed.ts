@@ -70,7 +70,11 @@ const seedProjectingChild: SharedSeedPass = (context, definition, slot, read, in
 	// one the SSR marker answers — payload ownership alone withholds the token from
 	// a composing child and leaves its parts resolving no instance at all.
 	const base = context.idPrefix + (context.rowSegment ?? '') + rootEdge.symbolPrefix;
-	const chain = childrenProjectionChain(context.surface, rootEdge.childComponentName);
+	const chain = childrenProjectionChain(
+		context.surface,
+		rootEdge.childComponentName,
+		rootEdge.importSource,
+	);
 	const composedRoot = chain.map((link) => link.edge.symbolPrefix).join('');
 	const inheritedSeeds = new Map(inherited ?? []);
 	// A carrier of an unseeded family roots it when the page gives it composition's
@@ -78,15 +82,20 @@ const seedProjectingChild: SharedSeedPass = (context, definition, slot, read, in
 	// which component it is: otherwise the count a part of that instance asks for
 	// mints a placeholder under the bare handle id while composition has qualified
 	// every handle of the instance, and the ask answers nothing at first paint.
-	const rootedDefinitions = renderedWidgetRootsOf(context.surface, rootEdge.childComponentName, {
-		enclosing: enclosingProjectingChildNames(context.surface, componentEdgeId).map(
-			(componentName) => ({ surface: context.surface, componentName }),
-		),
-		enclosed: projectedChildNames(context.surface, definition, componentEdgeId, read).map(
-			(componentName) => ({ surface: context.surface, componentName }),
-		),
-		inRow: (context.rowSegment ?? '') !== '',
-	});
+	const rootedDefinitions = renderedWidgetRootsOf(
+		context.surface,
+		rootEdge.childComponentName,
+		{
+			enclosing: enclosingProjectingChildNames(context.surface, componentEdgeId).map(
+				(componentName) => ({ surface: context.surface, componentName }),
+			),
+			enclosed: projectedChildNames(context.surface, definition, componentEdgeId, read).map(
+				(componentName) => ({ surface: context.surface, componentName }),
+			),
+			inRow: (context.rowSegment ?? '') !== '',
+		},
+		rootEdge.importSource,
+	);
 	// Filed per definition as well as under the plain key: an element inside this
 	// child can carry handles from ANOTHER family's instance, and that family's
 	// token must not be overwritten by this one. See marklessWidgetInstanceKey.
@@ -129,7 +138,7 @@ function seedEdgeAndOwnTemplate(
 		() =>
 			applyComposedChainSeeds(
 				context,
-				childrenForwardChain(context.surface, edge.childComponentName),
+				childrenForwardChain(context.surface, edge.childComponentName, edge.importSource),
 				edge,
 				context.symbolPrefix + edge.symbolPrefix,
 				edgeChildProps(context, context.surface, edge, read),
@@ -257,8 +266,9 @@ function composedScopeRead(
 function childrenForwardChain(
 	surface: PrerenderDataSurface,
 	componentName: string,
+	importSource?: string,
 ): ChildrenProjectionLink[] {
-	const own = childSurfaceOf(surface, componentName);
+	const own = childSurfaceOf(surface, componentName, importSource);
 	const definition = own?.components[componentName];
 	if (!own || !definition) return [];
 	const chunks = own.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
@@ -279,7 +289,7 @@ function childrenForwardChain(
 			if (!edge || edge.materialized) continue;
 			const owner = chain[chain.length - 1];
 			const ownerSurface = owner
-				? childSurfaceOf(owner.surface, owner.edge.childComponentName)
+				? childSurfaceOf(owner.surface, owner.edge.childComponentName, owner.edge.importSource)
 				: own;
 			const ownerDefinition = owner
 				? ownerSurface?.components[owner.edge.childComponentName]
@@ -289,7 +299,9 @@ function childrenForwardChain(
 				edge,
 				surface: ownerSurface,
 				definition: ownerDefinition,
-				rootsWidget: widgetRootsOf(ownerSurface, edge.childComponentName).length > 0,
+				rootsWidget:
+					widgetRootsOf(ownerSurface, edge.childComponentName, undefined, edge.importSource)
+						.length > 0,
 			});
 			if (walk(slot.projectionChunkId)) {
 				found = [...chain];
@@ -356,9 +368,13 @@ function projectedEdges(
 	const families = [
 		...new Set(
 			[
-				rootEdge.childComponentName,
-				...enclosingProjectingChildNames(surface, componentEdgeId),
-			].flatMap((name) => renderedWidgetRootsOf(surface, name)),
+				[rootEdge.childComponentName, rootEdge.importSource] as const,
+				...enclosingProjectingChildNames(surface, componentEdgeId).map(
+					(name) => [name, undefined] as const,
+				),
+			].flatMap(([name, importSource]) =>
+				renderedWidgetRootsOf(surface, name, undefined, importSource),
+			),
 		),
 	];
 	const startsOwnInstance = (edgeId: string): boolean => {
@@ -366,8 +382,8 @@ function projectedEdges(
 		const edge = edges.find((candidate) => candidate.id === edgeId);
 		return (
 			edge !== undefined &&
-			renderedWidgetRootsOf(surface, edge.childComponentName).some((definitionId) =>
-				families.includes(definitionId),
+			renderedWidgetRootsOf(surface, edge.childComponentName, undefined, edge.importSource).some(
+				(definitionId) => families.includes(definitionId),
 			)
 		);
 	};
@@ -564,7 +580,7 @@ function applySharedSeeds(
 	read: PrerenderReadSeed,
 	seeded: Map<string, unknown>,
 ): Awaitable<void> {
-	const child = childSurfaceOf(surface, edge.childComponentName)?.components[
+	const child = childSurfaceOf(surface, edge.childComponentName, edge.importSource)?.components[
 		edge.childComponentName
 	];
 	const initials = child?.initialValues ?? [];

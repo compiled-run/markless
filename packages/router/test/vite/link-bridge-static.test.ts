@@ -2,13 +2,11 @@ import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/pr
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // A built app whose middleware redirects every path that is not one of its pages, as a signed-in-only app does.
 
@@ -43,13 +41,9 @@ beforeAll(async () => {
 	const nodeEnv = process.env.NODE_ENV;
 	process.env.NODE_ENV = 'production';
 	try {
-		const builder = await createBuilder({
+		await buildFixture({
 			root,
-			configFile: false,
-			logLevel: 'silent',
-			plugins: [markless(), router()],
 		});
-		await builder.buildApp();
 	} finally {
 		if (nodeEnv === undefined) delete process.env.NODE_ENV;
 		else process.env.NODE_ENV = nodeEnv;

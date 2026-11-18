@@ -2,7 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { extname, resolve } from 'pathe';
-import { chromium } from '@playwright/test';
+import { chromium, type Page } from '@playwright/test';
 import { startBuiltServer as startNitroServer } from '../../../../scripts/test-utils/built-server.ts';
 
 export type ServedApp = { readonly url: string; close(): Promise<void> };
@@ -84,6 +84,41 @@ export async function executedAtLoad(
 		await page.evaluate(
 			() => new Promise<void>((settled) => requestIdleCallback(() => settled())),
 		);
+		const { result } = await cdp.send('Profiler.takePreciseCoverage');
+		let executed = 0;
+		for (const script of result) {
+			const scriptUrl = script.url || scriptUrls.get(script.scriptId) || '';
+			if (scriptUrl.startsWith(origin)) executed += executedBytes(script.functions);
+		}
+		return executed;
+	} finally {
+		await browser.close();
+	}
+}
+
+/** Bytes of same-origin JavaScript V8 ran between a first click on `selector` and `settled` resolving, on a page that has loaded and gone idle. */
+export async function executedByFirstClick(
+	url: string,
+	selector: string,
+	settled: (page: Page) => Promise<unknown>,
+): Promise<number> {
+	const browser = await chromium.launch();
+	try {
+		const page = await browser.newPage();
+		const origin = new URL(url).origin;
+		const cdp = await page.context().newCDPSession(page);
+		const scriptUrls = new Map<string, string>();
+		await cdp.send('Profiler.enable');
+		await cdp.send('Debugger.enable');
+		cdp.on('Debugger.scriptParsed', (event) => scriptUrls.set(event.scriptId, event.url));
+		await cdp.send('Profiler.startPreciseCoverage', { callCount: true, detailed: true });
+		await page.goto(url, { waitUntil: 'load' });
+		await page.waitForLoadState('networkidle');
+		await page.evaluate(() => new Promise<void>((done) => requestIdleCallback(() => done())));
+		// Taking coverage resets the counts, so the second take holds only what the click ran.
+		await cdp.send('Profiler.takePreciseCoverage');
+		await page.click(selector);
+		await settled(page);
 		const { result } = await cdp.send('Profiler.takePreciseCoverage');
 		let executed = 0;
 		for (const script of result) {

@@ -120,4 +120,17 @@ describe('CI benchmark workflow', () => {
 			/"\$GITHUB_EVENT_NAME" = "merge_group" \]; then\n\s+base="\$\{\{ github\.event\.merge_group\.base_sha \}\}"/,
 		);
 	});
+
+	test('a pull request benchmarks against the main commit its merge was built on', async () => {
+		const workflow = parse(await readFile(workflowPath, 'utf8')) as {
+			jobs: Record<string, { steps: Array<{ name?: string; run?: string }> }>;
+		};
+		const filter = workflow.jobs.changes!.steps.find(
+			(step) => step.name === 'Decide whether benchmarks can be affected',
+		)!.run!;
+		expect(filter).toMatch(
+			/"\$GITHUB_EVENT_NAME" = "pull_request" \]; then\n\s+base="\$\(git rev-parse HEAD\^1\)"/,
+		);
+		expect(filter).not.toContain('pull_request.base.sha');
+	});
 });

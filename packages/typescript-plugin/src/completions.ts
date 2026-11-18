@@ -1,4 +1,7 @@
-import { compileTsrxForTypeService } from '@markless/compiler/type-service';
+import {
+	compileTsrxForTypeService,
+	isCamelCaseAttributeSpelling,
+} from '@markless/compiler/type-service';
 import type * as ts from 'typescript';
 import { compileEditorSource } from './volar.ts';
 
@@ -228,7 +231,7 @@ export function installMarklessCompletions(
 			return base;
 		}
 		const prefix = source.slice(0, position).match(/@\w*$/)?.[0];
-		if (!prefix) return withAdditionalEntries(base, importEntries);
+		if (!prefix) return withAdditionalEntries(withCamelCaseAttributesLast(typeScript, base), importEntries);
 
 		const context = validConstructContext(source, fileName, position, prefix.length, info);
 		if (context === 'none') return withoutSyntheticEntries(base);
@@ -927,6 +930,26 @@ function withAdditionalEntries(
 			...additional,
 			...(base?.entries.filter((entry) => !names.has(entry.name)) ?? []),
 		],
+	};
+}
+
+// camelCase spellings type-check too, but completion lists the real attribute names first.
+function withCamelCaseAttributesLast(
+	typeScript: TypeScript,
+	base: ts.CompletionInfo | undefined,
+): ts.CompletionInfo | undefined {
+	if (!base) return undefined;
+	const attributeKinds = new Set<string>([
+		typeScript.ScriptElementKind.jsxAttribute,
+		typeScript.ScriptElementKind.memberVariableElement,
+	]);
+	return {
+		...base,
+		entries: base.entries.map((entry) =>
+			attributeKinds.has(entry.kind) && isCamelCaseAttributeSpelling(entry.name)
+				? { ...entry, sortText: `~${entry.sortText}` }
+				: entry,
+		),
 	};
 }
 

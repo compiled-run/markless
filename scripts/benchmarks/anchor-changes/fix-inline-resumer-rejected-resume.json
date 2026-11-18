@@ -1,0 +1,94 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"counter",
+				"executedChars"
+			],
+			"delta": 8,
+			"reason": "a failed resume import no longer leaves self-wake, return-wake and click paths dead for the page",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"toggle",
+				"executedChars"
+			],
+			"delta": 8,
+			"reason": "a failed resume import no longer leaves self-wake, return-wake and click paths dead for the page",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"tab",
+				"executedChars"
+			],
+			"delta": 8,
+			"reason": "a failed resume import no longer leaves self-wake, return-wake and click paths dead for the page",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"search",
+				"executedChars"
+			],
+			"delta": 8,
+			"reason": "a failed resume import no longer leaves self-wake, return-wake and click paths dead for the page",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"dialog",
+				"executedChars"
+			],
+			"delta": 8,
+			"reason": "a failed resume import no longer leaves self-wake, return-wake and click paths dead for the page",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"settings",
+				"executedChars"
+			],
+			"delta": 8,
+			"reason": "a failed resume import no longer leaves self-wake, return-wake and click paths dead for the page",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 18,
+			"reason": "a failed resume import no longer leaves self-wake, return-wake and click paths dead for the page",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 18,
+			"reason": "a failed resume import no longer leaves self-wake, return-wake and click paths dead for the page",
+			"date": "2026-11-10"
+		}
+	]
+}

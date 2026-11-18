@@ -210,7 +210,7 @@ test('a shared seed travels only with the component whose body writes it', async
 const meter = shared(() => {
 	const s = state({ own: '' });
 	return s;
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function MeterCaption({ children }) @{
 	const m = meter();
 	<em ui-own={m.own}>{children}</em>

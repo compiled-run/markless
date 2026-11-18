@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
+import { UNLINKED_RENDER } from './support/unlinked-render.ts';
 
 /**
  * A `@for` inside another `@for`'s row renders once per enclosing row. Its record
@@ -141,15 +142,16 @@ test('only the nested record folds in the per-enclosing-row wiring module', asyn
 
 // Neither shape is wired per enclosing row yet, so each refuses the build by name
 // rather than serving rows that go stale.
-test('nested rows inside a sync @if arm fail the compile', async () => {
-	const result = await compile(
-		library('shelf.books')
-			.replace('<section>', '<section>@if (opened) {<div>')
-			.replace('</section>', '</div>}</section>'),
-	);
-	expect(
-		[...errors(result), ...result.publicRenderPlan.diagnostics].map((diagnostic) => diagnostic.code),
-	).toContain('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
+test('nested rows inside a sync @if arm run in the browser, and fail the compile where the page cannot re-render', async () => {
+	const page = library('shelf.books')
+		.replace('<section>', '<section>@if (opened) {<div>')
+		.replace('</section>', '</div>}</section>');
+	const codes = (result: Awaited<ReturnType<typeof compile>>) =>
+		[...errors(result), ...result.publicRenderPlan.diagnostics].map((diagnostic) => diagnostic.code);
+	const shipped = await compile(page);
+	expect(codes(shipped)).not.toContain('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
+	expect(shipped.symbolModules.armEscalationCandidates ?? []).toHaveLength(1);
+	expect(codes(await compile(page + UNLINKED_RENDER))).toContain('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
 });
 
 test('an element() handle bound in a nested row fails the compile by naming the nesting', async () => {

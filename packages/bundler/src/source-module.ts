@@ -8,11 +8,11 @@ import type {
 } from '@markless/web/inline/resumer';
 import { MARKLESS_COMPONENT_PART_BRAND } from '@markless/web/render-to-string';
 import type { StorageSeedMetadata } from '@markless/serializer';
-import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
+import { ASYNC_PROTOCOL_VERSION, hasLiveSharedDefinitions } from '@markless/serializer';
 import type { RuntimeDemandMapArtifact } from '@markless/compiler';
 import { emitScalarPlanLoader } from './scalar-plan-loader.ts';
 import { scalarPlanSourceReference } from './scalar-plan-source.ts';
-import { emitSymbolRouteTable } from './rebound-symbol-route.ts';
+import { RESIDENT_LOAD_MODULE, emitSymbolRouteTable } from './rebound-symbol-route.ts';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
@@ -30,6 +30,7 @@ export type SourceSymbolRoute = {
 	readonly prefix: string;
 	readonly importSource: string;
 	readonly boundSymbols?: Readonly<Record<string, string>>;
+	readonly forwardedSymbols?: Readonly<Record<string, string>>;
 };
 
 // A child declared in the SAME module carries an instance path like any other
@@ -271,6 +272,7 @@ export function emitSourceModule(input: {
 		readonly location: 'head' | 'body';
 	}>;
 	readonly storageSeeds?: ReadonlyArray<StorageSeedMetadata>;
+	readonly storageSeedImports?: ReadonlyArray<string>;
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly inlineResumerSources?: InlineResumerSourceVariants;
 	readonly prerenderBoot?: PrerenderBootArtifact;
@@ -316,7 +318,10 @@ export function emitSourceModule(input: {
 	readonly lazyFullRenderDataId?: string;
 	/** Whether the app's serialized state defines computed nodes. */
 	readonly hasComputedState?: boolean;
+	/** Whether it serves async computeds, and whether a reader pairs one with an input of its key. */
+	readonly asyncPlanes?: AsyncPlanesDemand;
 	readonly hasOverlayMarks?: boolean;
+	readonly hasLiveSharedState?: boolean;
 	readonly hasIdleEvents?: boolean;
 	readonly runtimeDemandMap?: unknown;
 	readonly scalarActions?: RuntimeDemandMapArtifact['actions'];
@@ -391,6 +396,11 @@ export function emitSourceModule(input: {
 					'installMarklessDerivedReconcile();',
 				].join('\n')
 			: null,
+		// Every client module serving or composing async values installs their planes; installing twice is one assignment.
+		input.environment === 'client' &&
+		input.asyncPlanes?.async === true
+			? emitAsyncPlanesInstall(input.asyncPlanes)
+			: null,
 		// Same split for the live roster: a CSR mount reaches the runtime's start
 		// through THIS module, so without the loader here a row added after mount
 		// would never be renumbered. The line is page-agnostic, so a resumed page
@@ -403,6 +413,9 @@ export function emitSourceModule(input: {
 		// has to name the behaviour here or it would never install.
 		input.environment === 'client' && input.hasOverlayMarks === true
 			? emitOverlayLoaderInstall()
+			: null,
+		input.environment === 'client' && input.hasLiveSharedState === true
+			? emitSharedInstancesLoaderInstall()
 			: null,
 		// And for `onIdle`: a CSR mount gets the idle wake only from an app module with an idle record.
 		input.environment === 'client' && input.hasIdleEvents === true && !symbolsOnly
@@ -486,6 +499,7 @@ export function emitSourceModule(input: {
 					executionLog: input.executionLog,
 					headInjections: input.headInjections,
 					storageSeeds: input.storageSeeds,
+					storageSeedImports: input.storageSeedImports,
 					inlineResumerSources: input.inlineResumerSources,
 					prerenderBoot: input.prerenderBoot,
 					sharedInlineSources: sharedInlineSources(input),
@@ -563,6 +577,36 @@ function payloadHasComputed(payloadState: unknown): boolean {
 	return Array.isArray(computed) && computed.length > 0;
 }
 
+export type AsyncPlanesDemand = { readonly async: boolean; readonly held: boolean };
+
+// The only place the async and matched-value planes are named, so an app that serves neither emits neither; it installs them for composed components too.
+export function payloadAsyncPlanes(
+	payloadState: unknown,
+	composed?: { readonly async?: boolean; readonly held?: boolean },
+): AsyncPlanesDemand {
+	const computed =
+		(payloadState as { readonly computed?: ReadonlyArray<{ async?: boolean; holds?: boolean }> })
+			?.computed ?? [];
+	return {
+		async: !!composed?.async || computed.some((record) => record.async === true),
+		held: !!composed?.held || computed.some((record) => record.holds === true),
+	};
+}
+
+function emitAsyncPlanesInstall(planes: AsyncPlanesDemand | undefined): string | null {
+	if (!planes?.async) return null;
+	return [
+		"import { installMarklessAsyncPlane } from '@markless/web/fns/async-plane';",
+		'installMarklessAsyncPlane();',
+		...(planes.held
+			? [
+					"import { installMarklessHeldInputs } from '@markless/web/fns/held-inputs-plane';",
+					'installMarklessHeldInputs();',
+				]
+			: []),
+	].join('\n');
+}
+
 export function emitIdleTriggerInstall(): string {
 	return [
 		"import { installMarklessIdle } from '@markless/web/fns/idle-trigger';",
@@ -597,6 +641,20 @@ export function emitOverlayLoaderInstall(): string {
  * modules every resumed page runs, which is why neither may write the specifier.
  * A composed MDX route writes it too: it cannot see its islands' computeds.
  */
+/**
+ * The same one line for shared() instances that outlive the page: graph
+ * construction, resume start and CSR mount sit in modules every app loads, so the
+ * specifier lives only in a module whose state declares a non-widget definition.
+ */
+export function emitSharedInstancesLoaderInstall(): string {
+	return "globalThis.__marklessSharedInstances ??= () => import('@markless/web/fns/shared-start');";
+}
+
+// An MDX page's islands never load before its resume builds the graph, so its route installs their planes on demand.
+export function emitAsyncPlanesLoaderInstall(): string {
+	return "globalThis.__marklessAsyncPlanes ??= (state) => state.computed.some((c) => c.async) && Promise.all([import('@markless/web/fns/async-plane').then((m) => m.installMarklessAsyncPlane()), state.computed.some((c) => c.holds) && import('@markless/web/fns/held-inputs-plane').then((m) => m.installMarklessHeldInputs())]);";
+}
+
 export function emitRosterResumeLoaderInstall(): string {
 	return "globalThis.__marklessRosterResume ??= () => import('@markless/web/fns/roster-resume');";
 }
@@ -782,6 +840,7 @@ export function emitResumeModule(input: {
 	readonly payloadId: string;
 	readonly resolverId: string;
 	readonly payloadState?: unknown;
+	readonly asyncPlanes?: AsyncPlanesDemand;
 	readonly payloadView?: unknown;
 	readonly runtimeDemandMap?: unknown;
 	// Scalar plans of a module compiled for the conservative demand class, for payload-document containers.
@@ -813,6 +872,8 @@ export function emitResumeModule(input: {
 	readonly linkedRowBranches?: boolean;
 	// The page's component tree derives from an element() roster, possibly through a child module whose computeds this payload never holds.
 	readonly rosterDerivation?: boolean;
+	// A component this module renders, here or in a module it imports, resolves a shared() instance outliving the page.
+	readonly hasLiveSharedState?: boolean;
 	// The page's tree reaches a storage() cell, possibly in a child module whose cells this payload never holds.
 	readonly storageCells?: boolean;
 	readonly installResumeSummary?: boolean;
@@ -903,6 +964,7 @@ export function emitResumeModule(input: {
 		// evaluation so the plane is in place before any resume entry builds the
 		// graph. The call is explicit because `@markless/web` declares
 		// `sideEffects: false`, which would drop a bare side-effect import.
+		emitAsyncPlanesInstall(input.asyncPlanes ?? payloadAsyncPlanes(input.payloadState)),
 		payloadHasComputed(input.payloadState)
 			? [
 					"import { installMarklessDerivedReconcile } from '@markless/web/fns/reconcile-plane';",
@@ -918,6 +980,10 @@ export function emitResumeModule(input: {
 		// all. The loader stays unresolved until a resumed root turns out to carry
 		// a marked element, so having the mark somewhere is still not fetching it.
 		demandsOverlay(input.runtimeDemandMap) ? emitOverlayLoaderInstall() : null,
+		input.hasLiveSharedState === true ||
+		hasLiveSharedDefinitions(input.payloadState as Parameters<typeof hasLiveSharedDefinitions>[0])
+			? emitSharedInstancesLoaderInstall()
+			: null,
 		input.hasIdleEvents ? emitIdleTriggerInstall() : null,
 		// Row building is pay-per-use the same way: this module is the ONLY place
 		// the mint's specifier is written, so an app whose repeats carry neither
@@ -1185,6 +1251,7 @@ function emitCompiledAppDefault(input: {
 		readonly location: 'head' | 'body';
 	}>;
 	readonly storageSeeds?: ReadonlyArray<StorageSeedMetadata>;
+	readonly storageSeedImports?: ReadonlyArray<string>;
 	readonly resumeModuleUrl?: string;
 	readonly prerenderWakeModuleUrl?: string;
 	readonly rootExportName: string | null;
@@ -1268,10 +1335,17 @@ function emitCompiledAppDefault(input: {
 		input.headInjections?.length && input.environment !== 'client'
 			? [`	headInjections: ${JSON.stringify(input.headInjections)},`]
 			: [];
-	const storageSeedEntry =
-		input.storageSeeds?.length && input.environment !== 'client'
-			? [`\tstorageSeeds: ${JSON.stringify(input.storageSeeds)},`]
-			: [];
+	const storageSeedImports = input.storageSeedImports ?? [];
+	const servesStorageSeeds =
+		(!!input.storageSeeds?.length || storageSeedImports.length > 0) && input.environment !== 'client';
+	const storageSeedImportLines = servesStorageSeeds
+		? storageSeedImports.map(
+				(source, index) => `import marklessStorageSeedChild${index} from ${JSON.stringify(source)};`,
+			)
+		: [];
+	const storageSeedEntry = servesStorageSeeds
+		? [`\tstorageSeeds: ${storageSeedsSource(input.storageSeeds ?? [], storageSeedImports.length)},`]
+		: [];
 	const modulePreloadEntry =
 		input.resumeModuleUrl && input.environment === 'server'
 			? [
@@ -1296,6 +1370,7 @@ function emitCompiledAppDefault(input: {
 				];
 
 	return [
+		...storageSeedImportLines,
 		'const marklessCompiledApp = {',
 		...renderCsrEntry,
 		...renderDataEntry,
@@ -1337,6 +1412,19 @@ const RESERVED_MODULE_BINDINGS: ReadonlySet<string> = new Set([
 	'readMarklessBehaviorSourceSymbol',
 	'resumeContainerEvent',
 ]);
+
+// A composing page lists its children's seeds after its own, once per slot.
+function storageSeedsSource(own: ReadonlyArray<StorageSeedMetadata>, childCount: number): string {
+	if (childCount === 0) return JSON.stringify(own);
+	const entries = [
+		...own.map((seed) => JSON.stringify(seed)),
+		...Array.from(
+			{ length: childCount },
+			(_, index) => `...(marklessStorageSeedChild${index}.storageSeeds ?? [])`,
+		),
+	];
+	return `[...new Map([${entries.join(', ')}].map((seed) => [seed.slotKey, seed])).values()]`;
+}
 
 /**
  * One real ES named export per component the module serves, so plain ESM reaches
@@ -1459,15 +1547,16 @@ function emitResumeContainerEvent(
 					'\t\t})();',
 					'\t\tconst marklessFullRuntime = await handoff.root.__marklessFullResumeRuntime;',
 					'\t\tif (!marklessFullRuntime) return;',
-					'\t\tawait marklessFullRuntime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+					'\t\tawait marklessFullRuntime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });',
 					'\t\treturn;',
 					'\t}',
 					'\tconst records = mergePrerenderPayloadRecords({ state: group.state, view: group.view }, handoff.root);',
 					'\tconst { runtime } = await resumePrerenderTriggerGroup({',
 					'\t\t...records, groupId: group.groupId, graphNodeIds: group.graphNodeIds,',
 					'\t\troot: handoff.root, loadSymbol: group.loadSymbol, prepareBoundaryArm: group.prepareBoundaryArm, renderBoundaryArm: group.renderBoundaryArm,',
+					...renderDataEntry('\t\t', 'marklessLoadPrerenderData()'),
 					'\t});',
-					'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+					'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });',
 					'}',
 				].join('\n')
 			: prerenderDataId
@@ -1497,7 +1586,7 @@ function emitResumeContainerEvent(
 							: ['\t\t})).runtime;']),
 						'\t})());',
 						'\tif (!runtime) return;',
-						'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+						'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });',
 						'}',
 					].join('\n')
 				: [
@@ -1517,7 +1606,7 @@ function emitResumeContainerEvent(
 						),
 						'	});',
 						...armsStarted('\t'),
-						'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+						'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });',
 						'}',
 					].join('\n');
 	const scalarOnlySpecialized =
@@ -1541,6 +1630,10 @@ function emitResumeContainerEvent(
 	const actionScopedLean =
 		leanMode === 'scalar' && scalarSpecializations.length > 0 && !prerenderDataId;
 
+	// The execution log forwards an event no record names only to record it; it never starts the runtime.
+	const logOnlyReturn = executionLogEnabled
+		? ['\tif (input.logOnly && !input.root.__asyncResumeRuntimeStarted) return;']
+		: [];
 	if (needsFullResume && !actionScopedLean) {
 		// Branch flips need graph subscriptions and range replacement: start the
 		// full resume runtime once, mark the container so the inline resumer
@@ -1548,6 +1641,7 @@ function emitResumeContainerEvent(
 		return [
 			fullResumeHandoff,
 			'export async function resumeContainerEvent(input) {',
+			...logOnlyReturn,
 			'	await marklessFullResumeHandoff({ ...input, document: input.root });',
 			'}',
 		].join('\n');
@@ -1562,6 +1656,7 @@ function emitResumeContainerEvent(
 			'		element: input.element,',
 			'		runtimeDemandMap: payloadRuntimeDemandMap,',
 			'		syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true,',
+			'		propagationStopped: input.propagationStopped === true,',
 			`		loadSymbol: ${loadSymbolName},`,
 			'	});',
 		];
@@ -1588,7 +1683,9 @@ function emitResumeContainerEvent(
 			].join('\n');
 		}
 		if (leanMode === 'row') {
-			return ['export async function resumeContainerEvent(input) {', ...row, '}'].join('\n');
+			return ['export async function resumeContainerEvent(input) {', ...logOnlyReturn, ...row, '}'].join(
+				'\n',
+			);
 		}
 		return [
 			fullResumeHandoff,
@@ -1598,6 +1695,7 @@ function emitResumeContainerEvent(
 			'		await marklessResumeSpecializedScalarEvent(input);',
 			'		return;',
 			'	}',
+			...logOnlyReturn,
 			...row,
 			'}',
 		].join('\n');
@@ -1608,6 +1706,7 @@ function emitResumeContainerEvent(
 	return [
 		fullResumeHandoff,
 		'export async function resumeContainerEvent(input) {',
+		...logOnlyReturn,
 		'	await marklessFullResumeHandoff({ ...input, document: input.root });',
 		'}',
 	].join('\n');
@@ -2225,9 +2324,10 @@ function emitLoadSymbol(
 	}
 
 	return [
+		`import { marklessWhenLoaded as marklessSymbolResolverWhenLoaded } from '${RESIDENT_LOAD_MODULE}';`,
 		`const marklessSymbolResolverModule = () => import(${singleQuoted(input.resolverId)});`,
 		'function loadSymbol(symbolId) {',
-		'	return marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
+		'	return marklessSymbolResolverWhenLoaded(marklessSymbolResolverModule(), (mod) => mod.loadSymbol(symbolId));',
 		'}',
 	].join('\n');
 }
@@ -2239,8 +2339,7 @@ function emitDirectSourceSymbolLoader(
 	return [
 		'function loadSymbol(symbolId) {',
 		...symbols.flatMap((symbol) => [
-			`	if (symbolId === ${JSON.stringify(symbol.id)}) return import(${singleQuoted(symbol.chunk)})`,
-			`		.then((mod) => ${readerName}(mod, ${JSON.stringify(symbol.exportName)}));`,
+			`	if (symbolId === ${JSON.stringify(symbol.id)}) return ${readerName}(import(${singleQuoted(symbol.chunk)}), ${JSON.stringify(symbol.exportName)});`,
 		]),
 		'	return Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
 		'}',
@@ -2250,9 +2349,12 @@ function emitDirectSourceSymbolLoader(
 
 function emitSourceSymbolExportReader(name = 'readMarklessSourceSymbol'): string {
 	return [
-		`function ${name}(mod, exportName) {`,
-		'	mod.init__virtual_markless_symbol?.();',
-		'	return mod[exportName];',
+		`import { marklessWhenLoaded as ${name}WhenLoaded } from '${RESIDENT_LOAD_MODULE}';`,
+		`function ${name}(loading, exportName) {`,
+		`	return ${name}WhenLoaded(loading, (mod) => {`,
+		'		mod.init__virtual_markless_symbol?.();',
+		'		return mod[exportName];',
+		'	});',
 		'}',
 	].join('\n');
 }

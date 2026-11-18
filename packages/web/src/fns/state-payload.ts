@@ -1,3 +1,4 @@
+import { durableError, serializeGraphValue } from '@markless/serializer';
 import { marklessSerializeGraphValue } from './state-serialize.ts';
 
 // The served state payload while it is still being built: cells carry the
@@ -29,10 +30,12 @@ export type MarklessComputedPayloadDraft = {
 
 // `marklessCloneState` copies the computed ARRAY but not the records in it, so a
 // served value replaces its record rather than mutating one the module still shares.
+// A value in `ifDurable` the serializer refuses stays unserved; resume derives it instead.
 export function marklessSsrServeComputed(
 	state: MarklessComputedPayloadDraft,
 	values: ReadonlyMap<string, unknown>,
 	graphNodeIds: ReadonlyArray<string>,
+	ifDurable: ReadonlyArray<string> = [],
 ) {
 	const computed = state.computed;
 	if (!computed) return;
@@ -41,9 +44,34 @@ export function marklessSsrServeComputed(
 		const index = computed.findIndex((record) => record.graphNodeId === graphNodeId);
 		const record = index < 0 ? undefined : computed[index];
 		if (!record) continue;
-		computed[index] = {
-			...record,
-			value: marklessSerializeGraphValue(values.get(graphNodeId), record),
-		};
+		const value = values.get(graphNodeId);
+		if (ifDurable.includes(graphNodeId)) {
+			const result = serializeGraphValue(value);
+			if (result.ok) computed[index] = { ...record, value: result.payload };
+			continue;
+		}
+		computed[index] = { ...record, value: marklessSerializeGraphValue(value, record) };
 	}
+}
+
+// A served @catch keeps the error it shows in its cell, so text joining it with graph reads still spells it after resume.
+export function marklessSsrCatchError(
+	values: Map<string, unknown>,
+	state: MarklessStatePayloadDraft,
+	graphNodeId: string,
+	error: unknown,
+	context: {
+		readonly idPrefix?: string;
+		readonly instancePath?: string;
+		readonly streaming?: { readonly caughtErrors?: Map<string, string> };
+	} | undefined,
+	boundaryId: string,
+) {
+	const durable = durableError(error);
+	values.set(graphNodeId, durable);
+	marklessSetStatePayloadValue(state, graphNodeId, durable);
+	context?.streaming?.caughtErrors?.set(
+		(context.idPrefix ?? '') + boundaryId,
+		(context.instancePath ?? '') + graphNodeId,
+	);
 }

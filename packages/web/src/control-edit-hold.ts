@@ -56,6 +56,40 @@ export function marklessNoteControlEdits(target: unknown): () => void {
 
 function noRelease(): void {}
 
+// Edit events no handler has read yet, per control: a write that changes the control would rewind their text, so it is held.
+const arrived = new WeakMap<object, ControlLike>();
+const unread = new WeakMap<ControlLike, Set<object>>();
+// What each control last took from a flush, which tells a person's edit from an event that replays nothing.
+const written = new WeakMap<ControlLike, Map<string, unknown>>();
+
+export function marklessNoteArrivingControlEdits(event: {
+	readonly type?: string;
+	readonly target?: unknown;
+}): () => void {
+	const element = /^(?:input|change)$/.test(event.type ?? '') && marklessEditableControl(event.target);
+	if (!element || !edited(element)) return noRelease;
+	arrived.set(event, element);
+	unread.set(element, (unread.get(element) ?? new Set()).add(event));
+	return () => marklessControlEditsRead(event);
+}
+
+export function marklessControlEditsRead(event: object): void {
+	const element = arrived.get(event);
+	const events = element && unread.get(element);
+	if (events?.delete(event) && !events.size) unread.delete(element!);
+}
+
+function edited(element: ControlLike): boolean {
+	const last = written.get(element);
+	return EDITED_PROPERTIES.some((name) => {
+		const live = element[name];
+		const settled = last?.has(name)
+			? last.get(name)
+			: element[name === 'value' ? 'defaultValue' : 'defaultChecked'];
+		return (typeof live === 'string' || typeof live === 'boolean') && live !== settled;
+	});
+}
+
 /**
  * Whether writing `name` would discard edits made since the handlers ran.
  *
@@ -64,6 +98,7 @@ function noRelease(): void {}
  * One that changes the control while an earlier dispatch runs may answer older text.
  */
 export function marklessControlWriteHeld(target: unknown, name: string, value: unknown): boolean {
+	if (heldForUnread(target as ControlLike, name, value)) return true;
 	const notes = noted.get(target as ControlLike);
 	const newest = notes?.[notes.length - 1];
 	if (!newest?.has(name)) return false;
@@ -75,5 +110,12 @@ export function marklessControlWriteHeld(target: unknown, name: string, value: u
 	)
 		return true;
 	newest.set(name, value);
+	return false;
+}
+
+function heldForUnread(target: ControlLike, name: string, value: unknown): boolean {
+	if (unread.get(target)?.size && target[name] !== value) return true;
+	if ((EDITED_PROPERTIES as ReadonlyArray<string>).includes(name))
+		(written.get(target) ?? written.set(target, new Map()).get(target)!).set(name, value);
 	return false;
 }

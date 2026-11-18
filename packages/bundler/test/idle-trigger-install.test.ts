@@ -51,3 +51,27 @@ test('only the resume module of a page with an onIdle record hands the runtime t
 	);
 	expect(await resume('PlainResume', '<p>now</p>')).not.toContain('idle-trigger');
 });
+
+test('a resume module installs the idle queue for an onIdle record only inside a streamed @try arm', async () => {
+	const resume = (
+		await transformTsrxModule({
+			filename: '/workspace/app/src/StreamedIdle.tsrx',
+			source: `import { computed } from '@markless/core';
+
+export default function App() @{
+	const user = computed(async () => ({ text: 'x' }));
+
+	<main>
+		@try {
+			<output onIdle={() => {}}>{user.text}</output>
+		} @pending {
+			<p>Loading</p>
+		}
+	</main>
+}
+`,
+			environment: 'client',
+		})
+	).virtualModules.find((module) => module.type === 'resume')?.source;
+	expect(resume).toContain('installMarklessIdle();');
+});

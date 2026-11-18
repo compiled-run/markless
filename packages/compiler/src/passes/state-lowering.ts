@@ -2,6 +2,7 @@ import type {
 	LoweredRowItem,
 	LoweredStateRead,
 	LoweredStateWrite,
+	PassedStateWrite,
 	SemanticGraphAlias,
 	SemanticGraphArtifact,
 	SemanticGraphBinding,
@@ -16,7 +17,7 @@ import type {
 } from '../artifacts.ts';
 import {
 	graphBindingMap,
-	optionalMemberReadSource,
+	templateReadPath,
 	resolveGraphPath,
 	semanticAliasMap,
 	splitStaticGraphPath,
@@ -55,7 +56,7 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		const lookup = scopedGraphLookup(input, null, read.componentName);
 		const resolved = resolveStateGraphPath(
 			input,
-			optionalMemberReadSource(read.source),
+			templateReadPath(read),
 			lookup,
 			null,
 			read.componentName,
@@ -163,6 +164,13 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 
 		if (write.optional === true) {
 			diagnostics.push(optionalChainWriteDiagnostic(write, input.semanticGraph.filename));
+			continue;
+		}
+
+		if (write.passedTo) {
+			const passed = lowerPassedStateWrite(write, write.passedTo, input, lookup);
+			if (passed?.kind === 'write') writes.push(passed.write);
+			else if (passed) diagnostics.push(passed.diagnostic);
 			continue;
 		}
 
@@ -327,6 +335,38 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		),
 		writes,
 		diagnostics,
+	};
+}
+
+// A call changed state in place; an assumed change to a value nothing may write is the call's own business.
+function lowerPassedStateWrite(
+	write: SemanticStateWrite,
+	passedTo: PassedStateWrite,
+	input: StateLoweringInput,
+	lookup: GraphLookup,
+): RowItemWriteLowering | null {
+	if (write.rowRepeatId) {
+		const row = lowerRowItemWrite(write, input);
+		if (row?.kind === 'write')
+			return { kind: 'write', write: { ...row.write, source: passedTo.argument, passedTo } };
+		return row && !passedTo.assumed ? row : null;
+	}
+	const resolved = resolveStateGraphPath(input, write.target, lookup, null, write.componentName);
+	if (!resolved) return null;
+	if (resolved.binding.kind !== 'state' || !resolved.binding.writable)
+		return passedTo.assumed
+			? null
+			: { kind: 'diagnostic', diagnostic: readOnlyWriteDiagnostic(write, resolved.binding) };
+	return {
+		kind: 'write',
+		write: {
+			source: passedTo.argument,
+			sourceSpan: write.targetSpan,
+			graphNodeId: resolved.binding.id,
+			path: resolved.path,
+			operation: 'call',
+			passedTo,
+		},
 	};
 }
 
@@ -608,106 +648,6 @@ type ResolvedStateGraphPath = {
 	readonly componentName?: string;
 };
 
-function templateExpressionGraphReadSource(source: string, lookup: GraphLookup): string | null {
-	if (!isCompositeTemplateExpression(source)) return null;
-
-	const code = blankLiteralText(source);
-	const candidates = [...lookup.bindings.keys(), ...lookup.aliases.keys()].sort(
-		(left, right) => right.length - left.length,
-	);
-	for (const name of candidates) {
-		if (sourceContainsIdentifier(code, name)) return name;
-	}
-
-	return null;
-}
-
-// Blanks string, template-text and comment characters so only code is searched for names.
-function blankLiteralText(source: string): string {
-	let out = '';
-	const braceDepths: number[] = [];
-	let depth = 0;
-	let index = 0;
-	const blankUntil = (end: number) => {
-		out += source.slice(index, end).replace(/[^\n]/g, ' ');
-		index = end;
-	};
-	const scanTemplateText = () => {
-		while (index < source.length) {
-			const char = source[index];
-			if (char === '\\') {
-				blankUntil(Math.min(index + 2, source.length));
-			} else if (char === '`') {
-				out += char;
-				index += 1;
-				return;
-			} else if (char === '$' && source[index + 1] === '{') {
-				out += '${';
-				index += 2;
-				braceDepths.push(depth);
-				depth += 1;
-				return;
-			} else {
-				blankUntil(index + 1);
-			}
-		}
-	};
-	while (index < source.length) {
-		const char = source[index]!;
-		if (char === "'" || char === '"') {
-			out += char;
-			index += 1;
-			while (index < source.length && source[index] !== char) {
-				blankUntil(Math.min(index + (source[index] === '\\' ? 2 : 1), source.length));
-			}
-			if (index < source.length) {
-				out += char;
-				index += 1;
-			}
-		} else if (char === '`') {
-			out += char;
-			index += 1;
-			scanTemplateText();
-		} else if (char === '/' && source[index + 1] === '/') {
-			const end = source.indexOf('\n', index);
-			blankUntil(end === -1 ? source.length : end);
-		} else if (char === '/' && source[index + 1] === '*') {
-			const end = source.indexOf('*/', index + 2);
-			blankUntil(end === -1 ? source.length : end + 2);
-		} else if (char === '{') {
-			depth += 1;
-			out += char;
-			index += 1;
-		} else if (char === '}') {
-			depth -= 1;
-			out += char;
-			index += 1;
-			if (braceDepths.at(-1) === depth) {
-				braceDepths.pop();
-				scanTemplateText();
-			}
-		} else {
-			out += char;
-			index += 1;
-		}
-	}
-	return out;
-}
-
-function isCompositeTemplateExpression(source: string): boolean {
-	return /[?:+\-*/%<>=!&|()[\]{}]/.test(source);
-}
-
-function sourceContainsIdentifier(source: string, identifier: string): boolean {
-	return new RegExp(`(^|[^$0-9A-Z_a-z])${escapeRegExp(identifier)}(?=$|[^$0-9A-Z_a-z])`).test(
-		source,
-	);
-}
-
-function escapeRegExp(value: string): string {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function scopedGraphLookup(
 	input: StateLoweringInput,
 	sharedDefinitionId: string | null,
@@ -742,34 +682,41 @@ export function staticTemplateReadDiagnostic(
 		bindings: graphBindingMap(semanticGraph, null, read.componentName),
 		aliases: semanticAliasMap(semanticGraph, null, read.componentName),
 	};
-	if (resolveGraphPath(optionalMemberReadSource(read.source), lookup.bindings, lookup.aliases))
+	if (resolveGraphPath(templateReadPath(read), lookup.bindings, lookup.aliases))
 		return null;
-	const readSource = templateExpressionGraphReadSource(read.source, lookup);
+	const readSource = read.readNames?.find(
+		(name) => lookup.bindings.has(name) || lookup.aliases.has(name),
+	);
 	if (!readSource) return null;
 	const diagnostic = templateExpressionStaticDiagnostic({
 		source: read.source,
 		readSource,
 		sourceSpan: read.sourceSpan,
 		filename: semanticGraph.filename,
+		target: read.target,
+		...(read.propMemberReads?.length
+			? {
+					propMembers: read.propMemberReads,
+					changingProps: (read.readNames ?? []).filter(
+						(name) => resolveGraphPath(name, lookup.bindings, lookup.aliases)?.binding.kind === 'prop',
+					),
+				}
+			: {}),
 	});
-	const props = read.componentName ? propsOnlyReads(read.source, lookup, semanticGraph.moduleImports) : null;
+	const props = read.componentName
+		? propsOnlyReads(read.readNames ?? [], lookup, semanticGraph.moduleImports)
+		: null;
 	return props ? { ...diagnostic, decidedByProps: { componentName: read.componentName!, props } } : diagnostic;
 }
 
 // Every name the expression reads is a prop or an import: anything else, a body local included, keeps the warning unsettled.
 function propsOnlyReads(
-	source: string,
+	names: ReadonlyArray<string>,
 	lookup: GraphLookup,
 	imports: StateLoweringInput['semanticGraph']['moduleImports'],
 ): ReadonlyArray<string> | null {
-	const code = blankLiteralText(source);
 	const props = new Set<string>();
-	for (const match of code.matchAll(/(?<![$\w.])([A-Za-z_$][\w$]*)(?![$\w])/g)) {
-		const name = match[1]!;
-		const after = code.slice(match.index + name.length);
-		const before = code.slice(0, match.index);
-		if (/^\s*:/.test(after) && /[{,]\s*$/.test(before)) continue;
-		if (/^(?:true|false|null|undefined|typeof|void|in|instanceof|new)$/.test(name)) continue;
+	for (const name of names) {
 		const resolved = resolveGraphPath(name, lookup.bindings, lookup.aliases);
 		if (!resolved && imports.some((imported) => imported.localName === name && !imported.typeOnly))
 			continue;
@@ -784,24 +731,63 @@ function propsOnlyReads(
 	return props.size > 0 ? [...props] : null;
 }
 
+function listed(items: ReadonlyArray<string>, joiner = 'and'): string {
+	return items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} ${joiner} ${items.at(-1)}`;
+}
+
+function callSite(
+	target: SemanticGraphArtifact['templateReads'][number]['target'] | undefined,
+	prop: string,
+): string {
+	if (target?.kind === 'class') return `class={classFor(${prop})}`;
+	if (target?.kind === 'attribute' || target?.kind === 'property')
+		return `${target.name}={valueFor(${prop})}`;
+	return `{textFor(${prop})}`;
+}
+
 function templateExpressionStaticDiagnostic({
 	source,
 	readSource,
 	sourceSpan,
 	filename,
+	target,
+	propMembers,
+	changingProps,
 }: {
 	readonly source: string;
 	readonly readSource: string;
 	readonly sourceSpan?: SourceSpan;
 	readonly filename: string;
+	readonly target?: SemanticGraphArtifact['templateReads'][number]['target'];
+	readonly propMembers?: ReadonlyArray<string>;
+	readonly changingProps?: ReadonlyArray<string>;
 }): StateLoweringDiagnostic {
+	const names = propMembers?.map((name) => `\`${name}\``);
+	const props = names && (names.length === 1 ? `the prop ${names[0]}` : `the props ${listed(names)}`);
+	const each = names && (names.length === 1 ? names[0]! : listed(names, 'or'));
+	const changing = listed(
+		(changingProps?.length ? changingProps : (propMembers ?? [])).map((name) => `\`${name}\``),
+		'or',
+	);
+	const place =
+		target?.kind === 'class'
+			? 'This class attribute'
+			: target?.kind === 'attribute'
+				? `This ${target.name} attribute`
+				: target?.kind === 'property'
+					? `This ${target.name} property`
+					: 'This text';
 	return {
 		code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
 		severity: 'warning',
 		phase: 'state-lowering',
 		title: 'This expression reads state but never updates',
-		message: `This text reads \`${readSource}\`, but only plain reads like \`{${readSource}}\` update the page today. The expression renders its initial value and never changes when \`${readSource}\` changes.`,
-		why: 'Each template read compiles to a graph subscription with a DOM-update record; composite expressions are not lowered yet, so no subscription exists to wake this text.',
+		message: props
+			? `${place} reads into ${props} in \`${source}\`. The browser holds a prop only as the plain value the caller passed, and the build cannot tell whether ${each} is a plain value or an object, so the expression renders its initial value and never changes when ${changing} changes.`
+			: `${place} reads \`${readSource}\`, but only plain reads like \`{${readSource}}\` update the page today. The expression renders its initial value and never changes when \`${readSource}\` changes.`,
+		why: props
+			? 'A child keeps each prop as one value the caller passed: a string, number or boolean, never the object behind it. An expression that reads into a prop is lowered only when that cannot be an object, so no subscription exists to wake it.'
+			: 'Each template read compiles to a graph subscription with a DOM-update record; composite expressions are not lowered yet, so no subscription exists to wake this text.',
 		primarySpan: sourceSpan ?? fallbackSpan(filename),
 		passId: 'state-lowering',
 		artifactKeys: ['semanticGraph', 'stateLowering'],
@@ -809,8 +795,9 @@ function templateExpressionStaticDiagnostic({
 		source,
 		suggestions: [
 			{
-				message:
-					"Hoist the logic into a derived value: `const label = computed(() => a ? 'x' : 'y');` with `<p>{label}</p>`.",
+				message: propMembers?.length
+					? `If ${names!.length === 1 ? `${each} is` : `${listed(names!)} are each`} a string, number or boolean, move the whole expression into a function declared outside the component that takes ${names!.length === 1 ? 'the prop' : 'those props'}, and call it in its place: \`${callSite(target, propMembers.join(', '))}\`. If one is an object, have the caller pass the value the expression needs as its own prop.`
+					: "Hoist the logic into a derived value: `const label = computed(() => a ? 'x' : 'y');` with `<p>{label}</p>`.",
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_STATIC',

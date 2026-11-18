@@ -14,8 +14,8 @@ import MultiEmbed from './scenarios/multi-embed.tsrx';
 //
 //   rovingKey — a progress bar has no walk and takes no focus.
 //   disabled — a bar reports, it never refuses; there is no locked state to read.
-//   pageScoped — the family's only cell is widget-scoped, so this scenario reads
-//   no page-scoped `shared()` for the singular-cell half of the id rule.
+//   pageScoped — the family's only cell is subtree-scoped, so this scenario reads
+//   no app-scoped `shared()` for the singular-cell half of the id rule.
 //
 // What is left is the whole of what a display family owes: its value is its own.
 runMultiEmbedConformance({

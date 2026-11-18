@@ -9,7 +9,7 @@ export const picker = shared(
 
 		return { ...s };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function PickerRoot({ children }) @{

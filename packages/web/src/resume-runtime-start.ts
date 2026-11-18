@@ -2,7 +2,8 @@ import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../serializer/src/protocol-event
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 // Only resume.ts loads this module, and it imports the locators statically already.
 import { elementsBetweenAnchors, hostIdsInsideRemovedElements } from './resume-locators.ts';
-import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
+import { withRangeJournalCode } from './dom-journal-load.ts';
+import type { AsyncBoundarySettleTracker, AsyncBoundaryWiring } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type { OverlayHiddenBoundRoot } from './overlay-handoff.ts';
 import type {
@@ -87,24 +88,30 @@ export async function startResumeRuntime(input: {
 		boundary: ResumeAsyncBoundaryRecord,
 		update: ArmCommitUpdate,
 	) => Promise<void>;
+	readonly prepareArmCommit: (
+		boundary: ResumeAsyncBoundaryRecord,
+		update: ArmCommitUpdate,
+	) => Promise<() => Promise<void>>;
 	// Receives the branch-runtime hooks built here (escalated-flip re-settle +
 	// pending-flip hold) before any branch runtime loads.
 	readonly connectBranchWiring: (wiring: {
 		readonly resettleBoundary: (boundaryId: string) => Promise<DomJournalResult | void>;
 		readonly holdPendingFlip: (graphNodeId: string) => boolean;
 	}) => void;
-	readonly connectAsyncBoundaryWiring: (
-		wiring: import('./resume-async-wiring.ts').AsyncBoundaryWiring,
-	) => void;
+	readonly connectAsyncBoundaryWiring: (wiring: () => Promise<AsyncBoundaryWiring>) => void;
+	// Hosts of behaviors a served arm holds, activated once the runtime has started.
+	readonly servedBehaviors: string[];
 	readonly receiveSharedPatch: RuntimeShared['receiveSharedPatch'];
 	readonly sharedPatchEventType: string;
 	// Handed straight to the repeat runtime, which hands it to a component row's
 	// bridge: the registrar a row born after boot registers its records through.
 	readonly armRegistrationDeps: (
 		records: import('./resume-commit-arm.ts').ArmCommitUpdate['armRecords'],
+		servedBehaviors?: string[],
 	) => Promise<import('./resume-commit-arm.ts').ArmRegistrationDeps>;
 	readonly installArmEventType: (eventType: string) => void;
-}): Promise<AsyncBoundarySettleTracker | undefined> {
+	readonly rowComponentHost: import('./fns/row-component-mint.ts').RowComponentMintHost;
+}): Promise<() => AsyncBoundarySettleTracker | undefined> {
 	const {
 		runtimeInput,
 		prepared,
@@ -127,7 +134,7 @@ export async function startResumeRuntime(input: {
 	await events.prepareSyncPolicy(runtimeInput.view.events, [...rowEvents, ...armEvents]);
 	if (runtimeInput.applyDomJournal) {
 		storeContainerSubscription(
-			runtimeInput.graph.subscribeJournal(async (entries) => {
+			runtimeInput.graph.subscribeJournal(withRangeJournalCode(async (entries) => {
 				await disposeRemovedAsyncRangeHosts(runtimeInput, prepared, entries, disposeHost);
 				const branchRuntime = input.branchRuntime();
 				if (branchRuntime) {
@@ -137,13 +144,14 @@ export async function startResumeRuntime(input: {
 						prepared.asyncBoundariesById,
 					);
 				}
+				if (input.rowComponentHost.disposed?.()) return;
 				await runtimeInput.applyDomJournal!(entries);
 				await input
 					.branchRuntime()
 					?.materializeFlippedBranchArms(entries, (hostNodeId) =>
 						input.behaviorRuntime()!.activateBehaviors(hostNodeId, { flush: false }),
 					);
-			}),
+			})),
 		);
 	}
 	if ((runtimeInput.view.keyedRepeats ?? []).length > 0) {
@@ -165,6 +173,7 @@ export async function startResumeRuntime(input: {
 			loadSymbol: runtimeInput.loadSymbol,
 			elementHandles: prepared.elementHandles,
 		});
+		await runtimeInput.loadRepeatModules?.(runtimeInput.view.keyedRepeats!);
 		await keyedRepeats.wireKeyedRepeats(
 			{
 				graph: runtimeInput.graph,
@@ -175,12 +184,7 @@ export async function startResumeRuntime(input: {
 				renderData: runtimeInput.renderData,
 				root: runtimeInput.root,
 			},
-			{
-				runtimeInput,
-				armRegistrationDeps: input.armRegistrationDeps,
-				installArmEventType: input.installArmEventType,
-				elementsByHostId: prepared.elementsByHostId,
-			},
+			input.rowComponentHost,
 		);
 	}
 	// Not gated on a keyed repeat: a family whose parts are written flat has a
@@ -201,37 +205,28 @@ export async function startResumeRuntime(input: {
 		});
 	}
 	let settleTracker: AsyncBoundarySettleTracker | undefined;
-	if (runtimeInput.view.asyncBoundaries.length > 0) {
-		const asyncWiring = await import('./resume-async-wiring.ts');
-		// D8: settled-content tracking (deadline-gated pending, the navigation-
-		// transition settle promise, pending minimum duration).
-		settleTracker = asyncWiring.createAsyncBoundarySettleTracker({
-			boundaries: prepared.asyncBoundariesById.values(),
-		});
-		// Captures the mounted @pending arms before the runners are demanded below.
-		const { wireResettleHold } = await import('./resume-resettle-hold.ts');
-		const onAsyncSnapshot = wireResettleHold({
-			tracker: settleTracker,
-			boundaries: prepared.asyncBoundariesById.values(),
-			readStatus: (graphNodeId) => runtimeInput.graph.read(graphNodeId, ['status']),
-			commitArm: input.commitArm,
-			hasHtmlRenderer: !!runtimeInput.renderBranchHtml,
-		});
-		input.connectAsyncBoundaryWiring(asyncWiring.wireAsyncBoundariesWithoutLoadingCapability({
-			asyncBoundariesById: prepared.asyncBoundariesById,
-			graph: runtimeInput.graph,
-			root: runtimeInput.root,
-			loadSymbol: runtimeInput.loadSymbol,
-			renderBranchHtml: runtimeInput.renderBranchHtml,
-			renderAsyncBoundary: runtimeInput.renderAsyncBoundary,
-			elementHandles: prepared.elementHandles,
-			storeContainerSubscription,
-			commitArm: input.commitArm,
-			demandOnStart: runtimeInput.demandAsyncBoundaries === true,
-			settleTracker,
-			onAsyncSnapshot,
-		}));
-	}
+	// A page that served no @try still wires one an escalated @if renders later.
+	let wiring: Promise<AsyncBoundaryWiring> | undefined;
+	const wire = () =>
+		(wiring ??= (async () => {
+			const started = (await import('./resume-async-wiring.ts')).startAsyncBoundaries({
+				asyncBoundariesById: prepared.asyncBoundariesById,
+				graph: runtimeInput.graph,
+				root: runtimeInput.root,
+				loadSymbol: runtimeInput.loadSymbol,
+				renderBranchHtml: runtimeInput.renderBranchHtml,
+				renderAsyncBoundary: runtimeInput.renderAsyncBoundary,
+				elementHandles: prepared.elementHandles,
+				storeContainerSubscription,
+				commitArm: input.commitArm,
+				prepareArmCommit: input.prepareArmCommit,
+				demandOnStart: runtimeInput.demandAsyncBoundaries === true,
+			});
+			settleTracker = started.settleTracker;
+			return started;
+		})());
+	if (runtimeInput.view.asyncBoundaries.length > 0) await wire();
+	input.connectAsyncBoundaryWiring(wire);
 	for (const computed of runtimeInput.state?.computed ?? []) {
 		if (
 			computed.snapshot?.status === 'pending' &&
@@ -245,6 +240,20 @@ export async function startResumeRuntime(input: {
 		) {
 			runtimeInput.graph.read(computed.graphNodeId, ['status']);
 		}
+	}
+	// After the wiring connects and pending runners start, so a served arm's nested @try registers into it as a committed arm's does.
+	for (const boundary of prepared.asyncBoundariesById.values()) {
+		const armRecords = boundary.armRecords as ArmCommitUpdate['armRecords'] | undefined;
+		if (!armRecords || Array.isArray(armRecords)) continue;
+		await (await import('./resume-commit-arm.ts')).registerArmRecordSet(
+			await input.armRegistrationDeps(armRecords, input.servedBehaviors),
+			input.installArmEventType,
+			boundary,
+			{ armRecords },
+			undefined,
+			// The page's records, registered at boot: only the arm's nested @try runners are defined from them.
+			runtimeInput.state?.computed,
+		);
 	}
 	// Branch-runtime hooks live here with the settle machinery they depend on;
 	// the runtime core only carries their connection point.
@@ -264,10 +273,13 @@ export async function startResumeRuntime(input: {
 					renderAsyncBoundary: runtimeInput.renderAsyncBoundary,
 					elementHandles: prepared.elementHandles,
 					commitArm: input.commitArm,
+					prepareArmCommit: input.prepareArmCommit,
 					settleTracker,
 				},
 				boundary,
 				runtimeInput.graph.read(boundary.runnerGraphNodeId, []),
+				undefined,
+				true,
 			);
 		},
 		// Spec D8: a branch flip whose deciding test read goes THROUGH an async
@@ -361,8 +373,14 @@ export async function startResumeRuntime(input: {
 		runtimeInput.root.addEventListener?.(sharedPatchEventType, receiveSharedPatch, {
 			capture: true,
 		});
+		storeContainerSubscription(() =>
+			runtimeInput.root.removeEventListener?.(sharedPatchEventType, receiveSharedPatch, {
+				capture: true,
+			}),
+		);
 	}
-	return settleTracker;
+	// A getter: the tracker is created when the first @try is wired, which can be after start.
+	return () => settleTracker;
 }
 
 async function disposeRemovedAsyncRangeHosts(

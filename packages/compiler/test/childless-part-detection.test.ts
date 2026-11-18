@@ -26,7 +26,7 @@ export const barState = shared(() => {
 	const bar = state({ amount: 40 });
 
 	return { ...bar };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ children, ...rest }) @{
 	const bar = barState();

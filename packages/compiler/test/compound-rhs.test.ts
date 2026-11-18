@@ -111,7 +111,7 @@ test('the compound shape never emits the binding name, whichever way it is decid
 
 const SUPPORTED: ReadonlyArray<readonly [string, string, string]> = [
 	['a direct read', 's.n = s.text;', 'context.graph.read("state:s", ["text"])'],
-	['a read in an operand', 's.n = s.n + 1;', 'context.graph.read("state:s", ["n"]) + 1'],
+	['a read in an operand', 's.n = s.n + 1;', 'return value + 1;'],
 	[
 		'a local hop',
 		'const t = s.text; s.n = t.length;',

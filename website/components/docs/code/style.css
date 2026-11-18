@@ -1,7 +1,7 @@
 body {
 	--ink: light-dark(
 		oklch(28% 0.015 90),
-		oklch(93% 0.012 85)
+		oklch(91.4% 0.033 79)
 	);
 	--pen: oklch(84% 0.1 140);
 	color: var(--ink);

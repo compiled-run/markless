@@ -25,7 +25,7 @@ import { shared, state } from '@markless/core';
 export const buf = shared(() => {
 	const s = state({ search: '', searchAt: 0, echo: '' });
 	return { ...s, ${method} };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Box() @{
 	const b = buf();

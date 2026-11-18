@@ -20,13 +20,13 @@ export const groupState = shared(() => {
 	const cell = state({ value: 'a' });
 
 	return { ...cell };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export const itemState = shared(() => {
 	const cell = state({ picked: 'b' });
 
 	return { ...cell };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Group() @{
 	const group = groupState();
@@ -57,7 +57,7 @@ export const flagState = shared(() => {
 	const cell = state({ open: true });
 
 	return { ...cell };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Panel() @{
 	const panel = flagState();

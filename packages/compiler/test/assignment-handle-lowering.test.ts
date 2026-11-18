@@ -135,7 +135,7 @@ export function Page() @{
 
 	const [source] = eventSymbolSources(result);
 	expect(source).toContain('openOverlay(context.getElementHandle("element:contentEl")');
-	expect(source).toContain('context.graph.write({ graphNodeId: "state:dismissals"');
+	expect(source).toContain('context.graph.update({ graphNodeId: "state:dismissals"');
 	expect(source).not.toContain('context.graph.read("state:dismissals") =');
 	expect(() => parseJavaScriptModule(source ?? '')).not.toThrow();
 });
@@ -221,6 +221,6 @@ export function Page() @{
 	const [source] = eventSymbolSources(result);
 	expect(source).toContain('context.getElementHandle("box")?.focus()');
 	// The handler's own write is claimed by the write lowering, not refused.
-	expect(source).toContain('context.graph.write(');
+	expect(source).toContain('context.graph.update(');
 	expect(source).not.toMatch(/\bhits\s*=/);
 });

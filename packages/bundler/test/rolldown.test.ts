@@ -17,6 +17,8 @@ import { readExecutionDemandAsset } from '../src/build/execution-demand.ts';
 import { UNSHIPPED_HOOK_REASON } from '../src/build/execution-sizes.ts';
 import { verifyGeneratedSymbolTableRoutes } from '../src/build/symbol-table.ts';
 import { moduleIdFor } from '../src/module-id.ts';
+import { RESIDENT_LOAD_MODULE } from '../src/rebound-symbol-route.ts';
+import { marklessWhenLoaded } from '@markless/web/fns/resident-load';
 import {
 	callBuildStart,
 	callGenerateBundle,
@@ -695,7 +697,7 @@ let active = state(true);
 		expect(result.code).toContain('if (symbolId === "symbol:0")');
 		expect(result.code).toContain('if (symbolId === "symbol:7")');
 		expect(result.code).toContain('import("virtual:markless:symbol:');
-		expect(result.code).toMatch(/readMarklessSourceSymbol\(mod, "symbol_0_[a-z0-9]+"\)/);
+		expect(result.code).toMatch(/readMarklessSourceSymbol\(import\("[^"]+"\), "symbol_0_[a-z0-9]+"\)/);
 		expect(result.code).toContain('mod.init__virtual_markless_symbol?.();');
 		expect(result.code).not.toContain('name.startsWith("init__virtual_markless_symbol")');
 	});
@@ -710,7 +712,7 @@ let active = state(true);
 			'const marklessSymbolResolverModule = () => import("virtual:markless:resolver:',
 		);
 		expect(result.code).toContain(
-			'return marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
+			'return marklessSymbolResolverWhenLoaded(marklessSymbolResolverModule(), (mod) => mod.loadSymbol(symbolId));',
 		);
 	});
 
@@ -1899,7 +1901,11 @@ export function App() @{
 		)!;
 		const childHandlerUrl = `data:text/javascript,${encodeURIComponent(childHandlerModule.source)}`;
 		const resolverUrl = `data:text/javascript,${encodeURIComponent(
-			resolver.source.split(childHandlerModule.id).join(childHandlerUrl),
+			resolver.source
+				.split(childHandlerModule.id)
+				.join(childHandlerUrl)
+				.split(RESIDENT_LOAD_MODULE)
+				.join(`data:text/javascript,${encodeURIComponent(`export ${marklessWhenLoaded}`)}`),
 		)}`;
 		const loadedResolver = (await import(resolverUrl)) as {
 			loadSymbol(id: string): Promise<(context: unknown) => unknown>;
@@ -2279,7 +2285,9 @@ export function App() @{
 				item.moduleIds.includes(`\0${resolverId}`),
 		);
 		expect(resolverChunk?.code).toContain('if (id === "symbol:0")');
-		expect(resolverChunk?.code).toContain('import(/* @vite-ignore */ "./chunk-');
+		// Packed, the resolver's imports are the bundler's own, rewritten to the chunk each symbol landed in.
+		expect(resolverChunk?.code).toContain('import("./chunk-');
+		expect(resolverChunk?.code).not.toContain('@vite-ignore');
 		expect(resolverChunk?.code).not.toContain('virtual:markless:symbol:');
 	});
 

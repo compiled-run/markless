@@ -13,7 +13,7 @@ import type {
 } from '../artifacts.ts';
 import {
 	graphBindingMap,
-	optionalMemberReadSource,
+	templateReadPath,
 	resolveGraphPath,
 	runtimeGraphDependencyPath,
 	runtimeGraphReadPath,
@@ -58,7 +58,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	// the host it is bound to.
 	const resolveTemplateRead = (read: SemanticTemplateRead) => {
 		const scope = readScopeOf(read.componentName ?? componentByHostNodeId.get(read.hostNodeId));
-		const source = optionalMemberReadSource(read.source);
+		const source = templateReadPath(read);
 		return (
 			resolveGraphPath(source, scope.bindings, scope.aliases) ??
 			resolveSharedInstanceGraphPath(
@@ -194,7 +194,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		// A read authored directly in a branch arm has no host of its own: bound
 		// to the enclosing element it would erase the sibling arm's markers, so
 		// it drives the arm's range instead (branchContentReads below).
-		if (read.armScopeBranchSiteId) return [];
+		if (read.armScopeBranchSiteId || read.armScopeBoundaryId) return [];
 		// A read projected into a child edge's children has no element here either:
 		// written to the enclosing host it replaces that host's whole content.
 		if (read.projectedComponentEdgeId) return [];
@@ -450,6 +450,7 @@ function payloadBehavior(
 		constantInputs,
 		functionSpan: _functionSpan,
 		functionParameters: _functionParameters,
+		readSources: _readSources,
 		...record
 	} = behavior;
 	const inputGraphReads = behaviorInputGraphReads(behavior.inputSources, bindings, aliases);

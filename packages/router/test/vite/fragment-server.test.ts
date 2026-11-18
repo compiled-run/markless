@@ -172,6 +172,68 @@ test("the head's modulepreloads, the document's own included, come right after t
 	expect(html.indexOf('/in-body.js')).toBeGreaterThan(html.indexOf('<body'));
 });
 
+test("the head's modulepreloads follow its stylesheets, so WebKit paints without waiting for them", async () => {
+	const importMap = '<script type="importmap">{"imports":{}}</script>';
+	const served = entry({
+		importMap,
+		shell: '<html><head><meta charset="utf-8"><link rel="modulepreload" href="/site-script.js"><link rel="stylesheet" href="/a.css"><title>Shell</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/b.css"><meta name="description" content="d"></head><body>__children__</body></html>',
+	});
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	const preloads = [...html.matchAll(/<link rel="modulepreload"[^>]*>/g)];
+	expect(preloads.map((preload) => preload[0].includes('/site-script.js'))).toContain(true);
+	expect(preloads.length).toBeGreaterThan(1);
+	const lastStylesheet = html.indexOf('<link rel="stylesheet" href="/b.css">');
+	for (const preload of preloads) {
+		expect(preload.index).toBeGreaterThan(html.indexOf(importMap));
+		expect(preload.index).toBeGreaterThan(lastStylesheet);
+		expect(preload.index).toBeLessThan(html.indexOf('<meta name="description"'));
+	}
+});
+
+test('a classic head script keeps every modulepreload ahead of it, even with a stylesheet after it', async () => {
+	const served = entry({
+		importMap: '<script type="importmap">{"imports":{}}</script>',
+		shell: '<html><head><meta charset="utf-8"><link rel="stylesheet" href="/a.css"><script type="module">import "/m.js"</script><script src="/later.js" defer></script><script>window.theme = 1</script><link rel="stylesheet" href="/b.css"><title>Shell</title></head><body>__children__</body></html>',
+	});
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	const preloads = [...html.matchAll(/<link rel="modulepreload"[^>]*>/g)];
+	expect(preloads.length).toBeGreaterThan(0);
+	for (const preload of preloads) {
+		expect(preload.index).toBeGreaterThan(html.indexOf('<link rel="stylesheet" href="/a.css">'));
+		expect(preload.index).toBeLessThan(html.indexOf('<script>window.theme'));
+	}
+});
+
+test('a ">" inside a quoted stylesheet attribute does not split the tag, and an uppercase head end keeps the preloads in the head', async () => {
+	const stylesheet = '<link rel="stylesheet" href="/a.css" title="wide > narrow">';
+	const served = entry({
+		importMap: '<script type="importmap">{"imports":{}}</script>',
+		shell: `<html><head><meta charset="utf-8">${stylesheet}<title>Shell</title></HEAD><body><link rel="stylesheet" href="/body.css">__children__</body></html>`,
+	});
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	expect(html).toContain(stylesheet);
+	const preloads = [...html.matchAll(/<link rel="modulepreload"[^>]*>/g)];
+	expect(preloads.length).toBeGreaterThan(0);
+	for (const preload of preloads) {
+		expect(preload.index).toBeGreaterThan(html.indexOf(stylesheet));
+		expect(preload.index).toBeLessThan(html.indexOf('<body'));
+	}
+});
+
+test('a classic script with any JavaScript type keeps the preloads ahead of it, and a stylesheet in a nested template does not count', async () => {
+	const served = entry({
+		importMap: '<script type="importmap">{"imports":{}}</script>',
+		shell: '<html><head><meta charset="utf-8"><link rel="stylesheet" href="/a.css"><template><template></template><link rel="stylesheet" href="/inert.css"></template><script type="text/ecmascript">window.theme = 1</script><link rel="stylesheet" href="/b.css"><title>Shell</title></head><body>__children__</body></html>',
+	});
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	const preloads = [...html.matchAll(/<link rel="modulepreload"[^>]*>/g)];
+	expect(preloads.length).toBeGreaterThan(0);
+	for (const preload of preloads) {
+		expect(preload.index).toBeGreaterThan(html.indexOf('/a.css'));
+		expect(preload.index).toBeLessThan(html.indexOf('<template>'));
+	}
+});
+
 test('a modulepreload written as text inside a head script, style or comment stays where it is', async () => {
 	const script = `<script>document.head.insertAdjacentHTML('beforeend', '<link rel="modulepreload" href="/widget.js">')</script>`;
 	const style = '<style>/* <link rel="modulepreload" href="/in-style.js"> */</style>';

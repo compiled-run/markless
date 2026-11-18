@@ -1,5 +1,3 @@
-// oxlint-disable-next-line typescript/triple-slash-reference -- the source ships to consumers, who need these globals
-/// <reference path="./navigation-api.d.ts" />
 import {
 	buildRouteManifestFromFileIds,
 	matchRouteManifest,
@@ -12,6 +10,7 @@ import {
 	type RouteUpdate,
 } from './route-state.ts';
 import { LINK_ATTRIBUTE, REPLACE_ATTRIBUTE, SCROLL_ATTRIBUTE } from './link-attributes.ts';
+import type { NavigateEvent, Navigation, NavigationScrollBehavior } from './navigation-api.ts';
 
 const STARTED = '__marklessRouterSpaNavigationStarted';
 const LINK_INFO = '__marklessRouterLink';

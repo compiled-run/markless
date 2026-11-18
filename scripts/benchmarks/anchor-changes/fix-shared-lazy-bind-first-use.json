@@ -1,0 +1,148 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 4,
+			"reason": "page-scoped shared() loads a small start module with its binding; the docs new-app startup pack crosses the pack size cap and splits in two",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 4,
+			"reason": "page-scoped shared() loads a small start module with its binding; the docs new-app startup pack crosses the pack size cap and splits in two",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 4,
+			"reason": "page-scoped shared() loads a small start module with its binding; the docs new-app startup pack crosses the pack size cap and splits in two",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1525,
+			"reason": "page-scoped shared() loads a small start module with its binding; the docs new-app startup pack crosses the pack size cap and splits in two",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1109,
+			"reason": "page-scoped shared() loads a small start module with its binding; the docs new-app startup pack crosses the pack size cap and splits in two",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 384,
+			"reason": "page-scoped shared() loads a small start module with its binding; the docs new-app startup pack crosses the pack size cap and splits in two",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 23,
+			"reason": "page-scoped shared() loads a small start module with its binding; the docs new-app startup pack crosses the pack size cap and splits in two",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 23,
+			"reason": "page-scoped shared() loads a small start module with its binding; the docs new-app startup pack crosses the pack size cap and splits in two",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 23,
+			"reason": "page-scoped shared() loads a small start module with its binding; the docs new-app startup pack crosses the pack size cap and splits in two",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 653,
+			"reason": "page-scoped shared() loads a small start module with its binding; the docs new-app startup pack crosses the pack size cap and splits in two",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1141,
+			"reason": "page-scoped shared() loads a small start module with its binding; the docs new-app startup pack crosses the pack size cap and splits in two",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 401,
+			"reason": "page-scoped shared() loads a small start module with its binding; the docs new-app startup pack crosses the pack size cap and splits in two",
+			"date": "2026-11-05"
+		}
+	]
+}

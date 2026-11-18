@@ -3,16 +3,17 @@ import {
 	protocolBoundSymbolBaseEnd,
 } from '../../../serializer/src/protocol-constants.ts';
 
-export function marklessBoundSymbolId(
-	child: {
-		readonly symbolPrefix?: string;
-		readonly boundSymbols?: Readonly<Record<string, string>>;
-	},
-	symbolId: string,
-): string {
+type BoundChild = {
+	readonly symbolPrefix?: string;
+	readonly boundSymbols?: Readonly<Record<string, string>>;
+	/** Where the module whose edge owns `boundSymbols` is rooted, in the same space as `symbolPrefix`. */
+	readonly boundSymbolPrefix?: string;
+};
+
+export function marklessBoundSymbolId(child: BoundChild, symbolId: string): string {
 	const rebound = marklessReboundSymbolId(child.boundSymbols, symbolId);
 	return rebound
-		? marklessBoundOwnerPrefix(child.symbolPrefix) + rebound
+		? (child.boundSymbolPrefix ?? '') + rebound
 		: `${child.symbolPrefix ?? ''}${symbolId}`;
 }
 
@@ -34,23 +35,13 @@ export function marklessReboundSymbolId(
 		: undefined;
 }
 
-function marklessBoundOwnerPrefix(symbolPrefix: string | undefined): string {
-	return /^m\d+:/.exec(symbolPrefix ?? '')?.[0] ?? '';
-}
-
 // A composed DOM update receives its current value from the remapped graph
 // record. If an inner component already bound the update symbol, keep that
 // complete ID in the inner resolver's namespace instead of rebinding its bare
 // `symbol:N` segment through an unrelated outer symbol with the same local ID.
-export function marklessDomUpdateSymbolId(
-	child: {
-		readonly symbolPrefix?: string;
-		readonly boundSymbols?: Readonly<Record<string, string>>;
-	},
-	symbolId: string,
-): string {
+export function marklessDomUpdateSymbolId(child: BoundChild, symbolId: string): string {
 	const direct = child.boundSymbols?.[symbolId];
-	if (direct) return direct;
+	if (direct) return (child.boundSymbolPrefix ?? '') + direct;
 	return protocolBoundSymbolBase(symbolId)
 		? `${child.symbolPrefix ?? ''}${symbolId}`
 		: marklessBoundSymbolId(child, symbolId);

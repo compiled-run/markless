@@ -11,7 +11,8 @@ describe('anatomy drawings', () => {
 			if (!/^## (Anatomy|Structure)$/m.test(source) || file.startsWith('_')) continue;
 			const family = file.replace('.mdx', '');
 			expect(scenes[family], family).toBeDefined();
-			expect(source, family).toContain('<AnatomyTable');
+			const figure = family.replace(/(^|-)(\w)/g, (_, _dash, letter: string) => letter.toUpperCase()) + 'Anatomy';
+			expect(source.includes('<AnatomyTable') || source.includes(`<${figure} />`), family).toBe(true);
 		}
 	});
 

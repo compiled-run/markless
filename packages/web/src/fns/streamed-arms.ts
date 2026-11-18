@@ -18,7 +18,7 @@ import { PROTOCOL_STREAM_OPEN_PROPERTY } from '../../../serializer/src/protocol-
 
 type StreamRoot = Element & {
 	__mArmLive?: (boundaryId: string) => boolean;
-	__marklessArmRegistering?: Set<Promise<unknown>>;
+	__marklessArmRegistering?: Set<import('../resume-types.ts').ResumeArmRegistration>;
 	__marklessEventOnlyGraph?: Map<string, unknown>;
 };
 
@@ -210,7 +210,7 @@ export function marklessStreamedArms<Load extends SymbolLoader>(
 		setTimeout(async () => {
 			const registering = root.__marklessArmRegistering;
 			if (registering?.size) {
-				await Promise.all(registering);
+				await Promise.all([...registering].map((entry) => entry.settled));
 				return endAdoption();
 			}
 			adopting = false;

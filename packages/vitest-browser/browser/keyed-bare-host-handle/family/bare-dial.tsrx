@@ -12,7 +12,7 @@ export const bareDial = shared(
 
 		return { ...d, markEls, rows };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function BareDial({ tag }) @{

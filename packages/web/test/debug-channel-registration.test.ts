@@ -1,4 +1,7 @@
-import { createRuntimeGraph } from '@markless/runtime';
+import { createRuntimeGraph as createGraph } from '@markless/runtime';
+import { createAsyncComputedPlane } from '@markless/runtime/graph-async';
+import { createHeldInputsPlane } from '@markless/runtime/graph-held';
+
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
 	ASYNC_BOUNDARY_ARM,
@@ -22,6 +25,9 @@ import { renderCsrRuntime } from '../src/render-csr.ts';
 import { renderToStream } from '../src/render-to-stream.ts';
 import { renderToString } from '../src/render-to-string.ts';
 import { createResumeRuntime as createDebugResumeRuntime } from '../src/resume-runtime.ts';
+
+const createRuntimeGraph: typeof createGraph = (input) =>
+	createGraph({ async: createAsyncComputedPlane, held: createHeldInputsPlane, ...input });
 
 function requiredScriptContent(text: string, pattern: RegExp): string {
 	const match = text.match(pattern);

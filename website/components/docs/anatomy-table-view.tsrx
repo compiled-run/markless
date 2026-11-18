@@ -138,6 +138,7 @@ export default function AnatomyTableView({ family: name, data }: { readonly fami
 			button { color: inherit; font: inherit; cursor: pointer; }
 			.drawing { position: relative; overflow-x: auto; }
 			.anatomy-canvas { display: block; width: 100%; height: auto; overflow: visible; }
+			html.dark .anatomy-canvas { --ink: var(--on-accent); --paper: var(--cream); }
 			.part-shape { --plane-y: var(--layer-y); cursor: pointer; opacity: .8; transition: opacity 180ms ease-out; }
 			.part-shape .shape-face { fill: color-mix(in srgb, var(--purple) 28%, var(--paper)); stroke: var(--ink); stroke-width: 1.8; transition: fill 180ms ease-out, stroke 180ms ease-out; }
 			.part-shape[data-kind='wash'] .shape-face { fill: color-mix(in srgb, var(--purple) 40%, var(--paper)); }

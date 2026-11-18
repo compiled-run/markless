@@ -11,7 +11,7 @@ export const mbNav = shared(
 
 		return { ...s, partEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function MbNavRoot({ children }) @{

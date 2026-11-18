@@ -44,7 +44,7 @@ async function exercise(container: HTMLElement) {
 		await typed;
 	}
 	await expect.poll(rows, { timeout: 5_000 }).toBe('apricot');
-	await expect.poll(() => list()?.getAttribute('aria-busy') ?? null).toBe(null);
+	await expect.poll(() => list()?.getAttribute('aria-busy') === 'true').toBe(false);
 	watch.disconnect();
 	expect(seen).toEqual([]);
 }

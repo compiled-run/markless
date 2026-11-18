@@ -24,12 +24,12 @@ import { shared, state } from '@markless/core';
 export const outerState = shared(() => {
 	const outer = state({ label: '', count: 0 });
 	return { ...outer };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export const innerState = shared(() => {
 	const inner = state({ place: 0 });
 	return { ...inner };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Outer({ label, children }) @{
 	const outer = outerState();

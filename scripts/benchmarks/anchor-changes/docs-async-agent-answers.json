@@ -1,0 +1,16 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 6321,
+			"reason": "app code, not framework: the Async page's new answers (PR #637) add about 6.3 KB gzip to the Async page's own chunks, which /concepts/state downloads only through the router's idle-tier prefetch of its sidebar link to /concepts/async (fetched at low priority, never run at load: executed chars unchanged). Linux numbers from PR #637 run 43198380013 against merge-base b2fccd550's merge-queue run 43184438514",
+			"date": "2026-11-12"
+		}
+	]
+}

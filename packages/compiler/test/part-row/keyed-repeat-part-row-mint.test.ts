@@ -23,7 +23,7 @@ export const gateState = shared(
 		});
 		return { ...gate, cells, step() { gate.offset = gate.offset + 1; } };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function GateItem({ value, children, ...rest }: { readonly value: string; readonly children?: unknown }) @{
@@ -139,7 +139,7 @@ import { shared, state } from '@markless/core';
 export const deckState = shared(() => {
 	const deck = state({ page: 0 });
 	return { ...deck, turn() { deck.page = deck.page + 1; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Chip({ tag, children, ...rest }: { readonly tag: string; readonly children?: unknown }) @{
 	const held = state({ tag });

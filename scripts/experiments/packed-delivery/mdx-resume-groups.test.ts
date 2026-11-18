@@ -236,7 +236,7 @@ function widget(prefix: string): ProtocolStatePayload {
 				id: prefix + 'shared:control',
 				name: 'control',
 				exportedName: 'control',
-				scope: 'widget',
+				scope: 'subtree',
 				version: 0,
 				graphNodeIds: [prefix + 'state:value', prefix + 'element:items'],
 			},
@@ -400,7 +400,7 @@ test.each([
 			...local,
 			sharedDefinitions: local.sharedDefinitions!.map((record) => ({
 				...record,
-				scope: 'page',
+				scope: 'app',
 			})),
 		};
 	if (shape === 'async runner')

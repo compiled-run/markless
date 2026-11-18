@@ -32,7 +32,7 @@ export const box = shared(() => {
 	const banged = computed(() => loud + SUFFIX);
 	const plain = computed(() => s.label + '?');
 	return { ...s, loud, banged, plain };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Family() @{
 	const b = box();

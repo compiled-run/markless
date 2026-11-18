@@ -1,0 +1,52 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "link-params-row (PR #657): the docs playground ships the compiler, which grows by the row-read fact on component props and the line and column in prop-decided refusals; 1 more character runs at load; measured on CI run 43360038910 against main's merge-queue run 43351538939",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 317,
+			"reason": "link-params-row (PR #657): the docs playground ships the compiler, which grows by the row-read fact on component props and the line and column in prop-decided refusals; 1 more character runs at load; measured on CI run 43360038910 against main's merge-queue run 43351538939",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "link-params-row (PR #657): the docs playground ships the compiler, which grows by the row-read fact on component props and the line and column in prop-decided refusals; 1 more character runs at load; measured on CI run 43360038910 against main's merge-queue run 43351538939",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 317,
+			"reason": "link-params-row (PR #657): the docs playground ships the compiler, which grows by the row-read fact on component props and the line and column in prop-decided refusals; 1 more character runs at load; measured on CI run 43360038910 against main's merge-queue run 43351538939",
+			"date": "2026-11-13"
+		}
+	]
+}

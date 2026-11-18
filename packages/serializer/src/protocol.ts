@@ -33,6 +33,10 @@ export {
 } from './protocol-constants.ts';
 export { PROTOCOL_CONTAINER_HOST_NODE_ID } from './protocol-page-markers.ts';
 export {
+	PROTOCOL_STATE_PATCH_SCRIPT_TYPE,
+	PROTOCOL_STREAMED_ARM_SCRIPT_TYPE,
+} from './protocol-stream-scripts.ts';
+export {
 	protocolBoundSymbolBase,
 	protocolBoundSymbolBaseEnd,
 	protocolBoundSymbolPrefix,
@@ -46,6 +50,8 @@ export {
 export {
 	constantSyncPolicyCode,
 	formatEventHostEntries,
+	IN_PLACE_SUBMIT_POLICY,
+	isInPlaceSubmitPolicy,
 	parseEventHostEntries,
 	PROTOCOL_EVENT_HOST_ATTRIBUTE,
 	PROTOCOL_EVENT_HOST_DELEGATED_REF,
@@ -57,6 +63,9 @@ export {
 	type ProtocolConstantSyncPolicyCode,
 	type ProtocolEventHostEntry,
 } from './protocol-event-host.ts';
+
+export const PROTOCOL_SHARED_SCOPES = ['app', 'container', 'subtree'] as const;
+export type ProtocolSharedScope = (typeof PROTOCOL_SHARED_SCOPES)[number];
 
 export type ProtocolAsyncBoundaryArm = (typeof ASYNC_BOUNDARY_ARM)[keyof typeof ASYNC_BOUNDARY_ARM];
 
@@ -98,6 +107,10 @@ export type ProtocolSyncPolicyCondition =
 			readonly type: 'event-equals';
 			readonly field: string;
 			readonly value: unknown;
+	  }
+	| {
+			/** The submit event sends a same-origin POST in this tab: the runtime sends it in place instead. */
+			readonly type: 'submits-in-place';
 	  };
 
 export type ProtocolSyncPolicyBranch = {
@@ -125,7 +138,21 @@ export type ProtocolEventRecord = {
 	readonly syncPolicy?: ProtocolSyncPolicy;
 	readonly symbolIds: ReadonlyArray<string>;
 	readonly action?: ProtocolEventAction;
+	/** The element sits in a child this record's component spread its props onto, so that component's instance is one edge above the host. */
+	readonly forwarded?: true;
+} & ProtocolSubmitEventFacts;
+
+/** On a submit event record: a control that submits this form has an author-written aria-disabled, so a submitting form marks no control. */
+export type ProtocolSubmitEventFacts = {
+	readonly authoredSubmitAriaDisabled?: true;
+	/**
+	 * A form with no submit handler that the runtime sends in place, and what a successful send does to its fields:
+	 * `reset` shows the fresh form a reload would, `keep` leaves a form whose fields are bound to state as it is.
+	 */
+	readonly inPlaceSubmit?: ProtocolInPlaceSubmit;
 };
+
+export type ProtocolInPlaceSubmit = 'reset' | 'keep';
 
 export function protocolEventActionKind(
 	record: Pick<ProtocolEventRecord, 'action'>,
@@ -158,10 +185,7 @@ export type ProtocolStatePayload = {
 		readonly async: boolean;
 		// Sync computeds only: the update symbol that recomputes this node on resume.
 		readonly deriveSymbolId?: string;
-		// The value the render already derived, in the same envelope a cell value
-		// uses. A resume only re-derives a sync computed when a dependency is
-		// WRITTEN, so without this a handler reading one before the first write
-		// answers undefined. Served only for computeds a handler reads.
+		// The render's derived value, served only where resume reads it before a dependency write: a handler, a flipped arm or a keyed @for.
 		readonly value?: unknown;
 		// The same value on the live channel cells use: a CSR mount hands it over
 		// in memory, so it never needs an envelope. Never served — payload
@@ -170,6 +194,8 @@ export type ProtocolStatePayload = {
 		readonly dependencies?: ReadonlyArray<{
 			readonly graphNodeId: string;
 			readonly path: ReadonlyArray<string>;
+			// Text only: the element showing it writes this state from its own handler, so it reads as written while the rest stays matched.
+			readonly writtenByControl?: true;
 		}>;
 		readonly snapshot?:
 			| {
@@ -196,6 +222,15 @@ export type ProtocolStatePayload = {
 		// A roster derive only: the host-id prefix of the component that declared it,
 		// which its symbol-space id cannot spell once a module holds several components.
 		readonly hostScope?: string;
+		// Only subscriptions and other such computeds read it, so resume re-derives it
+		// when it is read rather than on every dependency write.
+		readonly deriveOnRead?: true;
+		// Async only: some reader pairs this value with an input of its key, so the page loads matched values.
+		readonly holds?: true;
+		// Sync only: the nearest async values it derives from, through other sync computeds of its module.
+		readonly asyncFrom?: ReadonlyArray<string>;
+		// Async only: a @try's own gate over the values it shows, so it fails whenever one of them fails.
+		readonly boundaryGate?: true;
 	}>;
 	// A shared node a component seeds from its own props. The node keeps its own
 	// value (a part's write stands until the next prop moves), and these say which
@@ -220,7 +255,7 @@ export type ProtocolStatePayload = {
 		readonly id: string;
 		readonly name: string;
 		readonly exportedName: string;
-		readonly scope?: 'request' | 'container' | 'page' | 'widget';
+		readonly scope?: ProtocolSharedScope;
 		readonly version: number;
 		readonly graphNodeIds: ReadonlyArray<string>;
 		readonly projectionIds?: ReadonlyArray<string>;
@@ -302,6 +337,19 @@ export type ProtocolBranchIdrefSite = {
 	readonly armIndex: number;
 };
 
+/** A state cell an arm declares: written back to `value` each time arm `arm` opens. */
+export type ProtocolBranchArmSeed = {
+	readonly arm: number;
+	readonly graphNodeId: string;
+	readonly value: unknown;
+};
+
+/**
+ * Per arm, the instance segments of the components it holds, under the branch's own instance path.
+ * Their computeds run only while that arm shows.
+ */
+export type ProtocolBranchArmComponents = ReadonlyArray<ReadonlyArray<string>>;
+
 export type ProtocolArmBranchRecord = {
 	readonly id: string;
 	readonly testReads: ReadonlyArray<{
@@ -312,6 +360,8 @@ export type ProtocolArmBranchRecord = {
 	readonly contentReads?: ReadonlyArray<ProtocolBranchContentRead>;
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
+	readonly armSeeds?: ReadonlyArray<ProtocolBranchArmSeed>;
+	readonly armComponents?: ProtocolBranchArmComponents;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	// A composed child's branch inside the arm keeps the `dom-order-comment`
 	// anchors its own module counted; they name its comment text, not an index
@@ -341,6 +391,12 @@ export type ProtocolArmRecordSet = {
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
 	readonly keyedRepeats?: ProtocolViewPayload['keyedRepeats'];
 	readonly branches?: ReadonlyArray<ProtocolArmBranchRecord>;
+	/** @try blocks the arm renders inside itself, anchor indexes counted from the arm start. */
+	readonly asyncBoundaries?: ReadonlyArray<
+		Omit<ProtocolViewPayload['asyncBoundaries'][number], 'armRecords'> & {
+			readonly armRecords?: ProtocolArmRecordSet;
+		}
+	>;
 	/** Served beside `events` sent as templates: the names the stream boot listens for. */
 	readonly eventNames?: ReadonlyArray<string>;
 };
@@ -524,6 +580,8 @@ export type ProtocolViewPayload = {
 			readonly repeatId: string;
 			readonly parentHostPath: ProtocolElementAddress;
 			readonly itemPath?: ReadonlyArray<string>;
+			/** The parent sits in an arm of the enclosing row's `@if`/`@switch`, as on a row event: `parentHostPath` is then arm-relative. */
+			readonly arm?: { readonly slot: number; readonly arm: number };
 		};
 		readonly collectionGraphNodeId?: string;
 		readonly collectionPath: ReadonlyArray<string>;
@@ -543,8 +601,10 @@ export type ProtocolViewPayload = {
 		readonly branchArm?: { readonly branchId: string; readonly arm: number };
 		readonly itemName: string;
 		/**
-		 * The `index` name of the `@for`, which a row handler reading it is handed
-		 * beside the item. Pay-per-use: present only when a row handler reads it.
+		 * The `index` name of the `@for`. A row handler reading it is handed it
+		 * beside the item, and a component row whose props read it is built again
+		 * when its row moves. Pay-per-use: present only when a row handler or a row
+		 * component's props read it.
 		 */
 		readonly indexName?: string;
 		readonly rowElementCount: number;
@@ -562,6 +622,11 @@ export type ProtocolViewPayload = {
 		 * `items.length` element children ending `rowEndOffset` before the last.
 		 */
 		readonly rowEndOffset?: number;
+		/**
+		 * Each row renders between a pair of row comments because its top level is not one element;
+		 * offsets count only elements outside rows, and `hostPath`s start inside the comments.
+		 */
+		readonly rowRange?: true;
 		/**
 		 * The browser can never change these rows: the collection and every value a
 		 * row shows are fixed once the page is served, so the record carries no row
@@ -617,11 +682,21 @@ export type ProtocolViewPayload = {
 			/** The component whose render-data reader answers `source` slots; present exactly when one is. */
 			readonly componentName?: string;
 			readonly textSlots?: ReadonlyArray<
-				{ readonly path: ReadonlyArray<number> } & ProtocolRowTemplateSlotValue
+				{
+					readonly path: ReadonlyArray<number>;
+					readonly fromEnd?: ReadonlyArray<number>;
+				} & ProtocolRowTemplateSlotValue
 			>;
+			/**
+			 * `fromEnd` lists the depths in `path` whose element follows a nested
+			 * list's rows in its parent: on a live row those rows sit in front of it,
+			 * so a patch counts that step from the parent's last element. Omitted when
+			 * no nested list stands before the slot.
+			 */
 			readonly attributeSlots?: ReadonlyArray<
 				{
 					readonly path: ReadonlyArray<number>;
+					readonly fromEnd?: ReadonlyArray<number>;
 					readonly name: string;
 				} & ProtocolRowTemplateSlotValue
 			>;
@@ -694,7 +769,7 @@ export type ProtocolViewPayload = {
 			readonly name: string;
 			readonly plural?: boolean;
 		}>;
-		readonly rowEvents: ReadonlyArray<{
+		readonly rowEvents: ReadonlyArray<ProtocolSubmitEventFacts & {
 			readonly hostPath: ProtocolElementAddress;
 			readonly eventName: string;
 			readonly symbolIds: ReadonlyArray<string>;
@@ -713,8 +788,10 @@ export type ProtocolViewPayload = {
 		readonly endAnchor: { readonly strategy: 'dom-order-comment'; readonly index: number };
 		readonly symbolId?: string;
 		readonly armTests?: ReadonlyArray<unknown>;
+		readonly armSeeds?: ReadonlyArray<ProtocolBranchArmSeed>;
+		readonly armComponents?: ProtocolBranchArmComponents;
 		readonly armRecords?: ReadonlyArray<{
-			readonly events: ReadonlyArray<{
+			readonly events: ReadonlyArray<ProtocolSubmitEventFacts & {
 				readonly hostPath: ProtocolElementAddress;
 				readonly eventName: string;
 				readonly symbolIds: ReadonlyArray<string>;
@@ -724,6 +801,18 @@ export type ProtocolViewPayload = {
 			readonly domUpdates: ReadonlyArray<Record<string, unknown>>;
 			readonly behaviors: ReadonlyArray<Record<string, unknown>>;
 			readonly elementHandles: ReadonlyArray<Record<string, unknown>>;
+			/**
+			 * The `@for`s whose parent element this arm renders (not `keyedRepeats`:
+			 * an arm record set's `keyedRepeats` are whole records). Each names its page
+			 * record by `repeatId`, which composition prefixes exactly as it prefixes that
+			 * record's `id` and this branch's `id`, and its parent by `parentHostPath`,
+			 * arm-relative like `hostPath` above. The browser wires them whenever this arm
+			 * shows. Pay-per-use: an arm holding no list omits the field.
+			 */
+			readonly repeatParents?: ReadonlyArray<{
+				readonly repeatId: string;
+				readonly parentHostPath: ProtocolElementAddress;
+			}>;
 		}>;
 		readonly testReads?: ReadonlyArray<{
 			readonly source: string;
@@ -783,6 +872,19 @@ export type ProtocolViewPayload = {
 		readonly runnerGraphNodeId: string | null;
 		readonly initiallyServedArm: ProtocolAsyncBoundaryArm;
 		readonly updateSymbolId?: string;
+		/** The @try arm holds keyed rows the browser cannot build, so a refresh that lands re-renders the arm. */
+		readonly rerendersOnRefresh?: true;
+		/**
+		 * The values the @try arm's text reads beside its async ones, for a @try
+		 * inside a keyed row: such a row has no template to patch, so a write to
+		 * one re-renders each row's shown @try arm. Pay-per-use: absent elsewhere.
+		 */
+		readonly rerenderReads?: ReadonlyArray<{
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+		}>;
+		/** A handler inside the @try arm that rejects fails this boundary's own runner, so its @catch shows the error. */
+		readonly catchesHandlers?: true;
 		// A single set is the armized truth for the arm the render actually
 		// served (SSR compose / arm-render modules); an array is the compiler's
 		// per-arm plan (index 0 = @try, 1 = @pending, 2 = @catch), which is not
@@ -802,6 +904,13 @@ export type ProtocolViewPayload = {
 			readonly path: ReadonlyArray<string>;
 			readonly runnerSymbolId?: string;
 		}>;
+		/**
+		 * For each sync computed whose value depends on one of this boundary's async
+		 * reads, the async graph nodes it depends on. A refresh marks busy the elements
+		 * whose bindings read a refreshing async node directly or through one of these.
+		 * Absent when no sync computed sits between a binding and an async read.
+		 */
+		readonly asyncSources?: Readonly<Record<string, ReadonlyArray<string>>>;
 		/** As on a branch: the part instance that authored this boundary and where its live props now live, for the arm its own module re-renders on settle. */
 		readonly composedInstancePath?: string;
 		readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;

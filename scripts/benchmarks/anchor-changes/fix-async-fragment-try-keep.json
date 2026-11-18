@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 43,
+			"reason": "empty @catch keeps @try content on a failed refresh: rebuilt async wiring runtime chunk; executed chars at or below anchor; measured 1690285 vs anchor 1690242, executed 25825 vs 25860 on PR #598 linux CI run 42962060205 (branch merged with main 224ddbee3)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 43,
+			"reason": "empty @catch keeps @try content on a failed refresh: rebuilt async wiring runtime chunk; executed chars at or below anchor; measured 2221111 vs anchor 2221068, executed 25859 vs 27008 on PR #598 linux CI run 42962060205 (branch merged with main 224ddbee3)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 45,
+			"reason": "empty @catch keeps @try content on a failed refresh: rebuilt async wiring runtime chunk; executed chars at or below anchor; measured 511866 vs anchor 511821, executed 24617 vs 25182 on PR #598 linux CI run 42962060205 (branch merged with main 224ddbee3)",
+			"date": "2026-11-10"
+		}
+	]
+}

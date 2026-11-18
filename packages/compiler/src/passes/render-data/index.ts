@@ -10,6 +10,7 @@ import type {
 	SymbolResolverPlan,
 } from '../../artifacts.ts';
 import { resolveBoundaryRunners } from '../public-render/boundary-runner.ts';
+import { rowRangeRefusal } from '../row-range.ts';
 import { repeatRowSiblingElements } from './row-position.ts';
 
 // The link-stage half of this pass: what an emitted render-data module carries
@@ -71,6 +72,7 @@ export function createRenderData(input: {
 				armChunkIds: slot?.armTemplateIds ?? {
 					try: `async:${boundary.id}:arm:try`,
 				},
+				...(boundary.errorGraphNodeId ? { errorGraphNodeId: boundary.errorGraphNodeId } : {}),
 			};
 		}),
 		interactions: interactionEvents.map((event) => ({
@@ -175,6 +177,7 @@ function branchRecord(
 		...(site.testComputedGraphNodeId
 			? { testComputedGraphNodeId: site.testComputedGraphNodeId }
 			: {}),
+		...(site.armIndexSource ? { armIndexSource: site.armIndexSource } : {}),
 		testReads:
 			symbol?.kind === 'branch-update'
 				? symbol.testReads.map((read) => ({
@@ -188,16 +191,23 @@ function branchRecord(
 		...(site.asyncBoundaryArm !== undefined ? { asyncBoundaryArm: site.asyncBoundaryArm } : {}),
 		...(site.armTests ? { armTests: site.armTests } : {}),
 		...(declaredEmptyArms.length > 0 ? { declaredEmptyArms } : {}),
-		update:
-			site.asyncBoundaryId &&
-			(slot?.armTemplateIds ?? []).some((chunkId) =>
-				chunks
-					.find((chunk) => chunk.id === chunkId)
-					?.slots.some((candidate) => candidate.kind === 'child-component'),
-			)
-				? 'boundary'
-				: 'range',
+		update: branchUpdate(site, slot, chunks),
 	};
+}
+
+function branchUpdate(
+	site: SemanticGraphArtifact['branchSites'][number],
+	slot: Extract<SemanticMarkupSlot, { readonly kind: 'branch' }> | undefined,
+	chunks: SemanticGraphArtifact['markup']['chunks'],
+): RenderDataBranch['update'] {
+	if (!site.asyncBoundaryId) return 'range';
+	if (site.keyedRepeatId && site.asyncBoundaryArm === 0) return 'row-arm';
+	const holdsComponent = (slot?.armTemplateIds ?? []).some((chunkId) =>
+		chunks
+			.find((chunk) => chunk.id === chunkId)
+			?.slots.some((candidate) => candidate.kind === 'child-component'),
+	);
+	return holdsComponent ? 'boundary' : 'range';
 }
 
 /**
@@ -301,6 +311,10 @@ function repeatRecord(
 		rowStartOffset === 'unknown' && repeat.projectedElementsBefore === undefined
 			? repeatRowEndOffset(chunks, repeat.id)
 			: undefined;
+	const rowRange =
+		repeat.rowRange &&
+		repeat.collectionGraphNodeId !== undefined &&
+		rowRangeRefusal(semanticGraph, repeat.id) === null;
 	const payloadRepeat = payloadArena?.view.keyedRepeats.find((item) => item.id === repeat.id);
 	const rowElementHandles = payloadRepeat?.rowElementHandles?.flatMap((handle) => {
 		const hostPath = rowHostPaths.get(handle.hostNodeId);
@@ -343,6 +357,7 @@ function repeatRecord(
 		rowChunkId,
 		...(slot?.emptyTemplateId ? { emptyChunkId: slot.emptyTemplateId } : {}),
 		rowElementCount: chunks.find((chunk) => chunk.id === rowChunkId)?.hosts.length ?? 0,
+		...(rowRange ? { rowRange: true as const } : {}),
 		...(rowStartOffset === 0 ? {} : { rowStartOffset }),
 		...(typeof rowEndOffset === 'number' ? { rowEndOffset } : {}),
 		...(parent ? { parentPath: relativePath(parent.coordinate.path) } : {}),
@@ -351,6 +366,6 @@ function repeatRecord(
 		...(rowElementHandles && rowElementHandles.length > 0 ? { rowElementHandles } : {}),
 		...(rowBehaviors.length > 0 ? { rowBehaviors } : {}),
 		directSupported:
-			repeat.indexName === undefined && repeat.collectionGraphNodeId !== undefined,
+			!rowRange && repeat.indexName === undefined && repeat.collectionGraphNodeId !== undefined,
 	};
 }

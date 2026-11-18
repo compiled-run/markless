@@ -74,6 +74,7 @@ export default function AccordionDisabled() @{
 
 			.trigger:hover {
 				background: var(--tinted-quiet);
+				color: var(--on-accent);
 			}
 
 			.trigger:disabled {

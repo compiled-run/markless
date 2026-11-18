@@ -2,8 +2,10 @@ import {
 	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
 	type ProtocolRowTemplateSlotValue,
+	type ProtocolSubmitEventFacts,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
+import { asyncComputedGraphNodeIds, browserGraphReads } from '../artifact-helpers/graph-paths.ts';
 import { repeatRowSiblingElements } from './render-data/row-position.ts';
 import { elementAddress } from './semantic-graph/projection-placement.ts';
 import type {
@@ -13,21 +15,30 @@ import type {
 	ProtocolViewPayloadInput,
 	ProtocolViewPayloadWithArmRecords,
 	RenderDataArtifact,
+	SemanticComponentEdge,
+	SemanticKeyedRepeat,
 	SemanticMarkupChunk,
 	SemanticMarkupSlot,
 } from '../artifacts.ts';
 import { armChildRead, armHostPaths, type ArmHostPlacement } from './arm-child-content.ts';
 import {
+	constantInBrowser,
 	expressionSlotValue,
 	mintableSlotValue,
 	payloadRecordHosts,
 	resolveRowChunkMint,
 	resolveRowComponentMint,
+	rowComponentReadsIndex,
+	slotReadsRow,
+	stepsAfterNestedRows,
 	type RowComponentMint,
 } from './row-mint.ts';
 import { forwardedSpreadViewRecords } from './spread-forwarding.ts';
 import { addressedHostNodeIds } from '../artifact-helpers/addressed-hosts.ts';
 import { armEscalationCandidateSiteIds } from './symbol-modules.ts';
+import { rowBoundNames } from './semantic-graph/repeat-item-binding.ts';
+import { handlerCatchBoundaryIds } from './public-render/boundary-runner.ts';
+import { componentEdgeInstanceSegment } from '../component-edge-instance.ts';
 
 function renderDataOf(input: ProtocolViewPayloadInput): RenderDataArtifact {
 	if (!input.renderData) {
@@ -44,6 +55,9 @@ export function createProtocolViewPayload(
 	const eventSymbols = new Map<string, string[]>();
 	const domUpdateSymbols = new Map<string, string>();
 	const asyncRunnerSymbols = new Map<string, string>();
+	const catchTargets = input.semanticGraph
+		? handlerCatchBoundaryIds(input.semanticGraph)
+		: new Set<string>();
 
 	for (const symbol of input.symbolResolver.symbols) {
 		if (symbol.kind === 'event-handler') {
@@ -100,6 +114,7 @@ export function createProtocolViewPayload(
 					eventName: event.eventName,
 					syncPolicy: event.syncPolicy,
 					symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
+					...submitEventFacts(input, event),
 				})),
 			forwarded.events,
 		),
@@ -129,14 +144,20 @@ export function createProtocolViewPayload(
 		keyedRepeats,
 		// Branch and boundary anchor pairs share one document-order stream, so
 		// re-indexing allocates over the emitted union in anchorOrder.
-		branches: supportedBranchRecords(input).filter((branch) => !rowFlippedBranchIds.has(branch.id)),
+		branches: supportedBranchRecords(input).filter(
+			(branch) => !rowFlippedBranchIds.has(branch.id),
+		),
 		asyncBoundaries: input.payloadArena.view.asyncBoundaries.map(
 			({ kind: _kind, anchorOrder: _order, armRecords, ...boundary }) => ({
 				...boundary,
+				...boundaryAsyncSources(input, protocolAsyncBoundaryReads(input, boundary)),
 				armRecords: armRecords.map((set, arm) =>
-					wiredArmRecordSet(input, set, boundary.id, arm),
+					wiredArmRecordSet(input, set, boundary.id, arm, keyedRepeats),
 				),
 				updateSymbolId: boundaryUpdateSymbols(input).get(boundary.id),
+				...rerendersOnRefreshField(input, boundary.id, keyedRepeats),
+				...rowArmRerenderReadsField(input, boundary.id, boundary.asyncReads),
+				...(catchTargets.has(boundary.id) && { catchesHandlers: true as const }),
 				startAnchor: {
 					...boundary.startAnchor,
 					index: emittedPairRank(input, boundary.id) * 2,
@@ -155,11 +176,14 @@ export function createProtocolViewPayload(
 }
 
 // A host no record names is static markup: the browser never looks it up, so it gets no locator.
-function withAddressedLocators<View extends { readonly locators: ReadonlyArray<{ readonly hostNodeId: string }> }>(
-	view: View,
-): View {
+function withAddressedLocators<
+	View extends { readonly locators: ReadonlyArray<{ readonly hostNodeId: string }> },
+>(view: View): View {
 	const addressed = addressedHostNodeIds(view);
-	return { ...view, locators: view.locators.filter((locator) => addressed.has(locator.hostNodeId)) };
+	return {
+		...view,
+		locators: view.locators.filter((locator) => addressed.has(locator.hostNodeId)),
+	};
 }
 
 function protocolAsyncBoundaryReads(
@@ -197,6 +221,49 @@ function protocolAsyncBoundaryReads(
 		}
 	}
 	return reads;
+}
+
+// Per sync computed reaching one of the boundary's async reads, those reads: a refresh marks the elements bound to it busy.
+function boundaryAsyncSources(
+	input: ProtocolViewPayloadInput,
+	reads: ReadonlyArray<{ readonly graphNodeId: string }>,
+): { readonly asyncSources?: Record<string, string[]> } {
+	const computedByGraphNode = new Map(
+		input.payloadArena.state.computed.map((computed) => [computed.graphNodeId, computed]),
+	);
+	const boundaryAsync = new Set(
+		reads
+			.map((read) => read.graphNodeId)
+			.filter((graphNodeId) => computedByGraphNode.get(graphNodeId)?.async === true),
+	);
+	const reached = new Map<string, Set<string>>();
+	const reach = (graphNodeId: string, visiting: Set<string>): Set<string> => {
+		const known = reached.get(graphNodeId);
+		if (known) return known;
+		const found = new Set<string>();
+		const computed = computedByGraphNode.get(graphNodeId);
+		if (boundaryAsync.has(graphNodeId)) found.add(graphNodeId);
+		if (computed?.async !== true && !visiting.has(graphNodeId)) {
+			visiting.add(graphNodeId);
+			for (const dependency of computed?.dependencies ?? [])
+				for (const source of reach(dependency.graphNodeId, visiting)) found.add(source);
+			visiting.delete(graphNodeId);
+		}
+		reached.set(graphNodeId, found);
+		return found;
+	};
+	const mintedGates = new Set(
+		input.semanticGraph?.asyncBoundaries.flatMap((boundary) =>
+			boundary.gateGraphNodeId ? [boundary.gateGraphNodeId] : [],
+		),
+	);
+	const asyncSources: Record<string, string[]> = {};
+	for (const computed of input.payloadArena.state.computed) {
+		if (computed.async === true || mintedGates.has(computed.graphNodeId)) continue;
+		const sources = reach(computed.graphNodeId, new Set());
+		if (sources.size > 0) asyncSources[computed.graphNodeId] = [...sources];
+	}
+	return Object.keys(asyncSources).length > 0 ? { asyncSources } : {};
 }
 
 function optionalAsyncRunnerRegistry(
@@ -245,9 +312,7 @@ function supportedBranchIds(input: ProtocolViewPayloadInput): ReadonlySet<string
 	// settle (need 8): no flip records, no anchor pairs.
 	return new Set(
 		renderDataOf(input).branches.flatMap((branch) =>
-			branch.asyncBoundaryId || branch.update === 'boundary'
-				? []
-				: [branch.branchSiteId],
+			branch.asyncBoundaryId || branch.update === 'boundary' ? [] : [branch.branchSiteId],
 		),
 	);
 }
@@ -296,18 +361,16 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 	return (input.payloadArena.view.branchSites ?? [])
 		.filter((site) => branchIds.has(site.id))
 		.map((site) => ({
-			...(renderDataOf(input).branches.find(
-				(branch) => branch.branchSiteId === site.id,
-			)?.armTests
+			...(renderDataOf(input).branches.find((branch) => branch.branchSiteId === site.id)
+				?.armTests
 				? {
 						armTests: renderDataOf(input).branches.find(
 							(branch) => branch.branchSiteId === site.id,
 						)?.armTests,
 					}
 				: {}),
-			...(renderDataOf(input).branches.find(
-				(branch) => branch.branchSiteId === site.id,
-			)?.declaredEmptyArms
+			...(renderDataOf(input).branches.find((branch) => branch.branchSiteId === site.id)
+				?.declaredEmptyArms
 				? {
 						declaredEmptyArms: renderDataOf(input).branches.find(
 							(branch) => branch.branchSiteId === site.id,
@@ -324,8 +387,10 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 				index: emittedPairRank(input, site.id) * 2 + 1,
 			},
 			symbolId: branchSymbols.get(site.id)?.id,
-			testReads: branchSymbols.get(site.id)?.testReads ?? [],
+			testReads: browserTestReads(input, branchSymbols.get(site.id)?.testReads),
 			...branchContentReadsField(input, site.id),
+			...branchArmSeedsField(input, site.id),
+			...branchArmComponentsField(input, site.id),
 			...(escalatingIds.has(site.id)
 				? { escalates: true as const }
 				: { armRecords: branchArmRecords(input, site.id) }),
@@ -340,6 +405,13 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
  * markers. These reads refresh the arm's own marker range instead, through the
  * branch's existing update symbol, so nothing outside the served arm moves.
  */
+function browserTestReads<Read extends { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>(
+	input: ProtocolViewPayloadInput,
+	reads: ReadonlyArray<Read> | undefined,
+): ReadonlyArray<Read> {
+	return browserGraphReads(reads ?? [], asyncComputedGraphNodeIds(input.semanticGraph));
+}
+
 function branchContentReadsField(input: ProtocolViewPayloadInput, branchSiteId: string) {
 	const reads = (input.payloadArena.view.branchContentReads ?? []).filter(
 		(read) => read.branchSiteId === branchSiteId,
@@ -353,6 +425,57 @@ function branchContentReadsField(input: ProtocolViewPayloadInput, branchSiteId: 
 				})),
 			}
 		: {};
+}
+
+// State cells declared in an arm body, or in a branch nested in it, written back to their starting value each time that arm opens.
+function branchArmSeedsField(input: ProtocolViewPayloadInput, branchSiteId: string) {
+	const armSeeds = (input.semanticGraph?.graphBindings ?? []).flatMap((binding) => {
+		if (binding.kind !== 'state' || !binding.armScope || binding.initialValueKnown !== true) return [];
+		const owner = [binding.armScope, ...(binding.enclosingArms ?? [])].find(
+			(scope) => scope.branchSiteId === branchSiteId,
+		);
+		return owner ? [{ arm: owner.arm, graphNodeId: binding.id, value: binding.initialValue }] : [];
+	});
+	return armSeeds.length > 0 ? { armSeeds } : {};
+}
+
+// Per arm, the instance segments of the components it holds that own a value to stop: their computeds stop when the arm leaves.
+function branchArmComponentsField(input: ProtocolViewPayloadInput, branchSiteId: string) {
+	// A site in a row takes its own arm per row, but its record is one for the page: it cannot say which rows show an arm.
+	if (input.semanticGraph?.branchSites.find((site) => site.id === branchSiteId)?.keyedRepeatId)
+		return {};
+	const edges = input.semanticGraph?.componentEdges ?? [];
+	const armComponents: string[][] = [];
+	for (const edge of edges) {
+		const held = edge.branchArms?.find((arm) => arm.branchSiteId === branchSiteId);
+		if (held && treeOwnsComputed(input, edge, new Set()))
+			(armComponents[held.arm] ??= []).push(componentEdgeInstanceSegment(edge, edges));
+	}
+	return armComponents.length > 0 ? { armComponents: Array.from(armComponents, (arm) => arm ?? []) } : {};
+}
+
+// A computed in the component's tree, or for an imported one a derive over its props or an async value in its module; unknown counts.
+function treeOwnsComputed(input: ProtocolViewPayloadInput, edge: SemanticComponentEdge, seen: Set<string>): boolean {
+	if (edge.importSource !== undefined) {
+		const moduleInterface = input.source?.importedModuleInterfaces?.[edge.importSource];
+		const component = moduleInterface?.render.components.find(
+			(candidate) =>
+				candidate.componentName === edge.childComponentName ||
+				(edge.importedName !== undefined && candidate.exportName === edge.importedName),
+		);
+		return !component || !!component.derivedProps?.length || !!moduleInterface?.asyncPlanes;
+	}
+	if (seen.has(edge.childComponentName)) return false;
+	seen.add(edge.childComponentName);
+	const graph = input.semanticGraph!;
+	return (
+		graph.graphBindings.some(
+			(binding) => binding.kind === 'computed' && binding.componentName === edge.childComponentName,
+		) ||
+		graph.componentEdges.some(
+			(child) => child.parentComponentName === edge.childComponentName && treeOwnsComputed(input, child, seen),
+		)
+	);
 }
 
 // Row event symbols already exist on the row host nodes; the record maps
@@ -402,11 +525,13 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 					nestedRepeatIds.has(repeat.id) ||
 					liveRowComponentMint(input, repeat, render) !== null)) ||
 			(render.rowStartOffset === 'unknown' && render.rowEndOffset === undefined) ||
-			!rowRootsOneElement(input, render) ||
+			!(render.rowRange || rowRootsOneElement(input, render)) ||
 			enclosingRow === null
-		) return [];
+		)
+			return [];
 		emitted.add(repeat.id);
-		const rowHostPaths = hostPathsForChunk(input, render.rowChunkId, true);
+		// A ranged row's addresses start at the first node inside its comments, not at a row element.
+		const rowHostPaths = hostPathsForChunk(input, render.rowChunkId, !render.rowRange);
 		// Row-owned handles ride the repeat, in row-relative coordinates, for the
 		// same reason row events do: the resumed set is whatever the parent's live
 		// children are right now, so a read walks rows rather than trusting a
@@ -414,19 +539,25 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 		const rowElementHandles = (repeat.rowElementHandles ?? []).flatMap((handle) => {
 			const hostPath = rowHostPaths.get(handle.hostNodeId);
 			return hostPath
-				? [{
-					hostPath,
-					handleId: handle.handleId,
-					name: handle.name,
-					...(handle.plural ? { plural: true as const } : {}),
-				}]
+				? [
+						{
+							hostPath,
+							handleId: handle.handleId,
+							name: handle.name,
+							...(handle.plural ? { plural: true as const } : {}),
+						},
+					]
 				: [];
 		});
 		const built = fixedRows(input, repeat, render)
 			? { fixed: true as const }
 			: {
 					...mintableEmptyArm(input, render),
-					...mintableRowTemplate(input, render, liveRowComponentMint(input, repeat, render)),
+					...mintableRowTemplate(
+						input,
+						render,
+						liveRowComponentMint(input, repeat, render),
+					),
 					...mintableRowComponent(liveRowComponentMint(input, repeat, render)),
 				};
 		const rowEvent = (
@@ -442,26 +573,25 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 			// host's, so dropping the policy here left every row past the
 			// first with no synchronous preventDefault.
 			...(event.syncPolicy ? { syncPolicy: event.syncPolicy } : {}),
+			...submitEventFacts(input, event),
 		});
 		const events = oneRecordPerEvent(input.payloadArena.view.events);
 		const indexName = input.semanticGraph?.keyedRepeats.find(
 			(candidate) => candidate.id === repeat.id,
 		)?.indexName;
 		const branchSlots = 'rowTemplate' in built ? (built.rowTemplate?.branchSlots ?? []) : [];
-		const armEvents = branchSlots.flatMap(
-			(branch, slot) => {
-				const site = renderDataOf(input).branches.find(
-					(candidate) => candidate.branchSiteId === branch.branchId,
-				);
-				return (site?.armChunkIds ?? []).flatMap((chunkId, arm) => {
-					const hosts = branchArmHostPaths(input, chunkId);
-					return events.flatMap((event) => {
-						const path = hosts.get(event.hostNodeId)?.path;
-						return path ? [{ ...rowEvent(event, path), arm: { slot, arm } }] : [];
-					});
+		const armEvents = branchSlots.flatMap((branch, slot) => {
+			const site = renderDataOf(input).branches.find(
+				(candidate) => candidate.branchSiteId === branch.branchId,
+			);
+			return (site?.armChunkIds ?? []).flatMap((chunkId, arm) => {
+				const hosts = branchArmHostPaths(input, chunkId);
+				return events.flatMap((event) => {
+					const path = hosts.get(event.hostNodeId)?.path;
+					return path ? [{ ...rowEvent(event, path), arm: { slot, arm } }] : [];
 				});
-			},
-		);
+			});
+		});
 		const rowEvents = [
 			...events
 				.filter((event) => rowHostPaths.has(event.hostNodeId))
@@ -489,8 +619,17 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 					? { rowStartOffset: render.rowStartOffset }
 					: {}),
 				...(render.rowEndOffset !== undefined ? { rowEndOffset: render.rowEndOffset } : {}),
+				...(render.rowRange ? { rowRange: true as const } : {}),
 				...built,
-				...(rowEvents.some((event) => handlersRead(input, event.symbolIds, indexName))
+				...(indexName &&
+				(rowEvents.some((event) => handlersRead(input, event.symbolIds, indexName)) ||
+					('rowComponent' in built &&
+						built.rowComponent &&
+						rowComponentReadsIndex(
+							input.semanticGraph?.componentEdges ?? [],
+							built.rowComponent,
+							indexName,
+						)))
 					? { indexName }
 					: {}),
 				rowEvents,
@@ -506,7 +645,7 @@ function rowSuffixField(
 	repeatId: string,
 	render: { readonly rowStartOffset?: number | 'unknown'; readonly rowEndOffset?: number },
 	enclosingRow: unknown,
-	rowEvents: ReadonlyArray<{ readonly syncPolicy?: unknown }>,
+	rowEvents: ReadonlyArray<{ readonly syncPolicy?: unknown; readonly relayedProp?: string }>,
 ): { readonly rowEndOffset?: number } {
 	const chunks = input.semanticGraph?.markup.chunks;
 	if (
@@ -514,7 +653,7 @@ function rowSuffixField(
 		enclosingRow ||
 		render.rowEndOffset !== undefined ||
 		render.rowStartOffset === 'unknown' ||
-		!rowEvents.some((event) => event.syncPolicy)
+		!rowEvents.some((event) => event.syncPolicy || event.relayedProp)
 	)
 		return {};
 	const after = repeatRowSiblingElements(chunks, repeatId, 'after');
@@ -532,7 +671,8 @@ function handlersRead(
 		(symbol) =>
 			symbol.kind === 'event-handler' &&
 			symbolIds.some(
-				(id) => id === symbol.id || id.startsWith(`bound:${encodeURIComponent(symbol.id)}:`),
+				(id) =>
+					id === symbol.id || id.startsWith(`bound:${encodeURIComponent(symbol.id)}:`),
 			) &&
 			mention.test(symbol.source ?? ''),
 	);
@@ -581,7 +721,9 @@ function asyncArmField(
 	if (repeat.enclosingRepeatId) return {};
 	const chunks = renderDataOf(input).chunks;
 	for (const boundary of renderDataOf(input).boundaries) {
-		for (const name of Object.keys(ASYNC_BOUNDARY_ARM) as Array<keyof typeof ASYNC_BOUNDARY_ARM>) {
+		for (const name of Object.keys(ASYNC_BOUNDARY_ARM) as Array<
+			keyof typeof ASYNC_BOUNDARY_ARM
+		>) {
 			const chunk = chunks.find((candidate) => candidate.id === boundary.armChunkIds[name]);
 			const holdsRepeat = chunk?.slots.some(
 				(slot) => slot.kind === 'repeat' && slot.repeatId === repeat.id,
@@ -592,6 +734,85 @@ function asyncArmField(
 		}
 	}
 	return {};
+}
+
+// Rows the browser cannot build (a row holding two components, or an @if over page state around one), and text written straight into the arm, re-render the arm on refresh.
+function rerendersOnRefreshField(
+	input: ProtocolViewPayloadInput,
+	boundaryId: string,
+	keyedRepeats: ReturnType<typeof resumableKeyedRepeats>,
+): { readonly rerendersOnRefresh?: true } {
+	const data = renderDataOf(input);
+	const tryChunkId = data.boundaries.find((boundary) => boundary.boundaryId === boundaryId)
+		?.armChunkIds.try;
+	const chunk = data.chunks.find((candidate) => candidate.id === tryChunkId);
+	const stale = chunk?.slots.some((slot) => {
+		if (slot.kind !== 'repeat') return false;
+		const record = keyedRepeats.find((candidate) => candidate.id === slot.repeatId);
+		return !(record && (('rowTemplate' in record && record.rowTemplate) || ('rowComponent' in record && record.rowComponent)));
+	});
+	const armText = input.semanticGraph?.templateReads.some(
+		(read) => read.armScopeBoundaryId === boundaryId,
+	);
+	return stale || armText ? { rerendersOnRefresh: true } : {};
+}
+
+// A row holding a @try has no row template, so the arm's own text is re-rendered when what it reads is written.
+function rowArmRerenderReadsField(
+	input: ProtocolViewPayloadInput,
+	boundaryId: string,
+	asyncReads: ReadonlyArray<{ readonly graphNodeId: string }>,
+): {
+	readonly rerenderReads?: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>;
+	readonly rerendersOnRefresh?: true;
+} {
+	const data = renderDataOf(input);
+	const tryChunkId = data.boundaries.find((boundary) => boundary.boundaryId === boundaryId)
+		?.armChunkIds.try;
+	const graph = input.semanticGraph;
+	const enclosing = tryChunkId
+		? data.repeats.filter((repeat) => chunkIdsForChunkTree(input, repeat.rowChunkId).includes(tryChunkId))
+		: [];
+	if (!tryChunkId || !graph || enclosing.length === 0) return {};
+	const rowNames = new Set(
+		enclosing.flatMap((repeat) =>
+			rowBoundNames(graph.keyedRepeats.find((candidate) => candidate.id === repeat.repeatId)),
+		),
+	);
+	const settledBy = new Set(asyncReads.map((read) => read.graphNodeId));
+	const reads = new Map<string, { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>();
+	const add = (read: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }) => {
+		if (!settledBy.has(read.graphNodeId)) reads.set(`${read.graphNodeId}:${read.path.join('.')}`, read);
+	};
+	let readsRow = false;
+	for (const chunkId of chunkIdsForChunkTree(input, tryChunkId, new Set(), false)) {
+		const chunk = data.chunks.find((candidate) => candidate.id === chunkId);
+		const slotValue = (slot: SemanticMarkupSlot) =>
+			mintableSlotValue(slot) ??
+			(chunk?.componentName ? expressionSlotValue(slot, graph, chunk.componentName, rowNames) : null);
+		for (const slot of chunk?.slots ?? []) {
+			const branch =
+				slot.kind === 'branch'
+					? data.branches.find((candidate) => candidate.branchSiteId === slot.branchSiteId)
+					: undefined;
+			if (slot.kind === 'branch' && !branch) continue;
+			const shown = branch ? branchTestSlot(branch, slot.coordinate) : slot;
+			const value = branch ? branchTestValue(input, branch, shown, slotValue) : slotValue(slot);
+			if (value && 'graphNodeId' in value) add({ graphNodeId: value.graphNodeId, path: value.graphPath });
+			else if (value && 'reads' in value) for (const read of value.reads ?? []) add(read);
+			readsRow ||= slotReadsRow(shown, rowNames);
+		}
+	}
+	// An item written under its key keeps its row, so an arm reading it is redrawn from the list's write.
+	const asyncNodes = asyncComputedGraphNodeIds(graph);
+	for (const repeat of readsRow ? enclosing : [])
+		if (repeat.collectionGraphNodeId && !asyncNodes.has(repeat.collectionGraphNodeId))
+			add({ graphNodeId: repeat.collectionGraphNodeId, path: repeat.collectionPath });
+	return {
+		...(reads.size > 0 && { rerenderReads: [...reads.values()] }),
+		// Text reading the row has no record to update in place, so a refresh redraws the arm.
+		...(readsRow && { rerendersOnRefresh: true as const }),
+	};
 }
 
 // A nested record's own parent renders once per enclosing row, so it names the outermost
@@ -617,12 +838,33 @@ function enclosingRowField(
 	const parentHostPath = hostPathsForChunk(input, enclosing.rowChunkId, true).get(
 		repeat.parentHostNodeId,
 	);
-	if (!parentHostPath) return null;
+	const inArm = parentHostPath ? undefined : rowArmParent(input, enclosing, repeat.parentHostNodeId);
+	if (!parentHostPath && !inArm) return null;
 	return {
 		repeatId: enclosing.repeatId,
-		parentHostPath,
+		parentHostPath: parentHostPath ?? inArm!.path,
 		...(repeat.enclosingItemPath ? { itemPath: repeat.enclosingItemPath } : {}),
+		...(inArm ? { arm: { slot: inArm.slot, arm: inArm.arm } } : {}),
 	};
+}
+
+// A parent in an arm of a branch the enclosing row template flips, addressed as that arm's row events are.
+function rowArmParent(
+	input: ProtocolViewPayloadInput,
+	enclosing: RenderDataArtifact['repeats'][number],
+	hostNodeId: string,
+): { readonly slot: number; readonly arm: number; readonly path: ReadonlyArray<number> } | undefined {
+	const branchSlots = mintableRowTemplate(input, enclosing, null).rowTemplate?.branchSlots ?? [];
+	for (const [slot, branch] of branchSlots.entries()) {
+		const site = renderDataOf(input).branches.find(
+			(candidate) => candidate.branchSiteId === branch.branchId,
+		);
+		for (const [arm, chunkId] of (site?.armChunkIds ?? []).entries()) {
+			const path = branchArmHostPaths(input, chunkId).get(hostNodeId)?.path;
+			if (path) return { slot, arm, path };
+		}
+	}
+	return undefined;
 }
 
 /**
@@ -718,25 +960,22 @@ function mintableRowTemplate(
 	// `rowComponent`; markup carries only the row element that wraps it, and a row
 	// that IS the component has no wrapper to carry.
 	const wrappedComponentSlot = mint?.slotPath ? componentSlotAt(chunk, mint.slotPath) : undefined;
-	if (chunk.slots.some((slot) => slot.kind === 'child-component' && slot !== wrappedComponentSlot))
+	if (
+		chunk.slots.some((slot) => slot.kind === 'child-component' && slot !== wrappedComponentSlot)
+	)
 		return {};
 	const textSlots: Array<RowTemplateTextSlot> = [];
 	const attributeSlots: Array<RowTemplateAttributeSlot> = [];
-	// An expression slot is answered by the owning component's reader, so a row
-	// wrapping a component - rebuilt by that component's render - never takes one.
+	// An expression slot is answered by the owning component's reader, the wrapper of a component row's included.
 	const semanticRepeat = input.semanticGraph?.keyedRepeats.find(
 		(candidate) => candidate.id === render.repeatId,
 	);
 	const expressionScope =
-		!mint && chunk.componentName && input.semanticGraph && semanticRepeat
+		(!mint || mint.slotPath) && chunk.componentName && input.semanticGraph && semanticRepeat
 			? {
 					graph: input.semanticGraph,
 					componentName: chunk.componentName,
-					rowNames: new Set(
-						[semanticRepeat.itemName, semanticRepeat.indexName].filter(
-							(name): name is string => name !== undefined,
-						),
-					),
+					rowNames: new Set(rowBoundNames(semanticRepeat)),
 				}
 			: undefined;
 	const slotValue = (slot: SemanticMarkupSlot) =>
@@ -750,11 +989,19 @@ function mintableRowTemplate(
 				)
 			: null);
 	const branchSlots: Array<RowTemplateBranchSlot> = [];
+	let holdsServedOnlyRows = false;
 	for (const slot of chunk.slots) {
 		if (slot === wrappedComponentSlot) continue;
 		if (slot.kind === 'repeat' && nestedRepeatMints(input, render, slot.repeatId)) continue;
+		if (
+			slot.kind === 'repeat' &&
+			servedOnlyNestedRepeat(input, chunk, semanticRepeat, slot.repeatId)
+		) {
+			holdsServedOnlyRows = true;
+			continue;
+		}
 		if (slot.kind === 'branch' && !mint) {
-			const branch = rowBranchSlot(input, chunk, slot, slotValue);
+			const branch = rowBranchSlot(input, render, chunk, slot, slotValue);
 			if (!branch) return {};
 			branchSlots.push(branch);
 			continue;
@@ -764,9 +1011,18 @@ function mintableRowTemplate(
 		if (slot.kind !== 'text' && slot.kind !== 'attribute') return {};
 		const value = slotValue(slot);
 		if (!value) return {};
-		if (slot.kind === 'text') textSlots.push({ path: slot.coordinate.path, ...value });
-		else attributeSlots.push({ path: slot.coordinate.path, name: slot.name, ...value });
+		const fromEnd = stepsAfterNestedRows(chunk, slot.coordinate.path, slot.kind === 'text');
+		if (!fromEnd) return {};
+		const at = { path: slot.coordinate.path, ...(fromEnd.length > 0 ? { fromEnd } : {}) };
+		if (slot.kind === 'text') textSlots.push({ ...at, ...value });
+		else attributeSlots.push({ ...at, name: slot.name, ...value });
 	}
+	// Only a patch keeps rows the server alone rendered, and only attribute writes and item text never fall back to a rebuild.
+	if (
+		holdsServedOnlyRows &&
+		(branchSlots.length > 0 || textSlots.some((slot) => !('itemPath' in slot)))
+	)
+		return {};
 	const html = chunk.statics.join('');
 	if (!html) return {};
 	const readsExpressions = [
@@ -794,6 +1050,7 @@ type RowTemplateArm = RowTemplateBranchSlot['arms'][number];
 // An arm holding more than elements, text, attributes and events is wiring a row cannot redo on a flip, so it refuses.
 function rowBranchSlot(
 	input: ProtocolViewPayloadInput,
+	render: RenderDataArtifact['repeats'][number],
 	rowChunk: SemanticMarkupChunk,
 	slot: Extract<SemanticMarkupSlot, { readonly kind: 'branch' }>,
 	slotValue: (slot: SemanticMarkupSlot) => ProtocolRowTemplateSlotValue | null,
@@ -803,14 +1060,7 @@ function rowBranchSlot(
 	);
 	if (!branch || branch.update !== 'range' || branch.asyncBoundaryId) return null;
 	if (branch.kind === 'switch' && !branch.armTests) return null;
-	const test: ProtocolRowTemplateSlotValue | null =
-		branch.testReads.length === 1
-			? { graphNodeId: branch.testReads[0]!.graphNodeId, graphPath: branch.testReads[0]!.path }
-			: slotValue({
-					kind: 'text',
-					residue: { kind: 'authored-expression', source: branch.testSource },
-					coordinate: slot.coordinate,
-				} as SemanticMarkupSlot);
+	const test = branchTestValue(input, branch, branchTestSlot(branch, slot.coordinate), slotValue);
 	if (!test) return null;
 	const root = rowBranchIsRow(rowChunk, slot);
 	const unwired = new Set([
@@ -826,11 +1076,19 @@ function rowBranchSlot(
 		const textSlots: Array<RowTemplateTextSlot> = [];
 		const attributeSlots: Array<RowTemplateAttributeSlot> = [];
 		for (const armSlot of chunk.slots) {
+			if (armSlot.kind === 'repeat' && nestedRepeatMints(input, render, armSlot.repeatId, chunkId))
+				continue;
 			if (armSlot.kind !== 'text' && armSlot.kind !== 'attribute') return null;
 			const value = slotValue(armSlot);
 			if (!value) return null;
-			if (armSlot.kind === 'text') textSlots.push({ path: armSlot.coordinate.path, ...value });
-			else attributeSlots.push({ path: armSlot.coordinate.path, name: armSlot.name, ...value });
+			if (armSlot.kind === 'text')
+				textSlots.push({ path: armSlot.coordinate.path, ...value });
+			else
+				attributeSlots.push({
+					path: armSlot.coordinate.path,
+					name: armSlot.name,
+					...value,
+				});
 		}
 		arms.push({
 			html: chunk.statics.join(''),
@@ -845,6 +1103,33 @@ function rowBranchSlot(
 		arms,
 		...test,
 	};
+}
+
+// What a branch's test reads, answered like a row slot when the test reads the row's item.
+function branchTestValue(
+	input: ProtocolViewPayloadInput,
+	branch: RenderDataArtifact['branches'][number],
+	test: SemanticMarkupSlot,
+	slotValue: (slot: SemanticMarkupSlot) => ProtocolRowTemplateSlotValue | null,
+): ProtocolRowTemplateSlotValue | null {
+	return branch.testReads.length === 1
+		? {
+				graphNodeId: branch.testReads[0]!.graphNodeId,
+				graphPath: browserTestReads(input, branch.testReads)[0]!.path,
+			}
+		: slotValue(test);
+}
+
+// A branch's test, read as a text slot at the branch's place.
+function branchTestSlot(
+	branch: RenderDataArtifact['branches'][number],
+	coordinate: SemanticMarkupSlot['coordinate'],
+): SemanticMarkupSlot {
+	return {
+		kind: 'text',
+		residue: { kind: 'authored-expression', source: branch.armIndexSource ?? branch.testSource },
+		coordinate,
+	} as SemanticMarkupSlot;
 }
 
 // The branch is everything the row renders, so the arm it shows is the row itself.
@@ -871,12 +1156,19 @@ function nestedRepeatMints(
 	input: ProtocolViewPayloadInput,
 	enclosing: RenderDataArtifact['repeats'][number],
 	repeatId: string,
+	armChunkId?: string,
 ): boolean {
 	const nested = input.payloadArena.view.keyedRepeats.find(
-		(candidate) => candidate.id === repeatId && candidate.enclosingRepeatId === enclosing.repeatId,
+		(candidate) =>
+			candidate.id === repeatId && candidate.enclosingRepeatId === enclosing.repeatId,
 	);
 	const render = renderDataOf(input).repeats.find((candidate) => candidate.repeatId === repeatId);
-	if (!nested || !render || render.rowStartOffset === 'unknown' || !rowRootsOneElement(input, render))
+	if (
+		!nested ||
+		!render ||
+		(render.rowStartOffset === 'unknown' && render.rowEndOffset === undefined) ||
+		!rowRootsOneElement(input, render)
+	)
 		return false;
 	if (
 		input.semanticGraph?.keyedRepeats.some(
@@ -884,12 +1176,36 @@ function nestedRepeatMints(
 		)
 	)
 		return false;
-	if (!hostPathsForChunk(input, enclosing.rowChunkId, true).has(nested.parentHostNodeId))
-		return false;
+	const parents = armChunkId
+		? branchArmHostPaths(input, armChunkId)
+		: hostPathsForChunk(input, enclosing.rowChunkId, true);
+	if (!parents.has(nested.parentHostNodeId)) return false;
 	if (render.emptyChunkId && !mintableEmptyArm(input, render).emptyArm) return false;
 	if (rowComponentMint(input, render)) return true;
 	const template = mintableRowTemplate(input, render, null).rowTemplate;
 	return template !== undefined;
+}
+
+// A list the browser never adds rows to only patches them, so rows inside them that only the server renders stay as served.
+function servedOnlyNestedRepeat(
+	input: ProtocolViewPayloadInput,
+	chunk: SemanticMarkupChunk,
+	enclosing: SemanticKeyedRepeat | undefined,
+	repeatId: string,
+): boolean {
+	const graph = input.semanticGraph;
+	const nested = graph?.keyedRepeats.find((candidate) => candidate.id === repeatId);
+	if (
+		!graph ||
+		!chunk.componentName ||
+		!enclosing?.collectionGraphNodeId ||
+		!nested ||
+		nested.collectionGraphNodeId ||
+		nested.enclosingItemPath ||
+		input.payloadArena.view.keyedRepeats.some((candidate) => candidate.id === repeatId)
+	)
+		return false;
+	return constantInBrowser(graph, chunk.componentName, enclosing.collectionGraphNodeId);
 }
 
 /**
@@ -919,19 +1235,13 @@ function fixedRows(
 	if (!template || template.componentName || template.branchSlots) return false;
 	const slots = [...(template.textSlots ?? []), ...(template.attributeSlots ?? [])];
 	if (slots.some((slot) => !('itemPath' in slot))) return false;
-	return invariantInBrowser(
-		graph,
-		root,
-		repeat.collectionGraphNodeId,
-		semantic.asyncBoundaryId !== undefined,
-	);
+	return invariantInBrowser(graph, root, repeat.collectionGraphNodeId);
 }
 
 function invariantInBrowser(
 	graph: NonNullable<ProtocolViewPayloadInput['semanticGraph']>,
 	root: string,
 	graphNodeId: string,
-	asyncOwned: boolean,
 	seen = new Set<string>(),
 ): boolean {
 	if (seen.has(graphNodeId)) return true;
@@ -942,10 +1252,10 @@ function invariantInBrowser(
 	if (!binding || binding.sharedDefinitionId !== undefined) return false;
 	if (binding.kind === 'prop') return true;
 	if (binding.kind !== 'computed' || binding.storage) return false;
-	// A value that settles in the browser re-renders its own arm, so only rows inside that arm may read it.
-	if ((binding.async || binding.asyncCapable) && !asyncOwned) return false;
+	// An async value is asked again in the browser (a return re-ask, a reset), so its rows can change.
+	if (binding.async || binding.asyncCapable) return false;
 	return (binding.dependencies ?? []).every((dependency) =>
-		invariantInBrowser(graph, root, dependency.graphNodeId, asyncOwned, seen),
+		invariantInBrowser(graph, root, dependency.graphNodeId, seen),
 	);
 }
 
@@ -986,18 +1296,18 @@ function rowComponentMint(
 	const semanticRepeat = input.semanticGraph?.keyedRepeats.find(
 		(candidate) => candidate.id === render.repeatId,
 	);
-	const componentRow = resolveRowComponentMint({ ...rowMintInput, itemName: render.itemName });
+	const componentRow = resolveRowComponentMint({
+		...rowMintInput,
+		itemName: render.itemName,
+		...(semanticRepeat?.indexName ? { indexName: semanticRepeat.indexName } : {}),
+	});
 	if (componentRow) return componentRow;
 	// A rebuilt row loses its elements, so a row a template can patch in place never takes the chunk mint.
 	if (mintableRowTemplate(input, render, null).rowTemplate) return null;
-	return (
-		resolveRowChunkMint({
-			...rowMintInput,
-			rowNames: [render.itemName, semanticRepeat?.indexName].filter(
-				(name): name is string => name !== undefined,
-			),
-		})
-	);
+	return resolveRowChunkMint({
+		...rowMintInput,
+		rowNames: semanticRepeat ? rowBoundNames(semanticRepeat) : [render.itemName],
+	});
 }
 
 function componentSlotAt(
@@ -1017,7 +1327,9 @@ function boundaryUpdateSymbols(input: ProtocolViewPayloadInput): ReadonlyMap<str
 	// share the async-boundary-update wiring: either one settles the range.
 	return new Map(
 		input.symbolResolver.symbols.flatMap((symbol) =>
-			symbol.kind === 'async-boundary-update' ? [[symbol.boundaryId, symbol.id] as const] : [],
+			symbol.kind === 'async-boundary-update'
+				? [[symbol.boundaryId, symbol.id] as const]
+				: [],
 		),
 	);
 }
@@ -1041,8 +1353,17 @@ function wiredArmRecordSet(
 	set: ProtocolViewPayloadInput['payloadArena']['view']['asyncBoundaries'][number]['armRecords'][number],
 	boundaryId: string,
 	arm: number,
+	keyedRepeats: ReturnType<typeof resumableKeyedRepeats>,
 ): ProtocolViewArmRecordSet {
-	const flipHostIds = armScopedBranchHostIds(input, boundaryId);
+	// A host in a row a keyed repeat record wires is the row's to register, with its row's locals.
+	const flipHostIds = new Set([
+		...armScopedBranchHostIds(input, boundaryId),
+		...renderDataOf(input).repeats.flatMap((repeat) =>
+			keyedRepeats.some((record) => record.id === repeat.repeatId)
+				? hostIdsForChunkTree(input, repeat.rowChunkId)
+				: [],
+		),
+	]);
 	const boundEventSymbols = boundEventSymbolIds(input);
 	const eventSymbols = new Map<string, string[]>();
 	for (const symbol of input.symbolResolver.symbols) {
@@ -1052,7 +1373,10 @@ function wiredArmRecordSet(
 		symbols[symbol.order] = boundEventSymbols.get(symbol.id) ?? symbol.id;
 		eventSymbols.set(key, symbols);
 	}
-	const branches = bindArmBranchEventSymbols(input, armScopedBranchRecords(input, boundaryId, arm));
+	const branches = bindArmBranchEventSymbols(
+		input,
+		armScopedBranchRecords(input, boundaryId, arm),
+	);
 	return {
 		locators: set.locators.filter((locator) => !flipHostIds.has(locator.hostNodeId)),
 		events: oneRecordPerEvent(set.events)
@@ -1062,6 +1386,7 @@ function wiredArmRecordSet(
 				eventName: event.eventName,
 				syncPolicy: event.syncPolicy,
 				symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
+				...submitEventFacts(input, event),
 			})),
 		behaviors: withBehaviorSymbols(
 			input,
@@ -1077,7 +1402,11 @@ function armHostIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
 	const escalatingIds = escalatingBranchIds(input);
 	return new Set(
 		renderDataOf(input).branches.flatMap((branch) =>
-			escalatingIds.has(branch.branchSiteId) ? [] : branch.armChunkIds.flatMap((chunkId) => [...branchArmHostPaths(input, chunkId).keys()]),
+			escalatingIds.has(branch.branchSiteId)
+				? []
+				: branch.armChunkIds.flatMap((chunkId) => [
+						...branchArmHostPaths(input, chunkId).keys(),
+					]),
 		),
 	);
 }
@@ -1119,7 +1448,9 @@ function rowRootsOneElement(
 	input: ProtocolViewPayloadInput,
 	render: { readonly rowElementCount: number; readonly rowChunkId: string },
 ): boolean {
-	const chunk = renderDataOf(input).chunks.find((candidate) => candidate.id === render.rowChunkId);
+	const chunk = renderDataOf(input).chunks.find(
+		(candidate) => candidate.id === render.rowChunkId,
+	);
 	if (render.rowElementCount > 0) return chunk !== undefined && armRootsOneElement(chunk);
 	if ((chunk?.slots ?? []).some((slot) => slot.kind === 'child-component')) return true;
 	// A row that is one @if or @switch is the one element its shown arm renders.
@@ -1197,27 +1528,40 @@ function armScopedBranchHostIds(
 	input: ProtocolViewPayloadInput,
 	boundaryId: string,
 ): ReadonlySet<string> {
+	// A branch holding a component carries no records of its own; what its arm shows is the boundary's.
 	return new Set(
-		renderDataOf(input).branches
-			.filter((branch) => branch.asyncBoundaryId === boundaryId)
+		renderDataOf(input)
+			.branches.filter(
+				(branch) => branch.asyncBoundaryId === boundaryId && branch.update === 'range',
+			)
 			.flatMap((branch) =>
 				branch.armChunkIds.flatMap((chunkId) => hostIdsForChunkTree(input, chunkId)),
 			),
 	);
 }
 
-function hostIdsForChunkTree(
+function hostIdsForChunkTree(input: ProtocolViewPayloadInput, chunkId: string): ReadonlyArray<string> {
+	const chunks = renderDataOf(input).chunks;
+	return chunkIdsForChunkTree(input, chunkId).flatMap(
+		(id) => chunks.find((candidate) => candidate.id === id)?.hosts.map((host) => host.hostNodeId) ?? [],
+	);
+}
+
+// `nested` false stops at the lists and @try blocks inside, which keep their own records.
+function chunkIdsForChunkTree(
 	input: ProtocolViewPayloadInput,
 	chunkId: string,
 	seen = new Set<string>(),
+	nested = true,
 ): ReadonlyArray<string> {
 	if (seen.has(chunkId)) return [];
 	seen.add(chunkId);
-	const data = renderDataOf(input);
-	const chunk = data.chunks.find((candidate) => candidate.id === chunkId);
+	const chunk = renderDataOf(input).chunks.find((candidate) => candidate.id === chunkId);
 	if (!chunk) return [];
 	const childChunkIds = chunk.slots.flatMap((slot) => {
 		if (slot.kind === 'branch') return slot.armTemplateIds;
+		if (slot.kind === 'dynamic-host') return [slot.childChunkId];
+		if (!nested) return [];
 		if (slot.kind === 'repeat')
 			return [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])];
 		if (slot.kind === 'async')
@@ -1226,13 +1570,9 @@ function hostIdsForChunkTree(
 				...(slot.armTemplateIds.pending ? [slot.armTemplateIds.pending] : []),
 				...(slot.armTemplateIds.catch ? [slot.armTemplateIds.catch] : []),
 			];
-		if (slot.kind === 'dynamic-host') return [slot.childChunkId];
 		return [];
 	});
-	return [
-		...chunk.hosts.map((host) => host.hostNodeId),
-		...childChunkIds.flatMap((childChunkId) => hostIdsForChunkTree(input, childChunkId, seen)),
-	];
+	return [chunkId, ...childChunkIds.flatMap((id) => chunkIdsForChunkTree(input, id, seen, nested))];
 }
 
 function armScopedBranchRecords(
@@ -1242,7 +1582,7 @@ function armScopedBranchRecords(
 ): ReadonlyArray<NonNullable<ProtocolViewArmRecordSet['branches']>[number]> | undefined {
 	const branches = renderDataOf(input).branches.filter(
 		(branch) =>
-			branch.asyncBoundaryId === boundaryId && branch.asyncBoundaryArm === arm,
+			branch.asyncBoundaryId === boundaryId && branch.asyncBoundaryArm === arm && branch.update !== 'row-arm',
 	);
 	if (branches.length === 0) return undefined;
 	const branchSymbols = new Map(
@@ -1250,30 +1590,58 @@ function armScopedBranchRecords(
 			symbol.kind === 'branch-update' ? [[symbol.branchSiteId, symbol] as const] : [],
 		),
 	);
+	const escalating = escalatingBranchIds(input);
 	return branches.map((branch, rank) =>
 		branch.update === 'boundary'
 			? {
 					id: branch.branchSiteId,
-					testReads: branchSymbols.get(branch.branchSiteId)?.testReads ?? [],
+					testReads: browserTestReads(input, branchSymbols.get(branch.branchSiteId)?.testReads),
+					// A component in the arm runs, so the flip renders its own range from the page.
+					...(escalating.has(branch.branchSiteId) && {
+						symbolId: branchSymbols.get(branch.branchSiteId)?.id,
+						startAnchor: { strategy: 'arm-branch-comment' as const, index: rank * 2 },
+						endAnchor: { strategy: 'arm-branch-comment' as const, index: rank * 2 + 1 },
+						...(branch.armTests && { armTests: branch.armTests }),
+						...branchArmComponentsField(input, branch.branchSiteId),
+					}),
 				}
-			: ({
-		id: branch.branchSiteId,
-		symbolId: branchSymbols.get(branch.branchSiteId)?.id,
-		testReads: branchSymbols.get(branch.branchSiteId)?.testReads ?? [],
-		startAnchor: { strategy: 'arm-branch-comment', index: rank * 2 },
-		endAnchor: { strategy: 'arm-branch-comment', index: rank * 2 + 1 },
-		...branchContentReadsField(input, branch.branchSiteId),
-		armRecords: branchArmRecords(input, branch.branchSiteId),
-		...(branch.armTests ? { armTests: branch.armTests } : {}),
-		...(branch.declaredEmptyArms
-			? { declaredEmptyArms: branch.declaredEmptyArms }
-			: {}),
-	}));
+			: {
+					id: branch.branchSiteId,
+					symbolId: branchSymbols.get(branch.branchSiteId)?.id,
+					testReads: browserTestReads(input, branchSymbols.get(branch.branchSiteId)?.testReads),
+					startAnchor: { strategy: 'arm-branch-comment', index: rank * 2 },
+					endAnchor: { strategy: 'arm-branch-comment', index: rank * 2 + 1 },
+					...branchContentReadsField(input, branch.branchSiteId),
+					...branchArmSeedsField(input, branch.branchSiteId),
+					...branchArmComponentsField(input, branch.branchSiteId),
+					armRecords: branchArmRecords(input, branch.branchSiteId),
+					...(branch.armTests ? { armTests: branch.armTests } : {}),
+					...(branch.declaredEmptyArms
+						? { declaredEmptyArms: branch.declaredEmptyArms }
+						: {}),
+				},
+	);
 }
 
 // Per-arm records for gate-supported branch sites: everything the resume
 // runtime must rewire when an arm flips in, addressed by arm-relative host
 // paths (the keyed-repeat rowEvents convention).
+// The page's lists whose parent element this arm renders, addressed from the arm.
+function armRepeatParents(
+	input: ProtocolViewPayloadInput,
+	chunkId: string,
+	hostIds: ReturnType<typeof branchArmHostPaths>,
+	pageRepeats: ReturnType<typeof resumableKeyedRepeats>,
+) {
+	const chunk = renderDataOf(input).chunks.find((candidate) => candidate.id === chunkId);
+	return (chunk?.slots ?? []).flatMap((slot) => {
+		if (slot.kind !== 'repeat') return [];
+		const record = pageRepeats.find((candidate) => candidate.id === slot.repeatId);
+		const parent = record && !record.enclosingRow ? hostIds.get(record.parentHostNodeId) : undefined;
+		return parent ? [{ repeatId: slot.repeatId, parentHostPath: parent.path }] : [];
+	});
+}
+
 function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string) {
 	const branch = renderDataOf(input).branches.find(
 		(entry) => entry.branchSiteId === branchSiteId,
@@ -1297,9 +1665,12 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 			);
 		}
 	}
+	const pageRepeats = resumableKeyedRepeats(input);
 	return branch.armChunkIds.map((chunkId) => {
 		const hostIds = branchArmHostPaths(input, chunkId);
+		const repeatParents = armRepeatParents(input, chunkId, hostIds, pageRepeats);
 		return {
+			...(repeatParents.length > 0 ? { repeatParents } : {}),
 			events: oneRecordPerEvent(input.payloadArena.view.events)
 				.filter((event) => hostIds.has(event.hostNodeId))
 				.map((event) => ({
@@ -1307,6 +1678,7 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 					eventName: event.eventName,
 					syncPolicy: event.syncPolicy,
 					symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
+					...submitEventFacts(input, event),
 				})),
 			domUpdates: input.payloadArena.view.domUpdates
 				.filter((domUpdate) => hostIds.has(domUpdate.hostNodeId))
@@ -1328,7 +1700,9 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 				}),
 			behaviors: withBehaviorSymbols(
 				input,
-				input.payloadArena.view.behaviors.filter((behavior) => hostIds.has(behavior.hostNodeId)),
+				input.payloadArena.view.behaviors.filter((behavior) =>
+					hostIds.has(behavior.hostNodeId),
+				),
 			).map((behavior) => ({
 				...behavior,
 				hostPath: hostIds.get(behavior.hostNodeId)!.path,
@@ -1390,7 +1764,8 @@ function mergeForwardedEvents<
 	for (const event of forwarded) {
 		const at = merged.findIndex(
 			(candidate) =>
-				candidate.hostNodeId === event.hostNodeId && candidate.eventName === event.eventName,
+				candidate.hostNodeId === event.hostNodeId &&
+				candidate.eventName === event.eventName,
 		);
 		if (at < 0) {
 			appended.push(event);
@@ -1421,9 +1796,14 @@ function boundSymbolIds(
 			kinds.has(symbol.kind) ? [symbol.id] : [],
 		),
 	);
+	const rows = new Map<string, string[]>();
+	for (const row of input.captureAnalysis?.boundResolverRows ?? [])
+		if (baseSymbolIds.has(row.baseSymbolId))
+			rows.set(row.baseSymbolId, [...(rows.get(row.baseSymbolId) ?? []), row.id]);
+	// A symbol bound once per instance keeps its own id: each instance's composition binds it to that instance's row.
 	return new Map(
-		(input.captureAnalysis?.boundResolverRows ?? []).flatMap((row) =>
-			baseSymbolIds.has(row.baseSymbolId) ? [[row.baseSymbolId, row.id] as const] : [],
+		[...rows].flatMap(([baseSymbolId, ids]) =>
+			ids.length === 1 ? [[baseSymbolId, ids[0]!] as const] : [],
 		),
 	);
 }
@@ -1483,4 +1863,25 @@ function withBehaviorSymbols<Behavior extends { readonly hostNodeId: string }>(
 			...behaviorSymbolFields(input, symbolsByHost.get(behavior.hostNodeId)?.[rank]),
 		};
 	});
+}
+
+// The analyzer's submit facts for this event's host, carried on its record so the runtime reads no DOM to learn them.
+// `relayedProp`: the handler is the component's own prop handed over as is, so composition gives the record the cancel its parent passed in that prop.
+function submitEventFacts(
+	input: Pick<ProtocolViewPayloadInput, 'semanticGraph'>,
+	event: { readonly hostNodeId: string; readonly eventName: string },
+): ProtocolSubmitEventFacts & { readonly relayedProp?: string } {
+	const same = input.semanticGraph?.events.filter(
+		(candidate) =>
+			candidate.hostNodeId === event.hostNodeId && candidate.eventName === event.eventName,
+	);
+	const inPlace = same?.find((candidate) => candidate.inPlaceSubmit)?.inPlaceSubmit;
+	const relayedProp = same?.find((candidate) => candidate.relayedPropName)?.relayedPropName;
+	return {
+		...(relayedProp && { relayedProp }),
+		...(same?.some((candidate) => candidate.authoredSubmitAriaDisabled) && {
+			authoredSubmitAriaDisabled: true,
+		}),
+		...(inPlace && { inPlaceSubmit: inPlace }),
+	};
 }

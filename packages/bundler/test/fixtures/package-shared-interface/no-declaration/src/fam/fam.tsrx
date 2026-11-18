@@ -6,7 +6,7 @@ export const famState = shared(
 
 		return { ...fam };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function FamRoot({ children }) @{

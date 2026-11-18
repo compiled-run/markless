@@ -98,7 +98,7 @@ path can ever name that root. The two halves:
 The SSR side declares it into the same seam rather than a parallel one: the
 emitted module puts `childrenWidgetRoot` on the composed child it already builds,
 so CSR and SSR reach the same registration code with the same value. Browser
-resume has no composition to watch, so the payload carries it: a widget-scoped
+resume has no composition to watch, so the payload carries it: a subtree-scoped
 shared definition now has `projectionIds`, and resume registers those the way it
 already registers the definition's own id.
 

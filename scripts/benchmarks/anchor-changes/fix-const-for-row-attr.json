@@ -1,0 +1,53 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /", "jsGzipBytes"],
+			"delta": 29,
+			"reason": "row-mint counts a row slot's steps after a nested list from the parent's end (fromEnd) and protocol validation checks it, so the slot patches its own element; downloaded, not executed at load",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /records", "jsGzipBytes"],
+			"delta": 29,
+			"reason": "row-mint counts a row slot's steps after a nested list from the parent's end (fromEnd) and protocol validation checks it, so the slot patches its own element; downloaded, not executed at load",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /settings", "jsGzipBytes"],
+			"delta": 29,
+			"reason": "row-mint counts a row slot's steps after a nested list from the parent's end (fromEnd) and protocol validation checks it, so the slot patches its own element; downloaded, not executed at load",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /", "jsGzipBytes"],
+			"delta": 279,
+			"reason": "the docs playground compile worker carries the compiler's nested-list row template changes, and row-mint and validation carry fromEnd; downloaded, not executed at load",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /concepts/state", "jsGzipBytes"],
+			"delta": 279,
+			"reason": "the docs playground compile worker carries the compiler's nested-list row template changes, and row-mint and validation carry fromEnd; downloaded, not executed at load",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /ui/accordion", "executedChars"],
+			"delta": 168,
+			"reason": "protocol validation checks each row template slot's optional fromEnd at load, on pages whose rows ship templates",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /ui/accordion", "jsGzipBytes"],
+			"delta": 30,
+			"reason": "the docs playground compile worker carries the compiler's nested-list row template changes, and row-mint and validation carry fromEnd; downloaded, not executed at load",
+			"date": "2026-11-05"
+		}
+	]
+}

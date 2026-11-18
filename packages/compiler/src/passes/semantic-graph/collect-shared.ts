@@ -1,3 +1,4 @@
+import { PROTOCOL_SHARED_SCOPES } from '@markless/serializer';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type {
@@ -5,6 +6,7 @@ import type {
 	ModuleGraphInterfaceSharedDefinition,
 	SemanticGraphAlias,
 	SemanticGraphBinding,
+	SemanticGraphArtifact,
 	SemanticGraphDiagnostic,
 	SemanticModuleImport,
 	SemanticSharedDefinition,
@@ -13,6 +15,9 @@ import type {
 	SemanticSharedModuleDeclaration,
 	SemanticSharedReturnProperty,
 	SemanticSharedScope,
+	SemanticStateRead,
+	SemanticStateWrite,
+	SourceSpan,
 } from '../../artifacts.ts';
 import {
 	graphBindingMap,
@@ -25,6 +30,7 @@ import {
 	callbackSlotSourceDiagnostic,
 	implicitFamilyScopeDiagnostic,
 	invalidSharedScopeDiagnostic,
+	renamedSharedScopeDiagnostic,
 	sharedDefinitionCycleDiagnostic,
 	sharedSeedUnresolvedValueDiagnostic,
 	unboundCallbackSlotDiagnostic,
@@ -32,7 +38,7 @@ import {
 	unnamedSharedReturnDiagnostic,
 } from './diagnostics.ts';
 import { collectComputedBinding } from './collect-state.ts';
-import { collectExpressionReads } from './collect-expressions.ts';
+import { collectExpressionReads, resolvedSymbolAt } from './collect-expressions.ts';
 import { getCallName, getFrameworkApiForCall, isFrameworkApiName } from './imports.ts';
 import { ownedModuleAst } from './shared-ast.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
@@ -168,8 +174,14 @@ function namesIdentifier(text: string, name: string): boolean {
 	return new RegExp(`(^|[^\\w$.])${name}([^\\w$]|$)`).test(text);
 }
 
+const sharedInstancesByDeclarationStart = new WeakMap<
+	WalkState,
+	Map<number, SemanticSharedInstance>
+>();
+
 export function collectSharedInstance(input: {
 	readonly localName: string;
+	readonly declaration: AnyNode;
 	readonly init: AnyNode;
 	readonly state: WalkState;
 }): void {
@@ -182,7 +194,7 @@ export function collectSharedInstance(input: {
 
 	if (resolved?.published) adoptSharedDefinition(resolved.published, input.state);
 
-	input.state.graph.sharedInstances.push({
+	const instance: SemanticSharedInstance = {
 		definitionId: target.id,
 		definitionName: target.name,
 		localName: input.localName,
@@ -191,7 +203,43 @@ export function collectSharedInstance(input: {
 			: {}),
 		source: expressionSource(input.init, input.state.source),
 		sourceSpan: sourceSpan(input.init, input.state.filename),
-	});
+	};
+	input.state.graph.sharedInstances.push(instance);
+	if (typeof input.declaration.start === 'number') {
+		let byStart = sharedInstancesByDeclarationStart.get(input.state);
+		if (!byStart) {
+			byStart = new Map();
+			sharedInstancesByDeclarationStart.set(input.state, byStart);
+		}
+		byStart.set(input.declaration.start, instance);
+	}
+}
+
+/**
+ * Whether `receiver.method(...)` calls a method the receiver's shared() factory
+ * returns. The receiver is matched by the binding it resolves to, so a local
+ * that shadows the instance name is not mistaken for it.
+ */
+export function callsSharedInstanceMethod(
+	receiver: AnyNode | undefined,
+	method: string,
+	state: WalkState,
+): boolean {
+	if (receiver?.type !== 'Identifier' || typeof receiver.start !== 'number') return false;
+	const semantic = state.semantic();
+	const symbolId = resolvedSymbolAt(semantic, receiver.start);
+	if (symbolId === null) return false;
+	const declarationStart = semantic.bindings[symbolId]!.declarations[0]?.start;
+	if (typeof declarationStart !== 'number') return false;
+	const instance = sharedInstancesByDeclarationStart.get(state)?.get(declarationStart);
+	if (!instance) return false;
+	return (
+		state.graph.sharedDefinitions
+			.find((definition) => definition.id === instance.definitionId)
+			?.returnProperties?.some(
+				(property) => property.kind === 'method' && property.name === method,
+			) === true
+	);
 }
 
 /**
@@ -334,12 +382,27 @@ function resolvePublishedSharedDefinition(input: {
 	}
 
 	for (const reexport of moduleInterface.reexports ?? []) {
+		if (reexport.exportName === '*') {
+			if (segment === 'default') continue;
+			const resolved = resolvePublishedSharedDefinition({
+				moduleInterface: interfaceForSource(reexport.source, input.state),
+				exportPath,
+				state: input.state,
+				seen: new Set([...input.seen, moduleInterface.filename]),
+			});
+			if (resolved) return resolved;
+			continue;
+		}
 		if (reexport.exportName !== segment) continue;
 		// `export * as ns from` binds a namespace, so the segment is spent on the
 		// namespace and the rest of the path walks inside it; a named re-export
 		// renames one export, so the whole path continues under the new name.
 		const nextPath =
-			reexport.importedName === '*' ? rest : rest.length === 0 ? [reexport.importedName] : null;
+			reexport.importedName === '*'
+				? rest
+				: rest.length === 0
+					? [reexport.importedName]
+					: null;
 		if (!nextPath) continue;
 
 		const resolved = resolvePublishedSharedDefinition({
@@ -388,6 +451,15 @@ function adoptSharedDefinition(
 	for (const binding of published.graphBindings) {
 		if (state.graph.graphBindings.some((item) => item.id === binding.id)) continue;
 		state.graph.graphBindings.push(binding);
+	}
+	for (const alias of published.methodAliases ?? []) {
+		if (!state.graph.aliases.includes(alias)) state.graph.aliases.push(alias);
+	}
+	for (const read of published.methodStateReads ?? []) {
+		if (!state.graph.stateReads.includes(read)) state.graph.stateReads.push(read);
+	}
+	for (const write of published.methodStateWrites ?? []) {
+		if (!state.graph.stateWrites.includes(write)) state.graph.stateWrites.push(write);
 	}
 }
 
@@ -465,9 +537,9 @@ function reachableSharedExportPaths(input: {
 				return reachableSharedExportPaths({
 					moduleInterface: target,
 					state: input.state,
-					prefix: [...input.prefix, reexport.exportName],
+					prefix: reexport.exportName === '*' ? input.prefix : [...input.prefix, reexport.exportName],
 					seen,
-				});
+				}).filter((path) => reexport.exportName !== '*' || path.split('.')[input.prefix.length] !== 'default');
 			}
 			// A named re-export renames one export, so it contributes that one name
 			// under this module's spelling of it.
@@ -508,7 +580,7 @@ function unresolvedSharedCallDiagnostic(input: {
 		suggestions: [
 			{
 				message:
-					"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'widget' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
+					"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'subtree' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_CALL_UNRESOLVED',
@@ -548,22 +620,82 @@ export function moduleInterfaceSharedDefinitions(input: {
 	readonly moduleId: string;
 	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
+	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
+	readonly stateReads: ReadonlyArray<SemanticStateRead>;
+	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
 }): ReadonlyArray<ModuleGraphInterfaceSharedDefinition> {
 	const exportNames = exportedLocalNames(input.statements);
 
 	return input.sharedDefinitions.flatMap((definition) => {
 		// A definition this module adopted from an import is that module's to
 		// publish; republishing it here would give one definition two owners.
-		if (definition.id !== sharedDefinitionId(input.moduleId, definition.exportedName)) return [];
+		if (definition.id !== sharedDefinitionId(input.moduleId, definition.exportedName))
+			return [];
 
+		const inMethod = methodSpanTest(definition);
+		const ownState = ownStateTest(input, definition.id);
+		const methodAliases = input.aliases.filter(
+			(alias) => alias.sharedDefinitionId === definition.id && inMethod(alias.sourceSpan),
+		);
+		const methodStateReads = input.stateReads.filter(
+			(read) =>
+				read.sharedDefinitionId === definition.id &&
+				inMethod(read.sourceSpan) &&
+				ownState(read.source),
+		);
+		// A write to a method's own local stays plain JavaScript in the copy, so only state writes travel.
+		const methodStateWrites = input.stateWrites.filter(
+			(write) =>
+				write.sharedDefinitionId === definition.id &&
+				inMethod(write.targetSpan) &&
+				ownState(writtenStateSource(write)),
+		);
 		return (exportNames.get(definition.name) ?? []).map((exportName) => ({
 			exportName,
 			definition,
 			graphBindings: input.graphBindings.filter(
 				(binding) => binding.sharedDefinitionId === definition.id,
 			),
+			...(methodAliases.length > 0 ? { methodAliases } : {}),
+			...(methodStateReads.length > 0 ? { methodStateReads } : {}),
+			...(methodStateWrites.length > 0 ? { methodStateWrites } : {}),
 		}));
 	});
+}
+
+function ownStateTest(
+	graph: Pick<SemanticGraphArtifact, 'graphBindings' | 'aliases'>,
+	definitionId: string,
+): (source: string | null) => boolean {
+	const bindings = graphBindingMap(graph, definitionId);
+	const aliases = semanticAliasMap(graph, definitionId);
+	return (source) =>
+		source !== null &&
+		resolveGraphPath(source, bindings, aliases)?.binding.sharedDefinitionId === definitionId;
+}
+
+function writtenStateSource(write: SemanticStateWrite): string | null {
+	const through = write.through;
+	if (!through) return write.target;
+	if (through.kind === 'path') return through.target;
+	if (through.kind === 'element') return through.collection;
+	return null;
+}
+
+function methodSpanTest(
+	definition: SemanticSharedDefinition,
+): (span: SourceSpan | undefined) => boolean {
+	const methodSpans = (definition.returnProperties ?? []).flatMap((property) =>
+		property.kind === 'method' && property.sourceSpan ? [property.sourceSpan] : [],
+	);
+	return (span) =>
+		span !== undefined &&
+		methodSpans.some(
+			(method) =>
+				method.filename === span.filename &&
+				span.start >= method.start &&
+				span.end <= method.end,
+		);
 }
 
 // `export const pnl = ...` and `export { pnl as state }` — the names this
@@ -668,11 +800,38 @@ export function collectSharedFactoryGraph(
 		const index = state.graph.sharedDefinitions.findIndex((item) => item.id === definition.id);
 		if (index === -1) continue;
 
+		const instanceGraphNodeId = wholeStateReturn(returnProperties, state.graph.graphBindings);
 		state.graph.sharedDefinitions[index] = {
 			...state.graph.sharedDefinitions[index],
 			returnProperties,
+			...(instanceGraphNodeId ? { instanceGraphNodeId } : {}),
 		};
 	}
+}
+
+// `return box` and `return { ...box }`: every field of one state object, each under its own name.
+function wholeStateReturn(
+	properties: ReadonlyArray<SemanticSharedReturnProperty>,
+	bindings: ReadonlyArray<SemanticGraphBinding>,
+): string | undefined {
+	const first = properties[0];
+	if (first?.kind !== 'graph') return undefined;
+	const binding = bindings.find((item) => item.id === first.graphNodeId);
+	if (binding?.kind !== 'state' || binding.valueKind !== 'object') return undefined;
+	if (binding.initialValueKnown !== true) return undefined;
+	const initial = binding.initialValue;
+	if (typeof initial !== 'object' || initial === null || Array.isArray(initial)) return undefined;
+
+	const names = new Set<string>();
+	for (const property of properties) {
+		if (property.kind !== 'graph' || property.graphNodeId !== binding.id) return undefined;
+		if (property.path.length !== 1 || property.path[0] !== property.name) return undefined;
+		names.add(property.name);
+	}
+	const fields = Object.keys(initial);
+	return fields.length === names.size && fields.every((field) => names.has(field))
+		? binding.id
+		: undefined;
 }
 
 /**
@@ -919,7 +1078,10 @@ export function findSharedInstance(
 	localName: string,
 	graph: Pick<SharedInstanceGraph, 'sharedDefinitions' | 'sharedInstances'>,
 	componentName?: string | null,
-): { readonly instance: SemanticSharedInstance; readonly definition: SemanticSharedDefinition } | null {
+): {
+	readonly instance: SemanticSharedInstance;
+	readonly definition: SemanticSharedDefinition;
+} | null {
 	const instance = findLast(
 		graph.sharedInstances,
 		(item) => item.localName === localName && sharedInstanceVisibleFrom(item, componentName),
@@ -952,7 +1114,13 @@ export function resolveSharedInstanceGraphPath(
 			componentName,
 		);
 	}
-	if (segments.length < 2) return null;
+	if (segments.length === 1) {
+		if (source !== segments[0]) return null;
+		const nodeId = findSharedInstance(segments[0]!, graph, componentName)?.definition
+			.instanceGraphNodeId;
+		const binding = nodeId ? graph.graphBindings.find((item) => item.id === nodeId) : undefined;
+		return binding ? { binding, path: [] } : null;
+	}
 
 	const [localName, propertyName, ...propertyPath] = segments;
 	if (!localName || !propertyName) return null;
@@ -1636,6 +1804,15 @@ function canonicalCycleKey(cycleNames: ReadonlyArray<string>): string {
 	return canonical ?? cycleNames.join('->');
 }
 
+const RENAMED_SHARED_SCOPES = {
+	page: 'app',
+	request: 'app',
+	widget: 'subtree',
+} as const satisfies Record<string, SemanticSharedScope>;
+
+const isSharedScope = (value: unknown): value is SemanticSharedScope =>
+	(PROTOCOL_SHARED_SCOPES as ReadonlyArray<unknown>).includes(value);
+
 function sharedScopeFromOptions(
 	node: AnyNode | undefined,
 	state: WalkState,
@@ -1660,13 +1837,20 @@ function sharedScopeFromOptions(
 			);
 			return undefined;
 		}
-		if (
-			value.value === 'request' ||
-			value.value === 'container' ||
-			value.value === 'page' ||
-			value.value === 'widget'
-		) {
-			return value.value;
+		if (isSharedScope(value.value)) return value.value;
+		const renamedTo =
+			typeof value.value === 'string' && Object.hasOwn(RENAMED_SHARED_SCOPES, value.value)
+				? RENAMED_SHARED_SCOPES[value.value as keyof typeof RENAMED_SHARED_SCOPES]
+				: undefined;
+		if (renamedTo) {
+			state.graph.diagnostics.push(
+				renamedSharedScopeDiagnostic({
+					from: value.value as string,
+					to: renamedTo,
+					valueSpan: sourceSpan(value, state.filename),
+				}),
+			);
+			return undefined;
 		}
 		state.graph.diagnostics.push(
 			invalidSharedScopeDiagnostic({

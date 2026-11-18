@@ -13,7 +13,7 @@ One widget family, `tabsState`, rooted by `tabs.root`: `value`, `orientation`,
 `loop`, `selectOnFocus`, the consumer's `onChange`, and `show(next)`. It is
 exported as `state` beside the parts, per the owner's namespace ruling.
 
-`tabsPartState` is a second, widget-scoped family rooted by each `tabs.trigger`.
+`tabsPartState` is a second, subtree-scoped family rooted by each `tabs.trigger`.
 It holds that tab's own `value`, for one measured reason (below), and since
 2026-08-23 an `element()` handle, `el`, bound to the tab's button so the key rule
 can read its own element instead of selecting for it. It is deliberately **not**
@@ -59,7 +59,7 @@ not read its own factory's handle there). Collapsible wires exactly this pairing
 because it has one pair; tabs has N.
 
 The single-pair shape the IDREF capability *can* express was tried and refused,
-on this tip, on 2026-08-22. One widget-scoped handle is one element per rendered
+on this tip, on 2026-08-22. One subtree-scoped handle is one element per rendered
 widget, so the showing tab is the only tab that may carry it:
 
 ```tsx
@@ -80,7 +80,7 @@ every panel resolves to the first of them — the exact ambiguity
 `el={…}` takes a bare handle, so there is no third spelling that binds only the
 showing tab.
 
-What would satisfy it is a widget-scoped instance **keyed by the authored value**
+What would satisfy it is a subtree-scoped instance **keyed by the authored value**
 that two parts in different subtrees both resolve — `shared()` takes only
 `scope`, so there is no key today. Research §6b states the full requirement.
 `tabs.browser.ts` asserts both attributes absent, so that row turns red the day
@@ -209,9 +209,9 @@ Two landings closed it, both on this branch. `element() handles resolve as value
 in handlers` (commit `1d8777e9`, defect 54, witnessed by
 `packages/compiler/test/element-handle-values.test.ts`) made the read compile and
 emit `context.getElementHandle(...)` for shared members, call arguments and
-cross-element reads. That alone was not enough: a widget-scoped handle id is one
+cross-element reads. That alone was not enough: a subtree-scoped handle id is one
 module-level string, so the read answered for whichever widget registered last.
-Defect 63 fixed that in two halves — `a8eaf144` qualifies a widget-scoped handle
+Defect 63 fixed that in two halves — `a8eaf144` qualifies a subtree-scoped handle
 id with the rendered widget's root path, and `0de21164` gives the **bound**
 symbol dispatch path the same scoping the graph already had. The second half is
 what this family needed: the trigger forwards a consumer callback

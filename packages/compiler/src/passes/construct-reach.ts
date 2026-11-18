@@ -122,3 +122,49 @@ function chunkTreeConstructReach(
 	}
 	return reach;
 }
+
+/**
+ * Whether a @try stands at the top level of what a component renders, outside
+ * every element: its anchors then sit beside the component's element, so a row
+ * the browser builds from it cannot be moved or settled as one element.
+ */
+export function componentRootBoundary(input: ConstructReachInput, rootChunkId: string): boolean {
+	return chunkRootBoundary(input, rootChunkId, new Set());
+}
+
+/** The same question for the component one edge reaches, local or behind an import. */
+export function childRootBoundary(
+	input: ConstructReachInput,
+	edge: SemanticComponentEdge,
+	childTemplateId: string,
+	seen: Set<string>,
+): boolean {
+	if (edge.importSource === undefined) return chunkRootBoundary(input, childTemplateId, seen);
+	const entry = input.importedModuleInterfaces?.[edge.importSource]?.render.components.find(
+		(candidate) => candidate.componentName === edge.childComponentName,
+	);
+	return entry?.rootBoundary === true;
+}
+
+function chunkRootBoundary(
+	input: ConstructReachInput,
+	chunkId: string,
+	seen: Set<string>,
+): boolean {
+	if (seen.has(chunkId)) return false;
+	seen.add(chunkId);
+	const chunk = input.chunks.find((candidate) => candidate.id === chunkId);
+	return (chunk?.slots ?? []).some((slot) => {
+		if (slot.coordinate.path.length !== 1) return false;
+		if (slot.kind === 'async') return true;
+		if (slot.kind === 'branch')
+			return slot.armTemplateIds.some((armChunkId) =>
+				chunkRootBoundary(input, armChunkId, seen),
+			);
+		if (slot.kind !== 'child-component') return false;
+		const edge = input.componentEdges.find(
+			(candidate) => candidate.id === slot.componentEdgeId,
+		);
+		return edge !== undefined && childRootBoundary(input, edge, slot.childTemplateId, seen);
+	});
+}

@@ -67,7 +67,7 @@ const install = (label: string) => (host: HTMLElement) => {
 export const gate = shared(() => {
 	const g = state({ minWidth: 1, x: 3 });
 	return { ...g, grow() { g.x = (g.x as number) + 1; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ cap = WIDTH as Limit }) @{
 	const g = gate();
@@ -144,7 +144,9 @@ export function Root() @{
 	expect(errors(compiled)).toEqual([]);
 	expect(moduleOfKind(compiled, 'event-handler')).toBe(
 		`export function symbol_0(context) {
-  context.graph.write({ graphNodeId: "state:count", path: [], value: context.graph.read("state:count") + 1 });
+  context.graph.update({ graphNodeId: "state:count", path: [], returnValue: "next", update(value) {
+    return value + 1;
+  } });
 }`,
 	);
 });

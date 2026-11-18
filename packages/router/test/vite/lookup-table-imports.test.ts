@@ -2,11 +2,9 @@ import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { expect, test } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 const TEXT_COUNT = 40;
@@ -53,13 +51,9 @@ test('a lookup table of import() loaders keeps each target in its own chunk, fet
 	const root = await mkdtemp(join(tmpdir(), 'markless-lookup-imports-'));
 	try {
 		await writeApp(root);
-		const builder = await createBuilder({
+		await buildFixture({
 			root,
-			configFile: false,
-			logLevel: 'silent',
-			plugins: [markless(), router()],
 		});
-		await builder.buildApp();
 
 		const clientDir = join(root, '.output/public/build');
 		const chunks = (await readdir(clientDir)).filter((file) => file.endsWith('.js'));

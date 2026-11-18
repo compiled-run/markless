@@ -142,7 +142,7 @@ test('nested @for loops binding the same name render each depth its own item', a
 	expect(html).toContain('<li data-depth="1">Leaf B</li>');
 });
 
-test('a name that is one loop\'s item and another loop\'s index is refused loudly', async () => {
+test("a name that is one loop's item and another loop's index is refused loudly", async () => {
 	const page = await compilePage('src/Clash.tsrx', itemVersusIndexSource);
 	const conflict = collectTsrxModuleDiagnostics(page).find(
 		(diagnostic) => diagnostic.code === 'MARKLESS_REPEAT_BINDING_NAME_CONFLICT',
@@ -153,4 +153,58 @@ test('a name that is one loop\'s item and another loop\'s index is refused loudl
 	// The span points at the loop that redefines the name, so both are findable.
 	expect(conflict?.primarySpan?.filename).toBe('src/Clash.tsrx');
 	expect(typeof conflict?.primarySpan?.start).toBe('number');
+});
+
+test("a destructured name that is another loop's index is refused loudly", async () => {
+	const page = await compilePage(
+		'src/Pairs.tsrx',
+		`import { state } from '@markless/core';
+export default function Pairs() @{
+	let pairs = state<[string, string[]][]>([['a', ['x']]]);
+	<ul>
+		@for (const [key, kids] of pairs; key key) {
+			<li>
+				@for (const kid of kids; index key; key kid) {
+					<b>{key + kid}</b>
+				}
+			</li>
+		}
+	</ul>
+}
+`,
+	);
+	const conflict = collectTsrxModuleDiagnostics(page).find(
+		(diagnostic) => diagnostic.code === 'MARKLESS_REPEAT_BINDING_NAME_CONFLICT',
+	);
+	expect(conflict?.message).toContain('"key"');
+});
+
+const itemVersusIndexAcrossComponentsSource = `import { state } from '@markless/core';
+
+function Firsts() @{
+	let first = state([{ id: 'f1', label: 'First' }]);
+	<ul class="first">
+		@for (const i of first; key i.id) {
+			<li>{i.label}</li>
+		}
+	</ul>
+}
+
+export default function Seconds() @{
+	let second = state([{ id: 's1', label: 'Second' }]);
+	<main>
+		<Firsts />
+		<ul class="second">
+			@for (const entry of second; index i; key entry.id) {
+				<li data-at={i}>{entry.label}</li>
+			}
+		</ul>
+	</main>
+}`;
+
+test('an item in one component and an index in another may share a name', async () => {
+	const html = await renderHtml('src/Spread.tsrx', itemVersusIndexAcrossComponentsSource);
+
+	expect(html).toContain('First');
+	expect(html).toMatch(/<li data-at="0"[^>]*>Second<\/li>/);
 });

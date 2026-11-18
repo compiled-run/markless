@@ -16,7 +16,7 @@ export const box = shared(() => {
 	const loud = computed(() => s.label.toUpperCase());
 	const asked = computed(() => loud() + '?');
 	return { ...s, loud, asked };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Family() @{
 	const b = box();
@@ -54,7 +54,7 @@ export const box = shared(() => {
 	const banged = computed(() => loud() + '!');
 	const asked = computed(() => banged() + '?');
 	return { ...s, loud, banged, asked };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Family() @{
 	const b = box();
@@ -128,7 +128,7 @@ export const dial = shared(() => {
 	const loud = computed(() => shout(cell.label));
 	const asked = computed(() => shout(loud) + '?');
 	return { ...cell, loud, asked };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Dial() @{
 	const d = dial();
@@ -154,7 +154,7 @@ export const box = shared(() => {
 		return shout(loud);
 	});
 	return { ...s, loud, asked };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Family() @{
 	const b = box();

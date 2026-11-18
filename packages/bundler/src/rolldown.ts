@@ -1,3 +1,4 @@
+import type { LiteralComponentInstance } from './prop-flow.ts';
 import type { InputOptions, Plugin } from 'rolldown';
 import {
 	DEBUGGING_PLAYBOOK_HINT,
@@ -126,8 +127,18 @@ export function createMarklessRolldownPlugin(input: {
 					runtimeDemandMaps,
 					runtimeDemandSources,
 					directCsrOnly,
+					undefined,
+					unreachableChildren,
 				)
 			: [];
+
+	function unreachableChildren(
+		files: ReadonlySet<string>,
+		roots: ReadonlySet<string>,
+		importers: ReadonlyMap<string, ReadonlySet<string>>,
+	) {
+		return state.moduleMetadata.propFlow.unreachableChildren(files, roots, importers);
+	}
 
 	function* runtimeDemandMaps() {
 		for (const manifest of state.moduleMetadata.symbolClaimManifests())
@@ -199,14 +210,27 @@ export function createMarklessRolldownPlugin(input: {
 			runtimeDemandMaps,
 			runtimeDemandSources,
 			directCsrOnly,
+			unreachableChildren,
+			recordLiteralComponentInstances: (
+				source: string,
+				instances: ReadonlyArray<LiteralComponentInstance>,
+			) => state.moduleMetadata.propFlow.recordLiteralInstances(source, instances),
 			chunkImportMap: () => chunkImportMapEnabled(internalOptions),
 			enableChunkImportMap: () => {
 				internalOptions.chunkImportMap = true;
+			},
+			deliverStylesheetsInDocuments: () => {
+				internalOptions.documentStylesheets = true;
 			},
 			declareServerOnlyProps: (
 				resolve: InternalMarklessRolldownOptions['serverOnlyProps'],
 			) => {
 				internalOptions.serverOnlyProps = resolve;
+			},
+			declareElementOnlyAttributes: (
+				attributes: InternalMarklessRolldownOptions['elementOnlyAttributes'],
+			) => {
+				internalOptions.elementOnlyAttributes = attributes;
 			},
 			declareRouteModules: (isRoute: (moduleId: string) => boolean) => {
 				internalOptions.routeModules = isRoute;
@@ -262,6 +286,18 @@ export function createMarklessRolldownPlugin(input: {
 				preserveEntrySignatures: packing
 					? 'allow-extension'
 					: (input.preserveEntrySignatures ?? 'allow-extension'),
+				// Leaves off the pass a route build never ran while its page modules awaited; facade merging stays on.
+				...(packing && internalOptions.routeModules
+					? {
+							experimental: {
+								...input.experimental,
+								chunkOptimization: {
+									mergeCommonChunks: true,
+									avoidRedundantChunkLoads: false,
+								},
+							},
+						}
+					: {}),
 			};
 		},
 		async buildStart(input) {

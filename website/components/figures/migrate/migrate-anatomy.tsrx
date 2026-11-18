@@ -187,7 +187,7 @@ export default function MigrateAnatomy() @{
 					}
 					<text class="served" transform={art.report.routes[0]!.served}>{served0}</text>
 					<text class="served" transform={art.report.routes[1]!.served}>{served1}</text>
-					<text class="served" transform={art.report.routes[2]!.served}>{served2}</text>
+					<text class="served switched" transform={art.report.routes[2]!.served}>{served2}</text>
 					<text class="served" transform={art.report.routes[3]!.served}>{served3}</text>
 					<path class="ink tick" d={art.report.tick} />
 					<path class="red-ink cross" d={art.report.cross} />
@@ -373,11 +373,10 @@ export default function MigrateAnatomy() @{
 
 				html.dark & {
 					--red: oklch(55% 0.2 27);
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--report: color-mix(in oklch, var(--ink) 90%, var(--yellow));
-					--sheet-ink: var(--paper);
-					--shade: rgb(0 0 0 / 0.55);
-					--shade-ink: rgb(0 0 0 / 0.85);
+					--sheet: var(--figure-sheet);
+					--report: var(--raised);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
 				}
 			}
 
@@ -434,10 +433,6 @@ export default function MigrateAnatomy() @{
 				fill: var(--yellow);
 				stroke: var(--yellow);
 				opacity: 0.85;
-
-				html.dark & {
-					opacity: 0.45;
-				}
 			}
 
 			.pink {
@@ -447,7 +442,7 @@ export default function MigrateAnatomy() @{
 			}
 
 			.pool {
-				fill: color-mix(in oklch, var(--yellow) 70%, oklch(70% 0.16 70));
+				fill: var(--marker);
 				stroke: none;
 				opacity: 0.5;
 			}
@@ -539,7 +534,7 @@ export default function MigrateAnatomy() @{
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;
@@ -650,6 +645,28 @@ export default function MigrateAnatomy() @{
 				overflow: hidden;
 				clip-path: inset(50%);
 				white-space: nowrap;
+			}
+
+			html.dark .scene {
+				.wash {
+					mix-blend-mode: normal;
+				}
+
+				.wash.yellow:not(.pool) {
+					opacity: 1;
+				}
+
+				.wash.pink:not(.pool) {
+					fill: color-mix(in srgb, var(--pink) 60%, color-mix(in oklch, var(--cream) 50%, white));
+					stroke: color-mix(in srgb, var(--pink) 60%, color-mix(in oklch, var(--cream) 50%, white));
+					opacity: 1;
+				}
+
+				&[data-live='yes'] .switched,
+				.js-at,
+				.btn {
+					fill: var(--on-accent);
+				}
 			}
 		</style>
 	</figure>

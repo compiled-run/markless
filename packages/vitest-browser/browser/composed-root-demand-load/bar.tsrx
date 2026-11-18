@@ -11,7 +11,7 @@ export const itemState = shared(
 
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 function BarControl() @{

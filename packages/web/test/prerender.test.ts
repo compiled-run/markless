@@ -14,6 +14,7 @@ import {
 	evaluatePrerenderClosure,
 	renderPrerenderDataSurface,
 	renderPrerenderBoundary,
+	renderPrerenderBranch,
 } from '../src/prerender/evaluator.ts';
 import { attachPrerenderStagedGraphRegistration } from '../src/prerender/staged-graph.ts';
 import {
@@ -668,6 +669,64 @@ test('renders a settled prerender boundary from declared structure coordinates',
 	expect(rendered).toEqual({ html: '<section>Stable</section>', armRecords, computed: [] });
 });
 
+// The page's own @if and a child's share a local id: the whole page spells the child's from the page root.
+test('a whole-page branch render takes the branch the page id names, not its local namesake', async () => {
+	const emptyView = {
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [],
+	};
+	const site = (id: string, start: number) => ({
+		id,
+		startAnchor: { strategy: 'dom-order-comment', index: start },
+		endAnchor: { strategy: 'dom-order-comment', index: start + 1 },
+	});
+	const artifact: SsrRenderArtifact = {
+		async renderSsr() {
+			return {
+				html: '<main><p>page arm</p><section><p>child arm</p></section></main>',
+				structure: {
+					anchors: [
+						{
+							kind: 'branch',
+							id: 'branch-site:0',
+							html: '<p>page arm</p>',
+							elementStart: 1,
+							elementEnd: 2,
+						},
+						{
+							kind: 'branch',
+							id: 'c0:branch-site:0',
+							html: '<p>child arm</p>',
+							elementStart: 3,
+							elementEnd: 4,
+						},
+					],
+				},
+				view: {
+					version: 1,
+					...emptyView,
+					branches: [site('branch-site:0', 0), site('c0:branch-site:0', 2)],
+					asyncBoundaries: [],
+				},
+			};
+		},
+	};
+
+	const rendered = await renderPrerenderBranch(
+		artifact,
+		'branch-site:0',
+		{ read: () => undefined } as never,
+		undefined,
+		'c0:branch-site:0',
+	);
+
+	expect(rendered.html).toBe('<p>child arm</p>');
+});
+
 test('registers newly discovered settled computeds while rendering their local value', async () => {
 	const order: string[] = [];
 	const values = new Map<string, unknown>([
@@ -852,13 +911,14 @@ test('linked boundary evaluation carries a composed branch graph-prop mapping in
 	);
 
 	expect(rendered.html).toContain('markless:branch:c0:branch-site:0-class');
+	// The live route reads the async value's field through its snapshot's value.
 	expect(rendered.armRecords.branches).toEqual([
 		expect.objectContaining({
 			id: 'c0:branch-site:0-class',
 			testReads: [
 				expect.objectContaining({
 					graphNodeId: 'computed:status',
-					path: ['active'],
+					path: ['value', 'active'],
 				}),
 			],
 		}),
@@ -1261,3 +1321,92 @@ function linkedBoundaryWithComposedBranch(
 		imports: { StatusBadge: childSurface },
 	};
 }
+
+// A keyed @for computed is served only when durable; the rebuilt records still hold the live value.
+test('a computed value the request could not serve is left out of the wake-channel parity check', async () => {
+	const view = {
+		version: 1 as const,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order' as const, index: 0, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const record = {
+		graphNodeId: 'computed:rows',
+		name: 'rows',
+		async: false,
+		deriveSymbolId: 'symbol:1',
+		dependencies: [],
+	};
+	const state = (computed: ReadonlyArray<Record<string, unknown>>) => ({
+		version: 1 as const,
+		cells: [],
+		computed: computed as never,
+		sharedDefinitions: [],
+	});
+	const artifact: SsrRenderArtifact & { readonly prerenderWakeModuleUrl: string } = {
+		resumeModuleUrl: '/build/resume.js',
+		prerenderWakeModuleUrl: '/build/prerender-wake-A1b2.js',
+		renderSsr: () => ({
+			html: '<button>Rows</button>',
+			state: state([{ ...record, directValue: [{ id: 'a', run: () => 'a' }] }]),
+			view,
+		}),
+	};
+	const request = { html: '<button>Rows</button>', state: state([record]), view };
+
+	const html = await assembleSsrContainer(artifact, request, {});
+
+	expect(html.match(/<script type="markless\/(?:state|view)">/g) ?? []).toHaveLength(0);
+	expect(html).toContain('data-markless-resume-module="/build/prerender-wake-A1b2.js"');
+});
+
+test('a request value that replaces a rebuilt value the serializer refuses travels as the delta', async () => {
+	const view = {
+		version: 1 as const,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order' as const, index: 0, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const record = {
+		graphNodeId: 'computed:rows',
+		name: 'rows',
+		async: false,
+		deriveSymbolId: 'symbol:1',
+		dependencies: [],
+	};
+	const state = (computed: ReadonlyArray<Record<string, unknown>>) => ({
+		version: 1 as const,
+		cells: [],
+		computed: computed as never,
+		sharedDefinitions: [],
+	});
+	const artifact: SsrRenderArtifact & { readonly prerenderWakeModuleUrl: string } = {
+		resumeModuleUrl: '/build/resume.js',
+		prerenderWakeModuleUrl: '/build/prerender-wake-A1b2.js',
+		renderSsr: () => ({
+			html: '<button>Rows</button>',
+			state: state([{ ...record, directValue: [{ id: 'a', run: () => 'a' }] }]),
+			view,
+		}),
+	};
+	const request = {
+		html: '<button>Rows</button>',
+		state: state([{ ...record, value: { version: 1, root: 'b', records: [] } }]),
+		view,
+	};
+
+	const html = await assembleSsrContainer(artifact, request, {});
+
+	expect(html).toContain('<script type="markless/state">');
+	expect(html).toContain('computed:rows');
+});

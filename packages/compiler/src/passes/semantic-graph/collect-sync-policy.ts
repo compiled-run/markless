@@ -136,7 +136,7 @@ function fallbackSpan(filename: string): SourceSpan {
 
 export function extractSyncPolicy(
 	node: AnyNode | undefined,
-	state: Pick<WalkState, 'graph' | 'source'>,
+	state: Pick<WalkState, 'graph' | 'source' | 'currentComponentName'>,
 ): SemanticSyncPolicy | undefined {
 	if (!node) return undefined;
 
@@ -146,7 +146,7 @@ export function extractSyncPolicy(
 
 export function uncoveredSyncPolicyCall(
 	node: AnyNode | undefined,
-	state: Pick<WalkState, 'graph' | 'source'>,
+	state: Pick<WalkState, 'graph' | 'source' | 'currentComponentName'>,
 ): StraySyncPolicyCall | null {
 	if (!node) return null;
 
@@ -177,8 +177,7 @@ function shadowedSyncPolicyCall(node: AnyNode | undefined): StraySyncPolicyCall 
 	walkNode(body, (candidate) => {
 		if (found || own.has(candidate)) return;
 		const action = syncActionCall(candidate, eventParam);
-		if (action)
-			found = { action, node: candidate, eventParam, reason: 'shadowed-event-name' };
+		if (action) found = { action, node: candidate, eventParam, reason: 'shadowed-event-name' };
 	});
 	return found;
 }
@@ -218,7 +217,7 @@ export function extractedSyncPolicyActionCalls(
 	node: AnyNode | undefined,
 	eventParam: string,
 	actions: ReadonlySet<SemanticSyncPolicyAction>,
-	state: Pick<WalkState, 'graph' | 'source'>,
+	state: Pick<WalkState, 'graph' | 'source' | 'currentComponentName'>,
 ): AnyNode[] {
 	if (!node || actions.size === 0) return [];
 	// Calls after the first plain statement stay in the lazy handler, as they always have.
@@ -289,7 +288,7 @@ export type SyncPolicyRefusal =
 
 type SyncPolicyScan = {
 	readonly eventParam: string;
-	readonly state: Pick<WalkState, 'graph' | 'source'>;
+	readonly state: Pick<WalkState, 'graph' | 'source' | 'currentComponentName'>;
 	readonly branches: SemanticSyncPolicyBranch[];
 	readonly calls: AnyNode[];
 	readonly refused: Map<AnyNode, SyncPolicyRefusal>;
@@ -302,7 +301,7 @@ type SyncPolicyScan = {
 function locateSyncPolicy(
 	body: AnyNode | undefined,
 	eventParam: string,
-	state: Pick<WalkState, 'graph' | 'source'>,
+	state: Pick<WalkState, 'graph' | 'source' | 'currentComponentName'>,
 ): SyncPolicyLocation | undefined {
 	if (!body || rebindsName(body, eventParam)) return undefined;
 
@@ -477,7 +476,7 @@ function negatedCondition(condition: SemanticSyncPolicyCondition): SemanticSyncP
 function approximateCondition(
 	input: AnyNode | undefined,
 	eventParam: string,
-	state: Pick<WalkState, 'graph' | 'source'>,
+	state: Pick<WalkState, 'graph' | 'source' | 'currentComponentName'>,
 	unreadable: boolean,
 ): SemanticSyncPolicyCondition {
 	const exact = extractSyncCondition(input, eventParam, state);
@@ -552,7 +551,8 @@ function rebindsName(node: AnyNode, name: string): boolean {
 				declaresName(statement, name, false, true),
 			),
 		);
-	if (node.type === 'CatchClause') return patternBindsName(node.param as AnyNode | undefined, name);
+	if (node.type === 'CatchClause')
+		return patternBindsName(node.param as AnyNode | undefined, name);
 	if (node.type === 'ForStatement')
 		return declaresName(node.init as AnyNode | undefined, name, false, true);
 	if (node.type === 'ForInStatement' || node.type === 'ForOfStatement')
@@ -576,7 +576,8 @@ function declaresName(
 	if (
 		statements.some(
 			(statement) =>
-				((statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') &&
+				((statement.type === 'FunctionDeclaration' ||
+					statement.type === 'ClassDeclaration') &&
 					getIdentifierName(statement.id as AnyNode | undefined) === name) ||
 				(statement.type === 'VariableDeclaration' &&
 					asNodes(statement.declarations).some((declarator) =>
@@ -712,7 +713,7 @@ const BOOLEAN_EVENT_FIELDS: ReadonlySet<string> = new Set([
 function extractSyncCondition(
 	input: AnyNode | undefined,
 	eventParam: string,
-	state: Pick<WalkState, 'graph' | 'source'>,
+	state: Pick<WalkState, 'graph' | 'source' | 'currentComponentName'>,
 ): SemanticSyncPolicyCondition | undefined {
 	const node = unwrapParens(input);
 	if (!node) return undefined;
@@ -764,8 +765,8 @@ function extractSyncCondition(
 
 	const resolved = resolveGraphPath(
 		expressionSource(node, state.source),
-		graphBindingMap(state.graph),
-		semanticAliasMap(state.graph),
+		graphBindingMap(state.graph, undefined, state.currentComponentName ?? undefined),
+		semanticAliasMap(state.graph, undefined, state.currentComponentName ?? undefined),
 	);
 	if (!resolved) {
 		const constant = syncPolicyConstantValue(node, state.graph.syncPolicyConstants ?? []);
@@ -788,7 +789,7 @@ function extractSyncCondition(
 function extractSyncEquality(
 	node: AnyNode,
 	eventParam: string,
-	state: Pick<WalkState, 'graph' | 'source'>,
+	state: Pick<WalkState, 'graph' | 'source' | 'currentComponentName'>,
 ): SemanticSyncPolicyCondition | undefined {
 	const leftField = eventFieldName(node.left as AnyNode | undefined, eventParam);
 	const rightValue = literalValue(node.right as AnyNode | undefined);
@@ -814,8 +815,8 @@ function extractSyncEquality(
 	if (!graphSide || !compared.ok || !isComparablePrimitive(compared.value)) return undefined;
 	const resolved = resolveGraphPath(
 		expressionSource(graphSide as AnyNode, state.source),
-		graphBindingMap(state.graph),
-		semanticAliasMap(state.graph),
+		graphBindingMap(state.graph, undefined, state.currentComponentName ?? undefined),
+		semanticAliasMap(state.graph, undefined, state.currentComponentName ?? undefined),
 	);
 	return resolved
 		? {

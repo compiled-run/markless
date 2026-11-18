@@ -224,7 +224,7 @@ test('a shared() factory returning a class instance is refused', async () => {
 		`
 import { shared } from '@markless/core';
 ${NAV_CLASS}
-export const nav = shared(() => new Nav(), { scope: 'widget' });
+export const nav = shared(() => new Nav(), { scope: 'subtree' });
 
 export function App() @{
 	let n = nav();
@@ -247,7 +247,7 @@ import { shared } from '@markless/core';
 export const nav = shared(() => ({
 	index: 0,
 	next() { this.index += 1; return this.index; },
-}), { scope: 'widget' });
+}), { scope: 'subtree' });
 
 export function App() @{
 	let n = nav();
@@ -287,7 +287,7 @@ test('a class instance on a shared() factory object is refused', async () => {
 		`
 import { shared } from '@markless/core';
 ${NAV_CLASS}
-export const spike = shared(() => ({ count: 0, nav: new Nav() }), { scope: 'widget' });
+export const spike = shared(() => ({ count: 0, nav: new Nav() }), { scope: 'subtree' });
 
 export function App() @{
 	let s = spike();

@@ -16,8 +16,10 @@ import {
 	findSharedInstance,
 	resolveSharedInstanceGraphPath,
 	sharedCallbackSlotGraphNodeId,
+	sharedDefinitionIdOf,
 	sharedInstanceVisibleFrom,
 } from '../semantic-graph/collect-shared.ts';
+import { sharedInstanceValuesMapSource } from './shared-seed-pass.ts';
 import { splitStaticGraphPath } from '../../artifact-helpers/graph-paths.ts';
 import { sharedInstancePreludeLines } from './residue-reader.ts';
 import type { PublicRenderRoot } from './types.ts';
@@ -208,9 +210,21 @@ function sharedStateSeedLine(
 	// payload left holding the factory initial resumes a value nobody rendered.
 	// An assignment always assigns: an omitted prop with no destructuring default
 	// writes undefined, exactly as the same statement would in plain JavaScript.
-	return `{ const marklessSharedSeed = (${value}); ${stateValueFunctionName}(${stateValuesName}, ${statePayloadName}, ${JSON.stringify(
-		resolved.binding.id,
-	)}, ${seedValueSource(read, resolved.path, 'marklessSharedSeed')}); }`;
+	const id = JSON.stringify(resolved.binding.id);
+	return `{ const marklessSharedSeed = (${value}); ${stateValueFunctionName}(${stateValuesName}, ${statePayloadName}, ${id}, ${seedValueSource(read, resolved.path, 'marklessSharedSeed')});${descendantSeedPublishSource(input, resolved.binding.id, id, read)} }`;
+}
+
+// Every later render of the request, a sibling's included, reads the seeded node through the map its enclosing body opened.
+function descendantSeedPublishSource(
+	input: PublicRenderModuleInput,
+	graphNodeId: string,
+	idSource: string,
+	readSource: string,
+): string {
+	const definitionId = sharedDefinitionIdOf(graphNodeId);
+	const definition = input.semanticGraph.sharedDefinitions.find((item) => item.id === definitionId);
+	if (!definition || definition.scope === 'subtree') return '';
+	return ` ${sharedInstanceValuesMapSource()}.set(${idSource}, ${readSource});`;
 }
 
 /**

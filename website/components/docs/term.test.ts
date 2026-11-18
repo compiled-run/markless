@@ -18,6 +18,19 @@ const render = (component: unknown, props: Record<string, unknown>) =>
 const tag = (html: string, pattern: RegExp) => html.match(pattern)?.[0] ?? '';
 
 describe('Term', () => {
+	it('explains a word that has no sketch with its caption alone', async () => {
+		const html = await render(Term, { word: 'state' });
+		expect(html).toContain(GLOSSARY.state);
+		expect(html).not.toContain('class="sketch');
+	});
+
+	it('defines every glossary word in one plain sentence', () => {
+		for (const [word, caption] of Object.entries(GLOSSARY)) {
+			expect(caption.length, word).toBeLessThan(120);
+			expect(caption.trim().endsWith('.'), word).toBe(true);
+		}
+	});
+
 	it('is a focusable button in the text that points at its caption as its description', async () => {
 		const html = await render(Term, { word: 'elements' });
 		const button = tag(html, /<button[^>]*>elements<\/button>/);
@@ -63,7 +76,9 @@ describe('Term', () => {
 	});
 
 	it('draws with filled ink only: no filters, patterns, hrefs or dy', () => {
-		expect(source).not.toMatch(/<(filter|pattern|use)\b|\bhref=|\bdy=/);
+		const drawing = source.slice(source.indexOf('<svg'), source.indexOf('</svg>'));
+		expect(drawing.length).toBeGreaterThan(100);
+		expect(drawing).not.toMatch(/<(filter|pattern|use)\b|\bhref=|\bdy=/);
 		for (const sketch of [sketches.elements, sketches.events]) {
 			expect(sketch.ink.length).toBeGreaterThan(500);
 			expect(sketch.pink).toMatch(/^M/);

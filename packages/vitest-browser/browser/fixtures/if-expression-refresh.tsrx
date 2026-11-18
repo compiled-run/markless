@@ -17,7 +17,7 @@ export const row = shared(() => {
 			cell.value = cell.value === 'b' ? 'a' : 'b';
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function IfExpressionRefreshPage() @{
 	let value = state('a');

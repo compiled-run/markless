@@ -1,11 +1,18 @@
 import { expect, test, vi } from 'vitest';
 import { createRuntimeGraph as createGraph, type RuntimeGraphInput } from '../src/index.ts';
 import { createDerivedReconcilePlane, diffDerivedValue } from '../src/graph-reconcile.ts';
+import { createAsyncComputedPlane } from '../src/graph-async.ts';
+import { createHeldInputsPlane } from '../src/graph-held.ts';
 
 // Reconciliation is a plug-in plane: every graph below installs it, and the
 // last test in the file pins what a graph without it does instead.
 const createRuntimeGraph = (input: RuntimeGraphInput) =>
-	createGraph({ ...input, reconcile: createDerivedReconcilePlane });
+	createGraph({
+		async: createAsyncComputedPlane,
+		held: createHeldInputsPlane,
+		...input,
+		reconcile: createDerivedReconcilePlane,
+	});
 
 // Derived reconciliation (specs/framework/03-state-graph.md "Derived
 // reconciliation", specs/framework/06-runtime-resumer.md flush bullet): a
@@ -1170,6 +1177,8 @@ test('an async publish dirties the whole node when no plane is installed', async
 		const y = subscriptionRecorder();
 		const graph = createGraph({
 			reconcile,
+			async: createAsyncComputedPlane,
+			held: createHeldInputsPlane,
 			cells: [{ graphNodeId: TICK, value: 0 }],
 			asyncComputed: [
 				{

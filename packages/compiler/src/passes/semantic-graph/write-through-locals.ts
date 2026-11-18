@@ -30,7 +30,7 @@ type LocalOrigin =
 type UntrackedReason = Extract<SemanticWriteThrough, { readonly kind: 'untracked' }>['reason'];
 
 // Array methods that hand each element, by reference, to the callback's first parameter.
-const ELEMENT_CALLBACK_METHODS = new Set([
+export const ELEMENT_CALLBACK_METHODS = new Set([
 	'every',
 	'filter',
 	'find',
@@ -43,9 +43,9 @@ const ELEMENT_CALLBACK_METHODS = new Set([
 	'some',
 ]);
 // Array methods that return one element of the array, by reference.
-const ELEMENT_RETURNING_METHODS = new Set(['at', 'find', 'findLast']);
+export const ELEMENT_RETURNING_METHODS = new Set(['at', 'find', 'findLast']);
 // Array methods that return a new array holding the same element references.
-const COPYING_METHODS = new Set([
+export const COPYING_METHODS = new Set([
 	'concat',
 	'filter',
 	'flat',
@@ -177,7 +177,7 @@ function isNestedFunctionLocal(binding: Binding, state: WalkState): boolean {
 	return false;
 }
 
-function isComponentFunction(node: AnyNode): boolean {
+export function isComponentFunction(node: AnyNode): boolean {
 	return (node.body as AnyNode | undefined)?.type === 'JSXCodeBlock';
 }
 

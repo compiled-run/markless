@@ -10,7 +10,7 @@ export const knobState = shared(
 
 		return { ...knob };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Knob({ name }) @{

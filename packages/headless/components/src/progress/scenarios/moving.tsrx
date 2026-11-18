@@ -9,7 +9,7 @@ export default function Moving() @{
 	</progress.root>
 }
 
-// Inside the root: the widget scope hands a component under the root the same
+// Inside the root: the subtree scope hands a component under the root the same
 // bar, and one placed outside would seed a second bar of its own.
 function Advance() @{
 	const bar = progress.state();

@@ -4,7 +4,7 @@ export const cbranchState = shared(() => {
 	const s = state({ value: 0 });
 
 	return { ...s };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function CbranchRoot({ value, children }) @{
 	const s = cbranchState();

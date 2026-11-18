@@ -1,4 +1,4 @@
-import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
+import { isUncountedComment } from './resume-anchor-census.ts';
 import { PROTOCOL_BLOCK_START_COMMENT } from '../../serializer/src/protocol-page-markers.ts';
 import { PROTOCOL_LOCATOR_PATHS_DIGITS } from '../../serializer/src/protocol-locator-paths-format.ts';
 import {
@@ -93,10 +93,10 @@ export function servedElementTree(html: string): ServedTree {
 				const steps: number[] = [];
 				stepsOf(parent).push(-1);
 				openBlocks[parent]!.push({ end: `/${data}`, steps });
-				if (!isArmBranchAnchorComment({ nodeType: 8, data }))
+				if (!isUncountedComment({ nodeType: 8, data }))
 					blockSteps.set(commentElementIndexes.length, steps);
 			}
-			if (!isArmBranchAnchorComment({ nodeType: 8, data }))
+			if (!isUncountedComment({ nodeType: 8, data }))
 				commentElementIndexes.push(elements.length);
 			continue;
 		}

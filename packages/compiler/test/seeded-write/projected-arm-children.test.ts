@@ -14,7 +14,7 @@ const source = `import { shared, state } from '@markless/core';
 export const gaugeState = shared(() => {
 	const gauge = state({ ownText: '' });
 	return { ...gauge };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function GaugeNote({ children }) @{
 	const gauge = gaugeState();

@@ -87,6 +87,6 @@ or reconciling a VDOM.
   web, mobile, desktop package boundaries, platform-owned adapters, and deferred
   `@markless/core/ui`.
 - [13-resume-cache.md](./framework/13-resume-cache.md) — resume cache:
-  refresh-stable boundaries via persisted settled snapshots — on by default,
-  session-scoped, opt-out via exclude/false — boot demand set and
-  stale-while-revalidate swap semantics (specified, not implemented).
+  refresh-stable boundaries via persisted settled snapshots — parked by the
+  owner 2026-11-07; the design is kept, the code lives only on branch
+  `proto/resume-cache`.

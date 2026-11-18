@@ -2,11 +2,6 @@ import type { PaintedApiSections } from './api-derive/model.ts';
 
 export default function ApiTableView({ painted }: { readonly painted: PaintedApiSections }) @{
 	<div class="api-reference">
-		<style>
-			.api-prop.is-required {
-				font-weight: 700;
-			}
-		</style>
 		@for (const section of painted; key section.id) {
 			<section class="api-part" id={section.id}>
 				@if (section.headed) {
@@ -15,36 +10,57 @@ export default function ApiTableView({ painted }: { readonly painted: PaintedApi
 				@if (section.empty) {
 					<p class="api-none">No props of its own.</p>
 				} @else {
-					<table class="api-table">
-						<thead>
-							<tr>
-								<th>Prop</th>
-								<th>What it does</th>
-							</tr>
-						</thead>
-						<tbody>
-							@for (const row of section.rows; key row.name) {
-								<tr>
-									<td>
-										<span class="tsrx-hover prop-name" tabindex={0} role="img" aria-label={row.label}>
-											<code class={row.nameClass}>{row.name}</code>
-											<span class="tsrx-tip" aria-hidden="true">
-												<span class="tsrx-tip-title">{row.name}</span>
-												<span class="tsrx-tip-body">{row.type}</span>
-											</span>
-										</span>
-									</td>
-									<td>
-										@for (const piece of row.pieces; key piece.id) {
-											<code class={piece.pieceClass}>{piece.text}</code>
-										}
-									</td>
-								</tr>
-							}
-						</tbody>
-					</table>
+					<dl class="props">
+						@for (const row of section.rows; key row.name) {
+							<div class="prop">
+								<dt>
+									<code class={row.nameClass}>{row.name}</code>
+									<span class="type">{row.type}</span>
+								</dt>
+								<dd>
+									@for (const piece of row.pieces; key piece.id) {
+										<code class={piece.pieceClass}>{piece.text}</code>
+									}
+								</dd>
+							</div>
+						}
+					</dl>
 				}
 			</section>
 		}
+		<style>
+			.props {
+				display: grid;
+				gap: 1.1rem;
+				margin: 0.6rem 0 var(--space-m);
+			}
+
+			.prop {
+				display: grid;
+				gap: 0.2rem;
+			}
+
+			dt {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.2rem 0.7rem;
+				align-items: baseline;
+			}
+
+			.is-required {
+				font-weight: 700;
+			}
+
+			.type {
+				color: var(--muted-ink);
+				font-family: var(--font-mono);
+				font-size: 0.85em;
+				white-space: pre-wrap;
+			}
+
+			dd {
+				margin: 0;
+			}
+		</style>
 	</div>
 }

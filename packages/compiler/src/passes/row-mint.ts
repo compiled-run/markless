@@ -10,9 +10,18 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
-import { childConstructReach, type ConstructReachInput } from './construct-reach.ts';
+import {
+	childConstructReach,
+	childRootBoundary,
+	type ConstructReachInput,
+} from './construct-reach.ts';
 import { TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX } from './public-render/html.ts';
-import { createResidueDependencyReader } from './public-render/residue-dependencies.ts';
+import {
+	createResidueDependencyReader,
+	residueReferences,
+} from './public-render/residue-dependencies.ts';
+import { childRootIsOneElement } from './row-range.ts';
+import { rowBoundNames } from './semantic-graph/repeat-item-binding.ts';
 
 export type RowComponentMint = {
 	/** Absent when `rowChunkId` names the row's own markup instead of one edge. */
@@ -56,16 +65,8 @@ export type RowComponentMint = {
  * chain the row render walks - so an imported child mints on the same terms as a
  * local one.
  *
- * Still refused when the component's body carries a boundary (`@try`): its
- * settle bookkeeping reads a census the page counted once, at boot, for the rows
- * it served, and a row born after resume has none of it - the mint would index
- * into another row's, which is why the runtime refuses such a row loudly.
- * Refusing here means the page never gets that far: it falls back to today's
- * no-growth behaviour instead. A branch is admitted: its anchors are a comment
- * pair the minted row counts in its own fragment, exactly as it counts its own
- * elements. That question must be ANSWERED, not assumed: a child whose tree this
- * module cannot reach is refused too, because the chunk it could not read might
- * have held a boundary.
+ * A branch or a boundary (`@try`) is admitted: the minted row counts its comment
+ * anchors like its own elements. A child whose tree this module cannot reach is refused.
  *
  * The public render plan pass asks the same question to decide whether a row
  * that cannot grow deserves a diagnostic, so the answer lives here once.
@@ -75,6 +76,7 @@ export function resolveRowComponentMint(
 		readonly rowChunkId: string;
 		readonly rowElementCount: number;
 		readonly itemName: string;
+		readonly indexName?: string;
 	},
 ): RowComponentMint | null {
 	const chunk = input.chunks.find((candidate) => candidate.id === input.rowChunkId);
@@ -84,15 +86,21 @@ export function resolveRowComponentMint(
 	const slot = componentSlots[0]!;
 	if (slot.kind !== 'child-component') return null;
 	const wraps = input.rowElementCount > 0;
-	if (wraps) {
-		// The wrapper is minted from markup, so its own slots have to be ones that
-		// markup plus the item can finish - and the child needs a marker to land on.
-		if (slot.coordinate.kind !== 'comment-anchor') return null;
-		if (!chunk.slots.every((candidate) => candidate === slot || mintableSlotValue(candidate) !== null))
-			return null;
-	} else if (chunk.slots.length !== 1) return null;
 	const componentName = chunk.componentName;
 	if (!componentName) return null;
+	if (wraps) {
+		// The wrapper is minted from markup, so its own slots have to be ones that
+		// markup, the item and the owner's reader can finish - and the child needs a marker to land on.
+		if (slot.coordinate.kind !== 'comment-anchor') return null;
+		const rowNames = new Set([input.itemName, ...(input.indexName ? [input.indexName] : [])]);
+		const finishes = (candidate: SemanticMarkupSlot) =>
+			candidate === slot ||
+			mintableSlotValue(candidate) !== null ||
+			(!!input.semanticGraph &&
+				!isLoweredStyleObject(candidate) &&
+				expressionSlotValue(candidate, input.semanticGraph, componentName, rowNames) !== null);
+		if (!chunk.slots.every(finishes)) return null;
+	} else if (chunk.slots.length !== 1) return null;
 	const edge = input.componentEdges.find((candidate) => candidate.id === slot.componentEdgeId);
 	if (!edge || edge.parentComponentName !== componentName) return null;
 	if (edge.children.childCount > 0 && slot.projectionChunkId === undefined) return null;
@@ -101,7 +109,7 @@ export function resolveRowComponentMint(
 		!projectionIsMintable(input, slot.projectionChunkId, new Set(), [input.itemName])
 	)
 		return null;
-	if (!childIsMintable(input, edge, slot.childTemplateId, new Set())) return null;
+	if (!childIsMintable(input, edge, slot.childTemplateId, new Set(), !wraps)) return null;
 	const itemProps = edge.props.filter((prop) => prop.source === input.itemName);
 	return {
 		componentEdgeId: slot.componentEdgeId,
@@ -109,6 +117,29 @@ export function resolveRowComponentMint(
 		...(itemProps.length === 1 ? { itemPropName: itemProps[0]!.name } : {}),
 		...(wraps ? { slotPath: slot.coordinate.path } : {}),
 	};
+}
+
+/** A component row's props read the loop index: a moved row renders differently, and a callback is handed the index. */
+export function rowComponentReadsIndex(
+	componentEdges: ReadonlyArray<SemanticComponentEdge>,
+	rowComponent: RowComponentMint,
+	indexName: string,
+): boolean {
+	const edge = componentEdges.find((candidate) => candidate.id === rowComponent.componentEdgeId);
+	return (edge?.props ?? []).some(
+		(prop) =>
+			prop.source !== undefined &&
+			residueReferences(readResidueNames(prop.source, 'expression'), indexName),
+	);
+}
+
+/** A text or attribute slot reads the row it renders in, its item or a name bound beside it. */
+export function slotReadsRow(slot: SemanticMarkupSlot, rowNames: ReadonlySet<string>): boolean {
+	if (slot.kind !== 'text' && slot.kind !== 'attribute') return false;
+	if (slot.residue.kind === 'repeat-item') return true;
+	if (slot.residue.kind !== 'authored-expression') return false;
+	const names = readResidueNames(slot.residue.source, 'expression');
+	return [...rowNames].some((name) => residueReferences(names, name));
 }
 
 /**
@@ -133,7 +164,12 @@ export function resolveRowChunkMint(
 ): RowComponentMint | null {
 	const chunk = input.chunks.find((candidate) => candidate.id === input.rowChunkId);
 	if (!chunk?.componentName || !input.semanticGraph || input.rowElementCount < 1) return null;
-	if (!chunk.slots.some((slot) => slot.kind === 'branch')) return null;
+	// Rows with one component and no branch take the component mint or the row template instead.
+	if (
+		!chunk.slots.some((slot) => slot.kind === 'branch' || slot.kind === 'async') &&
+		chunk.slots.filter((slot) => slot.kind === 'child-component').length < 2
+	)
+		return null;
 	// One row element holds everything, so the row's root is that element whichever arm renders.
 	if (chunk.hosts.filter((host) => host.coordinate.path.length === 1).length !== 1) return null;
 	const onRowElement = chunk.slots.every(
@@ -170,11 +206,23 @@ function rowContentIsMintable(
 				(candidate) => candidate.id === slot.branchSiteId,
 			);
 			if (!site || site.asyncBoundaryId || site.testComputedGraphNodeId) return false;
-			if (!readsOnlyTheRow(input, chunk.componentName, site.testSource, rowNames)) return false;
+			if (
+				!readsOnlyTheRow(
+					input,
+					chunk.componentName,
+					site.armIndexSource ?? site.testSource,
+					rowNames,
+				)
+			)
+				return false;
 			return slot.armTemplateIds.every((armChunkId) =>
 				rowContentIsMintable(input, armChunkId, seen, rowNames),
 			);
 		}
+		if (slot.kind === 'async')
+			return Object.values(slot.armTemplateIds).every(
+				(armChunkId) => !armChunkId || rowArmIsMintable(input, armChunkId, seen, rowNames),
+			);
 		if (slot.kind !== 'child-component') return false;
 		if (
 			slot.projectionChunkId !== undefined &&
@@ -187,6 +235,27 @@ function rowContentIsMintable(
 		if (edge.children.childCount > 0 && slot.projectionChunkId === undefined) return false;
 		return childIsMintable(input, edge, slot.childTemplateId, new Set());
 	});
+}
+
+// A row @try's arm is drawn again whenever a value it reads is written, so its text may read the page beside the row.
+function rowArmIsMintable(
+	input: RowMintInput,
+	chunkId: string,
+	seen: Set<string>,
+	rowNames: ReadonlyArray<string>,
+): boolean {
+	if (seen.has(chunkId)) return false;
+	seen.add(chunkId);
+	const chunk = input.chunks.find((candidate) => candidate.id === chunkId);
+	if (!chunk?.componentName || !input.semanticGraph || !input.recordHostIds) return false;
+	if (chunk.hosts.some((host) => input.recordHostIds!.has(host.hostNodeId))) return false;
+	return chunk.slots.every(
+		(slot) =>
+			(slot.kind === 'text' || slot.kind === 'attribute') &&
+			(slot.residue.kind === 'repeat-item' ||
+				expressionSlotValue(slot, input.semanticGraph!, chunk.componentName!, new Set(rowNames)) !==
+					null),
+	);
 }
 
 // The row renders with an empty owner view, so an owner element it projects must need no record.
@@ -274,6 +343,7 @@ export function rowBranchMints(
 	componentName: string,
 	slot: Extract<SemanticMarkupSlot, { readonly kind: 'branch' }>,
 	rowNames: ReadonlySet<string>,
+	repeatMints?: (repeatId: string) => boolean,
 ): boolean {
 	const graph = input.semanticGraph;
 	const site = graph.branchSites.find((candidate) => candidate.id === slot.branchSiteId);
@@ -287,12 +357,13 @@ export function rowBranchMints(
 		) !== null;
 	const testReadable =
 		site.testComputedGraphNodeId !== undefined ||
-		resolveGraphPath(
-			site.testSource,
-			graphBindingMap(graph, null, componentName),
-			semanticAliasMap(graph, null, componentName),
-		) !== null ||
-		expression(site.testSource);
+		(site.armIndexSource === undefined &&
+			resolveGraphPath(
+				site.testSource,
+				graphBindingMap(graph, null, componentName),
+				semanticAliasMap(graph, null, componentName),
+			) !== null) ||
+		expression(site.armIndexSource ?? site.testSource);
 	if (!testReadable) return false;
 	return slot.armTemplateIds.every((chunkId) => {
 		const chunk = input.chunks.find((candidate) => candidate.id === chunkId);
@@ -300,9 +371,10 @@ export function rowBranchMints(
 		if (chunk.hosts.some((host) => input.unregistrableHostIds?.has(host.hostNodeId))) return false;
 		return chunk.slots.every(
 			(armSlot) =>
-				(armSlot.kind === 'text' || armSlot.kind === 'attribute') &&
-				(mintableSlotValue(armSlot) !== null ||
-					expressionSlotValue(armSlot, graph, componentName, rowNames) !== null),
+				(armSlot.kind === 'repeat' && repeatMints?.(armSlot.repeatId) === true) ||
+				((armSlot.kind === 'text' || armSlot.kind === 'attribute') &&
+					(mintableSlotValue(armSlot) !== null ||
+						expressionSlotValue(armSlot, graph, componentName, rowNames) !== null)),
 		);
 	});
 }
@@ -345,10 +417,7 @@ function projectionIsMintable(
 			const nested = input.semanticGraph?.keyedRepeats.find(
 				(candidate) => candidate.id === slot.repeatId,
 			);
-			const nestedNames = [
-				...rowNames,
-				...[nested?.itemName, nested?.indexName].filter((name): name is string => !!name),
-			];
+			const nestedNames = [...rowNames, ...rowBoundNames(nested)];
 			return [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])].every(
 				(chunkId) => projectionIsMintable(input, chunkId, seen, nestedNames, true),
 			);
@@ -445,16 +514,27 @@ export function expressionSlotValue(
 	for (const name of names.names) {
 		if (rowNames.has(name)) continue;
 		const resolved = resolveGraphPath(name, bindings, aliases);
-		// A shared instance or a prop reads ids this page does not spell as its own.
+		const local = resolved
+			? undefined
+			: graph.rowLocalReads?.find(
+					(entry) => entry.componentName === componentName && entry.name === name,
+				);
+		if (local) {
+			if (local.unfollowed) return null;
+			for (const read of local.reads)
+				reads.push({ graphNodeId: read.graphNodeId, path: read.path });
+			continue;
+		}
 		if (!resolved) {
-			if (
-				graph.sharedInstances.some(
-					(instance) =>
-						instance.localName === name &&
-						(instance.componentName ?? componentName) === componentName,
-				)
-			)
-				return null;
+			const instance = graph.sharedInstances.find(
+				(candidate) =>
+					candidate.localName === name &&
+					(candidate.componentName ?? componentName) === componentName,
+			);
+			if (!instance) continue;
+			const members = sharedInstanceMemberReads(graph, instance, slot.residue.source);
+			if (!members) return null;
+			reads.push(...members);
 			continue;
 		}
 		// A prop read is routed to the parent's node by composition, which drops the template when it cannot.
@@ -475,7 +555,34 @@ export function expressionSlotValue(
 		}
 		reads.push({ graphNodeId: resolved.binding.id, path: resolved.path });
 	}
-	return { source: slot.residue.source, ...(reads.length > 0 ? { reads } : {}) };
+	const distinct = reads.filter(
+		(read, index) =>
+			reads.findIndex(
+				(other) =>
+					other.graphNodeId === read.graphNodeId &&
+					JSON.stringify(other.path) === JSON.stringify(read.path),
+			) === index,
+	);
+	return { source: slot.residue.source, ...(distinct.length > 0 ? { reads: distinct } : {}) };
+}
+
+// A shared() instance's members are its definition's graph nodes; the row reader qualifies a widget's per root.
+function sharedInstanceMemberReads(
+	graph: SemanticGraphArtifact,
+	instance: SemanticGraphArtifact['sharedInstances'][number],
+	source: string,
+): ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> | null {
+	const definition = graph.sharedDefinitions.find((candidate) => candidate.id === instance.definitionId);
+	if (!definition) return null;
+	const members = memberReads(source, instance.localName);
+	if (!members) return null;
+	const reads: Array<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> = [];
+	for (const member of members) {
+		const property = definition.returnProperties?.findLast((candidate) => candidate.name === member);
+		if (property?.kind !== 'graph') return null;
+		reads.push({ graphNodeId: property.graphNodeId, path: property.path });
+	}
+	return reads;
 }
 
 // The members `name` is read through, or null when any mention is not a plain `.member` read.
@@ -492,13 +599,12 @@ function memberReads(source: string, name: string): ReadonlySet<string> | null {
 }
 
 /**
- * Whether one component the row reaches is PROVABLY free of an async boundary,
- * whose settle bookkeeping the page counted only for the rows it served. A nested
- * @for or a render-chosen tag is admitted: the row renders whole in the browser,
- * so its own fragment counts their nodes and its records wire the nested rows.
+ * Whether one component the row reaches has a tree this module can answer for. A
+ * nested @for, a render-chosen tag or a boundary is admitted: the row renders
+ * whole in the browser, so its own fragment counts their nodes and its records
+ * wire the nested rows and boundaries.
  *
- * Provably is the whole point: a tree this module cannot reach is a refusal,
- * never a pass. A child declared here is answered from this module's own chunks.
+ * A tree this module cannot reach is a refusal, never a pass. A child declared here is answered from this module's own chunks.
  * A child behind an import has no chunks here, so the answer comes from the
  * construct reach its module published PER COMPONENT - a fact about that
  * component's own tree, so a boundary in a sibling of it says nothing about this
@@ -509,6 +615,7 @@ function childIsMintable(
 	edge: SemanticComponentEdge,
 	childTemplateId: string,
 	seen: Set<string>,
+	isWholeRow = false,
 ): boolean {
 	if (edge.importSource !== undefined) {
 		const entry = input.importedModuleInterfaces?.[edge.importSource]?.render.components.find(
@@ -517,5 +624,62 @@ function childIsMintable(
 		if (!entry) return false;
 	}
 	const reach = childConstructReach(input, edge, childTemplateId, seen);
-	return reach !== 'boundaries' && reach !== 'unknown';
+	if (reach === 'unknown') return false;
+	if (!isWholeRow || reach !== 'boundaries') return true;
+	// A row whose child renders more than one element moves as its whole row range, @try anchors included.
+	return (
+		!childRootIsOneElement(input, edge, childTemplateId) ||
+		!childRootBoundary(input, edge, childTemplateId, new Set())
+	);
+}
+
+// A nested list's rows stand in front of what follows its anchor, so a patch counts those steps from the parent's end; lists on both sides leave no count.
+export function stepsAfterNestedRows(
+	chunk: SemanticMarkupChunk,
+	path: ReadonlyArray<number>,
+	text: boolean,
+): number[] | null {
+	// A component a row wraps renders its own nodes in place of its marker, as nested rows do.
+	const anchors = chunk.slots.flatMap((slot) =>
+		slot.kind === 'repeat' || slot.kind === 'child-component' ? [slot.coordinate.path] : [],
+	);
+	const fromEnd: number[] = [];
+	for (let depth = 1; depth < path.length - (text ? 1 : 0); depth++) {
+		const siblings = anchors.filter(
+			(anchor) =>
+				anchor.length === depth + 1 &&
+				anchor.slice(0, depth).every((step, at) => step === path[at]),
+		);
+		const before = siblings.some((anchor) => anchor[depth]! < path[depth]!);
+		if (before && siblings.some((anchor) => anchor[depth]! > path[depth]!)) return null;
+		if (before) fromEnd.push(depth);
+	}
+	return fromEnd;
+}
+
+// A computed over computeds only, with no storage, async or shared() node, never changes in the browser.
+export function constantInBrowser(
+	graph: SemanticGraphArtifact,
+	component: string,
+	graphNodeId: string,
+	seen = new Set<string>(),
+): boolean {
+	if (seen.has(graphNodeId)) return true;
+	seen.add(graphNodeId);
+	const binding = graph.graphBindings.find(
+		(candidate) =>
+			candidate.id === graphNodeId && (candidate.componentName ?? component) === component,
+	);
+	if (
+		!binding ||
+		binding.kind !== 'computed' ||
+		binding.storage ||
+		binding.async ||
+		binding.asyncCapable ||
+		binding.sharedDefinitionId !== undefined
+	)
+		return false;
+	return (binding.dependencies ?? []).every((dependency) =>
+		constantInBrowser(graph, component, dependency.graphNodeId, seen),
+	);
 }

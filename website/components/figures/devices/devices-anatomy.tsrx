@@ -182,14 +182,44 @@ export default function DevicesAnatomy() @{
 				--shade: color-mix(in oklch, var(--ink) 22%, transparent);
 				--shade-ink: var(--ink);
 				--sheet-ink: var(--ink);
-				--pencil: color-mix(in srgb, var(--pink) 70%, #e0603c);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--shell: oklch(34% 0.012 75);
-					--shade: rgb(0 0 0 / 0.5);
-					--shade-ink: rgb(0 0 0 / 0.85);
-					--sheet-ink: var(--paper);
+					--sheet: var(--figure-sheet);
+					--shell: var(--slab);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
+				}
+			}
+
+			html.dark .scene {
+				.wash,
+				.wash-edge {
+					mix-blend-mode: normal;
+				}
+
+				.yellow {
+					opacity: 1;
+				}
+
+				.pink {
+					fill: color-mix(in srgb, var(--pink) 75%, var(--cream));
+					stroke: color-mix(in srgb, var(--pink) 75%, var(--cream));
+					opacity: 1;
+				}
+
+				.status,
+				.action,
+				.state .now {
+					fill: var(--on-accent);
+				}
+
+				.now,
+				.tick {
+					stroke: var(--on-accent);
+				}
+
+				.lens {
+					fill: var(--figure-sheet);
 				}
 			}
 
@@ -266,14 +296,14 @@ export default function DevicesAnatomy() @{
 			}
 
 			.pool {
-				fill: color-mix(in oklch, var(--yellow) 70%, oklch(70% 0.16 70));
+				fill: var(--marker);
 				stroke: none;
 				opacity: 0.5;
 			}
 
 			.wash-edge {
 				fill: none;
-				stroke: oklch(72% 0.15 75);
+				stroke: var(--highlight);
 				stroke-width: 0.8;
 				opacity: 0.5;
 				mix-blend-mode: multiply;

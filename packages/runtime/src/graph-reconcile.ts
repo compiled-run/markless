@@ -1,7 +1,7 @@
-import { ASYNC_SNAPSHOT_META_KEYS, type RuntimeAsyncComputedNode } from './graph-async.ts';
+import type { RuntimeAsyncComputedNode } from './graph-async-load.ts';
 import type { RuntimeComputedNode } from './graph-computed.ts';
 import { readPath } from './graph-core.ts';
-import type { DirtyPath } from './graph-scheduler.ts';
+import { isAsyncSnapshotMetaKey, type DirtyPath } from './graph-scheduler.ts';
 import type {
 	RuntimeGraphAsyncSnapshot,
 	RuntimeGraphRead,
@@ -352,10 +352,12 @@ export type DerivedReconcilePlane = {
 	readonly reconcileComputed: (computed: RuntimeComputedNode, previous: unknown) => void;
 	/** Commits a whole derived value onto a cell-backed computed node. */
 	readonly commitDerived: (write: RuntimeGraphWrite, path: ReadonlyArray<string>) => boolean;
-	/** Dirties the paths an async snapshot commit changed. */
+	/** Dirties the paths an async snapshot commit changed: the `shown` fields it moved, and its value unless it is `carried` forward. */
 	readonly publishAsync: (
 		node: RuntimeAsyncComputedNode,
 		previous: RuntimeGraphAsyncSnapshot,
+		shown: ReadonlyArray<ReadonlyArray<string>>,
+		carried: boolean,
 	) => void;
 	/** Flush-pass start: recompute the dirty computeds something is subscribed to. */
 	readonly recomputeSubscribed: () => void;
@@ -463,8 +465,8 @@ export const createDerivedReconcilePlane: DerivedReconcilePlaneFactory = (intern
 			scheduleFlush();
 			return true;
 		},
-		publishAsync(node, previous) {
-			for (const path of asyncCommitPaths(node, previous, node.snapshot)) {
+		publishAsync(node, previous, shown, carried) {
+			for (const path of asyncCommitPaths(node, previous, node.snapshot, shown, carried)) {
 				markDirtyPath(node.graphNodeId, path);
 			}
 		},
@@ -519,21 +521,15 @@ function asyncCommitPaths(
 	node: RuntimeAsyncComputedNode,
 	previous: RuntimeGraphAsyncSnapshot,
 	next: RuntimeGraphAsyncSnapshot,
+	shown: ReadonlyArray<ReadonlyArray<string>>,
+	carried: boolean,
 ): ReadonlyArray<ReadonlyArray<string>> {
-	const paths: ReadonlyArray<string>[] = [];
-	if (previous.status !== next.status) paths.push(['status']);
-	if (previous.version !== next.version) paths.push(['version']);
-	if (!Object.is(snapshotField(previous, 'key'), snapshotField(next, 'key'))) paths.push(['key']);
-	if (!Object.is(snapshotField(previous, 'error'), snapshotField(next, 'error'))) {
-		paths.push(['error']);
-	}
-
-	// A pending re-run carries the prior settled value forward, so value cells
-	// never re-check on a pending flip.
-	if (next.status === 'pending') return paths;
+	const paths: ReadonlyArray<string>[] = [...shown];
+	if (carried) return paths;
 
 	const previousValue = snapshotField(previous, 'value');
 	const nextValue = snapshotField(next, 'value');
+
 	if (
 		!Object.is(previousValue, nextValue) &&
 		isDiffableContainer(previousValue) &&
@@ -548,7 +544,7 @@ function asyncCommitPaths(
 		if (changed.every((path) => path.length > 0)) {
 			for (const path of changed) {
 				paths.push(['value', ...path]);
-				if (!ASYNC_SNAPSHOT_META_KEYS.has(path[0])) paths.push([...path]);
+				if (!isAsyncSnapshotMetaKey(path[0])) paths.push([...path]);
 			}
 			return paths;
 		}

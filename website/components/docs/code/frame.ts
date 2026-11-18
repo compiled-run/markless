@@ -2,8 +2,9 @@
 // the compiled modules; this page links them to Blob URLs and renders the entry's
 // default export into its body.
 import { render, type RenderTarget } from '@markless/core';
+import { PACK_RESIDENT } from '../../../../packages/web/src/fns/resident-load.ts';
 import { installRuntimeImport, runtimeImportCall, runtimeModuleUrl } from './frame-runtime.ts';
-import { blockStyles, createLinker } from './link.ts';
+import { blockStyles, createLinker, moduleKey } from './link.ts';
 import type { CodeDiagnostic, CompiledModule, FrameReply, FrameRequest } from './protocol.ts';
 
 type Run = { load(specifier: string): Promise<unknown> };
@@ -16,6 +17,13 @@ const stage = document.querySelector<HTMLElement>('[data-code-frame]') ?? docume
 let latest = 0;
 let urls: string[] = [];
 let mountedRun = -1;
+type Mounted = Awaited<ReturnType<typeof render>>;
+let mounted: Mounted | undefined;
+
+// A run left running keeps settling its async values and loads their code through a run already deleted.
+function dispose(container: Mounted | undefined): void {
+	(container?.runtime as { readonly dispose?: () => void } | undefined)?.dispose?.();
+}
 
 function reply(message: FrameReply): void {
 	parent.postMessage(message, location.origin);
@@ -32,6 +40,13 @@ function runtimeUrl(code: string): string {
 	return URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
 }
 installRuntimeImport(runtimeUrl);
+
+// A load of code already run answers in the caller's own task, the contract a build's packed loads keep.
+function resident(namespace: unknown): Promise<unknown> {
+	const loading: Promise<unknown> & { [PACK_RESIDENT]?: () => unknown } = Promise.resolve(namespace);
+	loading[PACK_RESIDENT] = () => namespace;
+	return loading;
+}
 
 function runtimeError(error: unknown): CodeDiagnostic {
 	const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
@@ -53,26 +68,38 @@ async function run(
 		dynamicImport: (expression, specifier) =>
 			runtimeImportCall(specifier) ?? `globalThis.${RUNS}.get(${id}).load(${expression})`,
 	});
+	const evaluated = new Map<string, unknown>();
+	// Vite 8.3 wraps import() in a non-async preload arrow, so its argument must not await.
+	const evaluate = async (specifier: string) => {
+		const moduleUrl = await linker.url(specifier);
+		const namespace: unknown = await import(/* @vite-ignore */ moduleUrl);
+		evaluated.set(moduleKey(specifier), namespace);
+		return namespace;
+	};
 	runs.set(id, {
-		// Vite 8.3 wraps import() in a non-async preload arrow, so its argument must not await.
-		load: async (specifier) => {
-			const moduleUrl = await linker.url(specifier);
-			return import(/* @vite-ignore */ moduleUrl);
+		load: (specifier) => {
+			const key = moduleKey(specifier);
+			return evaluated.has(key) ? resident(evaluated.get(key)) : evaluate(specifier);
 		},
 	});
 	const mount = document.createElement('div');
+	let container: Mounted;
 	try {
 		const entryUrl = await linker.url(entryId);
 		const entry = (await import(/* @vite-ignore */ entryUrl)) as {
 			default?: unknown;
 		};
+		// One that throws is left to throw where the component loads it.
+		await Promise.all(
+			modules.filter((module) => module.generated).map((module) => evaluate(module.id).catch(() => {})),
+		);
 		if (id !== latest) return;
 		if (!entry.default)
 			throw new Error(
 				`${entryId} has no default export, so there is no component to show.`,
 			);
 		// render() types its target for the resume DOM too, so a real element needs the cast.
-		await render(entry.default as Parameters<typeof render>[0], {
+		container = await render(entry.default as Parameters<typeof render>[0], {
 			target: mount as unknown as RenderTarget,
 		});
 	} catch (error) {
@@ -80,11 +107,13 @@ async function run(
 			reply({ type: 'code:result', id, ok: false, diagnostics: [runtimeError(error)] });
 		return;
 	}
-	if (id !== latest) return;
+	if (id !== latest) return dispose(container);
 	const page = document.createElement('style');
 	page.textContent = pageStyles.join('\n');
 	const style = document.createElement('style');
 	style.textContent = blockStyles(modules);
+	dispose(mounted);
+	mounted = container;
 	stage.replaceChildren(page, style, mount);
 	for (const old of runs.keys()) if (old < id) runs.delete(old);
 	for (const url of previousUrls) URL.revokeObjectURL(url);

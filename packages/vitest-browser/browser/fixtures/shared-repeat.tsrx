@@ -27,7 +27,7 @@ export const listBox = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export default function SharedRepeatPage() @{

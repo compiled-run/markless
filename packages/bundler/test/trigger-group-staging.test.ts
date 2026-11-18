@@ -847,6 +847,47 @@ test('a button group whose cell a settled arm reads owns that arm and its render
 	expect(groups.find((group) => group.id === 'self-wake')?.armRendererModuleId).toBeUndefined();
 });
 
+test('a button that refetches the value a settled arm shows owns that arm and the symbols its hosts name', () => {
+	const input = settledArmPageInput(false);
+	const again = { hostNodeId: 'h:again', strategy: 'dom-order', index: 2, tagName: 'button' };
+	const click = { hostNodeId: 'h:again', eventName: 'click', symbolIds: ['symbol:again'] };
+	const groups = planPrerenderTriggerGroups({
+		...input,
+		view: { ...input.view, locators: [...input.view.locators, again], events: [click] },
+		completeView: {
+			...input.completeView,
+			locators: [...input.completeView.locators, again],
+			events: [click],
+		},
+		componentEdges: [],
+		boundRows: [],
+		symbolResolver: {
+			...input.symbolResolver,
+			symbols: [
+				...input.symbolResolver.symbols,
+				{
+					id: 'symbol:again',
+					kind: 'event-handler',
+					hostNodeId: 'h:again',
+					eventName: 'click',
+					source: '() => seed++',
+					parameters: [],
+					order: 0,
+					writes: [{ source: 'seed++', graphNodeId: 'state:seed', path: [], operation: 'update' }],
+				},
+			],
+		},
+	} as unknown as Parameters<typeof planPrerenderTriggerGroups>[0]);
+
+	const refetch = groups.find((group) => group.id === 'h:again:click');
+	// The settle commits the arm through this group's runtime, so the records its hosts carry must resolve here.
+	expect(refetch?.view.asyncBoundaries.map((boundary) => boundary.id)).toEqual(['async:feed']);
+	expect(Array.isArray(refetch?.view.asyncBoundaries[0]?.armRecords)).toBe(true);
+	expect(refetch?.symbolIds).toEqual(
+		expect.arrayContaining(['symbol:again', 'symbol:row', 'symbol:runner', 'symbol:settle', 'symbol:weighted-patch']),
+	);
+});
+
 test('a page with no settled-arm reader leaves the self-wake group sole arm owner', () => {
 	const groups = planPrerenderTriggerGroups(settledArmPageInput(false));
 
@@ -1224,4 +1265,218 @@ test('a group that selects a sync computed carries its derive symbol and the der
 		'computed:doubled',
 	]);
 	expect(plan(false)[0]?.symbolIds).toEqual(['symbol:branch', 'symbol:click']);
+});
+
+test('a group that writes a list of component rows carries the symbols those components own and bind under the list', () => {
+	const symbolResolver = {
+		passId: 'symbol-resolver' as const,
+		dynamicImportOwner: 'generated-symbol-resolver' as const,
+		syncPolicies: [],
+		diagnostics: [],
+		symbols: [
+			{
+				id: 'symbol:add',
+				kind: 'event-handler',
+				hostNodeId: 'h-add',
+				eventName: 'click',
+				order: 0,
+				parameters: [],
+				reads: [],
+				writes: [
+					{
+						source: 'tracks',
+						graphNodeId: 'state:tracks',
+						path: [],
+						operation: 'call',
+						method: 'push',
+					},
+				],
+				elementHandleCalls: [],
+				elementHandleReads: [],
+			},
+			{
+				id: 'symbol:play',
+				kind: 'event-handler',
+				hostNodeId: 'h-track',
+				eventName: 'click',
+				order: 0,
+				parameters: [],
+				reads: [],
+				writes: [],
+				elementHandleCalls: [],
+				elementHandleReads: [],
+			},
+			{
+				id: 'symbol:label',
+				kind: 'dom-update',
+				hostNodeId: 'h-track',
+				graphNodeId: 'computed:label',
+				target: { kind: 'text' },
+			},
+			{
+				id: 'symbol:open',
+				kind: 'sync-computed-derive',
+				graphNodeId: 'computed:open',
+				name: 'open',
+				dependencies: [],
+			},
+			{
+				id: 'symbol:arm',
+				kind: 'branch-update',
+				branchSiteId: 'branch-site:detail',
+				testSource: 'open',
+				testReads: [],
+			},
+			{
+				id: 'symbol:badge',
+				kind: 'dom-update',
+				hostNodeId: 'h-badge',
+				graphNodeId: 'computed:badge',
+				target: { kind: 'text' },
+			},
+			{
+				id: 'symbol:footer',
+				kind: 'event-handler',
+				hostNodeId: 'h-footer',
+				eventName: 'click',
+				order: 0,
+				parameters: [],
+				reads: [],
+				writes: [],
+				elementHandleCalls: [],
+				elementHandleReads: [],
+			},
+		],
+	} as unknown as Parameters<typeof planPrerenderTriggerGroups>[0]['symbolResolver'];
+	const chunk = (componentName: string, hostNodeIds: string[]) => ({
+		id: `chunk:${componentName}`,
+		kind: 'template',
+		componentName,
+		statics: [],
+		hosts: hostNodeIds.map((hostNodeId) => ({
+			hostNodeId,
+			tagName: 'li',
+			coordinate: { kind: 'child-index', path: [] },
+		})),
+		slots: [],
+	});
+	const groups = planPrerenderTriggerGroups({
+		filename: '/workspace/src/Playlist.tsrx',
+		state: {
+			version: 1,
+			cells: [{ graphNodeId: 'state:tracks', name: 'tracks', valueKind: 'array', value: [] }],
+			computed: [],
+		},
+		view: {
+			version: 1,
+			locators: [
+				{ hostNodeId: 'h-add', strategy: 'dom-order', index: 1, tagName: 'button' },
+				{ hostNodeId: 'h-list', strategy: 'dom-order', index: 2, tagName: 'ol' },
+			],
+			events: [{ hostNodeId: 'h-add', eventName: 'click', symbolIds: ['symbol:add'] }],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			keyedRepeats: [
+				{
+					id: 'repeat:tracks',
+					parentHostNodeId: 'h-list',
+					collectionGraphNodeId: 'state:tracks',
+					collectionPath: [],
+					keyPath: [],
+					itemName: 'track',
+					rowElementCount: 0,
+					rowComponent: {
+						componentEdgeId: 'component-edge:track',
+						componentName: 'Playlist',
+						itemPropName: 'title',
+					},
+					rowEvents: [],
+				},
+			],
+			asyncBoundaries: [],
+		},
+		triggerGroups: { passId: 'trigger-groups', groups: [] },
+		symbolResolver,
+		boundRows: [
+			{
+				id: 'bound:symbol:title',
+				baseSymbolId: 'symbol:label',
+				componentEdgePath: ['component-edge:track'],
+				ancestry: [
+					{
+						componentEdgeId: 'component-edge:track',
+						branchScopeIds: [],
+						keyedRepeatScopeIds: ['repeat:tracks'],
+					},
+				],
+				captureSlots: [],
+			},
+			{
+				id: 'bound:symbol:footer',
+				baseSymbolId: 'symbol:footer',
+				componentEdgePath: ['component-edge:footer'],
+				ancestry: [
+					{
+						componentEdgeId: 'component-edge:footer',
+						branchScopeIds: [],
+						keyedRepeatScopeIds: [],
+					},
+				],
+				captureSlots: [],
+			},
+		],
+		componentEdges: [
+			{
+				id: 'component-edge:track',
+				parentComponentName: 'Playlist',
+				childComponentName: 'Track',
+				props: [],
+				children: { childCount: 0 },
+				branchScopeIds: [],
+				keyedRepeatScopeIds: ['repeat:tracks'],
+			},
+			{
+				id: 'component-edge:badge',
+				parentComponentName: 'Track',
+				childComponentName: 'Badge',
+				props: [],
+				children: { childCount: 0 },
+				branchScopeIds: [],
+				keyedRepeatScopeIds: [],
+			},
+			{
+				id: 'component-edge:footer',
+				parentComponentName: 'Playlist',
+				childComponentName: 'Footer',
+				props: [],
+				children: { childCount: 0 },
+				branchScopeIds: [],
+				keyedRepeatScopeIds: [],
+			},
+		],
+		graphBindings: [
+			{ id: 'computed:open', componentName: 'Track' },
+			{ id: 'state:tracks', componentName: 'Playlist' },
+		],
+		branchSites: [{ id: 'branch-site:detail', componentName: 'Track' }],
+		renderData: {
+			chunks: [
+				chunk('Playlist', ['h-add', 'h-list']),
+				chunk('Track', ['h-track']),
+				chunk('Badge', ['h-badge']),
+				chunk('Footer', ['h-footer']),
+			],
+		} as unknown as Parameters<typeof planPrerenderTriggerGroups>[0]['renderData'],
+	});
+
+	expect(groups.find((group) => group.hostNodeId === 'h-add')?.symbolIds).toEqual([
+		'bound:symbol:title',
+		'symbol:add',
+		'symbol:arm',
+		'symbol:badge',
+		'symbol:label',
+		'symbol:open',
+		'symbol:play',
+	]);
 });

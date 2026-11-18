@@ -27,7 +27,10 @@ const USAGE = `usage: node scripts/ci/local.mjs [--list] [--fast | --full] [--jo
   --linux           run inside a Linux container (needs docker; see docs/ci-process.md)
   --keep-going      keep running jobs after one fails (default: on)
   --bail            stop at the first failing job
-  --dry-run         print the commands without running them`;
+  --dry-run         print the commands without running them
+  --unit-selection <file>
+                    run the unit job on the tests an \`affected.mjs --json\` selection names, none when
+                    it names none; a runAll or unreadable selection runs every unit test (the hook)`;
 
 // A job with check steps but no entry here fails --list and every run, so this table cannot drift from the YAML.
 const JOB_POLICY = {
@@ -35,7 +38,12 @@ const JOB_POLICY = {
 		'agent-files': { mode: 'fast' },
 		typecheck: { mode: 'fast' },
 		'typecheck-ts7': { mode: 'fast' },
-		unit: { mode: 'fast' },
+		// MARKLESS_CI_JSON_REPORT_DIR adds a JSON reporter beside the default one; the tests that run are unchanged.
+		unit: { mode: 'fast', vitestJsonReport: true, testSelection: true },
+		'unit-budget': {
+			mode: 'ci-only',
+			reason: 'checks the Linux CPU and memory the unit shards measured in this CI run; a Mac run has no comparable numbers',
+		},
 		browser: { mode: 'full', needsBrowser: true },
 		'completion-matrix': { mode: 'full' },
 		'boxes-bundler': { mode: 'full', needsBrowser: true },
@@ -99,6 +107,7 @@ const parseArgs = (argv) => {
 		list: false,
 		bail: false,
 		dryRun: false,
+		unitSelection: null,
 	};
 	for (let index = 0; index < argv.length; index += 1) {
 		const arg = argv[index];
@@ -113,6 +122,7 @@ const parseArgs = (argv) => {
 		else if (arg === '--bail') options.bail = true;
 		else if (arg === '--keep-going') options.bail = false;
 		else if (arg === '--dry-run') options.dryRun = true;
+		else if (arg === '--unit-selection') options.unitSelection = argv[++index];
 		else if (arg === '--help' || arg === '-h') {
 			console.log(USAGE);
 			process.exit(0);
@@ -308,6 +318,36 @@ const runShell = (command, { cwd, env }) =>
 		stdio: 'inherit',
 	}).status ?? 1;
 
+const withJsonReport = (job, command) => {
+	const dir = process.env.MARKLESS_CI_JSON_REPORT_DIR;
+	if (!dir || !job.policy.vitestJsonReport || !/\bvp test\b/.test(command)) return command;
+	return `${command} --reporter=default --reporter=json --outputFile.json=${JSON.stringify(join(dir, `${job.id}.json`))}`;
+};
+
+// Anything but a readable selection naming its tests runs the whole job, so a selector fault never drops a test.
+const readUnitSelection = (path) => {
+	try {
+		const selection = JSON.parse(readFileSync(path, 'utf8'));
+		if (selection.runAll) return { files: null, note: `every test: ${selection.runAll}` };
+		if (!Array.isArray(selection.selected))
+			return { files: null, note: 'every test: the selection names no test list' };
+		return {
+			files: selection.selected,
+			note: `${selection.selected.length} of ${selection.total} tests the change selects`,
+		};
+	} catch (error) {
+		return {
+			files: null,
+			note: `every test: the selection is unreadable (${error instanceof Error ? error.message : error})`,
+		};
+	}
+};
+
+const withTestFiles = (job, command, files) => {
+	if (!files || !job.policy.testSelection || !/\bvp test\b/.test(command)) return command;
+	return `${command} ${files.map((file) => JSON.stringify(file)).join(' ')}`;
+};
+
 const selectJobs = (workflow, options) => {
 	const unknown = workflow.jobs.filter((job) => job.mode === 'unknown');
 	if (unknown.length) {
@@ -371,6 +411,19 @@ const runJobs = (workflow, options) => {
 			});
 			continue;
 		}
+		const selection =
+			options.unitSelection && job.policy.testSelection
+				? readUnitSelection(options.unitSelection)
+				: null;
+		if (selection) console.log(`\n=== ${job.id} runs ${selection.note}`);
+		if (selection?.files?.length === 0) {
+			results.push({
+				id: job.id,
+				status: 'skipped',
+				note: 'the change selects no unit test',
+			});
+			continue;
+		}
 		const started = Date.now();
 		let failed = null;
 		const ran = new Set();
@@ -379,9 +432,13 @@ const runJobs = (workflow, options) => {
 				if (step.kind !== 'check' || ran.has(step.command)) continue;
 				ran.add(step.command);
 				const label = `${job.id}${comboLabel(run.combo)} :: ${step.name}`;
-				console.log(`\n=== ${label}\n$ ${step.command}`);
+				const command = withJsonReport(
+					job,
+					withTestFiles(job, step.command, selection?.files),
+				);
+				console.log(`\n=== ${label}\n$ ${command}`);
 				if (options.dryRun) continue;
-				const status = runShell(step.command, {
+				const status = runShell(command, {
 					cwd: step.cwd ? resolve(repoRoot, step.cwd) : repoRoot,
 					env: { ...baseEnv, ...job.env, ...step.env },
 				});

@@ -2,6 +2,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { siteBase } from '../../../website/site-base.ts';
+import { CODE_PREFETCH_FILE } from '../../../website/tooling/code-client.ts';
 
 export const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 export const GUARD_DIR = join(ROOT_DIR, 'scripts/benchmarks/perf-guards');
@@ -29,6 +30,10 @@ export const LOAD_WEIGHT_RUNS = 3;
 export const BUDGETS = {
 	// The lowest of three loads moved by at most 107 chars across three measurements of one build (bench /settings); 2.4x that.
 	loadExecutionSwingChars: 256,
+	// Gzip is not additive: a PR's download growth measured up to 48 B more in the merge queue than on its own run (42 queue runs, 2026-10-30 to 11-11).
+	loadDownloadCompositionBytes: 48,
+	// The <Code> playground's prefetch moves with every compiler, bundler and runtime change: 24 open PRs on 2026-11-17 moved docs / by -71 to +1,713 B each, about 6 KB together.
+	loadPlaygroundGrowthBytes: 16 * 1024,
 	runtimeModuleGrowthBytes: 128,
 	constructGlueGrowthBytes: 24,
 	resumeRowGrowthBytes: 16,
@@ -40,6 +45,15 @@ export const BUDGETS = {
 	routeTableLoadChars: 512,
 	// Below this the many-link page no longer ships a bigger route table, and G15 would compare two equal pages.
 	routeTableMinHtmlGrowth: 4 * 1024,
+	// Pages passing Caption only text loaded the same bytes with the short and long Gloss; on main the long one leaked 3.7 KB into them.
+	staticPropArmLoadBytes: 512,
+	staticPropArmLoadChars: 512,
+	// Below this the long Gloss no longer loads more where it shows, and G18 would compare two equal builds.
+	staticPropArmMinShownGrowth: 2 * 1024,
+	// The two Workers differ only in a prerendered page's stylesheet; they measured 1 B apart.
+	serverStylesheetGrowthBytes: 1024,
+	// Below this the large build no longer ships a bigger prerendered stylesheet, and G17 would compare two equal builds.
+	serverStylesheetMinCssGrowth: 64 * 1024,
 	executionGrowth: 0.25,
 	executionMinChars: 2048,
 	initializerMinExtra: 2,
@@ -55,6 +69,8 @@ export const SITES = {
 		label: 'docs site',
 		base: siteBase,
 		routes: [siteBase, `${siteBase}concepts/state`, `${siteBase}ui/accordion`],
+		// The build's list of what a <Code> block downloads before a reader opens it; G16 weighs it apart from the page's own code.
+		playgroundPrefetch: CODE_PREFETCH_FILE,
 	},
 };
 

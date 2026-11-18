@@ -41,7 +41,7 @@ points site navigation at a disclosure; nothing here moves it.
 
 ## State
 
-Two widget-scoped families, one per level of ownership.
+Two subtree-scoped families, one per level of ownership.
 
 ```ts
 menu.state() // rooted by menu.root - one per menu, however deep it nests
@@ -341,7 +341,7 @@ exactly a dismissal. An outside press reaches only the topmost surface, so a
   depends on `@markless/core` and nothing else, so there is no locale source.
 - **macOS `Control+Enter`** is not worked around. Both upstream bugs (WebKit PR
   62278, Chrome 147) are fixed and shipping.
-- **`menu.state()` is not a repeat source.** A repeat over widget-scoped shared
+- **`menu.state()` is not a repeat source.** A repeat over subtree-scoped shared
   state adds rows and never removes one, so a menu whose item list _shortens_ -
   a filtered command palette - hits that wall. Items are the consumer's markup
   or the consumer's own array.

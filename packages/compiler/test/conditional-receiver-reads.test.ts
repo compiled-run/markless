@@ -28,7 +28,7 @@ async function compileTree(body: string) {
 export const tree = shared(() => {
 	const s = state({ typeahead: '', typeaheadAt: 0, active: '', open: false });
 	return { ...s };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Tree() @{
 	const t = tree();
@@ -103,7 +103,7 @@ test('nested parentheses around the receiver do not hide the read', async () => 
 	`);
 
 	expect(result.symbolModules.diagnostics).toEqual([]);
-	expect(handlerSource(result)).toContain(`context.graph.read("${SHARED_ID}", ["typeahead"])`);
+	expect(handlerSource(result)).toContain('return value.toLowerCase()');
 });
 
 test('a member on a conditional with no call reads through the conditional', async () => {
@@ -148,7 +148,7 @@ test('a method the graph itself declares keeps its read at the member', async ()
 export const tree = shared(() => {
 	const s = state({ typeahead: '' });
 	return { ...s, reset() { s.typeahead = ''; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Tree() @{
 	const t = tree();

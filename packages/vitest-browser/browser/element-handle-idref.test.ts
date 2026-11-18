@@ -57,7 +57,7 @@ test('CSR: two widgets on one page mint distinct ids for their own triggers', as
 	expect(first!.id).toBeTruthy();
 	expect(first!.for).toBe(first!.id);
 	expect(second!.for).toBe(second!.id);
-	// The whole point of widget scope: one rendered widget, one id.
+	// The whole point of subtree scope: one rendered widget, one id.
 	expect(first!.id).not.toBe(second!.id);
 });
 

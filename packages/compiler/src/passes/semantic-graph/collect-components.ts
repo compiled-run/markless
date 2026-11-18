@@ -1,11 +1,17 @@
 import { componentExportPath, linkedComponentTarget } from '../link/component-target.ts';
 import { isEventAttribute } from '../../ast/events.ts';
-import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, getIdentifierName, unwrapTypeAssertion, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
-import type { SemanticComponentEdge, SemanticComponentPropBinding } from '../../artifacts.ts';
+import type {
+	SemanticAsyncArmPlacement,
+	SemanticComponentEdge,
+	SemanticComponentPropBinding,
+} from '../../artifacts.ts';
 import {
+	getComponentFunction,
 	getElementAttributes,
 	getElementTagName,
+	getElementTagNode,
 	isHostTagName,
 	isIgnorableJsxTextNode,
 	isMemberTagName,
@@ -22,6 +28,8 @@ import { collectExpressionReads } from './collect-expressions.ts';
 import { collectObjectPatternAliases } from './collect-aliases.ts';
 import { constantPropValue } from './constant-props.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
+import { rowItemRead } from './row-item-read.ts';
+import { tagRenderedProp } from './prop-tag.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	type GraphReadScope,
@@ -32,17 +40,30 @@ import {
 	readsUnroutedGraphCell,
 } from './composite-reads.ts';
 import { scopedClassValue } from './collect-elements.ts';
+import { readsOnlyFixedValues } from './fixed-prop-value.ts';
+import { catchErrorPropScope, computedReads } from './catch-error-cell.ts';
 import {
 	callbackPropArityUnsupportedDiagnostic,
 	componentPropExpressionUnsupportedDiagnostic,
 	componentSpreadUnsupportedDiagnostic,
+	handlerReadsRenderLocalDiagnostic,
 	memberTagNestedPartDiagnostic,
 	memberTagPartMissingDiagnostic,
 	memberTagUnresolvedDiagnostic,
+	componentPropTagDiagnostic,
 } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
-import { inlineHandlerRenderLocals, liftArmRenderLocalValue } from './render-local-inline.ts';
+import { propsRestSignature } from './spread-event-guard.ts';
+import { namedHandler } from './named-handler.ts';
+import { handlerMayReturnPromise } from './handler-returns-promise.ts';
+import {
+	collectDefinitionReads,
+	factoryHandlerSource,
+	inlineHandlerRenderLocals,
+	liftArmRenderLocalValue,
+	resetRelay,
+} from './render-local-inline.ts';
 import {
 	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
@@ -155,16 +176,30 @@ export function collectComponentEdge(
 		);
 	}
 
+	const renderedProp = importSource.importSource ? undefined : tagRenderedProp(getElementTagNode(node), state);
+	if (renderedProp?.[0] !== undefined)
+		state.graph.diagnostics.push(
+			componentPropTagDiagnostic({
+				tagName,
+				componentName: state.currentComponentName,
+				propName: renderedProp[0],
+				node,
+				filename: state.filename,
+			}),
+		);
+
 	const props = componentPropBindings(node, state, tagName, {
 		childComponentName,
 		importSource: importSource.importSource,
 	});
 	const edgeId = `component-edge:${state.nextComponentEdgeId++}`;
+	if (state.currentHostNodeId) state.edgeHosts.set(edgeId, state.currentHostNodeId);
 	state.graph.componentEdges.push({
 		id: edgeId,
 		parentComponentName: state.currentComponentName,
 		childComponentName,
-		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
+		...asyncArmPlacement(state),
+		...(state.currentCatchBoundaryId ? { catchBoundaryId: state.currentCatchBoundaryId } : {}),
 		...importSource,
 		sourceSpan: sourceSpan(node, state.filename),
 		props,
@@ -173,6 +208,7 @@ export function collectComponentEdge(
 		},
 		branchScopeIds: [...state.currentBranchScopeIds],
 		branchSiteIds: [...state.currentBranchSiteIds],
+		...(state.currentBranchArms.length > 0 ? { branchArms: [...state.currentBranchArms] } : {}),
 		keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
 	});
 
@@ -195,19 +231,7 @@ function componentPropBindings(
 ): ReadonlyArray<SemanticComponentPropBinding> {
 	// Component-body scope: an unscoped map resolves `checklist` to the shared
 	// factory's own local of the same name, which is a different node.
-	const scope: GraphReadScope = {
-		bindings: graphBindingMap(
-			state.graph,
-			state.currentSharedDefinitionId ?? null,
-			state.currentComponentName,
-		),
-		aliases: semanticAliasMap(
-			state.graph,
-			state.currentSharedDefinitionId ?? null,
-			state.currentComponentName,
-		),
-	};
-	const { bindings, aliases } = scope;
+	const scope = componentBodyScope(state);
 	const props: SemanticComponentPropBinding[] = [];
 
 	for (const attribute of getElementAttributes(node)) {
@@ -220,7 +244,8 @@ function componentPropBindings(
 		if (!name) continue;
 
 		const value = attribute.value as AnyNode | undefined;
-		const expression = unwrapExpressionContainer(value);
+		// `id={selected!}` hands the child the same value as `id={selected}`.
+		const expression = unwrapTypeAssertion(unwrapExpressionContainer(value));
 		const source = expression
 			? expressionSource(expression, state.source)
 			: expressionSourceOrFallback(value, state.source, 'true');
@@ -238,12 +263,57 @@ function componentPropBindings(
 		const localBinding = localBindingId
 			? state.componentLocalBindings.get(localBindingId)
 			: undefined;
-		// Deliberately bounded: only the declaration's direct function initializer
-		// is callable here. Identifier aliases do not inherit callback identity.
-		const namedCallback =
-			localBinding?.declaration.writeCount === 1 ? localBinding.initializerNode : undefined;
+		const named =
+			expression && localBinding && isEventAttribute(name)
+				? namedHandler(expression, state, name)
+				: localBinding?.declaration.writeCount === 1 && localBinding.initializerNode
+					? { kind: 'function' as const, node: localBinding.initializerNode }
+					: null;
+		if (named?.kind === 'unroutable') {
+			if (expression && childSpreadsProp(name, link, state, childComponentName))
+				state.graph.diagnostics.push(
+					handlerReadsRenderLocalDiagnostic({
+						handlerLabel: name,
+						localName: source,
+						handler: expression,
+						filename: state.filename,
+						unroutable: named,
+					}),
+				);
+			props.push({
+				name,
+				source,
+				kind: 'opaque',
+				sourceSpan: span,
+				unroutableHandler: { why: named.why, rewrite: named.rewrite },
+			});
+			continue;
+		}
+		const factoryCall = named?.kind === 'factory' ? expression : undefined;
 		const callback =
-			expression && isCallbackExpression(expression) ? expression : namedCallback;
+			expression && isCallbackExpression(expression)
+				? expression
+				: named?.kind === 'function'
+					? named.node
+					: named?.kind === 'factory'
+						? named.returned
+						: undefined;
+
+		// `onRetry={reset}` names no local function, so it becomes a callback whose source is `reset`.
+		if (!callback && expression) {
+			const relayedReset = resetRelay(expression, state);
+			if (relayedReset) {
+				props.push({
+					name,
+					source: relayedReset.name,
+					kind: 'callback',
+					parameters: [],
+					sourceSpan: span,
+					catchResets: [{ name: relayedReset.name, boundaryId: relayedReset.boundaryId }],
+				});
+				continue;
+			}
+		}
 
 		if (callback && isCallbackExpression(callback)) {
 			const parameterNodes = asNodes(callback.params);
@@ -272,23 +342,30 @@ function componentPropBindings(
 				? hasSyncEventPolicyCandidate(callback) ||
 					Boolean(firstDetachedSyncPolicyReference(callback))
 				: false;
-			if (
-				hasSyncPolicyCandidate &&
-				!syncPolicy &&
-				spreadForwardsProp(name, link, state, childComponentName)
-			) {
-				state.graph.diagnostics.push(
-					unextractableSyncPolicyDiagnostic(name, callback, [callback], state),
-				);
-			}
 			const strayCancel = syncPolicy ? uncoveredSyncPolicyCall(callback, state) : null;
-			if (strayCancel && spreadForwardsProp(name, link, state, childComponentName)) {
-				state.graph.diagnostics.push(
-					secondSyncPolicyCancelDiagnostic(name, strayCancel, state),
-				);
-			}
+			const misplacedCancel =
+				hasSyncPolicyCandidate && !syncPolicy
+					? unextractableSyncPolicyDiagnostic(name, callback, [callback], state)
+					: strayCancel
+						? secondSyncPolicyCancelDiagnostic(name, strayCancel, state)
+						: null;
+			if (misplacedCancel && spreadForwardsProp(name, link, state, childComponentName))
+				state.graph.diagnostics.push(misplacedCancel);
+			else if (misplacedCancel)
+				state.relayCancelRefusals.push({
+					childComponentName: link?.childComponentName || childComponentName,
+					...(link?.importSource ? { importSource: link.importSource } : {}),
+					propName: name,
+					diagnostic: misplacedCancel,
+				});
 
-			const inlined = inlineHandlerRenderLocals(callback, state, name);
+			const factory = factoryCall
+				? factoryHandlerSource(factoryCall, parameterNodes.length, state, name)
+				: null;
+			if (factoryCall && !factory) continue;
+			const inlined = factory ?? inlineHandlerRenderLocals(callback, state, name);
+			// A callback named by a body function reads at its definition, which the prop walk never visits.
+			if (callback !== expression && !factoryCall) collectDefinitionReads(callback, state);
 			props.push({
 				name,
 				source: inlined?.source ?? expressionSource(callback, state.source),
@@ -296,12 +373,44 @@ function componentPropBindings(
 				...(inlined?.definitionSpans.length
 					? { definitionSpans: inlined.definitionSpans }
 					: {}),
-				parameters: parameterNodes.map((parameter) =>
-					expressionSource(parameter, state.source),
-				),
-				sourceSpan: sourceSpan(callback, state.filename),
+				parameters: factory
+					? factory.parameters
+					: parameterNodes.map((parameter) => expressionSource(parameter, state.source)),
+				sourceSpan: sourceSpan(factoryCall ?? callback, state.filename),
 				...(hasSyncPolicyCandidate ? { hasSyncPolicyCandidate } : {}),
 				...(syncPolicy ? { syncPolicy } : {}),
+				...(handlerMayReturnPromise(callback)
+					? {
+							returnsPromise: true as const,
+							...(state.currentCatchBoundaryId
+								? { catchBoundaryId: state.currentCatchBoundaryId }
+								: {}),
+						}
+					: {}),
+				...(inlined?.catchResets.size
+					? {
+							catchResets: [...inlined.catchResets].map(([resetName, boundaryId]) => ({
+								name: resetName,
+								boundaryId,
+							})),
+						}
+					: {}),
+			});
+			continue;
+		}
+
+		// A received handler handed on as is (`onClick={onPress}`) runs as this instance's `(event) => onPress?.(event)` would.
+		const relayed =
+			expression && isEventAttribute(name)
+				? relayedHandlerSource(expression, scope, state)
+				: undefined;
+		if (relayed && childSpreadsProp(name, link, state, childComponentName)) {
+			props.push({
+				name,
+				source: relayed.source,
+				kind: 'callback',
+				parameters: [relayed.parameter],
+				sourceSpan: span,
 			});
 			continue;
 		}
@@ -324,11 +433,27 @@ function componentPropBindings(
 		// to that local's cell, and every row sends the same value to its child.
 		// The instance local must be THIS component's: a same-named local declared
 		// in a sibling component is not in scope here (defect 46).
+		const caught = expression ? catchErrorPropScope(expression, scope, state) : null;
+		const propScope = caught?.scope ?? scope;
 		const graph = repeatRowBindsName(source, state)
 			? null
-			: (resolveGraphPath(source, bindings, aliases) ??
+			: (resolveGraphPath(source, propScope.bindings, propScope.aliases) ??
 				resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName));
 		if (graph) {
+			if (
+				caught &&
+				!caught.keep(
+					[
+						{
+							node: expression!,
+							reads: [{ graphNodeId: graph.binding.id, path: graph.path }],
+							instanceofs: caught.instanceofs,
+						},
+					],
+					childComponentName,
+				)
+			)
+				continue;
 			// `aria-labelledby={headingEl}` names an element the PARENT renders, so
 			// what crosses the edge is the id minted for it, not the handle. Sent as
 			// an ordinary graph reference the child receives a DOM object and writes
@@ -368,12 +493,28 @@ function componentPropBindings(
 		// out sent it to the refusal below instead of the route it already had.
 		const composite = expression
 			? collectCompositeTemplateExpression(expression, state, {
-					scope,
+					scope: propScope,
 					methodCalls: true,
 					unaryOperators: true,
+					// A scoped class joins its value with the scope, so an array or object there stays opaque.
+					literalBranches: !(name === 'class' && state.currentStyleScopeClass),
 				})
 			: null;
 		if (composite) {
+			if (
+				caught &&
+				!caught.keep(
+					[
+						{
+							node: expression!,
+							reads: computedReads(composite.graphNodeId, state),
+							instanceofs: caught.instanceofs,
+						},
+					],
+					childComponentName,
+				)
+			)
+				continue;
 			props.push({
 				name,
 				source,
@@ -419,7 +560,8 @@ function componentPropBindings(
 			expression && opaqueSource === source ? constantPropValue(expression, state) : null;
 		const lifted =
 			expression && opaqueSource === source && !constant?.value.ok
-				? (liftArmModuleValue(expression, state) ?? liftArmRenderLocalValue(expression, state))
+				? (liftArmModuleValue(expression, state) ??
+					liftArmRenderLocalValue(expression, state))
 				: null;
 		if (lifted) {
 			props.push({
@@ -433,11 +575,19 @@ function componentPropBindings(
 			});
 			continue;
 		}
+		const rowRead = expression && opaqueSource === source ? rowItemRead(expression, state) : null;
+		const fixedValue =
+			!rowRead &&
+			!constant?.value.ok &&
+			expression !== undefined &&
+			readsOnlyFixedValues(expression, state);
 		props.push({
 			name,
 			source: opaqueSource,
 			kind: 'opaque',
 			sourceSpan: span,
+			...(rowRead ? { rowRead } : {}),
+			...(fixedValue ? { fixedValue: true as const } : {}),
 			...(constant?.value.ok ? { buildTimeValue: { value: constant.value.value } } : {}),
 			...(constant && constant.importedConstants.length > 0
 				? { importedConstants: constant.importedConstants }
@@ -449,7 +599,7 @@ function componentPropBindings(
 }
 
 /**
- * The call-site `class` with the calling module's style-scope class composed in.
+ * The call-site `class` with the calling component's hash class composed in.
  * A literal composes at build time; a dynamic value is only known at runtime, so
  * the scope rides in a computed of its own - a graph-reference prop carries a
  * node id and nothing beside it. Null when neither shape fits, and the caller
@@ -558,7 +708,7 @@ function componentImportSource(
 }
 
 // Maps a tag's local name (aliased import or barrel member path) to the component its module declares.
-function resolveImportedChildComponent(
+export function resolveImportedChildComponent(
 	localTarget: string,
 	state: WalkState,
 ): {
@@ -657,6 +807,75 @@ function spreadForwardsProp(
 	);
 }
 
+/** A received prop handed to an event attribute as is (`onClick={onPress}`), rewritten as the instance's `(event) => onPress?.(event)`. */
+export function receivedHandlerRelay(
+	expression: AnyNode,
+	state: WalkState,
+): { readonly source: string; readonly parameter: string; readonly propName: string } | undefined {
+	return relayedHandlerSource(expression, componentBodyScope(state), state);
+}
+
+function componentBodyScope(state: WalkState): GraphReadScope {
+	return {
+		bindings: graphBindingMap(
+			state.graph,
+			state.currentSharedDefinitionId ?? null,
+			state.currentComponentName,
+		),
+		aliases: semanticAliasMap(
+			state.graph,
+			state.currentSharedDefinitionId ?? null,
+			state.currentComponentName,
+		),
+	};
+}
+
+function relayedHandlerSource(
+	expression: AnyNode,
+	scope: GraphReadScope,
+	state: WalkState,
+): { readonly source: string; readonly parameter: string; readonly propName: string } | undefined {
+	const source =
+		expression.type === 'Identifier' ? getIdentifierName(expression) : staticPropsMember(expression);
+	if (!source) return undefined;
+	const root = source.split('.')[0]!;
+	if (repeatRowBindsName(root, state)) return undefined;
+	const graph = resolveGraphPath(source, scope.bindings, scope.aliases);
+	if (graph?.binding.kind !== 'prop' || graph.path.length !== 1) return undefined;
+	const parameter = source === 'event' ? 'domEvent' : 'event';
+	return {
+		source: `(${parameter}) => ${source}?.(${parameter})`,
+		parameter,
+		propName: graph.path[0]!,
+	};
+}
+
+/** `props.onClick`: one static member read off an identifier, the props object read without destructuring. */
+function staticPropsMember(expression: AnyNode): string | undefined {
+	if (expression.type !== 'MemberExpression' || expression.computed || expression.optional)
+		return undefined;
+	const object = getIdentifierName(expression.object as AnyNode | undefined);
+	const property = getIdentifierName(expression.property as AnyNode | undefined);
+	return object && property ? `${object}.${property}` : undefined;
+}
+
+function childSpreadsProp(
+	propName: string,
+	link: { readonly childComponentName: string; readonly importSource?: string } | undefined,
+	state: WalkState,
+	fallbackChildName: string,
+): boolean {
+	if (link?.importSource) return spreadForwardsProp(propName, link, state, fallbackChildName);
+	const childName = link?.childComponentName || fallbackChildName;
+	for (const statement of asNodes(state.semantic().ast.body as unknown)) {
+		const component = getComponentFunction(statement);
+		if (component?.name !== childName) continue;
+		const signature = propsRestSignature(component.node);
+		return Boolean(signature && !signature.destructuredNames.has(propName));
+	}
+	return false;
+}
+
 function servedComponentNames(
 	moduleInterface: WalkState['importedModuleInterfaces'][string],
 ): ReadonlyArray<string> {
@@ -710,4 +929,13 @@ function serializableLiteralValue(
 	if (node.type !== 'Literal') return { known: false };
 
 	return { known: true, value: node.value };
+}
+
+function asyncArmPlacement(state: WalkState): SemanticAsyncArmPlacement {
+	return state.currentAsyncBoundaryId
+		? {
+				asyncBoundaryId: state.currentAsyncBoundaryId,
+				asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
+			}
+		: {};
 }

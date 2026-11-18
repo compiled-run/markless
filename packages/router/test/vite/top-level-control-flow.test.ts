@@ -2,13 +2,11 @@ import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, webkit, type Browser, type BrowserType, type Page } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { PROTOCOL_CONTAINER_END_COMMENT } from '../../../serializer/src/protocol-page-markers.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // A keyed @for written straight into a page's template, with no element around it, keeps its rows
 // as the container's own children: served, resumed, client-rendered and swapped in by navigation.
@@ -138,13 +136,9 @@ async function serve(name: string, files: Record<string, string>): Promise<App> 
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
 	let server: BuiltServer;
 	try {
-		const builder = await createBuilder({
+		await buildFixture({
 			root,
-			configFile: false,
-			logLevel: 'silent',
-			plugins: [markless(), router()],
-		} as Parameters<typeof createBuilder>[0]);
-		await builder.buildApp();
+		});
 		server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 			env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 		});

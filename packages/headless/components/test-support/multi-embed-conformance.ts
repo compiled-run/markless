@@ -84,13 +84,13 @@ import { decodeProtocolPayloadLists } from '../../../serializer/src/protocol-rec
  * EXPECTED PRE-FIX REDS. Before the island discriminator lands (the `m<n>:`
  * segment in PROTOCOL_INSTANCE_PATH plus its application across
  * composeMdxState / composeMdxView), checks (a)-(c) fail for every
- * widget-scoped family, with these signatures — any OTHER failure is a real
+ * subtree-scoped family, with these signatures — any OTHER failure is a real
  * finding, not the known gap:
  *
  *   (a) distinct-widget-ids — `expected length 2, received 1` for a declared
  *       suffix: both embeds' definitions collapsed to one merged entry. A
  *       `received ''` from the instance-path assertion is the separate
- *       bare-widget-id defect (a widget-scoped `shared:` id that no registered
+ *       bare-widget-id defect (a subtree-scoped `shared:` id that no registered
  *       widget root claimed), not the merge.
  *   (b) interaction-isolation — embed 1 reports `activeValue` after only embed
  *       0 was clicked: one cell behind both embeds.
@@ -98,9 +98,9 @@ import { decodeProtocolPayloadLists } from '../../../serializer/src/protocol-rec
  *       plural element handle merged into one roster across embeds.
  *
  * Checks (d) and (e) are expected GREEN pre-fix: a disabled control is guarded
- * at its own call site, and page scope is deliberately one cell per page.
+ * at its own call site, and app scope is deliberately one cell per page.
  * Check (e) is the other half of the id rule — island discrimination must not
- * reach page-scoped `shared()`, so it stays singular by design.
+ * reach app-scoped `shared()`, so it stays singular by design.
  */
 
 export type MultiEmbedCheckId =
@@ -176,11 +176,11 @@ export type MultiEmbedDisabled = {
 };
 
 export type MultiEmbedPageScope = {
-	/** A thunk mounting N islands of a component that reads a page-scoped `shared()`. */
+	/** A thunk mounting N islands of a component that reads an app-scoped `shared()`. */
 	readonly render: EmbedRender;
 	/** The same islands composed in the browser. Omit until the family adopts the CSR lever. */
 	readonly renderCsr?: EmbedCsrRender;
-	/** Substring identifying the page-scoped cell in the merged payload. */
+	/** Substring identifying the app-scoped cell in the merged payload. */
 	readonly cellIdIncludes: string;
 	/** Testid of the element displaying the shared value, once per embed. */
 	readonly value: string;
@@ -217,7 +217,7 @@ export type MultiEmbedDescriptor = {
 	readonly rovingFrom?: string;
 	/** Omit when the family has no disabled concept. */
 	readonly disabled?: MultiEmbedDisabled;
-	/** Omit when the family's scenario reads no page-scoped shared cell. */
+	/** Omit when the family's scenario reads no app-scoped shared cell. */
 	readonly pageScoped?: MultiEmbedPageScope;
 	readonly exemptions?: readonly MultiEmbedExemption[];
 };
@@ -334,12 +334,12 @@ function runMultiEmbedMode(
 				}
 			}
 
-			// The family-agnostic half of the same rule: no widget-scoped id may
+			// The family-agnostic half of the same rule: no subtree-scoped id may
 			// appear twice anywhere in the merged payload.
 			const widgetIds = definitions
-				.filter((one) => one.scope === 'widget')
+				.filter((one) => one.scope === 'subtree')
 				.map((one) => one.id);
-			expect(new Set(widgetIds).size, 'widget-scoped ids collide across embeds').toBe(
+			expect(new Set(widgetIds).size, 'subtree-scoped ids collide across embeds').toBe(
 				widgetIds.length,
 			);
 		});
@@ -429,12 +429,12 @@ function runMultiEmbedMode(
 			});
 		}
 
-		// (e) The other half of the id rule. Page scope means one cell for the
+		// (e) The other half of the id rule. App scope means one cell for the
 		// whole page, so island discrimination must not reach it: both embeds
 		// still read one cell and see each other's writes.
 		if (descriptor.pageScoped) {
 			const pageScoped = descriptor.pageScoped;
-			register('page-scope-shared', 'a page-scoped shared cell stays one cell across embeds', async () => {
+			register('page-scope-shared', 'an app-scoped shared cell stays one cell across embeds', async () => {
 				const mounted =
 					mode === 'ssr' || !pageScoped.renderCsr ? await pageScoped.render() : await pageScoped.renderCsr();
 				const cellIds = (mountedStatePayload(mode, mounted).cells ?? [])
@@ -442,7 +442,7 @@ function runMultiEmbedMode(
 					.filter((id) => id.includes(pageScoped.cellIdIncludes));
 
 				expect(cellIds.length, `no cell matched "${pageScoped.cellIdIncludes}"`).toBeGreaterThan(0);
-				expect(new Set(cellIds).size, 'a page-scoped cell was split per embed').toBe(1);
+				expect(new Set(cellIds).size, 'an app-scoped cell was split per embed').toBe(1);
 
 				await userEvent.click(parts(pageScoped.bump, embeds)[0]!);
 
@@ -452,7 +452,7 @@ function runMultiEmbedMode(
 				for (let embed = 1; embed < embeds; embed++) {
 					expect(
 						parts(pageScoped.value, embeds)[embed]!.textContent?.trim(),
-						`embed ${embed} did not see the page-scoped write`,
+						`embed ${embed} did not see the app-scoped write`,
 					).toBe(pageScoped.afterBump);
 				}
 			});

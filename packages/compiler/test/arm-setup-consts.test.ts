@@ -28,8 +28,8 @@ async function compile(arm: string) {
 
 test('a plain read of an @try arm const derives from its definition', async () => {
 	for (const arm of [
-		'const stale = results.q !== query; <ul aria-busy={stale}>{stale}</ul>',
-		'const view = { stale: results.q !== query }; <ul aria-busy={view.stale}>{view.stale}</ul>',
+		'const stale = results.q !== query; <ul data-stale={stale}>{stale}</ul>',
+		'const view = { stale: results.q !== query }; <ul data-stale={view.stale}>{view.stale}</ul>',
 	]) {
 		const result = await compile(arm);
 		expect(result.semanticGraph.diagnostics, arm).toEqual([]);

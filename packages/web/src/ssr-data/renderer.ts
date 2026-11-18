@@ -1,6 +1,7 @@
 import { PROJECTION_MARK_PATTERN, PROJECTION_MARK_PREFIX } from '../fns/projection-html.ts';
 import { marklessAttributeValue } from '../dom-attribute.ts';
 import type { KeepParts } from '../fns/keep-parts-hook.ts';
+import { PROTOCOL_ROW_COMMENT } from '../../../serializer/src/protocol-page-markers.ts';
 import {
 	MARKLESS_DEFERRED_COUNT_CLOSE,
 	MARKLESS_DEFERRED_COUNT_NAME,
@@ -150,6 +151,7 @@ export type SsrRenderData = {
 		readonly itemKey?: true;
 		readonly rowChunkId: string;
 		readonly emptyChunkId?: string;
+		readonly rowRange?: true;
 	}>;
 	readonly boundaries: ReadonlyArray<{
 		readonly boundaryId: string;
@@ -160,6 +162,7 @@ export type SsrRenderData = {
 			readonly pending?: string;
 			readonly catch?: string;
 		}>;
+		readonly errorGraphNodeId?: string;
 	}>;
 	readonly branches?: ReadonlyArray<{
 		readonly branchSiteId: string;
@@ -171,6 +174,8 @@ export type SsrRenderData = {
 		// The authored test, for an arm the compiler could not reduce to one graph
 		// read: the browser answers it through the component's compiled reader.
 		readonly testSource?: string;
+		// An `@else if` chain or condition-case `@switch` answers its arm index here, read in place of `testSource`.
+		readonly armIndexSource?: string;
 		readonly armTests?: ReadonlyArray<unknown>;
 	}>;
 };
@@ -192,6 +197,8 @@ export type SsrDataReadContext = {
 	// Inside an arm this render is bringing into the DOM for the first time, so
 	// the components it holds are new instances rather than live ones.
 	readonly freshInstances?: true;
+	// The @try blocks this context renders inside, outermost first.
+	readonly enclosingBoundaryIds?: ReadonlyArray<string>;
 };
 
 export type SsrDataStructure = {
@@ -201,17 +208,26 @@ export type SsrDataStructure = {
 		readonly index: number;
 	}>;
 	readonly anchors: ReadonlyArray<{
-		readonly kind: 'branch' | 'async';
+		// An arm-branch's comment indexes count only the page's comments around it.
+		readonly kind: 'branch' | 'async' | 'arm-branch';
 		readonly id: string;
 		readonly startIndex: number;
 		readonly endIndex: number;
 		readonly elementStart: number;
 		readonly elementEnd: number;
 		readonly html: string;
+		/** The arm a branch or @try painted: a served @try arm's branch is wired to it, since its test reads nothing until the browser derives it. */
+		readonly arm?: number;
+		/** The id of the anchor this one renders directly inside. */
+		readonly outer?: string;
+		/** A @try in a keyed row: the boundary's own id, which `id` qualifies with the row. */
+		readonly site?: string;
 	}>;
 	readonly elementCount: number;
 	/** Repeat slots walked by this render, including their id prefix. */
 	readonly repeatIds?: ReadonlyArray<string>;
+	/** Component edges this render placed a child through, including their id prefix. */
+	readonly componentEdgeIds?: ReadonlyArray<string>;
 };
 
 export type SsrDataCoordinates = {
@@ -231,8 +247,12 @@ export type SsrDataCoordinates = {
 
 export type RenderSsrDataInput = {
 	readonly renderData: SsrRenderData;
+	// Only a module whose markup spreads attributes passes it, so pages without a spread never load the name table.
+	readonly attributeName?: (name: string) => string;
 	// Only an owner whose keyed rows project elements passes it: the row segment those elements take.
 	readonly projectionSegment?: (context: SsrDataReadContext) => { readonly hostSegment?: string };
+	// Only an owner with a @try inside a keyed row passes it: the rows that name each row's boundary.
+	readonly rowSegment?: (context: SsrDataReadContext) => string | undefined;
 	readonly idPrefix?: string;
 	// The repeat row the root chunk renders inside, for a caller that starts the
 	// render partway down a component's tree: a `@for` row's projection chunk.
@@ -299,6 +319,8 @@ export type StructureToken =
 			readonly anchorId: string;
 			readonly edge: 'start' | 'end';
 			readonly anchorHtml?: string;
+			readonly arm?: number;
+			readonly site?: string;
 	  };
 
 type RenderedPart = { readonly html: string; readonly tokens: ReadonlyArray<StructureToken> };
@@ -320,6 +342,7 @@ type ProjectionSpan = {
 	readonly mark: string;
 	readonly tokens: ReadonlyArray<StructureToken>;
 	consumed: boolean;
+	inAsyncArm: boolean;
 };
 
 // Keyed by a counter rather than by the projection HTML: two renders in flight at
@@ -335,6 +358,7 @@ function openProjectionSpan(tokens: ReadonlyArray<StructureToken>): ProjectionSp
 		mark: `${PROJECTION_MARK_PREFIX}${key}-->`,
 		tokens,
 		consumed: false,
+		inAsyncArm: false,
 	};
 	projectionSpans.set(key, span);
 	return span;
@@ -349,6 +373,7 @@ function openProjectionSpan(tokens: ReadonlyArray<StructureToken>): ProjectionSp
 function claimProjectionSpans(
 	text: string,
 	inDocument: boolean,
+	inAsyncArm: boolean,
 ): { readonly text: string; readonly tokens: ReadonlyArray<StructureToken> } {
 	if (!text.includes(PROJECTION_MARK_PREFIX)) return { text, tokens: [] };
 	const tokens: StructureToken[] = [];
@@ -359,6 +384,7 @@ function claimProjectionSpans(
 		// places; the tokens are counted once, where the first copy landed.
 		if (inDocument && !span.consumed) tokens.push(...span.tokens);
 		span.consumed = true;
+		if (inAsyncArm) span.inAsyncArm = true;
 		return '';
 	});
 	return { text: stripped, tokens };
@@ -422,15 +448,32 @@ export function projectionNotRenderedError(
 	componentName: string,
 	edgeId: string,
 ): Error & Record<string, unknown> {
-	const message = `MARKLESS_PROJECTION_NOT_RENDERED: <${componentName}> was given projected children but never rendered them, so they are counted by the served locator table and absent from the served HTML. Render \`{children}\` somewhere in <${componentName}>'s own markup, including inside an @if/@else arm.`;
-	const error = new Error(message) as Error & Record<string, unknown>;
-	error.code = 'MARKLESS_PROJECTION_NOT_RENDERED';
+	return projectionError(
+		'MARKLESS_PROJECTION_NOT_RENDERED',
+		`<${componentName}> was given projected children but never rendered them, so they are counted by the served locator table and absent from the served HTML. Render \`{children}\` somewhere in <${componentName}>'s own markup, including inside an @if/@else arm.`,
+		componentName,
+		edgeId,
+	);
+}
+
+function projectionError(
+	code: string,
+	text: string,
+	componentName: string,
+	edgeId: string,
+): Error & Record<string, unknown> {
+	const error = new Error(`${code}: ${text}`) as Error & Record<string, unknown>;
+	error.code = code;
 	error.severity = 'error';
 	error.phase = 'runtime';
 	error.componentName = componentName;
 	error.componentEdgeId = edgeId;
-	error.docsUrl = 'https://markless.dev/errors/MARKLESS_PROJECTION_NOT_RENDERED';
+	error.docsUrl = `https://markless.dev/errors/${code}`;
 	return error;
+}
+
+function isLiveToken(token: StructureToken): boolean {
+	return token.kind === 'comment' || token.hostNodeId !== '';
 }
 
 export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDataOutput> {
@@ -461,6 +504,9 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 					...materializeStructure(rendered.tokens),
 					repeatIds: anchors.flatMap((anchor) =>
 						anchor.kind === 'repeat' ? [anchor.id] : [],
+					),
+					componentEdgeIds: anchors.flatMap((anchor) =>
+						anchor.kind === 'child-component' ? [anchor.id] : [],
 					),
 				},
 				structureTokens: rendered.tokens,
@@ -502,6 +548,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 			repeatOuter: repeat.repeatOuter,
 			...(repeat.key !== undefined ? { repeatKey: repeat.key } : {}),
 			...(repeat.freshInstances ? { freshInstances: repeat.freshInstances } : {}),
+			enclosingBoundaryIds: repeat.enclosingBoundaryIds,
 			hostSegment: repeat.hostSegment,
 			sharedSeeds: repeat.sharedSeeds,
 			...(repeat.asyncError !== undefined ? { asyncError: repeat.asyncError } : {}),
@@ -573,6 +620,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 	function releaseSkippedProjections(
 		chunkIds: ReadonlyArray<string | undefined>,
 		context: SsrDataReadContext,
+		inAsyncArm = (context.enclosingBoundaryIds?.length ?? 0) > 0,
 	): void {
 		for (const chunkId of chunkIds)
 			for (const slot of (chunkId && chunks.get(chunkId)?.slots) || []) {
@@ -581,17 +629,17 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 						slot.raw && slot.residue.kind === 'graph-read'
 							? input.read(slot.residue, context)
 							: 0;
-					if (typeof value === 'string') claimProjectionSpans(value, false);
+					if (typeof value === 'string') claimProjectionSpans(value, false, inAsyncArm);
 				} else if (slot.kind === 'branch')
-					releaseSkippedProjections(slot.armTemplateIds, context);
+					releaseSkippedProjections(slot.armTemplateIds, context, inAsyncArm);
 				else if (slot.kind === 'async')
-					releaseSkippedProjections(Object.values(slot.armTemplateIds), context);
+					releaseSkippedProjections(Object.values(slot.armTemplateIds), context, true);
 				else if (slot.kind === 'repeat')
-					releaseSkippedProjections([slot.rowTemplateId, slot.emptyTemplateId], context);
+					releaseSkippedProjections([slot.rowTemplateId, slot.emptyTemplateId], context, inAsyncArm);
 				else if (slot.kind === 'child-component')
-					releaseSkippedProjections([slot.projectionChunkId], context);
+					releaseSkippedProjections([slot.projectionChunkId], context, inAsyncArm);
 				else if (slot.kind === 'dynamic-host')
-					releaseSkippedProjections([slot.childChunkId], context);
+					releaseSkippedProjections([slot.childChunkId], context, inAsyncArm);
 			}
 	}
 
@@ -602,7 +650,11 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 					// The `{children}` of a projecting component is exactly this slot: it
 					// reports the projection's token span so `renderChunk` can sort it into
 					// the child's own stream by this slot's coordinate.
-					const claimed = claimProjectionSpans(String(value ?? ''), slot.raw === true);
+					const claimed = claimProjectionSpans(
+						String(value ?? ''),
+						slot.raw === true,
+						(context.enclosingBoundaryIds?.length ?? 0) > 0,
+					);
 					if (slot.raw) return { html: claimed.text, tokens: claimed.tokens };
 					return { html: value == null ? '' : escapeHtml(claimed.text), tokens: [] };
 				});
@@ -617,7 +669,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 				}));
 			case 'spread-attributes':
 				return marklessThen(input.read(slot.residue, context), (value) => ({
-					html: renderSpreadAttributes(value, slot.excludeNames),
+					html: renderSpreadAttributes(value, slot.excludeNames, input.attributeName),
 					tokens: [],
 				}));
 			case 'child-component': {
@@ -637,6 +689,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									repeatId: context.repeatId,
 									repeatOuter: context.repeatOuter,
 									sharedSeeds: childSeeds,
+									enclosingBoundaryIds: context.enclosingBoundaryIds,
 									...input.projectionSegment?.(context),
 								})
 							: undefined,
@@ -724,6 +777,13 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									: withoutProjectionMarks(child.html);
 								// Spliced: the child's own `{children}` slot already placed the projection
 								// where the HTML puts it, so appending it again would double-count it.
+								if (span?.inAsyncArm && span.tokens.some(isLiveToken))
+									throw projectionError(
+										'MARKLESS_PROJECTION_LIVE_IN_TRY',
+										`<${slot.childComponentName}> renders its projected children inside a @try, and those children read state or handle events. The browser redraws a @try arm from static markup, so they would render but never update or respond. Keep \`{children}\` outside the @try in <${slot.childComponentName}>, or write the @try in the component that owns the projected markup.`,
+										slot.childComponentName,
+										slot.componentEdgeId,
+									);
 								if (span?.consumed) return { html, tokens: baseTokens };
 								if (span) {
 									const markAt = child.html.indexOf(span.mark);
@@ -788,7 +848,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 							return {
 								html: `<!--markless:${marker}:${id}-->${body.html}<!--/markless:${marker}:${id}-->`,
 								tokens: [
-									commentToken(marker, id, 'start', body.html),
+									commentToken(marker, id, 'start', body.html, arm),
 									...body.tokens,
 									commentToken(marker, id, 'end'),
 								],
@@ -823,10 +883,17 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 										context,
 									)
 								: [],
-					(items): Awaitable<RenderedPart> => {
-						if (!Array.isArray(items) || items.length === 0)
+					(collection): Awaitable<RenderedPart> => {
+						const items = Array.isArray(collection)
+							? collection
+							: typeof (collection as Iterable<unknown> | null)?.[Symbol.iterator] === 'function'
+								? [...(collection as Iterable<unknown>)]
+								: [];
+						if (items.length === 0)
 							return slot.emptyTemplateId
-								? renderChunk(slot.emptyTemplateId, {})
+								? renderChunk(slot.emptyTemplateId, {
+										enclosingBoundaryIds: context.enclosingBoundaryIds,
+									})
 								: { html: '', tokens: [] };
 						const keyPath = record?.keyPath;
 						// `key row` reads the item itself, so an empty path is still a key.
@@ -842,6 +909,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 								// Rows mint fresh item/index but must not drop the seed map the
 								// way branch and async keep it: a part's pre-row write rides here.
 								sharedSeeds: context.sharedSeeds,
+								enclosingBoundaryIds: context.enclosingBoundaryIds,
 								...(keyed ? { key: readValuePath(item, keyPath ?? []) } : {}),
 							}),
 						);
@@ -850,7 +918,13 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 								? Promise.all(started)
 								: (started as ReadonlyArray<RenderedPart>),
 							(rows): RenderedPart => ({
-								html: rows.map((row) => row.html).join(''),
+								html: rows
+									.map((row) =>
+										record?.rowRange
+											? `<!--${PROTOCOL_ROW_COMMENT}-->${row.html}<!--/${PROTOCOL_ROW_COMMENT}-->`
+											: row.html,
+									)
+									.join(''),
 								tokens: rows.flatMap((row) => row.tokens),
 							}),
 						);
@@ -858,7 +932,9 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 				);
 			}
 			case 'async': {
-				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.boundaryId));
+				// Each keyed row's @try is its own boundary, so its anchor carries the row it renders in.
+				const rows = input.rowSegment?.(context) ?? '';
+				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, rows + slot.boundaryId));
 				const boundary = input.renderData.boundaries.find(
 					(candidate) => candidate.boundaryId === slot.boundaryId,
 				);
@@ -878,17 +954,29 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 							armChunkId
 								? renderChunk(armChunkId, {
 										...context,
+										item: context.repeatItem,
+										index: context.repeatIndex,
+										key: context.repeatKey,
+										enclosingBoundaryIds: [
+											...(context.enclosingBoundaryIds ?? []),
+											slot.boundaryId,
+										],
 										...(typeof selected === 'number'
 											? {}
 											: { asyncError: selected.error }),
 									})
 								: ({ html: '', tokens: [] } as RenderedPart),
 							(body): RenderedPart => {
-								const id = `${idPrefix}${slot.boundaryId}`;
+								releaseSkippedProjections(
+									Object.values(slot.armTemplateIds).filter((chunkId) => chunkId !== armChunkId),
+									context,
+									true,
+								);
+								const id = `${idPrefix}${rows}${slot.boundaryId}`;
 								return {
 									html: `<!--markless:async:${id}-->${body.html}<!--/markless:async:${id}-->`,
 									tokens: [
-										commentToken('async', id, 'start', body.html),
+										commentToken('async', id, 'start', body.html, arm, rows ? idPrefix + slot.boundaryId : undefined),
 										...body.tokens,
 										commentToken('async', id, 'end'),
 									],
@@ -922,7 +1010,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 							attributes +=
 								attribute.kind === 'attribute'
 									? renderAttribute(attribute.name, value)
-									: renderSpreadAttributes(value, attribute.excludeNames);
+									: renderSpreadAttributes(value, attribute.excludeNames, input.attributeName);
 						};
 						const walkAttributes = (from: number): Awaitable<void> => {
 							for (let index = from; index < slot.attributeSlots.length; index++) {
@@ -990,6 +1078,8 @@ function commentToken(
 	anchorId: string,
 	edge: 'start' | 'end',
 	anchorHtml?: string,
+	arm?: number,
+	site?: string,
 ): StructureToken {
 	return {
 		kind: 'comment',
@@ -997,6 +1087,8 @@ function commentToken(
 		anchorId,
 		edge,
 		...(anchorHtml === undefined ? {} : { anchorHtml }),
+		arm,
+		site,
 	};
 }
 
@@ -1017,9 +1109,10 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 	let elementCount = 0;
 	const starts = new Map<
 		string,
-		{ readonly comment: number; readonly element: number; readonly html: string }
+		{ readonly comment: number; readonly element: number; readonly html: string; readonly arm?: number; readonly site?: string }
 	>();
 	const anchors: Array<SsrDataStructure['anchors'][number]> = [];
+	const open: string[] = [];
 	let commentIndex = 0;
 	for (const token of tokens) {
 		if (token.kind === 'element') {
@@ -1034,14 +1127,17 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 		}
 		// Arm-branch comments live in their owning boundary's local census.
 		// Page-level anchor indexes deliberately do not count them.
-		if (token.anchorKind === 'arm-branch') continue;
-		if (token.edge === 'start')
+		if (token.edge === 'start') {
 			starts.set(token.anchorId, {
 				comment: commentIndex,
 				element: elementCount,
 				html: token.anchorHtml ?? '',
+				arm: token.arm,
+				site: token.site,
 			});
-		else {
+			open.push(token.anchorId);
+		} else {
+			open.pop();
 			const start = starts.get(token.anchorId);
 			if (!start)
 				throw new Error(`MARKLESS_SSR_DATA_ANCHOR_START_MISSING: ${token.anchorId}`);
@@ -1053,9 +1149,12 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 				elementStart: start.element,
 				elementEnd: elementCount,
 				html: start.html,
+				arm: start.arm,
+				outer: open.at(-1),
+				site: start.site,
 			});
 		}
-		commentIndex++;
+		if (token.anchorKind !== 'arm-branch') commentIndex++;
 	}
 	return { locators, anchors, elementCount };
 }
@@ -1137,10 +1236,15 @@ function renderAttribute(name: string, value: unknown): string {
 	return text === null ? '' : ` ${name}="${escapeHtml(text)}"`;
 }
 
-function renderSpreadAttributes(value: unknown, excludeNames: ReadonlyArray<string> = []): string {
+function renderSpreadAttributes(
+	value: unknown,
+	excludeNames: ReadonlyArray<string> = [],
+	attributeName?: (name: string) => string,
+): string {
 	if (!value || typeof value !== 'object') return '';
 	let html = '';
-	for (const [name, attribute] of Object.entries(value)) {
+	for (const [key, attribute] of Object.entries(value)) {
+		const name = attributeName?.(key) ?? key;
 		if (excludeNames.includes(name)) continue;
 		// `__markless` is the framework's own reserved prefix for the channels a
 		// parent arranges with a child; none of them is an attribute anyone wrote.

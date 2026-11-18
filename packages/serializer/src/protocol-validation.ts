@@ -2,6 +2,7 @@ import {
 	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
 	PROTOCOL_EVENT_ACTION_KIND,
+	PROTOCOL_SHARED_SCOPES,
 	STORAGE_PROTOCOL_VERSION,
 	type ProtocolEventActionKind,
 	type ProtocolStatePayload,
@@ -224,6 +225,8 @@ export function assertProtocolViewPayload(
 		if (event.syncPolicy !== undefined) {
 			assertSyncPolicy(event.syncPolicy, `${context}.syncPolicy`);
 		}
+		assertOptionalTrueField(event, 'authoredSubmitAriaDisabled', context);
+		assertOptionalInPlaceSubmit(event, context);
 	}
 
 	for (const [index, domUpdate] of domUpdates.entries()) {
@@ -267,6 +270,7 @@ export function assertProtocolViewPayload(
 		assertCommentAnchor(boundary.startAnchor, `${context}.startAnchor`);
 		assertCommentAnchor(boundary.endAnchor, `${context}.endAnchor`);
 		assertAsyncBoundaryReads(boundary.asyncReads, context);
+		assertOptionalStringArrayRecord(boundary.asyncSources, `${context}.asyncSources`);
 	}
 
 	assertOptionalKeyedRepeats(payload);
@@ -393,6 +397,11 @@ function assertBooleanField(record: Record<string, unknown>, key: string, contex
 			`Invalid ${context}: expected ${key} boolean.`,
 		);
 	}
+}
+
+function assertOptionalTrueField(record: Record<string, unknown>, key: string, context: string): void {
+	if (record[key] !== undefined && record[key] !== true)
+		throw invalidPayloadShapeError(contextPayloadType(context), `Invalid ${context}: expected ${key} true when present.`);
 }
 
 function assertLiteralField(
@@ -540,6 +549,11 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 			assertNonNegativeIntegerField(repeat, 'rowStartOffset', context);
 		if (repeat.rowEndOffset !== undefined)
 			assertNonNegativeIntegerField(repeat, 'rowEndOffset', context);
+		if (repeat.rowRange !== undefined && repeat.rowRange !== true)
+			throw invalidPayloadShapeError(
+				'markless/view',
+				`Invalid ${context}: expected rowRange true when present.`,
+			);
 		assertRowEvents(repeat.rowEvents, `${context}.rowEvents`);
 		assertOptionalStringField(repeat, 'indexName', context);
 		assertOptionalRowElementHandles(repeat, `${context}.rowElementHandles`);
@@ -557,6 +571,11 @@ function assertOptionalEnclosingRow(record: Record<string, unknown>, context: st
 	assertStringField(enclosingRow, 'repeatId', context);
 	assertElementAddressField(enclosingRow, 'parentHostPath', context);
 	assertOptionalStringArrayField(enclosingRow, 'itemPath', context);
+	if (enclosingRow.arm !== undefined) {
+		assertRecordShape(enclosingRow.arm, `${context}.arm`);
+		assertNonNegativeIntegerField(enclosingRow.arm, 'slot', `${context}.arm`);
+		assertNonNegativeIntegerField(enclosingRow.arm, 'arm', `${context}.arm`);
+	}
 }
 
 function assertOptionalPropRoutes(record: Record<string, unknown>, context: string): void {
@@ -580,7 +599,8 @@ function assertOptionalRowComponent(record: Record<string, unknown>, context: st
 	const rowComponent = record.rowComponent;
 	if (rowComponent === undefined) return;
 	assertRecordShape(rowComponent, context);
-	if (rowComponent.rowChunkId === undefined) assertStringField(rowComponent, 'componentEdgeId', context);
+	if (rowComponent.rowChunkId === undefined)
+		assertStringField(rowComponent, 'componentEdgeId', context);
 	else assertStringField(rowComponent, 'rowChunkId', context);
 	assertStringField(rowComponent, 'componentName', context);
 	assertOptionalStringField(rowComponent, 'itemPropName', context);
@@ -647,16 +667,16 @@ function assertOptionalRowTemplateBranchSlots(slots: unknown, context: string): 
 			assertRecordShape(arm, armContext);
 			assertStringField(arm, 'html', armContext);
 			assertOptionalRowTemplateSlots(arm.textSlots, `${armContext}.textSlots`);
-			assertOptionalRowTemplateSlots(arm.attributeSlots, `${armContext}.attributeSlots`, true);
+			assertOptionalRowTemplateSlots(
+				arm.attributeSlots,
+				`${armContext}.attributeSlots`,
+				true,
+			);
 		}
 	}
 }
 
-function assertOptionalRowTemplateSlots(
-	slots: unknown,
-	context: string,
-	named = false,
-): void {
+function assertOptionalRowTemplateSlots(slots: unknown, context: string, named = false): void {
 	if (slots === undefined) return;
 	if (!Array.isArray(slots)) {
 		throw invalidPayloadShapeError(
@@ -668,6 +688,8 @@ function assertOptionalRowTemplateSlots(
 		const slotContext = `${context}[${index}]`;
 		assertRecordShape(slot, slotContext);
 		assertNonNegativeIntegerArrayField(slot, 'path', slotContext);
+		if (slot.fromEnd !== undefined)
+			assertNonNegativeIntegerArrayField(slot, 'fromEnd', slotContext);
 		if (named) assertStringField(slot, 'name', slotContext);
 		assertRowTemplateSlotValue(slot, slotContext);
 	}
@@ -723,10 +745,7 @@ function assertOptionalEmptyArm(record: Record<string, unknown>, context: string
 	assertStringField(arm, 'html', context);
 }
 
-function assertOptionalRowElementHandles(
-	record: Record<string, unknown>,
-	context: string,
-): void {
+function assertOptionalRowElementHandles(record: Record<string, unknown>, context: string): void {
 	const handles = record.rowElementHandles;
 	if (handles === undefined) return;
 	if (!Array.isArray(handles)) {
@@ -839,6 +858,7 @@ function assertOptionalBranchArmRecords(record: Record<string, unknown>, context
 		assertOptionalArrayField(arm, 'domUpdates', armContext);
 		assertOptionalArrayField(arm, 'behaviors', armContext);
 		assertOptionalArrayField(arm, 'elementHandles', armContext);
+		assertOptionalArrayField(arm, 'repeatParents', armContext);
 	}
 }
 
@@ -859,6 +879,8 @@ function assertRowEvents(value: unknown, context: string): void {
 		if (event.syncPolicy !== undefined) {
 			assertSyncPolicy(event.syncPolicy, `${eventContext}.syncPolicy`);
 		}
+		assertOptionalTrueField(event, 'authoredSubmitAriaDisabled', eventContext);
+		assertOptionalInPlaceSubmit(event, eventContext);
 		if (event.arm !== undefined) {
 			assertRecordShape(event.arm, `${eventContext}.arm`);
 			assertNonNegativeIntegerField(event.arm, 'slot', `${eventContext}.arm`);
@@ -958,13 +980,11 @@ function assertOptionalSharedDefinitions(record: Record<string, unknown>): void 
 
 function assertOptionalSharedScope(record: Record<string, unknown>, context: string): void {
 	if (record.scope === undefined) return;
-	if (record.scope === 'widget' || record.scope === 'request' || record.scope === 'container' || record.scope === 'page') {
-		return;
-	}
+	if ((PROTOCOL_SHARED_SCOPES as ReadonlyArray<unknown>).includes(record.scope)) return;
 
 	throw invalidPayloadShapeError(
 		contextPayloadType(context),
-		`Invalid ${context}: expected scope widget, request, container, or page.`,
+		`Invalid ${context}: expected scope ${PROTOCOL_SHARED_SCOPES.join(', ')}.`,
 	);
 }
 
@@ -1581,6 +1601,19 @@ function assertAsyncBoundaryReads(value: unknown, context: string): void {
 	}
 }
 
+function assertOptionalStringArrayRecord(value: unknown, context: string): void {
+	if (value === undefined) return;
+	assertRecordShape(value, context);
+	for (const [key, entry] of Object.entries(value)) {
+		if (!Array.isArray(entry) || entry.some((item) => typeof item !== 'string')) {
+			throw invalidPayloadShapeError(
+				contextPayloadType(context),
+				`Invalid ${context}.${key}: expected string array.`,
+			);
+		}
+	}
+}
+
 function assertOptionalStringRecord(value: unknown, context: string): void {
 	if (value === undefined) return;
 	assertRecordShape(value, context);
@@ -1667,6 +1700,15 @@ function assertSyncPolicyBranch(value: unknown, context: string): void {
 	}
 }
 
+function assertOptionalInPlaceSubmit(record: Record<string, unknown>, context: string): void {
+	const value = record.inPlaceSubmit;
+	if (value === undefined || value === 'reset' || value === 'keep') return;
+	throw invalidPayloadShapeError(
+		contextPayloadType(context),
+		`Invalid ${context}: expected inPlaceSubmit to be 'reset' or 'keep'.`,
+	);
+}
+
 function assertSyncPolicyCondition(value: unknown, context: string): void {
 	assertRecordShape(value, context);
 
@@ -1714,6 +1756,8 @@ function assertSyncPolicyCondition(value: unknown, context: string): void {
 		}
 		return;
 	}
+
+	if (value.type === 'submits-in-place') return;
 
 	if (value.type === 'event-equals') {
 		assertStringField(value, 'field', context);

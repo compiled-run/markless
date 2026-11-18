@@ -8,7 +8,7 @@ export const boxState = shared(() => {
 	const box = state({ on: false });
 	const triggerEl = element();
 	return { ...box, triggerEl, toggle() { box.on = !box.on; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Root({ children, ...rest }) @{
 	const box = boxState();
 	<div {...rest} ui-on={box.on}>{children}</div>
@@ -26,7 +26,7 @@ export const panelState = shared(() => {
 	const panel = state({ open: false });
 	const knobEl = element();
 	return { ...panel, knobEl, flip() { panel.open = !panel.open; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Shell({ children, ...others }) @{
 	const panel = panelState();
 	<section {...others} ui-open={panel.open}>{children}</section>
@@ -93,7 +93,7 @@ export function App() @{
 	);
 
 	expect(result.protocolView?.elementHandles).toEqual([
-		{ hostNodeId: 'c1:h1', handleId: 'element:mine', name: 'mine' },
+		{ hostNodeId: 'c1:h1', handleId: 'element:mine', name: 'mine', componentEdgeId: expect.stringMatching(/^component-edge:\d+$/) },
 	]);
 });
 
@@ -154,6 +154,6 @@ export function App() @{
 		})),
 	).toEqual([{ hostNodeId: 'c1:h1', eventName: 'pointerdown' }]);
 	expect(result.protocolView?.elementHandles).toEqual([
-		{ hostNodeId: 'c1:h1', handleId: 'element:spot', name: 'spot' },
+		{ hostNodeId: 'c1:h1', handleId: 'element:spot', name: 'spot', componentEdgeId: expect.stringMatching(/^component-edge:\d+$/) },
 	]);
 });

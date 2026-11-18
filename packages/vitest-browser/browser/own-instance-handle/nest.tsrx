@@ -7,7 +7,7 @@ export const nestState = shared(
 
 		return { ...nest };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // One LEVEL of the nest. `NestItem` is the only part that seeds it, so an item
@@ -19,7 +19,7 @@ export const nestLevelState = shared(
 
 		return { ...level, contentEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function NestRoot({ children }) @{

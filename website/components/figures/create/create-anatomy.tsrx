@@ -621,11 +621,10 @@ export default function CreateAnatomy() @{
 
 				html.dark & {
 					--red: oklch(55% 0.2 27);
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: var(--paper);
-					--kraft: color-mix(in oklch, var(--paper) 74%, oklch(48% 0.06 72));
-					--shade: rgb(0 0 0 / 0.55);
-					--shade-ink: rgb(0 0 0 / 0.85);
+					--sheet: var(--figure-sheet);
+					--kraft: var(--slab);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
 				}
 			}
 
@@ -709,7 +708,7 @@ export default function CreateAnatomy() @{
 			}
 
 			.pool {
-				fill: color-mix(in oklch, var(--yellow) 70%, oklch(70% 0.16 70));
+				fill: var(--marker);
 				stroke: none;
 				opacity: 0.5;
 			}
@@ -795,7 +794,7 @@ export default function CreateAnatomy() @{
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;
@@ -962,6 +961,26 @@ export default function CreateAnatomy() @{
 				overflow: hidden;
 				clip-path: inset(50%);
 				white-space: nowrap;
+			}
+
+			html.dark .scene {
+				.wash {
+					mix-blend-mode: normal;
+				}
+
+				.wash.yellow:not(.pool) {
+					opacity: 1;
+				}
+
+				.wash.pink:not(.pool) {
+					fill: color-mix(in srgb, var(--pink) 60%, color-mix(in oklch, var(--cream) 50%, white));
+					stroke: color-mix(in srgb, var(--pink) 60%, color-mix(in oklch, var(--cream) 50%, white));
+					opacity: 1;
+				}
+
+				.cursor[data-on='yes'] ~ .term :is(.mark, .line, .caret, .value) {
+					fill: var(--on-accent);
+				}
 			}
 		</style>
 	</figure>

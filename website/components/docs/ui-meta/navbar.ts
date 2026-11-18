@@ -3,7 +3,7 @@ import type { FamilyMeta } from './types.ts';
 
 export const navbar: FamilyMeta = {
 	family: 'navbar',
-	partOrder: ['root', 'item', 'itemtrigger', 'itemcontent', 'itemlink'],
+	partOrder: ['root', 'item', 'itemtrigger', 'itemcontent', 'itemlink', 'trigger'],
 	quick: [
 		{ part: 'root', prop: 'hover' },
 		{ part: 'root', prop: 'value' },

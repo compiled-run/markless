@@ -8,7 +8,7 @@ export const v2Dial = shared(
 
 		return { ...d, markEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function V2Dial({ children }) @{

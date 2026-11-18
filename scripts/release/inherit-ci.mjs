@@ -85,12 +85,22 @@ export function releaseDiffProblems(entries, read, base, release) {
 	return problems;
 }
 
-/** Why `run` cannot be inherited for `base`; empty when it is main's green push CI run on it. */
-export function runProblems(run, base) {
+const MERGE_QUEUE_BRANCH = /^gh-readonly-queue\/main\//u;
+
+/**
+ * Why `run` cannot be inherited for `base`; empty when it is main's green push CI run on it, or,
+ * with `mergeGroup`, the green CI run main's merge queue ran on it.
+ */
+export function runProblems(run, base, { mergeGroup = false } = {}) {
 	const problems = [];
 	if (!/(?:^|\/)ci\.yml$/u.test(run.path ?? '')) problems.push(`it is ${run.path}, not ci.yml`);
-	if (run.event !== 'push' || run.head_branch !== 'main') {
-		problems.push(`it is a ${run.event} run on ${run.head_branch}, not a push to main`);
+	const onMain = run.event === 'push' && run.head_branch === 'main';
+	const queued =
+		mergeGroup && run.event === 'merge_group' && MERGE_QUEUE_BRANCH.test(run.head_branch ?? '');
+	if (!onMain && !queued) {
+		problems.push(
+			`it is a ${run.event} run on ${run.head_branch}, not a push to main${mergeGroup ? " or main's merge queue" : ''}`,
+		);
 	}
 	if (run.head_sha !== base) problems.push(`it ran on ${run.head_sha}, not ${base}`);
 	if (run.status !== 'completed' || run.conclusion !== 'success') {
@@ -111,6 +121,34 @@ export function inheritedStatuses(required, run, base) {
 				140,
 			),
 	}));
+}
+
+/** Why the tree of `release` is more than `base` with new versions and a changelog section. */
+export function treeProblems(git, base, release) {
+	return releaseDiffProblems(
+		parseRawDiff(git('diff', '--raw', '--no-renames', '--no-abbrev', '-z', base, release)),
+		(ref, file) => git('show', `${ref}:${file}`),
+		base,
+		release,
+	);
+}
+
+/** Posts each status on `sha`; the only place a release posts a commit status. */
+export function postStatuses(sha, statuses) {
+	for (const status of statuses) {
+		execFileSync(
+			'gh',
+			[
+				'api',
+				'-X',
+				'POST',
+				`repos/${repository}/statuses/${sha}`,
+				...Object.entries(status).flatMap(([key, value]) => ['-f', `${key}=${value}`]),
+			],
+			{ stdio: ['ignore', 'ignore', 'inherit'] },
+		);
+		console.log(`inherit-ci: ${status.context} on ${sha.slice(0, 12)}: ${status.description}`);
+	}
 }
 
 function options(argv) {
@@ -148,14 +186,7 @@ function main(argv) {
 	const releaseSha = git('rev-parse', '--verify', `${release}^{commit}`).trim();
 	const baseSha = git('rev-parse', '--verify', `${base}^{commit}`).trim();
 
-	const diff = releaseDiffProblems(
-		parseRawDiff(
-			git('diff', '--raw', '--no-renames', '--no-abbrev', '-z', baseSha, releaseSha),
-		),
-		(ref, file) => git('show', `${ref}:${file}`),
-		baseSha,
-		releaseSha,
-	);
+	const diff = treeProblems(git, baseSha, releaseSha);
 	const run = gh(`repos/${repository}/actions/runs/${runId}`);
 	const required = requiredChecks();
 	const checks = checkRunProblems(required, checkRunsFor(baseSha), new Set([run.check_suite_id]));
@@ -171,22 +202,7 @@ function main(argv) {
 		output(false);
 		return 0;
 	}
-	for (const status of inheritedStatuses(required, run, baseSha)) {
-		execFileSync(
-			'gh',
-			[
-				'api',
-				'-X',
-				'POST',
-				`repos/${repository}/statuses/${releaseSha}`,
-				...Object.entries(status).flatMap(([key, value]) => ['-f', `${key}=${value}`]),
-			],
-			{ stdio: ['ignore', 'ignore', 'inherit'] },
-		);
-		console.log(
-			`inherit-ci: ${status.context} on ${releaseSha.slice(0, 12)}: ${status.description}`,
-		);
-	}
+	postStatuses(releaseSha, inheritedStatuses(required, run, baseSha));
 	console.log(
 		`inherit-ci: ${releaseSha.slice(0, 12)} differs from ${baseSha.slice(0, 12)} only in package versions and CHANGELOG.md, so it inherits ${run.html_url}`,
 	);

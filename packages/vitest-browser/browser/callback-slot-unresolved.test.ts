@@ -9,7 +9,7 @@ import { expect, test } from 'vitest';
 const SLOT_NODE_ID = 'shared:src/box.tsrx#boxState/slot:onChange';
 
 function graphOf(definitionIds: ReadonlyArray<string>) {
-	const definitions = definitionIds.map((id) => ({ id, scope: 'widget' }));
+	const definitions = definitionIds.map((id) => ({ id, scope: 'subtree' }));
 	return {
 		read: () => undefined,
 		listSharedDefinitions: () => definitions,

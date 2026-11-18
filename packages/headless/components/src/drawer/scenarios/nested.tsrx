@@ -1,7 +1,7 @@
 import { drawer } from '../../index.ts';
 
 // Recursive composition: a drawer inside a drawer's surface is the same parts,
-// and the inner root is its own widget-scoped instance. There is no nested root
+// and the inner root is its own subtree-scoped instance. There is no nested root
 // part and no `nested` prop.
 export default function Nested() @{
 	<section>

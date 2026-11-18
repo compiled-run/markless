@@ -38,7 +38,7 @@ export const checkboxState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function CheckboxRoot({

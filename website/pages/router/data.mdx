@@ -1,79 +1,183 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import FeedSteps from '../../components/demos/router/feed-steps.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import StreamAnatomy from '../../components/figures/stream/stream-anatomy.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
-# Page data arrives in the same response
+# Load data for a page
 
-<PageMeta time="2 min" assumes="async, routes" />
+<PageMeta time="4 min" assumes="async, routes, API routes" />
 
-<ThemeToggle />
+<Subtitle text="A page loads its data with async values inside @try, and the slow part arrives later in the same response." terms="values" />
 
-A page needs data from somewhere slow, like a database. You don't want the whole page to wait for
-it. You also don't want the browser to make a second trip to fetch it.
-
-There is no special loader function for this. A page loads data the way any component does: with an
-async `computed()` inside `@try`.
-
-Think of a restaurant that brings the bread first. The main dish comes later, to the same table.
-That is an analogy. In the router, the bread is everything fast, and the main dish is the `@try`
-content.
-
-Press **Next** to see the second part of one page response. Then pick **quick** data.
-
-<FeedSteps />
-
-With slow data, the reader sees the heading and **Loading...** first. The data comes later, in the
-same response. The browser never asks a second time.
-
-## The code
-
-```tsrx
-import { computed } from '@markless/core';
+```tsrx title="pages/recipes/[name].tsrx"
+import { computed, state } from '@markless/core';
 import type { PageProps } from '@markless/router';
-import { slowGreeting } from '../lib/slow.ts';
+import { loadReviews } from '../../src/reviews.ts';
 
-export default function Feed({ url }: PageProps) @{
-	const data = computed(async () => slowGreeting(url.pathname));
+export default function Recipe({ params }: PageProps<{ name: string }>) @{
+	let page = state(1);
+	const reviews = computed(async () => loadReviews(params.name, page));
 
 	<main>
-		<h1>Feed</h1>
+		<h1>{params.name}</h1>
 		@try {
-			<p>{data.text}</p>
+			@for (const review of reviews; key review.id) {
+				<p>{review.text}</p>
+			}
 		} @pending {
-			<p>Loading...</p>
-		} @catch {
-			<p>Failed</p>
+			<p>Loading reviews…</p>
+		} @catch (error) {
+			<p>Couldn't load the reviews: {error.message}</p>
 		}
+		<button onClick={() => page++}>Older reviews</button>
 	</main>
 }
 ```
 
-`slowGreeting` stands for any slow call that returns `{ text }`. If it is slow, one response comes in
-two parts:
+**`computed(async …)`** asks for the reviews. **`@try`** shows them when they arrive, and **`@pending`** holds their place until then. Press **Older reviews**, and `page` changes, so the reviews load again.
 
-1. The heading and the `@pending` content come first.
-2. When the data is ready, the same response adds the `@try` content. The page puts it in place, and
-   the response ends.
+## Keep the database on the server
 
-If the data is ready quickly, it goes in the first part, and the server never sends `Loading...`. You turn
-nothing on. For the rules of async values, see [async](/concepts/async).
+The reviews load on the server for the first visit. They load again in the browser when `page` changes. So the code an async value runs goes to the browser too.
 
-<Callout
-	sprite="cross"
-	title="Why does fetch fail on the server?"
-	text="On the server, fetch needs a full address with a host. A path like /api/feed is not enough. Build the full address from the url.href prop, for example new URL('/api/feed', url.href)."
-/>
+A database can't run in a browser. If the page imports one, the build stops with `MARKLESS_NODE_IN_BROWSER` and lists the imports that lead to it. So give the loading its own file, with one half for each side:
 
-<Callout
-	sprite="speech-bubble"
-	title="Can the server wait for all the data first?"
-	text="Not with router(). It has no option for that. A slow @try always sends its @pending content first."
-/>
+```ts title="src/reviews.ts"
+export type Review = { id: number; text: string };
+
+export async function loadReviews(name: string, page: number): Promise<Review[]> {
+	if (import.meta.env.SSR) {
+		const { reviews } = await import('../server/db.ts');
+		const { signedIn } = await import('../server/session.ts');
+		if (!signedIn()) throw new Error('Sign in to read reviews.');
+		return reviews(name, page);
+	}
+	const response = await fetch(`/api/reviews/${encodeURIComponent(name)}?page=${page}`);
+	if (!response.ok) throw new Error(await response.text());
+	return response.json();
+}
+```
+
+- `import.meta.env.SSR` is `true` on the server and `false` in the browser. The build drops the half that can't run there.
+- Import server files with `await import(…)` inside the server half. An `import` at the top of the file goes to the browser too, and the build stops.
+- In the browser, the loader asks an [API route](/router/api-routes) for the same data.
+
+The API route answers from the same database:
+
+```ts title="api/reviews/[name].get.ts"
+import type { EndpointHttpContext } from '@markless/router';
+import { reviews } from '../../server/db.ts';
+import { signedIn } from '../../server/session.ts';
+
+export default async function list({ params, request, url }: EndpointHttpContext<{ name: string }>) {
+	if (!signedIn(request)) return new Response('Sign in to read reviews.', { status: 401 });
+	const page = Number(url.searchParams.get('page') ?? 1);
+	return Response.json(await reviews(params.name, page));
+}
+```
+
+Here `server/db.ts` stands in for your database:
+
+```ts title="server/db.ts"
+import { DatabaseSync } from 'node:sqlite';
+import type { Review } from '../src/reviews.ts';
+
+const db = new DatabaseSync(':memory:');
+db.exec('CREATE TABLE reviews (id INTEGER PRIMARY KEY, recipe TEXT, text TEXT)');
+const add = db.prepare('INSERT INTO reviews (recipe, text) VALUES (?, ?)');
+for (const text of ['Lovely and lemony', 'Too sweet for me', 'Made it twice', 'Needs more zest'])
+	add.run('lemon-cake', text);
+
+export async function reviews(recipe: string, page: number): Promise<Review[]> {
+	const query = db.prepare('SELECT id, text FROM reviews WHERE recipe = ? ORDER BY id LIMIT 2 OFFSET ?');
+	return query.all(recipe, (page - 1) * 2) as Review[];
+}
+```
+
+## Check who is asking
+
+A *cookie* is a small value the browser sends with every request to your site, such as a sign-in. In the browser, `fetch` to your own site sends the visitor's cookies by itself.
+
+On the server, the loader gets no request to read them from. Turn on the server's request context in `vite.config.ts`:
+
+```ts title="vite.config.ts"
+import { markless } from '@markless/core/vite';
+import { router } from '@markless/router/vite';
+import { defineConfig } from 'vite-plus';
+
+export default defineConfig({
+	plugins: [markless(), router()],
+	nitro: { experimental: { asyncContext: true } },
+});
+```
+
+Then `useRequest()` gives server code the request the page is answering, cookies included:
+
+```ts title="server/session.ts"
+import { useRequest } from 'nitro/context';
+
+export function signedIn(request: Request = useRequest()): boolean {
+	return request.headers.get('cookie')?.includes('session=') ?? false;
+}
+```
+
+The API route passes its own `request`. The page's server half calls `signedIn()` with nothing, and gets the page's request. Replace the cookie check with your own sign-in check.
+
+## The slow part arrives in the same response
+
+The server sends a page as a *stream*: one response that keeps arriving in parts.
+
+- Everything outside `@try` goes out at once.
+- `@pending` holds the slow part's place.
+- When the data is ready, the same response carries the `@try` content.
+
+Reload the recipe, then turn the database dial towards the snail and reload again.
+
+<StreamAnatomy />
+
+<Code steps={[{ label: 'Wait for the review to replace Loading reviews…', shows: 'Lovely and lemony' }, { label: 'Change `1500` to `4000`. Loading reviews… stays for four seconds, and the heading never waits.', source: 'slowReview(4000)' }]}>
+```tsrx title="reviews.tsrx"
+import { computed } from '@markless/core';
+import { slowReview } from './slow.ts';
+
+export default function Reviews() @{
+	const text = computed(async () =>
+		slowReview(1500),
+	);
+
+	<section>
+		<h2>Reviews</h2>
+		@try {
+			<p>{text}</p>
+		} @pending {
+			<p>Loading reviews…</p>
+		} @catch {
+			<p>Couldn't load them.</p>
+		}
+	</section>
+}
+```
+
+```ts title="slow.ts"
+export function slowReview(ms: number) {
+	return new Promise<string>((done) => {
+		const review = 'Lovely and lemony';
+		setTimeout(() => done(review), ms);
+	});
+}
+```
+</Code>
+
+Keep in mind:
+
+- Data that is ready within a few milliseconds goes out with the rest, and `@pending` is never sent.
+- The router can't wait for all the data first. A slow `@try` always sends its `@pending` content first.
+- On the server, a `fetch` to your own API route goes out without the visitor's cookies, so a route that checks who is asking refuses it. Call the server code directly, as `loadReviews` does.
 
 <Collapsible
 	sprite="star-badge"
@@ -81,9 +185,4 @@ nothing on. For the rules of async values, see [async](/concepts/async).
 	text="The router has no loader or action export. A page gets only params, url, status and http as props. Data comes from async values inside the page, and slow parts arrive later in the same response."
 />
 
-## Try it yourself
-
-Give the feed page a second `@try` block with its own slow call. Make one call slower than the
-other, and watch which part shows up first.
-
-Next: [answer requests with API routes](/router/api-routes).
+Some requests want JSON, not a page. [Answer them with API routes](/router/api-routes).

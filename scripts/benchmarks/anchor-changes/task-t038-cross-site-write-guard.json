@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -2,
+			"reason": "most likely the new error page for MARKLESS_ROUTER_CROSS_SITE_WRITE_REFUSED: it changes the site's links manifest and four build chunks this page downloads; per-file sizes are not measured, so the split is unattributed; JS run at load does not grow (-2 chars); the api/ guard is server-only code",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 113,
+			"reason": "most likely the new error page for MARKLESS_ROUTER_CROSS_SITE_WRITE_REFUSED: it changes the site's links manifest and four build chunks this page downloads; per-file sizes are not measured, so the split is unattributed; JS run at load does not grow (-2 chars); the api/ guard is server-only code",
+			"date": "2026-11-11"
+		}
+	]
+}

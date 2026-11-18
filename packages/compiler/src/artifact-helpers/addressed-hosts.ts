@@ -1,4 +1,5 @@
 import { chunkCoordinateOrder } from '@markless/serializer/render-data-hosts';
+import type { ModuleGraphInterfaceArtifact } from '../artifacts.ts';
 
 const HOST_KEYS = new Set(['hostNodeId', 'parentHostNodeId', 'ownerHostNodeId']);
 
@@ -32,6 +33,18 @@ export function addressedHostNodeIds(view: unknown): Set<string> {
 			else visit(field);
 		}
 	})(view);
+	return addressed;
+}
+
+/** The hosts render data must locate: every host this view names, plus each element a component spreads its props onto, which a parent in any module addresses through its own edge. */
+export function renderAddressedHostNodeIds(input: {
+	readonly protocolView: unknown;
+	readonly semanticGraph: { readonly moduleGraphInterface: ModuleGraphInterfaceArtifact };
+}): Set<string> {
+	const addressed = addressedHostNodeIds(input.protocolView);
+	for (const component of input.semanticGraph.moduleGraphInterface.render.components)
+		for (const spread of component.spreadHosts ?? [])
+			if (spread.carriesProps) addressed.add(spread.hostNodeId);
 	return addressed;
 }
 

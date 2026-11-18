@@ -45,8 +45,13 @@ export default function QrcodeBasic() @{
 				translate: -50% -50%;
 				border: 1px solid var(--ink);
 				border-radius: 999px;
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
 				color: var(--ink);
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.qr-logo[hidden] {

@@ -124,11 +124,19 @@ export default function LazyLanesSketch() @{
 			}
 
 			.live:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.live:active {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.live:focus-visible {
@@ -183,8 +191,12 @@ export default function LazyLanesSketch() @{
 
 			.chip.ran {
 				border-style: solid;
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
 				font-weight: 700;
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			@media (max-width: 480px) {

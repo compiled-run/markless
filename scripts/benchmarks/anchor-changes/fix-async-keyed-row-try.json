@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 52,
+			"reason": "a row added in the browser under a nested list owner reads its bound ids in its module's prefix: web/fns/row-component-mint grows; measured on PR #595's linux CI run 42981061093 (main 485e12ae7 merged) against main's merge-queue run 42978304189; executed chars within the load swing (+1, +1, -166), not recorded",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 52,
+			"reason": "a row added in the browser under a nested list owner reads its bound ids in its module's prefix: web/fns/row-component-mint grows; measured on PR #595's linux CI run 42981061093 (main 485e12ae7 merged) against main's merge-queue run 42978304189; executed chars within the load swing (+1, +1, -166), not recorded",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 52,
+			"reason": "a row added in the browser under a nested list owner reads its bound ids in its module's prefix: web/fns/row-component-mint grows; measured on PR #595's linux CI run 42981061093 (main 485e12ae7 merged) against main's merge-queue run 42978304189; executed chars within the load swing (+1, +1, -166), not recorded",
+			"date": "2026-11-11"
+		}
+	]
+}

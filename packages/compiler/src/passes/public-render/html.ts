@@ -136,21 +136,19 @@ function ssrAsyncRunnerSource(
 	for (const dependency of symbol.dependencies ?? []) {
 		const registered = registeredGraphNodeIds.has(dependency.graphNodeId);
 		if (!registered && !stateGraphNodeIds.has(dependency.graphNodeId)) continue;
-		const sourcePath = dependency.source.split('.');
-		const name = sourcePath[0];
-		if (!name || sourcePath.some((part) => !/^[$A-Z_a-z][$\w]*$/.test(part))) continue;
+		const { name, members: sourceMembers } = dependency.local;
 		const entry = roots.get(name) ?? { root: null, members: new Map<string, string>() };
 		roots.set(name, entry);
 		const read = (path: ReadonlyArray<string>) =>
 			registered
 				? `read(${JSON.stringify(dependency.graphNodeId)},${JSON.stringify(path)})`
 				: `marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(dependency.graphNodeId)}),${JSON.stringify(path)})`;
-		const rootPathLength = dependency.path.length - sourcePath.length + 1;
+		const rootPathLength = dependency.path.length - sourceMembers.length;
 		if (rootPathLength >= 0) {
 			entry.root ??= read(dependency.path.slice(0, rootPathLength));
 			continue;
 		}
-		const member = sourcePath[1];
+		const member = sourceMembers[0];
 		if (!member || entry.members.has(member)) continue;
 		entry.members.set(member, read(dependency.path));
 	}

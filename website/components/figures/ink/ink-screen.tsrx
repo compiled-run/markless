@@ -55,11 +55,9 @@ export default function InkScreen({
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 
 				html.dark & {
-					--screen-paper: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--screen-ink: var(--paper);
-					--screen-edge: var(--paper);
-					--screen-shade: rgb(0 0 0 / 0.55);
-					--screen-hatch: rgb(0 0 0 / 0.85);
+					--screen-paper: var(--figure-sheet);
+					--screen-shade: var(--figure-shade);
+					--screen-hatch: var(--figure-hatch);
 				}
 			}
 
@@ -69,9 +67,8 @@ export default function InkScreen({
 				--screen-edge: var(--ink);
 
 				html.dark & {
-					--screen-paper: oklch(24% 0.012 70);
-					--screen-ink: oklch(93% 0.012 85);
-					--screen-edge: var(--ink);
+					--screen-paper: var(--slab);
+					--screen-ink: var(--ink);
 				}
 			}
 
@@ -130,7 +127,7 @@ export default function InkScreen({
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;

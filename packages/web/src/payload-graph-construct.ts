@@ -1,13 +1,11 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
 import type { SerializedGraphPayload } from '../../serializer/src/value-decode-client.ts';
-import { derivedReconcilePlane } from './reconcile-plane-slot.ts';
+import { asyncPlanes, derivedReconcilePlane } from './reconcile-plane-slot.ts';
+import { hasLiveSharedDefinitions } from '../../serializer/src/protocol-shared-instances.ts';
 import type { ResumeDomElement, ResumeRuntimeInput } from './resume.ts';
 
 type RuntimeModule = typeof import('@markless/runtime');
 type RuntimeGraph = import('@markless/runtime').RuntimeGraph;
-type RuntimeGraphAsyncSnapshot = import('@markless/runtime').RuntimeGraphAsyncSnapshot;
-type RuntimeGraphRead = import('@markless/runtime').RuntimeGraphRead;
-type RuntimeGraphAsyncComputed = import('@markless/runtime').RuntimeGraphAsyncComputed;
 
 export type ResumePayloadGraphInput = {
 	readonly state: ProtocolStatePayload;
@@ -15,6 +13,14 @@ export type ResumePayloadGraphInput = {
 	readonly root: ResumeDomElement;
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 };
+
+// Installed by a compiled module whose state declares a non-widget shared(); no module every app loads names it.
+type SharedInstancesHost = {
+	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-start.ts')>;
+};
+
+// Installed by an MDX route, whose islands' modules have not loaded when its graph is built.
+type AsyncPlanesHost = { readonly __marklessAsyncPlanes?: (state: ProtocolStatePayload) => unknown };
 
 let runtimeModulePromise: Promise<RuntimeModule> | undefined;
 let valueDecoderPromise:
@@ -36,24 +42,35 @@ export async function createRuntimeGraphFromResumePayload(
 ): Promise<RuntimeGraph> {
 	const { createRuntimeGraph } = await runtimeModule();
 	let graph!: RuntimeGraph;
-	const asyncComputed = await asyncComputedFromPayload(input, () => graph);
+	if (!asyncPlanes.fromPayload) await (globalThis as AsyncPlanesHost).__marklessAsyncPlanes?.(input.state);
+	const asyncComputed = asyncPlanes.fromPayload
+		? await asyncPlanes.fromPayload(input, () => graph, deserializeGraphValue)
+		: withoutAsyncValues(input.state);
+	const cells = [
+		...(await decodeStateCells(input.state, input.root.__marklessEventOnlyGraph)),
+		...(await decodeServedComputedValues(input.state, input.root.__marklessEventOnlyGraph)),
+	];
+	const shared = hasLiveSharedDefinitions(input.state)
+		? await (
+				await (globalThis as SharedInstancesHost).__marklessSharedInstances?.()
+			)?.bindSharedCells(input.root, input.state, cells)
+		: undefined;
 	graph = createRuntimeGraph({
-		cells: [
-			...(await decodeStateCells(input.state, input.root.__marklessEventOnlyGraph)),
-			...(await decodeServedComputedValues(input.state, input.root.__marklessEventOnlyGraph)),
-		],
+		cells: shared?.cells ?? cells,
 		computed: input.state.computed.map((computed) => ({
 			...computed,
 			dependencies: computed.dependencies ?? [],
 		})),
 		sharedDefinitions: input.state.sharedDefinitions,
 		asyncComputed,
+		...(asyncComputed.length > 0 && asyncPlanes),
 		reconcile: derivedReconcilePlane(),
 	});
+	shared?.connect(graph);
 	return graph;
 }
 
-async function decodeStateCells(
+export async function decodeStateCells(
 	payload: ProtocolStatePayload,
 	eventOnlyValues?: ReadonlyMap<string, unknown>,
 ) {
@@ -85,7 +102,7 @@ async function decodeStateCells(
 
 // A sync computed has no compute node here — `readGraph` answers it from the cells
 // map — so a served value belongs there for a handler's first read to see it.
-async function decodeServedComputedValues(
+export async function decodeServedComputedValues(
 	payload: ProtocolStatePayload,
 	eventOnlyValues?: ReadonlyMap<string, unknown>,
 ) {
@@ -106,82 +123,18 @@ async function decodeServedComputedValues(
 	);
 }
 
-function asyncComputedFromPayload(
-	input: ResumePayloadGraphInput,
-	graphRef: () => RuntimeGraph,
-): Promise<NonNullable<Parameters<RuntimeModule['createRuntimeGraph']>[0]['asyncComputed']>> {
-	const runnerSymbols = asyncRunnerSymbolsByGraphNode(input.view);
-	return Promise.all(
-		input.state.computed
-			.filter((computed) => computed.async === true && !!runnerSymbols[computed.graphNodeId])
-			.map((computed) =>
-				asyncComputedFromRecord(
-					computed,
-					runnerSymbols[computed.graphNodeId]!,
-					input,
-					graphRef,
-				),
-			),
-	);
+// No compiled module installed the async plane, so the payload must carry no async value.
+function withoutAsyncValues(state: ProtocolStatePayload): [] {
+	if (state.computed.some((computed) => computed.async)) asyncPlaneFactories();
+	return [];
 }
 
-export async function asyncComputedFromRecord(
-	computed: ProtocolStatePayload['computed'][number],
-	runnerSymbolId: string,
-	input: Pick<ResumePayloadGraphInput, 'root' | 'loadSymbol'>,
-	graphRef: () => RuntimeGraph,
-): Promise<RuntimeGraphAsyncComputed> {
-	const dependencies = computed.dependencies ?? [];
-	return {
-		graphNodeId: computed.graphNodeId,
-		dependencies,
-		initialSnapshot:
-			computed.snapshot && (await deserializeAsyncComputedSnapshot(computed.snapshot)),
-		key: (read: RuntimeGraphRead) => {
-			const values = dependencies.map((dependency) =>
-				read(dependency.graphNodeId, dependency.path),
-			);
-			const [only] = values;
-			// An object changed in place keeps its identity, so it is never the same key twice.
-			return values.length > 1 || Object(only) === only ? values : only;
-		},
-		run: async ({ key, signal, read }) => {
-			return (await input.loadSymbol(runnerSymbolId))({
-				graph: graphRef(),
-				read,
-				key,
-				signal,
-				element: input.root,
-				getElementHandle: () => undefined,
-			});
-		},
-	};
+export function asyncPlaneFactories() {
+	if (!asyncPlanes.async) throw new Error('MARKLESS_ASYNC_PLANE_MISSING: no compiled module installed it');
+	return asyncPlanes as Required<typeof asyncPlanes>;
 }
 
-function asyncRunnerSymbolsByGraphNode(view: ProtocolViewPayload): Record<string, string> {
-	const symbols = { ...view.asyncRunners };
-	for (const boundary of view.asyncBoundaries)
-		for (const read of boundary.asyncReads)
-			if (read.runnerSymbolId) symbols[read.graphNodeId] ??= read.runnerSymbolId;
-	return symbols;
-}
-
-async function deserializeAsyncComputedSnapshot(
-	snapshot: NonNullable<ProtocolStatePayload['computed'][number]['snapshot']>,
-) {
-	if (snapshot.status === 'idle') return snapshot;
-	const decoded: Record<string, unknown> = {
-		...snapshot,
-		key: await deserializeGraphValue(snapshot.key as SerializedGraphPayload),
-	};
-	if (snapshot.status === 'fulfilled')
-		decoded.value = await deserializeGraphValue(snapshot.value as SerializedGraphPayload);
-	else if (snapshot.status === 'rejected')
-		decoded.error = await deserializeGraphValue(snapshot.error as SerializedGraphPayload);
-	return decoded as RuntimeGraphAsyncSnapshot;
-}
-
-function runtimeModule(): Promise<RuntimeModule> {
+export function runtimeModule(): Promise<RuntimeModule> {
 	runtimeModulePromise ??= import('@markless/runtime');
 	return runtimeModulePromise;
 }

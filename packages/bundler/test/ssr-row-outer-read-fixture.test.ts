@@ -7,11 +7,16 @@ import { promisify } from 'node:util';
 import { chromium, type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterEach, describe, expect, test } from 'vitest';
+import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
+import { runtimeModuleIdFromOrigin } from '../src/build/bundle-graph.ts';
+import { MARKLESS_INTERACTION_CLOSURES } from '../src/build/chunking.ts';
+import { readInteractionClosuresAsset } from '../src/build/interaction-closures.ts';
+import { lazyRenderDataEntryId, servedRenderDataEntryId } from '../src/transform.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
-const fixture = resolve(import.meta.dirname, 'fixtures/vite-ssr-row-outer-read');
-const dist = resolve(fixture, 'dist');
+const outerRead = resolve(import.meta.dirname, 'fixtures/vite-ssr-row-outer-read');
+const componentRows = resolve(import.meta.dirname, 'fixtures/component-row-demand');
 let server: Server | undefined;
 
 afterEach(async () => {
@@ -19,16 +24,43 @@ afterEach(async () => {
 	server = undefined;
 });
 
-async function buildAndServe(env: Record<string, string>): Promise<string> {
-	await rm(dist, { force: true, recursive: true });
+async function buildAndServe(fixture: string, env: Record<string, string>): Promise<string> {
+	await build(fixture, env);
+	return serve(fixture);
+}
+
+async function build(fixture: string, env: Record<string, string>): Promise<void> {
+	await rm(resolve(fixture, 'dist'), { force: true, recursive: true });
 	await exec(resolve(root, 'node_modules/.bin/vp'), ['build', '--app'], {
 		cwd: fixture,
 		env: { ...process.env, ...env },
 	});
+}
+
+// How the page's component rows reach its render data: the served subset, or, on a page with prerender records, the whole module.
+const renderDataPaths = {
+	served: {},
+	records: { MARKLESS_PRERENDER_WAKE: '1' },
+} as const;
+type RenderDataPath = keyof typeof renderDataPaths;
+let componentRowsBuilt: { readonly path: RenderDataPath; readonly done: Promise<void> } | undefined;
+async function serveComponentRows(path: RenderDataPath = 'served'): Promise<string> {
+	if (componentRowsBuilt?.path !== path)
+		componentRowsBuilt = { path, done: build(componentRows, renderDataPaths[path]) };
+	await componentRowsBuilt.done;
+	return `${await serve(componentRows, { clientHead: true })}/`;
+}
+
+// With `clientHead`, the page is served as a production document is: the client build's head, preloads and all.
+async function serve(fixture: string, options: { clientHead?: boolean } = {}): Promise<string> {
+	const dist = resolve(fixture, 'dist');
 	const entry = (await import(
 		`${pathToFileURL(resolve(dist, 'server-render/server.js')).href}?test=${Date.now()}`
 	)) as { render(): Promise<string> };
-	const html = `<!doctype html><html><body>${await entry.render()}</body></html>`;
+	const head = options.clientHead
+		? (await readFile(resolve(dist, 'index.html'), 'utf8')).replace('<div id="app"></div>', '')
+		: '';
+	const html = `<!doctype html><html><head>${head}</head><body>${await entry.render()}</body></html>`;
 	server = createServer(async (request, response) => {
 		const path = new URL(request.url ?? '/', 'http://fixture.local').pathname;
 		if (path === '/') {
@@ -107,7 +139,7 @@ for (const [label, env] of [
 ] as const) {
 	describe(`row bindings reading outer state (${label})`, () => {
 		test('follow writes after SSR resume and in a client render', async () => {
-			const url = await buildAndServe(env);
+			const url = await buildAndServe(outerRead, env);
 			await exerciseOuterReads(`${url}/`, async () => {});
 			await exerciseOuterReads(`${url}/csr.html`, (page) =>
 				page.waitForSelector('body[data-ready="true"]').then(() => undefined),
@@ -115,3 +147,179 @@ for (const [label, env] of [
 		}, 180_000);
 	});
 }
+
+const titles = (page: Page, shelf: number) =>
+	page.locator(`section[data-shelf="${shelf}"] [data-title]`).allTextContents();
+
+// Files of the packs no route loads, and the runtime they hold, from the pack planner's own manifest.
+async function leftOutOfThePage(): Promise<{ files: Set<string>; runtime: string[] }> {
+	const asset = readInteractionClosuresAsset(
+		await readFile(
+			marklessBuildManifestPath(resolve(componentRows, 'dist'), MARKLESS_INTERACTION_CLOSURES),
+			'utf8',
+		),
+	);
+	const routeFiles = new Set(
+		asset.routes.flatMap((route) => [...(route.files?.firstUse ?? []), ...(route.files?.render ?? [])]),
+	);
+	const files = new Set<string>();
+	const runtime: string[] = [];
+	for (const [name, packFiles] of Object.entries(asset.packFiles ?? {})) {
+		if (packFiles.some((file) => routeFiles.has(file))) continue;
+		for (const file of packFiles) files.add(`/${file}`);
+		for (const id of asset.packs[name] ?? []) {
+			const runtimeId = runtimeModuleIdFromOrigin(resolve(componentRows, id));
+			if (runtimeId) runtime.push(runtimeId);
+		}
+	}
+	return { files, runtime };
+}
+
+async function exerciseComponentRows(url: string) {
+	const browser = await chromium.launch();
+	try {
+		const page = await browser.newPage();
+		const errors: string[] = [];
+		page.on('pageerror', (error) => errors.push(error.message));
+		const fetched: string[] = [];
+		page.on('request', (request) => {
+			if (request.resourceType() === 'script') fetched.push(new URL(request.url()).pathname);
+		});
+		await page.goto(url, { waitUntil: 'networkidle' });
+		await expect.poll(() => titles(page, 0)).toEqual(['Dune', 'Emma', 'Ubik']);
+		await expect.poll(() => titles(page, 1)).toEqual(['Dune', 'Ubik']);
+		const first = page.locator('section[data-shelf="0"]');
+		await first.locator('[data-toggle]').click();
+		await expect.poll(() => first.locator('[data-detail]').textContent()).toBe('Filter: ');
+		await first.locator('[data-toggle]').click();
+		await expect.poll(() => first.locator('[data-detail]').count()).toBe(0);
+		await first.locator('[data-edit]').nth(1).click();
+		await expect.poll(() => page.locator('[data-editing]').textContent()).toBe('Emma');
+		await page.locator('[data-close]').click();
+		await expect.poll(() => page.locator('[data-editor]').count()).toBe(0);
+
+		await page.locator('[data-new-title]').fill('Eon');
+		await page.locator('[data-save]').click();
+		await expect.poll(() => page.locator('[data-saved]').textContent()).toBe('1');
+		await expect.poll(() => titles(page, 0)).toEqual(['Dune', 'Emma', 'Ubik', 'Eon']);
+
+		await page.locator('[data-add-shelf]').click();
+		const added = page.locator('section[data-shelf="2"]');
+		await expect.poll(() => titles(page, 2)).toEqual(['Dune', 'Emma', 'Eon']);
+		await added.locator('[data-toggle]').click();
+		await expect.poll(() => added.locator('[data-detail]').textContent()).toBe('Filter: e');
+		await added.locator('[data-edit]').first().click();
+		await expect.poll(() => page.locator('[data-editing]').textContent()).toBe('Dune');
+
+		await page.locator('[data-poll]').click();
+		await expect.poll(() => page.locator('[data-polls]').textContent()).toBe('3');
+		await expect.poll(() => titles(page, 1)).toEqual(['Dune', 'Ubik']);
+
+		await page.locator('[data-browse]').click();
+		const catalog = page.locator('[data-catalog]');
+		await expect.poll(() => catalog.locator('[data-pick]').allTextContents()).toEqual(['Dune']);
+		await catalog.locator('[data-pick]').click();
+		await expect.poll(() => catalog.locator('[data-picked]').textContent()).toBe('Dune');
+		await page.locator('[data-browse]').click();
+		await expect.poll(() => catalog.count()).toBe(0);
+
+		expect(errors).toEqual([]);
+		const leftOut = await leftOutOfThePage();
+		expect(leftOut.runtime).toContain('web/resume-repeat-branch-arm');
+		expect(fetched.filter((file) => leftOut.files.has(file))).toEqual([]);
+	} finally {
+		await browser.close();
+	}
+}
+
+// Runtime the page's records never name is packed apart; whatever a component row, an @if that runs a
+// component, a form or a poll reaches must arrive with the page's pack, never from a pack left out of it.
+test('a page whose rows are components never fetches the runtime its build left out', async () => {
+	await exerciseComponentRows(await serveComponentRows());
+}, 180_000);
+
+type HeldIdle = typeof globalThis & { __heldIdle: Array<() => void> };
+
+// Idle is held, through the clock every root inherits and the browser's own callback, so "before idle" is a state the test reads, not a race.
+function holdIdle() {
+	const held: Array<() => void> = ((globalThis as HeldIdle).__heldIdle = []);
+	Object.defineProperty(Element.prototype, '__mClock', {
+		configurable: true,
+		get: () => ({ frame: (run: () => void) => requestAnimationFrame(run), idle: (run: () => void) => held.push(run) }),
+	});
+	globalThis.requestIdleCallback = ((run: IdleRequestCallback) =>
+		held.push(() => run({ didTimeout: false, timeRemaining: () => 50 }))) as typeof requestIdleCallback;
+}
+
+async function drainIdle(page: Page) {
+	for (let quiet = 0; quiet < 3; ) {
+		const ran = await page.evaluate(() => {
+			const due = (globalThis as HeldIdle).__heldIdle.splice(0);
+			for (const run of due) run();
+			return due.length;
+		});
+		quiet = ran ? 0 : quiet + 1;
+		await page.waitForTimeout(50);
+	}
+}
+
+// The render data the row loader names, as the pack planner placed it: in the page's own pack, and which one.
+async function routePackRenderData(): Promise<{ served: boolean; whole: boolean }> {
+	const asset = readInteractionClosuresAsset(
+		await readFile(
+			marklessBuildManifestPath(resolve(componentRows, 'dist'), MARKLESS_INTERACTION_CLOSURES),
+			'utf8',
+		),
+	);
+	const routeFiles = new Set(
+		asset.routes.flatMap((route) => [...(route.files?.firstUse ?? []), ...(route.files?.render ?? [])]),
+	);
+	const inRoutePacks = new Set(
+		Object.entries(asset.packs).flatMap(([name, ids]) =>
+			(asset.packFiles?.[name] ?? []).some((file) => routeFiles.has(file)) ? ids : [],
+		),
+	);
+	const root = encodeURIComponent('src/root.tsrx');
+	return {
+		served: inRoutePacks.has(servedRenderDataEntryId(root)),
+		whole: inRoutePacks.has(lazyRenderDataEntryId(root)),
+	};
+}
+
+// The row mint leaves the page's render data to the first row build: a press that adds a component row
+// evaluates it from the pack the page already loaded, right after load or once the page is idle, and fetches no script.
+for (const path of Object.keys(renderDataPaths) as RenderDataPath[])
+test(`a component row added right after load or once the page is idle fetches no script (${path} render data)`, async () => {
+	const url = await serveComponentRows(path);
+	expect(await routePackRenderData()).toEqual(
+		path === 'served' ? { served: true, whole: false } : { served: false, whole: true },
+	);
+	const browser = await chromium.launch();
+	try {
+		for (const idle of ['held', 'reached'] as const) {
+			const page = await browser.newPage();
+			const errors: string[] = [];
+			page.on('pageerror', (error) => errors.push(error.message));
+			await page.addInitScript(holdIdle);
+			await page.goto(url, { waitUntil: 'networkidle' });
+			const afterLoad: string[] = [];
+			page.on('request', (request) => {
+				if (request.resourceType() === 'script') afterLoad.push(new URL(request.url()).pathname);
+			});
+			// Held, no idle callback has run when the press arrives.
+			if (idle === 'reached') await drainIdle(page);
+			await page.locator('[data-add-shelf]').click();
+			await expect.poll(() => page.locator('section[data-shelf]').count()).toBe(3);
+			await expect.poll(() => titles(page, 2), { timeout: 10_000 }).toEqual(['Dune', 'Emma']);
+			await page.locator('section[data-shelf="2"] [data-toggle]').click();
+			await expect
+				.poll(() => page.locator('section[data-shelf="2"] [data-detail]').textContent())
+				.toBe('Filter: e');
+			await page.waitForLoadState('networkidle');
+			expect({ path, idle, errors, afterLoad }).toEqual({ path, idle, errors: [], afterLoad: [] });
+			await page.close();
+		}
+	} finally {
+		await browser.close();
+	}
+}, 180_000);

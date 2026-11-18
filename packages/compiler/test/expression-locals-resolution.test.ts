@@ -88,7 +88,7 @@ export function Report() @{
 	expect(codes(result.semanticGraph.diagnostics)).not.toContain('MARKLESS_ASYNC_POST_AWAIT_READ');
 });
 
-test('a post-await read of the graph cell itself is still reported', async () => {
+test('a post-await read of the graph cell itself is captured into the key', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Inventory.tsrx',
 		source: `
@@ -113,5 +113,5 @@ export function Inventory() @{
 		symbols: [],
 	});
 
-	expect(codes(result.semanticGraph.diagnostics)).toContain('MARKLESS_ASYNC_POST_AWAIT_READ');
+	expect(codes(result.semanticGraph.diagnostics)).not.toContain('MARKLESS_ASYNC_POST_AWAIT_READ');
 });

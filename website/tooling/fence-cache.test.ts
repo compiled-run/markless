@@ -88,3 +88,14 @@ fixtureValue();</code></pre><pre><code class="language-css">a { color: red; }</c
 	expect(edited).toContain('Second wording.');
 	expect(edited).not.toContain('First wording.');
 }, 60000);
+
+test('a closed pool ends its worker threads and starts new ones for the next fence', async () => {
+	const cacheDir = temporaryDirectory();
+	const html = '<pre><code class="language-css">a { color: red; }</code></pre>';
+	const pool = createFencePool({ cacheDir, workers: 1 });
+	const first = await replaceFences(html, pool.render);
+	expect(first).toContain('shiki');
+	await pool.close();
+	expect(await replaceFences(html.replace('red', 'blue'), pool.render)).toContain('blue');
+	await pool.close();
+}, 60000);

@@ -3,17 +3,20 @@ import {
 	marklessIslandSpacedSymbol,
 } from '../../../../web/src/fns/instance-scope.ts';
 import { marklessThen } from '../../../../web/src/ssr-data/awaitable.ts';
+import { marklessWhenLoaded, PACK_RESIDENT } from '../../../../web/src/fns/resident-load.ts';
 import { type StructureToken, withProjectionSpan } from '../../../../web/src/ssr-data/renderer.ts';
 import { marklessSsrRosterPositionContext } from '../../../../web/src/fns/roster-position.ts';
 import { STORAGE_RENDER_CONTEXT_READER } from '../../../../serializer/src/storage-cookie.ts';
 import { marklessSsrIslandRosterAnswered } from '../../../../web/src/prerender/island-roster.ts';
+import type { KeepParts } from '../../../../web/src/fns/keep-parts-hook.ts';
 import {
 	protocolInstancePath,
 	protocolInstanceQualifies,
 	protocolStateVersion,
 } from '../../../../serializer/src/protocol-constants.ts';
-import { isArmBranchAnchorComment } from '../../../../web/src/resume-anchor-census.ts';
+import { isUncountedComment } from '../../../../web/src/resume-anchor-census.ts';
 import type { ProtocolViewPayload } from '../../../../serializer/src/protocol.ts';
+import type { ResumeKeyedRepeatRecord } from '../../../../web/src/resume-types.ts';
 export { tryResumeMdxScalar } from './mdx-scalar.ts';
 
 export type MdxRoutePart =
@@ -63,7 +66,46 @@ export type MdxComponentArtifact = {
 export type MdxSymbolLoader = {
 	readonly prefix: string;
 	readonly loadSymbol: (symbolId: string) => unknown;
+	readonly loadModule?: () => Promise<unknown>;
 };
+
+type MdxIslandModule = {
+	readonly loadSymbol: (symbolId: string) => unknown;
+	readonly loadScalarActionPlan?: (
+		symbolId: string,
+	) => MdxScopedAction | undefined | Promise<MdxScopedAction | undefined>;
+};
+type MdxScopedAction = { readonly scope: string };
+type ResidentLoad = Promise<unknown> & { [PACK_RESIDENT]?: () => unknown };
+
+/** One island's symbols, loaded once from its own module; a failed load is retried on the next ask. */
+export function mdxSymbolLoader(prefix: string, importModule: () => Promise<MdxIslandModule>) {
+	let module: Promise<MdxIslandModule> | undefined;
+	const loadModule = () => {
+		if (module) return module;
+		const loading = (module = importModule());
+		// An island in its own chunk loads without the pack's marker; once it has run, later symbols answer in the caller's task.
+		loading.then(
+			(mod) => void ((loading as ResidentLoad)[PACK_RESIDENT] ??= () => mod),
+			() => {
+				if (module === loading) module = undefined;
+			},
+		);
+		return loading;
+	};
+	return {
+		prefix,
+		loadModule,
+		loadSymbol: (symbolId: string) =>
+			marklessWhenLoaded(loadModule(), (mod: MdxIslandModule) =>
+				mod.loadSymbol(symbolId.slice(prefix.length)),
+			),
+		loadScalarActionPlan: (symbolId: string) =>
+			loadModule()
+				.then((mod) => mod.loadScalarActionPlan?.(symbolId.slice(prefix.length)))
+				.then((action) => action && { ...action, scope: prefix + action.scope }),
+	};
+}
 
 type MdxRenderDataSurface = {
 	readonly rootComponentName: string | null;
@@ -79,6 +121,11 @@ type MdxRenderDataChild = {
 	readonly props: Readonly<Record<string, unknown>>;
 	readonly surface: MdxRenderDataSurface;
 };
+
+// Every live block's root has the same name, so a child's surface is filed by its slot.
+function mdxChildImportKey(componentIndex: number): string {
+	return `mdx:${componentIndex}`;
+}
 
 // MDX contributes only static markup records. Imported TSRX children keep their
 // compiler-emitted render-data surfaces and compose through ordinary child edges.
@@ -135,6 +182,7 @@ export function createMdxRenderDataSurface(
 		edges.push({
 			id: edgeId,
 			childComponentName,
+			importSource: mdxChildImportKey(part.componentIndex),
 			hostPrefix: child.hostPrefix,
 			symbolPrefix: child.symbolPrefix,
 			props: Object.entries(child.props).map(([name, value]) => ({
@@ -194,7 +242,7 @@ export function createMdxRenderDataSurface(
 		imports: Object.fromEntries(
 			children.flatMap((child) =>
 				child.surface.rootComponentName
-					? [[child.surface.rootComponentName, child.surface] as const]
+					? [[mdxChildImportKey(child.componentIndex), child.surface] as const]
 					: [],
 			),
 		),
@@ -321,7 +369,11 @@ export async function renderMdxChild(
 				)
 			: rendered;
 	if (output) children.push({ ...child, output });
-	return output?.html ?? '';
+	const keep = (globalThis as Record<symbol, KeepParts | undefined>)[Symbol.for('markless.keep-parts')];
+	// An island with markdown between its tags places that content itself, so only a childless one is offered for keeping.
+	return output?.html && keep && !child.childrenElementTags?.length
+		? keep(output.html, undefined, { ...output, instancePath: child.hostPrefix })
+		: (output?.html ?? '');
 }
 
 // Markdown children travel as a projection, so the island counts their elements where its `{children}` lands.
@@ -429,7 +481,7 @@ export function composeMdxState(children: readonly MdxChild[]): MdxStatePayload 
 }
 
 /**
- * The island segment every id this child owns takes, plus the widget-scoped
+ * The island segment every id this child owns takes, plus the subtree-scoped
  * definitions that segment is allowed to reach.
  *
  * The segment is read back out of the child's own prefix rather than minted
@@ -448,7 +500,7 @@ function islandScope(child: MdxChild, state: MdxStatePayload): MdxIslandScope {
 		segment: prefix && protocolInstancePath(prefix) === prefix ? prefix : '',
 		widgetDefinitionIds: new Set(
 			(state.sharedDefinitions ?? [])
-				.filter((definition) => definition.scope === 'widget')
+				.filter((definition) => definition.scope === 'subtree')
 				.map((definition) => definition.id),
 		),
 	};
@@ -461,11 +513,11 @@ function islandScope(child: MdxChild, state: MdxStatePayload): MdxIslandScope {
  * same `c`/`p` path and their cells, computeds and element-handle rosters land
  * on one node unless the island segment separates them. What must NOT take the
  * segment is the page-space families that mean one node per page on purpose: a
- * `scope: 'page' | 'container' | 'request'` shared() graph and a storage slot
+ * `scope: 'app' | 'container'` shared() graph and a storage slot
  * are shared BETWEEN islands, and prefixing them gives each island a private
  * copy of state the author asked to be common.
  *
- * A widget-scoped shared() id is the exception inside the exception — one graph
+ * A subtree-scoped shared() id is the exception inside the exception — one graph
  * per rendered widget, so it is the island's — and a bare one (no path, because
  * no registered widget root claimed it at compose) is recognised by asking the
  * child's own definitions which scope it was declared at.
@@ -484,7 +536,7 @@ function islandScopedGraphNodeId(graphNodeId: string, island: MdxIslandScope): s
 /**
  * The registering half of a handle key, mirrored on the reading half.
  *
- * Resume re-spells only a widget-scoped `shared:` handle id per rendered widget;
+ * Resume re-spells only a subtree-scoped `shared:` handle id per rendered widget;
  * a component-local handle is already one element per key and the reading symbol
  * asks for it exactly as its module compiled it. Segmenting that second kind
  * here would file it under a key nothing ever asks for.
@@ -636,7 +688,7 @@ function mdxDomCensus(root: MdxCensusNode): MdxNodeCensus {
 	let comments = 0;
 	(function visit(node: MdxCensusNode): void {
 		if (node.nodeType === 1) elements++;
-		else if (node.nodeType === 8 && !isArmBranchAnchorComment({ nodeType: 8, data: node.data }))
+		else if (node.nodeType === 8 && !isUncountedComment({ nodeType: 8, data: node.data }))
 			comments++;
 		for (const child of Array.from(node.childNodes ?? [])) visit(child);
 	})(root);
@@ -658,7 +710,7 @@ function mdxHtmlCensus(html: string): MdxNodeCensus {
 		if (html.startsWith('<!--', open)) {
 			const close = html.indexOf('-->', open + 4);
 			const text = html.slice(open + 4, close < 0 ? html.length : close);
-			if (templateDepth === 0 && !isArmBranchAnchorComment({ nodeType: 8, data: text }))
+			if (templateDepth === 0 && !isUncountedComment({ nodeType: 8, data: text }))
 				comments++;
 			at = close < 0 ? html.length : close + 3;
 			continue;
@@ -736,6 +788,21 @@ export function loadMdxSymbol(
 	return Promise.reject(new Error(`Unknown Markless MDX symbol ${symbolId}`));
 }
 
+// An island's own module names the row code its lists build with, and resume runs no island code; a list that changes needs it first.
+export function loadMdxRepeatModules(
+	repeats: ReadonlyArray<ResumeKeyedRepeatRecord>,
+	loaders: readonly MdxSymbolLoader[],
+): Promise<unknown> {
+	const islands = new Set<MdxSymbolLoader>();
+	for (const repeat of repeats) {
+		if (!(repeat.rowTemplate ?? repeat.emptyArm ?? repeat.rowComponent)) continue;
+		if (!repeat.collectionGraphNodeId || repeat.fixed) continue;
+		const island = loaders.find((loader) => repeat.id.startsWith(loader.prefix));
+		if (island) islands.add(island);
+	}
+	return Promise.all([...islands].map((island) => island.loadModule?.())).catch(() => undefined);
+}
+
 type MdxInstanceScopedLoad = Parameters<typeof marklessInstanceScopedLoadSymbol>[0];
 
 // The WHOLE path scopes the symbol, island segment included: composeMdxState
@@ -806,7 +873,7 @@ function appendMdxChildView(context: {
 	for (const behavior of childView.behaviors ?? []) {
 		context.behaviors.push(prefixMdxSymbolRecord(behavior, context.child, island));
 	}
-	// A widget-scoped handle id IS the roster key, so an island-blind one merges
+	// A subtree-scoped handle id IS the roster key, so an island-blind one merges
 	// two islands' plural handles into one roster and the arrow walk leaves the
 	// island it was pressed in.
 	for (const handle of childView.elementHandles ?? []) {

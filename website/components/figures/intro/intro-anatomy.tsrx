@@ -1,4 +1,4 @@
-// A Beanshop takeaway cup: the barista writes the name when it scrolls into view; pressing it ticks a shot box and the lid sticker follows.
+// A Beanshop takeaway cup: the barista writes the name when it scrolls into view (CSS alone, no code runs at load); pressing it ticks a shot box and the lid sticker follows.
 import { computed, state } from '@markless/core';
 import { add, describe, flip, PRODUCT, SHOTS, SLOTS, START, STICKER } from './model.ts';
 import { art } from './wired.art.ts';
@@ -7,19 +7,13 @@ export default function IntroAnatomy() @{
 	let count = state(START);
 	let newest = state('');
 	let beat = state('rest');
-	let written = state('no');
 	const level = computed(() => '--count:' + count);
 	const latest = computed(() => art.shots.boxes[Math.max(0, count - 1)]!);
 	const tick = computed(() => latest.d);
 	const tickLength = computed(() => '--l:' + latest.length);
 	const said = computed(() => describe(count, beat !== 'rest'));
 
-	<figure
-		class="anatomy"
-		onVisible={() => {
-			written = 'yes';
-		}}
-	>
+	<figure class="anatomy">
 		<button
 			type="button"
 			class="stage"
@@ -37,7 +31,7 @@ export default function IntroAnatomy() @{
 				}
 			}}
 		>
-			<svg class="scene" data-beat={beat} data-written={written} data-empty={count === 0 ? 'yes' : 'no'} style={level} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
+			<svg class="scene" data-beat={beat} data-empty={count === 0 ? 'yes' : 'no'} style={level} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
 				<path class="shadow-wash" d={art.cup.shadow.wash} />
 				<path class="hatch deep light" d={art.cup.shadow.hatch} />
 				<path class="hatch deep" d={art.cup.shadow.core} />
@@ -51,8 +45,8 @@ export default function IntroAnatomy() @{
 					<path class="jar-ink thin" d={art.cup.body.seam} />
 					<path class="sleeve" d={art.cup.sleeve.paper} />
 					<path class="wash pink" d={art.cup.sleeve.paper} />
-					<path class="hatch light" d={art.cup.sleeve.tone} />
-					<path class="hatch" d={art.cup.body.under} />
+					<path class="hatch light sleeve-tone" d={art.cup.sleeve.tone} />
+					<path class="hatch sleeve-tone" d={art.cup.body.under} />
 					<path class="jar-ink" d={art.cup.sleeve.ink} />
 					<path class="jar-ink" d={art.cup.body.ink} />
 					<g class="name">
@@ -161,12 +155,44 @@ export default function IntroAnatomy() @{
 				--label-ink: var(--ink);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--shade: rgb(0 0 0 / 0.55);
-					--shade-ink: rgb(0 0 0 / 0.85);
-					--kraft: oklch(42% 0.05 62);
-					--kraft-deep: oklch(34% 0.05 58);
-					--label-ink: var(--paper);
+					--sheet: var(--figure-sheet);
+					--shade: oklch(12% 0.012 90 / 0.25);
+					--shade-ink: var(--figure-hatch);
+					--kraft: var(--figure-sheet);
+					--kraft-deep: color-mix(in oklch, var(--cream) 35%, oklch(68% 0.08 62));
+					--lid: var(--figure-sheet);
+				}
+			}
+
+			html.dark .anatomy {
+				.thin {
+					opacity: 0.9;
+				}
+
+				.light {
+					opacity: 0.8;
+				}
+
+				.sleeve-tone,
+				.tick,
+				.digit.now {
+					stroke: var(--on-accent);
+				}
+
+				.shots .printed,
+				.shots .jar-ink,
+				.digit.now {
+					fill: var(--on-accent);
+				}
+
+				.sip {
+					fill: var(--figure-hatch);
+				}
+
+				.spot .wash,
+				.spot .wash-edge {
+					mix-blend-mode: normal;
+					opacity: 1;
 				}
 			}
 
@@ -203,7 +229,7 @@ export default function IntroAnatomy() @{
 			}
 
 			.lid-paper {
-				fill: var(--paper);
+				fill: var(--lid, var(--paper));
 			}
 
 			.kraft {
@@ -237,14 +263,14 @@ export default function IntroAnatomy() @{
 			}
 
 			.pool {
-				fill: color-mix(in oklch, var(--yellow) 70%, oklch(70% 0.16 70));
+				fill: var(--marker);
 				stroke: none;
 				opacity: 0.5;
 			}
 
 			.wash-edge {
 				fill: none;
-				stroke: oklch(72% 0.15 75);
+				stroke: var(--highlight);
 				stroke-width: 1;
 				opacity: 0.55;
 				mix-blend-mode: multiply;
@@ -398,24 +424,42 @@ export default function IntroAnatomy() @{
 			}
 
 			@media (prefers-reduced-motion: no-preference) {
-				.scene[data-written='no'] .name {
-					opacity: 0;
-				}
-
-				.scene[data-written='yes'] .write {
+				.write {
 					animation: write-in 420ms var(--d) ease-out both;
 				}
 
-				.scene[data-written='yes'] .draw {
+				.draw {
 					animation: draw-on 300ms var(--d) ease-out both;
 				}
 
-				.scene[data-written='yes'] .eyes {
+				.eyes {
 					animation: pop-in 120ms 1560ms both;
+				}
+
+				/* The writing holds until the cup scrolls into view; without scroll timelines or style queries it writes at load. */
+				.stage {
+					--seen: 0;
+					animation: seen 1ms linear both;
+					animation-timeline: view();
+					animation-range: entry 0% entry 2%;
+				}
+
+				@container style(--seen: 0) {
+					.write,
+					.draw,
+					.eyes {
+						animation-play-state: paused;
+					}
 				}
 
 				.wisp {
 					animation: rise 4.8s calc(var(--w) * -1.6s) ease-in-out infinite;
+				}
+			}
+
+			@keyframes seen {
+				to {
+					--seen: 1;
 				}
 			}
 

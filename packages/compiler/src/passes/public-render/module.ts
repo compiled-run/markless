@@ -1,7 +1,7 @@
 import { jsonSourceWithNonFiniteNumbers } from '@markless/serializer';
 import { parseModule } from '../../js-ast.ts';
 import {
-	addressedHostNodeIds,
+	renderAddressedHostNodeIds,
 	withInertHostsFolded,
 } from '../../artifact-helpers/addressed-hosts.ts';
 import type { PublicRenderModuleArtifact, PublicRenderModuleInput } from '../../artifacts.ts';
@@ -117,7 +117,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 	return {
 		passId: 'public-render-module',
 		renderDataModuleSource: root
-			? `export const marklessRenderData = ${jsonSourceWithNonFiniteNumbers(withInertHostsFolded(input.renderData, addressedHostNodeIds(input.protocolView))) ?? 'undefined'};`
+			? `export const marklessRenderData = ${jsonSourceWithNonFiniteNumbers(withInertHostsFolded(input.renderData, renderAddressedHostNodeIds(input))) ?? 'undefined'};`
 			: '',
 		moduleSource,
 		rootExportName: moduleSource ? (rootComponentName ?? null) : null,

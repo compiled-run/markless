@@ -1,0 +1,148 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 97,
+			"reason": "link bridge phase: the load-time bridge keeps one phase changed through one move() call site, and the run half's same-page go() dispatches the rendered event so a cancelled navigate() settles (measured vs merge-base on linux-x64, CI run 42724269012 against 42717022718)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 91,
+			"reason": "link bridge phase: the load-time bridge keeps one phase changed through one move() call site, and the run half's same-page go() dispatches the rendered event so a cancelled navigate() settles (measured vs merge-base on linux-x64, CI run 42724269012 against 42717022718)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 97,
+			"reason": "link bridge phase: the load-time bridge keeps one phase changed through one move() call site, and the run half's same-page go() dispatches the rendered event so a cancelled navigate() settles (the bridge body that runs at load grew by 95 minified chars; set to what the other routes of this site measured on linux-x64 in CI run 42724269012 against 42717022718, because this route measured +321, run-to-run noise)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 91,
+			"reason": "link bridge phase: the load-time bridge keeps one phase changed through one move() call site, and the run half's same-page go() dispatches the rendered event so a cancelled navigate() settles (measured vs merge-base on linux-x64, CI run 42724269012 against 42717022718)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 97,
+			"reason": "link bridge phase: the load-time bridge keeps one phase changed through one move() call site, and the run half's same-page go() dispatches the rendered event so a cancelled navigate() settles (measured vs merge-base on linux-x64, CI run 42724269012 against 42717022718)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 91,
+			"reason": "link bridge phase: the load-time bridge keeps one phase changed through one move() call site, and the run half's same-page go() dispatches the rendered event so a cancelled navigate() settles (measured vs merge-base on linux-x64, CI run 42724269012 against 42717022718)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 96,
+			"reason": "link bridge phase: the load-time bridge keeps one phase changed through one move() call site, and the run half's same-page go() dispatches the rendered event so a cancelled navigate() settles (measured vs merge-base on linux-x64, CI run 42724269012 against 42717022718)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 83,
+			"reason": "link bridge phase: the load-time bridge keeps one phase changed through one move() call site, and the run half's same-page go() dispatches the rendered event so a cancelled navigate() settles (measured vs merge-base on linux-x64, CI run 42724269012 against 42717022718)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 96,
+			"reason": "link bridge phase: the load-time bridge keeps one phase changed through one move() call site, and the run half's same-page go() dispatches the rendered event so a cancelled navigate() settles (measured vs merge-base on linux-x64, CI run 42724269012 against 42717022718)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 83,
+			"reason": "link bridge phase: the load-time bridge keeps one phase changed through one move() call site, and the run half's same-page go() dispatches the rendered event so a cancelled navigate() settles (measured vs merge-base on linux-x64, CI run 42724269012 against 42717022718)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 96,
+			"reason": "link bridge phase: the load-time bridge keeps one phase changed through one move() call site, and the run half's same-page go() dispatches the rendered event so a cancelled navigate() settles (the bridge body that runs at load grew by 95 minified chars; set to what the other routes of this site measured on linux-x64 in CI run 42724269012 against 42717022718, because this route measured -71, run-to-run noise)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 83,
+			"reason": "link bridge phase: the load-time bridge keeps one phase changed through one move() call site, and the run half's same-page go() dispatches the rendered event so a cancelled navigate() settles (measured vs merge-base on linux-x64, CI run 42724269012 against 42717022718)",
+			"date": "2026-11-10"
+		}
+	]
+}

@@ -1,0 +1,84 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": 95,
+			"reason": "A @try inside a composed child spells its computed-to-async-value table in the child's ids, so a refresh marks the elements that read the value instead of missing computed readers or marking the whole block (refresh-time code, not run at load)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": 95,
+			"reason": "A @try inside a composed child spells its computed-to-async-value table in the child's ids, so a refresh marks the elements that read the value instead of missing computed readers or marking the whole block (refresh-time code, not run at load)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "A @try inside a composed child spells its computed-to-async-value table in the child's ids, so a refresh marks the elements that read the value instead of missing computed readers or marking the whole block (refresh-time code, not run at load)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 213,
+			"reason": "A @try nested in an arm the browser renders inside a composed child now spells its computed-to-async-value table in the child's ids, so a refresh marks the elements that read the value instead of missing computed readers or marking the whole block; settle-time code, not run at load",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 71,
+			"reason": "Measured on CI (linux-x64) against the merge-base's merge-queue run: +71 B gzip downloaded, from the composed-child @try qualifier in the instance-scope module these pages download (+213 B rendered, settle-time code); the executed-chars moves are within the measured run-to-run swing, nothing new runs at load",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 71,
+			"reason": "Measured on CI (linux-x64) against the merge-base's merge-queue run: +71 B gzip downloaded, from the composed-child @try qualifier in the instance-scope module these pages download (+213 B rendered, settle-time code); the executed-chars moves are within the measured run-to-run swing, nothing new runs at load",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 71,
+			"reason": "Measured on CI (linux-x64) against the merge-base's merge-queue run: +71 B gzip downloaded, from the composed-child @try qualifier in the instance-scope module these pages download (+213 B rendered, settle-time code); the executed-chars moves are within the measured run-to-run swing, nothing new runs at load",
+			"date": "2026-11-12"
+		}
+	]
+}

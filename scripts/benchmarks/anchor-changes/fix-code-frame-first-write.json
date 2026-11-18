@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 123,
+			"reason": "the playground result frame, which docs pages prefetch, runs the compiler's handler and update modules before mounting so the first write after Run again lands before the handler returns",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 123,
+			"reason": "the playground result frame, which docs pages prefetch, runs the compiler's handler and update modules before mounting so the first write after Run again lands before the handler returns",
+			"date": "2026-11-16"
+		}
+	]
+}

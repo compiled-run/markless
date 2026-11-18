@@ -9,6 +9,7 @@ import {
 import type { LinkedModuleChildResolution } from '@markless/compiler';
 import type { createMarklessDevGraph } from './dev.ts';
 import { createBuildDelegateLoader } from './build/delegate-loader.ts';
+import { createCompilerWarningLog } from './compiler-warnings.ts';
 import {
 	createDelegateModuleCache,
 	moduleLinkArtifact,
@@ -105,9 +106,12 @@ export function createPluginState() {
 	// An edit clears the child's capture metadata, and Vite can answer its re-request from cache.
 	const recoveringChildMetadata = new Set<string>();
 	const delegateModules = createDelegateModuleCache();
+	// Not cleared by reset: the client and server builds compile one source twice and it warns once.
+	const compilerWarnings = createCompilerWarningLog();
 	const buildDelegateLoader = createBuildDelegateLoader();
 
 	return {
+		compilerWarnings,
 		delegateModules,
 		buildDelegateLoader,
 		virtualModules,
@@ -196,6 +200,9 @@ export function registerTransformArtifacts(
 					input.devServer !== true))
 				? { provisional: true }
 				: {}),
+			...(input.finalPublication === false && input.devServer !== true
+				? { firstPass: true }
+				: {}),
 		};
 		const published = publishesVirtualModule(stored, state.virtualModules.get(module.id));
 		if (published) {
@@ -269,6 +276,7 @@ function publishesVirtualModule(
 	if (!current) return true;
 	if (next.provisional === true) return false;
 	if (current.provisional === true) return true;
+	if (next.firstPass === true && current.firstPass !== true) return false;
 	if (next.type === 'resolver' && current.type === 'resolver') {
 		const verdict = linkedResolverClaimVerdict({
 			resolverId: next.id,

@@ -108,6 +108,8 @@ export type ComposeChild = {
 	readonly hostPrefix: string;
 	readonly symbolPrefix?: string;
 	readonly boundSymbols?: Readonly<Record<string, string>>;
+	/** Where the module whose edge owns `boundSymbols` is rooted; absent when `symbolPrefix` is relative to that module. */
+	readonly boundSymbolPrefix?: string;
 	readonly graphProps?: ComposeGraphProps;
 	readonly output?: ComposeChildOutput;
 	/** Build-time: the child-relative path of the composed widget root its children land in. */
@@ -253,7 +255,7 @@ export function marklessQualifyChildState(
 		...(computed.dependencies && {
 			dependencies: computed.dependencies.map(
 				(dependency) =>
-					marklessCsrRemapChildGraph(dependency, graphProps, instancePath) ?? {
+					marklessCsrRemapChildGraph(dependency, graphProps, instancePath) || {
 						...dependency,
 						graphNodeId: marklessComposedGraphNodeId(
 							dependency.graphNodeId,
@@ -311,7 +313,7 @@ export function marklessRegisterComposedWidgets(children: ReadonlyArray<ComposeC
 		const instancePath = marklessComposedInstancePath(child);
 		if (!instancePath) continue;
 		for (const definition of child.output?.state?.sharedDefinitions ?? []) {
-			if (definition.scope !== 'widget') continue;
+			if (definition.scope !== 'subtree') continue;
 			if (!marklessCarriesWidgetCells(child, definition.id)) continue;
 			if (
 				!marklessDesignatesWidget(child, definition.id) &&
@@ -350,7 +352,7 @@ function marklessComposedWidgetSites(
 		const instancePath = marklessComposedInstancePath(child);
 		if (!instancePath) continue;
 		for (const definition of child.output?.state?.sharedDefinitions ?? []) {
-			if (definition.scope !== 'widget') continue;
+			if (definition.scope !== 'subtree') continue;
 			if (!marklessCarriesWidgetCells(child, definition.id)) continue;
 			const site: MarklessWidgetSite = {
 				path: instancePath,
@@ -457,7 +459,7 @@ function marklessComposedSharedDefinition(
 	instancePath: string,
 	childrenWidgetRoot: string | undefined,
 ): ComposeSharedDefinition {
-	if (definition.scope !== 'widget' || !instancePath) return definition;
+	if (definition.scope !== 'subtree' || !instancePath) return definition;
 	const projectionIds = marklessProjectionIds(definition, childrenWidgetRoot).map(
 		(projectionId) => instancePath + projectionId,
 	);
@@ -567,7 +569,7 @@ function marklessComposedState<T extends ComposeStateDraft>(
 			),
 		),
 	]);
-	const cells = marklessMergedWidgetCells(
+	const cells = marklessMergedSharedCells(
 		[...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])],
 		sharedDefinitions,
 	);
@@ -599,7 +601,9 @@ function marklessComposedState<T extends ComposeStateDraft>(
 					...(computed.deriveSymbolId
 						? { deriveSymbolId: marklessBoundSymbolId(child, computed.deriveSymbolId) }
 						: {}),
-					...(computed.dependencies?.some((read) => read.graphNodeId.includes('/element:')) && {
+					...(computed.dependencies?.some((read) =>
+						read.graphNodeId.includes('/element:'),
+					) && {
 						hostScope: child.hostPrefix + (computed.hostScope ?? ''),
 					}),
 				})),
@@ -628,7 +632,7 @@ function marklessDropCarriedWidgetCells(children: ReadonlyArray<ComposeChild>): 
 		if (!marklessComposedInstancePath(child).includes('r:')) continue;
 		const carried = new Set(
 			(state.sharedDefinitions ?? []).flatMap((definition) =>
-				definition.scope === 'widget' && !marklessDesignatesWidget(child, definition.id)
+				definition.scope === 'subtree' && !marklessDesignatesWidget(child, definition.id)
 					? [definition.id]
 					: [],
 			),
@@ -640,25 +644,17 @@ function marklessDropCarriedWidgetCells(children: ReadonlyArray<ComposeChild>): 
 	}
 }
 
-// One widget instance is one graph, and every part of a family nothing seeds
-// carries the family's cells - so several children qualify onto the same node
-// id and the collapse must leave one. Only widget nodes are asked: two page-space
-// records spelling one id are somebody else's question and ride through as they
-// always have.
-function marklessMergedWidgetCells(
+// Several children may carry one shared() instance's cells; the composed state keeps one per node id.
+function marklessMergedSharedCells(
 	cells: ReadonlyArray<ComposeStateNode>,
 	sharedDefinitions: ReadonlyArray<ComposeSharedDefinition>,
 ): ReadonlyArray<ComposeStateNode> {
-	const widgetIds = new Set(
-		sharedDefinitions.flatMap((definition) =>
-			definition.scope === 'widget' ? [definition.id] : [],
-		),
-	);
-	if (widgetIds.size === 0) return cells;
+	const definitionIds = new Set(sharedDefinitions.map((definition) => definition.id));
+	if (definitionIds.size === 0) return cells;
 	const taken = new Set<string>();
 	return cells.filter((cell) => {
 		const graphNodeId = cell.graphNodeId;
-		if (!widgetIds.has(graphNodeId.slice(0, graphNodeId.lastIndexOf('/')))) return true;
+		if (!definitionIds.has(graphNodeId.slice(0, graphNodeId.lastIndexOf('/')))) return true;
 		if (taken.has(graphNodeId)) return false;
 		taken.add(graphNodeId);
 		return true;
@@ -762,7 +758,7 @@ function marklessComposedSymbol(
 				...marklessInstanceScopedGraph(graph, instancePath),
 				read,
 			},
-			// A widget-scoped element() handle is one element per rendered widget,
+			// A subtree-scoped element() handle is one element per rendered widget,
 			// so it resolves against this instance the way this instance's graph
 			// nodes do.
 			getElementHandle: marklessInstanceScopedElementHandle(
@@ -853,6 +849,23 @@ export function marklessCsrChildReadIsStatic(
 	// static undefined and rendered its final answer with it.
 	if (!binding) return true;
 	return binding.kind !== undefined && binding.kind !== 'graph-reference';
+}
+
+/** A child's event whose handler is its own prop takes the cancel the parent passed in that prop, or relays it on when the parent passed its own prop. */
+export function marklessRelayedPolicy<T extends { readonly relayedProp?: unknown; readonly syncPolicy?: unknown }>(
+	event: T,
+	graphProps: ComposeGraphProps,
+): T {
+	const { relayedProp, ...rest } = event;
+	const route = graphProps?.find((prop) => prop.name === relayedProp);
+	if (!route) return (relayedProp ? rest : event) as T;
+	if (route.kind === 'callback')
+		return (route.syncPolicy && !event.syncPolicy ? { ...rest, syncPolicy: route.syncPolicy } : rest) as T;
+	const passedOn =
+		route.graphNodeId && (route.path?.length ?? 0) <= +(route.graphNodeId === 'prop:props')
+			? marklessCompositionPropName(route.graphNodeId, route.path ?? [])
+			: null;
+	return (passedOn ? { ...rest, relayedProp: passedOn } : rest) as T;
 }
 
 function marklessCompositionPropName(

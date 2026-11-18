@@ -21,7 +21,7 @@ export const dial = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 /** The designated root: first resolver declared, so the compiler picks it. */

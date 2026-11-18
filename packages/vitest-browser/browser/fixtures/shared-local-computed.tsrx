@@ -7,7 +7,7 @@ export const cell = shared(
 		const c = state({ checked: false });
 		return { ...c };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function App() @{

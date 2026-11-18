@@ -1,4 +1,7 @@
-import { PROTOCOL_PROP_GRAPH_NODE_PREFIX, PROTOCOL_PROPS_GRAPH_NODE_ID } from '@markless/serializer';
+import {
+	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
+	PROTOCOL_PROPS_GRAPH_NODE_ID,
+} from '@markless/serializer';
 import {
 	childNodes,
 	getIdentifierName,
@@ -7,6 +10,7 @@ import {
 	type AnyNode,
 } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
+import type { SemanticGraphDependency } from '../../artifacts.ts';
 import type { SourceSpan } from '../../diagnostics.ts';
 import {
 	graphBindingMap,
@@ -19,6 +23,7 @@ import { collectExpressionReads, resolvedSymbolAt } from './collect-expressions.
 import {
 	isCompositeTemplateExpression,
 	mintTemplateExpressionComputed,
+	joinReadSources,
 	pureCompositeReadSources,
 	type CompositeReadOptions,
 } from './composite-reads.ts';
@@ -46,6 +51,12 @@ export type RenderLocalInline =
 			// The defining expressions spliced in; their graph reads are the expression's too.
 			readonly definitions: ReadonlyArray<AnyNode>;
 			readonly names: ReadonlySet<string>;
+			// `@catch (error, reset)` reset bindings left free, with the boundary each resets.
+			readonly catchResets: ReadonlyMap<string, string>;
+			// `@catch (error)` error bindings left free, with the boundary whose error each names.
+			readonly catchErrors: ReadonlyMap<string, string>;
+			// `error instanceof X` tests on such a binding.
+			readonly catchErrorInstanceofs: ReadonlyArray<AnyNode>;
 	  }
 	| { readonly kind: 'row-item'; readonly name: string }
 	| { readonly kind: 'render-local'; readonly name: string }
@@ -54,6 +65,12 @@ export type RenderLocalInline =
 			readonly name: string;
 			readonly write: string;
 			readonly call: boolean;
+	  }
+	| {
+			readonly kind: 'stateful-factory';
+			readonly name: string;
+			readonly why: string;
+			readonly rewrite: string;
 	  };
 
 type Replacement = { readonly start: number; readonly end: number; readonly text: string };
@@ -69,17 +86,25 @@ export function inlineRenderLocals(
 		readonly inlineFunctions?: boolean;
 		// Only locals declared where this answers true are spliced; any other is left as written.
 		readonly inlineOnly?: (declarationStart: number) => boolean;
+		// A `@catch (error)` binding is left free, for the caller to read from the boundary's error cell.
+		readonly catchErrors?: boolean;
 	} = {},
 ): RenderLocalInline {
 	const definitions: AnyNode[] = [];
 	const names = new Set<string>();
-	const result = inlineWithin(node, state, definitions, names, new Set(), {
+	const catchResets = new Map<string, string>();
+	const catchErrors = new Map<string, string>();
+	const catchErrorInstanceofs: AnyNode[] = [];
+	const result = inlineWithin(node, state, definitions, names, { catchResets, catchErrors, catchErrorInstanceofs }, new Set(), {
 		leaveCaptureOwned: options.leaveCaptureOwned === true,
 		leaveRowItems: options.leaveRowItems === true,
 		inlineFunctions: options.inlineFunctions === true,
 		inlineOnly: options.inlineOnly,
+		catchErrors: options.catchErrors === true,
 	});
-	return 'source' in result ? { kind: 'inlined', source: result.source, definitions, names } : result;
+	return 'source' in result
+		? { kind: 'inlined', source: result.source, definitions, names, catchResets, catchErrors, catchErrorInstanceofs }
+		: result;
 }
 
 function inlineWithin(
@@ -87,12 +112,18 @@ function inlineWithin(
 	state: WalkState,
 	definitions: AnyNode[],
 	names: Set<string>,
+	catches: {
+		readonly catchResets: Map<string, string>;
+		readonly catchErrors: Map<string, string>;
+		readonly catchErrorInstanceofs: AnyNode[];
+	},
 	inlining: Set<number>,
 	options: {
 		readonly leaveCaptureOwned: boolean;
 		readonly leaveRowItems: boolean;
 		readonly inlineFunctions: boolean;
 		readonly inlineOnly: ((declarationStart: number) => boolean) | undefined;
+		readonly catchErrors: boolean;
 	},
 ):
 	| { readonly source: string; readonly freeNames: ReadonlySet<string> }
@@ -107,6 +138,7 @@ function inlineWithin(
 	const splicedNames = new Set<string>();
 	const boundInside = new Set<string>();
 	let refusal: Exclude<RenderLocalInline, { readonly kind: 'inlined' }> | null = null;
+	let stateful: { readonly why: string; readonly rewrite: string } | null = null;
 
 	const ancestors: AnyNode[] = [];
 	const visit = (candidate: AnyNode, parent: AnyNode | null): void => {
@@ -121,6 +153,30 @@ function inlineWithin(
 					semantic.scopes[scopeId]!.node.end <= region.end
 				) {
 					boundInside.add(name);
+				} else if (
+					options.inlineFunctions &&
+					state.catchResetBoundaries.has(declarationStartOf(semantic, symbolId))
+				) {
+					const boundaryId = state.catchResetBoundaries.get(declarationStartOf(semantic, symbolId))!;
+					const known = catches.catchResets.get(name);
+					if (known !== undefined && known !== boundaryId) refusal = { kind: 'render-local', name };
+					else {
+						catches.catchResets.set(name, boundaryId);
+						freeNames.add(name);
+					}
+				} else if (
+					options.catchErrors &&
+					state.catchErrorBoundaries.has(declarationStartOf(semantic, symbolId))
+				) {
+					const boundaryId = state.catchErrorBoundaries.get(declarationStartOf(semantic, symbolId))!;
+					const known = catches.catchErrors.get(name);
+					if (known !== undefined && known !== boundaryId) refusal = { kind: 'render-local', name };
+					else {
+						catches.catchErrors.set(name, boundaryId);
+						freeNames.add(name);
+						if (parent?.type === 'BinaryExpression' && parent.operator === 'instanceof' && parent.left === candidate)
+							catches.catchErrorInstanceofs.push(parent);
+					}
 				} else if (repeatRowBindsName(name, state)) {
 					if (options.leaveRowItems) freeNames.add(name);
 					else refusal = { kind: 'row-item', name };
@@ -149,11 +205,26 @@ function inlineWithin(
 						refusal = { kind: 'render-local', name };
 					} else if (
 						options.inlineFunctions &&
+						(stateful = statefulFactoryCall(name, local.init, candidate, parent, state))
+					) {
+						refusal = { kind: 'stateful-factory', name, ...stateful };
+					} else if (
+						options.inlineFunctions &&
 						!isFunctionNode(local.init) &&
 						rebuiltLocalWrite(candidate, ancestors, local.init, state.source)
 					) {
-						const write = rebuiltLocalWrite(candidate, ancestors, local.init, state.source)!;
-						refusal = { kind: 'writes-render-local', name, write: write.source, call: write.call };
+						const write = rebuiltLocalWrite(
+							candidate,
+							ancestors,
+							local.init,
+							state.source,
+						)!;
+						refusal = {
+							kind: 'writes-render-local',
+							name,
+							write: write.source,
+							call: write.call,
+						};
 					} else {
 						const definition = local.init;
 						definitions.push(definition);
@@ -163,6 +234,7 @@ function inlineWithin(
 							state,
 							definitions,
 							names,
+							catches,
 							new Set([...inlining, symbolId]),
 							options,
 						);
@@ -214,6 +286,39 @@ function inlineWithin(
 	return { source: text, freeNames };
 }
 
+function declarationStartOf(semantic: ReturnType<WalkState['semantic']>, symbolId: number): number {
+	return semantic.bindings[symbolId]!.declarations[0]?.start ?? -1;
+}
+
+// The `@catch (error, reset)` reset a bare prop value such as `onRetry={reset}` names, if any.
+export function resetRelay(
+	expression: AnyNode,
+	state: WalkState,
+): { readonly name: string; readonly boundaryId: string } | undefined {
+	if (expression.type !== 'Identifier' || typeof expression.start !== 'number') return undefined;
+	const name = getIdentifierName(expression);
+	if (!name) return undefined;
+	const semantic = state.semantic();
+	const symbolId = resolvedSymbolAt(semantic, expression.start);
+	if (symbolId === null) return undefined;
+	const boundaryId = state.catchResetBoundaries.get(declarationStartOf(semantic, symbolId));
+	return boundaryId !== undefined ? { name, boundaryId } : undefined;
+}
+
+// The `@catch (error, reset)` reset bindings a function names, from the analyzer's resolved references.
+export function catchResetUses(
+	node: AnyNode,
+	state: WalkState,
+): ReadonlyArray<{ readonly name: string; readonly boundaryId: string }> {
+	if (state.catchResetBoundaries.size === 0) return [];
+	const uses = new Map<string, { readonly name: string; readonly boundaryId: string }>();
+	walkNode(node, (candidate) => {
+		const use = resetRelay(candidate, state);
+		if (use) uses.set(use.name, use);
+	});
+	return [...uses.values()];
+}
+
 // A row, an arm and a nested `@{ ... }` have no body of their own in the render, so a slot
 // reading a `const` declared in one carries that const's definition instead.
 export function inlineNestedTemplateLocals(node: AnyNode, state: WalkState): string | null {
@@ -249,7 +354,8 @@ function nestedTemplateScopes(state: WalkState): ReadonlyArray<Span> {
 			add(candidate.alternate as AnyNode | undefined);
 		}
 		if (candidate.type === 'JSXSwitchExpression')
-			for (const switchCase of (candidate.cases as AnyNode[] | undefined) ?? []) add(switchCase);
+			for (const switchCase of (candidate.cases as AnyNode[] | undefined) ?? [])
+				add(switchCase);
 		if (candidate.type === 'JSXTryExpression') {
 			add(candidate.block as AnyNode | undefined);
 			add(candidate.pending as AnyNode | undefined);
@@ -271,7 +377,11 @@ export function inlineHandlerRenderLocals(
 	node: AnyNode,
 	state: WalkState,
 	handlerLabel: string,
-): { readonly source: string; readonly definitionSpans: ReadonlyArray<SourceSpan> } | null {
+): {
+	readonly source: string;
+	readonly definitionSpans: ReadonlyArray<SourceSpan>;
+	readonly catchResets: ReadonlyMap<string, string>;
+} | null {
 	if (state.currentSharedDefinitionId) return null;
 	const inlined = inlineRenderLocals(node, state, {
 		leaveCaptureOwned: true,
@@ -298,6 +408,7 @@ export function inlineHandlerRenderLocals(
 				localName: inlined.name,
 				handler: node,
 				filename: state.filename,
+				...(inlined.kind === 'stateful-factory' && { unroutable: inlined }),
 			}),
 		);
 		return null;
@@ -308,6 +419,24 @@ export function inlineHandlerRenderLocals(
 		definitionSpans: inlined.definitions.flatMap(
 			(definition) => sourceSpan(definition, state.filename) ?? [],
 		),
+		catchResets: inlined.catchResets,
+	};
+}
+
+/** A handler named by a const that a visible factory call returns: each run rebuilds it from that call, then calls it. */
+export function factoryHandlerSource(
+	name: AnyNode,
+	parameterCount: number,
+	state: WalkState,
+	handlerLabel: string,
+): (NonNullable<ReturnType<typeof inlineHandlerRenderLocals>> & { readonly parameters: string[] }) | null {
+	const inlined = inlineHandlerRenderLocals(name, state, handlerLabel);
+	if (!inlined) return null;
+	const parameter = parameterCount === 0 ? '' : /\bevent\b/.test(inlined.source) ? 'domEvent' : 'event';
+	return {
+		...inlined,
+		source: `(${parameter}) => (${inlined.source})(${parameter})`,
+		parameters: parameter ? [parameter] : [],
 	};
 }
 
@@ -328,21 +457,18 @@ export function liftRenderLocalComposite(
 	if (!readSources && !inlineFunctions) return null;
 	const inlined = inlineRenderLocals(expression, state, { inlineFunctions });
 	if (inlined.kind !== 'inlined' || inlined.definitions.length === 0) return null;
-	if (inlineFunctions && inlined.definitions.some((definition) => writesOutside(definition, state)))
+	if (
+		inlineFunctions &&
+		inlined.definitions.some((definition) => writesOutside(definition, state))
+	)
 		return null;
-	const sources = new Set(
-		(readSources ?? collectGraphDependencies(expression, state).map(({ source }) => source)).filter(
-			(source) => readsGraphRoot(source, state),
+	const sources = joinReadSources([
+		(readSources ?? collectGraphDependencies(expression, state)).filter((read) =>
+			readsGraphRoot(read.source, state),
 		),
-	);
-	for (const definition of inlined.definitions)
-		for (const dependency of collectGraphDependencies(definition, state))
-			sources.add(dependency.source);
-	const lifted = mintTemplateExpressionComputed(
-		`() => ${inlined.source}`,
-		[...sources],
-		state,
-	);
+		...inlined.definitions.map((definition) => collectGraphDependencies(definition, state)),
+	])!;
+	const lifted = mintTemplateExpressionComputed(`() => ${inlined.source}`, sources, state);
 	if (lifted)
 		for (const definition of new Set(inlined.definitions))
 			collectDefinitionReads(definition, state);
@@ -358,7 +484,10 @@ function callsBodyFunction(expression: AnyNode, state: WalkState): boolean {
 		const callee = candidate.type === 'CallExpression' ? (candidate.callee as AnyNode) : null;
 		if (found || callee?.type !== 'Identifier' || typeof callee.start !== 'number') return;
 		const symbolId = resolvedSymbolAt(semantic, callee.start);
-		if (symbolId !== null && semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind !== 'module')
+		if (
+			symbolId !== null &&
+			semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind !== 'module'
+		)
 			found = true;
 	});
 	return found;
@@ -383,7 +512,8 @@ export function writesOutside(definition: AnyNode, state: WalkState): boolean {
 			root.type === 'Identifier' && typeof root.start === 'number'
 				? resolvedSymbolAt(semantic, root.start)
 				: null;
-		const scope = symbolId === null ? null : semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.node;
+		const scope =
+			symbolId === null ? null : semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.node;
 		writes =
 			!scope ||
 			typeof definition.start !== 'number' ||
@@ -397,11 +527,13 @@ export function writesOutside(definition: AnyNode, state: WalkState): boolean {
 // A const written inside an arm, row or `@{ }` re-runs with every render of that block, so a plain read of it is live.
 function namesNestedTemplateLocal(expression: AnyNode, state: WalkState): boolean {
 	let root = expression;
-	while (root.type === 'MemberExpression' && root.computed !== true) root = root.object as AnyNode;
+	while (root.type === 'MemberExpression' && root.computed !== true)
+		root = root.object as AnyNode;
 	if (root.type !== 'Identifier' || typeof root.start !== 'number') return false;
 	const semantic = state.semantic();
 	const symbolId = resolvedSymbolAt(semantic, root.start);
-	const declared = symbolId === null ? undefined : semantic.bindings[symbolId]!.declarations[0]?.start;
+	const declared =
+		symbolId === null ? undefined : semantic.bindings[symbolId]!.declarations[0]?.start;
 	return (
 		declared !== undefined &&
 		nestedTemplateScopes(state).some((scope) => declared >= scope.start && declared < scope.end)
@@ -443,28 +575,71 @@ export function liftArmRenderLocalValue(
 	const guard = armGuardCondition(state);
 	if (!guard) return null;
 	const definitions = [...guard.definitions, ...inlined.definitions];
-	const dependencies = [expression, ...guard.nodes, ...definitions].flatMap((node) =>
+	const shownDependencies = [expression, ...inlined.definitions].flatMap((node) =>
 		collectGraphDependencies(node, state),
 	);
+	const dependencies = [
+		...shownDependencies,
+		...[...guard.nodes, ...guard.definitions].flatMap((node) =>
+			collectGraphDependencies(node, state),
+		),
+	];
 	const asyncNodeIds = new Set(
 		state.graph.graphBindings.flatMap((binding) => (binding.asyncCapable ? [binding.id] : [])),
 	);
 	if (dependencies.some((dependency) => asyncNodeIds.has(dependency.graphNodeId))) return null;
 	// Nothing the browser can change decides the arm or its value, so the server's render of it stands.
-	if (dependencies.length > 0 && dependencies.every((dependency) => readsServerOnlyProp(dependency, state)))
+	if (
+		dependencies.length > 0 &&
+		dependencies.every((dependency) => readsServerOnlyProp(dependency, state))
+	)
 		return null;
 	const lifted = mintTemplateExpressionComputed(
 		guard.source === null
 			? `() => ${inlined.source}`
 			: `() => (${guard.source}) ? ${inlined.source} : undefined`,
-		[...new Set(dependencies.map((dependency) => dependency.source))],
+		joinReadSources([dependencies])!,
 		state,
 		undefined,
 		true,
 	);
-	if (lifted)
+	if (lifted) {
 		for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
+		markArmGuardDependencies(
+			lifted.graphNodeId,
+			shownDependencies,
+			dependencies.slice(shownDependencies.length),
+			state,
+		);
+	}
 	return lifted;
+}
+
+// A read of the same cell at a path prefix reads this one too: `props` covers `props.subject`.
+const covers = (reader: SemanticGraphDependency, read: SemanticGraphDependency) =>
+	reader.graphNodeId === read.graphNodeId &&
+	reader.path.length <= read.path.length &&
+	reader.path.every((segment, index) => segment === read.path[index]);
+
+// Only a cell the arm test reads and the shown value does not is the guard's alone.
+function markArmGuardDependencies(
+	graphNodeId: string,
+	shown: ReadonlyArray<SemanticGraphDependency>,
+	guard: ReadonlyArray<SemanticGraphDependency>,
+	state: WalkState,
+): void {
+	const guardOnly = (dependency: SemanticGraphDependency) =>
+		guard.some((read) => covers(read, dependency) && covers(dependency, read)) &&
+		!shown.some((reader) => covers(reader, dependency));
+	const index = state.graph.graphBindings.findIndex((binding) => binding.id === graphNodeId);
+	const binding = state.graph.graphBindings[index];
+	if (!binding?.dependencies?.some(guardOnly)) return;
+	state.graph.graphBindings[index] = {
+		...binding,
+		dependencies: binding.dependencies.map((dependency) =>
+			guardOnly(dependency) ? { ...dependency, armGuard: true as const } : dependency,
+		),
+	};
 }
 
 // The enclosing arms' conditions with body locals inlined, so a lifted value is only computed where its arm renders.
@@ -547,7 +722,12 @@ function classifyLocal(
 	const semantic = state.semantic();
 	if (semantic.bindings[symbolId]!.declarations.length !== 1) return { kind: 'opaque' };
 	const declared = classifyDeclaration(symbolId, state, inlineFunctions);
-	if (declared.kind === 'definition' && isFunctionNode(declared.init)) return declared;
+	// A const alias of another local is spliced as that local, which is classified in turn.
+	if (
+		declared.kind === 'definition' &&
+		(isFunctionNode(declared.init) || (inlineFunctions && declared.init.type === 'Identifier'))
+	)
+		return declared;
 	if (state.graph.localBindings.some((binding) => binding.name === name))
 		return { kind: 'capture-owned' };
 	return declared;
@@ -602,9 +782,9 @@ function classifyDeclaration(
 								  init.type === 'FunctionExpression' ||
 								  isClassInstanceValue(init)
 								? { kind: 'capture-owned' }
-							: candidate.kind === 'const'
-								? { kind: 'definition', init: declarator.init as AnyNode }
-								: { kind: 'opaque' };
+								: candidate.kind === 'const'
+									? { kind: 'definition', init: declarator.init as AnyNode }
+									: { kind: 'opaque' };
 		}
 	});
 	return found ?? { kind: 'opaque' };
@@ -641,7 +821,87 @@ function readsServerOnlyProp(
 	return state.serverOnlyProps.some(
 		({ exportName: owner, propName }) =>
 			owner === exportName &&
-			((dependency.graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID && dependency.path[0] === propName) ||
+			((dependency.graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID &&
+				dependency.path[0] === propName) ||
 				dependency.graphNodeId === `${PROTOCOL_PROP_GRAPH_NODE_PREFIX}${propName}`),
 	);
+}
+
+/** A factory-returned const is rebuilt on every event, so a stateful factory would restart; null when the rebuild is sound. */
+function statefulFactoryCall(
+	name: string,
+	init: AnyNode,
+	reference: AnyNode,
+	parent: AnyNode | null,
+	state: WalkState,
+): { readonly why: string; readonly rewrite: string } | null {
+	const call = unwrapTypeAssertion(init);
+	if (call?.type !== 'CallExpression') return null;
+	const callee = unwrapTypeAssertion(call.callee as AnyNode | undefined);
+	if (callee?.type !== 'Identifier' || typeof callee.start !== 'number') return null;
+	const calleeName = getIdentifierName(callee) ?? '';
+	const rewrite = `Write \`${name}\` as a const arrow in the component body that does the work itself, \`const ${name} = (event) => { … }\`, and keep anything it must remember between events in state().`;
+	const semantic = state.semantic();
+	const symbolId = resolvedSymbolAt(semantic, callee.start);
+	const factory = symbolId === null ? null : declaredFunction(declarationStartOf(semantic, symbolId), state);
+	if (!factory) {
+		const called = parent?.type === 'CallExpression' && parent.callee === reference;
+		if (!called || (symbolId !== null && semantic.bindings[symbolId]!.scope.kind !== 'module'))
+			return null;
+		return {
+			why: `\`${name}\` is what \`${calleeName}(…)\` returns, and that function is not declared in this file, so the compiler cannot see whether it keeps state between calls. The browser rebuilds \`${name}\` from its definition each time the event runs, so that call would run again on every event.`,
+			rewrite,
+		};
+	}
+	if (!returnsFunction(factory) || onlyReturnsFunction(factory)) return null;
+	return {
+		why: `\`${name}\` is what \`${calleeName}(…)\` returns, and \`${calleeName}\` does more than return a function. The browser rebuilds \`${name}\` from its definition each time the event runs, so that work would run again on every event and anything it remembers would start over.`,
+		rewrite,
+	};
+}
+
+function declaredFunction(declarationStart: number, state: WalkState): AnyNode | null {
+	let found: AnyNode | null = null;
+	walkNode(ownedModuleAst(state, state.source, state.filename), (candidate) => {
+		if (found) return;
+		if (candidate.type === 'FunctionDeclaration') {
+			if ((candidate.id as AnyNode | undefined)?.start === declarationStart) found = candidate;
+			return;
+		}
+		if (candidate.type !== 'VariableDeclaration' || candidate.kind !== 'const') return;
+		for (const declarator of (candidate.declarations as AnyNode[] | undefined) ?? []) {
+			const init = unwrapTypeAssertion(declarator.init as AnyNode | undefined);
+			if ((declarator.id as AnyNode | undefined)?.start === declarationStart && init && isFunctionNode(init))
+				found = init;
+		}
+	});
+	return found;
+}
+
+function returnsFunction(factory: AnyNode): boolean {
+	const body = factory.body as AnyNode | undefined;
+	if (!body) return false;
+	if (body.type !== 'BlockStatement') {
+		const value = unwrapTypeAssertion(body);
+		return !!value && isFunctionNode(value);
+	}
+	let found = false;
+	const visit = (node: AnyNode): void => {
+		if (found || (node !== body && isFunctionNode(node))) return;
+		if (node.type === 'ReturnStatement') {
+			const value = unwrapTypeAssertion(node.argument as AnyNode | undefined);
+			if (value && isFunctionNode(value)) found = true;
+		}
+		for (const child of childNodes(node)) visit(child);
+	};
+	visit(body);
+	return found;
+}
+
+function onlyReturnsFunction(factory: AnyNode): boolean {
+	if (factory.async === true || factory.generator === true) return false;
+	const body = factory.body as AnyNode | undefined;
+	if (body?.type !== 'BlockStatement') return true;
+	const statements = (body.body as AnyNode[] | undefined) ?? [];
+	return statements.length === 1 && statements[0]!.type === 'ReturnStatement';
 }

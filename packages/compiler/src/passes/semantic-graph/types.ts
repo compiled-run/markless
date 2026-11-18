@@ -26,11 +26,14 @@ import type {
 	SemanticLocalDeclaration,
 	SemanticMarkupArtifact,
 	SemanticOverlay,
+	SemanticBranchArm,
 	SemanticBranchSite,
 	SemanticStateRead,
 	SemanticStateWrite,
+	ModuleFunctionWrites,
 	SemanticTemplateBindingTarget,
 	SemanticTemplateRead,
+	SemanticRowLocalReads,
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
 import type { StyleConstResolver } from './style-object.ts';
@@ -75,11 +78,20 @@ export type MutableSemanticGraphArtifact = {
 	aliases: SemanticGraphAlias[];
 	stateReads: SemanticStateRead[];
 	templateReads: SemanticTemplateRead[];
+	rowLocalReads?: SemanticRowLocalReads[];
 	stateWrites: SemanticStateWrite[];
+	importedFunctionWriteRequests?: string[];
 	asyncBoundaries: Array<{
 		readonly id: string;
 		readonly anchorOrder: number;
 		readonly parentBoundaryId?: string;
+		readonly componentName?: string;
+		/** The name `@catch (name)` binds the rejection to. */
+		readonly errorName?: string;
+		errorGraphNodeId?: string;
+		readonly gateGraphNodeId?: string;
+		/** Where the `@try` keyword is written. */
+		readonly keywordSpan?: SourceSpan;
 	}>;
 	branchSites: SemanticBranchSite[];
 	markup: SemanticMarkupArtifact;
@@ -102,6 +114,19 @@ export type PendingElementHandleIdref = Omit<
 	readonly declaringScope?: string;
 };
 
+/** An `aria-busy` the author wrote on a host element, static or bound. */
+export type AuthoredAriaBusy = { readonly hostNodeId: string; readonly sourceSpan?: SourceSpan };
+
+/** A `<form>` whose method may be post, and the `@try` in its own markup whose `@catch` would take its failure. */
+export type PostFormCandidate = {
+	readonly hostNodeId: string;
+	readonly catchBoundaryId?: string;
+	readonly componentName?: string;
+	readonly sourceSpan?: SourceSpan;
+	/** A `target`, `rel="external"` or another site's `action` asks for the browser's own submit. */
+	readonly leavesByDesign?: true;
+};
+
 export type WalkState = {
 	readonly filename: string;
 	readonly moduleId: string;
@@ -121,9 +146,24 @@ export type WalkState = {
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly importedModuleConstants: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+	readonly importedFunctionWrites: Readonly<Record<string, ModuleFunctionWrites>>;
+	/** The router renders this module's default export as a page, so that component's props never change in the browser. */
+	readonly routeRoot: boolean;
 	/** Props the host provides only while rendering on the server, by component export. */
-	readonly serverOnlyProps: ReadonlyArray<{ readonly exportName: string; readonly propName: string }>;
+	readonly serverOnlyProps: ReadonlyArray<{
+		readonly exportName: string;
+		readonly propName: string;
+	}>;
 	readonly hostIds: WeakMap<object, string>;
+	/** Cancels in event callback props the compiler cannot place, refused once the walk knows the child hands that prop to an event. */
+	readonly relayCancelRefusals: Array<{
+		readonly childComponentName: string;
+		readonly importSource?: string;
+		readonly propName: string;
+		readonly diagnostic: SemanticGraphDiagnostic;
+	}>;
+	/** The host element each host sits directly inside, in its component's own markup. */
+	readonly hostParents: Map<string, string>;
 	/** Template values already refused at their use site; the walk must not treat them as markup again. */
 	readonly handledTemplateValues: WeakSet<object>;
 	currentComponentName: string | null;
@@ -133,6 +173,7 @@ export type WalkState = {
 	currentBranchScopeIds: string[];
 	/** The `branch-site:` ids of the @if/@switch blocks enclosing the walk, outermost first. */
 	currentBranchSiteIds: string[];
+	currentBranchArms: SemanticBranchArm[];
 	currentKeyedRepeatScopeIds: string[];
 	/** Source span of each keyed repeat's item declaration, by repeat id. */
 	readonly keyedRepeatItemSpans: Map<string, { readonly start: number; readonly end: number }>;
@@ -143,6 +184,8 @@ export type WalkState = {
 	currentArmScope: { readonly branchSiteId: string; readonly hostNodeId: string | null } | null;
 	// The conditions every enclosing @if/@switch arm needs to hold, outermost first.
 	currentArmGuards: ArmGuard[];
+	/** Statements written directly in an @if/@switch arm body, where a state() is arm-local. */
+	readonly armBodyStatements: WeakSet<object>;
 	// Set while walking a component edge's children; `hostNodeId` is the enclosing
 	// host at entry. A read still seeing it is projected into the child.
 	currentProjectionScope: {
@@ -153,11 +196,23 @@ export type WalkState = {
 	currentAsyncBoundaryId: string | null;
 	// Arm index inside the current boundary: 0 = @try, 1 = @pending, 2 = @catch.
 	currentAsyncBoundaryArm: number | null;
+	// The enclosing host at the current boundary's entry, the async twin of `currentArmScope.hostNodeId`.
+	currentAsyncArmHostNodeId: string | null;
+	// The nearest `@try` with a `@catch` whose @try arm holds the current node.
+	currentCatchBoundaryId: string | null;
 	currentSharedDefinitionId: string | null;
-	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | null;
+	// 'branch' is a plain `if` statement in the body; 'arm' is an @if/@switch arm, where a state() can be arm-local.
+	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'arm' | 'loop' | 'row' | null;
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
+	repeatCollectionSpans: Map<string, SourceSpan>;
+	authoredAriaBusy: AuthoredAriaBusy[];
+	// aria-disabled written on a control that submits its form.
+	authoredSubmitAriaDisabled: AuthoredAriaBusy[];
+	postForms: PostFormCandidate[];
+	/** The host element each component edge sits inside, in its parent's own markup. */
+	edgeHosts: Map<string, string>;
 	currentHelperCall: HelperStateCallSite | null;
 	helperFunctions: Map<string, AnyNode>;
 	// `checkbox.root` -> `CheckboxRoot` for module-scope objects that hold
@@ -186,6 +241,10 @@ export type WalkState = {
 	nextHostId: number;
 	nextEventId: number;
 	nextBoundaryId: number;
+	/** The boundary each `@catch (error, reset)` reset binding resets, by the binding's declaration offset. */
+	catchResetBoundaries: Map<number, string>;
+	/** The boundary each `@catch (error)` error binding names, by the binding's declaration offset. */
+	catchErrorBoundaries: Map<number, string>;
 	nextBranchSiteId: number;
 	nextAnchorOrder: number;
 };
@@ -260,7 +319,12 @@ export function createWalkState(input: {
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
-	readonly serverOnlyProps?: ReadonlyArray<{ readonly exportName: string; readonly propName: string }>;
+	readonly importedFunctionWrites?: Readonly<Record<string, ModuleFunctionWrites>>;
+	readonly serverOnlyProps?: ReadonlyArray<{
+		readonly exportName: string;
+		readonly propName: string;
+	}>;
+	readonly routeRoot?: boolean;
 	/** Overridable so a test can observe when analysis is requested. */
 	readonly analyzeSemantics?: (source: string, filename: string) => ModuleSemantics;
 }): WalkState {
@@ -275,28 +339,41 @@ export function createWalkState(input: {
 		frameworkApiImports: input.frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces ?? {},
 		importedModuleConstants: input.importedModuleConstants ?? {},
+		importedFunctionWrites: input.importedFunctionWrites ?? {},
 		serverOnlyProps: input.serverOnlyProps ?? [],
+		routeRoot: input.routeRoot === true,
 		hostIds: new WeakMap<object, string>(),
+		relayCancelRefusals: [],
+		hostParents: new Map(),
 		handledTemplateValues: new WeakSet<object>(),
 		currentComponentName: null,
 		currentComponentId: null,
 		currentStyleScopeClass: null,
 		currentBranchScopeIds: [],
 		currentBranchSiteIds: [],
+		currentBranchArms: [],
 		currentKeyedRepeatScopeIds: [],
 		keyedRepeatItemSpans: new Map(),
 		currentHostNodeId: null,
 		currentArmScope: null,
 		currentArmGuards: [],
+		armBodyStatements: new WeakSet<object>(),
 		currentProjectionScope: null,
 		currentTextTarget: null,
 		currentAsyncBoundaryId: null,
 		currentAsyncBoundaryArm: null,
+		currentAsyncArmHostNodeId: null,
+		currentCatchBoundaryId: null,
 		currentSharedDefinitionId: null,
 		currentCreationSite: null,
 		currentFunctionSite: null,
 		deferredComputedWrites: [],
 		pendingElementHandleIdrefs: [],
+		repeatCollectionSpans: new Map(),
+		authoredAriaBusy: [],
+		authoredSubmitAriaDisabled: [],
+		postForms: [],
+		edgeHosts: new Map(),
 		currentHelperCall: null,
 		helperFunctions: new Map(),
 		memberTagTargets: new Map(),
@@ -310,6 +387,8 @@ export function createWalkState(input: {
 		nextHostId: 0,
 		nextEventId: 0,
 		nextBoundaryId: 0,
+		catchResetBoundaries: new Map(),
+		catchErrorBoundaries: new Map(),
 		nextBranchSiteId: 0,
 		nextAnchorOrder: 0,
 	};

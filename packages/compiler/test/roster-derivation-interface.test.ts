@@ -14,7 +14,7 @@ export const beadState = shared(
 		const beads = element<HTMLSpanElement[]>();
 		return { ...strand, beads };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 export function BeadStrand({ children }: { readonly children?: unknown }) @{
 	const strand = beadState();

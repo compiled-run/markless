@@ -110,3 +110,38 @@ test('the emitted resolver answers each bound id with the row it replaced', asyn
 		'Unknown async symbol',
 	);
 });
+
+// A handler handed a row's whole item reads it along an empty path, which the served row has to keep.
+test('a row-local slot for a whole row item reads that item', async () => {
+	const route = { componentEdgeId: 'component-edge:0', componentEdgePath: ['component-edge:0'] };
+	const row = {
+		id: 'bound:symbol%3A0:component-edge%3A0',
+		baseSymbolId: 'symbol:0',
+		componentEdgePath: ['component-edge:0'],
+		ancestry: [{}],
+		captureSlots: [
+			{
+				slotId: 'capture-slot:prop:Tag:word#0',
+				route: { kind: 'row-local', ...route, itemName: 'word', path: [] },
+				legacyGraphRead: { graphNodeId: 'prop:props', path: ['word'] },
+			},
+		],
+	};
+	const source = emitSymbolResolverModule({
+		symbols: [
+			{
+				id: 'symbol:0',
+				chunk: `data:text/javascript,${encodeURIComponent(
+					"export const run = (context) => context.capture.read('capture-slot:prop:Tag:word#0')",
+				)}`,
+				exportName: 'run',
+			},
+		],
+		boundSymbols: [row] as never,
+	});
+	const resolver = (await import(`data:text/javascript,${encodeURIComponent(source)}`)) as {
+		loadSymbol(id: string): Promise<(context: object) => unknown>;
+	};
+	const handler = await resolver.loadSymbol(row.id);
+	expect(handler({ locals: { word: 'kept' } })).toBe('kept');
+});

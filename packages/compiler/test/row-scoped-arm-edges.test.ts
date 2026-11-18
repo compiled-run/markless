@@ -114,9 +114,9 @@ test('a component edge under an @if arm inside a keyed row emits row-scoped', as
 	const ssr = page.publicRenderModule.ssrModuleSource;
 
 	// The edge takes the row's runtime placement, and its refusal is the keyed
-	// one (no row key) rather than the blanket "inside any row" refusal.
+	// one (an enclosing row with no key) rather than the blanket "inside any row" refusal.
 	expect(ssr).toContain('marklessSsrRowPlacement');
-	expect(ssr).toContain('marklessSsrDataContext.repeatKey===undefined');
+	expect(ssr).toContain('marklessSsrRowSegment(marklessSsrDataContext)===undefined');
 	expect(ssr).not.toContain('marklessSsrDataContext.repeatItem!==undefined');
 });
 

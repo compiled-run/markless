@@ -82,10 +82,10 @@ test('SSR resume: the same deep click record runs', async () => {
  * - Escape still works. The backdrop's dismissal reads at a shorter path that
  *   never probes the poisoned key.
  * - A consumer's own button in the same surface still works. It is not a
- *   widget-scoped part, so it never asks this registry at all.
+ *   subtree-scoped part, so it never asks this registry at all.
  *
  * The fix: one registry per RuntimeGraph, held in a WeakMap and filled from the
- * graph's own widget-scoped definitions. A torn-down container's graph is the
+ * graph's own subtree-scoped definitions. A torn-down container's graph is the
  * only thing its roots were ever filed against, so it strands no keys.
  */
 test('CSR: an earlier nested render leaves the flat page deep close working', async () => {

@@ -1,6 +1,7 @@
 import { render } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
 import { virtualDriver } from '../../test-support/virtual-driver.ts';
+import { EMPTY_VALUE_TEXT } from './datebox-math.ts';
 import Basic from './scenarios/basic.tsrx';
 import Bounded from './scenarios/bounded.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
@@ -126,6 +127,18 @@ async function focusBox(testid: string) {
 test('the three boxes are announced inside a group that carries the name', async () => {
 	await open(Basic);
 	expectConveys(await readFor([say.group, 'Start date']), [say.group, 'Start date']);
+});
+
+// An empty box has no aria-valuenow; handed none, a platform reader computes 0 and speaks it as a percentage of the bounds.
+test('an empty box conveys that it is empty, never a number', async () => {
+	await open(Basic);
+	for (const name of ['month input', 'day input', 'year input']) {
+		const phrase = await readFor([say.spinbutton, name]);
+		expect(phrase, `${sr.name} announced "${phrase}"`).toContain(EMPTY_VALUE_TEXT);
+	}
+	for (const box of document.querySelectorAll('[role="spinbutton"]')) {
+		expect(box.hasAttribute('aria-valuenow')).toBe(false);
+	}
 });
 
 test('each box conveys the spinbutton role and which part of the date it holds', async () => {

@@ -13,7 +13,7 @@ export const widthFamily = shared(
 
 		return { ...s, trackEl, rootEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function WidthRoot({ children }) @{

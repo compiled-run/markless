@@ -1,4 +1,4 @@
-import { dirname, join, normalize, relative } from 'pathe';
+import { basename, dirname, join, normalize, relative } from 'pathe';
 import {
 	type ChunkDynamicImport,
 	chunkDynamicImports,
@@ -17,17 +17,34 @@ import {
 } from './chunk-ast.ts';
 import { RolldownMagicString, type Plugin } from 'rolldown';
 import { CHUNK_WORKER_MIN_CODE_LENGTH, runChunkTask } from './chunk-workers.ts';
-import { PACK_LOAD, PACK_LOADER_PREFIX } from './pack-loader-names.ts';
+import {
+	PACK_LOAD,
+	PACK_LOADER_PREFIX,
+	PACK_RESIDENT,
+	PACK_RESIDENT_LOAD,
+} from './pack-loader-names.ts';
 import { rootRelativeId } from '../module-id.ts';
 import { withoutMachinePaths } from './machine-paths.ts';
 import { packOfPiece, startupPackOfLazy } from './route-pack-groups.ts';
 import { warmPacksSuffix } from './warm-packs.ts';
+import {
+	NAMESPACE_HELPER,
+	type NamespaceLoad,
+	type NamespaceObject,
+	crossChunkNamespaceLoad,
+	namespaceLoadTexts,
+	namespaceObjects,
+	namespaceOwners,
+	sameChunkLoadCandidates,
+	sameChunkNamespaceLoads,
+} from './namespace-lazy-loads.ts';
 
 export function lazyModuleFacadesPlugin(
 	root: () => string = () => '',
 	packOf?: (moduleId: string) => string | undefined,
 	packRoutes?: (pack: string) => ReadonlyArray<string> | undefined,
 	eagerLazyRoutes?: (lazyPack: string) => ReadonlyArray<string> | undefined,
+	namespaceLoads: () => ((moduleId: string) => boolean) | undefined = () => () => true,
 ): Plugin & { readonly api: { removedChunks(): ReadonlySet<string> } } {
 	let chunks: Record<string, Chunk> = {};
 	let removed = new Set<string>();
@@ -42,6 +59,8 @@ export function lazyModuleFacadesPlugin(
 		chunks = {};
 		removed = new Set();
 		pending = new Map();
+		droppedNamespaceChars.clear();
+		collapsedLoadChars.clear();
 	};
 	return {
 		name: 'markless-lazy-module-facades',
@@ -59,6 +78,9 @@ export function lazyModuleFacadesPlugin(
 				dynamicImports: [...chunk.dynamicImports],
 				moduleIds: [...chunk.moduleIds],
 				exports: [...chunk.exports],
+				namespaceModules: code.includes(NAMESPACE_HELPER)
+					? namespaceOwners(chunk.modules)
+					: undefined,
 			};
 			return new Promise((resolve, reject) => {
 				pending.set(chunk.fileName, { resolve, reject });
@@ -82,7 +104,13 @@ export function lazyModuleFacadesPlugin(
 								chunks,
 								(chunk, replacements, suffix) =>
 									edits.set(chunk.fileName, { replacements, suffix }),
-								{ root: root(), packOf, packRoutes, eagerLazyRoutes },
+								{
+									root: root(),
+									packOf,
+									packRoutes,
+									eagerLazyRoutes,
+									namespaceLoads: namespaceLoads(),
+								},
 							).removed,
 						);
 						const prefixes = buildPathIdentifierPrefixes(root());
@@ -206,6 +234,8 @@ type Chunk = {
 	facadeModuleId?: string | null;
 	moduleIds: string[];
 	exports: string[];
+	// The module each `__exportAll` namespace object of the chunk belongs to.
+	namespaceModules?: Readonly<Record<string, string>>;
 };
 type Facade = {
 	target: Chunk;
@@ -235,6 +265,8 @@ export function collapseLazyModuleFacades(
 		readonly packOf?: (moduleId: string) => string | undefined;
 		readonly packRoutes?: (pack: string) => ReadonlyArray<string> | undefined;
 		readonly eagerLazyRoutes?: (lazyPack: string) => ReadonlyArray<string> | undefined;
+		/** Which modules' lazy loads Rolldown writes as namespace reads to collapse too, not only facade chunks. */
+		readonly namespaceLoads?: (moduleId: string) => boolean;
 	} = {},
 ): { removed: string[] } {
 	const chunks = new Map(
@@ -430,6 +462,9 @@ export function collapseLazyModuleFacades(
 			identity: facadeIdentity(chunk, exports, calls, options.root),
 		});
 	}
+	const namespaceRemovals = options.namespaceLoads
+		? collectNamespaceLoads(chunks, imports, pending, options.namespaceLoads, options.root)
+		: new Map<string, Replacement[]>();
 	// Loader names follow facade identity, not emission order, so one new facade changes no other chunk.
 	pending.sort(
 		(a, b) =>
@@ -449,10 +484,13 @@ export function collapseLazyModuleFacades(
 		reserved.push(name);
 		return name;
 	};
-	const namespaces = new Map<string, string>();
+	const namespaces = new Map<string, { readonly namespace: string; readonly once: string }>();
 	for (const facade of pending) {
 		if (!namespaces.has(facade.target.fileName))
-			namespaces.set(facade.target.fileName, reserve(facade.target, '__marklessNamespace'));
+			namespaces.set(facade.target.fileName, {
+				namespace: reserve(facade.target, '__marklessNamespace'),
+				once: reserve(facade.target, `${PACK_LOADER_PREFIX}Once`),
+			});
 		const loader = reserve(facade.target, `${PACK_LOADER_PREFIX}${shortHash(facade.identity)}`);
 		const imports: Facade['imports'] = [];
 		const local = ({ from, name }: Binding) => {
@@ -486,9 +524,11 @@ export function collapseLazyModuleFacades(
 		}
 	}
 	for (const [fileName, facade] of facades) {
-		const namespace = namespaces.get(facade.target.fileName)!;
+		const { namespace, once } = namespaces.get(facade.target.fileName)!;
 		const declarations = additions.get(facade.target.fileName) ?? [
 			`const ${namespace}=(${createPackedNamespace.toString()});`,
+			// Loader state lives on the function, so an unevaluated loader adds no top-level statement.
+			`function ${once}(loader,build){const state=loader.state;if(state){if(state.failed)throw state.error;return state.value}try{return(loader.state={value:${namespace}(build())}).value}catch(error){throw(loader.state={failed:true,error}).error}}`,
 		];
 		const { loader } = facade;
 		for (const { from, name, alias } of facade.imports) {
@@ -498,13 +538,12 @@ export function collapseLazyModuleFacades(
 			);
 		}
 		declarations.push(
-			// Loader state lives on the function, so an unevaluated loader adds no top-level statement.
-			`export function ${loader}(){const state=${loader}.state;if(state){if(state.failed)throw state.error;return state.value}try{${facade.calls.map((name) => `${name}();`).join('')}return(${loader}.state={value:${namespace}({__proto__:null,${facade.exports.map(([name, local]) => `get ${JSON.stringify(name)}(){return ${local}}`).join(',')}})}).value}catch(error){throw(${loader}.state={failed:true,error}).error}}`,
+			`export function ${loader}(){return ${once}(${loader},()=>(${facade.calls.map((name) => `${name}(),`).join('')}{${facade.exports.map(([name, local]) => `get ${JSON.stringify(name)}(){return ${local}}`).join(',')}}))}`,
 		);
 		additions.set(facade.target.fileName, declarations);
 		facade.target.exports.push(loader);
-		const original = chunks.get(fileName)!;
-		if (original.facadeModuleId && !facade.target.moduleIds.includes(original.facadeModuleId))
+		const original = chunks.get(fileName);
+		if (original?.facadeModuleId && !facade.target.moduleIds.includes(original.facadeModuleId))
 			facade.target.moduleIds.push(original.facadeModuleId);
 	}
 	// A pack only some routes preload, loaded from code other routes run too, is evaluated by those routes' own packs.
@@ -563,7 +602,7 @@ export function collapseLazyModuleFacades(
 		additions.get(fileName)!.push(`${PACK_REGISTRATION}={${[...loaders].join(',')}};`);
 	for (const chunk of chunks.values()) {
 		if (facades.has(chunk.fileName)) continue;
-		const replacements: Replacement[] = [];
+		const replacements: Replacement[] = [...(namespaceRemovals.get(chunk.fileName) ?? [])];
 		const lookup = usesRegistry(chunk);
 		const evaluated = new Set<Chunk>(evaluatedByRoute.get(chunk.fileName));
 		for (const node of imports.get(chunk.fileName) ?? []) {
@@ -584,7 +623,7 @@ export function collapseLazyModuleFacades(
 				end: node.end,
 				source:
 					facade.target === chunk && !awaiting.has(chunk.fileName)
-						? `(async()=>{await 0;return ${facade.loader}()})()`
+						? `${PACK_RESIDENT_LOAD}(${facade.loader})`
 						: lookup
 							? `${PACK_LOAD}(${specifier},"${facade.loader}",()=>import(${specifier}))`
 							: `import(${specifier}).then(module=>module.${facade.loader}())`,
@@ -603,6 +642,12 @@ export function collapseLazyModuleFacades(
 			...(additions.get(chunk.fileName) ?? []),
 			...(lookup && replacements.some(({ source }) => source.startsWith(PACK_LOAD))
 				? [PACK_LOAD_SOURCE]
+				: []),
+			...(replacements.some(
+				({ source }) =>
+					source.startsWith(PACK_RESIDENT_LOAD) || (lookup && source.startsWith(PACK_LOAD)),
+			)
+				? [PACK_RESIDENT_LOAD_SOURCE]
 				: []),
 			...(evaluated.size
 				? [
@@ -637,14 +682,16 @@ export function collapseLazyModuleFacades(
 	}
 	for (const [key, value] of Object.entries(bundle))
 		if (facades.has((value as Chunk)?.fileName)) delete bundle[key];
-	return { removed: [...facades.keys()] };
+	return { removed: [...facades.keys()].filter((name) => !isNamespaceLoadKey(name)) };
 }
 
 // A pack registers its loaders when it evaluates, because import() of an evaluated module still resolves a task later.
 export const PACK_REGISTRY = '__marklessPacks';
 export const PACK_REGISTRATION = `(globalThis.${PACK_REGISTRY}??={})[import.meta.url]`;
 const PACKED_NAME_PATTERN = /\$ml[\w$]*|__marklessNamespace[\w$]*/g;
-const PACK_LOAD_SOURCE = `function ${PACK_LOAD}(specifier,loader,load){const pack=globalThis.${PACK_REGISTRY}?.[import.meta.resolve?.(specifier)];return pack?Promise.resolve().then(pack[loader]):load().then(module=>module[loader]())}`;
+// The module still evaluates a microtask after the import() call, as a native import() would; only a caller that reads the loader runs it sooner.
+const PACK_RESIDENT_LOAD_SOURCE = `function ${PACK_RESIDENT_LOAD}(load){const loading=(async()=>{await 0;return load()})();loading.${PACK_RESIDENT}=load;return loading}`;
+const PACK_LOAD_SOURCE = `function ${PACK_LOAD}(specifier,loader,load){const pack=globalThis.${PACK_REGISTRY}?.[import.meta.resolve?.(specifier)];return pack?${PACK_RESIDENT_LOAD}(pack[loader]):load().then(module=>module[loader]())}`;
 
 // Evaluating a pack only declares its lazy module bodies. A route preloads the lazy targets of every pack it
 // reaches, so a target serving the same route, or shared, is evaluated a task after its importer and registers.
@@ -751,7 +798,31 @@ export function facadeChunkFacts(fileName: string, code: string) {
 		localExportSpecifiers: readChunkLocalExportSpecifiers(fileName, code),
 		inertness: readChunkInertness(fileName, code),
 		topLevelAwait: readChunkTopLevelAwait(fileName, code),
+		sameChunkLoadStarts: readSameChunkLoadStarts(fileName, code),
 	};
+}
+
+const sameChunkLoadStartsByCode = new Map<string, readonly number[]>();
+
+function sameChunkLoadStarts(fileName: string, code: string): readonly number[] {
+	return sameChunkLoadStartsByCode.get(code) ?? readSameChunkLoadStarts(fileName, code);
+}
+
+// A same-pack load is matched as text, so only the matches that are calls in the tree count.
+export function readSameChunkLoadStarts(fileName: string, code: string): number[] {
+	const candidates = sameChunkLoadCandidates(code);
+	if (!candidates.length) return [];
+	const spans = new Set(candidates.map(({ start, end }) => `${start}:${end}`));
+	const starts: number[] = [];
+	walk(
+		parseChunkCode(fileName, code).program,
+		candidates.map(({ start }) => start),
+		(node) => {
+			if (node.type === 'CallExpression' && spans.has(`${node.start}:${node.end}`))
+				starts.push(node.start!);
+		},
+	);
+	return starts;
 }
 
 /** Reads every large chunk's facade facts on the chunk workers, so the collapse finds them cached. */
@@ -780,6 +851,7 @@ export async function prefetchFacadeChunkFacts(
 						);
 						inertnessByCode.set(chunk.code, facts.inertness);
 						topLevelAwaitByCode.set(chunk.code, facts.topLevelAwait);
+						sameChunkLoadStartsByCode.set(chunk.code, facts.sameChunkLoadStarts);
 					},
 					// A read that throws is left to the synchronous path, which reports it where it did.
 					() => {},
@@ -791,6 +863,7 @@ export async function prefetchFacadeChunkFacts(
 export function clearFacadeChunkFacts(): void {
 	inertnessByCode.clear();
 	topLevelAwaitByCode.clear();
+	sameChunkLoadStartsByCode.clear();
 }
 
 function topLevelScope(body: Syntax[], leafSources: Set<string>): TopLevelScope {
@@ -899,7 +972,7 @@ function createPackedNamespace(bindings: Record<string, unknown>): object {
 	Object.preventExtensions(target);
 	return new Proxy(target, {
 		get(target, key) {
-			return key in bindings ? Reflect.get(bindings, key) : Reflect.get(target, key);
+			return Object.hasOwn(bindings, key) ? Reflect.get(bindings, key) : Reflect.get(target, key);
 		},
 		getOwnPropertyDescriptor(target, key) {
 			const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
@@ -908,7 +981,7 @@ function createPackedNamespace(bindings: Record<string, unknown>): object {
 			return descriptor;
 		},
 		defineProperty(target, key, descriptor) {
-			if (!(key in bindings)) return Reflect.defineProperty(target, key, descriptor);
+			if (!Object.hasOwn(bindings, key)) return Reflect.defineProperty(target, key, descriptor);
 			return (
 				descriptor.configurable !== true &&
 				descriptor.enumerable !== false &&
@@ -1047,4 +1120,380 @@ function mayHold(offsets: readonly number[], value: unknown): boolean {
 		Array.isArray(value) ||
 		spansAnyOffset(offsets, value)
 	);
+}
+
+const NAMESPACE_LOAD_KEY = '\0markless-namespace-load:';
+
+// Per module, the chars of namespace objects the last render dropped; Rolldown's per-module code still holds them.
+const droppedNamespaceChars = new Map<string, number>();
+
+// The chars each collapsed namespace load's text adds over the facade load it replaced.
+const collapsedLoadChars = new Map<string, number>();
+
+/** Chars of a module's rendered code that the facade pass removed again: namespace objects and namespace loads. */
+export function collapsedGlueLength(moduleId: string, code: string): number {
+	let glue = droppedNamespaceChars.get(moduleId) ?? 0;
+	for (const text of namespaceLoadTexts(code)) glue += collapsedLoadChars.get(text) ?? 0;
+	return glue;
+}
+
+function isNamespaceLoadKey(name: string): boolean {
+	return name.startsWith(NAMESPACE_LOAD_KEY);
+}
+
+// Rolldown drops a grouped module's facade chunk and reads its namespace object from the pack instead.
+// Each such read becomes a facade entry the collapse below turns into a loader, as it does a facade chunk;
+// returns the edits that drop namespace objects no other code reads.
+function collectNamespaceLoads(
+	chunks: ReadonlyMap<string, Chunk>,
+	imports: Map<string, readonly ChunkDynamicImport[]>,
+	pending: PendingFacade[],
+	collapses: (moduleId: string) => boolean,
+	root: string | undefined,
+): Map<string, Replacement[]> {
+	const namespaces = new Map<string, Map<string, NamespaceObject>>();
+	const namespacesOf = (chunk: Chunk) => {
+		let found = namespaces.get(chunk.fileName);
+		if (!found) namespaces.set(chunk.fileName, (found = namespaceObjects(chunk.code)));
+		return found;
+	};
+	const exportsOf = new Map<string, Map<string, string> | undefined>();
+	const localExports = (chunk: Chunk) => {
+		if (!exportsOf.has(chunk.fileName))
+			exportsOf.set(
+				chunk.fileName,
+				chunkLocalExportSpecifiers(chunk.fileName, chunk.code) ??
+					exportSpecifiersFromTree(chunk),
+			);
+		return exportsOf.get(chunk.fileName);
+	};
+	type Read = { readonly target: Chunk; readonly local: string };
+	const reads = new Map<string, Read>();
+	const initOf = new Map<string, string | null>();
+	// Per chunk, how many collapsed loads read each namespace name, whichever pack it names.
+	const siteNames = new Map<string, Map<string, number>>();
+	// Per chunk, where each import() a collapsed load replaces starts.
+	const collapsed = new Map<string, Set<number>>();
+	for (const chunk of chunks.values()) {
+		const loads: { load: NamespaceLoad; target: Chunk; read?: number }[] = [];
+		// The parser's module record can list one import() twice.
+		const seen = new Set<number>();
+		for (const expression of imports.get(chunk.fileName) ?? []) {
+			if (
+				expression.specifier === undefined ||
+				!expression.plain ||
+				seen.has(expression.start)
+			)
+				continue;
+			seen.add(expression.start);
+			const target = chunks.get(resolve(chunk.fileName, expression.specifier));
+			if (!target || target === chunk || !target.moduleIds.length) continue;
+			const load = crossChunkNamespaceLoad(chunk.code, expression.start, expression.end);
+			if (load) loads.push({ load, target, read: expression.end });
+		}
+		const sameChunk = sameChunkNamespaceLoads(chunk.code, namespacesOf(chunk));
+		const calls = sameChunk.length ? sameChunkLoadStarts(chunk.fileName, chunk.code) : [];
+		for (const load of sameChunk)
+			if (calls.includes(load.start)) loads.push({ load, target: chunk });
+		if (!loads.length) continue;
+		const nodes = [...(imports.get(chunk.fileName) ?? [])];
+		for (const { load, target, read } of loads) {
+			const exported = target === chunk ? undefined : localExports(target);
+			const local = target === chunk ? load.namespace : exported?.get(load.namespace);
+			const init =
+				load.init === undefined
+					? null
+					: target === chunk
+						? load.init
+						: exported?.get(load.init);
+			const namespace = local === undefined ? undefined : namespacesOf(target).get(local);
+			const owner = namespace && target.namespaceModules?.[namespace.local];
+			if (
+				!namespace ||
+				owner === undefined ||
+				!collapses(owner) ||
+				init === undefined ||
+				target.exports.includes('then') ||
+				namespace.entries.some(([name]) => name === 'then' || /^(0|[1-9]\d*)$/.test(name))
+			)
+				continue;
+			const key = `${NAMESPACE_LOAD_KEY}${target.fileName}#${namespace.local}`;
+			if (!reads.has(key)) {
+				reads.set(key, { target, local: namespace.local });
+				initOf.set(key, init);
+				// Identity reads the names a facade chunk would have imported, so loaders keep their names.
+				const exportedAs = new Map<string, string>();
+				for (const [name, bound] of localExports(target) ?? [])
+					if (!exportedAs.has(bound)) exportedAs.set(bound, name);
+				const bindings = new Map<string, string>();
+				const bind = (local: string): Binding => {
+					let name = exportedAs.get(local) ?? local;
+					// `#` cannot start an identifier, so a local another local's export alias shadows keys apart.
+					if ((bindings.get(name) ?? local) !== local) name = `#${local}`;
+					bindings.set(name, local);
+					return { from: target.fileName, name };
+				};
+				const calls = init ? [bind(init)] : [];
+				const exports = namespace.entries
+					.map(([name, value]): [string, Binding] => [name, bind(value)])
+					.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+				pending.push({
+					fileName: key,
+					target,
+					targetBindings: bindings,
+					calls,
+					exports,
+					identity: facadeIdentity(
+						{ facadeModuleId: owner } as Chunk,
+						exports,
+						calls,
+						root,
+					),
+				});
+			}
+			if (target !== chunk) {
+				const starts = collapsed.get(chunk.fileName) ?? new Set<number>();
+				starts.add(load.start);
+				collapsed.set(chunk.fileName, starts);
+			}
+			const names = siteNames.get(chunk.fileName) ?? new Map<string, number>();
+			names.set(load.namespace, (names.get(load.namespace) ?? 0) + 1);
+			siteNames.set(chunk.fileName, names);
+			nodes.push({ start: load.start, end: load.end, specifier: key, plain: true });
+			// A facade chunk's load was `import("./facade.js")`: what the namespace read writes beyond it.
+			const text = chunk.code.slice(read ?? load.start, load.end);
+			const measured = withoutMachinePaths(text, root).length;
+			collapsedLoadChars.set(
+				text,
+				read === undefined
+					? measured - `import("./${basename(target.fileName)}")`.length
+					: measured,
+			);
+		}
+		imports.set(chunk.fileName, nodes);
+	}
+	// Where each chunk's import() expressions start, by the chunk they load.
+	const startsByTarget = new Map<string, Map<string, number[]>>();
+	const importStarts = (reader: Chunk) => {
+		let found = startsByTarget.get(reader.fileName);
+		if (!found) {
+			found = new Map();
+			for (const expression of imports.get(reader.fileName) ?? []) {
+				if (expression.specifier === undefined) continue;
+				const target = resolve(reader.fileName, expression.specifier);
+				found.set(target, [...(found.get(target) ?? []), expression.start]);
+			}
+			startsByTarget.set(reader.fileName, found);
+		}
+		return found;
+	};
+	return namespaceObjectEdits(
+		chunks,
+		reads,
+		namespacesOf,
+		localExports,
+		initOf,
+		siteNames,
+		(reader, target) => {
+			const starts = collapsed.get(reader.fileName);
+			return (importStarts(reader).get(target.fileName) ?? []).every(
+				(start) => !!starts?.has(start),
+			);
+		},
+		root,
+	);
+}
+
+// A facade chunk imported the bindings its loader reads, so Rolldown exported them from the pack; later
+// passes read those exports. Keeps that, and drops namespace objects nothing but the collapsed loads read.
+function namespaceObjectEdits(
+	chunks: ReadonlyMap<string, Chunk>,
+	reads: ReadonlyMap<
+		string,
+		{
+			readonly target: Chunk;
+			readonly local: string;
+		}
+	>,
+	namespacesOf: (chunk: Chunk) => ReadonlyMap<string, NamespaceObject>,
+	localExports: (chunk: Chunk) => ReadonlyMap<string, string> | undefined,
+	initOf: ReadonlyMap<string, string | null>,
+	siteNames: ReadonlyMap<string, ReadonlyMap<string, number>>,
+	onlyCollapsedLoads: (reader: Chunk, target: Chunk) => boolean,
+	root: string | undefined,
+): Map<string, Replacement[]> {
+	const sitesNaming = (chunk: Chunk, name: string) =>
+		siteNames.get(chunk.fileName)?.get(name) ?? 0;
+	const readers = new Map<string, Set<Chunk>>();
+	for (const chunk of chunks.values())
+		for (const name of [...chunk.imports, ...chunk.dynamicImports]) {
+			const set = readers.get(name) ?? new Set();
+			set.add(chunk);
+			readers.set(name, set);
+		}
+	const counts = new Map<string, Map<string, number>>();
+	const countIn = (chunk: Chunk, name: string) => {
+		let found = counts.get(chunk.fileName);
+		if (!found) {
+			found = new Map();
+			for (const match of chunk.code.matchAll(NAMESPACE_NAME))
+				found.set(match[0], (found.get(match[0]) ?? 0) + 1);
+			counts.set(chunk.fileName, found);
+		}
+		return found.get(name) ?? 0;
+	};
+	const byTarget = new Map<
+		Chunk,
+		{ added: Set<string>; dropped: NamespaceObject[]; droppedNames: Set<string> }
+	>();
+	for (const [key, { target, local }] of reads) {
+		const edit = byTarget.get(target) ?? {
+			added: new Set(),
+			dropped: [],
+			droppedNames: new Set(),
+		};
+		byTarget.set(target, edit);
+		const namespace = namespacesOf(target).get(local)!;
+		for (const [, value] of namespace.entries)
+			if (/^[A-Za-z_$][\w$]*$/.test(value)) edit.added.add(value);
+		const init = initOf.get(key);
+		if (init) edit.added.add(init);
+		if (!NAMESPACE_NAME_EXACT.test(local)) continue;
+		const exportedAs = [...(localExports(target) ?? [])]
+			.filter(([, bound]) => bound === local)
+			.map(([name]) => name);
+		if (exportedAs.some((name) => !NAMESPACE_NAME_EXACT.test(name))) continue;
+		// The declaration, its export specifiers, and the collapsed loads are all the code reading it.
+		if (countIn(target, local) !== 1 + exportedAs.length + sitesNaming(target, local)) continue;
+		if (
+			[...(readers.get(target.fileName) ?? [])].some(
+				(reader) =>
+					(reader !== target &&
+						reader.dynamicImports.includes(target.fileName) &&
+						!onlyCollapsedLoads(reader, target)) ||
+					(reader.imports.includes(target.fileName) &&
+						importsAnyOf(reader, target, exportedAs)),
+			)
+		)
+			continue;
+		edit.dropped.push(namespace);
+		for (const name of exportedAs) edit.droppedNames.add(name);
+	}
+	// The runtime chunk each chunk imports the namespace helper from.
+	const helperImporters = new Map<string, Set<string>>();
+	for (const chunk of chunks.values()) {
+		const helper = chunk.code.includes(NAMESPACE_HELPER)
+			? [...chunk.code.matchAll(HELPER_IMPORT_STATEMENT)].at(-1)
+			: undefined;
+		if (!helper) continue;
+		const runtime = resolve(chunk.fileName, JSON.parse(helper[2]!) as string);
+		const set = helperImporters.get(runtime) ?? new Set();
+		set.add(chunk.fileName);
+		helperImporters.set(runtime, set);
+	}
+	const edits = new Map<string, Replacement[]>();
+	for (const [target, { added, dropped, droppedNames }] of byTarget) {
+		const exported = localExports(target) ?? new Map<string, string>();
+		const bound = new Set(exported.values());
+		const additions = [...added].filter((local) => !bound.has(local) && !exported.has(local));
+		const statement = [...target.code.matchAll(EXPORT_STATEMENT)].at(-1);
+		if (!statement && (droppedNames.size || additions.length)) continue;
+		const list: Replacement[] = [];
+		if (statement) {
+			const specifiers = statement[1]!
+				.split(', ')
+				.filter((specifier) => !droppedNames.has(specifierExportName(specifier)));
+			const next = [...specifiers, ...additions].sort((a, b) =>
+				compareText(specifierExportName(a), specifierExportName(b)),
+			);
+			const open = statement.index + 'export { '.length;
+			if (next.join(', ') !== statement[1])
+				list.push(
+					next.length
+						? { start: open, end: open + statement[1]!.length, source: next.join(', ') }
+						: {
+								start: statement.index,
+								end: statement.index + statement[0].length,
+								source: '',
+							},
+				);
+		}
+		for (const namespace of dropped) {
+			list.push({ start: namespace.start, end: namespace.end, source: '' });
+			const owner = target.namespaceModules?.[namespace.local];
+			if (owner !== undefined)
+				droppedNamespaceChars.set(
+					owner,
+					(droppedNamespaceChars.get(owner) ?? 0) +
+						withoutMachinePaths(target.code.slice(namespace.start, namespace.end), root)
+							.length,
+				);
+		}
+		if (dropped.length && countIn(target, NAMESPACE_HELPER) === dropped.length + 1) {
+			const helper = [...target.code.matchAll(HELPER_IMPORT_STATEMENT)].at(-1);
+			if (helper) {
+				const kept = helper[1]!.split(', ').filter((name) => name !== NAMESPACE_HELPER);
+				const open = helper.index + 'import { '.length;
+				if (kept.length < helper[1]!.split(', ').length)
+					helperImporters
+						.get(resolve(target.fileName, JSON.parse(helper[2]!) as string))
+						?.delete(target.fileName);
+				list.push(
+					kept.length
+						? { start: open, end: open + helper[1]!.length, source: kept.join(', ') }
+						: {
+								start: helper.index,
+								end: helper.index + helper[0].length,
+								source: `import ${helper[2]};`,
+							},
+				);
+			}
+		}
+		target.exports = [
+			...target.exports.filter((name) => !droppedNames.has(name)),
+			...additions,
+		];
+		if (list.length) edits.set(target.fileName, list);
+	}
+	// A runtime chunk no chunk imports the helper from any longer stops exporting it, so minifying drops it.
+	for (const [fileName, importers] of helperImporters) {
+		const runtime = chunks.get(fileName);
+		if (importers.size || !runtime || edits.has(fileName)) continue;
+		const statement = [...runtime.code.matchAll(EXPORT_STATEMENT)].at(-1);
+		const specifiers = statement?.[1]!.split(', ') ?? [];
+		const kept = specifiers.filter((specifier) => specifier !== NAMESPACE_HELPER);
+		if (!statement || !kept.length || kept.length === specifiers.length) continue;
+		const open = statement.index + 'export { '.length;
+		edits.set(fileName, [
+			{ start: open, end: open + statement[1]!.length, source: kept.join(', ') },
+		]);
+		runtime.exports = runtime.exports.filter((name) => name !== NAMESPACE_HELPER);
+	}
+	return edits;
+}
+
+const NAMESPACE_NAME = /(?<![\w$])(?:[A-Za-z_$][\w$]*_exports(?:\$\d+)?|__exportAll)(?![\w$])/g;
+const NAMESPACE_NAME_EXACT = /^[A-Za-z_$][\w$]*_exports(?:\$\d+)?$/;
+const EXPORT_STATEMENT = /^export \{ ([^}]*) \};$/gm;
+const HELPER_IMPORT_STATEMENT = /^import \{ ([^}]*\b__exportAll\b[^}]*) \} from ("[^"\n]+");$/gm;
+
+// Whether a static import or re-export in `reader` names one of `names` from `target`.
+function importsAnyOf(reader: Chunk, target: Chunk, names: readonly string[]): boolean {
+	const path = relative(dirname(reader.fileName), target.fileName);
+	const source = JSON.stringify(path.startsWith('.') ? path : `./${path}`);
+	for (const match of reader.code.matchAll(STATIC_BINDINGS)) {
+		if (match[2] !== source) continue;
+		for (const specifier of match[1]!.split(',')) {
+			const imported = specifier.trim().split(/\s+as\s+/)[0];
+			if (imported && names.includes(imported)) return true;
+		}
+	}
+	return false;
+}
+
+const STATIC_BINDINGS = /^(?:import|export) \{([^}]*)\} from ("[^"\n]+");$/gm;
+
+function specifierExportName(specifier: string): string {
+	const alias = / as ([\w$]+)$/.exec(specifier);
+	return alias ? alias[1]! : specifier;
 }

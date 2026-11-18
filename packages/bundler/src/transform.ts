@@ -33,6 +33,7 @@ import {
 	jsonSourceWithNonFiniteNumbers,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
+	hasLiveSharedDefinitions,
 } from '@markless/serializer';
 import type {
 	MarklessTransformManifest,
@@ -53,6 +54,7 @@ import {
 	resumeVirtualModuleId,
 	rewriteSymbolModuleExport,
 	scopedSymbolExportName,
+	payloadAsyncPlanes,
 	settleVirtualModuleId,
 	symbolGroupVirtualModuleId,
 	symbolVirtualModuleId,
@@ -72,6 +74,7 @@ import { createCompileErrorPayload, MarklessCompileError } from './dev-error/ind
 import { modulePropFlow } from './prop-flow.ts';
 import {
 	emitPrerenderBoundaryRendererModule,
+	prerenderRowBoundarySites,
 	emitPrerenderTriggerGroupModule,
 	planPrerenderTriggerGroups,
 	triggerGroupVirtualModuleId,
@@ -254,8 +257,13 @@ function servedRenderDataId(encodedModuleId: string): string {
 	return `${MARKLESS_VIRTUAL_PREFIX}render-data-served:${encodedModuleId}`;
 }
 
-function servedRenderDataEntryId(encodedModuleId: string): string {
+export function servedRenderDataEntryId(encodedModuleId: string): string {
 	return `${MARKLESS_VIRTUAL_PREFIX}render-data-served-entry:${encodedModuleId}`;
+}
+
+// A page with prerender records hands its component rows this whole render data instead of the served one.
+export function lazyRenderDataEntryId(encodedModuleId: string): string {
+	return `${MARKLESS_VIRTUAL_PREFIX}render-data-entry:${encodedModuleId}`;
 }
 
 // What a client render of a server-rendered app's module imports on demand: only `render()` runs it.
@@ -308,8 +316,11 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const resumeId = resumeVirtualModuleId(input.filename);
 	const prerenderWakeId = prerenderWakeVirtualModuleId(input.filename);
 	const settleId = settleVirtualModuleId(input.filename);
-	const { compiled: compiledForAllClasses, blockingDiagnostics } =
-		await compileWithBlockingDiagnostics(input, resolverId);
+	const {
+		compiled: compiledForAllClasses,
+		blockingDiagnostics,
+		warnings: compilerWarnings,
+	} = await compileWithBlockingDiagnostics(input);
 	const linkPendingDiagnostics = linkPendingRefusals(
 		input,
 		compiledForAllClasses,
@@ -373,9 +384,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		chunk: symbolModuleIdOf(module.symbolId),
 		exportName: symbolExportNames[index]!,
 	}));
-	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols(
+	const linkInput = withServedRenderData(
 		linkedSymbolInput(compiled, input, renderDataId, resolverId, input.environment === 'client'),
+		servedRenderDataEntryId(encodedModuleId),
+		input.prerenderRecords === true,
 	);
+	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols(linkInput);
 	const symbolRows = [
 		...compilerSymbolRows,
 		...linkedBoundarySymbols.map((symbol) => symbol.row),
@@ -397,6 +411,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const resolverSource = adaptImportedCaptureResolver(
 		emitSymbolResolverModule({
 			literalImports: input.experimentalNativePacking,
+			bundlerVisibleImports: input.experimentalNativePacking,
 			resolverId: input.experimentalNativePacking
 				? `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedModuleId}`
 				: undefined,
@@ -436,6 +451,8 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					symbolResolver: compiled.symbolResolver,
 					boundRows: importedBoundRows,
 					componentEdges: compiled.semanticGraph.componentEdges,
+					graphBindings: compiled.semanticGraph.graphBindings,
+					branchSites: compiled.semanticGraph.branchSites,
 					renderData: compiled.renderData,
 				})
 			: [];
@@ -469,6 +486,13 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		compiled.publicRenderPlan.styleScopes.length > 0
 			? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedModuleId}.css`
 			: null;
+	const asyncPlanes = payloadAsyncPlanes(
+		compiled.payloadScripts.state,
+		compiled.moduleGraphInterface.asyncPlanes,
+	);
+	const hasLiveSharedState =
+		hasLiveSharedDefinitions(compiled.payloadScripts.state) ||
+		compiled.moduleGraphInterface.liveShared === true;
 	const rosterDerivation = compiled.moduleGraphInterface.render.components.some(
 		(component) => component.rosterDerivation === true,
 	);
@@ -555,12 +579,11 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		prerenderInterfacesComplete(compiled, input);
 	const lazyRenderDataId =
 		canonicalRenderData && compiled.publicRenderModule.renderDataModuleSource
-			? `${MARKLESS_VIRTUAL_PREFIX}render-data-entry:${encodedModuleId}`
+			? lazyRenderDataEntryId(encodedModuleId)
 			: undefined;
-	const servedRenderData =
-		linkedClientRenderData && lazyRenderDataId
-			? compiled.publicRenderModule.servedRenderData
-			: undefined;
+	const servedRenderData = linkInput.servedRenderDataId
+		? compiled.publicRenderModule.servedRenderData
+		: undefined;
 	const virtualModules: MarklessVirtualModule[] = [
 		...(compiled.publicRenderModule.renderDataModuleSource
 			? [
@@ -653,8 +676,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				payloadId,
 				resolverId,
 				payloadState: compiled.payloadScripts.state,
+				asyncPlanes,
 				payloadView: containerScopedResumeView(compiled.payloadScripts.view),
-				hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
+				hasIdleEvents: compiled.moduleGraphInterface.idleRecords === true,
 				streamsArms: authorsPendingArm(compiled.semanticGraph.markup),
 				runtimeDemandMap: compiled.runtimeDemandMap,
 				servedScalarPlans,
@@ -689,6 +713,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				linkedNestedRepeats: importedNestedRepeats(input.importedModuleInterfaces),
 				linkedRowBranches: importedRowBranchMints(input.importedModuleInterfaces),
 				rosterDerivation,
+				hasLiveSharedState,
 				storageCells,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				boundSymbolDescriptors,
@@ -706,18 +731,29 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 							payloadId,
 							resolverId,
 							payloadState: compiled.payloadScripts.state,
+							asyncPlanes,
 							payloadView: containerScopedResumeView(compiled.payloadScripts.view),
-							hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
+							hasIdleEvents: compiled.moduleGraphInterface.idleRecords === true,
 							runtimeDemandMap: compiled.runtimeDemandMap,
 							executionLog: input.executionLog,
 							needsFullResume: prerenderClosureNeedsWake,
 							prerenderDataId: renderDataId,
 							lazyRenderDataId,
+							...(servedRenderData
+								? { servedRenderDataId: servedRenderDataEntryId(encodedModuleId) }
+								: {}),
+							renderDataId: canonicalRenderData ? renderDataId : undefined,
+							linkedRowSlotReaders: importedRowSlotReaders(input.importedModuleInterfaces),
+							linkedRowComponents: importedRowComponentMints(input.importedModuleInterfaces),
+							linkedRowTemplates: importedRowTemplateMints(input.importedModuleInterfaces),
+							linkedNestedRepeats: importedNestedRepeats(input.importedModuleInterfaces),
+							linkedRowBranches: importedRowBranchMints(input.importedModuleInterfaces),
 							prerenderTriggerGroups: prerenderTriggerGroups.map((group, index) => ({
 								...group,
 								moduleId: triggerGroupVirtualModuleId(input.filename, index),
 							})),
 							rosterDerivation,
+							hasLiveSharedState,
 							storageCells,
 							installResumeSummary: true,
 							recordsOnly: true,
@@ -761,7 +797,13 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					{
 						id: selfWakeArmRendererId,
 						type: 'trigger-group' as const,
-						source: emitPrerenderBoundaryRendererModule(renderDataId),
+						source: emitPrerenderBoundaryRendererModule(
+							renderDataId,
+							prerenderRowBoundarySites(
+								containerScopedResumeView(compiled.protocolView),
+								input.prerenderRecordData?.boundarySites,
+							),
+						),
 					},
 				]
 			: []),
@@ -797,7 +839,13 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		),
 	];
 
-	const styleImport = styleId ? `import ${JSON.stringify(styleId)};\n` : '';
+	const stylesheetImports = await resolvedStylesheetImports(
+		compiled.publicRenderPlan.stylesheetImports,
+		input.resolveStylesheetImport,
+	);
+	const styleImport = [...stylesheetImports, ...(styleId ? [styleId] : [])]
+		.map((id) => `import ${JSON.stringify(id)};\n`)
+		.join('');
 	const inlineResumerSources =
 		(input.environment ?? 'lib') === 'client'
 			? undefined
@@ -807,7 +855,11 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				});
 	// Dev links the children's scoped styles too, so the SSR HTML is styled before any island's JS.
 	const styleModuleIds = [
-		...new Set([...(styleId ? [styleId] : []), ...(input.linkedStyleModuleIds ?? [])]),
+		...new Set([
+			...stylesheetImports,
+			...(styleId ? [styleId] : []),
+			...(input.linkedStyleModuleIds ?? []),
+		]),
 	];
 	const styleModuleUrl = input.styleModuleUrl;
 	const headInjections = [
@@ -855,6 +907,10 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					executionLog: input.executionLog,
 					headInjections: headInjections.length > 0 ? headInjections : undefined,
 					storageSeeds: storageSeeds.length > 0 ? storageSeeds : undefined,
+					storageSeedImports: importedStorageSeedSources(
+						compiled.semanticGraph.componentEdges,
+						input.importedModuleInterfaces,
+					),
 					inlineResumerSources,
 					prerenderBoot,
 					...(input.environment === 'server'
@@ -872,10 +928,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					prerenderRecords: input.prerenderRecords,
 					directCsr: input.directCsr,
 					hasComputedState: compiled.payloadScripts.state.computed.length > 0,
+					asyncPlanes,
 					hasOverlayMarks: compiled.runtimeDemandMap.payloadRecords.some(
 						(record) => record.kind === 'overlay',
 					),
-					hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
+					hasLiveSharedState,
+					hasIdleEvents: moduleHasIdleEvents(compiled.semanticGraph),
 					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,
 					scalarActions: input.includeScalarActionPlans
@@ -912,16 +970,24 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		map: null,
 		virtualModules,
 		manifest,
+		compilerWarnings,
 		moduleGraphInterface: compiled.moduleGraphInterface,
 		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
+		stylesheetImports,
 		artifactChildren: artifactChildCandidates(compiled),
-		propFlow: modulePropFlow(compiled, moduleDiagnostics(compiled)),
+		propFlow: modulePropFlow(compiled, moduleDiagnostics(compiled), input.source),
 		importedConstantRequests: compiled.semanticGraph.componentEdges.flatMap((edge) =>
 			edge.props.flatMap((prop) =>
 				'importedConstants' in prop ? (prop.importedConstants ?? []) : [],
 			),
 		),
+		...(compiled.semanticGraph.importedFunctionWriteRequests?.length
+			? {
+					importedFunctionWriteRequests:
+						compiled.semanticGraph.importedFunctionWriteRequests,
+				}
+			: {}),
 		...(linkPendingDiagnostics.length > 0 ? { linkPendingDiagnostics } : {}),
 	};
 }
@@ -1019,6 +1085,54 @@ function servedDefinition(
 	);
 }
 
+// Imported children whose linked interface says their tree serves storage() cells; each child's artifact carries its own collected seeds.
+function importedStorageSeedSources(
+	edges: CompileTsrxModuleResult['semanticGraph']['componentEdges'],
+	importedModuleInterfaces: TransformTsrxModuleInput['importedModuleInterfaces'],
+): ReadonlyArray<string> {
+	const sources = new Set<string>();
+	for (const edge of edges) {
+		if (!edge.importSource) continue;
+		const reachesStorage = importedModuleInterfaces?.[edge.importSource]?.render.components.some(
+			(component) =>
+				component.componentName === (edge.importedName ?? edge.childComponentName) &&
+				component.storageCells === true,
+		);
+		if (reachesStorage) sources.add(edge.importSource);
+	}
+	return [...sources];
+}
+
+// The first edge to use a name also answers by it, for walks that only know a name; a later same-named one does not.
+function bareNameImportAliases(
+	edges: ReadonlyArray<{ readonly childComponentName: string; readonly importSource?: string }>,
+	importedComponents: ReadonlyMap<string, { readonly source: string; readonly local: string }>,
+): ReadonlyArray<readonly [string, { readonly source: string; readonly local: string }]> {
+	const claimed = new Map<string, { readonly source: string; readonly local: string }>();
+	for (const edge of edges) {
+		if (!edge.importSource || claimed.has(edge.childComponentName)) continue;
+		const entry = importedComponents.get(edge.importSource);
+		if (entry) claimed.set(edge.childComponentName, entry);
+	}
+	return [...claimed];
+}
+
+// A client module whose linked render data is canonical also ships the served subset a component-row build reads.
+function withServedRenderData<T extends ReturnType<typeof linkedSymbolInput>>(
+	linkInput: T,
+	servedRenderDataId: string,
+	prerenderRecords: boolean,
+): T & { readonly servedRenderDataId?: string } {
+	const { compiled, link } = linkInput;
+	const serves =
+		linkInput.clientLink &&
+		!prerenderRecords &&
+		!!compiled.publicRenderModule.renderDataModuleSource &&
+		!!compiled.publicRenderModule.servedRenderData &&
+		prerenderInterfacesComplete(compiled, link);
+	return serves ? { ...linkInput, servedRenderDataId } : linkInput;
+}
+
 async function prerenderDataModuleSource(
 	compiled: CompileTsrxModuleResult,
 	environment: TransformTsrxModuleInput['environment'],
@@ -1029,6 +1143,7 @@ async function prerenderDataModuleSource(
 	moduleId: string,
 	served?: ServedRenderDataArtifact,
 ): Promise<string> {
+	// Keyed by import source: two modules can declare a same-named component.
 	const importedComponents = new Map<
 		string,
 		{ readonly source: string; readonly local: string }
@@ -1037,12 +1152,14 @@ async function prerenderDataModuleSource(
 	const browserRenderedChildren = served
 		? new Set(
 				compiled.semanticGraph.componentEdges.flatMap((edge) =>
-					served.browserRenderedEdgeIds.includes(edge.id) ? [edge.childComponentName] : [],
+					served.browserRenderedEdgeIds.includes(edge.id) && edge.importSource
+						? [edge.importSource]
+						: [],
 				),
 			)
 		: undefined;
 	for (const edge of compiled.semanticGraph.componentEdges) {
-		if (!edge.importSource || importedComponents.has(edge.childComponentName)) continue;
+		if (!edge.importSource || importedComponents.has(edge.importSource)) continue;
 		if (artifactChildMaterializations?.[edge.id]) continue;
 		const linked = importedModuleInterfaces?.[edge.importSource];
 		if (!linked) {
@@ -1053,9 +1170,9 @@ async function prerenderDataModuleSource(
 		const full =
 			renderDataImportSources?.[edge.importSource] ??
 			`${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(linked.moduleId ?? linked.filename)}`;
-		importedComponents.set(edge.childComponentName, {
+		importedComponents.set(edge.importSource, {
 			source:
-				browserRenderedChildren && !browserRenderedChildren.has(edge.childComponentName)
+				browserRenderedChildren && !browserRenderedChildren.has(edge.importSource)
 					? servedRenderDataReference(full)
 					: full,
 			local: `marklessPrerenderImport${importedComponents.size}`,
@@ -1081,6 +1198,7 @@ async function prerenderDataModuleSource(
 	);
 	const componentEntries: Array<{ name: string; data: string; functions: string[] }> = [];
 	let qualifiesRows = false;
+	let namesAttributes = false;
 	for (const definition of compiled.publicRenderModule.componentDefinitions) {
 		const {
 			residueReaderSource,
@@ -1090,9 +1208,11 @@ async function prerenderDataModuleSource(
 			// gate adds no payload byte to the modules it turns the pass on for.
 			rootsWidget,
 			projectsIntoRows,
+			spreadsAttributes,
 			...record
 		} = definition as Readonly<Record<string, unknown>> & {
 			readonly projectsIntoRows?: boolean;
+			readonly spreadsAttributes?: boolean;
 			readonly residueReaderSource?: string;
 			readonly residueReaderImports?: ReadonlyArray<{
 				readonly source: string;
@@ -1152,9 +1272,11 @@ async function prerenderDataModuleSource(
 				)
 			: undefined;
 		if (projectsIntoRows) qualifiesRows = true;
+		if (spreadsAttributes) namesAttributes = true;
 		const functions = [
 			...(reader ? [`readResidue:${reader}`] : []),
 			...(projectsIntoRows ? ['rowHosts:marklessRowHosts'] : []),
+			...(spreadsAttributes ? ['attributeName:marklessAttributeName'] : []),
 			...(initializers.size
 				? [
 						`initializers:{${[...initializers].map(([id, local]) => `${JSON.stringify(id)}:${local}`).join(',')}}`,
@@ -1182,7 +1304,7 @@ async function prerenderDataModuleSource(
 	// Two facts turn it on, because the pass does two jobs. It RUNS a widget
 	// root's shared seeds, which a module with a `shared-seed` symbol needs; and
 	// it FILES the widget-instance token every `shared()` element() handle mints
-	// its id from, which a module that roots a widget-scoped family needs whether
+	// its id from, which a module that roots a subtree-scoped family needs whether
 	// or not that family plans a seed. A family of element() handles over constant
 	// state plans no seed symbol at all, so gating on seeds alone left its parts
 	// minting against a token nobody had filed (MARKLESS_ELEMENT_HANDLE_WIDGET_
@@ -1217,6 +1339,9 @@ async function prerenderDataModuleSource(
 		...(qualifiesRows
 			? ["import { marklessRowHosts } from '@markless/web/fns/row-qualified-view';"]
 			: []),
+		...(namesAttributes
+			? ["import { marklessAttributeName } from '@markless/web/fns/attribute-name';"]
+			: []),
 		...preludes,
 		served ? served.renderDataModuleSource : compiled.publicRenderModule.renderDataModuleSource,
 		...factored.factories,
@@ -1230,7 +1355,7 @@ async function prerenderDataModuleSource(
 		`\trootComponentName: ${JSON.stringify(compiled.renderData.root?.componentName ?? null)},`,
 		'\trenderData: marklessRenderData,',
 		'\tcomponents: marklessPrerenderComponents,',
-		`\timports: {${[...importedComponents].map(([name, entry]) => `${JSON.stringify(name)}:${entry.local}`).join(',')}},`,
+		`\timports: {${[...importedComponents, ...bareNameImportAliases(compiled.semanticGraph.componentEdges, importedComponents)].map(([name, entry]) => `${JSON.stringify(name)}:${entry.local}`).join(',')}},`,
 		'};',
 	].join('\n');
 }
@@ -1238,14 +1363,11 @@ async function prerenderDataModuleSource(
 export async function preflightTsrxModuleDiagnostics(
 	input: Pick<TransformTsrxModuleInput, 'filename' | 'source' | 'buildId'>,
 ): Promise<void> {
-	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(input.filename)}`;
-	const { blockingDiagnostics } = await compileWithBlockingDiagnostics(input, resolverId);
+	const { blockingDiagnostics } = await compileWithBlockingDiagnostics(input);
 	throwIfBlocked(input, blockingDiagnostics);
 }
 
-// The naming closures that decide what this bundler links. Naming a branch
-// export is what fulfils an escalation candidate, so the same call answers both
-// "what do we emit" and "which refusal still stands".
+// The naming closures that decide what this bundler links.
 function linkedSymbolInput(
 	compiled: CompileTsrxModuleResult,
 	input: Pick<
@@ -1270,26 +1392,6 @@ function linkedSymbolInput(
 	} satisfies Parameters<typeof linkedRenderDataBoundarySymbols>[0];
 }
 
-// The client link ships the escalation symbol, so it decides the refusal for
-// every environment: a server build must not refuse the shape its own client
-// build knows how to flip.
-function fulfilledEscalationSymbolIds(
-	compiled: CompileTsrxModuleResult,
-	input: Pick<
-		TransformTsrxModuleInput,
-		'filename' | 'moduleId' | 'importedModuleInterfaces' | 'artifactChildMaterializations'
-	>,
-	resolverId: string,
-): ReadonlySet<string> {
-	if ((compiled.symbolModules.armEscalationCandidates ?? []).length === 0) return new Set();
-	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(input.moduleId ?? input.filename)}`;
-	return new Set(
-		linkedRenderDataBoundarySymbols(
-			linkedSymbolInput(compiled, input, renderDataId, resolverId, true),
-		).flatMap((symbol) => (symbol.manifest.kind === 'branch-update' ? [symbol.row.id] : [])),
-	);
-}
-
 type CompiledTransformInput = Pick<
 	TransformTsrxModuleInput,
 	| 'filename'
@@ -1299,10 +1401,13 @@ type CompiledTransformInput = Pick<
 	| 'symbols'
 	| 'importedModuleInterfaces'
 	| 'importedModuleConstants'
+	| 'importedFunctionWrites'
 	| 'artifactChildMaterializations'
 	| 'executionLog'
 	| 'serverOnlyProps'
+	| 'elementOnlyAttributes'
 	| 'routeRoot'
+	| 'dev'
 >;
 
 /** The compiler input a transform compiles; anything else that only needs a module's interface asks for the same one. */
@@ -1312,12 +1417,16 @@ export function transformCompileInput(input: CompiledTransformInput): CompileTsr
 		moduleId: input.moduleId,
 		source: input.source,
 		...(input.serverOnlyProps?.length ? { serverOnlyProps: input.serverOnlyProps } : {}),
+		...(input.elementOnlyAttributes?.length
+			? { elementOnlyAttributes: input.elementOnlyAttributes }
+			: {}),
 		...(input.routeRoot ? { routeRoot: true } : {}),
 		buildId: input.buildId,
 		resolverId: `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(input.filename)}`,
 		symbols: input.symbols ?? [],
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		importedModuleConstants: input.importedModuleConstants,
+		importedFunctionWrites: input.importedFunctionWrites,
 		artifactChildMaterializations: input.artifactChildMaterializations,
 		// 'never' is the consumer posture (MARKLESS_CONSUMER_BUILD); the lab
 		// default 'auto' keeps the authored-source strings for dev tooling.
@@ -1325,19 +1434,20 @@ export function transformCompileInput(input: CompiledTransformInput): CompileTsr
 	};
 }
 
-async function compileWithBlockingDiagnostics(input: CompiledTransformInput, resolverId: string) {
+async function compileWithBlockingDiagnostics(input: CompiledTransformInput) {
 	const compiled = await compileTsrxModule(transformCompileInput(input));
-	const fulfilled = fulfilledEscalationSymbolIds(compiled, input, resolverId);
 	return {
 		compiled,
-		blockingDiagnostics: moduleDiagnostics(compiled).filter(
+		warnings: moduleDiagnostics(compiled).filter(
 			(diagnostic) =>
-				diagnostic.severity === 'error' &&
-				!(
-					diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED' &&
-					typeof diagnostic.symbolId === 'string' &&
-					fulfilled.has(diagnostic.symbolId)
-				),
+				diagnostic.severity === 'warning' &&
+				diagnostic.suppressed !== true &&
+				// A build fails at bundle time on a caller that can change these props, so what it ships is proven fixed.
+				!(diagnostic.decidedByProps &&
+					(input.dev !== true || diagnostic.decidedByProps.props.length === 0)),
+		),
+		blockingDiagnostics: moduleDiagnostics(compiled).filter(
+			(diagnostic) => diagnostic.severity === 'error',
 		),
 	};
 }
@@ -1631,34 +1741,11 @@ function componentEdgesReachableFrom(
 	return edges;
 }
 
-type IdleEventRecordSet = {
-	readonly events?: ReadonlyArray<{ readonly eventName: string }>;
-	readonly keyedRepeats?: ReadonlyArray<{
-		readonly rowEvents: ReadonlyArray<{ readonly eventName: string }>;
-	}>;
-};
-
-// An idle record anywhere, arm and row records included, means a CSR mount wakes its runtime at idle.
-function viewHasIdleEvents(view: ProtocolViewPayload): boolean {
-	const sets: IdleEventRecordSet[] = [
-		view,
-		...(view.branches ?? []).flatMap((branch) => [
-			...(branch.armRecords ?? []),
-			...(branch.servedArmRecords ? [branch.servedArmRecords] : []),
-		]),
-		...view.asyncBoundaries.flatMap((boundary) =>
-			boundary.armRecords && !Array.isArray(boundary.armRecords)
-				? [boundary.armRecords as IdleEventRecordSet]
-				: [],
-		),
-	];
-	return sets.some(
-		(set) =>
-			(set.events ?? []).some((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME) ||
-			(set.keyedRepeats ?? []).some((repeat) =>
-				repeat.rowEvents.some((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME),
-			),
-	);
+// A client-rendered mount wakes its runtime at idle from the module whose own records, arms and rows included, name idle.
+function moduleHasIdleEvents(graph: {
+	readonly events: ReadonlyArray<{ readonly eventName: string }>;
+}): boolean {
+	return graph.events.some((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME);
 }
 
 function authorsPendingArm(markup: {
@@ -1673,4 +1760,12 @@ function authorsPendingArm(markup: {
 				(slot.armTemplateIds as { readonly pending?: string }).pending !== undefined,
 		),
 	);
+}
+
+async function resolvedStylesheetImports(
+	requests: ReadonlyArray<string>,
+	resolve: TransformTsrxModuleInput['resolveStylesheetImport'],
+): Promise<ReadonlyArray<string>> {
+	const ids = await Promise.all(requests.map(async (request) => (await resolve?.(request)) ?? request));
+	return [...new Set(ids)];
 }

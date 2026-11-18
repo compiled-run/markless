@@ -1,9 +1,25 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { ANCHORS_PATH } from './config.mjs';
-import { evaluate, formatReport, isLean, LOAD_PLATFORM, routeKey } from './evaluate.mjs';
+import { execFileSync } from 'node:child_process';
+import {
+	formatChange,
+	labelOf,
+	openMergeBaseCheckout,
+	readAnchorsWithChanges,
+	recordChange,
+} from '../anchor-ledger.mjs';
+import { applyBaseline } from './baseline.mjs';
+import { BUDGETS } from './config.mjs';
+import {
+	evaluate,
+	formatReport,
+	isLean,
+	LOAD_PLATFORM,
+	playgroundKey,
+	routeKey,
+} from './evaluate.mjs';
 import { measure } from './measure.mjs';
 
 export const LAST_MEASUREMENT = join(tmpdir(), 'markless-perf-guards', 'last-measurement.json');
@@ -11,14 +27,16 @@ const GUARDS = ['runtime', 'construct', 'execution', 'lean', 'resume', 'load', '
 const USAGE = `usage:
   node scripts/benchmarks/perf-guards/cli.mjs check [--no-build] [--sites bench,docs] [--from <measurement.json>]
   node scripts/benchmarks/perf-guards/cli.mjs measure [--no-build] [--out <file>]
-  node scripts/benchmarks/perf-guards/cli.mjs accept <${GUARDS.join('|')}> <subject|*> --reason "<why>" [--from-last] [--no-build]`;
+  node scripts/benchmarks/perf-guards/cli.mjs accept <${GUARDS.join('|')}> <subject|*> --reason "<why>" [--from-last | --from <file>] [--base <file>] [--no-build]
+    accept records this tree's measurement minus its merge-base's; without --base it measures the merge-base in a throwaway checkout.
+    A load change for Linux comes from two CI artifacts (gh run download <run> -n perf-guards-measurement): --from this pull
+    request's run, --base the merge-queue run of its merge-base. CI judges a page's download against its measurement of the
+    last commit that recorded a nonzero change to it, plus the changes recorded since, so recorded changes compose in the queue.
+    Record every page your change grows, even by a few bytes: growth nobody records shares one 48 B allowance across pull requests.`;
 
-export function readAnchors(path = ANCHORS_PATH) {
-	return JSON.parse(readFileSync(path, 'utf8'));
-}
-
-export function writeAnchors(anchors, path = ANCHORS_PATH) {
-	writeFileSync(path, `${JSON.stringify(anchors, null, '\t')}\n`);
+/** anchors.json with every pending change file applied, and G16 downloads moved onto CI's baseline when one is named. */
+export function readAnchors() {
+	return applyBaseline(readAnchorsWithChanges('perf-guards'));
 }
 
 export function saveLastMeasurement(measurement) {
@@ -93,15 +111,24 @@ export function accept(
 		for (const [site, siteResult] of Object.entries(measurement.sites))
 			for (const [route, result] of Object.entries(siteResult.routes)) {
 				const key = routeKey(site, route);
-				if (!result.load || !pick(key)) continue;
+				const playground = playgroundKey(key);
+				if (!result.load || !(pick(key) || pick(playground))) continue;
 				next.loadWeight ??= {};
-				const anchors = (next.loadWeight[LOAD_PLATFORM] ??= {});
-				const value = {
-					executedChars: result.load.executedChars,
-					jsGzipBytes: result.load.jsGzipBytes,
-				};
-				log('load', `${key} (${LOAD_PLATFORM})`, anchors[key], value);
-				anchors[key] = value;
+				const platform = measurement.platform ?? LOAD_PLATFORM;
+				const anchors = (next.loadWeight[platform] ??= {});
+				if (pick(key)) {
+					const value = {
+						executedChars: result.load.executedChars,
+						jsGzipBytes: result.load.jsGzipBytes,
+					};
+					log('load', `${key} (${platform})`, anchors[key], value);
+					anchors[key] = value;
+					matched++;
+				}
+				if (!result.load.playground) continue;
+				const prefetched = { jsGzipBytes: result.load.playground.jsGzipBytes };
+				log('load', `${playground} (${platform})`, anchors[playground], prefetched);
+				anchors[playground] = prefetched;
 				matched++;
 			}
 	for (const [, siteResult] of Object.entries(measurement.sites)) {
@@ -155,7 +182,10 @@ export function accept(
 			matched++;
 		}
 	}
-	if (!matched) throw new Error(`no measured ${guard} subject matches "${subject}"`);
+	if (!matched)
+		throw Object.assign(new Error(`no measured ${guard} subject matches "${subject}"`), {
+			code: 'NO_MEASURED_SUBJECT',
+		});
 	if (moved.length)
 		next.history.push({
 			date,
@@ -166,6 +196,61 @@ export function accept(
 			reason: reason.trim(),
 		});
 	return next;
+}
+
+/** `head` with each page's executed chars put back to `base`'s when they moved no more than one run of the same tree can. */
+export function withoutExecutedNoise(head, base) {
+	const next = structuredClone(head);
+	for (const [platform, pages] of Object.entries(next.loadWeight ?? {}))
+		for (const [page, load] of Object.entries(pages)) {
+			const before = base.loadWeight?.[platform]?.[page];
+			if (
+				before &&
+				Math.abs(load.executedChars - before.executedChars) <=
+					BUDGETS.loadExecutionSwingChars
+			)
+				load.executedChars = before.executedChars;
+		}
+	return next;
+}
+
+/** Which of this branch's earlier entries an accept of `guard subject` replaces. */
+export function covers(guard, subject, platform = LOAD_PLATFORM) {
+	return (entry) => {
+		const label = labelOf(entry);
+		if (guard !== 'all' && label.guard !== guard) return false;
+		if (entry.path[0] === 'loadWeight' && entry.path[1] !== platform) return false;
+		if (subject === '*' || guard === 'all') return true;
+		if (entry.path[0] === 'allowFullResume')
+			return (entry.append ?? []).some((exemption) => exemption.route === subject);
+		return label.subject === subject || label.subject.startsWith(`${subject} (`);
+	};
+}
+
+/** Measures the merge-base with its own guard code, the way the anchors on main were measured. */
+function measureMergeBase({ sites }) {
+	const checkout = openMergeBaseCheckout({ log: (message) => console.error(message) });
+	try {
+		const out = join(checkout.root, 'merge-base-measurement.json');
+		execFileSync(
+			'node',
+			[
+				'scripts/benchmarks/perf-guards/cli.mjs',
+				'measure',
+				'--out',
+				out,
+				...(sites ? ['--sites', sites.join(',')] : []),
+			],
+			{
+				cwd: checkout.root,
+				stdio: ['ignore', 'ignore', 'inherit'],
+				env: { ...process.env, TMPDIR: mkdtempSync(join(checkout.root, '.tmp-')) },
+			},
+		);
+		return JSON.parse(readFileSync(out, 'utf8'));
+	} finally {
+		checkout.close();
+	}
 }
 
 function flag(args, name) {
@@ -183,6 +268,7 @@ async function main(argv) {
 	const fromLast = args.includes('--from-last');
 	const from = flag(args, '--from');
 	const out = flag(args, '--out');
+	const baseFile = flag(args, '--base');
 	const reason = flag(args, '--reason');
 	const sites = flag(args, '--sites')?.split(',');
 	const positional = args.filter((a) => !a.startsWith('--'));
@@ -208,9 +294,43 @@ async function main(argv) {
 	if (command === 'accept') {
 		const [guard, subject] = positional;
 		if (!guard || !subject) throw new Error(USAGE);
-		const next = accept(readAnchors(), await load(), guard, subject, reason);
-		writeAnchors(next);
-		console.log(`anchors updated in ${ANCHORS_PATH}`);
+		if (!reason?.trim())
+			throw new Error('accept needs --reason "<one line: why this cost is intended>"');
+		const measurement = await load();
+		const base = baseFile
+			? JSON.parse(readFileSync(baseFile, 'utf8'))
+			: { ...measureMergeBase({ sites }), platform: LOAD_PLATFORM };
+		const platform = measurement.platform ?? LOAD_PLATFORM;
+		if (base.platform && base.platform !== platform)
+			throw new Error(
+				`the merge-base was measured on ${base.platform} and this tree on ${platform}; measure both on one platform`,
+			);
+		const anchorBase = (anchors) => {
+			try {
+				return accept(anchors, { ...base, platform }, guard, subject, reason);
+			} catch (error) {
+				if (error.code === 'NO_MEASURED_SUBJECT') return anchors;
+				throw error;
+			}
+		};
+		const { file, changes } = recordChange(
+			'perf-guards',
+			{
+				head: (anchors) =>
+					withoutExecutedNoise(
+						accept(anchors, measurement, guard, subject, reason),
+						anchorBase(structuredClone(anchors)),
+					),
+				base: anchorBase,
+				covers: covers(guard, subject, platform),
+			},
+			{ reason },
+		);
+		console.log(
+			changes.length
+				? `recorded in ${file}:\n${changes.map((entry) => `  ${formatChange(entry)}`).join('\n')}`
+				: `${guard} ${subject}: this tree measures the same as its merge-base; nothing recorded`,
+		);
 		return 0;
 	}
 	console.error(USAGE);

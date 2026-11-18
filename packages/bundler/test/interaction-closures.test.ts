@@ -877,6 +877,54 @@ test('boot leaves a symbol only a control or nothing loads to that control, unle
 	expect(unbounded.get('boot')).toContain(symbol(file, 'symbol:3'));
 });
 
+test('a landing symbol no module carries widens boot to its own file, never to code only another file loads lazily', () => {
+	const page = `${root}/pages/home.tsrx`;
+	const figure = `${root}/figures/printout.tsrx`;
+	const art = `${root}/figures/printout.art.ts`;
+	const modules = new Map<string, InteractionClosureModule>([
+		[
+			`${page}?markless-resume`,
+			{
+				dependencies: [`${figure}?markless-symbols`],
+				dynamicDependencies: [symbol(page, 'symbol:0'), symbol(page, 'symbol:1')],
+				source: page,
+			},
+		],
+		[
+			`${figure}?markless-symbols`,
+			{ dependencies: [], dynamicDependencies: [symbol(figure, 'symbol:0')], source: figure },
+		],
+		[symbol(page, 'symbol:0'), { dependencies: [], source: page }],
+		[symbol(page, 'symbol:1'), { dependencies: [], source: page }],
+		[symbol(figure, 'symbol:0'), { dependencies: [art], source: figure }],
+		[art, { dependencies: [], source: art }],
+	]);
+	const boot = (resumeSymbols: string[]) =>
+		computeInteractionClosures({
+			root,
+			modules,
+			routes: new Map([['pages/home.tsrx', [`${page}?markless-resume`]]]),
+			demand: [
+				{
+					source: `${page}?markless-symbols`,
+					map: demandMap({
+						page: { resume: { symbolIds: resumeSymbols, runtimeModuleIds: [] } },
+					}),
+				},
+				{ source: `${figure}?markless-symbols`, map: demandMap({}) },
+			],
+		})[0]!.consumers.find((consumer) => consumer.key === 'boot')!;
+	expect(boot(['symbol:1']).conservative).toBeUndefined();
+	expect(boot(['symbol:1']).modules).not.toContain(symbol(page, 'symbol:0'));
+
+	const widened = boot(['symbol:1', 'symbol:9']);
+	expect(widened.conservative).toBe('unresolved-symbol');
+	expect(widened.modules).toContain(symbol(page, 'symbol:0'));
+	expect(widened.modules).toContain(symbol(page, 'symbol:1'));
+	expect(widened.modules).not.toContain(symbol(figure, 'symbol:0'));
+	expect(widened.modules).not.toContain(art);
+});
+
 test('runtime only a fallback path imports joins boot only when something that runs at landing names it', () => {
 	for (const [file, marker, full, loadsLean] of [
 		[
@@ -1291,5 +1339,93 @@ describe('an async boundary on a landing page the server streams', () => {
 		expect(consumers(false).get('action:screens/feed.tsrx#h11:click')).toContain(
 			runtime('fns/prerender-resume'),
 		);
+	});
+});
+
+describe('a component whose literal props rule out an arm', () => {
+	const pageFile = `${root}/pages/plain.tsrx`;
+	const caption = `${root}/components/caption.tsrx`;
+	const gloss = `${root}/components/gloss.tsrx`;
+	const captionData = `\0virtual:markless:render-data:components%2Fcaption.tsrx`;
+	const glossData = `\0virtual:markless:render-data:components%2Fgloss.tsrx`;
+	// The page loads Caption's symbols on demand, and its client render reads Caption's render data, which imports Gloss's.
+	const modules = new Map<string, InteractionClosureModule>([
+		[
+			`${pageFile}?markless-route`,
+			{
+				dependencies: [`${pageFile}?markless-resume`, captionData],
+				dynamicDependencies: [`${caption}?markless-symbols`],
+				source: pageFile,
+			},
+		],
+		[`${pageFile}?markless-resume`, { dependencies: [], source: pageFile }],
+		[
+			`${caption}?markless-symbols`,
+			{ dependencies: [], dynamicDependencies: [`${gloss}?markless-symbols`], source: caption },
+		],
+		[
+			`${gloss}?markless-symbols`,
+			{ dependencies: [], dynamicDependencies: [symbol(gloss, 'symbol:0')], source: gloss },
+		],
+		[symbol(gloss, 'symbol:0'), { dependencies: [], source: gloss }],
+		[captionData, { dependencies: [glossData], owner: caption }],
+		[glossData, { dependencies: [], owner: gloss }],
+	]);
+	const click = demandMap({
+		payloadRecords: [
+			{ recordId: 'event:h0:click', kind: 'event', symbolIds: ['symbol:0'], runtimeModuleIds: [] },
+		],
+		actions: [
+			{
+				hostNodeId: 'h0',
+				eventName: 'click',
+				recordKind: 'event',
+				recordKinds: ['event'],
+				payloadRecordIds: ['event:h0:click'],
+				runtimeModuleIds: [],
+			},
+		],
+	});
+	const demand = [
+		{ source: `${pageFile}?markless-resume`, map: demandMap({}) },
+		{ source: `${caption}?markless-symbols`, map: demandMap({}) },
+		{ source: `${gloss}?markless-symbols`, map: click },
+	];
+	const closures = (unreachableChildren?: Parameters<typeof computeInteractionClosures>[0]['unreachableChildren']) =>
+		computeInteractionClosures({
+			root,
+			modules,
+			routes: new Map([['pages/plain.tsrx', [`${pageFile}?markless-route`]]]),
+			demand,
+			...(unreachableChildren ? { unreachableChildren } : {}),
+		})[0]!;
+
+	test("without a decision, the route counts the child's control", () => {
+		const route = closures();
+		expect(route.consumers.map((consumer) => consumer.key)).toContain(
+			'action:components/gloss.tsrx#h0:click',
+		);
+	});
+
+	test("the route drops the child's control and code, and its client render keeps the render data it imports", () => {
+		let asked: { files: string[]; roots: string[]; importers: Record<string, string[]> } | undefined;
+		const route = closures((files, roots, importers) => {
+			asked = {
+				files: [...files].sort(),
+				roots: [...roots],
+				importers: Object.fromEntries([...importers].map(([file, from]) => [file, [...from].sort()])),
+			};
+			return new Map([[caption, new Set([gloss])]]);
+		});
+		expect(asked).toEqual({
+			files: [caption, gloss, pageFile].sort(),
+			roots: [pageFile],
+			importers: { [caption]: [pageFile], [gloss]: [caption] },
+		});
+		expect(route.consumers.map((consumer) => consumer.key)).toEqual(['boot', 'render']);
+		const byKind = new Map(route.consumers.map((consumer) => [consumer.kind, consumer.modules]));
+		expect(byKind.get('boot')!.filter((id) => id.includes('gloss'))).toEqual([]);
+		expect(byKind.get('render')).toContain(glossData);
+		expect(byKind.get('render')!.filter((id) => id.includes('gloss.tsrx?'))).toEqual([]);
 	});
 });

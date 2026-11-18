@@ -5,7 +5,7 @@ import NestedPage from './fixtures/sel-nested-page.tsrx';
 import Page from './fixtures/sel-page.tsrx';
 import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
 
-// `shared(factory, { scope: 'widget' })` is one graph per rendered widget. The
+// `shared(factory, { scope: 'subtree' })` is one graph per rendered widget. The
 // root/trigger/content pieces of one widget resolve the same instance; a second
 // widget of the same family on the same page resolves a different one.
 //
@@ -89,7 +89,7 @@ test('CSR: a widget projected into another widget content resolves its own insta
 });
 
 // Server-rendered markup must carry each part's OWN element, and the payload
-// must hold one widget-scoped state node per widget, qualified by the instance
+// must hold one subtree-scoped state node per widget, qualified by the instance
 // path composition minted. Both widgets resume, and a trigger still opens only
 // its own widget.
 function expectServerRenderedParts(container: HTMLElement) {

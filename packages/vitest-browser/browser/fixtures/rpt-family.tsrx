@@ -1,6 +1,6 @@
 import { computed, element, shared, state } from '@markless/core';
 
-// A minimal widget-scoped family shaped like the item families (tabs,
+// A minimal subtree-scoped family shaped like the item families (tabs,
 // radio-group, checklist): a root that seeds from its own props, parts that read
 // the seed, a gesture that writes, and an element() handle in an IDREF position.
 export const rpt = shared(() => {
@@ -15,7 +15,7 @@ export const rpt = shared(() => {
 			r.checked = !r.checked;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ checked, disabled, label, children }) @{
 	const r = rpt();

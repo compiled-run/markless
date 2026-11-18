@@ -1,0 +1,146 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/render-csr"
+			],
+			"delta": 53,
+			"reason": "the CSR container listener passes the stop its sync policy applied on to the walk (+53 B rendered, +24 B gzip); without it a nested stopPropagation() never held",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 24,
+			"reason": "the CSR container listener passes the stop its sync policy applied on to the walk (+53 B rendered, +24 B gzip); without it a nested stopPropagation() never held",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/render-csr"
+			],
+			"delta": 53,
+			"reason": "the CSR container listener passes the stop its sync policy applied on to the walk (+53 B rendered, +24 B gzip); without it a nested stopPropagation() never held",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 25,
+			"reason": "the CSR container listener passes the stop its sync policy applied on to the walk (+53 B rendered, +24 B gzip); without it a nested stopPropagation() never held",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 53,
+			"reason": "nested stopPropagation holds: the CSR container listener and the inline resumer pass the stop on, and composed MDX pages dispatch on what the boot applied",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 53,
+			"reason": "nested stopPropagation holds: the CSR container listener and the inline resumer pass the stop on, and composed MDX pages dispatch on what the boot applied",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 53,
+			"reason": "nested stopPropagation holds: the CSR container listener and the inline resumer pass the stop on, and composed MDX pages dispatch on what the boot applied",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 152,
+			"reason": "nested stopPropagation holds: the CSR container listener and the inline resumer pass the stop on, and composed MDX pages dispatch on what the boot applied",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 72,
+			"reason": "nested stopPropagation holds: the CSR container listener and the inline resumer pass the stop on, and composed MDX pages dispatch on what the boot applied",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 152,
+			"reason": "nested stopPropagation holds: the CSR container listener and the inline resumer pass the stop on, and composed MDX pages dispatch on what the boot applied",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 87,
+			"reason": "nested stopPropagation holds: the CSR container listener and the inline resumer pass the stop on, and composed MDX pages dispatch on what the boot applied",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 53,
+			"reason": "nested stopPropagation holds: the CSR container listener and the inline resumer pass the stop on, and composed MDX pages dispatch on what the boot applied",
+			"date": "2026-11-05"
+		}
+	]
+}

@@ -144,7 +144,7 @@ export const boxState = shared(() => {
 			box.own = rect;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function BoxRoot() @{
 	const box = boxState();

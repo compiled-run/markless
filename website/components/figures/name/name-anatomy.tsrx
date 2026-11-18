@@ -147,10 +147,10 @@ export default function NameAnatomy() @{
 				--tab: color-mix(in oklch, var(--paper) 25%, white);
 				--shade: color-mix(in oklch, var(--ink) 16%, transparent);
 				--shade-ink: var(--ink);
-				--c-kw: #d73a49;
-				--c-fn: #6f42c1;
-				--c-str: #032f62;
-				--c-tag: #22863a;
+				--c-kw: var(--syntax-kw);
+				--c-fn: var(--syntax-fn);
+				--c-str: var(--syntax-str);
+				--c-tag: var(--syntax-tag);
 				--rubber: color-mix(in oklch, var(--pink) 75%, white);
 				--crumb: color-mix(in oklch, var(--pink) 55%, var(--ink));
 				--red: oklch(from var(--pink) calc(l - 0.22) calc(c + 0.05) calc(h + 25));
@@ -160,15 +160,11 @@ export default function NameAnatomy() @{
 				--blend: multiply;
 
 				html.dark & {
-					--sheet: oklch(27% 0.01 70);
-					--tab: oklch(33% 0.01 70);
-					--shade: rgb(0 0 0 / 0.5);
-					--shade-ink: rgb(0 0 0 / 0.9);
-					--c-kw: #f97583;
-					--c-fn: #b392f0;
-					--c-str: #9ecbff;
-					--c-tag: #85e89d;
-					--rubber: color-mix(in oklch, var(--pink) 80%, black);
+					--sheet: var(--figure-sheet);
+					--tab: var(--slab);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
+					--rubber: color-mix(in oklch, var(--pink) 75%, white);
 					--crumb: color-mix(in oklch, var(--pink) 70%, white);
 					--red: oklch(from var(--pink) calc(l - 0.04) calc(c + 0.02) calc(h + 22));
 					--red-tab: color-mix(in oklch, var(--red) 14%, var(--tab));
@@ -368,19 +364,29 @@ export default function NameAnatomy() @{
 				opacity: 0.85;
 
 				html.dark & {
-					opacity: 0.35;
+					opacity: 1;
 				}
 			}
 
+			html.dark .name .marker {
+				fill: var(--on-accent);
+				stroke: var(--on-accent);
+			}
+
+			html.dark .marks {
+				--red: oklch(from var(--pink) calc(l - 0.22) calc(c + 0.05) calc(h + 25));
+				--red-tab: color-mix(in oklch, var(--red) 10%, color-mix(in oklch, var(--cream) 25%, white));
+			}
+
 			.pool {
-				fill: color-mix(in oklch, var(--yellow) 70%, oklch(70% 0.16 70));
+				fill: var(--marker);
 				stroke: none;
 				opacity: 0.5;
 			}
 
 			.wash-edge {
 				fill: none;
-				stroke: oklch(72% 0.15 75);
+				stroke: var(--highlight);
 				stroke-width: 1;
 				opacity: 0.35;
 				mix-blend-mode: var(--blend);
@@ -403,7 +409,7 @@ export default function NameAnatomy() @{
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;

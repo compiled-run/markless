@@ -11,7 +11,11 @@ export type FencePoolOptions = {
 	readonly workers: number;
 };
 
-export type FencePool = { readonly render: FenceRenderer };
+export type FencePool = {
+	readonly render: FenceRenderer;
+	/** Ends every worker thread; a later render starts new ones. */
+	close(): Promise<void>;
+};
 
 type Reply = { readonly id: number; readonly html?: string | null; readonly error?: string };
 
@@ -45,7 +49,8 @@ export function createFencePool(options: FencePoolOptions): FencePool {
 			else wait.resolve(reply.html ?? undefined);
 		});
 		worker.on('error', (error) => {
-			lanes.splice(lanes.indexOf(lane), 1);
+			const index = lanes.indexOf(lane);
+			if (index !== -1) lanes.splice(index, 1);
 			for (const wait of lane.waiting.values()) wait.reject(error);
 			lane.waiting.clear();
 		});
@@ -79,6 +84,16 @@ export function createFencePool(options: FencePoolOptions): FencePool {
 			if (!html) rendered.set(key, (html = send(code, fenceLanguage)));
 			return html;
 		},
+		async close() {
+			const closing = lanes.splice(0);
+			for (const lane of closing) {
+				for (const wait of lane.waiting.values())
+					wait.reject(new Error('The fence pool closed before this fence rendered.'));
+				lane.waiting.clear();
+			}
+			for (const [key, html] of rendered) html.catch(() => rendered.delete(key));
+			await Promise.all(closing.map((lane) => lane.worker.terminate()));
+		},
 	};
 }
 
@@ -90,4 +105,9 @@ export function sharedFencePool(): FencePool {
 		workers: Math.max(1, Math.min(4, Math.floor(availableParallelism() / 2))),
 	});
 	return shared;
+}
+
+/** An unreferenced idle worker still holds its type checker, so whoever ends the build or server ends the pool. */
+export async function closeSharedFencePool(): Promise<void> {
+	await shared?.close();
 }

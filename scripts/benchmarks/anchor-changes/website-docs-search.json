@@ -1,0 +1,112 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 5,
+			"reason": "docs search (PR #431): the navbar's Search button and Cmd K wiring run at load, and first-use packing preloads the dialog's combobox and modal code without running it (deferring that download to the first open needs a framework change, left to the owner); the resume-locators fix for array element() handles adds 5 B to every page; measured on CI run 41910413032 against main's merge-queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 5,
+			"reason": "docs search (PR #431): the navbar's Search button and Cmd K wiring run at load, and first-use packing preloads the dialog's combobox and modal code without running it (deferring that download to the first open needs a framework change, left to the owner); the resume-locators fix for array element() handles adds 5 B to every page; measured on CI run 41910413032 against main's merge-queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 5,
+			"reason": "docs search (PR #431): the navbar's Search button and Cmd K wiring run at load, and first-use packing preloads the dialog's combobox and modal code without running it (deferring that download to the first open needs a framework change, left to the owner); the resume-locators fix for array element() handles adds 5 B to every page; measured on CI run 41910413032 against main's merge-queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 2798,
+			"reason": "docs search (PR #431): the navbar's Search button and Cmd K wiring run at load, and first-use packing preloads the dialog's combobox and modal code without running it (deferring that download to the first open needs a framework change, left to the owner); the resume-locators fix for array element() handles adds 5 B to every page; measured on CI run 41910413032 against main's merge-queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 44759,
+			"reason": "docs search (PR #431): the navbar's Search button and Cmd K wiring run at load, and first-use packing preloads the dialog's combobox and modal code without running it (deferring that download to the first open needs a framework change, left to the owner); the resume-locators fix for array element() handles adds 5 B to every page; measured on CI run 41910413032 against main's merge-queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 2853,
+			"reason": "docs search (PR #431): the navbar's Search button and Cmd K wiring run at load, and first-use packing preloads the dialog's combobox and modal code without running it (deferring that download to the first open needs a framework change, left to the owner); the resume-locators fix for array element() handles adds 5 B to every page; measured on CI run 41910413032 against main's merge-queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 45068,
+			"reason": "docs search (PR #431): the navbar's Search button and Cmd K wiring run at load, and first-use packing preloads the dialog's combobox and modal code without running it (deferring that download to the first open needs a framework change, left to the owner); the resume-locators fix for array element() handles adds 5 B to every page; measured on CI run 41910413032 against main's merge-queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 130,
+			"reason": "docs search (PR #431): the navbar's Search button and Cmd K wiring run at load, and first-use packing preloads the dialog's combobox and modal code without running it (deferring that download to the first open needs a framework change, left to the owner); the resume-locators fix for array element() handles adds 5 B to every page; measured on CI run 41910413032 against main's merge-queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 67751,
+			"reason": "docs search (PR #431): the navbar's Search button and Cmd K wiring run at load, and first-use packing preloads the dialog's combobox and modal code without running it (deferring that download to the first open needs a framework change, left to the owner); the resume-locators fix for array element() handles adds 5 B to every page; measured on CI run 41910413032 against main's merge-queue run 41903352996",
+			"date": "2026-11-04"
+		}
+	]
+}

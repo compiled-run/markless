@@ -47,6 +47,11 @@ function recordingContext(props: Record<string, unknown>) {
 				write: (write: { graphNodeId: string; value: unknown }) => {
 					writes.push({ graphNodeId: write.graphNodeId, value: write.value });
 				},
+				update: (update: { graphNodeId: string; update: (value: unknown) => unknown }) => {
+					const value = update.update(undefined);
+					writes.push({ graphNodeId: update.graphNodeId, value });
+					return value;
+				},
 			},
 		},
 	};
@@ -218,6 +223,11 @@ function graphContext(cells: Record<string, unknown>, props: Record<string, unkn
 					),
 				write: (write: { graphNodeId: string; value: unknown }) => {
 					values.set(write.graphNodeId, write.value);
+				},
+				update: (update: { graphNodeId: string; update: (value: unknown) => unknown }) => {
+					const next = update.update(values.get(update.graphNodeId));
+					values.set(update.graphNodeId, next);
+					return next;
 				},
 			},
 		},

@@ -1,11 +1,9 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 
@@ -75,13 +73,9 @@ beforeAll(async () => {
 		await mkdir(dirname(join(root, file)), { recursive: true });
 		await writeFile(join(root, file), source);
 	}
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
 	});
-	await builder.buildApp();
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
@@ -142,16 +136,10 @@ export default function Document({ children }: { readonly children?: Children })
 			join(app, 'pages/index.tsrx'),
 			`export default function Page() @{\n\t<main><button id="b">press</button></main>\n}\n`,
 		);
-		const builder = await createBuilder({
-			root: app,
-			configFile: false,
-			logLevel: 'silent',
-			plugins: [markless(), router()],
-		});
-		await expect(builder.buildApp()).rejects.toThrow(
+		await expect(buildFixture({ root: app })).rejects.toThrow(
 			/MARKLESS_ROUTER_DOCUMENT_HANDLERS_UNSUPPORTED: .*document\.tsrx sets onClick on <body>/,
 		);
 	} finally {
 		await rm(app, { recursive: true, force: true });
 	}
-});
+}, 120_000);

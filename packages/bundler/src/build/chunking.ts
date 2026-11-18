@@ -57,6 +57,14 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 	{ name: 'markless-resume-runtime-shared', test: fileBasenamePattern('resume-runtime-shared') },
 	{ name: 'markless-resume-events', test: fileBasenamePattern('resume-events') },
 	{ name: 'markless-resume-handoff', test: fileBasenamePattern('resume-handoff') },
+	// Only an app whose state declares a non-widget shared() loads these.
+	// The start decides whether to bind and ships with the binding it loads.
+	{
+		name: 'markless-shared-instances',
+		test: fileBasenamePattern('shared-instances', 'shared-start'),
+	},
+	{ name: 'markless-shared-swap', test: fileBasenamePattern('shared-swap') },
+	{ name: 'markless-kept-swap', test: fileBasenamePattern('kept-swap') },
 	// The census splice chunks with the module that pins the census: a chunk of
 	// its own would cost every importer a preload for ~40 lines.
 	{
@@ -120,14 +128,15 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 	{ name: 'markless-runtime-graph-core', test: fileBasenamePattern('graph-core') },
 	{ name: 'markless-runtime-graph-collections', test: fileBasenamePattern('graph-collections') },
 	{ name: 'markless-runtime-graph-computed', test: fileBasenamePattern('graph-computed') },
-	{ name: 'markless-runtime-graph-async', test: fileBasenamePattern('graph-async') },
+	{ name: 'markless-runtime-graph-async', test: fileBasenamePattern('graph-async', 'graph-async-load') },
+	{ name: 'markless-runtime-graph-async-refresh', test: fileBasenamePattern('graph-async-refresh') },
 	{ name: 'markless-runtime-graph-scheduler', test: fileBasenamePattern('graph-scheduler') },
 	{ name: 'markless-runtime-graph-shared', test: fileBasenamePattern('graph-shared') },
 	// Workspace-source paths: @markless/runtime + serializer resolve to packages/*/src
 	// in this monorepo, so the package-name groups below never match them.
 	{
 		name: 'markless-graph',
-		test: /[/\\](?:runtime[/\\]src[/\\](?!graph-(?:core|collections|computed|async|scheduler|shared)\.ts)|core[/\\]src[/\\]runtime)[/\\]?/,
+		test: /[/\\](?:runtime[/\\]src[/\\](?!graph-(?:core|collections|computed|async|async-load|async-refresh|scheduler|shared)\.ts)|core[/\\]src[/\\]runtime)[/\\]?/,
 	},
 	{ name: 'markless-serializer', test: /[/\\]serializer[/\\]src[/\\](?!protocol-validation)/ },
 ];

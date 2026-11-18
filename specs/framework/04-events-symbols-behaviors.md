@@ -54,7 +54,7 @@ The minted id is emitted per module that has such a record; a module with none
 carries no minting code at all. What the id is derived from depends on where the
 handle is declared. A handle declared in a component is one element per rendered
 component, so the id carries that render's own instance prefix. A handle
-declared in a `shared()` factory with `{ scope: 'widget' }` is one element per
+declared in a `shared()` factory with `{ scope: 'subtree' }` is one element per
 rendered widget, so the id carries the token the widget root registers - from
 static edge data, before any HTML is written - into the seed map it hands the
 parts placed inside it. Two widgets on one page therefore mint different ids for
@@ -66,7 +66,7 @@ this lowering cannot recover:
 - A handle named by an IDREF inside a keyed list. One authored handle would name
   one element per row.
 - An IDREF read from inside the widget root itself, or from a `shared()` factory
-  that is not `{ scope: 'widget' }`. The widget token does not exist yet in the
+  that is not `{ scope: 'subtree' }`. The widget token does not exist yet in the
   first case and names nothing per-widget in the second.
 - An authored `id` on the element an IDREF names. Two id attributes would leave
   the relationship pointing at whichever one the parser kept.
@@ -252,6 +252,80 @@ effects, dependency-array bugs, and effect-ordering races are not lintable
 mistakes here, they are unrepresentable. (Prior art: Ryan Carniato's
 derived-first direction for Solid 2.0 — "you don't need effects; computed is
 your effect.")
+
+### A received callback as the handler
+
+A component may hand a callback prop it received straight to an event prop, on
+a native element or on a part it renders:
+
+```tsrx
+function Key({ onPress }: { readonly onPress?: (event: MouseEvent) => void }) @{
+  <button onClick={onPress}>Go</button>
+}
+```
+
+The semantic graph pass reads `onClick={onPress}`, where `onPress` resolves to
+one of the component's own props, as the handler
+`(event) => onPress?.(event)` (the parameter is renamed when the prop itself is
+called `event`). Everything downstream sees an ordinary handler that invokes a
+callback prop, so:
+
+- each instance runs the callback its own parent passed, with the DOM event as
+  the callback's first argument, and its writes land on the graph nodes of the
+  parent that passed it, including subtree-scoped `shared()` state;
+- an instance whose parent passed no callback runs nothing;
+- a parent that passes something other than a callback, such as a function
+  call's result or a `let`, still stops the build with
+  `MARKLESS_CAPTURE_OPAQUE_PROP`, as it does for any handler reading that prop.
+
+Only a bare identifier naming a prop is rewritten. A `@for` row binding of the
+same name, a component-local function, or any other expression keeps its own
+meaning. Validated by `packages/vitest-browser/browser/direct-callback.test.ts`
+(CSR and SSR resume) and `packages/compiler/test/direct-callback-prop.test.ts`.
+
+### Callbacks a component hands on through its props
+
+A component's props reach a child through a spread in either signature form:
+`function Pad({ children, ...rest })` spreading `rest`, or `function Pad(props)`
+spreading `props`. Both carry every prop the consumer passed (the rest form less
+what the signature took out), so a consumer's `onClick` on `<Pad>` becomes an
+event record on the element `Pad` spreads onto, and a child component's handler
+that calls a prop it got through the spread runs the consumer's callback.
+
+A widget root files the callback it is handed into a callback slot. When a
+component hands a root a callback it only received, by name
+(`<toggle.root onChange={onChange}>`) or inside its props spread
+(`<toggle.root {...rest}>`), the semantic graph pass reads that prop as the
+component's own `(value) => onChange?.(value)`, the same lowering as a received
+handler above. The family's module graph interface lists the props each root
+files into a slot (`callbackSlotProps`), which is how a consumer in another
+module knows to lower them. Each instance then runs the callback its own parent
+passed, and an instance whose parent passed none runs nothing. Validated by
+`packages/vitest-browser/browser/callback-spread.test.ts` (CSR and SSR resume) and
+`packages/compiler/test/callback-spread.test.ts`.
+
+### Components in nested keyed rows
+
+A component placed inside keyed `@for` loops is one instance per row of every
+loop around it: its instance path carries a `r:<key>:` segment for each
+enclosing row, outermost first (`r:b:r:y:c0:`). When one of those rows is
+unkeyed it has no identity to carry, and an interactive child refuses as it
+does in a single unkeyed row.
+
+A handler in such a component that reads a row value it was passed (`group`,
+`item`) finds it by key, not by position: the inner rows of every outer row can
+sit side by side in one parent. The compiler records the chain of rows that
+holds the value: the outermost row's collection on the graph, each inner row's
+collection read off the item around it, and the key path every row is named by.
+At dispatch, the keys come from the record's own path. A callback such a
+component writes runs on its own row's instance even when a component further
+down calls it: the caller names the callback's bound row, cut to the rows that
+row was placed by. A chain the compiler
+cannot describe (an inner collection that is not a static path off the enclosing
+item) stays the build error it is today. Validated by
+`packages/vitest-browser/browser/nested-row-components.test.ts` (CSR and SSR resume),
+`packages/compiler/test/nested-row-locals.test.ts` and
+`packages/web/test/row-bound-path.test.ts`.
 
 ### Event handler arrays and sync policy
 

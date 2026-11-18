@@ -1,6 +1,6 @@
 export type Finding = { readonly guard: string; readonly message: string };
 export type Evaluation = { readonly failures: Finding[]; readonly notes: Finding[] };
-export type Measurement = { readonly sites: Record<string, unknown> };
+export type Measurement = { readonly platform?: string; readonly sites: Record<string, unknown> };
 export type Anchors = Record<string, unknown>;
 
 export function measure(options?: {
@@ -10,5 +10,5 @@ export function measure(options?: {
 }): Promise<Measurement>;
 export function evaluate(measurement: Measurement, anchors: Anchors): Evaluation;
 export function formatReport(evaluation: Evaluation): string;
-export function readAnchors(path?: string): Anchors;
+export function readAnchors(): Anchors;
 export function saveLastMeasurement(measurement: Measurement): void;

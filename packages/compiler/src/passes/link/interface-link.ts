@@ -4,6 +4,7 @@
 // known. Resolution is an input: the pass never resolves or loads a specifier,
 // and virtual module naming stays with the caller that owns the module ids.
 import { compileTsrxModule } from '../../compile-module.ts';
+import { prerenderInterfacesComplete } from './interfaces-complete.ts';
 import {
 	componentEdgeSymbolRoutes,
 	type ComponentEdgeSymbolRoute,
@@ -14,7 +15,6 @@ import type {
 	LinkedBoundarySymbol,
 	LinkedBoundarySymbolsInput,
 	LinkedInterfaceClaim,
-	LinkedInterfaceCompleteness,
 	LinkedInterfaceImport,
 	LinkedInterfacesArtifact,
 	LinkedInterfacesInput,
@@ -156,17 +156,7 @@ function hashedInterface(value: ModuleGraphInterfaceArtifact | undefined): unkno
 	};
 }
 
-export function prerenderInterfacesComplete(
-	compiled: Pick<CompileTsrxModuleResult, 'semanticGraph'>,
-	link: LinkedInterfaceCompleteness,
-): boolean {
-	return compiled.semanticGraph.componentEdges.every(
-		(edge) =>
-			!edge.importSource ||
-			link.artifactChildMaterializations?.[edge.id] !== undefined ||
-			link.importedModuleInterfaces?.[edge.importSource] !== undefined,
-	);
-}
+export { prerenderInterfacesComplete };
 
 export function linkedRenderDataBoundarySymbols(
 	input: LinkedBoundarySymbolsInput,
@@ -228,6 +218,7 @@ function linkedBoundaryUpdateSymbols(
 						boundaryId: boundary.id,
 						exportName,
 						renderDataId: input.renderDataId,
+						...(input.servedRenderDataId && { servedRenderDataId: input.servedRenderDataId }),
 						resolverId: input.resolverId,
 						routes,
 					}),
@@ -290,13 +281,24 @@ function linkedRenderDataBoundarySymbolSource(input: {
 	readonly boundaryId: string;
 	readonly exportName: string;
 	readonly renderDataId: string;
+	readonly servedRenderDataId?: string;
 	readonly resolverId: string;
 	readonly routes: ReadonlyArray<ComponentEdgeSymbolRoute>;
 }): string {
+	const served = input.servedRenderDataId;
 	return [
-		...linkedRenderDataSymbolPreamble(input, 'renderPrerenderBoundary'),
+		...linkedRenderDataSymbolPreamble(
+			served ? { ...input, renderDataId: served } : input,
+			'renderPrerenderBoundary',
+		),
+		// The settle kernel draws from the served data; only a render it refuses loads the whole module.
+		...(served
+			? [
+					`const marklessWholePrerenderData = () => import(${JSON.stringify(input.renderDataId)}).then((module) => module.marklessPrerenderData);`,
+				]
+			: []),
 		`export async function ${input.exportName}(context) {`,
-		`\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, ${JSON.stringify(input.boundaryId)}, context.status, context.graph, marklessLoadLinkedSymbol);`,
+		`\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, ${JSON.stringify(input.boundaryId)}, context.status, context.graph, marklessLoadLinkedSymbol, context.asyncBoundary?.id${served ? ', marklessWholePrerenderData' : ''});`,
 		'\treturn { ...rendered, arm: context.status === "rejected" ? 2 : 0 };',
 		'}',
 	].join('\n');
@@ -312,7 +314,7 @@ function linkedRenderDataBranchSymbolSource(input: {
 	return [
 		...linkedRenderDataSymbolPreamble(input, 'renderPrerenderBranch'),
 		`export async function ${input.exportName}(context) {`,
-		`\tconst rendered = await renderPrerenderBranch(marklessPrerenderData, ${JSON.stringify(input.branchSiteId)}, context.graph, marklessLoadLinkedSymbol);`,
+		`\tconst rendered = await renderPrerenderBranch(marklessPrerenderData, ${JSON.stringify(input.branchSiteId)}, context.graph, marklessLoadLinkedSymbol, context.composedBranchId, context.element);`,
 		// `resolved` marks the render authoritative: an arm that legitimately shows
 		// nothing must not be mistaken for a module that found no parts.
 		'\treturn { ...rendered, arm: context.arm, resolved: true };',
@@ -340,7 +342,7 @@ function linkedRenderDataSymbolPreamble(
 			`\tif (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
 			'importSource' in route
 				? `\t\treturn import(${JSON.stringify(linkedRenderDataSymbolRouteSource(route.importSource))}).then((module) => module.loadSymbol(symbolId.slice(${route.prefix.length})));`
-				: `\t\treturn marklessLoadLocalSymbol(symbolId.slice(${route.prefix.length}));`,
+				: `\t\treturn marklessLoadLinkedSymbol(symbolId.slice(${route.prefix.length}));`,
 			'\t}',
 		]),
 		'\treturn marklessLoadLocalSymbol(symbolId);',

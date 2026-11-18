@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 347,
+			"reason": "a component placed twice in one module (the navbar's theme toggle, preview cards) gets a symbol route per placement, so each copy's callback reaches its own bound row (download only; executed code within swing)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 347,
+			"reason": "a component placed twice in one module (the navbar's theme toggle, preview cards) gets a symbol route per placement, so each copy's callback reaches its own bound row (download only; executed code within swing)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 94,
+			"reason": "a component placed twice in one module (the navbar's theme toggle, preview cards) gets a symbol route per placement, so each copy's callback reaches its own bound row (download only; executed code within swing)",
+			"date": "2026-11-11"
+		}
+	]
+}

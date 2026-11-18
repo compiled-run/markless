@@ -484,6 +484,34 @@ const PANEL = `
 	}
 `;
 
+test('only a branch whose arm renders a list\'s parent demands the arm-list wiring', async () => {
+	const armList = 'web/resume-arm-lists';
+	const branchModules = (map: Awaited<ReturnType<typeof panelDemandMap>>['map']) =>
+		map.payloadRecords.find((record) => record.kind === 'branch')?.runtimeModuleIds ?? [];
+	const withList = await panelDemandMap(`
+		import { state } from '@markless/core';
+		export default function Panel() @{
+			let open = state(false);
+			let items = state(['a']);
+			<section>
+				<button onClick={() => (open = !open)}>toggle</button>
+				@if (open) {
+					<ul>
+						@for (const item of items; key item) {
+							<li>{item}</li>
+						}
+					</ul>
+				}
+			</section>
+		}
+	`);
+	expect(branchModules(withList.map)).toContain(armList);
+	const plain = await panelDemandMap(PANEL);
+	expect(branchModules(plain.map)).toContain('web/resume-branches');
+	expect(branchModules(plain.map)).not.toContain(armList);
+	expect(plain.map.unknownRecordModuleIds).toContain(armList);
+});
+
 test('a control that flips a branch through a computed reaches the flip, its derive and the arm handlers', async () => {
 	const { action, kinds } = await panelDemandMap(PANEL);
 	const input = action('h1', 'input');
@@ -784,6 +812,82 @@ test('an event inside an async boundary arm is a planner action owned by its bou
 	}
 });
 
+test('the submit hold is demanded by an async submit handler and the in-place sender by a form sent in place, and by nothing else', async () => {
+	const { compileTsrxModule } = await import('../src/index.ts');
+	const result = await compileTsrxModule({
+		filename: '/workspace/src/Desk.tsrx',
+		symbols: [],
+		source: `import { state } from '@markless/core';
+		export default function Desk() @{
+			let note = state('');
+			let count = state(0);
+			<section>
+				<form data-save onSubmit={async (event) => { event.preventDefault(); await fetch('/save'); note = 'saved'; }}>
+					<button>Save</button>
+				</form>
+				<form data-count onSubmit={(event) => { event.preventDefault(); count++; }}>
+					<button>Count {count}</button>
+				</form>
+				<button onClick={async () => { await fetch('/ask'); note = 'asked'; }}>Ask {note}</button>
+				@try {
+					<form method="post" action="/notes"><input name="note" /></form>
+				} @catch (error) {
+					<p>{error.message}</p>
+				}
+			</section>
+		}`,
+	});
+	const hold = 'web/submit-hold';
+	const sender = 'web/form-send';
+	for (const map of Object.values(result.runtimeDemandMaps)) {
+		expect(map.unknownRecordModuleIds).toEqual(expect.arrayContaining([hold, sender]));
+		const handlers = map.symbols.filter((symbol) => symbol.runtimeModuleIds.includes(hold));
+		expect(handlers).toHaveLength(1);
+		const submits = [...map.actions, ...(map.armActions ?? [])].filter((action) => action.eventName === 'submit');
+		expect(submits.filter((action) => action.runtimeModuleIds.includes(hold))).toHaveLength(2);
+		expect(submits.filter((action) => action.runtimeModuleIds.includes(sender))).toHaveLength(1);
+		for (const action of map.actions.filter((entry) => entry.eventName === 'click')) {
+			expect(action.runtimeModuleIds).not.toContain(hold);
+			expect(action.runtimeModuleIds).not.toContain(sender);
+		}
+	}
+});
+
+test('busy marks, the refresh announcement and the async refresh half are demanded only by a control whose writes reach an async value', async () => {
+	const { compileTsrxModule } = await import('../src/index.ts');
+	const result = await compileTsrxModule({
+		filename: '/workspace/src/Tide.tsrx',
+		symbols: [],
+		source: `import { computed, state } from '@markless/core';
+		export default function Tide() @{
+			let port = state('Oban');
+			let likes = state(0);
+			const tide = computed(async () => ({ high: port + ' 06:10' }));
+			<section>
+				<button onClick={() => (port = 'Mallaig')}>Next port</button>
+				<button onClick={() => likes++}>Like {likes}</button>
+				@try {
+					<p>{tide.high}</p>
+				} @pending {
+					<p>reading</p>
+				}
+			</section>
+		}`,
+	});
+	const lazy = ['web/fns/busy-elements', 'web/fns/refresh-announcer', 'web/fns/async-refresh'];
+	for (const map of Object.values(result.runtimeDemandMaps)) {
+		expect(map.payloadRecords.some((record) => record.kind === 'async-boundary')).toBe(true);
+		expect(map.unknownRecordModuleIds).toEqual(expect.arrayContaining(lazy));
+		for (const entry of [...map.payloadRecords, ...map.symbols])
+			for (const id of lazy) expect(entry.runtimeModuleIds).not.toContain(id);
+		for (const id of lazy) expect(map.capabilityModuleIds ?? []).not.toContain(id);
+		const clicks = map.actions.filter((action) => action.eventName === 'click');
+		expect(clicks).toHaveLength(2);
+		expect(clicks.filter((action) => lazy.every((id) => action.runtimeModuleIds.includes(id)))).toHaveLength(1);
+		expect(clicks.filter((action) => lazy.some((id) => action.runtimeModuleIds.includes(id)))).toHaveLength(1);
+	}
+});
+
 test.each([
 	{
 		name: 'an @if on a module constant',
@@ -863,3 +967,106 @@ test.each([
 		}
 	},
 );
+
+// A row rooted by a component, or an arm that runs one, renders records its own component declared in this
+// module, so this module's view enumerates them; an imported child's records are its own module's map.
+test.each([
+	{
+		name: 'a row that is the component',
+		filename: '/workspace/src/Shelf.tsrx',
+		source: `import { state } from '@markless/core';
+		function Book(props) @{
+			let open = state(false);
+			<li><button onClick={() => (open = !open)}>{props.book.title}</button>@if (open) { <p>blurb</p> }</li>
+		}
+		export default function Shelf() @{
+			let books = state([{ id: 1, title: 'Dune' }]);
+			<ul>@for (const book of books; key book.id) { <Book book={book} /> }</ul>
+		}`,
+		rows: true,
+	},
+	{
+		name: 'a row element wrapping the component',
+		filename: '/workspace/src/Roster.tsrx',
+		source: `import { state } from '@markless/core';
+		function Crew({ member }) @{
+			let shown = state('');
+			<div><input onInput={(event) => (shown = event.currentTarget.value)} />@if (shown === member.name) { <em>match</em> } @else { <i>{shown}</i> }</div>
+		}
+		export default function Roster() @{
+			let members = state([{ key: 'a', name: 'Ada' }]);
+			<section>@for (const member of members; key member.key) { <article><Crew member={member} /></article> }</section>
+		}`,
+		rows: true,
+	},
+	{
+		name: 'an @if whose arm runs a component holding an async value',
+		filename: '/workspace/src/Directory.tsrx',
+		source: `import { computed, state } from '@markless/core';
+		function Profile(props) @{
+			const user = computed(async () => ({ name: 'u' + props.id }));
+			<article>@try { <h3>{user.name}</h3> } @pending { <i>wait</i> } @catch { <b>no</b> }</article>
+		}
+		export default function Directory() @{
+			let picked = state(0);
+			<nav><select onChange={(event) => (picked = Number(event.currentTarget.value))}><option value="1">one</option></select>@if (picked > 0) { <aside><Profile id={picked} /><a onClick={() => (picked = 0)}>x</a></aside> }</nav>
+		}`,
+		rows: false,
+	},
+])('records a component renders inside rows or arms are listed: $name', async ({ filename, source, rows }) => {
+	const { compileTsrxModule } = await import('../src/index.ts');
+	const result = await compileTsrxModule({ filename, symbols: [], source });
+	if (rows) expect(result.protocolView.keyedRepeats?.some((repeat) => repeat.rowComponent)).toBe(true);
+	else expect(result.protocolView.branches?.some((branch) => branch.escalates)).toBe(true);
+	for (const map of Object.values(result.runtimeDemandMaps)) {
+		expect(map.nestedRecordModuleIds).toEqual(
+			expect.arrayContaining(['web/resume-events', 'web/resume-branches', 'web/resume-commit-arm']),
+		);
+		if (!rows)
+			expect(map.nestedRecordModuleIds).toEqual(
+				expect.arrayContaining(['web/resume-async-wiring', 'web/fns/async-plane']),
+			);
+	}
+});
+
+test('the arm gate is demanded only by a branch whose arm holds a component that owns a value, nested arms included', async () => {
+	const { compileTsrxModule } = await import('../src/index.ts');
+	const gate = 'web/fns/arm-gate';
+	const owning = await compileTsrxModule({
+		filename: '/workspace/src/Shelf.tsrx',
+		symbols: [],
+		source: `import { computed, state } from '@markless/core';
+		function Spine({ id }: { id: number }) @{ const title = computed(() => 'vol ' + id); <p>{title}</p> }
+		export default function Shelf() @{
+			let outer = state(true);
+			let inner = state(false);
+			let id = state(1);
+			<div><button onClick={() => (inner = !inner)}>Inner</button><button onClick={() => id++}>Next</button>@if (outer) { <section><b>{id}</b>@if (inner) { <Spine id={id} /> }</section> }</div>
+		}`,
+	});
+	expect(owning.protocolView.branches?.some((branch) => branch.armComponents)).toBe(true);
+	for (const map of Object.values(owning.runtimeDemandMaps)) {
+		const branches = map.payloadRecords.filter((record) => record.kind === 'branch');
+		expect(branches.some((record) => record.runtimeModuleIds.includes(gate))).toBe(true);
+		expect(map.capabilityModuleIds).toContain(gate);
+		expect(map.unknownRecordModuleIds).toContain(gate);
+		expect(map.nestedRecordModuleIds).toContain(gate);
+	}
+	const plain = await compileTsrxModule({
+		filename: '/workspace/src/Lamp.tsrx',
+		symbols: [],
+		source: `import { state } from '@markless/core';
+		function Icon({ name }: { name: string }) @{ <i>{name}</i> }
+		export default function Lamp() @{
+			let on = state(false);
+			<div><button onClick={() => (on = !on)}>Switch</button>@if (on) { <Icon name="bulb" /> } @else { <p>dark</p> }</div>
+		}`,
+	});
+	expect(plain.protocolView.branches?.length).toBeGreaterThan(0);
+	for (const map of Object.values(plain.runtimeDemandMaps)) {
+		for (const entry of [...map.payloadRecords, ...map.actions, ...map.symbols])
+			expect(entry.runtimeModuleIds).not.toContain(gate);
+		expect(map.capabilityModuleIds ?? []).not.toContain(gate);
+		expect(map.nestedRecordModuleIds ?? []).not.toContain(gate);
+	}
+});

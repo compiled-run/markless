@@ -1,0 +1,16 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 3,
+			"reason": "shared() docs page text shifts the docs bundle's gzip by 3 B (1,673,964 to 1,673,967 B on linux-x64, CI run 42548722918 against merge-base 55a513939's merge-queue run 42547843065)",
+			"date": "2026-11-09"
+		}
+	]
+}

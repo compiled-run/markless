@@ -13,7 +13,7 @@ import {
 	type ProtocolViewPayload,
 	type StorageSeedMetadata,
 } from '@markless/serializer';
-import { encodeProtocolPayloadLists, renderPayloadScripts } from '@markless/serializer';
+import { encodeProtocolPayloadLists, renderPayloadScripts, serializeGraphValue } from '@markless/serializer';
 import {
 	type ProtocolArmRecordSet,
 	protocolEventDispatchesMarkless,
@@ -27,6 +27,7 @@ import {
 	formatEventHostEntries,
 	syncPolicyNeverActs,
 	type ProtocolEventHostEntry,
+	type ProtocolSubmitEventFacts,
 } from '@markless/serializer/protocol';
 import {
 	classifyResumeRecordDelta,
@@ -40,18 +41,27 @@ import {
 	createPrerenderInlineResumerSource,
 	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
+	createInlineResumerReturnWakeSource,
 	createInlineResumerStorageWakeSource,
+	createInlineResumerSharedWakeSource,
+	createInlineInPlaceCheckSource,
 	renderPrerenderInlineResumerSource,
 	renderInlineResumerPageSource,
 	INLINE_PAGE_FORWARDS_UNKNOWN,
 	INLINE_PAGE_SCOPED,
 	type InlineResumerPage,
 	type InlineResumerSourceVariants,
+	type InlineWakeSources,
 	type PrerenderBootArtifact,
 } from './inline/resumer.ts';
 import { createInlineDeferTriggerSource, inlineDeferSource } from './inline/defer.ts';
 import { prepareSsrResumeRecords } from './prerender/records.ts';
-import { CONTAINER_ATTRIBUTE } from './fns/container-region.ts';
+import { CONTAINER_ATTRIBUTE, RESUME_MODULE_ATTRIBUTE } from './fns/container-region.ts';
+import {
+	hasLiveSharedDefinitions,
+	PROTOCOL_SHARED_INSTANCES_PROPERTY,
+	PROTOCOL_SHARED_INSTANCES_VERSION,
+} from '../../serializer/src/protocol-shared-instances.ts';
 import {
 	marklessSsrRosterCounted,
 	marklessSsrRosterPositionContext,
@@ -59,10 +69,13 @@ import {
 import { marklessRosterPositions } from './prerender/shared-seed-slot.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 import { createEarlyEventCaptureSource } from './inline/early-events.ts';
+import { CONTAINER_REASK_PROPERTY } from './resume-return-reask.ts';
 import { servedElementTree, servedLocatorPaths, withElementAttributes } from './locator-paths.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
 export { CONTAINER_RETIRE_PROPERTY } from './payload-resume-registry.ts';
+export { CONTAINER_HANDLING_PROPERTY } from './event-current-target.ts';
+export { CONTAINER_REASK_PROPERTY } from './resume-return-reask.ts';
 
 type RosterResumeHost = {
 	__marklessRosterResume?: () => Promise<typeof import('./fns/roster-resume.ts')>;
@@ -74,9 +87,15 @@ export type SsrRenderOutput = {
 	readonly view?: ProtocolViewPayload;
 	readonly structure?: {
 		readonly anchors: ReadonlyArray<{
-			readonly kind: 'branch' | 'async';
+			readonly kind: 'branch' | 'async' | 'arm-branch';
 			readonly id: string;
 			readonly html: string;
+			/** How many page elements precede the anchor. */
+			readonly elementStart: number;
+			/** How many page elements precede the anchor's end. */
+			readonly elementEnd: number;
+			/** A @try in a keyed row: the boundary's own id, which `id` qualifies with the row. */
+			readonly site?: string;
 		}>;
 	};
 };
@@ -143,11 +162,20 @@ export async function renderToString(
 	component: SsrRenderable,
 	options: RenderToStringOptions = {},
 ): Promise<string> {
-	const output = await renderSsrOutput(
-		component,
-		options.props,
-		storageRenderContext(options.cookie),
-	);
+	// Start every value the page reaches before waiting on any, so separate blocks load side by side.
+	const runs = new Map<string, { readonly promise?: Promise<unknown> }>();
+	const storage = storageRenderContext(options.cookie);
+	const discovered = await renderSsrOutput(component, options.props, {
+		...storage,
+		streaming: { runs, prestart: true },
+	});
+	if (runs.size === 0) return assembleSsrContainer(component, discovered, options);
+	await Promise.all([...runs.values()].map((run) => run.promise));
+	// A whole-page render has no first flush, so a value the discovery pass did not reach is waited for in place.
+	const output = await renderSsrOutput(component, options.props, {
+		...storage,
+		streaming: { runs, deadline: new Promise<never>(() => {}) },
+	});
 	return assembleSsrContainer(component, output, options);
 }
 
@@ -156,6 +184,21 @@ export function storageRenderContext(cookie: string | null | undefined): {
 	readonly [STORAGE_RENDER_CONTEXT_READER]?: (key: string) => string | undefined;
 } {
 	return cookie ? { [STORAGE_RENDER_CONTEXT_READER]: createStorageCookieReader(cookie) } : {};
+}
+
+// A rebuilt value the serializer refuses is compared as absent: the request left it out too, or serves its own.
+function withoutUnserializableComputedValues<T extends { readonly state: ProtocolStatePayload }>(
+	baseline: T,
+): T {
+	const unserializable = (record: ProtocolStatePayload['computed'][number]) =>
+		record.directValue !== undefined && !serializeGraphValue(record.directValue).ok;
+	if (!baseline.state.computed.some(unserializable)) return baseline;
+	const computed = baseline.state.computed.map((record) => {
+		if (!unserializable(record)) return record;
+		const { directValue: _, ...kept } = record;
+		return kept;
+	});
+	return { ...baseline, state: { ...baseline.state, computed } };
 }
 
 // Shared container assembly for the blocking (renderToString) and streaming
@@ -176,7 +219,7 @@ export async function assembleSsrContainer(
 	const wakeChannelEnabled =
 		hasPayload && browserTriggers && prerenderWakeModuleUrl !== undefined;
 	const baseline = wakeChannelEnabled
-		? await derivePrerenderResumeRecords(component, options.props)
+		? withoutUnserializableComputedValues(await derivePrerenderResumeRecords(component, options.props))
 		: undefined;
 	const requestRecords = { state, view };
 	const classification = baseline
@@ -270,13 +313,19 @@ export async function assembleSsrContainer(
 					true,
 					overlayPrimer,
 					deferredTriggerSource(view) +
-						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)),
+						(selfWake
+							? ''
+							: storageWakeSource(state, selectedResumeModuleUrl, artifactSources?.wakes)) +
+						sharedWakeSource(state) +
+						returnWakeSource(view, selectedResumeModuleUrl, artifactSources?.wakes) +
+						(sendsFormInPlace(view) ? createInlineInPlaceCheckSource() : ''),
 					artifactSources?.defer,
+					artifactSources?.wakes,
 				)
 			: '';
 	const policyTable = createSyncPolicyTable();
 	const pageHtml = resumerScript
-		? withEventHostMarks(view, output.html, policyTable)
+		? withEventHostMarks(view, output.html, policyTable, output.structure?.anchors)
 		: output.html;
 	const storageSeedScript = renderStorageSeedScript(
 		artifactStorageSeeds(component),
@@ -284,12 +333,12 @@ export async function assembleSsrContainer(
 	);
 
 	return [
-		storageSeedScript,
-		renderHeadInjections(artifactHeadInjections(component), options.nonce),
-		renderModulePreloadLinks(modulePreloads, options.nonce),
 		resumerScript && selectedResumeModuleUrl && !wakeChannelEnabled && !options.resumerSource
 			? `<script${options.nonce ? ` nonce="${escapeAttribute(options.nonce)}"` : ''}>${escapeInlineScript(createEarlyEventCaptureSource(browserEventNames(view)))}</script>`
 			: '',
+		storageSeedScript,
+		renderHeadInjections(artifactHeadInjections(component), options.nonce),
+		renderModulePreloadLinks(modulePreloads, options.nonce),
 		renderContainer(
 			options.containerId,
 			[
@@ -338,6 +387,7 @@ export async function assemblePrerenderPageParts(
 	const eventNames = browserEventNames(view);
 	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
 	const boot = artifactPrerenderBoot(component);
+	const wakes = artifactInlineResumerSources(component)?.wakes;
 	// The settle path replaces the self-wake: it fills the arm from the plan and
 	// never imports the resume module, so a page only takes it when the build
 	// produced BOTH the plan this document ships and the settle module it needs.
@@ -362,8 +412,11 @@ export async function assemblePrerenderPageParts(
 					!boot,
 					false,
 					deferredTriggerSource(view) +
-						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)),
+						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl, wakes)) +
+						sharedWakeSource(state) +
+						returnWakeSource(view, resumeModuleUrl, wakes),
 					artifactInlineResumerSources(component)?.defer,
+					wakes,
 				)
 			: '';
 
@@ -378,7 +431,9 @@ export async function assemblePrerenderPageParts(
 	const container = renderContainer(
 		options.containerId,
 		[
-			resumerScript ? withEventHostMarks(view, output.html, policyTable) : output.html,
+			resumerScript
+				? withEventHostMarks(view, output.html, policyTable, output.structure?.anchors)
+				: output.html,
 			options.armEmission,
 			renderSyncPolicyTableScript(policyTable.policies),
 			resumerScript,
@@ -544,10 +599,66 @@ function renderStorageSeedScript(
 	return `<script${nonceAttribute}>${escapeInlineScript(source)}</script>`;
 }
 
+type EventLists = {
+	readonly events?: ReadonlyArray<ProtocolSubmitEventFacts>;
+	readonly keyedRepeats?: ReadonlyArray<{
+		readonly rowEvents?: ReadonlyArray<ProtocolSubmitEventFacts>;
+	}>;
+	readonly branches?: ReadonlyArray<{ readonly armRecords?: ReadonlyArray<EventLists> }>;
+	readonly asyncBoundaries?: ReadonlyArray<{
+		readonly armRecords?: EventLists | ReadonlyArray<EventLists>;
+	}>;
+};
+
+// A form the runtime sends in place, anywhere in the page's records: its page carries the check the boot runs on submit.
+export function sendsFormInPlace(lists: EventLists): boolean {
+	const sets = (records: EventLists | ReadonlyArray<EventLists> | undefined) =>
+		records === undefined
+			? []
+			: Array.isArray(records)
+				? (records as ReadonlyArray<EventLists>)
+				: [records as EventLists];
+	return (
+		!!lists.events?.some((event) => event.inPlaceSubmit) ||
+		!!lists.keyedRepeats?.some((repeat) =>
+			repeat.rowEvents?.some((event) => event.inPlaceSubmit),
+		) ||
+		!!lists.branches?.some((branch) => sets(branch.armRecords).some(sendsFormInPlace)) ||
+		!!lists.asyncBoundaries?.some((boundary) =>
+			sets(boundary.armRecords).some(sendsFormInPlace),
+		)
+	);
+}
+
+// Only app-scoped instances are shared with other containers; container and subtree instances are a container's own.
+function sharedWakeSource(state: ProtocolStatePayload): string {
+	return (state.sharedDefinitions ?? []).some(
+		(definition) => definition.scope !== 'subtree' && definition.scope !== 'container',
+	)
+		? createInlineResumerSharedWakeSource(
+				PROTOCOL_SHARED_INSTANCES_PROPERTY,
+				PROTOCOL_SHARED_INSTANCES_VERSION,
+				CONTAINER_ATTRIBUTE,
+			)
+		: '';
+}
+
+function returnWakeSource(
+	view: ProtocolViewPayload,
+	resumeModuleUrl: string | undefined,
+	wakes: InlineWakeSources | undefined,
+): string {
+	return Object.keys(view.asyncRunners ?? {}).length > 0 ||
+		view.asyncBoundaries.some((boundary) => boundary.asyncReads.some((read) => !!read.runnerSymbolId))
+		? createInlineResumerReturnWakeSource(resumeModuleUrl, CONTAINER_REASK_PROPERTY, wakes)
+		: '';
+}
+
 // Each storage cell's slot key and the value this render gave it.
 function storageWakeSource(
 	state: ProtocolStatePayload,
 	resumeModuleUrl: string | undefined,
+	wakes: InlineWakeSources | undefined,
 ): string {
 	const rendered = (state.storage ?? []).flatMap((record) => {
 		const value = renderedCellValue(
@@ -562,6 +673,7 @@ function storageWakeSource(
 		resumeModuleUrl,
 		STORAGE_SLOT_SYMBOL_KEY,
 		escapeScriptJson(JSON.stringify(rendered)),
+		wakes,
 	);
 }
 
@@ -577,16 +689,16 @@ function renderedCellValue(
 
 function renderHeadInjection(injection: RenderHeadInjection, nonce: string | undefined): string {
 	const attributes = { ...injection.attributes };
-	if (nonce && injection.tag === 'script' && !attributes.nonce) {
+	if (nonce && (injection.tag === 'script' || injection.tag === 'style') && !attributes.nonce) {
 		attributes.nonce = nonce;
 	}
 	const renderedAttributes = Object.entries(attributes)
 		.map(([name, value]) => `${name}="${escapeAttribute(value)}"`)
 		.join(' ');
 	const suffix = renderedAttributes ? ` ${renderedAttributes}` : '';
-	return injection.tag === 'link'
-		? `<${injection.tag}${suffix}>`
-		: `<${injection.tag}${suffix}>${escapeInlineScript(injection.children ?? '')}</${injection.tag}>`;
+	if (injection.tag === 'link') return `<${injection.tag}${suffix}>`;
+	const children = injection.children ?? '';
+	return `<${injection.tag}${suffix}>${injection.tag === 'style' ? escapeInlineStyle(children) : escapeInlineScript(children)}</${injection.tag}>`;
 }
 
 function renderModulePreloadLinks(
@@ -617,6 +729,8 @@ function renderModulePreloadLinks(
 function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePayload): boolean {
 	return (
 		(state.storage?.length ?? 0) > 0 ||
+		// A page that only reads a shared() instance still binds to its live value after a swap or another container's write.
+		hasLiveSharedDefinitions(state) ||
 		view.events.some(protocolEventDispatchesMarkless) ||
 		state.computed.some(
 			(computed) =>
@@ -639,7 +753,10 @@ function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePaylo
 				) || branchServedArmEventNames(branch).length > 0,
 		) ||
 		// Async boundary arm events also nest under armRecords (D3).
-		view.asyncBoundaries.some((boundary) => boundaryArmEventNames(boundary).length > 0)
+		view.asyncBoundaries.some((boundary) => boundaryArmEventNames(boundary).length > 0) ||
+		boundaryArmBranches(view.asyncBoundaries).some(
+			(branch) => branchServedArmEventNames(branch).length > 0,
+		)
 	);
 }
 
@@ -695,6 +812,24 @@ function boundaryArmEventNames(
 			repeat.rowEvents.map((event) => event.eventName),
 		),
 	];
+}
+
+// A child's @if in a @try arm is filed under that arm; its painted arm is on the page as much as the arm's own events are.
+function boundaryArmBranches(
+	boundaries: ProtocolViewPayload['asyncBoundaries'],
+): NonNullable<ProtocolViewPayload['branches']> {
+	return boundaries.flatMap((boundary) => {
+		const armRecords = boundary.armRecords as
+			| ProtocolArmRecordSet
+			| ReadonlyArray<unknown>
+			| undefined;
+		return armRecords && !Array.isArray(armRecords)
+			? ((armRecords as ProtocolArmRecordSet).branches ?? []).filter(
+					(branch) =>
+						(branch as { readonly servedArmRecords?: unknown }).servedArmRecords,
+				)
+			: [];
+	}) as unknown as NonNullable<ProtocolViewPayload['branches']>;
 }
 
 // An escalating branch's served arm holds the events the page actually painted;
@@ -895,6 +1030,7 @@ export function withEventHostMarks(
 	>,
 	html: string,
 	policyTable: ReturnType<typeof createSyncPolicyTable>,
+	anchors: NonNullable<SsrRenderOutput['structure']>['anchors'] = [],
 ): string {
 	const tree = servedElementTree(html);
 	const marks: EventHostMarks = new Map();
@@ -944,6 +1080,29 @@ export function withEventHostMarks(
 			const index = arm.get(repeat.parentHostNodeId);
 			if (index !== undefined)
 				addRowPolicyMarks(marks, tree, offset + index, repeat, policyTable);
+		}
+	}
+	// Placed from where the render put the @if within its arm, counted from the arm's own anchor.
+	const placedAt = (kind: string, id: string) =>
+		anchors.find((candidate) => candidate.kind === kind && candidate.id === id)?.elementStart;
+	for (const boundary of view.asyncBoundaries) {
+		const armStart = placedAt('async', boundary.id);
+		const offset = tree.commentElementIndexes[boundary.startAnchor.index];
+		if (armStart === undefined || offset === undefined) continue;
+		for (const branch of boundaryArmBranches([boundary])) {
+			const branchStart = placedAt('branch', branch.id);
+			if (branchStart === undefined) continue;
+			const set = branch.servedArmRecords!;
+			const arm = indexes(set.locators);
+			for (const event of set.events) {
+				const policy = policyTable.entry(event.syncPolicy);
+				const index = arm.get(event.hostNodeId);
+				if (policy !== undefined && index !== undefined)
+					addEventHostEntry(marks, offset + branchStart - armStart + index, {
+						name: event.eventName,
+						policy,
+					});
+			}
 		}
 	}
 	for (const branch of view.branches ?? [])
@@ -1035,6 +1194,7 @@ function deferredEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
 				...branchServedArmEventNames(branch),
 			]),
 			...view.asyncBoundaries.flatMap(boundaryArmEventNames),
+			...boundaryArmBranches(view.asyncBoundaries).flatMap(branchServedArmEventNames),
 		]),
 	];
 }
@@ -1049,6 +1209,23 @@ function renderContainer(
 	const id = containerId ? `="${escapeAttribute(containerId)}"` : '';
 	const located = paths ? ` ${PROTOCOL_LOCATOR_PATHS_ATTRIBUTE}="${paths}"` : '';
 	return `${CONTAINER_OPEN}${id}${located}>${inner}${CONTAINER_CLOSE}`;
+}
+
+/**
+ * Splits the early-event capture script off the front of the html that precedes the container.
+ * A document host serves it ahead of its stylesheets: a classic script waits for every stylesheet
+ * above it, and the parser waits for the script.
+ */
+export function splitEarlyEventCapture(head: string): {
+	readonly capture: string;
+	readonly rest: string;
+} {
+	// Built here, not at module scope, so a bundle that never splits drops this function whole.
+	const captureStart = `>${escapeInlineScript(createEarlyEventCaptureSource([]).slice(0, -'[]);'.length))}`;
+	const start = head.startsWith('<script') ? head.indexOf(captureStart) : -1;
+	if (start === -1 || head.lastIndexOf('<', start) !== 0) return { capture: '', rest: head };
+	const end = head.indexOf('</script>', start) + '</script>'.length;
+	return { capture: head.slice(0, end), rest: head.slice(end) };
 }
 
 const CONTAINER_OPEN = `<div ${CONTAINER_ATTRIBUTE}`;
@@ -1111,17 +1288,18 @@ function renderInlineResumerScript(
 	overlayPrimer = false,
 	appendedSource = '',
 	deferFactory?: string,
+	wakes?: InlineWakeSources,
 ): string {
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	const resumeModuleAttribute = resumeModuleUrl
-		? ` data-markless-resume-module="${escapeAttribute(resumeModuleUrl)}"`
+		? ` ${RESUME_MODULE_ATTRIBUTE}="${escapeAttribute(resumeModuleUrl)}"`
 		: '';
 	const settleModuleAttribute = settleModuleUrl
 		? ` data-markless-settle-module="${escapeAttribute(settleModuleUrl)}"`
 		: '';
 	const selfWakeAttribute = selfWake ? ' data-markless-self-wake' : '';
 	const selfWakeSource =
-		selfWake && appendSelfWakeSource ? createInlineResumerSelfWakeSource(resumeModuleUrl) : '';
+		selfWake && appendSelfWakeSource ? createInlineResumerSelfWakeSource(resumeModuleUrl, wakes) : '';
 	const overlayPrimerSource = overlayPrimer
 		? createInlineResumerOverlayPrimerSource(resumeModuleUrl)
 		: '';
@@ -1170,11 +1348,15 @@ function viewSyncPolicies(view: ProtocolViewPayload): ReadonlyArray<ProtocolSync
 				: [];
 		}),
 		// An @if arm's events cancel at once too, from its painted arm or its served records.
-		...(view.branches ?? []).flatMap((branch) => [
-			...(branch.armRecords ?? []).flatMap((arm) => arm.events),
-			...(branch.servedArmRecords?.events ?? []),
-			...(branch.servedArmRecords?.keyedRepeats ?? []).flatMap((repeat) => repeat.rowEvents),
-		]),
+		...[...(view.branches ?? []), ...boundaryArmBranches(view.asyncBoundaries)].flatMap(
+			(branch) => [
+				...(branch.armRecords ?? []).flatMap((arm) => arm.events),
+				...(branch.servedArmRecords?.events ?? []),
+				...(branch.servedArmRecords?.keyedRepeats ?? []).flatMap(
+					(repeat) => repeat.rowEvents,
+				),
+			],
+		),
 	].flatMap((event) => (event.syncPolicy ? [event.syncPolicy] : []));
 }
 
@@ -1237,4 +1419,9 @@ function escapeAttribute(value: string): string {
 
 function escapeInlineScript(value: string): string {
 	return value.replace(/<\/script/gi, '<\\/script');
+}
+
+// `</style` can only sit in a CSS string or comment, where `\/` reads as `/`.
+function escapeInlineStyle(value: string): string {
+	return value.replace(/<\/style/gi, '<\\/style');
 }

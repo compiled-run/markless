@@ -56,5 +56,6 @@ export const stateRuntimeImports = {
 		'marklessSelectStateNodes',
 		'marklessStateValue',
 		'marklessSsrServeComputed',
+		'marklessSsrCatchError',
 	],
 } as const satisfies CatalogHelperImport;

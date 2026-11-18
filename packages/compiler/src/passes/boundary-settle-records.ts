@@ -40,6 +40,10 @@ export type BoundarySettleRecordsInput = {
 	readonly captureAnalysis: CaptureAnalysisArtifact;
 	/** Repeat parts per emitted arm; the plan must agree with what the module renders. */
 	readonly repeatPartCounts: ReadonlyArray<number>;
+	/** Settled reads that also read live inputs, so their bindings change between settles. */
+	readonly liveSettledReads?: ReadonlySet<string>;
+	/** Graph nodes that re-run when what they read changes; a refresh of one updates the arm in place. */
+	readonly refreshingGraphNodeIds: ReadonlySet<string>;
 };
 
 // Null when an element position cannot be stated exactly; the settle then commits html only.
@@ -98,8 +102,14 @@ export function boundarySettleRecords(
 		});
 		rowElements.push(layout.rowElements);
 	}
-	// Pay-per-use: an arm whose only bindings show the settled value needs no records.
-	const settledReads = new Set(boundary.asyncReads.map((read) => read.graphNodeId));
+	// Pay-per-use: a settle that never refreshes renders its value, so an arm showing only that value needs no records.
+	if (boundary.asyncReads.some((read) => input.refreshingGraphNodeIds.has(read.graphNodeId)))
+		return { arms, rowElements };
+	const settledReads = new Set(
+		boundary.asyncReads
+			.map((read) => read.graphNodeId)
+			.filter((graphNodeId) => !input.liveSettledReads?.has(graphNodeId)),
+	);
 	const registers = arms.some(
 		(arm) =>
 			arm.events.length > 0 ||
@@ -150,7 +160,8 @@ function armElementLayout(
 				(candidate) => candidate.repeatId === slot.repeatId,
 			);
 			const row = renderData.chunks.find((candidate) => candidate.id === repeat?.rowChunkId);
-			if (!row || row.slots.some((rowSlot) => rowSlot.kind !== 'text')) return null;
+			if (!row || row.slots.some((rowSlot) => rowSlot.kind !== 'text' && rowSlot.kind !== 'attribute'))
+				return null;
 			rowElements.push(row.hosts.length);
 			continue;
 		}

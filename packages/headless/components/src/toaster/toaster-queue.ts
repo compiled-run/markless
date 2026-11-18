@@ -65,7 +65,7 @@ export function enqueue(
 /**
  * Say something, from a consumer's own handler: the queue goes in, the queue
  * with the message in it comes out. The id is the caller's own or is minted from
- * the queue, because a page-scoped counter is not reachable from here.
+ * the queue, because an app-scoped counter is not reachable from here.
  */
 export function say(
 	held: readonly ToastRecord[],
@@ -93,7 +93,7 @@ export function dismiss(held: readonly ToastRecord[], id: string): ToastRecord[]
  * A message waiting its turn ages with the rest: the queue is a line, not a
  * freezer. Sonner counts down only what is showing, which needs the showing
  * count inside the clock - and the count is a prop of `toaster.root`, which a
- * page-scoped graph cannot be seeded with.. */
+ * app-scoped graph cannot be seeded with.. */
 export function expire(held: readonly ToastRecord[], now: number): ToastRecord[] {
 	return held.filter((one) => one.dueAt === 0 || one.dueAt > now);
 }

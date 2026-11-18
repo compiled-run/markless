@@ -14,7 +14,7 @@ export const slider = shared(() => {
 	const start = computed(() => (s.written < 0 ? s.seed : s.written));
 	const span = computed(() => s.max - s.min);
 	return { ...s, start, span };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 `;
 
 const START_DERIVE =
@@ -99,7 +99,7 @@ export const slider = shared(() => {
 	const span = computed(() => s.max - s.min);
 	const fraction = computed(() => (s.seed - s.min) / span);
 	return { ...s, span, fraction };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Thumb() @{
 	const s = slider();
@@ -140,7 +140,7 @@ export const slider = shared(() => {
 	const left = computed(() => right + s.seed);
 	const right = computed(() => left - s.seed);
 	return { ...s, left, right };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Thumb() @{
 	const s = slider();

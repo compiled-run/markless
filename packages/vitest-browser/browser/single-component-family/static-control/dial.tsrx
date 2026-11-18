@@ -10,7 +10,7 @@ export const staticControlDial = shared(
 
 		return { ...d, markEls, headEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function StaticControlDial({ tag }) @{

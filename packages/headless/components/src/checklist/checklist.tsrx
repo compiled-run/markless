@@ -57,7 +57,7 @@ export const checklistState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // The select-all's mixed state is computed from the items, never a destination a

@@ -126,7 +126,36 @@ const resumeOnDemandEntries = [
 // minified 12,365 -> 12,365, gzip 4,821 -> 4,827 bytes (rolldown, workspace packages external, same method both sides).
 // 2026-10-27: rows counted from the parent's start are placed after the last row, ahead of an @if that follows: 30,164 -> 30,849 raw;
 // minified 12,229 -> 12,433, gzip 4,782 -> 4,860 bytes (rolldown, workspace packages external, same method both sides).
-const sourceByteLimit = 30849;
+// 2026-11-03: a row repeat in a @try arm hands its rows to the follow check, so rows an arm re-commit replaced stop being
+// reordered by the repeat that painted them: 30,849 -> 30,862 raw (the check itself is in the lazy resume-repeat-branch-arm.ts).
+// 2026-11-04: row code that arrives after a contenteditable deleted a row no longer re-inserts it when nothing wrote the
+// list: 30,862 -> 31,139 raw, one guard in resume-keyed-repeats.ts; the fixture builds' rendered module stays inside its +128 B budget.
+// 2026-11-05: a row value reading state that a gesture wrote before the row code arrived repaints instead of keeping the
+// served value: 31,139 -> 33,152 raw, the wiring-time read of what the server painted in resume-keyed-repeats.ts.
+// 2026-11-05: a row hands its nested repeats the elements its @if arms hold, so a list in an arm wires on every flip:
+// 31,139 -> 31,214 raw, one call in resume-keyed-repeats.ts; the fixture builds re-anchor the rendered module.
+// 2026-11-05: a row wrapping a component patches its wrapper's slots, and rows read the inputs a refreshing collection was
+// fetched with: 31,214 -> 31,426 raw, in resume-keyed-repeats.ts; minified 10,208 -> 10,308, gzip 4,140 -> 4,173 bytes
+// (rolldown, workspace packages external, same method both sides).
+// 2026-11-05: merge of the two changes above with the row-value repaint: 33,152 -> 33,417 raw.
+// 2026-11-05: the row slot read helpers return to resume-keyed-repeats.ts, which an arm settle with rows loads lazily to
+// record the state its rows were painted from: 33,417 -> 33,433 raw.
+// 2026-11-05: a row wired under a component built in the browser tags its own root with its locals at wire time, so a
+// handler reads its prop/item/index without depending on the page's static keyed-repeat view: 33,433 -> 33,512 raw,
+// one line in resume-keyed-repeats.ts.
+// 2026-11-06: a keyed row that is not one element renders between row comments, and resume-keyed-repeats.ts finds,
+// moves and removes it as that whole range: 33,512 -> 35,910 raw. The range code itself is the lazy
+// fns/served-row-ranges.ts, loaded only by a page with such a list; minified 10,887 -> 11,524, gzip 4,381 -> 4,550 bytes
+// (rolldown, workspace packages and lazy imports external, same method both sides).
+// 2026-11-14: a removed row's components stop their async values: resume-keyed-repeats.ts hands the leaving keys to the
+// async plane's slot, which only a page with async values fills: 35,910 -> 37,220 raw, nearly all of it
+// reconcile-plane-slot.ts, which resume-runtime.ts already loads; minified 11,586 -> 11,720, gzip 4,578 -> 4,621 bytes
+// with that slot inlined (rolldown, workspace packages and lazy imports external, same method both sides).
+// 2026-11-15: a row whose values wait for the reader keeps a copy of the item it was painted from, so a write into that
+// item in place before the reader arrives still repaints it: 37,220 -> 37,236 raw, one condition in resume-keyed-repeats.ts.
+// 2026-11-17: a first click on a keyed row climbs from the target to its row instead of walking every row at each
+// ancestor (1,000 rows, cell no handler owns: 1,000 rows walked -> 1): 37,236 -> 37,431 raw, in resume-keyed-repeats.ts.
+const sourceByteLimit = 37431;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

@@ -13,7 +13,7 @@ export const seededBox = shared(
 
 		return { ...box };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function SeededRoot({ items = [] as readonly string[], children }) @{

@@ -167,7 +167,7 @@ export function drawing() {
 }
 
 /** One SVG as a CSS `url()`; paths are black and only their alpha matters, because every piece is used as a mask over a token colour. */
-function svgUrl(viewBox: string, width: number, height: number, body: string, stretch = false): string {
+export function svgUrl(viewBox: string, width: number, height: number, body: string, stretch = false): string {
 	const svg =
 		`<svg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}' viewBox='${viewBox}'${stretch ? " preserveAspectRatio='none'" : ''}>` +
 		body +

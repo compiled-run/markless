@@ -4,6 +4,8 @@ import { compileTsrxModule } from '../src/index.ts';
 import {
 	componentEdgeInstancePaths,
 	componentEdgeInstanceSegment,
+	componentEdgeSymbolRoutes,
+	importedSymbolRoutes,
 } from '../src/component-edge-instance.ts';
 
 function edge(index: number, span: [number, number], importSource?: string): SemanticComponentEdge {
@@ -78,4 +80,39 @@ export default function Page() @{
 		{ componentEdgeId: 'component-edge:0', instancePath: 'c0:' },
 		{ componentEdgeId: 'component-edge:1', instancePath: 'c0:p1:' },
 	]);
+});
+
+// Two placements of Desk each bind Sheet's callback to their own state: the
+// Desk-to-Sheet edge keeps one row, so the second placement's full path routes on its own.
+test('a second placement of a same-module owner gets a route for its own instance path', async () => {
+	const compiled = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `import { state } from '@markless/core';
+export default function Page() @{
+	<main>
+		<Desk />
+		<Desk />
+	</main>
+}
+function Desk() @{
+	let open = state('yes');
+	<div>
+		<p>{open}</p>
+		<Sheet close={() => (open = 'no')} />
+	</div>
+}
+function Sheet({ close }: { close: () => void }) @{
+	<button onClick={() => close()}>Close</button>
+}`,
+		symbols: [],
+	});
+
+	const routes = componentEdgeSymbolRoutes(compiled, undefined);
+	const sheetRoutes = routes.filter((route) => route.componentEdgeId === 'component-edge:2');
+	expect(sheetRoutes.map((route) => route.prefix)).toEqual(['c1:c2:', 'c2:']);
+	const rowsOf = (route: (typeof routes)[number]) => Object.values(route.boundSymbols ?? {});
+	expect(rowsOf(sheetRoutes[0]!).length).toBeGreaterThan(0);
+	for (const row of rowsOf(sheetRoutes[0]!)) expect(row).toMatch(/:1\/2$/);
+	for (const row of rowsOf(sheetRoutes[1]!)) expect(row).toMatch(/:0\/2$/);
+	expect(importedSymbolRoutes(routes)).toEqual([]);
 });

@@ -8,9 +8,11 @@ not in `styles/global.css`. Reach for `global.css` only for what one component
 cannot own: tokens on `:root` or `html`, typography for MDX prose, markup emitted
 by tooling, and classes several components share.
 
-`components/docs/preview-card.tsrx` and `components/docs/opener-line.tsrx` are
-the pattern to copy. Every interactive preview follows `PreviewCard` (see README "Previews"). Global tokens (`var(--ink)`, `var(--step--1)`, the space
-scale) resolve inside scoped styles as usual.
+A live demo on a page is a textbook column (built on
+`components/figures/ink/margin-notes.tsrx`) or an ink figure in
+`components/figures/<page>/` (see README "Visuals"). `PreviewCard` is being
+retired, so don't copy it. Global tokens (`var(--ink)`, `var(--step--1)`, the
+space scale) resolve inside scoped styles as usual.
 
 Inside a scoped `<style>`, prefer the simplest selectors that work: bare
 elements (`p`, `button img`, `article > div`) and short single-purpose classes
@@ -32,5 +34,5 @@ page's `mug-card.tsrx`, for instance), the panel shows the smallest honest
 version of that file. The demo component's own `<style>` tag is deliberately
 omitted from the displayed code: the panel teaches the feature under
 discussion, not the demo's cosmetics. Keep displayed code truthful about
-behaviour (every line shown must do what it says on the card), but do not
+behaviour (every line shown must do what it says), but do not
 show the styling machinery.

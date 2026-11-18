@@ -12,7 +12,7 @@ export const factory = shared(
 
 		return { ...s, itemEls, shownCount };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function FactoryRoot({ children }) @{

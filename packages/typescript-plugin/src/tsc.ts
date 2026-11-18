@@ -9,10 +9,11 @@
 //
 // Everything a tsc invocation supports still works - flags, `-p`, `--watch` - because the
 // tsc command line is what actually runs.
-import { realpathSync } from 'node:fs';
+import { existsSync, promises as fs, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { MARKLESS_TSRX_EXTENSIONS } from './language.ts';
 import {
 	addMarklessJsxContract,
@@ -76,7 +77,11 @@ export function runMarklessTsc(argv: readonly string[]): void {
 						process.stderr.write(`${line}\n`);
 					},
 					(fileName, source) => {
-						for (const line of formatMarklessCompilerWarnings(fileName, source, process.cwd()))
+						for (const line of formatMarklessCompilerWarnings(
+							fileName,
+							source,
+							process.cwd(),
+						))
 							process.stderr.write(`${line}\n`);
 					},
 				),
@@ -89,7 +94,25 @@ export function runMarklessTsc(argv: readonly string[]): void {
 // argv[1] may be a bin symlink, so both sides are resolved through the filesystem.
 const entryPoint = process.argv[1];
 if (entryPoint && realpathOrSelf(entryPoint) === realpathOrSelf(fileURLToPath(import.meta.url))) {
+	await writeAppRouteTypes(process.cwd());
 	runMarklessTsc(process.argv.slice(2));
+}
+
+/** Write a router app's route types, as dev and build do, so a fresh clone type-checks its links. */
+export async function writeAppRouteTypes(root: string): Promise<void> {
+	if (!existsSync(join(root, 'pages'))) return;
+	let routeTypesModule: string;
+	try {
+		routeTypesModule = createRequire(join(root, 'package.json')).resolve(
+			'@markless/router/vite/route-types',
+		);
+	} catch {
+		return;
+	}
+	const { writeRouteTypes } = (await import(
+		pathToFileURL(routeTypesModule).href
+	)) as typeof import('@markless/router/vite/route-types');
+	await writeRouteTypes(fs, root);
 }
 
 function realpathOrSelf(path: string): string {

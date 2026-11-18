@@ -1,0 +1,166 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 175,
+			"reason": "the paint hold answers a press's reads as shown, except its own writes and async keys (+441 B rendered in resume-return-reask, pages that can save only)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"delta": 432,
+			"reason": "the paint hold answers a press's reads as shown, except its own writes and async keys (+441 B rendered in resume-return-reask, pages that can save only)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 11,
+			"reason": "the paint hold answers a press's reads as shown, except its own writes and async keys (+441 B rendered in resume-return-reask, pages that can save only)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 175,
+			"reason": "the paint hold answers a press's reads as shown, except its own writes and async keys (+441 B rendered in resume-return-reask, pages that can save only)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"delta": 432,
+			"reason": "the paint hold answers a press's reads as shown, except its own writes and async keys (+441 B rendered in resume-return-reask, pages that can save only)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -4,
+			"reason": "the paint hold answers a press's reads as shown, except its own writes and async keys (+441 B rendered in resume-return-reask, pages that can save only)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -5,
+			"reason": "the paint hold answers a press's reads as shown, except its own writes and async keys (+441 B rendered in resume-return-reask, pages that can save only)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 31,
+			"reason": "a press reads a held state as shown, except its own writes and async keys; the paint hold, on pages that can save",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 31,
+			"reason": "a press reads a held state as shown, except its own writes and async keys; the paint hold, on pages that can save",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 31,
+			"reason": "a press reads a held state as shown, except its own writes and async keys; the paint hold, on pages that can save",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 91,
+			"reason": "a press reads a held state as shown, except its own writes and async keys; the paint hold, on pages that can save",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 153,
+			"reason": "a press reads a held state as shown, except its own writes and async keys; the paint hold, on pages that can save",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 29,
+			"reason": "a press reads a held state as shown, except its own writes and async keys; the paint hold, on pages that can save",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-return-reask"
+			],
+			"delta": 450,
+			"reason": "a press reads a held state as shown, except its own writes and async keys; the paint hold, on pages that can save",
+			"date": "2026-11-14"
+		}
+	]
+}

@@ -2,8 +2,9 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { describe, expect, test } from 'vitest';
 import { accept } from './cli.mjs';
+import { BUDGETS } from './config.mjs';
 import { evaluate } from './evaluate.mjs';
-import { criticalPathRounds, routeHtml } from './measure.mjs';
+import { criticalPathRounds, routeHtml, splitLoadFiles } from './measure.mjs';
 import { compareCells } from './timing-guard.mjs';
 
 type Json = Record<string, any>;
@@ -105,6 +106,36 @@ function measurement(): Json {
 		hiddenContent: {
 			short: { shippedBytes: 330_000, executedChars: 55_000, answered: true, errors: [] },
 			long: { shippedBytes: 355_000, executedChars: 55_001, answered: true, errors: [] },
+		},
+		staticPropArms: {
+			short: {
+				routes: {
+					tsrx: { executedChars: 3_820, jsGzipBytes: 20_686 },
+					mdx: { executedChars: 1_891, jsGzipBytes: 2_106 },
+					shown: { executedChars: 3_820, jsGzipBytes: 19_439 },
+				},
+				answered: true,
+			},
+			long: {
+				routes: {
+					tsrx: { executedChars: 3_820, jsGzipBytes: 20_686 },
+					mdx: { executedChars: 1_891, jsGzipBytes: 2_106 },
+					shown: { executedChars: 3_820, jsGzipBytes: 22_929 },
+				},
+				answered: true,
+			},
+		},
+		serverStylesheets: {
+			small: {
+				workerBytes: 498_145,
+				clientCssBytes: 939,
+				copies: { prerendered: 0, runtime: 1, document: 1 },
+			},
+			large: {
+				workerBytes: 498_146,
+				clientCssBytes: 358_845,
+				copies: { prerendered: 0, runtime: 1, document: 1 },
+			},
 		},
 	};
 }
@@ -361,6 +392,65 @@ describe('performance guards', () => {
 		]);
 	});
 
+	test('G18 fails a page that loads code for an arm its literal props rule out', () => {
+		expect(failures(measurement())).toEqual([]);
+
+		const leaking = measurement();
+		leaking.staticPropArms.long.routes.tsrx.jsGzipBytes += 3_677;
+		expect(failures(leaking)).toEqual([
+			expect.stringContaining(
+				'[G18] a page passing Caption only text loads 20.2 KB of JS and runs 3820 chars at load with the short Gloss, 23.8 KB and 3820 with the long one: +3677 B and +0 chars for a Gloss its literal props never show (budget +512 B, +512 chars)',
+			),
+		]);
+
+		const running = measurement();
+		running.staticPropArms.long.routes.mdx.executedChars += 1_500;
+		expect(failures(running)).toEqual([
+			expect.stringContaining('[G18] an MDX page passing Caption only text'),
+		]);
+
+		const toothless = measurement();
+		toothless.staticPropArms.long.routes.shown.jsGzipBytes =
+			toothless.staticPropArms.short.routes.shown.jsGzipBytes;
+		expect(failures(toothless)).toEqual([
+			expect.stringContaining('it must load at least 2.0 KB more'),
+		]);
+
+		const broken = measurement();
+		broken.staticPropArms.long.answered = false;
+		expect(failures(broken)).toEqual([
+			expect.stringContaining("[G18] the static-prop fixture's /glossary did not open its Gloss"),
+		]);
+	});
+
+	test('G17 fails a Worker that carries the stylesheet text of a prerendered page, or a sheet twice', () => {
+		const over = measurement();
+		over.serverStylesheets.large.workerBytes += 178_376;
+		expect(failures(over)).toEqual([
+			expect.stringContaining(
+				"[G17] the inline-CSS fixture's Worker is 486.5 KB with its prerendered page's stylesheet small and 660.7 KB with it 349.5 KB bigger: +174.2 KB of Worker for CSS only a prerendered page uses (budget +1.0 KB)",
+			),
+		]);
+
+		const carried = measurement();
+		carried.serverStylesheets.small.copies.prerendered = 1;
+		expect(failures(carried)).toEqual([
+			expect.stringContaining(
+				"the small Worker carries the prerendered page's stylesheet text 1 times, the runtime page's 1 times and the document's 1 times",
+			),
+		]);
+
+		const twice = measurement();
+		twice.serverStylesheets.large.copies.runtime = 2;
+		expect(failures(twice)).toEqual([expect.stringContaining("the runtime page's 2 times")]);
+
+		const toothless = measurement();
+		toothless.serverStylesheets.large.clientCssBytes = 939;
+		expect(failures(toothless)).toEqual([
+			expect.stringContaining('the large build must ship at least 64.0 KB more CSS'),
+		]);
+	});
+
 	test('accept re-anchors one subject and records the reason', () => {
 		const m = measurement();
 		m.sites.bench.runtimeModules['web/resume-branches'] = 4_400;
@@ -501,12 +591,48 @@ describe('G16 load weight', () => {
 		expect(g16(withLoad({ executedChars: 9_000, jsGzipBytes: 70_000 }), anchors())).toEqual([]);
 	});
 
-	test('running more than the swing at load, or downloading one byte more, fails', () => {
+	test('running more than the swing at load fails, even with no more bytes downloaded', () => {
 		expect(
 			g16(withLoad({ executedChars: 10_400, jsGzipBytes: 80_000 }), anchors()),
 		).toHaveLength(1);
+		const swing = BUDGETS.loadExecutionSwingChars;
 		expect(
-			g16(withLoad({ executedChars: 10_000, jsGzipBytes: 80_001 }), anchors()),
+			g16(withLoad({ executedChars: 10_000 + swing, jsGzipBytes: 80_000 }), anchors()),
+		).toEqual([]);
+		expect(
+			g16(withLoad({ executedChars: 10_000 + swing + 1, jsGzipBytes: 80_000 }), anchors()),
+		).toHaveLength(1);
+	});
+
+	test('two accepted changes whose gzip does not add up pass within the composition allowance, and one byte past it fails', () => {
+		const composed = anchors({});
+		composed.loadWeight[platform]['bench /records'].jsGzipBytes += 43 + 88;
+		const tree = (extra: number) =>
+			withLoad({ executedChars: 10_000, jsGzipBytes: 80_000 + 43 + 88 + extra });
+		expect(g16(tree(7), composed)).toEqual([]);
+		expect(g16(tree(BUDGETS.loadDownloadCompositionBytes), composed)).toEqual([]);
+		const over = g16(tree(BUDGETS.loadDownloadCompositionBytes + 1), composed);
+		expect(over).toHaveLength(1);
+		expect(over[0].message).toContain(`+${BUDGETS.loadDownloadCompositionBytes + 1} B gzip`);
+	});
+
+	test('the allowance is measured against the anchor, so unaccepted growth across pull requests adds up and fails', () => {
+		const step = Math.ceil(BUDGETS.loadDownloadCompositionBytes / 2) + 1;
+		expect(
+			g16(withLoad({ executedChars: 10_000, jsGzipBytes: 80_000 + step }), anchors()),
+		).toEqual([]);
+		expect(
+			g16(withLoad({ executedChars: 10_000, jsGzipBytes: 80_000 + 2 * step }), anchors()),
+		).toHaveLength(1);
+	});
+
+	test('the composition allowance does not cover code run at load', () => {
+		const swing = BUDGETS.loadExecutionSwingChars;
+		expect(
+			g16(
+				withLoad({ executedChars: 10_000 + swing + 1, jsGzipBytes: 80_000 + 1 }),
+				anchors(),
+			),
 		).toHaveLength(1);
 	});
 
@@ -522,6 +648,84 @@ describe('G16 load weight', () => {
 		);
 		expect(next.loadWeight).toEqual({
 			[platform]: { 'bench /records': { executedChars: 1_234, jsGzipBytes: 5_678 } },
+		});
+	});
+});
+
+describe('G16 on a page with a <Code> playground', () => {
+	const platform = `${process.platform}-${process.arch}`;
+	const page = { executedChars: 10_000, jsGzipBytes: 150_000 };
+	const prefetch = { jsGzipBytes: 1_300_000 };
+	const withPlayground = (pageBytes: number, playgroundBytes: number) => {
+		const m = measurement();
+		m.sites.bench.routes['/records'].load = {
+			executedChars: page.executedChars,
+			jsGzipBytes: pageBytes,
+			files: ['/build/page.js'],
+			playground: { jsGzipBytes: playgroundBytes, files: ['/assets/compile-worker.js'] },
+		};
+		return m;
+	};
+	const anchors = {
+		loadWeight: {
+			[platform]: { 'bench /records': page, 'bench /records playground': prefetch },
+		},
+	};
+	const g16 = (m: Json, a: Json = anchors) =>
+		evaluate(m, a as never).failures.filter((f: Json) => f.guard === 'G16');
+
+	test("a compiler change that grows only the playground's prefetch leaves the page's own figure alone", () => {
+		expect(g16(withPlayground(page.jsGzipBytes, prefetch.jsGzipBytes + 1_285))).toEqual([]);
+	});
+
+	test("the page's own code still fails one byte past the composition allowance, whatever the playground does", () => {
+		const over = page.jsGzipBytes + BUDGETS.loadDownloadCompositionBytes + 1;
+		const failures = g16(withPlayground(over, prefetch.jsGzipBytes - 5_000));
+		expect(failures).toHaveLength(1);
+		expect(failures[0].message).toMatch(/^bench \/records \(/);
+	});
+
+	test('the playground fails past its own allowance, and without an anchor', () => {
+		const limit = prefetch.jsGzipBytes + BUDGETS.loadPlaygroundGrowthBytes;
+		expect(g16(withPlayground(page.jsGzipBytes, limit))).toEqual([]);
+		const over = g16(withPlayground(page.jsGzipBytes, limit + 1));
+		expect(over).toHaveLength(1);
+		expect(over[0].message).toContain('bench /records playground');
+		const unanchored = structuredClone(anchors);
+		delete unanchored.loadWeight[platform]['bench /records playground'];
+		expect(g16(withPlayground(page.jsGzipBytes, prefetch.jsGzipBytes), unanchored)).toHaveLength(1);
+	});
+
+	test('accept records the page and its playground as two anchors', () => {
+		const next = accept({}, withPlayground(150_010, 1_300_200), 'load', '*', 'test', '2026-11-17');
+		expect(next.loadWeight[platform]).toEqual({
+			'bench /records': { executedChars: page.executedChars, jsGzipBytes: 150_010 },
+			'bench /records playground': { jsGzipBytes: 1_300_200 },
+		});
+		const only = accept({}, withPlayground(1, 1_300_300), 'load', 'bench /records playground', 'test');
+		expect(only.loadWeight[platform]).toEqual({
+			'bench /records playground': { jsGzipBytes: 1_300_300 },
+		});
+	});
+});
+
+describe('splitting what a page fetches at load', () => {
+	const playground = new Set(['/assets/compile-worker.js', '/build/frame.js', '/build/shared.js']);
+	const loaded = ['/assets/compile-worker.js', '/build/frame.js', '/build/page.js', '/build/shared.js'];
+
+	test("a file the playground lists counts as the playground's unless the page's HTML preloads it too", () => {
+		expect(
+			splitLoadFiles(loaded, { playground, preloaded: ['/build/page.js', '/build/shared.js'] }),
+		).toEqual({
+			page: ['/build/page.js', '/build/shared.js'],
+			playground: ['/assets/compile-worker.js', '/build/frame.js'],
+		});
+	});
+
+	test('a site without a playground keeps every file as its own', () => {
+		expect(splitLoadFiles(loaded, { playground: undefined, preloaded: [] })).toEqual({
+			page: loaded,
+			playground: undefined,
 		});
 	});
 });

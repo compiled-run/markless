@@ -1,119 +1,86 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import LazyLanesSketch from '../../components/sketch/how2/lazy-lanes-sketch.tsrx';
+import InkCards from '../../components/docs/ink-cards.tsrx';
+import GalleryAnatomy from '../../components/figures/lazy-chunks/gallery-anatomy.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
-# When click code downloads, and when it runs
+# Lazy chunks
 
-<PageMeta time="4 min" assumes="state, events, elements" />
+<PageMeta time="3 min" assumes="state, events, elements" />
 
-<ThemeToggle />
+<Subtitle text="Each chunk of click code downloads with the page, and runs only when its own click happens." terms="chunk" />
 
-Every handler and every update turned out to be a small function. Where does that code live, and
-when does it reach the browser?
+```tsrx title="gallery.tsrx"
+import { state } from '@markless/core';
 
-This page answers two questions that sound like one. When does the code **download**? When does it
-**run**? Markless gives them different answers.
+export default function Gallery() @{
+	let open = state('');
 
-## Two different costs
+	<button onClick={() => (open = 'Bay')}>Bay</button>
+}
+```
 
-Downloading costs network time. Running costs main-thread time. A page that waits for the first
-click to download its click code makes that click wait. A page that runs all its code at load makes
-the load wait.
+**`onClick`** becomes a small function of its own. It downloads while the page loads, and **runs** only when someone presses **Bay**.
 
-Markless keeps the two apart. A production build fetches the code for first interactions early. That
-code still runs only when its event fires.
+## Downloading is not running
 
-## Symbols and chunks
+Open a photo or press Share, and watch the network panel:
 
-The compiler cuts your component into [symbols](/how-it-works), such as `symbol:0`. The compiler
-plans one for each of these:
+<GalleryAnatomy />
 
-- an event handler, such as `onClick`, or a callback prop
-- a DOM update, such as the text that shows `count`
-- an `attach={...}` behavior
-- the derive function of a sync `computed()`, and the runner of an async one
-- a `state()` initializer and a `shared()` seed
-- `@if` branch updates and async block updates
+- Both click files arrived with the page.
+- Each one runs only on its own click.
+- Nothing new downloads when you press.
 
-A _chunk_ is one JavaScript file the browser downloads. One chunk can hold many symbols.
+## What a small page pays
 
-As an analogy, think of a kitchen. Packing a chunk is a delivery. Running a symbol is cooking one
-dish. The ingredients can arrive early, and the cook still waits for each order.
+Measured in Chromium for a one-page `@markless/router` app with one button and one line of text (uncompressed, main at `2efb1c6e2`):
 
-<LazyLanesSketch />
+- **Executed at load:** 8.4 kB, four small inline scripts and the router's link script.
+- **Downloaded at load, not executed:** 23.6 kB, fetched with `modulepreload` at low priority.
+- **Executed on the first click:** that same 23.6 kB, with nothing new to download.
 
-## When code runs
+## Every handler and update is a symbol
 
-A symbol runs only when its trigger fires. A click runs its handler. A write runs the updates that
-read the written path. An `onVisible` handler runs when its element scrolls into view, and an `onIdle`
-handler runs once the page has loaded and gone idle.
+The compiler cuts a component into *symbols*: one small function each for an event handler, a text or attribute update, an `attach={...}` behavior, a `computed()` recipe, a `state()` starting value and an `@if` or async update. A symbol runs only when its trigger fires, and no handler runs at mount.
 
-At mount, no handler runs. That is true on every path from [resuming](/how-it-works/resuming).
+## Packing decides which file holds which code
 
-## When code downloads: packing
+Production client builds put the symbols into a few files, cut by what each page needs and when:
 
-Production client builds turn on _packing_ by default. Packing puts the lazily loaded modules into a
-few chunks instead of one chunk per module. The bundler cuts those chunks by what each route needs,
-and when:
-
-| Pack | Holds | Downloads |
-| --- | --- | --- |
-| First use | Code that the page load and its first interactions run | With the page, through `modulepreload` |
-| Navigation | Code that only a client-side navigation runs | On navigation intent, never on a landing page |
-| Deferred | Code that no page load, first use or navigation needs | On its first `import()` |
-
-A tier too small to earn a file of its own rides in the first-use pack instead.
-
-A `<link rel="modulepreload">` tag tells the browser to fetch and parse a module early. It does not
-run the module. A production build adds these tags for symbol chunks, at high fetch priority.
-
-One packed chunk still runs lazily inside. Each module in it starts only when something first
-imports it. A bundler test packs three modules into one chunk. After the first import, only the
-first module has run.
-
-Set `packing: false` in the `markless()` plugin options to ship one chunk per module. Dev builds are
-never packed.
-
-<Callout
-	sprite="speech-bubble"
-	title="So does nothing download before the click?"
-	text="Not in a production build. The code for first interactions downloads with the page. What waits for the click is running that code."
+<InkCards
+	label="The three packs"
+	cards={[
+		{ icon: 'play', name: 'First use', line: 'What the page load and its first interactions run. It downloads with the page.' },
+		{ icon: 'map', name: 'Navigation', line: 'What only a client-side navigation runs. It downloads when a navigation is about to happen.' },
+		{ icon: 'hourglass', name: 'Deferred', line: 'Everything else. It downloads on its first import().' },
+	]}
 />
 
-## What a symbol can reach
+Each module in a pack still starts only when something first imports it. Set `packing: false` in the `markless()` options to ship one file per module.
 
-A symbol runs later, after the component body has finished. On a server-rendered page, it also runs
-on a different machine from the body. So it can only reach values that Markless can find again. The
-compiler checks every symbol when it compiles the file. A symbol can use:
+## A symbol reaches only what crosses
 
-- state and computed values, through the graph
-- element handles from `element()`
-- props and `shared()` values
-- module imports
-- constants it can write down, such as a string or a `Date`
+A handler runs later than the component body, so it can only use what Markless can find again, like state and element handles.
 
-Here is a handler that uses an element handle and a piece of state. Click **Focus**:
-
-<Code note="Add a second button that runs field?.blur() and sets status = 'idle'. Then add const box = document.querySelector('input'); above the elements, change field?.focus() to box?.focus(), and read the error.">
-```tsrx title="element-behavior.tsrx"
+<Code steps={[{ label: 'Change `Focus` to `Focus the note`.', shows: 'Focus the note' }, { label: "Try breaking it: above the elements, add `const box = document.querySelector('input');` and change `field?.focus()` to `box?.focus()`. The result pane shows the error and why `box` can't cross.", source: 'box?.focus()' }]}>
+```tsrx title="gift-note.tsrx"
 import { element, state } from '@markless/core';
 
-export default function ElementBehavior() @{
+export default function GiftNote() @{
 	const field = element<HTMLInputElement>();
 	let status = state('idle');
 
 	<section>
-		<input el={field} />
-		<button
-			onClick={() => {
-				field?.focus();
-				status = 'focused';
-			}}
-		>
+		<input el={field} placeholder="Gift note" />
+		<button onClick={() => {
+			field?.focus();
+			status = 'writing';
+		}}>
 			Focus
 		</button>
 		<output>{status}</output>
@@ -122,32 +89,4 @@ export default function ElementBehavior() @{
 ```
 </Code>
 
-Anything else fails the build. A DOM node held in a local variable is the common case:
-
-```tsrx
-import { state } from '@markless/core';
-
-export function Panel() @{
-	const panel = document.querySelector('#panel');
-	let shown = state(0);
-
-	<button onClick={() => { panel?.scrollIntoView(); shown++; }}>Show {shown}</button>
-}
-```
-
-That fails with `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED`. The message says why: `panel` is a local
-DOM node value that cannot cross a resume boundary. Use an element handle instead, as above.
-
-A function declared in the component body is different. When the handler calls it, the chunk
-carries the function's definition along, so `onClick={() => add(2)}` works where `add` is a body
-function. The build fails only if that function reads something that cannot cross, such as the
-`panel` node above, or if it is declared with `let`, which could point at another function by the
-time of the click.
-
-| Symbol kind | Error code |
-| --- | --- |
-| Event handler or callback prop | `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED` |
-| `attach={...}` behavior | `MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED` |
-| Any other symbol | `MARKLESS_CAPTURE_UNSUPPORTED_VALUE` |
-
-Next: [the same counter on a phone](/how-it-works/native-targets).
+[Native targets](/how-it-works/native-targets) asks whether a browser has to run these symbols at all.

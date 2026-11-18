@@ -1,17 +1,19 @@
 import type { Children } from '@markless/core';
 import type { CodePane } from '../../tooling/code-blocks.ts';
 import type { CodeFile } from './code/protocol.ts';
-import { prefetchCodeBlock } from './code/prefetch.ts';
+import { codeBlockKey } from './code/prefetch-key.ts';
 import { labelPieces, type CodeStep } from './playground/checklist.ts';
 import { lucide, resizable } from '@markless/ui';
 import sessionUrl from 'virtual:code-session-url';
 import liveUrl from 'virtual:code-live-url';
+import prefetchManifest from 'virtual:code-prefetch';
 import CodeFiles, { CodeTabs } from './code-files.tsrx';
 
+// A block runs nothing at load: no idle or on-sight trigger. Prefetch links in the served page download what boot needs; the first press or focus boots.
 // A URL the bundler cannot follow keeps the editor out of preloads.
-function boot(event: { readonly target: unknown }, files: readonly CodeFile[], onSight = false): void {
+function boot(event: { readonly target: unknown }, files: readonly CodeFile[]): void {
 	const box = (event.target as Element | null)?.closest<HTMLElement>('.code-block');
-	if (!box || (onSight && !bootsOnSight(box))) return;
+	if (!box) return;
 	// Keys typed before the editor attaches stay in the textarea; the session compiles them.
 	for (const input of box.querySelectorAll<HTMLTextAreaElement>('[data-code-input]')) input.readOnly = false;
 	void (import(/* @vite-ignore */ sessionUrl) as Promise<typeof import('./code/session.ts')>).then(
@@ -23,22 +25,6 @@ function boot(event: { readonly target: unknown }, files: readonly CodeFile[], o
 				).then((live) => live.bootLive(box));
 		},
 	);
-}
-
-function prefetch(event: { readonly target: unknown }, files: readonly CodeFile[]): void {
-	const box = (event.target as Element | null)?.closest<HTMLElement>('.code-block');
-	if (box) prefetchCodeBlock(box, files);
-}
-
-// Mirrors session.ts: `markless-code:editor` and `markless-code:<path>:<block index>:<hash>`.
-function bootsOnSight(box: HTMLElement): boolean {
-	try {
-		const connection = (navigator as { connection?: { saveData?: boolean } }).connection;
-		if (localStorage.getItem('markless-code:editor') && !connection?.saveData) return true;
-		const prefix = `markless-code:${location.pathname}:${[...document.querySelectorAll('.code-block')].indexOf(box)}:`;
-		for (let i = 0; i < localStorage.length; i++) if (localStorage.key(i)?.startsWith(prefix)) return true;
-	} catch {}
-	return false;
 }
 
 export default function Code({
@@ -75,6 +61,7 @@ export default function Code({
 		shows: step.shows,
 		source: step.source,
 		rewrites: step.rewrites === undefined ? undefined : String(step.rewrites),
+		fails: step.fails,
 	}));
 	// Panel names become element ids, so each block names its panes after its own files.
 	const key = (
@@ -85,20 +72,25 @@ export default function Code({
 	).toString(36);
 	const codePane = `code-pane-${key}`;
 	const resultPane = `result-pane-${key}`;
+	const prefetches = [
+		...new Set([
+			...prefetchManifest.session,
+			...(live ? prefetchManifest.live : []),
+			...prefetchManifest.cache,
+			...(prefetchManifest.blocks[codeBlockKey(files)] ?? []),
+		]),
+	];
 
 	<figure
 		class="code-block"
 		data-code="idle"
 		data-code-live={live ? '' : undefined}
-		onVisible={(event) => {
-			prefetch(event, files);
-			boot(event, files, true);
-		}}
-		onIdle={(event) => prefetch(event, files)}
-		onPointerenter={(event) => boot(event, files)}
-		onTouchstart={(event) => boot(event, files)}
+		onPointerdown={(event) => boot(event, files)}
 		onFocusin={(event) => boot(event, files)}
 	>
+		@for (const href of prefetches; key href) {
+			<link rel="prefetch" as={href.endsWith('.html') ? 'document' : undefined} href={href} />
+		}
 		<header class="bar">
 			<span class="title">{title ?? 'Playground'}</span>
 			<span class="restored">
@@ -126,7 +118,7 @@ export default function Code({
 			</div>
 		</header>
 		<CodeTabs panes={panes}>
-			<resizable.root class="body" defaultSizes={{ [codePane]: 64, [resultPane]: 36 }}>
+			<resizable.root class="body" defaultSizes={{ [codePane]: 70, [resultPane]: 30 }}>
 				<resizable.item class="source" value={codePane}>
 					<CodeFiles panes={panes} />
 				</resizable.item>
@@ -159,6 +151,7 @@ export default function Code({
 							data-step-shows={step.shows}
 							data-step-source={step.source}
 							data-step-rewrites={step.rewrites}
+							data-step-fails={step.fails}
 						>
 							<span class="tick" aria-hidden="true"></span>
 							<span class="said" data-step-state>To do: </span>
@@ -184,7 +177,7 @@ export default function Code({
 		<style>
 			.code-block {
 				--code-band: color-mix(in oklch, var(--ink) 70%, transparent);
-				--code-wash: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				--code-wash: color-mix(in srgb, var(--purple) 26%, var(--cream));
 				--code-tab-back: color-mix(in oklch, var(--ink) 9%, var(--paper));
 				--code-tab-h: 2.7rem;
 				--code-bleed: min(4.6rem, 2 * var(--space-s-l));
@@ -204,7 +197,7 @@ export default function Code({
 				flex-direction: column;
 				box-sizing: border-box;
 				width: calc(100% + var(--code-bleed));
-				margin: calc(var(--space-s) + var(--code-tab-h)) 0 var(--space-l) calc(var(--code-bleed) / -2);
+				margin: calc(var(--flow-block) + var(--code-tab-h)) 0 var(--flow-block) calc(var(--code-bleed) / -2);
 				padding: 0.25rem var(--code-inset) 0.4rem 2.6rem;
 				border: 2px solid transparent;
 				border-image: url('/notebook/frame.png') 40 47 50 72 / 28.6px 33.6px 35.7px 51.4px / 7.1px 14.3px 19.3px 17.9px round;
@@ -215,11 +208,25 @@ export default function Code({
 				line-height: 1.5;
 
 				html.dark & {
-					--code-wash: color-mix(in srgb, var(--purple) 20%, var(--paper));
 					--code-tab-back: color-mix(in oklch, var(--ink) 12%, var(--paper));
 					--code-selection: color-mix(in oklch, var(--yellow) 28%, transparent);
 					--code-problem: oklch(76% 0.14 15);
 					--code-problem-wash: color-mix(in oklch, var(--pink) 13%, transparent);
+				}
+			}
+
+			/* On a docs page the block can grow to the article track, which widens when the sidebar closes. */
+			@media (min-width: 70.01rem) {
+				.code-block {
+					--code-wide: min(1100px, 100vw - 2 * var(--space-s-l) - var(--sidebar-track, 17rem) - var(--rail-track, 17rem));
+					width: max(calc(100% + var(--code-bleed)), var(--code-wide));
+					margin-inline-start: calc(50% - max(calc(100% + var(--code-bleed)), var(--code-wide)) / 2);
+				}
+			}
+
+			@media (min-width: 96.01rem) {
+				.code-block {
+					--code-font-size: clamp(0.9rem, 1.8cqi, 1.2rem);
 				}
 			}
 
@@ -251,6 +258,7 @@ export default function Code({
 				border-radius: 999px;
 				background: var(--tinted);
 				box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--yellow) 60%, transparent);
+				color: var(--on-accent);
 				font-size: var(--step--1);
 				line-height: 1.3;
 				white-space: nowrap;
@@ -318,6 +326,11 @@ export default function Code({
 
 			.tool:active {
 				background: var(--code-wash);
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.tool[data-code-action='lines'][aria-pressed='false'] {
@@ -353,7 +366,7 @@ export default function Code({
 				display: flex;
 				flex-direction: column;
 				gap: var(--space-xs);
-				min-width: 0;
+				min-width: min-content;
 				padding: 0.9rem 0 0.9rem 1.1rem;
 				overflow: clip;
 				overflow-clip-margin: 0.4rem;
@@ -440,7 +453,7 @@ export default function Code({
 				top: -0.12em;
 				width: 0.28em;
 				height: 0.62em;
-				border: solid var(--ink);
+				border: solid var(--on-mark);
 				border-width: 0 2.5px 2.5px 0;
 				transform: rotate(40deg);
 				content: '';

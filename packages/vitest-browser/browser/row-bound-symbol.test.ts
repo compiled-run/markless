@@ -31,9 +31,9 @@ function bumps(container: HTMLElement): string {
 	return container.querySelector('[data-bumps]')?.textContent ?? '';
 }
 
-// --- widget-scoped writes from a row's bound handler -----------------------
+// --- subtree-scoped writes from a row's bound handler -----------------------
 //
-// The second half of the fixture puts a whole widget-scoped family in each row:
+// The second half of the fixture puts a whole subtree-scoped family in each row:
 // a root that owns the family's cells and a trigger part that reaches them
 // through the same `shared()` call. Because the root is INSIDE the `@for`, each
 // row's widget graph is registered under that row's `r:<key>:` segment, while

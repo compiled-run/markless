@@ -40,7 +40,7 @@ export const dial = shared(
 		const rows = computed(() => [d.tag + '1', d.tag + '2']);
 		return { ...d, markEls, rows };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 `;
 

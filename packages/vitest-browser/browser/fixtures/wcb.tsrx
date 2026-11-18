@@ -18,7 +18,7 @@ export const wcb = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function WcbRoot({ label = '', on = false, onChange, children }) @{

@@ -6,6 +6,7 @@ import type {
 	CaptureSlotRoute,
 	LoweredStateRead,
 	PlannedSymbol,
+	RowLocalStep,
 	SemanticComponentEdge,
 	SemanticGraphArtifact,
 	SemanticComponentPropDeclaration,
@@ -14,6 +15,7 @@ import type {
 	SemanticSharedDefinition,
 	SemanticStateRead,
 	SemanticTemplateRead,
+	SourcePosition,
 	SourceSpan,
 } from '../artifacts.ts';
 import {
@@ -21,18 +23,25 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
-import { protocolInstanceQualifies } from '@markless/serializer';
-import { componentEdgeInstancePath } from '../component-edge-instance.ts';
+import {
+	PROTOCOL_PROPS_GRAPH_NODE_ID,
+	protocolInstanceQualifies,
+	valueAlongPaths,
+} from '@markless/serializer';
+import { componentEdgeInstancePath, componentEdgePathsEndingAt } from '../component-edge-instance.ts';
 import { asNodes, childNodes, unwrapTypeAssertion, type AnyNode } from '../ast/nodes.ts';
+import { isEventAttribute } from '../ast/events.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
 import {
 	createSymbolSourceSemanticsReader,
+	type AbsentUse,
 	type SymbolSourceSemanticsReader,
 } from './capture-semantics.ts';
 import { sharedCallbackSlotGraphNodeId } from './semantic-graph/collect-shared.ts';
 import { createSourceMemo } from './semantic-graph/shared-ast.ts';
 import { PROJECTION_PROP_NAME } from './public-render/shared-seed-pass.ts';
+import { aliasedItemPath } from './semantic-graph/repeat-item-binding.ts';
 
 // Capture analysis owns these diagnostic contract values. Tests and any other
 // reader import them from here rather than restating the strings, so the
@@ -80,10 +89,12 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 	const localSymbols = input.symbolResolver.symbols.map((symbol) => {
 		const captureSlots = symbolCaptureSlots(symbol, input, semantics);
 		const firstOwner = captureSlots[0]?.owner;
+		const start = handlerSourceStart(symbol, input);
 		return {
 			symbolId: symbol.id,
 			kind: symbol.kind,
 			source: symbolSource(symbol),
+			...(start ? { sourceStart: start } : {}),
 			...('writes' in symbol && symbol.writes?.length
 				? {
 						graphWrites: symbol.writes.map(({ graphNodeId, path }) => ({
@@ -110,10 +121,10 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 			captureSlots,
 		};
 	});
-	const extractedSymbols = [...localSymbols, ...importedCaptureSymbols(input)];
+	const extractedSymbols = [...localSymbols, ...importedCaptureSymbols(input, semantics)];
 	const componentScopeBindings = componentScopeLocalBindings(input);
 	const diagnostics = [
-		...extractedSymbols.flatMap((symbol) => opaqueSlotDiagnostics(symbol)),
+		...extractedSymbols.flatMap((symbol) => opaqueSlotDiagnostics(symbol, input)),
 		...localSymbols.flatMap((symbol, index) =>
 			unreducedPropReadDiagnostics(
 				symbol,
@@ -210,6 +221,7 @@ function symbolTouchesPageSpaceGraph(
 
 function importedCaptureSymbols(
 	input: CaptureAnalysisInput,
+	semantics: SymbolSourceSemanticsReader,
 ): CaptureAnalysisArtifact['extractedSymbols'] {
 	return (input.symbols ?? []).flatMap((symbol) => {
 		if (!symbol.captureSymbol || !symbol.componentEdgeId) return [];
@@ -219,19 +231,19 @@ function importedCaptureSymbols(
 		if (!edge) return [];
 		if (!claimBelongsToEdge(symbol, edge, input)) return [];
 		const captureSymbol = symbol.captureSymbol;
-		const forwarded =
-			captureSymbol.loaderSymbolId !== undefined || captureSymbol.forwarded === true
-				? ({ forwarded: true } as const)
-				: {};
+		const relayed =
+			captureSymbol.loaderSymbolId !== undefined || captureSymbol.forwarded === true;
+		const forwarded = relayed ? ({ forwarded: true } as const) : {};
 		// A child's own claim it could not bind: its slots already name the child's routes, save the props it forwards.
 		const republished = captureSymbol.innerInstancePath !== undefined;
 		// One route per ancestry the edge is rendered under, as a local symbol's routes are.
-		const edgePaths = componentEdgePathsEndingAt(edge, input.semanticGraph.componentEdges);
-		// Absent callback props fold to undefined only at optional/guarded call sites.
-		const absentPropIsUndefined = (slot: CaptureSlot) =>
+		const edgePaths = componentEdgePathsEndingAt(edge, input.semanticGraph);
+		// An absent prop reads as undefined unless a handler calls it, or reads into it, with no guard.
+		const absentUse = (slot: CaptureSlot) =>
 			captureSymbol.kind !== 'event-handler' && captureSymbol.kind !== 'callback-prop'
-				? true
-				: referenceInvocationIsAbsentSafe(captureSymbol.source, slot.source);
+				? null
+				: absentPropUse(semantics, captureSymbol.source, slot.source, slot.path, captureSymbol.sourceStart);
+		const absentPropIsUndefined = (slot: CaptureSlot) => absentUse(slot) === null;
 		// A widget-callback claim binds one thing: the slot the enclosing root
 		// answers. The child's own graph reads keep resolving in the child's
 		// module, so rebinding them here would take the part's records with them.
@@ -258,6 +270,99 @@ function importedCaptureSymbols(
 				},
 			];
 		}
+		const captureSlots = symbol.captureSymbol.captureSlots
+			.map((slot) => ({
+				...slot,
+				routes: slot.routes.some((route) => route.kind === 'widget-callback-route')
+					? slot.routes.map((route) =>
+							route.kind === 'widget-callback-route'
+								? resolveWidgetCallbackRoute(route, edge, input)
+								: route,
+						)
+					: // An own claim's passthrough names a forwarder inside the child's module; this edge fills the slot's own prop.
+						(republished || relayed) &&
+						  slot.routes.some((route) => route.kind === 'passthrough-route')
+						? slot.routes.flatMap((route) =>
+								route.kind === 'passthrough-route'
+									? edgePaths.map((path) =>
+											propCaptureRoute(
+												path,
+												route.propName,
+												[...route.path, ...slot.path],
+												input,
+												absentPropIsUndefined(slot),
+											),
+										)
+									: [],
+							)
+						: slot.propName && !republished
+							? keepConstantFields(
+									edgePaths.map((path) => {
+										const ownRead = captureSlotReadInContext(slot)
+											? ownPropRead(captureSymbol.kind, slot)
+											: undefined;
+										const route = withAbsentUse(
+											propCaptureRoute(
+												path,
+												slot.propName as string,
+												slot.path,
+												input,
+												absentPropIsUndefined(slot),
+												ownRead,
+											),
+											absentUse(slot),
+										);
+										// The child's symbol reads this slot, so a value worked out from the row, or fixed at render, comes from the instance's own props too.
+										return ownRead &&
+											route.kind === 'unsupported-opaque' &&
+											(route.rowValue === true || route.fixedValue === true)
+											? ownInstancePropRoute(
+													edge.id,
+													path.map((step) => step.id),
+													ownRead,
+												)
+											: route;
+									}),
+									slot.fieldPaths ?? [slot.path],
+								)
+							: slot.routes.flatMap((route): CaptureSlotRoute[] =>
+									route.kind === 'graph-reference' ||
+									(republished && route.kind === 'compiler-known-constant')
+										? edgePaths.map((path) => ({
+												...route,
+												...(route.kind === 'graph-reference' && republished
+													? republishedGraphNodeId(
+															route.graphNodeId,
+															path,
+															input,
+														)
+													: {}),
+												componentEdgeId: edge.id,
+												componentEdgePath: path.map((step) => step.id),
+											}))
+										: [route],
+								),
+			}))
+			.filter((slot) => republished || !wasProjectedThroughComponentEdge(slot.propName, edge))
+			// An unrouted derive reads its own instance's props; a row's value rebuilds with the row, so only a callback needs it later.
+			.flatMap((slot) => {
+				if (
+					captureSymbol.kind === 'event-handler' ||
+					captureSymbol.kind === 'callback-prop'
+				)
+					return [slot];
+				const routes = slot.routes.filter(
+					(route) =>
+						route.kind !== 'row-local' &&
+						(route.kind !== 'unsupported-opaque' ||
+							(captureSymbol.kind !== 'sync-computed-derive' &&
+								route.rowValue !== true &&
+								route.fixedValue !== true)),
+				);
+				return routes.length > 0 ? [{ ...slot, routes }] : [];
+			});
+		// A forwarded prop this module cannot route (a row's own value) leaves the claim to the child's binding, which reads it.
+		if (republished && captureSlots.length < captureSymbol.captureSlots.length) return [];
 		return [
 			{
 				...symbol.captureSymbol,
@@ -265,88 +370,48 @@ function importedCaptureSymbols(
 				owner: { componentName: edge.parentComponentName },
 				loaderSymbolId: symbol.id,
 				...forwarded,
-				captureSlots: symbol.captureSymbol.captureSlots
-					.map((slot) => ({
-						...slot,
-						routes: slot.routes.some((route) => route.kind === 'widget-callback-route')
-							? slot.routes.map((route) =>
-									route.kind === 'widget-callback-route'
-										? resolveWidgetCallbackRoute(route, edge, input)
-										: route,
-								)
-							: slot.routes.some((route) => route.kind === 'passthrough-route')
-								? slot.routes.flatMap((route) =>
-										route.kind === 'passthrough-route'
-											? edgePaths.map((path) =>
-													propCaptureRoute(
-														path,
-														route.propName,
-														[...route.path, ...slot.path],
-														input,
-														absentPropIsUndefined(slot),
-													),
-												)
-											: [],
-									)
-								: slot.propName && !republished
-									? keepConstantFields(
-											edgePaths.map((path) =>
-												propCaptureRoute(
-													path,
-													slot.propName as string,
-													slot.path,
-													input,
-													absentPropIsUndefined(slot),
-												),
-											),
-											slot.fieldPaths ?? [slot.path],
-										)
-									: slot.routes.flatMap((route): CaptureSlotRoute[] =>
-											route.kind === 'graph-reference' ||
-											(republished &&
-												route.kind === 'compiler-known-constant')
-												? edgePaths.map((path) => ({
-														...route,
-														...(route.kind === 'graph-reference' &&
-														republished
-															? republishedGraphNodeId(
-																	route.graphNodeId,
-																	path,
-																	input,
-																)
-															: {}),
-														componentEdgeId: edge.id,
-														componentEdgePath: path.map(
-															(step) => step.id,
-														),
-													}))
-												: [route],
-										),
-					}))
-					.filter(
-						(slot) =>
-							republished || !wasProjectedThroughComponentEdge(slot.propName, edge),
-					)
-					// A derive whose prop has no route on this edge stays unbound here and reads its own instance's props.
-					// A row's value is rendered with the row, and a changed item rebuilds it, so only a callback needs it later.
-					.flatMap((slot) => {
-						if (
-							captureSymbol.kind === 'event-handler' ||
-							captureSymbol.kind === 'callback-prop'
-						)
-							return [slot];
-						const routes = slot.routes.filter(
-							(route) =>
-								route.kind !== 'row-local' &&
-								(route.kind !== 'unsupported-opaque' ||
-									(captureSymbol.kind !== 'sync-computed-derive' &&
-										route.rowValue !== true)),
-						);
-						return routes.length > 0 ? [{ ...slot, routes }] : [];
-					}),
+				captureSlots,
 			},
 		];
 	});
+}
+
+/** Whether a symbol's emitted body reads this slot through its capture context rather than straight from the graph. */
+export function captureSlotReadInContext(slot: CaptureSlot): boolean {
+	return slot.routes.some(
+		(route) =>
+			route.componentEdgeId !== undefined ||
+			// A composing module supplies this slot's edge.
+			route.kind === 'widget-callback-route' ||
+			// This module already resolved the slot itself.
+			route.kind === 'callback-slot-route',
+	);
+}
+
+// A derive or runner the edge places in a row reads that row's item from its own instance's props, as a local symbol's does.
+function ownPropRead(
+	kind: PlannedSymbol['kind'],
+	slot: CaptureSlot,
+): RowItemDeriveRead | undefined {
+	return slot.propName && (kind === 'sync-computed-derive' || kind === 'async-computed-runner')
+		? { graphNodeId: PROTOCOL_PROPS_GRAPH_NODE_ID, path: [slot.propName, ...slot.path] }
+		: undefined;
+}
+
+// The read a derive makes of the props of the instance its edge path ends at.
+function ownInstancePropRoute(
+	componentEdgeId: string,
+	componentEdgePath: ReadonlyArray<string>,
+	read: RowItemDeriveRead,
+): CaptureSlotRoute {
+	return {
+		kind: 'graph-reference',
+		componentEdgeId,
+		componentEdgePath,
+		graphNodeId: read.graphNodeId,
+		path: read.path,
+		ownerEdgeCount: componentEdgePath.length,
+	};
 }
 
 // A republished claim's graph reads name the child module's nodes, which this module holds under the edge's instance.
@@ -434,6 +499,26 @@ function edgePropBinding(
 		name: propName,
 		kind: 'graph-reference',
 		...edge.children.text,
+	};
+}
+
+// `{...rest}` on a component tag hands the child every prop the composer received under its own name, save what the rest binding left out.
+function spreadCarriedPropBinding(
+	edge: SemanticComponentEdge,
+	propName: string,
+): SemanticComponentEdge['props'][number] | undefined {
+	const spread = edge.props.findLast(
+		(candidate) => candidate.kind === 'spread' && !candidate.excludeNames.includes(propName),
+	);
+	if (spread?.kind !== 'spread') return undefined;
+	return {
+		name: propName,
+		source: `${spread.source}.${propName}`,
+		kind: 'graph-reference',
+		graphNodeId: spread.graphNodeId,
+		graphBindingKind: 'prop',
+		path: [...spread.path, propName],
+		...(spread.sourceSpan ? { sourceSpan: spread.sourceSpan } : {}),
 	};
 }
 
@@ -761,16 +846,20 @@ function propReadForLazySymbol(
 	];
 }
 
-// A computed minted for one markup expression reads the props of the component that wrote it.
+// A computed minted for one markup expression or branch condition reads the props of the component that wrote it.
 function templateComputedPropDeclaration(
 	symbol: PlannedSymbol,
 	source: string,
 	input: CaptureAnalysisInput,
 ): SemanticComponentPropDeclaration | undefined {
 	if (symbol.kind !== 'sync-computed-derive') return undefined;
-	const componentName = input.semanticGraph.templateReads.find(
-		(read) => read.computedGraphNodeId === symbol.graphNodeId,
-	)?.componentName;
+	const componentName =
+		input.semanticGraph.templateReads.find(
+			(read) => read.computedGraphNodeId === symbol.graphNodeId,
+		)?.componentName ??
+		input.semanticGraph.branchSites.find(
+			(site) => site.testComputedGraphNodeId === symbol.graphNodeId,
+		)?.componentName;
 	const name = rootIdentifierName(source);
 	if (!componentName || !name) return undefined;
 	return input.semanticGraph.componentPropBindings.find(
@@ -888,14 +977,27 @@ function captureSlot(
 	const componentName = declaration?.componentName ?? read.componentName;
 	const propName = read.graphNodeId.startsWith('prop:') ? read.path[0] : undefined;
 	const routePath = propName ? read.path.slice(1) : read.path;
-	// Absent callback props fold to undefined only at optional/guarded call sites; a derive
-	// reads an absent prop as undefined, as an imported claim's derive already does.
+	// An absent prop reads as undefined unless a handler calls it, or reads into it, with no guard;
+	// a derive reads an absent prop as undefined, as an imported claim's derive already does.
+	const absentUse =
+		symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'
+			? absentPropUse(semantics, symbolSource(symbol), read.source, routePath, handlerSourceStart(symbol, input))
+			: null;
 	const absentPropIsUndefined =
 		symbol.kind === 'sync-computed-derive' ||
-		((symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') &&
-			referenceInvocationIsAbsentSafe(symbolSource(symbol), read.source));
+		(absentUse === null &&
+			(symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'));
 	let routes = propName
-		? propCaptureRoutes(componentName, propName, routePath, input, absentPropIsUndefined)
+		? propCaptureRoutes(
+				componentName,
+				propName,
+				routePath,
+				input,
+				absentPropIsUndefined,
+				symbol.kind === 'sync-computed-derive' || symbol.kind === 'async-computed-runner'
+					? read
+					: undefined,
+			).map((route) => withAbsentUse(route, absentUse))
 		: [
 				{
 					kind: 'graph-reference' as const,
@@ -962,6 +1064,7 @@ function propCaptureRoutes(
 	readPath: ReadonlyArray<string>,
 	input: CaptureAnalysisInput,
 	absentPropIsUndefined = false,
+	deriveRead?: RowItemDeriveRead,
 ): ReadonlyArray<CaptureSlotRoute> {
 	const edges = componentName
 		? input.semanticGraph.componentEdges.filter(
@@ -981,11 +1084,15 @@ function propCaptureRoutes(
 	}
 
 	return edges.flatMap((edge) =>
-		componentEdgePathsEndingAt(edge, input.semanticGraph.componentEdges).map((path) =>
-			propCaptureRoute(path, propName, readPath, input, absentPropIsUndefined),
+		componentEdgePathsEndingAt(edge, input.semanticGraph).map((path) =>
+			propCaptureRoute(path, propName, readPath, input, absentPropIsUndefined, deriveRead),
 		),
 	);
 }
+
+// A derive re-runs outside any dispatch, so a row's item reaches it from the props of the
+// instance the row placed, which a changed item rebuilds; a handler reads the row's own locals.
+type RowItemDeriveRead = { readonly graphNodeId: string; readonly path: ReadonlyArray<string> };
 
 function propCaptureRoute(
 	componentEdgePath: ReadonlyArray<SemanticComponentEdge>,
@@ -993,6 +1100,7 @@ function propCaptureRoute(
 	readPath: ReadonlyArray<string>,
 	input: CaptureAnalysisInput,
 	absentPropIsUndefined = false,
+	deriveRead?: RowItemDeriveRead,
 ): CaptureSlotRoute {
 	const terminalEdge = componentEdgePath.at(-1);
 	if (!terminalEdge) {
@@ -1007,6 +1115,7 @@ function propCaptureRoute(
 		terminalEdge.id,
 		input,
 		absentPropIsUndefined,
+		deriveRead,
 	);
 }
 
@@ -1019,11 +1128,12 @@ function resolvePropCaptureRoute(
 	terminalEdgeId: string,
 	input: CaptureAnalysisInput,
 	absentPropIsUndefined: boolean,
+	deriveRead?: RowItemDeriveRead,
 ): CaptureSlotRoute {
 	const edge = componentEdgePath[edgeIndex];
 	if (!edge) throw new Error('Capture route ancestry ended before its terminal value.');
 	const edgePathIds = componentEdgePath.map((candidate) => candidate.id);
-	const prop = edgePropBinding(edge, propName);
+	const prop = edgePropBinding(edge, propName) ?? spreadCarriedPropBinding(edge, propName);
 	if (!prop) {
 		if (absentPropIsUndefined) {
 			return createCompilerKnownConstantCaptureRoute(terminalEdgeId, edgePathIds, undefined);
@@ -1045,7 +1155,7 @@ function resolvePropCaptureRoute(
 		if (scoped?.binding.kind === 'prop') {
 			const upstreamPropName = scoped.path[0];
 			if (edgeIndex > 0 && upstreamPropName) {
-				return resolvePropCaptureRoute(
+				const upstream = resolvePropCaptureRoute(
 					componentEdgePath,
 					edgeIndex - 1,
 					upstreamPropName,
@@ -1054,7 +1164,19 @@ function resolvePropCaptureRoute(
 					terminalEdgeId,
 					input,
 					absentPropIsUndefined,
+					deriveRead,
 				);
+				if (upstream.kind !== 'row-local' || !deriveRead) return upstream;
+				return {
+					kind: 'graph-reference',
+					componentEdgeId: terminalEdgeId,
+					componentEdgePath: edgePathIds,
+					graphNodeId: prop.graphNodeId,
+					path: [...prop.path, ...forwardedPath, ...readPath],
+					...(edgeIndex < componentEdgePath.length - 1
+						? { ownerEdgeCount: edgeIndex }
+						: {}),
+				};
 			}
 			if (upstreamPropName && scoped.bindingId) {
 				return {
@@ -1081,6 +1203,9 @@ function resolvePropCaptureRoute(
 			graphNodeId: scoped?.binding.id ?? prop.graphNodeId,
 			path: [...(scoped?.path ?? prop.path), ...forwardedPath, ...readPath],
 			...(edgeIndex < componentEdgePath.length - 1 ? { ownerEdgeCount: edgeIndex } : {}),
+			...(scoped?.binding.kind === 'computed' && scoped.binding.async === true
+				? { asyncValue: true as const }
+				: {}),
 		};
 	}
 	if (prop.kind === 'serializable') {
@@ -1120,13 +1245,20 @@ function resolvePropCaptureRoute(
 	}
 
 	const rowItem = rowItemPath(prop.source, edge, input);
-	if (rowItem)
+	if (rowItem && deriveRead && edgeIndex === componentEdgePath.length - 1)
+		return ownInstancePropRoute(terminalEdgeId, edgePathIds, deriveRead);
+	const rows =
+		rowItem && edge.keyedRepeatScopeIds.length > 1
+			? nestedRowSteps(rowItem.itemName, edge, input)
+			: undefined;
+	if (rowItem && (edge.keyedRepeatScopeIds.length < 2 || rows))
 		return {
 			kind: 'row-local',
 			componentEdgeId: terminalEdgeId,
 			componentEdgePath: edgePathIds,
 			itemName: rowItem.itemName,
 			path: [...rowItem.path, ...forwardedPath, ...readPath],
+			...(rows ? { rows, rowEdgeId: edge.id } : {}),
 		};
 	return {
 		kind: 'unsupported-opaque',
@@ -1135,6 +1267,10 @@ function resolvePropCaptureRoute(
 		expression: prop.source,
 		...(prop.sourceSpan ? { sourceSpan: prop.sourceSpan } : {}),
 		...(readsOnlyRowLocals(prop.source, edge, input) ? { rowValue: true as const } : {}),
+		...(prop.kind === 'opaque' && prop.fixedValue ? { fixedValue: true as const } : {}),
+		...('unroutableHandler' in prop && prop.unroutableHandler
+			? { unroutableHandler: prop.unroutableHandler }
+			: {}),
 	};
 }
 
@@ -1148,10 +1284,50 @@ function rowItemPath(
 	const segments = source.trim().split('.');
 	if (!segments.every((segment) => /^[A-Za-z_$][\w$]*$/.test(segment))) return undefined;
 	const [itemName, ...path] = segments;
-	const enclosing = input.semanticGraph.keyedRepeats.some(
-		(repeat) => edge.keyedRepeatScopeIds.includes(repeat.id) && repeat.itemName === itemName,
+	const enclosing = input.semanticGraph.keyedRepeats.filter((repeat) =>
+		edge.keyedRepeatScopeIds.includes(repeat.id),
 	);
-	return enclosing && itemName ? { itemName, path } : undefined;
+	for (const repeat of enclosing.toReversed()) {
+		if (repeat.itemName === itemName) return itemName ? { itemName, path } : undefined;
+		const aliased = aliasedItemPath(repeat.itemAliases, source.trim());
+		if (aliased) return { itemName: repeat.itemName, path: aliased };
+	}
+	return undefined;
+}
+
+// Rows that share one parent cannot be told apart by position, so an item in nested rows is found by its rows' keys; undefined when a row on the way has no collection to look in.
+function nestedRowSteps(
+	itemName: string,
+	edge: SemanticComponentEdge,
+	input: CaptureAnalysisInput,
+): ReadonlyArray<RowLocalStep> | undefined {
+	const repeatOf = (id: string | undefined) =>
+		input.semanticGraph.keyedRepeats.find((repeat) => repeat.id === id);
+	let repeat = repeatOf(
+		edge.keyedRepeatScopeIds.findLast((id) => repeatOf(id)?.itemName === itemName),
+	);
+	const steps: RowLocalStep[] = [];
+	while (repeat) {
+		const rowIndex = edge.keyedRepeatScopeIds.indexOf(repeat.id);
+		if (rowIndex < 0) return undefined;
+		const step = {
+			rowIndex,
+			keyPath: repeat.keyPath,
+			...(repeat.indexKey ? { indexKey: true as const } : {}),
+		};
+		if (repeat.collectionGraphNodeId) {
+			steps.unshift({
+				...step,
+				graphNodeId: repeat.collectionGraphNodeId,
+				collectionPath: repeat.collectionPath,
+			});
+			return steps;
+		}
+		if (!repeat.enclosingItemPath) return undefined;
+		steps.unshift({ ...step, itemPath: repeat.enclosingItemPath });
+		repeat = repeatOf(repeat.enclosingRepeatId);
+	}
+	return undefined;
 }
 
 // Whether an edge prop's expression reads nothing but the item and index of the keyed rows the edge renders in.
@@ -1164,7 +1340,11 @@ function readsOnlyRowLocals(
 	const rowLocals = new Set(
 		input.semanticGraph.keyedRepeats.flatMap((repeat) =>
 			edge.keyedRepeatScopeIds.includes(repeat.id)
-				? [repeat.itemName, ...(repeat.indexName ? [repeat.indexName] : [])]
+				? [
+						repeat.itemName,
+						...(repeat.itemAliases ?? []).map((alias) => alias.name),
+						...(repeat.indexName ? [repeat.indexName] : []),
+					]
 				: [],
 		),
 	);
@@ -1179,6 +1359,12 @@ function readsOnlyRowLocals(
 }
 
 const rowLocalReaders = new WeakMap<CaptureAnalysisInput, SymbolSourceSemanticsReader>();
+
+function withAbsentUse(route: CaptureSlotRoute, use: RefusedAbsentUse | null): CaptureSlotRoute {
+	return route.kind === 'unsupported-opaque' && route.absentProp && use !== null
+		? { ...route, absentUse: use }
+		: route;
+}
 
 export function createCompilerKnownConstantCaptureRoute(
 	componentEdgeId: string,
@@ -1214,23 +1400,6 @@ function composesItself(
 	return false;
 }
 
-function componentEdgePathsEndingAt(
-	edge: SemanticComponentEdge,
-	edges: ReadonlyArray<SemanticComponentEdge>,
-	seen: ReadonlySet<string> = new Set(),
-): ReadonlyArray<ReadonlyArray<SemanticComponentEdge>> {
-	if (seen.has(edge.id)) return [];
-	const nextSeen = new Set(seen).add(edge.id);
-	const incoming = edges.filter(
-		(candidate) =>
-			candidate.childComponentName === edge.parentComponentName &&
-			!nextSeen.has(candidate.id),
-	);
-	if (incoming.length === 0) return [[edge]];
-	return incoming.flatMap((parent) =>
-		componentEdgePathsEndingAt(parent, edges, nextSeen).map((path) => [...path, edge]),
-	);
-}
 
 /**
  * The fields of a destructured prop a symbol reaches: one path per use of the
@@ -1317,44 +1486,6 @@ function memberPathAbove(identifier: AnyNode, ancestors: ReadonlyArray<AnyNode>)
 	return path;
 }
 
-// The value with only what `paths` reach kept, so the page ships the fields
-// browser code reads and not the whole constant.
-function valueAlongPaths(value: unknown, paths: ReadonlyArray<ReadonlyArray<string>>): unknown {
-	if (value === null || typeof value !== 'object' || paths.some((path) => path.length === 0))
-		return value;
-	const rests = new Map<string, Array<ReadonlyArray<string>>>();
-	for (const [key, ...rest] of paths) {
-		if (key === undefined) continue;
-		const known = rests.get(key) ?? [];
-		known.push(rest);
-		rests.set(key, known);
-	}
-	if (Array.isArray(value)) {
-		const indices = [...rests.keys()]
-			.map(Number)
-			.filter((index) => Number.isInteger(index) && index >= 0 && index < value.length);
-		const length = rests.has('length')
-			? value.length
-			: indices.length > 0
-				? Math.max(...indices) + 1
-				: 0;
-		const kept: unknown[] = Array.from({ length }, () => null);
-		for (const index of indices)
-			kept[index] = valueAlongPaths(value[index], rests.get(String(index)) ?? []);
-		return kept;
-	}
-	const kept: Record<string, unknown> = {};
-	for (const [key, rest] of rests)
-		if (Object.hasOwn(value, key))
-			Object.defineProperty(kept, key, {
-				value: valueAlongPaths((value as Record<string, unknown>)[key], rest),
-				enumerable: true,
-				writable: true,
-				configurable: true,
-			});
-	return kept;
-}
-
 function valueAtPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	return path.reduce<unknown>((current, key) => {
 		if ((typeof current !== 'object' && typeof current !== 'function') || current === null) {
@@ -1364,152 +1495,52 @@ function valueAtPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	}, value);
 }
 
-const absentSafeMemo = createSourceMemo<boolean>(2048);
-
-// True when every call of `reference` in source already no-ops on a missing value (?.(), if/&&/?: guards).
-function referenceInvocationIsAbsentSafe(source: string, reference: string): boolean {
-	return absentSafeMemo(reference, source, () =>
-		computeReferenceInvocationIsAbsentSafe(source, reference),
-	);
+// What would throw in `source` if the prop that `read` reads were missing, matched on the prop's own root binding.
+function absentPropUse(
+	semantics: SymbolSourceSemanticsReader,
+	source: string,
+	read: string,
+	pathBelowProp: ReadonlyArray<string>,
+	sourceStart: SourcePosition | undefined,
+): RefusedAbsentUse | null {
+	const chain = semantics.read(read).memberChain;
+	const use: AbsentUse | null = chain
+		? semantics
+				.read(source)
+				.absentUse(chain.root, chain.keys.length > pathBelowProp.length ? chain.keys[0] : undefined)
+		: { kind: 'use', source: read, offset: 0 };
+	if (!use) return null;
+	const at = sourceStart ? positionWithin(sourceStart, source, use.offset) : undefined;
+	return { kind: use.kind, source: use.source, ...(at ? { at } : {}) };
 }
 
-function computeReferenceInvocationIsAbsentSafe(source: string, reference: string): boolean {
-	const moduleSource = `const __marklessCaptureSource = ${source};`;
-	let ast: AnyNode;
-	try {
-		// Handler sources are TypeScript: parsing them as JavaScript throws on the
-		// first annotation or cast, and the catch would read that as unconditional.
-		ast = parseJavaScriptModule(moduleSource, CAPTURE_SOURCE_PARSE_FILENAME);
-	} catch {
-		return false;
-	}
-	const isReference = (node: AnyNode | undefined): boolean =>
-		node !== undefined &&
-		typeof node.start === 'number' &&
-		typeof node.end === 'number' &&
-		moduleSource.slice(node.start, node.end) === reference;
-	const isUndefinedLiteral = (node: AnyNode | undefined): boolean =>
-		node?.type === 'Identifier' && node.name === 'undefined';
-	const isNullLiteral = (node: AnyNode | undefined): boolean =>
-		node?.type === 'Literal' && node.value === null && node.raw === 'null';
-	const isTypeofReference = (node: AnyNode | undefined): boolean =>
-		node?.type === 'UnaryExpression' &&
-		node.operator === 'typeof' &&
-		isReference(asNode(node.argument));
-	const isUndefinedString = (node: AnyNode | undefined): boolean =>
-		node?.type === 'Literal' && node.value === 'undefined';
-	// A comparison pairs the reference (or `typeof reference`) with the value the
-	// side names: `onChange !== null` names null, which an absent prop is not.
-	const comparesWith = (
-		node: AnyNode,
-		operand: (side: AnyNode | undefined) => boolean,
-		value: (side: AnyNode | undefined) => boolean,
-	): boolean => {
-		const left = asNode(node.left);
-		const right = asNode(node.right);
-		return (operand(left) && value(right)) || (operand(right) && value(left));
-	};
-	// True when the test cannot be truthy while `reference` is absent, so its
-	// consequent never runs on an absent prop.
-	const provesPresent = (node: AnyNode | undefined): boolean => {
-		if (!node) return false;
-		if (isReference(node)) return true;
-		if (node.type === 'ChainExpression') return provesPresent(asNode(node.expression));
-		if (node.type === 'UnaryExpression' && node.operator === '!')
-			return provesAbsent(asNode(node.argument));
-		if (node.type === 'LogicalExpression' && node.operator === '&&')
-			return provesPresent(asNode(node.left)) || provesPresent(asNode(node.right));
-		if (node.type !== 'BinaryExpression') return false;
-		if (node.operator === '!==')
-			return (
-				comparesWith(node, isReference, isUndefinedLiteral) ||
-				comparesWith(node, isTypeofReference, isUndefinedString)
-			);
-		if (node.operator === '!=')
-			return (
-				comparesWith(
-					node,
-					isReference,
-					(side) => isUndefinedLiteral(side) || isNullLiteral(side),
-				) || comparesWith(node, isTypeofReference, isUndefinedString)
-			);
-		return false;
-	};
-	// The mirror: the test cannot be falsy while `reference` is absent, so its
-	// alternate never runs on an absent prop.
-	const provesAbsent = (node: AnyNode | undefined): boolean => {
-		if (!node) return false;
-		if (node.type === 'ChainExpression') return provesAbsent(asNode(node.expression));
-		if (node.type === 'UnaryExpression' && node.operator === '!')
-			return provesPresent(asNode(node.argument));
-		if (node.type === 'LogicalExpression' && node.operator === '||')
-			return provesAbsent(asNode(node.left)) || provesAbsent(asNode(node.right));
-		if (node.type !== 'BinaryExpression') return false;
-		if (node.operator === '===')
-			return (
-				comparesWith(node, isReference, isUndefinedLiteral) ||
-				comparesWith(node, isTypeofReference, isUndefinedString)
-			);
-		if (node.operator === '==')
-			return (
-				comparesWith(
-					node,
-					isReference,
-					(side) => isUndefinedLiteral(side) || isNullLiteral(side),
-				) || comparesWith(node, isTypeofReference, isUndefinedString)
-			);
-		return false;
-	};
+type RefusedAbsentUse = NonNullable<Extract<CaptureSlotRoute, { readonly kind: 'unsupported-opaque' }>['absentUse']>;
 
-	let invoked = false;
-	let unguarded = false;
-	const visit = (node: AnyNode, guarded: boolean): void => {
-		if (node.type === 'CallExpression' && isReference(asNode(node.callee))) {
-			invoked = true;
-			if (node.optional !== true && !guarded) unguarded = true;
-		}
-		if (node.type === 'IfStatement' || node.type === 'ConditionalExpression') {
-			const test = asNode(node.test);
-			visit(test ?? node, guarded);
-			const consequent = asNode(node.consequent);
-			if (consequent) visit(consequent, guarded || provesPresent(test));
-			const alternate = asNode(node.alternate);
-			if (alternate) visit(alternate, guarded || provesAbsent(test));
-			return;
-		}
-		// `??` and `||` run their right side when the left is absent/falsy, so the
-		// left proves nothing about presence there; only `&&` carries a guard.
-		if (
-			node.type === 'LogicalExpression' &&
-			(node.operator === '&&' || node.operator === '||' || node.operator === '??')
-		) {
-			const left = asNode(node.left);
-			if (left) visit(left, guarded);
-			const right = asNode(node.right);
-			if (right)
-				visit(
-					right,
-					guarded ||
-						(node.operator === '&&'
-							? provesPresent(left)
-							: node.operator === '||'
-								? provesAbsent(left)
-								: false),
-				);
-			return;
-		}
-		for (const child of childNodes(node)) visit(child, guarded);
+function positionWithin(start: SourcePosition, source: string, offset: number): SourcePosition {
+	const lines = source.slice(0, offset).split('\n');
+	return {
+		filename: start.filename,
+		line: start.line + lines.length - 1,
+		column: lines.length === 1 ? start.column + offset : lines.at(-1)!.length + 1,
 	};
-	visit(ast, false);
+}
 
-	return invoked && !unguarded;
+// Only a handler whose source is its own authored text can be placed in its file.
+function handlerSourceStart(symbol: PlannedSymbol, input: CaptureAnalysisInput): SourcePosition | undefined {
+	if (symbol.kind !== 'event-handler' && symbol.kind !== 'callback-prop') return undefined;
+	const span = 'sourceSpan' in symbol ? symbol.sourceSpan : undefined;
+	const module = input.moduleSource;
+	if (!span || module === undefined || module.slice(span.start, span.end) !== symbolSource(symbol)) return undefined;
+	const lines = module.slice(0, span.start).split('\n');
+	return { filename: span.filename, line: lines.length, column: lines.at(-1)!.length + 1 };
 }
 
 function lazySymbolRole(kind: string | undefined): string {
 	if (kind === 'event-handler') return 'an event handler';
 	if (kind === 'dom-update') return 'a DOM update';
 	if (kind === 'sync-computed-derive') return 'a computed';
-	return 'a lazy symbol';
+	if (kind === 'async-computed-runner') return 'an async computed';
+	return 'code';
 }
 
 function asNode(value: unknown): AnyNode | undefined {
@@ -1520,11 +1551,14 @@ function asNode(value: unknown): AnyNode | undefined {
 		: undefined;
 }
 
-function opaqueSlotDiagnostics(symbol: {
-	readonly symbolId: string;
-	readonly kind?: string;
-	readonly captureSlots: ReadonlyArray<CaptureSlot>;
-}): ReadonlyArray<CaptureAnalysisDiagnostic> {
+function opaqueSlotDiagnostics(
+	symbol: {
+		readonly symbolId: string;
+		readonly kind?: string;
+		readonly captureSlots: ReadonlyArray<CaptureSlot>;
+	},
+	input: CaptureAnalysisInput,
+): ReadonlyArray<CaptureAnalysisDiagnostic> {
 	const reportedRoutes = new Set<string>();
 	return symbol.captureSlots.flatMap((slot) =>
 		slot.routes.flatMap((route) => {
@@ -1534,6 +1568,15 @@ function opaqueSlotDiagnostics(symbol: {
 			const routeKey = `${route.componentEdgeId}:${propName}`;
 			if (reportedRoutes.has(routeKey)) return [];
 			reportedRoutes.add(routeKey);
+			const absentUse = route.absentProp ? route.absentUse : undefined;
+			const callsAbsent = absentUse?.kind === 'call';
+			const absentAction = callsAbsent ? 'calls' : absentUse?.kind === 'member' ? 'reads into' : 'uses';
+			const absentSource = absentUse?.source ?? propName;
+			const absentAt = absentUse?.at ? ` (${absentUse.at.filename}:${absentUse.at.line}:${absentUse.at.column})` : '';
+			const edgeSpan = input.semanticGraph.componentEdges.find(
+				(edge) => edge.id === route.componentEdgeId,
+			)?.sourceSpan;
+			const primarySpan = route.sourceSpan ?? (route.absentProp ? edgeSpan : undefined);
 			return [
 				{
 					code: CAPTURE_OPAQUE_PROP_CODE,
@@ -1541,12 +1584,14 @@ function opaqueSlotDiagnostics(symbol: {
 					phase: CAPTURE_ANALYSIS_PHASE,
 					title: 'Lazy handler prop capture is not resumable',
 					message: route.absentProp
-						? `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" is not passed by the parent that renders "${componentName}", and this call site invokes it unconditionally.`
-						: `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" for "${componentName}" is the runtime expression "${route.expression}". "${componentName}" reads it as \`${slot.source}\` in ${lazySymbolRole(symbol.kind)}, which runs in the browser after resume, and this value has no route there.`,
-					why: route.absentProp
-						? 'An absent prop has no value to route at this component edge. An optional or guarded call folds to undefined; an unconditional call would throw after resume, so it stays a build error.'
-						: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. Constant data reaches the browser as its build-time value: literals, object and array literals, and static member or index reads of a module `const` in this file or of a plain-data `const` export of an imported module that no statement there writes through. This expression is none of those - a function call, a `let`, a class instance, a namespace import, or a constant its module mutates - so its value exists only when the render runs.',
-					...(route.sourceSpan ? { primarySpan: route.sourceSpan } : {}),
+						? `"${componentName}" ${absentAction} its prop "${propName}" in \`${absentSource}\`${absentAt} without checking that it was passed, and this <${componentName}> passes no "${propName}", so that code would throw when it runs in the browser.`
+						: `"${componentName}" reads its prop "${propName}" as \`${slot.source}\` in ${lazySymbolRole(symbol.kind)}, which runs in the browser, but this <${componentName}> passes \`${route.expression}\`: code that runs only while the page renders, with no way for the browser to get its value.`,
+					why: route.unroutableHandler
+						? route.unroutableHandler.why
+						: route.absentProp
+							? 'A prop the caller leaves out is undefined. Reading it, or checking it, works; calling it or reading a field of it throws unless the code checks first that it is there.'
+							: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. Constant data reaches the browser as its build-time value: literals, object and array literals, and static member or index reads of a module `const` in this file or of a plain-data `const` export of an imported module that no statement there writes through. This expression is none of those - a function call, a `let`, a class instance, a namespace import, or a constant its module mutates - so its value exists only when the render runs.',
+					...(primarySpan ? { primarySpan } : {}),
 					passId: CAPTURE_ANALYSIS_PASS_ID,
 					artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
 					symbolId: symbol.symbolId,
@@ -1556,9 +1601,17 @@ function opaqueSlotDiagnostics(symbol: {
 					source: route.expression,
 					suggestions: [
 						{
-							message: route.absentProp
-								? `Call it optionally as ${propName}?.(…), guard it with if (${propName}), or pass ${propName} where "${componentName}" is rendered.`
-								: `Pass plain constant data (such as TREE[0] from a module that only declares it), pass a string, number or boolean literal (such as an id) and look the value up inside "${componentName}", or hold the value in state() in the component that renders "${componentName}".`,
+							message: route.unroutableHandler
+								? route.unroutableHandler.rewrite
+								: route.absentProp
+									? !callsAbsent
+										? `Read it optionally as ${propName}?.…, guard it with if (${propName}) or ${propName} ? … : …, or pass ${propName} where "${componentName}" is rendered.`
+										: `Call it optionally as ${propName}?.(…), guard it with if (${propName}), or pass ${propName} where "${componentName}" is rendered.`
+									: route.fixedValue && (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop')
+										? `Work the value out inside the handler from what the browser has, such as \`new URLSearchParams(location.search)\` for a value from the page url, or hold it in state() in the component that renders "${componentName}" and pass that.`
+										: isEventAttribute(propName)
+										? `Pass ${propName} an arrow written inline (${propName}={() => …}) or the name of a const arrow or function declared in the component body (${propName}={add}).`
+										: `Pass plain constant data (such as TREE[0] from a module that only declares it), pass a string, number or boolean literal (such as an id) and look the value up inside "${componentName}", or hold the value in state() in the component that renders "${componentName}".`,
 						},
 					],
 					docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',

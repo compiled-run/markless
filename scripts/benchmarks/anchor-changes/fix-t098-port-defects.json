@@ -1,0 +1,116 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": 152,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them: +152 B rendered in web/fns/ssr and +94 B in web/prerender/evaluator, +2 B gzip emitted runtime, measured against the merge base on this machine",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 94,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them: +152 B rendered in web/fns/ssr and +94 B in web/prerender/evaluator, +2 B gzip emitted runtime, measured against the merge base on this machine",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them: +152 B rendered in web/fns/ssr and +94 B in web/prerender/evaluator, +2 B gzip emitted runtime, measured against the merge base on this machine",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": 152,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them: +152 B rendered in web/fns/ssr and +94 B in web/prerender/evaluator, +2 B gzip emitted runtime, measured against the merge base on this machine",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 94,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them: +152 B rendered in web/fns/ssr and +94 B in web/prerender/evaluator, +2 B gzip emitted runtime, measured against the merge base on this machine",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them: +152 B rendered in web/fns/ssr and +94 B in web/prerender/evaluator, +2 B gzip emitted runtime, measured against the merge base on this machine",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/ssr"
+			],
+			"delta": 152,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them; measured from PR run 43171877292 against main's merge-group run 43169057548 (4ffa885bd), the tree the PR run merged onto",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "docs /concepts/state downloads +781 B gzip that is never run at load (code run at load fell by 1 char); the bytes sit in two chunks only the State page loads (xyJ_a4yv / y_XbTJ0G became 1xt3lj5J / rzFTlB5t); cause not traced. Measured from PR run 43171877292 against main's merge-group run 43169057548 (4ffa885bd)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 781,
+			"reason": "docs /concepts/state downloads +781 B gzip that is never run at load (code run at load fell by 1 char); the bytes sit in two chunks only the State page loads (xyJ_a4yv / y_XbTJ0G became 1xt3lj5J / rzFTlB5t); cause not traced. Measured from PR run 43171877292 against main's merge-group run 43169057548 (4ffa885bd)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/evaluator"
+			],
+			"delta": 151,
+			"reason": "the client evaluator passes each child's @try arm (typed required with its boundary) so composition files its @if records under that arm; measured from PR run 43178630340 against main's merge-group run 43169057548 (4ffa885bd)",
+			"date": "2026-11-12"
+		}
+	]
+}

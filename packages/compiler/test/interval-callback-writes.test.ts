@@ -47,7 +47,7 @@ export const ticker = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Panel() @{
@@ -66,7 +66,7 @@ export function Panel() @{
 	const node = 'shared:src/Ticker.tsrx#ticker/state:t';
 	expect(eventSymbolSources(result)).toEqual([
 		expect.stringContaining(
-			`context.graph.write({ graphNodeId: "${node}", path: ["count"], value: context.graph.read("${node}", ["count"]) + 1 })`,
+			`context.graph.update({ graphNodeId: "${node}", path: ["count"], returnValue: "next", update(value) {`,
 		),
 	]);
 	// The shape that used to ship: a graph read standing where an assignment
@@ -217,7 +217,7 @@ export const ticker = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 function Root({ onTick }) @{
@@ -240,7 +240,7 @@ export default function Page() @{
 
 	expect(result.symbolModules.diagnostics).toEqual([]);
 	const starter = eventSymbolSources(result).find((source) => source.includes('setInterval'));
-	expect(starter).toContain('window.setInterval(async () => {');
+	expect(starter).toContain('window.setInterval(marklessRepeatingTimer(context, async () => {');
 	expect(starter).toContain('await marklessInvokeCallbackSlot(context, "');
 });
 
@@ -258,7 +258,7 @@ export function Panel() @{
 `);
 
 	expect(eventSymbolSources(result)).toEqual([
-		expect.stringContaining('window.setInterval(() => {'),
+		expect.stringContaining('window.setInterval(marklessRepeatingTimer(context, () => {'),
 	]);
 });
 
@@ -278,7 +278,7 @@ export function Panel() @{
 	expect(result.symbolModules.diagnostics).toEqual([]);
 	expect(eventSymbolSources(result)).toEqual([
 		expect.stringContaining(
-			'context.graph.write({ graphNodeId: "state:t", path: ["count"], value: context.graph.read("state:t", ["count"]) + 1 })',
+			'context.graph.update({ graphNodeId: "state:t", path: ["count"], returnValue: "next", update(value) {\n    return value + 1;',
 		),
 	]);
 });

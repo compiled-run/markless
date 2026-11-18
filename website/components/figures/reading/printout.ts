@@ -30,12 +30,13 @@ export function createPrintout(width: number, height: number, extra: Point3[], t
 				cuts.add(at);
 				cuts.add(at + value.text.length);
 			}
-			const runs: { from: number; to: number; color: string }[] = [];
+			const washes = VALUES.filter((v) => v.line === i).map((v) => ({ from: line.text.indexOf(v.text), to: line.text.indexOf(v.text) + v.text.length }));
+			const runs: { from: number; to: number; color: string; dark: string }[] = [];
 			let col = -line.indent;
 			for (const token of tokens[i] ?? []) {
 				const from = col;
 				col += token.content.length;
-				if (col > 0) runs.push({ from: Math.max(0, from), to: col, color: token.color });
+				if (col > 0) runs.push({ from: Math.max(0, from), to: col, color: token.color, dark: token.dark ?? '' });
 			}
 			for (const run of runs) cuts.add(run.from);
 			const edges = [...cuts].filter((at) => at >= 0 && at <= line.text.length).sort((a, b) => a - b);
@@ -45,7 +46,7 @@ export function createPrintout(width: number, height: number, extra: Point3[], t
 					.slice(0, -1)
 					.map((from, k) => {
 						const run = runs.find((r) => r.from <= from && from < r.to);
-						return { key: k, text: line.text.slice(from, edges[k + 1]), tint: run?.color ? '--c:' + run.color : '', matrix: sheetMatrix(columnU(i, from), baselineV(i)) };
+						return { key: k, text: line.text.slice(from, edges[k + 1]), tint: run?.color ? '--c:' + run.color + ';--cd:' + (run.dark || 'var(--ink)') : '', washed: washes.some((w) => w.from <= from && from < w.to), matrix: sheetMatrix(columnU(i, from), baselineV(i)) };
 					})
 					.filter((piece) => piece.text.trim() !== ''),
 			};

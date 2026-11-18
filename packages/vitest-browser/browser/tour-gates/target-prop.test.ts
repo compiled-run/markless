@@ -144,7 +144,7 @@ test('an array of objects carrying the handle is refused when the handler reads 
 	expect(status).toBe(500);
 	expect(body).toContain('MARKLESS_CAPTURE_OPAQUE_PROP');
 	expect(body).toContain(
-		'because prop \\"steps\\" for \\"SpotListWhole\\" is the runtime expression',
+		'\\"SpotListWhole\\" reads its prop \\"steps\\" as',
 	);
 	expect(body).toContain(
 		'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol.',
@@ -162,7 +162,7 @@ test('the same array read one entry at a time is refused too', async () => {
 	expect(status).toBe(500);
 	expect(body).toContain('MARKLESS_CAPTURE_OPAQUE_PROP');
 	expect(body).toContain(
-		'because prop \\"steps\\" for \\"SpotListIndexed\\" is the runtime expression',
+		'\\"SpotListIndexed\\" reads its prop \\"steps\\" as',
 	);
-	expect(body).toContain('reads it as `steps[0]` in an event handler');
+	expect(body).toContain('as `steps[0]` in an event handler, which runs in the browser');
 });

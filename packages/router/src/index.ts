@@ -8,6 +8,7 @@ import {
 	REPLACE_ATTRIBUTE,
 	SCROLL_ATTRIBUTE,
 } from './link-attributes.ts';
+import { IN_PLACE_LOCATION_HEADER, IN_PLACE_REQUEST_HEADER } from '@markless/web/fns/in-place-headers';
 import { HTML_ATTRIBUTES_SLOT } from './route-dom.ts';
 import { rememberRequestLocals } from './request-locals.ts';
 
@@ -93,10 +94,26 @@ export interface LinkNavigationProps {
 	readonly scroll?: boolean;
 }
 
+declare global {
+	namespace __MarklessTypeService {
+		/** Filled in by @markless/typescript-plugin's JSX contract; a plain TypeScript program loads none. */
+		interface RouterContract {}
+	}
+}
+
+type JsxChild = __MarklessTypeService.RouterContract extends { readonly child: infer Child }
+	? Child
+	: unknown;
+
+type HtmlAttributes = __MarklessTypeService.RouterContract extends {
+	readonly htmlAttributes: infer Attributes;
+}
+	? Attributes
+	: { readonly [name: string]: unknown };
+
 export type DefaultLinkProps = {
 	readonly href?: string;
-	// The JSX contract's child shape, reached ambiently: core depends on router, not the reverse.
-	readonly children?: __MarklessTypeService.Child;
+	readonly children?: JsxChild;
 	readonly class?: string;
 	readonly id?: string;
 	readonly target?: string;
@@ -161,14 +178,69 @@ export function __marklessCreateHttpContext<
 	};
 }
 
+const CROSS_SITE_WRITE_REFUSED =
+	'MARKLESS_ROUTER_CROSS_SITE_WRITE_REFUSED: this api/ route refused a write that a browser sent from another site. Writes are accepted from pages on this origin and from callers that are not browsers, such as curl or another server.';
+
+/** The 403 an api/ route answers when a browser sends it a write from another site, so a page elsewhere cannot act for a signed-in visitor. */
+export function __marklessRefuseCrossSiteWrite(event: RuntimeHttpEvent): Response | undefined {
+	const request = event.req;
+	if (!request || request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS')
+		return undefined;
+	const site = request.headers.get('sec-fetch-site');
+	const origin = request.headers.get('origin');
+	const crossSite = site
+		? site !== 'same-origin' && site !== 'none'
+		: origin !== null && origin !== (event.url ?? new URL(request.url)).origin;
+	return crossSite
+		? new Response(CROSS_SITE_WRITE_REFUSED, {
+				status: 403,
+				headers: { 'content-type': 'text/plain; charset=utf-8' },
+			})
+		: undefined;
+}
+
+// The redirects after which the browser fetches the location with GET; a 307 or 308 repeats the POST, so it stays the browser's.
+const REDIRECTS_TO_GET: ReadonlySet<number> = new Set([301, 302, 303]);
+
+/**
+ * A form Markless sends in place marks its POST; this api/ route's redirect to an http(s) page then answers with no
+ * body and its location in a header, with every other header (cookies included), so the page that location names is
+ * not fetched and thrown away. Runs after the cross-site check, so the mark changes only how an accepted request's
+ * redirect is answered; the answer is never stored, and any other method or location keeps the redirect.
+ */
+export function __marklessAnswerInPlace(event: RuntimeHttpEvent, answer: unknown): unknown {
+	const request = event.req;
+	// A Response, or an answer shaped like one (h3's redirect() returns its own HTTPResponse class).
+	const shaped = answer as { readonly status?: unknown; readonly headers?: unknown; readonly body?: unknown } | null;
+	if (typeof shaped?.status !== 'number' || !(shaped.headers instanceof Headers)) return answer;
+	if (!REDIRECTS_TO_GET.has(shaped.status)) return answer;
+	if (request?.method !== 'POST' || !request.headers.get(IN_PLACE_REQUEST_HEADER)) return answer;
+	const location = shaped.headers.get('location');
+	if (location === null) return answer;
+	let landed: URL;
+	try {
+		landed = new URL(location, event.url ?? request.url);
+	} catch {
+		return answer;
+	}
+	if (landed.protocol !== 'http:' && landed.protocol !== 'https:') return answer;
+	if (shaped.body instanceof ReadableStream) void shaped.body.cancel().catch(() => {});
+	const headers = new Headers(shaped.headers);
+	for (const name of ['location', 'content-length', 'content-encoding']) headers.delete(name);
+	headers.set(IN_PLACE_LOCATION_HEADER, location);
+	headers.set('cache-control', 'no-store');
+	headers.append('vary', IN_PLACE_REQUEST_HEADER);
+	return new Response(null, { status: 200, headers });
+}
+
 export const Html = Object.assign(
-	function Html(props: { readonly children?: __MarklessTypeService.Child }): unknown {
+	function Html(props: HtmlAttributes & { readonly children?: JsxChild }): unknown {
 		return props.children;
 	},
 	{
 		renderSsr(
 			props: {
-				readonly children?: __MarklessTypeService.Child;
+				readonly children?: JsxChild;
 				readonly [name: string]: unknown;
 			} = {},
 			renderContext?: { readonly [HTML_ATTRIBUTES_SLOT]?: Record<string, unknown> },

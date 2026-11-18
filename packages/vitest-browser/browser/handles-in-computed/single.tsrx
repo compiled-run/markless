@@ -11,7 +11,7 @@ export const single = shared(
 
 		return { ...s, boxEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function SingleRoot({ children }) @{

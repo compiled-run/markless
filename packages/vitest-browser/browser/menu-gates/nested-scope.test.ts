@@ -5,7 +5,7 @@ import Page from './nest-page.tsrx';
 import SinglePage from './nest-single-page.tsrx';
 import { decodeProtocolPayloadLists } from '../../../serializer/src/protocol-record-templates.ts';
 
-// A widget-scoped family composed inside ITSELF - a submenu inside a menu. Each
+// A subtree-scoped family composed inside ITSELF - a submenu inside a menu. Each
 // part has to be answered by its own nearest root: the inner parts by the inner
 // instance, the outer parts by the outer one, and neither by a fresh instance
 // of its own.

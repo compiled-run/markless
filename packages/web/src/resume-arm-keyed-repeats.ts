@@ -5,6 +5,7 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 import type { ResumeEventWiring } from './resume-events.ts';
+import type { SlotRead } from './resume-keyed-repeats.ts';
 
 // An arm's rows adopt the served ones only once the computed they read from holds the served value.
 export async function wireArmKeyedRepeats(
@@ -16,29 +17,38 @@ export async function wireArmKeyedRepeats(
 		readonly elementHandles: ElementHandleRegistry;
 		readonly storeHostSubscription: (hostNodeId: string, release: () => void) => void;
 	},
+	rowComponentHost?: import('./fns/row-component-mint.ts').RowComponentMintHost,
+	moved?: (read: SlotRead) => boolean,
+	// The arm's own records: a computed a component in the arm declares is not in the page's.
+	armComputed?: NonNullable<ResumeRuntimeInput['state']>['computed'],
 ): Promise<void> {
 	const { primeKeyedRepeatCollections, wireKeyedRepeats } =
 		await import('./resume-keyed-repeats-lazy.ts');
 	await primeKeyedRepeatCollections({
 		graph: runtime.graph,
 		repeats: records,
-		computed: runtime.state?.computed ?? [],
+		computed: [...(runtime.state?.computed ?? []), ...(armComputed ?? [])],
 		root: runtime.root,
 		loadSymbol: runtime.loadSymbol,
 		elementHandles: host.elementHandles,
+		arm: new Set((armComputed ?? []).map((record) => record.graphNodeId)),
 	});
 	for (const record of records)
-		await wireKeyedRepeats({
-			graph: runtime.graph,
-			view: {
-				...runtime.view,
-				keyedRepeats: [record, ...records.filter((each) => each.enclosingRow)],
+		await wireKeyedRepeats(
+			{
+				graph: runtime.graph,
+				view: {
+					...runtime.view,
+					keyedRepeats: [record, ...records.filter((each) => each.enclosingRow)],
+				},
+				elementsByHostId: host.elementsByHostId,
+				events: host.events,
+				storeContainerSubscription: (release) =>
+					host.storeHostSubscription(record.parentHostNodeId, release),
+				renderData: runtime.renderData,
+				pageRepeats: runtime.view.keyedRepeats,
+				moved,
 			},
-			elementsByHostId: host.elementsByHostId,
-			events: host.events,
-			storeContainerSubscription: (release) =>
-				host.storeHostSubscription(record.parentHostNodeId, release),
-			renderData: runtime.renderData,
-			pageRepeats: runtime.view.keyedRepeats,
-		});
+			rowComponentHost,
+		);
 }

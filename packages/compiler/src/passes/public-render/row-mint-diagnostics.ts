@@ -1,4 +1,4 @@
-import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import {
 	isStaticTextNode,
 	literalContainerText,
@@ -14,14 +14,17 @@ import type {
 	SemanticMarkupSlot,
 } from '../../artifacts.ts';
 import {
+	constantInBrowser,
 	expressionSlotValue,
 	isLoweredStyleObject,
 	mintableSlotValue,
 	resolveRowChunkMint,
 	resolveRowComponentMint,
 	rowBranchMints,
+	stepsAfterNestedRows,
 } from '../row-mint.ts';
 import { repeatRowsUnplaceable } from '../render-data/row-position.ts';
+import { rowRangeRefusal } from '../row-range.ts';
 import { staticTemplateReadDiagnostic } from '../state-lowering.ts';
 import {
 	joinDeciders,
@@ -33,9 +36,17 @@ import {
 	keyedRepeatRowMintUnsupportedDiagnostic,
 	keyedRepeatRowNotOneElementDiagnostic,
 	keyedRepeatRowsUnplacedDiagnostic,
+	keyedRepeatRowValueUnpaintedDiagnostic,
 	rowBranchFlipUnsupportedDiagnostic,
 	type KeyedRepeatRowMintRefusal,
+	type KeyedRepeatRowValueUnpaintedCause,
 } from './diagnostics.ts';
+import { childRootBoundary } from '../construct-reach.ts';
+import {
+	repeatItemBinding,
+	rowBoundNames,
+	rowItemLabel,
+} from '../semantic-graph/repeat-item-binding.ts';
 
 /**
  * A keyed @for whose rows cannot be built in the browser says so.
@@ -73,7 +84,7 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 		)
 			diagnostics.push(
 				keyedRepeatRowsUnplacedDiagnostic({
-					itemName: repeat.itemName,
+					itemName: rowItemLabel(repeat),
 					node,
 					filename: input.filename,
 				}),
@@ -95,7 +106,7 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 		if (emptyBranch) {
 			diagnostics.push({
 				...keyedRepeatRowCanBeEmptyDiagnostic({
-					itemName: repeat.itemName,
+					itemName: rowItemLabel(repeat),
 					collectionSource: repeat.collectionSource,
 					branchLabel: emptyBranch.type === 'JSXSwitchExpression' ? '@switch' : '@if',
 					testSource: expressionSource(
@@ -111,12 +122,16 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			});
 			return;
 		}
-		const rowShape = shapeDecidedBy?.length === 0 ? null : rowShapeBesidesOneElement(rowNodes);
-		if (rowShape) {
+		const rangeRefusal =
+			shapeDecidedBy?.length === 0 || !repeat.rowRange
+				? null
+				: rowRangeRefusal(input.semanticGraph, repeat.id);
+		if (rangeRefusal) {
 			diagnostics.push({
 				...keyedRepeatRowNotOneElementDiagnostic({
-					itemName: repeat.itemName,
-					rowShape,
+					itemName: rowItemLabel(repeat),
+					rowShape: rowShapeBesidesOneElement(rowNodes) ?? 'no single element at its top level',
+					reason: rangeRefusal,
 					node,
 					filename: input.filename,
 				}),
@@ -124,6 +139,17 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			});
 			return;
 		}
+		const unpainted = unpaintedRowValues(repeat, input.semanticGraph);
+		for (const { decidedByProps, ...value } of unpainted)
+			diagnostics.push({
+				...keyedRepeatRowValueUnpaintedDiagnostic({
+					itemName: rowItemLabel(repeat),
+					...value,
+					node,
+					filename: input.filename,
+				}),
+				...(decidedByProps ? { decidedByProps } : {}),
+			});
 		const refusal = rowMintRefusal({
 			chunks: input.semanticGraph.markup.chunks,
 			componentEdges: input.semanticGraph.componentEdges,
@@ -140,11 +166,7 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			repeatId: repeat.id,
 			itemName: repeat.itemName,
 			graph: input.semanticGraph,
-			rowNames: new Set(
-				[repeat.itemName, repeat.indexName].filter(
-					(name): name is string => name !== undefined,
-				),
-			),
+			rowNames: new Set(rowBoundNames(repeat)),
 		});
 		if (!refusal) return;
 		const rowChunk = input.semanticGraph.markup.chunks.find(
@@ -159,7 +181,7 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 		if (deciding?.length !== 0)
 			diagnostics.push({
 				...keyedRepeatRowMintUnsupportedDiagnostic({
-					itemName: repeat.itemName,
+					itemName: rowItemLabel(repeat),
 					refusal,
 					node,
 					filename: input.filename,
@@ -168,6 +190,7 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			});
 		for (const read of input.semanticGraph.templateReads) {
 			if (read.keyedRepeatId !== repeat.id) continue;
+			if (unpainted.some((value) => value.source === read.source)) continue;
 			const stale = staticTemplateReadDiagnostic(input.semanticGraph, read);
 			if (stale) diagnostics.push(stale);
 		}
@@ -184,7 +207,7 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			if (flippedBy?.length === 0) continue;
 			diagnostics.push({
 				...rowBranchFlipUnsupportedDiagnostic({
-					itemName: repeat.itemName,
+					itemName: rowItemLabel(repeat),
 					branchLabel: site.kind === 'switch' ? '@switch' : '@if',
 					testSource: site.testSource,
 					refusal,
@@ -207,6 +230,82 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 
 type Repeat = SemanticGraphArtifact['keyedRepeats'][number];
 
+// Mirrors the protocol view's two row-template refusals that leave a page-state read with nothing to repaint it.
+function unpaintedRowValues(
+	repeat: Repeat,
+	graph: SemanticGraphArtifact,
+): Array<{
+	readonly source: string;
+	readonly attributeName?: string;
+	readonly cause: KeyedRepeatRowValueUnpaintedCause;
+	readonly decidedByProps?: {
+		readonly componentName: string;
+		readonly props: ReadonlyArray<string>;
+	};
+}> {
+	const chunk = graph.markup.chunks.find(
+		(candidate) => candidate.id === `repeat:${repeat.id}:row`,
+	);
+	const component = chunk?.componentName;
+	if (!chunk || !component) return [];
+	const rowNames = new Set(rowBoundNames(repeat));
+	const servedOnly = chunk.slots.flatMap((slot) => {
+		if (slot.kind !== 'repeat') return [];
+		const nested = graph.keyedRepeats.find((candidate) => candidate.id === slot.repeatId);
+		return nested && !nested.collectionGraphNodeId && !nested.enclosingItemPath ? [nested] : [];
+	});
+	const servedOnlyRefused =
+		servedOnly.length > 0 &&
+		!!repeat.collectionGraphNodeId &&
+		(!constantInBrowser(graph, component, repeat.collectionGraphNodeId) ||
+			chunk.slots.some(
+				(slot) =>
+					slot.kind === 'branch' ||
+					(slot.kind === 'text' && slot.residue.kind !== 'repeat-item'),
+			));
+	// One value no count reaches withholds the whole row's template.
+	const betweenLists = chunk.slots.some(
+		(slot) =>
+			(slot.kind === 'text' || slot.kind === 'attribute') &&
+			stepsAfterNestedRows(chunk, slot.coordinate.path, slot.kind === 'text') === null,
+	);
+	const values = [];
+	for (const slot of chunk.slots) {
+		if (slot.kind !== 'text' && slot.kind !== 'attribute') continue;
+		const value =
+			mintableSlotValue(slot) ?? expressionSlotValue(slot, graph, component, rowNames);
+		if (!value || 'itemPath' in value) continue;
+		const reads =
+			'graphNodeId' in value
+				? [{ graphNodeId: value.graphNodeId, path: value.graphPath }]
+				: (value.reads ?? []);
+		if (reads.every((read) => constantInBrowser(graph, component, read.graphNodeId))) continue;
+		// A value read only off props is stale only if some caller passes one that changes; the build checks each.
+		const deciding = reads.reduce<ReadonlyArray<string> | null>(
+			(props, read) => joinDeciders(props, propsDeciding(read.graphNodeId, read.path, graph)),
+			[],
+		);
+		if (deciding?.length === 0) continue;
+		const cause: KeyedRepeatRowValueUnpaintedCause | null = betweenLists
+			? { kind: 'between-lists' }
+			: servedOnlyRefused
+				? { kind: 'served-only-list', listSource: servedOnly[0]!.collectionSource }
+				: null;
+		if (!cause) continue;
+		values.push({
+			source:
+				'source' in value
+					? value.source
+					: (graph.graphBindings.find((binding) => binding.id === value.graphNodeId)
+							?.name ?? value.graphNodeId),
+			...(slot.kind === 'attribute' ? { attributeName: slot.name } : {}),
+			cause,
+			...(deciding ? { decidedByProps: { componentName: component, props: deciding } } : {}),
+		});
+	}
+	return values;
+}
+
 // A row's @if test that reads only its row items, module values and props.
 function testDecidedBy(
 	testSource: string,
@@ -219,8 +318,7 @@ function testDecidedBy(
 		at;
 		at = graph.keyedRepeats.find((candidate) => candidate.id === at!.enclosingRepeatId)
 	) {
-		rowNames.add(at.itemName);
-		if (at.indexName) rowNames.add(at.indexName);
+		for (const name of rowBoundNames(at)) rowNames.add(name);
 	}
 	const props = new Set<string>();
 	for (const [, name] of testSource.matchAll(/(?<![\w$.])([A-Za-z_$][\w$]*)/g)) {
@@ -346,7 +444,7 @@ function pairedRepeat(
 	source: string,
 	paired: ReadonlySet<string>,
 ): SemanticGraphArtifact['keyedRepeats'][number] | undefined {
-	const itemName = repeatItemName(node) ?? 'item';
+	const itemName = repeatItemBinding(node)?.itemName ?? 'item';
 	const collection = node.right as AnyNode | undefined;
 	const key = node.key as AnyNode | undefined;
 	return semanticGraph.keyedRepeats.find(
@@ -393,8 +491,9 @@ function rowMintRefusal(input: {
 		})
 	)
 		return null;
-	const componentSlot = chunk.slots.find((slot) => slot.kind === 'child-component');
-	if (componentSlot?.kind === 'child-component') {
+	const componentSlots = chunk.slots.filter((slot) => slot.kind === 'child-component');
+	const componentSlot = componentSlots[0];
+	if (componentSlots.length === 1 && componentSlot?.kind === 'child-component') {
 		const mint = resolveRowComponentMint({
 			...(input.recordHostIds ? { recordHostIds: input.recordHostIds } : {}),
 			...(input.liveHostIds ? { liveHostIds: input.liveHostIds } : {}),
@@ -409,16 +508,40 @@ function rowMintRefusal(input: {
 			rowElementCount: chunk.hosts.length,
 			itemName: input.itemName,
 		});
-		return mint ? null : { kind: 'component', componentName: componentSlot.childComponentName };
+		if (mint) return null;
+		const edge = input.componentEdges.find(
+			(candidate) => candidate.id === componentSlot.componentEdgeId,
+		);
+		const reachInput = {
+			chunks: input.chunks,
+			componentEdges: input.componentEdges,
+			componentNames: input.componentNames,
+			...(input.importedModuleInterfaces
+				? { importedModuleInterfaces: input.importedModuleInterfaces }
+				: {}),
+		};
+		if (
+			chunk.hosts.length === 0 &&
+			edge &&
+			childRootBoundary(reachInput, edge, componentSlot.childTemplateId, new Set())
+		)
+			return { kind: 'component-root-boundary', componentName: componentSlot.childComponentName };
 	}
+	const unseen = componentSlots.find(
+		(slot) =>
+			slot.kind === 'child-component' && !componentSeen(input, slot.componentEdgeId),
+	);
+	if (unseen?.kind === 'child-component')
+		return { kind: 'component', componentName: unseen.childComponentName };
 	for (const slot of chunk.slots) {
 		if (slot.kind === 'text' || slot.kind === 'attribute') {
+			if (stepsAfterNestedRows(chunk, slot.coordinate.path, slot.kind === 'text') === null)
+				return { kind: 'between-lists' };
 			// The mint fills a text or attribute slot from the item or from the page's
 			// graph, so what is left is a value only the render can produce.
 			if (mintableSlotValue(slot)) continue;
 			if (isLoweredStyleObject(slot)) return { kind: 'style-object' };
 			if (
-				!componentSlot &&
 				chunk.componentName &&
 				expressionSlotValue(slot, input.graph, chunk.componentName, input.rowNames)
 			)
@@ -439,12 +562,27 @@ function rowMintRefusal(input: {
 				chunk.componentName,
 				slot,
 				input.rowNames,
+				(repeatId) => nestedRepeatMints(input, repeatId),
 			)
 		)
 			continue;
+		if (slot.kind === 'child-component') continue;
 		return { kind: 'nested-construct', label: nestedConstructLabel(slot, input.branchSites) };
 	}
-	return null;
+	return componentSlot?.kind === 'child-component'
+		? { kind: 'component-content', componentName: componentSlot.childComponentName }
+		: null;
+}
+
+// A child from another module is seen when the build compiled that module's interface.
+function componentSeen(input: Parameters<typeof rowMintRefusal>[0], componentEdgeId: string): boolean {
+	const edge = input.componentEdges.find((candidate) => candidate.id === componentEdgeId);
+	if (!edge?.importSource) return true;
+	return (
+		input.importedModuleInterfaces?.[edge.importSource]?.render.components.some(
+			(candidate) => candidate.componentName === edge.childComponentName,
+		) ?? false
+	);
 }
 
 // A nested @for builds its own rows inside a minted row when it could build them anywhere.
@@ -461,11 +599,7 @@ function nestedRepeatMints(input: Parameters<typeof rowMintRefusal>[0], repeatId
 			...input,
 			repeatId,
 			itemName: nested.itemName,
-			rowNames: new Set(
-				[nested.itemName, nested.indexName].filter(
-					(name): name is string => name !== undefined,
-				),
-			),
+			rowNames: new Set(rowBoundNames(nested)),
 		}) === null
 	);
 }
@@ -504,12 +638,4 @@ function nestedConstructLabel(
 		default:
 			return 'a spread of attributes';
 	}
-}
-
-function repeatItemName(node: AnyNode): string | null {
-	const left = node.left as AnyNode | undefined;
-	if (!left) return null;
-	if (left.type !== 'VariableDeclaration') return getIdentifierName(left);
-	const [declaration] = asNodes(left.declarations);
-	return getIdentifierName(declaration?.id as AnyNode | undefined);
 }

@@ -1,0 +1,14 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 146,
+			"reason": "a computed in a child @if arm opened in the browser reads the live parent value its routed dependency follows, not the props the arm was rendered with: arm-commit-time code, none executed at load",
+			"date": "2026-11-12"
+		}
+	]
+}

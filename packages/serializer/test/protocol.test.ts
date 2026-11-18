@@ -10,6 +10,13 @@ import {
 	type ProtocolStreamedArmPatch,
 	type ProtocolViewPayload,
 } from '../src/index.ts';
+import {
+	constantSyncPolicyCode,
+	formatEventHostEntries,
+	IN_PLACE_SUBMIT_POLICY,
+	isInPlaceSubmitPolicy,
+	parseEventHostEntries,
+} from '../src/protocol.ts';
 
 test('streamed arm patches keep the served arm beside its records', () => {
 	const patch = [
@@ -858,4 +865,124 @@ test('a row slot may carry an authored expression, with its component and reads'
 			textSlots: [{ path: [0, 0], source: 'x', reads: [{ graphNodeId: 7, path: [] }] }],
 		}),
 	).toThrow(/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]\.reads\[0\]/);
+});
+
+test('a submit event record carries authoredSubmitAriaDisabled through payload scripts, templated or not', () => {
+	const state: ProtocolStatePayload = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
+	const form = (hostNodeId: string) => ({
+		hostNodeId,
+		eventName: 'submit',
+		symbolIds: [`symbol:${hostNodeId}`],
+		authoredSubmitAriaDisabled: true as const,
+	});
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [form('h1'), form('h2'), { hostNodeId: 'h3', eventName: 'submit', symbolIds: ['symbol:h3'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
+	expect(decoded.view.events.map((event) => event.authoredSubmitAriaDisabled)).toEqual([true, true, undefined]);
+});
+
+test('authoredSubmitAriaDisabled other than true is refused', () => {
+	const state = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
+	const view = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [{ hostNodeId: 'h1', eventName: 'submit', symbolIds: [], authoredSubmitAriaDisabled: false }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	expect(() => decodePayloadScripts(renderPayloadScripts({ state, view } as never))).toThrow(
+		/authoredSubmitAriaDisabled/,
+	);
+});
+
+test('a submit record the runtime sends in place carries inPlaceSubmit through payload scripts; other values are refused', () => {
+	const state: ProtocolStatePayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+	const form = (hostNodeId: string, inPlaceSubmit: 'reset' | 'keep') => ({
+		hostNodeId,
+		eventName: 'submit',
+		symbolIds: [],
+		syncPolicy: IN_PLACE_SUBMIT_POLICY,
+		inPlaceSubmit,
+	});
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [form('h1', 'reset'), form('h2', 'keep'), form('h3', 'reset')],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
+	expect(decoded.view.events.map((event) => [event.inPlaceSubmit, event.syncPolicy])).toEqual([
+		['reset', IN_PLACE_SUBMIT_POLICY],
+		['keep', IN_PLACE_SUBMIT_POLICY],
+		['reset', IN_PLACE_SUBMIT_POLICY],
+	]);
+	const refused = { ...view, events: [{ ...form('h1', 'reset'), inPlaceSubmit: 'clear' }] };
+	expect(() =>
+		decodePayloadScripts(renderPayloadScripts({ state, view: refused } as never)),
+	).toThrow(/inPlaceSubmit/);
+});
+
+test('the in-place submit policy is served as the constant code f, and read back', () => {
+	expect(constantSyncPolicyCode(IN_PLACE_SUBMIT_POLICY)).toBe('f');
+	expect(isInPlaceSubmitPolicy(IN_PLACE_SUBMIT_POLICY)).toBe(true);
+	expect(
+		isInPlaceSubmitPolicy({
+			when: { type: 'submits-in-place' },
+			actions: ['preventDefault', 'stopPropagation'],
+		}),
+	).toBe(false);
+	const served = formatEventHostEntries([{ name: 'submit', ref: 0, policy: 'f' }]);
+	expect(served).toBe('submit:0!f');
+	expect(parseEventHostEntries(served)).toEqual([{ name: 'submit', ref: 0, policy: 'f' }]);
+});
+
+test('branch arm records round-trip the lists an arm holds, and a malformed field is refused', () => {
+	const arm = {
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		repeatParents: [{ repeatId: 'repeat:0', parentHostPath: [0, 1] }],
+	};
+	const view = (armRecords: ReadonlyArray<unknown>): ProtocolViewPayload => ({
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		branches: [
+			{
+				id: 'branch-site:0',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				symbolId: 'symbol:1',
+				armRecords: armRecords as never,
+			},
+		],
+	});
+	const state: ProtocolStatePayload = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
+
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view: view([arm, { ...arm, repeatParents: undefined }]) }));
+	expect(decoded.view.branches?.[0]?.armRecords?.[0]?.repeatParents).toEqual(arm.repeatParents);
+	expect(() =>
+		decodePayloadScripts(renderPayloadScripts({ state, view: view([{ ...arm, repeatParents: 'repeat:0' }]) })),
+	).toThrow(/repeatParents/);
 });

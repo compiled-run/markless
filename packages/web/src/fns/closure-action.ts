@@ -1,6 +1,6 @@
 import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
 import { marklessAttributeValue, marklessWriteAttribute } from '../dom-attribute.ts';
-import { marklessRunAtCurrentTarget } from '../event-current-target.ts';
+import { marklessEventHandled, marklessRunAtCurrentTarget } from '../event-current-target.ts';
 import { marklessDecodeScalarCell, marklessScalarSpecializedError } from './scalar-specialized.ts';
 import { marklessScalarLocate, marklessServedDomUpdate } from './scalar-served.ts';
 
@@ -235,7 +235,11 @@ export async function marklessRunClosureAction(
 				invokeCallback: refuse,
 				invokeSymbol: refuse,
 			});
-			if (isThenable(result)) await result;
+			if (isThenable(result)) {
+				// As in the full runtime: a body that returns a promise no longer holds a navigation back.
+				marklessEventHandled(root, input.event);
+				await result;
+			}
 		} catch (error) {
 			if ((error as { readonly code?: unknown } | null)?.code === ESCALATE) throw error;
 			// A thrown handler still commits what it wrote before throwing, as the full runtime's flush does.

@@ -5,11 +5,14 @@ export function App() @{
 	let open = state(false);
 	let picks = state(0);
 	let marks = state(0);
+	let status = state('Brewing');
 	const field = element();
 
 	<main>
 		<button data-tap onClick={() => taps++}>Tap</button>
 		<output data-taps>{taps}</output>
+		<button data-ready onClick={() => (status = 'Ready')}>Ready</button>
+		<output data-status>Status: {status}</output>
 		<button data-toggle onClick={() => (open = !open)}>Toggle</button>
 		@if (open) {
 			<p data-shown>Shown</p>

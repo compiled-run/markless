@@ -10,12 +10,14 @@ import {
 	type StructureToken,
 } from '../ssr-data/renderer.ts';
 import type { SsrRenderable, SsrRenderOutput } from '../render-to-string.ts';
-import type { ResumeArmRecordSet } from '../resume-types.ts';
-import type { RuntimeGraph } from '@markless/runtime';
+import type { ResumeArmRecordSet, ShownAsyncArm } from '../resume-types.ts';
+import type { RuntimeGraph, RuntimeGraphAsyncSnapshot } from '@markless/runtime';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
+import type { ComposedBranchGraph } from '../resume-branches.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import { SERIALIZED_NULL_GRAPH_PAYLOAD } from '../../../serializer/src/value-constants.ts';
 import { PROTOCOL_PROPS_GRAPH_NODE_ID } from '../../../serializer/src/protocol-constants.ts';
-import { prepareSsrResumeRecords } from './records.ts';
+import { boundariesInside, prepareSsrResumeRecords } from './records.ts';
 import {
 	marklessSsrAttachSnapshots,
 	marklessComposeState,
@@ -24,16 +26,23 @@ import {
 	marklessSsrRemapGraphOutput,
 	marklessSsrSpreadProps,
 	type MarklessSsrComposedChild,
+	type SsrAsyncArmPlacement,
 } from '../fns/ssr.ts';
 import type { ComposeGraphProps } from '../fns/composition.ts';
 import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
+import { childEdgeSurface } from './owning-surface.ts';
 import { marklessBoundSymbolId, marklessReboundSymbolId } from '../fns/bound-symbol.ts';
 import {
 	marklessInstancePath,
+	marklessInstanceSegments,
+	marklessRecordRowScope,
 	marklessRowFreeSymbolId,
-	marklessRowSegment,
+	marklessRowPath,
+	type MarklessScopedGraph,
 } from '../fns/instance-scope.ts';
 import { prerenderBranchArm } from './branch-arm.ts';
+import { branchOwnerPlacement, type BranchOwnerPlacement, type OwnerPlacementStep } from './owner-placement.ts';
+import type { OwnerRootedRender } from './owner-rooted.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
 import { marklessThen, marklessWalk, type Awaitable } from '../ssr-data/awaitable.ts';
 import {
@@ -44,6 +53,7 @@ import {
 	sharedSeedPass,
 } from './shared-seed-slot.ts';
 import { branchArmIdrefResolution } from '../ssr-data/branch-arm-idrefs.ts';
+import { asyncPlanes } from '../reconcile-plane-slot.ts';
 
 // This evaluator is the seam where a SERIALIZED protocol payload meets the
 // mutable draft the SSR composer works on. They describe the same records; the
@@ -73,6 +83,7 @@ export type PrerenderRenderData = SsrRenderData & {
 
 export type PrerenderDataDefinition = {
 	readonly name: string;
+	readonly attributeName?: (name: string) => string;
 	readonly state: ProtocolStatePayload;
 	readonly view: import('@markless/serializer').ProtocolViewPayload;
 	readonly rootChunkId: string;
@@ -83,9 +94,7 @@ export type PrerenderDataDefinition = {
 	readonly stateCellIndexes?: ReadonlyArray<number>;
 	readonly stateComputedIndexes?: ReadonlyArray<number>;
 	readonly stateSharedSeedIndexes?: ReadonlyArray<number>;
-	// Positions into `state.computed` for the sync computeds a handler reads:
-	// their derived value travels with the payload so the first read, before any
-	// dependency write, answers with it.
+	// Positions into `state.computed` whose derived value travels with the payload, for resume's first read.
 	readonly servedComputedIndexes?: ReadonlyArray<number>;
 	readonly initialValues?: PrerenderRenderData['initialValues'];
 	readonly initialValueKinds?: Readonly<Record<string, string>>;
@@ -95,10 +104,11 @@ export type PrerenderDataDefinition = {
 	readonly initializers?: Readonly<Record<string, unknown>>;
 	readonly branches?: PrerenderRenderData['branches'];
 	readonly boundaries?: PrerenderRenderData['boundaries'];
-	readonly edges?: ReadonlyArray<{
+	readonly edges?: ReadonlyArray<SsrAsyncArmPlacement & {
 		readonly id: string;
 		readonly childComponentName: string;
-		readonly asyncBoundaryId?: string;
+		// Set when the edge crosses a module boundary: its key in `surface.imports`.
+		readonly importSource?: string;
 		readonly hostPrefix: string;
 		readonly symbolPrefix: string;
 		readonly boundSymbols?: Readonly<Record<string, string>>;
@@ -119,6 +129,8 @@ export type PrerenderDataDefinition = {
 			readonly structureTokens?: ReadonlyArray<StructureToken>;
 		};
 	}>;
+	// The same-module edge chains that place this component, from a component nothing in the module places.
+	readonly placements?: ReadonlyArray<ReadonlyArray<OwnerPlacementStep>>;
 	readonly propCellId?: string | null;
 	// The shared() element() handles a rendered instance of this component binds,
 	// published by the compiler so a widget's seed phase can file them before any
@@ -188,6 +200,8 @@ export type PrerenderDataSurface = {
 	readonly imports: Readonly<Record<string, PrerenderDataSurface>>;
 };
 
+export { childEdgeSurface, surfaceImportKey } from './owning-surface.ts';
+
 export type PrerenderLoadSymbol = (symbolId: string) => unknown | Promise<unknown>;
 
 function isPrerenderLoadSymbol(value: unknown): value is PrerenderLoadSymbol {
@@ -196,6 +210,7 @@ function isPrerenderLoadSymbol(value: unknown): value is PrerenderLoadSymbol {
 
 export type PrerenderPageClosure = {
 	readonly renderData: PrerenderRenderData;
+	readonly attributeName?: (name: string) => string;
 	readonly props?: unknown;
 	readonly idPrefix?: string;
 	readonly computed?: ReadonlyArray<{
@@ -260,6 +275,7 @@ export async function evaluatePrerenderClosure(
 
 	return renderSsrData({
 		renderData: closure.renderData,
+		attributeName: closure.attributeName,
 		idPrefix: closure.idPrefix,
 		read: (residue, context) => {
 			if (residue.kind === 'repeat-item') return readPath(context.repeatItem, residue.path);
@@ -332,34 +348,89 @@ export async function renderPrerenderDataSurface(
 export async function renderPrerenderBoundary(
 	page: SsrRenderable | PrerenderDataSurface,
 	boundaryId: string,
-	_status: 'fulfilled' | 'rejected',
+	status: 'fulfilled' | 'rejected',
 	graph: RuntimeGraph,
 	propsOrLoadSymbol?: unknown | PrerenderLoadSymbol,
+	pageBoundaryId?: string,
 ): Promise<{
 	readonly html: string;
 	readonly armRecords: ResumeArmRecordSet;
 	readonly computed: ProtocolStatePayload['computed'];
 	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
+	readonly moduleRootPath?: string;
 }> {
 	if (isPrerenderDataSurface(page)) {
 		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
 		const freshCellIds = new Set<string>();
+		const ownerName = Object.keys(page.components).find(
+			(name) => !!page.components[name]?.boundaries?.some((boundary) => boundary.boundaryId === boundaryId),
+		);
+		// A @try inside its owner's keyed rows is named by those rows; the owner stands before them.
+		const prefix = marklessInstanceSegments(pagePrefix(pageBoundaryId, boundaryId));
+		const rows = prefix.slice(prefix.length - ownRowDepth(page.renderData.chunks, boundaryId)).join('');
+		const drawnAt = pagePrefix(pageBoundaryId, rows + boundaryId);
+		const owner = branchOwnerPlacement(page, ownerName, graph);
+		if (!owner && ownerName && ownerName !== page.rootComponentName) throw unplacedOwnerError(pageBoundaryId ?? boundaryId);
 		const output = await evaluatePrerenderDataSurface(
 			page,
 			propsOrLoadSymbol,
 			graph,
 			true,
-			servedPageProps(graph),
-			{ cellIds: freshCellIds },
+			servedPageProps(graph, page, ownerName),
+			{
+				cellIds: freshCellIds,
+				rootName: owner && ownerName,
+				drawnAt,
+				...(owner && { owner }),
+				...(status === 'rejected' && { keepsShown: true as const }),
+				...(pageBoundaryId && { settling: boundaryId }),
+			},
 		);
-		const settled = await settledBoundaryResult(output, boundaryId);
+		const settled = await settledBoundaryResult(output, drawnAt + rows + boundaryId, rows + boundaryId);
 		const cells = freshArmCells(output, freshCellIds);
-		return cells.length > 0 ? { ...settled, cells } : settled;
+		return { ...settled, ...(cells.length > 0 && { cells }), ...(owner && { moduleRootPath: owner.moduleRootPath }) };
 	}
 	const output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
-	return settledBoundaryResult(output, boundaryId);
+	return settledBoundaryResult(output, pageBoundaryId ?? boundaryId, pageBoundaryId ?? boundaryId);
+}
+
+// With no placement the render starts at the module root, which draws a helper's ids, and the child state it places, from the wrong instance.
+function unplacedOwnerError(pageId: string): Error {
+	return new Error(`MARKLESS_PRERENDER_OWNER_UNPLACED: ${pageId} has no owner instance to render from`);
+}
+
+// Where the render root stands on the page: the page id of what it renders, less its own id.
+function pagePrefix(pageId: string | undefined, localId: string): string {
+	return pageId?.endsWith(localId) ? pageId.slice(0, pageId.length - localId.length) : '';
+}
+
+// How many keyed rows of its owner's own template enclose a @try, read off the render data.
+function ownRowDepth(chunks: PrerenderRenderData['chunks'], boundaryId: string): number {
+	const parents = new Map<string, { readonly chunkId: string; readonly row: boolean }>();
+	let holder: string | undefined;
+	for (const chunk of chunks)
+		for (const slot of chunk.slots) {
+			if (slot.kind === 'async' && slot.boundaryId === boundaryId) holder = chunk.id;
+			const nested =
+				slot.kind === 'repeat'
+					? [slot.rowTemplateId, slot.emptyTemplateId]
+					: slot.kind === 'branch'
+						? slot.armTemplateIds
+						: slot.kind === 'async'
+							? Object.values(slot.armTemplateIds)
+							: slot.kind === 'dynamic-host'
+								? [slot.childChunkId]
+								: slot.kind === 'child-component'
+									? [slot.projectionChunkId]
+									: [];
+			for (const id of nested)
+				if (id) parents.set(id, { chunkId: chunk.id, row: slot.kind === 'repeat' && id === slot.rowTemplateId });
+		}
+	let depth = 0;
+	for (let at = holder && parents.get(holder); at; at = parents.get(at.chunkId)) if (at.row) depth++;
+	return depth;
 }
 
 /**
@@ -374,33 +445,53 @@ export async function renderPrerenderBranch(
 	branchSiteId: string,
 	graph: RuntimeGraph,
 	propsOrLoadSymbol?: unknown | PrerenderLoadSymbol,
+	pageBranchId?: string,
+	shownAsyncArm?: (boundaryId: string) => ShownAsyncArm | undefined,
 ): Promise<{
 	readonly html: string;
 	readonly armRecords: ResumeArmRecordSet;
 	readonly computed: ProtocolStatePayload['computed'];
 	readonly cells: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
+	// Bound symbol ids are spelled from the module root, which stands here on the page.
+	readonly moduleRootPath?: string;
 }> {
 	let output: SsrRenderOutput;
+	let owner: BranchOwnerPlacement | undefined;
 	const freshCellIds = new Set<string>();
+	const drawnAt = isPrerenderDataSurface(page) ? pagePrefix(pageBranchId, branchSiteId) : '';
+	// A whole-page render spells every id from the page root, as the boundary render reads it.
+	const siteId = isPrerenderDataSurface(page) ? branchSiteId : (pageBranchId ?? branchSiteId);
 	if (isPrerenderDataSurface(page)) {
 		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
+		const ownerName = branchOwnerName(page, branchSiteId);
+		owner = branchOwnerPlacement(page, ownerName, graph);
+		if (!owner && ownerName && ownerName !== page.rootComponentName) throw unplacedOwnerError(pageBranchId ?? branchSiteId);
 		output = await evaluatePrerenderDataSurface(
 			page,
 			propsOrLoadSymbol,
 			graph,
 			true,
-			servedPageProps(graph),
-			{ branchSiteId, cellIds: freshCellIds },
+			servedPageProps(graph, page, ownerName),
+			{ branchSiteId, cellIds: freshCellIds, drawnAt, ...(owner && { owner }), shownAsyncArm },
 		);
 	} else {
 		output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
 	}
 	const records = await prepareSsrResumeRecords(output);
+	const inArm = armBranchRange(output, records.view, siteId, drawnAt);
+	const placed = owner ? { moduleRootPath: owner.moduleRootPath } : {};
+	if (inArm)
+		return {
+			...inArm,
+			computed: records.state.computed,
+			cells: freshArmCells(output, freshCellIds),
+			...placed,
+		};
 	const arm = prerenderBranchArm({
 		structure: output.structure,
-		branchSiteId,
+		branchSiteId: drawnAt + siteId,
 		// The structure's element ranges count the render's own elements; the
 		// prepared view has already shifted for the container root, so the range
 		// has to be read off the render's own locators.
@@ -412,14 +503,123 @@ export async function renderPrerenderBranch(
 		output.view?.branches as
 			| ReadonlyArray<{ readonly id: string; readonly servedArmRecords?: ResumeArmRecordSet }>
 			| undefined
-	)?.find((branch) => branch.id === branchSiteId)?.servedArmRecords;
+	)?.find((branch) => branch.id === siteId)?.servedArmRecords;
+	const range = records.view.branches?.find((candidate) => candidate.id === siteId);
+	const nested = range ? boundariesInside(records.view, range) : [];
+	const flips = range ? branchesInside(records.view, range) : [];
+	const armRecords = served ?? arm.armRecords;
 	return {
 		...arm,
-		...(served ? { armRecords: served } : {}),
+		armRecords: {
+			...armRecords,
+			...(flips.length > 0 && { branches: [...(armRecords.branches ?? []), ...flips] }),
+			...(nested.length > 0 && { asyncBoundaries: nested }),
+		},
 		computed: records.state.computed,
 		cells: freshArmCells(output, freshCellIds),
+		...placed,
 	};
 }
+
+type StructureAnchor = SsrDataStructure['anchors'][number];
+
+// A branch inside a @try arm: its records left the flat streams with that arm's, arm-relative to the @try.
+function armBranchRange(
+	output: SsrRenderOutput,
+	view: Awaited<ReturnType<typeof prepareSsrResumeRecords>>['view'],
+	branchSiteId: string,
+	drawnAt: string,
+): { readonly html: string; readonly armRecords: ResumeArmRecordSet } | undefined {
+	const anchors = (output.structure as SsrDataStructure | undefined)?.anchors ?? [];
+	const range = anchors.find(
+		(candidate) => candidate.kind === 'arm-branch' && candidate.id === drawnAt + branchSiteId,
+	);
+	if (!range) return undefined;
+	let owner: StructureAnchor | undefined;
+	for (const candidate of anchors)
+		if (
+			candidate.kind === 'async' &&
+			candidate.startIndex < range.startIndex &&
+			candidate.endIndex >= range.endIndex &&
+			candidate.startIndex > (owner?.startIndex ?? -1)
+		)
+			owner = candidate;
+	const served = view.asyncBoundaries.find((boundary) => drawnAt + boundary.id === owner?.id)?.armRecords;
+	if (!owner || !served || Array.isArray(served))
+		throw new Error(`MARKLESS_PRERENDER_BRANCH_MISSING: ${branchSiteId}`);
+	const set = served as ResumeArmRecordSet;
+	const arm = prerenderBranchArm({
+		structure: { anchors: [{ ...range, kind: 'branch' }] },
+		branchSiteId: range.id,
+		view: {
+			...set,
+			locators: set.locators.map((locator) => ({
+				...locator,
+				index: locator.index + owner.elementStart,
+			})),
+		},
+	});
+	const nested = view.asyncBoundaries
+		.filter(
+			(boundary) =>
+				boundary.startAnchor.index >= range.startIndex &&
+				boundary.endAnchor.index < range.endIndex,
+		)
+		.map(({ armRecords: own, ...boundary }) => ({
+			...boundary,
+			...(own && !Array.isArray(own) && { armRecords: own as ResumeArmRecordSet }),
+			startAnchor: {
+				...boundary.startAnchor,
+				index: boundary.startAnchor.index - range.startIndex,
+			},
+			endAnchor: {
+				...boundary.endAnchor,
+				index: boundary.endAnchor.index - range.startIndex,
+			},
+		}));
+	// Branches the range's markup holds flip inside it, so the commit wires them again.
+	const outer = new Map(anchors.map((anchor) => [anchor.id, anchor.outer]));
+	const inRange = (id: string | undefined): boolean =>
+		id !== undefined && (outer.get(id) === range.id || inRange(outer.get(id)));
+	const branches = (set.branches ?? []).filter((branch) => inRange(drawnAt + branch.id));
+	return {
+		...arm,
+		armRecords: {
+			...arm.armRecords,
+			...(branches.length > 0 && { branches }),
+			...(nested.length > 0 && { asyncBoundaries: nested }),
+		},
+	};
+}
+
+// @if and @switch blocks inside a range, outside any @try in it (whose own records carry those);
+// their comment anchors resolve by text against the committed content.
+function branchesInside(
+	view: Awaited<ReturnType<typeof prepareSsrResumeRecords>>['view'],
+	range: {
+		readonly id: string;
+		readonly startAnchor: { readonly index: number };
+		readonly endAnchor: { readonly index: number };
+	},
+): NonNullable<ResumeArmRecordSet['branches']> {
+	type Range = {
+		readonly startAnchor: { readonly index: number };
+		readonly endAnchor: { readonly index: number };
+	};
+	const within = (inner: Range, outer: Range) =>
+		inner.startAnchor.index > outer.startAnchor.index &&
+		inner.endAnchor.index < outer.endAnchor.index;
+	const boundaries = view.asyncBoundaries.filter((boundary) => within(boundary, range));
+	return (view.branches ?? []).filter(
+		(branch) =>
+			branch.id !== range.id &&
+			within(branch, range) &&
+			!boundaries.some((boundary) => within(branch, boundary)),
+	) as unknown as NonNullable<ResumeArmRecordSet['branches']>;
+}
+
+// The error each shown @catch renders, for the commit to write into its cell; it never passes through serialization.
+const caughtErrors = new WeakMap<ReadonlySet<string>, Map<string, unknown>>();
 
 // Taken before serialization: nothing in the live graph answers for a component this render is creating.
 function freshArmCells(
@@ -431,10 +631,25 @@ function freshArmCells(
 			? [
 					{
 						graphNodeId: cell.graphNodeId,
-						value: (cell as { readonly directValue?: unknown }).directValue,
+						value:
+							caughtErrors.get(freshCellIds)?.get(cell.graphNodeId) ??
+							(cell as { readonly directValue?: unknown }).directValue,
 					},
 				]
 			: [],
+	);
+}
+
+// Composition routes read the live graph, where an async value is its snapshot's `value`.
+export function runtimeEdgeProps<P extends { readonly kind?: string; readonly graphNodeId?: string; readonly path?: ReadonlyArray<string> }>(
+	props: ReadonlyArray<P>,
+	computed: ReadonlyArray<{ readonly graphNodeId: string; readonly async?: boolean }>,
+): ReadonlyArray<P> {
+	return props.map((prop) =>
+		prop.kind === 'graph-reference' &&
+		computed.some((record) => record.graphNodeId === prop.graphNodeId && record.async)
+			? { ...prop, path: ['value', ...(prop.path ?? [])] }
+			: prop,
 	);
 }
 
@@ -448,27 +663,61 @@ async function evaluatePrerenderDataSurface(
 	graph: RuntimeGraph | undefined,
 	requireHtml: boolean,
 	props: Readonly<Record<string, unknown>> = {},
-	fresh?: { readonly branchSiteId?: string; readonly cellIds: Set<string> },
+	fresh?: {
+		readonly rootName?: string | undefined;
+		readonly branchSiteId?: string;
+		readonly owner?: BranchOwnerPlacement;
+		readonly cellIds: Set<string>;
+		readonly settling?: string;
+		// Where the render root stands on the page, so its ids are spelled as the server spelled them.
+		readonly drawnAt?: string;
+		// A @catch drawn after shown @try content: the instances that content placed stay on the page.
+		readonly keepsShown?: true;
+		readonly shownAsyncArm?: (boundaryId: string) => ShownAsyncArm | undefined;
+	},
 ): Promise<SsrRenderOutput & { readonly structure?: SsrDataStructure }> {
-	const rootName = surface.rootComponentName;
+	const rootName =
+		fresh?.rootName ?? branchOwnerName(surface, fresh?.branchSiteId) ?? surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
+	const ownerPath = fresh?.owner?.ownerPath;
+	const ownerModule: PrerenderBoundModule | undefined = ownerPath
+		? { rootPrefix: '', instanceReads: new Map(), ownerPath }
+		: undefined;
+	const placed =
+		ownerModule &&
+		graph &&
+		fresh?.owner?.chain &&
+		(await import('./owner-rooted.ts')).ownerRootedRender(surface, fresh.owner, ownerModule, graph);
 	const sharedSeeds = marklessRosterPositionSeeds();
 	const mountedNow = new Set<string>();
 	const rendered = await evaluatePrerenderDataComponent({
 		surface,
 		componentName: rootName,
 		props,
-		idPrefix: '',
+		idPrefix: fresh?.drawnAt ?? '',
 		...(surface.elementIdScope ? { elementIdScope: surface.elementIdScope } : {}),
 		symbolPrefix: '',
+		...(ownerModule && { module: ownerModule }),
+		...placed,
 		loadSymbol,
 		graph,
 		requireHtml,
 		sharedSeeds,
-		...(fresh?.branchSiteId ? { freshBranchSiteId: fresh.branchSiteId } : {}),
+		...(fresh?.branchSiteId
+			? { freshBranchSiteId: fresh.branchSiteId, placingBranchSiteId: fresh.branchSiteId }
+			: {}),
 		...(fresh ? { freshCellIds: fresh.cellIds, mountedInstances: mountedNow } : {}),
+		...(fresh?.settling && { settling: fresh.settling }),
+		...(fresh?.shownAsyncArm && { shownAsyncArm: fresh.shownAsyncArm }),
 	});
-	if (fresh && graph) mountedInstances.set(graph, mountedNow);
+	if (fresh && graph) {
+		const shown = mountedInstances.get(graph);
+		if (!fresh.keepsShown) {
+			mountedInstances.set(graph, mountedNow);
+			mintedRows.delete(pageGraphOf(graph));
+		}
+		else if (shown) for (const instance of mountedNow) shown.add(instance);
+	}
 	// A count is asked before the members it counts have rendered, so the page
 	// this render produced is where it becomes a number.
 	const positions = marklessRosterPositions(sharedSeeds);
@@ -482,13 +731,37 @@ async function evaluatePrerenderDataSurface(
 	);
 }
 
+// A flip's symbol runs as the instance of the component holding the branch, not always the module root.
+function branchOwnerName(
+	surface: PrerenderDataSurface,
+	branchSiteId: string | undefined,
+): string | undefined {
+	if (!branchSiteId) return undefined;
+	return Object.keys(surface.components).find(
+		(name) => !!surface.components[name]?.branches?.some((branch) => branch.branchSiteId === branchSiteId),
+	);
+}
+
 type RosterResumeHost = {
 	readonly __marklessRosterResume?: () => Promise<typeof import('../fns/roster-resume.ts')>;
 };
 
 // The page's props were served once, as its props cell; a render in the browser reads them back from there.
-function servedPageProps(graph: RuntimeGraph): Readonly<Record<string, unknown>> {
-	return asPropsRecord(graph.read(PROTOCOL_PROPS_GRAPH_NODE_ID));
+// A composed owner's routed props are read live; `children` stays the projection markup a render is handed.
+function servedPageProps(
+	graph: ComposedBranchGraph,
+	surface?: PrerenderDataSurface,
+	owner?: string,
+): Readonly<Record<string, unknown>> {
+	const props = { ...asPropsRecord(graph.read(PROTOCOL_PROPS_GRAPH_NODE_ID)) };
+	const routed = (graph.composedGraphProps ?? []).map((route) => route.name);
+	for (const component of owner ? Object.values(surface!.components) : [])
+		for (const edge of component.edges ?? [])
+			for (const prop of edge.childComponentName === owner ? edge.props : [])
+				if (prop.kind === 'graph-reference') routed.push(prop.name);
+	for (const name of routed)
+		if (name !== 'children') props[name] = graph.read(PROTOCOL_PROPS_GRAPH_NODE_ID, [name]);
+	return props;
 }
 
 function asPropsRecord(value: unknown): Readonly<Record<string, unknown>> {
@@ -532,9 +805,10 @@ function marklessSurfaceDeclaresGraphNode(
 		if (definition.stateGraphNodeIds?.includes(graphNodeId)) return true;
 		if (definition.initialValues?.some((initial) => initial.graphNodeId === graphNodeId))
 			return true;
-		if (definition.state.cells.some((cell) => cell.graphNodeId === graphNodeId)) return true;
-		if (definition.state.computed.some((computed) => computed.graphNodeId === graphNodeId))
-			return true;
+		// A served page strips `state` from a component it only walks through; an evaluated sibling carries the module's.
+		const state = definition.state as ProtocolStatePayload | undefined;
+		if (state?.cells.some((cell) => cell.graphNodeId === graphNodeId)) return true;
+		if (state?.computed.some((computed) => computed.graphNodeId === graphNodeId)) return true;
 	}
 	return false;
 }
@@ -566,30 +840,103 @@ export function marklessBoundGraphValues(
 	return routed.size > 0 ? routed : undefined;
 }
 
+// A bound symbol spells ids from the module root, so a render rooted at a flip's owner reads them past the owner's place.
+function marklessPlacedInstanceRead(
+	module: PrerenderBoundModule,
+	placed: string,
+): PrerenderRead | undefined {
+	return module.instanceReads.get(module.rootPrefix + placed);
+}
+
 // Per live graph, the component instances its last re-render placed on the page.
 const mountedInstances = new WeakMap<RuntimeGraph, Set<string>>();
+// Rows the browser built after the last re-render, by page-space row path: what they hold is on the page too.
+const mintedRows = new WeakMap<RuntimeGraph, Set<string>>();
+const pageGraphOf = (graph: RuntimeGraph) =>
+	(graph as MarklessScopedGraph).marklessPageGraph ?? graph;
+
+export function marklessNoteMintedRow(graph: RuntimeGraph, rowSegment: string): void {
+	const page = pageGraphOf(graph);
+	let rows = mintedRows.get(page);
+	if (!rows) mintedRows.set(page, (rows = new Set()));
+	rows.add(rowSegment);
+}
+
+function inMintedRow(graph: RuntimeGraph, instancePrefix: string): boolean {
+	const rows = mintedRows.get(pageGraphOf(graph));
+	if (!rows) return false;
+	const qualify = (graph as MarklessScopedGraph).marklessQualifyGraphNodeId;
+	const pagePrefix = qualify ? qualify(instancePrefix) : instancePrefix;
+	for (const row of rows) if (pagePrefix.startsWith(row)) return true;
+	return false;
+}
 
 // An instance the last re-render did not place (or, before any, whose cells the graph holds nothing for) starts fresh.
 function marklessChildNotYetLive(
 	graph: RuntimeGraph | undefined | false,
+	surface: PrerenderDataSurface,
 	definition: PrerenderDataDefinition | undefined,
 	instancePrefix: string,
 ): boolean {
 	if (!graph || !definition) return false;
 	const mounted = mountedInstances.get(graph);
-	if (mounted) return !mounted.has(instancePrefix);
+	if (mounted && (mounted.has(instancePrefix) || !inMintedRow(graph, instancePrefix)))
+		return !mounted.has(instancePrefix);
+	const ids = instanceCellIds(surface, definition, instancePrefix, new Set());
+	return ids.length > 0 && ids.every((id) => graph.read(id) === undefined);
+}
+
+// An instance's own cells and those of the components it renders: one with no state of its own is live while a child's is.
+function instanceCellIds(
+	surface: PrerenderDataSurface,
+	definition: PrerenderDataDefinition,
+	instancePrefix: string,
+	visiting: Set<PrerenderDataDefinition>,
+): string[] {
 	const ids = [
-		...ownedStateCells(definition).map((cell) => cell.graphNodeId),
-		...(definition.propCellId ? [definition.propCellId] : []),
+		...ownedStateCells(definition).map((cell) => instancePrefix + cell.graphNodeId),
+		...(definition.propCellId ? [instancePrefix + definition.propCellId] : []),
 	];
-	return ids.length > 0 && ids.every((id) => graph.read(instancePrefix + id) === undefined);
+	if (visiting.has(definition)) return ids;
+	visiting.add(definition);
+	for (const edge of definition.edges ?? []) {
+		const childSurface = childEdgeSurface(surface, edge);
+		const child = childSurface?.components[edge.childComponentName];
+		if (child)
+			ids.push(...instanceCellIds(childSurface, child, instancePrefix + edge.symbolPrefix, visiting));
+	}
+	visiting.delete(definition);
+	return ids;
+}
+
+// Only what renders inside the settling boundary, which the render root holds, can be new: everything else is on the page.
+function settlesInside(
+	settling: string | undefined,
+	edge: { readonly asyncBoundaryId?: string },
+	parentPath: string,
+	enclosingBoundaryIds: ReadonlyArray<string> | undefined,
+): boolean {
+	return (
+		!settling ||
+		(!parentPath && (edge.asyncBoundaryId === settling || !!enclosingBoundaryIds?.includes(settling)))
+	);
 }
 
 // The cells this component declares, as against the module's whole list: the
 // producer hands every component in a module all of them.
-function ownedStateCells(
-	definition: PrerenderDataDefinition,
-): ProtocolStatePayload['cells'] {
+function ownedComputed(definition: PrerenderDataDefinition): ProtocolStatePayload['computed'] {
+	const computedIndexes = definition.stateComputedIndexes;
+	if (computedIndexes)
+		return computedIndexes.flatMap((index) =>
+			definition.state.computed[index] ? [definition.state.computed[index]!] : [],
+		);
+	const owned = new Set(definition.stateGraphNodeIds ?? []);
+	return definition.state.computed.filter(
+		(computed) => owned.size === 0 || owned.has(computed.graphNodeId),
+	);
+}
+
+function ownedStateCells(definition: PrerenderDataDefinition): ProtocolStatePayload['cells'] {
 	const cellIndexes = definition.stateCellIndexes;
 	if (cellIndexes)
 		return cellIndexes.flatMap((index) =>
@@ -599,20 +946,24 @@ function ownedStateCells(
 	return definition.state.cells.filter((cell) => owned.size === 0 || owned.has(cell.graphNodeId));
 }
 
-// A module as one render placed it: its root's prefix, each evaluated instance's reader, and the import edge an outer module claims through.
-type PrerenderBoundModule = {
+// A module as one render placed it: its root's prefix and each instance's reader, keyed by that prefix and its path from the module root.
+export type PrerenderBoundModule = {
 	readonly rootPrefix: string;
 	readonly instanceReads: Map<string, PrerenderRead>;
-	readonly outer?: {
-		readonly boundSymbols: Readonly<Record<string, string>>;
-		readonly composer: PrerenderBoundComposer;
-	} | undefined;
+	// Where this render's root stands on the page when it is not the module root: a flip renders only the branch's owner.
+	readonly ownerPath?: string;
 };
 
 export type PrerenderBoundComposer = {
 	readonly symbolPrefix: string;
+	// Reads as a compiled symbol does: an async computed's node is its snapshot.
 	readonly read: PrerenderRead;
 	readonly module?: PrerenderBoundModule;
+	// The edge that placed this composer, so a symbol its child bound rebinds once per enclosing instance.
+	readonly bound?: {
+		readonly boundSymbols: Readonly<Record<string, string>>;
+		readonly composer: PrerenderBoundComposer;
+	};
 };
 
 export function evaluatePrerenderDataComponent(input: {
@@ -647,9 +998,16 @@ export function evaluatePrerenderDataComponent(input: {
 	readonly freshInstance?: true;
 	readonly freshCellIds?: Set<string>;
 	readonly mountedInstances?: Set<string>;
+	readonly settling?: string;
 	// The branch site whose arm this render brings in, forwarded to the renderer
 	// so it can mark that arm's subtree.
 	readonly freshBranchSiteId?: string;
+	// Set through the whole render when it brings in an escalated arm, whose commit feeds the props of what it places.
+	readonly placingBranchSiteId?: string;
+	// Set on a render rooted at a flip's owner its own file places.
+	readonly placedAbove?: OwnerRootedRender['placedAbove'];
+	// The arm the live page shows for a @try, by its page id.
+	readonly shownAsyncArm?: (boundaryId: string) => ShownAsyncArm | undefined;
 }): Awaitable<
 	SsrRenderOutput & {
 		// The render-data path emits the full ssr-data structure, not just anchors.
@@ -692,10 +1050,13 @@ export function evaluatePrerenderDataComponent(input: {
 					.filter((graphNodeId) => !freshOwnCellIds?.has(graphNodeId)),
 			)
 		: undefined;
-	// The live graph holds a composed instance's own cells under its instance path.
+	// The live graph holds a composed instance's own cells and derives under its instance path.
 	const instanceCellIds =
 		input.graph && input.symbolPrefix
-			? new Set(ownedStateCells(definition).map((cell) => cell.graphNodeId))
+			? new Set([
+					...ownedStateCells(definition).map((cell) => cell.graphNodeId),
+					...ownedComputed(definition).map((computed) => computed.graphNodeId),
+				])
 			: undefined;
 	const readAt = (
 		graphNodeId: string,
@@ -729,11 +1090,13 @@ export function evaluatePrerenderDataComponent(input: {
 			)
 				? ['value', ...path]
 				: path;
-		if (input.graph)
-			return input.graph.read(
-				instanceCellIds?.has(graphNodeId) ? input.symbolPrefix + graphNodeId : graphNodeId,
-				graphPath,
-			);
+		const graph = input.graph;
+		if (graph) {
+			const id = instanceCellIds?.has(graphNodeId) ? input.symbolPrefix + graphNodeId : graphNodeId;
+			// Markup lands on the page, so it reads a state a save's hold shows as the page paints it.
+			const hold = graph.paintHold?.();
+			return hold ? hold.asShown(() => graph.read(id, graphPath)) : graph.read(id, graphPath);
+		}
 		if (input.boundGraphValues?.has(graphNodeId))
 			return readPath(input.boundGraphValues.get(graphNodeId), path);
 		return readPath(values.get(graphNodeId), path);
@@ -746,9 +1109,11 @@ export function evaluatePrerenderDataComponent(input: {
 	const ownModule: PrerenderBoundModule = input.module ?? {
 		rootPrefix: input.symbolPrefix,
 		instanceReads: input.composer?.module?.instanceReads ?? new Map(),
-		outer: input.composer && input.boundSymbols && { boundSymbols: input.boundSymbols, composer: input.composer },
 	};
-	ownModule.instanceReads.set(input.symbolPrefix, read);
+	ownModule.instanceReads.set(
+		ownModule.rootPrefix + (ownModule.ownerPath ?? '') + input.symbolPrefix.slice(ownModule.rootPrefix.length),
+		symbolRead,
+	);
 	// A part may derive where it stands in its family's roster. First paint has no
 	// DOM, so the answer is the order this widget instance emits its members.
 	// A row minted after resume is its own small render, with no page seeds to
@@ -770,13 +1135,20 @@ export function evaluatePrerenderDataComponent(input: {
 		// derive reaches it unbound and dies on the capture context it never got.
 		if (!marklessOwnsDerivedNode(input.surface, input.componentName, initial.graphNodeId))
 			return undefined;
+		// Component-body code: a live cell's initializer never runs again.
+		if (liveCellIds?.has(initial.graphNodeId)) return undefined;
+		if (asyncPlanes.awaits?.(definition.state, initial.graphNodeId, symbolRead))
+			return undefined;
 		const symbolId = symbolValue.symbolId;
 		const initializer = definition.initializerResidues?.[symbolId];
 		if (initializer && definition.readResidue) {
-			values.set(initial.graphNodeId, definition.readResidue(
-				{ kind: 'authored-expression', source: initializer },
-				{ read },
-			));
+			values.set(
+				initial.graphNodeId,
+				definition.readResidue(
+					{ kind: 'authored-expression', source: initializer },
+					{ read },
+				),
+			);
 			return undefined;
 		}
 
@@ -787,32 +1159,53 @@ export function evaluatePrerenderDataComponent(input: {
 				: undefined;
 		let boundSymbolId = input.boundSymbols?.[symbolId];
 		let composer = input.composer;
-		// An outer module that claimed the row again, through a prop its slot passed through, binds it there.
-		for (let outer = composer?.module?.outer; outer && boundSymbolId; outer = composer?.module?.outer) {
+		// Each enclosing edge, in this module or an outer one, binds the row again for its own instance.
+		for (let outer = composer?.bound; outer && boundSymbolId; outer = composer?.bound) {
 			const rebound = marklessReboundSymbolId(outer.boundSymbols, boundSymbolId);
 			if (!rebound) break;
 			boundSymbolId = rebound;
 			composer = outer.composer;
 		}
 		const scope = composer;
+		// A route spells another instance without rows; this derive's own place supplies the rows it sits in.
+		const rows =
+			boundSymbolId && scope?.module
+				? marklessRecordRowScope(
+						(scope.module.ownerPath ?? '') +
+							input.symbolPrefix.slice(scope.module.rootPrefix.length),
+					)
+				: undefined;
 		// Slot routes name the composer's nodes bare and any other instance by its path in the module; a minted row knows only its composer.
 		const deriveRead: PrerenderRead =
 			boundSymbolId && scope
 				? (graphNodeId, path) => {
 						const at = marklessInstancePath(graphNodeId),
 							local = graphNodeId.slice(at.length),
-							holder = at ? scope.module?.instanceReads.get(scope.module.rootPrefix + at) : scope.read;
+							placed =
+								rows?.find((pair) => !pair.rowBoundary && pair.rowFree === at)
+									?.withRows ?? at,
+							holder = at
+								? scope.module && marklessPlacedInstanceRead(scope.module, placed)
+								: scope.read;
 						if (holder) return holder(local, path);
-						const own = read(graphNodeId, path);
-						return own === undefined && scope.symbolPrefix.endsWith(at) ? scope.read(local, path) : own;
+						const own = symbolRead(graphNodeId, path);
+						return own === undefined && scope.symbolPrefix.endsWith(at)
+							? scope.read(local, path)
+							: own;
 					}
 				: symbolRead;
 		return marklessThen(
 			linkedInitializer ??
 				(input.loadSymbol(
 					boundSymbolId
-						? (composer?.symbolPrefix ?? '') + boundSymbolId
-						: marklessRowFreeSymbolId(input.symbolPrefix + symbolId, input.symbolPrefix),
+						? marklessRowFreeSymbolId(
+								(composer?.symbolPrefix ?? '') + boundSymbolId,
+								composer?.symbolPrefix ?? '',
+							)
+						: marklessRowFreeSymbolId(
+								input.symbolPrefix + symbolId,
+								input.symbolPrefix,
+							),
 				) as Awaitable<unknown>),
 			(loaded) => {
 				if (typeof loaded !== 'function') {
@@ -826,9 +1219,12 @@ export function evaluatePrerenderDataComponent(input: {
 								...(definition.propCaptures && {
 									capture: {
 										read: (slotId: string) => {
-											const [name, ...path] = definition.propCaptures![slotId] ?? [];
+											const [name, ...path] =
+												definition.propCaptures![slotId] ?? [];
 											if (name === undefined)
-												throw new Error(`MARKLESS_PRERENDER_CAPTURE_UNBOUND: ${slotId}`);
+												throw new Error(
+													`MARKLESS_PRERENDER_CAPTURE_UNBOUND: ${slotId}`,
+												);
 											return readPath(input.props[name], path);
 										},
 									},
@@ -853,11 +1249,19 @@ export function evaluatePrerenderDataComponent(input: {
 						{
 							...computed,
 							...(computed.deriveSymbolId
-								? { deriveSymbolId: marklessBoundSymbolId(input, computed.deriveSymbolId) }
+								? {
+										deriveSymbolId: marklessBoundSymbolId(
+											{ ...input, boundSymbolPrefix: input.composer?.module?.rootPrefix },
+											computed.deriveSymbolId,
+										),
+									}
 								: {}),
 							value: values.get(computed.graphNodeId),
 							dependencies: (computed.dependencies ?? []).map((dependency) => {
-								const mapped = marklessCsrRemapChildGraph(dependency, input.graphProps);
+								const mapped = marklessCsrRemapChildGraph(
+									dependency,
+									input.graphProps,
+								);
 								return mapped ?? dependency;
 							}),
 						},
@@ -865,353 +1269,440 @@ export function evaluatePrerenderDataComponent(input: {
 				}),
 			),
 			() => {
-
-			const owned = new Set(definition.stateGraphNodeIds ?? []);
-			const servedComputed = new Set(
-				(definition.servedComputedIndexes ?? []).flatMap((index) => {
-					const computed = definition.state.computed[index];
-					return computed ? [computed.graphNodeId] : [];
-				}),
-			);
-			const computedIndexes = definition.stateComputedIndexes;
-			const ownedCells = ownedStateCells(definition);
-			const ownedComputed = computedIndexes
-				? computedIndexes.flatMap((index) =>
-						definition.state.computed[index] ? [definition.state.computed[index]!] : [],
-					)
-				: definition.state.computed.filter(
-						(computed) => owned.size === 0 || owned.has(computed.graphNodeId),
-					);
-			const state: ProtocolStatePayload = {
-				...structuredClone(definition.state),
-				cells: ownedCells
-					.map((cell) =>
+				const servedComputed = new Set(
+					(definition.servedComputedIndexes ?? []).flatMap((index) => {
+						const computed = definition.state.computed[index];
+						return computed ? [computed.graphNodeId] : [];
+					}),
+				);
+				const ownedCells = ownedStateCells(definition);
+				const state: ProtocolStatePayload = {
+					...structuredClone(definition.state),
+					cells: ownedCells.map((cell) =>
 						values.has(cell.graphNodeId)
-							? { ...cell, value: undefined, directValue: values.get(cell.graphNodeId) }
+							? {
+									...cell,
+									value: undefined,
+									directValue: values.get(cell.graphNodeId),
+								}
 							: { ...cell },
 					),
-				computed: ownedComputed
-					.map((computed) =>
+					computed: ownedComputed(definition).map((computed) =>
 						computed.async
 							? {
 									...computed,
+									// An instance an arm places has not loaded: the graph still holds the closed one's at this path.
 									snapshot: input.graph
-										? (input.graph.read(computed.graphNodeId, []) as never)
+										? input.freshInstance && input.placingBranchSiteId
+											? undefined
+											: (input.graph.read(input.symbolPrefix + computed.graphNodeId, []) as never)
 										: {
 												status: 'pending' as const,
 												version: 1,
 												key: SERIALIZED_NULL_GRAPH_PAYLOAD,
 											},
 								}
-							: servedComputed.has(computed.graphNodeId) && values.has(computed.graphNodeId)
+							: servedComputed.has(computed.graphNodeId) &&
+								  values.has(computed.graphNodeId)
 								? { ...computed, directValue: values.get(computed.graphNodeId) }
 								: computed,
 					),
-			};
-			const seeds = definition.stateSharedSeedIndexes;
-			if (seeds)
-				(state as SeedSelection).sharedSeeds = seeds.map((at) => state.sharedSeeds![at]!);
-			if (definition.propCellId) {
-				const propCell = state.cells.find((cell) => cell.graphNodeId === definition.propCellId);
-				if (propCell) Object.assign(propCell, { value: undefined, directValue: input.props });
-				else
-					(state.cells as Array<ProtocolStatePayload['cells'][number]>).push({
-						graphNodeId: definition.propCellId,
-						name: 'props',
-						valueKind: 'object',
-						directValue: input.props,
-					});
-			}
-			// An arm test or child prop the compiler could not reduce to a graph read is
-			// an authored expression, answered by the same compiled reader as markup
-			// residue. It decides what renders, so it runs even when the HTML is dropped.
-			// The row a decision is evaluated inside is part of the answer: a child prop or
-			// arm test written over the `@for` binding reads it from this context.
-			const readDecision = (source: string | undefined, context: SsrDataReadContext) =>
-				source &&
-				definition.readResidue?.(
-					{ kind: 'authored-expression', source },
-					{
-						repeatItem: context.repeatItem,
-						repeatIndex: context.repeatIndex,
-						repeatId: context.repeatId,
-						repeatOuter: context.repeatOuter,
-						read,
-						idPrefix: input.idPrefix,
-					},
-				);
-			const children: Array<MarklessSsrComposedChild> = [];
-			const branches: Array<{ readonly id: string; readonly takenArm: number }> = [];
-			const asyncSnapshots = state.computed.flatMap((computed) =>
-				computed.async && computed.snapshot
-					? [{ graphNodeId: computed.graphNodeId, snapshot: computed.snapshot }]
-					: [],
-			);
-			const renderData = {
-				...input.surface.renderData,
-				root: { componentName: input.componentName, templateId: definition.rootChunkId },
-				chunks: input.surface.renderData.chunks.filter(
-					(chunk) => chunk.componentName === input.componentName,
-				),
-				branches: definition.branches ?? [],
-				boundaries: definition.boundaries ?? [],
-			};
-			return marklessThen(
-				renderSsrData({
-					renderData,
-					idPrefix: input.idPrefix,
-					projectionSegment: definition.rowHosts?.segment,
-					...(input.freshBranchSiteId ? { freshBranchSiteId: input.freshBranchSiteId } : {}),
-					sharedSeeds: input.sharedSeeds,
-					read: (residue, context) => {
-						if (residue.kind === 'repeat-item') return readPath(context.repeatItem, residue.path);
-						if (residue.kind === 'graph-read') return read(residue.graphNodeId, residue.path);
-						// Initial wake consumes only the reconstructed state/view records. Its
-						// rendered HTML is discarded because the prerendered DOM is already live,
-						// so authored markup residue is not a dependency of record reconstruction.
-						// Skipping the reader here also keeps authored side effects single-run.
-						if (!input.requireHtml) return '';
-						if (definition.readResidue)
-							return definition.readResidue(residue, {
-								repeatItem: context.repeatItem,
-								repeatIndex: context.repeatIndex,
-								repeatId: context.repeatId,
-								repeatOuter: context.repeatOuter,
-								asyncError: context.asyncError,
-								read,
-								idPrefix: input.idPrefix,
-								elementIdScope: input.elementIdScope,
-								deferCount: rosterPositionContext.deferCount,
-							});
-						throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING');
-					},
-					selectBranchArm: (slot, context) => {
-						const branch = (definition.branches ?? []).find(
-							(candidate) => candidate.branchSiteId === slot.branchSiteId,
-						);
-						const testRead = branch?.testReads?.length === 1 ? branch.testReads[0] : undefined;
-						const value = testRead
-							? read(testRead.graphNodeId, testRead.path)
-							: readDecision(branch?.testSource, context);
-						let arm = value ? 0 : 1;
-						if (branch?.armTests) {
-							const match = branch.armTests.findIndex(
-								(candidate) => candidate !== null && Object.is(candidate, value),
-							);
-							arm = match >= 0 ? match : branch.armTests.indexOf(null);
-						}
-						branches.push({
-							id: slot.branchSiteId,
-							takenArm: arm,
-							...branchArmIdrefResolution(
-								renderData.chunks,
-								slot.armTemplateIds,
-								input.idPrefix,
-								(handleGraphNodeId) =>
-									definition.readResidue?.(
-										{ kind: 'element-handle-id', handleGraphNodeId },
-										{ read, idPrefix: input.idPrefix, elementIdScope: input.elementIdScope },
-									),
-							),
+				};
+				const seeds = definition.stateSharedSeedIndexes;
+				if (seeds)
+					(state as SeedSelection).sharedSeeds = seeds.map(
+						(at) => state.sharedSeeds![at]!,
+					);
+				if (definition.propCellId) {
+					const propCell = state.cells.find(
+						(cell) => cell.graphNodeId === definition.propCellId,
+					);
+					if (propCell) Object.assign(propCell, { value: undefined, directValue: input.props });
+					else
+						(state.cells as Array<ProtocolStatePayload['cells'][number]>).push({
+							graphNodeId: definition.propCellId,
+							name: 'props',
+							valueKind: 'object',
+							directValue: input.props,
 						});
-						return arm;
+				}
+				// An arm test or child prop the compiler could not reduce to a graph read is
+				// an authored expression, answered by the same compiled reader as markup
+				// residue. It decides what renders, so it runs even when the HTML is dropped.
+				// The row a decision is evaluated inside is part of the answer: a child prop or
+				// arm test written over the `@for` binding reads it from this context.
+				const readDecision = (source: string | undefined, context: SsrDataReadContext) =>
+					source &&
+					definition.readResidue?.(
+						{ kind: 'authored-expression', source },
+						{
+							repeatItem: context.repeatItem,
+							repeatIndex: context.repeatIndex,
+							repeatId: context.repeatId,
+							repeatOuter: context.repeatOuter,
+							read,
+							idPrefix: input.idPrefix,
+						},
+					);
+				const children: Array<MarklessSsrComposedChild> = [];
+				const branches: Array<{ readonly id: string; readonly takenArm: number }> = [];
+				const asyncSnapshots = state.computed.flatMap((computed) =>
+					computed.async && computed.snapshot
+						? [{ graphNodeId: computed.graphNodeId, snapshot: computed.snapshot }]
+						: [],
+				);
+				const renderData = {
+					...input.surface.renderData,
+					root: {
+						componentName: input.componentName,
+						templateId: definition.rootChunkId,
 					},
-					selectAsyncArm: (slot) => {
-						const boundary = (definition.boundaries ?? []).find(
-							(candidate) => candidate.boundaryId === slot.boundaryId,
-						);
-						const status = boundary?.runnerGraphNodeId
-							? runnerStatus(boundary.runnerGraphNodeId, state.computed)
-							: undefined;
-						if (status === 'rejected')
-							return { arm: 2, error: runnerError(boundary!.runnerGraphNodeId!, state.computed) };
-						return status === 'fulfilled' ? 0 : 1;
-					},
-					seedChild: (slot, context) =>
-						marklessRosterSeedPass(context.sharedSeeds, () =>
-							sharedSeedPass()?.(
-								{
-									...input,
-									// Seeds load by compile-time symbol id; the row reaches them as identity.
-									symbolPrefix: marklessRowFreeSymbolId(input.symbolPrefix, input.symbolPrefix),
-									rowSegment:
-										context.repeatKey === undefined ? '' : marklessRowSegment(context.repeatKey),
-									readEdgeProp: (prop) => readDecision(prop.source, context),
-								},
-								definition,
-								slot,
-								read,
-								context.sharedSeeds,
-							),
-						),
-					renderChild: (slot, context) => {
-						const edge = (definition.edges ?? []).find(
-							(candidate) => candidate.id === slot.componentEdgeId,
-						);
-						if (!edge) throw new Error(`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`);
-						// One compile-time edge inside a keyed `@for` is many instances at render time.
-						const rowSegment = context.repeatKey === undefined ? '' : marklessRowSegment(context.repeatKey);
-						const hostPrefix = rowSegment + edge.hostPrefix;
-						const symbolPrefix = rowSegment + edge.symbolPrefix;
-						if (edge.materialized) {
-							const materialized = placeMaterializedChild(
-								edge.materialized,
-								input.idPrefix + hostPrefix,
-							);
-							children.push({
-								output: materialized as SsrComposableChildOutput,
-								hostPrefix,
-								symbolPrefix,
-								graphProps: edge.props,
-								asyncBoundaryId: edge.asyncBoundaryId,
-								boundSymbols: edge.boundSymbols ?? {},
-								callbackProps: {},
-							});
-							return materialized;
-						}
-						const childProps: Record<string, unknown> = {};
-						const callbacks: Record<string, string> = {};
-						for (const prop of edge.props) {
-							if (prop.kind === 'spread' && prop.graphNodeId) {
-								Object.assign(
-									childProps,
-									marklessSsrSpreadProps(read(prop.graphNodeId, prop.path ?? []), prop.excludeNames),
-								);
-							} else if (prop.kind === 'graph-reference' && prop.graphNodeId) {
-								childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
-								const forwarded = forwardedCallback(
-									input.props,
-									definition.propCellId,
-									prop.graphNodeId,
-									prop.path,
-								);
-								if (forwarded) callbacks[prop.name] = forwarded;
-							} else if (
-								prop.kind === 'element-handle-id' &&
-								prop.graphNodeId &&
-								definition.readResidue
-							) {
-								// The element this IDREF names is rendered by THIS component, so this
-								// render spells the id and the child receives a string. The same
-								// compiled reader that writes the id onto that element answers here,
-								// so the two sides of the relationship cannot disagree.
-								childProps[prop.name] = definition.readResidue(
-									{ kind: 'element-handle-id', handleGraphNodeId: prop.graphNodeId },
-									{ read, idPrefix: input.idPrefix, elementIdScope: input.elementIdScope },
-								);
-							} else if (prop.kind === 'absent') {
-								childProps[prop.name] = undefined;
-							} else if (prop.kind === 'serializable' && 'value' in prop) {
-								childProps[prop.name] = prop.value;
-							} else if (prop.kind === 'callback') {
-								const symbolId = edge.boundSymbols?.[prop.name] ?? prop.symbolId;
-								if (symbolId) callbacks[prop.name] = input.symbolPrefix + symbolId;
-							} else if (prop.source !== undefined && definition.readResidue) {
-								childProps[prop.name] = readDecision(prop.source, context);
-							} else {
-								throw new Error(`MARKLESS_PRERENDER_PROP_UNDERIVABLE: ${prop.name}`);
-							}
-						}
-						if (context.projectionHtml !== undefined) {
-							childProps.children = context.projectionHtml;
-						}
-						if (Object.keys(callbacks).length > 0) childProps.__marklessSsrCallbacks = callbacks;
-						const childSurface = input.surface.components[edge.childComponentName]
-							? input.surface
-							: input.surface.imports[edge.childComponentName];
-						if (!childSurface) {
-							throw new Error(
-								`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${edge.childComponentName}`,
-							);
-						}
-						input.mountedInstances?.add(input.symbolPrefix + symbolPrefix);
-						return marklessThen(
-							evaluatePrerenderDataComponent({
-								surface: childSurface,
-								componentName: edge.childComponentName,
-								props: childProps,
-								idPrefix: input.idPrefix + hostPrefix,
-								elementIdScope: input.elementIdScope,
-								symbolPrefix: input.symbolPrefix + symbolPrefix,
-								boundSymbols: edge.boundSymbols,
-								composer: { symbolPrefix: input.symbolPrefix, read, module: ownModule },
-								...(childSurface === input.surface ? { module: ownModule } : {}),
-								graphProps: edge.props,
-								loadSymbol: input.loadSymbol,
-								graph: input.graph,
-								requireHtml: input.requireHtml,
-								sharedSeeds: context.sharedSeeds,
-								boundGraphValues: marklessBoundGraphValues(
-									input.boundGraphValues,
-									childSurface,
-									edge.props,
+					chunks: input.surface.renderData.chunks.filter(
+						(chunk) => chunk.componentName === input.componentName,
+					),
+					branches: definition.branches ?? [],
+					boundaries: definition.boundaries ?? [],
+				};
+				return marklessThen(
+					renderSsrData({
+						renderData,
+						attributeName: definition.attributeName,
+						idPrefix: input.idPrefix,
+						projectionSegment: definition.rowHosts?.segment,
+						rowSegment: marklessRowPath,
+						...(input.freshBranchSiteId
+							? { freshBranchSiteId: input.freshBranchSiteId }
+							: {}),
+						sharedSeeds: input.sharedSeeds,
+						read: (residue, context) => {
+							if (residue.kind === 'repeat-item')
+								return readPath(context.repeatItem, residue.path);
+							if (residue.kind === 'graph-read')
+								return read(residue.graphNodeId, residue.path);
+							// Initial wake consumes only the reconstructed state/view records. Its
+							// rendered HTML is discarded because the prerendered DOM is already live,
+							// so authored markup residue is not a dependency of record reconstruction.
+							// Skipping the reader here also keeps authored side effects single-run.
+							if (!input.requireHtml) return '';
+							if (definition.readResidue)
+								return definition.readResidue(residue, {
+									repeatItem: context.repeatItem,
+									repeatIndex: context.repeatIndex,
+									repeatId: context.repeatId,
+									repeatOuter: context.repeatOuter,
+									asyncError: context.asyncError,
 									read,
+									idPrefix: input.idPrefix,
+									elementIdScope: input.elementIdScope,
+									deferCount: rosterPositionContext.deferCount,
+								});
+							throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING');
+						},
+						selectBranchArm: (slot, context) => {
+							const branch = (definition.branches ?? []).find(
+								(candidate) => candidate.branchSiteId === slot.branchSiteId,
+							);
+							const testRead =
+								branch?.testReads?.length === 1 ? branch.testReads[0] : undefined;
+							const value = testRead
+								? read(testRead.graphNodeId, testRead.path)
+								: readDecision(branch?.armIndexSource ?? branch?.testSource, context);
+							let arm = value ? 0 : 1;
+							if (branch?.armTests) {
+								const match = branch.armTests.findIndex(
+									(candidate) =>
+										candidate !== null && Object.is(candidate, value),
+								);
+								arm = match >= 0 ? match : branch.armTests.indexOf(null);
+							}
+							branches.push({
+								id: slot.branchSiteId,
+								takenArm: arm,
+								...branchArmIdrefResolution(
+									renderData.chunks,
+									slot.armTemplateIds,
+									input.idPrefix,
+									(handleGraphNodeId) =>
+										definition.readResidue?.(
+											{ kind: 'element-handle-id', handleGraphNodeId },
+											{
+												read,
+												idPrefix: input.idPrefix,
+												elementIdScope: input.elementIdScope,
+											},
+										),
 								),
-								...(input.freshInstance ||
-								context.freshInstances ||
-								marklessChildNotYetLive(
-									input.freshCellIds && input.graph,
-									childSurface.components[edge.childComponentName],
-									input.symbolPrefix + symbolPrefix,
-								)
-									? { freshInstance: true as const }
-									: {}),
-								...(input.freshCellIds ? { freshCellIds: input.freshCellIds } : {}),
-								...(input.mountedInstances ? { mountedInstances: input.mountedInstances } : {}),
-							}),
-							(output) => {
+							});
+							return arm;
+						},
+						selectAsyncArm: (slot, context) => {
+							const boundary = (definition.boundaries ?? []).find(
+								(candidate) => candidate.boundaryId === slot.boundaryId,
+							);
+							const runner = boundary?.runnerGraphNodeId;
+							let status = runner ? runnerStatus(runner, state.computed) : undefined;
+							// While its value loads, a @try already on the page draws the arm the page shows; one this render brings in shows an answer kept for its key.
+							if (status === 'pending') {
+								const shown =
+									input.freshInstance || context.freshInstances
+										? undefined
+										: input.shownAsyncArm?.(input.idPrefix + slot.boundaryId);
+								if (shown !== undefined) return shown;
+								status = runnerStatus(runner!, state.computed, true);
+							}
+							if (status === 'rejected') {
+								const error = runnerError(boundary!.runnerGraphNodeId!, state.computed);
+								const shown = boundary!.errorGraphNodeId;
+								const fresh = input.freshCellIds;
+								if (shown && fresh) {
+									fresh.add(input.symbolPrefix + shown);
+									caughtErrors.set(fresh, (caughtErrors.get(fresh) ?? new Map()).set(input.symbolPrefix + shown, error));
+								}
+								return { arm: ASYNC_BOUNDARY_ARM.catch, error };
+							}
+							return status === 'fulfilled' ? ASYNC_BOUNDARY_ARM.try : ASYNC_BOUNDARY_ARM.pending;
+						},
+						seedChild: (slot, context) =>
+							marklessRosterSeedPass(context.sharedSeeds, () =>
+								sharedSeedPass()?.(
+									{
+										...input,
+										// Seeds load by compile-time symbol id; the row reaches them as identity.
+										symbolPrefix: marklessRowFreeSymbolId(
+											input.symbolPrefix,
+											input.symbolPrefix,
+										),
+										rowSegment: marklessRowPath(context) ?? '',
+										readEdgeProp: (prop) => readDecision(prop.source, context),
+									},
+									definition,
+									slot,
+									read,
+									context.sharedSeeds,
+								),
+							),
+						renderChild: (slot, context) => {
+							const edge = (definition.edges ?? []).find(
+								(candidate) => candidate.id === slot.componentEdgeId,
+							);
+							if (!edge)
+								throw new Error(
+									`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`,
+								);
+							const boundSymbols = input.placedAbove ? input.placedAbove(edge.boundSymbols) : edge.boundSymbols;
+							// One compile-time edge inside a keyed `@for` is many instances at render time.
+							const rowSegment = marklessRowPath(context) ?? '';
+							const hostPrefix = rowSegment + edge.hostPrefix;
+							const symbolPrefix = rowSegment + edge.symbolPrefix;
+							if (edge.materialized) {
+								const materialized = placeMaterializedChild(
+									edge.materialized,
+									input.idPrefix + hostPrefix,
+								);
 								children.push({
-									output: output as SsrComposableChildOutput,
+									output: materialized as SsrComposableChildOutput,
 									hostPrefix,
 									symbolPrefix,
-									graphProps: edge.props,
-									asyncBoundaryId: edge.asyncBoundaryId,
-									boundSymbols: edge.boundSymbols ?? {},
-									callbackProps: callbacks,
-									// Where this child's own composition puts the children written into it,
-									// so composition can register the widget a projected part sits beside.
-									childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
-										childSurface,
-										edge.childComponentName,
-									),
-									widgetFallbacks: sharedSeedPass()?.widgetFallbacks?.(
-										childSurface,
-										edge.childComponentName,
-									),
+									graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
+									...asyncArmPlacement(edge),
+									boundSymbols: boundSymbols ?? {},
+									callbackProps: {},
 								});
-								return output;
-							},
-						);
-					},
-				}),
-				(rendered) => {
-					const view = structuredClone(definition.view) as SsrComposableView;
-					const composition = marklessSsrComposeView(
-						rendered.structure,
-						definition.rowHosts?.qualify(rendered.structure, view, input.idPrefix) ?? view,
-						children,
-						asyncSnapshots,
-						input.idPrefix,
-					);
-					const output = {
-						html: rendered.html,
-						state: marklessSsrAttachSnapshots(marklessComposeState(state, children), asyncSnapshots),
-						view: {
-							...composition.view,
-							branches: marklessSsrMergeBranches(composition.view.branches, branches),
-						} as unknown as import('@markless/serializer').ProtocolViewPayload,
-						structure: rendered.structure,
-						structureTokens: rendered.structureTokens,
-						elementCount: composition.elementCount,
-						propEvents: definition.propEvents ?? [],
-						externalSymbolIds: composition.externalSymbolIds,
-						m(graphProps: ComposeGraphProps, instancePath?: string) {
-							marklessSsrRemapGraphOutput(output, graphProps, instancePath);
+								return materialized;
+							}
+							const childProps: Record<string, unknown> = {};
+							const callbacks: Record<string, string> = {};
+							for (const prop of edge.props) {
+								if (prop.kind === 'spread' && prop.graphNodeId) {
+									Object.assign(
+										childProps,
+										marklessSsrSpreadProps(
+											read(prop.graphNodeId, prop.path ?? []),
+											prop.excludeNames,
+										),
+									);
+								} else if (prop.kind === 'graph-reference' && prop.graphNodeId) {
+									childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
+									const forwarded = forwardedCallback(
+										input.props,
+										definition.propCellId,
+										prop.graphNodeId,
+										prop.path,
+									);
+									if (forwarded) callbacks[prop.name] = forwarded;
+								} else if (
+									prop.kind === 'element-handle-id' &&
+									prop.graphNodeId &&
+									definition.readResidue
+								) {
+									// The element this IDREF names is rendered by THIS component, so this
+									// render spells the id and the child receives a string. The same
+									// compiled reader that writes the id onto that element answers here,
+									// so the two sides of the relationship cannot disagree.
+									childProps[prop.name] = definition.readResidue(
+										{
+											kind: 'element-handle-id',
+											handleGraphNodeId: prop.graphNodeId,
+										},
+										{
+											read,
+											idPrefix: input.idPrefix,
+											elementIdScope: input.elementIdScope,
+										},
+									);
+								} else if (prop.kind === 'absent') {
+									childProps[prop.name] = undefined;
+								} else if (prop.kind === 'serializable' && 'value' in prop) {
+									childProps[prop.name] = prop.value;
+								} else if (prop.kind === 'callback') {
+									const symbolId =
+										edge.boundSymbols?.[prop.name] ?? prop.symbolId;
+									if (symbolId)
+										callbacks[prop.name] = input.symbolPrefix + symbolId;
+								} else if (prop.source !== undefined && definition.readResidue) {
+									childProps[prop.name] = readDecision(prop.source, context);
+								} else {
+									throw new Error(
+										`MARKLESS_PRERENDER_PROP_UNDERIVABLE: ${prop.name}`,
+									);
+								}
+							}
+							if (context.projectionHtml !== undefined) {
+								childProps.children = context.projectionHtml;
+							}
+							if (Object.keys(callbacks).length > 0)
+								childProps.__marklessSsrCallbacks = callbacks;
+							const childSurface = childEdgeSurface(input.surface, edge);
+							if (!childSurface) {
+								throw new Error(
+									`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${edge.childComponentName}`,
+								);
+							}
+							input.mountedInstances?.add(input.symbolPrefix + symbolPrefix);
+							return marklessThen(
+								evaluatePrerenderDataComponent({
+									surface: childSurface,
+									componentName: edge.childComponentName,
+									props: childProps,
+									idPrefix: input.idPrefix + hostPrefix,
+									elementIdScope: input.elementIdScope,
+									symbolPrefix: input.symbolPrefix + symbolPrefix,
+									boundSymbols: edge.boundSymbols,
+									composer: {
+										symbolPrefix: input.symbolPrefix,
+										read: symbolRead,
+										module: ownModule,
+										bound: input.composer &&
+											input.boundSymbols && {
+												boundSymbols: input.boundSymbols,
+												composer: input.composer,
+											},
+									},
+									...(childSurface === input.surface
+										? { module: ownModule }
+										: {}),
+									graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
+									loadSymbol: input.loadSymbol,
+									graph: input.graph,
+									requireHtml: input.requireHtml,
+									sharedSeeds: context.sharedSeeds,
+									boundGraphValues: marklessBoundGraphValues(
+										input.boundGraphValues,
+										childSurface,
+										edge.props,
+										read,
+									),
+									...(input.freshInstance ||
+									context.freshInstances ||
+									(marklessChildNotYetLive(
+										input.freshCellIds && input.graph,
+										childSurface,
+										childSurface.components[edge.childComponentName],
+										input.symbolPrefix + symbolPrefix,
+									) &&
+										settlesInside(
+											input.settling,
+											edge,
+											input.symbolPrefix,
+											context.enclosingBoundaryIds,
+										))
+										? { freshInstance: true as const }
+										: {}),
+									...(input.settling && { settling: input.settling }),
+									...(input.freshCellIds
+										? { freshCellIds: input.freshCellIds }
+										: {}),
+									...(input.placingBranchSiteId && {
+										placingBranchSiteId: input.placingBranchSiteId,
+									}),
+									...(input.shownAsyncArm && { shownAsyncArm: input.shownAsyncArm }),
+									...(input.mountedInstances
+										? { mountedInstances: input.mountedInstances }
+										: {}),
+								}),
+								(output) => {
+									children.push({
+										output: output as SsrComposableChildOutput,
+										hostPrefix,
+										symbolPrefix,
+										graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
+										...asyncArmPlacement(edge),
+										boundSymbols: boundSymbols ?? {},
+										callbackProps: callbacks,
+										// Where this child's own composition puts the children written into it,
+										// so composition can register the widget a projected part sits beside.
+										childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
+											childSurface,
+											edge.childComponentName,
+										),
+										widgetFallbacks: sharedSeedPass()?.widgetFallbacks?.(
+											childSurface,
+											edge.childComponentName,
+										),
+									});
+									return output;
+								},
+							);
 						},
-					};
-				return output;
-				},
-			);
+					}),
+					(rendered) => {
+						const view = structuredClone(definition.view) as SsrComposableView;
+						const composition = marklessSsrComposeView(
+							rendered.structure,
+							definition.rowHosts?.qualify(
+								rendered.structure,
+								view,
+								input.idPrefix,
+							) ?? view,
+							children,
+							asyncSnapshots,
+							input.idPrefix,
+						);
+						const output = {
+							html: rendered.html,
+							state: marklessSsrAttachSnapshots(
+								marklessComposeState(state, children),
+								asyncSnapshots,
+							),
+							view: {
+								...composition.view,
+								branches: marklessSsrMergeBranches(
+									composition.view.branches,
+									branches,
+								),
+							} as unknown as import('@markless/serializer').ProtocolViewPayload,
+							structure: rendered.structure,
+							structureTokens: rendered.structureTokens,
+							elementCount: composition.elementCount,
+							propEvents: definition.propEvents ?? [],
+							externalSymbolIds: composition.externalSymbolIds,
+							m(graphProps: ComposeGraphProps, instancePath?: string) {
+								marklessSsrRemapGraphOutput(output, graphProps, instancePath);
+							},
+						};
+						return output;
+					},
+				);
 			},
 		),
 	);
@@ -1221,16 +1712,20 @@ export function evaluatePrerenderDataComponent(input: {
 function runnerStatus(
 	graphNodeId: string,
 	computed: ProtocolStatePayload['computed'],
+	keptShows?: boolean,
 	visited = new Set<string>(),
 ): unknown {
 	visited.add(graphNodeId);
 	const record = computed.find((candidate) => candidate.graphNodeId === graphNodeId);
-	if (!record || record.async) return record?.snapshot?.status;
+	const snapshot = record?.snapshot as RuntimeGraphAsyncSnapshot | undefined;
+	if (!record || record.async)
+		return keptShows && asyncPlanes.showsKept?.(snapshot) ? 'fulfilled' : snapshot?.status;
 	let status = 'fulfilled';
 	for (const dependency of record.dependencies ?? []) {
 		if (visited.has(dependency.graphNodeId)) continue;
-		if (!computed.some((candidate) => candidate.graphNodeId === dependency.graphNodeId)) continue;
-		const settled = runnerStatus(dependency.graphNodeId, computed, visited);
+		if (!computed.some((candidate) => candidate.graphNodeId === dependency.graphNodeId))
+			continue;
+		const settled = runnerStatus(dependency.graphNodeId, computed, keptShows, visited);
 		if (settled === 'rejected') return settled;
 		if (settled !== 'fulfilled') status = 'pending';
 	}
@@ -1246,36 +1741,21 @@ function runnerError(
 	const record = computed.find((candidate) => candidate.graphNodeId === graphNodeId);
 	if (record?.async) return (record.snapshot as { readonly error?: unknown } | undefined)?.error;
 	for (const { graphNodeId: next } of record?.dependencies ?? [])
-		if (!visited.has(next) && runnerStatus(next, computed, new Set(visited)) === 'rejected')
+		if (!visited.has(next) && runnerStatus(next, computed, false, new Set(visited)) === 'rejected')
 			return runnerError(next, computed, visited);
 }
 
-async function settledBoundaryResult(output: SsrRenderOutput, boundaryId: string) {
+async function settledBoundaryResult(output: SsrRenderOutput, anchorId: string, boundaryId: string) {
 	const records = await prepareSsrResumeRecords(output);
 	const anchor = output.structure?.anchors.find(
-		(candidate) => candidate.kind === 'async' && candidate.id === boundaryId,
+		(candidate) => candidate.kind === 'async' && candidate.id === anchorId,
 	);
 	const boundary = records.view.asyncBoundaries.find((candidate) => candidate.id === boundaryId);
 	const armRecords = boundary?.armRecords;
 	if (!anchor || !armRecords || Array.isArray(armRecords)) {
 		throw new Error(`MARKLESS_PRERENDER_BOUNDARY_MISSING: ${boundaryId}`);
 	}
-	const armIndex = <A extends { readonly index: number }>(anchor: A): A => ({
-		...anchor,
-		index: anchor.index - boundary.startAnchor.index - 1,
-	});
-	const nested = records.view.asyncBoundaries
-		.filter(
-			(candidate) =>
-				candidate.startAnchor.index > boundary.startAnchor.index &&
-				candidate.endAnchor.index < boundary.endAnchor.index,
-		)
-		.map(({ armRecords: served, ...candidate }) => ({
-			...candidate,
-			...(served && !Array.isArray(served) && { armRecords: served as ResumeArmRecordSet }),
-			startAnchor: armIndex(candidate.startAnchor),
-			endAnchor: armIndex(candidate.endAnchor),
-		}));
+	const nested = boundariesInside(records.view, boundary);
 	// Array.isArray cannot narrow the readonly per-arm plan out of the union.
 	const set = armRecords as ResumeArmRecordSet;
 	return {
@@ -1339,4 +1819,10 @@ function placeMaterializedChild<
 				: { ...token, anchorId: idPrefix + token.anchorId },
 		),
 	};
+}
+
+function asyncArmPlacement(edge: SsrAsyncArmPlacement): SsrAsyncArmPlacement {
+	return edge.asyncBoundaryId === undefined
+		? {}
+		: { asyncBoundaryId: edge.asyncBoundaryId, asyncBoundaryArm: edge.asyncBoundaryArm };
 }

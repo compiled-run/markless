@@ -112,6 +112,7 @@ export default function Settings() @{
 
 			.group-trigger:hover {
 				background: var(--tinted-quiet);
+				color: var(--on-accent);
 			}
 
 			.group-name {

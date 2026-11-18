@@ -276,10 +276,10 @@ test('a row widget resolves to its own row root behind an island segment', () =>
 	for (const island of ['', protocolIslandSegment(0)]) {
 		const rowRoot = `${island}${row}c0:p1:p2:`;
 		const definitions = [
-			{ id: `${island}c0:${tabs}`, scope: 'widget' },
-			{ id: `${rowRoot}${part}`, scope: 'widget' },
-			{ id: `${island}c0:p1:${part}`, scope: 'widget' },
-			{ id: `${island}${part}`, scope: 'widget' },
+			{ id: `${island}c0:${tabs}`, scope: 'subtree' },
+			{ id: `${rowRoot}${part}`, scope: 'subtree' },
+			{ id: `${island}c0:p1:${part}`, scope: 'subtree' },
+			{ id: `${island}${part}`, scope: 'subtree' },
 		];
 		const graph = {
 			listSharedDefinitions: () => definitions,
@@ -295,4 +295,37 @@ test('a row widget resolves to its own row root behind an island segment', () =>
 			`${island}c0:${tabs}/state:tabs`,
 		);
 	}
+});
+
+test('two children carrying one app-scoped shared() cell compose to one record of it', () => {
+	const graphNodeId = 'shared:src/theme.tsrx#theme/state:value';
+	const sharedDefinitions = [
+		{
+			id: 'shared:src/theme.tsrx#theme',
+			name: 'theme',
+			exportedName: 'theme',
+			version: 0,
+			graphNodeIds: [graphNodeId],
+		},
+	];
+	const child = (prefix: string) => ({
+		output: {
+			state: {
+				version: ASYNC_PROTOCOL_VERSION,
+				cells: [
+					{ graphNodeId, name: 'value', valueKind: 'object', value: { name: 'paper' } },
+				],
+				computed: [],
+				sharedDefinitions,
+			},
+		},
+		hostPrefix: prefix,
+		symbolPrefix: prefix,
+		graphProps: [],
+	});
+	const composed = marklessComposeState(
+		{ version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] },
+		[child('c0:'), child('c1:')],
+	);
+	expect(composed.cells.map((cell) => cell.graphNodeId)).toEqual([graphNodeId]);
 });

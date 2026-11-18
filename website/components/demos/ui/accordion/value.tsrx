@@ -73,6 +73,7 @@ export default function AccordionValue() @{
 
 			.trigger:hover {
 				background: var(--tinted-quiet);
+				color: var(--on-accent);
 			}
 
 			.trigger:disabled {

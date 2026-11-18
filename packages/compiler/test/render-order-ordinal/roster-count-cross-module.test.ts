@@ -29,7 +29,7 @@ export const ic = shared(
 		const itemEls = element<HTMLDivElement[]>();
 		return { ...s, itemEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 `;
 

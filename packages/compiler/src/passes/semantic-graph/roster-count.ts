@@ -1,8 +1,11 @@
-import type {
-	ModuleGraphInterfacePropSpend,
-	SemanticElementRosterCount,
-} from '../../artifacts.ts';
-import { asNodes, childNodes, forEachChildNode, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import type { ModuleGraphInterfacePropSpend, SemanticElementRosterCount } from '../../artifacts.ts';
+import {
+	asNodes,
+	childNodes,
+	forEachChildNode,
+	getIdentifierName,
+	type AnyNode,
+} from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
 import { pendingDeriveOwner } from './collect-async.ts';
@@ -215,7 +218,10 @@ export function collectComponentPropSpends(
 		for (const propName of destructuredPropNames(node)) {
 			const spends = propSpends(state, node, component.name, propName);
 			if (spends.length === 0) continue;
-			byComponent.set(component.name, [...(byComponent.get(component.name) ?? []), ...spends]);
+			byComponent.set(component.name, [
+				...(byComponent.get(component.name) ?? []),
+				...spends,
+			]);
 		}
 	}
 	return byComponent;
@@ -472,7 +478,9 @@ function deferredExpression(
 	if (typeof start !== 'number' || typeof end !== 'number') return null;
 	const raw = source.slice(start, end);
 	let thunk = raw;
-	for (const one of [...reads].sort((left, right) => (right.read.start ?? 0) - (left.read.start ?? 0))) {
+	for (const one of [...reads].sort(
+		(left, right) => (right.read.start ?? 0) - (left.read.start ?? 0),
+	)) {
 		if (typeof one.read.start !== 'number' || typeof one.read.end !== 'number') return null;
 		const name = getIdentifierName(one.read);
 		if (!name) return null;
@@ -613,8 +621,7 @@ function thunkable(parent: AnyNode, child: AnyNode): boolean {
 
 // A markup slot: the value the renderer prints, verbatim, wherever it stands.
 function isPrintedPosition(parent: AnyNode, child: AnyNode): boolean {
-	if (parent.type === 'JSXExpressionContainer')
-		return parent.expression === child;
+	if (parent.type === 'JSXExpressionContainer') return parent.expression === child;
 	// The block-with-one-expression form a bare arm interpolation parses as.
 	if (parent.type === 'ExpressionStatement') return parent.expression === child;
 	return false;
@@ -754,7 +761,11 @@ function declaredSymbolAt(
 	if (!byOffset) {
 		const index = new Map<number, number>();
 		for (let symbolId = 0; symbolId < semantic.bindings.length; symbolId += 1) {
-			for (let declIndex = 0; declIndex < semantic.bindings[symbolId]!.declarations.length; declIndex += 1) {
+			for (
+				let declIndex = 0;
+				declIndex < semantic.bindings[symbolId]!.declarations.length;
+				declIndex += 1
+			) {
 				const start = semantic.bindings[symbolId]!.declarations[declIndex]!.start;
 				if (typeof start === 'number' && !index.has(start)) index.set(start, symbolId);
 			}

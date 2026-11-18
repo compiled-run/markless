@@ -12,10 +12,10 @@ const box = shared(() => {
 			b.on = !b.on;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 // The early slice: same module, self-closed at the repeat, body writes the
-// widget-scoped seed off its own prop.
+// subtree-scoped seed off its own prop.
 function Row({ item, onTap }) @{
 	const b = box();
 	b.label = item.label;

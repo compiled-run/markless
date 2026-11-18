@@ -12,7 +12,7 @@ export default function MugSpot({
 }: {
 	/** A studio pose such as `cheers`, `sleep`, `brew` or `bow`, or a face such as `scared` or `proud`. */
 	readonly mood: string;
-	/** How much of him clears the edge of the block that follows: `peek` shows his face, `eyes` only the rim and eyes, `bottom` peeks his eyes over the pager line at the end of a page. */
+	/** How much of him clears the edge of the block that follows: `peek` shows his face, `eyes` only the rim and eyes, `bottom` peeks his eyes over the pager line at the end of a page, `perch` stands him whole on the top line of the callout that follows. */
 	readonly at?: string;
 	/** Which end of the edge he hides behind: `right` or `left`. */
 	readonly from?: string;
@@ -44,6 +44,19 @@ export default function MugSpot({
 				--show: 0.7;
 				margin-bottom: calc(-1 * var(--space-xl));
 			}
+			/* The art leaves 12.8% of its height below his base; that much hangs over the card's top line so the base rests on it. */
+			.is-perch {
+				position: relative;
+				z-index: 1;
+				height: var(--mug-height);
+				margin-bottom: calc(-1 * var(--flow-note) - var(--mug-height) * 0.128);
+				overflow: visible;
+				pointer-events: none;
+			}
+			.is-perch .docs-mug-art {
+				pointer-events: auto;
+				filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--ink) 25%, transparent));
+			}
 			.from-left {
 				justify-content: flex-start;
 			}
@@ -58,6 +71,9 @@ export default function MugSpot({
 			.from-right .docs-mug-art {
 				rotate: -4deg;
 			}
+			.is-perch .docs-mug-art {
+				rotate: none;
+			}
 			@media (prefers-reduced-motion: no-preference) {
 				@supports (animation-timeline: view()) {
 					.docs-mug-art {
@@ -68,6 +84,9 @@ export default function MugSpot({
 					.react-duck .docs-mug-art {
 						animation-name: docs-mug-duck;
 						animation-range: entry 10% cover 70%;
+					}
+					.is-perch .docs-mug-art {
+						animation-name: docs-mug-hop;
 					}
 				}
 				@media (hover: hover) {
@@ -82,6 +101,16 @@ export default function MugSpot({
 				}
 				to {
 					translate: 0 0;
+				}
+			}
+			@keyframes docs-mug-hop {
+				from {
+					translate: 0 -30%;
+					opacity: 0;
+				}
+				to {
+					translate: 0 0;
+					opacity: 1;
 				}
 			}
 			@keyframes docs-mug-duck {

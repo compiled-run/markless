@@ -8,6 +8,7 @@ export function App() @{
 	let level = state(1);
 	let section = state('north');
 	let shown = state(false);
+	let held = state('idle');
 	const lamp = computed(() => (lit ? 'Lamp on' : 'Lamp off'));
 	const levelText = computed(() => `Level ${level} of ${HIGH}`);
 	const atLow = computed(() => level <= LOW);
@@ -54,6 +55,11 @@ export function App() @{
 			}}
 		>South</button>
 		<div data-notes>{notes}</div>
+		<button data-hold onClick={() => {
+			held = 'holding';
+			return fetch('/hold');
+		}}>Hold</button>
+		<output data-held>{held}</output>
 		<button data-show onClick={() => (shown = !shown)}>Show</button>
 		@if (shown) {
 			<p data-shown>Shown</p>

@@ -24,7 +24,7 @@ const factory = (name: string, body: ReadonlyArray<string>) => [
 	"import { computed, shared, state } from '@markless/core';",
 	`export const ${name}State = shared(`,
 	...body,
-	"\t{ scope: 'widget' },",
+	"\t{ scope: 'subtree' },",
 	');',
 	`export function ${name}Root({ children }) @{`,
 	`	const one = ${name}State();`,
@@ -87,7 +87,7 @@ test('a factory whose whole body is the returned object publishes it', async () 
 		'export const conciseState = shared(() => {',
 		"	const tones = state({ tone: 'plain' });",
 		'	return { ...tones };',
-		"}, { scope: 'widget' });",
+		"}, { scope: 'subtree' });",
 	]);
 
 	expect(returnedGraphProperties(graph).map((property) => property.name)).toEqual(['tone']);
@@ -97,7 +97,7 @@ test('a factory whose whole body is the returned object publishes it', async () 
 test('a returned state() call is refused by name instead of compiling to an unbound read', async () => {
 	const graph = await graphFor('direct', [
 		"import { shared, state } from '@markless/core';",
-		"export const directState = shared(() => state({ tone: 'plain' }), { scope: 'widget' });",
+		"export const directState = shared(() => state({ tone: 'plain' }), { scope: 'subtree' });",
 		'export function DirectRoot({ children }) @{',
 		'	const direct = directState();',
 		'	<div data-root data-tone={direct.tone}>{children}</div>',
@@ -116,7 +116,7 @@ test('a returned computed() call is refused the same way', async () => {
 		'export const derivedState = shared(() => {',
 		"	const tones = state({ tone: 'plain' });",
 		'	return computed(() => tones.tone);',
-		"}, { scope: 'widget' });",
+		"}, { scope: 'subtree' });",
 	]);
 
 	const refusal = graph.diagnostics.find((diagnostic) => diagnostic.code === UNNAMED);
@@ -130,7 +130,7 @@ test('a keyed repeat over a directly returned state object resolves to its cell'
 		'export const listBox = shared(() => {',
 		"	const box = state({ items: [{ id: 'a', label: 'A' }] });",
 		'	return box;',
-		"}, { scope: 'widget' });",
+		"}, { scope: 'subtree' });",
 		'export function List() @{',
 		'	const box = listBox();',
 		'	<ul>',
@@ -155,7 +155,7 @@ test('a repeat over a path the returned cells do not carry is still refused', as
 		'export const missingBox = shared(() => {',
 		"	const box = state({ items: [{ id: 'a' }] });",
 		'	return box;',
-		"}, { scope: 'widget' });",
+		"}, { scope: 'subtree' });",
 		'export function List() @{',
 		'	const box = missingBox();',
 		'	<ul>',

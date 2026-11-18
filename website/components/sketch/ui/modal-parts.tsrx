@@ -82,7 +82,11 @@ export default function ModalParts() @{
 			}
 
 			.trigger:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.trigger::before {
@@ -155,7 +159,11 @@ export default function ModalParts() @{
 			}
 
 			.close:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.close::before {
@@ -163,7 +171,13 @@ export default function ModalParts() @{
 			}
 
 			.box[ui-open] {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					--paper: var(--cream);
+					color: var(--ink);
+				}
 			}
 
 			.box[ui-open]::after {
@@ -182,7 +196,7 @@ export default function ModalParts() @{
 			}
 
 			.box[ui-open] > .box::before {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
 			}
 
 			@media (prefers-reduced-motion: reduce) {

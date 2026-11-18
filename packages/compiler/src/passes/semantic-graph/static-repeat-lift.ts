@@ -11,12 +11,19 @@ import {
 	isHostTagName,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
-import { mintTemplateExpressionComputed, pureCompositeReadSources } from './composite-reads.ts';
+import {
+	joinReadSources,
+	mintTemplateExpressionComputed,
+	pureCompositeReadSources,
+	type GraphReadSource,
+} from './composite-reads.ts';
 import { collectGraphDependencies } from './collect-async.ts';
 import { inlineRenderLocals } from './render-local-inline.ts';
 import { splitStaticGraphPath } from '../../artifact-helpers/graph-paths.ts';
+import { rowChildHandlerName } from './handler-props.ts';
 import type { SemanticKeyedRepeat } from '../../artifacts.ts';
 import type { WalkState } from './types.ts';
+import { aliasedItemPath } from './repeat-item-binding.ts';
 
 // Row handlers take their item from the repeat's graph node, so an off-graph collection
 // they sit under is lifted into a synthetic computed when the browser can recompute it.
@@ -43,7 +50,9 @@ export function enclosingRowItemPath(
 	enclosing: SemanticKeyedRepeat,
 ): ReadonlyArray<string> | null {
 	const [root, ...path] = splitStaticGraphPath(collectionSource);
-	return root === enclosing.itemName && path.length > 0 ? path : null;
+	if (root === enclosing.itemName && path.length > 0) return path;
+	const aliased = aliasedItemPath(enclosing.itemAliases, collectionSource);
+	return aliased?.length ? aliased : null;
 }
 
 // Each enclosing row wires its own instance of a nested repeat, found through the enclosing
@@ -70,8 +79,16 @@ export function liftRowHandlerCollection(
 	itemName: string,
 	state: WalkState,
 ): RowHandlerCollection {
-	const handlerName = firstRowHandlerName(forNode.body as AnyNode | undefined);
-	if (!handlerName) return { kind: 'no-row-handlers' };
+	const handlerName =
+		firstRowHandlerName(forNode.body as AnyNode | undefined) ??
+		rowChildHandlerName(forNode, itemName, state);
+	if (!handlerName) {
+		// A row-bound element() handle walks the repeat's rows, so the rows need a graph collection too.
+		if (!bindsRowElementHandle(forNode.body as AnyNode | undefined))
+			return { kind: 'no-row-handlers' };
+		const lifted = liftStaticCollection(forNode, collectionNode, itemName, state);
+		return lifted.kind === 'lifted' ? lifted : { kind: 'no-row-handlers' };
+	}
 	const lifted = liftStaticCollection(forNode, collectionNode, itemName, state);
 	return lifted.kind === 'unliftable' ? { ...lifted, handlerName } : lifted;
 }
@@ -120,14 +137,11 @@ export function liftStaticCollection(
 		: { kind: 'unliftable', reason: { kind: 'opaque' } };
 }
 
-function dependencySources(nodes: ReadonlyArray<AnyNode>, state: WalkState): ReadonlyArray<string> {
-	return [
-		...new Set(
-			nodes.flatMap((node) =>
-				collectGraphDependencies(node, state).map((read) => read.source),
-			),
-		),
-	];
+function dependencySources(
+	nodes: ReadonlyArray<AnyNode>,
+	state: WalkState,
+): ReadonlyArray<GraphReadSource> {
+	return joinReadSources(nodes.map((node) => collectGraphDependencies(node, state)))!;
 }
 
 function firstRowHandlerName(node: AnyNode | undefined): string | null {
@@ -156,6 +170,26 @@ function firstRowHandlerName(node: AnyNode | undefined): string | null {
 		if (found) return found;
 	}
 	return null;
+}
+
+function bindsRowElementHandle(node: AnyNode | undefined): boolean {
+	if (!node) return false;
+	if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression') return false;
+	if (node.type === 'Element' || node.type === 'JSXElement') {
+		const tagName = getElementTagName(node);
+		if (
+			tagName &&
+			isHostTagName(tagName) &&
+			getElementAttributes(node).some(
+				(attribute) =>
+					getIdentifierName(attribute.name as AnyNode | undefined) === 'el' &&
+					unwrapExpressionContainer(attribute.value as AnyNode | undefined),
+			)
+		)
+			return true;
+		return asNodes(node.children).some(bindsRowElementHandle);
+	}
+	return childNodes(node).some(bindsRowElementHandle);
 }
 
 function writesName(node: AnyNode | undefined, name: string): boolean {

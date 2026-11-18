@@ -6,7 +6,7 @@ import { combobox } from '../../index.ts';
 // which is the whole reason the `combobox.empty` part was dropped.
 //
 // A component of the consumer's own, INSIDE the root, is what reads the
-// instance: a widget-scoped shared definition is rooted by the module that
+// instance: a subtree-scoped shared definition is rooted by the module that
 // declares it, so a consumer reading one is a part of that widget.
 function Options() @{
 	const c = combobox.state();

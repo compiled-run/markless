@@ -100,7 +100,7 @@ export const tourState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 /** One instance per step, so the parts inside a card read that step's own facts. */
@@ -115,7 +115,7 @@ export const tourItemState = shared(
 
 		return { ...item, el, titleEl, descriptionEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function TourItem({ target, children, ...rest }: TourItemProps) @{

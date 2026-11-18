@@ -2,10 +2,12 @@ import {
 	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
 	createProtocolStatePayload,
+	IN_PLACE_SUBMIT_POLICY,
 	PROTOCOL_EVENT_HOST_ATTRIBUTE,
 } from '@markless/serializer';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '../src/fns/ssr.ts';
+import { IN_PLACE_CHECK } from '../src/inline/resumer.ts';
 import { renderToStream } from '../src/render-to-stream.ts';
 
 // A compiled-module-shaped artifact: renderSsr threads the render context
@@ -17,6 +19,7 @@ function relayArtifact(input: {
 	readonly delayMs: number;
 	readonly fail?: boolean;
 	readonly prerenderWakeModuleUrl?: string;
+	readonly inPlaceForm?: true;
 }) {
 	return {
 		resumeModuleUrl: '/build/relay-resume.js',
@@ -62,11 +65,19 @@ function relayArtifact(input: {
 								},
 							],
 							events: [
-								{
-									hostNodeId: 'h3',
-									eventName: 'click',
-									symbolIds: ['symbol:relay-tap'],
-								},
+								input.inPlaceForm
+									? {
+											hostNodeId: 'h3',
+											eventName: 'submit',
+											symbolIds: [],
+											syncPolicy: IN_PLACE_SUBMIT_POLICY,
+											inPlaceSubmit: 'reset',
+										}
+									: {
+											hostNodeId: 'h3',
+											eventName: 'click',
+											symbolIds: ['symbol:relay-tap'],
+										},
 							],
 							behaviors: [],
 							elementHandles: [],
@@ -556,6 +567,17 @@ test('renderToStream flushes the pending shell and appends the settled arm out o
 	expect(chunk).toContain('__mArm("boundary:0")');
 	// The executor learns the resume module for post-commit wake triggers.
 	expect(chunk).toContain('/build/relay-resume.js');
+});
+
+test('an arm holding a form sent in place carries the in-place check its submit runs; another arm does not', async () => {
+	const check = `self.${IN_PLACE_CHECK}||=`;
+	const form = await renderToStream(relayArtifact({ delayMs: 40, inPlaceForm: true }) as never, {});
+	expect(form.shell).not.toContain(check);
+	const [chunk] = await collect(form.appends());
+	expect(chunk).toContain(check);
+	expect(chunk!.indexOf(check)).toBeLessThan(chunk!.indexOf('__mArm("boundary:0")'));
+	const plain = await renderToStream(relayArtifact({ delayMs: 40 }) as never, {});
+	expect((await collect(plain.appends())).join('')).not.toContain(check);
 });
 
 test('wake-channel streaming emits a zero-payload baseline shell without changing installment bytes', async () => {

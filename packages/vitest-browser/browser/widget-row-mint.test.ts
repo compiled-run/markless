@@ -4,7 +4,7 @@ import { cleanup, renderSSR } from '../src/index.ts';
 import App, { Served } from './fixtures/widget-row-mint.tsrx';
 
 // The row component here IS a widget root: each rendered row gets its own
-// widget-scoped shared() graph, and a row minted on the client has to bring one.
+// subtree-scoped shared() graph, and a row minted on the client has to bring one.
 
 const keys = (container: Element): string[] =>
 	Array.from(container.querySelectorAll('[data-row]')).map(

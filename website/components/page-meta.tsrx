@@ -48,7 +48,7 @@ export default function PageMeta({
 			/* The assumes line: one link per concept, and the slots a page does not use. */
 			.page-meta-assume-link {
 				color: inherit;
-				text-decoration-color: var(--pink);
+				text-decoration-color: var(--link-underline);
 				text-decoration-thickness: 0.1em;
 				text-underline-offset: 0.16em;
 			}

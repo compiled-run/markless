@@ -1,0 +1,300 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/control-edit-hold"
+			],
+			"delta": 1396,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/render-csr"
+			],
+			"delta": 188,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 119,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 253,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/control-edit-hold"
+			],
+			"delta": 1396,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/render-csr"
+			],
+			"delta": 188,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 119,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 231,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 259,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"router/vite/entries/fragment-entry"
+			],
+			"delta": 153,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph"
+			],
+			"delta": 40,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/control-edit-hold"
+			],
+			"delta": 1396,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/render-csr"
+			],
+			"delta": 188,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 119,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 273,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 273,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 273,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 307,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 307,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 308,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a freshly minted row's first flush cannot wipe it (lost first input fix)",
+			"date": "2026-11-10"
+		}
+	]
+}

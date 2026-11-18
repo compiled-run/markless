@@ -3,6 +3,14 @@ import {
 	createSymbolResolverModuleManifest,
 	emitSymbolResolverModule,
 } from '../src/passes/symbol-resolver-module.ts';
+import { marklessWhenLoaded } from '@markless/web/fns/resident-load';
+
+// A data: module resolves no package specifier, so the resident read it imports is inlined as one too.
+const residentLoad = `data:text/javascript,${encodeURIComponent(`export ${marklessWhenLoaded}`)}`;
+const importResolver = (source: string) =>
+	import(
+		`data:text/javascript,${encodeURIComponent(source.replace("'@markless/web/fns/resident-load'", JSON.stringify(residentLoad)))}`
+	);
 
 test.each([false, true])(
 	'literal import tables expose dependencies with bound symbols: %s',
@@ -26,9 +34,14 @@ test.each([false, true])(
 				exportName: `run${index}`,
 			})),
 		});
-		for (let index = 0; index < 9; index++)
+		for (let index = 0; index < 9; index++) {
 			expect(source).toContain(`import("./action-${index}.js")`);
+			// The table's URL list would be dead text the bundler rewrites after rendering.
+			expect(source.split(`"./action-${index}.js"`)).toHaveLength(2);
+		}
 		expect(source).not.toContain('import(/* @vite-ignore */ moduleUrls[row[0]])');
+		// With no URL list a row's module index is dead weight, so every row ships it as 0.
+		expect(source).toContain('"action:8":[0,8]');
 	},
 );
 
@@ -51,7 +64,7 @@ test('coalescing transport URLs does not change which logical module a symbol lo
 		JSON.stringify(manifest),
 		JSON.stringify(coalesced),
 	);
-	const resolver = await import(`data:text/javascript,${encodeURIComponent(source)}`);
+	const resolver = await importResolver(source);
 	expect(await resolver.loadSymbol('action:8')).toBe(8);
 });
 
@@ -73,3 +86,26 @@ test.each([false, true])(
 			);
 	},
 );
+
+test('a packed symbol already on the page answers in the caller task, a cold one as a promise', async () => {
+	const source = emitSymbolResolverModule({
+		literalImports: true,
+		symbols: Array.from({ length: 9 }, (_, index) => ({
+			id: `action:${index}`,
+			chunk: `data:text/javascript,export const run${index}=${index}`,
+			exportName: `run${index}`,
+		})),
+	});
+	// What the bundler writes for a module packed beside the resolver: a load carrying its loader.
+	const packed = source.replace(
+		'"action:3":()=>import("data:text/javascript,export const run3=3")',
+		'"action:3":()=>Object.assign(Promise.resolve({ run3: 3 }), { $mlNow: () => ({ run3: 3 }) })',
+	);
+	expect(packed).not.toBe(source);
+	const resolver = await importResolver(packed);
+	expect(resolver.loadSymbol('action:3')).toBe(3);
+	const cold = resolver.loadSymbol('action:4');
+	expect(cold).toBeInstanceOf(Promise);
+	expect(await cold).toBe(4);
+	await expect(resolver.loadSymbol('action:99')).rejects.toThrow('Unknown async symbol action:99');
+});

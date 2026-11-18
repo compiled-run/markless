@@ -7,6 +7,7 @@ import {
 	type CsrRenderOutput,
 	type RenderTarget,
 } from '@markless/web';
+import { PROTOCOL_SHARED_INSTANCES_PROPERTY } from '@markless/web/fns/container-region';
 import { composeCsrIslands, type CsrIslandComponent } from './csr-islands.ts';
 import type { SsrFixtureRenderOptions } from './ssr-plugin.ts';
 
@@ -191,6 +192,22 @@ export function renderStreamShell(
 	);
 }
 
+// Marker rewritten by testSSR() into a Node-side renderToStream command that
+// drains every append, so a test can play the whole response into the page.
+export function renderStream(
+	component: unknown,
+	options?: SsrFixtureRenderOptions,
+): Promise<{ readonly shell: string; readonly appends: ReadonlyArray<string> }> {
+	void component;
+	void options;
+	throw new Error(
+		'renderStream(Component) was not transformed. Add testSSR() from ' +
+			'@markless/vitest-browser/ssr-plugin to the browser test project plugins ' +
+			'(before the markless plugin). v1 supports renderStream(Component) with a ' +
+			'component imported from a separate .tsrx module and no props.',
+	);
+}
+
 export function renderServerHTML(
 	html: string,
 	options: SsrRenderHtmlOptions = {},
@@ -257,9 +274,12 @@ function globalDomDocument(): Document {
 export async function cleanup(): Promise<void> {
 	while (mountedContainers.size > 0) {
 		const mounted = mountedContainers.values().next().value;
-		if (!mounted) return;
+		if (!mounted) break;
 		destroyContainer(mounted);
 	}
+	// The next test starts as a freshly loaded document would: no live shared() instances.
+	if (typeof document !== 'undefined')
+		delete (document as unknown as Record<string, unknown>)[PROTOCOL_SHARED_INSTANCES_PROPERTY];
 }
 
 function setupContainer(options: BrowserRenderOptions): MountedContainer & {

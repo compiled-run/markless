@@ -132,11 +132,21 @@ export default function UrlPicker() @{
 			}
 
 			.row:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.row[aria-pressed='true'] {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.row:focus-visible {
@@ -178,7 +188,12 @@ export default function UrlPicker() @{
 			.board[data-file='slug'] .slug,
 			.board[data-file='rest'] .rest,
 			.board[data-file='missing'] .missing {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.board[data-file='slug'] .slug .param,

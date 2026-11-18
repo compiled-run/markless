@@ -9,6 +9,7 @@ import {
 	isSpreadAttribute,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
+import { browserReadPath } from '../../artifact-helpers/graph-paths.ts';
 import { emitHtmlChildren } from './html.ts';
 import { componentEdgeInstanceSegment, objectPropertyName } from './shared.ts';
 import type { ComponentEdge, CsrRenderContext, SsrRenderContext } from './types.ts';
@@ -183,13 +184,24 @@ function ssrComponentPropsSource(
 	return props;
 }
 
-export function componentEdgeGraphRoutes(edge: ComponentEdge | undefined, hasProjection = false) {
+export function componentEdgeGraphRoutes(
+	edge: ComponentEdge | undefined,
+	hasProjection = false,
+	asyncGraphNodeIds?: ReadonlySet<string>,
+) {
 	const routes = (edge?.props ?? []).map((prop) =>
 		prop.kind === 'graph-reference'
-			? { name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }
+			? {
+					name: prop.name,
+					graphNodeId: prop.graphNodeId,
+					// The runtime reads an async value whole through its snapshot's value.
+					path: asyncGraphNodeIds ? browserReadPath(prop.graphNodeId, prop.path, asyncGraphNodeIds) : prop.path,
+				}
 			: {
 					name: prop.name,
 					kind: prop.kind === 'serializable' ? 'compiler-known-constant' : prop.kind,
+					// A child that hands this prop to an event as is cancels with it during the dispatch.
+					...(prop.kind === 'callback' && prop.syncPolicy ? { syncPolicy: prop.syncPolicy } : {}),
 				},
 	);
 	if (!hasProjection || routes.some((route) => route.name === 'children')) return routes;
@@ -253,9 +265,23 @@ export function collectSsrPropEvents(
 		readonly wraps?: true;
 	}> = collectCsrPropEvents(root, propNames, source).flatMap((event) => {
 		const hostNodeId = hostNodeIdByPath.get(JSON.stringify(event.hostPath));
-		return hostNodeId
-			? [{ hostNodeId, eventName: event.eventName, propName: event.propName }]
-			: [];
+		if (!hostNodeId) return [];
+		// The semantic graph relays `onClick={onPress}` as `(event) => onPress?.(event)`, which hands the callback its event.
+		const relayed = semanticEvents.some(
+			(candidate) =>
+				candidate.hostNodeId === hostNodeId &&
+				candidate.eventName === event.eventName &&
+				candidate.handlerSource !== undefined &&
+				candidate.handlerSource.trim() !== event.propName,
+		);
+		return [
+			{
+				hostNodeId,
+				eventName: event.eventName,
+				propName: event.propName,
+				...(relayed ? { wraps: true as const } : {}),
+			},
+		];
 	});
 	const propNameSet = new Set(propNames);
 	for (const event of semanticEvents) {

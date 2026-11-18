@@ -14,7 +14,7 @@ import { shared, state } from '@markless/core';
 export const gate = shared(() => {
 	const g = state({ minWidth: 1, caps: ${cap}, x: 2, label: '' });
 	return { ...g, grow() { g.x = g.x + 1; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root(props) @{
 	const g = gate();

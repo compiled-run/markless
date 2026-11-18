@@ -1,22 +1,6 @@
-// Settle filler: turns ONE async boundary's arm/row/empty <template> elements
-// plus its fill plan into live DOM for a settled value, and splices the result
-// between the boundary's comment anchors.
-//
-// Constraints (T002 ruling section 3.5, T011 checkpoint):
-//   - a leaf: no runtime, graph, protocol or DOM-library imports, because it
-//     loads before anything else on a prerendered client-fetching page;
-//   - data reaches the DOM through textContent/setAttribute ONLY. Never
-//     innerHTML: settled values are server-controlled strings and the slot
-//     model this replaces has no markup sink;
-//   - it never evaluates an expression. A derived hole is a reference to a
-//     COMPILED symbol; the caller loads and calls it, this module places the
-//     result;
-//   - anything it cannot place exactly throws before the splice, so the caller
-//     falls back with the pending arm still on screen. Never half-render.
-//
-// Nearly every byte here executes at load, so failure reasons are short codes
-// and the arm, row and empty paths share one filler instead of reading well
-// three times over: T014 measured this module as the largest load-path item.
+// Fills one async boundary's arm, row and empty templates from a settled value and splices them between its anchors.
+// A leaf that loads first on a prerendered page: data reaches the DOM only through textContent and attributes, never markup, and anything it cannot place throws before the splice.
+import { marklessAttributeValue, marklessWriteAttribute } from '../dom-attribute.ts';
 
 export const SETTLE_PLAN_UNSUPPORTED = 'MARKLESS_SETTLE_PLAN_UNSUPPORTED';
 
@@ -139,18 +123,20 @@ function fill(
 			(reference.args ?? []).map((argument) => read(argument.node, argument.path)),
 		);
 	}
-	const text = value == null ? '' : String(value);
 	if (hole.kind === 'attribute') {
-		// The anchor sits immediately before the owning element, because a
-		// comment cannot live inside an attribute value.
+		// A comment cannot live inside an attribute value, so the anchor sits just before the owning element.
 		let owner = anchor.nextSibling;
 		while (owner && owner.nodeType !== 1) owner = owner.nextSibling;
 		if (!owner || !hole.name) unsupported('attr');
-		(owner as Element).setAttribute(hole.name, text);
+		marklessWriteAttribute(
+			owner as Element,
+			hole.name,
+			marklessAttributeValue(hole.name, value),
+		);
 		anchor.parentNode!.removeChild(anchor);
 		return;
 	}
-	swap(anchor, anchor.ownerDocument!.createTextNode(text));
+	swap(anchor, anchor.ownerDocument!.createTextNode(value == null ? '' : String(value)));
 }
 
 function clone(template: HTMLTemplateElement | null | undefined): DocumentFragment {

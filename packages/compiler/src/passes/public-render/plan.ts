@@ -1,15 +1,14 @@
 import { parseModule } from '../../js-ast.ts';
-import { childNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
-import { getElementTagName, isHostTagName } from '../../ast/tsrx.ts';
+import { type AnyNode } from '../../ast/nodes.ts';
 import type {
 	PublicRenderPlanArtifact,
 	PublicRenderPlanInput,
 } from '../../artifacts.ts';
-import { collectModuleStyleScopes } from './style-scopes.ts';
+import { collectModuleStyleScopes, collectStylesheetImports } from './style-scopes.ts';
 import { moduleIdOf } from '../../module-id.ts';
 import { collectAsyncBoundaryNodes } from './async-boundaries.ts';
 import { resolveBoundaryRunners } from './boundary-runner.ts';
-import { gatePlanDisagreementDiagnostic, tryBlockToggleRerenderDiagnostic } from './diagnostics.ts';
+import { gatePlanDisagreementDiagnostic } from './diagnostics.ts';
 import {
 	collectChildrenOpacityDiagnostics,
 	collectRepeatBindingConflictDiagnostics,
@@ -20,7 +19,6 @@ import {
 	componentRootDiagnostics,
 	componentUnsupportedBodyDiagnostics,
 	emptyPlan,
-	sameModuleChildBoundaryDiagnostics,
 } from './validation.ts';
 import { collectKeyedRepeatRowMintDiagnostics } from './row-mint-diagnostics.ts';
 import { payloadRecordHosts } from '../row-mint.ts';
@@ -52,8 +50,6 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	if (!selectedRoot) return emptyPlan(componentRootDiagnostics(ast, input.source.filename));
 
 	const repeatBindingConflictDiagnostics = collectRepeatBindingConflictDiagnostics({
-		// Module-wide, because the emitted row prelude is built from the module's
-		// whole keyed-repeat list rather than one component's slice of it.
 		root: ast,
 		filename: input.source.filename,
 	});
@@ -65,9 +61,6 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		component: selectedRoot.component,
 		filename: input.source.filename,
 		moduleImports: input.semanticGraph.moduleImports.map((item) => item.localName),
-		repeatLocals: input.semanticGraph.keyedRepeats.flatMap((repeat) =>
-			repeat.indexName ? [repeat.itemName, repeat.indexName] : [repeat.itemName],
-		),
 		root: selectedRoot.root,
 		source: input.source.source,
 	});
@@ -76,11 +69,13 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	}
 
 	const styles = collectModuleStyleScopes(ast, input.source.filename, moduleIdOf(input.source));
-	const boundaryNodes = collectAsyncBoundaryNodes(selectedRoot.root);
+	const boundaryNodesByStart = new Map(
+		collectAsyncBoundaryNodes(ast).map((found) => [found.node.start, found]),
+	);
 	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 	const boundaryRunnerDiagnostics = input.semanticGraph.asyncBoundaries.flatMap(
-		(boundary, index) => {
-			const found = boundaryNodes[index];
+		(boundary) => {
+			const found = boundaryNodesByStart.get(boundary.keywordSpan?.start);
 			const resolution = boundaryRunners.get(boundary.id);
 			if (!found || !resolution) return [];
 			if (resolution.reads.length === 0 && resolution.unresolvedSources.length === 0)
@@ -108,28 +103,6 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			];
 		},
 	);
-	const branchNodes: AnyNode[] = [];
-	walkNode(selectedRoot.root, (node) => {
-		if (node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression')
-			branchNodes.push(node);
-	});
-	const armEscalationDiagnostics = input.semanticGraph.branchSites.flatMap((site, index) => {
-		if (!site.asyncBoundaryId) return [];
-		const branchNode = branchNodes[index];
-		const containsComponent = input.semanticGraph.markup.chunks
-			.filter((chunk) => chunk.id.startsWith(`branch:${site.id}:arm:`))
-			.some((chunk) => chunk.slots.some((slot) => slot.kind === 'child-component'));
-		const componentName = branchNode ? firstComponentName(branchNode) : null;
-		if (!branchNode || !containsComponent || !componentName) return [];
-		return [
-			tryBlockToggleRerenderDiagnostic({
-				branchLabel: site.kind === 'switch' ? '@switch' : '@if',
-				componentName,
-				node: branchNode,
-				filename: input.source.filename,
-			}),
-		];
-	});
 	const rowMintDiagnostics = collectKeyedRepeatRowMintDiagnostics({
 		...payloadRecordHosts(input.payloadArena.view),
 		root: ast,
@@ -143,32 +116,15 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	return {
 		passId: 'public-render-plan',
 		styleScopes: styles.styleScopes,
+		stylesheetImports: collectStylesheetImports(ast),
 		diagnostics: [
 			...styles.diagnostics,
-			...sameModuleChildBoundaryDiagnostics(
-				ast,
-				selectedRoot.componentName,
-				input.source.filename,
-			),
 			...collectUnsupportedConstructDiagnostics(selectedRoot.root, input.source.filename),
 			...collectChildrenOpacityDiagnostics(ast, input.source.filename),
 			...boundaryRunnerDiagnostics,
-			...armEscalationDiagnostics,
 			...rowMintDiagnostics,
 		],
 	};
-}
-
-function firstComponentName(node: AnyNode): string | null {
-	if (node.type === 'Element' || node.type === 'JSXElement') {
-		const tagName = getElementTagName(node);
-		if (tagName && !isHostTagName(tagName)) return tagName;
-	}
-	for (const child of childNodes(node)) {
-		const found = firstComponentName(child);
-		if (found) return found;
-	}
-	return null;
 }
 
 export { firstComponentRoot, selectPublicRenderRoot } from './template.ts';

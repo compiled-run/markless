@@ -2,15 +2,10 @@
 
 function accent(card: string): string {
 	return `			${card} {
-				--pg-accent: color-mix(in srgb, var(--purple) 45%, var(--paper));
-				--pg-wash: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				--pg-accent: color-mix(in srgb, var(--purple) 45%, var(--cream));
+				--pg-wash: color-mix(in srgb, var(--purple) 26%, var(--cream));
 				--pg-edge: color-mix(in oklch, var(--ink) 80%, transparent);
 				--pg-font: 'Shantell Sans', system-ui, sans-serif;
-
-				html.dark & {
-					--pg-accent: color-mix(in srgb, var(--purple) 42%, var(--paper));
-					--pg-wash: color-mix(in srgb, var(--purple) 20%, var(--paper));
-				}
 			}`;
 }
 
@@ -20,7 +15,7 @@ function sticker(card: string): string {
 				position: relative;
 				display: grid;
 				grid-template-columns: minmax(0, 1fr);
-				margin-block: var(--space-m);
+				margin-block: var(--flow-block);
 				border: 1.5px solid var(--ink);
 				border-radius: 14px;
 				background: var(--paper);
@@ -197,6 +192,11 @@ const PICK_CSS = `			.pg-pick-trigger {
 
 			.pg-pick-item[ui-selected] {
 				background: var(--pg-wash);
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}`;
 
 /** One focus ring for every control the chrome draws: the site's yellow, as its hover docs use. */
@@ -294,7 +294,13 @@ export const CONTROLS_CSS = `${sticker('.pg')}
 			}
 
 			.pg-switch[ui-checked] {
-				background: color-mix(in srgb, var(--switch-on) 65%, var(--paper));
+				background: color-mix(in srgb, var(--switch-on) 65%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					--paper: var(--cream);
+					color: var(--on-accent);
+				}
 			}
 
 			.pg-switch:disabled {
@@ -408,7 +414,7 @@ ${tipLook('.pg-tip')}
 
 			.pg-showall:hover {
 				text-decoration: underline;
-				text-decoration-color: var(--pink);
+				text-decoration-color: var(--link-underline);
 				text-underline-offset: 0.15em;
 			}
 
@@ -569,11 +575,13 @@ export const CODE_CSS = `			.pg-panel-outer {
 			}
 
 			.pg-tab:hover {
-				background: color-mix(in oklch, var(--pg-wash) 50%, var(--paper));
+				background: color-mix(in oklch, var(--pg-wash) 50%, var(--cream));
+				color: var(--on-accent);
 			}
 
 			.pg-tab[ui-selected] {
 				background: var(--pg-wash);
+				color: var(--on-accent);
 			}
 
 			.pg-tab + .pg-tab {
@@ -674,7 +682,7 @@ export const CODE_CSS = `			.pg-panel-outer {
 
 			.pg-expand:hover {
 				text-decoration: underline;
-				text-decoration-color: var(--pink);
+				text-decoration-color: var(--link-underline);
 				text-underline-offset: 0.15em;
 			}
 
@@ -761,11 +769,110 @@ export function docRules(keys: readonly string[], root: string): string {
 		.join('\n\n');
 }
 
+
+/** The preview's skin: the `<Code>` block's binder frame and paper, with dashed rules between its bands. */
+function binder(card: string): string {
+	return `			${card} {
+				--pg-band: color-mix(in oklch, var(--ink) 70%, transparent);
+				border: 2px solid transparent;
+				border-image: url('/notebook/frame-plain.png') 40 47 50 72 / 28.6px 33.6px 35.7px 51.4px / 7.1px 14.3px 19.3px 17.9px round;
+				border-radius: 0;
+				box-shadow: none;
+				background: var(--paper);
+				padding: 0.25rem 1.1rem 0.4rem 2.6rem;
+			}
+
+			html.dark ${card} {
+				--paper: var(--raised);
+				border-image-source: url('/notebook/frame-dark-plain.png');
+			}
+
+			@media (max-width: 600px) {
+				${card} {
+					border-radius: 0;
+					box-shadow: none;
+					padding-left: 1.5rem;
+				}
+			}
+
+			${card}::before {
+				position: absolute;
+				inset-block: 0;
+				inset-inline-start: -2px;
+				width: 51.4px;
+				background: url('/notebook/frame-ring.png') 0 6% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 20% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 35% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 50% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 65% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 80% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 94% / 51.4px 41.4px no-repeat;
+				content: '';
+				pointer-events: none;
+			}
+
+			html.dark ${card}::before {
+				background: url('/notebook/frame-dark-ring.png') 0 6% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 20% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 35% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 50% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 65% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 80% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 94% / 51.4px 41.4px no-repeat;
+			}
+
+			@media (max-width: 600px) {
+				${card}::before {
+					background: url('/notebook/frame-ring.png') 0 8% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 30% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 52% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 74% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 94% / 51.4px 41.4px no-repeat;
+				}
+
+				html.dark ${card}::before {
+					background: url('/notebook/frame-dark-ring.png') 0 8% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 30% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 52% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 74% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 94% / 51.4px 41.4px no-repeat;
+				}
+			}
+
+			${card} .pg-controls {
+				border-block-end: 2px dashed var(--pg-band);
+			}
+
+			${card} .pg-rest {
+				padding-block-start: 0.9em;
+				border-block-start: 0;
+			}
+
+			${card} :is(.pg-quick, .pg-rest) {
+				gap: 0.9em 2em;
+			}
+
+
+
+			${card} .pg-clamp {
+				border-block-start: 2px dashed var(--pg-band);
+				border-radius: 0;
+			}
+
+			${card} .pg-tab {
+				border: 2px solid var(--ink);
+				border-block-end: 0;
+				border-radius: 22px 24px 5px 4px / 18px 20px 5px 4px;
+				background: color-mix(in oklch, var(--ink) 9%, var(--paper));
+				color: var(--ink);
+			}
+
+			${card} .pg-tab[ui-selected] {
+				background: var(--paper);
+				color: var(--ink);
+				font-weight: 700;
+			}
+
+			${card} .pg-tab + .pg-tab {
+				margin-inline-start: -0.3rem;
+			}
+
+			${card} .pg-fade {
+				background: linear-gradient(to bottom, transparent, var(--paper) 80%);
+			}
+
+			${card} .pg-expand {
+				background: var(--paper);
+			}`;
+}
+
 export const CHROME_CSS = `${CONTROLS_CSS}
 
 ${STAGE_CSS}
 
 ${CODE_CSS}
+
+${binder('.pg')}
 
 ${docCss('.pg')}`;
 

@@ -15,7 +15,7 @@ export const spike = shared(() => {
 		isChecked,
 		toggle() { s.checked = !s.checked; },
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root(props) @{
 	const s = spike();
@@ -84,7 +84,7 @@ export const gate = shared(() => {
 	const isOpen = computed(() => cell.open !== false);
 
 	return { ...cell, isOpen, flip() { cell.open = !cell.open; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel(config) @{
 	const cell = gate();
@@ -123,7 +123,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ label: '' });
 	return { ...s };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root(props) @{
 	const s = spike();
@@ -166,7 +166,7 @@ export const spike = shared(() => {
 		isChecked: computed(() => s.checked === true),
 		toggle() { s.checked = !s.checked; },
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Box() @{
 	const s = spike();
@@ -290,7 +290,7 @@ import { shared, state } from '@markless/core';
 export const gate = shared(() => {
 	const cell = state({ open: false, locked: true });
 	return { ...cell, flip() { cell.open = !cell.open; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel({ locked, children }) @{
 	const cell = gate();
@@ -339,7 +339,7 @@ import { shared, state } from '@markless/core';
 export const gate = shared(() => {
 	const cell = state({ open: false, locked: true });
 	return { ...cell, flip() { cell.open = !cell.open; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel({ locked, children }) @{
 	const cell = gate();

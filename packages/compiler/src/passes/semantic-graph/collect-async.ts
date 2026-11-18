@@ -11,7 +11,11 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 	uniqueBy,
+	templateReadPath,
 } from '../../artifact-helpers/graph-paths.ts';
+import type { SourceSpan } from '../../diagnostics.ts';
+import { placeAsyncArmText } from './collect-elements.ts';
+import { readLocal } from './composite-reads.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
@@ -23,7 +27,7 @@ import {
 } from './collect-expressions.ts';
 import {
 	asyncBoundaryRequiredDiagnostic,
-	asyncPostAwaitReadDiagnostic,
+	asyncPostAwaitDependentReadDiagnostic,
 	computedDependencyGraphCycleDiagnostic,
 } from './diagnostics.ts';
 import type { MutableSemanticGraphArtifact, SemanticGraphWalk, WalkState } from './types.ts';
@@ -43,6 +47,8 @@ export function collectAsyncBoundary(
 	const boundaryId = `boundary:${state.nextBoundaryId++}`;
 	const previousBoundaryId = state.currentAsyncBoundaryId;
 	const previousArm = state.currentAsyncBoundaryArm;
+	const previousArmHost = state.currentAsyncArmHostNodeId;
+	const previousCatchBoundaryId = state.currentCatchBoundaryId;
 	// Arm index inside this boundary: 0 = @try, 1 = @pending, 2 = @catch.
 	const armByNode = new Map<unknown, number>([
 		[node.block, 0],
@@ -50,20 +56,40 @@ export function collectAsyncBoundary(
 		[node.handler, 2],
 	]);
 
+	const handler = node.handler as AnyNode | null | undefined;
+	const errorParam = handler?.param as AnyNode | null | undefined;
 	state.graph.asyncBoundaries.push({
 		id: boundaryId,
 		anchorOrder: state.nextAnchorOrder++,
 		...(previousBoundaryId ? { parentBoundaryId: previousBoundaryId } : {}),
+		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
+		...(errorParam?.type === 'Identifier' && typeof errorParam.name === 'string'
+			? { errorName: errorParam.name }
+			: {}),
+		...(typeof node.start === 'number'
+			? { keywordSpan: { filename: state.filename, start: node.start, end: node.start + '@try'.length } }
+			: {}),
 	});
 	state.currentAsyncBoundaryId = boundaryId;
+	state.currentAsyncArmHostNodeId = state.currentHostNodeId;
+	const resetParam = handler?.resetParam as AnyNode | null | undefined;
+	if (resetParam?.type === 'Identifier' && typeof resetParam.start === 'number')
+		state.catchResetBoundaries.set(resetParam.start, boundaryId);
+	if (errorParam?.type === 'Identifier' && typeof errorParam.start === 'number')
+		state.catchErrorBoundaries.set(errorParam.start, boundaryId);
 
 	for (const child of asNodes([node.block, node.handler, node.pending])) {
 		state.currentAsyncBoundaryArm = armByNode.get(child) ?? previousArm;
+		state.currentCatchBoundaryId =
+			handler && child === node.block ? boundaryId : previousCatchBoundaryId;
+		placeAsyncArmText(node, child, state);
 		walk(child, state);
 	}
 
 	state.currentAsyncBoundaryId = previousBoundaryId;
 	state.currentAsyncBoundaryArm = previousArm;
+	state.currentAsyncArmHostNodeId = previousArmHost;
+	state.currentCatchBoundaryId = previousCatchBoundaryId;
 }
 
 export function propagateAsyncComputedCapability(graph: MutableSemanticGraphArtifact): void {
@@ -113,7 +139,7 @@ export function finalizeComputedDependencies(state: WalkState): void {
 			pending.body,
 			state,
 			declaringComponentName,
-		).filter((dependency) => directBindingNames.has(dependency.source.split('.')[0] ?? ''));
+		).filter((dependency) => directBindingNames.has(dependency.local.name));
 		state.currentSharedDefinitionId = previousSharedDefinitionId;
 		state.graph.graphBindings = state.graph.graphBindings.map((binding) => {
 			if (binding.id !== pending.graphNodeId) return binding;
@@ -214,14 +240,31 @@ function canonicalCycleKey(cycle: ReadonlyArray<string>): string {
 		.sort()[0];
 }
 
-export function collectAsyncBoundaryDiagnostics(graph: MutableSemanticGraphArtifact): void {
+export function collectAsyncBoundaryDiagnostics(
+	graph: MutableSemanticGraphArtifact,
+	repeatCollectionSpans: ReadonlyMap<string, SourceSpan>,
+): void {
 	const bindings = graphBindingMap(graph, null);
 	const aliases = semanticAliasMap(graph, null);
+	const bindingsById = new Map(graph.graphBindings.map((binding) => [binding.id, binding]));
+
+	for (const repeat of graph.keyedRepeats) {
+		if (repeat.asyncBoundaryId || !repeat.collectionGraphNodeId) continue;
+		const binding = bindingsById.get(repeat.collectionGraphNodeId);
+		if (binding?.kind !== 'computed' || binding.asyncCapable !== true) continue;
+		const sourceSpan = repeatCollectionSpans.get(repeat.id);
+		graph.diagnostics.push(
+			asyncBoundaryRequiredDiagnostic(
+				{ source: repeat.collectionSource, ...(sourceSpan ? { sourceSpan } : {}) },
+				binding,
+			),
+		);
+	}
 
 	for (const read of graph.templateReads) {
 		if (read.asyncBoundaryId) continue;
 
-		const resolved = resolveGraphPath(read.source, bindings, aliases);
+		const resolved = resolveGraphPath(templateReadPath(read), bindings, aliases);
 		if (!resolved) continue;
 		if (resolved.binding.kind !== 'computed' || resolved.binding.asyncCapable !== true)
 			continue;
@@ -308,11 +351,15 @@ export function collectAsyncComputedPostAwaitReads(
 	body: AnyNode | undefined,
 	state: WalkState,
 ): void {
-	const firstAwaitEnd = findFirstAwaitEnd(body);
-	if (firstAwaitEnd === null) return;
+	const firstAwait = findFirstAwait(body);
+	if (firstAwait === null) return;
 
-	for (const read of postAwaitGraphReads(body, firstAwaitEnd, state)) {
-		state.graph.diagnostics.push(asyncPostAwaitReadDiagnostic(computedName, read));
+	// A static-path read is already a dependency, so it is in the key and the runner binds it before run().
+	for (const read of postAwaitGraphReads(body, firstAwait, state)) {
+		if (read.awaitedSegment)
+			state.graph.diagnostics.push(
+				asyncPostAwaitDependentReadDiagnostic(computedName, read.read, read.awaitedSegment),
+			);
 	}
 }
 
@@ -333,12 +380,13 @@ function graphDependency(
 		resolveGraphPath(source, bindings, aliases) ??
 		resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName);
 	if (!resolved) return null;
+	const local = readLocal(node);
+	if (!local)
+		throw new Error(
+			`A graph read of ${source} resolved to ${resolved.binding.id} without a static name and members.`,
+		);
 
-	return {
-		source,
-		graphNodeId: resolved.binding.id,
-		path: resolved.path,
-	};
+	return { source, graphNodeId: resolved.binding.id, path: resolved.path, local };
 }
 
 /**
@@ -366,31 +414,43 @@ function namesGraphBinding(
 	return !rootBindsInsideRegion(node, state, bodyRegion);
 }
 
-function findFirstAwaitEnd(node: AnyNode | undefined): number | null {
-	let firstStart: number | null = null;
-	let firstEnd: number | null = null;
+type AwaitSpan = { readonly start: number; readonly end: number };
+
+function findFirstAwait(node: AnyNode | undefined): AwaitSpan | null {
+	let first: AwaitSpan | null = null;
 
 	walkNode(node, (candidate) => {
 		if (candidate.type !== 'AwaitExpression') return;
 		if (typeof candidate.start !== 'number' || typeof candidate.end !== 'number') return;
-		if (firstStart !== null && candidate.start >= firstStart) return;
+		if (first !== null && candidate.start >= first.start) return;
 
-		firstStart = candidate.start;
-		firstEnd = candidate.end;
+		first = { start: candidate.start, end: candidate.end };
 	});
 
-	return firstEnd;
+	return first;
 }
+
+type PostAwaitRead = {
+	readonly read: SemanticStateRead;
+	/** The computed member segment whose value comes from the awaited work, when there is one. */
+	readonly awaitedSegment?: string;
+};
 
 function postAwaitGraphReads(
 	node: AnyNode | undefined,
-	firstAwaitEnd: number,
+	firstAwait: AwaitSpan,
 	state: WalkState,
-): SemanticStateRead[] {
-	const reads: SemanticStateRead[] = [];
+): PostAwaitRead[] {
+	const reads: PostAwaitRead[] = [];
 	const bindings = graphBindingMap(state.graph, currentGraphScope(state));
 	const aliases = semanticAliasMap(state.graph, currentGraphScope(state));
 	const bodyRegion = readRegion(node);
+	const locals = bodyLocals(node, firstAwait, state, bodyRegion);
+	const readAt = (candidate: AnyNode): SemanticStateRead | null =>
+		postAwaitRead(candidate, firstAwait.end, state, bindings, aliases, bodyRegion);
+	// `items[await key()]` reads `items` only once its own key's await resolves.
+	const readAnywhere = (candidate: AnyNode): SemanticStateRead | null =>
+		postAwaitRead(candidate, -1, state, bindings, aliases, bodyRegion);
 
 	const visit = (candidate: AnyNode | undefined): void => {
 		if (!candidate) return;
@@ -402,35 +462,40 @@ function postAwaitGraphReads(
 		}
 
 		if (candidate.type === 'MemberExpression') {
-			const read = postAwaitRead(
-				candidate,
-				firstAwaitEnd,
-				state,
-				bindings,
-				aliases,
-				bodyRegion,
-			);
+			const read = readAt(candidate);
 			if (read) {
-				reads.push(read);
+				reads.push({ read });
 				return;
 			}
 
 			if (candidate.computed === true) {
-				visit(candidate.property as AnyNode | undefined);
+				const object = candidate.object as AnyNode;
+				const property = candidate.property as AnyNode;
+				const keyAwaits = containsAwait(property);
+				const objectRead = staticPrefixRead(object, keyAwaits ? readAnywhere : readAt);
+				if (objectRead) {
+					const awaited = keyAwaits || dependsOnAwaitedValue(property, state, locals);
+					reads.push({
+						read: {
+							...objectRead,
+							source: expressionSource(candidate, state.source),
+							sourceSpan:
+								sourceSpan(candidate, state.filename) ?? objectRead.sourceSpan,
+						},
+						...(awaited
+							? { awaitedSegment: expressionSource(property, state.source) }
+							: {}),
+					});
+				}
+				visit(property);
 			}
+			visit(candidate.object as AnyNode | undefined);
 			return;
 		}
 
 		if (candidate.type === 'Identifier') {
-			const read = postAwaitRead(
-				candidate,
-				firstAwaitEnd,
-				state,
-				bindings,
-				aliases,
-				bodyRegion,
-			);
-			if (read) reads.push(read);
+			const read = readAt(candidate);
+			if (read) reads.push({ read });
 			return;
 		}
 
@@ -441,7 +506,111 @@ function postAwaitGraphReads(
 
 	visit(node);
 
-	return uniqueBy(reads, (read) => read.source);
+	return uniqueBy(reads, (read) => `${read.read.sourceSpan?.start}:${read.read.source}`);
+}
+
+/** The graph read a computed member hangs off: `items` in `items[k]`, `a.b` in `a.b[k].c`. */
+function staticPrefixRead(
+	node: AnyNode,
+	readAt: (candidate: AnyNode) => SemanticStateRead | null,
+): SemanticStateRead | null {
+	const direct = readAt(node);
+	if (direct) return direct;
+	if (node.type === 'MemberExpression') return staticPrefixRead(node.object as AnyNode, readAt);
+	if (node.type && transparentWrappers.has(node.type))
+		return staticPrefixRead(node.expression as AnyNode, readAt);
+	return null;
+}
+
+const transparentWrappers = new Set([
+	'ParenthesizedExpression',
+	'TSAsExpression',
+	'TSSatisfiesExpression',
+	'TSNonNullExpression',
+	'TSTypeAssertion',
+]);
+
+function containsAwait(node: AnyNode): boolean {
+	let found = false;
+	walkNode(node, (candidate) => {
+		if (candidate.type === 'AwaitExpression') found = true;
+	});
+	return found;
+}
+
+type BodyLocals = { readonly all: ReadonlySet<number>; readonly settled: ReadonlySet<number> };
+
+/**
+ * Bindings the derive body declares, and those whose value is fixed before the
+ * first await starts: declared with their initializer before it and never
+ * written after it. Parameters count as settled.
+ */
+function bodyLocals(
+	body: AnyNode | undefined,
+	firstAwait: AwaitSpan,
+	state: WalkState,
+	bodyRegion: ReadRegion | null,
+): BodyLocals {
+	const all = new Set<number>();
+	const settled = new Set<number>();
+	if (!bodyRegion) return { all, settled };
+	const semantic = state.semantic();
+	const declaratorEndById = new Map<number, number>();
+	// A write lands when its whole assignment finishes, so `key = await x` writes after the await.
+	const writeEndByTarget = new Map<number, number>();
+	walkNode(body, (candidate) => {
+		const target =
+			candidate.type === 'VariableDeclarator'
+				? candidate.id
+				: candidate.type === 'AssignmentExpression'
+					? candidate.left
+					: candidate.type === 'UpdateExpression'
+						? candidate.argument
+						: null;
+		if (!target) return;
+		walkNode(target as AnyNode, (pattern) => {
+			if (pattern.type !== 'Identifier' || typeof pattern.start !== 'number') return;
+			writeEndByTarget.set(pattern.start, candidate.end as number);
+			if (candidate.type === 'VariableDeclarator')
+				declaratorEndById.set(pattern.start, candidate.end as number);
+		});
+	});
+	const writtenAfterAwait = new Set<number>();
+	for (const reference of semantic.references) {
+		const start = reference.node.start;
+		if (!reference.isWrite || (writeEndByTarget.get(start) ?? start) <= firstAwait.start)
+			continue;
+		const id = reference.binding?.id;
+		if (typeof id === 'number') writtenAfterAwait.add(id);
+	}
+	for (let id = 0; id < semantic.bindings.length; id += 1) {
+		const binding = semantic.bindings[id]!;
+		const scope = semantic.scopes[binding.scope.id]!.node;
+		if (scope.start < bodyRegion.start || scope.end > bodyRegion.end) continue;
+		all.add(id);
+		const declared = binding.declarations[0]?.start;
+		if (typeof declared !== 'number') continue;
+		const settledAt = declaratorEndById.get(declared) ?? declared;
+		if (settledAt <= firstAwait.start && !writtenAfterAwait.has(id)) settled.add(id);
+	}
+	return { all, settled };
+}
+
+/** Whether a computed member key can hold a value produced by awaited work. */
+function dependsOnAwaitedValue(node: AnyNode, state: WalkState, locals: BodyLocals): boolean {
+	const semantic = state.semantic();
+	let awaited = false;
+	walkNode(node, (candidate) => {
+		if (awaited) return;
+		if (candidate.type === 'AwaitExpression') {
+			awaited = true;
+			return;
+		}
+		if (candidate.type !== 'Identifier' || typeof candidate.start !== 'number') return;
+		const id = resolvedSymbolAt(semantic, candidate.start);
+		if (id !== null && locals.all.has(id) && !locals.settled.has(id)) awaited = true;
+	});
+	return awaited;
 }
 
 function postAwaitRead(

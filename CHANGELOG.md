@@ -10,6 +10,267 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.14.0
+
+### Breaking changes
+
+- **@markless/core:** Rename shared() scopes to app, container and subtree.
+  To upgrade, rename the `scope` option of each `shared()` call: `'page'` and `'request'` become `'app'` (the default, so you can also drop the option), and `'widget'` becomes `'subtree'`. `'container'` keeps its name. Behaviour does not change. An old name now fails the compile with `MARKLESS_SHARED_SCOPE_RENAMED`, which names the new spelling.
+
+[All 3 commits since v0.13.0](https://github.com/compiled-run/markless/compare/7dd60eb3df318577f58415eadecb40bd8fb02f31...v0.14.0)
+
+## 0.13.0
+
+No user-facing changes in the released packages.
+
+[All 2 commits since v0.12.0](https://github.com/compiled-run/markless/compare/44e2ecf53b88a7aad24541c3432fbe73e033c372...v0.13.0)
+
+## 0.12.0
+
+### General
+
+- **Fixed:** Imported stateful components render inside @if/@switch, and computeds only a hidden branch reads stay unrun.
+- **Fixed:** An @if holding a @try block renders it fresh each time it shows.
+- **Fixed:** An @if holding a @try block renders fresh inside nested and layer components.
+- **Fixed:** An @if around rows with an attribute binding, a nested @if, or held by a non-root component renders fresh.
+- **Fixed:** A keyed @for over a computed resumes with the served value instead of deriving it at startup.
+- **Fixed:** @for rows repaint when a computed or shared() value their attribute reads changes.
+- **Fixed:** @for rows repaint when an attribute reads widget-scoped shared() state.
+- **Fixed:** List rows holding sibling lists or server-only lists repaint, and row slots after a nested list patch their own element.
+- **Fixed:** StopPropagation in a nested handler keeps its ancestors' handlers from running.
+- **Fixed:** Draggable, contenteditable and spellcheck write "true" and "false", not an empty value.
+- **Fixed:** Every resume entry passes a nested handler's stopPropagation on to the walk.
+- **Fixed:** Page-scoped shared() binds on first change, and constant @for rows keep first use bounded.
+- **Fixed:** @for row values follow state read through body helpers.
+- **Faster:** Docs / and /ui/accordion load anchors back to their measurement.
+
+### @markless/bundler
+
+- **Fixed:** A page's payload ships its final compile whatever order its sibling requests finish in.
+- **Fixed:** An @if decided by props no longer moves a page's lazy code into its landing packs.
+- **Fixed:** A build settles its compile store writes before it resolves or rejects.
+- **Fixed:** A page loads no code for an arm its literal props rule out.
+
+### @markless/compiler
+
+- **Fixed:** A handler that passes state to a helper which changes it updates the page.
+- **Fixed:** The shadcn client build fits its 6656 MB heap again after #401.
+- **Fixed:** A branch-arm handler binds to the instance it renders in.
+- **Fixed:** A @for binding resolves only inside the loop that declares it.
+- **Fixed:** A synthetic computed belongs to the component that minted it.
+- **Fixed:** Each nested component instance binds its own handlers and computeds.
+- **Fixed:** A constant prop forwarded through imported components reaches the inner computed after resume.
+- **Fixed:** A spread-forwarded handler belongs to the edge that passed it.
+- **Fixed:** A row item forwarded into a computed, and a structured prop only a computed reads, reach it after resume.
+- **Fixed:** A module-constant @for goes on the graph when a row's child reads the row item in a handler.
+- **Fixed:** An @pending written after @catch fails with MARKLESS_ASYNC_ARM_ORDER.
+- **Fixed:** A parenthesized constant write takes the scalar path.
+- **Fixed:** A shared() method named add, delete, set, push or clear is a method call.
+- **Fixed:** An element() handle on rows of an @for over a constant array reads every row.
+- **Fixed:** A callback handed to an imported part runs for its own instance, at any depth and through a spread.
+- **Fixed:** A received callback handed straight to a native element runs as that instance's handler.
+- **Fixed:** A @for row value that can never repaint is a build error.
+- **Fixed:** The never-updates warning reads names from scope analysis, so a property named like a state is not a read of it.
+- **Fixed:** A callback handed on through props reaches the element or widget it lands on.
+- **Fixed:** A callback two components deep runs with its own instance's captures.
+- **Fixed:** State() written directly in a @for row is a build error naming the row-component fix.
+- **Fixed:** A destructured @for loop name renders its rows.
+- **Fixed:** An @else if chain and a condition-case @switch pick their arm by index.
+- **New:** State() written in an @if or @switch arm starts fresh each time the arm opens.
+- **Fixed:** A handler let copied from state and then reassigned is the handler's own variable.
+- **Fixed:** A @switch picked by index never reads its bare discriminant against arm indexes.
+- **Fixed:** State() in an arm nested inside another arm starts fresh when the outer arm reopens.
+
+### @markless/typescript-plugin
+
+- **Fixed:** Prefetch is a boolean on <a>, so a link or a part built on one typechecks.
+
+### @markless/web
+
+- **Fixed:** A navbar part outside every root no longer breaks the navbar.
+- **Fixed:** A header that differs between routes only in prop-set attributes stays in place across an in-place navigation.
+- **Fixed:** A shared() value survives in-place navigation and is shared between containers.
+- **Fixed:** A click on rows a @try just painted is never lost.
+- **Fixed:** A @try commits each settled value once, so a click on its fresh rows is never lost.
+- **Fixed:** An @if in a child imported from another file reads its routed props live.
+- **Fixed:** Row code that arrives late no longer puts back a row the browser deleted.
+- **Fixed:** Element() handles resolve per component.
+- **Fixed:** ARIA states write "false" instead of dropping the attribute.
+- **Fixed:** A row value reading state written before the row code arrived repaints.
+- **Fixed:** A callback in a component a constant @for renders runs with its row's captures.
+- **New:** A kept part with state keeps its state and handlers across in-place navigation.
+- **Fixed:** A component in nested keyed @for rows is one instance per row and reads its own rows.
+- **Fixed:** @for straight over a Set or Map renders its rows on first render.
+- **Fixed:** A @for row added after load appears when its component holds an @try.
+
+[All 113 commits since v0.11.0](https://github.com/compiled-run/markless/compare/aa239188704c8c5187edbc6a906e10c06a11dc7e...v0.12.0)
+
+## 0.11.0
+
+### @markless/bundler
+
+- **Faster:** The closures asset names each module's own code hash, so a route's runnable code compares without its packs.
+- **Faster:** A source's symbols the pack planner treats alike ship as one module.
+- **Faster:** The client environment builds in its own process.
+- **Faster:** An environment drops its transform memos once its module graph is built.
+- **Fixed:** Compile error frames clip long lines, pluginCode built on first read.
+- **Faster:** A first pass holds the refusals its link can clear instead of throwing and compiling again.
+- **Faster:** Compiles run in child processes that exit once the module graph is built.
+- **Fixed:** Removing the Vite preload helper keeps calls to a local named like its init.
+- **Fixed:** Retiring compile processes waits for them to exit, so their store writes land first.
+- **Faster:** A router build stops rendering a facade chunk for every lazily loaded module.
+
+### @markless/compiler
+
+- **Fixed:** An @if whose test reads nothing never flips, so it no longer warns that it cannot rebuild its arms.
+- **New:** Reads after an await in an async computed join its key.
+
+[All 36 commits since v0.10.0](https://github.com/compiled-run/markless/compare/v0.10.0...v0.11.0)
+
+## 0.10.0
+
+### @markless/bundler
+
+- **Fixed:** Per-page build memory: drop the transform cache after the module graph, dedupe execution-demand.json, and a guard with per-page symbols.
+- **Faster:** Parse a rendered chunk for var merging only when it can hold two bare var statements.
+- **Faster:** Keep compile results across builds under Vite's cacheDir.
+- **Fixed:** A module reads its children's claims only after every child has settled, however long each compile takes.
+- **Fixed:** Fail every browser build that reaches Node code, and name the import chain.
+- **Faster:** Stop re-deriving the same facts per route and per symbol while planning packs and checking the symbol table.
+- **Faster:** Compile modules on worker threads during a build.
+- **Faster:** A barrel walk reads a component's interface from the compile its own transform runs.
+- **Fixed:** An app built in another directory, or through a symlinked path, ships the same bytes.
+- **Faster:** Walk chunk trees without allocating at every node.
+- **Faster:** Preload cleanup reads chunk trees with the compiler's parser.
+- **Faster:** Read rendered chunks on worker threads, once per chunk where the code is unchanged.
+- **Faster:** A directly rendered app no longer preloads render's other paths or the runtime loaders.
+- **Faster:** Unwrap async import wrappers and rewrite preload-helper importers on chunk workers.
+- **Faster:** Lighter playground highlighter, and no docs chunk over Vite's size limit.
+- **Fixed:** A wake still loading its code when a navigation swaps the page never resumes the next page.
+- **Fixed:** A table of import() loaders keeps each target in its own chunk.
+- **Fixed:** Under vite dev with installed packages, emitted runtime imports share the optimizer's copy.
+- **Fixed:** Files that render each other's components stop the build with the cycle named instead of hanging.
+- **Fixed:** A handler's import() with a template path loads the file beside the page.
+- **Faster:** A page's pack cut into size-capped parts stays out of the import map.
+- **Faster:** Only chunks three or more pages load get an import map entry.
+- **Fixed:** A client build loads the same modules and links the same symbols whatever order its files compile in.
+- **Fixed:** ?raw.tsrx imports get text in dev, and dev serves the playground prefetch list.
+- **Faster:** A routed page's startup pack over the size cap splits into a few pieces in execution order.
+- **Fixed:** Closing a compile pool waits for the compiles it handed a worker.
+- **Fixed:** A lazy module that re-exports modules as namespaces keeps every namespace it reads.
+- **Faster:** Initializer symbols load without a re-export module in front.
+
+### @markless/compiler
+
+- **Fixed:** Constructs from the Reading a.tsrx file guide reach the page.
+- **New:** Event handlers call functions declared in the component body.
+- **Fixed:** A nested function's own binding is not the handler's event parameter.
+- **Fixed:** A handler reading a body Map, Set or Date rebuilds it, and an instance of an unknown class fails the build.
+- **Fixed:** A handler that changes a rebuilt body value fails the build.
+- **Fixed:** A cancel on a nested binding named like the event is refused, not moved into the event's policy.
+- **Faster:** A warm build no longer re-strips emitted code or re-serializes child interfaces.
+- **Faster:** Stop redoing the same work in four compiler hot spots.
+- **Fixed:** An @if decided by an expression of props rebuilds arms with computed attributes.
+- **Fixed:** Route top-level markup that indexes a component const by state.
+- **Fixed:** Controls in @if arms and @for rows find their own element after resume.
+- **Fixed:** A shared() factory's imports come along wherever its state initializer is copied.
+- **Fixed:** An @if decided only by http renders on the server and ships none of http.
+- **Fixed:** Keep fixed render data in the served HTML.
+- **Fixed:** An @if in a @for row flips on every row.
+- **Fixed:** A nested bound symbol id adds its own path once instead of re-encoding the levels below.
+- **Fixed:** An @try nested in another @try's settled content loads, refreshes and resumes.
+- **Fixed:** An imported component of fixed size counts as its own steps in an element address.
+- **Fixed:** Keyed rows holding an @if move and keep their elements when other rows shift.
+- **Fixed:** A textarea's value renders as its text on the server.
+- **Fixed:** Async values read through shared fields, sync computeds, filtered lists and ?. reads.
+- **Fixed:** A nested @for whose rows hold an @if renders rows written after load.
+- **Fixed:** An assignment used as a value passes the value it assigned.
+- **Fixed:** A @for row named like a component value reads the row, and a stuck stream fails instead of spinning.
+- **Fixed:** An @try settles when its arm hands the async value to a child prop of the same name.
+- **New:** A preventDefault guard may compare a prop or a state with a literal.
+- **Fixed:** Text and attributes reading through ?. inside an expression update.
+- **Fixed:** Eval() that reads component names fails the build.
+- **Fixed:** An @if arm holding an imported component given constants renders in the browser, and arm rows bind attributes.
+- **Fixed:** A branch whose test reads nothing names no flip symbol, so its controls stop taking every symbol of the file.
+- **Fixed:** An @if arm attribute or text computed from props rebuilds on a flip, like a table read of the same props.
+- **Fixed:** A control that opens no @if around an imported child leaves that child's code out of its first use.
+- **Faster:** An @try whose keyed rows bind attributes re-settles through its own update module.
+- **Fixed:** A read means the same in text, attributes, computed() and handlers.
+- **Fixed:** State a helper in another.tsrx file creates renders and updates.
+- **Fixed:** An attribute that renders [object Object] and content the render drops fail the build.
+- **Fixed:** A write through a handler local that holds state updates the page, or fails the build.
+- **Fixed:** A const at the top of an @try, @pending or @catch body renders and stays live.
+- **Fixed:** A child declared beside its parent shows its @catch when its search fails.
+- **Fixed:** An attach nothing starts on a server-rendered page fails the build.
+- **Fixed:** An @if decided by a prop fails the build when a caller passes it state.
+- **Fixed:** A style object value can be a conditional, an arm const, a row item or the @catch error.
+- **Fixed:** Markless-allow silences a warning from any compiler pass, and the last site warnings are settled at their source.
+- **Fixed:** An expression over a component's props follows the state its parent passes.
+- **Fixed:** A reassigned let copy of state stays a copy, and state() refuses functions.
+- **Fixed:** A function declared in the component body can be called in markup and in computed().
+- **Fixed:** A control's first use keeps the updates it reaches inside an @if that never flips, so its first click fetches nothing.
+- **Fixed:** Rows the browser cannot count as one element fail the build, and nested @if rows build in an empty list.
+
+### @markless/core
+
+- **Faster:** In a browser build the @markless/core root reaches server rendering and resume only when called.
+
+### @markless/runtime
+
+- **Faster:** A write reaches only the computeds and subscriptions that read it.
+- **Fixed:** One task's writes land together when an update in it still loads its code.
+
+### @markless/serializer
+
+- **Faster:** A recursive component's rows serve each subtree once, not once per level.
+- **Faster:** A row's resume records cost the same bytes at any depth.
+
+### @markless/typescript-plugin
+
+- **Fixed:** Compiler warnings reach the editor and pnpm typecheck.
+
+### @markless/web
+
+- **Fixed:** An event whose target a navigation takes out no longer throws MARKLESS_EVENT_DISPATCH_UNMATCHED.
+- **Faster:** Server rendering escapes text without four passes, and returns plain text untouched.
+- **Fixed:** Every served row of a list cancels a submit its handler prevents.
+- **Fixed:** Tab stays in an open dialog and a key pressed during a wake goes where focus moved.
+- **Faster:** A keyed client-rendered list moves only the rows outside the longest run already in order.
+- **Faster:** Rows appended to a resumed list find their census slot from the nearest sibling.
+- **Faster:** A form's submit handler starts loading when the pointer reaches its submit button.
+- **Fixed:** A form in an @if arm cancels its submit before any code loads.
+- **Faster:** Find the hosts a removed range held without walking the whole page.
+- **Fixed:** A resume the leaving page started is dropped when an in-place navigation swaps the page under it.
+- **New:** A part both pages render byte for byte stays across an in-place navigation.
+- **Fixed:** Every form whose handler calls preventDefault cancels its submit inside the dispatch.
+- **Fixed:** A streamed @try whose settled content fails to render shows @catch.
+- **Fixed:** An async value in a component the page imports streams from the server.
+- **Fixed:** A streamed arm's own comments no longer shift where the page's later boundaries resume.
+- **Fixed:** A keyed @for inside an @if arm reconciles the rows the server rendered.
+- **Fixed:** A boundary or branch the browser renders again reads the page's served props.
+- **Fixed:** An in-place arrival resumes from the server's stream, holds until it settles, and keeps links' handlers.
+- **Fixed:** Map and Set state survives a server render.
+- **Fixed:** A streamed arm the runtime already adopted is not committed again.
+- **Fixed:** A kept row of a component takes every new prop its item gives it, not only a whole-item prop.
+- **Fixed:** An attach in an arm a child component opens runs on the served page.
+- **Fixed:** A page resumes and updates with frozen built-in prototypes.
+- **New:** A refresh keeps the shown content, marked busy, until the new answer lands.
+- **Faster:** Rows holding an @if wait for the reader after an idle start, like other rows.
+- **Fixed:** An async handler no longer holds its field's next event, and currentTarget is its own element.
+- **Fixed:** An async value keyed on a whole state object refetches when a field inside it changes.
+- **Fixed:** A row in a child's @try reads the prop its parent passes after the search settles.
+- **Fixed:** Markup a script moves within the page keeps its handlers.
+- **Fixed:** A newer search started while an answer is drawn keeps the list instead of painting @pending.
+- **Fixed:** The first row after a list empties appears when an @if follows the list.
+- **Fixed:** Opening a dialog no longer stalls the first click by rescanning every removed element once per host.
+
+### Other changes
+
+- **Fixed:** Clear every docs, demo and starter build warning, and fail CI on new ones.
+- **Fixed:** Key the vitest module cache by the vitest install that runs it.
+
+[All 204 commits since v0.9.0](https://github.com/compiled-run/markless/compare/v0.9.0...v0.10.0)
+
 ## 0.9.0
 
 ### @markless/bundler

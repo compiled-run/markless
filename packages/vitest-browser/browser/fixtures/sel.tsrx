@@ -9,7 +9,7 @@ export const sel = shared(() => {
 			s.open = !s.open;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ children }) @{
 	const s = sel();
@@ -38,7 +38,7 @@ export const pop = shared(() => {
 			p.open = !p.open;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function PopRoot({ children }) @{
 	const p = pop();

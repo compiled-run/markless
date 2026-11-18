@@ -1,54 +1,80 @@
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
-import TestPathsDemo from '../../components/demos/tooling/test-paths-demo.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import RunnerFigure from '../../components/figures/testing/runner-figure.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
-# Test a component in a real browser
+# Testing
 
-<PageMeta time="3 min" assumes="state,events" />
+<PageMeta time="2 min" assumes="state,events" />
 
-<ThemeToggle />
+<Subtitle text="A browser test puts your component in a real browser, clicks its elements the way a visitor would, and checks what the page shows." terms="component elements" />
 
-Types pass. But a type check never clicks a button.
+```ts title="todo.browser.ts"
+import { render } from '@markless/vitest-browser';
+import { expect, test } from 'vite-plus/test';
+import { page } from 'vite-plus/test/browser';
+import TodoItem from './TodoItem.tsrx';
 
-`@markless/vitest-browser` runs your component in a real browser, and your test clicks it.
+test('a click marks it done', async () => {
+	await render(TodoItem);
+	const item = page.getByRole('button', { name: /buy milk/i });
+	await item.click();
+	await expect.element(item).toHaveTextContent('Buy milk: done');
+});
+```
 
-A Markless component renders wherever you need it: in the browser, on a server, at build time. A
-test is one more of those places. The package gives you two ways in. Mount the component in the
-browser. Or render it to HTML on a server, then click that HTML.
+**`render(TodoItem)`** puts the component on a real page. **`page.getByRole`** finds the button the way a visitor would, by its role and name. **`click()`** presses it, and **`expect.element`** waits until it reads `Buy milk: done`.
 
-A bug can hide in one way and not in the other. So write the check once and run it both ways.
+## A test clicks a real button
 
-Pick a way in. Then press **Next** until the test ends.
+A *browser test* runs in Chromium, so a click runs your real handler. Press **Run**, then click the handler to break it and run again:
 
-<TestPathsDemo />
+<RunnerFigure />
 
-Only the first step differs. After that, both tests click the same button and wait for the same
-text.
+- With the handler working, the row goes green.
+- With it broken, the text never changes and the test fails at its `expect`, printing what it expected and what it found.
 
-| Helper               | What it does                                                                   |
-| -------------------- | ------------------------------------------------------------------------------ |
-| `render(Counter)`    | Mounts `Counter` in the browser, the way an app without a server does.         |
-| `renderSSR(Counter)` | Renders `Counter` to HTML on the test server, then puts that HTML in the page. |
+## The component is plain Markless
 
-## Set it up
+This is the `TodoItem` the test clicks. Change it, and watch the result:
 
-The starters do not include this setup yet. This configuration comes from the Markless repo's own
-test projects.
+<Code steps={[{ label: 'Rename the item to `Buy bread`.', shows: 'Buy bread: to do' }, { label: 'Start it done.', source: 'state(true)' }]}>
+```tsrx title="TodoItem.tsrx"
+import { state } from '@markless/core';
+
+export default function TodoItem() @{
+	let done = state(false);
+
+	<button onClick={() => (done = !done)}>
+		Buy milk: {done ? 'done' : 'to do'}
+	</button>
+}
+```
+</Code>
+
+Rename it, and the test above fails too: it still expects `Buy milk: done`.
+
+## Set it up once
+
+The starters don't include this yet. In an app from `npm create markless`, add the packages and a browser:
 
 ```bash
-npm install -D @markless/vitest-browser @vitest/browser-playwright vitest playwright
+npm install -D @markless/vitest-browser playwright \
+  @vitest/browser-playwright@5.0.5
 npx playwright install chromium
 ```
 
-```ts
+A new app's `vite-plus` 1.3.0 runs Vitest 5.0.5, and `@vitest/browser-playwright` must match it exactly.
+
+```ts title="vitest.config.ts"
 import { markless } from '@markless/core/vite';
 import { testSSR } from '@markless/vitest-browser/ssr-plugin';
 import { playwright } from 'vite-plus/test/browser-playwright';
-import { defineProject } from 'vitest/config';
+import { defineProject } from 'vite-plus/test/config';
 
 export default defineProject({
 	plugins: [testSSR(), markless()],
@@ -64,62 +90,16 @@ export default defineProject({
 });
 ```
 
-That file is `vitest.config.ts`. Put `testSSR()` before `markless()`. Without it, `renderSSR()`
-throws.
+Put both files in `src/`, and run `npx vp test run --config vitest.config.ts`.
 
-## One check, both ways
+- `expect.element` keeps checking until the text matches or it times out, so a change that lands a moment after the click still passes.
+- Each test starts on an empty page: the package removes what it mounted after every test.
 
-Here is a counter like the one in the starter app:
+## Server pages use `renderSSR`
 
-```tsrx
-import { state } from '@markless/core';
+If your app renders its pages on a server, use `renderSSR(TodoItem)` instead of `render`. It renders the component to HTML on the test server and puts that HTML in the page, and your test clicks the same button.
 
-export default function Counter() @{
-	let count = state(0);
+- `testSSR()` must come before `markless()` in the config. Without it, `renderSSR()` throws `was not transformed`.
+- Write `renderSSR(TodoItem)` by name, with a component from its own `.tsrx` file and no props. A helper that gets `renderSSR` passed in as a value skips the rewrite and throws.
 
-	<button onClick={() => count++}>Count {count}</button>
-}
-```
-
-Write the check once, in `counter.browser.ts`. Then run it both ways:
-
-```ts
-import { render, renderSSR } from '@markless/vitest-browser';
-import { expect, test } from 'vitest';
-import Counter from './Counter.tsrx';
-
-async function clickCounts(container: HTMLElement) {
-	const button = container.querySelector('button')!;
-	button.click();
-	await expect.poll(() => button.textContent).toBe('Count 1');
-}
-
-test('mounted in the browser: a click counts', async () => {
-	const screen = await render(Counter);
-	await clickCounts(screen.container as HTMLElement);
-});
-
-test('rendered on a server: a click counts', async () => {
-	const screen = await renderSSR(Counter);
-	await clickCounts(screen.container);
-});
-```
-
-Put `Counter.tsrx` and `counter.browser.ts` in a `src/` folder. Then run `npx vp test run --config vitest.config.ts`.
-
-The package removes each mounted component after each test. Call `cleanup()` yourself only in the
-middle of a test.
-
-<Callout
-	sprite="cross"
-	title="Why does renderSSR() throw 'was not transformed'?"
-	text="testSSR() rewrites the text renderSSR(Counter) before the test runs. Write the call by name, with a component from its own .tsrx file and no props. A helper that gets renderSSR passed in as a value skips the rewrite."
-/>
-
-<Callout
-	sprite="thought-bubble"
-	title="Why does my check see the old text?"
-	text="A click's change can land a moment after click() returns, especially after a server render. So a read straight after click() can still see the old text. Wait with expect.poll before you compare."
-/>
-
-Next: [read a Markless error](/tooling/diagnostics).
+[Diagnostics](/tooling/diagnostics) reads what Markless says when something fails to build.

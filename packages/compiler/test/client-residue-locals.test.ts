@@ -137,3 +137,45 @@ test.each([
 		expect(calls).toBe(1);
 	},
 );
+
+test.each([
+	{ name: 'Vote', fn: 'lead', list: 'options', item: 'o', field: 'votes' },
+	{ name: 'Board', fn: 'topScorer', list: 'players', item: 'p', field: 'points' },
+])(
+	'a $name row calling $fn(), a function its component declares, reads it in the client reader',
+	async ({ name, fn, list, item, field }) => {
+		const result = await compileTsrxModule({
+			filename: `src/${name}.tsrx`,
+			source: `import { state } from '@markless/core';
+export function ${name}() @{
+	let ${list} = state([{ id: 'a', ${field}: 1 }, { id: 'b', ${field}: 3 }]);
+	function ${fn}() {
+		let best = '';
+		let most = -1;
+		for (const each of ${list}) if (each.${field} > most) { most = each.${field}; best = each.id; }
+		return best;
+	}
+	<ul>@for (const ${item} of ${list}; key ${item}.id) {
+		<li>{${item}.id === ${fn}() ? 'top' : 'rest'}</li>
+	}</ul>
+}`,
+			symbols: [],
+		});
+		const definition = result.publicRenderModule.componentDefinitions.find(
+			(def) => def.name === name,
+		)!;
+		const reader = new Function(`return (${definition.residueReaderSource as string});`)();
+		const items = [
+			{ id: 'a', [field]: 1 },
+			{ id: 'b', [field]: 3 },
+		];
+		const source = `${item}.id === ${fn}() ? 'top' : 'rest'`;
+		const context = (index: number) => ({
+			read: (id: string) => (id === `state:${list}` ? items : undefined),
+			repeatItem: items[index],
+			repeatIndex: index,
+		});
+		expect(reader({ source }, context(0))).toBe('rest');
+		expect(reader({ source }, context(1))).toBe('top');
+	},
+);

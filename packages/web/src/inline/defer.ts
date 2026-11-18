@@ -12,6 +12,7 @@ import {
 	PROTOCOL_CONTAINER_START_COMMENT,
 } from '../../../serializer/src/protocol-page-markers.ts';
 import { PROTOCOL_STREAM_OPEN_PROPERTY } from '../../../serializer/src/protocol-stream-open.ts';
+import { RUNTIME_ERROR_REPORTED } from '../runtime-error-reporting.ts';
 
 /** Test seam: a root (or its prototype) may carry a clock that replaces the browser's frame and idle scheduling. */
 export type MarklessDeferClock = {
@@ -148,17 +149,31 @@ export function createMarklessDefer(
 			root.__marklessCensus ||= census(root);
 			root.__marklessDelegatedDispatch ||= eventName;
 			pending++;
+			const release = () => {
+				if (!--pending && root.__marklessDelegatedDispatch === eventName)
+					root.__marklessDelegatedDispatch = undefined;
+			};
 			(queue
 				? Promise.resolve(queue(input))
 				: (root.__mResume ||= loadModule(url)).then(
 						(module) => root.__mL === life && module.resumeContainerEvent(input),
+						(error) => {
+							// A failed import is not kept: the next forward or wake imports again.
+							root.__mResume = undefined;
+							throw error;
+						},
 					)
-			).then(() => {
-				if (root.__asyncResumeRuntimeStarted) return;
-				fired.add(host);
-				if (!--pending && root.__marklessDelegatedDispatch === eventName)
-					root.__marklessDelegatedDispatch = undefined;
-			});
+			).then(
+				() => {
+					if (root.__asyncResumeRuntimeStarted) return;
+					fired.add(host);
+					release();
+				},
+				(error) => {
+					release();
+					throw error;
+				},
+			);
 		};
 		const hosts: Element[] = ownsRoot ? [root] : [];
 		hosts.push(
@@ -180,7 +195,8 @@ export function createMarklessDefer(
 	return Object.assign(trigger, { idle });
 }
 
-export const INLINE_DEFER_LOADER_SOURCE = '(url) => import(/* @vite-ignore */ url)';
+// A boot's listener drops the promise it returns, so a failure the runtime already reported is not surfaced again as an unhandled rejection.
+export const INLINE_DEFER_LOADER_SOURCE = `(url) => import(/* @vite-ignore */ url).then((module) => ({ ...module, async resumeContainerEvent(input) { try { await module.resumeContainerEvent(input); } catch (error) { if (!error?.${RUNTIME_ERROR_REPORTED}) throw error; } } }))`;
 
 /** An expression that installs the helper once per document and evaluates to it; a build passes the factory minified. */
 export function inlineDeferSource(factory = createMarklessDefer.toString()): string {

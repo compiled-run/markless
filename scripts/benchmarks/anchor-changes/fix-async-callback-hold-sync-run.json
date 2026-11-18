@@ -1,0 +1,62 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 23,
+			"reason": "a callback's flush hold ends after its synchronous run, so the caller's writes no longer wait for an async callback to settle (one release call in resume-events); measured locally by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 4,
+			"reason": "a callback's flush hold ends after its synchronous run, so the caller's writes no longer wait for an async callback to settle (one release call in resume-events); measured locally by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 23,
+			"reason": "a callback's flush hold ends after its synchronous run, so the caller's writes no longer wait for an async callback to settle (one release call in resume-events); measured locally by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 4,
+			"reason": "a callback's flush hold ends after its synchronous run, so the caller's writes no longer wait for an async callback to settle (one release call in resume-events); measured locally by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -8,
+			"reason": "a callback's flush hold ends after its synchronous run, so the caller's writes no longer wait for an async callback to settle (one release call in resume-events); measured locally by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-13"
+		}
+	]
+}

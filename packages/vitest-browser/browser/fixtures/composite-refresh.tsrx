@@ -15,7 +15,7 @@ export const gate = shared(() => {
 			g.phase = g.phase === 'wide' ? 'shut' : 'wide';
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Frame({ pinned, children }) @{
 	const g = gate();

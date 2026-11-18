@@ -3,7 +3,7 @@ import { cleanup, render, renderSSR } from '../src/index.ts';
 import ThreePage from './fixtures/hi-three-page.tsrx';
 import TwoPage from './fixtures/hi-two-page.tsrx';
 
-// A widget-scoped element() handle names one element PER RENDERED WIDGET. With
+// A subtree-scoped element() handle names one element PER RENDERED WIDGET. With
 // two instances of the same widget on one page, every handler must reach its own
 // instance's element. Before this witness a flat by-handleId map answered every
 // handler with the LAST registration, so instance one's trigger poked instance

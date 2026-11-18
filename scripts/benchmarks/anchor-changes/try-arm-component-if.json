@@ -1,0 +1,38 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/ssr-data/renderer"
+			],
+			"delta": 99,
+			"reason": "the SSR structure records each anchor's enclosing anchor so a branch flip inside a @try rewires a composed component's own @if (+220 B rendered, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "the SSR structure records each anchor's enclosing anchor so a branch flip inside a @try rewires a composed component's own @if (+220 B rendered, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
+			],
+			"delta": 99,
+			"reason": "the SSR structure records each anchor's enclosing anchor so a branch flip inside a @try rewires a composed component's own @if (+220 B rendered, measured)",
+			"date": "2026-11-17"
+		}
+	]
+}

@@ -1,3 +1,4 @@
+import { hasLiveSharedDefinitions } from '../../serializer/src/protocol-shared-instances.ts';
 import { markupNodes } from './markup-nodes.ts';
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
@@ -11,6 +12,7 @@ import {
 import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
 import { applyDirectJournalEntries } from './dom-journal-direct.ts';
+import { isDirectJournalEntry, loadRangeJournal } from './dom-journal-load.ts';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
 import {
@@ -20,16 +22,18 @@ import {
 } from './inline/sync-policy-core.ts';
 import { registerServedArmEventRecords } from './resume-arm-records.ts';
 import type {
+	ResumeArmRegistration,
 	ResumeAsyncBoundaryPayload,
 	ResumeDispatchOptions,
 	ResumeDomElement,
 } from './resume-types.ts';
 import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
 import { reportRuntimeErrorToHost } from './runtime-error-reporting.ts';
+import {
+	marklessControlEditsRead,
+	marklessNoteArrivingControlEdits,
+} from './control-edit-hold.ts';
 import type { MarklessIdleHost } from './fns/idle-trigger.ts';
-
-// Even an evaluated module's import() costs a task.
-let journal: typeof import('./dom-journal.ts') | undefined;
 
 declare const __MARKLESS_DEV_ENABLED__: boolean;
 
@@ -38,6 +42,11 @@ type ExecutionLogGlobal = typeof globalThis & {
 	__mxLoadLog?: () => Promise<{
 		readonly logMarklessRenderSummary?: (input?: unknown) => unknown;
 	}>;
+};
+
+// Installed by a compiled module whose state declares a non-widget shared(); no module every app loads names it.
+type SharedInstancesHost = {
+	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-start.ts')>;
 };
 
 export async function renderCsrRuntime(input: {
@@ -120,7 +129,7 @@ export async function renderCsrRuntime(input: {
 				const applyDomJournal =
 					options.applyDomJournal ??
 					((entries: ReadonlyArray<DomJournalEntry>) =>
-						applyDefaultCsrDomJournal(entries, runtime!));
+						applyDefaultCsrDomJournal(entries, runtime!, () => disposed));
 				runtime = createResumeRuntime({
 					root: output.root,
 					graph,
@@ -173,13 +182,13 @@ export async function renderCsrRuntime(input: {
 			for (const release of cleanup.splice(0).reverse()) release();
 			runtime?.dispose();
 		},
-		// A page with no async boundary has nothing to settle; answering without the full runtime keeps a route swap demand-loaded.
+		// Without a served @try or a started runtime nothing can be settling, so a route swap stays demand-loaded.
 		whenAsyncBoundariesSettled: async () => {
-			if (view.asyncBoundaries.length === 0) return;
+			if (view.asyncBoundaries.length === 0 && !runtime) return;
 			await (await demandRuntime()).whenAsyncBoundariesSettled?.();
 		},
 		holdPendingSettleCommits: async (ms) => {
-			if (view.asyncBoundaries.length === 0) return;
+			if (view.asyncBoundaries.length === 0 && !runtime) return;
 			await (await demandRuntime()).holdPendingSettleCommits?.(ms);
 		},
 	};
@@ -224,6 +233,14 @@ export async function renderCsrRuntime(input: {
 		await (await demandRuntime()).activateBehaviors(hostNodeId);
 	// Set only by an app module with an `onIdle` record; the runtime it starts at idle queues the hosts.
 	(globalThis as MarklessIdleHost).__mIdle?.wake(output.root, demandRuntime);
+	if (hasLiveSharedDefinitions(state))
+		(
+			await (globalThis as SharedInstancesHost).__marklessSharedInstances?.()
+		)?.registerDormantContainer(
+			output.root,
+			state,
+			() => void (disposed || deferredRuntime.start()),
+		);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await registerDelegatedTriggerDebug(output, view);
 	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();
@@ -428,7 +445,12 @@ function installDelegatedTriggers(
 					? actionKind === PROTOCOL_EVENT_ACTION_KIND.event && record.syncPolicy
 					: !syncPolicyApplied && rowPolicy(element as RowNode, event.type, path);
 				if (policy) {
-					runSyncPolicyActions(policy, syncPolicyGraph, event as unknown as SyncPolicyDomEvent);
+					marklessControlEditsRead(event);
+					runSyncPolicyActions(
+						policy,
+						syncPolicyGraph,
+						event as unknown as SyncPolicyDomEvent,
+					);
 					syncPolicyApplied = true;
 				}
 			}
@@ -437,11 +459,12 @@ function installDelegatedTriggers(
 			if (!actionKind && rowEventNames.has(event.type))
 				actionKind = PROTOCOL_EVENT_ACTION_KIND.event;
 			if (!actionKind) {
-				const pending = (
-					output.root as { __marklessArmRegistering?: Set<Promise<unknown>> }
-				).__marklessArmRegistering;
-				return !retried && pending?.size
-					? Promise.all(pending).then(() => route(event, true))
+				const pending = [
+					...((output.root as { __marklessArmRegistering?: Set<ResumeArmRegistration> })
+						.__marklessArmRegistering ?? []),
+				].filter((entry) => entry.holds(event.target));
+				return !retried && pending.length
+					? Promise.all(pending.map((entry) => entry.settled)).then(() => route(event, true))
 					: undefined;
 			}
 			const action = routes[actionKind];
@@ -452,21 +475,28 @@ function installDelegatedTriggers(
 					throw unroutedDelegatedTriggerError(actionKind);
 				return;
 			}
-			await action(
-				event,
-				{ ignoreUnmatched: !named, syncPolicyAlreadyApplied: syncPolicyApplied },
-			);
+			// The walk runs after the browser has reset cancelBubble, so the stop is read now.
+			await action(event, {
+				ignoreUnmatched: !named,
+				syncPolicyAlreadyApplied: syncPolicyApplied,
+				propagationStopped: event.cancelBubble === true,
+			});
 		};
 		// addEventListener drops the returned promise, so a rejection would escape
 		// the flush unhandled: contain it here and report it instead.
-		const listener = (event: DelegatedEvent) =>
-			route(event).catch((error) =>
-				reportRuntimeErrorToHost(error, {
-					phase: 'event',
-					eventName: event.type,
-					selector: delegatedTargetTag(event.target),
-				}),
-			);
+		const listener = (event: DelegatedEvent) => {
+			// A row placed before its records register takes edits a waiting route has not dispatched yet.
+			const releaseControlEdits = marklessNoteArrivingControlEdits(event);
+			return route(event)
+				.catch((error) =>
+					reportRuntimeErrorToHost(error, {
+						phase: 'event',
+						eventName: event.type,
+						selector: delegatedTargetTag(event.target),
+					}),
+				)
+				.finally(releaseControlEdits);
+		};
 		output.root.addEventListener?.(eventName, listener, { capture: true });
 		releases.push(() =>
 			output.root.removeEventListener?.(eventName, listener, { capture: true }),
@@ -512,7 +542,8 @@ function installDelegatedTriggers(
 	};
 	const installEventNames = (eventName: string) => {
 		installEventListener(eventName);
-		if (isFocusPreloadEventName(eventName)) installPreloadTrigger('focusin', focusPreloadEventNames);
+		if (isFocusPreloadEventName(eventName))
+			installPreloadTrigger('focusin', focusPreloadEventNames);
 		// pointerenter does not bubble, so a delegated listener would only ever see
 		// the container's own crossing.
 		if (PRESS_EVENT_NAMES.includes(eventName))
@@ -620,11 +651,14 @@ function delegatedTargetTag(target: { readonly tagName?: unknown } | null | unde
 async function applyDefaultCsrDomJournal(
 	entries: ReadonlyArray<DomJournalEntry>,
 	runtime: ResumeRuntime,
+	disposed: () => boolean,
 ): Promise<void> {
+	// Loaded before any entry applies, so a text and the branch beside it land in one task.
+	const journal = entries.every(isDirectJournalEntry) ? undefined : await loadRangeJournal();
+	if (disposed()) return;
 	const deferred = applyDirectJournalEntries(entries, (locator) => runtime.getElement(locator));
 	if (deferred.length === 0) return;
-	const { applyDomJournalEntries } = (journal ??= await import('./dom-journal.ts'));
-	applyDomJournalEntries(deferred, {
+	journal!.applyDomJournalEntries(deferred, {
 		resolveTarget(locator) {
 			const rangeAnchor = /^(branch|async-boundary):(.+?):(start|end)$/.exec(String(locator));
 			if (rangeAnchor) {

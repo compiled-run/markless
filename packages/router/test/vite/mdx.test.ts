@@ -9,6 +9,7 @@ import {
 	transformMdxRoute,
 } from '../../src/vite/mdx.ts';
 import { createMdxRenderDataSurface } from '../../src/vite/runtime/mdx-route.ts';
+import { marklessOwningSurface } from '../../../web/src/prerender/owning-surface.ts';
 import { servedRenderDataSourceReference } from '../../../bundler/src/served-render-data.ts';
 
 const fixtureRoot = mkdtempSync(join(tmpdir(), 'markless-mdx-config-'));
@@ -218,11 +219,9 @@ This page is static markdown.
 				'createMdxRenderDataSurface',
 				'marklessImport',
 				`const marklessMdxParts = ${declared('marklessMdxParts') ?? '[]'};\nreturn ${loader!.replaceAll('import(', 'marklessImport(')};`,
-			)(createMdxRenderDataSurface, async () => island) as () => Promise<{
-				readonly imports: Record<string, unknown>;
-			}>;
+			)(createMdxRenderDataSurface, async () => island) as () => Promise<unknown>;
 			const composed = await load();
-			expect(composed.imports, id).toEqual({ Steps: surface });
+			expect(marklessOwningSurface(composed as never, 'Steps')?.surface, id).toEqual(surface);
 		}
 	});
 
@@ -276,10 +275,31 @@ This page is static markdown.
 		}
 	});
 
-	it('static markdown routes name no overlay or roster loader', async () => {
+	it('composed and resume routes install the async planes loader before any island resumes', async () => {
+		for (const id of ['/project/pages/docs/weather.mdx', '/project/pages/docs/weather.mdx?markless-resume']) {
+			const code = await transformMdxRoute(
+				`import Forecast from '../../components/Forecast.tsrx';
+
+# Weather
+
+<Forecast />
+`,
+				id,
+			);
+
+			expect(code).toContain("import('@markless/web/fns/async-plane')");
+			expect(code.indexOf('globalThis.__marklessAsyncPlanes ??=')).toBeGreaterThan(-1);
+			expect(code.indexOf('globalThis.__marklessAsyncPlanes ??=')).toBeLessThan(
+				code.indexOf('export function resumeContainerEvent'),
+			);
+		}
+	});
+
+	it('static markdown routes name no overlay, roster or async planes loader', async () => {
 		const code = await transformMdxRoute('# Docs\n', '/project/pages/docs.mdx');
 		expect(code).not.toContain('__marklessOverlay');
 		expect(code).not.toContain('__marklessRosterResume');
+		expect(code).not.toContain('__marklessAsyncPlanes');
 	});
 
 	it('links MDX child render data through the materialized route context', async () => {

@@ -2,15 +2,19 @@ import { parseModule } from '../../js-ast.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { componentMarkupRoot } from './component-markup-root.ts';
+import { collectSsrAsyncRunners } from './html.ts';
 import { renderBodyLines } from './render-body.ts';
 import {
 	carriedSharedSeedSources,
+	ssrAsyncRegistryLines,
 	ssrSeedForwardBlockLines,
 	type SsrDataLines,
 } from './ssr-module.ts';
 import {
 	componentSharedSeeds,
 	sharedSeedConsumeLine,
+	sharedInstanceValuesConsumeLine,
+	sharedInstanceValuesOpenLine,
 	sharedSeedMarkerLine,
 	sharedSeedPassLines,
 	widgetRootDefinitionIds,
@@ -32,7 +36,18 @@ import {
 	type ComponentReference,
 	ssrComposedPayloadView,
 } from './shared.ts';
+import { componentSeedCellIndexes } from './derive-set.ts';
 import { ssrComposeStateExpression } from './prop-cell-seed.ts';
+
+// A boundary case runs its runner through the registry only when the boundary has one.
+function settlesAsyncBoundary(input: PublicRenderModuleInput, componentName: string): boolean {
+	const runners = collectSsrAsyncRunners(input);
+	return input.renderData.chunks.some(
+		(chunk) =>
+			chunk.componentName === componentName &&
+			chunk.slots.some((slot) => slot.kind === 'async' && runners.has(slot.boundaryId)),
+	);
+}
 
 export function ssrComponentFunctionName(componentName: string): string {
 	return `marklessRenderSsr${componentName}`;
@@ -107,7 +122,7 @@ export function emitSameModuleSsrComponents(
 		const payloadStateExpression = `marklessSelectStateNodes(marklessCloneState(payloadState), ${selectedStateNodeArguments(owned)})`;
 		return [
 			`const ${valuesName} = new Map([`,
-			stateEntries(input, owned.seedCellIndexes).join(',\n'),
+			stateEntries(input, componentSeedCellIndexes(input, componentName, owned)).join(',\n'),
 			']);',
 			localName ? `const ${localName} = { renderSsr: ${functionName} };` : null,
 			`async function ${functionName}(marklessSsrProps = {}, marklessSsrRenderContext) {`,
@@ -128,6 +143,13 @@ export function emitSameModuleSsrComponents(
 			`	const marklessSsrPayloadState = ${payloadStateExpression};`,
 			`	const marklessSsrRenderStateValues = new Map(${valuesName});`,
 			sharedSeedConsumeLine(input, componentName, 'marklessSsrRenderStateValues'),
+			sharedInstanceValuesConsumeLine(
+				input,
+				componentName,
+				'marklessSsrRenderStateValues',
+				'marklessSsrPayloadState',
+			),
+			sharedInstanceValuesOpenLine(input, componentName),
 			...dataLines.carriedSeed,
 			...renderBodyLines(
 				input,
@@ -139,6 +161,7 @@ export function emitSameModuleSsrComponents(
 					'const marklessSsrChildren = [];',
 					'const marklessSsrBranches = [];',
 					'const marklessSsrAsyncSnapshots = [];',
+					...(settlesAsyncBoundary(input, componentName) ? ssrAsyncRegistryLines(input) : []),
 					...dataLines.render,
 				],
 				dataLines.bodySharedComputed,

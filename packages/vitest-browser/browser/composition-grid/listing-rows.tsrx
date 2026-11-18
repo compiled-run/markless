@@ -1,0 +1,14 @@
+import { failSave, saveRow, type Board } from './grid-server.ts';
+import RowItem from './row-item.tsrx';
+
+export default function ListingRows({ board }: { board: Board }) @{
+	<div>
+		<ul>
+			@for (const row of board.items; key row.id) {
+				<RowItem row={row} />
+			}
+		</ul>
+		<button type="button" data-grid-save onClick={async () => await saveRow(board.subject)}>Save</button>
+		<button type="button" data-grid-fail onClick={async () => await failSave(board.subject)}>Fail</button>
+	</div>
+}

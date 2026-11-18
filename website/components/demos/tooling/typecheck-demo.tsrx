@@ -109,7 +109,12 @@ export default function TypecheckDemo() @{
 			}
 
 			.board[data-bad='yes'] .wrong {
-				background: color-mix(in srgb, var(--pink) 22%, var(--paper));
+				background: color-mix(in srgb, var(--pink) 22%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.board[data-bad='yes'] .error {

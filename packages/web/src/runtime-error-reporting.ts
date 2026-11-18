@@ -55,7 +55,7 @@ export function enrichRuntimeErrorForReporting(
 
 // Outer containment boundaries re-report whatever they catch; this flag keeps a
 // failure the dispatch layer already surfaced from reaching the surface twice.
-const RUNTIME_ERROR_REPORTED = '__marklessRuntimeErrorReported';
+export const RUNTIME_ERROR_REPORTED = '__mReported';
 
 export function markRuntimeErrorReported(error: ReportableError): void {
 	try {

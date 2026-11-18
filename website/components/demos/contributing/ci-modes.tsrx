@@ -105,7 +105,12 @@ export default function CiModes() @{
 			.board[data-mode='fast'] .fast,
 			.board[data-mode='full'] :is(.fast, .full),
 			.board[data-mode='ci'] .bench {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			@media (max-width: 40rem) {

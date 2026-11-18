@@ -23,7 +23,7 @@ export const pickWidget = shared(() => {
 	const s = state({ label: 'unset', selected: false });
 
 	return { ...s };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Chair({ label }) @{
 	const seat = pickWidget();

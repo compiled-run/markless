@@ -4,11 +4,7 @@ import {
 	missingElementLocatorError,
 	runtimeResumeError,
 } from './inline/resume-errors.ts';
-import {
-	isArmBranchAnchorComment,
-	marklessElementAt,
-	pageCommentCensus,
-} from './resume-anchor-census.ts';
+import { marklessElementAt, pageCommentCensus } from './resume-anchor-census.ts';
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
@@ -18,6 +14,13 @@ import type {
 	ResumeDomElement,
 	ResumeDomNode,
 } from './resume-types.ts';
+
+// Arm-branch anchors index in their owning boundary's census, never the page's.
+function isArmBranchAnchorComment(comment: ResumeDomComment): boolean {
+	const text = comment.data ?? (comment as { readonly textContent?: string }).textContent ?? '';
+	return /^\/?markless:(?:arm-)?branch:/.test(text);
+}
+
 export {
 	composedArmRecordQualifier,
 	installComposedArmRecordQualifier,
@@ -228,32 +231,33 @@ function materializeArmBranchRecords(
 	const planned = (anchor: ResumeArmBranchRecord['startAnchor']) =>
 		anchor as { readonly strategy?: string; readonly index?: number } | undefined;
 	// A composed child's own branch arrives still spelling the index it counted in
-	// its OWN module's census, which names nothing here; its anchors carry its
-	// instance-prefixed id, so the anchor text is the exact page-wide address.
+	// its OWN module's census, which names nothing here; its anchors carry its page id.
 	const composed = (record: ResumeArmBranchRecord) =>
 		planned(record.startAnchor)?.strategy === 'dom-order-comment';
 	const census = records.some(
-		(record) => !composed(record) && planned(record.startAnchor)?.index !== undefined,
+		(record) => composed(record) || planned(record.startAnchor)?.index !== undefined,
 	)
 		? armBranchCommentCensus(input.root, input.startAnchor, input.endAnchor)
 		: [];
-	let pageComments: ReadonlyArray<ResumeDomComment> | undefined;
-	const anchorNamed = (text: string): ResumeDomComment | undefined => {
-		pageComments ??= pageCommentCensus(input.root, true);
-		return pageComments.find((comment) => commentText(comment) === text);
-	};
 	return records.map((record) => {
 		if (composed(record)) {
-			const startAnchor = anchorNamed(`markless:branch:${record.id}`);
-			const endAnchor = anchorNamed(`/markless:branch:${record.id}`);
+			const own = (mark: string) =>
+				census.find((comment) => commentText(comment) === `${mark}markless:branch:${record.id}`);
+			const startAnchor = own('');
+			const endAnchor = own('/');
 			if (!startAnchor || !endAnchor) throw missingComposedArmBranchAnchorError(record.id);
 			return { ...record, startAnchor, endAnchor };
 		}
 		const startIndex = planned(record.startAnchor)?.index;
 		const endIndex = planned(record.endAnchor)?.index;
 		if (startIndex === undefined || endIndex === undefined) return record;
-		const startAnchor = census[startIndex];
-		const endAnchor = census[endIndex];
+		// A branch nested in another's arm is found by name: planned indexes count siblings only.
+		const named = (index: number, mark: string) =>
+			[census[index], ...census].find(
+				(comment) => comment && commentText(comment) === `${mark}markless:arm-branch:${record.id}`,
+			);
+		const startAnchor = named(startIndex, '');
+		const endAnchor = named(endIndex, '/');
 		if (!startAnchor || !endAnchor) throw missingArmBranchAnchorError(record.id, startIndex);
 		return { ...record, startAnchor, endAnchor };
 	});

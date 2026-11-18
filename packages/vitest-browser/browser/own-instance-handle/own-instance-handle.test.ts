@@ -4,7 +4,7 @@ import NestPage from './nest-page.tsrx';
 import OutsidePage from './outside-page.tsrx';
 import PairPage from './pair-page.tsrx';
 
-// A handler on the part that BINDS a widget-scoped element() handle must reach
+// A handler on the part that BINDS a subtree-scoped element() handle must reach
 // its own instance's element, at any nesting depth.
 afterEach(() => cleanup());
 

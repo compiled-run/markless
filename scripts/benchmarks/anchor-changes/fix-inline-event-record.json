@@ -1,0 +1,104 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/event-current-target"
+			],
+			"delta": 171,
+			"reason": "the per-container record of unhandled events and its settle moved here from web/resume-events (which shrinks by the same 171 B) so the lean closure path settles a navigation's wait when its handler returns a promise",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": -171,
+			"reason": "the record of unhandled events and its settle moved to web/event-current-target",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/event-current-target"
+			],
+			"delta": 171,
+			"reason": "the per-container record of unhandled events and its settle moved here from web/resume-events (which shrinks by the same bytes) so the lean closure path settles a navigation's wait when its handler returns a promise",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": -171,
+			"reason": "the per-container record of unhandled events and its settle moved here from web/resume-events (which shrinks by the same bytes) so the lean closure path settles a navigation's wait when its handler returns a promise",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 29,
+			"reason": "the per-container record of unhandled events and its settle moved here from web/resume-events (which shrinks by the same bytes) so the lean closure path settles a navigation's wait when its handler returns a promise",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/event-current-target"
+			],
+			"delta": 171,
+			"reason": "the per-container record of unhandled events and its settle moved here from web/resume-events (which shrinks by the same bytes) so the lean closure path settles a navigation's wait when its handler returns a promise",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": -171,
+			"reason": "the per-container record of unhandled events and its settle moved here from web/resume-events (which shrinks by the same bytes) so the lean closure path settles a navigation's wait when its handler returns a promise",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -3,
+			"reason": "the per-container record of unhandled events and its settle moved here from web/resume-events (which shrinks by the same bytes) so the lean closure path settles a navigation's wait when its handler returns a promise",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 34,
+			"reason": "the per-container record of unhandled events and its settle moved here from web/resume-events (which shrinks by the same bytes) so the lean closure path settles a navigation's wait when its handler returns a promise",
+			"date": "2026-11-12"
+		}
+	]
+}

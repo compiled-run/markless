@@ -2,11 +2,9 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, webkit, type BrowserType } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 
@@ -52,13 +50,9 @@ type Built = { root: string; server: BuiltServer };
 async function buildApp(count: number): Promise<Built> {
 	const root = await mkdtemp(join(tmpdir(), 'markless-landing-resume-'));
 	await writeApp(root, count);
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
 	});
-	await builder.buildApp();
 	return {
 		root,
 		server: await startBuiltServer(join(root, '.output/server/index.mjs'), { cwd: root }),

@@ -11,29 +11,12 @@ test('computed-repeat-async-arm.tsrx emits native async and repeat chunks', asyn
 	);
 });
 
-const diseaseFixtures = [
-	{
-		filename: 'for-call-expression.tsrx',
-		observe(result: Awaited<ReturnType<typeof compileFixture>>) {
-			return {
-				diagnostics: collectTsrxModuleDiagnostics(result).map(diagnosticIdentity),
-				keyedRepeatCount: result.payloadArena.view.keyedRepeats.length,
-				directRepeatCount: result.renderData.repeats.filter((repeat) => repeat.directSupported)
-					.length,
-			};
-		},
-	},
-] as const;
-
-// DISEASE PIN: this fixture intentionally preserves today's silent/broken
-// compiler behavior. A later architecture package must flip this assertion
-// to an expected build error; it must not make the silent output look supported.
-for (const fixture of diseaseFixtures) {
-	test(`pins the current disease for ${fixture.filename}`, async () => {
-		const result = await compileFixture(fixture.filename);
-		expect(fixture.observe(result)).toMatchSnapshot();
-	});
-}
+test('for-call-expression.tsrx keys its rows on a derived collection the browser re-runs', async () => {
+	const result = await compileFixture('for-call-expression.tsrx');
+	expect(collectTsrxModuleDiagnostics(result)).toEqual([]);
+	expect(result.payloadArena.view.keyedRepeats).toHaveLength(1);
+	expect(result.renderData.repeats.map((repeat) => repeat.directSupported)).toEqual([true]);
+});
 
 async function compileFixture(filename: string) {
 	const url = new URL(filename, import.meta.url);
@@ -44,16 +27,4 @@ async function compileFixture(filename: string) {
 		resolverId: `executed-at-load-negative-${filename}-resolver`,
 		symbols: [],
 	});
-}
-
-function diagnosticIdentity(diagnostic: {
-	readonly code: string;
-	readonly severity: string;
-	readonly message: string;
-}) {
-	return {
-		code: diagnostic.code,
-		severity: diagnostic.severity,
-		message: diagnostic.message,
-	};
 }

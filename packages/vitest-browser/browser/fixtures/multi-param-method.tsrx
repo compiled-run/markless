@@ -36,7 +36,7 @@ export const buf = shared(() => {
 			b.onOpenChange?.(next);
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ onOpenChange }) @{
 	const b = buf();

@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { transformTsrxModule } from '../src/transform.ts';
 
 // The pay-per-use gate on the shared-seed pass. It used to ask one question —
-// did this module plan a `shared-seed` symbol — and a widget-scoped family of
+// did this module plan a `shared-seed` symbol — and a subtree-scoped family of
 // element() handles over CONSTANT state plans none, so the pass never
 // installed, no widget-instance token was ever filed, and the first CSR mint
 // threw MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING while SSR's own marker
@@ -17,7 +17,7 @@ const INSTALL_IMPORT =
 	"import { installMarklessSharedSeedPass } from '@markless/web/fns/shared-seed';";
 const INSTALL_CALL = 'installMarklessSharedSeedPass();';
 
-// A page-scoped `shared()` is not `scope: 'widget'`, so it roots no widget and
+// An app-scoped `shared()` is not `scope: 'subtree'`, so it roots no widget and
 // nothing here can mint a widget-instance id. This is the zero-cost shape.
 const NO_WIDGET_SOURCE = `
 import { shared, state } from '@markless/core';
@@ -43,7 +43,7 @@ export default function ZcPage() @{
 }
 `;
 
-// The defect shape: widget scope, an element() handle, and state whose only
+// The defect shape: subtree scope, an element() handle, and state whose only
 // initial is a constant — so the compiler plans no shared-seed symbol at all.
 const WIDGET_ROOT_SOURCE = `
 import { element, shared, state } from '@markless/core';
@@ -55,7 +55,7 @@ export const wgField = shared(
 
 		return { ...s, inputEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function WgRoot({ children }) @{
@@ -110,7 +110,7 @@ test('a module that roots no widget keeps its render-data emission byte-identica
 // The row the widening exists for. Its seedless family is what the old gate
 // could not see, and the install is all the module pays: the render data either
 // side of the two-line prelude is what it was before.
-test('a widget-scoped element() family with no planned seed still installs the pass', async () => {
+test('a subtree-scoped element() family with no planned seed still installs the pass', async () => {
 	const source = await renderDataSource('widgetRoot', WIDGET_ROOT_SOURCE);
 	const [importLine, callLine, ...rest] = source.split('\n');
 	const payload = rest.join('\n');

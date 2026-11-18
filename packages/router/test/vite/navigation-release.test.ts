@@ -2,12 +2,10 @@ import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser, type Page } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // In-place navigations between pages of one route, on a production build served by its own Nitro server in Chromium.
 
@@ -26,13 +24,9 @@ beforeAll(async () => {
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
 	});
-	await builder.buildApp();
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
@@ -70,37 +64,27 @@ test('in-place navigations leave no window or document listeners behind and reta
 		await cdp.send('Runtime.releaseObjectGroup', { objectGroup: 'leak' });
 		return types.sort();
 	};
-	// Every DOM node the page's heap still holds, live or detached, in every document it parsed.
+	// Every DOM node and document the renderer still holds, live or detached, with or without a JavaScript wrapper.
 	const retainedNodes = async () => {
 		await cdp.send('HeapProfiler.collectGarbage');
 		await cdp.send('HeapProfiler.collectGarbage');
-		const { result: prototype } = await cdp.send('Runtime.evaluate', {
-			expression: 'Node.prototype',
-			objectGroup: 'leak',
-		});
-		const { objects } = await cdp.send('Runtime.queryObjects', {
-			prototypeObjectId: prototype.objectId!,
-			objectGroup: 'leak',
-		});
-		const { result } = await cdp.send('Runtime.callFunctionOn', {
-			objectId: objects.objectId!,
-			functionDeclaration: `function () {
-				const nodes = this.filter((node) => { try { return typeof node.nodeType === 'number'; } catch { return false; } });
-				return { nodes: nodes.length, documents: nodes.filter((node) => node.nodeType === 9).length };
-			}`,
-			returnByValue: true,
-		});
-		await cdp.send('Runtime.releaseObjectGroup', { objectGroup: 'leak' });
-		await cdp.send('HeapProfiler.collectGarbage');
-		// JavaScript objects and the DOM nodes behind them.
-		const heap = (await cdp.send('Runtime.getHeapUsage')) as {
-			usedSize: number;
-			embedderHeapUsedSize?: number;
+		const { nodes, documents } = await cdp.send('Memory.getDOMCounters');
+		// Reachable objects only: the heap's used size also counts space V8 has not reclaimed, which swung 47 to 192 kB on one tree.
+		const chunks: string[] = [];
+		const collect = ({ chunk }: { chunk: string }) => chunks.push(chunk);
+		cdp.on('HeapProfiler.addHeapSnapshotChunk', collect);
+		await cdp.send('HeapProfiler.takeHeapSnapshot', { reportProgress: false });
+		cdp.off('HeapProfiler.addHeapSnapshotChunk', collect);
+		const { snapshot, nodes: heapNodes } = JSON.parse(chunks.join('')) as {
+			snapshot: { meta: { node_fields: string[] } };
+			nodes: number[];
 		};
-		return {
-			...(result.value as { nodes: number; documents: number }),
-			heapKB: (heap.usedSize + (heap.embedderHeapUsedSize ?? 0)) / 1024,
-		};
+		const fields = snapshot.meta.node_fields;
+		const selfSize = fields.indexOf('self_size');
+		let bytes = 0;
+		for (let index = selfSize; index < heapNodes.length; index += fields.length)
+			bytes += heapNodes[index]!;
+		return { nodes, documents, heapKB: bytes / 1024 };
 	};
 	let n = 0;
 	const navigate = async (times: number) => {
@@ -137,9 +121,9 @@ test('in-place navigations leave no window or document listeners behind and reta
 	const after = await retainedNodes();
 	expect(listenersAfter).toEqual(listeners);
 	expect(after.documents).toBeLessThanOrEqual(settled.documents);
-	// A held page adds about 130 nodes per visit; the count moves by a node or so with timing alone.
+	// A held page adds about 630 nodes; without one the count does not move.
 	expect(after.nodes).toBeLessThanOrEqual(settled.nodes + 16);
-	// Measured over these ten visits: about 1.5 MB of growth with the leak, about 30 kB without.
+	// Reachable growth over these ten visits without a leak: 39 to 88 kB in 12 runs at 6x CPU throttle.
 	expect(after.heapKB - settled.heapKB).toBeLessThan(300);
 	expect(errors).toEqual([]);
 	await page.close();

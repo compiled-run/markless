@@ -1,13 +1,11 @@
 import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { chromium, type Browser } from '@playwright/test';
-import { createBuilder } from 'vite';
+import { chromium, type Browser, type Page } from '@playwright/test';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // An async value in a component the page imports, on a production build served by its own Nitro server.
 
@@ -26,13 +24,10 @@ beforeAll(async () => {
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	const builder = await createBuilder({
+	await symlink(resolve(packagesRoot, 'router/node_modules/nitro'), join(root, 'node_modules/nitro'), 'dir');
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
 	});
-	await builder.buildApp();
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
@@ -72,4 +67,168 @@ test('each instance of an async component, at any depth, streams its own value',
 
 test('a child with no props and a @try without @catch streams its value', async () => {
 	await served('/child-async-not-streamed', ['loaded child']);
+});
+
+const browserRuns = (page: Page) => page.evaluate(() => (window as { browserRuns?: number }).browserRuns ?? 0);
+
+// What the child shows now, without waiting: its value, its @pending, or the @catch text when the browser run failed.
+async function detailText(page: Page) {
+	if (await page.locator('#detail-failed').count()) return `failed: ${await page.locator('#detail-failed').textContent()}`;
+	if (await page.locator('#detail-pending').count()) return 'pending';
+	return page.locator('#detail').textContent();
+}
+
+// A component placed in a layout's children reads the page's `params` and `url` like one placed directly.
+for (const placement of ['framed', 'direct']) {
+	test(`a ${placement} child's value from params and url streams from the server, and the browser does not load it again`, async () => {
+		const page = await browser!.newPage();
+		const errors: string[] = [];
+		page.on('pageerror', (error) => errors.push(error.message));
+		await page.goto(`${server!.origin}/${placement}/abc`);
+		await expect.poll(() => page.locator('#detail').textContent(), { timeout: 5_000 }).toBe(`got abc at /${placement}/abc #1`);
+		await page.waitForLoadState('networkidle');
+		expect(await browserRuns(page)).toBe(0);
+		expect(await page.locator('#detail-failed').count()).toBe(0);
+		expect(errors).toEqual([]);
+		await page.close();
+	});
+
+	test(`a ${placement} child rendered by client navigation reads params and url`, async () => {
+		const page = await browser!.newPage();
+		await page.goto(`${server!.origin}/links`);
+		await page.locator(`#to-${placement}`).click();
+		await expect.poll(() => page.locator('#detail').textContent(), { timeout: 5_000 }).toBe(`got xyz at /${placement}/xyz #1`);
+		await page.close();
+	});
+
+	test(`a ${placement} child's value re-run in the browser reads the page's url`, async () => {
+		const page = await browser!.newPage();
+		await page.goto(`${server!.origin}/${placement}/abc`);
+		await expect.poll(() => page.locator('#detail').textContent(), { timeout: 5_000 }).toBe(`got abc at /${placement}/abc #1`);
+		await page.locator('#again').click();
+		await expect.poll(() => detailText(page), { timeout: 5_000 }).toBe(`got abc at /${placement}/abc #2`);
+		await page.close();
+	});
+}
+
+// A child whose async value reads the page's `params.id` and a `url` search value, wherever it sits.
+// Each re-run in the browser reads what the first run read: no request with an undefined id, never the @catch.
+type NoteRun = { readonly page: Page; readonly asked: string[]; readonly errors: string[] };
+
+async function openNote(path: string): Promise<NoteRun> {
+	const page = await browser!.newPage();
+	const asked: string[] = [];
+	const errors: string[] = [];
+	page.on('request', (request) => {
+		const url = new URL(request.url());
+		if (url.pathname === '/api/note') asked.push(`${request.method()} ${url.search}`);
+	});
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(`${server!.origin}${path}`);
+	return { page, asked, errors };
+}
+
+const noteText = async (page: Page) =>
+	(await page.locator('#note-failed').count()) ? `failed: ${await page.locator('#note-failed').textContent()}` : await page.locator('#note').textContent();
+
+async function expectNote(run: NoteRun, text: string) {
+	await expect.poll(() => noteText(run.page), { timeout: 5_000 }).toBe(text);
+}
+
+async function expectReRuns(run: NoteRun, id: string, firstRound: number) {
+	await run.page.locator('#again').click();
+	await expectNote(run, `note ${id} tab info rev 0 #${firstRound + 1}`);
+	await run.page.locator('#save').click();
+	await expectNote(run, `note ${id} tab info rev 1 #${firstRound + 2}`);
+	await run.page.waitForLoadState('networkidle');
+	const query = `?id=${id}&tab=info`;
+	expect(run.asked.filter((entry) => entry !== `GET ${query}` && entry !== `POST ?id=${id}`)).toEqual([]);
+	expect(run.asked.filter((entry) => entry === `POST ?id=${id}`)).toHaveLength(1);
+	expect(await run.page.locator('#note-failed').count()).toBe(0);
+	expect(run.errors).toEqual([]);
+	await run.page.close();
+}
+
+for (const placement of ['direct', 'framed', 'deep']) {
+	test(`a ${placement} note served by the server re-runs in the browser with the page's params and url`, async () => {
+		const id = `served-${placement}`;
+		const run = await openNote(`/note/${placement}/${id}?tab=info`);
+		await expectNote(run, `note ${id} tab info rev 0 #1`);
+		await run.page.waitForLoadState('networkidle');
+		expect(run.asked).toEqual([]);
+		await expectReRuns(run, id, 1);
+	});
+}
+
+test('a note opened by a click in an @if arm reads the page\'s params and url on its first run and every re-run', async () => {
+	const id = 'served-opened';
+	const run = await openNote(`/note/opened/${id}?tab=info`);
+	await run.page.locator('#open').click();
+	await expectNote(run, `note ${id} tab info rev 0 #1`);
+	await expectReRuns(run, id, 1);
+});
+
+for (const placement of ['direct', 'framed', 'deep', 'opened']) {
+	test(`a ${placement} note reached by client navigation re-runs with the new page's params and url`, async () => {
+		const id = `nav-${placement}`;
+		const run = await openNote('/note-links');
+		await run.page.locator(`#to-${placement}`).click();
+		await expect.poll(() => new URL(run.page.url()).pathname).toBe(`/note/${placement}/${id}`);
+		if (placement === 'opened') await run.page.locator('#open').click();
+		await expectNote(run, `note ${id} tab info rev 0 #1`);
+		await expectReRuns(run, id, 1);
+	});
+}
+
+// A child that takes its props as one bag and reads members of it in its async value reads the page's values on every run.
+test('a child that takes its props as one bag re-runs with the page\'s params and url', async () => {
+	const id = 'served-bag';
+	const run = await openNote(`/note/bag/${id}?tab=info`);
+	await expectNote(run, `note ${id} tab info rev 0 #1`);
+	await run.page.waitForLoadState('networkidle');
+	expect(run.asked).toEqual([]);
+	await run.page.locator('#again').click();
+	await expectNote(run, `note ${id} tab info rev 0 #2`);
+	expect(run.asked).toEqual([`GET ?id=${id}&tab=info`]);
+	expect(run.errors).toEqual([]);
+	await run.page.close();
+});
+
+test('a note the server renders in an @if arm open at load re-runs with the page\'s params and url, also after the arm closes and reopens', async () => {
+	const id = 'served-open';
+	const run = await openNote(`/note/served-open/${id}?tab=info`);
+	await expectNote(run, `note ${id} tab info rev 0 #1`);
+	await run.page.waitForLoadState('networkidle');
+	expect(run.asked).toEqual([]);
+	await run.page.locator('#again').click();
+	await expectNote(run, `note ${id} tab info rev 0 #2`);
+	await run.page.locator('#toggle').click();
+	await expect.poll(() => run.page.locator('#note').count()).toBe(0);
+	await run.page.locator('#toggle').click();
+	await expectNote(run, `note ${id} tab info rev 0 #1`);
+	await run.page.locator('#again').click();
+	await expectNote(run, `note ${id} tab info rev 0 #2`);
+	expect(run.asked.every((entry) => entry === `GET ?id=${id}&tab=info`)).toBe(true);
+	expect(run.errors).toEqual([]);
+	await run.page.close();
+});
+
+test('a component row whose async value reads the page\'s params and url streams, then re-runs with them', async () => {
+	const id = 'served-rows';
+	const run = await openNote(`/note/rows/${id}?tab=info`);
+	const row = (part: string) => run.page.locator(`li[data-part="${part}"]`);
+	const shown = async (part: string) =>
+		(await row(part).locator('[data-note-failed]').count())
+			? `failed: ${await row(part).locator('[data-note-failed]').textContent()}`
+			: await row(part).locator('[data-note]').textContent({ timeout: 100 }).catch(() => null);
+	for (const part of ['a', 'b'])
+		await expect.poll(() => shown(part), { timeout: 5_000 }).toBe(`note ${id}-${part} tab info rev 0 #1`);
+	await run.page.waitForLoadState('networkidle');
+	expect(run.asked).toEqual([]);
+	await row('b').locator('[data-again]').click();
+	await expect.poll(() => shown('b'), { timeout: 5_000 }).toBe(`note ${id}-b tab info rev 0 #2`);
+	expect(await shown('a')).toBe(`note ${id}-a tab info rev 0 #1`);
+	expect(run.asked).toEqual([`GET ?id=${id}-b&tab=info`]);
+	expect(run.errors).toEqual([]);
+	await run.page.close();
 });

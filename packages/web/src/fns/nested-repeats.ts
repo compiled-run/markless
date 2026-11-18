@@ -1,16 +1,22 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import { marklessElementAt } from '../resume-anchor-census.ts';
+import { protocolRowSegment } from '../../../serializer/src/protocol-instance-path.ts';
 import {
 	findRepeatItemByKey,
 	readKeyedRepeatCollection,
+	type RowScopedRepeat,
 	wireKeyedRepeats,
 } from '../resume-keyed-repeats.ts';
-import type { ResumeKeyedRepeatRecord, ResumeRepeatRowHook } from '../resume-types.ts';
+import type {
+	ResumeDomElement,
+	ResumeKeyedRepeatRecord,
+	ResumeRepeatRowHook,
+} from '../resume-types.ts';
 
 type WireInput = Parameters<typeof wireKeyedRepeats>[0];
 // `locals` answers the items of the rows enclosing an instance, for its row handlers;
 // `rowOuter` the enclosing row, by its authored repeat id, for its row slots.
-type NestedRecord = ResumeKeyedRepeatRecord & {
+type NestedRecord = RowScopedRepeat & {
 	readonly locals?: () => object;
 	readonly authoredId?: string;
 	readonly rowOuter?: () => RowOuter;
@@ -52,52 +58,81 @@ export function wireNestedRepeats(
 		if (enclosingId) nested.set(enclosingId, [...(nested.get(enclosingId) ?? []), repeat]);
 	}
 	const wired = new WeakMap<ResumeKeyedRepeatRecord, Map<unknown, () => void>>(),
+		// Instances whose parent sits in an arm of the row's @if, rewired whenever the row's arms change.
+		armWired = new WeakMap<ResumeKeyedRepeatRecord, Map<unknown, () => void>>(),
 		roots = new WeakMap<ResumeKeyedRepeatRecord, Scoped>(),
 		// Instances wired with the page whose @if arm events wait for row code; the first gesture waits with them.
 		settling: Array<Promise<unknown>> = [];
 	let serial = 0;
-	const onRow: ResumeRepeatRowHook = (enclosing, rowRoot, rowKey) => {
-		const records = nested.get(enclosing.id);
-		if (!records) return;
-		let rows = wired.get(enclosing);
+	const rowsOf = (
+		byEnclosing: WeakMap<ResumeKeyedRepeatRecord, Map<unknown, () => void>>,
+		enclosing: ResumeKeyedRepeatRecord,
+	) => {
+		let rows = byEnclosing.get(enclosing);
 		if (!rows) {
 			const own = (rows = new Map());
-			wired.set(enclosing, own);
+			byEnclosing.set(enclosing, own);
 			input.storeContainerSubscription(() => {
 				for (const release of own.values()) release();
 			});
 		}
-		// A rebuilt row's new root replaces the instances its old root carried.
-		rows.get(rowKey)?.();
-		const releases: Array<() => void> = [];
-		for (const record of records) {
-			const parent = marklessElementAt(rowRoot, record.enclosingRow!.parentHostPath);
-			if (!parent) continue;
-			const item = () => findRepeatItemByKey(input.graph, enclosing, rowKey);
-			const instance = nestedInstance(input.graph, record, enclosing, item);
-			const root = record.enclosingRow!.itemPath
-				? (roots.get(enclosing) ?? {
-						graphNodeId: enclosing.collectionGraphNodeId ?? '',
-						path: enclosing.collectionPath,
-					})
-				: undefined;
-			if (root) roots.set(instance, root);
-			const wiring = wireKeyedRepeats(
-				{
-					...input,
-					graph: instanceGraph(input.graph, root, () => item() === undefined, ++serial),
-					view: { ...input.view, keyedRepeats: [instance] },
-					elementsByHostId: new Map([[instance.parentHostNodeId, parent]]),
-					storeContainerSubscription: (release) => releases.push(release),
-				},
-				rowComponentHost,
-				onRow,
+		return rows;
+	};
+	const onRow: ResumeRepeatRowHook = (enclosing, rowRoot, rowKey, armHost, armsOnly) => {
+		const records = nested.get(enclosing.id);
+		if (!records) return;
+		const wireRows = (
+			rows: Map<unknown, () => void>,
+			parentOf: (record: ResumeKeyedRepeatRecord) => ResumeDomElement | undefined,
+		) => {
+			// A rebuilt row's new root, or a flipped arm, replaces the instances it carried.
+			rows.get(rowKey)?.();
+			const releases: Array<() => void> = [];
+			for (const record of records) {
+				const parent = parentOf(record);
+				if (!parent) continue;
+				const item = () => findRepeatItemByKey(input.graph, enclosing, rowKey);
+				const instance = nestedInstance(input.graph, record, enclosing, rowKey, item);
+				const root = record.enclosingRow!.itemPath
+					? (roots.get(enclosing) ?? {
+							graphNodeId: enclosing.collectionGraphNodeId ?? '',
+							path: enclosing.collectionPath,
+						})
+					: undefined;
+				if (root) roots.set(instance, root);
+				const wiring = wireKeyedRepeats(
+					{
+						...input,
+						graph: instanceGraph(input.graph, root, () => item() === undefined, ++serial),
+						view: { ...input.view, keyedRepeats: [instance] },
+						elementsByHostId: new Map([[instance.parentHostNodeId, parent]]),
+						storeContainerSubscription: (release) => releases.push(release),
+					},
+					rowComponentHost,
+					onRow,
+				);
+				if (wiring) settling.push(wiring.catch(() => undefined));
+			}
+			rows.set(rowKey, () => {
+				for (const release of releases.splice(0)) release();
+			});
+		};
+		if (!armsOnly)
+			wireRows(rowsOf(wired, enclosing), (record) =>
+				record.enclosingRow!.arm
+					? undefined
+					: marklessElementAt(rowRoot, record.enclosingRow!.parentHostPath),
 			);
-			if (wiring) settling.push(wiring.catch(() => undefined));
-		}
-		rows.set(rowKey, () => {
-			for (const release of releases.splice(0)) release();
-		});
+		wireRows(rowsOf(armWired, enclosing), (record) =>
+			record.enclosingRow!.arm
+				? armHost?.({
+						hostPath: record.enclosingRow!.parentHostPath,
+						arm: record.enclosingRow!.arm,
+						eventName: '',
+						symbolIds: [],
+					})
+				: undefined,
+		);
 	};
 	const topLevel = repeats.filter((repeat) => !repeat.enclosingRow);
 	const settled = () =>
@@ -114,6 +149,7 @@ function nestedInstance(
 	graph: RuntimeGraph,
 	record: ResumeKeyedRepeatRecord,
 	enclosing: NestedRecord,
+	rowKey: unknown,
 	item: () => unknown,
 ): NestedRecord {
 	const { enclosingRow, ...own } = record;
@@ -123,6 +159,7 @@ function nestedInstance(
 			: '';
 	const instance: NestedRecord = {
 		...own,
+		rowPath: (enclosing.rowPath ?? '') + protocolRowSegment(rowKey),
 		locals: () => ({ ...enclosing.locals?.(), [enclosing.itemName]: item() }),
 		authoredId: record.id.startsWith(prefix) ? record.id.slice(prefix.length) : record.id,
 		rowOuter: () => ({

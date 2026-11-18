@@ -6,6 +6,6 @@
 	--switch-off: oklch(64% 0.01 80);
 
 	&.dark {
-		--switch-off: oklch(42% 0.01 80);
+		--switch-off: oklch(42% 0.015 90);
 	}
 }

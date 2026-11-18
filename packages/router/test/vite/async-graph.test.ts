@@ -2,12 +2,10 @@ import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser, type Page } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // Async values feeding shared fields, derived lists and streamed content, on a production build in Chromium.
 
@@ -26,13 +24,9 @@ beforeAll(async () => {
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
 	});
-	await builder.buildApp();
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
@@ -63,7 +57,7 @@ async function open(
 const text = (page: Page, selector: string) => page.locator(selector).textContent();
 const items = (page: Page) => page.locator('[data-list] li').allTextContents();
 
-test('an async value that reads a page-scoped shared field loads and reruns when it changes', async () => {
+test('an async value that reads an app-scoped shared field loads and reruns when it changes', async () => {
 	const { page, errors } = await open('/shared-async');
 	await expect.poll(() => text(page, 'main')).toContain('loaded v0');
 	await page.click('[data-bump]');
@@ -73,7 +67,7 @@ test('an async value that reads a page-scoped shared field loads and reruns when
 	await page.close();
 });
 
-test('a sync value over an async one that reads a page-scoped shared field updates', async () => {
+test('a sync value over an async one that reads an app-scoped shared field updates', async () => {
 	const { page, errors } = await open('/shared-sync');
 	await expect.poll(() => text(page, 'main')).toContain('loaded+one+two #1');
 	await page.click('[data-step]');

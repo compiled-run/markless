@@ -1,5 +1,5 @@
 import {
-	addressedHostNodeIds,
+	renderAddressedHostNodeIds,
 	foldInertHosts,
 } from '../../artifact-helpers/addressed-hosts.ts';
 import { parseModule } from '../../js-ast.ts';
@@ -12,7 +12,7 @@ import {
 	emitClientResidueReader,
 	emitClientResidueReaderPrelude,
 } from './residue-reader.ts';
-import { handlerReadGraphNodeIds } from './derive-set.ts';
+import { resumeReadGraphNodeIds } from './derive-set.ts';
 import {
 	adoptedWidgetDefinitionIds,
 	componentBoundElementHandles,
@@ -29,11 +29,14 @@ import {
 	componentOwnedInitialValues,
 	componentOwnedStateNodes,
 	projectsElementsIntoRows,
+	spreadsAttributes,
 	sameModuleComponentMap,
 	staticHostLocators,
 } from './shared.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
 import { PROJECTION_PROP_NAME } from './shared-seed-pass.ts';
+import { componentPlacementChains } from '../../component-edge-instance.ts';
+import { armEscalationCandidateSiteIds } from '../symbol-modules.ts';
 import { moduleIdOf } from '../../module-id.ts';
 import type { PublicRenderRoot } from './types.ts';
 
@@ -59,18 +62,24 @@ export function collectPublicRenderComponentDefinitions(
 	});
 
 	const residueReaderPrelude = emitClientResidueReaderPrelude(input, [...componentNames]);
-	// A CSR mount derives these for the render and then drops the value, leaving a
-	// handler's first read undefined the way a resumed page's is.
-	const handlerReads = handlerReadGraphNodeIds(input);
-	const handlerReadComputedIds = new Set(
+	// A CSR mount derives these for the render and then drops the value, so they are served as on a resumed page.
+	const resumeReads = resumeReadGraphNodeIds(input);
+	const resumeReadComputedIds = new Set(
 		input.protocolState.computed.flatMap((computed) =>
-			computed.async === false && handlerReads.has(computed.graphNodeId)
+			computed.async === false && resumeReads.has(computed.graphNodeId)
 				? [computed.graphNodeId]
 				: [],
 		),
 	);
 
-	const addressedHosts = addressedHostNodeIds(input.protocolView);
+	const addressedHosts = renderAddressedHostNodeIds(input);
+	const escalatingBranchIds = armEscalationCandidateSiteIds({
+		source: input.source,
+		semanticGraph: input.semanticGraph,
+		symbolResolver: input.symbolResolver,
+		captureAnalysis: input.captureAnalysis,
+		renderData: input.renderData,
+	});
 	return [...componentNames].flatMap((componentName) => {
 		const componentNode = componentMap.get(componentName);
 		const componentRoot = componentNode ? firstComponentRoot(componentNode) : null;
@@ -95,7 +104,10 @@ export function collectPublicRenderComponentDefinitions(
 				),
 				id: edge.id,
 				childComponentName: edge.childComponentName,
-				...(edge.asyncBoundaryId ? { asyncBoundaryId: edge.asyncBoundaryId } : {}),
+				...(edge.importSource ? { importSource: edge.importSource } : {}),
+				...(edge.asyncBoundaryId
+					? { asyncBoundaryId: edge.asyncBoundaryId, asyncBoundaryArm: edge.asyncBoundaryArm }
+					: {}),
 				hostPrefix: componentEdgeHostSegment(edge, input.semanticGraph.componentEdges),
 				symbolPrefix: componentEdgeInstanceSegment(
 					edge,
@@ -122,7 +134,10 @@ export function collectPublicRenderComponentDefinitions(
 						...('excludeNames' in prop ? { excludeNames: prop.excludeNames } : {}),
 						...('value' in prop ? { value: prop.value } : {}),
 						...(prop.kind === 'callback'
-							? { symbolId: callbacks.get(`${edge.id}:${prop.name}`) }
+							? {
+									symbolId: callbacks.get(`${edge.id}:${prop.name}`),
+									...(prop.syncPolicy ? { syncPolicy: prop.syncPolicy } : {}),
+								}
 							: {}),
 						...(prop.kind === 'callback' ? {} : { source: prop.source }),
 					})),
@@ -179,11 +194,11 @@ export function collectPublicRenderComponentDefinitions(
 			...chunkGraphNodeIds(childChunks),
 			...branchDecisionGraphNodeIds(childChunks, input.renderData.branches),
 		]);
-		// A widget-scoped shared() graph is one instance per rendered widget, so its
+		// A subtree-scoped shared() graph is one instance per rendered widget, so its
 		// nodes travel with the components that resolve it, not with the module root.
 		const widgetScoped = new Set(
 			input.semanticGraph.sharedDefinitions.flatMap((definition) =>
-				definition.scope === 'widget' ? [definition.id] : [],
+				definition.scope === 'subtree' ? [definition.id] : [],
 			),
 		);
 		const resolvedDefinitionIds = new Set(
@@ -279,7 +294,7 @@ export function collectPublicRenderComponentDefinitions(
 			);
 		const servedComputedIndexes = ownedComputedIndexes.filter((index) => {
 			const computed = input.protocolState.computed[index];
-			return !!computed && handlerReadComputedIds.has(computed.graphNodeId);
+			return !!computed && resumeReadComputedIds.has(computed.graphNodeId);
 		});
 		return [
 			{
@@ -319,6 +334,9 @@ export function collectPublicRenderComponentDefinitions(
 					boundaryIds.has(boundary.boundaryId),
 				),
 				edges,
+				// A flip or settle the browser renders draws only the instance holding it, which rebinds through the edges that placed it.
+				...((boundaryIds.size > 0 || [...branchIds].some((id) => escalatingBranchIds.has(id))) &&
+					ownerPlacements(componentName)),
 				propCellId:
 					input.semanticGraph.components.find(
 						(component) => component.name === componentName,
@@ -340,6 +358,8 @@ export function collectPublicRenderComponentDefinitions(
 					: {}),
 				// A build-time gate: the render-data module attaches the per-row record qualifier only here.
 				...(projectsElementsIntoRows(chunks) ? { projectsIntoRows: true } : {}),
+				// A build-time gate: only a module that spreads attributes hands the renderer the camelCase name table.
+				...(spreadsAttributes(input.renderData.chunks) ? { spreadsAttributes: true } : {}),
 				...rootPropEvents(componentName),
 				// This component carries these families' cells so a page that renders
 				// no designated root still has them, but composes as a part of the
@@ -359,6 +379,20 @@ export function collectPublicRenderComponentDefinitions(
 			},
 		];
 
+		function ownerPlacements(name: string) {
+			const chains = componentPlacementChains(name, input.semanticGraph.componentEdges);
+			return (
+				chains.length > 0 && {
+					placements: chains.map((chain) =>
+						chain.map((edge) => ({
+							edgeId: edge.id,
+							prefix: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),
+							...(edge.keyedRepeatScopeIds.length > 0 && { rows: edge.keyedRepeatScopeIds.length }),
+						})),
+					),
+				}
+			);
+		}
 		function cellLessWidgetRoots(name: string): string[] {
 			return widgetRootDefinitionIds(input, name).filter(
 				(definitionId) =>

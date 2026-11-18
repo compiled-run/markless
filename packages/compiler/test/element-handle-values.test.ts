@@ -55,7 +55,7 @@ export const tabs = shared(
 		const panelEl = element<HTMLDivElement>();
 		return { ...t, panelEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Panel() @{
@@ -76,7 +76,7 @@ export function Trigger() @{
 	expect(source).toContain(
 		'context.getElementHandle("shared:src/Handles.tsrx#tabs/element:panelEl").focus()',
 	);
-	expect(source).toContain('context.graph.write(');
+	expect(source).toContain('context.graph.update(');
 });
 
 test('the planned symbol records the handle read beside the state reads', async () => {

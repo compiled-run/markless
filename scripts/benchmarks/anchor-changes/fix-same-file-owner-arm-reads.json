@@ -1,0 +1,139 @@
+{
+	"changes": [
+		{
+			"surface": "build-scale",
+			"path": [
+				"budgets",
+				"clientModules",
+				"value"
+			],
+			"delta": 1,
+			"reason": "the owner stand-in code is its own module, loaded only where a file places an owner whose arm the browser draws",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/owner-rooted"
+			],
+			"set": 1533,
+			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 345,
+			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 5,
+			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/owner-rooted"
+			],
+			"set": 1533,
+			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 345,
+			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -5,
+			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/evaluator"
+			],
+			"delta": 345,
+			"reason": "a flip or settle the browser draws at an owner its own file places rebinds through the edges above it; the stand-in code loads only where a file has such an owner",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/owner-rooted"
+			],
+			"set": 1545,
+			"reason": "a flip or settle the browser draws at an owner its own file places rebinds through the edges above it; the stand-in code loads only where a file has such an owner",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 697,
+			"reason": "a flip or settle the browser draws at an owner its own file places rebinds through the edges above it; the stand-in code loads only where a file has such an owner",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 726,
+			"reason": "a flip or settle the browser draws at an owner its own file places rebinds through the edges above it; the stand-in code loads only where a file has such an owner",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 77,
+			"reason": "a flip or settle the browser draws at an owner its own file places rebinds through the edges above it; the stand-in code loads only where a file has such an owner",
+			"date": "2026-11-14"
+		}
+	]
+}

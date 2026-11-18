@@ -1,0 +1,104 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": 216,
+			"reason": "a served @try arm's @if records the arm the render painted (fix/served-arm-branch-painted-arm): the structure anchor carries the arm and the armized branch record takes it; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/ssr-data/renderer"
+			],
+			"delta": 56,
+			"reason": "a served @try arm's @if records the arm the render painted (fix/served-arm-branch-painted-arm): the structure anchor carries the arm and the armized branch record takes it; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": 216,
+			"reason": "a served @try arm's @if records the arm the render painted (fix/served-arm-branch-painted-arm): the structure anchor carries the arm and the armized branch record takes it; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
+			],
+			"delta": 56,
+			"reason": "a served @try arm's @if records the arm the render painted (fix/served-arm-branch-painted-arm): the structure anchor carries the arm and the armized branch record takes it; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "a served @try arm's @if records the arm the render painted (fix/served-arm-branch-painted-arm): the structure anchor carries the arm and the armized branch record takes it; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/ssr"
+			],
+			"delta": 311,
+			"reason": "a served @try arm's @if records the arm the render painted (fix/served-arm-branch-painted-arm): the structure anchor carries the arm and the armized branch record takes it; measured on CI run 43394717301 against main's run 43385179144 (183a7555a)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/ssr-data/renderer"
+			],
+			"delta": 180,
+			"reason": "a served @try arm's @if records the arm the render painted (fix/served-arm-branch-painted-arm): the structure anchor carries the arm and the armized branch record takes it; measured on CI run 43394717301 against main's run 43385179144 (183a7555a)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 103,
+			"reason": "a served @try arm's @if records the arm the render painted: merge-queue run 43495606298 measured this change on 99edc327a at +103 B gzip downloaded over merge-group run 43493507326 on 99edc327a alone",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 103,
+			"reason": "a served @try arm's @if records the arm the render painted: merge-queue run 43495606298 measured this change on 99edc327a at +103 B gzip downloaded over merge-group run 43493507326 on 99edc327a alone",
+			"date": "2026-11-13"
+		}
+	]
+}

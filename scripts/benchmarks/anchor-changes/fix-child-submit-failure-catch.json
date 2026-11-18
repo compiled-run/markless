@@ -1,0 +1,86 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 19,
+			"reason": "a failing save reaches its @catch: a handler's rejection drops a re-run not yet started, and a @try in a module's later export renders its @catch from that export (head against merge-base, one machine)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "a failing save reaches its @catch: a handler's rejection drops a re-run not yet started, and a @try in a module's later export renders its @catch from that export (head against merge-base, one machine)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 19,
+			"reason": "a failing save reaches its @catch: a handler's rejection drops a re-run not yet started, and a @try in a module's later export renders its @catch from that export (head against merge-base, one machine)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "a failing save reaches its @catch: a handler's rejection drops a re-run not yet started, and a @try in a module's later export renders its @catch from that export (head against merge-base, one machine)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 43,
+			"reason": "a @try in a module's later export renders its @catch from that export: the browser render starts at the boundary's owner (docs pages load the prerender evaluator; CI run 43357741488 on the PR merge against merge-queue run 43355856212 of its parent 17d8d7e5)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 43,
+			"reason": "a @try in a module's later export renders its @catch from that export: the browser render starts at the boundary's owner (docs pages load the prerender evaluator; CI run 43357741488 on the PR merge against merge-queue run 43355856212 of its parent 17d8d7e5)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 35,
+			"reason": "a @try in a module's later export renders its @catch from that export: the browser render starts at the boundary's owner (docs pages load the prerender evaluator; CI run 43357741488 on the PR merge against merge-queue run 43355856212 of its parent 17d8d7e5)",
+			"date": "2026-11-13"
+		}
+	]
+}

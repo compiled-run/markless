@@ -2,12 +2,10 @@ import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { clientAssetsManifestPath } from '../../src/vite/client-assets-manifest.ts';
-import { createBuilder } from 'vite';
 import { expect, test } from 'vitest';
 import { MARKLESS_CHUNK_SPECIFIER_PREFIX, marklessImportMapPath } from '@markless/bundler/rolldown';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 
@@ -60,13 +58,9 @@ test('a packed router build resolves every symbol of a page that loads through i
 		);
 		await writeFile(join(root, 'pages/index.tsrx'), counterPage(5));
 
-		const builder = await createBuilder({
+		await buildFixture({
 			root,
-			configFile: false,
-			logLevel: 'silent',
-			plugins: [markless(), router()],
 		});
-		await builder.buildApp();
 
 		const clientDir = join(root, '.output/public/build');
 		const chunks = (await readdir(clientDir)).filter((file) => file.endsWith('.js'));
@@ -118,13 +112,10 @@ test('a packed router build serves one import map, ahead of every module preload
 			].join('\n'),
 		);
 
-		const builder = await createBuilder({
+		await buildFixture({
 			root,
-			configFile: false,
-			logLevel: 'silent',
-			plugins: [markless({ experimentalNativePacking: true }), router()],
+			markless: { experimentalNativePacking: true },
 		});
-		await builder.buildApp();
 
 		const clientDir = join(root, '.output/public/build');
 		const chunks = (await readdir(clientDir)).filter((file) => file.endsWith('.js'));

@@ -12,7 +12,7 @@ export function Results({ query }: { query: string }) @{
 
 	@try {
 		<ul
-			aria-busy={results.q !== query || results.attempt !== attempt}
+			data-stale={results.q !== query || results.attempt !== attempt}
 			style={results.q !== query || results.attempt !== attempt ? 'opacity: 0.5' : 'opacity: 1'}
 		>
 			@for (const item of results.items; key item.id) {

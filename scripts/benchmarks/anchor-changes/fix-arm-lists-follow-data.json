@@ -1,0 +1,270 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-arm-lists"
+			],
+			"set": 1101,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): branch arm records name their lists, a lazy arm-list module wires them only on pages whose arms hold one, SSR keeps a shut arm's list record; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": 1301,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): branch arm records name their lists, a lazy arm-list module wires them only on pages whose arms hold one, SSR keeps a shut arm's list record; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": 822,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): branch arm records name their lists, a lazy arm-list module wires them only on pages whose arms hold one, SSR keeps a shut arm's list record; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 32,
+			"reason": "a list inside an @if/@switch arm follows its data after the arm opens late (fix/arm-lists-follow-data): branch arm records name their lists, the branch runtime wires them on every flip and commit, page wiring leaves arm lists to their branch, SSR keeps a shut arm's list record and moves a @try arm's lists into its record set; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 209,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): branch arm records name their lists, a lazy arm-list module wires them only on pages whose arms hold one, SSR keeps a shut arm's list record; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 359,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): branch arm records name their lists, a lazy arm-list module wires them only on pages whose arms hold one, SSR keeps a shut arm's list record; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-arm-lists"
+			],
+			"set": 1101,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): branch arm records name their lists, a lazy arm-list module wires them only on pages whose arms hold one, SSR keeps a shut arm's list record; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": 1301,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): branch arm records name their lists, a lazy arm-list module wires them only on pages whose arms hold one, SSR keeps a shut arm's list record; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": 812,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): branch arm records name their lists, a lazy arm-list module wires them only on pages whose arms hold one, SSR keeps a shut arm's list record; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 32,
+			"reason": "a list inside an @if/@switch arm follows its data after the arm opens late (fix/arm-lists-follow-data): branch arm records name their lists, the branch runtime wires them on every flip and commit, page wiring leaves arm lists to their branch, SSR keeps a shut arm's list record and moves a @try arm's lists into its record set; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 209,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): branch arm records name their lists, a lazy arm-list module wires them only on pages whose arms hold one, SSR keeps a shut arm's list record; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 152,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): branch arm records name their lists, a lazy arm-list module wires them only on pages whose arms hold one, SSR keeps a shut arm's list record; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 213,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): arm records name their lists, a lazy web/resume-arm-lists wires them under an arm-scoped id only where an arm holds one; the composition and branch wiring that stays shared ships to every page using them; CI runs 43516699144 vs 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 213,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): arm records name their lists, a lazy web/resume-arm-lists wires them under an arm-scoped id only where an arm holds one; the composition and branch wiring that stays shared ships to every page using them; CI runs 43516699144 vs 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 213,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): arm records name their lists, a lazy web/resume-arm-lists wires them under an arm-scoped id only where an arm holds one; the composition and branch wiring that stays shared ships to every page using them; CI runs 43516699144 vs 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 831,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): arm records name their lists, a lazy web/resume-arm-lists wires them under an arm-scoped id only where an arm holds one; the composition and branch wiring that stays shared ships to every page using them; CI runs 43516699144 vs 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 831,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): arm records name their lists, a lazy web/resume-arm-lists wires them under an arm-scoped id only where an arm holds one; the composition and branch wiring that stays shared ships to every page using them; CI runs 43516699144 vs 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 373,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): arm records name their lists, a lazy web/resume-arm-lists wires them under an arm-scoped id only where an arm holds one; the composition and branch wiring that stays shared ships to every page using them; CI runs 43516699144 vs 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-arm-lists"
+			],
+			"set": 1113,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): arm records name their lists, a lazy web/resume-arm-lists wires them under an arm-scoped id only where an arm holds one; the composition and branch wiring that stays shared ships to every page using them; CI runs 43516699144 vs 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 143,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): arm records name their lists, a lazy web/resume-arm-lists wires them only where an arm holds one; the composition and branch wiring that stays shared ships to every page using them; CI runs 43510319315 vs 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/ssr"
+			],
+			"delta": 1301,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): arm records name their lists, a lazy web/resume-arm-lists wires them only where an arm holds one; the composition and branch wiring that stays shared ships to every page using them; CI runs 43510319315 vs 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-branches"
+			],
+			"delta": 812,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): arm records name their lists, a lazy web/resume-arm-lists wires them under an arm-scoped id only where an arm holds one; the composition and branch wiring that stays shared ships to every page using them; CI runs 43516699144 vs 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-commit-arm"
+			],
+			"delta": 32,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): arm records name their lists, a lazy web/resume-arm-lists wires them only where an arm holds one; the composition and branch wiring that stays shared ships to every page using them; CI runs 43510319315 vs 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime"
+			],
+			"delta": 209,
+			"reason": "a list inside an @if/@switch arm follows its data (fix/arm-lists-follow-data): arm records name their lists, a lazy web/resume-arm-lists wires them only where an arm holds one; the composition and branch wiring that stays shared ships to every page using them; CI runs 43510319315 vs 43505090454",
+			"date": "2026-11-13"
+		}
+	]
+}

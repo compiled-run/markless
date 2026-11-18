@@ -48,17 +48,18 @@ export function boundElementHandlesOf(
 	surface: PrerenderDataSurface,
 	componentName: string,
 	seen: Set<string> = new Set(),
+	importSource?: string,
 ): string[] {
 	if (seen.has(componentName)) return [];
 	seen.add(componentName);
-	const own = childSurfaceOf(surface, componentName);
+	const own = childSurfaceOf(surface, componentName, importSource);
 	const definition = own?.components[componentName];
 	if (!own || !definition) return [];
 	return [
 		...new Set([
 			...(definition.boundElementHandles ?? []),
 			...(definition.edges ?? []).flatMap((edge) =>
-				boundElementHandlesOf(own, edge.childComponentName, seen),
+				boundElementHandlesOf(own, edge.childComponentName, seen, edge.importSource),
 			),
 		]),
 	];
@@ -134,12 +135,18 @@ export function fileBoundElementHandles(
 	const handles = [
 		...new Set(
 			[
-				...(rootEdge ? [rootEdge.childComponentName] : []),
+				...(rootEdge
+					? [[rootEdge.childComponentName, rootEdge.importSource] as const]
+					: []),
 				// A childless widget root still binds the handles of its own template.
 				...(slot.projectionChunkId
-					? projectionHandleChildNames(surface, definition, slot.projectionChunkId)
+					? projectionHandleChildNames(surface, definition, slot.projectionChunkId).map(
+							(componentName) => [componentName, undefined] as const,
+						)
 					: []),
-			].flatMap((componentName) => boundElementHandlesOf(surface, componentName)),
+			].flatMap(([componentName, importSource]) =>
+				boundElementHandlesOf(surface, componentName, undefined, importSource),
+			),
 		),
 	];
 	if (handles.length === 0) return seeded;

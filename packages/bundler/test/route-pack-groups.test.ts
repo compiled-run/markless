@@ -15,6 +15,8 @@ import {
 	planRoutePackGroups,
 	startupPackOfLazy,
 } from '../src/build/route-pack-groups.ts';
+import { computeInteractionClosures } from '../src/build/interaction-closures.ts';
+import { symbolVirtualModuleId } from '../src/source-module.ts';
 
 test('packs route-local modules together and retains shared module identity', () => {
 	const groups = planRoutePackGroups({
@@ -1527,4 +1529,77 @@ test('an app module importing several deferred targets gets one deferred pack pe
 	expect(groups.get('common')).toBe(MARKLESS_DEFERRED_PACK);
 	expect(groups.get('runtime-a')).toBe(MARKLESS_DEFERRED_PACK);
 	expect(groups.get('runtime-b')).toBe(MARKLESS_DEFERRED_PACK);
+});
+
+// Art only a client render or a lazily loaded symbol draws must stay out of the packs a landing preloads.
+test('code a landing reaches only lazily stays out of every startup pack when one landing symbol carries no module', () => {
+	const page = '/app/pages/home.tsrx';
+	const figure = '/app/figures/printout.tsrx';
+	const art = '/app/figures/printout.art.ts';
+	const symbol = (file: string, id: string) => `\0${symbolVirtualModuleId(file, id)}`;
+	const modules = new Map([
+		[
+			`${page}?markless-resume`,
+			{
+				dependencies: [`${figure}?markless-symbols`],
+				dynamicDependencies: [symbol(page, 'symbol:0'), symbol(page, 'symbol:1')],
+				source: page,
+				size: 2_000,
+			},
+		],
+		[
+			`${page}?markless-route`,
+			{
+				dependencies: [`${figure}?markless-render-data`],
+				source: page,
+				navigationOnly: true,
+				size: 2_000,
+			},
+		],
+		[
+			`${figure}?markless-symbols`,
+			{
+				dependencies: [],
+				dynamicDependencies: [symbol(figure, 'symbol:0')],
+				source: figure,
+				size: 500,
+			},
+		],
+		[`${figure}?markless-render-data`, { dependencies: [art], source: figure, size: 4_000 }],
+		[symbol(page, 'symbol:0'), { dependencies: [], source: page, size: 3_000 }],
+		[symbol(page, 'symbol:1'), { dependencies: [], source: page, size: 3_000 }],
+		[symbol(figure, 'symbol:0'), { dependencies: [art], source: figure, size: 8_000 }],
+		[art, { dependencies: [], source: art, size: 300_000 }],
+	]);
+	const routes = new Map([
+		['pages/home.tsrx', [`${page}?markless-resume`, `${page}?markless-route`]],
+	]);
+	const demandMap = (resume: string[]) => ({
+		version: 1 as const,
+		recordKinds: [],
+		symbols: [],
+		payloadRecords: [],
+		actions: [],
+		unknownRecordModuleIds: [],
+		firstUsePage: {
+			resume: { symbolIds: resume, runtimeModuleIds: [] },
+			pageSpaceReaders: [],
+			passedProps: [],
+			callbackSlots: [],
+		},
+	});
+	for (const resume of [['symbol:1'], ['symbol:1', 'symbol:9']]) {
+		const closures = computeInteractionClosures({
+			root: '/app',
+			modules,
+			routes,
+			demand: [
+				{ source: `${page}?markless-symbols`, map: demandMap(resume) },
+				{ source: `${figure}?markless-symbols`, map: demandMap([]) },
+			],
+		});
+		const groups = planRoutePackGroups({ modules, routes, closures, pagesLoadOneRoute: true });
+		for (const id of [art, symbol(figure, 'symbol:0')])
+			expect(isStartupPack(groups.get(id)!), `${id} with resume ${resume}`).toBe(false);
+	}
 });

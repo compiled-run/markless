@@ -1,0 +1,144 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 53,
+			"reason": "runtime graph: the flush scheduler keeps one phase instead of three flags (+53 B gzip on bench pages, +90 B on docs pages, measured against the merge-base on CI)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 53,
+			"reason": "runtime graph: the flush scheduler keeps one phase instead of three flags (+53 B gzip on bench pages, +90 B on docs pages, measured against the merge-base on CI)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 53,
+			"reason": "runtime graph: the flush scheduler keeps one phase instead of three flags (+53 B gzip on bench pages, +90 B on docs pages, measured against the merge-base on CI)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 90,
+			"reason": "runtime graph: the flush scheduler keeps one phase instead of three flags (+53 B gzip on bench pages, +90 B on docs pages, measured against the merge-base on CI)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 90,
+			"reason": "runtime graph: the flush scheduler keeps one phase instead of three flags (+53 B gzip on bench pages, +90 B on docs pages, measured against the merge-base on CI)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 90,
+			"reason": "runtime graph: the flush scheduler keeps one phase instead of three flags (+53 B gzip on bench pages, +90 B on docs pages, measured against the merge-base on CI)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph"
+			],
+			"delta": 366,
+			"reason": "runtime graph: the flush scheduler keeps one phase instead of three flags; unminified rendered bytes count its named phase constants, minified it ships +53 B gzip on bench pages",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 910,
+			"reason": "runtime graph: the flush scheduler keeps one phase instead of three flags; fixture builds run with import.meta.env.DEV on, so they also carry its development-only move check, which production builds drop",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -4,
+			"reason": "runtime graph: the flush scheduler keeps one phase instead of three flags; fixture builds run with import.meta.env.DEV on, so they also carry its development-only move check, which production builds drop",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 910,
+			"reason": "runtime graph: the flush scheduler keeps one phase instead of three flags; fixture builds run with import.meta.env.DEV on, so they also carry its development-only move check, which production builds drop",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "runtime graph: the flush scheduler keeps one phase instead of three flags; fixture builds run with import.meta.env.DEV on, so they also carry its development-only move check, which production builds drop",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 11,
+			"reason": "runtime graph: the flush scheduler keeps one phase instead of three flags; fixture builds run with import.meta.env.DEV on, so they also carry its development-only move check, which production builds drop",
+			"date": "2026-11-09"
+		}
+	]
+}

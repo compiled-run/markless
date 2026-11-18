@@ -3,7 +3,7 @@ import { compileTsrxModulesWithInterfaces } from './multi-module-compile-support
 
 /**
  * Defect 26. A component-edge prop whose expression negates a read of a
- * widget-scoped shared instance — `<Leaf tall={!board.wide} />` — was refused and
+ * subtree-scoped shared instance — `<Leaf tall={!board.wide} />` — was refused and
  * dropped from the edge, so the child rendered as if the prop had never been
  * written. `board.wide === false` over the same read lifted to a computed and
  * worked, and `pureCompositeReadSources` already decomposes a `UnaryExpression`
@@ -30,7 +30,7 @@ import { Leaf } from './child.tsrx';
 export const boardState = shared(() => {
 	const board = state({ wide: false });
 	return { ...board };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel({ children }: { children?: unknown }) @{
 	const board = boardState();

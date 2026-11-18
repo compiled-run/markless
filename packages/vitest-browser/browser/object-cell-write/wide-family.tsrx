@@ -23,7 +23,7 @@ interface WideInstanceState {
 	name: string;
 }
 
-// The crop shape, scaled down: a widget-scoped `shared()` whose `state()` seed
+// The crop shape, scaled down: a subtree-scoped `shared()` whose `state()` seed
 // mixes literals, `undefined` and `as` casts, with one field seeded a plain
 // object. Methods hoist every cell read into a local before use.
 export const wideState = shared(
@@ -77,7 +77,7 @@ export const wideState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function WideRoot({ children }) @{

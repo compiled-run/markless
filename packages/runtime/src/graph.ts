@@ -11,21 +11,19 @@ import {
 	collectionCallMutated,
 	collectionMutationSnapshot,
 } from './graph-collections.ts';
-import {
-	createRuntimeAsyncComputedNodes,
-	demandAsyncComputed as demandRuntimeAsyncComputed,
-	invalidateAsyncComputed as invalidateRuntimeAsyncComputed,
-	readAsyncComputedNode,
-	type RuntimeAsyncComputedNode,
-} from './graph-async.ts';
+import type { RuntimeAsyncComputedNode } from './graph-async-load.ts';
+import type { HeldInputsPlaneFactory } from './graph-held.ts';
 import {
 	createRuntimeComputedNodes,
 	indexRuntimeDependents,
 	markDirtyComputedDependencies,
 	readComputedNode,
+	type RuntimeComputedNode,
+	type RuntimeDependents,
 } from './graph-computed.ts';
 import type {
 	DerivedReconcileInternals,
+	DerivedReconcilePlane,
 	DerivedReconcilePlaneFactory,
 	RuntimeGraphReconcileOptions,
 } from './graph-reconcile.ts';
@@ -45,6 +43,75 @@ export type {
 	RuntimeGraphReconcileOptions,
 	WriteTouchedRecord,
 } from './graph-reconcile.ts';
+export type { HeldInputsPlane, HeldInputsPlaneFactory } from './graph-held.ts';
+export type { RuntimeAsyncComputedNode } from './graph-async-load.ts';
+
+/** What a graph hands its async plane. */
+export type AsyncComputedPlaneInternals = {
+	readonly cells: ReadonlyMap<string, unknown>;
+	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
+	readonly readGraph: RuntimeGraphRead;
+	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
+	readonly scheduleFlush: () => void;
+	readonly reconcile?: Pick<DerivedReconcilePlane, 'publishAsync'>;
+	/** No handler statement follows an async answer, so what it dirties lands in the pass, past the write observers. */
+	readonly landWithoutObservers: (land: () => void) => void;
+	/** Runs the flush now, ignoring any `holdFlush` in effect; only `markEntry`/`endEntry` use it, to stay visible through a held dispatch. */
+	readonly flush?: () => Promise<void>;
+	/** True while a repeating timer's turn, through its awaited continuations, is running: a write made then refreshes quietly. */
+	readonly isQuiet?: () => boolean;
+	/** True while a write's dirty paths are still queued or being processed; `endEntry` waits on this before concluding a handler's write never reached anything. */
+	readonly hasPendingFlush?: () => boolean;
+	/** False for a value an @if or @switch arm owns once that arm no longer shows; undefined for a value no arm owns. */
+	readonly armShown?: (graphNodeId: string) => boolean | undefined;
+	/** True while a write waits on a pass that has not yet decided the arms, so a branch test may still read as it did before the write. */
+	readonly armsUndecided?: () => boolean;
+};
+
+/** Async computeds, from `@markless/runtime/graph-async`; a graph without async values never loads it. */
+export type AsyncComputedPlane = {
+	readonly nodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
+	readonly read: (node: RuntimeAsyncComputedNode, path: ReadonlyArray<string>) => unknown;
+	readonly invalidate: (node: RuntimeAsyncComputedNode) => void;
+	/**
+	 * Starts the runs that writes since the last call asked for; a flush calls it before its subscriptions read.
+	 * A value an arm owns waits for `passEnd`, when the pass has decided its arm, and starts only if the arm still shows.
+	 */
+	readonly startWritten?: (passEnd?: boolean) => void;
+	/** Forgets the async values `owns` names, aborting a run in flight: a closed arm's answer is never shown, and a reopened one defines them fresh. */
+	readonly drop: (owns: (graphNodeId: string) => boolean) => void;
+	readonly define: (asyncComputed: RuntimeGraphAsyncComputed) => void;
+	/** Re-runs a rejected async value with the key it already has, or quietly revalidates a fulfilled one when `revalidate` is set; false otherwise. */
+	readonly rerun: (graphNodeId: string, revalidate?: boolean) => boolean;
+	/** The listed async values and every async value they read through sync computeds, each input before its readers. */
+	readonly withInputs: (graphNodeIds: Iterable<string>) => RuntimeAsyncComputedNode[];
+	/** After a write, loudly re-asks each value still at the version it had when the writes settled, in the order given; a read still in flight starts over. Resolves once every re-asked value has settled and that commit has flushed. */
+	readonly refreshAfterWrite: (versions: ReadonlyMap<string, number>, started?: () => void) => Promise<void>;
+	/** Publishes a `rejected` snapshot for a handler's own rejection, standing in for the async value's own run; a no-op when the node does not exist. */
+	readonly failHandler: (graphNodeId: string, error: unknown) => void;
+	/** Marks a settled value busy ahead of the write that will really refresh it. */
+	readonly markEntry: (graphNodeId: string, save?: boolean) => void;
+	/**
+	 * Ends one `markEntry` hold; the mark ends with the last holder. `save` ends a save's hold, which no write stands behind,
+	 * so it ends without waiting for a pending flush; `'failed'` makes the publish that ends the mark announce a failure, and
+	 * `'left'` (the page went elsewhere) makes it end silently.
+	 */
+	readonly endEntry: (graphNodeId: string, save?: 'saved' | 'failed' | 'left') => void;
+	/** Installs matched values, from `@markless/runtime/graph-held`. */
+	readonly holdInputs: (factory: HeldInputsPlaneFactory) => void;
+	readonly shownRead: (
+		dependencies: ReadonlyArray<RuntimeGraphComputedDependency>,
+	) => RuntimeGraphRead | false | undefined;
+	/** A node or path was written: a derived cell reading it is stale until written. */
+	readonly wrote: (graphNodeId: string, path: ReadonlyArray<string>) => void;
+	/** A derive of a sync hop's cell starts; the call it returns ends it, waking async readers it held when it wrote nothing. */
+	readonly startDerive: (graphNodeId: string) => () => void;
+};
+
+export type AsyncComputedPlaneFactory = (
+	internals: AsyncComputedPlaneInternals,
+	asyncComputed?: ReadonlyArray<RuntimeGraphAsyncComputed>,
+) => AsyncComputedPlane;
 
 export type RuntimeGraphCell = {
 	readonly graphNodeId: string;
@@ -57,6 +124,8 @@ export type RuntimeGraphRead = (graphNodeId: string, path?: ReadonlyArray<string
 export type RuntimeGraphComputedDependency = {
 	readonly graphNodeId: string;
 	readonly path?: ReadonlyArray<string>;
+	/** The control showing this text writes this state from its own handler: it reads as written, never as the shown value was fetched. */
+	readonly writtenByControl?: true;
 };
 
 export type RuntimeGraphComputed = {
@@ -84,24 +153,47 @@ export type RuntimeGraphAsyncSnapshot =
 			// answering with it until the new snapshot commits (spec D8: "the
 			// prior value is always addressable"; Solid 2 `latest` semantics).
 			readonly value?: unknown;
+			/** The key `value` was fetched for; present only when a settled value exists. */
+			readonly valueKey?: unknown;
+			/** This run started outside a user action: no busy mark, no announcement. */
+			readonly quiet?: boolean;
 	  }
 	| {
 			readonly status: 'fulfilled';
 			readonly version: number;
 			readonly key: unknown;
 			readonly value: unknown;
+			readonly quiet?: boolean;
+			/** Published when a save that held this value failed: the busy marks clearing announce a failure. */
+			readonly writeFailed?: true;
+			/** Published when a save that held this value sent the page elsewhere: the busy marks clear without a word. */
+			readonly pageLeft?: true;
 	  }
 	| {
 			readonly status: 'rejected';
 			readonly version: number;
 			readonly key: unknown;
 			readonly error: unknown;
+			/** A failed refresh keeps the last good value, fetched for `valueKey`. */
+			readonly value?: unknown;
+			readonly valueKey?: unknown;
+			readonly quiet?: boolean;
+			readonly writeFailed?: true;
+			readonly pageLeft?: true;
 	  };
 
 export type RuntimeGraphAsyncComputed = {
 	readonly graphNodeId: string;
 	readonly dependencies: ReadonlyArray<RuntimeGraphComputedDependency>;
+	/** Sync computeds in the key, held as cells their derives write: a write to a source holds a run until the derive answers. */
+	readonly syncHops?: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly dependencies: ReadonlyArray<RuntimeGraphComputedDependency>;
+		readonly asyncFrom: ReadonlyArray<string>;
+	}>;
 	readonly initialSnapshot?: RuntimeGraphAsyncSnapshot;
+	/** A @try's own gate: it takes on a failed value it gates instead of pinning past it. */
+	readonly boundaryGate?: true;
 	readonly key: (read: RuntimeGraphRead) => unknown;
 	/** How a fulfilled value reconciles against the previously published one. */
 	readonly reconcile?: RuntimeGraphReconcileOptions;
@@ -147,7 +239,11 @@ export type DomJournalEntry =
 
 export type DomJournalResult = DomJournalEntry | ReadonlyArray<DomJournalEntry>;
 
-export type DomJournalListener = (entries: ReadonlyArray<DomJournalEntry>) => void | Promise<void>;
+export type DomJournalListener = {
+	(entries: ReadonlyArray<DomJournalEntry>): void | Promise<void>;
+	/** The code applying `entries` needs, a promise while it still loads: a pass waits for it before its commits land. */
+	readonly code?: (entries: ReadonlyArray<DomJournalEntry>) => unknown;
+};
 
 export type RuntimeGraphInput = {
 	readonly cells: ReadonlyArray<RuntimeGraphCell>;
@@ -160,6 +256,10 @@ export type RuntimeGraphInput = {
 	 * dirties the whole node and an async commit dirties the whole snapshot.
 	 */
 	readonly reconcile?: DerivedReconcilePlaneFactory;
+	/** Required when `asyncComputed` is non-empty; `@markless/runtime/graph-async`. */
+	readonly async?: AsyncComputedPlaneFactory;
+	/** Matched values for async computeds; `@markless/runtime/graph-held`. */
+	readonly held?: HeldInputsPlaneFactory;
 };
 
 export type RuntimeGraphWrite = {
@@ -202,6 +302,11 @@ export type RuntimeGraphCall = {
 	readonly args?: ReadonlyArray<unknown>;
 };
 
+export type RuntimeGraphChange = {
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+};
+
 export type RuntimeGraphDelete = {
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
@@ -221,8 +326,8 @@ export type RuntimeGraphSubscription = {
 		| RuntimeGraphCommit
 		| void
 		| Promise<DomJournalResult | RuntimeGraphCommit | void>;
-	/** False while `run` still has code to load; a write observer then leaves its DOM to the pass, so the task's writes land together. */
-	readonly ready?: () => boolean;
+	/** The code `run` needs, a promise while it still loads: a write observer then leaves its DOM to the pass, and the pass waits for it before its commits land. */
+	readonly code?: () => unknown;
 };
 
 /**
@@ -261,6 +366,10 @@ export type RuntimeGraph = {
 	readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
 	/** Available only in debug-enabled builds (`__MARKLESS_DEBUG_ENABLED__`). */
 	readonly peekAsyncSnapshot?: (graphNodeId: string) => RuntimeGraphAsyncSnapshot | undefined;
+	/** Debug builds only: the flush scheduler's phase, 0 idle, 1 scheduled, 2 running, 3 tail, 4 rearmed. */
+	readonly peekFlushPhase?: () => number;
+	/** Debug builds only: throws when the flush scheduler could not move from its phase now to `to`; moves nothing. */
+	readonly checkFlushMove?: (to: number) => void;
 	readonly readShared: (
 		definitionId: string,
 		propertyName: string,
@@ -278,9 +387,32 @@ export type RuntimeGraph = {
 	readonly update: (update: RuntimeGraphUpdate) => unknown;
 	readonly call: (call: RuntimeGraphCall) => unknown;
 	readonly delete: (deletion: RuntimeGraphDelete) => boolean;
+	/** Code outside the graph changed the value at `path` in place; everything reading it updates. */
+	readonly changed: (change: RuntimeGraphChange) => void;
 	readonly subscribe: (subscription: RuntimeGraphSubscription) => () => void;
+	/** How many subscriptions are registered on `graphNodeId`. */
+	readonly subscriptionCount?: (graphNodeId: string) => number;
+	/**
+	 * Runs `pull` once, at the next read of `graphNodeId` and before that read
+	 * answers, so a value derived on demand can write itself first.
+	 */
+	readonly pullBeforeRead?: (graphNodeId: string, pull: () => void) => void;
+	/** The async plane, when the graph has async values: re-runs, failures, entry marks, matched reads and derive marks go through it. */
+	readonly asyncPlane?: () => AsyncComputedPlane | undefined;
+	/** Which values an @if or @switch arm owns: `shown` answers false once the owning arm no longer shows, undefined for any other value. */
+	readonly gateArms?: (shown: (graphNodeId: string) => boolean | undefined) => void;
+	readonly armShown?: (graphNodeId: string) => boolean | undefined;
 	/** Adds an async computed a component rendered after the graph was built; false when the node already exists. */
-	readonly defineAsyncComputed?: (asyncComputed: RuntimeGraphAsyncComputed) => boolean;
+	readonly defineAsyncComputed?: (
+		asyncComputed: RuntimeGraphAsyncComputed,
+		plane: AsyncComputedPlaneFactory,
+		held?: HeldInputsPlaneFactory,
+	) => boolean;
+	/** A repeating timer's turn started: a write made before the matching `markQuietEnd` refreshes quietly, even while a user action is open. Nests. */
+	readonly markQuietStart?: () => void;
+	readonly markQuietEnd?: () => void;
+	/** Whether a repeating timer's turn is open, so a callee it calls can keep that turn once its code has loaded. */
+	readonly isQuiet?: () => boolean;
 	/**
 	 * Optional so a facade over a subset of this contract stays a `RuntimeGraph`;
 	 * a caller without it gets the flush-time answer it always had.
@@ -295,6 +427,12 @@ export type RuntimeGraph = {
 	readonly hasPendingFlush?: () => boolean;
 	/** Keeps the scheduled flush back until each returned release has run once; `flush()` itself still runs. */
 	readonly holdFlush?: () => () => void;
+	/** The pass that will paint pending writes, without starting it, so a hold still applies; `undefined` when nothing is pending. */
+	readonly pendingFlush?: () => Promise<void> | undefined;
+	/** Installs the paint hold the write watch builds from these internals, or ends it; answers the installed hold. */
+	readonly holdPaint?: (install: ((internals: PaintHoldInternals) => PaintHoldPlane) | undefined) => PaintHoldPlane | undefined;
+	/** The installed paint hold, if any. */
+	readonly paintHold?: () => PaintHoldPlane | undefined;
 	readonly subscribeJournal: (listener: DomJournalListener) => () => void;
 	readonly flush: () => Promise<void>;
 	readonly takeJournal: () => DomJournalEntry[];
@@ -302,12 +440,94 @@ export type RuntimeGraph = {
 
 type RuntimeSharedDefinition = NonNullable<ProtocolStatePayload['sharedDefinitions']>[number];
 
+// Flush scheduler phases. Scheduled and rearmed mean a microtask is queued to start a pass;
+// rearmed is a write landing while journal listeners run, before the pass ends.
+const FLUSH_IDLE = 0;
+const FLUSH_SCHEDULED = 1;
+const FLUSH_RUNNING = 2;
+const FLUSH_TAIL = 3;
+const FLUSH_REARMED = 4;
+type FlushPhase =
+	| typeof FLUSH_IDLE
+	| typeof FLUSH_SCHEDULED
+	| typeof FLUSH_RUNNING
+	| typeof FLUSH_TAIL
+	| typeof FLUSH_REARMED;
+
+function assertFlushMove(from: FlushPhase, to: FlushPhase): void {
+	let allowed: boolean;
+	switch (from) {
+		case FLUSH_IDLE:
+			allowed = to === FLUSH_SCHEDULED || to === FLUSH_RUNNING;
+			break;
+		case FLUSH_SCHEDULED:
+			allowed = to === FLUSH_RUNNING;
+			break;
+		case FLUSH_RUNNING:
+			allowed = to === FLUSH_TAIL;
+			break;
+		case FLUSH_TAIL:
+			allowed = to === FLUSH_REARMED || to === FLUSH_IDLE;
+			break;
+		case FLUSH_REARMED:
+			allowed = to === FLUSH_IDLE;
+	}
+	if (!allowed) throw new Error(`Illegal flush phase move ${from} -> ${to}`);
+}
+
+/** What a paint hold needs from its graph. */
+export type PaintHoldInternals = {
+	readonly cells: Map<string, unknown>;
+	readonly computedNodes: ReadonlyMap<string, unknown>;
+	readonly dependents: () => RuntimeDependents;
+	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
+	readonly paint: <T>(run: () => T) => T;
+	readonly read: RuntimeGraphRead;
+};
+
+/**
+ * Keeps a held state's earlier value on screen while code, computeds and async values read the written one:
+ * painting reads `shown`, and every write passes through `before` and, when not held, `after`.
+ */
+export type PaintHoldPlane = {
+	readonly shown: (graphNodeId: string) => { readonly value: unknown } | undefined;
+	readonly fresh: (graphNodeId: string) => boolean;
+	readonly before: (graphNodeId: string, path: ReadonlyArray<string>, leaf?: boolean) => boolean;
+	readonly after: (
+		graphNodeId: string,
+		path: ReadonlyArray<string>,
+		apply?: (copy: unknown) => unknown,
+		whole?: boolean,
+	) => void;
+	readonly release: (graphNodeId: string) => void;
+	readonly end: () => void;
+	/** Whether any state is held. */
+	readonly showing: () => boolean;
+	/** Whether a handler's own run reads `graphNodeId` now: until its first await, it reads what the page shows, except what that run wrote. */
+	readonly pressing: (graphNodeId: string) => boolean;
+	/** Whether the page paints another value of `graphNodeId` than code reads. */
+	readonly shows: (graphNodeId: string) => boolean;
+	/** Runs `run` with every graph read answering as the page paints. */
+	readonly asShown: <T>(run: () => T) => T;
+	/**
+	 * Writes a derived `value`; while a state is shown, `run` also derives, through the read it is handed, what the
+	 * page paints, landing both in one turn. `skip` is the answer that keeps the last painted value.
+	 */
+	readonly derived: (
+		graph: { readonly write: RuntimeGraph['write'] },
+		graphNodeId: string,
+		value: unknown,
+		run: (painted: (read: RuntimeGraphRead) => RuntimeGraphRead) => unknown,
+		skip: unknown,
+	) => void | Promise<void>;
+};
+
 export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const cells = new Map<string, unknown>();
 	const readInitializers = new Map<string, () => unknown>();
 	const computedNodes = createRuntimeComputedNodes(input.computed);
-	const asyncComputedNodes = createRuntimeAsyncComputedNodes(input.asyncComputed);
-	let dependents = indexRuntimeDependents(computedNodes, asyncComputedNodes);
+	let asyncPlane: AsyncComputedPlane | undefined;
+	let dependents!: RuntimeDependents;
 	// Per node, in subscribe order; the sequence number restores that order across nodes.
 	const subscriptionsByNode = new Map<string, RuntimeGraphSubscription[]>();
 	const subscriptionOrder = new Map<RuntimeGraphSubscription, number>();
@@ -316,28 +536,64 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const journalListeners: DomJournalListener[] = [];
 	const dirtyPaths: DirtyPath[] = [];
 	const journal: DomJournalEntry[] = [];
-	let flushScheduled = false;
-	let flushing = false;
+	let flushPhase: FlushPhase = FLUSH_IDLE;
+	let quietDepth = 0;
 	let notifyingWrite = false;
-	let activeFlush: Promise<void> | undefined;
+	// The pass from its scheduling until it lands.
+	let pass: { readonly landed: Promise<void>; readonly start: () => void } | undefined;
 	let flushHolds = 0;
+	const moveFlush = (to: FlushPhase): void => {
+		if (import.meta.env?.DEV) assertFlushMove(flushPhase, to);
+		flushPhase = to;
+	};
+	const hasPendingFlush = () => flushPhase !== FLUSH_IDLE || dirtyPaths.length > 0;
 
 	for (const cell of input.cells) {
 		cells.set(cell.graphNodeId, cell.value);
 		if (cell.readInitializer) readInitializers.set(cell.graphNodeId, cell.readInitializer);
 	}
 
+	let paintPlane: PaintHoldPlane | undefined;
+	// Above zero while the flush paints, so its reads see what is shown.
+	let painting = 0;
+	// Above zero while an async value works out its key, which reads what code holds.
+	let asking = 0;
+	const pressed = (graphNodeId: string): boolean => !asking && !!paintPlane?.pressing(graphNodeId);
+	const paint = <T,>(run: () => T): T => {
+		painting++;
+		try {
+			return run();
+		} finally {
+			painting--;
+		}
+	};
+
 	const readGraph: RuntimeGraphRead = (graphNodeId, path = []) => {
 		const computed = computedNodes.get(graphNodeId);
 		if (computed?.compute) {
-			return readComputedNode(computed, readGraph, path, plane?.reconcileComputed);
+			if (!painting && !pressed(graphNodeId) && paintPlane?.fresh(graphNodeId))
+				return readPath(computed.compute(readGraph), path);
+			return readComputedNode(
+				computed,
+				readGraph,
+				path,
+				plane?.reconcileComputed,
+				asyncPlane?.shownRead,
+			);
 		}
 
-		const asyncComputed = asyncComputedNodes.get(graphNodeId);
+		const asyncComputed = asyncPlane?.nodes.get(graphNodeId);
 		if (asyncComputed) {
-			return readAsyncComputedNode(asyncComputed, path, () =>
-				demandAsyncComputed(asyncComputed),
-			);
+			// A run this read starts asks with what code holds, not what is still painted.
+			const was = painting;
+			painting = 0;
+			asking++;
+			try {
+				return asyncPlane!.read(asyncComputed, path);
+			} finally {
+				painting = was;
+				asking--;
+			}
 		}
 
 		const initialize = readInitializers.get(graphNodeId);
@@ -346,14 +602,16 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const current = cells.get(graphNodeId);
 			try {
 				const value = initialize();
-				if (!Object.is(current, value)) commitCell(graphNodeId, [], value);
+				if (!Object.is(current, value)) commitCell(graphNodeId, [], value, false);
 			} catch {}
 		}
 
-		return readPath(cells.get(graphNodeId), path);
+		const shown = painting || pressed(graphNodeId) ? paintPlane?.shown(graphNodeId) : undefined;
+		return readPath(shown ? shown.value : cells.get(graphNodeId), path);
 	};
 
 	const markDirtyPath = (graphNodeId: string, path: ReadonlyArray<string>): void => {
+		asyncPlane?.wrote(graphNodeId, path);
 		dirtyPaths.push({ graphNodeId, path });
 		plane?.recordWrite(graphNodeId, path);
 		markDirtyComputedDependencies(
@@ -362,7 +620,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			dependents,
 			dirtyPaths,
 			plane,
-			invalidateAsyncComputed,
+			(node) => asyncPlane!.invalidate(node),
 		);
 		// Last, so an observer that reads back finds every computed this write
 		// invalidated already marked and answering afresh.
@@ -370,10 +628,19 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		scheduleFlush();
 	};
 
-	const commitCell = (graphNodeId: string, path: ReadonlyArray<string>, value: unknown): void => {
-		const current = cells.get(graphNodeId);
-		cells.set(graphNodeId, writePath(current, path, value));
-		markDirtyPath(graphNodeId, dirtyPathForGraphWrite(current, path));
+	let armShown: ((graphNodeId: string) => boolean | undefined) | undefined;
+	const commitCell = (
+		graphNodeId: string,
+		path: ReadonlyArray<string>,
+		value: unknown,
+		held = paintPlane?.before(graphNodeId, path) ?? false,
+		replay?: (shown: unknown) => unknown,
+	): void => {
+		const dirty = dirtyPathForGraphWrite(cells.get(graphNodeId), path);
+		cells.set(graphNodeId, writePath(cells.get(graphNodeId), path, value));
+		if (!held)
+			paintPlane?.after(graphNodeId, path, (copy) => writePath(copy, path, replay ? replay(readPath(copy, path)) : value), !!replay);
+		markDirtyPath(graphNodeId, dirty);
 	};
 
 	/**
@@ -405,10 +672,10 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	};
 
 	const notifyWriteObservers = (graphNodeId: string, path: ReadonlyArray<string>): void => {
-		if (writeObservers.length === 0 || flushing || notifyingWrite) return;
+		if (writeObservers.length === 0 || flushPhase === FLUSH_RUNNING || notifyingWrite) return;
 
 		const write: DirtyPath = { graphNodeId, path };
-		if (passWaitsOnCode()) return;
+		if (codeThePassWaitsOn().length > 0) return;
 		notifyingWrite = true;
 		try {
 			// A copy: an observer is free to release itself or another.
@@ -417,28 +684,41 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 					observer.graphNodeId === graphNodeId
 						? pathsIntersect(path, observer.path ?? [])
 						: derivesFromWrite(observer.graphNodeId, write, new Set());
-				if (reaches) observer.run();
+				if (reaches) paint(() => observer.run());
 			}
 		} finally {
 			notifyingWrite = false;
 		}
 	};
 
-	const passWaitsOnCode = (): boolean =>
-		dirtyPaths.some(({ graphNodeId, path }) =>
-			subscriptionsByNode
-				.get(graphNodeId)
-				?.some(
-					(subscription) =>
-						subscription.ready?.() === false &&
-						pathsIntersect(path, subscription.path ?? []),
-				),
+	const codeThePassWaitsOn = (): PromiseLike<unknown>[] =>
+		dirtyPaths.flatMap(({ graphNodeId, path }) =>
+			(subscriptionsByNode.get(graphNodeId) ?? []).flatMap((subscription) => {
+				const code = subscription.code?.() as PromiseLike<unknown> | undefined;
+				return typeof code?.then === 'function' && pathsIntersect(path, subscription.path ?? [])
+					? [code]
+					: [];
+			}),
 		);
 
-	const scheduleFlush = (): void => {
-		if (flushScheduled || flushing) return;
+	const codeTheJournalWaitsOn = (): PromiseLike<unknown>[] =>
+		journal.length === 0
+			? []
+			: journalListeners.flatMap((listener) => {
+					const code = listener.code?.(journal) as PromiseLike<unknown> | undefined;
+					return typeof code?.then === 'function' ? [code] : [];
+				});
 
-		flushScheduled = true;
+	const openPass = (): void => {
+		let start!: () => void;
+		moveFlush(FLUSH_SCHEDULED);
+		pass = { landed: new Promise<void>((resolve) => (start = () => resolve(runFlush()))), start };
+	};
+
+	const scheduleFlush = (): void => {
+		if (flushPhase === FLUSH_IDLE) openPass();
+		else if (flushPhase === FLUSH_TAIL) moveFlush(FLUSH_REARMED);
+		else return;
 		queueMicrotask(runScheduledFlush);
 	};
 
@@ -446,7 +726,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		if (!flushHolds) void flush();
 	};
 
-	const internals: DerivedReconcileInternals = {
+	const internals: DerivedReconcileInternals & AsyncComputedPlaneInternals = {
 		cells,
 		computedNodes,
 		dirtyPaths,
@@ -460,24 +740,47 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			bucket.push(subscription);
 			subscriptionOrder.set(subscription, subscriptionSequence++);
 		},
+		// Read by the async plane only; as methods they cost a page without async values nothing at load.
+		get reconcile() {
+			return plane;
+		},
+		landWithoutObservers(land) {
+			const was = notifyingWrite;
+			notifyingWrite = true;
+			try {
+				land();
+			} finally {
+				notifyingWrite = was;
+			}
+		},
+		flush() {
+			return flush();
+		},
+		isQuiet() {
+			return quietDepth > 0;
+		},
+		hasPendingFlush() {
+			return hasPendingFlush();
+		},
+		armShown: (graphNodeId) => armShown?.(graphNodeId),
+		armsUndecided() {
+			return dirtyPaths.length > 0 || flushPhase === FLUSH_SCHEDULED || flushPhase === FLUSH_RUNNING || flushPhase === FLUSH_REARMED;
+		},
 	};
 	// Without a plane a graph behaves as it did before reconciliation existed.
 	const plane = input.reconcile?.(internals);
 
-	const asyncComputedInput = () => ({
-		computedNodes,
-		asyncComputedNodes,
-		demandAsyncComputed,
-		readGraph,
-		markDirtyPath,
-		scheduleFlush,
-		reconcile: plane,
-	});
-	const demandAsyncComputed = (node: RuntimeAsyncComputedNode): void =>
-		demandRuntimeAsyncComputed({ node, ...asyncComputedInput() });
-
-	const invalidateAsyncComputed = (node: RuntimeAsyncComputedNode): void =>
-		invalidateRuntimeAsyncComputed({ node, ...asyncComputedInput() });
+	const installAsync = (
+		factory?: AsyncComputedPlaneFactory,
+		held?: HeldInputsPlaneFactory,
+		asyncComputed?: RuntimeGraphAsyncComputed,
+	) => {
+		asyncPlane ??= factory?.(internals, input.asyncComputed);
+		if (held) asyncPlane!.holdInputs(held);
+		if (asyncComputed) asyncPlane!.define(asyncComputed);
+		dependents = indexRuntimeDependents(computedNodes, asyncPlane?.nodes);
+	};
+	installAsync(input.async, input.held);
 
 	const sharedGraph = createSharedGraphPlane({
 		cells,
@@ -487,27 +790,35 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		scheduleFlush,
 	});
 
+	// Published before the pass runs: synchronous subscriptions reach the journal before runFlush returns.
 	const flush = (): Promise<void> => {
-		if (activeFlush) return activeFlush;
-
-		// Published before the pass runs: synchronous subscriptions reach the journal before runFlush returns.
-		let settle!: (pass: Promise<void>) => void;
-		activeFlush = new Promise<void>((resolve) => (settle = resolve));
-		settle(runFlush());
-		return activeFlush;
+		if (flushPhase === FLUSH_IDLE) openPass();
+		// A pass that throws before its first await has already cleared `pass` when start returns.
+		const current = pass!;
+		if (flushPhase === FLUSH_SCHEDULED) current.start();
+		return current.landed;
 	};
 
+	// A rearmed write lands in the pass its tail pass opens on ending.
+	const pendingFlush = (): Promise<void> | undefined =>
+		flushPhase === FLUSH_REARMED ? pass!.landed.then(pendingFlush) : pass?.landed;
+
+	// A commit that throws before its first await rejects instead of stopping the commits after it.
+	const landCommit = async (commit: RuntimeGraphCommit): Promise<void> => commit();
+
 	const runFlush = async (): Promise<void> => {
-		flushScheduled = false;
-		flushing = true;
+		moveFlush(FLUSH_RUNNING);
 
 		try {
 			try {
-				while (dirtyPaths.length > 0) {
-					plane?.recomputeSubscribed();
+				// The runs arm-owned values deferred start last, and what they dirty lands in this pass.
+				while (dirtyPaths.length > 0 || (asyncPlane?.startWritten?.(true), dirtyPaths.length > 0)) {
+					asyncPlane?.startWritten?.();
+					if (plane) paint(() => plane.recomputeSubscribed());
 					const pending = dirtyPaths.splice(0);
 					const ranSubscriptions = new Set<string>();
 					const commits: RuntimeGraphCommit[] = [];
+					const failures: unknown[] = [];
 					// A subscription added mid-pass runs after every older one, as an appended entry would.
 					for (
 						let floor = 0, ceiling;
@@ -521,40 +832,47 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 							)
 								continue;
 							ranSubscriptions.add(subscription.id);
-							const ran = subscription.run(
-								readGraph(subscription.graphNodeId, subscription.path ?? []),
-							);
-							const entries =
-								typeof (ran as PromiseLike<unknown>)?.then === 'function'
-									? await ran
-									: ran;
+							// One subscription failing still lets every other one in the round run and land.
+							let entries: DomJournalResult | RuntimeGraphCommit | void;
+							try {
+								const ran = paint(() =>
+									subscription.run(readGraph(subscription.graphNodeId, subscription.path ?? [])),
+								);
+								entries = (
+									typeof (ran as PromiseLike<unknown>)?.then === 'function' ? await ran : ran
+								) as DomJournalResult | RuntimeGraphCommit | void;
+							} catch (error) {
+								failures.push(error);
+								continue;
+							}
 							if (typeof entries === 'function') commits.push(entries);
-							else appendJournalResult(journal, entries as DomJournalResult | void);
+							else appendJournalResult(journal, entries);
 						}
 					if (commits.length > 0) {
-						const landing = commits.map((commit) => commit());
+						// The next round's code and the journal's own load first, so the journal paints in the task these commits do.
+						const waits = [...codeThePassWaitsOn(), ...codeTheJournalWaitsOn()];
+						if (waits.length > 0) await Promise.all(waits.map((code) => code.then(undefined, () => {})));
+						const landing = paint(() => commits.map((commit) => landCommit(commit)));
 						await notifyJournalListeners();
-						await Promise.all(landing);
+						for (const landed of await Promise.allSettled(landing))
+							if (landed.status === 'rejected') failures.push(landed.reason);
 					}
+					if (failures.length > 0) throw failures[0];
 				}
 			} finally {
-				plane?.settleBaselines();
-				flushing = false;
+				try {
+					plane?.settleBaselines();
+				} finally {
+					moveFlush(FLUSH_TAIL);
+				}
 			}
 
 			await notifyJournalListeners();
 		} finally {
-			activeFlush = undefined;
-			// A write landing while this pass is active arms flushScheduled, then
-			// finds flush() short-circuit on activeFlush, so the flag outlives the
-			// pass that would clear it and every later scheduleFlush no-ops. Clearing
-			// it here keeps it truthful, so the re-arm below can wake: any write that
-			// reached the graph is applied by a flush nobody had to call explicitly.
-			flushScheduled = false;
-
-			if (dirtyPaths.length > 0) {
-				scheduleFlush();
-			}
+			pass = undefined;
+			// A tail write's own microtask found this pass still active, so the pass end wakes it.
+			moveFlush(FLUSH_IDLE);
+			if (dirtyPaths.length > 0) scheduleFlush();
 		}
 	};
 
@@ -589,7 +907,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		...(typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
 			? {
 					peekAsyncSnapshot: (graphNodeId: string) =>
-						asyncComputedNodes.get(graphNodeId)?.snapshot,
+						asyncPlane?.nodes.get(graphNodeId)?.snapshot,
+					peekFlushPhase: () => flushPhase,
+					checkFlushMove: (to: number) => assertFlushMove(flushPhase, to as FlushPhase),
 				}
 			: {}),
 		readShared: sharedGraph.readShared,
@@ -606,7 +926,10 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const seeded = cells.has(write.graphNodeId);
 			if (
 				!seeded ||
-				!(plane?.commitDerived(write, path) || Object.is(readPath(current, path), write.value))
+				!(
+					plane?.commitDerived(write, path) ||
+					Object.is(readPath(current, path), write.value)
+				)
 			)
 				commitCell(write.graphNodeId, path, write.value);
 			return write.value;
@@ -615,49 +938,78 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const path = update.path ?? [];
 			const currentValue = readPath(cells.get(update.graphNodeId), path);
 			const nextValue = update.update(currentValue);
+			// Applied again to a value the page still shows, reading as the page paints.
 			if (!Object.is(currentValue, nextValue))
-				commitCell(update.graphNodeId, path, nextValue);
+				commitCell(update.graphNodeId, path, nextValue, undefined, (shown) => paint(() => update.update(shown)));
 			if (update.returnValue === 'previous') return currentValue;
 			if (update.returnValue === 'next') return nextValue;
 		},
 		call(call) {
 			const path = call.path ?? [];
+			const held = paintPlane?.before(call.graphNodeId, path, true) ?? false;
 			const target = readPath(cells.get(call.graphNodeId), path);
 			const beforeMutation = collectionMutationSnapshot(target, call.method, call.args ?? []);
 			const result = applyCollectionCall(target, call.method, call.args ?? []);
 
 			if (collectionCallMutated(call.method, result, beforeMutation)) {
+				if (!held) paintPlane?.after(call.graphNodeId, []);
 				markDirtyPath(call.graphNodeId, path);
 			}
 
 			return result;
 		},
 		delete(deletion) {
+			const held = paintPlane?.before(deletion.graphNodeId, deletion.path) ?? false;
 			const outcome = deletePath(cells.get(deletion.graphNodeId), deletion.path);
 			if (outcome.mutated) {
+				if (!held) paintPlane?.after(deletion.graphNodeId, deletion.path, (copy) => (deletePath(copy, deletion.path), copy));
 				markDirtyPath(deletion.graphNodeId, deletion.path);
 			}
 
 			return outcome.result;
 		},
-		defineAsyncComputed(asyncComputed) {
+		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
+		asyncPlane() {
+			return asyncPlane;
+		},
+		markQuietStart() {
+			quietDepth++;
+		},
+		markQuietEnd() {
+			quietDepth = Math.max(0, quietDepth - 1);
+		},
+		isQuiet() {
+			return quietDepth > 0;
+		},
+		defineAsyncComputed(asyncComputed, factory, held) {
 			const id = asyncComputed.graphNodeId;
-			if (asyncComputedNodes.has(id) || cells.has(id)) return false;
-			asyncComputedNodes.set(id, createRuntimeAsyncComputedNodes([asyncComputed]).get(id)!);
-			dependents = indexRuntimeDependents(computedNodes, asyncComputedNodes);
+			if (asyncPlane?.nodes.has(id) || cells.has(id)) return false;
+			installAsync(factory, held, asyncComputed);
 			return true;
 		},
 		subscribe(subscription) {
 			internals.addSubscription(subscription);
 			// Disposal contract: removed scopes unsubscribe their graph wiring
 			// (spec 01-tsrx-host-contract "branch scope disposal").
+			// The release forgets the subscription, so a list still holding the release keeps nothing it bound alive.
+			let held: RuntimeGraphSubscription | undefined = subscription;
 			return () => {
-				const bucket = subscriptionsByNode.get(subscription.graphNodeId)!;
-				const index = bucket.indexOf(subscription);
-				if (index < 0) return;
-				bucket.splice(index, 1);
-				subscriptionOrder.delete(subscription);
+				if (!held) return;
+				const bucket = subscriptionsByNode.get(held.graphNodeId)!;
+				const index = bucket.indexOf(held);
+				if (index >= 0) bucket.splice(index, 1);
+				subscriptionOrder.delete(held);
+				held = undefined;
 			};
+		},
+		subscriptionCount: (graphNodeId) => subscriptionsByNode.get(graphNodeId)?.length ?? 0,
+		pullBeforeRead(graphNodeId, pull) {
+			// The pull writes the node itself, so the initializer answers what it held before.
+			readInitializers.set(graphNodeId, () => {
+				const before = cells.get(graphNodeId);
+				pull();
+				return before;
+			});
 		},
 		subscribeWrite(observer) {
 			writeObservers.push(observer);
@@ -666,11 +1018,33 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 				if (index >= 0) writeObservers.splice(index, 1);
 			};
 		},
-		hasPendingFlush: () => flushScheduled || dirtyPaths.length > 0 || activeFlush !== undefined,
+		hasPendingFlush,
+		pendingFlush,
+		holdPaint(install) {
+			paintPlane?.end();
+			paintPlane = install?.({
+				cells,
+				computedNodes,
+				dependents: () => dependents,
+				markDirtyPath,
+				paint,
+				read: readGraph,
+			});
+			return paintPlane;
+		},
+		paintHold: () => paintPlane,
+		gateArms(shown) {
+			armShown = shown;
+		},
+		armShown: internals.armShown,
 		holdFlush() {
 			flushHolds++;
+			let held = true;
 			return () => {
-				if (!--flushHolds && flushScheduled) queueMicrotask(runScheduledFlush);
+				if (!held) return;
+				held = false;
+				if (!--flushHolds && (flushPhase === FLUSH_SCHEDULED || flushPhase === FLUSH_REARMED))
+					queueMicrotask(runScheduledFlush);
 			};
 		},
 		settleWriteObservers() {

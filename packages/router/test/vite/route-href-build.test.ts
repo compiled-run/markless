@@ -1,13 +1,11 @@
 import { readFile, readdir, mkdir, mkdtemp, cp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterAll, expect, test } from 'vitest';
 import { marklessBuildManifestDir, marklessBuildManifestPath } from '@markless/bundler/rolldown';
-import { markless } from '@markless/bundler/vite';
 import { MARKLESS_INTERACTION_CLOSURES } from '../../../bundler/src/build/chunking.ts';
 import { buildInternalFilesInPublicOutput } from '../../../../scripts/test-utils/public-build-output.ts';
-import { router } from '../../src/vite/index.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 const cleanups: Array<() => Promise<void>> = [];
@@ -37,13 +35,10 @@ function buildRouteHrefApp(): Promise<string> {
 				join(root, 'node_modules/@markless', pkg),
 				'dir',
 			);
-		const builder = await createBuilder({
+		await buildFixture({
 			root,
-			configFile: false,
-			logLevel: 'silent',
-			plugins: [markless({ experimentalNativePacking: true }), router()],
+			markless: { experimentalNativePacking: true },
 		});
-		await builder.buildApp();
 		return root;
 	})());
 }

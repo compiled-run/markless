@@ -17,7 +17,7 @@ export const sheetState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function SheetRoot({ shown = false, onShownChange, children }) @{

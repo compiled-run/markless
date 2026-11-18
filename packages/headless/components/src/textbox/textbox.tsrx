@@ -51,7 +51,7 @@ export const textboxState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function TextboxRoot({

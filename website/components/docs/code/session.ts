@@ -21,9 +21,6 @@ export type CodeSession = { reset(): void; dispose(): void };
  */
 export const ERROR_PAUSE_MS = 450;
 const sessions = new WeakMap<HTMLElement, Promise<CodeSession>>();
-// code.tsrx reads this key: a reader who has edited once gets later blocks booted on sight.
-const EDITOR_FLAG = 'markless-code:editor';
-let flagged = false;
 let compiler: Worker | undefined;
 const compiles = new Map<number, (outcome: CompileOutcome) => void>();
 let nextId = 1;
@@ -46,14 +43,6 @@ function compile(request: WorkerRequest): Promise<CompileOutcome> {
 		compiles.set(request.id, resolve);
 		worker.postMessage(request);
 	});
-}
-
-function markEditor(): void {
-	if (flagged) return;
-	flagged = true;
-	try {
-		localStorage.setItem(EDITOR_FLAG, '1');
-	} catch {}
 }
 
 /** The one way a block starts: every trigger calls this with the block's `<figure>`. */
@@ -273,7 +262,6 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 				file: name,
 				highlighter,
 				onChange() {
-					markEditor();
 					lastInput = performance.now();
 					clearTimeout(errorTimer);
 					request();

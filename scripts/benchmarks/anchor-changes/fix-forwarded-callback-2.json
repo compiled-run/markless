@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 330,
+			"reason": "a part's resolver runs its composer's callback on the page graph (graph: marklessPageGraph on every callback-route invoke); measured on CI run 41939839344 against merge-queue run 41926217694",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 387,
+			"reason": "a part's resolver runs its composer's callback on the page graph (graph: marklessPageGraph on every callback-route invoke); measured on CI run 41939839344 against merge-queue run 41926217694",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 103,
+			"reason": "a part's resolver runs its composer's callback on the page graph (graph: marklessPageGraph on every callback-route invoke); measured on CI run 41939839344 against merge-queue run 41926217694",
+			"date": "2026-11-05"
+		}
+	]
+}

@@ -12,7 +12,7 @@ export const plural = shared(
 
 		return { ...s, itemEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function PluralRoot({ children }) @{

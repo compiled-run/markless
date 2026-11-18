@@ -21,7 +21,7 @@ export const boxLiteralState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export type BoxLiteralRootProps = {

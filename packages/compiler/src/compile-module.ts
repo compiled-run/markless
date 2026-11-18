@@ -14,6 +14,7 @@ import type {
 	RuntimeDemandMapsArtifact,
 	TriggerGroupArtifact,
 	SemanticGraphArtifact,
+	ProjectionArmsArtifact,
 	ServerOnlyPropsArtifact,
 	StateLoweringArtifact,
 	SymbolModulesArtifact,
@@ -29,6 +30,7 @@ import {
 	type ChildrenSeedPathsInput,
 } from './passes/link/children-seed-paths.ts';
 import { withClosureActionOwners } from './passes/link/closure-action-owners.ts';
+import { withDerivedProps } from './passes/link/derived-props.ts';
 import { withRosterDerivations } from './passes/link/roster-derivations.ts';
 import { withStorageCells } from './passes/link/storage-cells.ts';
 import { withRowSlotReaders } from './passes/link/row-slot-readers.ts';
@@ -48,6 +50,7 @@ import {
 	firstUseScope,
 	mergeFirstUseReach,
 } from './passes/runtime-demand-map.ts';
+import { planProjectionArms } from './passes/projection-arms.ts';
 import { checkServerOnlyProps } from './passes/server-only-props.ts';
 import { createTriggerGroups } from './passes/trigger-groups.ts';
 import { buildSemanticGraph } from './passes/semantic-graph/index.ts';
@@ -96,6 +99,7 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 		readonly publicRenderPlan: PublicRenderPlanArtifact;
 		readonly publicRenderModule: PublicRenderModuleArtifact;
 		readonly serverOnlyProps: ServerOnlyPropsArtifact;
+		readonly projectionArms: ProjectionArmsArtifact;
 		readonly symbolModules: SymbolModulesArtifact;
 		readonly runtimeDemandMap: RuntimeDemandMapArtifact;
 		readonly runtimeDemandMaps: RuntimeDemandMapsArtifact;
@@ -117,10 +121,25 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 			withClosureActionOwners(
 				withRosterDerivations(
 					withRowSlotReaders(
-						withSeedsFromProps(withStorageCells(artifacts.semanticGraph.moduleGraphInterface, storageCellsInput), {
-							symbolResolver: artifacts.symbolResolver,
-							protocolState: artifacts.protocolState,
-						}),
+						withSeedsFromProps(
+							withStorageCells(
+								withDerivedProps(artifacts.semanticGraph.moduleGraphInterface, {
+									source: input,
+									semanticGraph: artifacts.semanticGraph,
+									renderData: artifacts.renderData,
+									publicRenderPlan: artifacts.publicRenderPlan,
+									symbolResolver: artifacts.symbolResolver,
+									captureAnalysis: artifacts.captureAnalysis,
+									protocolState: artifacts.protocolState,
+									protocolView: artifacts.protocolView,
+								}),
+								storageCellsInput,
+							),
+							{
+								symbolResolver: artifacts.symbolResolver,
+								protocolState: artifacts.protocolState,
+							},
+						),
 						{
 							componentEdges: artifacts.semanticGraph.componentEdges,
 							protocolView: artifacts.protocolView,
@@ -153,6 +172,7 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 				importedModuleInterfaces: input.importedModuleInterfaces,
 				components: artifacts.semanticGraph.components,
 				sharedCallbackBindings: artifacts.semanticGraph.sharedCallbackBindings,
+				keyedRepeats: artifacts.semanticGraph.keyedRepeats,
 			},
 			artifacts.runtimeDemandMaps,
 		),
@@ -172,6 +192,7 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 		publicRenderPlan: artifacts.publicRenderPlan,
 		publicRenderModule: artifacts.publicRenderModule,
 		serverOnlyProps: artifacts.serverOnlyProps,
+		projectionArms: artifacts.projectionArms,
 		symbolModules: artifacts.symbolModules,
 		runtimeDemandMap: artifacts.runtimeDemandMap,
 		runtimeDemandMaps: artifacts.runtimeDemandMaps,
@@ -307,6 +328,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 				run({ inputs }) {
 					const semanticGraph = inputs.semanticGraph as SemanticGraphArtifact;
 					const captureAnalysis = analyzeCaptures({
+						moduleSource: sourceInput(inputs.source).source,
 						semanticGraph,
 						symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 						symbols: inputs.symbols as CompileTsrxModuleInput['symbols'],
@@ -333,6 +355,20 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							payloadArena: inputs.payloadArena as PayloadArenaArtifact,
+						}),
+					};
+				},
+			};
+		}
+
+		if (pass.passId === 'projection-arms') {
+			return {
+				...pass,
+				run({ inputs }) {
+					return {
+						projectionArms: planProjectionArms({
+							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
+							renderData: inputs.renderData as RenderDataArtifact,
 						}),
 					};
 				},
@@ -474,6 +510,8 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
 							renderData: inputs.renderData as RenderDataArtifact,
 							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
+							publicRenderModule:
+								inputs.publicRenderModule as CompileTsrxModuleResult['publicRenderModule'],
 							protocolView: inputs.protocolView as ProtocolViewPayloadWithArmRecords,
 							omitAuthoredSource: (inputs.source as CompileTsrxModuleInput)
 								.omitAuthoredSource,
@@ -507,6 +545,8 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						components: (inputs.semanticGraph as SemanticGraphArtifact).components,
 						sharedCallbackBindings: (inputs.semanticGraph as SemanticGraphArtifact)
 							.sharedCallbackBindings,
+						keyedRepeats: (inputs.semanticGraph as SemanticGraphArtifact).keyedRepeats,
+						events: (inputs.semanticGraph as SemanticGraphArtifact).events,
 					};
 					const runtimeDemandMaps = {
 						'plain-ssr': createRuntimeDemandMap(demandInput, 'plain-ssr'),
@@ -586,13 +626,16 @@ function parseErrorDiagnostic(
 			span: parserErrorSpan(error, source),
 			parserMessage: message,
 		});
+	if (message.startsWith('TSRX2011')) return blockSiblingNodesDiagnostic(error, source);
 	const rule = templateRuleBroken(message, error, source);
 	return {
 		code: 'MARKLESS_PARSE_ERROR',
 		severity: 'error',
 		phase: 'parse',
 		title: rule?.title ?? 'TSRX parser rejected this source',
-		message: rule ? `${rule.message} (@tsrx/yuku reported: ${message})` : `@tsrx/yuku reported: ${message}`,
+		message: rule
+			? `${rule.message} (@tsrx/yuku reported: ${message})`
+			: `@tsrx/yuku reported: ${message}`,
 		why: 'The source could not enter the Markless compiler because the @tsrx/yuku parser failed at phase parse. Markless preserves the parser message and adapts its source location into the compiler diagnostic.',
 		primarySpan: parserErrorSpan(error, source),
 		passId: 'tsrx-semantic-graph',
@@ -608,24 +651,50 @@ function parseErrorDiagnostic(
 	};
 }
 
-// A code block and every control-flow arm render one node, after their statements (TSRX2011 and TSRX2012).
+function parserErrorLine(error: SyntaxError, source: CompileTsrxModuleInput): number | null {
+	const position = (error as SyntaxError & { readonly pos?: unknown }).pos;
+	return typeof position === 'number'
+		? source.source.slice(0, position).split('\n').length
+		: null;
+}
+
+// TSRX2011: a component body and every control-flow arm render exactly one node.
+function blockSiblingNodesDiagnostic(
+	error: SyntaxError,
+	source: CompileTsrxModuleInput,
+): SemanticGraphArtifact['diagnostics'][number] {
+	const span = parserErrorSpan(error, source);
+	const line = parserErrorLine(error, source);
+	const tag = span ? /^<[A-Za-z][\w.:-]*/.exec(source.source.slice(span.start))?.[0] : undefined;
+	const subject = `${tag ? `\`${tag}>\`` : 'This node'}${line === null ? '' : ` on line ${line}`}`;
+	return {
+		code: 'MARKLESS_BLOCK_SIBLING_NODES',
+		severity: 'error',
+		phase: 'parse',
+		title: 'A block renders one node',
+		message: `${subject} is a second node in the same block. A component body and each @if, @else, @for, @empty, @switch case, @try, @pending and @catch arm render exactly one node. (@tsrx/yuku reported: ${error.message})`,
+		why: 'Each block hands exactly one node to the place it renders into. A fragment `<>…</>` or one wrapping element is that node, and it can hold as many children as you need.',
+		primarySpan: span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'Wrap the nodes in one fragment: put `<>` before the first and `</>` after the last, as in `<><h2>Title</h2><ul>…</ul></>`. A fragment adds no element to the page. One wrapping element, like `<div>`, works too.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_BLOCK_SIBLING_NODES',
+	};
+}
+
+// TSRX2012: a code block runs its statements before the node it renders.
 function templateRuleBroken(
 	message: string,
 	error: SyntaxError,
 	source: CompileTsrxModuleInput,
 ): { title: string; message: string; fix: string } | null {
-	const position = (error as SyntaxError & { readonly pos?: unknown }).pos;
-	const line = typeof position === 'number' ? source.source.slice(0, position).split('\n').length : null;
+	const line = parserErrorLine(error, source);
 	const at = line === null ? '' : ` on line ${line}`;
-	if (message.startsWith('TSRX2011')) {
-		const tag = typeof position === 'number' ? /^<[A-Za-z][\w.:-]*/.exec(source.source.slice(position))?.[0] : undefined;
-		const subject = tag ? `\`${tag}>\`${at}` : `The node${at}`;
-		return {
-			title: 'A code block renders a single node',
-			message: `${subject} follows another node in the same code block or arm, and each one renders exactly one node.`,
-			fix: 'Wrap the nodes in one fragment: put `<>` before the first and `</>` after the last, as in `<><header>top</header><main>body</main></>`. A fragment adds no element to the page.',
-		};
-	}
 	if (message.startsWith('TSRX2012')) {
 		return {
 			title: 'Code must come before the rendered output',
@@ -649,7 +718,7 @@ function parserErrorSpan(
 /**
  * Diagnostics that make the render modules unserveable, so emitting them would
  * only produce source no host can run. A parse error leaves nothing to emit
- * from; an unbound shared call (defect 69) leaves a call the server prelude
+ * from; an unbound shared call leaves a call the server prelude
  * would emit verbatim and throw on, while the client body drops it — the exact
  * client-works/server-throws split the refusal exists to end.
  *
@@ -663,12 +732,15 @@ const unserveableDiagnosticCodes: ReadonlySet<string> = new Set([
 	// body, so emitting would ship the word "else" and the arm's escaped source
 	// to the page — visible garbage rather than a branch.
 	'MARKLESS_BRANCH_ELSE_SPELLING',
+	// Same shape for an @pending after @catch: the word and the arm's source would ship as text.
+	'MARKLESS_ASYNC_ARM_ORDER',
+	'MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
 ]);
 
 function hasUnserveableDiagnostic(semanticGraph: SemanticGraphArtifact): boolean {
 	return semanticGraph.diagnostics.some(
 		(diagnostic) =>
-			(diagnostic.phase === 'parse' && diagnostic.code === 'MARKLESS_PARSE_ERROR') ||
+			diagnostic.phase === 'parse' ||
 			(diagnostic.severity === 'error' && unserveableDiagnosticCodes.has(diagnostic.code)),
 	);
 }
@@ -677,6 +749,7 @@ function emptyPublicRenderPlanArtifact(): PublicRenderPlanArtifact {
 	return {
 		passId: 'public-render-plan',
 		styleScopes: [],
+		stylesheetImports: [],
 		diagnostics: [],
 	};
 }

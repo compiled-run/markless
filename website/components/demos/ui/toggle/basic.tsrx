@@ -40,7 +40,12 @@ export default function ToggleBasic() @{
 			}
 
 			.row[ui-checked] {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.words {
@@ -80,7 +85,13 @@ export default function ToggleBasic() @{
 			}
 
 			.track[ui-checked] {
-				background: color-mix(in srgb, var(--switch-on) 65%, var(--paper));
+				background: color-mix(in srgb, var(--switch-on) 65%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					--paper: var(--cream);
+					color: var(--on-accent);
+				}
 			}
 
 			.thumb {

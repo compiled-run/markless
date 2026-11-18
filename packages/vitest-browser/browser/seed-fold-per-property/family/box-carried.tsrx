@@ -22,7 +22,7 @@ export const boxCarriedState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export type BoxCarriedRootProps = {

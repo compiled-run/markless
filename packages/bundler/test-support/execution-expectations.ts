@@ -58,7 +58,7 @@ export function deriveAllowedModules(
 			: exactActionModules(runtimeDemandMap, action),
 	);
 	// The full tier loads the sync-policy core when ANY record on the page carries a
-	// policy (page-scoped). Exact (replaced) sets stay policy-free for policy-less
+	// policy (app-scoped). Exact (replaced) sets stay policy-free for policy-less
 	// actions, so this widening applies only while the action's kind is unreplaced.
 	const kindReplaced = new Map(
 		(runtimeDemandMap.recordKinds ?? []).map((kind) => [kind.kind, kind.replaced]),
@@ -207,6 +207,7 @@ const INTERPRETER_ROOTS_BY_KIND: Record<string, ReadonlyArray<string>> = {
 const GENERIC_PATH_MODULES = [
 	'web/dom-journal', // Generic graph writes stage their DOM commits through the journal.
 	'web/dom-journal-direct', // Element text and attribute writes apply without loading the range journal.
+	'web/dom-journal-load', // Every journal applier loads the range journal through one loader.
 	'web/inline/resume-errors', // Generic dispatch reports malformed resume state through fail-closed diagnostics.
 	'web/payload-document-common', // Generic payload lookup shares the document-script readers.
 	'web/payload-resume-registry', // Generic resume reuses decoded payload documents through the page registry.

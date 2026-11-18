@@ -441,6 +441,8 @@ test('CSR: enter in the single-line control submits and never reaches its value'
 	const seen = countSubmits(formOf(control));
 
 	await userEvent.fill(control, 'ada');
+	// The submit is native and needs no handler, so it can land before the typing reaches the family cell.
+	await expect.poll(() => el(UsernameRoot).hasAttribute('ui-empty')).toBe(false);
 	control.focus();
 	await userEvent.keyboard('{Enter}');
 	await expect.poll(() => seen.count).toBe(1);

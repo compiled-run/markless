@@ -19,7 +19,7 @@ export const boxState = shared(() => {
 		...box,
 		flip() { box.ticked = !box.ticked; },
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function BoxRoot({ ticked = false, locked = false, children }) @{
 	const box = boxState();
@@ -98,7 +98,7 @@ export const panelState = shared(() => {
 	const panel = state({ open: false });
 
 	return { ...panel, toggle() { panel.open = !panel.open; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function PanelSurface({ open = false, children }) @{
 	const panel = panelState();

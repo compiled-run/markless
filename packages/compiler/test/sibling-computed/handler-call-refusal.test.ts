@@ -45,7 +45,7 @@ export const box = shared(() => {
 	const s = state({ label: 'a', seen: '' });
 	const loud = computed(() => s.label.toUpperCase());
 	return { ...s, loud };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Family() @{
 	const b = box();
@@ -68,7 +68,7 @@ export const box = shared(() => {
 	const s = state({ label: 'a', seen: '' });
 	const loud = computed(() => s.label.toUpperCase());
 	return { ...s, loud };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Family() @{
 	const b = box();
@@ -99,7 +99,7 @@ export const dial = shared(() => {
 	const cell = state({ label: 'a', seen: '' });
 	const loud = computed(() => cell.label.toUpperCase());
 	return { ...cell, loud };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Dial() @{
 	const d = dial();

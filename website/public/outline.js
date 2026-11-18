@@ -34,7 +34,6 @@ class MarklessOutline extends HTMLElement {
 			.filter((entry) => entry.heading);
 		if (!entries.length) return;
 		const controller = new AbortController();
-		const header = document.querySelector('.site-header');
 		let frame = 0;
 		const save = () => {
 			try {
@@ -42,7 +41,7 @@ class MarklessOutline extends HTMLElement {
 			} catch {}
 		};
 		let current = entries.find((entry) => entry.link.hasAttribute('aria-current'));
-		const readingLine = () => (header?.getBoundingClientRect().bottom ?? 0) + 32;
+		const readingLine = () => Math.max(0, ...[...document.querySelectorAll('.navbar-edge')].map((edge) => edge.getBoundingClientRect().bottom)) + 32;
 		// A #fragment load can scroll after load; until it does, keep the heading the fragment names.
 		let awaitingFragment = entries.some((entry) => entry.link.hash === location.hash && entry.heading.getBoundingClientRect().top > readingLine() + 1);
 		const update = () => {
@@ -67,6 +66,8 @@ class MarklessOutline extends HTMLElement {
 			else if (linkBounds.top < bounds.top) rail.scrollTop -= bounds.top - linkBounds.top + 8;
 		};
 		const schedule = () => {
+			// While the sidebar slides, the column only moves; read the headings once it has settled.
+			if (document.documentElement.hasAttribute('data-sidebar-sliding')) return void setTimeout(schedule, 120);
 			if (!frame) frame = requestAnimationFrame(update);
 		};
 		for (const { link } of entries) link.title = link.textContent.trim();

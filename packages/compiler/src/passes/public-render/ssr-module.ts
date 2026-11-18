@@ -1,3 +1,4 @@
+import { componentCatchErrorNames } from './boundary-runner.ts';
 import { parseModule } from '../../js-ast.ts';
 import { stripAuthoredExpression, stripAuthoredStatements } from './authored-strip.ts';
 import {
@@ -15,8 +16,10 @@ import {
 } from './html.ts';
 import {
 	componentDeriveGraphNodeIds,
+	componentSeedCellIndexes,
 	computedDependencyEdges,
 	payloadServedComputedGraphNodeIds,
+	servedIfDurableGraphNodeIds,
 	foreignSharedComputedScope,
 	orderComputedDerives,
 	rowScopedEdgeIds,
@@ -33,6 +36,8 @@ import {
 	rowProjectedEdgeIdsUnder,
 	staticProjectionChildren,
 	sharedSeedConsumeLine,
+	sharedInstanceValuesConsumeLine,
+	sharedInstanceValuesOpenLine,
 	sharedSeedMarkerLine,
 	adoptedWidgetDefinitionIds,
 	sharedSeedPassLines,
@@ -57,7 +62,9 @@ import {
 	callbackSymbolIds,
 	componentEdgeInstanceSegment,
 	componentEdgesFor,
+	componentReferenceKey,
 	componentReferences,
+	edgeReferenceKey,
 	destructureProps,
 	emitComponentImport,
 	emitValueImport,
@@ -75,6 +82,8 @@ import {
 	objectPropertyName,
 	ssrComposedPayloadView,
 	projectsElementsIntoRows,
+	rendersTryInRows,
+	spreadsAttributes,
 } from './shared.ts';
 import { ssrComposeStateExpression } from './prop-cell-seed.ts';
 import {
@@ -92,12 +101,17 @@ import {
 	elementBoundKeySource,
 	widgetInstanceReadSource,
 	renderDecisionSources,
+	componentKeyedRepeats,
+	componentRowNames,
 	repeatLocalSource,
+	shadowedRowNameSource,
 	sharedInstancePreludeLines,
 } from './residue-reader.ts';
+import { createResidueDependencyReader, residueReferences } from './residue-dependencies.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
 import { boundSymbolsForEdge, componentEdgeGraphRoutes } from './component-wiring.ts';
 import type { ComponentEdge, PublicRenderRoot } from './types.ts';
+import { asyncComputedGraphNodeIds } from '../../artifact-helpers/graph-paths.ts';
 
 /**
  * The minted id for one handle, as an expression usable anywhere this module's
@@ -209,6 +223,21 @@ function branchArmHandleResolution(
 	return `,elementHandleIds:{${ids}},idrefSites:[${siteSources}]`;
 }
 
+// The runner registry a component's boundary cases read, declared inside each render function that has them.
+export function ssrAsyncRegistryLines(input: PublicRenderModuleInput): string[] {
+	const definitions = collectSsrAsyncRunnerDefinitions(input);
+	if (definitions.size === 0) return [];
+	return [
+		'const marklessSsrAsyncRuns = marklessSsrRenderContext?.streaming?.runs ?? new Map();',
+		`const marklessSsrAsyncRunnerDefinitions = new Map([${[...definitions]
+			.map(
+				([graphNodeId, definition]) =>
+					`[${JSON.stringify(graphNodeId)},{run:${definition.source},dependencies:${JSON.stringify(definition.dependencies)},async:${String(definition.async)}}]`,
+			)
+			.join(',')}]);`,
+	];
+}
+
 export function emitPublicSsrRenderModule(
 	input: PublicRenderModuleInput,
 	rootInfo: PublicRenderRoot,
@@ -219,8 +248,6 @@ export function emitPublicSsrRenderModule(
 		input.semanticGraph.componentEdges,
 		'__marklessSsrComponent',
 	);
-	const asyncRunnerDefinitions = collectSsrAsyncRunnerDefinitions(input);
-	const hasAsyncDependencyRegistry = asyncRunnerDefinitions.size > 0;
 	// A streamed arm's branches must name the arm this render painted; only an @pending arm streams.
 	const streamsArms = input.semanticGraph.markup.chunks.some((chunk) =>
 		chunk.slots.some((slot) => slot.kind === 'async' && slot.armTemplateIds.pending !== undefined),
@@ -273,7 +300,10 @@ export function emitPublicSsrRenderModule(
 		'',
 		`const marklessSsrPropEvents = ${JSON.stringify(propEvents)};`,
 		'const marklessSsrStateValues = new Map([',
-		stateEntries(input, ownedNodes?.seedCellIndexes).join(',\n'),
+		stateEntries(
+			input,
+			ownedNodes && componentSeedCellIndexes(input, rootInfo.componentName, ownedNodes),
+		).join(',\n'),
 		']);',
 		// The optional render context is the per-request streaming channel
 		// (T107): renderToStream threads it through child renders and async
@@ -302,6 +332,13 @@ export function emitPublicSsrRenderModule(
 			: `	const marklessSsrPayloadState = marklessSelectStateNodes(marklessCloneState(payloadState), ${selectedStateNodeArguments(ownedNodes)});`,
 		'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
 		sharedSeedConsumeLine(input, rootInfo.componentName, 'marklessSsrRenderStateValues'),
+		sharedInstanceValuesConsumeLine(
+			input,
+			rootInfo.componentName,
+			'marklessSsrRenderStateValues',
+			'marklessSsrPayloadState',
+		),
+		sharedInstanceValuesOpenLine(input, rootInfo.componentName),
 		...rootDataLines.carriedSeed,
 		...renderBodyLines(
 			input,
@@ -313,19 +350,7 @@ export function emitPublicSsrRenderModule(
 				'const marklessSsrChildren = [];',
 				'const marklessSsrBranches = [];',
 				'const marklessSsrAsyncSnapshots = [];',
-				...(hasAsyncDependencyRegistry
-					? [
-							'const marklessSsrAsyncRuns = marklessSsrRenderContext?.streaming?.runs ?? new Map();',
-							`const marklessSsrAsyncRunnerDefinitions = new Map([${[
-								...asyncRunnerDefinitions,
-							]
-								.map(
-									([graphNodeId, definition]) =>
-										`[${JSON.stringify(graphNodeId)},{run:${definition.source},dependencies:${JSON.stringify(definition.dependencies)},async:${String(definition.async)}}]`,
-								)
-								.join(',')}]);`,
-						]
-					: []),
+				...ssrAsyncRegistryLines(input),
 			...dataRenderLines,
 			],
 			rootDataLines.bodySharedComputed,
@@ -397,6 +422,7 @@ export function emitPublicSsrRenderModule(
 		...foreignScope.importLines,
 		...emitCatalogHelperImports(helperReferenceSource, [
 			{ module: 'ssr-data', names: ['renderSsrData'] },
+			{ module: 'attribute-name', names: ['marklessAttributeName'] },
 			{
 				module: 'row-qualified-view',
 				names: ['marklessSsrRowQualifiedView', 'marklessRowProjectionSegment'],
@@ -425,9 +451,10 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrWidgetRoots',
 					'marklessSsrPlacedWidgetRoots',
 					'marklessSsrChildrenWidgetRoot',
+					'marklessSsrChildInstancePath',
 					'marklessSsrWidgetBoundary',
 					// Keep the emitted SSR helper distinct from authored bindings.
-					'marklessComposeState as marklessSsrComposeState',
+					'marklessSsrComposeState',
 					'marklessSsrRemapGraphOutput',
 					'marklessSsrSeedPropCells',
 					'marklessSsrComposeView',
@@ -520,7 +547,7 @@ function childSurfaceArgs(
 	edge: { readonly childComponentName: string; readonly importKind?: string; readonly importSource?: string; readonly importedName?: string },
 	referenceByName: ReadonlyMap<string, string>,
 ): string | undefined {
-	const reference = referenceByName.get(edge.childComponentName);
+	const reference = referenceByName.get(edgeReferenceKey(edge));
 	if (!reference) return undefined;
 	const declaredName = edgeDeclaredComponentName(edge);
 	return `${reference},${declaredName ? JSON.stringify(declaredName) : 'undefined'}`;
@@ -529,10 +556,16 @@ function childSurfaceArgs(
 // One marker per component whose own `children` land inside its composition.
 function childrenWidgetRootMarkerLines(
 	input: PublicRenderModuleInput,
-	references: ReadonlyArray<{ readonly componentName: string; readonly localName: string }>,
+	references: ReadonlyArray<{
+		readonly componentName: string;
+		readonly importSource?: string;
+		readonly localName: string;
+	}>,
 	components: ReadonlyArray<readonly [string, string]>,
 ): string[] {
-	const referenceByName = new Map(references.map((entry) => [entry.componentName, entry.localName]));
+	const referenceByName = new Map(
+		references.map((entry) => [componentReferenceKey(entry.componentName, entry.importSource), entry.localName]),
+	);
 	const edgeById = new Map(input.semanticGraph.componentEdges.map((edge) => [edge.id, edge]));
 	return components.flatMap(([componentName, functionName]) => {
 		const chain = childrenProjectionChain(input.renderData.chunks, componentName, (edgeId) =>
@@ -617,34 +650,85 @@ export function ssrSeedForwardBlockLines(
 	];
 }
 
-// Sibling `@for` loops may bind the same authored name - two lists both calling
-// their item `row` is ordinary authoring. This prelude is ONE scope shared by
-// every row render, so each name may be declared once; the declaration is the
-// same whichever loop asked for it, because a row context names its own row and
-// the rows enclosing it. A name meaning an item in one loop and an index in another is
-// refused by `collectRepeatBindingConflictDiagnostics` before emission.
+// One declaration per name the component's own loops bind, shared by every row render of it.
 function repeatLocalLines(
-	repeats: PublicRenderModuleInput['semanticGraph']['keyedRepeats'],
+	input: PublicRenderModuleInput,
+	componentName: string,
+	repeats: ReturnType<typeof componentKeyedRepeats>,
+	rowNames: ReturnType<typeof componentRowNames>,
 ): string[] {
-	const declared = new Map<string, string>();
-	for (const repeat of repeats)
-		if (!declared.has(repeat.itemName))
-			declared.set(
-				repeat.itemName,
-				repeatLocalSource(repeats, repeat.itemName, 'repeatItem', 'marklessSsrDataContext'),
-			);
-	for (const repeat of repeats)
-		if (repeat.indexName && !declared.has(repeat.indexName))
-			declared.set(
-				repeat.indexName,
-				repeatLocalSource(
-					repeats,
-					repeat.indexName,
-					'repeatIndex',
-					'marklessSsrDataContext',
-				),
-			);
-	return [...declared].map(([name, source]) => `const ${name}=${source};`);
+	return rowNames.map(
+		(binding) =>
+			`const ${binding.name}=${
+				binding.shadowsOuter
+					? shadowedRowNameSource(
+							repeats,
+							binding,
+							'marklessSsrDataContext',
+							outerRowNameSource(input, componentName, binding.name),
+						)
+					: repeatLocalSource(repeats, binding, 'marklessSsrDataContext')
+			};`,
+	);
+}
+
+// A graph binding is read from the values map at the read, as a graph-read residue is; any other outer name is aliased before the readers shadow it.
+function outerRowNameSource(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	name: string,
+): string {
+	const binding = ownedGraphBinding(input, componentName, name);
+	return binding
+		? `marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(binding.id)}),[])`
+		: `marklessSsrOuter$${name}`;
+}
+
+function outerRowNameAliasLines(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	rowNames: ReturnType<typeof componentRowNames>,
+): string[] {
+	return rowNames.flatMap((binding) =>
+		binding.shadowsOuter && !ownedGraphBinding(input, componentName, binding.name)
+			? [
+					`const marklessSsrOuter$${binding.name}=typeof ${binding.name}==='undefined'?undefined:${binding.name};`,
+				]
+			: [],
+	);
+}
+
+// An authored residue that reads an async value runs once its @try has settled the value into the map.
+function asyncValueLocalLines(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	residueSources: ReadonlyArray<string>,
+	taken: ReadonlyArray<string>,
+): string[] {
+	if (residueSources.length === 0) return [];
+	const readDependencies = createResidueDependencyReader();
+	const read = residueSources.map((source) => readDependencies(source, 'expression'));
+	return input.semanticGraph.graphBindings.flatMap((binding) =>
+		binding.kind === 'computed' &&
+		binding.async === true &&
+		!taken.includes(binding.name) &&
+		ownedGraphBinding(input, componentName, binding.name) === binding &&
+		read.some((dependencies) => residueReferences(dependencies, binding.name))
+			? [
+					`const ${binding.name}=marklessSsrRenderStateValues.get(${JSON.stringify(binding.id)});`,
+				]
+			: [],
+	);
+}
+
+function ownedGraphBinding(input: PublicRenderModuleInput, componentName: string, name: string) {
+	return input.semanticGraph.graphBindings.find(
+		(binding) =>
+			binding.name === name &&
+			binding.sharedDefinitionId === undefined &&
+			(binding.componentName === componentName ||
+				(!binding.componentName && componentName === input.renderData.root?.componentName)),
+	);
 }
 
 // A component-body `computed()` whose expression names a shared instance rebuilds
@@ -673,13 +757,18 @@ function bodyComputedReadsSharedInstance(
 function emitSsrDataLines(
 	input: PublicRenderModuleInput,
 	componentName: string,
-	references: ReadonlyArray<{ readonly componentName: string; readonly localName: string }>,
+	references: ReadonlyArray<{
+		readonly componentName: string;
+		readonly importSource?: string;
+		readonly localName: string;
+	}>,
 ): SsrDataLines {
 	const rowScopedEdges = rowScopedEdgeIds(input.renderData.chunks);
 	const chunks = input.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
 	const componentGraphNodeIds = componentDeriveGraphNodeIds(input, componentName);
 	const residueSources = authoredResidueSources(chunks);
-	const repeats = input.semanticGraph.keyedRepeats;
+	const repeats = componentKeyedRepeats(input, componentName);
+	const rowNames = componentRowNames(input, componentName, repeats);
 	// The prelude serves every callback, not just the markup reader: an arm test
 	// the compiler could not reduce to one graph read is authored in the same
 	// scope and may spell shared instances the markup never mentions. Same union
@@ -687,22 +776,22 @@ function emitSsrDataLines(
 	const preludeText = [
 		...new Set([...residueSources, ...renderDecisionSources(input, componentName)]),
 	].join('\n');
-	// A row variable named `error` takes the name, as the client residue reader already decides.
-	const rowNamesError = repeats.some(
-		(repeat) => repeat.itemName === 'error' || repeat.indexName === 'error',
+	// A row variable named like the rejection takes the name, as the client residue reader already decides.
+	const errorNames = componentCatchErrorNames(input.semanticGraph, componentName).filter(
+		(name) => !rowNames.some((binding) => binding.name === name),
 	);
 	const localLines = [
-		...repeatLocalLines(repeats),
-		...(rowNamesError ? [] : ['const error=marklessSsrDataContext.asyncError;']),
+		...repeatLocalLines(input, componentName, repeats, rowNames),
+		...errorNames.map((name) => `const ${name}=marklessSsrDataContext.asyncError;`),
+		...asyncValueLocalLines(input, componentName, residueSources, [
+			...rowNames.map((binding) => binding.name),
+			...errorNames,
+		]),
 		...sharedInstancePreludeLines(
 			input.semanticGraph,
 			componentName,
 			preludeText,
-			new Set([
-				...repeats.map((repeat) => repeat.itemName),
-				...repeats.flatMap((repeat) => (repeat.indexName ? [repeat.indexName] : [])),
-				'error',
-			]),
+			new Set([...rowNames.map((binding) => binding.name), ...errorNames]),
 			(graphNodeId, path) =>
 				`marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(
 					graphNodeId,
@@ -743,7 +832,7 @@ function emitSsrDataLines(
 				? `marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(testRead.graphNodeId)}),${JSON.stringify(testRead.path)})`
 				: branch.testSource === undefined
 					? undefined
-					: stripSpan('a branch arm test')(branch.testSource);
+					: stripSpan('a branch arm test')(branch.armIndexSource ?? branch.testSource);
 			return [
 				branch.branchSiteId,
 				{
@@ -830,7 +919,7 @@ function emitSsrDataLines(
 						`{const marklessSsrDerived=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(value.graphNodeId)},${value.source},marklessSsrRenderContext,false${extra});if(marklessSsrDerived.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(value.graphNodeId)},marklessSsrDerived.value);}`,
 				)
 				.join('');
-			// A sync runner settles with its async inputs, which the arm may read directly too.
+			// A sync runner settles with its async inputs, which the arm may read directly too; a stream files them under the instance.
 			const definitions = collectSsrAsyncRunnerDefinitions(input);
 			const inputs = new Set<string>();
 			const visit = (graphNodeId: string): void => {
@@ -846,15 +935,23 @@ function emitSsrDataLines(
 			]
 				.map(
 					(graphNodeId) =>
-						`{const marklessSsrInput=marklessSsrAsyncRuns.get(${JSON.stringify(graphNodeId)})?.settled;if(marklessSsrInput?.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(graphNodeId)},marklessSsrInput.value);}`,
+						`{const marklessSsrInput=marklessSsrAsyncRuns.get((marklessSsrRenderContext?.streaming?.runs?(marklessSsrRenderContext?.instancePath??''):'')+${JSON.stringify(graphNodeId)})?.settled;if(marklessSsrInput?.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(graphNodeId)},marklessSsrInput.value);}`,
 				)
 				.join('')}`;
+			const showsError = boundary.errorGraphNodeId
+				? `if(marklessSsrSnapshot.status==='rejected')marklessSsrCatchError(marklessSsrRenderStateValues,marklessSsrPayloadState,${JSON.stringify(boundary.errorGraphNodeId)},marklessSsrSnapshot.error,marklessSsrRenderContext,${JSON.stringify(boundary.boundaryId)});`
+				: '';
 			return [
-				`case ${JSON.stringify(boundary.boundaryId)}:{const marklessSsrSnapshot=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(runner.graphNodeId)},${runner.source},marklessSsrRenderContext,${String(!!boundary.armChunkIds.pending)}${extra});if(marklessSsrSnapshot.status==='fulfilled')${derived ? `{${settled}${derived}}` : settled}return {arm:marklessSsrAsyncArm(marklessSsrSnapshot),error:marklessSsrSnapshot.error};}`,
+				`case ${JSON.stringify(boundary.boundaryId)}:{const marklessSsrSnapshot=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(runner.graphNodeId)},${runner.source},marklessSsrRenderContext,${String(!!boundary.armChunkIds.pending)}${extra});if(marklessSsrSnapshot.status==='fulfilled')${derived ? `{${settled}${derived}}` : settled}${showsError}return {arm:marklessSsrAsyncArm(marklessSsrSnapshot),error:marklessSsrSnapshot.error};}`,
 			];
 		});
 	const edges = componentEdgesFor(input, componentName);
-	const referenceByName = new Map(references.map((reference) => [reference.componentName, reference.localName]));
+	const referenceByName = new Map(
+		references.map((reference) => [
+			componentReferenceKey(reference.componentName, reference.importSource),
+			reference.localName,
+		]),
+	);
 	const callbacks = callbackSymbolIds(input);
 	// An edge whose slot sits inside another edge's projection chunk is PROJECTED
 	// into that component: it renders from what that component's body seeded. A
@@ -923,7 +1020,7 @@ function emitSsrDataLines(
 	);
 	// The mint that needs the token is inside the CHILD's module when the child is
 	// a root placed with no children, so this module's own chunks cannot answer
-	// for it. Its interface can: a module declaring a widget-scoped family with an
+	// for it. Its interface can: a module declaring a subtree-scoped family with an
 	// element() handle is one whose parts mint per-instance ids. A page importing
 	// no such module emits what it emitted before, byte for byte.
 	const importedWidgetHandleFamily = (edge: ComponentEdge): boolean =>
@@ -933,7 +1030,7 @@ function emitSsrDataLines(
 				: undefined) ?? []
 		).some(
 			(entry) =>
-				entry.definition.scope === 'widget' &&
+				entry.definition.scope === 'subtree' &&
 				entry.graphBindings.some((binding) => binding.kind === 'element'),
 		);
 	// Where every child this render places STANDS: its instance path and the two
@@ -942,7 +1039,7 @@ function emitSsrDataLines(
 	// instance paths its compose children carry.
 	const placementByEdgeId = new Map<string, { readonly path: string; readonly args: string }>();
 	for (const edge of edges) {
-		const component = referenceByName.get(edge.childComponentName);
+		const component = referenceByName.get(edgeReferenceKey(edge));
 		if (!component) continue;
 		const declaredName = edgeDeclaredComponentName(edge);
 		placementByEdgeId.set(edge.id, {
@@ -981,7 +1078,7 @@ function emitSsrDataLines(
 	// declared, exactly as the render and seed calls spell them.
 	const childSurfaceArgsByEdgeId = new Map<string, string>();
 	const childCases = edges.flatMap((edge, index) => {
-		const component = referenceByName.get(edge.childComponentName);
+		const component = referenceByName.get(edgeReferenceKey(edge));
 		if (!component) return [];
 		const props = edge.props.flatMap((prop) => {
 			if (prop.kind === 'callback') return [];
@@ -1053,8 +1150,16 @@ function emitSsrDataLines(
 		const child = {
 			hostPrefix: `c${index}:`,
 			symbolPrefix: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),
-			graphProps: componentEdgeGraphRoutes(edge, hasProjection),
+			graphProps: componentEdgeGraphRoutes(
+				edge,
+				hasProjection,
+				asyncComputedGraphNodeIds(input.semanticGraph),
+			),
 			boundSymbols: boundSymbolsForEdge(edge, callbacks),
+			// A child inside an @try arm files its @if records with that arm, so a streamed arm carries them.
+			...(edge.asyncBoundaryId
+				? { asyncBoundaryId: edge.asyncBoundaryId, asyncBoundaryArm: edge.asyncBoundaryArm }
+				: {}),
 		};
 		const declaredName = edgeDeclaredComponentName(edge);
 		const childSurface = declaredName
@@ -1094,7 +1199,7 @@ function emitSsrDataLines(
 				// A widget rooted per row is one instance per row, so the token its
 				// parts mint ids from names the row as well as the edge.
 				rowScopedEdges.has(edge.id)
-					? 'marklessSsrRowSegment(marklessSsrDataContext.repeatKey)+'
+					? '(marklessSsrRowSegment(marklessSsrDataContext)??\'\')+'
 					: ''
 			}${JSON.stringify(child.symbolPrefix)}+marklessSsrChildrenWidgetRoot(${surfaceArgs}));`;
 			// The same token filed PER family this child roots, which is what a
@@ -1138,13 +1243,13 @@ function emitSsrDataLines(
 		// no identity to carry, so its interactive output still refuses.
 		const rowScoped = rowScopedEdges.has(edge.id);
 		const placement = rowScoped
-			? `marklessSsrRowPlacement(${childLiteral},marklessSsrDataContext.repeatKey)`
+			? `marklessSsrRowPlacement(${childLiteral},marklessSsrDataContext)`
 			: childLiteral;
 		const refusal = rowScoped
-			? `if(marklessSsrDataContext.repeatKey===undefined){marklessAssertPresentationalRowChild(marklessSsrChildOutput,${JSON.stringify(edge.childComponentName)});return marklessSsrChildOutput;}`
+			? `if(marklessSsrRowSegment(marklessSsrDataContext)===undefined){marklessAssertPresentationalRowChild(marklessSsrChildOutput,${JSON.stringify(edge.childComponentName)});return marklessSsrChildOutput;}`
 			: `if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(marklessSsrChildOutput,${JSON.stringify(edge.childComponentName)});return marklessSsrChildOutput;}`;
 		return [
-			`case ${JSON.stringify(edge.id)}:{const marklessSsrPlacedChild=${placement};const marklessSsrChildProps={${props.join(',')}};const marklessSsrChildOutput=await ${childSurface}?.renderSsr?.(marklessSsrChildProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+marklessSsrPlacedChild.hostPrefix${
+			`case ${JSON.stringify(edge.id)}:{const marklessSsrPlacedChild=${placement};const marklessSsrChildProps={${props.join(',')}};const marklessSsrChildOutput=await ${childSurface}?.renderSsr?.(marklessSsrChildProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+marklessSsrPlacedChild.hostPrefix,instancePath:marklessSsrChildInstancePath(marklessSsrRenderContext,marklessSsrPlacedChild)${
 					// A widget ROOT reads its own instance's seeds too: the parts placed
 					// inside it wrote them before it rendered, and its consume line
 					// merges them over its statics. Not the child THIS component
@@ -1286,7 +1391,9 @@ function emitSsrDataLines(
 			!(binding.componentName === componentName || (!binding.componentName && componentName === input.renderData.root?.componentName)) ||
 			(binding.kind === 'computed' && binding.async === true) ||
 			// Seeded from the render props just above; its name may be a user local.
-			binding.id === 'prop:props'
+			binding.id === 'prop:props' ||
+			// A synthetic computed has no render-body local; the template computed lines seed it.
+			binding.id.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX)
 		)
 			return [];
 		if (binding.kind === 'computed') derivedComputedIds.push(binding.id);
@@ -1394,6 +1501,8 @@ function emitSsrDataLines(
 	const servedComputedIds = [...new Set(derivedComputedIds)].filter((graphNodeId) =>
 		servedComputedGraphNodeIds.has(graphNodeId),
 	);
+	const ifDurable = servedIfDurableGraphNodeIds(input);
+	const servedIfDurableIds = servedComputedIds.filter((graphNodeId) => ifDurable.has(graphNodeId));
 	return {
 		seedForward: seedForwardLines,
 		carriedSeed: unfoldedSeedLines,
@@ -1406,7 +1515,7 @@ function emitSsrDataLines(
 				: [
 						`	marklessSsrServeComputed(marklessSsrPayloadState, marklessSsrRenderStateValues, ${JSON.stringify(
 							servedComputedIds,
-						)});`,
+						)}${servedIfDurableIds.length ? `, ${JSON.stringify(servedIfDurableIds)}` : ''});`,
 					],
 		render: [
 		"marklessSsrRenderStateValues.set('prop:props',marklessSsrProps);",
@@ -1414,13 +1523,14 @@ function emitSsrDataLines(
 		...sharedComputedLines,
 		...templateComputedLines,
 		"const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';",
+		...outerRowNameAliasLines(input, componentName, rowNames),
 		...deferLine,
 		`const marklessSsrReadData=(marklessResidue,marklessSsrDataContext)=>{${mintCase}if(marklessResidue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(marklessResidue.graphNodeId),marklessResidue.path);if(marklessResidue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,marklessResidue.path);${localLines.join('')}switch(marklessResidue.source){${readCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+marklessResidue.source);}};`,
 		// A component placed inside a widget root renders that widget's parts from
 		// its own template, and their seed pass reads this context, not the values map.
 		`const marklessSsrRendered=await renderSsrData({renderData:{...marklessRenderData,root:{componentName:${JSON.stringify(componentName)},templateId:${JSON.stringify(`template:${componentName}`)}}},idPrefix:marklessSsrIdPrefix,${
 			childCases.length > 0 ? 'sharedSeeds:marklessSsrRenderContext?.sharedSeeds,' : ''
-		}${projectsElementsIntoRows(chunks) ? 'projectionSegment:marklessRowProjectionSegment,' : ''}read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.branchSiteId){${branchCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},${
+		}${projectsElementsIntoRows(chunks) ? 'projectionSegment:marklessRowProjectionSegment,' : ''}${rendersTryInRows(chunks) ? 'rowSegment:marklessSsrRowSegment,' : ''}${spreadsAttributes(input.renderData.chunks) ? 'attributeName:marklessAttributeName,' : ''}read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.branchSiteId){${branchCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},${
 			repeatCases.length > 0
 				? `repeatItems:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.repeatId){${repeatCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_REPEAT_MISSING: '+marklessSsrDataSlot.repeatId);}},`
 				: ''

@@ -25,7 +25,7 @@ export const contextGate = shared(
 
 		return { ...gate };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export default function ContextGatePage() @{

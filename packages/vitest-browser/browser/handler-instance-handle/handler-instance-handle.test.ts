@@ -5,7 +5,7 @@ import OutsidePage from './outside-page.tsrx';
 import RowsPage from './rows-page.tsrx';
 import SiblingsPage from './siblings-page.tsrx';
 
-// A handler that reads a SINGULAR element() handle of a widget-scoped family
+// A handler that reads a SINGULAR element() handle of a subtree-scoped family
 // must reach the element of the instance the handler is running in, however many
 // other instances of that family the page carries.
 afterEach(() => cleanup());

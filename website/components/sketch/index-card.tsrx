@@ -42,9 +42,12 @@ export default function IndexCard({
 					0 1px 2px rgb(146 131 112 / 0.35);
 
 				html.dark & {
+					--card: var(--figure-sheet);
+					--card-ink: var(--ink);
+					border-color: var(--code-edge);
 					box-shadow:
-						-4px 7px 12px rgb(0 0 0 / 0.55),
-						0 2px 4px rgb(0 0 0 / 0.45);
+						-4px 7px 12px var(--figure-shade),
+						0 2px 4px var(--figure-shade);
 				}
 			}
 

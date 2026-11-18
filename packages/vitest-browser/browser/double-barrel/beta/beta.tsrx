@@ -5,7 +5,7 @@ export const betaState = shared(
 		const tones = state({ tone: 'plain' });
 		return { ...tones, mark() { tones.tone = 'marked'; } };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function BetaRoot({ children }) @{

@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 1256,
+			"reason": "docs sidebar: close toggle, its slide, and the open sections the reader keeps (owner request)",
+			"date": "2026-11-08"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1796,
+			"reason": "docs sidebar: close toggle, its slide, and the open sections the reader keeps (owner request)",
+			"date": "2026-11-08"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 1256,
+			"reason": "docs sidebar: close toggle, its slide, and the open sections the reader keeps (owner request)",
+			"date": "2026-11-08"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1560,
+			"reason": "docs sidebar: close toggle, its slide, and the open sections the reader keeps (owner request)",
+			"date": "2026-11-08"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 1423,
+			"reason": "docs sidebar: close toggle, its slide, and the open sections the reader keeps (owner request)",
+			"date": "2026-11-08"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 913,
+			"reason": "docs sidebar: close toggle, its slide, and the open sections the reader keeps (owner request)",
+			"date": "2026-11-08"
+		}
+	]
+}

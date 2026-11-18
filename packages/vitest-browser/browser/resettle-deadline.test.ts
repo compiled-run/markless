@@ -2,12 +2,12 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render } from '../src/index.ts';
 import ResettleDeadline from './fixtures/resettle-deadline.tsrx';
 
-// Spec D8 re-settle, frame-sampled: a refresh past the 250 ms navigation deadline but under the stall threshold
-// keeps the prior settled content, marked aria-busy, until the fresh content commits. Exact timing is
-// property-tested under the fake clock in packages/web/test/resettle-hold-timing.test.ts.
+// Spec D8 re-settle, frame-sampled: a refresh past the 250 ms navigation deadline keeps the prior settled content,
+// marked aria-busy, until the fresh content commits. Waits far longer are checked under fake timers in
+// packages/web/test/resettle-hold-timing.test.ts and refresh-hold/refresh-hold.test.ts.
 afterEach(() => cleanup());
 
-test('a re-settle under the stall threshold holds the prior content busy and never shows @pending', async () => {
+test('a re-settle past the navigation deadline holds the prior content busy and never shows @pending', async () => {
 	const screen = await render(ResettleDeadline);
 	const container = screen.container as HTMLElement;
 	await expect

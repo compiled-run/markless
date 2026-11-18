@@ -206,7 +206,7 @@ export const carouselState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function CarouselRoot({
@@ -438,7 +438,7 @@ export function CarouselForwardTrigger({
 export function CarouselPlayTrigger({ children, onClick, ...rest }: CarouselPlayTriggerProps) @{
 	const carousel = carouselState();
 	// `false` removes the attribute: a control that may be pressed carries no record.
-	const refused = computed(() => (carousel.reducedMotion === true ? 'true' : false));
+	const refused = computed(() => (carousel.reducedMotion === true ? 'true' : undefined));
 
 	<button
 		{...rest}

@@ -4,6 +4,7 @@ import { commands } from 'vitest/browser';
 declare module 'vitest/browser' {
 	export interface BrowserCommands {
 		parkPointer(): Promise<void>;
+		throttleCpu(rate: number): Promise<void>;
 	}
 }
 

@@ -34,7 +34,11 @@ export default function MugLookup({ mug }: { readonly mug: string }) @{
 				display: inline-block;
 				padding: 0.1em 0.45em;
 				border-radius: 4px;
-				background: color-mix(in srgb, var(--pink) 14%, var(--paper));
+				background: color-mix(in srgb, var(--pink) 14%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 		</style>
 	</section>

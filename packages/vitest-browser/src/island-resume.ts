@@ -66,6 +66,8 @@ type IslandResumeInput = {
 	readonly event: Event | 0;
 	/** The record the inline resumer matched on its walk; null for its broad sweep. */
 	readonly eventRecord?: unknown;
+	readonly syncPolicyAlreadyApplied?: boolean;
+	readonly propagationStopped?: boolean;
 };
 
 /**
@@ -106,7 +108,8 @@ export function createIslandResumeContainerEvent(
 		// Record-less forwards are the inline resumer's broad sweep and pass through;
 		// a forward that named a record and matches nothing is the refusal's case.
 		await runtime.dispatch(input.event as never, {
-			syncPolicyAlreadyApplied: true,
+			syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true,
+			propagationStopped: input.propagationStopped === true,
 			ignoreUnmatched: input.eventRecord == null,
 		});
 	};

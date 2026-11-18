@@ -18,7 +18,7 @@ export const widgetState = shared(
 
 		return { ...widget, panelEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 `;
 

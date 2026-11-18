@@ -1,6 +1,6 @@
 import { shared, state } from '@markless/core';
 
-// A widget-scoped family shaped like the item families (tabs, radio-group,
+// A subtree-scoped family shaped like the item families (tabs, radio-group,
 // checklist): one graph per rendered widget, a root that owns the cells, and a
 // part that reaches them through the same `shared()` call. One root per keyed
 // `@for` row puts every row's widget graph under that row's `r:<key>:` segment,
@@ -15,7 +15,7 @@ const rowWidget = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 function WidgetRoot({ children }) @{
@@ -24,7 +24,7 @@ function WidgetRoot({ children }) @{
 }
 
 // `onBump` makes this handler a BOUND symbol, exactly as `RowCounter`'s does,
-// and `w.bump()` is the widget-scoped write that bound body has to land. The two
+// and `w.bump()` is the subtree-scoped write that bound body has to land. The two
 // together are pagination's shape: an item part inside a row whose handler takes
 // a consumer callback and calls a family method.
 function WidgetTrigger({ onBump }) @{
@@ -77,7 +77,7 @@ const navWidget = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 const seatWidget = shared(
@@ -90,7 +90,7 @@ const seatWidget = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 function NavRoot({ children }) @{

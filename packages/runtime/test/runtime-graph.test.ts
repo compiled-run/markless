@@ -1,5 +1,10 @@
 import { expect, test, vi } from 'vitest';
-import { createRuntimeGraph } from '../src/index.ts';
+import { createRuntimeGraph as createGraph } from '../src/index.ts';
+import { createAsyncComputedPlane } from '../src/graph-async.ts';
+import { createHeldInputsPlane } from '../src/graph-held.ts';
+
+const createRuntimeGraph: typeof createGraph = (input) =>
+	createGraph({ async: createAsyncComputedPlane, held: createHeldInputsPlane, ...input });
 
 test('lazy cells initialize exactly once on the first read', async () => {
 	const initialize = vi.fn(() => 'stored');
@@ -1441,10 +1446,12 @@ test('runtime graph versions async computed requests and ignores stale completio
 
 	expect(runs[0].signal.aborted).toBe(true);
 	expect(runs).toHaveLength(2);
+	// A plain `graph.write` outside a repeating timer's turn starts a loud refresh.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'pending',
 		version: 2,
 		key: 'b',
+		value: undefined,
 	});
 	expect(graph.takeJournal()).toEqual([
 		{ type: 'setText', locator: 'text:user', value: 'pending' },
@@ -1454,10 +1461,12 @@ test('runtime graph versions async computed requests and ignores stale completio
 	await drainMicrotasks();
 	await graph.flush();
 
+	// Still loud: the stale resolution it ignores does not change that.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'pending',
 		version: 2,
 		key: 'b',
+		value: undefined,
 	});
 	expect(graph.takeJournal()).toEqual([]);
 
@@ -1465,6 +1474,7 @@ test('runtime graph versions async computed requests and ignores stale completio
 	await drainMicrotasks();
 	await graph.flush();
 
+	// Still the same loud refresh: it lands loud too.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'fulfilled',
 		version: 2,
@@ -1532,16 +1542,19 @@ test('runtime graph ignores stale rejected async computed completions', async ()
 	await drainMicrotasks();
 	await graph.flush();
 
+	// Still loud: the stale rejection it ignores does not change that.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'pending',
 		version: 2,
 		key: 'b',
+		value: undefined,
 	});
 	expect(graph.takeJournal()).toEqual([]);
 
 	second.resolve('Bob');
 	await drainMicrotasks();
 
+	// Still the same loud refresh: it lands loud too.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'fulfilled',
 		version: 2,

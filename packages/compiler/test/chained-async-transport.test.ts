@@ -129,6 +129,7 @@ export function GlassArchive() @{
 		async: false,
 		deriveSymbolId: syncDerive.symbolId,
 		dependencies: [{ graphNodeId: 'computed:furnaceReading', path: ['value', 'tone'] }],
+		asyncFrom: ['computed:furnaceReading'],
 	});
 	const downstreamRunner = result.symbolModules.modules.find(
 		(module) =>

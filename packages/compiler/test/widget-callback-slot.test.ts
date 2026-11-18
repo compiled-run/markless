@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule, linkedImportedClaimKind } from '../src/index.ts';
 
-// The family module: a widget-scoped shared() whose returned object declares a
+// The family module: a subtree-scoped shared() whose returned object declares a
 // callback slot, a method that dispatches through it, and a root that fills it
 // with its own prop.
 const FAMILY_SOURCE = `import { shared, state } from '@markless/core';
@@ -18,7 +18,7 @@ export const boxState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function BoxRoot({ checked = false, onChange, children }) @{

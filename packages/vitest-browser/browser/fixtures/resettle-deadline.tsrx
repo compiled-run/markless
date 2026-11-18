@@ -1,7 +1,7 @@
 import { computed, state } from '@markless/core';
 import { ReportBadge } from './report-badge.tsrx';
 
-// A 350 ms refresh: past the navigation deadline, far under the re-settle stall threshold.
+// A 350 ms refresh: past the navigation deadline.
 export function App() @{
 	let query = state('alpha');
 	const report = computed(async ({ signal }) => {

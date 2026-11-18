@@ -13,8 +13,8 @@ their own handler (owner ruling). Nothing ships styled — no stylesheet, no
 `ui-tone`, `ui-front`, `ui-paused`, and the `--index` / `--offset` custom
 properties on a written-out item.
 
-One page-scoped `shared()`, `toasterState`, holds the queue. Page-scoped, not
-widget-scoped, because a component that never renders the region still has to
+One app-scoped `shared()`, `toasterState`, holds the queue. App-scoped, not
+subtree-scoped, because a component that never renders the region still has to
 reach the same queue — `basic.tsrx`'s `Elsewhere` button is that row, and it is
 green.
 
@@ -101,7 +101,7 @@ being a namespace call.
 
 ## What else the compiler forced — measured on this tip
 
-1. **A page-scoped factory takes no prop seeds.** `toaster.visible = visible` is
+1. **An app-scoped factory takes no prop seeds.** `toaster.visible = visible` is
    `MARKLESS_SHARED_SEED_UNKNOWN_FIELD`; seeds are written when a widget root
    seeds its parts, and a page-wide factory never gets one. This is why `visible`
    was a prop of `toaster.root` read by a component-local `computed()` rather than
@@ -119,7 +119,7 @@ being a namespace call.
    method writing the same field is fine, and so is the same write authored
    directly in a handler. Every write here goes through a pure function in
    `toaster-queue.ts` for that reason.
-4. **A behavior on a page-scoped root crashes the render.** `attach=` on
+4. **A behavior on an app-scoped root crashes the render.** `attach=` on
    `toaster.root` throws `TypeError: Cannot read properties of undefined
    (reading 'listSharedDefinitions')` from
    `packages/web/src/fns/instance-scope.ts:502` by way of
@@ -153,7 +153,7 @@ being a namespace call.
      raise it, which is not proof the split never would. Named here rather than
      silenced: it is the runtime's teardown ordering, not an assertion.
    - **A minted row's `computed()` cells are one flush stale.** The row is
-     evaluated before the page-scoped queue it reads is live, so
+     evaluated before the app-scoped queue it reads is live, so
      `positionOf(queue, item.id)` answers -1: `stackingStyle` clamps that to
      `--index: 0` and `ui-front` is left off the row that IS at the front. The
      cells correct on the next graph flush, by which time the row minted in that

@@ -1,7 +1,7 @@
 import { element, shared, state } from '@markless/core';
 import { markTrack } from './rshi-mark.ts';
 
-// The carousel's own shape, stripped to the part that breaks. A widget-scoped
+// The carousel's own shape, stripped to the part that breaks. A subtree-scoped
 // record closes over an element() handle and reads it from a METHOD, and the
 // part that calls the method binds no handle of its own - so nothing about the
 // reading part's own edge path names the rendered widget it stands inside.
@@ -21,7 +21,7 @@ export const rshi = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function RshiRoot({ children }) @{

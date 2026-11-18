@@ -1,4 +1,5 @@
 import { parse } from '@tsrx/yuku';
+import { marklessAttributeName } from '@markless/web/fns/attribute-name';
 
 type ParseResult = ReturnType<typeof parse>;
 export type Program = ParseResult['program'];
@@ -37,6 +38,8 @@ export type MarklessParseOptions = {
 	attachComments?: boolean;
 	/** Keep a fatal parse error a value in `errors` rather than a throw. */
 	collect?: boolean;
+	/** Keep camelCase attribute names as written, for the type checker, rather than the real names they spell. */
+	authoredAttributeNames?: boolean;
 	loose?: boolean;
 	errors?: MarklessCompileError[];
 	comments?: MarklessParserComment[];
@@ -144,6 +147,7 @@ function parseModuleWith(
 		lang = languageOf(filename),
 		preserveParens = true,
 		attachComments = outputComments !== undefined,
+		authoredAttributeNames = false,
 	} = options;
 	const result = parse(source, {
 		...languageOptions(lang),
@@ -176,7 +180,7 @@ function parseModuleWith(
 		const fatal = compileErrors.find((error) => error.type === 'fatal');
 		if (fatal) throw fatal;
 	}
-	settleTemplateShapes(program, source, result.comments);
+	settleTemplateShapes(program, source, result.comments, !authoredAttributeNames);
 	if (!cacheable) return program;
 	const shared = freezeParsedTrees ? deepFreeze(program) : program;
 	const byFile = parseCache.get(source) ?? new Map<string, Program>();
@@ -218,13 +222,19 @@ function deepFreeze<T>(root: T): T {
 type SpanNode = { type?: unknown; start?: unknown; end?: unknown; [key: string]: unknown };
 
 /**
- * Three spots where the compiler reads TSRX in the shape it was written against, settled once
+ * Four spots where the compiler reads TSRX in the shape it was written against, settled once
  * here by visiting only the nodes on the path to each spot, never the whole tree:
  * a `{/* … *\/}` or `//` comment among JSX children is a comment, not a child; an `@else if`
- * is the same construct as the `@if` it continues; and an `@case` body is its template's
- * nodes. No node's offsets move.
+ * is the same construct as the `@if` it continues; an `@case` body is its template's
+ * nodes; and a camelCase attribute on an element, such as `strokeWidth`, is the real
+ * attribute it spells. No node's offsets move.
  */
-function settleTemplateShapes(program: Program, source: string, comments: readonly Comment[]): void {
+function settleTemplateShapes(
+	program: Program,
+	source: string,
+	comments: readonly Comment[],
+	realAttributeNames: boolean,
+): void {
 	const elseIfStarts = new Set<number>();
 	const switchStarts = new Set<number>();
 	const targets: number[] = [];
@@ -242,6 +252,9 @@ function settleTemplateShapes(program: Program, source: string, comments: readon
 		switchStarts.add(match.index);
 		targets.push(match.index);
 	}
+	if (realAttributeNames)
+		for (const match of source.matchAll(/\b[a-z][A-Za-z0-9]*/g))
+			if (marklessAttributeName(match[0]) !== match[0]) targets.push(match.index);
 	if (targets.length === 0) return;
 	targets.sort((left, right) => left - right);
 
@@ -255,6 +268,7 @@ function settleTemplateShapes(program: Program, source: string, comments: readon
 					children.splice(index, 1);
 			}
 		}
+		if (realAttributeNames && node.type === 'JSXOpeningElement') settleAttributeNames(node);
 		if (node.type === 'IfStatement' && elseIfStarts.has(node.start as number)) {
 			node.type = 'JSXIfExpression';
 		}
@@ -288,6 +302,17 @@ function settleTemplateShapes(program: Program, source: string, comments: readon
 		if (first < last) visit(node, first, last);
 	};
 	visit(program as unknown as SpanNode, 0, targets.length);
+}
+
+// Components take props, so only a lowercase tag's attributes are renamed.
+function settleAttributeNames(element: SpanNode): void {
+	const tag = element.name as SpanNode | undefined;
+	if (tag?.type !== 'JSXIdentifier' || !/^[a-z]/.test(tag.name as string)) return;
+	for (const attribute of element.attributes as SpanNode[]) {
+		const name = attribute.name as SpanNode | undefined;
+		if (attribute.type === 'JSXAttribute' && name?.type === 'JSXIdentifier')
+			name.name = marklessAttributeName(name.name as string);
+	}
 }
 
 function lineStarts(source: string): number[] {

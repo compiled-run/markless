@@ -271,7 +271,7 @@ export const drawerState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function DrawerRoot({

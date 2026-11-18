@@ -1,0 +1,148 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state; measured on one darwin tree, change vs source reverted: /private/tmp/t087-scratch/measure-fix.json minus measure-base.json (perf-guards measure, figures in goals/async-dx/notes/T087-component-row-demand.md)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1166,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state; measured on one darwin tree, change vs source reverted: /private/tmp/t087-scratch/measure-fix.json minus measure-base.json (perf-guards measure, figures in goals/async-dx/notes/T087-component-row-demand.md)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state; measured on one darwin tree, change vs source reverted: /private/tmp/t087-scratch/measure-fix.json minus measure-base.json (perf-guards measure, figures in goals/async-dx/notes/T087-component-row-demand.md)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 4219,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state; measured on one darwin tree, change vs source reverted: /private/tmp/t087-scratch/measure-fix.json minus measure-base.json (perf-guards measure, figures in goals/async-dx/notes/T087-component-row-demand.md)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state; measured on one darwin tree, change vs source reverted: /private/tmp/t087-scratch/measure-fix.json minus measure-base.json (perf-guards measure, figures in goals/async-dx/notes/T087-component-row-demand.md)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -12780,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state; measured on one darwin tree, change vs source reverted: /private/tmp/t087-scratch/measure-fix.json minus measure-base.json (perf-guards measure, figures in goals/async-dx/notes/T087-component-row-demand.md)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state; perf-guards-measurement artifacts of CI run 43174754536 (PR #635) minus merge-queue run 43169057548 (main 4ffa885bd)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1396,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state; perf-guards-measurement artifacts of CI run 43174754536 (PR #635) minus merge-queue run 43169057548 (main 4ffa885bd)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state; perf-guards-measurement artifacts of CI run 43174754536 (PR #635) minus merge-queue run 43169057548 (main 4ffa885bd)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 4463,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state; perf-guards-measurement artifacts of CI run 43174754536 (PR #635) minus merge-queue run 43169057548 (main 4ffa885bd)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state; perf-guards-measurement artifacts of CI run 43174754536 (PR #635) minus merge-queue run 43169057548 (main 4ffa885bd)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -12671,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state; perf-guards-measurement artifacts of CI run 43174754536 (PR #635) minus merge-queue run 43169057548 (main 4ffa885bd)",
+			"date": "2026-11-12"
+		}
+	]
+}

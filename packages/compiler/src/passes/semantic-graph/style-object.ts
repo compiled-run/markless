@@ -118,7 +118,14 @@ export function lowerStyleObject(
 	// does in rendered CSS text. Map.set keeps the first-insertion position, the
 	// order a merged JS object would render its keys in.
 	const entries = new Map<string, StyleEntry>();
-	const failure = collectStyleEntries(node, source, options, options?.referenced === true, 0, entries);
+	const failure = collectStyleEntries(
+		node,
+		source,
+		options,
+		options?.referenced === true,
+		0,
+		entries,
+	);
 	if (failure !== null) return unsupported(failure);
 
 	const ordered = [...entries.values()];
@@ -173,7 +180,8 @@ function collectStyleEntries(
 		let propertyName: string | null;
 		if (property.computed === true) {
 			propertyName = compileTimeKeyName(property.key as AnyNode | undefined, options);
-			if (propertyName === null) return 'a computed key whose name is not a compile-time string';
+			if (propertyName === null)
+				return 'a computed key whose name is not a compile-time string';
 		} else {
 			propertyName = staticPropertyName(property.key as AnyNode | undefined);
 			if (propertyName === null) return 'a key that is not a plain name or string';
@@ -237,7 +245,9 @@ function collectSpreadEntries(
 		return `a spread of \`${spreadName}\`, which does not resolve to a same-file \`const\` object literal`;
 	}
 	if (resolved.reason !== undefined) return resolved.reason;
-	if (!options.resolver.sameBindingAtBothSites(spreadName, argument.start ?? 0, options.usagePos)) {
+	if (
+		!options.resolver.sameBindingAtBothSites(spreadName, argument.start ?? 0, options.usagePos)
+	) {
 		return shadowedReadReason(spreadName);
 	}
 	if (depth >= MAX_STYLE_SPREAD_DEPTH) {
@@ -536,7 +546,8 @@ function isAllowedObjectConstUse(use: StyleIdentifierUseKind): boolean {
 }
 
 function objectConstUseReason(name: string, use: StyleIdentifierUseKind): string {
-	if (use === 'reassigned') return `the const \`${name}\`, which is reassigned after its declaration`;
+	if (use === 'reassigned')
+		return `the const \`${name}\`, which is reassigned after its declaration`;
 	if (use === 'member-mutated') {
 		return `the const \`${name}\`, whose properties are written after its declaration`;
 	}
@@ -549,7 +560,8 @@ function objectConstUseReason(name: string, use: StyleIdentifierUseKind): string
 	if (use === 'method-receiver') {
 		return `the const \`${name}\`, which is used as a call receiver that could change it`;
 	}
-	if (use === 'exported') return `the const \`${name}\`, which is exported, so other files could change it`;
+	if (use === 'exported')
+		return `the const \`${name}\`, which is exported, so other files could change it`;
 	return `the const \`${name}\`, which is used outside style attributes as more than a property read`;
 }
 
@@ -645,7 +657,8 @@ function collectStyleBindings(ast: AnyNode, sourceLength: number): StyleBinding[
 			}
 		}
 		const blockScope = currentScopes[currentScopes.length - 1] ?? moduleScope;
-		const functionScope = currentFunctionScopes[currentFunctionScopes.length - 1] ?? moduleScope;
+		const functionScope =
+			currentFunctionScopes[currentFunctionScopes.length - 1] ?? moduleScope;
 
 		if (node.type === 'VariableDeclaration') {
 			const kind = node.kind === 'let' ? 'let' : node.kind === 'var' ? 'var' : 'const';
@@ -672,13 +685,20 @@ function collectStyleBindings(ast: AnyNode, sourceLength: number): StyleBinding[
 			for (const specifier of asNodes(node.specifiers)) {
 				const local = getIdentifierName(specifier.local as AnyNode | undefined);
 				if (local) {
-					bindings.push({ name: local, kind: 'import', init: null, exported: false, scope: moduleScope });
+					bindings.push({
+						name: local,
+						kind: 'import',
+						init: null,
+						exported: false,
+						scope: moduleScope,
+					});
 				}
 			}
 		}
 		if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') {
 			const name = getIdentifierName(node.id as AnyNode | undefined);
-			if (name) bindings.push({ name, kind: 'other', init: null, exported, scope: blockScope });
+			if (name)
+				bindings.push({ name, kind: 'other', init: null, exported, scope: blockScope });
 		}
 		if (
 			node.type === 'FunctionDeclaration' ||
@@ -689,7 +709,13 @@ function collectStyleBindings(ast: AnyNode, sourceLength: number): StyleBinding[
 				const own = getIdentifierName(parameter);
 				const names = own ? [own] : destructuredBindingNames(parameter);
 				for (const name of names) {
-					bindings.push({ name, kind: 'other', init: null, exported: false, scope: blockScope });
+					bindings.push({
+						name,
+						kind: 'other',
+						init: null,
+						exported: false,
+						scope: blockScope,
+					});
 				}
 			}
 		}
@@ -697,7 +723,13 @@ function collectStyleBindings(ast: AnyNode, sourceLength: number): StyleBinding[
 			const param = node.param as AnyNode | undefined;
 			const own = getIdentifierName(param);
 			for (const name of own ? [own] : destructuredBindingNames(param)) {
-				bindings.push({ name, kind: 'other', init: null, exported: false, scope: blockScope });
+				bindings.push({
+					name,
+					kind: 'other',
+					init: null,
+					exported: false,
+					scope: blockScope,
+				});
 			}
 		}
 
@@ -774,7 +806,11 @@ function classifyIdentifierUse(
 	) {
 		return null;
 	}
-	if (parent.type === 'MemberExpression' && parent.property === node && parent.computed !== true) {
+	if (
+		parent.type === 'MemberExpression' &&
+		parent.property === node &&
+		parent.computed !== true
+	) {
 		return null;
 	}
 	if (
@@ -871,9 +907,7 @@ function classifyIdentifierUse(
 	if (effectiveParent.type === 'MemberExpression' && effectiveParent.property === expression) {
 		return 'computed-key-read';
 	}
-	if (
-		effectiveParent.type === 'JSXExpressionContainer'
-	) {
+	if (effectiveParent.type === 'JSXExpressionContainer') {
 		const attribute = parents[parentIndex - 1];
 		if (
 			attribute &&

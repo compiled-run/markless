@@ -14,7 +14,12 @@ import {
 	type ResumeRuntime,
 } from '../resume.ts';
 import type { ProtocolStatePayload } from '@markless/serializer/protocol';
-import type { ResumeAsyncBoundaryPayload } from '../resume-types.ts';
+import type {
+	ResumeAsyncBoundaryPayload,
+	ResumeDomNode,
+	ResumeRemovalObserver,
+	ResumeRemovalObserverFactory,
+} from '../resume-types.ts';
 import type { ResumePayloadScriptsInput, ResumePayloadScriptsResult } from '../payload-full.ts';
 import { createRuntimeGraphFromResumePayload } from '../payload-graph-construct.ts';
 import {
@@ -37,6 +42,7 @@ import {
 	type PrerenderBoundaryArmRegistration,
 } from '../prerender/staged-boundary-authority.ts';
 import { marklessInstanceScopedLoadSymbol } from './instance-scope.ts';
+import { pageCommentCensus } from '../resume-anchor-census.ts';
 
 let journal: typeof import('../dom-journal.ts') | undefined;
 
@@ -119,7 +125,10 @@ export function resumePrerenderTriggerGroup(
 			dispatchRegistered: false,
 		};
 		stagedContainers.set(page, container);
+		// Records index the served page's comments; a settled arm holding a @try adds more.
+		input.root.__marklessComments ??= pageCommentCensus(input.root, true);
 		attachPrerenderBoundaryAuthority(input.root);
+		releaseRemovedHosts(input, container);
 	}
 	const existing = container.groups.get(input.groupId);
 	if (existing) return existing;
@@ -312,6 +321,7 @@ async function startTriggerGroup(
 			type Handoff = {
 				readonly event: ResumeDomEvent;
 				readonly syncPolicyAlreadyApplied?: boolean;
+				readonly propagationStopped?: boolean;
 			};
 			(
 				adopted.root as typeof adopted.root & {
@@ -328,6 +338,7 @@ async function startTriggerGroup(
 					try {
 						await candidate.runtime.dispatch(handoff.event, {
 							syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
+							propagationStopped: handoff.propagationStopped === true,
 						});
 						matched = true;
 					} catch (error) {
@@ -382,6 +393,64 @@ async function startTriggerGroup(
 			}
 		}
 	}
+}
+
+const removalObservers = new WeakMap<object, ResumeRemovalObserver>();
+
+// A commit in one runtime replaces elements the others bound, so each lets go of what left the page.
+function releaseRemovedHosts(input: TriggerGroupInput, container: StagedContainer): void {
+	const create = input.createRemovalObserver ?? defaultRemovalObserver();
+	if (!create) return;
+	removalObservers.get(input.root)?.disconnect?.();
+	const observer = create((records) => {
+		const removed = new Set<ResumeDomNode>();
+		for (const record of records) for (const node of record.removedNodes) removed.add(node);
+		if (removed.size > 0)
+			for (const { runtime } of container.runtimes) releaseRemoved(input.root, runtime, removed);
+	});
+	observer.observe(input.root, { childList: true, subtree: true });
+	removalObservers.set(input.root, observer);
+}
+
+// A removed element outside the page goes with its host; an arm's flips go once none of its branches is left.
+function releaseRemoved(
+	root: ResumeDomElement,
+	runtime: ResumeRuntime,
+	removed: ReadonlySet<ResumeDomNode>,
+): void {
+	const gone = (node: ResumeDomNode) =>
+		!root.contains?.(node as ResumeDomElement) &&
+		[...removed].some(
+			(candidate) =>
+				candidate === node || (candidate as ResumeDomElement).contains?.(node as ResumeDomElement),
+		);
+	for (const [hostNodeId, element] of runtime.hostElements ?? [])
+		if (gone(element)) runtime.disposeHost(hostNodeId);
+	const branches = runtime.armBranches?.();
+	if (!branches) return;
+	const live = new Set<string>(),
+		left = new Set<string>();
+	for (const [id, branch] of branches.branchesById) {
+		const owner = (branch as { readonly armBoundaryId?: string }).armBoundaryId;
+		if (!owner) continue;
+		if (root.contains?.(branch.startAnchor as unknown as ResumeDomElement)) live.add(owner);
+		else {
+			left.add(owner);
+			(branches.branchesById as Map<string, unknown>).delete(id);
+		}
+	}
+	for (const owner of left) {
+		if (live.has(owner)) continue;
+		for (const release of branches.armFlipReleasesByBoundary.get(owner) ?? []) release();
+		branches.armFlipReleasesByBoundary.delete(owner);
+	}
+}
+
+function defaultRemovalObserver(): ResumeRemovalObserverFactory | undefined {
+	const Observer = (
+		globalThis as unknown as { readonly MutationObserver?: new (callback: never) => never }
+	).MutationObserver;
+	return Observer && ((callback) => new Observer(callback as never));
 }
 
 function isUnmatchedDispatchError(error: unknown): boolean {
@@ -453,11 +522,26 @@ function createStagedGraph(container: StagedContainer, local: GraphSegment): Run
 			for (const segment of owners(write.graphNodeId)) segment.graph.write(write);
 			return write.value;
 		},
-		update: (update) => broadcastUpdate(staged, owners(update.graphNodeId), update),
+		update: (update) => broadcastUpdate(staged, () => owners(update.graphNodeId), update),
 		call: (call) => {
+			const { graphNodeId } = call;
+			const path = call.path ?? [];
+			const joining = !local.graphNodeIds.has(graphNodeId);
+			const held = staged.read(graphNodeId);
+			const segments = owners(graphNodeId);
+			// The page's own segment, joining a node born after resume, holds what the node's segment holds.
+			if (joining && local.graphNodeIds.has(graphNodeId) && held !== undefined)
+				local.graph.write({ graphNodeId, value: held });
+			// Segments holding the same object take the call once; the others hear it changed.
+			const called = new Set<unknown>();
 			let result: unknown;
-			for (const [index, segment] of owners(call.graphNodeId).entries()) {
+			for (const [index, segment] of segments.entries()) {
+				if (called.has(segment.graph.read(graphNodeId, path))) {
+					segment.graph.changed({ graphNodeId, path });
+					continue;
+				}
 				const next = segment.graph.call(call);
+				called.add(segment.graph.read(graphNodeId, path));
 				if (index === 0) result = next;
 			}
 			return result;
@@ -468,6 +552,18 @@ function createStagedGraph(container: StagedContainer, local: GraphSegment): Run
 				deleted = segment.graph.delete(deletion) || deleted;
 			return deleted;
 		},
+		changed: (change) => {
+			for (const segment of owners(change.graphNodeId)) segment.graph.changed(change);
+		},
+		...(local.graph.defineAsyncComputed
+			? {
+					// An async value a row or arm brings after resume runs in this group's own segment.
+					defineAsyncComputed: (asyncComputed, factory, held) => {
+						local.graphNodeIds.add(asyncComputed.graphNodeId);
+						return local.graph.defineAsyncComputed!(asyncComputed, factory, held);
+					},
+				}
+			: {}),
 		subscribe: (subscription) => local.graph.subscribe(subscription),
 		subscribeJournal: (listener) => local.graph.subscribeJournal(listener),
 		flush: async () => {
@@ -521,14 +617,15 @@ function registerStagedComputedClosure(
 	for (const graphNodeId of graphNodeIds) local.graphNodeIds.add(graphNodeId);
 }
 
+// Read before the owners are named: naming a node born after resume adds a segment that does not hold it yet.
 function broadcastUpdate(
 	graph: RuntimeGraph,
-	segments: ReadonlyArray<GraphSegment>,
+	segments: () => ReadonlyArray<GraphSegment>,
 	update: RuntimeGraphUpdate,
 ): unknown {
 	const previous = graph.read(update.graphNodeId, update.path);
 	const next = update.update(previous);
-	for (const segment of segments)
+	for (const segment of segments())
 		segment.graph.write({ graphNodeId: update.graphNodeId, path: update.path, value: next });
 	if (update.returnValue === 'previous') return previous;
 	if (update.returnValue === 'next') return next;

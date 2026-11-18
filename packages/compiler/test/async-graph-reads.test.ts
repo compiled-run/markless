@@ -32,13 +32,13 @@ export default function Reads() @{
 	});
 });
 
-test('the server runner of an async value reads a page-scoped shared field from the render state', async () => {
+test('the server runner of an async value reads an app-scoped shared field from the render state', async () => {
 	const result = await compile(`
 import { computed, shared, state } from '@markless/core';
 const settings = shared(() => {
 	const prefs = state({ page: 1 });
 	return { ...prefs };
-}, { scope: 'page' });
+}, { scope: 'app' });
 export default function Reads() @{
 	const s = settings();
 	const rows = computed(async () => ({ page: s.page }));

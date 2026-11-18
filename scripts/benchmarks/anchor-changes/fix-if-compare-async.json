@@ -1,0 +1,52 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 32,
+			"reason": "if-compare tests (PR #654): the docs playground ships the compiler, which grows by the branch-test reads a @try now gates on and derives; the executed-characters shift on the docs pages (+32 and -1) also appears on PR #650, an unrelated change, so it is not from this one; measured on CI run 43356289402 against main's merge-queue run 43344585225",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 116,
+			"reason": "if-compare tests (PR #654): the docs playground ships the compiler, which grows by the branch-test reads a @try now gates on and derives; the executed-characters shift on the docs pages (+32 and -1) also appears on PR #650, an unrelated change, so it is not from this one; measured on CI run 43356289402 against main's merge-queue run 43344585225",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "if-compare tests (PR #654): the docs playground ships the compiler, which grows by the branch-test reads a @try now gates on and derives; the executed-characters shift on the docs pages (+32 and -1) also appears on PR #650, an unrelated change, so it is not from this one; measured on CI run 43356289402 against main's merge-queue run 43344585225",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 116,
+			"reason": "if-compare tests (PR #654): the docs playground ships the compiler, which grows by the branch-test reads a @try now gates on and derives; the executed-characters shift on the docs pages (+32 and -1) also appears on PR #650, an unrelated change, so it is not from this one; measured on CI run 43356289402 against main's merge-queue run 43344585225",
+			"date": "2026-11-13"
+		}
+	]
+}

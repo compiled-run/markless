@@ -96,7 +96,7 @@ export const widget = shared(
 		const trackEl = element<HTMLDivElement>();
 		return { ...w, trackEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function WidgetRoot({ children }) @{
@@ -128,7 +128,7 @@ export const widget = shared(
 		const itemEls = element<HTMLDivElement[]>();
 		return { ...w, itemEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function WidgetRoot({ children }) @{

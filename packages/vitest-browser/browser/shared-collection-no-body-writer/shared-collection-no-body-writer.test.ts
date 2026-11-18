@@ -15,7 +15,7 @@ import SeededRootPage from './seeded-page.tsrx';
  *
  * No body writer is not an ingredient, and neither is an empty seed. What used
  * to separate the rows was which component of the family module the page
- * renders outermost: the cells of a widget-scoped definition went to one
+ * renders outermost: the cells of a subtree-scoped definition went to one
  * component, and only a composed child carrying them registered a widget root,
  * so a page whose outermost part was some other component rooted the widget
  * nowhere and the handler's `[...box.items, 'gamma']` spread undefined.
@@ -112,8 +112,7 @@ for (const mode of ['CSR', 'SSR'] as const) {
 	// Still unresolved, and pinned so it stays visible. This page renders a part
 	// of a family whose cells only its SEEDING root owns, and that root is
 	// nowhere - so the handler's `[...box.items, 'gamma']` spreads undefined and
-	// V8 spells that "context.graph.read is not a function or its return value is
-	// not iterable". Refusing it by name needs a signal composition does not have:
+	// V8 reports the spread as "not iterable". Refusing it by name needs a signal composition does not have:
 	// a part of a family declared in its own module whose cells went to a
 	// component the page never rendered, and a part ADOPTING a family declared in
 	// another module - which is page-wide on purpose and green today in
@@ -135,10 +134,10 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		expect(fieldValues()).toEqual([]);
 		click('add');
 
-		// The refusal names the read, not the instance, and the handler ran and
+		// The refusal names the update's value, not the instance, and the handler ran and
 		// caught it - so nothing reached the collection and nothing escaped.
 		await expect.poll(() => ran()).toBe('1');
-		expect(refused()).toContain('is not a function or its return value is not iterable');
+		expect(refused()).toBe('value is not iterable');
 		expect(fieldValues()).toEqual([]);
 		expect(count()).toBe('0');
 		expect(el('field').getAttribute('ui-seen')).toBe('');

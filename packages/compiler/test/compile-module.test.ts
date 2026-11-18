@@ -233,11 +233,44 @@ export function App() @{
 	const result = await compileTsrxModule({ filename: 'src/Siblings.tsrx', source, symbols: [] });
 
 	const [diagnostic] = result.semanticGraph.diagnostics;
-	expect(diagnostic?.code).toBe('MARKLESS_PARSE_ERROR');
-	expect(diagnostic?.title).toBe('A code block renders a single node');
-	expect(diagnostic?.message).toContain('`<main>` on line 4 follows another node');
+	expect(diagnostic?.code).toBe('MARKLESS_BLOCK_SIBLING_NODES');
+	expect(diagnostic?.phase).toBe('parse');
+	expect(diagnostic?.title).toBe('A block renders one node');
+	expect(diagnostic?.message).toContain('`<main>` on line 4 is a second node in the same block');
 	expect(diagnostic?.suggestions[0]?.message).toContain('put `<>` before the first and `</>` after the last');
+	expect(diagnostic?.docsUrl).toBe('https://markless.dev/errors/MARKLESS_BLOCK_SIBLING_NODES');
 	expect(diagnostic?.primarySpan?.start).toBe(source.indexOf('<main>'));
+	expect(result.publicRenderModule.ssrModuleSource).toBe('');
+});
+
+test('two nodes in an @try, @pending or @catch arm name the arm rule and the fragment fix', async () => {
+	for (const arm of ['try', 'pending', 'catch'] as const) {
+		const body = (name: string) =>
+			arm === name ? '<h2>Report</h2>\n\t\t\t<ul><li>a</li></ul>' : '<p>x</p>';
+		const source = `import { computed } from '@markless/core';
+export default function Report() @{
+	const report = computed(async () => ({ total: 1 }));
+	<section>
+		@try {
+			${body('try')}
+		} @pending {
+			${body('pending')}
+		} @catch {
+			${body('catch')}
+		}
+	</section>
+}
+`;
+		const result = await compileTsrxModule({ filename: 'src/Report.tsrx', source, symbols: [] });
+
+		const [diagnostic] = result.semanticGraph.diagnostics;
+		expect(diagnostic?.code).toBe('MARKLESS_BLOCK_SIBLING_NODES');
+		const line = source.slice(0, source.indexOf('<ul>')).split('\n').length;
+		expect(diagnostic?.message).toContain(`\`<ul>\` on line ${line} is a second node`);
+		expect(diagnostic?.message).toContain('@try, @pending and @catch arm');
+		expect(diagnostic?.suggestions[0]?.message).toContain('`<><h2>Title</h2><ul>…</ul></>`');
+		expect(diagnostic?.primarySpan?.start).toBe(source.indexOf('<ul>'));
+	}
 });
 
 test('a statement after the rendered markup names the reorder that fixes it', async () => {
@@ -2395,6 +2428,26 @@ export function App() @{
 	expect(output.html).not.toContain('<style');
 });
 
+test('compileTsrxModule names the stylesheets a module imports for their effect, in source order', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SiteShell.tsrx',
+		source: `
+import './site.css';
+import type { Theme } from './theme.css';
+import tokens from './tokens.css?url';
+import 'some-kit/base.scss';
+import './polyfill.ts';
+
+export function Shell() @{
+	<main class="shell"><p>{tokens}</p></main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.stylesheetImports).toEqual(['./site.css', 'some-kit/base.scss']);
+});
+
 // A scoped rule only matches an element carrying the scope class, so an element
 // whose class is an expression has to compose with it too.
 test('compileTsrxModule scopes an element whose class is a dynamic expression', async () => {
@@ -2566,12 +2619,15 @@ function Card({ value }) @{
 	});
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	expect(result.publicRenderPlan.styleScopes).toHaveLength(1);
-	const scope = result.publicRenderPlan.styleScopes[0]!.scopeId;
-	expect(result.publicRenderPlan.styleScopes[0]!.cssText).toBe(
-		[`.page.${scope} { display: grid; }`, `.card.${scope} { color: rebeccapurple; }`].join(
-			'\n',
-		),
+	// Each component's blocks get their own hash class, so App's rules never reach Card.
+	const [page, card] = result.publicRenderPlan.styleScopes;
+	expect(page!.scopeId).not.toBe(card!.scopeId);
+	expect(page!.cssText).toBe(`.page.${page!.scopeId} { display: grid; }`);
+	expect(card!.cssText).toBe(`.card.${card!.scopeId} { color: rebeccapurple; }`);
+
+	const ssrOutput = (await renderTestSsr(result)) as { readonly html: string };
+	expect(ssrOutput.html).toBe(
+		`<main class="page ${page!.scopeId}"><article class="card ${card!.scopeId}"><strong class="${card!.scopeId}">7</strong></article></main>`,
 	);
 });
 
@@ -2814,13 +2870,13 @@ test('sibling top-level elements without a fragment are refused with the fragmen
 
 	expect(result.semanticGraph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_PARSE_ERROR',
-			title: 'A code block renders a single node',
+			code: 'MARKLESS_BLOCK_SIBLING_NODES',
+			title: 'A block renders one node',
 			primarySpan: expect.objectContaining({ start: source.indexOf('<button') }),
 		}),
 	]);
 	const [diagnostic] = result.semanticGraph.diagnostics;
-	expect(diagnostic?.message).toContain('`<button>` on line 9 follows another node');
+	expect(diagnostic?.message).toContain('`<button>` on line 9 is a second node in the same block');
 	expect(diagnostic?.suggestions[0]?.message).toContain('put `<>` before the first and `</>` after the last');
 	expect(result.publicRenderModule.ssrModuleSource).toBe('');
 });
@@ -5514,10 +5570,10 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const toggleModule = eventModuleSource('menu.open = !menu.open');
 
-	expect(toggleModule).toContain('context.graph.write({');
+	expect(toggleModule).toContain('context.graph.update({');
 	expect(toggleModule).toContain('graphNodeId: "state:menu"');
 	expect(toggleModule).toContain('path: ["open"]');
-	expect(toggleModule).toContain('value: !context.graph.read("state:menu", ["open"])');
+	expect(toggleModule).toContain('return !value');
 
 	const addModule = eventModuleSource('total += profile.step');
 
@@ -5528,29 +5584,29 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const binaryAddModule = eventModuleSource('total = total + profile.step');
 
-	expect(binaryAddModule).toContain('context.graph.write({');
+	expect(binaryAddModule).toContain('context.graph.update({');
 	expect(binaryAddModule).toContain('graphNodeId: "state:total"');
 	expect(binaryAddModule).toContain('path: []');
 	expect(binaryAddModule).toContain(
-		'value: context.graph.read("state:total") + context.graph.read("state:profile", ["step"])',
+		'return value + context.graph.read("state:profile", ["step"])',
 	);
 
 	const nestedAddModule = eventModuleSource('total = (total + profile.step) * profile.scale');
 
-	expect(nestedAddModule).toContain('context.graph.write({');
+	expect(nestedAddModule).toContain('context.graph.update({');
 	expect(nestedAddModule).toContain('graphNodeId: "state:total"');
 	expect(nestedAddModule).toContain('path: []');
 	expect(nestedAddModule).toContain(
-		'value: (context.graph.read("state:total") + context.graph.read("state:profile", ["step"])) * context.graph.read("state:profile", ["scale"])',
+		'return (value + context.graph.read("state:profile", ["step"])) * context.graph.read("state:profile", ["scale"])',
 	);
 
 	const conditionalModule = eventModuleSource('total = menu.open ? profile.step : total');
 
-	expect(conditionalModule).toContain('context.graph.write({');
+	expect(conditionalModule).toContain('context.graph.update({');
 	expect(conditionalModule).toContain('graphNodeId: "state:total"');
 	expect(conditionalModule).toContain('path: []');
 	expect(conditionalModule).toContain(
-		'value: context.graph.read("state:menu", ["open"]) ? context.graph.read("state:profile", ["step"]) : context.graph.read("state:total")',
+		'return context.graph.read("state:menu", ["open"]) ? context.graph.read("state:profile", ["step"]) : value',
 	);
 
 	const callValueModule = eventModuleSource('total = Math.max(total, profile.step)');
@@ -5601,11 +5657,11 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const objectSpreadModule = eventModuleSource('settings = { ...settings, title: menu.title');
 
-	expect(objectSpreadModule).toContain('context.graph.write({');
+	expect(objectSpreadModule).toContain('context.graph.update({');
 	expect(objectSpreadModule).toContain('graphNodeId: "state:settings"');
 	expect(objectSpreadModule).toContain('path: []');
 	expect(objectSpreadModule).toContain(
-		'value: { ...context.graph.read("state:settings"), title: context.graph.read("state:menu", ["title"]) }',
+		'return { ...value, title: context.graph.read("state:menu", ["title"]) }',
 	);
 
 	const computedKeyModule = eventModuleSource('settings = { [menu.title]: profile.step');

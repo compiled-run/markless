@@ -12,7 +12,7 @@ export const dial = shared(
 
 		return { ...d, markEls, headEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Dial({ tag, children }) @{

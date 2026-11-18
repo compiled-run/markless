@@ -39,7 +39,7 @@ vi.mock('@markless/compiler', async (importOriginal) => {
 		prerenderInterfacesComplete: actual.prerenderInterfacesComplete,
 		collectTsrxModuleDiagnostics: vi.fn(() => []),
 		compileTsrxModule: vi.fn(async () => ({
-			semanticGraph: { componentEdges: compiler.componentEdges, markup: { chunks: [] } },
+			semanticGraph: { componentEdges: compiler.componentEdges, events: [], markup: { chunks: [] } },
 			protocolState: compiler.protocolState,
 			protocolView: compiler.protocolView,
 			// The real compiler always returns payloadArena (non-optional on
@@ -57,7 +57,7 @@ vi.mock('@markless/compiler', async (importOriginal) => {
 			},
 			symbolModules: { modules: [] },
 			boundSymbolResolver: { rows: [] },
-			publicRenderPlan: { styleScopes: [] },
+			publicRenderPlan: { styleScopes: [], stylesheetImports: [] },
 			payloadScripts: { state: compiler.protocolState, view: compiler.protocolView },
 			publicRenderModule: {
 				renderDataModuleSource: '',
@@ -93,7 +93,12 @@ test('transform selects the explicit demand map for each build class', async () 
 
 test('payload tier selection does not escalate on component edges alone', async () => {
 	compiler.componentEdges = [
-		{ childComponentName: 'Child', importSource: './Child.tsrx', props: [] },
+		{
+			childComponentName: 'Child',
+			importSource: './Child.tsrx',
+			props: [],
+			children: { childCount: 0 },
+		},
 	];
 	compiler.protocolView = {
 		branches: [],

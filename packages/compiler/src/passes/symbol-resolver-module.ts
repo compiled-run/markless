@@ -1,4 +1,5 @@
 import { ASYNC_PROTOCOL_VERSION, protocolInstanceQualifies } from '@markless/serializer';
+import { MARKLESS_SYMBOL_UNKNOWN } from '@markless/web/fns/symbol-unknown';
 import type { SymbolResolverModuleInput, SymbolResolverModuleManifest } from '../artifacts.ts';
 import { decodeBoundRow, factorBoundRows, type JsonBoundRow } from './bound-row-table.ts';
 
@@ -55,6 +56,14 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 	// A slot route reads its answering symbol id out of the graph, so only a page
 	// whose parts actually escape a widget callback carries the extra branch.
 	const rowed = scopesInstances && (input.boundSymbols ?? []).some((row) => row.rowPieces);
+	const keyedCallbackRows = (input.boundSymbols ?? []).some((row) =>
+		row.captureSlots.some(
+			(slot) => slot.route.kind === 'callback-route' && slot.route.callbackRowPieces !== undefined,
+		),
+	);
+	const keyedRowLocals = (input.boundSymbols ?? []).some((row) =>
+		row.captureSlots.some((slot) => slot.route.kind === 'row-local' && slot.route.rows),
+	);
 	const routesCallbackSlots = (input.boundSymbols ?? []).some((row) =>
 		row.captureSlots.some((slot) => slot.route.kind === 'callback-slot-route'),
 	);
@@ -70,12 +79,12 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 			: []),
 		...(rowed
 			? [
-					`import { marklessRowBoundGraphNodeId, marklessRowBoundPath } from '@markless/web/fns/row-bound-path';`,
+					`import { marklessRowBoundCallbackId, marklessRowBoundGraphNodeId, marklessRowBoundPath${keyedRowLocals ? ', marklessRowLocal' : ''}${keyedCallbackRows ? ', marklessRowBoundCallbackGraph' : ''} } from '@markless/web/fns/row-bound-path';`,
 					'',
 				]
 			: []),
 		'export const symbolManifest = ',
-		JSON.stringify(manifest),
+		JSON.stringify(shippedManifest(manifest, input.literalImports)),
 		';',
 		'',
 		input.literalImports
@@ -86,19 +95,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		...boundRowLookup(input.boundSymbols ?? []),
 		'const callbackRoute = "callback-route";',
 		'',
-		'export async function loadSymbol(id) {',
-		'	const bound = boundRow(id);',
-		'	if (bound) return loadBoundSymbol(bound);',
-		'	const row = symbolRows[id];',
-		'	if (!row) throw createUnknownSymbolError(id);',
-		input.literalImports
-			? '\treturn moduleLoads[id]()'
-			: '	return import(/* @vite-ignore */ moduleUrls[row[0]])',
-		'		.then((mod) => {',
-		'			runGeneratedSymbolChunkInitializers(mod);',
-		'			return mod[exportNames[row[1]]];',
-		'		});',
-		'}',
+		...emitLoadSymbolFunction(input.literalImports === true, true),
 		'',
 		'async function loadBoundSymbol(bound) {',
 		scopesInstances
@@ -112,7 +109,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'function createCaptureContext(context, bound) {',
 		'	const slots = {};',
 		'	for (const slot of bound.captureSlots) slots[slot.slotId] = slot;',
-		'	return {',
+		'	const capture = {',
 		'		read(slotId) {',
 		'			const slot = requiredCaptureSlot(slots, slotId);',
 		'			const route = slot.route;',
@@ -126,7 +123,9 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			}',
 		// A prop the root forwarded from its own props: the root's props are the page-space `prop:props` cell.
 		'			if (route.kind === "passthrough-route") return context.graph.read("prop:props", [route.propName, ...(route.path ?? []), ...(slot.path ?? [])]);',
-		'			if (route.kind === "row-local") return route.path.reduce((value, key) => value == null ? value : value[key], context.locals?.[route.itemName]);',
+		`			if (route.kind === "row-local") return route.path.reduce((value, key) => value == null ? value : value[key], ${rowed && keyedRowLocals ? 'route.rows ? marklessRowLocal(bound, context.graph, route) : ' : ''}context.locals?.[route.itemName]);`,
+		// A prop the child's module could only read as a value may be filled with a callback here.
+		'			if (route.kind === callbackRoute || route.kind === "callback-slot-route") return (...args) => capture.invoke(slotId, args);',
 		'			throw new Error(`Capture slot ${slotId} is a callback route`);',
 		'		},',
 		'		invoke(slotId, args) {',
@@ -153,10 +152,16 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 			: []),
 		'			if (route.kind !== callbackRoute) throw new Error(`Capture slot ${slotId} is not a callback route`);',
 		'			if (typeof context.invokeSymbol !== "function") throw new Error("Bound callback invocation is unavailable");',
-		// The row spells its composer's callback from its own module, which may sit under an instance path.
-		'			return context.invokeSymbol((context.graph?.marklessInstancePath || "") + route.callbackSymbolId, { ...context, event: context.event, args });',
+		// The composer's instance path rides the callback id, so the callback runs on the page graph; this scope would qualify it twice.
+		...(rowed && keyedCallbackRows
+			? [
+					'			if (route.callbackRowPieces !== undefined) return context.invokeSymbol((context.graph?.marklessInstancePath || "") + route.callbackSymbolId, { ...context, graph: marklessRowBoundCallbackGraph(bound, context.graph, route.callbackRowPieces), event: context.event, args });',
+				]
+			: []),
+		`			return context.invokeSymbol(${rowed ? 'marklessRowBoundCallbackId(bound, context.graph, route.callbackSymbolId)' : '(context.graph?.marklessInstancePath || "") + route.callbackSymbolId'}, { ...context, graph: context.graph?.marklessPageGraph ?? context.graph, event: context.event, args });`,
 		'		},',
 		'	};',
+		'	return capture;',
 		'}',
 		'',
 		// The resolver stays self-contained (it is loaded from a data: URL in some
@@ -198,10 +203,10 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'',
 		'function createUnknownSymbolError(id) {',
 		'	return Object.assign(new Error(`Unknown async symbol ${id}`), {',
-		'		code: "MARKLESS_SYMBOL_UNKNOWN",',
+		`		code: "${MARKLESS_SYMBOL_UNKNOWN}",`,
 		'		phase: "resume",',
 		'		symbolId: String(id),',
-		'		docsUrl: "https://markless.dev/errors/MARKLESS_SYMBOL_UNKNOWN",',
+		`		docsUrl: "https://markless.dev/errors/${MARKLESS_SYMBOL_UNKNOWN}",`,
 		'	});',
 		'}',
 		'',
@@ -220,6 +225,10 @@ function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 	// interleave would otherwise read each other's rendered widgets.
 	const scoped = (graphNodeId: string, registry: string) =>
 		widgetAware ? `scoped(${graphNodeId}, ${registry})` : `scoped(${graphNodeId})`;
+	const scopedRead = (graphNodeId: string, registry: string) =>
+		widgetAware
+			? `scopedRead(${graphNodeId}, readPath, ${registry})`
+			: `scopedRead(${graphNodeId}, readPath)`;
 	return [
 		...(rowed
 			? [
@@ -237,13 +246,17 @@ function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 				]),
 		'	if (!path) return base;',
 		'	const pageSpace = new Set(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [slot.legacyGraphRead.graphNodeId] : []));',
-		// A `shared:`/`storage:` id belongs to the page, and a widget-scoped one to
+		// A prop read no capture slot answers is this instance's own prop cell, never the page's.
+		'	const captured = new Set(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [JSON.stringify([slot.legacyGraphRead.graphNodeId, slot.legacyGraphRead.path ?? []])] : []));',
+		// A `shared:`/`storage:` id belongs to the page, and a subtree-scoped one to
 		// its widget root, not to the edge this row was bound through. The runtime
 		// owns that reading; restating it here would put the write on a graph the
 		// part's own records never read.
 		widgetAware
-			? `	const scoped = (graphNodeId, registry) => pageSpace.has(graphNodeId) ? graphNodeId : ${rowed ? 'marklessRowBoundGraphNodeId(graphNodeId, path, rowedPath, registry)' : 'marklessComposedGraphNodeId(graphNodeId, path, registry)'};`
-			: `	const scoped = (graphNodeId) => pageSpace.has(graphNodeId) ? graphNodeId : ${rowed ? 'marklessRowBoundGraphNodeId(graphNodeId, path, rowedPath)' : 'path + graphNodeId'};`,
+			? `	const own = (graphNodeId, registry) => ${rowed ? 'marklessRowBoundGraphNodeId(graphNodeId, path, rowedPath, registry)' : 'marklessComposedGraphNodeId(graphNodeId, path, registry)'};`
+			: `	const own = (graphNodeId) => ${rowed ? 'marklessRowBoundGraphNodeId(graphNodeId, path, rowedPath)' : 'path + graphNodeId'};`,
+		`	const scoped = (graphNodeId, registry) => pageSpace.has(graphNodeId) ? graphNodeId : own(graphNodeId, registry);`,
+		`	const scopedRead = (graphNodeId, readPath, registry) => pageSpace.has(graphNodeId) && captured.has(JSON.stringify([graphNodeId, readPath ?? []])) ? graphNodeId : own(graphNodeId, registry);`,
 		'	const scopeGraph = (graph) => {',
 		// A graph-less context still has an answer: the runtime hands back the
 		// `active` pointer, which is what an older payload's resolver read anyway.
@@ -255,7 +268,7 @@ function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 		// graph it qualifies against.
 		'		const outerQualify = graph.marklessQualifyGraphNodeId;',
 		`		const qualify = (graphNodeId) => { const scopedId = ${scoped('graphNodeId', 'registry')}; return typeof outerQualify === "function" ? outerQualify(scopedId) : scopedId; };`,
-		`		const wrapped = { ...graph, marklessInstancePath: path, marklessPageGraph: graph.marklessPageGraph ?? graph, marklessQualifyGraphNodeId: qualify, read: (graphNodeId, readPath) => graph.read(${scoped('graphNodeId', 'registry')}, readPath) };`,
+		`		const wrapped = { ...graph, marklessInstancePath: path, marklessPageGraph: graph.marklessPageGraph ?? graph, marklessQualifyGraphNodeId: qualify, read: (graphNodeId, readPath) => graph.read(${scopedRead('graphNodeId', 'registry')}, readPath) };`,
 		'		for (const name of ["write", "update", "call", "delete", "subscribe"]) {',
 		'			const method = graph[name];',
 		`			if (typeof method === "function") wrapped[name] = (record) => method.call(graph, { ...record, graphNodeId: ${scoped('record.graphNodeId', 'registry')} });`,
@@ -265,8 +278,8 @@ function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 		'	return (context) => base({',
 		'		...context,',
 		'		graph: scopeGraph(context.graph),',
-		`		...(context.read ? { read: (graphNodeId, readPath) => context.graph.read(${scoped('graphNodeId', 'marklessGraphWidgetRegistry(context.graph)')}, readPath) } : {}),`,
-		// A widget-scoped element() handle is spelled module-level in this symbol
+		`		...(context.read ? { read: (graphNodeId, readPath) => context.graph.read(${scopedRead('graphNodeId', 'marklessGraphWidgetRegistry(context.graph)')}, readPath) } : {}),`,
+		// A subtree-scoped element() handle is spelled module-level in this symbol
 		// exactly as its graph nodes are, so it takes the SAME instance path - the
 		// bound edge's, which names the rendered widget even when the dispatching
 		// part binds no handle of its own.
@@ -325,10 +338,17 @@ function serializeBoundRows(rows: SymbolResolverModuleInput['boundSymbols']): st
 			),
 		},
 	]);
-	return JSON.stringify(Object.fromEntries(serializedRows), (key, value) =>
-		Array.isArray(value) && value.length === 0 && OMITTED_EMPTY_BOUND_ROW_FIELDS.has(key)
-			? undefined
-			: value,
+	// A row-local route reads its item along `path`, so an empty one stays.
+	return JSON.stringify(
+		Object.fromEntries(serializedRows),
+		function (this: { readonly kind?: unknown }, key: string, value: unknown) {
+			return Array.isArray(value) &&
+				value.length === 0 &&
+				OMITTED_EMPTY_BOUND_ROW_FIELDS.has(key) &&
+				this.kind !== 'row-local'
+				? undefined
+				: value;
+		},
 	);
 }
 
@@ -338,24 +358,14 @@ function emitTableSymbolResolverModule(
 ): string {
 	return [
 		'export const symbolManifest = ',
-		JSON.stringify(manifest),
+		JSON.stringify(shippedManifest(manifest, literalImports)),
 		';',
 		'',
 		literalImports ? literalModuleLoads(manifest) : 'const moduleUrls = symbolManifest[3];',
 		'const exportNames = symbolManifest[4];',
 		'const symbolRows = symbolManifest[5];',
 		'',
-		'export async function loadSymbol(id) {',
-		'\tconst row = symbolRows[id];',
-		'\tif (!row) throw createUnknownSymbolError(id);',
-		literalImports
-			? '\treturn moduleLoads[id]()'
-			: '\treturn import(/* @vite-ignore */ moduleUrls[row[0]])',
-		'\t\t.then((mod) => {',
-		'\t\t\trunGeneratedSymbolChunkInitializers(mod);',
-		'\t\t\treturn mod[exportNames[row[1]]];',
-		'\t\t});',
-		'}',
+		...emitLoadSymbolFunction(literalImports, false),
 		'',
 		'function runGeneratedSymbolChunkInitializers(mod) {',
 		'\tfor (const name of Reflect.ownKeys(mod)) {',
@@ -367,14 +377,57 @@ function emitTableSymbolResolverModule(
 		'',
 		'function createUnknownSymbolError(id) {',
 		'\treturn Object.assign(new Error(`Unknown async symbol ${id}`), {',
-		'\t\tcode: "MARKLESS_SYMBOL_UNKNOWN",',
+		`\t\tcode: "${MARKLESS_SYMBOL_UNKNOWN}",`,
 		'\t\tphase: "resume",',
 		'\t\tsymbolId: String(id),',
-		'\t\tdocsUrl: "https://markless.dev/errors/MARKLESS_SYMBOL_UNKNOWN",',
+		`\t\tdocsUrl: "https://markless.dev/errors/${MARKLESS_SYMBOL_UNKNOWN}",`,
 		'\t});',
 		'}',
 		'',
 	].join('\n');
+}
+
+// A packed load already on the page answers in the caller's task, as a direct symbol load does.
+function emitLoadSymbolFunction(literalImports: boolean, bound: boolean): string[] {
+	const head = [
+		literalImports ? 'export function loadSymbol(id) {' : 'export async function loadSymbol(id) {',
+		...(bound ? ['\tconst bound = boundRow(id);', '\tif (bound) return loadBoundSymbol(bound);'] : []),
+		'\tconst row = symbolRows[id];',
+	];
+	if (!literalImports)
+		return [
+			...head,
+			'\tif (!row) throw createUnknownSymbolError(id);',
+			'\treturn import(/* @vite-ignore */ moduleUrls[row[0]])',
+			'\t\t.then((mod) => {',
+			'\t\t\trunGeneratedSymbolChunkInitializers(mod);',
+			'\t\t\treturn mod[exportNames[row[1]]];',
+			'\t\t});',
+			'}',
+		];
+	return [
+		`import { marklessWhenLoaded } from '@markless/web/fns/resident-load';`,
+		...head,
+		'\tif (!row) return Promise.reject(createUnknownSymbolError(id));',
+		'\treturn marklessWhenLoaded(moduleLoads[id](), (mod) => {',
+		'\t\trunGeneratedSymbolChunkInitializers(mod);',
+		'\t\treturn mod[exportNames[row[1]]];',
+		'\t});',
+		'}',
+	];
+}
+
+// Literal loads name each module in its own import(), so the URL list and each row's index into it are dead.
+function shippedManifest(
+	manifest: SymbolResolverModuleManifest,
+	literalImports: boolean | undefined,
+): SymbolResolverModuleManifest {
+	if (!literalImports) return manifest;
+	const [protocolVersion, buildId, resolverId, , exportNames, symbols] = manifest;
+	const rows = Object.fromEntries(
+		Object.entries(symbols).map(([id, [, exportIndex]]) => [id, [0, exportIndex] as const]),
+	);
+	return [protocolVersion, buildId, resolverId, [], exportNames, rows];
 }
 
 function literalModuleLoads(manifest: SymbolResolverModuleManifest): string {

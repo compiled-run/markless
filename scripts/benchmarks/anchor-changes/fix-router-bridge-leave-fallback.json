@@ -1,0 +1,64 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 42,
+			"reason": "a click whose run-half load is cut off by Back waits for pagehide before loading the page (PR #469): the link script's failure branch, downloaded with every page and run only when the run half fails to load. Measured +41 to +42 B gzip downloaded and +5 chars executed at load (the deadline argument, inside the swing, not recorded) on every page: bench on CI run 41902383839 against main run 41879749389, docs on merge-queue run 41909392328 against #410's queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 42,
+			"reason": "a click whose run-half load is cut off by Back waits for pagehide before loading the page (PR #469): the link script's failure branch, downloaded with every page and run only when the run half fails to load. Measured +41 to +42 B gzip downloaded and +5 chars executed at load (the deadline argument, inside the swing, not recorded) on every page: bench on CI run 41902383839 against main run 41879749389, docs on merge-queue run 41909392328 against #410's queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 42,
+			"reason": "a click whose run-half load is cut off by Back waits for pagehide before loading the page (PR #469): the link script's failure branch, downloaded with every page and run only when the run half fails to load. Measured +41 to +42 B gzip downloaded and +5 chars executed at load (the deadline argument, inside the swing, not recorded) on every page: bench on CI run 41902383839 against main run 41879749389, docs on merge-queue run 41909392328 against #410's queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 41,
+			"reason": "a click whose run-half load is cut off by Back waits for pagehide before loading the page (PR #469): the link script's failure branch, downloaded with every page and run only when the run half fails to load. Measured +41 to +42 B gzip downloaded and +5 chars executed at load (the deadline argument, inside the swing, not recorded) on every page: bench on CI run 41902383839 against main run 41879749389, docs on merge-queue run 41909392328 against #410's queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 41,
+			"reason": "a click whose run-half load is cut off by Back waits for pagehide before loading the page (PR #469): the link script's failure branch, downloaded with every page and run only when the run half fails to load. Measured +41 to +42 B gzip downloaded and +5 chars executed at load (the deadline argument, inside the swing, not recorded) on every page: bench on CI run 41902383839 against main run 41879749389, docs on merge-queue run 41909392328 against #410's queue run 41903352996",
+			"date": "2026-11-04"
+		}
+	]
+}

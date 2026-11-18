@@ -30,7 +30,7 @@ export const box = shared(() => {
 	const plain = computed(() => s.label + '?');
 	const echoed = computed(() => loud + '?');
 	return { ...s, loud, quiet, wrapped, trimmed, plain, echoed };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Family() @{
 	const b = box();

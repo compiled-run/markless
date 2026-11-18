@@ -61,11 +61,11 @@ export const accordion: FamilyMeta = {
 		},
 	],
 	keyboard: [
-		{ caps: [keys.down], does: 'Focus the next trigger, wrapping round to the first.' },
-		{ caps: [keys.up], does: 'Focus the previous trigger, wrapping round to the last.' },
+		{ caps: [keys.down], does: 'Focus the next trigger.' },
+		{ caps: [keys.up], does: 'Focus the previous trigger.' },
 		{ caps: [keys.home], does: 'Focus the first trigger.' },
 		{ caps: [keys.end], does: 'Focus the last trigger.' },
-		{ caps: [keys.enter, keys.space], join: 'or', does: 'Open or close the focused section.' },
+		{ caps: [keys.enter, keys.space], join: 'or', does: 'Open or close the section.' },
 	],
 	examples: [
 		{ id: 'faq', title: 'Help centre questions' },
