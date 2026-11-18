@@ -2,7 +2,7 @@
 // any other file that builds fixtures waits for its slot here, before its own hooks start their timeouts.
 import { readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
-import { afterAll, beforeAll, expect } from 'vitest';
+import { afterAll, beforeAll, beforeEach, expect } from 'vitest';
 import {
 	holdBuildSlot,
 	releaseReservedSlot,
@@ -25,5 +25,6 @@ if (test && inWorkerBuilds.tests.some((entry) => entry.test === test)) {
 	afterAll(() => release?.());
 } else {
 	beforeAll(reserveBuildSlot, 600_000);
+	beforeEach(releaseReservedSlot);
 	afterAll(releaseReservedSlot);
 }

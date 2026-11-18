@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process';
-import { rm } from 'node:fs/promises';
 import { resolve } from 'pathe';
 import type { markless } from '@markless/bundler/vite';
 import { noteFixtureBuilds, takeBuildSlot } from './build-slots.ts';
@@ -34,11 +33,11 @@ const failure = (build: FixtureBuild, report: string, output: string, exit: stri
 
 /** Runs `run`, a production build in another process, in a build slot unless this file holds one. */
 export async function withBuildSlot<T>(run: () => Promise<T>): Promise<T> {
-	const slot = await takeBuildSlot();
+	const release = await takeBuildSlot();
 	try {
 		return await run();
 	} finally {
-		if (slot) await rm(slot, { recursive: true, force: true });
+		await release();
 	}
 }
 
@@ -55,7 +54,7 @@ export async function buildFixture(build: FixtureBuild): Promise<void> {
 			);
 		return value;
 	});
-	const slot = await takeBuildSlot();
+	const release = await takeBuildSlot();
 	try {
 		await new Promise<void>((done, fail) => {
 			const proc = spawn(process.execPath, [child, config], {
@@ -81,6 +80,6 @@ export async function buildFixture(build: FixtureBuild): Promise<void> {
 			});
 		});
 	} finally {
-		if (slot) await rm(slot, { recursive: true, force: true });
+		await release();
 	}
 }

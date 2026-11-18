@@ -2,7 +2,8 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir, totalmem } from 'node:os';
-import { join, resolve } from 'pathe';
+import { join, relative, resolve } from 'pathe';
+import { expect } from 'vitest';
 
 const child = resolve(import.meta.dirname, 'fixture-build-child.ts');
 // CI attribution measured builds at up to 2.8 GB each; a 16 GB runner holds one at a time.
@@ -47,11 +48,18 @@ async function liveTickets(): Promise<string[]> {
 	return live;
 }
 
+const testFile = () => {
+	const path = expect.getState().testPath;
+	return path ? relative(process.cwd(), path) : `pid ${process.pid}`;
+};
+
 async function acquireSlot(held = ''): Promise<string> {
 	await mkdir(slotsDir, { recursive: true });
 	await mkdir(queueDir, { recursive: true });
 	const ticket = `${String(Date.now()).padStart(16, '0')}-${process.pid}-${String(tickets++).padStart(8, '0')}`;
 	await writeFile(join(queueDir, ticket), '');
+	const asked = Date.now();
+	const holders = new Set<string>();
 	try {
 		for (;;) {
 			if ((await liveTickets()).indexOf(ticket) < BUILD_SLOTS)
@@ -60,9 +68,17 @@ async function acquireSlot(held = ''): Promise<string> {
 					try {
 						await mkdir(slot);
 						await writeFile(join(slot, 'pid'), String(process.pid));
+						await writeFile(join(slot, 'file'), testFile());
 						if (held) await writeFile(join(slot, 'held'), held);
+						const waited = Date.now() - asked;
+						// A long wait is what turns a short build into a hook timeout; the CI log then says who held the slots.
+						if (waited > 30_000)
+							console.error(
+								`[build-slot] ${testFile()} waited ${Math.round(waited / 1000)} s for a build slot, held meanwhile by ${[...holders].join(', ') || 'unknown'}`,
+							);
 						return slot;
 					} catch {
+						holders.add(await readFile(join(slot, 'file'), 'utf8').catch(() => 'unknown'));
 						// A worker killed mid-build leaves its slot behind.
 						const holder = Number(await readFile(join(slot, 'pid'), 'utf8').catch(() => ''));
 						if (holder && !alive(holder)) await rm(slot, { recursive: true, force: true });
@@ -93,8 +109,9 @@ export const noteFixtureBuilds = () => {
 };
 
 /**
- * Before the file's own hooks (setup file, long timeout): a file that builds fixtures waits its turn here, so a test's hook
- * timeout measures its build and not its place in the queue. The slot is kept for the file's first build.
+ * Before the file's own hooks (setup file, long timeout): a file that builds fixtures waits its turn here, so a hook's
+ * timeout measures its builds and not its place in the queue. Every build of the file's setup hooks uses this slot; it is
+ * freed when the first test starts.
  */
 export async function reserveBuildSlot(): Promise<void> {
 	if (builds && !reserved && !(await heldByThisFile())) reserved = await acquireSlot();
@@ -105,13 +122,18 @@ export async function releaseReservedSlot(): Promise<void> {
 	reserved = null;
 }
 
-/** A slot for one build: none when the file holds one, the file's reservation, else one in turn. */
-export async function takeBuildSlot(): Promise<string | null> {
-	if (await heldByThisFile()) return null;
+let lending: Promise<void> = Promise.resolve();
+
+/** A slot for one build, released by the returned function: the file's reservation (one build at a time), else one in turn. */
+export async function takeBuildSlot(): Promise<() => Promise<void>> {
+	if (await heldByThisFile()) return async () => {};
 	if (reserved) {
-		const slot = reserved;
-		reserved = null;
-		return slot;
+		const previous = lending;
+		let returned = () => {};
+		lending = new Promise((done) => (returned = done));
+		await previous;
+		return async () => returned();
 	}
-	return acquireSlot();
+	const slot = await acquireSlot();
+	return () => rm(slot, { recursive: true, force: true });
 }
