@@ -1,0 +1,530 @@
+{
+  "RQ-1": {
+    "tags": "camera <base.camera>; pdf <base.pdf>; import { tabs, base } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "RQ-2": {
+    "tags": "camera <base.camera>; pdf <base.pdf>; import { tabs, base } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": "Camera panel wrapped in @if (tab === 'camera'), releasing the camera on tab switch; allowed."
+  },
+  "RQ-3": {
+    "tags": "camera <base.camera>; pdf <base.pdf>; import { tabs, base } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": "Imports ./media.css; guesses a base-camera tag selector for the box only (not its inside)."
+  },
+  "RQ-4": {
+    "tags": "camera <base.camera>; pdf <base.pdf>; import { tabs, base } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "RQ-5": {
+    "tags": "camera <base.camera>; pdf <base.pdf>; import { tabs, base } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "MZ-1": {
+    "tags": "camera <camera>; pdf <pdf>; no import",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": "Tag selectors camera.fill/pdf.fill size the boxes only."
+  },
+  "MZ-2": {
+    "tags": "camera <camera>; pdf <pdf>; no import",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "MZ-3": {
+    "tags": "camera <camera>; pdf <pdf>; no import",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "MZ-4": {
+    "tags": "camera <camera>; pdf <pdf>; no import",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "MZ-5": {
+    "tags": "camera <camera>; pdf <pdf>; no import",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "FJ-1": {
+    "tags": "camera <native.camera>; pdf <native.pdf>; import { tabs, base, native } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": "Fragments inside tabs.root and tabs.list; harmless."
+  },
+  "FJ-2": {
+    "tags": "camera <native.camera>; pdf <native.pdf>; import { tabs, base, native } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "FJ-3": {
+    "tags": "camera <native.camera>; pdf <native.pdf>; import { tabs, base, native } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "FJ-4": {
+    "tags": "camera <native.camera>; pdf <native.pdf>; import { tabs, base, native } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "FJ-5": {
+    "tags": "camera <native.camera>; pdf <native.pdf>; import { tabs, base, native } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": "Label reads 'Loading…' until onLoad, then 'Page N of M'."
+  },
+  "LT-1": {
+    "tags": "camera <system.camera>; pdf <system.pdf>; import { tabs, base, system } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "LT-2": {
+    "tags": "camera <system.camera>; pdf <system.pdf>; import { tabs, base, system } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "LT-3": {
+    "tags": "camera <system.camera>; pdf <system.pdf>; import { tabs, base, system } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": "Imports ./media.css for widths."
+  },
+  "LT-4": {
+    "tags": "camera <system.camera>; pdf <system.pdf>; import { tabs, base, system } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "LT-5": {
+    "tags": "camera <system.camera>; pdf <system.pdf>; import { tabs, base, system } from '@markless/ui'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "WY-1": {
+    "tags": "camera <cameraview>; pdf <pdfview>; import { camera, cameraview, pdfview } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "WY-2": {
+    "tags": "camera <cameraview>; pdf <pdfview>; import { camera, cameraview, pdfview } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": "Fragments inside tabs.root and tabs.list; harmless."
+  },
+  "WY-3": {
+    "tags": "camera <cameraview>; pdf <pdfview>; import { camera, cameraview, pdfview } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "WY-4": {
+    "tags": "camera <cameraview>; pdf <pdfview>; import { camera, cameraview, pdfview } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 2,
+    "notes": "Fragments inside tabs.root and tabs.list; harmless. Only answer below 3/5."
+  },
+  "WY-5": {
+    "tags": "camera <cameraview>; pdf <pdfview>; import { camera, cameraview, pdfview } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "KC-1": {
+    "tags": "camera <CameraView>; pdf <PdfView>; import { camera, CameraView, PdfView } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "KC-2": {
+    "tags": "camera <CameraView>; pdf <PdfView>; import { camera, CameraView, PdfView } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "KC-3": {
+    "tags": "camera <CameraView>; pdf <PdfView>; import { camera, CameraView, PdfView } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "KC-4": {
+    "tags": "camera <CameraView>; pdf <PdfView>; import { camera, CameraView, PdfView } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "KC-5": {
+    "tags": "camera <CameraView>; pdf <PdfView>; import { camera, CameraView, PdfView } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": "Shows 'No photo yet.' via @else; fine."
+  },
+  "HV-1": {
+    "tags": "camera <video src={cam}>; pdf <embed src={doc}>; no import (HTML elements); pdf from import { camera, pdf, type Photo } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "HV-2": {
+    "tags": "camera <video src={cam}>; pdf <embed src={doc}>; no import (HTML elements); pdf from import { camera, pdf, type Photo } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "HV-3": {
+    "tags": "camera <video src={cam}>; pdf <embed src={doc}>; no import (HTML elements); pdf from import { camera, pdf, type Photo } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": "<style> body written as raw CSS, not a template string; template detail, not counted."
+  },
+  "HV-4": {
+    "tags": "camera <video src={cam}>; pdf <embed src={doc}>; no import (HTML elements); pdf from import { camera, pdf, type Photo } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [
+      "`<base.button disabled={doc.page <= 1} onClick={() => (doc.page = doc.page - 1)}>` - base.button takes disabled, pressed, onChange and children only; no onClick",
+      "`<base.button disabled={doc.pages === 0 || doc.page >= doc.pages} onClick={() => (doc.page = doc.page + 1)}>` - base.button takes no onClick"
+    ],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": false
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": "Camera side correct; Previous/Next are base.button with onClick, which base.button does not take, so they have no press handler under the sheet."
+  },
+  "HV-5": {
+    "tags": "camera <video src={cam}>; pdf <embed src={doc}>; no import (HTML elements); pdf from import { camera, pdf, type Photo } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": "Label reads 'Loading…' until pages > 0."
+  },
+  "GN-1": {
+    "tags": "camera <View el={cam}>; pdf <View el={doc}>; import { camera, pdf, View } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "GN-2": {
+    "tags": "camera <View el={cam}>; pdf <View el={doc}>; import { camera, pdf, View } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [
+      "`<base.button onChange={async () => (photo = await cam.takePhoto())}>` - onChange is only called with the new state when `pressed` is given; a plain base.button has no state and no documented press callback",
+      "`<base.button onChange={() => cam.flip()}>` - same: onChange without `pressed` on a plain base.button",
+      "`<base.button disabled={doc.page <= 1} onChange={() => (doc.page = doc.page - 1)}>` - same: onChange without `pressed`",
+      "`<base.button disabled={doc.pages === 0 || doc.page >= doc.pages} onChange={() => (doc.page = doc.page + 1)}>` - same: onChange without `pressed`"
+    ],
+    "tasks": {
+      "tabs": true,
+      "camera": false,
+      "pdf": false
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": "Every button is base.button without pressed, using onChange as a click callback. The sheet ties onChange to the toggle form (pressed given); without pressed it is a plain button with no state, so no onChange press callback is documented. Shutter, flip and Previous/Next all rely on it."
+  },
+  "GN-3": {
+    "tags": "camera <View el={cam}>; pdf <View el={doc}>; import { camera, pdf, View } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "GN-4": {
+    "tags": "camera <View el={cam}>; pdf <View el={doc}>; import { camera, pdf, View } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": ""
+  },
+  "GN-5": {
+    "tags": "camera <View el={cam}>; pdf <View el={doc}>; import { camera, pdf, View } from '@markless/device'",
+    "tagRight": true,
+    "mistakes": [],
+    "tasks": {
+      "tabs": true,
+      "camera": true,
+      "pdf": true
+    },
+    "website": true,
+    "confidence": 3,
+    "notes": "Label reads 'Loading…' until pages > 0."
+  }
+}

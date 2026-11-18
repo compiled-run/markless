@@ -1,0 +1,662 @@
+{
+ "NT-1": {
+  "tags": "<native.camera>, <native.sheet>; import { base, drawer, native } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "NT-2": {
+  "tags": "<native.camera>, <native.sheet>; import { camera, native, platform, type Photo } from '@markless/device'",
+  "importRight": false,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "import { camera, native, platform, type Photo } from '@markless/device' -- native imported from @markless/device; the sheet puts it in @markless/ui. Tasks judged on usage apart from the import."
+ },
+ "NT-3": {
+  "tags": "<native.camera>, <native.sheet>; import { camera, native, platform, type Photo } from '@markless/device'",
+  "importRight": false,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "import { camera, native, platform, type Photo } from '@markless/device' -- native from wrong module. Tasks judged on usage apart from the import."
+ },
+ "NT-4": {
+  "tags": "<native.camera>, <native.sheet>; import { base, drawer, native } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "NT-5": {
+  "tags": "<native.camera>, <native.sheet>; import { camera, native, platform, type Photo } from '@markless/device'",
+  "importRight": false,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "import { camera, native, platform, type Photo } from '@markless/device' -- native from wrong module. No CSS written for full-width preview (relies on an assumed stylesheet). Tasks judged on usage apart from the import."
+ },
+ "PF-1": {
+  "tags": "<platform.camera>, <platform.sheet>; import { camera, platform, type Photo } from '@markless/device'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "PF-2": {
+  "tags": "<platform.camera>, <platform.sheet>; import { camera, platform, type Photo } from '@markless/device'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "PF-3": {
+  "tags": "<platform.camera>, <platform.sheet>; import { camera, platform, type Photo } from '@markless/device'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "PF-4": {
+  "tags": "<platform.camera>, <platform.sheet>; import { camera, platform, type Photo } from '@markless/device'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "PF-5": {
+  "tags": "<platform.camera>, <platform.sheet>; import { camera, platform, type Photo } from '@markless/device'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "IA-1": {
+  "tags": "<ios.camera>/<android.camera>/<web.camera>, <ios.sheet>/<android.sheet>/<web.sheet>, each inside its matching @if (platform.x); import { base, drawer, ios, android, web } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 8,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Duplicates: 2 extra camera tags + 2 extra sheets x 3 lines (open, <FilterChoices/>, close). Content shared via FilterChoices."
+ },
+ "IA-2": {
+  "tags": "<ios.camera>/<android.camera>/<web.camera>, <ios.sheet>/<android.sheet>/<web.sheet>, each inside its matching @if (platform.x); import { base, drawer, ios, android, web } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 8,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Duplicates: 2 extra camera tags + 2 extra sheets x 3 lines (open, <FilterChoices/>, close). Content shared via FilterChoices. No CSS written for full-width preview."
+ },
+ "IA-3": {
+  "tags": "<ios.camera>/<android.camera>/<web.camera>, <ios.sheet>/<android.sheet>/<web.sheet>, each inside its matching @if (platform.x); import { base, drawer, ios, android, web } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 8,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Duplicates: 2 extra camera tags + 2 extra sheets x 3 lines (open, <FilterChoices/>, close). Content shared via FilterChoices."
+ },
+ "IA-4": {
+  "tags": "<ios.camera>/<android.camera>/<web.camera>, <ios.sheet>/<android.sheet>/<web.sheet>, each inside its matching @if (platform.x); import { camera, platform, ios, android, web, base, drawer } from '@markless/device'",
+  "importRight": false,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 8,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "import { camera, platform, ios, android, web, base, drawer } from '@markless/device' -- ios/android/web and base/drawer imported from wrong module (writer flagged this in Guesses). Duplicates: 2 extra camera tags + 2 extra sheets x 3 lines. Tasks judged on usage apart from the import. No CSS written for full-width preview."
+ },
+ "IA-5": {
+  "tags": "<ios.camera>/<android.camera>/<web.camera>, <ios.sheet>/<android.sheet>/<web.sheet>, each inside its matching @if (platform.x); import { camera, platform, ios, android, web, base, drawer } from '@markless/device'",
+  "importRight": false,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 8,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "import { camera, platform, ios, android, web, base, drawer } from '@markless/device' -- ios/android/web and base/drawer imported from wrong module (writer flagged this in Guesses). Duplicates: 2 extra camera tags + 2 extra sheets x 3 lines. Tasks judged on usage apart from the import."
+ },
+ "SY-1": {
+  "tags": "<system.camera>, <system.sheet>; import { base, drawer, system } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "SY-2": {
+  "tags": "<system.camera>, <system.sheet>; import { base, drawer, system } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "SY-3": {
+  "tags": "<system.camera>, <system.sheet>; import { base, drawer, system } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "No CSS written for full-width preview (class only, assumed stylesheet)."
+ },
+ "SY-4": {
+  "tags": "<system.camera>, <system.sheet>; import { camera, platform, system } from '@markless/device'",
+  "importRight": false,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "import { camera, platform, system } from '@markless/device' -- system from wrong module. Tasks judged on usage apart from the import."
+ },
+ "SY-5": {
+  "tags": "<system.camera>, <system.sheet>; import { base, drawer, system } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "BC-1": {
+  "tags": "<base.camera>, <base.sheet>; import { base, drawer } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Places A written as '2 places ... in practice it is 1 place'; scored as final answer 1."
+ },
+ "BC-2": {
+  "tags": "<base.camera>, <base.sheet>; import { base, drawer } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "BC-3": {
+  "tags": "<base.camera>, <base.sheet>; import { base, drawer } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "BC-4": {
+  "tags": "<base.camera>, <base.sheet>; import { base, drawer } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "BC-5": {
+  "tags": "<base.camera>, <base.sheet>; import { base, drawer } from '@markless/ui'",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "BT-1": {
+  "tags": "<camera>, <sheet>; no import",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Preview width set in a separate styles/capture.css."
+ },
+ "BT-2": {
+  "tags": "<camera>, <sheet>; no import",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "BT-3": {
+  "tags": "<camera>, <sheet>; no import",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "No CSS written for full-width preview (class only, assumed stylesheet)."
+ },
+ "BT-4": {
+  "tags": "<camera>, <sheet>; no import",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ },
+ "BT-5": {
+  "tags": "<camera>, <sheet>; no import",
+  "importRight": true,
+  "mistakes": [],
+  "tasks": {
+   "camera": true,
+   "sheet": true,
+   "drawer": true,
+   "note": true
+  },
+  "duplicateLines": 0,
+  "sheetContentCopies": 1,
+  "places": {
+   "A": 1,
+   "Aright": true,
+   "B": 1,
+   "Bright": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": ""
+ }
+}

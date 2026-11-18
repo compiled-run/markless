@@ -1,0 +1,530 @@
+{
+ "RQ-1": {
+  "tags": "<base.camera el={cam}> and <base.pdf src=\"/guide.pdf\"> from import { tabs, base } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "RQ-2": {
+  "tags": "<base.camera el={cam}> and <base.pdf src=\"/guide.pdf\"> from import { tabs, base } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>. Camera panel wrapped in @if (tab === 'camera'), so the last photo is lost on tab switch; still meets the task."
+ },
+ "RQ-3": {
+  "tags": "<base.camera el={cam}> and <base.pdf src=\"/guide.pdf\"> from import { tabs, base } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>. CSS in imported media.css; 'base-camera.media-fill' guesses the box's tag name but only sizes the box."
+ },
+ "RQ-4": {
+  "tags": "<base.camera el={cam}> and <base.pdf src=\"/guide.pdf\"> from import { tabs, base } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "RQ-5": {
+  "tags": "<base.camera el={cam}> and <base.pdf src=\"/guide.pdf\"> from import { tabs, base } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "MZ-1": {
+  "tags": "<camera el={cam}> and <pdf src=\"/guide.pdf\">, no import (built-in lowercase elements); camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "MZ-2": {
+  "tags": "<camera el={cam}> and <pdf src=\"/guide.pdf\">, no import (built-in lowercase elements); camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "MZ-3": {
+  "tags": "<camera el={cam}> and <pdf src=\"/guide.pdf\">, no import (built-in lowercase elements); camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "MZ-4": {
+  "tags": "<camera el={cam}> and <pdf src=\"/guide.pdf\">, no import (built-in lowercase elements); camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "MZ-5": {
+  "tags": "<camera el={cam}> and <pdf src=\"/guide.pdf\">, no import (built-in lowercase elements); camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "FJ-1": {
+  "tags": "<native.camera el={cam}> and <native.pdf src=\"/guide.pdf\"> from import { tabs, base, native } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>. Fragments wrap tabs.root/tabs.list children; unused .native-camera-box rule."
+ },
+ "FJ-2": {
+  "tags": "<native.camera el={cam}> and <native.pdf src=\"/guide.pdf\"> from import { tabs, base, native } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "FJ-3": {
+  "tags": "<native.camera el={cam}> and <native.pdf src=\"/guide.pdf\"> from import { tabs, base, native } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "FJ-4": {
+  "tags": "<native.camera el={cam}> and <native.pdf src=\"/guide.pdf\"> from import { tabs, base, native } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "FJ-5": {
+  "tags": "<native.camera el={cam}> and <native.pdf src=\"/guide.pdf\"> from import { tabs, base, native } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "LT-1": {
+  "tags": "<system.camera el={cam}> and <system.pdf src=\"/guide.pdf\"> from import { tabs, base, system } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "LT-2": {
+  "tags": "<system.camera el={cam}> and <system.pdf src=\"/guide.pdf\"> from import { tabs, base, system } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "LT-3": {
+  "tags": "<system.camera el={cam}> and <system.pdf src=\"/guide.pdf\"> from import { tabs, base, system } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>. CSS in imported media.css."
+ },
+ "LT-4": {
+  "tags": "<system.camera el={cam}> and <system.pdf src=\"/guide.pdf\"> from import { tabs, base, system } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "LT-5": {
+  "tags": "<system.camera el={cam}> and <system.pdf src=\"/guide.pdf\"> from import { tabs, base, system } from '@markless/ui'; camera from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "WY-1": {
+  "tags": "<cameraview el={cam}> and <pdfview src=\"/guide.pdf\"> from import { camera, cameraview, pdfview } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "WY-2": {
+  "tags": "<cameraview el={cam}> and <pdfview src=\"/guide.pdf\"> from import { camera, cameraview, pdfview } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "WY-3": {
+  "tags": "<cameraview el={cam}> and <pdfview src=\"/guide.pdf\"> from import { camera, cameraview, pdfview } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "WY-4": {
+  "tags": "<cameraview el={cam}> and <pdfview src=\"/guide.pdf\"> from import { camera, cameraview, pdfview } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 2,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "WY-5": {
+  "tags": "<cameraview el={cam}> and <pdfview src=\"/guide.pdf\"> from import { camera, cameraview, pdfview } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "KC-1": {
+  "tags": "<CameraView el={cam}> and <PdfView src=\"/guide.pdf\"> from import { camera, CameraView, PdfView } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "KC-2": {
+  "tags": "<CameraView el={cam}> and <PdfView src=\"/guide.pdf\"> from import { camera, CameraView, PdfView } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "KC-3": {
+  "tags": "<CameraView el={cam}> and <PdfView src=\"/guide.pdf\"> from import { camera, CameraView, PdfView } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>. Website camera line says 'the live camera picture' after the browser's permission prompt; counted as the browser's camera picture."
+ },
+ "KC-4": {
+  "tags": "<CameraView el={cam}> and <PdfView src=\"/guide.pdf\"> from import { camera, CameraView, PdfView } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "KC-5": {
+  "tags": "<CameraView el={cam}> and <PdfView src=\"/guide.pdf\"> from import { camera, CameraView, PdfView } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "HV-1": {
+  "tags": "<video src={cam}> and <embed src={doc}>, no import (HTML elements); camera and pdf from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "HV-2": {
+  "tags": "<video src={cam}> and <embed src={doc}>, no import (HTML elements); camera and pdf from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "HV-3": {
+  "tags": "<video src={cam}> and <embed src={doc}>, no import (HTML elements); camera and pdf from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>. <style> holds raw CSS rather than a {`...`} string; a template-syntax issue, not counted. Flip base.button also takes disabled (allowed)."
+ },
+ "HV-4": {
+  "tags": "<video src={cam}> and <embed src={doc}>, no import (HTML elements); camera and pdf from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [
+   "`<base.button disabled={doc.page <= 1} onClick={() => (doc.page = doc.page - 1)}>Previous</base.button>`: base.button takes no onClick (props are disabled, pressed, onChange, children)",
+   "`<base.button disabled={doc.pages === 0 || doc.page >= doc.pages} onClick={() => (doc.page = doc.page + 1)}>Next</base.button>`: base.button takes no onClick"
+  ],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": false
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is correct (pressed + onChange). Previous/Next use base.button with onClick, which the sheet does not offer, so page changes have no handler."
+ },
+ "HV-5": {
+  "tags": "<video src={cam}> and <embed src={doc}>, no import (HTML elements); camera and pdf from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>. Flip base.button also takes disabled (allowed)."
+ },
+ "GN-1": {
+  "tags": "<View el={cam}> and <View el={doc}> from import { camera, pdf, View } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "GN-2": {
+  "tags": "<View el={cam}> and <View el={doc}> from import { camera, pdf, View } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [
+   "`<base.button onChange={async () => (photo = await cam.takePhoto())}>Take photo</base.button>`: onChange on a base.button without pressed; the sheet says a button without pressed is plain with no state, and onChange reports the new pressed state of a toggle, so the press is never reported",
+   "`<base.button onChange={() => cam.flip()}>`: same, flip button has no pressed, so onChange has no state change to report",
+   "`<base.button disabled={doc.page <= 1} onChange={() => (doc.page = doc.page - 1)}>Previous</base.button>`: onChange on a plain base.button",
+   "`<base.button ... onChange={() => (doc.page = doc.page + 1)}>Next</base.button>`: onChange on a plain base.button"
+  ],
+  "tasks": {
+   "tabs": true,
+   "camera": false,
+   "pdf": false
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Tags, imports and doc.page/doc.pages use are right; every button relies on onChange from a base.button with no pressed prop. camera() called with no facing (allowed). Judgement call: the sheet types onChange as optional on any base.button but only describes it firing for toggles."
+ },
+ "GN-3": {
+  "tags": "<View el={cam}> and <View el={doc}> from import { camera, pdf, View } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "GN-4": {
+  "tags": "<View el={cam}> and <View el={doc}> from import { camera, pdf, View } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>."
+ },
+ "GN-5": {
+  "tags": "<View el={cam}> and <View el={doc}> from import { camera, pdf, View } from '@markless/device'",
+  "tagRight": true,
+  "mistakes": [],
+  "tasks": {
+   "tabs": true,
+   "camera": true,
+   "pdf": true
+  },
+  "website": true,
+  "confidence": 3,
+  "notes": "Flip is base.button with pressed={cam.facing === 'front'} and onChange={() => cam.flip()}; shutter and Previous/Next are plain <button onClick>. Flip base.button also takes disabled (allowed)."
+ }
+}

@@ -1,0 +1,19 @@
+1: The `tabs.root`, `tabs.list`, `tabs.trigger` and `tabs.content` tags come from `@markless/ui`, imported as `tabs`. `base.button`, `base.camera` (the tag that shows the camera) and `base.pdf` (the tag that shows the PDF) also come from `@markless/ui`, through its `base` namespace. The camera data itself comes from a different package: `camera()` in `@markless/device` returns the `cam` handle, which is passed in as `el={cam}`. So the camera tag comes from the UI package but is driven by the device package. `button` and `img` are plain HTML, and so are `div` and `p`. None of the tags looks like it is built into Markless itself; Markless only supplies `state` and the `@if` block.
+
+2: The author styles `base.camera` (`class="preview"`), `base.pdf` (`class="document"`) and `img` (`class="photo"`). The buttons and the tabs tags have no class here, but they look styleable. Two tags probably have an inside the author cannot style: `base.camera` and `base.pdf`. The author can only size and place their outer box. Inside the camera tag is a live video feed, which is pixels from the camera. In the phone apps it is probably a native camera view, not page elements CSS can reach. Inside the PDF tag are rendered pages, possibly drawn by the platform's own viewer or embedded the way a browser shows a PDF. Neither exposes child elements to style. This part is a guess based on what the tags show; the code does not say it.
+
+3: These tags have behaviour of their own:
+- The `tabs` tags track which tab is selected (`value`), switch panels on click, and very likely handle arrow-key moves and focus between triggers. I am assuming that from the usual tabs pattern.
+- `base.button` keeps a toggle state and handles click and keyboard itself (`pressed`, `onChange`), so it is a toggle button rather than a plain button.
+- `base.pdf` loads and renders the file, shows the given `page`, and fires `onLoad` with info about the document.
+- `base.camera` shows the live feed from the `cam` handle. Most of its behaviour (`ready`, `facing`, `flip`, `takePhoto`) lives on the handle from `@markless/device`, not on the tag, so the tag is mostly a viewport.
+
+`button` and `img` have only the browser's built-in behaviour and no state of their own; the page's code handles their clicks. `div` and `p` are boxes with no behaviour.
+
+4: Both answers are guesses, because the code does not say what the website does. For the camera tag, I expect the browser to ask for camera permission and then show a live preview, probably through a `<video>` element fed by the browser's camera access. If the visitor refuses or has no camera, `cam.ready` stays false, so "Take photo" is disabled and the preview is likely empty or a placeholder. For the PDF tag, I expect page 1 of `/guide.pdf` rendered in the box, shown either by the browser's PDF viewer or drawn onto the page by a script, with "Page 1 of N" once `onLoad` fires.
+
+5: Can't tell. The name `base.camera` is not an HTML tag name, so the tag itself is a component from `@markless/ui`. What it puts on the page is not visible here. On the website it might produce a `<video>` element. On iPhone and Android it is probably a native camera view, which is not an HTML element at all. It could also be a different thing on each platform.
+
+6: For question 1, my confidence is 4 out of 5: the imports make the packages clear. The open point is whether `base.*` tags are thin wrappers around HTML elements or part of Markless's core set. For question 5, it is 2 out of 5. To be sure I would need the `@markless/ui` docs or source for `base.camera` and `base.pdf`: what each one renders on each platform, and whether it can be styled or reached inside. I would also need to know whether `el={cam}` attaches a device handle to a real DOM element or to a native view.
+
+Tools used: none
