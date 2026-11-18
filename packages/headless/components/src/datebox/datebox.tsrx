@@ -11,11 +11,11 @@ import {
 	resolvedDayMax,
 	resolvedDisplay,
 	resolvedEmpty,
-	resolvedMonthName,
 	resolvedNumber,
 	resolvedText,
 	resolvedTexts,
 	resolvedValue,
+	resolvedValueText,
 	settled,
 	type SegmentType,
 } from './datebox-math.ts';
@@ -260,15 +260,8 @@ function DateBoxItem({
 				datebox.yearAt,
 			) === '',
 	);
-	const spoken = computed(
-		() =>
-			resolvedMonthName(
-				segment.type,
-				datebox.seed,
-				datebox.dayAt,
-				datebox.monthAt,
-				datebox.yearAt,
-			) || null,
+	const spoken = computed(() =>
+		resolvedValueText(segment.type, datebox.seed, datebox.dayAt, datebox.monthAt, datebox.yearAt),
 	);
 	const named = computed(() => `${segment.type} input`);
 	const lowest = computed(() =>
