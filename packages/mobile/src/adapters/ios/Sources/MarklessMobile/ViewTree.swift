@@ -110,7 +110,7 @@ final class DrawingView: UIView {
 
 	override func draw(_ rect: CGRect) {
 		guard let context = UIGraphicsGetCurrentContext() else { return }
-		if let box = drawing.viewBox, box[2] > 0, box[3] > 0 {
+		if let box = drawing.viewBox?.map({ CGFloat($0) }), box[2] > 0, box[3] > 0 {
 			// SVG 2 xMidYMid meet: one scale that fits both axes, the rest centred.
 			let scale = min(bounds.width / box[2], bounds.height / box[3])
 			context.translateBy(x: -box[0] * scale + (bounds.width - box[2] * scale) / 2, y: -box[1] * scale + (bounds.height - box[3] * scale) / 2)
