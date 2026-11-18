@@ -1,0 +1,345 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Values",
+		"cells": [
+			{
+				"id": "state:scale",
+				"name": "scale",
+				"initial": 1
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"expr": {
+							"literal": "Small"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Rendered ",
+								{
+									"binary": "*",
+									"left": {
+										"cell": "state:scale"
+									},
+									"right": {
+										"literal": 2
+									}
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Now ",
+								{
+									"binary": "+",
+									"left": {
+										"binary": "*",
+										"left": {
+											"cell": "state:scale"
+										},
+										"right": {
+											"literal": 2
+										}
+									},
+									"right": {
+										"cell": "state:scale"
+									}
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "repeat",
+				"id": "repeat:0",
+				"parent": "h0",
+				"list": {
+					"array": [
+						{
+							"spread": false,
+							"value": {
+								"object": [
+									[
+										"id",
+										{
+											"literal": "s"
+										}
+									],
+									[
+										"label",
+										{
+											"literal": "Small"
+										}
+									],
+									[
+										"cm",
+										{
+											"literal": 10
+										}
+									]
+								]
+							}
+						},
+						{
+							"spread": false,
+							"value": {
+								"object": [
+									[
+										"id",
+										{
+											"literal": "l"
+										}
+									],
+									[
+										"label",
+										{
+											"literal": "Large"
+										}
+									],
+									[
+										"cm",
+										{
+											"literal": 30
+										}
+									]
+								]
+							}
+						}
+					]
+				},
+				"key": ["id"]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0",
+				"row": "repeat:0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"expr": {
+							"member": {
+								"item": "repeat:0"
+							},
+							"property": "label"
+						}
+					},
+					{
+						"text": " "
+					},
+					{
+						"expr": {
+							"binary": "*",
+							"left": {
+								"member": {
+									"item": "repeat:0"
+								},
+								"property": "cm"
+							},
+							"right": {
+								"cell": "state:scale"
+							}
+						}
+					},
+					{
+						"expr": {
+							"literal": "cm"
+						}
+					}
+				],
+				"row": "repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Grow"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:scale",
+						"value": {
+							"binary": "+",
+							"left": {
+								"binary": "*",
+								"left": {
+									"cell": "state:scale"
+								},
+								"right": {
+									"literal": 2
+								}
+							},
+							"right": {
+								"binary": "/",
+								"left": {
+									"binary": "+",
+									"left": {
+										"binary": "+",
+										"left": {
+											"literal": 0
+										},
+										"right": {
+											"literal": 10
+										}
+									},
+									"right": {
+										"literal": 30
+									}
+								},
+								"right": {
+									"literal": 40
+								}
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		["h1:text0", "Small"],
+		["h2:text0", "Rendered 2"],
+		["h3:text0", "Now 3"],
+		["h4:text0@s", "Small 10cm"],
+		["h4:text0@l", "Large 30cm"],
+		["h5:text0", "Grow"]
+	],
+	"initialRows": [["repeat:0", ["s", "l"]]],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Rendered 6"
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Now 9"
+				},
+				{
+					"op": "text",
+					"node": "h4:text0@s",
+					"value": "Small 30cm"
+				},
+				{
+					"op": "text",
+					"node": "h4:text0@l",
+					"value": "Large 90cm"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Rendered 14"
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Now 21"
+				},
+				{
+					"op": "text",
+					"node": "h4:text0@s",
+					"value": "Small 70cm"
+				},
+				{
+					"op": "text",
+					"node": "h4:text0@l",
+					"value": "Large 210cm"
+				}
+			]
+		}
+	]
+}

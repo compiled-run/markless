@@ -56,6 +56,26 @@ const stylesheetsOf = (
 		return sheet;
 	});
 
+type ReadModule = (
+	specifier: string,
+	importer: string,
+) => { readonly filename: string; readonly source: string } | undefined;
+
+/** A JSON file imports as a module whose default export is its value, as the web build loads it. */
+const withJsonModules =
+	(read: ReadModule | undefined): ReadModule | undefined =>
+	read &&
+	((specifier, importer) => {
+		const module = read(specifier, importer);
+		if (!module?.filename.endsWith('.json')) return module;
+		try {
+			JSON.parse(module.source);
+		} catch {
+			return undefined;
+		}
+		return { filename: module.filename, source: `const json = ${module.source};\nexport default json;\n` };
+	});
+
 /** Compiles one `.tsrx` module through the real compiler, then lowers its analysis to the native view payload. */
 export async function compileNativeComponent(input: {
 	readonly filename: string;
@@ -84,6 +104,7 @@ export async function compileNativeComponent(input: {
 		? manifest?.routes.find((candidate) => candidate.file === input.page)
 		: undefined;
 	if (input.page && !route) throw new Error(`${input.page} is not a page the router routes`);
+	const readModule = withJsonModules(input.readModule);
 	const compiled = await compileTsrxModule({
 		filename: input.filename,
 		source: input.source,
@@ -100,7 +121,7 @@ export async function compileNativeComponent(input: {
 	);
 	for (const entry of compiled.semanticGraph.moduleImports) {
 		if (entry.typeOnly || !entry.source.startsWith('.')) continue;
-		const module = input.readModule?.(entry.source, input.filename);
+		const module = readModule?.(entry.source, input.filename);
 		if (!module) continue;
 		const plan = (await compileTsrxModule({ ...module, symbols: [] })).publicRenderPlan;
 		importedStyles.push(...plan.styleScopes);
@@ -119,7 +140,7 @@ export async function compileNativeComponent(input: {
 	]);
 	const read = new Map<string, { readonly filename: string; readonly source: string }>();
 	const resolve = (specifier: string, importer: string): string | undefined => {
-		const module = input.readModule?.(specifier, importer);
+		const module = readModule?.(specifier, importer);
 		if (module) read.set(module.filename, module);
 		return module?.filename;
 	};

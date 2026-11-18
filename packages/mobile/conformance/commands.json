@@ -59,17 +59,7 @@
 										"property": "length"
 									},
 									"right": {
-										"member": {
-											"array": [
-												{
-													"spread": false,
-													"value": {
-														"literal": "a"
-													}
-												}
-											]
-										},
-										"property": "length"
+										"literal": 1
 									}
 								},
 								"whenTrue": {

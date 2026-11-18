@@ -13,7 +13,7 @@ const BINARY = new Set(['+', '-', '*', '/', '%', '===', '!==', '<', '<=', '>', '
 const LOGICAL = new Set(['&&', '||', '??']);
 const COMPOUND = new Set(['+=', '-=', '*=', '/=', '%=']);
 /** Calls with exact JavaScript meaning that a native host implements; any other call needs a script engine. */
-const BUILTINS = new Set(['String', 'Number', 'Boolean', 'Math.abs', 'Math.floor', 'Math.max', 'Math.min', 'Math.round']);
+const BUILTINS = new Set(['String', 'Number', 'Boolean', 'Math.abs', 'Math.floor', 'Math.max', 'Math.min', 'Math.round', 'Date.now']);
 
 const lambdaOf = (node: AnyNode): SemanticExpression => {
 	const parameters = asNodes(node.params);
@@ -132,6 +132,13 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 			if (callee?.type === 'Identifier' && name && !asNodes(node.arguments).some((argument) => argument.type === 'SpreadElement'))
 				return { kind: 'apply', callee: name, arguments: asNodes(node.arguments).map(expressionTreeOf) };
 			return unsupported(`a call to \`${name ?? 'a computed function'}\``);
+		}
+		case 'NewExpression': {
+			const callee = node.callee as AnyNode | undefined;
+			// `new Date()` is a call the native build answers by name; any other constructor is refused there by name.
+			return callee?.type === 'Identifier' && typeof callee.name === 'string'
+				? { kind: 'call', callee: `new ${callee.name}`, arguments: asNodes(node.arguments).map(expressionTreeOf) }
+				: unsupported('a `new` of a computed constructor');
 		}
 		case 'AwaitExpression':
 			return { kind: 'await', value: expressionTreeOf(node.argument as AnyNode | undefined) };
@@ -613,15 +620,29 @@ export function componentNativeFactsOf(
 	}
 	const stateInitializers: Record<string, SemanticExpression> = {};
 	const renderStatements: SemanticHandlerStatement[] = [];
+	const locals: Record<string, SemanticExpression> = {};
 	const body = node.body as AnyNode | undefined;
 	for (const statement of asNodes(body?.body)) {
 		if (statement.type === 'VariableDeclaration') {
 			for (const declarator of asNodes(statement.declarations)) {
 				const id = declarator.id as AnyNode | undefined;
 				const init = declarator.init as AnyNode | undefined;
-				if (id?.type !== 'Identifier' || typeof id.name !== 'string' || !init) continue;
+				if (!init) continue;
+				if (id?.type === 'ObjectPattern' && statement.kind === 'const') {
+					const value = expressionTreeOf(init);
+					for (const property of asNodes(id.properties)) {
+						const key = property.key as AnyNode | undefined;
+						const local = property.value as AnyNode | undefined;
+						if (property.type !== 'Property' || property.computed || key?.type !== 'Identifier' || local?.type !== 'Identifier')
+							continue;
+						locals[String(local.name)] = { kind: 'member', object: value, property: String(key.name) };
+					}
+					continue;
+				}
+				if (id?.type !== 'Identifier' || typeof id.name !== 'string') continue;
 				if (init.type === 'CallExpression' && isFrameworkCall(init, 'state'))
 					stateInitializers[id.name] = expressionTreeOf(asNodes(init.arguments)[0]);
+				else if (statement.kind === 'const') locals[id.name] = expressionTreeOf(init);
 			}
 			continue;
 		}
@@ -630,7 +651,13 @@ export function componentNativeFactsOf(
 		if (expression?.type?.startsWith('JSX')) continue;
 		renderStatements.push(statementOf(expression ?? null));
 	}
-	return { propDefaults, ...(restProp ? { restProp } : {}), stateInitializers, renderStatements };
+	return {
+		propDefaults,
+		...(restProp ? { restProp } : {}),
+		stateInitializers,
+		renderStatements,
+		...(Object.keys(locals).length > 0 ? { locals } : {}),
+	};
 }
 
 /** What a native build passes as `nativeFacts`; nothing else imports this module. */

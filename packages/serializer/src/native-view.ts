@@ -51,7 +51,11 @@ export type NativeBuiltin =
 	| 'Math.floor'
 	| 'Math.max'
 	| 'Math.min'
-	| 'Math.round';
+	| 'Math.round'
+	/** The clock when the expression is evaluated, in milliseconds since 1970 (UTC): `Date.now()`, `new Date().getTime()`. */
+	| 'Date.now'
+	/** `new Date(ms).toISOString()`: UTC, `YYYY-MM-DDTHH:mm:ss.sssZ` (six-digit signed years outside 0 to 9999). */
+	| 'Date.toISOString';
 
 /**
  * A value computed from cells, evaluated by every host with JavaScript's meaning (numbers are IEEE doubles; `String()`,
@@ -179,8 +183,13 @@ export type NativeNode = NativePlace &
 		  }
 	);
 
-/** Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click). */
-export type NativeEventName = 'activate' | 'input' | 'dismiss' | 'cancel';
+/**
+ * Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click).
+ * `idle` and `visible` mean what the web runtime gives them, once for each shown instance of their element (shown again
+ * after it left, it is a new one): `idle` at the first moment the host is idle after the screen's first frame (or after
+ * the element appears), `visible` the first time any of the element is on the screen.
+ */
+export type NativeEventName = 'activate' | 'input' | 'dismiss' | 'cancel' | 'idle' | 'visible';
 
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
 export type NativeOp =
@@ -271,6 +280,11 @@ export type NativeViewPayload = {
 		 * gone with it. A read or write inside the row reaches that row's value.
 		 */
 		readonly row?: string;
+		/**
+		 * The clock when the screen opened, in milliseconds since 1970 (UTC): the host writes it at mount, before the first
+		 * build, as a page's render reads the clock when it is served; `initial` is never shown.
+		 */
+		readonly clock?: true;
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;

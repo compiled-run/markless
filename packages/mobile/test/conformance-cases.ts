@@ -8,6 +8,8 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	/** For a page: its page file (the router derives the route) and the params it opens with. */
 	readonly page?: string;
 	readonly params?: Readonly<Record<string, string>>;
+	/** What the device's clock reads, for a component that reads it. */
+	readonly now?: number;
 	/** The app config's usage text, for a component that uses a device feature that asks. */
 	readonly device?: DeviceAppConfig;
 	readonly actions: ReadonlyArray<NativeAction>;
@@ -293,6 +295,35 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h4' },
 			{ event: 'activate', host: 'h7@b' },
 			{ event: 'activate', host: 'h7@c' },
+		],
+	},
+	{
+		name: 'values',
+		fixture: 'test/fixtures/Values.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'clock',
+		fixture: 'test/fixtures/Clock.tsrx',
+		now: 1795046400123,
+		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		name: 'load-events',
+		fixture: 'test/fixtures/LoadEvents.tsrx',
+		actions: [
+			{ event: 'idle', host: 'h1' },
+			{ event: 'idle', host: 'h1' },
+			{ event: 'visible', host: 'h3@b' },
+			{ event: 'visible', host: 'h3@b' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'idle', host: 'h1' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'idle', host: 'h1' },
+			{ event: 'visible', host: 'h3@a' },
 		],
 	},
 ];

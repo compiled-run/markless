@@ -10,6 +10,8 @@ export type NativeConformance = {
 	readonly payload: NativeViewPayload;
 	/** Present for a page: the route params it opens with. */
 	readonly params?: Readonly<Record<string, string>>;
+	/** Present when the payload reads the clock: what the device's clock reads throughout, in ms since 1970 (UTC). */
+	readonly now?: number;
 	readonly initial: ReadonlyArray<readonly [node: string, text: string]>;
 	/** Present when the payload binds attributes: `[node, name, value]`, value null when absent. */
 	readonly initialAttributes?: ReadonlyArray<
@@ -37,8 +39,9 @@ export function nativeConformance(
 	payload: NativeViewPayload,
 	actions: ReadonlyArray<NativeAction>,
 	params?: Readonly<Record<string, string>>,
+	now?: number,
 ): NativeConformance {
-	const runtime = createNativeRuntime(payload, new Map(), params);
+	const runtime = createNativeRuntime(payload, new Map(), params, now === undefined ? undefined : () => now);
 	const initial = runtime.texts();
 	const initialAttributes = runtime.attributes();
 	const initialArms = runtime.arms();
@@ -50,6 +53,7 @@ export function nativeConformance(
 		version: NATIVE_CONFORMANCE_VERSION,
 		payload,
 		...(params ? { params } : {}),
+		...(now === undefined ? {} : { now }),
 		initial,
 		...(initialAttributes.length > 0 ? { initialAttributes } : {}),
 		...(initialProperties.length > 0 ? { initialProperties } : {}),

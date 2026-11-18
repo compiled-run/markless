@@ -9,8 +9,12 @@ import type {
 	SemanticGraphInput,
 	SemanticLocalDeclaration,
 	NativeFactCollectors,
+	SemanticExpression,
+	SemanticModuleConstant,
 	SemanticModuleFunction,
 } from '../../artifacts.ts';
+import { namesMutatedInModule } from './constant-values.ts';
+import { ownedModuleAst } from './shared-ast.ts';
 import { applyMarklessAllowDirectives, type SourceSpan } from '../../diagnostics.ts';
 import {
 	collectAsyncBoundary,
@@ -151,7 +155,10 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		const name = getIdentifierName(declaration.id as AnyNode | undefined);
 		if (name) state.helperFunctions.set(name, declaration);
 	}
-	if (state.nativeFacts) graph.moduleFunctions = moduleFunctionsOf(statements, state.helperFunctions, state.nativeFacts);
+	if (state.nativeFacts) {
+		graph.moduleFunctions = moduleFunctionsOf(statements, state.helperFunctions, state.nativeFacts);
+		graph.moduleConstants = moduleConstantsOf(statements, state, state.nativeFacts);
+	}
 	graph.moduleGraphInterface = collectModuleGraphInterface({ statements, state });
 
 	for (const statement of statements) {
@@ -560,14 +567,14 @@ function resolveComponentLocalReferences(state: WalkState, bodySpan: SourceSpan)
 	}
 }
 
-/** Each top-level function that is not a component, with the names it is exported by, for a native build to inline. */
-function moduleFunctionsOf(
-	statements: ReadonlyArray<AnyNode>,
-	functions: ReadonlyMap<string, AnyNode>,
-	collectors: NativeFactCollectors,
-): SemanticModuleFunction[] {
+/** The names each top-level declaration is exported by (`export const`, `export function`, `export { name as alias }`). */
+function localExportNames(statements: ReadonlyArray<AnyNode>): Map<string, string[]> {
 	const exportNames = new Map<string, string[]>();
 	for (const statement of statements) {
+		if (statement.type === 'ExportDefaultDeclaration') {
+			const local = getIdentifierName(statement.declaration as AnyNode | undefined);
+			if (local) exportNames.set(local, [...(exportNames.get(local) ?? []), 'default']);
+		}
 		if (statement.type !== 'ExportNamedDeclaration' || statement.source) continue;
 		const declared = getIdentifierName((statement.declaration as AnyNode | undefined)?.id as AnyNode | undefined);
 		if (declared) exportNames.set(declared, [...(exportNames.get(declared) ?? []), declared]);
@@ -577,12 +584,83 @@ function moduleFunctionsOf(
 			const name = getIdentifierName(exported) ?? (typeof exported?.value === 'string' ? exported.value : undefined);
 			if (local && name) exportNames.set(local, [...(exportNames.get(local) ?? []), name]);
 		}
+		const declaration = statement.declaration as AnyNode | undefined;
+		if (declaration?.type === 'VariableDeclaration')
+			for (const declarator of asNodes(declaration.declarations)) {
+				const declared = getIdentifierName(declarator.id as AnyNode | undefined);
+				if (declared) exportNames.set(declared, [...(exportNames.get(declared) ?? []), declared]);
+			}
 	}
+	return exportNames;
+}
+
+/** Each top-level function that is not a component, with the names it is exported by, for a native build to inline. */
+function moduleFunctionsOf(
+	statements: ReadonlyArray<AnyNode>,
+	functions: ReadonlyMap<string, AnyNode>,
+	collectors: NativeFactCollectors,
+): SemanticModuleFunction[] {
+	const exportNames = localExportNames(statements);
 	return [...functions].map(([name, node]) => ({
 		name,
 		exportNames: exportNames.get(name) ?? [],
 		native: collectors.functionBody(node as never),
 	}));
+}
+
+const spanOf = (node: AnyNode, filename: string): { span?: SourceSpan } => {
+	const span = sourceSpan(node, filename);
+	return span ? { span } : {};
+};
+
+/** Each top-level `const` no statement of the module writes through, as a tree, for a native build to read by name. */
+function moduleConstantsOf(
+	statements: ReadonlyArray<AnyNode>,
+	state: WalkState,
+	collectors: NativeFactCollectors,
+): SemanticModuleConstant[] {
+	const exportNames = localExportNames(statements);
+	const mutated = namesMutatedInModule(ownedModuleAst(state, state.source, state.filename));
+	const constants: SemanticModuleConstant[] = [];
+	for (const statement of statements) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ? (statement.declaration as AnyNode | undefined) : statement;
+		if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		for (const declarator of asNodes(declaration.declarations)) {
+			const id = declarator.id as AnyNode | undefined;
+			const init = declarator.init as AnyNode | undefined;
+			if (!init) continue;
+			const value = collectors.expression(init as never);
+			// `const [a, b] = list` and `const { a, b: c } = object` read those members of the value.
+			const names: [string, SemanticExpression][] = [];
+			if (id?.type === 'ArrayPattern')
+				asNodes(id.elements).forEach((element, index) => {
+					const name = element?.type === 'Identifier' ? getIdentifierName(element) : undefined;
+					if (name) names.push([name, { kind: 'member', object: value, property: String(index) }]);
+				});
+			else if (id?.type === 'ObjectPattern')
+				for (const property of asNodes(id.properties)) {
+					const key = property.key as AnyNode | undefined;
+					const local = getIdentifierName(property.value as AnyNode | undefined);
+					if (property.type === 'Property' && !property.computed && key?.type === 'Identifier' && local)
+						names.push([local, { kind: 'member', object: value, property: String(key.name) }]);
+				}
+			else {
+				const name = getIdentifierName(id);
+				if (name) names.push([name, value]);
+			}
+			for (const [name, read] of names) {
+				if (mutated.has(name)) continue;
+				constants.push({
+					name,
+					exportNames: exportNames.get(name) ?? [],
+					value: read,
+					...spanOf(declarator, state.filename),
+				});
+			}
+		}
+	}
+	return constants;
 }
 
 function mergeComponentLocalDeclarations(state: WalkState): void {

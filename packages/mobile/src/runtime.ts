@@ -35,7 +35,12 @@ export type NativeAction =
 	/** The platform closed a system sheet (swipe, back, a tap on the dimmed page); it is already closed when this runs. */
 	| { readonly event: 'dismiss'; readonly host: string }
 	/** The host's back gesture (or Escape) on an open `<dialog>`: it closes, as the browser's cancel does. */
-	| { readonly event: 'cancel'; readonly host: string };
+	| { readonly event: 'cancel'; readonly host: string }
+	/**
+	 * The host went idle after the element appeared, or the element came on screen: its handler runs once for each shown
+	 * instance (`due` lists the ones still to fire); a second one, or one for an instance not shown, changes nothing.
+	 */
+	| { readonly event: 'idle' | 'visible'; readonly host: string };
 
 type Value = NativeValue;
 
@@ -47,6 +52,8 @@ export type NativeScope = {
 	readonly locals: ReadonlyMap<string, Value>;
 	/** The page's route params. */
 	readonly params?: Readonly<Record<string, string>>;
+	/** The device's clock, in milliseconds since 1970 (UTC). */
+	readonly now?: () => number;
 };
 
 const EMPTY_SCOPE: NativeScope = { items: new Map(), locals: new Map() };
@@ -74,6 +81,8 @@ export type NativeRuntime = {
 	readonly title: () => string | null;
 	/** The calls a host starts at mount, one per task cell, each settling its cell. */
 	readonly tasks: () => ReadonlyArray<Extract<NativeJournalEntry, { op: 'call' }>>;
+	/** The shown instances with an `idle` (or `visible`) handler that has not run for them, in document order. */
+	readonly due: (event: 'idle' | 'visible') => ReadonlyArray<string>;
 };
 
 /** How a value reads in text, as the web writes it (`marklessCsrText`): null is empty, anything else `String(value)`. */
@@ -88,6 +97,9 @@ const BUILTINS: { readonly [name in NativeBuiltin]: (...args: Value[]) => Value 
 	'Math.max': (...values) => Math.max(...(values as number[])),
 	'Math.min': (...values) => Math.min(...(values as number[])),
 	'Math.round': (value) => Math.round(value as number),
+	// Answered from the scope's clock below; listed so every builtin has an entry.
+	'Date.now': () => Date.now(),
+	'Date.toISOString': (time) => new Date(time as number).toISOString(),
 };
 
 /** The meaning of an expression: JavaScript's own, run here so the hosts have one definition to match. */
@@ -130,6 +142,7 @@ export function evaluateNativeExpr(
 						evaluateNativeExpr(argument.body, read, eventValue, {
 							items: scope.items,
 							...(scope.params ? { params: scope.params } : {}),
+							...(scope.now ? { now: scope.now } : {}),
 							locals: new Map([
 								...scope.locals,
 								...argument.lambda.map(
@@ -219,6 +232,7 @@ export function evaluateNativeExpr(
 			return (value as Record<string, Value>)[expr.property]!;
 		throw new Error(`.${expr.property} of a value that has none`);
 	}
+	if (expr.call === 'Date.now') return (scope.now ?? Date.now)();
 	return BUILTINS[expr.call](...expr.arguments.map(evaluate));
 }
 
@@ -229,14 +243,18 @@ export function createNativeRuntime(
 	store: Map<string, Value> = new Map(),
 	/** The route params the page opened with. */
 	params: Readonly<Record<string, string>> = {},
+	/** The device's clock; a conformance run fixes it. */
+	now: () => number = Date.now,
 ): NativeRuntime {
-	const base: NativeScope = { ...EMPTY_SCOPE, params };
+	const base: NativeScope = { ...EMPTY_SCOPE, params, now };
 	const values = new Map<string, Value>(
 		payload.cells.map((cell) => [
 			cell.id,
-			cell.storage && store.has(cell.storage.key)
-				? store.get(cell.storage.key)!
-				: cell.initial,
+			cell.clock
+				? now()
+				: cell.storage && store.has(cell.storage.key)
+					? store.get(cell.storage.key)!
+					: cell.initial,
 		]),
 	);
 	const storageKeys = new Map(
@@ -404,6 +422,21 @@ export function createNativeRuntime(
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));
 
 	const title = () => (payload.title ? render(payload.title, base) : null);
+	/** `idle` and `visible` handlers that ran, by `<event>\0<instance>`; an instance that leaves the screen is forgotten. */
+	const fired = new Set<string>();
+	const due = (event: 'idle' | 'visible'): string[] =>
+		payload.events.flatMap((bound) => {
+			if (bound.event !== event) return [];
+			const node = nodesById.get(bound.host);
+			return node ? instances(node).flatMap(({ id }) => (fired.has(`${event}\0${id}`) ? [] : [id])) : [];
+		});
+	const forgetHidden = () => {
+		for (const key of fired) {
+			const id = key.slice(key.indexOf('\0') + 1);
+			const node = nodesById.get(id.split('@')[0]!);
+			if (!node || !instances(node).some((shownNow) => shownNow.id === id)) fired.delete(key);
+		}
+	};
 
 	return {
 		texts,
@@ -463,6 +496,11 @@ export function createNativeRuntime(
 					return cancel ? run(handlers.get(cancel.handler) ?? [], undefined, base) : [];
 				});
 			}
+			if (action.event === 'idle' || action.event === 'visible') {
+				const key = `${action.event}\0${action.host}`;
+				if (fired.has(key) || !due(action.event).includes(action.host)) return [];
+				fired.add(key);
+			}
 			// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 			const at = action.host.indexOf('@');
 			const host = at < 0 ? action.host : action.host.slice(0, at);
@@ -480,6 +518,7 @@ export function createNativeRuntime(
 				run(handlers.get(event.handler) ?? [], eventValue, scope),
 			);
 		},
+		due,
 		tasks: () =>
 			payload.cells.flatMap((cell) =>
 				cell.task
@@ -598,6 +637,7 @@ export function createNativeRuntime(
 				const list = at < 0 ? undefined : rowOfCell.get(slot.slice(0, at));
 				if (list !== undefined && !kept.has(`${list}\0${slot.slice(at + 1)}`)) values.delete(slot);
 			}
+			forgetHidden();
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());
 			const afterProperties = keyed(properties());

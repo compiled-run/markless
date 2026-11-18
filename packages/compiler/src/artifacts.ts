@@ -184,6 +184,11 @@ export type SemanticComponentNativeFacts = {
 	readonly stateInitializers: Readonly<Record<string, SemanticExpression>>;
 	/** Statements the body runs while it renders (`collapsible.open = open`), in order. */
 	readonly renderStatements: ReadonlyArray<SemanticHandlerStatement>;
+	/**
+	 * Each `const` the body declares that is not `state()`, its initializer as a tree, by local name; a name destructured
+	 * from an object (`const { a } = value`) reads that member of the initializer.
+	 */
+	readonly locals?: Readonly<Record<string, SemanticExpression>>;
 };
 
 // An authored prop binding is identified by its declaration span, not by the
@@ -1266,6 +1271,15 @@ export type SemanticModuleFunction = {
 	};
 };
 
+/** A top-level `const` of a module that no statement writes through: what a native build reads where a name reads it. */
+export type SemanticModuleConstant = {
+	readonly name: string;
+	/** The names other modules import it by. */
+	readonly exportNames: ReadonlyArray<string>;
+	readonly value: SemanticExpression;
+	readonly span?: SourceSpan;
+};
+
 /** One statement of a module function's body, as a native build evaluates it where the function is called. */
 export type SemanticFunctionStatement =
 	/** `const name = value` or `let name = value` (`let name;` is `undefined`). */
@@ -1687,6 +1701,8 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly raw?: boolean;
 				/** The interpolation as a tree, for native builds only (`nativeFacts`). */
 				readonly nativeExpression?: SemanticExpression;
+				/** Where the interpolation is written, for native builds only. */
+				readonly nativeSpan?: SourceSpan;
 		  }
 		| {
 				readonly kind: 'attribute';
@@ -1846,6 +1862,8 @@ export type SemanticGraphArtifact = {
 	readonly localDeclarations: ReadonlyArray<SemanticLocalDeclaration>;
 	/** The module's top-level functions that are not components, for native builds only (`nativeFacts`). */
 	readonly moduleFunctions?: ReadonlyArray<SemanticModuleFunction>;
+	/** Top-level `const` values, for native builds only (`nativeFacts`). */
+	readonly moduleConstants?: ReadonlyArray<SemanticModuleConstant>;
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;
