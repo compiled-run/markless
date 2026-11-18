@@ -33,7 +33,11 @@
 				"kind": "element",
 				"id": "h1",
 				"element": "h1",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
 			},
 			{
 				"kind": "text",
@@ -204,11 +208,25 @@
 		"handlers": []
 	},
 	"initial": [
-		["h1:text0", "Location"],
-		["h2:text0", "Access unknown"],
-		["h5:text0", "Locating"]
+		[
+			"h1:text0",
+			"Location"
+		],
+		[
+			"h2:text0",
+			"Access unknown"
+		],
+		[
+			"h5:text0",
+			"Locating"
+		]
 	],
-	"initialArms": [["boundary:0", 1]],
+	"initialArms": [
+		[
+			"boundary:0",
+			1
+		]
+	],
 	"tasks": [
 		{
 			"op": "call",

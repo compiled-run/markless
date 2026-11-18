@@ -51,7 +51,11 @@
 				"kind": "element",
 				"id": "h9",
 				"element": "h1",
-				"parent": "h8"
+				"parent": "h8",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
 			},
 			{
 				"kind": "text",
@@ -389,18 +393,48 @@
 		]
 	},
 	"initial": [
-		["h9:text0", "Camera"],
-		["h10:text0", "Access unknown"],
-		["component-edge:1/h1:text0", "Hide preview"],
-		["component-edge:1/h2:text0", "Camera starting"],
-		["component-edge:1/h3:text0", "Facing back"],
-		["component-edge:1/h4:text0", "Flip"],
-		["component-edge:1/h5:text0", "Take photo"],
-		["component-edge:1/h6:text0", "Photos 0"]
+		[
+			"h9:text0",
+			"Camera"
+		],
+		[
+			"h10:text0",
+			"Access unknown"
+		],
+		[
+			"component-edge:1/h1:text0",
+			"Hide preview"
+		],
+		[
+			"component-edge:1/h2:text0",
+			"Camera starting"
+		],
+		[
+			"component-edge:1/h3:text0",
+			"Facing back"
+		],
+		[
+			"component-edge:1/h4:text0",
+			"Flip"
+		],
+		[
+			"component-edge:1/h5:text0",
+			"Take photo"
+		],
+		[
+			"component-edge:1/h6:text0",
+			"Photos 0"
+		]
 	],
 	"initialArms": [
-		["component-edge:1/branch-site:0", 0],
-		["component-edge:1/branch-site:1", 1]
+		[
+			"component-edge:1/branch-site:0",
+			0
+		],
+		[
+			"component-edge:1/branch-site:1",
+			1
+		]
 	],
 	"steps": [
 		{
@@ -484,7 +518,9 @@
 					"op": "call",
 					"call": "camera.facing",
 					"object": "object:component-edge:1/cam",
-					"arguments": ["front"]
+					"arguments": [
+						"front"
+					]
 				}
 			]
 		},

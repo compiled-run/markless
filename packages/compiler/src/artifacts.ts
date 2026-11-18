@@ -866,6 +866,8 @@ export type SemanticGraphReadLocal = {
 export type SemanticHostNode = {
 	readonly id: string;
 	readonly tagName: string;
+	/** Where the element is written; native builds name it in their refusals. */
+	readonly sourceSpan?: SourceSpan;
 	// Present when the element renders inside an @try/@pending/@catch arm:
 	// the boundary owns the element's coordinates (D3 arm-relative records).
 	// asyncBoundaryArm is the arm index (0 = @try, 1 = @pending, 2 = @catch).

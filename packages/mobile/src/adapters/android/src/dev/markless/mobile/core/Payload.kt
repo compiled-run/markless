@@ -76,8 +76,9 @@ sealed interface Node {
 	val row: String?
 
 	/** [obj]: the device object a `camera` element shows. */
-	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null) : Node
-	data class Text(override val id: String, override val parent: String, val parts: List<TextPart>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
+	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null, val defaultStyle: DefaultStyle? = null, val drawing: Drawing? = null) : Node
+	/** [parent] is null for text at the top of the page. */
+	data class Text(override val id: String, override val parent: String?, val parts: List<TextPart>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 	/** An `@if` with [test] (arm 0 while truthy, arm 1 otherwise), or a chain with [tests]: the first truthy arm, else the `null` arm. */
 	data class Branch(override val id: String, override val parent: String?, val test: Expr?, val arms: Int, override val arm: ArmPlace? = null, override val row: String? = null, val tests: List<Expr?>? = null) : Node
 	/** A keyed list: one row per item of [list], keyed by `String()` of the item at the [key] path. */
@@ -88,6 +89,46 @@ sealed interface Node {
 		override val row: String? get() = null
 	}
 }
+
+/** How an element looks under the browser's default stylesheet (the payload's `defaultStyle`); applied only without a style export. */
+data class DefaultStyle(
+	/** "inline" or "break" when the element flows in its parent's text; null for a box. */
+	val flow: String? = null,
+	val bold: Boolean = false,
+	val italic: Boolean = false,
+	val monospace: Boolean = false,
+	val size: Double = 1.0,
+	/** "underline" or "line-through". */
+	val line: String? = null,
+	/** "sub" or "super". */
+	val shift: String? = null,
+	val highlight: Boolean = false,
+	val quotes: Boolean = false,
+	val preformatted: Boolean = false,
+	val indent: Double = 0.0,
+	val rule: Boolean = false,
+	/** "disc" or "decimal", on a list. */
+	val marker: String? = null,
+	/** "table", "row" or "cell". */
+	val table: String? = null,
+)
+
+/** An RGBA colour, each channel 0-255. */
+data class Rgba(val r: Int, val g: Int, val b: Int, val alpha: Int) {
+	val argb: Int get() = (alpha shl 24) or (r shl 16) or (g shl 8) or b
+}
+
+/** A shape's paint: a colour, the svg's text colour, or none. */
+sealed interface ShapePaint {
+	data class Color(val color: Rgba) : ShapePaint
+	data object Current : ShapePaint
+}
+
+/** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
+data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?)
+
+/** An inline `<svg>` compiled to shapes. */
+data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
 
 enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel") }
 
@@ -171,7 +212,7 @@ data class Payload(
 				if (p != null) {
 					val parent = seen[p] ?: throw MarklessDecodeError("node \"${node.id}\" names parent \"$p\" that does not precede it")
 					if (parent !is Node.Element && (parent !is Node.Sheet || node is Node.Sheet)) throw MarklessDecodeError("node \"${node.id}\" has a ${parent::class.simpleName} node as its parent")
-				} else if (node is Node.Text) throw MarklessDecodeError("text node \"${node.id}\" has no parent")
+				}
 				node.arm?.let { a ->
 					val b = seen[a.branch] as? Node.Branch ?: throw MarklessDecodeError("node \"${node.id}\" sits in an arm of \"${a.branch}\", which is not a preceding branch")
 					if (a.index < 0 || a.index >= b.arms) throw MarklessDecodeError("node \"${node.id}\" sits in arm ${a.index} of a branch with ${b.arms}")
@@ -323,12 +364,69 @@ data class Payload(
 			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"))
 		}
 
+		private fun defaultStyle(v: Json, what: String): DefaultStyle {
+			val o = v.obj(what)
+			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule", "marker", "table"), what)
+			fun flag(name: String): Boolean = o[name]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.$name must be true when present"); true } ?: false
+			fun word(name: String, allowed: Set<String>): String? = o[name]?.let { oneOf(o, name, allowed, what) }
+			return DefaultStyle(
+				flow = word("flow", setOf("inline", "break")),
+				bold = flag("bold"), italic = flag("italic"), monospace = flag("monospace"),
+				size = o["size"]?.num("$what.size") ?: 1.0,
+				line = word("line", setOf("underline", "line-through")),
+				shift = word("shift", setOf("sub", "super")),
+				highlight = flag("highlight"), quotes = flag("quotes"), preformatted = flag("preformatted"),
+				indent = o["indent"]?.num("$what.indent") ?: 0.0,
+				rule = flag("rule"),
+				marker = word("marker", setOf("disc", "decimal")),
+				table = word("table", setOf("table", "row", "cell")),
+			)
+		}
+
+		private fun paint(v: Json, what: String): ShapePaint? = when (v) {
+			Json.Null -> null
+			is Json.Str -> if (v.value == "currentColor") ShapePaint.Current else throw MarklessDecodeError("$what must be a colour, \"currentColor\" or null")
+			else -> {
+				val o = v.obj(what)
+				o.only(setOf("r", "g", "b", "alpha"), what)
+				fun channel(name: String): Int {
+					val n = o.field(name, what).num("$what.$name")
+					if (n < 0 || n > 255 || n != Math.floor(n)) throw MarklessDecodeError("$what.$name is $n; a channel is an integer 0-255")
+					return n.toInt()
+				}
+				ShapePaint.Color(Rgba(channel("r"), channel("g"), channel("b"), channel("alpha")))
+			}
+		}
+
+		private fun drawing(v: Json, what: String): Drawing {
+			val o = v.obj(what)
+			o.only(setOf("viewBox", "width", "height", "shapes", "em"), what)
+			val em = o["em"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.em must be true when present"); true } ?: false
+			val viewBox = o.field("viewBox", what).let { if (it == Json.Null) null else it.arr("$what.viewBox").map { n -> n.num("$what.viewBox[]") } }
+			if (viewBox != null && viewBox.size != 4) throw MarklessDecodeError("$what.viewBox must hold four numbers")
+			val shapes = o.field("shapes", what).arr("$what.shapes").mapIndexed { n, sv ->
+				val w = "$what.shapes[$n]"
+				val so = sv.obj(w)
+				so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform"), w)
+				val path = so.field("path", w).arr("$w.path").map { it.num("$w.path[]") }
+				val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
+				if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
+				Shape(
+					path, paint(so.field("fill", w), "$w.fill"), oneOf(so, "fillRule", setOf("nonzero", "evenodd"), w) == "evenodd",
+					paint(so.field("stroke", w), "$w.stroke"), so.field("width", w).num("$w.width"),
+					oneOf(so, "cap", setOf("butt", "round", "square"), w), oneOf(so, "join", setOf("miter", "round", "bevel"), w),
+					so.field("miterLimit", w).num("$w.miterLimit"), transform,
+				)
+			}
+			return Drawing(viewBox, o["width"]?.num("$what.width"), o["height"]?.num("$what.height"), shapes, em)
+		}
+
 		private fun node(v: Json, what: String): Node {
 			val o = v.obj(what)
 			val id = o.field("id", what).str("$what.id")
 			return when (val kind = o.field("kind", what).str("$what.kind")) {
 				"element" -> {
-					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object"), what)
+					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object", "defaultStyle", "drawing"), what)
 					val parent = o.field("parent", what)
 					val attributes = o["attributes"]?.obj("$what.attributes")?.mapValues { (k, v) -> v.str("$what.attributes.$k") } ?: emptyMap()
 					val bindings = o["bindings"]?.arr("$what.bindings")?.mapIndexed { n, b ->
@@ -342,12 +440,13 @@ data class Payload(
 							Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), value)
 						}
 					} ?: emptyList()
-					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"))
+					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"), o["defaultStyle"]?.let { defaultStyle(it, "$what.defaultStyle") }, o["drawing"]?.let { drawing(it, "$what.drawing") })
 				}
 				"text" -> {
 					o.only(setOf("kind", "id", "parent", "parts", "arm", "row"), what)
 					val parts = o.field("parts", what).arr("$what.parts").mapIndexed { n, p -> part(p, "$what.parts[$n]") }
-					Node.Text(id, o.field("parent", what).str("$what.parent"), parts, armPlace(o, what), rowPlace(o, what))
+					val parent = o.field("parent", what)
+					Node.Text(id, if (parent == Json.Null) null else parent.str("$what.parent"), parts, armPlace(o, what), rowPlace(o, what))
 				}
 				"branch" -> {
 					o.only(setOf("kind", "id", "parent", "test", "tests", "arms", "arm", "row"), what)

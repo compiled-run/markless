@@ -1,4 +1,6 @@
 import type {
+	NativeDefaultStyle,
+	NativeDrawing,
 	NativePlace,
 	NativeBuiltin,
 	NativeExpr,
@@ -12,6 +14,9 @@ import type {
 } from '@markless/serializer';
 import {
 	isNativeStyleStateAttribute,
+	NATIVE_DATA_SCRIPT_TYPES,
+	NATIVE_ELEMENTS,
+	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_VIEW_VERSION,
 	PLATFORM_PIECES_NAMESPACE,
 	PLATFORM_PIECES_PACKAGE,
@@ -41,6 +46,7 @@ import type {
 	SemanticSharedDefinition,
 	SourceSpan,
 } from '../artifacts.ts';
+import { compileDrawing, type DrawingElement } from './native-drawing.ts';
 
 export const NATIVE_UNSUPPORTED_CODE = 'MARKLESS_NATIVE_UNSUPPORTED';
 
@@ -56,39 +62,72 @@ export type NativeViewArtifact = {
 
 type ElementBindings = NonNullable<Extract<NativeNode, { kind: 'element' }>['bindings']>;
 
-/** Elements every native host maps; anything else is refused here once, not in each host. */
-const PORTABLE_ELEMENTS = new Set([
-	'main',
-	'div',
-	'section',
-	'article',
-	'header',
-	'footer',
-	'nav',
-	'aside',
-	'h1',
-	'h2',
-	'h3',
-	'h4',
-	'h5',
-	'h6',
-	'p',
-	'span',
-	'b',
-	'strong',
-	'em',
-	'i',
-	'ul',
-	'ol',
-	'li',
-	'button',
-	'input',
-	'a',
-	'img',
-	'audio',
-	'label',
-	'dialog',
-]);
+/** Refusals of markup a phone cannot show, each with its own code so a person or a tool can act on it. */
+export const NATIVE_REFUSALS = {
+	element: {
+		code: 'MARKLESS_NATIVE_ELEMENT',
+		title: 'This element has no native view yet',
+		why: 'Native hosts build a platform view for each HTML element they know; this one has no view on iOS and Android yet.',
+	},
+	script: {
+		code: 'MARKLESS_NATIVE_SCRIPT',
+		title: 'A <script> cannot run in a native app',
+		why: 'A native app runs no browser engine: its handlers run as data. Write what the script does as Markless code (state, handlers) instead.',
+	},
+	stylesheet: {
+		code: 'MARKLESS_NATIVE_STYLESHEET',
+		title: 'A stylesheet loaded by a <link> does not reach a native app',
+		why: 'Native styles are compiled from the CSS the app imports when it is built; a stylesheet the browser fetches while the page runs is never seen. Import the CSS from the component instead.',
+	},
+	svg: {
+		code: 'MARKLESS_NATIVE_SVG',
+		title: 'Part of this <svg> is not drawn natively yet',
+		why: 'An inline <svg> is compiled into shapes when the app is built and the phone draws those; this part of SVG has no native drawing yet.',
+	},
+	title: {
+		code: 'MARKLESS_NATIVE_TITLE',
+		title: 'This <title> cannot be the screen title',
+		why: "A page's first <title> is its screen's title in the system navigation bar; it must be text shown in every state of the page.",
+	},
+} as const;
+export type NativeRefusalKind = keyof typeof NATIVE_REFUSALS;
+
+/** A refusal with its own code and the place it is written. */
+export function nativeRefusal(
+	kind: NativeRefusalKind,
+	message: string,
+	span?: SourceSpan,
+): CompilerDiagnostic {
+	const { code, title, why } = NATIVE_REFUSALS[kind];
+	return {
+		code,
+		severity: 'error',
+		phase: 'serialization',
+		title,
+		message,
+		why,
+		...(span ? { primarySpan: span } : {}),
+		passId: 'native-view',
+		suggestions: [],
+		docsUrl: `https://markless.dev/errors/${code}`,
+	};
+}
+
+/** The element's default look; `<abbr title>` is underlined, as Chrome's stylesheet has it. */
+function defaultStyleOf(
+	element: string,
+	attributes: Readonly<Record<string, string>>,
+	bindings: ReadonlyArray<{ readonly attribute: string } | { readonly property: string }>,
+): NativeDefaultStyle | undefined {
+	const base = NATIVE_ELEMENTS[element];
+	if (!base) return undefined;
+	const titled =
+		'title' in attributes ||
+		bindings.some((binding) => 'attribute' in binding && binding.attribute === 'title');
+	const style: NativeDefaultStyle =
+		element === 'abbr' && titled ? { ...base, line: 'underline' } : base;
+	return Object.keys(style).length > 0 ? style : undefined;
+}
 
 const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][number]['event']>> = {
 	click: 'activate',
@@ -430,6 +469,7 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 			),
 		),
 		tagOf: new Map(graph.hostNodes.map((host) => [host.id, host.tagName])),
+		hostSpans: new Map(graph.hostNodes.map((host) => [host.id, host.sourceSpan])),
 		branchSites: new Map(graph.branchSites.map((site) => [site.id, site])),
 		propBindingIds: new Set(
 			graph.graphBindings.flatMap((binding) => (binding.kind === 'prop' ? [binding.id] : [])),
@@ -645,6 +685,10 @@ export function createNativeViewPayload(
 	const missingModules = new Set<string>();
 	const refuse = (message: string, span?: SourceSpan): null => {
 		diagnostics.push(nativeUnsupported(message, span));
+		return null;
+	};
+	const refuseAs = (kind: NativeRefusalKind, message: string, span?: SourceSpan): null => {
+		diagnostics.push(nativeRefusal(kind, message, span));
 		return null;
 	};
 	const features = new Set<NativeDeviceFeature>();
@@ -1911,6 +1955,8 @@ export function createNativeViewPayload(
 	};
 
 	const nodes: NativeNode[] = [];
+	/** Where each element node is written, for refusals found after lowering. */
+	const nodeSpans = new Map<string, SourceSpan | undefined>();
 	/** Each list's row key as an expression of its row item: how a row's instance ids are spelt (`<node>@<key>`). */
 	const rowKeys = new Map<string, NativeExpr>();
 	const textRuns = new Map<string, number>();
@@ -2059,33 +2105,90 @@ export function createNativeViewPayload(
 			return parent ? scope.prefix + parent.id : baseParent;
 		};
 
-		let open: { parent: string; parts: NativeTextPart[]; last: ReadonlyArray<number> } | null =
-			null;
+		let open: {
+			parent: string | null;
+			parts: NativeTextPart[];
+			last: ReadonlyArray<number>;
+		} | null = null;
 		const close = () => {
 			if (!open) return;
-			const index = textRuns.get(open.parent) ?? 0;
-			textRuns.set(open.parent, index + 1);
+			// Text at the top of the page has no element: its runs are numbered per component instance.
+			const runs = open.parent ?? `\0${scope.prefix}`;
+			const index = textRuns.get(runs) ?? 0;
+			textRuns.set(runs, index + 1);
 			nodes.push({
 				kind: 'text',
-				id: `${open.parent}:text${index}`,
+				id:
+					open.parent === null
+						? `${scope.prefix}text${index}`
+						: `${open.parent}:text${index}`,
 				parent: open.parent,
 				parts: open.parts,
 				...place,
 			});
 			open = null;
 		};
+		const attributesAt = (path: ReadonlyArray<number>) =>
+			Object.fromEntries(
+				(chunk.attributes ?? [])
+					.filter((attribute) => comparePaths(attribute.coordinate.path, path) === 0)
+					.map((attribute) => [attribute.name, attribute.value]),
+			) as Record<string, string>;
+		const boundAt = (path: ReadonlyArray<number>) =>
+			chunk.slots.flatMap((slot) =>
+				slot.kind === 'attribute' && comparePaths(slot.coordinate.path, path) === 0
+					? [slot.name]
+					: [],
+			);
+		/** Subtrees lowered whole (an `<svg>`) or never shown (`<template>`): their items are not lowered one by one. */
+		const consumed: ReadonlyArray<number>[] = [];
 		for (const item of items) {
+			if (consumed.some((path) => isPrefix(path, item.path))) continue;
 			const parent = parentOf(item.path);
 			if (item.kind === 'host') {
 				close();
 				const element = scope.module.tagOf.get(item.id);
-				if (!element || element === '*') refuse(`host ${item.id} has no static tag`);
-				else if (
-					!PORTABLE_ELEMENTS.has(element) &&
-					!(element === 'title' && scope.module === rootModule && scope.prefix === '')
-				)
-					refuse(`the <${element}> element`);
+				const span = scope.module.hostSpans.get(item.id);
+				if (!element || element === '*') refuse(`host ${item.id} has no static tag`, span);
+				else if (!Object.hasOwn(NATIVE_ELEMENTS, element) && element !== 'title') {
+					const written = attributesAt(item.path);
+					const bound = boundAt(item.path);
+					if (
+						element === 'script' ||
+						element === 'link' ||
+						NATIVE_UNSHOWN_ELEMENTS.has(element)
+					)
+						consumed.push(item.path);
+					if (element === 'script') {
+						const type = written.type?.trim().toLowerCase();
+						if (
+							bound.includes('type') ||
+							type === undefined ||
+							!NATIVE_DATA_SCRIPT_TYPES.has(type)
+						)
+							refuseAs(
+								'script',
+								`a <script>${type ? ` of type ${type}` : ''} runs code in the browser, and a native app has no browser to run it`,
+								span,
+							);
+					} else if (element === 'link') {
+						const rel = written.rel?.trim().toLowerCase().split(/\s+/) ?? [];
+						if (bound.includes('rel') || rel.includes('stylesheet'))
+							refuseAs(
+								'stylesheet',
+								`<link rel="stylesheet"${written.href ? ` href="${written.href}"` : ''}> loads styles while the page runs`,
+								span,
+							);
+					} else if (!NATIVE_UNSHOWN_ELEMENTS.has(element))
+						refuseAs(
+							'element',
+							`the <${element}> element has no native view yet`,
+							span,
+						);
+					if (consumed.includes(item.path)) continue;
+				}
 				const id = scope.prefix + item.id;
+				nodeSpans.set(id, span);
 				const spread = chunk.slots.some(
 					(slot) =>
 						slot.kind === 'spread-attributes' &&
@@ -2154,6 +2257,54 @@ export function createNativeViewPayload(
 					}
 					if (key) boundHandles.set(key, [...(boundHandles.get(key) ?? []), id]);
 				}
+				const defaultStyle = element
+					? defaultStyleOf(element, attributes, bindings)
+					: undefined;
+				let drawing: NativeDrawing | undefined;
+				if (element === 'svg') {
+					consumed.push(item.path);
+					const inside = items.filter((other) => isPrefix(item.path, other.path));
+					const relative = (path: ReadonlyArray<number>) => path.slice(item.path.length);
+					const drawn: DrawingElement[] = [];
+					const texts: { path: ReadonlyArray<number>; text: string }[] = [];
+					for (const other of inside) {
+						if (other.kind === 'host') {
+							const tag = scope.module.tagOf.get(other.id) ?? '*';
+							drawn.push({
+								id: other.id,
+								tag,
+								path: relative(other.path),
+								attributes: attributesAt(other.path),
+								bound: boundAt(other.path),
+							});
+							for (const event of scope.module.eventsByHost.get(other.id) ?? []) {
+								if (scope.module === rootModule) loweredEvents.add(event.id);
+								refuseAs(
+									'svg',
+									`the ${event.eventName} handler on <${tag}> inside an <svg>: its shapes are drawn, not views`,
+									event.handlerSpan,
+								);
+							}
+						} else if (other.kind === 'part' && 'text' in other.part)
+							texts.push({ path: relative(other.path), text: other.part.text });
+						else
+							refuseAs(
+								'svg',
+								`${other.kind === 'part' ? 'a value' : other.kind === 'child' ? 'a component' : `an @${other.kind === 'repeat' ? 'for' : other.kind === 'boundary' ? 'try' : 'if'}`} inside an <svg>, which is drawn once when the app is built`,
+								span,
+							);
+					}
+					const result = compileDrawing(attributes, drawn, texts, item.id);
+					for (const refusal of result.refusals)
+						refuseAs(
+							'svg',
+							refusal.message,
+							scope.module.hostSpans.get(refusal.element) ?? span,
+						);
+					drawing = result.drawing;
+					if (result.title !== undefined && !('aria-label' in attributes))
+						attributes['aria-label'] = result.title;
+				}
 				nodes.push({
 					kind: 'element',
 					id,
@@ -2161,6 +2312,8 @@ export function createNativeViewPayload(
 					parent,
 					...(Object.keys(attributes).length > 0 ? { attributes } : {}),
 					...(bindings.length > 0 ? { bindings } : {}),
+					...(defaultStyle ? { defaultStyle } : {}),
+					...(drawing ? { drawing } : {}),
 					...place,
 				});
 				for (const event of scope.module.eventsByHost.get(item.id) ?? []) {
@@ -2595,10 +2748,6 @@ export function createNativeViewPayload(
 						lowerChunk(armChunk, parent, { arm: { branch: branchId, index } }, scope);
 					else refuse(`arm ${armId} has no markup`);
 				});
-				continue;
-			}
-			if (parent === null) {
-				refuse('text outside an element');
 				continue;
 			}
 			const adjacent =
@@ -3262,19 +3411,46 @@ export function createNativeViewPayload(
 		deviceObjects: rootObjects.byName,
 	};
 	lowerChunk(rootChunk, null, {}, TOP);
+	// As `document.title` reads the document's first <title>, the first one in the page is the screen's; none shows in the page.
 	const titles = nodes.filter((node) => node.kind === 'element' && node.element === 'title');
 	let title: NativeTextPart[] | undefined;
-	if (titles.length > 1) refuse('more than one <title>');
-	for (const element of titles) {
+	for (const [index, element] of titles.entries()) {
 		const inside = nodes.filter((node) => node.parent === element.id);
-		if (element.arm || element.row) refuse('a <title> inside an @if arm or a @for row');
-		if (inside.some((node) => node.kind !== 'text'))
-			refuse('a <title> holding something other than text');
+		const span = nodeSpans.get(element.id);
+		if (index === 0) {
+			if (element.arm || element.row)
+				refuseAs('title', 'a <title> inside an @if arm or a @for row', span);
+			if (inside.some((node) => node.kind !== 'text'))
+				refuseAs('title', 'a <title> holding something other than text', span);
+			title = inside.flatMap((node) => (node.kind === 'text' ? node.parts : []));
+		}
 		if (events.some((event) => event.host === element.id))
-			refuse('a <title> with an event handler');
-		title = inside.flatMap((node) => (node.kind === 'text' ? node.parts : []));
+			refuseAs('title', 'a <title> with an event handler', span);
 		const removed = new Set([element.id, ...inside.map((node) => node.id)]);
 		nodes.splice(0, nodes.length, ...nodes.filter((node) => !removed.has(node.id)));
+	}
+	// An element flows in its parent's text only when all it holds flows too and it needs no view of its own.
+	const handled = new Set([...boundHandles.values()].flat());
+	for (let index = nodes.length - 1; index >= 0; index--) {
+		const node = nodes[index]!;
+		if (node.kind !== 'element' || !node.defaultStyle?.flow) continue;
+		const own = (name: string) =>
+			(node.attributes && name in node.attributes) ||
+			node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === name);
+		const flows =
+			!events.some((event) => event.host === node.id) &&
+			!handled.has(node.id) &&
+			!own('hidden') &&
+			nodes.every(
+				(child) =>
+					child.parent !== node.id ||
+					child.kind === 'text' ||
+					(child.kind === 'element' && child.defaultStyle?.flow !== undefined),
+			);
+		if (flows) continue;
+		const { flow: _flow, ...rest } = node.defaultStyle;
+		const { defaultStyle: _style, ...plain } = node;
+		nodes[index] = Object.keys(rest).length > 0 ? { ...plain, defaultStyle: rest } : plain;
 	}
 	rootObjects.own(0);
 	if (graph.markup.chunks.some((chunk) => chunk.kind !== 'template' && !lowered.has(chunk.id)))

@@ -1,0 +1,8 @@
+appId: ${APP_ID}
+name: r113-svg-use
+---
+- launchApp:
+      clearState: true
+- assertVisible: Symbols
+- assertVisible: Three stars
+- assertVisible: A symbol used three times

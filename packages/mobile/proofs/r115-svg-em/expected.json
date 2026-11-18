@@ -1,0 +1,5 @@
+{
+	"rung": "R115",
+	"name": "An SVG sized in ems takes the size of the text it sits in",
+	"steps": [{ "visible": ["Heading star", "Text star", "Stars sized in ems"] }]
+}

@@ -28,6 +28,10 @@
 				"parent": "h0",
 				"attributes": {
 					"class": "mk-1fsdhn3"
+				},
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
 				}
 			},
 			{

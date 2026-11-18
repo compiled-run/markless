@@ -1,0 +1,13 @@
+appId: ${APP_ID}
+name: r102-code
+---
+- launchApp:
+      clearState: true
+- assertVisible: Code
+- assertVisible: Call state\(\) to keep a value
+- assertVisible: Press Ctrl \+ C to copy
+- assertVisible: The shell prints done
+- tapOn: Use Mac keys
+- assertNotVisible: Press Ctrl \+ C to copy
+- assertVisible: Press Cmd \+ C to copy
+- assertNotVisible: Press Ctrl \+ C to copy

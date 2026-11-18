@@ -40,6 +40,7 @@ export function Counter() @{
 					element: 'h1',
 					parent: 'h0',
 					attributes: { class: 'title' },
+					defaultStyle: { bold: true, size: 2 },
 				},
 				{ kind: 'text', id: 'h1:text0', parent: 'h1', parts: [{ text: 'Counter' }] },
 				{
@@ -96,7 +97,13 @@ export function Tally() @{
 				parent: 'h1',
 				parts: [{ cell: 'state:left' }, { text: ' before ' }],
 			},
-			{ kind: 'element', id: 'h2', element: 'b', parent: 'h1' },
+			{
+				kind: 'element',
+				id: 'h2',
+				element: 'b',
+				parent: 'h1',
+				defaultStyle: { flow: 'inline', bold: true },
+			},
 			{ kind: 'text', id: 'h2:text0', parent: 'h2', parts: [{ text: 'bold' }] },
 			{
 				kind: 'text',
@@ -1072,5 +1079,260 @@ export function Words() @{
 		expect(diagnostics.map((d) => d.message)).toContain(
 			'a @for keyed by its index; a native list keys each row by its item',
 		);
+	});
+});
+
+describe('the element vocabulary', () => {
+	const source = (markup: string) => `import { state } from '@markless/core';
+export function Page() @{
+	let n = state(1);
+	<main>
+${markup}
+		<button onClick={() => n++}>Add</button>
+	</main>
+}`;
+	const lineOf = (text: string, offset: number) => text.slice(0, offset).split('\n').length;
+
+	it('gives phrase elements a flow inside their paragraph and blocks their default look', async () => {
+		const { payload, diagnostics } = await nativeView(
+			source(`		<p>Run <code>{n}</code><br /><kbd>K</kbd></p>
+		<pre>{'a\\n  b'}</pre>
+		<abbr title="x">X</abbr>`),
+		);
+		expect(diagnostics).toEqual([]);
+		const styles = payload!.nodes.flatMap((node) =>
+			node.kind === 'element' ? [[node.element, node.defaultStyle]] : [],
+		);
+		expect(styles).toEqual([
+			['main', undefined],
+			['p', undefined],
+			['code', { flow: 'inline', monospace: true, size: 0.8125 }],
+			['br', { flow: 'break' }],
+			['kbd', { flow: 'inline', monospace: true, size: 0.8125 }],
+			['pre', { monospace: true, size: 0.8125, preformatted: true }],
+			['abbr', { flow: 'inline', line: 'underline' }],
+			['button', undefined],
+		]);
+	});
+
+	it('keeps a phrase element out of the text flow when it needs a view of its own', async () => {
+		const { payload } = await nativeView(
+			source(
+				`		<p><span onClick={() => n++}>tap</span> <em hidden>gone</em> <strong><div>block</div></strong> <b>kept</b></p>`,
+			),
+		);
+		const flows = Object.fromEntries(
+			payload!.nodes.flatMap((node) =>
+				node.kind === 'element' ? [[node.element, node.defaultStyle?.flow ?? null]] : [],
+			),
+		);
+		expect(flows).toMatchObject({ span: null, em: null, strong: null, b: 'inline' });
+	});
+
+	it('shows nothing for metadata, hints, data scripts, templates and noscript, as the web does', async () => {
+		const { payload, diagnostics } = await nativeView(
+			source(`		<meta name="description" content="d" />
+		<link rel="preload" as="image" href="/a.png" />
+		<script type="application/ld+json">{'{}'}</script>
+		<template><p>inert</p></template>
+		<noscript><p>no script</p></noscript>`),
+		);
+		expect(diagnostics).toEqual([]);
+		expect(
+			payload!.nodes.flatMap((node) => (node.kind === 'element' ? [node.element] : [])),
+		).toEqual(['main', 'button']);
+	});
+
+	it('refuses scripts, loaded stylesheets and unknown elements with their own code and place', async () => {
+		const text = source(`		<script>{'run()'}</script>
+		<link rel="stylesheet" href="/site.css" />
+		<marquee>old</marquee>`);
+		const { payload, diagnostics } = await nativeView(text);
+		expect(payload).toBeNull();
+		expect(
+			diagnostics.map((d) => [
+				d.code,
+				d.message,
+				d.primarySpan && lineOf(text, d.primarySpan.start),
+			]),
+		).toEqual([
+			[
+				'MARKLESS_NATIVE_SCRIPT',
+				'a <script> runs code in the browser, and a native app has no browser to run it',
+				5,
+			],
+			[
+				'MARKLESS_NATIVE_STYLESHEET',
+				'<link rel="stylesheet" href="/site.css"> loads styles while the page runs',
+				6,
+			],
+			['MARKLESS_NATIVE_ELEMENT', 'the <marquee> element has no native view yet', 7],
+		]);
+		expect(diagnostics.every((d) => d.primarySpan?.filename === 'src/App.tsrx')).toBe(true);
+	});
+
+	it("takes the page's first <title> as the screen's title and shows no <title> in the page", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function Layout({ children }) @{
+	<div><title>From the layout</title>{children}</div>
+}
+export function Page() @{
+	let n = state(1);
+	<Layout><title>Second</title><p>Body</p><button onClick={() => n++}>Add</button></Layout>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.title).toEqual([{ text: 'From the layout' }]);
+		expect(
+			payload!.nodes.some((node) => node.kind === 'element' && node.element === 'title'),
+		).toBe(false);
+	});
+
+	it('shows text written at the top of a page, outside any element', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Page() @{
+	<>{'Only text'}</>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.nodes).toEqual([
+			{ kind: 'text', id: 'text0', parent: null, parts: [{ text: 'Only text' }] },
+		]);
+	});
+});
+
+describe('inline svg', () => {
+	it("compiles an svg's shapes into a drawing, with its <title> as its name", async () => {
+		const { payload, diagnostics } = await nativeView(`export function Icon() @{
+	<svg viewBox="0 0 20 10" width="40" height="20" fill="currentColor">
+		<title>Logo</title>
+		<path d="M0 0h10v10z" />
+		<g transform="translate(10 0)" stroke="red" stroke-width="2" fill="none">
+			<circle cx="5" cy="5" r="5" />
+		</g>
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const svg = payload!.nodes[0]!;
+		expect(payload!.nodes).toHaveLength(1);
+		expect(svg).toMatchObject({
+			kind: 'element',
+			element: 'svg',
+			attributes: { 'aria-label': 'Logo' },
+		});
+		if (svg.kind !== 'element') throw new Error('not an element');
+		expect(svg.drawing).toMatchObject({ viewBox: [0, 0, 20, 10], width: 40, height: 20 });
+		const [path, circle] = svg.drawing!.shapes;
+		expect(path).toEqual({
+			path: [0, 0, 0, 1, 10, 0, 1, 10, 10, 4],
+			fill: 'currentColor',
+			fillRule: 'nonzero',
+			stroke: null,
+			width: 1,
+			cap: 'butt',
+			join: 'miter',
+			miterLimit: 4,
+		});
+		expect(circle).toMatchObject({
+			fill: null,
+			stroke: { r: 255, g: 0, b: 0, alpha: 255 },
+			width: 2,
+			transform: [1, 0, 0, 1, 10, 0],
+		});
+		expect(circle!.path.slice(0, 3)).toEqual([0, 10, 5]);
+	});
+
+	it('reads hex, rgb() and named colours with their alpha', async () => {
+		const { payload } = await nativeView(`export function Swatches() @{
+	<svg viewBox="0 0 4 1">
+		<rect width="1" height="1" fill="#e63946" />
+		<rect width="1" height="1" fill="#0f08" />
+		<rect width="1" height="1" fill="rgb(10 20 30 / 50%)" />
+		<rect width="1" height="1" fill="teal" />
+	</svg>
+}`);
+		const svg = payload!.nodes[0]!;
+		if (svg.kind !== 'element') throw new Error('not an element');
+		expect(svg.drawing!.shapes.map((shape) => shape.fill)).toEqual([
+			{ r: 230, g: 57, b: 70, alpha: 255 },
+			{ r: 0, g: 255, b: 0, alpha: 136 },
+			{ r: 10, g: 20, b: 30, alpha: 128 },
+			{ r: 0, g: 128, b: 128, alpha: 255 },
+		]);
+	});
+
+	it('keeps a size in ems as ems and turns absolute units into CSS pixels', async () => {
+		const sizes = async (width: string, height: string) => {
+			const { payload } = await nativeView(`export function Icon() @{
+	<svg viewBox="0 0 10 10" width="${width}" height="${height}"><rect width="10" height="10" /></svg>
+}`);
+			const svg = payload!.nodes[0]!;
+			if (svg.kind !== 'element') throw new Error('not an element');
+			const { shapes: _shapes, viewBox: _viewBox, ...size } = svg.drawing!;
+			return size;
+		};
+		expect(await sizes('1em', '1.5em')).toEqual({ width: 1, height: 1.5, em: true });
+		expect(await sizes('12pt', '1in')).toEqual({ width: 16, height: 96 });
+		expect(await sizes('100%', '2rem')).toEqual({ height: 32 });
+	});
+
+	it('draws a <use> of a <symbol> in the same svg, fitted to the size the use gives it', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Stars() @{
+	<svg viewBox="0 0 20 10">
+		<defs><symbol id="dot" viewBox="0 0 2 2"><rect width="2" height="2" /></symbol></defs>
+		<use href="#dot" x="10" width="10" height="10" />
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const svg = payload!.nodes[0]!;
+		if (svg.kind !== 'element') throw new Error('not an element');
+		expect(svg.drawing!.shapes).toHaveLength(1);
+		expect(svg.drawing!.shapes[0]!.transform).toEqual([5, 0, 0, 5, 10, 0]);
+	});
+
+	it('turns arcs and quadratics into cubics that end where the web ends them', async () => {
+		const { payload } = await nativeView(`export function Arc() @{
+	<svg viewBox="0 0 20 20"><path d="M0 10A10 10 0 0 1 20 10Q20 20 10 20" /></svg>
+}`);
+		const svg = payload!.nodes[0]!;
+		if (svg.kind !== 'element') throw new Error('not an element');
+		const outline = svg.drawing!.shapes[0]!.path;
+		expect(outline.filter((verb, index) => index === 0 || verb === 3).length).toBeGreaterThan(
+			2,
+		);
+		expect(outline.slice(-2)).toEqual([10, 20]);
+		const halfway = outline.indexOf(3, outline.indexOf(3) + 1);
+		expect(
+			outline.slice(halfway + 5, halfway + 7).map((value) => Math.round(value * 1e6) / 1e6),
+		).toEqual([20, 10]);
+	});
+
+	it('refuses what a drawing cannot hold by name, at the shape that holds it', async () => {
+		const text = `import { state } from '@markless/core';
+export function Chart() @{
+	let w = state(4);
+	<svg viewBox="0 0 10 10">
+		<path d="M0 0h10" stroke-dasharray="2 2" />
+		<rect width={w} height="2" fill="url(#g)" />
+		<text x="0" y="5">label</text>
+	</svg>
+}`;
+		const { payload, diagnostics } = await nativeView(text);
+		expect(payload).toBeNull();
+		expect(diagnostics.every((d) => d.code === 'MARKLESS_NATIVE_SVG')).toBe(true);
+		expect(
+			diagnostics.map((d) => [
+				d.message,
+				text.slice(0, d.primarySpan!.start).split('\n').length,
+			]),
+		).toEqual([
+			['`stroke-dasharray` on <path>: dashed strokes are not drawn natively yet', 5],
+			[
+				'`width` on <rect> follows state; a native drawing is compiled when the app is built',
+				6,
+			],
+			[
+				'`fill="url(#g)"` on <rect>, a paint a native drawing does not have (gradients and patterns are not drawn yet)',
+				6,
+			],
+			['the SVG <text> element, which a native drawing does not draw yet', 7],
+		]);
 	});
 });

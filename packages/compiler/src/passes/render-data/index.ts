@@ -49,7 +49,10 @@ export function createRenderData(input: {
 		chunks: semanticGraph.markup.chunks.map(
 			({ texts: _texts, attributes: _attributes, ...chunk }) => chunk,
 		),
-		hosts: semanticGraph.hostNodes.map((host) => ({ ...host, hostNodeId: host.id })),
+		hosts: semanticGraph.hostNodes.map(({ sourceSpan: _span, ...host }) => ({
+			...host,
+			hostNodeId: host.id,
+		})),
 		initialValues: semanticGraph.graphBindings.flatMap((binding) =>
 			initialValue(binding, symbolResolver),
 		),

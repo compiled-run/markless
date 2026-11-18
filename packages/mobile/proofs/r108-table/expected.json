@@ -1,0 +1,29 @@
+{
+	"rung": "R108",
+	"name": "A table lines its cells up in rows, with a caption, a head and rows from a list",
+	"steps": [
+		{
+			"visible": [
+				"Table",
+				"Seed stock",
+				"Plant",
+				"Packets",
+				"Basil",
+				"3",
+				"Mint",
+				"12",
+				"Kinds",
+				"2"
+			],
+			"absent": ["Thyme"],
+			"order": ["Seed stock", "Plant", "Basil", "Mint", "Kinds"]
+		},
+		{
+			"do": {
+				"tap": "Add thyme"
+			},
+			"visible": ["Thyme", "7", "3"],
+			"order": ["Plant", "Basil", "Mint", "Thyme"]
+		}
+	]
+}

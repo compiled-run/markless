@@ -7863,6 +7863,29 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_NATIVE_ELEMENT',
+		title: 'This element has no native view yet',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'This element has no native view yet: a Markless build error.',
+		printed: [
+			'MARKLESS_NATIVE_ELEMENT: This element has no native view yet',
+			'Native hosts build a platform view for each HTML element they know; this one has no view on iOS and Android yet.',
+		],
+		structured: true,
+		why: 'Native hosts build a platform view for each HTML element they know; this one has no view on iOS and Android yet.',
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/native-view.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_NATIVE_KEYBOARD_ONLY',
 		title: 'A keyboard-only handler is left out of the native build',
 		area: 'internal',
@@ -7890,6 +7913,99 @@ export const errorEntries: readonly ErrorEntry[] = [
 				],
 			},
 		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/native-view.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_NATIVE_SCRIPT',
+		title: 'A <script> cannot run in a native app',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'A <script> cannot run in a native app: a Markless build error.',
+		printed: [
+			'MARKLESS_NATIVE_SCRIPT: A <script> cannot run in a native app',
+			'A native app runs no browser engine: its handlers run as data. Write what the script does as Markless code (state, handlers) instead.',
+		],
+		structured: true,
+		why: 'A native app runs no browser engine: its handlers run as data. Write what the script does as Markless code (state, handlers) instead.',
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/native-view.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_NATIVE_STYLESHEET',
+		title: 'A stylesheet loaded by a <link> does not reach a native app',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'A stylesheet loaded by a <link> does not reach a native app: a Markless build error.',
+		printed: [
+			'MARKLESS_NATIVE_STYLESHEET: A stylesheet loaded by a <link> does not reach a native app',
+			'Native styles are compiled from the CSS the app imports when it is built; a stylesheet the browser fetches while the page runs is never seen. Import the CSS from the component instead.',
+		],
+		structured: true,
+		why: 'Native styles are compiled from the CSS the app imports when it is built; a stylesheet the browser fetches while the page runs is never seen. Import the CSS from the component instead.',
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/native-view.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_NATIVE_SVG',
+		title: 'Part of this <svg> is not drawn natively yet',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'Part of this <svg> is not drawn natively yet: a Markless build error.',
+		printed: [
+			'MARKLESS_NATIVE_SVG: Part of this <svg> is not drawn natively yet',
+			'An inline <svg> is compiled into shapes when the app is built and the phone draws those; this part of SVG has no native drawing yet.',
+		],
+		structured: true,
+		why: 'An inline <svg> is compiled into shapes when the app is built and the phone draws those; this part of SVG has no native drawing yet.',
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/native-view.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_NATIVE_TITLE',
+		title: 'This <title> cannot be the screen title',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'This <title> cannot be the screen title: a Markless build error.',
+		printed: [
+			'MARKLESS_NATIVE_TITLE: This <title> cannot be the screen title',
+			"A page's first <title> is its screen's title in the system navigation bar; it must be text shown in every state of the page.",
+		],
+		structured: true,
+		why: "A page's first <title> is its screen's title in the system navigation bar; it must be text shown in every state of the page.",
 		sources: [
 			{
 				id: 'f0',

@@ -1,0 +1,26 @@
+{
+	"rung": "R101",
+	"name": "Phrase elements flow inside their paragraph's text",
+	"steps": [
+		{
+			"visible": [
+				"Inline text",
+				"Plain, strong, em, b and i text",
+				"An abbr, a cite, a dfn and a var",
+				"Small print with marked, underlined, struck, deleted and inserted words",
+				"H2O and E = mc2",
+				"Liked by 1 reader so far"
+			],
+			"visibleOn": {
+				"ios": ["She said “hello”"],
+				"android": ["She said “hello”"],
+				"web": ["She said hello"]
+			}
+		},
+		{
+			"do": { "tap": "Like" },
+			"visible": ["Liked by 2 readers so far"],
+			"absent": ["Liked by 1 reader so far"]
+		}
+	]
+}

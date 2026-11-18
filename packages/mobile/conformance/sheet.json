@@ -31,7 +31,11 @@
 				"kind": "element",
 				"id": "h1",
 				"element": "h1",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
 			},
 			{
 				"kind": "text",
@@ -96,7 +100,11 @@
 				"kind": "element",
 				"id": "h4",
 				"element": "h2",
-				"parent": "sheet:component-edge:0"
+				"parent": "sheet:component-edge:0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 1.5
+				}
 			},
 			{
 				"kind": "text",
@@ -148,7 +156,11 @@
 				"kind": "element",
 				"id": "h7",
 				"element": "ul",
-				"parent": "sheet:component-edge:0"
+				"parent": "sheet:component-edge:0",
+				"defaultStyle": {
+					"indent": 40,
+					"marker": "disc"
+				}
 			},
 			{
 				"kind": "element",

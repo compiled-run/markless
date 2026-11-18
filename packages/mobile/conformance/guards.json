@@ -275,12 +275,30 @@
 		]
 	},
 	"initial": [
-		["component-edge:0/h1:text0", "Power off"],
-		["component-edge:0/h2:text0", "Lock"],
-		["h4:text0", "Last none"],
-		["h5:text0", "Step 0"]
+		[
+			"component-edge:0/h1:text0",
+			"Power off"
+		],
+		[
+			"component-edge:0/h2:text0",
+			"Lock"
+		],
+		[
+			"h4:text0",
+			"Last none"
+		],
+		[
+			"h5:text0",
+			"Step 0"
+		]
 	],
-	"initialAttributes": [["h5", "aria-label", null]],
+	"initialAttributes": [
+		[
+			"h5",
+			"aria-label",
+			null
+		]
+	],
 	"steps": [
 		{
 			"action": {

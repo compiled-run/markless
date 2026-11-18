@@ -53,6 +53,28 @@ is the platform's and journals nothing, and a page's `<title>` is its navigation
   either adopt it or replace it with a `compileNativeStyles`-based reader of `markless.native-style-input/0` that writes the
   same `/1` shape, and say which here.
 
+## 0c. Element vocabulary (2026-11-18, `cw/real-elements`, rungs R101 to R114)
+
+Real pages are refused first for plain HTML (`real-app-probe.md`); these additions are in the payload, both hosts and the
+reference. Notes and the before and after probe: `element-vocabulary.md`.
+
+- **`defaultStyle`** on an element node: its look under Chrome's default stylesheet (`NativeDefaultStyle`): `flow`
+  (`inline`: its text flows on in its parent's text; `break`: `<br>`), `bold`, `italic`, `monospace`, `size` (a multiple
+  of the parent's), `line`, `shift`, `highlight`, `quotes`, `preformatted`, `indent` (CSS px), `rule`, `marker` (on
+  `ul`/`ol`), `table` (`table`, `row`, `cell`). Hosts apply it only without a style export; with one, Dragon decides.
+- **Paragraphs:** among one parent's children in one place, each run of text nodes and flowing elements is one text
+  view (`nativeParagraphs`, `nativeShownTexts` in `packages/mobile/src/paragraphs.ts`). Its text collapses whitespace as
+  CSS `white-space: normal`, except inside a `preformatted` element; a `text` journal entry re-renders the whole
+  paragraph. The compiler gives `flow` only to an element with no handler, no handle, no `hidden` and only text and
+  flowing elements inside, so a flowing element never needs a view.
+- **`drawing`** on an `<svg>` node (`NativeDrawing`): viewBox, size and shapes compiled when the app is built (path verbs
+  0 move, 1 line, 3 cubic, 4 close, as Dragon codes them; `width`/`height` in CSS px, or in ems with `em`; arcs and quadratics arrive as cubics; `<use>` of a `<symbol>` in
+  the same svg is inlined with its transform). The svg's descendants are not nodes. Its `<title>` becomes its
+  `aria-label`. What a drawing cannot hold is refused as `MARKLESS_NATIVE_SVG` at the shape.
+- **Text at the top of a page** is a text node with `parent: null`, id `text<n>`.
+- **`<title>`**: the page's first `<title>` in document order, in any component, is the screen's title (as
+  `document.title` reads the first); no `<title>` shows in the page.
+
 ## 1. What I found before building (the owner's picture is weeks old)
 
 - **`docs/goals/native-targets-api/` was not in the repo.** The research board lives only on the planner's machine (copy read
@@ -423,9 +445,12 @@ points it calls (`MarklessViewController(payload:style:fonts:)`, `MarklessActivi
 relative to the root of the Dragon checkout it came from (`vendor/fonts/...`); the harness's SHA-256 check stays. **6**
 routes at launch arrive with rung 10. **7** rung screenshots are committed under `proofs/<rung>/screenshots/{ios,android}/`.
 
-**Portable elements (compiler-checked).** A native build accepts `main`, `div`, `section`, `article`, `header`, `footer`,
-`nav`, `aside`, `h1`-`h6`, `p`, `span`, `b`, `strong`, `em`, `i`, `ul`, `ol`, `li` and `button`; any other element is
-refused with `MARKLESS_NATIVE_UNSUPPORTED` naming it. Rungs add to this list (`input` with rung 8).
+**Portable elements (compiler-checked).** The list is `NATIVE_ELEMENTS` in `@markless/serializer/native-view`, with each
+element's look under Chrome's default stylesheet as data (`defaultStyle`, below). `NATIVE_UNSHOWN_ELEMENTS` (`meta`,
+`link`, `template`, `noscript`) and data scripts (`NATIVE_DATA_SCRIPT_TYPES`) show nothing, as on the web, and are left
+out of the payload. Anything else is refused with its own code and the element's place: `MARKLESS_NATIVE_ELEMENT`,
+`MARKLESS_NATIVE_SCRIPT` (a script that runs code), `MARKLESS_NATIVE_STYLESHEET` (`<link rel="stylesheet">`). See
+"Element vocabulary" in section 0c.
 
 Rungs 1 and 3 run without Dragon: hosts stack children vertically (start-aligned, system font, platform default size). This
 is a temporary layout so the state rungs do not wait on styling; rung 2 replaces it with Dragon frames.

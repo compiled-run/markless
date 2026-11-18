@@ -1,0 +1,5 @@
+{
+	"rung": "R112",
+	"name": "Rectangles, circles, ellipses, lines, polylines and grouped polygons are drawn natively",
+	"steps": [{ "visible": ["Shapes", "Six shapes"] }]
+}

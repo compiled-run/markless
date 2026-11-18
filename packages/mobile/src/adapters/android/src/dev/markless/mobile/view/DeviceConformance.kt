@@ -18,7 +18,7 @@ object DeviceConformance {
 		val vector = Json.parse(vectorBytes).obj("vector")
 		val host = MarklessHost(context, canonical(vector.field("payload", "vector")).toByteArray(), store = dev.markless.mobile.core.MemoryStore(), params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap())
 		val failures = ArrayList<String>()
-		fun shownTexts(): String = host.runtime.texts().joinToString(",", "[", "]") { (id, _) -> "[${jsonString(id)},${jsonString(if (host.hasView(id)) host.textView(id).text.toString() else "<no view>")}]" }
+		fun shownTexts(): String = host.runtime.texts().joinToString(",", "[", "]") { (id, _) -> "[${jsonString(id)},${jsonString(if (host.hasView(id)) host.shownText(id) else "<no view>")}]" }
 		fun structure(where: String) {
 			val wanted = host.payload.nodes.filter { it is Node.Element || it is Node.Text }.flatMap(host.runtime::instances).mapTo(HashSet()) { it.id }
 			if (host.viewIds() != wanted) failures.add("$where: views exist for ${(host.viewIds() - wanted).sorted()} and are missing for ${(wanted - host.viewIds()).sorted()}")

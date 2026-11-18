@@ -110,9 +110,69 @@ public struct NativeNode: Equatable, Sendable {
 	public let kind: Kind
 	/// For a `camera` element: the device object it shows.
 	public var object: String? = nil
+	/// The browser's default look of an element, when it is more than a box of plain text.
+	public var defaultStyle: NativeDefaultStyle? = nil
+	/// On an `<svg>`: the shapes it draws.
+	public var drawing: NativeDrawing? = nil
 
 	public var isElement: Bool { if case .element = kind { true } else { false } }
 	public var isText: Bool { if case .text = kind { true } else { false } }
+}
+
+/// How an element looks and flows under the browser's default stylesheet (`NativeDefaultStyle` in the serializer).
+public struct NativeDefaultStyle: Equatable, Sendable {
+	public enum Flow: String, Sendable { case inline, `break` }
+	public var flow: Flow?
+	public var bold = false
+	public var italic = false
+	public var monospace = false
+	/// Font size as a multiple of the parent's.
+	public var size: Double?
+	/// `underline` or `line-through`.
+	public var line: String?
+	/// `sub` or `super`.
+	public var shift: String?
+	public var highlight = false
+	public var quotes = false
+	public var preformatted = false
+	/// Start-side inset in CSS px.
+	public var indent: Double?
+	public var rule = false
+	/// `disc` or `decimal`, on a list.
+	public var marker: String?
+	/// `table`, `row` or `cell`.
+	public var table: String?
+	public init() {}
+}
+
+/// One shape of a drawing, in the drawing's user units.
+public struct NativeShape: Equatable, Sendable {
+	public enum Paint: Equatable, Sendable {
+		case color(RGBA)
+		case currentColor
+	}
+	/// Verb-coded: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close.
+	public let path: [Double]
+	public let fill: Paint?
+	public let evenOdd: Bool
+	public let stroke: Paint?
+	public let width: Double
+	public let cap: String
+	public let join: String
+	public let miterLimit: Double
+	/// `[a, b, c, d, e, f]`.
+	public let transform: [Double]?
+}
+
+/// An inline `<svg>` compiled when the app was built.
+public struct NativeDrawing: Equatable, Sendable {
+	/// min-x, min-y, width, height.
+	public let viewBox: [Double]?
+	public let width: Double?
+	public let height: Double?
+	public let shapes: [NativeShape]
+	/// `width` and `height` are in ems of the font size of the text the svg sits in, not CSS px.
+	public var em = false
 }
 
 public enum NativeEventName: String, Sendable {
@@ -271,7 +331,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let place = ["arm", "row"]
 			switch kind {
 			case "element":
-				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object"] + place)
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing"] + place)
 				var attributes: [String: String] = [:]
 				if field.has("attributes") {
 					let reader = try field["attributes"]
@@ -290,12 +350,14 @@ public struct NativeViewPayload: Equatable, Sendable {
 				return NativeNode(
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
 					row: try decodeRow(field), kind: .element(element: try field["element"].string(), attributes: attributes, bindings: bindings),
-					object: field.has("object") ? try field["object"].string() : nil)
+					object: field.has("object") ? try field["object"].string() : nil,
+					defaultStyle: field.has("defaultStyle") ? try decodeDefaultStyle(try field["defaultStyle"]) : nil,
+					drawing: field.has("drawing") ? try decodeDrawing(try field["drawing"]) : nil)
 			case "text":
 				let field = try node.object(required: ["kind", "id", "parent", "parts"], optional: place)
 				let parts = try decodeParts(try field["parts"])
 				return NativeNode(
-					id: try field["id"].string(), parent: try field["parent"].string(), arm: try decodeArm(field), row: try decodeRow(field),
+					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field), row: try decodeRow(field),
 					kind: .text(parts: parts))
 			case "branch":
 				let field = try node.object(required: ["kind", "id", "parent", "arms"], optional: place + ["test", "tests"])
@@ -420,6 +482,66 @@ public struct NativeViewPayload: Equatable, Sendable {
 			objects: objects)
 		try payload.check()
 		return payload
+	}
+
+	private static func decodeDefaultStyle(_ reader: Reader) throws -> NativeDefaultStyle {
+		let field = try reader.object(required: [], optional: [
+			"flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule",
+			"marker", "table",
+		])
+		func oneOf(_ key: String, _ allowed: [String]) throws -> String? {
+			guard field.has(key) else { return nil }
+			let value = try field[key].string()
+			guard allowed.contains(value) else { throw PayloadError(path: "\(reader.path).\(key)", reason: "unknown value \"\(value)\"") }
+			return value
+		}
+		func flag(_ key: String) throws -> Bool { field.has(key) ? try field[key].bool() : false }
+		var style = NativeDefaultStyle()
+		style.flow = try oneOf("flow", ["inline", "break"]).flatMap(NativeDefaultStyle.Flow.init(rawValue:))
+		style.bold = try flag("bold")
+		style.italic = try flag("italic")
+		style.monospace = try flag("monospace")
+		style.size = field.has("size") ? try field["size"].number() : nil
+		style.line = try oneOf("line", ["underline", "line-through"])
+		style.shift = try oneOf("shift", ["sub", "super"])
+		style.highlight = try flag("highlight")
+		style.quotes = try flag("quotes")
+		style.preformatted = try flag("preformatted")
+		style.indent = field.has("indent") ? try field["indent"].number() : nil
+		style.rule = try flag("rule")
+		style.marker = try oneOf("marker", ["disc", "decimal"])
+		style.table = try oneOf("table", ["table", "row", "cell"])
+		return style
+	}
+
+	private static func decodeDrawing(_ reader: Reader) throws -> NativeDrawing {
+		let field = try reader.object(required: ["viewBox", "shapes"], optional: ["width", "height", "em"])
+		let viewBox = try field["viewBox"].isNull ? nil : try field["viewBox"].array().map { try $0.number() }
+		if let viewBox, viewBox.count != 4 { throw PayloadError(path: "\(reader.path).viewBox", reason: "expected four numbers") }
+		func paint(_ reader: Reader) throws -> NativeShape.Paint? {
+			if reader.isNull { return nil }
+			if reader.isString {
+				guard try reader.string() == "currentColor" else { throw reader.fail("unknown paint") }
+				return .currentColor
+			}
+			let color = try reader.object(["r", "g", "b", "alpha"])
+			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))
+		}
+		let shapes = try field["shapes"].array().map { shape -> NativeShape in
+			let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform"])
+			let transform = s.has("transform") ? try s["transform"].array().map { try $0.number() } : nil
+			if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
+			let rule = try s["fillRule"].string()
+			guard rule == "nonzero" || rule == "evenodd" else { throw shape.fail("unknown fillRule \(rule)") }
+			return NativeShape(
+				path: try s["path"].array().map { try $0.number() }, fill: try paint(try s["fill"]), evenOdd: rule == "evenodd",
+				stroke: try paint(try s["stroke"]), width: try s["width"].number(), cap: try s["cap"].string(), join: try s["join"].string(),
+				miterLimit: try s["miterLimit"].number(), transform: transform)
+		}
+		return NativeDrawing(
+			viewBox: viewBox, width: field.has("width") ? try field["width"].number() : nil,
+			height: field.has("height") ? try field["height"].number() : nil, shapes: shapes,
+			em: field.has("em") ? try field["em"].bool() : false)
 	}
 
 	private static func decodeParts(_ reader: Reader) throws -> [NativeTextPart] {

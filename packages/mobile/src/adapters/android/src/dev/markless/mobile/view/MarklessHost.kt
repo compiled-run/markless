@@ -89,6 +89,15 @@ class MarklessHost(
 	private val views = HashMap<String, View>()
 	private val built = HashMap<String, Instance>()
 	private val textViews = HashMap<String, TextView>()
+	/** Without a style export, text flows in paragraphs (one text view each); with one, Dragon lays out every text node. */
+	private val flow: TextFlow? = if (style == null) TextFlow(payload) else null
+	/** Each shown text instance's current string, which its paragraph view is rendered from. */
+	private val heldTexts = HashMap<String, String>()
+	/** Shown instances that are part of a paragraph without being its first node: they have no view of their own. */
+	private val members = HashSet<String>()
+	/** The page's own box when its top holds more than one node (text at the top of the page). */
+	private val pageBox: MarklessBox?
+	private val baseTextSize = TextView(context).textSize
 	private var assignment = style?.start(payload.cells.filter { it.styled }.map { it.id }, runtime::value, isDark(context.resources.configuration)) ?: 0
 	private val expanded = HashMap<View, Boolean?>()
 	private val sheets = LinkedHashMap<String, SystemSheet>()
@@ -116,9 +125,10 @@ class MarklessHost(
 	val root: View
 
 	init {
-		val top = payload.nodes.firstOrNull() as? Node.Element ?: throw MarklessHostError("payload does not start with its root element")
-		if (top.parent != null || top.arm != null) throw MarklessHostError("the root element has a parent or sits in an arm")
-		if (payload.nodes.count { it.parent == null } != 1) throw MarklessHostError("payload has more than one root")
+		val single = (payload.nodes.firstOrNull() as? Node.Element)?.takeIf { it.parent == null && it.arm == null && payload.nodes.count { n -> n.parent == null } == 1 }
+		if (single == null && style != null) throw MarklessHostError("a styled payload must start with its one root element")
+		if (single == null && payload.nodes.isEmpty()) throw MarklessHostError("payload has no nodes")
+		pageBox = if (single == null) MarklessBox(context) else null
 		for (sheet in payload.nodes.filterIsInstance<Node.Sheet>()) {
 			if (sheet.dismissible && runtime.handlerFor(sheet.id, EventName.Dismiss) == null) throw MarklessHostError("\"${sheet.id}\" is dismissible but has no dismiss handler")
 			val content = MarklessBox(context).apply { named(this, sheet.id) }
@@ -127,7 +137,8 @@ class MarklessHost(
 		}
 		for (cell in payload.cells) cell.device?.let { runtime.device(cell.id, needDevice().read(it, cell.obj)) }
 		buildShown()
-		root = views.getValue(top.id)
+		refreshMarkers()
+		root = pageBox ?: views.getValue(single!!.id)
 		for ((id, open) in runtime.sheets()) if (open) root.post { sheets.getValue(id).open() }
 		for (cell in payload.cells) cell.device?.let { name -> needDevice().watch(name, cell.obj) { if (!released) apply(runtime.device(cell.id, it)) } }
 		for (call in runtime.tasks()) runCall(call)
@@ -168,14 +179,35 @@ class MarklessHost(
 		needDevice().call(call.node, call.obj, call.arguments, settle)
 	}
 
-	fun view(id: String): View = views[id] ?: throw MarklessHostError("no view for \"$id\"")
+	fun view(id: String): View = views[id] ?: (if (id in members) views[paragraphOf(id)] else null) ?: throw MarklessHostError("no view for \"$id\"")
 
-	fun hasView(id: String): Boolean = id in views
+	fun hasView(id: String): Boolean = id in views || id in members
 
-	/** Every instance id that has a retained view. */
-	fun viewIds(): Set<String> = built.keys.toSet()
+	/** Every instance id that is shown: one with its own view, or a part of a paragraph's text view. */
+	fun viewIds(): Set<String> = built.keys + members
 
-	fun textView(id: String): TextView = textViews[id] ?: throw MarklessHostError("no text view for \"$id\"")
+	fun textView(id: String): TextView = textViews[id] ?: (if (id in members) textViews[paragraphOf(id)] else null) ?: throw MarklessHostError("no text view for \"$id\"")
+
+	/** The string a text instance shows: its own text view's, or its part of its paragraph's. */
+	fun shownText(id: String): String = heldTexts[id] ?: textView(id).text.toString()
+
+	/** The instance id of the paragraph [id] is part of: its first node, in the same row. */
+	private fun paragraphOf(id: String): String {
+		val at = id.indexOf('@')
+		val base = if (at < 0) id else id.substring(0, at)
+		val lead = flow?.leadOf?.get(base) ?: return id
+		return lead + if (at < 0) "" else id.substring(at)
+	}
+
+	/** Renders a paragraph again from the texts it holds. */
+	private fun render(lead: String) {
+		val f = flow ?: return
+		val view = textViews[lead] ?: return
+		val at = lead.indexOf('@')
+		val base = if (at < 0) lead else lead.substring(0, at)
+		val node = f.node(base)!!
+		view.text = f.render(base, if (at < 0) "" else lead.substring(at), f.blockText(node.parent).preformatted) { heldTexts[it] }
+	}
 
 	/** Whether the sheet's dialog is on screen. */
 	fun sheetShowing(id: String): Boolean = (sheets[id] ?: throw MarklessHostError("no sheet \"$id\"")).showing
@@ -189,8 +221,15 @@ class MarklessHost(
 	fun apply(journal: List<JournalEntry>) {
 		for (entry in journal) {
 			when (entry) {
-				is JournalEntry.Text -> textView(entry.node).text = entry.value
-				is JournalEntry.Attribute -> attribute(entry.node, entry.name, entry.value)
+				is JournalEntry.Text -> if (flow != null) {
+					if (entry.node !in heldTexts) throw MarklessHostError("journal names text \"${entry.node}\", which is not shown")
+					heldTexts[entry.node] = entry.value
+					render(paragraphOf(entry.node))
+				} else textView(entry.node).text = entry.value
+				is JournalEntry.Attribute -> if (flow?.flowing(flow.node(entry.node.substringBefore('@'))) == true) {
+					// A phrase element's attributes (`datetime`, `title`) change nothing its paragraph shows.
+					attrs.getOrPut(entry.node) { HashMap() }.let { if (entry.value == null) it.remove(entry.name) else it[entry.name] = entry.value }
+				} else attribute(entry.node, entry.name, entry.value)
 				is JournalEntry.Property -> {
 					val field = view(entry.node) as? EditText ?: throw MarklessHostError("journal sets the value of \"${entry.node}\", which is not an input")
 					if (field.text.toString() != entry.value) { field.setText(entry.value); field.setSelection(entry.value.length) }
@@ -254,18 +293,33 @@ class MarklessHost(
 		removeHidden()
 		buildShown()
 		for (v in views.values.toList()) if (v is MarklessBox) reorder(v)
+		pageBox?.let { reorder(it) }
+		refreshMarkers()
+	}
+
+	/** Each list's markers, numbered in the order its items show now. */
+	private fun refreshMarkers() {
+		if (flow == null) return
+		for (inst in built.values) {
+			val marker = (inst.node as? Node.Element)?.defaultStyle?.marker ?: continue
+			val box = views[inst.id] as? MarklessBox ?: continue
+			val items = (0 until box.childCount).map { box.getChildAt(it) }.filter { v -> built[views.entries.firstOrNull { it.value === v }?.key]?.node.let { it is Node.Element && it.element == "li" } }
+			box.markers = items.withIndex().associate { (i, v) -> v to if (marker == "decimal") "${i + 1}." else "•" }
+		}
 	}
 
 	private fun shownInstances(): List<Instance> = payload.nodes.filter { it is Node.Element || it is Node.Text }.flatMap(runtime::instances)
 
 	private fun removeHidden() {
 		val live = shownInstances().mapTo(HashSet()) { it.id }
+		members.retainAll(live)
+		heldTexts.keys.retainAll(live)
 		for (inst in built.values.sortedByDescending { order.getValue(it.node.id) }) {
 			if (inst.id in live) continue
 			val view = views.remove(inst.id)!!
 			built.remove(inst.id)
 			textViews.remove(inst.id)
-			if (inst.node is Node.Text && view is Button) continue
+			if ((inst.node is Node.Text || flow?.flowing(inst.node) == true) && view is Button) continue
 			expanded.remove(view)
 			(view.parent as? ViewGroup)?.let { p ->
 				(p as? MarklessBox)?.frames?.remove(view)
@@ -275,23 +329,65 @@ class MarklessHost(
 	}
 
 	private fun buildShown() {
+		val fresh = ArrayList<String>()
 		for (inst in shownInstances()) {
+			val node = inst.node
+			if (flow != null) {
+				if (node is Node.Text && inst.id !in heldTexts) heldTexts[inst.id] = runtime.text(node, inst.scope)
+				val lead = flow.leadOf[node.id]
+				if (lead != null && lead != node.id) { members.add(inst.id); continue }
+			}
 			if (inst.id in views) continue
-			val view = when (val node = inst.node) {
-				is Node.Element -> element(node, inst)
-				is Node.Text -> text(node, inst)
+			val view = when {
+				flow != null && flow.leadOf[node.id] == node.id -> paragraph(inst).also { fresh.add(inst.id) }
+				node is Node.Element -> element(node, inst)
+				node is Node.Text -> text(node, inst)
 				else -> continue
 			}
 			views[inst.id] = view
 			built[inst.id] = inst
 			val parentId = parentOf(inst)
-			if (parentId != null && view !== views[parentId]) {
-				val parent = views[parentId] as? MarklessBox ?: throw MarklessHostError("\"${inst.id}\" is inside \"$parentId\", which cannot hold children on Android")
-				parent.addView(view)
-				reorder(parent)
+			val parent = if (parentId != null) views[parentId] else pageBox
+			if (parent != null && view !== parent) {
+				val box = parent as? MarklessBox ?: throw MarklessHostError("\"${inst.id}\" is inside \"$parentId\", which cannot hold children on Android")
+				box.addView(view)
+				reorder(box)
 			}
 			style?.let { place(inst, view, it) }
 		}
+		for (id in fresh) render(id)
+	}
+
+	/** The one text view of the paragraph that starts at [inst]; a button whose text it is shows it as its own. */
+	private fun paragraph(inst: Instance): TextView {
+		val f = flow!!
+		val parent = parentOf(inst)?.let { views.getValue(it) } ?: pageBox!!
+		val block = f.blockText(inst.node.parent)
+		val view: TextView = if (parent is Button) {
+			if (textViews.values.any { it === parent }) throw MarklessHostError("button \"${inst.node.parent}\" has more than one paragraph; Android holds one per button")
+			parent
+		} else TextView(context).apply {
+			includeFontPadding = false
+			isClickable = false
+			isFocusable = false
+			named(this, inst.id, heading = parent.isAccessibilityHeading)
+		}
+		if (view !is Button || block != BlockText(false, false, false, 1.0, false)) {
+			view.typeface = Typeface.create(if (block.monospace) Typeface.MONOSPACE else Typeface.DEFAULT, when {
+				block.bold && block.italic -> Typeface.BOLD_ITALIC
+				block.bold -> Typeface.BOLD
+				block.italic -> Typeface.ITALIC
+				else -> Typeface.NORMAL
+			})
+			view.setTextSize(TypedValue.COMPLEX_UNIT_PX, (baseTextSize * block.size).toFloat())
+		}
+		if (block.preformatted) {
+			view.setHorizontallyScrolling(true)
+			view.isHorizontalScrollBarEnabled = true
+			view.movementMethod = android.text.method.ScrollingMovementMethod()
+		}
+		textViews[inst.id] = view
+		return view
 	}
 
 	/** The instance id of [inst]'s parent: in the same row when the parent is a row node too. */
@@ -320,13 +416,16 @@ class MarklessHost(
 		for (v in wanted) box.addView(v)
 	}
 
-	private fun named(view: View, id: String, heading: Boolean = false, control: Boolean = false, link: Boolean = false) {
+	private fun named(view: View, id: String, heading: Boolean = false, control: Boolean = false, link: Boolean = false, image: Boolean = false) {
 		view.isAccessibilityHeading = heading
+		// A drawing is read only when it is named (an `aria-label`, or its <title>); an unnamed one is decoration.
+		if (image) view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
 		view.accessibilityDelegate = object : View.AccessibilityDelegate() {
 			override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
 				super.onInitializeAccessibilityNodeInfo(host, info)
 				info.viewIdResourceName = id
 				if (control) info.className = Button::class.java.name
+				if (image) info.className = android.widget.ImageView::class.java.name
 				val current = attrs[id].orEmpty()
 				if (current["role"] == "switch") {
 					info.className = "android.widget.Switch"
@@ -344,8 +443,12 @@ class MarklessHost(
 
 	private fun element(node: Node.Element, inst: Instance): View {
 		// A Button holds one text run; a button with an element inside (a switch's thumb) is a box that reads as a Button.
-		val holdsElements = payload.nodes.any { it.parent == node.id && it is Node.Element }
-		val view = when (if (node.element == "button" && holdsElements) "box-button" else node.element) {
+		val holdsElements = payload.nodes.any { it.parent == node.id && it is Node.Element && flow?.flowing(it) != true }
+		val drawing = node.drawing
+		val unstyled = flow?.let { node.defaultStyle }
+		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (drawing != null) "drawing" else if (unstyled?.rule == true) "rule" else node.element) {
+			"drawing" -> DrawingView(context, drawing!!, baseTextSize * (flow?.blockText(node.parent)?.size ?: 1.0)).also { named(it, inst.id, image = true) }
+			"rule" -> RuleView(context).also { named(it, inst.id) }
 			"box-button" -> MarklessBox(context).apply { isClickable = true; isFocusable = true; named(this, inst.id, control = true) }
 			"button" -> Button(context).apply {
 				background = null
@@ -373,7 +476,13 @@ class MarklessHost(
 				if (style != null) { background = null; setPadding(0, 0, 0, 0) }
 				named(this, inst.id)
 			}
-			else -> MarklessBox(context).apply { named(this, inst.id, heading = node.element in HEADINGS, control = events[node.id].orEmpty().any { it.event == EventName.Activate }, link = node.element == "a") }
+			else -> MarklessBox(context).apply {
+				named(this, inst.id, heading = node.element in HEADINGS, control = events[node.id].orEmpty().any { it.event == EventName.Activate }, link = node.element == "a")
+				unstyled?.let { s ->
+					table = s.table?.takeIf { it != "cell" }
+					if (s.indent > 0) setPaddingRelative((s.indent * dpr).roundToInt(), 0, 0, 0)
+				}
+			}
 		}
 		views[inst.id] = view
 		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
@@ -400,7 +509,7 @@ class MarklessHost(
 	}
 
 	private fun text(node: Node.Text, inst: Instance): View {
-		val parent = views.getValue(parentOf(inst)!!)
+		val parent = views.getValue(parentOf(inst) ?: throw MarklessHostError("text \"${inst.id}\" at the top of a styled page"))
 		val view: TextView = if (parent is Button) {
 			if (textViews.values.any { it === parent }) throw MarklessHostError("button \"${node.parent}\" has more than one text run; Android holds one per button")
 			parent
@@ -426,7 +535,10 @@ class MarklessHost(
 				view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
 				view.setOnClickListener { views[value]?.performClick() }
 			}
-			"aria-label" -> if (view is AudioButton) view.label(value) else view.contentDescription = value
+			"aria-label" -> if (view is AudioButton) view.label(value) else {
+				view.contentDescription = value
+				if (view is DrawingView && current["aria-hidden"] != "true") view.importantForAccessibility = if (value != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO
+			}
 			"alt" -> if (view is SizedImage) view.contentDescription = value
 			"src" -> when (view) {
 				is SizedImage -> view.show(value)
@@ -436,7 +548,7 @@ class MarklessHost(
 			"disabled" -> view.isEnabled = value == null
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
-			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else if (view is DrawingView) (if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO) else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
 			// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
 			"hidden" -> if (style == null) view.visibility = if (value != null) View.GONE else View.VISIBLE
 		}
@@ -612,7 +724,7 @@ class MarklessHost(
 				typeface = fonts.typeface(w.family)
 				setTextSize(TypedValue.COMPLEX_UNIT_PX, (w.size * dpr).toFloat())
 			}
-			is StyleWrite.TextColor -> (view as? TextView ?: throw MarklessHostError("text colour on \"${s.id}\", which is not text")).setTextColor(w.color.argb)
+			is StyleWrite.TextColor -> if (view is DrawingView) view.currentColor = w.color.argb else (view as? TextView ?: throw MarklessHostError("text colour on \"${s.id}\", which is not text")).setTextColor(w.color.argb)
 		}
 		if (s.kind == "text") {
 			if (view !is Button) view.background = null

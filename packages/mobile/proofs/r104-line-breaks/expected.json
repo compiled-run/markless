@@ -1,0 +1,26 @@
+{
+	"rung": "R104",
+	"name": "A <br> breaks the line inside its paragraph",
+	"steps": [
+		{
+			"visible": ["Line breaks", "Longword", "Now in Lyon"],
+			"visibleOn": {
+				"ios": ["Ada Lovelace\n12 Rue Example\nLyon"],
+				"android": ["Ada Lovelace\n12 Rue Example\nLyon"],
+				"web": ["Ada Lovelace12 Rue ExampleLyon"]
+			}
+		},
+		{
+			"do": {
+				"tap": "Move"
+			},
+			"visible": ["Now in Paris"],
+			"visibleOn": {
+				"ios": ["Ada Lovelace\n12 Rue Example\nParis"],
+				"android": ["Ada Lovelace\n12 Rue Example\nParis"],
+				"web": ["Ada Lovelace12 Rue ExampleParis"]
+			},
+			"absent": ["Now in Lyon"]
+		}
+	]
+}

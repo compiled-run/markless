@@ -1,0 +1,5 @@
+{
+	"rung": "R111",
+	"name": "An inline SVG icon is drawn natively, and named by its label",
+	"steps": [{ "visible": ["Icon", "GitHub", "Two icons above"] }]
+}

@@ -1,0 +1,15 @@
+{
+	"rung": "R103",
+	"name": "A <pre> keeps its spaces and line breaks in monospace",
+	"steps": [
+		{
+			"visible": ["Preformatted", "lines: 1"],
+			"visibleOn": {
+				"ios": ["let a = 1;\n  let b = 2;"],
+				"android": ["let a = 1;\n  let b = 2;"],
+				"web": ["let a = 1; let b = 2;"]
+			}
+		},
+		{ "do": { "tap": "Add line" }, "visible": ["lines: 2"], "absent": ["lines: 1"] }
+	]
+}

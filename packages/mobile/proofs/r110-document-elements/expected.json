@@ -1,0 +1,17 @@
+{
+	"rung": "R110",
+	"name": "Metadata, hints, data scripts, templates and noscript show nothing, as on the web",
+	"steps": [
+		{
+			"visible": ["Metadata", "Visits 0"],
+			"absent": ["Template content", "Scripts are off"]
+		},
+		{
+			"do": {
+				"tap": "Visit"
+			},
+			"visible": ["Visits 1"],
+			"absent": ["Visits 0"]
+		}
+	]
+}
