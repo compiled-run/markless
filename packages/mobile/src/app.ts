@@ -123,6 +123,8 @@ export function createNativeAppRuntime(
 				entry.page as NativeViewPayload,
 				store,
 				params,
+				undefined,
+				undefined,
 				scriptHost,
 			),
 		};

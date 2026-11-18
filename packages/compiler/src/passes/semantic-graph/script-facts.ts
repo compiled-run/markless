@@ -64,6 +64,36 @@ function cloneWith(node: AnyNode, replace: (node: AnyNode) => AnyNode | undefine
 	// `{ count }` reads `count`; once `count` is spelled `__s.count`, the property says so.
 	if (copy.type === 'Property' && copy.shorthand === true && copy.value !== node.value)
 		copy.shorthand = false;
+	// Hermes runs async functions but not async arrows: one becomes an async function bound to the `this` around it.
+	if (copy.type === 'ArrowFunctionExpression' && copy.async === true) {
+		const body = copy.body as AnyNode;
+		const fn = {
+			type: 'FunctionExpression',
+			id: null,
+			async: true,
+			generator: false,
+			params: copy.params,
+			body:
+				body.type === 'BlockStatement'
+					? body
+					: {
+							type: 'BlockStatement',
+							body: [{ type: 'ReturnStatement', argument: body }],
+						},
+		};
+		return {
+			type: 'CallExpression',
+			callee: {
+				type: 'MemberExpression',
+				object: fn,
+				property: identifier('bind'),
+				computed: false,
+				optional: false,
+			},
+			arguments: [{ type: 'ThisExpression' }],
+			optional: false,
+		} as unknown as AnyNode;
+	}
 	return copy as AnyNode;
 }
 
@@ -383,7 +413,12 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 	}
 	const statements: SemanticScriptStatement[] = [];
 	const exports: SemanticScriptExport[] = [];
-	const describe = (node: AnyNode, declares: string[], effect: boolean): void => {
+	const describe = (
+		node: AnyNode,
+		declares: string[],
+		effect: boolean,
+		range: AnyNode = node,
+	): void => {
 		const replaced = new Map<AnyNode, AnyNode>();
 		const uses = new Set<string>();
 		const used = new Map<string, { slot: number; name: string | null }>();
@@ -393,7 +428,7 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 		const unsupported: { construct: string; span: SourceSpan }[] = [];
 		for (const reference of semantic.references) {
 			const at = reference.node as unknown as AnyNode;
-			if (reference.inTypePosition || !within(at as never, node as never)) continue;
+			if (reference.inTypePosition || !within(at as never, range as never)) continue;
 			const binding = reference.binding;
 			if (!binding) {
 				globals.push(globalOf(semantic, reference, filename));
@@ -492,6 +527,7 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 				} as unknown as AnyNode,
 				['__default'],
 				false,
+				declaration,
 			);
 			exports.push({ name: 'default', local: '__default' });
 			continue;

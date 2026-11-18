@@ -27,6 +27,10 @@
 				"parent": "h0",
 				"attributes": {
 					"class": "title mk-u81dxg"
+				},
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
 				}
 			},
 			{

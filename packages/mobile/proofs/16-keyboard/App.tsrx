@@ -1,0 +1,90 @@
+import { state } from '@markless/core';
+
+export default function App() @{
+	let note = state('');
+	<main>
+		<h1>Keyboard</h1>
+		<p>Line 1</p>
+		<p>Line 2</p>
+		<p>Line 3</p>
+		<p>Line 4</p>
+		<p>Line 5</p>
+		<p>Line 6</p>
+		<p>Line 7</p>
+		<p>Line 8</p>
+		<p>Line 9</p>
+		<p>Line 10</p>
+		<p>Line 11</p>
+		<p>Line 12</p>
+		<p>Line 13</p>
+		<p>Line 14</p>
+		<p>Line 15</p>
+		<p>Line 16</p>
+		<p>Line 17</p>
+		<p>Line 18</p>
+		<p>Line 19</p>
+		<p>Line 20</p>
+		<p>Line 21</p>
+		<p>Line 22</p>
+		<p>Line 23</p>
+		<p>Line 24</p>
+		<p>Line 25</p>
+		<p>Line 26</p>
+		<p>Line 27</p>
+		<p>Line 28</p>
+		<p>Line 29</p>
+		<p>Line 30</p>
+		<p>Line 31</p>
+		<p>Line 32</p>
+		<p>Line 33</p>
+		<p>Line 34</p>
+		<p>Line 35</p>
+		<p>Line 36</p>
+		<p>Line 37</p>
+		<p>Line 38</p>
+		<p>Line 39</p>
+		<p>Line 40</p>
+		<p>Line 41</p>
+		<p>Line 42</p>
+		<p>Line 43</p>
+		<p>Line 44</p>
+		<p>Line 45</p>
+		<p>Line 46</p>
+		<p>Line 47</p>
+		<p>Line 48</p>
+		<p>Line 49</p>
+		<p>Line 50</p>
+		<p>Line 51</p>
+		<p>Line 52</p>
+		<p>Line 53</p>
+		<p>Line 54</p>
+		<p>Line 55</p>
+		<p>Line 56</p>
+		<p>Line 57</p>
+		<p>Line 58</p>
+		<p>Line 59</p>
+		<p>Line 60</p>
+		<p>Line 61</p>
+		<p>Line 62</p>
+		<p>Line 63</p>
+		<p>Line 64</p>
+		<p>Line 65</p>
+		<p>Line 66</p>
+		<p>Line 67</p>
+		<p>Line 68</p>
+		<p>Line 69</p>
+		<p>Line 70</p>
+		<p>Line 71</p>
+		<p>Line 72</p>
+		<p>Line 73</p>
+		<p>Line 74</p>
+		<p>Line 75</p>
+		<p>Line 76</p>
+		<p>Line 77</p>
+		<p>Line 78</p>
+		<p>Line 79</p>
+		<p>Line 80</p>
+		<p>Note says {note}</p>
+		<input aria-label="Note" value={note} onInput={(event) => (note = event.currentTarget.value)} />
+	</main>
+}

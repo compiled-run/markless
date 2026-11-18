@@ -1,0 +1,7 @@
+appId: ${APP_ID}
+name: r112-svg-shapes
+---
+- launchApp:
+      clearState: true
+- assertVisible: Shapes
+- assertVisible: Six shapes

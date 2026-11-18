@@ -36,7 +36,11 @@
 				"kind": "element",
 				"id": "h1",
 				"element": "h1",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
 			},
 			{
 				"kind": "text",
@@ -138,6 +142,7 @@
 					{
 						"op": "script",
 						"fn": "fn:0",
+						"type": "click",
 						"bindings": {
 							"heading": {
 								"cell": "state:heading"
@@ -155,6 +160,7 @@
 					{
 						"op": "script",
 						"fn": "fn:1",
+						"type": "click",
 						"bindings": {
 							"price": {
 								"cell": "state:price"

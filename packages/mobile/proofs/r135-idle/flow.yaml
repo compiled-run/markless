@@ -1,0 +1,25 @@
+appId: ${APP_ID}
+name: r135-idle
+---
+- launchApp:
+      clearState: true
+- assertVisible: Idle 1
+- assertVisible: More
+- assertNotVisible: Idle 0
+- assertNotVisible: Idle 2
+- assertNotVisible: More idle once
+- tapOn: More
+- assertVisible: More idle once
+- assertVisible: More idle once
+- assertVisible: Idle 1
+- assertNotVisible: More waiting
+- tapOn: More
+- assertNotVisible: More idle once
+- assertVisible: Idle 1
+- assertNotVisible: More idle once
+- assertNotVisible: More idle again
+- tapOn: More
+- assertVisible: More idle again
+- assertVisible: More idle again
+- assertVisible: Idle 1
+- assertNotVisible: More idle once

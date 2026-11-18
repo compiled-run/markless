@@ -14,6 +14,14 @@ import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.arr
+import dev.markless.mobile.core.field
+import dev.markless.mobile.core.num
+import dev.markless.mobile.core.ScrollAlign
+import dev.markless.mobile.core.ScrollAlignment
+import dev.markless.mobile.core.ScrollBox
+import dev.markless.mobile.core.ScrollRange
+import dev.markless.mobile.core.ScrollRect
+import dev.markless.mobile.core.scrollIntoView
 import dev.markless.mobile.core.jsonString
 import dev.markless.mobile.core.jsonValue
 import dev.markless.mobile.core.num
@@ -54,7 +62,9 @@ private fun runVector(file: File) {
 	check("${file.name} version", version == CONFORMANCE_VERSION) { "vector version is $version, this test reads $CONFORMANCE_VERSION" }
 	val payload = Payload.decode(field(vector, "payload", file.name))
 	val params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap()
-	val runtime = Runtime(payload, params = params)
+	val languages = vector["preferredLanguages"]?.arr("preferredLanguages")?.map { it.str("preferredLanguages[]") } ?: listOf("en")
+	val now = (vector["now"] as? Json.Num)?.value
+	val runtime = if (now == null) Runtime(payload, params = params, preferredLanguages = languages) else Runtime(payload, params = params, preferredLanguages = languages, now = { now })
 	val mounted = runtime.texts().joinToString(",", "[", "]") { (n, t) -> "[${jsonString(n)},${jsonString(t)}]" }
 	val initial = canonical(field(vector, "initial", file.name))
 	check("${file.name} initial", mounted == initial) { "expected $initial\n  actual   $mounted" }
@@ -67,6 +77,9 @@ private fun runVector(file: File) {
 	val rows = runtime.rows().joinToString(",", "[", "]") { (n, keys) -> "[${jsonString(n)},${keys.joinToString(",", "[", "]", transform = ::jsonString)}]" }
 	val initialRows = vector["initialRows"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialRows", rows == initialRows) { "expected $initialRows\n  actual   $rows" }
+	val checks = runtime.checks().joinToString(",", "[", "]") { (n, c) -> "[${jsonString(n)},$c]" }
+	val initialChecks = vector["initialChecks"]?.let(::canonical) ?: "[]"
+	check("${file.name} initialChecks", checks == initialChecks) { "expected $initialChecks\n  actual   $checks" }
 	val arms = runtime.arms().joinToString(",", "[", "]") { (n, i) -> "[${jsonString(n)},${i ?: "null"}]" }
 	val initialArms = vector["initialArms"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialArms", arms == initialArms) { "expected $initialArms\n  actual   $arms" }
@@ -103,6 +116,13 @@ private fun runVector(file: File) {
 				error != null -> runtime.settleError(cell, field(error, "name", "error").str("name"), field(error, "message", "error").str("message"))
 				else -> runtime.settle(cell, JsValue.fromJson(field(action, "value", "action")))
 			}
+			val expected = canonical(field(s, "journal", "steps[$n]"))
+			val actual = journal.joinToString(",", "[", "]") { it.toJson() }
+			check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
+			continue
+		}
+		if (event == "timer") {
+			val journal = runtime.timer(field(action, "timer", "action").str("timer"))
 			val expected = canonical(field(s, "journal", "steps[$n]"))
 			val actual = journal.joinToString(",", "[", "]") { it.toJson() }
 			check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
@@ -371,6 +391,30 @@ private fun appStyle(fixtures: File) {
 	refusesApp("an unknown route field", text.replace("\"pattern\":\"/help\"", "\"pattern\":\"/help\",\"extra\":1"), "unknown field \"extra\"")
 }
 
+/** The scroll-into-view vectors (`conformance/scroll/`), which ladder-web checks against Chrome. */
+private fun scrollVectors(dir: File) {
+	val file = File(dir, "scroll/scroll-into-view.json")
+	val root = Json.parse(file.readBytes()).obj("scroll vectors")
+	check("scroll vectors version", root.field("version", "scroll").str("version") == "markless.native-scroll/0") { "" }
+	val rect = { v: Json -> v.obj("rect").let { ScrollRect(it.field("x", "rect").num("x"), it.field("y", "rect").num("y"), it.field("width", "rect").num("width"), it.field("height", "rect").num("height")) } }
+	val cases = root.field("cases", "scroll").arr("cases")
+	check("scroll vectors have cases", cases.isNotEmpty()) { "" }
+	for (c in cases) {
+		val o = c.obj("case")
+		val name = o.field("name", "case").str("name")
+		val chain = o.field("chain", name).arr("chain").map { b ->
+			val box = b.obj("box")
+			val offset = box.field("offset", name).obj("offset")
+			val range = box.field("range", name).obj("range")
+			ScrollBox(rect(box.field("port", name)), offset.field("x", name).num("x"), offset.field("y", name).num("y"), ScrollRange(range.field("minX", name).num("minX"), range.field("maxX", name).num("maxX"), range.field("minY", name).num("minY"), range.field("maxY", name).num("maxY")))
+		}
+		val align = o.field("align", name).obj("align")
+		val got = scrollIntoView(chain, rect(o.field("target", name)), ScrollAlignment(ScrollAlign.of(align.field("block", name).str("block")), ScrollAlign.of(align.field("inline", name).str("inline"))))
+		val want = o.field("offsets", name).arr("offsets").map { it.obj("offset").let { p -> p.field("x", name).num("x") to p.field("y", name).num("y") } }
+		check("scroll: $name", got == want) { "$got, expected $want" }
+	}
+}
+
 fun main(args: Array<String>) {
 	routes()
 	arrays()
@@ -383,6 +427,7 @@ fun main(args: Array<String>) {
 	appCanvas(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)
+	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)
 	val files = dirs.flatMap { d -> d.listFiles { f -> f.name.endsWith(".json") }?.sortedBy { it.name } ?: error("no vector directory $d") }
 	if (files.isEmpty()) { println("FAIL no conformance vectors in ${args.joinToString()}"); failures++ }
 	for (f in files) try { runVector(f) } catch (e: Exception) { failures++; println("FAIL ${f.name}: $e") }

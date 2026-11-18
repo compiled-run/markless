@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
+import { NATIVE_REFUSALS } from '@markless/compiler/native';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '@markless/router';
 import type {
 	NativeAppPayload,
@@ -13,6 +14,7 @@ import {
 	createNativeAppRuntime,
 	createNativeRuntime,
 	type NativeAction,
+	nativeShownTexts,
 	type NativeRuntime,
 } from '../src/index.ts';
 import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harness/rung.ts';
@@ -32,8 +34,6 @@ import {
 // The native column before any device: each rung's payload, run by the reference runtime, must show what the
 // web build shows; a rung the compiler cannot lower yet must be refused by name, never emitted half right.
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
-/** What a handler running as JavaScript uses that no phone script has. */
-const NATIVE_SCRIPT = 'MARKLESS_NATIVE_SCRIPT';
 const NATIVE_KEYBOARD_ONLY = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
 const REFUSED_RUNGS = new Set(['11-async', 'y4-sheet-beside-drawer', 'j7-page-refused']);
@@ -44,11 +44,11 @@ const REFUSED_RUNGS = new Set(['11-async', 'y4-sheet-beside-drawer', 'j7-page-re
  */
 function scriptServices() {
 	let now = 0;
-	const timers = new Map<number, number>();
+	const timers = new Map<string, number>();
 	const host = nodeScriptHost('00'.repeat(32));
 	const answer = (entry: NativeJournalEntry): NativeAction | undefined => {
-		if (entry.op === 'timer') timers.set(entry.id, now + entry.ms);
-		else if (entry.op === 'clearTimer') timers.delete(entry.id);
+		if (entry.op === 'timer') timers.set(entry.timer, now + entry.ms);
+		else if (entry.op === 'clearTimer') timers.delete(entry.timer);
 		else if (entry.op === 'fetch') {
 			const url = new URL(entry.request.url);
 			const contentType =
@@ -79,11 +79,11 @@ function scriptServices() {
 		for (;;) {
 			const due = [...timers]
 				.filter(([, at]) => at <= end)
-				.sort((a, b) => a[1] - b[1] || a[0] - b[0])[0];
+				.sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))[0];
 			if (!due) break;
 			now = due[1];
 			timers.delete(due[0]);
-			fire({ event: 'timer', id: due[0] });
+			fire({ event: 'timer', timer: due[0] });
 		}
 		now = end;
 	};
@@ -95,6 +95,7 @@ function mirror(
 	payload: NativeViewPayload,
 	opened: NativeRuntime,
 	store: Map<string, NativeValue> = new Map(),
+	styled = false,
 ) {
 	let runtime = opened;
 	const texts = new Map<string, string>();
@@ -201,7 +202,9 @@ function mirror(
 					value,
 				);
 			}
-			const shown = [...texts.values(), ...labels().map(([, label]) => label)];
+			// Without a style export a host flows text as the browser's default stylesheet does; with one, Dragon lays it out.
+			const read = styled ? [...texts.values()] : nativeShownTexts(payload, texts);
+			const shown = [...read, ...labels().map(([, label]) => label)];
 			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 			for (const text of step.absent ?? [])
 				expect(shown, `step ${index}`).not.toContain(text);
@@ -239,13 +242,20 @@ function mirror(
  * The navigation column: a stack of mirrored screens. A `navigate` entry pushes (or replaces the top with) a new
  * screen built from the app runtime's own; Back pops and the screen below must still show what it was left with.
  */
-function walkApp(app: NativeAppPayload, steps: readonly LadderStep[], start: string) {
+function walkApp(
+	app: NativeAppPayload,
+	steps: readonly LadderStep[],
+	start: string,
+	styled: ReadonlySet<string> = new Set(),
+) {
 	const services = scriptServices();
 	const appRuntime = createNativeAppRuntime(app, start, new Map(), services.host);
 	const pageOf = (route: string) => app.routes.find((entry) => entry.pattern === route)!.page;
 	const stack = appRuntime
 		.screens()
-		.map((screen) => mirror(pageOf(screen.route), screen.runtime));
+		.map((screen) =>
+			mirror(pageOf(screen.route), screen.runtime, new Map(), styled.has(screen.route)),
+		);
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
 		if (action && 'back' in action) {
@@ -280,7 +290,14 @@ function walkApp(app: NativeAppPayload, steps: readonly LadderStep[], start: str
 				const opened = appRuntime.screens().at(-1)!;
 				expect(opened.route, `step ${index}: the screen opened`).toBe(entry.route);
 				if (entry.replace) stack.pop();
-				stack.push(mirror(pageOf(opened.route), opened.runtime));
+				stack.push(
+					mirror(
+						pageOf(opened.route),
+						opened.runtime,
+						new Map(),
+						styled.has(opened.route),
+					),
+				);
 			}
 			for (const next of answered)
 				for (const entry of appRuntime.dispatch(next)) stack.at(-1)!.apply(entry, index);
@@ -301,6 +318,8 @@ function walk(
 	params: Readonly<Record<string, string>>,
 	position: LadderRung['location'],
 	target: 'ios' | 'android',
+	styled = false,
+	belowFold?: string,
 ) {
 	const store = new Map<string, NativeValue>();
 	let calls: string[] = [];
@@ -343,8 +362,10 @@ function walk(
 					error: { name: 'NotAllowedError', message: 'Location was refused' },
 				});
 	const services = scriptServices();
+	// The device's clock: a second passes between a person's actions.
+	let clock = Date.now();
 	const start = () => {
-		const r = createNativeRuntime(payload, store, params, services.host);
+		const r = createNativeRuntime(payload, store, params, undefined, () => clock, services.host);
 		for (const cell of payload.cells)
 			if (cell.device)
 				r.dispatch({ event: 'device', cell: cell.id, value: deviceValue(cell.device) });
@@ -376,6 +397,8 @@ function walk(
 		for (const [node, , value] of runtime.properties()) properties.set(node, value);
 		sheetOpen.clear();
 		for (const [node, open] of runtime.sheets()) sheetOpen.set(node, open);
+		checks.clear();
+		for (const [node, checked] of runtime.checks()) checks.set(node, checked);
 	};
 	const nodeOf = new Map(payload.nodes.map((node) => [node.id, node]));
 	// A closed <dialog> shows nothing (the UA's dialog:not([open]) rule); the journal opens and closes it.
@@ -483,7 +506,27 @@ function walk(
 		const node = shownTexts().find(([id, shown]) => shown === text && !hiddenWithin(id))?.[0];
 		return node ? parentOf(node) : undefined;
 	};
-	function apply(dispatched: ReadonlyArray<NativeJournalEntry>, index: number) {
+	// A field's text: what its `value` binding or attribute gave it, then what was typed or the journal wrote.
+	const staticValue = (id: string) => {
+		const node = nodeOf.get(id);
+		return node?.kind === 'element' && node.element === 'input' && !properties.has(id)
+			? (node.attributes?.['value'] ?? '')
+			: undefined;
+	};
+	const typed = new Map<string, string>();
+	const checks = new Map(runtime.checks());
+	const attributeNow = (id: string, name: string) => {
+		const bound = attributes.get(`${id}\0${name}`);
+		if (bound !== undefined) return bound;
+		const node = nodeOf.get(id);
+		return node?.kind === 'element' ? (node.attributes?.[name] ?? null) : null;
+	};
+	const fieldText = (id: string) => typed.get(id) ?? properties.get(id) ?? staticValue(id);
+	// Timers the journal set, on a clock that only `wait` moves; a host shows a blocked submit's message until the next action.
+	let now = 0;
+	let timers: { readonly timer: string; readonly due: number }[] = [];
+	let invalid: string | undefined;
+	function apply(dispatched: ReadonlyArray<NativeJournalEntry>, index: number, at = now) {
 		const answered: Array<() => ReadonlyArray<NativeJournalEntry>> = [];
 		for (const entry of dispatched) {
 			if (entry.op === 'call') {
@@ -558,11 +601,19 @@ function walk(
 						payload.cells.some((cell) => cell.object === object && cell.device === name)
 					)
 						answered.push(() => setObject(object, name, value));
-			} else if (entry.op === 'text') texts.set(entry.node, entry.value);
+			} else if (entry.op === 'timer') timers.push({ timer: entry.timer, due: at + entry.ms });
+			else if (entry.op === 'clearTimer') timers = timers.filter((timer) => timer.timer !== entry.timer);
+			else if (entry.op === 'invalid') invalid = entry.message;
+			else if (entry.op === 'text') texts.set(entry.node, entry.value);
 			else if (entry.op === 'dialog') openDialogs.set(entry.node, entry.open);
 			else if (entry.op === 'attribute')
 				attributes.set(`${entry.node}\0${entry.name}`, entry.value);
-			else if (entry.op === 'property') properties.set(entry.node, entry.value);
+			else if (entry.op === 'property' && entry.name === 'checked')
+				checks.set(entry.node, entry.value);
+			else if (entry.op === 'property') {
+				properties.set(entry.node, entry.value);
+				typed.delete(entry.node);
+			}
 			else if (entry.op === 'navigate') {
 				// One page per rung: a navigation opens this page again with the link's params.
 				expect(entry.route, `step ${index}: the link's route`).toBe(payload.route?.pattern);
@@ -633,6 +684,7 @@ function walk(
 	startTasks();
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
+		if (action) invalid = undefined;
 		if (action && 'relaunch' in action) {
 			if (action.permissions?.location === 'unset') permission = 'unknown';
 			// Android remembers a refusal across a revoke: access stays denied, and the system still asks again.
@@ -647,6 +699,7 @@ function walk(
 			// The test build's call label starts over with the app.
 			calls = [];
 			runtime = start();
+			typed.clear();
 			mount();
 			startTasks();
 		} else if (action && 'device' in action) {
@@ -667,11 +720,19 @@ function walk(
 				if (given === 'granted') recording.set(object, 0);
 				else apply(setObject(object, 'recorder.active', false), index);
 		} else if (action && 'wait' in action) {
-			services.advance(action.wait, (fired) => apply(runtime.dispatch(fired), index));
 			for (const [object, seconds] of recording) {
-				const now = seconds + Math.floor(action.wait / 1000);
-				recording.set(object, now);
-				apply(setObject(object, 'recorder.seconds', now), index);
+				const elapsed = seconds + Math.floor(action.wait / 1000);
+				recording.set(object, elapsed);
+				apply(setObject(object, 'recorder.seconds', elapsed), index);
+			}
+			now += action.wait;
+			for (
+				let next = timers.sort((x, y) => x.due - y.due)[0];
+				next && next.due <= now;
+				next = timers.sort((x, y) => x.due - y.due)[0]
+			) {
+				timers = timers.filter((timer) => timer !== next);
+				apply(runtime.dispatch({ event: 'timer', timer: next.timer }), index, next.due);
 			}
 		} else if (action && 'dismiss' in action) {
 			if (sheet === undefined) throw new Error(`step ${index}: no share sheet is open`);
@@ -689,12 +750,15 @@ function walk(
 			if (!labels().some(([, label]) => label === action.tap))
 				throw new Error(`step ${index}: no audio control reads "${action.tap}"`);
 			playing = action.tap === 'Play';
-		} else if (action && 'swipe' in action) openSheet(index);
+		} else if (action && 'swipe' in action && action.swipe === 'up') openSheet(index);
+		else if (action && 'swipe' in action) {
+			// Scrolling changes what is on screen, not what the page holds; the devices and the web judge the screen.
+		}
 		else if (action && 'scrollTo' in action) {
 			openSheet(index);
 			if (!shownTexts().some(([, text]) => text === action.scrollTo))
 				throw new Error(`step ${index}: "${action.scrollTo}" is not in the open sheet`);
-		} else if (action && !('tap' in action) && !('type' in action) && !('dismissSheet' in action))
+		} else if (action && !('tap' in action) && !('type' in action) && !('submit' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
@@ -704,32 +768,66 @@ function walk(
 			sheetOpen.set(sheet, false);
 			apply(runtime.dispatch({ event: 'dismiss', host: sheet }), index);
 		} else if (action) {
-			const name = 'tap' in action ? action.tap : action.type.field;
+			const name =
+				'tap' in action ? action.tap : 'type' in action ? action.type.field : action.submit;
 			const host = elementReading(name);
 			if (!host)
 				throw new Error(
 					`step ${index}: nothing reads "${name}" to ${'tap' in action ? 'tap' : 'type into'}`,
 				);
-			if (attributes.get(`${host}\0disabled`) != null)
+			if (attributeNow(host, 'disabled') != null)
 				throw new Error(`step ${index}: "${name}" is disabled`);
 			// Typing shows the text in the field at once; the input event then runs the handler.
-			if ('type' in action) properties.set(host, action.type.text);
+			if ('type' in action) {
+				if (properties.has(host)) properties.set(host, action.type.text);
+				else typed.set(host, action.type.text);
+			}
 			// A touch reaches the nearest element around it that handles a press, as on a phone.
 			let pressed: string | null | undefined = host;
-			while (pressed && !payload.events.some((event) => event.host === pressed && event.event === 'activate'))
+			while (
+				pressed &&
+				!payload.events.some(
+					(event) => event.host === pressed && event.event === 'activate',
+				)
+			)
 				pressed = nodeOf.get(pressed)?.parent;
+			// The return key in a field that submits nothing only puts the keyboard away.
+			const returns = payload.events.some(
+				(event) => event.host === host && event.event === 'enter',
+			);
 			const dispatched =
 				'tap' in action
 					? runtime.dispatch({ event: 'activate', host: pressed ?? host })
-					: runtime.dispatch({ event: 'input', host, value: action.type.text });
+					: 'type' in action
+						? runtime.dispatch({ event: 'input', host, value: action.type.text })
+						: returns
+							? runtime.dispatch({ event: 'enter', host })
+							: [];
 			apply(dispatched, index);
 		}
+		raiseLoadEvents(index);
 		check(index, step);
+		clock += 1000;
+	}
+	// What a host raises once the screen is drawn: `idle` for every element due one, `visible` for each above the fold.
+	function raiseLoadEvents(index: number) {
+		const foldText = belowFold === undefined ? undefined : [...texts].find(([, text]) => text === belowFold)?.[0];
+		const foldNode = foldText === undefined ? -1 : payload.nodes.findIndex((node) => node.id === nodeOf.get(foldText.split('@')[0]!)?.parent);
+		const aboveFold = (instance: string) =>
+			foldNode < 0 || payload.nodes.findIndex((node) => node.id === instance.split('@')[0]) < foldNode;
+		for (;;) {
+			const idle = runtime.due('idle')[0];
+			const visible = runtime.due('visible').find(aboveFold);
+			const host = idle ?? visible;
+			if (host === undefined) return;
+			apply(runtime.dispatch({ event: idle === undefined ? 'visible' : 'idle', host }), index);
+		}
 	}
 	function check(index: number, step: LadderStep) {
+		expect(invalid, `step ${index}: the message of a blocked submit`).toBe(step.invalid);
 		for (const [field, value] of Object.entries(step.fields ?? {})) {
 			const host = elementReading(field);
-			expect(host && properties.get(host), `step ${index}: the field "${field}"`).toBe(value);
+			expect(host && fieldText(host), `step ${index}: the field "${field}"`).toBe(value);
 		}
 		if (step.calls) expect(calls, `step ${index}: the device calls made`).toEqual(step.calls);
 		if (step.engineStarts !== undefined)
@@ -750,21 +848,32 @@ function walk(
 			expect(running ? 'on' : 'off', `step ${index}: the camera session`).toBe(step.camera);
 		}
 		const shown = [
-			...shownTexts()
-				.filter(([id]) => !hiddenWithin(id))
-				.map(([, text]) => text),
+			...(styled
+				? shownTexts()
+						.filter(([id]) => !hiddenWithin(id))
+						.map(([, text]) => text)
+				: nativeShownTexts(
+						payload,
+						new Map(shownTexts().filter(([id]) => !hiddenWithin(id))),
+					)),
 			...labels()
 				.filter(([id]) => !hiddenWithin(id))
 				.map(([, label]) => label),
 		];
 		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
+		expect(shown, `step ${index}: scrolled out of sight, still held`).toEqual(
+			expect.arrayContaining([...(step.offScreen ?? [])]),
+		);
 		if (step.order)
 			expect(shown.filter((text) => step.order!.includes(text))).toEqual(step.order);
+		// `aria-disabled` reports a control as unavailable, as Maestro and Playwright read it, though a press still reaches it.
 		for (const text of step.disabled ?? []) {
 			const host = elementReading(text);
 			expect(
-				host && attributes.get(`${host}\0disabled`),
+				host &&
+					(attributeNow(host, 'disabled') ??
+						(attributeNow(host, 'aria-disabled') === 'true' ? '' : null)),
 				`step ${index}: "${text}" is disabled`,
 			).not.toBeNull();
 		}
@@ -775,6 +884,10 @@ function walk(
 			new Map(runtime.attributes().map(([node, name, value]) => [`${node}\0${name}`, value])),
 			`step ${index}: the journal left an attribute stale`,
 		).toEqual(attributes);
+		expect(
+			new Map(runtime.checks()),
+			`step ${index}: the journal left a checkbox stale`,
+		).toEqual(checks);
 		expect(
 			new Map(runtime.properties().map(([node, , value]) => [node, value])),
 			`step ${index}: the journal left a field stale`,
@@ -814,12 +927,16 @@ test.each(
 		if (build.payload === null) {
 			// Every refusal is named; a keyboard-only handler left out is a warning beside them, never the reason.
 			expect(build.diagnostics.some((diagnostic) => diagnostic.severity === 'error')).toBe(true);
+			const refusalCodes = new Set<string>([
+				NATIVE_UNSUPPORTED,
+				...Object.values(NATIVE_REFUSALS).map((refusal) => refusal.code),
+			]);
 			expect(
 				build.diagnostics.map((diagnostic) => [diagnostic.severity, diagnostic.code]),
 			).toEqual(
 				build.diagnostics.map((diagnostic) =>
-					diagnostic.severity === 'error'
-						? ['error', diagnostic.code === NATIVE_SCRIPT ? NATIVE_SCRIPT : NATIVE_UNSUPPORTED]
+					diagnostic.severity === 'error' && refusalCodes.has(diagnostic.code)
+						? ['error', diagnostic.code]
 						: ['warning', NATIVE_KEYBOARD_ONLY],
 				),
 			);
@@ -833,7 +950,15 @@ test.each(
 			...step,
 			visible: [...step.visible, ...(step.visibleOn?.[target] ?? [])],
 		}));
-		walk(build.payload, steps, opened?.params ?? {}, rung.location, target);
+		walk(
+			build.payload,
+			steps,
+			opened?.params ?? {},
+			rung.location,
+			target,
+			build.styles.length > 0 || build.stylesheets.length > 0,
+			rung.belowFold,
+		);
 	},
 );
 
@@ -845,6 +970,11 @@ test.each([...navRungFolders(), ...styleRungFolders()])(
 		expect(
 			build.diagnostics.map((diagnostic) => `${diagnostic.page}: ${diagnostic.message}`),
 		).toEqual([]);
-		walkApp(build.payload!, rung.steps, rung.start ?? '/');
+		walkApp(
+			build.payload!,
+			rung.steps,
+			rung.start ?? '/',
+			new Set(build.styleInputs.map((input) => input.pattern)),
+		);
 	},
 );

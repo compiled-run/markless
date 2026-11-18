@@ -13,6 +13,12 @@ import { resolvePackageModule } from '../src/harness/rung.ts';
 type Module = { readonly filename: string; readonly source: string };
 type ReadModule = (specifier: string, importer: string) => Module | undefined;
 type PageDiagnostic = CompilerDiagnostic & { readonly page: string };
+type Refusal = {
+	readonly code: string;
+	readonly message: string;
+	readonly file: string | null;
+	readonly line: number | null;
+};
 type AppCompiler = (input: {
 	readonly pages: ReadonlyArray<Module & { readonly page: string }>;
 	readonly document?: Module;
@@ -99,11 +105,7 @@ type PageResult = {
 	readonly builds: boolean;
 	readonly crashed?: string;
 	readonly web: readonly string[];
-	readonly refusals: ReadonlyArray<{
-		readonly code: string;
-		readonly message: string;
-		readonly file: string | null;
-	}>;
+	readonly refusals: ReadonlyArray<Refusal>;
 	readonly keyboardOnly: number;
 };
 
@@ -123,13 +125,23 @@ function summarize(
 			? relative(file.startsWith(appRoot) ? appRoot : repoRoot, file)
 			: file;
 	};
-	const refusals = new Map<string, { code: string; message: string; file: string | null }>();
-	for (const diagnostic of native)
-		refusals.set(`${diagnostic.message}\0${where(diagnostic)}`, {
+	const lineOf = (diagnostic: CompilerDiagnostic) => {
+		const span = diagnostic.primarySpan;
+		if (!span) return null;
+		const file = span.filename.startsWith('/') ? span.filename : join(appRoot, span.filename);
+		if (!existsSync(file)) return null;
+		return readFileSync(file, 'utf8').slice(0, span.start).split('\n').length;
+	};
+	const refusals = new Map<string, Refusal>();
+	for (const diagnostic of native) {
+		const line = lineOf(diagnostic);
+		refusals.set(`${diagnostic.message}\0${where(diagnostic)}\0${line}`, {
 			code: diagnostic.code,
 			message: diagnostic.message,
 			file: where(diagnostic),
+			line,
 		});
+	}
 	return {
 		app,
 		page,

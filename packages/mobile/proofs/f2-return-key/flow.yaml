@@ -1,0 +1,47 @@
+appId: ${APP_ID}
+name: f2-return-key
+---
+- launchApp:
+    clearState: true
+- assertVisible: Find
+- assertVisible: No search yet
+- assertVisible: No place yet
+- assertVisible: Go pressed 0 times
+- tapOn: Search
+- eraseText
+- inputText: tea
+- hideKeyboard
+- assertVisible: tea
+- assertVisible: No search yet
+- assertVisible: tea
+- tapOn: Search
+- pressKey: Enter
+- assertNotVisible: No search yet
+- assertVisible: Searched for tea
+- assertNotVisible: No search yet
+- tapOn: City
+- eraseText
+- inputText: Lima
+- hideKeyboard
+- assertVisible: Lima
+- assertVisible: No place yet
+- assertVisible: Lima
+- tapOn: Country
+- eraseText
+- inputText: Peru
+- hideKeyboard
+- assertVisible: Peru
+- assertVisible: No place yet
+- assertNotVisible: Going to Lima, Peru
+- assertNotVisible: Go pressed 1 times
+- assertVisible: Lima
+- assertVisible: Peru
+- tapOn: City
+- pressKey: Enter
+- assertVisible: Going to Lima, Peru
+- assertVisible: Go pressed 1 times
+- assertNotVisible: No place yet
+- assertVisible: Going to Lima, Peru
+- assertVisible: Go pressed 1 times
+- assertNotVisible: No place yet
+- assertNotVisible: Go pressed 0 times

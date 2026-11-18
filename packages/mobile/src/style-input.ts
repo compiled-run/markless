@@ -100,16 +100,22 @@ export function nativeStyleInput(
 				throw new Error(
 					`${payload.component}: styles reach Dragon as one page; a system sheet's content is a second root it does not lay out yet`,
 				);
-			if (node.kind === 'text')
+			if (node.kind === 'text') {
+				const parent = node.parent;
+				if (parent === null)
+					throw new Error(
+						`${payload.component}: text outside any element reaches Dragon with no box to lay it out in`,
+					);
 				return [
 					{
 						kind: 'text',
 						id: node.id,
-						parent: node.parent,
+						parent,
 						text: initial.get(node.id) ?? unshownText(node.parts),
 						...place,
 					},
 				];
+			}
 			const classBinding = (node.bindings ?? []).find(
 				(binding) => 'attribute' in binding && binding.attribute === 'class',
 			);

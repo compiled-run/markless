@@ -113,7 +113,7 @@ export default function App() @{
 	it('runs a call to author code as JavaScript by default', async () => {
 		const result = await build(handler('() => save()'));
 		expect(result.diagnostics).toEqual([]);
-		expect(result.payload?.handlers[0]?.ops).toEqual([{ op: 'script', fn: 'fn:0', bindings: {} }]);
+		expect(result.payload?.handlers[0]?.ops).toEqual([{ op: 'script', fn: 'fn:0', type: 'click', bindings: {} }]);
 		expect(result.payload?.script?.services).toEqual([]);
 	});
 
@@ -123,7 +123,7 @@ export default function App() @{
 		const start = source.indexOf('location.current');
 		expect(result.diagnostics.map((d) => [d.code, d.message, d.primarySpan])).toEqual([
 			[
-				'MARKLESS_NATIVE_SCRIPT',
+				'MARKLESS_NATIVE_JAVASCRIPT',
 				'the click handler calls `location` from @markless/device inside JavaScript that runs on the phone, which it cannot reach there yet',
 				{ filename: 'src/App.tsrx', start, end: start + 'location'.length },
 			],

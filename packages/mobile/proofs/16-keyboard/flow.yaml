@@ -1,0 +1,26 @@
+appId: ${APP_ID}
+name: 16-keyboard
+---
+- launchApp:
+      clearState: true
+- assertVisible: Keyboard
+- assertVisible: Line 1
+- assertNotVisible: Note
+- repeat:
+      times: 80
+      while:
+          notVisible: Note
+      commands:
+          - swipe:
+                start: 50%, 80%
+                end: 50%, 25%
+- assertVisible: Note
+- assertNotVisible: Keyboard
+- assertVisible: Note
+- assertNotVisible: Keyboard
+- tapOn: Note
+- eraseText
+- inputText: Hi
+- assertVisible: Hi
+- assertVisible: Note says Hi
+- assertVisible: Hi

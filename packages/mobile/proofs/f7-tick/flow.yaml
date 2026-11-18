@@ -1,0 +1,46 @@
+appId: ${APP_ID}
+name: f7-tick
+---
+- launchApp:
+      clearState: true
+- assertVisible: Order
+- assertVisible: Place order
+- assertVisible: Newsletter off
+- assertVisible: Terms accepted
+- assertVisible: Size M
+- assertVisible: Nothing ordered
+- assertNotVisible: news null, size M, terms yes
+- tapOn: Place order
+- assertVisible: news null, size M, terms yes
+- assertNotVisible: Nothing ordered
+- assertVisible: news null, size M, terms yes
+- assertNotVisible: Nothing ordered
+- assertNotVisible: Newsletter on
+- tapOn: Newsletter
+- assertVisible: Newsletter on
+- assertVisible: Newsletter on
+- assertNotVisible: Newsletter off
+- assertNotVisible: Size L
+- tapOn: Large
+- assertVisible: Size L
+- assertVisible: Size L
+- assertNotVisible: Size M
+- assertNotVisible: Terms not accepted
+- tapOn: Accept the terms
+- assertVisible: Terms not accepted
+- assertVisible: Terms not accepted
+- assertNotVisible: Terms accepted
+- tapOn: Place order
+- assertVisible: Please check this box if you want to proceed\.
+- assertVisible: news null, size M, terms yes
+- assertNotVisible: Terms accepted
+- assertVisible: Please check this box if you want to proceed\.
+- tapOn: Accept the terms
+- assertVisible: Terms accepted
+- assertVisible: Terms accepted
+- assertNotVisible: Terms not accepted
+- assertNotVisible: news on, size L, terms yes
+- tapOn: Place order
+- assertVisible: news on, size L, terms yes
+- assertVisible: news on, size L, terms yes
+- assertNotVisible: news null, size M, terms yes

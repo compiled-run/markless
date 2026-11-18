@@ -1,0 +1,67 @@
+{
+	"rung": 57,
+	"name": "A checkbox and a radio group a person ticks, as on the web: change handlers, one radio per group, and their form data",
+	"steps": [
+		{
+			"visible": [
+				"Order",
+				"Place order",
+				"Newsletter off",
+				"Terms accepted",
+				"Size M",
+				"Nothing ordered"
+			],
+			"absent": ["news null, size M, terms yes"]
+		},
+		{
+			"do": {
+				"tap": "Place order"
+			},
+			"visible": ["news null, size M, terms yes"],
+			"absent": ["Nothing ordered", "Newsletter on"]
+		},
+		{
+			"do": {
+				"tap": "Newsletter"
+			},
+			"visible": ["Newsletter on"],
+			"absent": ["Newsletter off", "Size L"]
+		},
+		{
+			"do": {
+				"tap": "Large"
+			},
+			"visible": ["Size L"],
+			"absent": ["Size M", "Terms not accepted"]
+		},
+		{
+			"do": {
+				"tap": "Accept the terms"
+			},
+			"visible": ["Terms not accepted"],
+			"absent": ["Terms accepted"]
+		},
+		{
+			"do": {
+				"tap": "Place order"
+			},
+			"visible": ["news null, size M, terms yes"],
+			"invalid": "Please check this box if you want to proceed.",
+			"absent": ["Terms accepted"]
+		},
+		{
+			"do": {
+				"tap": "Accept the terms"
+			},
+			"visible": ["Terms accepted"],
+			"absent": ["Terms not accepted", "news on, size L, terms yes"]
+		},
+		{
+			"do": {
+				"tap": "Place order"
+			},
+			"visible": ["news on, size L, terms yes"],
+			"absent": ["news null, size M, terms yes"]
+		}
+	]
+}

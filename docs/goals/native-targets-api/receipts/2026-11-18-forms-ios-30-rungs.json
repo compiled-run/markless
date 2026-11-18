@@ -1,0 +1,186 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 1.763909749999999,
+			"flowSeconds": 16.956912292
+		},
+		{
+			"name": "02-styles",
+			"failure": null,
+			"installSeconds": 0.27153433299999596,
+			"flowSeconds": 14.370982666999996
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.23673237500000688,
+			"flowSeconds": 15.792825291999995
+		},
+		{
+			"name": "04-attributes",
+			"failure": null,
+			"installSeconds": 0.2997200409999932,
+			"flowSeconds": 17.34501245899999
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 0.24426249999998254,
+			"flowSeconds": 18.90114175000001
+		},
+		{
+			"name": "05b-choices",
+			"failure": null,
+			"installSeconds": 0.2536780420000141,
+			"flowSeconds": 24.886222332999985
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 0.23856995899998584,
+			"flowSeconds": 18.44661383399999
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 0.29065200000000185,
+			"flowSeconds": 17.177145832999987
+		},
+		{
+			"name": "07b-imported-component",
+			"failure": null,
+			"installSeconds": 0.2593002909999923,
+			"flowSeconds": 19.087922791999997
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 0.24671216600004117,
+			"flowSeconds": 18.276060791000024
+		},
+		{
+			"name": "07d-children",
+			"failure": null,
+			"installSeconds": 0.2420838330000406,
+			"flowSeconds": 16.83573166599998
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.24740787500003353,
+			"flowSeconds": 26.04931841600005
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 0.2614337500000256,
+			"flowSeconds": 27.10195212500001
+		},
+		{
+			"name": "10-url-route",
+			"failure": null,
+			"installSeconds": 0.24802912500000093,
+			"flowSeconds": 14.515544832999993
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 0.28189999999996507,
+			"flowSeconds": 37.062331542
+		},
+		{
+			"name": "f2-return-key",
+			"failure": null,
+			"installSeconds": 0.26591612499998885,
+			"flowSeconds": 51.214230125
+		},
+		{
+			"name": "f3-families",
+			"failure": null,
+			"installSeconds": 0.25152479100006164,
+			"flowSeconds": 24.486364750000067
+		},
+		{
+			"name": "f4-required",
+			"failure": null,
+			"installSeconds": 0.24596462500002236,
+			"flowSeconds": 30.99491966700007
+		},
+		{
+			"name": "f5-async",
+			"failure": null,
+			"installSeconds": 0.258502000000095,
+			"flowSeconds": 54.230335917000076
+		},
+		{
+			"name": "f6-disabled",
+			"failure": null,
+			"installSeconds": 0.30292112499999346,
+			"flowSeconds": 27.547310000000056
+		},
+		{
+			"name": "f7-tick",
+			"failure": null,
+			"installSeconds": 0.246672125000041,
+			"flowSeconds": 26.30362704199995
+		},
+		{
+			"name": "u1-base",
+			"failure": null,
+			"installSeconds": 0.23766600000008475,
+			"flowSeconds": 16.96814058300003
+		},
+		{
+			"name": "u2-collapsible",
+			"failure": null,
+			"installSeconds": 0.26494483299995775,
+			"flowSeconds": 19.085454583000043
+		},
+		{
+			"name": "u3-tabs",
+			"failure": null,
+			"installSeconds": 0.3699000419999938,
+			"flowSeconds": 27.33921604099998
+		},
+		{
+			"name": "u4-dialog",
+			"failure": null,
+			"installSeconds": 0.33304420799994844,
+			"flowSeconds": 37.621996208
+		},
+		{
+			"name": "u5-toggle",
+			"failure": null,
+			"installSeconds": 0.3749619579999708,
+			"flowSeconds": 25.075844333000017
+		},
+		{
+			"name": "u11-pagination",
+			"failure": null,
+			"installSeconds": 0.38345966699998824,
+			"flowSeconds": 29.852290290999925
+		},
+		{
+			"name": "u12-buttongroup",
+			"failure": null,
+			"installSeconds": 0.24370550000015645,
+			"flowSeconds": 41.88766270800005
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 0.24676925000012853,
+			"flowSeconds": 41.495391250000104
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 0.2491732910000719,
+			"flowSeconds": 21.13195695900009
+		}
+	]
+}

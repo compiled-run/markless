@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+name: r138-trailing-slash
+---
+- launchApp:
+      clearState: true
+- assertVisible: Start here
+- assertVisible: Open about
+- assertNotVisible: About this app
+- assertVisible: Home
+- tapOn: Open about
+- assertVisible: About this app
+- assertNotVisible: Start here
+- assertVisible: About
+- assertVisible: About this app
+- assertNotVisible: Start here
+- assertVisible: About

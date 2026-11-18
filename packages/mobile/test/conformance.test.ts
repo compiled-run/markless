@@ -10,6 +10,8 @@ import {
 } from '../src/index.ts';
 import { compileRungApp, readWorkspaceModule } from '../src/harness/rung.ts';
 import { APP_CONFORMANCE_CASES, CONFORMANCE_CASES, CONFORMANCE_SCRIPT_HOST } from './conformance-cases.ts';
+import { scrollVectors } from '../src/scroll.ts';
+import { SCROLL_CASES } from './scroll-cases.ts';
 
 const fixture = (name: string) =>
 	readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -17,6 +19,10 @@ const committed = (name: string) =>
 	JSON.parse(readFileSync(new URL(`../conformance/${name}`, import.meta.url), 'utf8')) as unknown;
 
 describe('native conformance vectors', () => {
+	it('the committed scroll-into-view vectors are what the reference computes (ladder-web checks them against Chrome)', () => {
+		expect(committed('scroll/scroll-into-view.json')).toEqual(scrollVectors(SCROLL_CASES));
+	});
+
 	it('the committed counter vectors are what the compiler and the reference runtime produce today', async () => {
 		const { payload, diagnostics } = await compileNativeComponent({
 			filename: 'src/counter.tsrx',
@@ -45,7 +51,7 @@ describe('native conformance vectors', () => {
 				source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
 			});
 			expect(committed(`${entry.name}.json`), entry.name).toEqual(
-				nativeConformance(payload!, entry.actions, entry.params, CONFORMANCE_SCRIPT_HOST()),
+				nativeConformance(payload!, entry.actions, entry.params, entry.preferredLanguages, entry.now, CONFORMANCE_SCRIPT_HOST()),
 			);
 		}
 	});

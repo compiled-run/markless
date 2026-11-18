@@ -34,11 +34,15 @@ const look = (
 	payload: NativeViewPayload,
 	actions: ReadonlyArray<NativeAction>,
 	params?: Readonly<Record<string, string>>,
+	preferredLanguages?: ReadonlyArray<string>,
+	now?: number,
 ) => {
 	const runtime = createNativeRuntime(
 		payload,
 		new Map(),
 		params,
+		preferredLanguages,
+		now === undefined ? undefined : () => now,
 		nodeScriptHost('00'.repeat(32)),
 	);
 	const screen = () => ({
@@ -68,16 +72,18 @@ const scriptOps = (payload: NativeViewPayload): number => {
 };
 
 describe('a handler means the same as data and as JavaScript', () => {
-	it.each(CONFORMANCE_CASES.map((entry) => [entry.name, entry] as const))(
-		'%s',
-		async (_name, entry) => {
-			const chosen = await build(entry);
-			const forced = await build(entry, 'all');
-			expect(look(forced, entry.actions, entry.params)).toEqual(
-				look(chosen, entry.actions, entry.params),
-			);
-		},
-	);
+	// The clock vector fixes the data path's clock; the engine reads the device's own, which is that clock on a phone.
+	it.each(
+		CONFORMANCE_CASES.filter((entry) => entry.now === undefined).map(
+			(entry) => [entry.name, entry] as const,
+		),
+	)('%s', async (_name, entry) => {
+		const chosen = await build(entry);
+		const forced = await build(entry, 'all');
+		expect(look(forced, entry.actions, entry.params)).toEqual(
+			look(chosen, entry.actions, entry.params),
+		);
+	});
 
 	it('forces most handlers of the vectors into the engine, so the comparison covers them', async () => {
 		let data = 0;
@@ -131,7 +137,7 @@ describe('a handler means the same as data and as JavaScript', () => {
 			]),
 		).toEqual([
 			[
-				'MARKLESS_NATIVE_SCRIPT',
+				'MARKLESS_NATIVE_JAVASCRIPT',
 				'the click handler uses `document`: the web page, which a phone does not have',
 				filename,
 				10,

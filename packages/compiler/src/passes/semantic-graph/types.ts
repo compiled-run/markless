@@ -5,6 +5,7 @@ import type { SourceSpan } from '../../diagnostics.ts';
 import type {
 	NativeFactCollectors,
 	SemanticComponent,
+	SemanticModuleConstant,
 	SemanticModuleFunction,
 	SemanticComponentPropDeclaration,
 	SemanticComponentEdge,
@@ -57,6 +58,7 @@ export type MutableSemanticGraphArtifact = {
 	filename: string;
 	moduleId: string;
 	moduleFunctions?: SemanticModuleFunction[];
+	moduleConstants?: SemanticModuleConstant[];
 	scriptModule?: import('../../artifacts.ts').SemanticScriptModule;
 	components: SemanticComponent[];
 	componentPropBindings: SemanticComponentPropDeclaration[];

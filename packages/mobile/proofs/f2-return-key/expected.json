@@ -1,0 +1,61 @@
+{
+	"rung": 52,
+	"name": "The keyboard's return key in a single-line field submits its form, with or without a submit button; with one, it clicks it",
+	"steps": [
+		{
+			"visible": ["Find", "No search yet", "No place yet", "Go pressed 0 times"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Search",
+					"text": "tea"
+				}
+			},
+			"visible": ["No search yet"],
+			"fields": {
+				"Search": "tea"
+			}
+		},
+		{
+			"do": {
+				"submit": "Search"
+			},
+			"visible": ["Searched for tea"],
+			"absent": ["No search yet"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "City",
+					"text": "Lima"
+				}
+			},
+			"visible": ["No place yet"],
+			"fields": {
+				"City": "Lima"
+			}
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Country",
+					"text": "Peru"
+				}
+			},
+			"visible": ["No place yet"],
+			"fields": {
+				"City": "Lima",
+				"Country": "Peru"
+			},
+			"absent": ["Going to Lima, Peru", "Go pressed 1 times"]
+		},
+		{
+			"do": {
+				"submit": "City"
+			},
+			"visible": ["Going to Lima, Peru", "Go pressed 1 times"],
+			"absent": ["No place yet", "Go pressed 0 times"]
+		}
+	]
+}

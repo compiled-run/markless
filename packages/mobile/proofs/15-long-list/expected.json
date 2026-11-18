@@ -1,0 +1,29 @@
+{
+	"rung": 15,
+	"name": "A keyed list of 500 rows scrolls, and a button below its last row can be pressed",
+	"steps": [
+		{
+			"visible": ["Long list", "Row 1"],
+			"offScreen": ["Row 480", "End of list"],
+			"absent": ["Reached 1"]
+		},
+		{
+			"do": {
+				"swipe": {
+					"from": [50, 80],
+					"to": [50, 25],
+					"until": "Reached 0"
+				}
+			},
+			"visible": ["End of list", "Row 480", "Row 500", "Reached 0"],
+			"offScreen": ["Long list", "Row 1"]
+		},
+		{
+			"do": {
+				"tap": "End of list"
+			},
+			"visible": ["Reached 1"],
+			"absent": ["Reached 0"]
+		}
+	]
+}

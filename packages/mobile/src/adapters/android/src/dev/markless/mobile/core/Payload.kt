@@ -56,6 +56,10 @@ sealed interface Expr {
 	data object EventValue : Expr
 	/** The page's route params, an object of strings. */
 	data object RouteParams : Expr
+	/** `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order. */
+	data class FormData(val form: String) : Expr
+	/** A checkbox's or radio button's checkedness now. */
+	data class Checked(val node: String) : Expr
 }
 
 sealed interface TextPart {
@@ -65,7 +69,7 @@ sealed interface TextPart {
 
 data class ArmPlace(val branch: String, val index: Int)
 
-/** An attribute that follows state, or (when [property]) an input's `value` property. */
+/** An attribute that follows state, or (when [property]) an input's `value`, `checked` or `indeterminate` property. */
 data class Binding(val name: String, val value: Expr, val property: Boolean = false)
 
 sealed interface Node {
@@ -76,8 +80,9 @@ sealed interface Node {
 	val row: String?
 
 	/** [obj]: the device object a `camera` element shows. */
-	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null) : Node
-	data class Text(override val id: String, override val parent: String, val parts: List<TextPart>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
+	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null, val defaultStyle: DefaultStyle? = null, val drawing: Drawing? = null) : Node
+	/** [parent] is null for text at the top of the page. */
+	data class Text(override val id: String, override val parent: String?, val parts: List<TextPart>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 	/** An `@if` with [test] (arm 0 while truthy, arm 1 otherwise), or a chain with [tests]: the first truthy arm, else the `null` arm. */
 	data class Branch(override val id: String, override val parent: String?, val test: Expr?, val arms: Int, override val arm: ArmPlace? = null, override val row: String? = null, val tests: List<Expr?>? = null) : Node
 	/** A keyed list: one row per item of [list], keyed by `String()` of the item at the [key] path. */
@@ -89,7 +94,48 @@ sealed interface Node {
 	}
 }
 
-enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel") }
+/** How an element looks under the browser's default stylesheet (the payload's `defaultStyle`); applied only without a style export. */
+data class DefaultStyle(
+	/** "inline" or "break" when the element flows in its parent's text; null for a box. */
+	val flow: String? = null,
+	val bold: Boolean = false,
+	val italic: Boolean = false,
+	val monospace: Boolean = false,
+	val size: Double = 1.0,
+	/** "underline" or "line-through". */
+	val line: String? = null,
+	/** "sub" or "super". */
+	val shift: String? = null,
+	val highlight: Boolean = false,
+	val quotes: Boolean = false,
+	val preformatted: Boolean = false,
+	val indent: Double = 0.0,
+	val rule: Boolean = false,
+	/** "disc" or "decimal", on a list. */
+	val marker: String? = null,
+	/** "table", "row" or "cell". */
+	val table: String? = null,
+)
+
+/** An RGBA colour, each channel 0-255. */
+data class Rgba(val r: Int, val g: Int, val b: Int, val alpha: Int) {
+	val argb: Int get() = (alpha shl 24) or (r shl 16) or (g shl 8) or b
+}
+
+/** A shape's paint: a colour, the svg's text colour, or none. */
+sealed interface ShapePaint {
+	data class Color(val color: Rgba) : ShapePaint
+	data object Current : ShapePaint
+}
+
+/** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
+data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?)
+
+/** An inline `<svg>` compiled to shapes. */
+data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
+
+/** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
+enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible") }
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
@@ -105,6 +151,12 @@ sealed interface Op {
 	data class Dialog(val node: String, val open: Boolean) : Op
 	/** `focus()` or `scrollIntoView()` on an element, run once the views show the handler's writes. */
 	data class Command(val node: String, val command: String, val preventScroll: Boolean) : Op
+	/** Submits [form] as pressing [submitter] does (null: the return key with no submit button). */
+	data class Submit(val form: String, val submitter: String?) : Op
+	/** After [ms], [ops] run with each [capture] name holding the value it had when this op ran. */
+	data class After(val ms: Expr, val capture: List<Pair<String, Expr>>, val ops: List<Op>) : Op
+	/** A press on a checkbox (it flips) or a radio button (it is checked, the rest of its group unchecked). */
+	data class Tick(val node: String) : Op
 }
 
 /** A device call a task cell starts at mount. */
@@ -128,7 +180,8 @@ data class Route(val pattern: String, val params: List<String>) {
 }
 
 /** [device]: a live device value the host fills at mount and on change. [task]: an async device call started at mount. [row]: state of a component a list row renders, one value per row of that `repeat`, [initial] when the row is built. */
-data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null)
+/** [clock]: the clock when the screen opened, written at mount before the first build. */
+data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null, val clock: Boolean = false)
 data class Event(val host: String, val event: EventName, val handler: String)
 data class Handler(val id: String, val ops: List<Op>)
 
@@ -137,6 +190,16 @@ data class Continuation(val id: String, val local: String, val ops: List<Op>, va
 
 /** A device object a component makes (`const cam = camera()`); it lives while its [owner] node is shown. */
 data class DeviceObject(val id: String, val device: String, val owner: String)
+
+enum class FieldKind(val wire: String) { Text("text"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden") }
+
+data class Field(val node: String, val kind: FieldKind)
+
+/** What the web says when a required field of each kind has no value, in one language. */
+data class ValueMissing(val text: String, val checkbox: String, val radio: String)
+
+/** A form's submittable fields and submit buttons, each in tree order. */
+data class Form(val node: String, val fields: List<Field>, val submitters: List<String>, val noValidate: Boolean = false, val authoredAriaDisabled: Boolean = false)
 
 data class Payload(
 	val component: String,
@@ -148,13 +211,16 @@ data class Payload(
 	/** The page's `<title>` text parts, shown in the screen's action bar. */
 	val title: List<TextPart>? = null,
 	val objects: List<DeviceObject> = emptyList(),
+	val forms: List<Form> = emptyList(),
+	/** [ValueMissing] by the locale the browser shows its own text in. */
+	val valueMissing: Map<String, ValueMissing> = emptyMap(),
 ) {
 	companion object {
 		fun decode(bytes: ByteArray): Payload = decode(Json.parse(bytes))
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -171,7 +237,7 @@ data class Payload(
 				if (p != null) {
 					val parent = seen[p] ?: throw MarklessDecodeError("node \"${node.id}\" names parent \"$p\" that does not precede it")
 					if (parent !is Node.Element && (parent !is Node.Sheet || node is Node.Sheet)) throw MarklessDecodeError("node \"${node.id}\" has a ${parent::class.simpleName} node as its parent")
-				} else if (node is Node.Text) throw MarklessDecodeError("text node \"${node.id}\" has no parent")
+				}
 				node.arm?.let { a ->
 					val b = seen[a.branch] as? Node.Branch ?: throw MarklessDecodeError("node \"${node.id}\" sits in an arm of \"${a.branch}\", which is not a preceding branch")
 					if (a.index < 0 || a.index >= b.arms) throw MarklessDecodeError("node \"${node.id}\" sits in arm ${a.index} of a branch with ${b.arms}")
@@ -208,7 +274,15 @@ data class Payload(
 				if (owner !in seen) throw MarklessDecodeError("objects[$n] is owned by unknown node \"$owner\"")
 				DeviceObject(o.field("id", "objects[$n]").str("objects[$n].id"), o.field("device", "objects[$n]").str("objects[$n].device"), owner)
 			} ?: emptyList()
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects)
+			val forms = root["forms"]?.arr("payload.forms")?.mapIndexed { n, f -> form(f, "forms[$n]") } ?: emptyList()
+			for (f in forms) for (id in listOf(f.node) + f.fields.map { it.node } + f.submitters) if (seen[id] !is Node.Element) throw MarklessDecodeError("form \"${f.node}\" names \"$id\", which is not an element")
+			val valueMissing = root["valueMissing"]?.obj("payload.valueMissing")?.entries?.associateTo(LinkedHashMap()) { (locale, m) ->
+				val mo = m.obj("payload.valueMissing.$locale")
+				mo.only(setOf("text", "checkbox", "radio"), "payload.valueMissing.$locale")
+				fun text(k: String) = mo.field(k, "payload.valueMissing.$locale").str("payload.valueMissing.$locale.$k")
+				locale to ValueMissing(text("text"), text("checkbox"), text("radio"))
+			} ?: emptyMap()
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing)
 		}
 
 		fun cellsOf(e: Expr): List<String> = when (e) {
@@ -227,14 +301,14 @@ data class Payload(
 			is Expr.Lambda -> cellsOf(e.body)
 			is Expr.Local, is Expr.Item, Expr.RouteParams -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
-			Expr.EventValue -> emptyList()
+			Expr.EventValue, is Expr.FormData, is Expr.Checked -> emptyList()
 		}
 
 		private val UNARY = setOf("!", "-", "+", "typeof")
 		private val BINARY = setOf("+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=")
 		private val LOGICAL = setOf("&&", "||", "??")
 		private val METHODS = setOf("filter", "map", "findIndex", "some", "every", "includes", "indexOf", "join", "concat", "slice", "reverse", "toReversed", "toUpperCase", "toLowerCase", "trim")
-		private val BUILTINS = setOf("String", "Number", "Boolean", "Math.abs", "Math.floor", "Math.max", "Math.min", "Math.round")
+		private val BUILTINS = setOf("String", "Number", "Boolean", "Math.abs", "Math.floor", "Math.max", "Math.min", "Math.round", "Date.now", "Date.toISOString")
 
 		private fun oneOf(o: Map<String, Json>, key: String, allowed: Set<String>, what: String): String {
 			val v = o.field(key, what).str("$what.$key")
@@ -288,6 +362,8 @@ data class Payload(
 				}
 				o.containsKey("route") -> { o.only(setOf("route"), what); oneOf(o, "route", setOf("params"), what); Expr.RouteParams }
 				o.containsKey("event") -> { o.only(setOf("event"), what); oneOf(o, "event", setOf("value"), what); Expr.EventValue }
+				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
+				o.containsKey("formData") -> { o.only(setOf("formData"), what); Expr.FormData(o.field("formData", what).str("$what.formData")) }
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")
 			}
 		}
@@ -313,14 +389,72 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled", "device", "task", "object", "row"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled", "device", "task", "object", "row", "clock"), what)
+			val clock = o["clock"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.clock must be true when present"); true } ?: false
 			val styled = o["styled"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.styled must be true when present"); true } ?: false
 			val storage = o["storage"]?.obj("$what.storage")?.let { it.only(setOf("key"), "$what.storage"); it.field("key", what).str("$what.storage.key") }
 			val task = o["task"]?.obj("$what.task")?.let { t ->
 				t.only(setOf("call", "arguments"), "$what.task")
 				Task(t.field("call", what).str("$what.task.call"), t.field("arguments", what).arr("$what.task.arguments").mapIndexed { n, a -> expr(a, "$what.task.arguments[$n]") })
 			}
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"))
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock)
+		}
+
+		private fun defaultStyle(v: Json, what: String): DefaultStyle {
+			val o = v.obj(what)
+			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule", "marker", "table"), what)
+			fun flag(name: String): Boolean = o[name]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.$name must be true when present"); true } ?: false
+			fun word(name: String, allowed: Set<String>): String? = o[name]?.let { oneOf(o, name, allowed, what) }
+			return DefaultStyle(
+				flow = word("flow", setOf("inline", "break")),
+				bold = flag("bold"), italic = flag("italic"), monospace = flag("monospace"),
+				size = o["size"]?.num("$what.size") ?: 1.0,
+				line = word("line", setOf("underline", "line-through")),
+				shift = word("shift", setOf("sub", "super")),
+				highlight = flag("highlight"), quotes = flag("quotes"), preformatted = flag("preformatted"),
+				indent = o["indent"]?.num("$what.indent") ?: 0.0,
+				rule = flag("rule"),
+				marker = word("marker", setOf("disc", "decimal")),
+				table = word("table", setOf("table", "row", "cell")),
+			)
+		}
+
+		private fun paint(v: Json, what: String): ShapePaint? = when (v) {
+			Json.Null -> null
+			is Json.Str -> if (v.value == "currentColor") ShapePaint.Current else throw MarklessDecodeError("$what must be a colour, \"currentColor\" or null")
+			else -> {
+				val o = v.obj(what)
+				o.only(setOf("r", "g", "b", "alpha"), what)
+				fun channel(name: String): Int {
+					val n = o.field(name, what).num("$what.$name")
+					if (n < 0 || n > 255 || n != Math.floor(n)) throw MarklessDecodeError("$what.$name is $n; a channel is an integer 0-255")
+					return n.toInt()
+				}
+				ShapePaint.Color(Rgba(channel("r"), channel("g"), channel("b"), channel("alpha")))
+			}
+		}
+
+		private fun drawing(v: Json, what: String): Drawing {
+			val o = v.obj(what)
+			o.only(setOf("viewBox", "width", "height", "shapes", "em"), what)
+			val em = o["em"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.em must be true when present"); true } ?: false
+			val viewBox = o.field("viewBox", what).let { if (it == Json.Null) null else it.arr("$what.viewBox").map { n -> n.num("$what.viewBox[]") } }
+			if (viewBox != null && viewBox.size != 4) throw MarklessDecodeError("$what.viewBox must hold four numbers")
+			val shapes = o.field("shapes", what).arr("$what.shapes").mapIndexed { n, sv ->
+				val w = "$what.shapes[$n]"
+				val so = sv.obj(w)
+				so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform"), w)
+				val path = so.field("path", w).arr("$w.path").map { it.num("$w.path[]") }
+				val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
+				if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
+				Shape(
+					path, paint(so.field("fill", w), "$w.fill"), oneOf(so, "fillRule", setOf("nonzero", "evenodd"), w) == "evenodd",
+					paint(so.field("stroke", w), "$w.stroke"), so.field("width", w).num("$w.width"),
+					oneOf(so, "cap", setOf("butt", "round", "square"), w), oneOf(so, "join", setOf("miter", "round", "bevel"), w),
+					so.field("miterLimit", w).num("$w.miterLimit"), transform,
+				)
+			}
+			return Drawing(viewBox, o["width"]?.num("$what.width"), o["height"]?.num("$what.height"), shapes, em)
 		}
 
 		private fun node(v: Json, what: String): Node {
@@ -328,7 +462,7 @@ data class Payload(
 			val id = o.field("id", what).str("$what.id")
 			return when (val kind = o.field("kind", what).str("$what.kind")) {
 				"element" -> {
-					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object"), what)
+					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object", "defaultStyle", "drawing"), what)
 					val parent = o.field("parent", what)
 					val attributes = o["attributes"]?.obj("$what.attributes")?.mapValues { (k, v) -> v.str("$what.attributes.$k") } ?: emptyMap()
 					val bindings = o["bindings"]?.arr("$what.bindings")?.mapIndexed { n, b ->
@@ -336,18 +470,19 @@ data class Payload(
 						val value = expr(bo.field("value", what), "$what.bindings[$n].value")
 						if (bo.containsKey("property")) {
 							bo.only(setOf("property", "value"), "$what.bindings[$n]")
-							Binding(oneOf(bo, "property", setOf("value"), "$what.bindings[$n]"), value, property = true)
+							Binding(oneOf(bo, "property", setOf("value", "checked", "indeterminate"), "$what.bindings[$n]"), value, property = true)
 						} else {
 							bo.only(setOf("attribute", "value"), "$what.bindings[$n]")
 							Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), value)
 						}
 					} ?: emptyList()
-					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"))
+					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"), o["defaultStyle"]?.let { defaultStyle(it, "$what.defaultStyle") }, o["drawing"]?.let { drawing(it, "$what.drawing") })
 				}
 				"text" -> {
 					o.only(setOf("kind", "id", "parent", "parts", "arm", "row"), what)
 					val parts = o.field("parts", what).arr("$what.parts").mapIndexed { n, p -> part(p, "$what.parts[$n]") }
-					Node.Text(id, o.field("parent", what).str("$what.parent"), parts, armPlace(o, what), rowPlace(o, what))
+					val parent = o.field("parent", what)
+					Node.Text(id, if (parent == Json.Null) null else parent.str("$what.parent"), parts, armPlace(o, what), rowPlace(o, what))
 				}
 				"branch" -> {
 					o.only(setOf("kind", "id", "parent", "test", "tests", "arms", "arm", "row"), what)
@@ -394,6 +529,22 @@ data class Payload(
 			val name = o.field("event", what).str("$what.event")
 			val event = EventName.entries.firstOrNull { it.wire == name } ?: throw MarklessDecodeError("$what has unknown event \"$name\"")
 			return Event(o.field("host", what).str("$what.host"), event, o.field("handler", what).str("$what.handler"))
+		}
+
+		private fun flag(o: Map<String, Json>, key: String, what: String): Boolean =
+			o[key]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.$key must be true when present"); true } ?: false
+
+		private fun form(v: Json, what: String): Form {
+			val o = v.obj(what)
+			o.only(setOf("node", "fields", "submitters", "noValidate", "authoredAriaDisabled"), what)
+			val fields = o.field("fields", what).arr("$what.fields").mapIndexed { n, f ->
+				val fo = f.obj("$what.fields[$n]")
+				fo.only(setOf("node", "kind"), "$what.fields[$n]")
+				val kind = oneOf(fo, "kind", FieldKind.entries.mapTo(HashSet()) { it.wire }, "$what.fields[$n]")
+				Field(fo.field("node", what).str("$what.fields[$n].node"), FieldKind.entries.first { it.wire == kind })
+			}
+			val submitters = o.field("submitters", what).arr("$what.submitters").map { it.str("$what.submitters[]") }
+			return Form(o.field("node", what).str("$what.node"), fields, submitters, flag(o, "noValidate", what), flag(o, "authoredAriaDisabled", what))
 		}
 
 		private fun handler(v: Json, what: String, cells: Set<String>): Handler {
@@ -449,6 +600,27 @@ data class Payload(
 				val then = o.field("whenTrue", what).arr("$what.whenTrue").mapIndexed { n, inner -> op(inner, "$what.whenTrue[$n]", cells) }
 				val otherwise = o.field("whenFalse", what).arr("$what.whenFalse").mapIndexed { n, inner -> op(inner, "$what.whenFalse[$n]", cells) }
 				return Op.If(test, then, otherwise)
+			}
+			if (name == "submit") {
+				o.only(setOf("op", "form", "submitter"), what)
+				val submitter = o.field("submitter", what)
+				return Op.Submit(o.field("form", what).str("$what.form"), if (submitter == Json.Null) null else submitter.str("$what.submitter"))
+			}
+			if (name == "tick") {
+				o.only(setOf("op", "node"), what)
+				return Op.Tick(o.field("node", what).str("$what.node"))
+			}
+			if (name == "after") {
+				o.only(setOf("op", "ms", "capture", "ops"), what)
+				val ms = expr(o.field("ms", what), "$what.ms")
+				val capture = o.field("capture", what).arr("$what.capture").mapIndexed { n, c ->
+					val pair = c.arr("$what.capture[$n]")
+					if (pair.size != 2) throw MarklessDecodeError("$what.capture[$n] is not a [name, value] pair")
+					pair[0].str("$what.capture[$n][0]") to expr(pair[1], "$what.capture[$n][1]")
+				}
+				for (e in listOf(ms) + capture.map { it.second }) for (c in cellsOf(e)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				val ops = o.field("ops", what).arr("$what.ops").mapIndexed { n, inner -> op(inner, "$what.ops[$n]", cells) }
+				return Op.After(ms, capture, ops)
 			}
 			if (name != "assign") throw MarklessDecodeError("$what has unknown op \"$name\"")
 			o.only(setOf("op", "cell", "value"), what)

@@ -199,10 +199,12 @@ object Js {
 		return if (x - f >= 0.5) f + 1 else f
 	}
 
-	/** The builtins a payload may call; a missing argument is undefined. */
-	fun call(name: String, args: List<JsValue>): JsValue {
+	/** The builtins a payload may call; a missing argument is undefined. [now] is the device's clock, in ms since 1970 (UTC). */
+	fun call(name: String, args: List<JsValue>, now: () -> Double = { System.currentTimeMillis().toDouble() }): JsValue {
 		fun num(i: Int): Double = if (i < args.size) toNumber(args[i]) else Double.NaN
 		return when (name) {
+			"Date.now" -> JsValue.Num(now())
+			"Date.toISOString" -> JsValue.Str(isoString(num(0)))
 			"String" -> JsValue.Str(if (args.isEmpty()) "" else toStr(args[0]))
 			"Number" -> JsValue.Num(if (args.isEmpty()) 0.0 else toNumber(args[0]))
 			"Boolean" -> JsValue.Bool(args.isNotEmpty() && truthy(args[0]))
@@ -213,5 +215,27 @@ object Js {
 			"Math.min" -> JsValue.Num(args.map(::toNumber).fold(Double.POSITIVE_INFINITY) { acc, x -> if (acc.isNaN() || x.isNaN()) Double.NaN else if (x < acc || (x == 0.0 && acc == 0.0 && 1 / x < 0)) x else acc })
 			else -> throw MarklessRuntimeError("unknown builtin \"$name\"")
 		}
+	}
+
+	/** `Date.prototype.toISOString` of a time value: UTC, `YYYY-MM-DDTHH:mm:ss.sssZ`, six digits and a sign outside 0 to 9999. */
+	fun isoString(time: Double): String {
+		if (time.isNaN() || time.isInfinite() || Math.abs(time) > 8.64e15) throw MarklessRuntimeError("RangeError: Invalid time value")
+		val ms = time.toLong()
+		val dayMs = 86_400_000L
+		val days = Math.floorDiv(ms, dayMs)
+		val inDay = Math.floorMod(ms, dayMs)
+		// Civil date from days since 1970-01-01 (proleptic Gregorian).
+		val z = days + 719_468
+		val era = Math.floorDiv(z, 146_097L)
+		val dayOfEra = z - era * 146_097
+		val yearOfEra = (dayOfEra - dayOfEra / 1460 + dayOfEra / 36524 - dayOfEra / 146_096) / 365
+		val dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100)
+		val monthIndex = (5 * dayOfYear + 2) / 153
+		val day = dayOfYear - (153 * monthIndex + 2) / 5 + 1
+		val month = if (monthIndex < 10) monthIndex + 3 else monthIndex - 9
+		val year = yearOfEra + era * 400 + (if (month <= 2) 1 else 0)
+		fun pad(value: Long, width: Int) = value.toString().padStart(width, '0')
+		val yearText = if (year in 0..9999) pad(year, 4) else (if (year < 0) "-" else "+") + pad(Math.abs(year), 6)
+		return "$yearText-${pad(month, 2)}-${pad(day, 2)}T${pad(inDay / 3_600_000, 2)}:${pad(inDay / 60_000 % 60, 2)}:${pad(inDay / 1000 % 60, 2)}.${pad(inDay % 1000, 3)}Z"
 	}
 }

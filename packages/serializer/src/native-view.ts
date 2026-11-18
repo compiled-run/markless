@@ -51,7 +51,11 @@ export type NativeBuiltin =
 	| 'Math.floor'
 	| 'Math.max'
 	| 'Math.min'
-	| 'Math.round';
+	| 'Math.round'
+	/** The clock when the expression is evaluated, in milliseconds since 1970 (UTC): `Date.now()`, `new Date().getTime()`. */
+	| 'Date.now'
+	/** `new Date(ms).toISOString()`: UTC, `YYYY-MM-DDTHH:mm:ss.sssZ` (six-digit signed years outside 0 to 9999). */
+	| 'Date.toISOString';
 
 /**
  * A value computed from cells, evaluated by every host with JavaScript's meaning (numbers are IEEE doubles; `String()`,
@@ -102,6 +106,14 @@ export type NativeExpr =
 	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> }
 	/** In an `input` handler: the field's text after the edit (`event.currentTarget.value`). */
 	| { readonly event: 'value' }
+	/**
+	 * `new FormData(form)`: the form's entry list as the web builds it, `[name, value]` pairs in tree order. A field is left
+	 * out when it is disabled or has no name, a checkbox when it is not checked; a checkbox's value is its `value` attribute
+	 * or "on", a text field's its text now, a hidden input's its `value` attribute.
+	 */
+	| { readonly formData: string }
+	/** A checkbox's or radio button's checkedness now: what its `checked` binding last set, or a person's tick since. */
+	| { readonly checked: string }
 	/** A computed whose body runs in the script engine: function `script` of the payload's script, called with `bindings`. */
 	| { readonly script: string; readonly bindings: NativeScriptBindings };
 
@@ -141,6 +153,189 @@ export type NativeArmPlace = { readonly branch: string; readonly index: number }
 /** Where a node sits: in an `@if` arm, or in a list row (`row` names the `repeat` node). */
 export type NativePlace = { readonly arm?: NativeArmPlace; readonly row?: string };
 
+/**
+ * How an element looks and flows under the browser's default stylesheet, as data, so hosts need no table of tags. Hosts
+ * apply it only when no style export decides the element's look (Dragon's export already holds the default stylesheet).
+ */
+export type NativeDefaultStyle = {
+	/**
+	 * `inline`: the element's text flows on in its parent's text, as one paragraph (`<strong>`, `<code>`, `<time>`).
+	 * `break`: a line break inside that text (`<br>`). Absent: a box that stacks.
+	 */
+	readonly flow?: 'inline' | 'break';
+	readonly bold?: true;
+	readonly italic?: true;
+	readonly monospace?: true;
+	/** Font size as a multiple of the parent's (`<h1>` 2, `<small>` 0.833, `<code>` 0.8125). */
+	readonly size?: number;
+	readonly line?: 'underline' | 'line-through';
+	readonly shift?: 'sub' | 'super';
+	/** `<mark>`: black text on yellow. */
+	readonly highlight?: true;
+	/** `<q>`: the text inside curly quotes. */
+	readonly quotes?: true;
+	/** `<pre>`: whitespace and line breaks kept, no wrapping; a longer line scrolls sideways. */
+	readonly preformatted?: true;
+	/** Space before the content on the start side, in CSS pixels (`<blockquote>`, `<dd>`, `<ul>`). */
+	readonly indent?: number;
+	/** `<hr>`: a thin horizontal line across the box. */
+	readonly rule?: true;
+	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
+	readonly marker?: 'disc' | 'decimal';
+	/** Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`. */
+	readonly table?: 'table' | 'row' | 'cell';
+};
+
+const MONOSPACE: NativeDefaultStyle = { monospace: true, size: 0.8125 };
+const SMALLER = 1 / 1.2;
+
+/**
+ * The HTML elements every native host builds, with their look under Chrome's default stylesheet where it is more than a box
+ * of plain text. Elements the web never shows are in `NATIVE_UNSHOWN_ELEMENTS`; anything else is refused by the compiler.
+ */
+export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
+	main: {},
+	div: {},
+	section: {},
+	article: {},
+	header: {},
+	footer: {},
+	nav: {},
+	aside: {},
+	hgroup: {},
+	search: {},
+	p: {},
+	h1: { bold: true, size: 2 },
+	h2: { bold: true, size: 1.5 },
+	h3: { bold: true, size: 1.17 },
+	h4: { bold: true },
+	h5: { bold: true, size: 0.83 },
+	h6: { bold: true, size: 0.67 },
+	address: { italic: true },
+	blockquote: { indent: 40 },
+	figure: { indent: 40 },
+	figcaption: {},
+	hr: { rule: true },
+	pre: { ...MONOSPACE, preformatted: true },
+	ul: { indent: 40, marker: 'disc' },
+	ol: { indent: 40, marker: 'decimal' },
+	menu: { indent: 40, marker: 'disc' },
+	li: {},
+	dl: {},
+	dt: {},
+	dd: { indent: 40 },
+	table: { table: 'table' },
+	caption: {},
+	thead: {},
+	tbody: {},
+	tfoot: {},
+	tr: { table: 'row' },
+	td: { table: 'cell' },
+	th: { table: 'cell', bold: true },
+	span: { flow: 'inline' },
+	b: { flow: 'inline', bold: true },
+	strong: { flow: 'inline', bold: true },
+	i: { flow: 'inline', italic: true },
+	em: { flow: 'inline', italic: true },
+	cite: { flow: 'inline', italic: true },
+	var: { flow: 'inline', italic: true },
+	dfn: { flow: 'inline', italic: true },
+	code: { flow: 'inline', ...MONOSPACE },
+	kbd: { flow: 'inline', ...MONOSPACE },
+	samp: { flow: 'inline', ...MONOSPACE },
+	tt: { flow: 'inline', ...MONOSPACE },
+	small: { flow: 'inline', size: SMALLER },
+	sub: { flow: 'inline', size: SMALLER, shift: 'sub' },
+	sup: { flow: 'inline', size: SMALLER, shift: 'super' },
+	u: { flow: 'inline', line: 'underline' },
+	ins: { flow: 'inline', line: 'underline' },
+	s: { flow: 'inline', line: 'line-through' },
+	del: { flow: 'inline', line: 'line-through' },
+	strike: { flow: 'inline', line: 'line-through' },
+	mark: { flow: 'inline', highlight: true },
+	q: { flow: 'inline', quotes: true },
+	abbr: { flow: 'inline' },
+	time: { flow: 'inline' },
+	data: { flow: 'inline' },
+	bdi: { flow: 'inline' },
+	bdo: { flow: 'inline' },
+	wbr: { flow: 'inline' },
+	br: { flow: 'break' },
+	button: {},
+	input: {},
+	a: {},
+	img: {},
+	audio: {},
+	label: {},
+	dialog: {},
+	form: {},
+	svg: {},
+};
+
+/**
+ * Elements the web never shows in the page, so a native page shows nothing for them either: document metadata and hints
+ * (`<meta>`, `<link>` but a stylesheet, `<base>`), inert markup (`<template>`), and content for browsers that run no scripts
+ * (`<noscript>`), since a native app runs its handlers.
+ */
+export const NATIVE_UNSHOWN_ELEMENTS: ReadonlySet<string> = new Set([
+	'meta',
+	'link',
+	'template',
+	'noscript',
+]);
+
+/**
+ * `<script type>` values that hold data rather than code (structured data for search engines, markup a script reads):
+ * the browser runs nothing for them, so a native page shows nothing for them either. A script of any other type runs code.
+ */
+export const NATIVE_DATA_SCRIPT_TYPES: ReadonlySet<string> = new Set([
+	'application/ld+json',
+	'application/json',
+	'importmap',
+	'speculationrules',
+	'text/html',
+	'text/template',
+]);
+
+/** A colour as eight-bit red, green, blue and alpha. */
+export type NativeColor = {
+	readonly r: number;
+	readonly g: number;
+	readonly b: number;
+	readonly alpha: number;
+};
+
+/** One shape of a drawing; numbers are in the drawing's user units. */
+export type NativeShape = {
+	/**
+	 * The outline as verb-coded numbers (Dragon's svg-shapes coding): 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y,
+	 * 4 close. Arcs, quadratics and every other SVG shape arrive as these.
+	 */
+	readonly path: ReadonlyArray<number>;
+	/** `currentColor` is the svg's text colour: its style export's, else the page's default black. */
+	readonly fill: NativeColor | 'currentColor' | null;
+	readonly fillRule: 'nonzero' | 'evenodd';
+	readonly stroke: NativeColor | 'currentColor' | null;
+	readonly width: number;
+	readonly cap: 'butt' | 'round' | 'square';
+	readonly join: 'miter' | 'round' | 'bevel';
+	readonly miterLimit: number;
+	/** The affine map from the shape's units to the drawing's (`[a, b, c, d, e, f]`), from `transform` on it and its groups. */
+	readonly transform?: readonly [number, number, number, number, number, number];
+};
+
+/** An inline `<svg>`, compiled when the app is built: the host draws `shapes` in the element's box. */
+export type NativeDrawing = {
+	/** min-x, min-y, width and height; drawn centred and scaled to fit the box (`xMidYMid meet`), as the web does. */
+	readonly viewBox: readonly [number, number, number, number] | null;
+	/** The `width` and `height` attributes in CSS pixels; without a size the box is the web's: full width, the viewBox's ratio. */
+	readonly width?: number;
+	readonly height?: number;
+	/** `width` and `height` are in ems of the svg's font size (`width="1em"`), not CSS pixels. */
+	readonly em?: true;
+	readonly shapes: ReadonlyArray<NativeShape>;
+};
+
 export type NativeNode = NativePlace &
 	(
 		| {
@@ -149,6 +344,10 @@ export type NativeNode = NativePlace &
 				/** The authored tag; each platform maps it to the view it builds. */
 				readonly element: string;
 				readonly parent: string | null;
+				/** The browser's default look of this element, when it differs from a plain box of plain text. */
+				readonly defaultStyle?: NativeDefaultStyle;
+				/** On an `<svg>`: what it draws. Its shapes are not nodes. */
+				readonly drawing?: NativeDrawing;
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
 				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */
@@ -156,14 +355,14 @@ export type NativeNode = NativePlace &
 				/** Attributes that follow state, written as the web writes them (absent, bare or a string), and an input's `value`. */
 				readonly bindings?: ReadonlyArray<
 					| { readonly attribute: string; readonly value: NativeExpr }
-					| { readonly property: 'value'; readonly value: NativeExpr }
+					| { readonly property: NativeProperty; readonly value: NativeExpr }
 				>;
 		  }
 		| {
 				readonly kind: 'text';
-				/** `<host>:text<n>`, the n-th text run of its element. */
+				/** `<host>:text<n>`, the n-th text run of its element; `text<n>` at the top of the page. */
 				readonly id: string;
-				readonly parent: string;
+				readonly parent: string | null;
 				readonly parts: ReadonlyArray<NativeTextPart>;
 		  }
 		| {
@@ -206,8 +405,17 @@ export type NativeNode = NativePlace &
 		  }
 	);
 
-/** Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click). */
-export type NativeEventName = 'activate' | 'input' | 'dismiss' | 'cancel';
+/** A field's state a binding sets as a DOM property: a text field's text, a checkbox's checkedness and its mixed look. */
+export type NativeProperty = 'value' | 'checked' | 'indeterminate';
+
+/**
+ * Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click).
+ * `enter` is the keyboard's return key in a single-line text field. `submit` is a form's, raised only by a `submit` op.
+ * `idle` and `visible` mean what the web runtime gives them, once for each shown instance of their element (shown again
+ * after it left, it is a new one): `idle` at the first moment the host is idle after the screen's first frame (or after
+ * the element appears), `visible` the first time any of the element is on the screen.
+ */
+export type NativeEventName = 'activate' | 'input' | 'dismiss' | 'cancel' | 'enter' | 'submit' | 'idle' | 'visible';
 
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
 export type NativeOp =
@@ -259,6 +467,30 @@ export type NativeOp =
 			readonly preventScroll?: true;
 	  }
 	/**
+	 * Submits `form` as the web does when `submitter` is pressed, or the return key submits it with no submit button (null):
+	 * nothing when the submitter is disabled; then, unless the form has `novalidate` or the submitter `formnovalidate`,
+	 * the first field that is required and empty (or unchecked) stops it with an `invalid` entry; then a submission that
+	 * carries the same entries from the same submitter as one still running is dropped; then the form's `submit` handler
+	 * runs. While a run it starts waits on an `after`, the form has `aria-busy="true"` and the submitter
+	 * `aria-disabled="true"` (unless an author wrote `aria-disabled` on a submit button of the form).
+	 */
+	| { readonly op: 'submit'; readonly form: string; readonly submitter: string | null }
+	/**
+	 * What follows an `await` of a timer the build can see: after `ms`, `ops` run with each `capture` name read as a
+	 * `{ local }` holding the value it had when this op ran. The host schedules it from a `timer` journal entry.
+	 */
+	| {
+			readonly op: 'after';
+			readonly ms: NativeExpr;
+			readonly capture: ReadonlyArray<readonly [string, NativeExpr]>;
+			readonly ops: ReadonlyArray<NativeOp>;
+	  }
+	/**
+	 * A press on a checkbox or radio button, before its handlers run: a checkbox flips its checkedness, a radio button is
+	 * checked and every other radio button of its group (same `name`, same form or none) unchecked.
+	 */
+	| { readonly op: 'tick'; readonly node: string }
+	/**
 	 * Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. A param
 	 * is a string fixed at build time or an expression evaluated when the op runs (a row's item inside a list row).
 	 * `replace` takes the place of the current screen instead of pushing a new one.
@@ -277,6 +509,8 @@ export type NativeOp =
 	| {
 			readonly op: 'script';
 			readonly fn: string;
+			/** The web event's `type` the handler sees (`click`, `input`, `submit`, `change`). */
+			readonly type: string;
 			readonly bindings: NativeScriptBindings;
 			readonly catch?: string;
 	  };
@@ -314,6 +548,11 @@ export type NativeViewPayload = {
 		 * gone with it. A read or write inside the row reaches that row's value.
 		 */
 		readonly row?: string;
+		/**
+		 * The clock when the screen opened, in milliseconds since 1970 (UTC): the host writes it at mount, before the first
+		 * build, as a page's render reads the clock when it is served; `initial` is never shown.
+		 */
+		readonly clock?: true;
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;
@@ -341,6 +580,13 @@ export type NativeViewPayload = {
 	}>;
 	/** The page's `<title>`, as text parts: what the system navigation bar shows for this screen. */
 	readonly title?: ReadonlyArray<NativeTextPart>;
+	/** Forms a `submit` op can submit; absent when there are none. */
+	readonly forms?: ReadonlyArray<NativeForm>;
+	/**
+	 * What the web says when a required field has no value, by the language its browser shows its own text in (Chromium's
+	 * wording); the host picks the device's language. Present with `forms`.
+	 */
+	readonly valueMissing?: Readonly<Record<string, NativeValueMissing>>;
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	readonly script?: NativeScript;
 };
@@ -357,6 +603,53 @@ export type NativeAppPayload = {
 	}>;
 };
 
+export type NativeValueMissing = {
+	readonly text: string;
+	readonly checkbox: string;
+	readonly radio: string;
+};
+
+/** A form's submittable fields and submit buttons, each in tree order. */
+export type NativeForm = {
+	readonly node: string;
+	readonly fields: ReadonlyArray<{ readonly node: string; readonly kind: NativeFieldKind }>;
+	readonly submitters: ReadonlyArray<string>;
+	/** The form's `novalidate`: no field is checked before it submits. */
+	readonly noValidate?: true;
+	/** An author wrote `aria-disabled` on one of its submit buttons, so a running submission marks none of them. */
+	readonly authoredAriaDisabled?: true;
+};
+
+/** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, or a hidden input. */
+export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden';
+
+export { NATIVE_VALUE_MISSING_BY_LOCALE } from './native-validation-messages.ts';
+
+/**
+ * The language a browser on a device with these preferred languages shows its own text in, among `available`: the first
+ * preference that matches exactly, then without its script (`zh-Hant-TW` as `zh-TW`), then by language alone; else `en`.
+ */
+export function nativeLocale(
+	preferred: ReadonlyArray<string>,
+	available: ReadonlyArray<string>,
+): string {
+	const byLower = new Map(available.map((locale) => [locale.toLowerCase(), locale]));
+	for (const wanted of preferred) {
+		const parts = wanted.replaceAll('_', '-').toLowerCase().split('-');
+		const language = parts[0]!;
+		const region = parts.slice(1).find((part) => part.length !== 4);
+		for (const candidate of [
+			parts.join('-'),
+			region ? `${language}-${region}` : language,
+			language,
+		]) {
+			const found = byLower.get(candidate);
+			if (found) return found;
+		}
+	}
+	return 'en';
+}
+
 /** One change a host applies to its retained views after a handler runs. */
 export type NativeJournalEntry =
 	| { readonly op: 'text'; readonly node: string; readonly value: string }
@@ -369,6 +662,13 @@ export type NativeJournalEntry =
 	  }
 	/** A `<dialog>` opened in the top layer or closed (by an op, or by the host's back gesture as a `cancel`). */
 	| { readonly op: 'dialog'; readonly node: string; readonly open: boolean }
+	/** A submit stopped: the host moves focus to `node` as `focus()` would and shows `message` until the next action. */
+	| { readonly op: 'invalid'; readonly node: string; readonly message: string }
+	/**
+	 * Run the `after` op `timer` names in `ms` milliseconds, by dispatching a `timer` action for it. A timer the script set
+	 * is named `script:<n>`, and fires once; an interval asks again when it fires.
+	 */
+	| { readonly op: 'timer'; readonly timer: string; readonly ms: number }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
 	| {
 			readonly op: 'attribute';
@@ -382,6 +682,13 @@ export type NativeJournalEntry =
 			readonly node: string;
 			readonly name: 'value';
 			readonly value: string;
+	  }
+	/** A checkbox's or radio button's checkedness changed: by a tick, by its `checked` binding, or by another radio's tick. */
+	| {
+			readonly op: 'property';
+			readonly node: string;
+			readonly name: 'checked';
+			readonly value: boolean;
 	  }
 	/** A styled cell's new value: the host moves to Dragon's next style assignment (`next[a][s][v]`) and applies it. */
 	| { readonly op: 'state'; readonly cell: string; readonly value: NativeValue }
@@ -419,10 +726,8 @@ export type NativeJournalEntry =
 	  }
 	/** The page's `<title>` text changed: the host writes it to the screen's navigation bar. */
 	| { readonly op: 'title'; readonly value: string }
-	/** The script set a timer: after `ms` the host fires it with a `timer` action (once; an interval asks again). */
-	| { readonly op: 'timer'; readonly id: number; readonly ms: number }
-	/** The script cleared a timer it set: the host drops it. */
-	| { readonly op: 'clearTimer'; readonly id: number }
+	/** The script cleared a timer it set (`timer` names it, `script:<n>`): the host drops it. */
+	| { readonly op: 'clearTimer'; readonly timer: string }
 	/** The script called `fetch`: the host sends the request and answers with a `response` action naming `id`. */
 	| { readonly op: 'fetch'; readonly id: number; readonly request: NativeFetchRequest };
 

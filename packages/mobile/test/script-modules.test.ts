@@ -43,7 +43,7 @@ describe('modules a JavaScript handler imports', () => {
 		);
 		expect(diagnostics).toEqual([]);
 		expect(payload!.script!.source).not.toContain('retitle');
-		const runtime = createNativeRuntime(payload!, new Map(), {}, nodeScriptHost());
+		const runtime = createNativeRuntime(payload!, new Map(), {}, undefined, undefined, nodeScriptHost());
 		expect(runtime.dispatch({ event: 'activate', host: payload!.events[0]!.host })).toEqual([
 			{ op: 'text', node: 'h0:text0', value: 'HELLO!2' },
 		]);
@@ -57,7 +57,7 @@ describe('modules a JavaScript handler imports', () => {
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => [d.code, d.message, d.primarySpan?.filename])).toEqual([
 			[
-				'MARKLESS_NATIVE_SCRIPT',
+				'MARKLESS_NATIVE_JAVASCRIPT',
 				'app/helpers.ts uses `document`: the web page, which a phone does not have',
 				'app/helpers.ts',
 			],

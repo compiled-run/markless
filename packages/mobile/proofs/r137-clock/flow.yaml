@@ -1,0 +1,19 @@
+appId: ${APP_ID}
+name: r137-clock
+---
+- launchApp:
+      clearState: true
+- assertVisible: Opened in 20xx
+- assertVisible: Opened ISO 24
+- assertVisible: Not pressed
+- assertVisible: Clock moved not yet
+- tapOn: Press
+- assertNotVisible: Not pressed
+- assertVisible: Pressed ISO 24
+- assertVisible: Clock moved not yet
+- assertNotVisible: Not pressed
+- tapOn: Press
+- assertNotVisible: Clock moved not yet
+- assertVisible: Pressed ISO 24
+- assertVisible: Clock moved forward
+- assertNotVisible: Clock moved not yet

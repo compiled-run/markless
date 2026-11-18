@@ -1,0 +1,12 @@
+{
+	"rung": 131,
+	"name": "Module constants: an imported list, a JSON file's fields, destructured names, and a @for over a constant list",
+	"steps": [
+		{
+			"visible": ["Plans", "Basic $5", "Team $12.5", "Scale $40.05", "Picked Basic"],
+			"absent": ["Picked Team"]
+		},
+		{ "do": { "tap": "Team $12.5" }, "visible": ["Picked Team"], "absent": ["Picked Basic"] },
+		{ "do": { "tap": "Scale $40.05" }, "visible": ["Picked Scale"], "absent": ["Picked Team"] }
+	]
+}

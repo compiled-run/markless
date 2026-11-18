@@ -1,0 +1,12 @@
+{
+	"rung": 133,
+	"name": "Props passed down: a row item's field, a module constant, a body constant and state, to a component in each row and beside them",
+	"steps": [
+		{ "visible": ["Basic plan 0", "Team plan 0", "Scale plan 0", "x plan 0"] },
+		{
+			"do": { "tap": "Pick" },
+			"visible": ["Basic plan 1", "Team plan 1", "Scale plan 1", "x plan 1"],
+			"absent": ["Basic plan 0"]
+		}
+	]
+}

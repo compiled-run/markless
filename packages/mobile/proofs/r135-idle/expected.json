@@ -1,0 +1,22 @@
+{
+	"rung": 135,
+	"name": "idle: once for each element after the first frame, and again for an element shown again later",
+	"steps": [
+		{ "visible": ["Idle 1", "More"], "absent": ["Idle 0", "Idle 2", "More idle once"] },
+		{
+			"do": { "tap": "More" },
+			"visible": ["More idle once", "Idle 1"],
+			"absent": ["More waiting"]
+		},
+		{
+			"do": { "tap": "More" },
+			"visible": ["Idle 1"],
+			"absent": ["More idle once", "More idle again"]
+		},
+		{
+			"do": { "tap": "More" },
+			"visible": ["More idle again", "Idle 1"],
+			"absent": ["More idle once"]
+		}
+	]
+}

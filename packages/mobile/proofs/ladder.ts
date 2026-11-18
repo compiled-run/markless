@@ -21,6 +21,19 @@ export type LadderAction =
 	| { readonly dismissSheet: 'swipe' | 'back' }
 	/** Pull the open system sheet up to its next resting height. */
 	| { readonly swipe: 'up' }
+	/**
+	 * A drag across the screen from one point to another, each `[x, y]` in percent of the screen; with `until`, repeated
+	 * (up to 80 times) until that text or accessible name is on screen.
+	 */
+	| {
+			readonly swipe: {
+				readonly from: readonly [number, number];
+				readonly to: readonly [number, number];
+				readonly until?: string;
+			};
+	  }
+	/** The keyboard's return key in the text field with this accessible name. */
+	| { readonly submit: string }
 	/** Scroll until this text is on screen. */
 	| { readonly scrollTo: string }
 	| {
@@ -60,6 +73,9 @@ export const PERMISSION_BUTTONS = {
 	deny: 'Don.t Allow|Don.t allow',
 } as const;
 
+/** The most swipes a `swipe` with `until` makes before its step's checks fail it. */
+export const SWIPES_UNTIL = 80;
+
 /** What the screen shows after a step's action (or at launch, for the first step). */
 export type LadderStep = {
 	readonly do?: LadderAction;
@@ -67,6 +83,8 @@ export type LadderStep = {
 	readonly visible: readonly string[];
 	/** Texts or accessible names that are not on screen. */
 	readonly absent?: readonly string[];
+	/** Texts or accessible names the page holds but that are scrolled out of sight. */
+	readonly offScreen?: readonly string[];
 	/** Controls, by text or accessible name, that are on screen and cannot be activated. */
 	readonly disabled?: readonly string[];
 	/** Texts that are on screen in this order, top to bottom. */
@@ -108,6 +126,11 @@ export type LadderStep = {
 	readonly microphone?: 'on' | 'off';
 	/** Texts on screen on one platform only: a `platform` check shows a different arm on each. */
 	readonly visibleOn?: Readonly<Partial<Record<'ios' | 'android' | 'web', readonly string[]>>>;
+	/**
+	 * The validation message shown for the field a blocked submit focused: on the web the browser's bubble, read as the
+	 * focused field's `validationMessage`; on a phone the host's message, on screen.
+	 */
+	readonly invalid?: string;
 	/**
 	 * Phones and the reference runtime: how many times the app has started its script engine since launch, from the test
 	 * build's label `ENGINE_STARTS_ID`. A page whose handlers are all data never starts one.
@@ -151,6 +174,11 @@ export type LadderRung = {
 	readonly route?: string;
 	/** The path the app opens at; `/` when absent. */
 	readonly start?: string;
+	/**
+	 * The text of the first element the screens and the browser leave below the first screen. The reference runtime has no
+	 * layout, so it raises `visible` only for elements before that one in document order.
+	 */
+	readonly belowFold?: string;
 	/** How the app opens at `start`: a launch argument (the default) or a deep link the system hands the app. */
 	readonly open?: 'launch' | 'link';
 	/** Where the device says it is, set before launch (Maestro `setLocation`; the web test's geolocation). */
@@ -177,24 +205,19 @@ export const rungFolders = (): string[] =>
 		.filter(
 			(entry) =>
 				entry.isDirectory() &&
-				(/^((\d\d|[dp]\d)[a-z]?|[uy]\d+)-/.test(entry.name) ||
-					(isScriptRung(entry.name) && !isApp(entry.name))),
+				/^((\d\d|[dp]\d)[a-z]?|[fjruy]\d+)-/.test(entry.name),
 		)
+		.filter((entry) => !isApp(entry.name))
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
-/** The script ladder (`j<n>-`): handlers that run as JavaScript; one-screen rungs and apps both. */
-const isScriptRung = (name: string): boolean => /^j\d+-/.test(name);
-const isApp = (name: string): boolean => existsSync(join(proofsDir, name, 'pages'));
+/** A rung that is an app of several routes (`pages/`) rather than one screen (`App.tsrx`). */
+const isApp = (folder: string): boolean => existsSync(join(proofsDir, folder, 'pages'));
 
-/** The navigation ladder: each folder an app (`pages/`) of several routes. */
+/** The navigation ladder: each folder an app (`pages/`) of several routes; an `r<n>` or `j<n>` rung with `pages/` too. */
 export const navRungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter(
-			(entry) =>
-				entry.isDirectory() &&
-				(/^n\d+-/.test(entry.name) || (isScriptRung(entry.name) && isApp(entry.name))),
-		)
+		.filter((entry) => entry.isDirectory() && (/^n\d+-/.test(entry.name) || (/^[jr]\d+-/.test(entry.name) && isApp(entry.name))))
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
@@ -229,7 +252,7 @@ const selector = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  */
 export function changeWitness(previous: LadderStep, step: LadderStep): LadderStep {
 	const wasShown = new Set(previous.visible);
-	const wasAbsent = new Set(previous.absent ?? []);
+	const wasAbsent = new Set([...(previous.absent ?? []), ...(previous.offScreen ?? [])]);
 	const order = step.order?.join('\n') !== previous.order?.join('\n') ? step.order : undefined;
 	const fields = Object.fromEntries(
 		Object.entries(step.fields ?? {}).filter(
@@ -241,6 +264,9 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 	return {
 		visible: step.visible.filter((text) => wasAbsent.has(text)),
 		absent: (step.absent ?? []).filter((text) => wasShown.has(text)),
+		...((step.offScreen ?? []).some((text) => wasShown.has(text)) && {
+			offScreen: (step.offScreen ?? []).filter((text) => wasShown.has(text)),
+		}),
 		...(order && { order }),
 		...(Object.keys(fields).length > 0 && { fields }),
 		...(step.title !== undefined && step.title !== previous.title && { title: step.title }),
@@ -248,6 +274,8 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 		...(step.camera && step.camera !== previous.camera && { camera: step.camera }),
 		...(step.microphone &&
 			step.microphone !== previous.microphone && { microphone: step.microphone }),
+		...(step.invalid !== undefined &&
+			step.invalid !== previous.invalid && { invalid: step.invalid }),
 		...(step.engineStarts !== undefined &&
 			step.engineStarts !== previous.engineStarts && { engineStarts: step.engineStarts }),
 	};
@@ -256,13 +284,15 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 export const witnessCount = (witness: LadderStep): number =>
 	witness.visible.length +
 	(witness.absent?.length ?? 0) +
+	(witness.offScreen?.length ?? 0) +
 	(witness.order ? 1 : 0) +
 	Object.keys(witness.fields ?? {}).length +
 	(witness.calls ? 1 : 0) +
 	(witness.camera ? 1 : 0) +
 	(witness.microphone ? 1 : 0) +
 	(witness.engineStarts === undefined ? 0 : 1) +
-	(witness.title === undefined ? 0 : 1);
+	(witness.title === undefined ? 0 : 1) +
+	(witness.invalid !== undefined ? 1 : 0);
 
 const assertions = (step: LadderStep): unknown[] =>
 	step.prompt
@@ -290,7 +320,9 @@ const platformAssertions = (step: LadderStep): unknown[] =>
 
 const screenAssertions = (step: LadderStep): unknown[] => [
 	...step.visible.map((text) => ({ assertVisible: selector(text) })),
-	...(step.absent ?? []).map((text) => ({ assertNotVisible: selector(text) })),
+	...[...(step.absent ?? []), ...(step.offScreen ?? [])].map((text) => ({
+		assertNotVisible: selector(text),
+	})),
 	...(step.disabled ?? []).map((text) => ({
 		assertVisible: { text: selector(text), enabled: false },
 	})),
@@ -308,6 +340,7 @@ const screenAssertions = (step: LadderStep): unknown[] => [
 	...(step.microphone
 		? [{ assertVisible: { id: MICROPHONE_STATE_ID, text: `microphone ${step.microphone}` } }]
 		: []),
+	...(step.invalid !== undefined ? [{ assertVisible: selector(step.invalid) }] : []),
 	...(step.engineStarts === undefined
 		? []
 		: [{ assertVisible: { id: ENGINE_STARTS_ID, text: engineStartsText(step.engineStarts) } }]),
@@ -335,6 +368,7 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			{ inputText: action.type.text },
 			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];
+	if ('submit' in action) return [{ tapOn: selector(action.submit) }, { pressKey: 'Enter' }];
 	if ('relaunch' in action)
 		return [
 			'stopApp',
@@ -371,7 +405,7 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 		return action.dismissSheet === 'swipe'
 			? [pullDown()]
 			: [onPlatform('Android', [backGesture]), onPlatform('iOS', [pullDown()])];
-	if ('swipe' in action) return [pullUp];
+	if ('swipe' in action && action.swipe === 'up') return [pullUp];
 	if ('scrollTo' in action)
 		return [
 			{
@@ -390,6 +424,20 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 					onPlatform('iOS', [{ tapOn: { id: 'BackButton' } }]),
 					onPlatform('Android', [{ pressKey: 'back' }]),
 				];
+	if ('swipe' in action) {
+		const at = ([x, y]: readonly [number, number]) => `${x}%, ${y}%`;
+		const swipe = { swipe: { start: at(action.swipe.from), end: at(action.swipe.to) } };
+		if (!action.swipe.until) return [swipe];
+		return [
+			{
+				repeat: {
+					times: SWIPES_UNTIL,
+					while: { notVisible: selector(action.swipe.until) },
+					commands: [swipe],
+				},
+			},
+		];
+	}
 	return [
 		{
 			extendedWaitUntil: {

@@ -48,7 +48,11 @@
 				"kind": "element",
 				"id": "h7",
 				"element": "h1",
-				"parent": "h6"
+				"parent": "h6",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
 			},
 			{
 				"kind": "text",
@@ -343,16 +347,40 @@
 		]
 	},
 	"initial": [
-		["h7:text0", "Recorder"],
-		["h9:text0", "Close recorder"],
-		["component-edge:0/h1:text0", "Access unknown"],
-		["component-edge:0/h2:text0", "Record"],
-		["component-edge:0/h3:text0", "Seconds 0"],
-		["component-edge:0/h4:text0", "Too short"]
+		[
+			"h7:text0",
+			"Recorder"
+		],
+		[
+			"h9:text0",
+			"Close recorder"
+		],
+		[
+			"component-edge:0/h1:text0",
+			"Access unknown"
+		],
+		[
+			"component-edge:0/h2:text0",
+			"Record"
+		],
+		[
+			"component-edge:0/h3:text0",
+			"Seconds 0"
+		],
+		[
+			"component-edge:0/h4:text0",
+			"Too short"
+		]
 	],
 	"initialArms": [
-		["branch-site:1", 0],
-		["component-edge:0/branch-site:0", 1]
+		[
+			"branch-site:1",
+			0
+		],
+		[
+			"component-edge:0/branch-site:0",
+			1
+		]
 	],
 	"steps": [
 		{
@@ -370,7 +398,9 @@
 					"op": "call",
 					"call": "recorder.active",
 					"object": "object:component-edge:0/rec",
-					"arguments": [true]
+					"arguments": [
+						true
+					]
 				}
 			]
 		},
@@ -431,7 +461,9 @@
 					"op": "call",
 					"call": "recorder.active",
 					"object": "object:component-edge:0/rec",
-					"arguments": [true]
+					"arguments": [
+						true
+					]
 				}
 			]
 		},
@@ -469,7 +501,9 @@
 					"op": "call",
 					"call": "recorder.active",
 					"object": "object:component-edge:0/rec",
-					"arguments": [false]
+					"arguments": [
+						false
+					]
 				}
 			]
 		},
@@ -502,7 +536,9 @@
 					"op": "call",
 					"call": "recorder.active",
 					"object": "object:component-edge:0/rec",
-					"arguments": [true]
+					"arguments": [
+						true
+					]
 				}
 			]
 		},

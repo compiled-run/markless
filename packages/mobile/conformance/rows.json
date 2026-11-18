@@ -63,7 +63,11 @@
 				"kind": "element",
 				"id": "h5",
 				"element": "ul",
-				"parent": "h3"
+				"parent": "h3",
+				"defaultStyle": {
+					"indent": 40,
+					"marker": "disc"
+				}
 			},
 			{
 				"kind": "repeat",
@@ -72,7 +76,9 @@
 				"list": {
 					"cell": "state:entries"
 				},
-				"key": ["id"]
+				"key": [
+					"id"
+				]
 			},
 			{
 				"kind": "element",
@@ -366,7 +372,9 @@
 							},
 							"arguments": [
 								{
-									"lambda": ["other"],
+									"lambda": [
+										"other"
+									],
 									"body": {
 										"binary": "!==",
 										"left": {
@@ -391,23 +399,76 @@
 		]
 	},
 	"initial": [
-		["h4:text0", "Add"],
-		["component-edge:0/h1:text0@a", "A 0"],
-		["component-edge:0/h1:text0@b", "B 0"],
-		["component-edge:0/h2:text0@a", "open"],
-		["component-edge:0/h2:text0@b", "open"],
-		["h7:text0@a", "Drop A"],
-		["h7:text0@b", "Drop B"],
-		["h9:text0", "Total 0"]
+		[
+			"h4:text0",
+			"Add"
+		],
+		[
+			"component-edge:0/h1:text0@a",
+			"A 0"
+		],
+		[
+			"component-edge:0/h1:text0@b",
+			"B 0"
+		],
+		[
+			"component-edge:0/h2:text0@a",
+			"open"
+		],
+		[
+			"component-edge:0/h2:text0@b",
+			"open"
+		],
+		[
+			"h7:text0@a",
+			"Drop A"
+		],
+		[
+			"h7:text0@b",
+			"Drop B"
+		],
+		[
+			"h9:text0",
+			"Total 0"
+		]
 	],
 	"initialAttributes": [
-		["component-edge:0/h1@a", "aria-expanded", "false"],
-		["component-edge:0/h1@b", "aria-expanded", "false"],
-		["component-edge:0/h2@a", "hidden", ""],
-		["component-edge:0/h2@b", "hidden", ""]
+		[
+			"component-edge:0/h1@a",
+			"aria-expanded",
+			"false"
+		],
+		[
+			"component-edge:0/h1@b",
+			"aria-expanded",
+			"false"
+		],
+		[
+			"component-edge:0/h2@a",
+			"hidden",
+			""
+		],
+		[
+			"component-edge:0/h2@b",
+			"hidden",
+			""
+		]
 	],
-	"initialArms": [["repeat:0:empty", null]],
-	"initialRows": [["repeat:0", ["a", "b"]]],
+	"initialArms": [
+		[
+			"repeat:0:empty",
+			null
+		]
+	],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"a",
+				"b"
+			]
+		]
+	],
 	"steps": [
 		{
 			"action": {
@@ -508,7 +569,9 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["b"]
+					"keys": [
+						"b"
+					]
 				}
 			]
 		},
@@ -521,7 +584,10 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["b", "c"]
+					"keys": [
+						"b",
+						"c"
+					]
 				}
 			]
 		},
@@ -564,7 +630,9 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["b"]
+					"keys": [
+						"b"
+					]
 				}
 			]
 		},
@@ -577,7 +645,10 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["b", "c"]
+					"keys": [
+						"b",
+						"c"
+					]
 				}
 			]
 		},
@@ -590,7 +661,9 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["c"]
+					"keys": [
+						"c"
+					]
 				}
 			]
 		},

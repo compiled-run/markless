@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import {
 	copyFile,
 	cp,
@@ -19,12 +19,14 @@ import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 import { startEchoServer } from '../src/harness/echo-server.ts';
 import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
 import { buildFixture } from '../../router/test/support/fixture-build.ts';
+import type { ScrollVectors } from '../src/scroll.ts';
 import {
 	allRungFolders,
 	callsText,
 	proofsDir,
 	readRung,
 	styleRungFolders,
+	SWIPES_UNTIL,
 	type LadderRung,
 	type LadderStep,
 } from '../proofs/ladder.ts';
@@ -125,6 +127,52 @@ function recordDeviceCalls() {
 const shown = (page: Page, text: string): Locator =>
 	page.getByText(text, { exact: true }).or(page.getByLabel(text, { exact: true }));
 
+// The phone the style exports lay out for (Dragon's iOS viewport): a rung that scrolls scrolls here as on the phones.
+const PHONE = { width: 402, height: 778 };
+
+// On screen: some of it is inside the viewport and not clipped away by a scrolling box, as an IntersectionObserver reports.
+const onScreenCount = (page: Page, text: string): Promise<number> =>
+	shown(page, text).evaluateAll(async (elements) => {
+		const seen = await Promise.all(
+			elements.map(
+				(element) =>
+					new Promise<boolean>((resolve) => {
+						const observer = new IntersectionObserver(([entry]) => {
+							observer.disconnect();
+							resolve(
+								entry!.intersectionRect.width * entry!.intersectionRect.height > 0,
+							);
+						});
+						observer.observe(element);
+					}),
+			),
+		);
+		return seen.filter(Boolean).length;
+	});
+
+// A drag from one screen point to another: a wheel turn of the same length at the start point, which scrolls the box under
+// it (or the page, once that box is at its end), as a finger's drag does; resolved once the scroll has ended.
+async function swipe(page: Page, from: readonly [number, number], to: readonly [number, number]) {
+	const at = ([x, y]: readonly [number, number]) =>
+		[(x / 100) * PHONE.width, (y / 100) * PHONE.height] as const;
+	const [fx, fy] = at(from);
+	const [tx, ty] = at(to);
+	const ended = page.evaluate(
+		() =>
+			new Promise<void>((resolve) => {
+				document.addEventListener('scrollend', () => resolve(), {
+					capture: true,
+					once: true,
+				});
+				// Nothing scrolls when every box under the point is at its end, and then no scrollend comes.
+				setTimeout(resolve, 2_000);
+			}),
+	);
+	await page.mouse.move(fx, fy);
+	await page.mouse.wheel(fx - tx, fy - ty);
+	await ended;
+}
+
 async function act(page: Page, step: LadderStep) {
 	const action = step.do;
 	if (!action) return;
@@ -133,20 +181,29 @@ async function act(page: Page, step: LadderStep) {
 		// a button named by its own text comes first, over a region its heading also names.
 		const button = page.getByRole('button', { name: action.tap, exact: true });
 		const named = page.getByLabel(action.tap, { exact: true });
-		await ((await button.count()) === 1
-			? button
-			: (await named.count()) === 1
-				? named
-				: shown(page, action.tap)
+		await (
+			(await button.count()) === 1
+				? button
+				: (await named.count()) === 1
+					? named
+					: shown(page, action.tap)
 		).click();
 	} else if ('type' in action) {
 		const field = page.getByRole('textbox', { name: action.type.field, exact: true });
 		await field.fill('');
 		await field.pressSequentially(action.type.text);
-	} else if ('relaunch' in action) await page.reload();
+	} else if ('submit' in action)
+		await page.getByRole('textbox', { name: action.submit, exact: true }).press('Enter');
+	else if ('relaunch' in action) await page.reload();
 	else if ('back' in action) await page.goBack();
 	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });
-	else if ('wait' in action) await page.clock.runFor(action.wait);
+	else if ('swipe' in action && action.swipe !== 'up') {
+		const { from, to, until } = action.swipe;
+		for (let turn = 0; turn < (until ? SWIPES_UNTIL : 1); turn++) {
+			if (until && (await onScreenCount(page, until)) > 0) break;
+			await swipe(page, from, to);
+		}
+	} else if ('wait' in action) await page.clock.runFor(action.wait);
 }
 
 // Every expectation of a step read at one moment, so a screen the action has not reached yet cannot pass.
@@ -154,9 +211,13 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 	const failed: string[] = [];
 	const onScreen = (text: string) => shown(page, text).filter({ visible: true });
 	for (const text of step.visible)
-		if ((await onScreen(text).count()) === 0) failed.push(`"${text}" is not on screen`);
+		if ((await onScreenCount(page, text)) === 0) failed.push(`"${text}" is not on screen`);
 	for (const text of step.absent ?? [])
-		if ((await onScreen(text).count()) > 0) failed.push(`"${text}" is on screen`);
+		if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);
+	for (const text of step.offScreen ?? []) {
+		if ((await shown(page, text).count()) === 0) failed.push(`"${text}" is not on the page`);
+		else if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);
+	}
 	for (const text of step.disabled ?? [])
 		if ((await onScreen(text).count()) === 0 || !(await onScreen(text).first().isDisabled()))
 			failed.push(`"${text}" is not a disabled control on screen`);
@@ -171,6 +232,16 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 			() => (window as { __marklessDeviceCalls?: string[] }).__marklessDeviceCalls ?? [],
 		);
 		if (callsText(made) !== callsText(step.calls)) failed.push(`device ${callsText(made)}`);
+	}
+	if (step.invalid !== undefined) {
+		const message = await page.evaluate(() => {
+			const focused = document.activeElement;
+			return focused instanceof HTMLInputElement && !focused.validity.valid
+				? focused.validationMessage
+				: null;
+		});
+		if (message !== step.invalid)
+			failed.push(`the focused field's validation message is ${JSON.stringify(message)}`);
 	}
 	if (step.order) {
 		const tops: number[] = [];
@@ -239,7 +310,7 @@ describe.each(allRungFolders())('%s', (folder) => {
 		{ timeout: 60_000 },
 		async (phone) => {
 			const context = await browser.newContext(
-				phone ? { ...PHONES[phone], colorScheme: 'light' } : {},
+				phone ? { ...PHONES[phone], colorScheme: 'light' } : { viewport: PHONE },
 			);
 			const shots = phone ? join(proofsDir, folder, 'screenshots', `web-${phone}`) : null;
 			if (shots && screenshotsWanted) await mkdir(shots, { recursive: true });
@@ -280,6 +351,62 @@ describe.each(allRungFolders())('%s', (folder) => {
 				}
 			}
 			expect(errors).toEqual([]);
+			await context.close();
+		},
+	);
+});
+
+// The scroll vectors both hosts reproduce must be what Chrome does: each case is built as a page in Chrome, its offsets set,
+// then scrollIntoView() or focus() run and every scroller's offsets read back.
+describe('scroll-into-view vectors', () => {
+	const vectors = JSON.parse(
+		readFileSync(
+			join(import.meta.dirname, '../conformance/scroll/scroll-into-view.json'),
+			'utf8',
+		),
+	) as ScrollVectors;
+	test.each(vectors.cases.map((c) => [c.name, c] as const))(
+		'%s',
+		{ timeout: 30_000 },
+		async (_, c) => {
+			const outer = c.chain.at(-1)!;
+			const context = await browser.newContext({
+				viewport: { width: outer.port.width, height: outer.port.height },
+			});
+			const page = await context.newPage();
+			const size = (b: (typeof c.chain)[number]) =>
+				`width:${b.port.width + b.range.maxX}px;height:${b.port.height + b.range.maxY}px`;
+			const at = (r: { x: number; y: number; width: number; height: number }) =>
+				`position:absolute;left:${r.x}px;top:${r.y}px;width:${r.width}px;height:${r.height}px`;
+			let html = `<div id="target" tabindex="-1" style="${at(c.target)}"></div>`;
+			for (const [index, box] of c.chain.entries()) {
+				const content = `<div style="position:relative;${size(box)}">${html}</div>`;
+				html =
+					index === c.chain.length - 1
+						? content
+						: `<div id="box${index}" style="${at(box.port)};overflow:auto;scrollbar-width:none">${content}</div>`;
+			}
+			await page.setContent(
+				`<!doctype html><html style="scrollbar-width:none"><body style="margin:0">${html}</body></html>`,
+			);
+			const offsets = await page.evaluate(
+				({ chain, align }) => {
+					const scrollers = chain.map((_, index) =>
+						index === chain.length - 1
+							? document.scrollingElement!
+							: document.getElementById(`box${index}`)!,
+					);
+					scrollers.forEach((s, index) =>
+						s.scrollTo(chain[index]!.offset.x, chain[index]!.offset.y),
+					);
+					const target = document.getElementById('target')!;
+					if (align.block === 'if-needed') target.focus();
+					else target.scrollIntoView(align as ScrollIntoViewOptions);
+					return scrollers.map((s) => ({ x: s.scrollLeft, y: s.scrollTop }));
+				},
+				{ chain: c.chain, align: c.align },
+			);
+			expect(offsets).toEqual(c.offsets);
 			await context.close();
 		},
 	);

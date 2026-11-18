@@ -1,0 +1,41 @@
+{
+	"rung": 12,
+	"name": "A page taller than the screen scrolls, and a button at its bottom can be pressed",
+	"steps": [
+		{
+			"visible": ["Long page", "Section 1"],
+			"offScreen": ["Press me", "Page end"],
+			"absent": ["Pressed 1"]
+		},
+		{
+			"do": {
+				"swipe": {
+					"from": [50, 80],
+					"to": [50, 25],
+					"until": "Page end"
+				}
+			},
+			"visible": ["Page end", "Press me", "Pressed 0"],
+			"offScreen": ["Long page"]
+		},
+		{
+			"do": {
+				"tap": "Press me"
+			},
+			"visible": ["Pressed 1"],
+			"absent": ["Pressed 0"],
+			"offScreen": ["Long page"]
+		},
+		{
+			"do": {
+				"swipe": {
+					"from": [50, 25],
+					"to": [50, 80],
+					"until": "Long page"
+				}
+			},
+			"visible": ["Long page", "Section 1"],
+			"offScreen": ["Page end", "Press me"]
+		}
+	]
+}

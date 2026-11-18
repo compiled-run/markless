@@ -206,7 +206,7 @@ const androidManifest = (
 	<uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
 ${permissions.map((name) => `\t<uses-permission android:name="${name}" />\n`).join('')}
 	<application android:label="${PROOF_APP_NAME}" android:hasCode="true">
-		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
+		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:windowSoftInputMode="adjustResize" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />

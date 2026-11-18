@@ -11,3 +11,5 @@ Markless on iOS and Android. Private until the ladder in `docs/goals/native-targ
 - `src/adapters/ios/`: the UIKit host (Swift). `src/adapters/android/`: the Android Views host (Kotlin).
 - `proofs/<nn>-<name>/`: one ladder rung each: `App.tsrx`, a Maestro flow run on both platforms, the web reference.
 - `proofs/n<n>-<name>/`: one navigation rung each: an app (`pages/`), its flow and the web reference.
+- `proofs/r<n>-<name>/`: one element-vocabulary rung each (`docs/goals/native-targets-api/element-vocabulary.md`).
+- `src/paragraphs.ts`: the reference meaning of text flow (which nodes are one paragraph and what it reads).

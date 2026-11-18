@@ -44,7 +44,11 @@
 							"kind": "element",
 							"id": "h2",
 							"element": "h1",
-							"parent": "h0"
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
 						},
 						{
 							"kind": "text",
@@ -76,7 +80,11 @@
 							"kind": "element",
 							"id": "h4",
 							"element": "ul",
-							"parent": "h0"
+							"parent": "h0",
+							"defaultStyle": {
+								"indent": 40,
+								"marker": "disc"
+							}
 						},
 						{
 							"kind": "repeat",
@@ -210,7 +218,11 @@
 							"kind": "element",
 							"id": "h2",
 							"element": "h1",
-							"parent": "h0"
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
 						},
 						{
 							"kind": "text",
