@@ -56,15 +56,18 @@ const lambdaOf = (node: AnyNode): SemanticExpression => {
 
 const unsupported = (construct: string): SemanticExpression => ({ kind: 'unsupported', construct });
 
-function calleeName(node: AnyNode | undefined): string | null {
-	if (node?.type === 'Identifier' && typeof node.name === 'string') return node.name;
+function calleePath(node: AnyNode | undefined): string[] | null {
+	if (node?.type === 'Identifier' && typeof node.name === 'string') return [node.name];
 	if (node?.type === 'MemberExpression' && !node.computed) {
-		const object = calleeName(node.object as AnyNode | undefined);
+		const object = calleePath(node.object as AnyNode | undefined);
 		const property = (node.property as AnyNode | undefined)?.name;
-		return object && typeof property === 'string' ? `${object}.${property}` : null;
+		return object && typeof property === 'string' ? [...object, property] : null;
 	}
 	return null;
 }
+
+const calleeName = (node: AnyNode | undefined): string | null =>
+	calleePath(node)?.join('.') ?? null;
 
 /** A template value, test or assigned value as a tree a native host evaluates; names are the component's bindings. */
 export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression {
@@ -163,17 +166,18 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 					),
 				};
 			}
-			const name = calleeName(callee);
-			return name && BUILTINS.has(name)
+			const path = calleePath(callee);
+			return path
 				? {
 						kind: 'call',
-						callee: name,
+						callee: path.join('.'),
+						calleePath: path,
 						arguments: asNodes(node.arguments).map(expressionTreeOf),
 					}
-				: unsupported(`a call to \`${name ?? 'a computed function'}\``);
+				: unsupported('a call to a computed function');
 		}
 		case 'AwaitExpression':
-			return unsupported('`await`');
+			return { kind: 'await', value: expressionTreeOf(node.argument as AnyNode | undefined) };
 		case 'ArrowFunctionExpression':
 		case 'FunctionExpression':
 			return unsupported('a function value');
@@ -248,6 +252,10 @@ const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
 	}
 	if (expression.type === 'AssignmentExpression') {
 		const target = expression.left as AnyNode | undefined;
+		const holder = target?.type === 'MemberExpression' && !target.computed ? (target.object as AnyNode | undefined) : undefined;
+		const field = (target?.property as AnyNode | undefined)?.name;
+		if (holder?.type === 'Identifier' && typeof holder.name === 'string' && typeof field === 'string' && expression.operator === '=')
+			return { kind: 'assign-field', target: holder.name, field, value: expressionTreeOf(expression.right as AnyNode | undefined) };
 		if (target?.type !== 'Identifier' || typeof target.name !== 'string')
 			return {
 				kind: 'unsupported',
@@ -273,6 +281,7 @@ const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
 			: { kind: 'unsupported', construct: `the \`${operator}\` assignment` };
 	}
 	const tree = expressionTreeOf(expression);
+	if (tree.kind === 'call' || tree.kind === 'await') return { kind: 'effect', value: tree };
 	return {
 		kind: 'unsupported',
 		construct: tree.kind === 'unsupported' ? tree.construct : 'an expression statement',
@@ -285,7 +294,6 @@ export function handlerStatementsOf(
 ): ReadonlyArray<SemanticHandlerStatement> | undefined {
 	if (!node || (node.type !== 'ArrowFunctionExpression' && node.type !== 'FunctionExpression'))
 		return undefined;
-	if (node.async) return [{ kind: 'unsupported', construct: 'an async handler' }];
 	const body = node.body as AnyNode | undefined;
 	if (body?.type !== 'BlockStatement') return [statementOf(body ?? null)];
 	return asNodes(body.body).map((statement) =>

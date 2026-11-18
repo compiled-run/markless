@@ -34,8 +34,26 @@ abstract class MarklessActivity : Activity() {
 
 	open fun styleExportBytes(): ByteArray? = null
 
+	/** Where device values come from and device calls go; the phone's own by default. */
+	open val device: NativeDevice by lazy { PlatformDevice(this) }
+
+	override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+		super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+		device.permissionsAnswered(requestCode)
+	}
+
+	override fun onResume() {
+		super.onResume()
+		device.resumed()
+	}
+
+	override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+		super.onActivityResult(requestCode, resultCode, data)
+		device.activityResult(requestCode)
+	}
+
 	/** The path this screen opens at: the `route` extra (Maestro's launch argument, or a link), or a deep link's path. */
-	open fun route(): String? = intent.getStringExtra(ROUTE) ?: intent.data?.path
+	open fun route(): String? = intent.getStringExtra(ROUTE) ?: intent.data?.takeIf { it.host == APP_LINK_HOST }?.path
 
 	/** How deep this screen sits in the stack; the bottom screen has no Up arrow. */
 	private val depth get() = intent.getIntExtra(DEPTH, 0)
@@ -73,7 +91,7 @@ abstract class MarklessActivity : Activity() {
 		val (route, params) = app.match(path) ?: throw MarklessHostError("$path is not a route of this app")
 		val styles = styleExportBytes()?.let { StyleExport.decodeApp(it) } ?: emptyMap()
 		for (pattern in styles.keys) if (app.routes.none { it.route.pattern == pattern }) throw MarklessHostError("the app style has styles for $pattern, which is not a route of this app")
-		show(MarklessHost(this, route.page, styles[route.route.pattern], params = params))
+		show(MarklessHost(this, route.page, styles[route.route.pattern], params = params, device = device))
 		title = host.runtime.title() ?: ""
 		host.onTitle = { title = it }
 		host.onNavigate = { entry ->
@@ -136,7 +154,8 @@ abstract class MarklessActivity : Activity() {
 
 	/** Builds the page from scratch with [params]: one page per payload, so a link names this page's own route. */
 	private fun open(params: Map<String, String>) {
-		show(MarklessHost(this, payloadBytes(), styleExportBytes(), params = params))
+		if (::host.isInitialized) host.release()
+		show(MarklessHost(this, payloadBytes(), styleExportBytes(), params = params, device = device))
 		host.onNavigate = { entry ->
 			if (entry.route != host.payload.route?.pattern) throw MarklessHostError("navigate to ${entry.route}; this app holds only ${host.payload.route?.pattern}")
 			open(entry.params)
@@ -176,5 +195,7 @@ abstract class MarklessActivity : Activity() {
 		private val APP_THEME = if (Build.VERSION.SDK_INT >= 29) android.R.style.Theme_DeviceDefault_DayNight else android.R.style.Theme_Material_Light
 		const val ROUTE = "route"
 		const val DEPTH = "markless.depth"
+		/** A deep link's host: `markless-proof://app/<path>`; a test build's device links use another. */
+		const val APP_LINK_HOST = "app"
 	}
 }

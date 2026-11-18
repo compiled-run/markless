@@ -91,6 +91,7 @@ export interface TransformTsrxModuleInput {
 	importedFunctionWrites?: SemanticGraphInput['importedFunctionWrites'];
 	serverOnlyProps?: SemanticGraphInput['serverOnlyProps'];
 	elementOnlyAttributes?: SemanticGraphInput['elementOnlyAttributes'];
+	deviceTargetFacts?: SemanticGraphInput['deviceTargetFacts'];
 	routeRoot?: SemanticGraphInput['routeRoot'];
 	renderDataImportSources?: Readonly<Record<string, string>>;
 	/** Pages are rendered on the server, so a browser-side render loads full render data only when it runs. */

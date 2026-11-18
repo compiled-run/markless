@@ -3,6 +3,7 @@ import type {
 	NativeExpr,
 	NativeJournalEntry,
 	NativeNode,
+	NativeOp,
 	NativeTextPart,
 	NativeValue,
 	NativeViewPayload,
@@ -13,7 +14,26 @@ import { marklessAttributeValue } from '@markless/web/dom-attribute';
 export type NativeAction =
 	| { readonly event: 'activate'; readonly host: string }
 	/** The field's whole text after an edit. */
-	| { readonly event: 'input'; readonly host: string; readonly value: string };
+	| { readonly event: 'input'; readonly host: string; readonly value: string }
+	/** A live device value changed (connectivity, permission): the host writes the device cell. */
+	| { readonly event: 'device'; readonly cell: string; readonly value: Value }
+	/** A device call the host started has answered: a task cell takes `{ state: 'value', value }` or the error. */
+	| { readonly event: 'settle'; readonly cell: string; readonly value: Value }
+	/** A device call made from a handler answered: its continuation runs with the answer. */
+	| { readonly event: 'resume'; readonly continuation: string; readonly value: Value }
+	/** That call failed: the rest of the handler does not run, and the nearest `@catch` around it takes the error. */
+	| {
+			readonly event: 'reject';
+			readonly continuation: string;
+			readonly error: { readonly name: string; readonly message: string };
+	  }
+	| {
+			readonly event: 'settle';
+			readonly cell: string;
+			readonly error: { readonly name: string; readonly message: string };
+	  }
+	/** The platform closed a system sheet (swipe, back, a tap on the dimmed page); it is already closed when this runs. */
+	| { readonly event: 'dismiss'; readonly host: string };
 
 type Value = NativeValue;
 
@@ -40,10 +60,14 @@ export type NativeRuntime = {
 	readonly arms: () => ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Every shown list's row keys, in order. */
 	readonly rows: () => ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
-	/** Runs the handler bound to the action and returns the journal the host applies. */
+	/** Every system sheet and whether its `open` is truthy. */
+	readonly sheets: () => ReadonlyArray<readonly [node: string, open: boolean]>;
+	/** Runs the handler bound to the action (or writes the device or task cell it names) and returns the journal. */
 	readonly dispatch: (action: NativeAction) => ReadonlyArray<NativeJournalEntry>;
 	/** The page's `<title>` text, null when it has none. */
 	readonly title: () => string | null;
+	/** The calls a host starts at mount, one per task cell, each settling its cell. */
+	readonly tasks: () => ReadonlyArray<Extract<NativeJournalEntry, { op: 'call' }>>;
 };
 
 /** How a value reads in text, as the web writes it (`marklessCsrText`): null is empty, anything else `String(value)`. */
@@ -211,6 +235,19 @@ export function createNativeRuntime(
 		),
 	);
 	const handlers = new Map(payload.handlers.map((handler) => [handler.id, handler.ops]));
+	/** Every `after` of every call op, by id: what runs when a host resumes it. */
+	const continuations = new Map<
+		string,
+		NonNullable<Extract<NativeOp, { op: 'call' }>['after']>
+	>();
+	const collectThen = (ops: ReadonlyArray<NativeOp>): void => {
+		for (const op of ops)
+			if (op.op === 'call' && op.after) {
+				continuations.set(op.after.id, op.after);
+				collectThen(op.after.ops);
+			}
+	};
+	for (const handler of payload.handlers) collectThen(handler.ops);
 	const branches = new Map(
 		payload.nodes.flatMap((node) => (node.kind === 'branch' ? [[node.id, node] as const] : [])),
 	);
@@ -236,6 +273,14 @@ export function createNativeRuntime(
 		const branch = branches.get(node.arm.branch);
 		return !!branch && shown(branch) && armOf(branch) === node.arm.index;
 	};
+	const nodesById = new Map(payload.nodes.map((node) => [node.id, node]));
+	/** Device objects whose owning component is shown. */
+	const liveObjects = (): string[] =>
+		(payload.objects ?? []).flatMap((object) => {
+			const owner = nodesById.get(object.owner);
+			if (!owner) throw new Error(`${object.id} is owned by unknown node ${object.owner}`);
+			return shown(owner) ? [object.id] : [];
+		});
 	/** A row's key as hosts and journal entries spell it: `String()` of the item's key path. */
 	const rowsOf = (repeat: Extract<NativeNode, { kind: 'repeat' }>) => {
 		const list = evaluate(repeat.list);
@@ -328,6 +373,10 @@ export function createNativeRuntime(
 				? [[node.id, rowsOf(node).map((row) => row.key)] as const]
 				: [],
 		);
+	const sheets = () =>
+		payload.nodes.flatMap((node) =>
+			node.kind === 'sheet' ? [[node.id, Boolean(evaluate(node.open))] as const] : [],
+		);
 	const keyed = <T>(list: ReadonlyArray<readonly [string, string, T]>) =>
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));
 
@@ -353,51 +402,147 @@ export function createNativeRuntime(
 		arms,
 		rows,
 		title,
+		sheets,
 		dispatch(action) {
+			if (action.event === 'resume') {
+				const continuation = continuations.get(action.continuation);
+				if (!continuation) throw new Error(`no continuation ${action.continuation}`);
+				const scope: NativeScope = {
+					...base,
+					locals: new Map([...base.locals, [continuation.as, action.value]]),
+				};
+				return change(undefined, undefined, () => run(continuation.ops, undefined, scope));
+			}
+			if (action.event === 'reject') {
+				const continuation = continuations.get(action.continuation);
+				if (!continuation) throw new Error(`no continuation ${action.continuation}`);
+				const cell = continuation.catch;
+				// With no @catch around the handler, a failed call ends it and changes nothing.
+				if (cell === undefined) return [];
+				return change(undefined, undefined, () => {
+					values.set(cell, { name: action.error.name, message: action.error.message });
+					return [];
+				});
+			}
+			if (action.event === 'device' || action.event === 'settle') {
+				const cell = payload.cells.find((candidate) => candidate.id === action.cell);
+				if (action.event === 'device' ? !cell?.device : !cell?.task)
+					throw new Error(
+						`${action.cell} is not a ${action.event === 'device' ? 'device' : 'task'} cell`,
+					);
+				const value: Value =
+					action.event === 'device'
+						? action.value
+						: 'error' in action
+							? { state: 'error', error: { ...action.error } }
+							: { state: 'value', value: action.value };
+				return change(undefined, undefined, () => {
+					values.set(action.cell, value);
+					return [];
+				});
+			}
 			const { node: host, scope } = scopeOf(action.host);
 			const event = payload.events.find(
 				(candidate) => candidate.host === host && candidate.event === action.event,
 			);
 			if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
 			const eventValue = action.event === 'input' ? action.value : undefined;
+			return change(action.host, eventValue, () =>
+				run(handlers.get(event.handler) ?? [], eventValue, scope),
+			);
+		},
+		tasks: () =>
+			payload.cells.flatMap((cell) =>
+				cell.task
+					? [
+							{
+								op: 'call' as const,
+								call: cell.task.call,
+								arguments: cell.task.arguments.map((argument) =>
+									evaluate(argument),
+								),
+								result: cell.id,
+							},
+						]
+					: [],
+			),
+	};
+
+	/** Runs ops in order: writes cells, collects the calls (a continuation's id rides on its call), stops at a navigation. */
+	function run(
+		ops: ReadonlyArray<NativeOp>,
+		eventValue: string | undefined,
+		scope: NativeScope,
+	): NativeJournalEntry[] {
+		const calls: NativeJournalEntry[] = [];
+		for (const op of ops) {
+			if (op.op === 'navigate') {
+				const params = Object.fromEntries(
+					Object.entries(op.params).map(([name, value]) => [
+						name,
+						typeof value === 'string' ? value : String(evaluate(value, eventValue, scope)),
+					]),
+				);
+				return [
+					{
+						op: 'navigate',
+						route: op.route,
+						params,
+						...(op.replace ? { replace: true as const } : {}),
+					},
+				];
+			}
+			if (op.op === 'call') {
+				calls.push({
+					op: 'call',
+					call: op.call,
+					...(op.object !== undefined ? { object: op.object } : {}),
+					arguments: op.arguments.map((argument) =>
+						evaluate(argument, eventValue, scope),
+					),
+					...(op.result !== undefined ? { result: op.result } : {}),
+					...(op.after ? { resume: op.after.id } : {}),
+				});
+				continue;
+			}
+			const value = evaluate(op.value, eventValue, scope);
+			values.set(op.cell, value);
+			const key = storageKeys.get(op.cell);
+			if (key !== undefined) store.set(key, value);
+		}
+		return calls;
+	}
+
+	/**
+	 * Runs `apply` (which writes cells and returns the calls it made, or a navigation that ends the page) and returns the
+	 * journal: styled cells first, then every shown node whose output changed, in document order, then the calls.
+	 */
+	function change(
+		host: string | undefined,
+		eventValue: string | undefined,
+		apply: () => NativeJournalEntry[],
+	): ReadonlyArray<NativeJournalEntry> {
+		{
 			const cellsBefore = new Map(values);
 			const beforeTexts = new Map(texts());
 			const beforeAttributes = keyed(attributes());
 			// The edited field already shows what was typed, so its own value counts as already written.
 			const beforeProperties = keyed(properties());
-			if (eventValue !== undefined) beforeProperties.set(`${action.host}\0value`, eventValue);
+			if (eventValue !== undefined && host !== undefined)
+				beforeProperties.set(`${host}\0value`, eventValue);
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
 			const beforeTitle = title();
-			for (const op of handlers.get(event.handler) ?? []) {
-				if (op.op === 'navigate') {
-					const params = Object.fromEntries(
-						Object.entries(op.params).map(([name, value]) => [
-							name,
-							typeof value === 'string'
-								? value
-								: String(evaluate(value, eventValue, scope)),
-						]),
-					);
-					return [
-						{
-							op: 'navigate',
-							route: op.route,
-							params,
-							...(op.replace ? { replace: true as const } : {}),
-						},
-					];
-				}
-				const value = evaluate(op.value, eventValue, scope);
-				values.set(op.cell, value);
-				const key = storageKeys.get(op.cell);
-				if (key !== undefined) store.set(key, value);
-			}
+			const beforeSheets = new Map(sheets());
+			const ownedBefore = new Set(liveObjects());
+			const calls = apply();
+			if (calls[0]?.op === 'navigate') return calls;
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());
 			const afterProperties = keyed(properties());
 			const afterArms = new Map(arms());
 			const afterRows = new Map(rows());
+			const afterSheets = new Map(sheets());
 			const styles = payload.cells.flatMap((cell): NativeJournalEntry[] =>
 				cell.styled && cellsBefore.get(cell.id) !== values.get(cell.id)
 					? [{ op: 'state', cell: cell.id, value: values.get(cell.id)! }]
@@ -411,6 +556,10 @@ export function createNativeRuntime(
 					return before && after && before.join('\0') !== after.join('\0')
 						? [{ op: 'rows', node: node.id, keys: after }]
 						: [];
+				}
+				if (node.kind === 'sheet') {
+					const open = afterSheets.get(node.id)!;
+					return beforeSheets.get(node.id) !== open ? [{ op: 'sheet', node: node.id, open }] : [];
 				}
 				if (node.kind === 'branch') {
 					return beforeArms.has(node.id) &&
@@ -463,6 +612,12 @@ export function createNativeRuntime(
 					}),
 				);
 			});
+			const owned = new Set(liveObjects());
+			const releases = (payload.objects ?? []).flatMap((object): NativeJournalEntry[] =>
+				ownedBefore.has(object.id) && !owned.has(object.id)
+					? [{ op: 'release', object: object.id }]
+					: [],
+			);
 			const afterTitle = title();
 			return [
 				...styles,
@@ -470,7 +625,9 @@ export function createNativeRuntime(
 				...(afterTitle !== beforeTitle && afterTitle !== null
 					? [{ op: 'title' as const, value: afterTitle }]
 					: []),
+				...releases,
+				...calls,
 			];
-		},
-	};
+		}
+	}
 }

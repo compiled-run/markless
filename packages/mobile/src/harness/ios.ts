@@ -1,7 +1,8 @@
 import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { exec } from './exec.ts';
-import { PROOF_APP_ID, PROOF_APP_NAME, PROOF_URL_SCHEME } from './proof-app.ts';
+import { PROOF_APP_ID, PROOF_APP_NAME, PROOF_LINK_SCHEME } from './proof-app.ts';
+import type { DeviceManifest } from '../permissions.ts';
 import type { ProofAssets } from './rung.ts';
 import { cacheRoot, contentKey, filesUnder } from './tools.ts';
 
@@ -180,7 +181,7 @@ const infoPlist = (minimumOs: string) => `<?xml version="1.0" encoding="UTF-8"?>
 <key>UILaunchScreen</key><dict/>
 <key>CFBundleSupportedPlatforms</key><array><string>iPhoneSimulator</string></array>
 <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
-<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>${PROOF_APP_ID}</string><key>CFBundleURLSchemes</key><array><string>${PROOF_URL_SCHEME}</string></array></dict></array>
+<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>${PROOF_APP_ID}</string><key>CFBundleURLSchemes</key><array><string>${PROOF_LINK_SCHEME}</string></array></dict></array>
 </dict></plist>
 `;
 
@@ -189,11 +190,14 @@ export async function installProofApp(
 	simulator: BootedSimulator,
 	shellApp: string,
 	assets: ProofAssets,
+	manifest: DeviceManifest,
 	workDir: string,
 ) {
 	const app = join(workDir, `${PROOF_APP_NAME}.app`);
 	rmSync(app, { recursive: true, force: true });
 	cpSync(shellApp, app, { recursive: true });
+	for (const { key, text } of manifest.ios)
+		await exec('plutil', ['-insert', key, '-string', text, join(app, 'Info.plist')]);
 	for (const [path, bytes] of assets) {
 		mkdirSync(join(app, path, '..'), { recursive: true });
 		writeFileSync(join(app, path), bytes);

@@ -4,6 +4,7 @@ import {
 	buildSemanticGraph,
 	createNativeViewPayload,
 	NATIVE_FACT_COLLECTORS,
+	DEVICE_TARGET_FACTS,
 	type SemanticGraphArtifact,
 	type CompilerDiagnostic,
 	type NativeViewArtifact,
@@ -16,6 +17,8 @@ import {
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
 import { NATIVE_APP_VERSION } from '@markless/serializer/native-view';
 import { nativeStyleInput, type NativeStyleInput } from './style-input.ts';
+import type { NativeDeviceFeature } from '@markless/serializer/native-device';
+import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
 
 export type NativeBuild = {
 	readonly payload: NativeViewPayload | null;
@@ -26,6 +29,9 @@ export type NativeBuild = {
 	readonly styles: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
 	/** Stylesheets imported for their effect (`import './app.css'`) by the module or a module it imports, in import order. */
 	readonly stylesheets: ReadonlyArray<NativeStylesheet>;
+	/** The device features the payload uses, and the manifest entries they need. */
+	readonly features: ReadonlyArray<NativeDeviceFeature>;
+	readonly manifest: DeviceManifest;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 
@@ -66,6 +72,10 @@ export async function compileNativeComponent(input: {
 	/** In an app build: every page's route, so links and `navigate()` are checked and resolved against them. */
 	readonly manifest?: RouteManifest;
 	readonly readStylesheet?: ReadStylesheet;
+	/** The app config's `device` section (usage text per feature). */
+	readonly device?: DeviceAppConfig;
+	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
+	readonly target?: 'ios' | 'android';
 }): Promise<NativeBuild> {
 	const manifest =
 		input.manifest ?? (input.page ? buildRouteManifestFromFileIds([input.page]) : undefined);
@@ -78,6 +88,8 @@ export async function compileNativeComponent(input: {
 		source: input.source,
 		symbols: [],
 		nativeFacts: NATIVE_FACT_COLLECTORS,
+		target: input.target ?? 'native',
+		deviceTargetFacts: DEVICE_TARGET_FACTS,
 	});
 	const importedModules: Record<string, SemanticGraphArtifact> = {};
 	const importedStyles: NativeBuild['styles'][number][] = [];
@@ -94,6 +106,8 @@ export async function compileNativeComponent(input: {
 		importedModules[entry.source] = await buildSemanticGraph({
 			...module,
 			nativeFacts: NATIVE_FACT_COLLECTORS,
+			target: input.target ?? 'native',
+			deviceTargetFacts: DEVICE_TARGET_FACTS,
 		});
 		const plan = (await compileTsrxModule({ ...module, symbols: [] })).publicRenderPlan;
 		importedStyles.push(...plan.styleScopes);
@@ -121,11 +135,14 @@ export async function compileNativeComponent(input: {
 				}
 			: {}),
 	});
+	// A phone build reads only the analysis; what the web's emission passes cannot emit does not bind it.
 	const errors = collectTsrxModuleDiagnostics(compiled).filter(
-		(diagnostic) => diagnostic.severity === 'error',
+		(diagnostic) =>
+			diagnostic.severity === 'error' && (diagnostic.phase === 'parse' || diagnostic.phase === 'semantic-graph'),
 	);
+	const { manifest: deviceEntries, diagnostics: usage } = deviceManifest(native.features, input.device);
 	return {
-		payload: errors.length > 0 ? null : native.payload,
+		payload: errors.length > 0 || usage.length > 0 ? null : native.payload,
 		styles: [...importedStyles, ...compiled.publicRenderPlan.styleScopes].filter(
 			(style, index, all) =>
 				all.findIndex((other) => other.scopeId === style.scopeId) === index,
@@ -133,7 +150,9 @@ export async function compileNativeComponent(input: {
 		stylesheets: stylesheets.filter(
 			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 		),
-		diagnostics: [...errors, ...native.diagnostics],
+		features: native.features,
+		manifest: deviceEntries,
+		diagnostics: [...errors, ...native.diagnostics, ...usage],
 	};
 }
 

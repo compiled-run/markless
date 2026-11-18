@@ -17,6 +17,7 @@ import {
 	isIgnorableJsxTextNode,
 	isMemberTagName,
 	isSpreadAttribute,
+	memberTagPropertyPath,
 	memberTagRootName,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
@@ -573,6 +574,9 @@ function componentPropBindings(
 			source: opaqueSource,
 			kind: 'opaque',
 			sourceSpan: span,
+			...(expression && state.nativeFacts
+				? { nativeExpression: state.nativeFacts.expression(expression as never) }
+				: {}),
 			...(rowRead ? { rowRead } : {}),
 			...(fixedValue ? { fixedValue: true as const } : {}),
 			...nativeExpressionOf(expression, state),
@@ -682,15 +686,17 @@ function spreadPropBinding(
 function componentImportSource(
 	childComponentName: string,
 	state: WalkState,
-): Pick<SemanticComponentEdge, 'importSource' | 'importKind' | 'importedName'> {
+): Pick<SemanticComponentEdge, 'importSource' | 'importKind' | 'importedName' | 'importedMemberPath'> {
 	// Member tags resolve through their root identifier (`checkbox` in `checkbox.root`).
 	const localName = memberTagRootName(childComponentName);
 	const imported = state.graph.moduleImports.find((item) => item.localName === localName);
+	const memberPath = memberTagPropertyPath(childComponentName);
 	return imported
 		? {
 				importSource: imported.source,
 				importKind: imported.kind,
 				importedName: imported.importedName,
+				...(memberPath.length > 0 ? { importedMemberPath: memberPath } : {}),
 			}
 		: {};
 }

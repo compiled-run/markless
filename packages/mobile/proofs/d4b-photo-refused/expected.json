@@ -1,0 +1,30 @@
+{
+	"rung": "D4b",
+	"name": "A failed awaited device call in a handler lands in the nearest @catch",
+	"permissions": { "camera": "unset" },
+	"steps": [
+		{
+			"prompt": "camera",
+			"visible": ["Camera", "Access unknown", "Take photo", "Photos 0"],
+			"absent": ["Photo failed: NotAllowedError"]
+		},
+		{
+			"do": { "answer": "deny" },
+			"visible": ["Access denied", "Take photo", "Photos 0"],
+			"absent": ["Access unknown", "Photo failed: NotAllowedError"],
+			"camera": "off"
+		},
+		{
+			"do": { "tap": "Take photo" },
+			"visible": ["Access denied", "Photo failed: NotAllowedError"],
+			"absent": ["Take photo", "Photos 0"],
+			"calls": ["camera.takePhoto"]
+		}
+	],
+	"web": {
+		"steps": [
+			{ "visible": ["Camera", "No camera here"], "absent": ["Take photo", "Photo failed"] }
+		],
+		"absentFromOutput": ["Take photo", "takePhoto", "Photo failed", "@markless/device"]
+	}
+}

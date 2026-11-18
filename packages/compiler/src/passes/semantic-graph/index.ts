@@ -76,7 +76,7 @@ import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.t
 import { retargetProjectedRepeatHosts } from './projected-repeat-host.ts';
 import { childContainerRepeatDiagnostics, containerRepeatComponents } from './container-repeat.ts';
 import { collectBranchSite } from './collect-branches.ts';
-import { ifChainOf } from './if-chain.ts';
+import { armStatements, ifChainOf } from './if-chain.ts';
 import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
 import { moduleHandlerProps } from './handler-props.ts';
 import {
@@ -134,6 +134,8 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		serverOnlyProps: input.serverOnlyProps,
 		routeRoot: input.routeRoot,
 		...(input.nativeFacts ? { nativeFacts: input.nativeFacts } : {}),
+		...(input.target ? { target: input.target } : {}),
+		...(input.deviceTargetFacts ? { deviceTargetFacts: input.deviceTargetFacts } : {}),
 	});
 	state.walk = walk;
 	collectMemberTagTargets(statements, state);
@@ -158,9 +160,13 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectSharedFactoryGraph(statements, state, walk);
 	collectSharedCallbackInvocations(statements, state);
 
+	const deviceObjects = state.deviceTarget?.collectDeviceObjects(statements as never, state as never) ?? [];
+	if (deviceObjects.length > 0) graph.deviceObjects = deviceObjects;
+	const absentComponents =
+		state.deviceTarget?.componentsAbsentOnTarget(statements as never, state as never) ?? new Set<string>();
 	for (const statement of statements) {
 		const componentFunction = getComponentFunction(statement);
-		if (!componentFunction) continue;
+		if (!componentFunction || absentComponents.has(componentFunction.name)) continue;
 
 		const exportName = componentExportName(statement, componentFunction.name);
 		graph.components.push({
@@ -233,6 +239,8 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		ariaBusy: state.authoredAriaBusy,
 		submitAriaDisabled: state.authoredSubmitAriaDisabled,
 	});
+	if (state.target === 'web')
+		graph.webDeviceEdits = state.deviceTarget?.collectWebDeviceAbsence(ast as never, state as never);
 	graph.markup = collectSemanticMarkup({
 		ast,
 		source: input.source,
@@ -242,6 +250,9 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		hostIds: state.hostIds,
 		nestedLocalSource: (expression) => inlineNestedTemplateLocals(expression, state),
 		nativeFacts: state.nativeFacts,
+		foldedIfs: state.foldedIfs,
+		foldedTexts: state.foldedTexts,
+		absentComponents,
 	});
 	// Needs the chunks, so it runs after them: a repeat inside a child's
 	// `{children}` renders into that child's markup, not the enclosing element of
@@ -562,10 +573,16 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'JSXElement':
 			collectElement(node, state, walk);
 			return;
-		case 'JSXExpressionContainer':
-			if (literalContainerText(node) === null)
-				collectTemplateExpression(node.expression as AnyNode | undefined, state);
+		case 'JSXExpressionContainer': {
+			if (literalContainerText(node) !== null) break;
+			const folded = state.deviceTarget?.foldedText(node as never, state as never);
+			if (folded !== undefined) {
+				state.foldedTexts.set(node, folded);
+				return;
+			}
+			collectTemplateExpression(node.expression as AnyNode | undefined, state);
 			break;
+		}
 		case 'VariableDeclaration':
 			collectVariableDeclaration(node, state);
 			break;
@@ -580,6 +597,13 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			});
 			return;
 		case 'JSXIfExpression': {
+			// Decided by target constants: the kept arm is ordinary markup and the others never existed.
+			const folded = state.deviceTarget?.foldedIfArm(node as never, state as never);
+			if (folded !== undefined) {
+				if (folded !== null)
+					for (const statement of armStatements(ifChainOf(node).arms[folded])) walkMarkupStatement(statement, state);
+				return;
+			}
 			collectBranchSite(node, state);
 			const site = lastBranchSiteId(state);
 			const chain = ifChainOf(node);

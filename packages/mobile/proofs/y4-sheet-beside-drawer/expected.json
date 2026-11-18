@@ -1,0 +1,68 @@
+{
+	"rung": 104,
+	"name": "A system sheet and the headless drawer on one page",
+	"steps": [
+		{
+			"visible": [
+				"Two sheets",
+				"Last closed: nothing",
+				"Open the drawer",
+				"Open the system sheet"
+			],
+			"absent": ["Drawn by the app", "Drawn by the platform"]
+		},
+		{
+			"do": {
+				"tap": "Open the drawer"
+			},
+			"visible": ["Drawn by the app", "Close the drawer"]
+		},
+		{
+			"do": {
+				"tap": "Close the drawer"
+			},
+			"visible": ["Last closed: the drawer"],
+			"absent": ["Drawn by the app", "Last closed: nothing", "Drawn by the platform"]
+		},
+		{
+			"do": {
+				"tap": "Open the system sheet"
+			},
+			"visible": ["Drawn by the platform"]
+		},
+		{
+			"do": {
+				"dismissSheet": "swipe"
+			},
+			"visible": ["Last closed: the system sheet"],
+			"absent": ["Drawn by the platform", "Last closed: the drawer"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": [
+					"Two sheets",
+					"Last closed: nothing",
+					"Open the drawer",
+					"On the web, only the drawer"
+				],
+				"absent": ["Drawn by the app", "Drawn by the platform"]
+			},
+			{
+				"do": {
+					"tap": "Open the drawer"
+				},
+				"visible": ["Drawn by the app", "Close the drawer"]
+			},
+			{
+				"do": {
+					"tap": "Close the drawer"
+				},
+				"visible": ["Last closed: the drawer"],
+				"absent": ["Drawn by the app", "Last closed: nothing"]
+			}
+		],
+		"absentFromOutput": ["Drawn by the platform", "Close the system sheet"]
+	}
+}

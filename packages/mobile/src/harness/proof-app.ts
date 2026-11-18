@@ -18,3 +18,6 @@ export const ANDROID_SHELL_ACTIVITY = 'dev.markless.proof.ShellActivity';
 
 export type ProofPlatform = 'ios' | 'android';
 export const PROOF_PLATFORMS: ReadonlyArray<ProofPlatform> = ['ios', 'android'];
+
+/** The link scheme both shells answer: `markless-proof://device/<live value>?value=<json>` sets a test build's device value. */
+export const PROOF_LINK_SCHEME = PROOF_URL_SCHEME;

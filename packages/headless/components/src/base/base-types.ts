@@ -55,3 +55,9 @@ export type SeparatorProps = {
  * no consumer stylesheet can collide with it.
  */
 export type VisuallyHiddenProps = Pick<PropsOf<'span'>, 'children'>;
+
+/** The props of `base.camera`, which becomes `native.camera` once `@markless/ui` exports the `native` namespace. */
+export type CameraProps = {
+	/** The device object whose picture this shows: `const cam = camera()`. */
+	readonly el?: object;
+};

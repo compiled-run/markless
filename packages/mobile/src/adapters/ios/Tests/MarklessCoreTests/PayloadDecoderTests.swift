@@ -70,3 +70,37 @@ func rejectsWhatItDoesNotKnow(find: String, replace: String, reason: String) thr
 		"""))
 	#expect(try runtime.texts().map(\.text) == ["[<null>]"])
 }
+
+private let sheet = """
+	{"version":"markless.native-view/0","component":"S","cells":[{"id":"state:open","name":"open","initial":false}],
+	"nodes":[{"kind":"element","id":"h0","element":"main","parent":null},
+	{"kind":"sheet","id":"sheet:0","parent":"h0","open":{"cell":"state:open"},"snapPoints":[0.5,1],"dismissible":true,"modal":true},
+	{"kind":"element","id":"h1","element":"p","parent":"sheet:0"},{"kind":"text","id":"h1:text0","parent":"h1","parts":[{"text":"Inside"}]}],
+	"events":[{"host":"h0","event":"activate","handler":"handler:open"},{"host":"sheet:0","event":"dismiss","handler":"handler:keep"}],
+	"handlers":[{"id":"handler:open","ops":[{"op":"assign","cell":"state:open","value":{"literal":true}}]},
+	{"id":"handler:keep","ops":[{"op":"assign","cell":"state:open","value":{"literal":1}}]}]}
+	"""
+
+@Test func aSheetsContentIsShownWhileClosedAndADismissThatKeepsItOpenJournalsNothing() throws {
+	let runtime = NativeRuntime(payload: try decode(sheet))
+	#expect(try runtime.texts().map(\.text) == ["Inside"])
+	#expect(try runtime.sheets().map(\.open) == [false])
+	#expect(try runtime.dispatch(NativeAction(event: .activate, host: "h0")) == [.sheet(node: "sheet:0", open: true)])
+	#expect(try runtime.dispatch(NativeAction(event: .dismiss, host: "sheet:0")) == [])
+}
+
+@Test(arguments: [
+	("\"snapPoints\":[0.5,1]", "\"snapPoints\":[1,0.5]", "a sheet rests at"),
+	("\"snapPoints\":[0.5,1]", "\"snapPoints\":[0.25,0.5,1]", "a sheet rests at"),
+	("\"snapPoints\":[0.5,1]", "\"snapPoints\":[0.5]", "a sheet rests at"),
+	("\"modal\":true}", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}}", "unknown field \"arm\""),
+	("\"host\":\"sheet:0\"", "\"host\":\"h0\"", "which is not a sheet"),
+	("\"event\":\"activate\"", "\"event\":\"dismiss\"", "which is not a sheet"),
+	("\"host\":\"h0\"", "\"host\":\"sheet:0\"", "which is not an element"),
+])
+func rejectsSheetsItCannotPresent(find: String, replace: String, reason: String) throws {
+	let mutated = sheet.replacingOccurrences(of: find, with: replace)
+	#expect(mutated != sheet)
+	let message = try #require(rejection(mutated))
+	#expect(message.contains(reason), "\(message)")
+}

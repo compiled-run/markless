@@ -89,6 +89,10 @@ export function nativeStyleInput(
 		nodes: payload.nodes.flatMap((node): NativeStyleInput['nodes'][number][] => {
 			const place = node.arm ? { arm: node.arm } : {};
 			if (node.kind === 'branch' || node.kind === 'repeat') return [];
+			if (node.kind === 'sheet')
+				throw new Error(
+					`${payload.component}: styles reach Dragon as one page; a system sheet's content is a second root it does not lay out yet`,
+				);
 			if (node.kind === 'text')
 				return [
 					{

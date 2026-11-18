@@ -1,0 +1,59 @@
+{
+	"rung": "D7",
+	"name": "Settings opened from a refused-access message; access follows the change made there",
+	"location": {
+		"latitude": 51.5,
+		"longitude": -0.125
+	},
+	"permissions": {
+		"location": "unset"
+	},
+	"steps": [
+		{
+			"prompt": "location",
+			"visible": ["Where you are", "Access unknown", "Locating"],
+			"absent": ["Open Settings"]
+		},
+		{
+			"do": {
+				"answer": "deny"
+			},
+			"visible": [
+				"Access denied",
+				"Location is off for this app",
+				"Open Settings",
+				"NotAllowedError"
+			],
+			"absent": ["Access unknown", "Locating"],
+			"calls": ["location.current"]
+		},
+		{
+			"do": {
+				"tap": "Open Settings"
+			},
+			"system": "settings",
+			"visible": ["Open Settings"],
+			"calls": ["location.current", "settings.open"]
+		},
+		{
+			"do": {
+				"settings": {
+					"ios": ["Apps", "Proof", "Location", "While Using the App"],
+					"android": ["Permissions", "Location", "Allow only while using the app"]
+				}
+			},
+			"visible": ["Access granted", "NotAllowedError"],
+			"absent": ["Access denied", "Location is off for this app", "Open Settings"],
+			"calls": ["location.current", "settings.open"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Where you are", "Location is not available here"],
+				"absent": ["Open Settings", "Locating"]
+			}
+		],
+		"absentFromOutput": ["Open Settings", "Location is off", "@markless/device"]
+	}
+}

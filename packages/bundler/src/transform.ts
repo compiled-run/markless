@@ -1379,6 +1379,7 @@ type CompiledTransformInput = Pick<
 	| 'executionLog'
 	| 'serverOnlyProps'
 	| 'elementOnlyAttributes'
+	| 'deviceTargetFacts'
 	| 'routeRoot'
 >;
 
@@ -1393,6 +1394,7 @@ export function transformCompileInput(input: CompiledTransformInput): CompileTsr
 			? { elementOnlyAttributes: input.elementOnlyAttributes }
 			: {}),
 		...(input.routeRoot ? { routeRoot: true } : {}),
+		...(input.deviceTargetFacts ? { deviceTargetFacts: input.deviceTargetFacts } : {}),
 		buildId: input.buildId,
 		resolverId: `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(input.filename)}`,
 		symbols: input.symbols ?? [],

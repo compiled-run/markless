@@ -17,7 +17,34 @@ import {
 
 test('the ladder has one proof folder per rung, in rung order', () => {
 	expect(rungFolders().map((folder) => readRung(folder).rung)).toEqual([
-		1, 2, 3, 4, 5, 5.5, 6, 7, 7.5, 7.75, 7.875, 8, 9, 10, 11,
+		1,
+		2,
+		3,
+		4,
+		5,
+		5.5,
+		6,
+		7,
+		7.5,
+		7.75,
+		7.875,
+		8,
+		9,
+		10,
+		11,
+		'D1',
+		'D2',
+		'D3',
+		'D4',
+		'D4b',
+		'D5',
+		'D6',
+		'D7',
+		'P1',
+		101,
+		102,
+		103,
+		104,
 	]);
 	for (const folder of rungFolders())
 		expect(existsSync(join(proofsDir, folder, 'App.tsrx'))).toBe(true);
@@ -32,7 +59,24 @@ test.each(allRungFolders())('%s: flow.yaml is the flow its expected.json describ
 	);
 	const [header, commands] = committed;
 	expect(header).toEqual({ appId: '${APP_ID}', name: folder });
-	expect(commands[0]).toMatchObject({ launchApp: { clearState: true } });
+	// Before the launch only the device's place and a cold Settings app are set; the launch always clears the app's state.
+	const launch = commands.findIndex(
+		(command: unknown) =>
+			typeof command === 'object' && command !== null && 'launchApp' in command,
+	);
+	const coldSettings = {
+		runFlow: { when: { platform: 'iOS' }, commands: [{ stopApp: 'com.apple.Preferences' }] },
+	};
+	expect(
+		commands
+			.slice(0, launch)
+			.every(
+				(command: object) =>
+					'setLocation' in command ||
+					JSON.stringify(command) === JSON.stringify(coldSettings),
+			),
+	).toBe(true);
+	expect(commands[launch]).toMatchObject({ launchApp: { clearState: true } });
 });
 
 test('the navigation ladder has one app folder per rung, in rung order', () => {
@@ -63,7 +107,14 @@ test.each(allRungFolders())(
 	(folder) => {
 		const { steps } = readRung(folder);
 		for (const [index, step] of steps.entries()) {
-			if (index === 0 || (step.do && 'relaunch' in step.do) || looksOnly(step.do)) continue;
+			// A resting height is not a text: the screenshot after a swipe is its record. Maestro's scrollUntilVisible fails by
+			// itself unless the text comes on screen.
+			if (
+				index === 0 ||
+				looksOnly(step.do) ||
+				(step.do && ('relaunch' in step.do || 'swipe' in step.do || 'scrollTo' in step.do))
+			)
+				continue;
 			expect(
 				witnessCount(changeWitness(steps[index - 1]!, step)),
 				`step ${index}`,

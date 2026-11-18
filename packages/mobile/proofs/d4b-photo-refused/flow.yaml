@@ -1,0 +1,37 @@
+appId: ${APP_ID}
+name: d4b-photo-refused
+---
+- launchApp:
+    clearState: true
+    permissions:
+      camera: unset
+- assertVisible:
+    text: Allow .?Proof.? to (access your camera|take pictures and record video)\?
+- tapOn:
+    text: Don.t Allow|Don.t allow
+- assertNotVisible: Access unknown
+- assertVisible:
+    id: markless-camera
+    text: camera off
+- assertVisible: Access denied
+- assertVisible: Take photo
+- assertVisible: Photos 0
+- assertNotVisible: Access unknown
+- assertNotVisible: "Photo failed: NotAllowedError"
+- assertVisible:
+    id: markless-camera
+    text: camera off
+- tapOn: Take photo
+- assertVisible: "Photo failed: NotAllowedError"
+- assertNotVisible: Take photo
+- assertNotVisible: Photos 0
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: camera\\.takePhoto"
+- assertVisible: Access denied
+- assertVisible: "Photo failed: NotAllowedError"
+- assertNotVisible: Take photo
+- assertNotVisible: Photos 0
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: camera\\.takePhoto"

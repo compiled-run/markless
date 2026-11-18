@@ -1,0 +1,28 @@
+{
+	"rung": "D6",
+	"name": "The system share sheet opens from a handler, and the handler resumes when it closes",
+	"steps": [
+		{
+			"visible": ["Share", "Share link", "Closed 0"],
+			"calls": []
+		},
+		{
+			"do": { "tap": "Share link" },
+			"system": "share",
+			"visible": ["Share link", "Closed 0"],
+			"calls": ["sharesheet.open"]
+		},
+		{
+			"do": { "dismiss": true },
+			"visible": ["Share link", "Closed 1"],
+			"absent": ["Closed 0"],
+			"calls": ["sharesheet.open"]
+		}
+	],
+	"web": {
+		"steps": [
+			{ "visible": ["Share", "Sharing is not available here"], "absent": ["Share link"] }
+		],
+		"absentFromOutput": ["Share link", "Markless proof", "@markless/device"]
+	}
+}

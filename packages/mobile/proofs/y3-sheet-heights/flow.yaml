@@ -1,0 +1,34 @@
+appId: ${APP_ID}
+name: y3-sheet-heights
+---
+- launchApp:
+      clearState: true
+- assertVisible: Catalog
+- assertVisible: Browse
+- assertNotVisible: All items
+- assertNotVisible: Item 1
+- tapOn: Browse
+- assertVisible: All items
+- assertVisible: Item 1
+- assertVisible: All items
+- assertVisible: Item 1
+- swipe:
+      start: 50%, 56%
+      end: 50%, 20%
+      duration: 600
+- assertVisible: All items
+- assertVisible: Item 1
+- scrollUntilVisible:
+      element:
+          text: Item 70
+      direction: DOWN
+- assertVisible: Item 70
+- assertVisible: Close
+- tapOn: Close
+- assertNotVisible: Item 70
+- assertNotVisible: Close
+- assertVisible: Catalog
+- assertVisible: Browse
+- assertNotVisible: All items
+- assertNotVisible: Item 70
+- assertNotVisible: Close

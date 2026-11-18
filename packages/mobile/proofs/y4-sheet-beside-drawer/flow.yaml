@@ -1,0 +1,32 @@
+appId: ${APP_ID}
+name: y4-sheet-beside-drawer
+---
+- launchApp:
+      clearState: true
+- assertVisible: Two sheets
+- assertVisible: 'Last closed: nothing'
+- assertVisible: Open the drawer
+- assertVisible: Open the system sheet
+- assertNotVisible: Drawn by the app
+- assertNotVisible: Drawn by the platform
+- tapOn: Open the drawer
+- assertVisible: Drawn by the app
+- assertVisible: Drawn by the app
+- assertVisible: Close the drawer
+- tapOn: Close the drawer
+- assertNotVisible: Drawn by the app
+- assertVisible: 'Last closed: the drawer'
+- assertNotVisible: Drawn by the app
+- assertNotVisible: 'Last closed: nothing'
+- assertNotVisible: Drawn by the platform
+- tapOn: Open the system sheet
+- assertVisible: Drawn by the platform
+- assertVisible: Drawn by the platform
+- swipe:
+      start: 50%, 56%
+      end: 50%, 96%
+      duration: 150
+- assertNotVisible: Drawn by the platform
+- assertVisible: 'Last closed: the system sheet'
+- assertNotVisible: Drawn by the platform
+- assertNotVisible: 'Last closed: the drawer'

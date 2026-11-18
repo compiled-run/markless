@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 318,
+	total: 320,
 	guided: 51,
 	groups: [
 		{
@@ -1596,6 +1596,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a debug event’s element is missing markless_debug_event_host_missing a markless runtime error from @markless/web.',
 				},
 				{
+					code: 'MARKLESS_DEVICE_USAGE_MISSING',
+					title: 'A device feature has no usage text',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'a device feature has no usage text markless_device_usage_missing a device feature has no usage text: a markless runtime error.',
+				},
+				{
 					code: 'MARKLESS_DYNAMIC_TAG_INVALID',
 					title: 'A dynamic tag name is not a valid element',
 					chip: 'error',
@@ -1754,6 +1762,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a list row reads a widget no one owns markless_repeat_row_component_widget_unresolved a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_DEVICE_WEB_ABSENT',
+					title: 'A native element does not exist on the web',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'a native element does not exist on the web markless_device_web_absent a native element does not exist on the web: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_REPEAT_ROW_MINT_RENDERER_MISSING',

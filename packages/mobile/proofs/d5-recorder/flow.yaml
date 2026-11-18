@@ -1,0 +1,178 @@
+appId: ${APP_ID}
+name: d5-recorder
+---
+- launchApp:
+    clearState: true
+    permissions:
+      microphone: unset
+- assertVisible: Recorder
+- assertVisible: Close recorder
+- assertVisible: Access unknown
+- assertVisible: Record
+- assertVisible: Seconds 0
+- assertVisible: Too short
+- assertNotVisible: Stop
+- assertNotVisible: Play
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: none"
+- assertVisible:
+    id: markless-microphone
+    text: microphone off
+- tapOn: Record
+- assertVisible:
+    text: Allow .?Proof.? to (access your microphone|record audio)\?
+- assertVisible:
+    text: Allow .?Proof.? to (access your microphone|record audio)\?
+- tapOn:
+    text: Don.t Allow|Don.t allow
+- assertVisible: Record
+- assertNotVisible: Stop
+- assertNotVisible: Access unknown
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: recorder\\.active"
+- assertVisible:
+    id: markless-microphone
+    text: microphone off
+- assertVisible: Record
+- assertVisible: Access denied
+- assertVisible: Seconds 0
+- assertNotVisible: Stop
+- assertNotVisible: Access unknown
+- assertNotVisible: Play
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: recorder\\.active"
+- assertVisible:
+    id: markless-microphone
+    text: microphone off
+- stopApp
+- launchApp:
+    permissions:
+      microphone: unset
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: none"
+- assertVisible: Record
+- assertNotVisible: Stop
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: none"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible: Access unknown
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: Access denied
+- tapOn: Record
+- assertVisible:
+    text: Allow .?Proof.? to (access your microphone|record audio)\?
+- assertVisible:
+    text: Allow .?Proof.? to (access your microphone|record audio)\?
+- tapOn:
+    text: Allow While Using App|While using the app|Allow
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: recorder\\.active"
+- assertVisible:
+    id: markless-microphone
+    text: microphone on
+- assertVisible: Stop
+- assertVisible: Access granted
+- assertVisible: Too short
+- assertNotVisible: Record
+- assertNotVisible: Access unknown
+- assertNotVisible: Access denied
+- assertNotVisible: Long enough
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: recorder\\.active"
+- assertVisible:
+    id: markless-microphone
+    text: microphone on
+- extendedWaitUntil:
+    visible: Long enough
+    timeout: 19000
+- assertVisible: Long enough
+- assertNotVisible: Too short
+- assertVisible: Long enough
+- assertVisible: Stop
+- assertNotVisible: Too short
+- assertNotVisible: Seconds 0
+- assertVisible:
+    id: markless-microphone
+    text: microphone on
+- tapOn: Stop
+- assertNotVisible: Stop
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: recorder\\.active, recorder\\.active"
+- assertVisible:
+    id: markless-microphone
+    text: microphone off
+- assertVisible: Record
+- assertVisible: Play
+- assertVisible: Long enough
+- assertNotVisible: Stop
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: recorder\\.active, recorder\\.active"
+- assertVisible:
+    id: markless-microphone
+    text: microphone off
+- tapOn: Play
+- assertNotVisible: Play
+- assertVisible: Pause
+- assertVisible: Record
+- assertNotVisible: Play
+- tapOn: Record
+- assertNotVisible: Record
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: recorder\\.active, recorder\\.active, recorder\\.active"
+- assertVisible:
+    id: markless-microphone
+    text: microphone on
+- assertVisible: Stop
+- assertNotVisible: Record
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: recorder\\.active, recorder\\.active, recorder\\.active"
+- assertVisible:
+    id: markless-microphone
+    text: microphone on
+- tapOn: Close recorder
+- assertNotVisible: Stop
+- assertVisible:
+    id: markless-microphone
+    text: microphone off
+- assertVisible: Open recorder
+- assertNotVisible: Close recorder
+- assertNotVisible: Stop
+- assertNotVisible: Record
+- assertNotVisible: Access granted
+- assertVisible:
+    id: markless-microphone
+    text: microphone off
+- tapOn: Open recorder
+- assertVisible: Close recorder
+- assertVisible: Record
+- assertVisible: Access granted
+- assertNotVisible: Open recorder
+- assertVisible: Close recorder
+- assertVisible: Record
+- assertVisible: Seconds 0
+- assertVisible: Too short
+- assertVisible: Access granted
+- assertNotVisible: Open recorder
+- assertNotVisible: Stop
+- assertNotVisible: Play
+- assertNotVisible: Pause
+- assertVisible:
+    id: markless-microphone
+    text: microphone off

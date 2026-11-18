@@ -10,9 +10,26 @@ import type {
 	NativeTextPart,
 	NativeViewPayload,
 } from '@markless/serializer';
-import { NATIVE_VIEW_VERSION, nativeStyleAttribute } from '@markless/serializer/native-view';
+import {
+	NATIVE_VIEW_VERSION,
+	nativeStyleAttribute,
+	PLATFORM_PIECES_NAMESPACE,
+	PLATFORM_PIECES_PACKAGE,
+} from '@markless/serializer/native-view';
+import {
+	DEVICE_CALLS,
+	DEVICE_ELEMENTS,
+	DEVICE_MODULE,
+	DEVICE_OBJECTS,
+	DEVICE_VALUES,
+	type NativeDeviceCall,
+	type NativeDeviceFeature,
+	type NativeDeviceObject,
+	type NativeDeviceValue,
+} from '@markless/serializer/native-device';
 import type {
 	CompilerDiagnostic,
+	SemanticComponentEdge,
 	SemanticEvent,
 	SemanticGraphArtifact,
 	SemanticMarkupChunk,
@@ -26,6 +43,8 @@ export const NATIVE_UNSUPPORTED_CODE = 'MARKLESS_NATIVE_UNSUPPORTED';
 export type NativeViewArtifact = {
 	readonly passId: 'native-view';
 	readonly payload: NativeViewPayload | null;
+	/** The device features the payload uses, in first-use order: what the app's manifests must declare. */
+	readonly features: ReadonlyArray<NativeDeviceFeature>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 
@@ -59,6 +78,8 @@ const PORTABLE_ELEMENTS = new Set([
 	'button',
 	'input',
 	'a',
+	'img',
+	'audio',
 ]);
 
 const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][number]['event']>> = {
@@ -88,7 +109,17 @@ type Item =
 			readonly projection?: string;
 			readonly path: ReadonlyArray<number>;
 	  }
-	| { readonly kind: 'children'; readonly path: ReadonlyArray<number> };
+	| { readonly kind: 'children'; readonly path: ReadonlyArray<number> }
+	| {
+			readonly kind: 'boundary';
+			readonly id: string;
+			readonly arms: {
+				readonly try: string;
+				readonly pending?: string;
+				readonly catch?: string;
+			};
+			readonly path: ReadonlyArray<number>;
+	  };
 
 const isNativeValue = (value: unknown): value is NativeValue =>
 	value === null ||
@@ -128,7 +159,38 @@ type Scope = {
 	readonly locals: ReadonlySet<string>;
 	readonly items: ReadonlyMap<string, string>;
 	readonly props: ReadonlyMap<string, Prop>;
+	/** Callback parameters the caller fixes at build time, such as a sheet's `onChange` reading `false` on dismiss. */
+	readonly bound?: ReadonlyMap<string, NativeExpr>;
+	/** This instance's device objects by local name (`cam`), each with its payload id. */
+	readonly objects: ReadonlyMap<
+		string,
+		{ readonly id: string; readonly device: NativeDeviceObject }
+	>;
+	/** The nearest `@catch` around this markup: a handler's failed awaited device call writes its error there. */
+	readonly catches?: HandlerCatch;
+	/** Inside a `@try` arm: the boundary, whose task cells its reads collect, and the name `@catch` binds its error to. */
+	readonly boundary?: {
+		readonly tasks: Set<string>;
+		readonly errorName?: string;
+		readonly arm: 'try' | 'pending' | 'catch';
+		readonly catches: HandlerCatch;
+	};
 };
+
+/** A `@try`'s `@catch` as handlers inside its `@try` arm reach it: the cell made the first time one needs it. */
+type HandlerCatch = { readonly cell: () => string; readonly used: () => boolean };
+
+/** Calls every host implements with exact JavaScript meaning (`NativeBuiltin`). */
+const BUILTINS = new Set<string>([
+	'String',
+	'Number',
+	'Boolean',
+	'Math.abs',
+	'Math.floor',
+	'Math.max',
+	'Math.min',
+	'Math.round',
+] satisfies NativeBuiltin[]);
 
 /** Methods with JavaScript meaning that return a new value; `reverse` mutates, so only a fresh array may take it. */
 const METHODS = new Set<string>([
@@ -213,12 +275,13 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 		repeatsById: new Map(graph.keyedRepeats.map((repeat) => [repeat.id, repeat])),
 		/** Sync computeds by component, then name: a read of one inlines its expression. */
 		computeds: graph.graphBindings.reduce((byComponent, binding) => {
-			if (binding.kind !== 'computed' || binding.async) return byComponent;
+			if (binding.kind !== 'computed') return byComponent;
 			const names =
 				byComponent.get(binding.componentName ?? '') ?? new Map<string, typeof binding>();
 			names.set(binding.name, binding);
 			return byComponent.set(binding.componentName ?? '', names);
 		}, new Map<string, Map<string, SemanticGraphArtifact['graphBindings'][number]>>()),
+		boundaries: new Map(graph.asyncBoundaries.map((boundary) => [boundary.id, boundary])),
 		imports: new Map(
 			graph.moduleImports
 				.filter((entry) => !entry.typeOnly)
@@ -252,15 +315,16 @@ export function createNativeViewPayload(
 		diagnostics.push(nativeUnsupported(message, span));
 		return null;
 	};
+	const features = new Set<NativeDeviceFeature>();
 	const done = (payload: NativeViewPayload | null): NativeViewArtifact => ({
 		passId: 'native-view',
 		payload: diagnostics.length > 0 ? null : payload,
+		features: [...features],
 		diagnostics,
 	});
 
 	const root = graph.markup.root;
 	if (!root) return done(refuse('the module has no root component'));
-	if (graph.asyncBoundaries.length > 0) refuse('@try');
 	if (graph.behaviors.length > 0) refuse('attach behaviours');
 	const rootModule = moduleFactsOf(graph);
 	const rootChunk = rootModule.chunks.get(root.templateId);
@@ -319,6 +383,7 @@ export function createNativeViewPayload(
 		props: new Map<string, Prop>(
 			options.route ? [['params', { kind: 'value', expr: { route: 'params' } }]] : [],
 		),
+		objects: new Map(),
 	};
 	const importedModuleFacts = new Map<string, ModuleFacts>();
 	const importedFacts = (specifier: string, imported: SemanticGraphArtifact): ModuleFacts => {
@@ -379,6 +444,136 @@ export function createNativeViewPayload(
 			);
 		return { route: pattern, params };
 	};
+	const isPlatformSheet = (edge: SemanticComponentEdge): boolean =>
+		edge.importSource === PLATFORM_PIECES_PACKAGE &&
+		edge.importedName === PLATFORM_PIECES_NAMESPACE &&
+		edge.importedMemberPath?.length === 1 &&
+		edge.importedMemberPath[0] === 'sheet';
+	/** `haptics.tap` for `['haptics', 'tap']` when `haptics` is this module's import from `@markless/device`. */
+	const deviceName = (path: ReadonlyArray<string>, scope: Scope): string | undefined => {
+		const [local, property, ...rest] = path;
+		if (
+			local === undefined ||
+			property === undefined ||
+			rest.length > 0 ||
+			scope.locals.has(local)
+		)
+			return undefined;
+		const entry = scope.module.imports.get(local);
+		return entry?.source === DEVICE_MODULE && entry.importedName
+			? `${entry.importedName}.${property}`
+			: undefined;
+	};
+	const importsDevice = (name: string, scope: Scope): boolean =>
+		!scope.locals.has(name) && scope.module.imports.get(name)?.source === DEVICE_MODULE;
+	const deviceValueCell = (name: NativeDeviceValue): string => {
+		const id = `device:${name}`;
+		features.add(DEVICE_VALUES[name].feature);
+		if (!cells.some((cell) => cell.id === id))
+			cells.push({ id, name, initial: DEVICE_VALUES[name].initial, device: name });
+		return id;
+	};
+	/** An async computed's value: its task cell's `value`, read only inside the `@try` arm that waits on it. */
+	const asyncRead = (
+		computed: SemanticGraphArtifact['graphBindings'][number],
+		what: string,
+		scope: Scope,
+	): NativeExpr | null => {
+		if (scope.boundary?.arm !== 'try')
+			return refuse(`${what} reads the async value \`${computed.name}\` outside a @try`);
+		const body = computed.nativeExpression;
+		const call = body?.kind === 'await' ? body.value : body;
+		const device = call?.kind === 'call' ? deviceName(call.calleePath, scope) : undefined;
+		if (
+			call?.kind !== 'call' ||
+			device === undefined ||
+			!isDeviceCall(device) ||
+			!DEVICE_CALLS[device].async
+		)
+			return refuse(
+				`${what} reads the async value \`${computed.name}\`, whose body is not one device call; it needs a script engine`,
+			);
+		const id = `${scope.prefix}task:${computed.id}`;
+		if (!cells.some((cell) => cell.id === id)) {
+			const args = call.arguments.map((argument) =>
+				exprOf(argument, `the async value \`${computed.name}\``, {
+					...scope,
+					boundary: undefined,
+				}),
+			);
+			if (!args.every((argument) => argument !== null)) return null;
+			features.add(DEVICE_CALLS[device].feature);
+			cells.push({
+				id,
+				name: computed.name,
+				initial: { state: 'pending' },
+				task: { call: device, arguments: args as NativeExpr[] },
+			});
+		}
+		scope.boundary.tasks.add(id);
+		return { member: { cell: id }, property: 'value' };
+	};
+	const objects: { id: string; device: NativeDeviceObject; owner: string }[] = [];
+	/** A component instance's device objects (`const cam = camera()`), each one per instance; `own` names their owner node. */
+	const instanceObjects = (module: ModuleFacts, component: string, prefix: string) => {
+		const made: { id: string; device: NativeDeviceObject; owner: string }[] = [];
+		const byName = new Map(
+			(module.graph.deviceObjects ?? []).flatMap((fact) => {
+				if (fact.componentName !== component || !Object.hasOwn(DEVICE_OBJECTS, fact.device))
+					return [];
+				const object = {
+					id: `object:${prefix}${fact.name}`,
+					device: fact.device as NativeDeviceObject,
+					owner: '',
+				};
+				if (!objects.some((known) => known.id === object.id)) {
+					objects.push(object);
+					made.push(object);
+				}
+				features.add(DEVICE_OBJECTS[object.device].feature);
+				return [[fact.name, object] as const];
+			}),
+		);
+		return {
+			byName,
+			/** The instance's first node owns its objects: they live while it is shown. */
+			own: (firstNode: number) => {
+				const owner = nodes[firstNode];
+				if (made.length > 0 && !owner)
+					refuse(`<${component}> makes a device object and renders nothing`);
+				for (const object of made) object.owner = owner?.id ?? '';
+			},
+		};
+	};
+	/** A device object's field (`cam.ready`) as its device cell. */
+	const objectFieldCell = (
+		local: string,
+		object: { id: string; device: NativeDeviceObject },
+		field: string,
+		what: string,
+	): string | null => {
+		const name = `${object.device}.${field}`;
+		if (!isDeviceValue(name) || !('object' in DEVICE_VALUES[name]))
+			return refuse(
+				`${what} reads \`${local}.${field}\`, which a ${object.device} has no native field for yet`,
+			);
+		const id = `${object.id}:${field}`;
+		if (!cells.some((cell) => cell.id === id))
+			cells.push({
+				id,
+				name: `${local}.${field}`,
+				initial: DEVICE_VALUES[name].initial,
+				device: name,
+				object: object.id,
+			});
+		return id;
+	};
+	const rootObjects = instanceObjects(rootModule, root.componentName, '');
+	(TOP as { objects: Scope['objects'] }).objects = rootObjects.byName;
+	const isDeviceValue = (name: string): name is NativeDeviceValue =>
+		Object.hasOwn(DEVICE_VALUES, name);
+	const isDeviceCall = (name: string): name is NativeDeviceCall =>
+		Object.hasOwn(DEVICE_CALLS, name);
 	const inlining = new Set<string>();
 	const exprOf = (
 		expression: SemanticExpression | undefined,
@@ -392,7 +587,45 @@ export function createNativeViewPayload(
 		};
 		switch (expression.kind) {
 			case 'read': {
+				const bound = scope.bound?.get(expression.name);
+				if (bound) return bound;
 				if (scope.locals.has(expression.name)) return { local: expression.name };
+				if (scope.objects.has(expression.name))
+					return refuse(
+						`${what} reads the device object \`${expression.name}\` as a value; read one of its fields`,
+					);
+				if (
+					scope.boundary?.arm === 'catch' &&
+					expression.name === scope.boundary.errorName
+				) {
+					const [task] = scope.boundary.tasks;
+					const handlerError = scope.boundary.catches.used()
+						? scope.boundary.catches.cell()
+						: undefined;
+					const taskError: NativeExpr | undefined = task
+						? { member: { cell: task }, property: 'error' }
+						: undefined;
+					if (handlerError && taskError)
+						return {
+							if: {
+								binary: '!==',
+								left: { cell: handlerError },
+								right: { literal: null },
+							},
+							whenTrue: { cell: handlerError },
+							whenFalse: taskError,
+						};
+					return handlerError
+						? { cell: handlerError }
+						: (taskError ??
+								refuse(
+									`${what} reads the @catch error of a @try that reads no device value`,
+								));
+				}
+				if (importsDevice(expression.name, scope))
+					return refuse(
+						`${what} reads \`${expression.name}\` from ${DEVICE_MODULE} as a value; read one of its fields`,
+					);
 				const repeat = scope.items.get(expression.name);
 				if (repeat) return { item: repeat };
 				const prop = scope.props.get(
@@ -404,6 +637,8 @@ export function createNativeViewPayload(
 				const computed =
 					scope.module.computeds.get(scope.component)?.get(expression.name) ??
 					scope.module.computeds.get('')?.get(expression.name);
+				if (computed?.kind === 'computed' && computed.async)
+					return asyncRead(computed, what, scope);
 				if (computed) {
 					if (!computed.nativeExpression)
 						return refuse(
@@ -471,13 +706,54 @@ export function createNativeViewPayload(
 					holder.object.name === scope.event
 				)
 					return { event: 'value' };
+				if (
+					holder.kind === 'read' &&
+					!scope.locals.has(holder.name) &&
+					scope.objects.has(holder.name)
+				) {
+					const cell = objectFieldCell(
+						holder.name,
+						scope.objects.get(holder.name)!,
+						expression.property,
+						what,
+					);
+					return cell === null ? null : { cell };
+				}
+				if (holder.kind === 'read') {
+					const device = deviceName([holder.name, expression.property], scope);
+					if (
+						device !== undefined &&
+						holder.name !== undefined &&
+						scope.module.imports.get(holder.name)?.importedName === 'platform'
+					)
+						return refuse(
+							`${what} reads \`${device}\`, which is decided per phone; build the payload with a target`,
+						);
+					if (device !== undefined)
+						return isDeviceValue(device)
+							? { cell: deviceValueCell(device) }
+							: refuse(
+									`${what} reads \`${device}\`, which ${DEVICE_MODULE} has no native value for yet`,
+								);
+				}
 				const object = exprOf(expression.object, what, scope);
 				return object && { member: object, property: expression.property };
 			}
 			case 'call': {
+				const device = deviceName(expression.calleePath, scope);
+				if (device !== undefined)
+					return refuse(
+						`${what} calls \`${device}\` inside an expression; call it as a handler statement or as an async computed's body`,
+					);
+				if (!BUILTINS.has(expression.callee))
+					return refuse(
+						`${what} uses a call to \`${expression.callee}\`, which needs a script engine`,
+					);
 				const args = all(expression.arguments);
 				return args && { call: expression.callee as NativeBuiltin, arguments: args };
 			}
+			case 'await':
+				return refuse(`${what} uses \`await\`, which needs a script engine`);
 			case 'array': {
 				const items = expression.items.map((item) => {
 					const value = exprOf(item.value, what, scope);
@@ -631,6 +907,15 @@ export function createNativeViewPayload(
 				});
 				continue;
 			}
+			if (slot.kind === 'async') {
+				items.push({
+					kind: 'boundary',
+					id: slot.boundaryId,
+					arms: slot.armTemplateIds,
+					path: slot.coordinate.path,
+				});
+				continue;
+			}
 			if (slot.kind !== 'text') {
 				refuse(`a ${slot.kind} binding`);
 				continue;
@@ -771,7 +1056,7 @@ export function createNativeViewPayload(
 					}
 					const handler = `handler:${scope.prefix}${event.id}`;
 					events.push({ host: id, event: semantic, handler });
-					handlers.push({ id: handler, ops: handlerOps(event, scope) });
+					handlers.push({ id: handler, ops: handlerOps(event, scope, handler) });
 				}
 				continue;
 			}
@@ -805,6 +1090,42 @@ export function createNativeViewPayload(
 					: scope.module.chunks.get(item.template);
 				if (!edge) {
 					refuse(`the component call ${item.edge}`);
+					continue;
+				}
+				if (isPlatformSheet(edge)) {
+					lowerSheet(edge, item.projection, parent, place, scope);
+					continue;
+				}
+				const deviceElement = DEVICE_ELEMENTS.find(
+					(candidate) =>
+						edge.importSource === candidate.module &&
+						edge.importedName === candidate.export &&
+						edge.importedMemberPath?.length === 1 &&
+						edge.importedMemberPath[0] === candidate.member,
+				);
+				if (deviceElement) {
+					const el = edge.props.find((prop) => prop.name === 'el');
+					const named = el && 'nativeExpression' in el ? el.nativeExpression : undefined;
+					const object =
+						named?.kind === 'read' ? scope.objects.get(named.name) : undefined;
+					if (
+						!object ||
+						object.device !== deviceElement.device ||
+						edge.props.some((prop) => prop.name !== 'el')
+					) {
+						refuse(
+							`<${edge.childComponentName}> needs el={…} naming a ${deviceElement.device} the component made, and no other props`,
+						);
+						continue;
+					}
+					nodes.push({
+						kind: 'element',
+						id: scope.prefix + edge.id,
+						element: deviceElement.element,
+						object: object.id,
+						parent,
+						...place,
+					});
 					continue;
 				}
 				if (isRouterLink(scope, edge.childComponentName)) {
@@ -908,6 +1229,8 @@ export function createNativeViewPayload(
 					}
 				}
 				const childPrefix = `${scope.prefix}${edge.id}/`;
+				const childObjects = instanceObjects(childModule, childComponent, childPrefix);
+				const first = nodes.length;
 				lowerChunk(template, parent, place, {
 					module: childModule,
 					component: childComponent,
@@ -921,7 +1244,10 @@ export function createNativeViewPayload(
 					locals: new Set(),
 					items: new Map(),
 					props,
+					objects: childObjects.byName,
+					...(scope.catches ? { catches: scope.catches } : {}),
 				});
+				childObjects.own(first);
 				continue;
 			}
 			if (item.kind === 'repeat') {
@@ -959,6 +1285,96 @@ export function createNativeViewPayload(
 					{ row: repeatId },
 					{ ...scope, items: new Map([...scope.items, [repeat.itemName, repeatId]]) },
 				);
+				continue;
+			}
+			if (item.kind === 'boundary') {
+				close();
+				const boundary = scope.module.boundaries.get(item.id);
+				if (place.row || place.arm || scope.boundary) {
+					refuse('a @try inside an @if arm, a @for row or another @try');
+					continue;
+				}
+				if (item.arms.catch === undefined) {
+					refuse('a @try with no @catch; its error would leave this screen');
+					continue;
+				}
+				const branchId = scope.prefix + item.id;
+				const at = nodes.length;
+				const tasks = new Set<string>();
+				const catchCell = `${branchId}:catch`;
+				let caught = false;
+				const catches: HandlerCatch = {
+					cell: () => {
+						if (!caught)
+							cells.push({
+								id: catchCell,
+								name: boundary?.errorName ?? 'error',
+								initial: null,
+							});
+						caught = true;
+						return catchCell;
+					},
+					used: () => caught,
+				};
+				(['try', 'pending', 'catch'] as const).forEach((arm, index) => {
+					const armId = item.arms[arm];
+					// No @pending shows nothing while the value is on its way.
+					if (armId === undefined) return;
+					const chunk = scope.module.chunks.get(armId);
+					if (!chunk) return refuse(`the @${arm} arm of ${item.id} has no markup`);
+					lowerChunk(
+						chunk,
+						parent,
+						{ arm: { branch: branchId, index } },
+						{
+							...scope,
+							...(arm === 'try' ? { catches } : {}),
+							boundary: {
+								tasks,
+								arm,
+								catches,
+								...(boundary?.errorName ? { errorName: boundary.errorName } : {}),
+							},
+						},
+					);
+				});
+				if (tasks.size > 1 || (tasks.size === 0 && !caught)) {
+					refuse(
+						tasks.size > 1
+							? `a @try that waits on ${tasks.size} device values; one is supported`
+							: 'a @try that neither reads a device value nor holds a handler that awaits a device call',
+					);
+					continue;
+				}
+				const [task] = tasks;
+				// A handler's error shows the @catch arm whatever the value is doing.
+				const noHandlerError = (test: NativeExpr): NativeExpr =>
+					caught
+						? {
+								logical: '&&',
+								left: {
+									binary: '===',
+									left: { cell: catchCell },
+									right: { literal: null },
+								},
+								right: test,
+							}
+						: test;
+				const state = (value: string): NativeExpr =>
+					task === undefined
+						? { literal: value === 'value' }
+						: {
+								binary: '===',
+								left: { member: { cell: task }, property: 'state' },
+								right: { literal: value },
+							};
+				nodes.splice(at, 0, {
+					kind: 'branch',
+					id: branchId,
+					parent,
+					tests: [noHandlerError(state('value')), noHandlerError(state('pending')), null],
+					arms: 3,
+				});
 				continue;
 			}
 			if (item.kind === 'branch') {
@@ -1026,7 +1442,136 @@ export function createNativeViewPayload(
 		}
 		close();
 	};
-	function handlerOps(event: SemanticEvent, scope: Scope): NativeOp[] {
+	/** `<native.sheet>`: a sheet node whose content is the markup between its tags, in the caller's scope. */
+	function lowerSheet(
+		edge: SemanticComponentEdge,
+		projection: string | undefined,
+		parent: string | null,
+		place: NativePlace,
+		scope: Scope,
+	) {
+		const what = `<${PLATFORM_PIECES_NAMESPACE}.sheet>`;
+		if (place.arm || place.row) {
+			refuse(`a ${what} inside an @if arm or a @for row`, edge.sourceSpan);
+			return;
+		}
+		const props = new Map(edge.props.map((prop) => [prop.name, prop]));
+		const NOT_FIXED = Symbol('not fixed');
+		const fixed = (name: string): unknown => {
+			const prop = props.get(name);
+			if (!prop) return undefined;
+			if (prop.kind === 'serializable') return prop.value;
+			if (prop.kind === 'opaque' && prop.buildTimeValue) return prop.buildTimeValue.value;
+			refuse(`the \`${name}\` prop of ${what}, which must be fixed at build time`, prop.sourceSpan);
+			return NOT_FIXED;
+		};
+		const flag = (name: string): boolean | null => {
+			const value = fixed(name) ?? true;
+			if (typeof value === 'boolean') return value;
+			if (value !== NOT_FIXED)
+				refuse(`the \`${name}\` prop of ${what}, which must be true or false`, props.get(name)?.sourceSpan);
+			return null;
+		};
+		for (const prop of edge.props)
+			if (
+				!['open', 'onChange', 'snapPoints', 'dismissible', 'modal', 'children'].includes(
+					prop.name,
+				)
+			)
+				refuse(
+					`the \`${prop.name}\` prop of ${what}, which it does not take`,
+					prop.sourceSpan,
+				);
+		const openProp = props.get('open');
+		const open: NativeExpr | null =
+			openProp === undefined
+				? { literal: false }
+				: openProp.kind === 'graph-reference'
+					? scope.cells.byBinding.has(openProp.graphNodeId) && openProp.path.length === 0
+						? { cell: scope.cells.byBinding.get(openProp.graphNodeId)! }
+						: refuse(
+								`the \`open\` prop of ${what} reads something other than this component's state`,
+								openProp.sourceSpan,
+							)
+					: openProp.kind === 'serializable' && typeof openProp.value === 'boolean'
+						? { literal: openProp.value }
+						: refuse(
+								`the \`open\` prop of ${what}, which must be state or true or false`,
+								openProp.sourceSpan,
+							);
+		const points = fixed('snapPoints') ?? [1];
+		const portableHeights =
+			Array.isArray(points) &&
+			points.length >= 1 &&
+			points.length <= 2 &&
+			points.every((point) => typeof point === 'number' && point > 0 && point <= 1) &&
+			Math.max(...(points as number[])) === 1 &&
+			new Set(points).size === points.length;
+		if (points !== NOT_FIXED && !portableHeights)
+			refuse(
+				`\`snapPoints\` of ${what}: one or two fractions of the screen's height, the largest 1 (Android's sheet has one height between collapsed and full)`,
+				props.get('snapPoints')?.sourceSpan,
+			);
+		const snapPoints = portableHeights ? [...(points as number[])].sort((a, b) => a - b) : null;
+		const dismissible = flag('dismissible');
+		const modal = flag('modal');
+		if (modal === false)
+			refuse(
+				`a ${what} with \`modal={false}\`: Android's non-modal sheet sits in the page's own layout, which hosts do not build yet`,
+				props.get('modal')?.sourceSpan,
+			);
+		const onChange = props.get('onChange');
+		if (dismissible === true && !onChange)
+			refuse(
+				`a dismissible ${what} without \`onChange\`: the platform closes it, and the page's state must hear it`,
+				edge.sourceSpan,
+			);
+		if (onChange && onChange.kind !== 'callback')
+			refuse(
+				`the \`onChange\` prop of ${what}, which must be a function written where it is passed`,
+				onChange.sourceSpan,
+			);
+		const projected = projection ? scope.module.chunks.get(projection) : undefined;
+		if (projection && !projected)
+			refuse(`children passed to ${what} that have no markup`, edge.sourceSpan);
+		const id = `sheet:${scope.prefix}${edge.id}`;
+		if (open && snapPoints && dismissible !== null && modal !== null)
+			nodes.push({ kind: 'sheet', id, parent, open, snapPoints, dismissible, modal });
+		if (projected) lowerChunk(projected, id, {}, scope);
+		if (onChange?.kind === 'callback' && dismissible === true) {
+			if (!onChange.nativeStatements) {
+				refuse(
+					`the \`onChange\` of ${what} is defined elsewhere (a named or factory function)`,
+					onChange.sourceSpan,
+				);
+				return;
+			}
+			const [parameter] = onChange.parameters ?? [];
+			const handler = `handler:${id}`;
+			events.push({ host: id, event: 'dismiss', handler });
+			handlers.push({
+				id: handler,
+				ops: statementOps(
+					onChange.nativeStatements,
+					parameter === undefined
+						? scope
+						: {
+								...scope,
+								bound: new Map([
+									...(scope.bound ?? []),
+									[parameter, { literal: false }],
+								]),
+							},
+					`the \`onChange\` of ${what}`,
+					onChange.sourceSpan,
+					0,
+					{ base: handler, next: 0 },
+				),
+			});
+		}
+	}
+
+	function handlerOps(event: SemanticEvent, scope: Scope, handlerId: string): NativeOp[] {
 		const what = `the ${event.eventName} handler`;
 		const eventParameter = event.eventName === 'input' ? event.handlerParameters[0] : undefined;
 		if (event.handlerParameters.length > (eventParameter === undefined ? 0 : 1)) {
@@ -1043,7 +1588,87 @@ export function createNativeViewPayload(
 			what,
 			event.handlerSpan,
 			0,
+			{ base: handlerId, next: 0 },
 		);
+	}
+
+	/** The one device call a statement awaits, and the statement's value with that await replaced by `as`. */
+	function splitAwait(
+		expression: SemanticExpression,
+		as: string,
+	): {
+		readonly call: Extract<SemanticExpression, { kind: 'call' }> | null;
+		readonly rest: SemanticExpression;
+		readonly count: number;
+	} {
+		let call: Extract<SemanticExpression, { kind: 'call' }> | null = null;
+		let count = 0;
+		const walk = (node: SemanticExpression): SemanticExpression => {
+			if (node.kind === 'await') {
+				count++;
+				if (node.value.kind === 'call') call = node.value;
+				return { kind: 'read', name: as };
+			}
+			const copy: Record<string, unknown> = {};
+			for (const [key, value] of Object.entries(node))
+				copy[key] = Array.isArray(value)
+					? value.map((item) =>
+							Array.isArray(item)
+								? item.map((inner) =>
+										inner && typeof inner === 'object' && 'kind' in inner
+											? walk(inner as SemanticExpression)
+											: inner,
+									)
+								: item && typeof item === 'object' && 'kind' in item
+									? walk(item as SemanticExpression)
+									: item &&
+										  typeof item === 'object' &&
+										  'value' in item &&
+										  typeof (item as { value: unknown }).value === 'object'
+										? {
+												...item,
+												value: walk(
+													(item as { value: SemanticExpression }).value,
+												),
+											}
+										: item,
+						)
+					: value && typeof value === 'object' && 'kind' in value
+						? walk(value as SemanticExpression)
+						: value;
+			return copy as SemanticExpression;
+		};
+		const rest = walk(expression);
+		return { call, rest, count };
+	}
+
+	/** A device call by its callee: an import's (`haptics.tap`) or a device object's (`cam.takePhoto`). */
+	function deviceCallOf(
+		value: Extract<SemanticExpression, { kind: 'call' }>,
+		scope: Scope,
+		what: string,
+		span: SourceSpan | undefined,
+	): { readonly call: NativeDeviceCall; readonly object?: string } | null {
+		const [local, method, ...more] = value.calleePath;
+		const object =
+			local !== undefined && !scope.locals.has(local) ? scope.objects.get(local) : undefined;
+		const device =
+			object && method !== undefined && more.length === 0
+				? `${object.device}.${method}`
+				: deviceName(value.calleePath, scope);
+		if (device === undefined) {
+			refuse(`${what} uses a call to \`${value.callee}\`, which needs a script engine`, span);
+			return null;
+		}
+		if (!isDeviceCall(device) || 'object' in DEVICE_CALLS[device] !== (object !== undefined)) {
+			refuse(
+				`${what} calls \`${device}\`, which ${DEVICE_MODULE} has no native call for yet`,
+				span,
+			);
+			return null;
+		}
+		features.add(DEVICE_CALLS[device].feature);
+		return { call: device, ...(object ? { object: object.id } : {}) };
 	}
 
 	function statementOps(
@@ -1052,8 +1677,109 @@ export function createNativeViewPayload(
 		what: string,
 		span: SourceSpan | undefined,
 		depth: number,
+		continuations: { readonly base: string; next: number },
 	): NativeOp[] {
-		return statements.flatMap((statement): NativeOp[] => {
+		const ops: NativeOp[] = [];
+		for (const [index, statement] of statements.entries()) {
+			// A statement that awaits a device call: the call, then the rest of the handler as its continuation.
+			const awaited =
+				statement.kind === 'effect' && statement.value.kind === 'await'
+					? splitAwait(statement.value, '')
+					: statement.kind === 'assign' || statement.kind === 'assign-field'
+						? splitAwait(statement.value, `$${continuations.next}`)
+						: null;
+			if (awaited && awaited.count > 0) {
+				if (awaited.count > 1 || !awaited.call) {
+					refuse(
+						`${what} awaits ${awaited.count > 1 ? 'more than once in one statement' : 'something other than a call'}`,
+						span,
+					);
+					return ops;
+				}
+				const target = deviceCallOf(awaited.call, scope, what, span);
+				if (!target) return ops;
+				const as = `$${continuations.next}`;
+				const id = `${continuations.base}:after:${continuations.next++}`;
+				const inner: Scope = { ...scope, locals: new Set([...scope.locals, as]) };
+				const remaining: SemanticHandlerStatement[] = [
+					...(statement.kind === 'effect'
+						? []
+						: [{ ...statement, value: awaited.rest } as SemanticHandlerStatement]),
+					...statements.slice(index + 1),
+				];
+				const args = awaited.call.arguments.map((argument) =>
+					exprOf(argument, what, scope),
+				);
+				if (!args.every((argument) => argument !== null)) return ops;
+				ops.push({
+					op: 'call',
+					...target,
+					arguments: args as NativeExpr[],
+					after: {
+						id,
+						as,
+						ops: statementOps(remaining, inner, what, span, depth, continuations),
+						...(scope.catches ? { catch: scope.catches.cell() } : {}),
+					},
+				});
+				return ops;
+			}
+			ops.push(...statementOp(statement, scope, what, span, depth, continuations));
+		}
+		return ops;
+	}
+
+	function statementOp(
+		statement: SemanticHandlerStatement,
+		scope: Scope,
+		what: string,
+		span: SourceSpan | undefined,
+		depth: number,
+		continuations: { readonly base: string; next: number },
+	): NativeOp[] {
+		{
+			if (statement.kind === 'effect') {
+				if (statement.value.kind !== 'call') {
+					refuse(
+						`${what} uses ${statement.value.kind === 'await' ? 'an `await` of something other than a call' : 'an expression statement'}, which needs a script engine`,
+						span,
+					);
+					return [];
+				}
+				const value = statement.value;
+				const target = deviceCallOf(value, scope, what, span);
+				if (!target) return [];
+				const args = value.arguments.map((argument) => exprOf(argument, what, scope));
+				return args.every((argument) => argument !== null)
+					? [{ op: 'call', ...target, arguments: args as NativeExpr[] }]
+					: [];
+			}
+			if (statement.kind === 'assign-field') {
+				const object = !scope.locals.has(statement.target)
+					? scope.objects.get(statement.target)
+					: undefined;
+				const field = `${object?.device}.${statement.field}`;
+				if (!object || !isDeviceValue(field) || !('writable' in DEVICE_VALUES[field])) {
+					refuse(
+						`${what} writes \`${statement.target}.${statement.field}\`, which is not a setting of a device object`,
+						span,
+					);
+					return [];
+				}
+				const cell = objectFieldCell(statement.target, object, statement.field, what);
+				const value = exprOf(statement.value, what, scope);
+				return cell && value
+					? [
+							{ op: 'assign', cell, value },
+							{
+								op: 'call',
+								call: field as NativeDeviceCall,
+								object: object.id,
+								arguments: [{ cell }],
+							},
+						]
+					: [];
+			}
 			if (statement.kind === 'unsupported') {
 				refuse(`${what} uses ${statement.construct}, which needs a script engine`, span);
 				return [];
@@ -1077,7 +1803,14 @@ export function createNativeViewPayload(
 					);
 					return [];
 				}
-				return statementOps(prop.statements, prop.scope, what, span, depth + 1);
+				return statementOps(
+					prop.statements,
+					prop.scope,
+					what,
+					span,
+					depth + 1,
+					continuations,
+				);
 			}
 			const cell = cellOf(statement.target, scope);
 			if (!cell) {
@@ -1089,7 +1822,7 @@ export function createNativeViewPayload(
 			}
 			const value = exprOf(statement.value, what, scope);
 			return value ? [{ op: 'assign', cell, value }] : [];
-		});
+		}
 	}
 
 	/** `navigate('/orders/42', { replace: true })`: a path fixed at build time, resolved against the app's routes. */
@@ -1148,6 +1881,7 @@ export function createNativeViewPayload(
 		const removed = new Set([element.id, ...inside.map((node) => node.id)]);
 		nodes.splice(0, nodes.length, ...nodes.filter((node) => !removed.has(node.id)));
 	}
+	rootObjects.own(0);
 	if (graph.markup.chunks.some((chunk) => chunk.kind !== 'template' && !lowered.has(chunk.id)))
 		refuse('markup outside the root template, its @if arms and its @for rows');
 	for (const event of graph.events)
@@ -1184,5 +1918,6 @@ export function createNativeViewPayload(
 		events,
 		handlers,
 		...(title ? { title } : {}),
+		...(objects.length > 0 ? { objects } : {}),
 	});
 }

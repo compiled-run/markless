@@ -201,6 +201,12 @@ function inlineWithin(
 						freeNames.add(name);
 					} else if (local.kind === 'row-binding') {
 						refusal = { kind: 'row-item', name };
+					} else if (
+						local.kind === 'definition' &&
+						state.deviceTarget?.deviceObjectOf(local.init as never, state as never)
+					) {
+						// A device object belongs to its component; a handler uses that one, never a rebuilt copy.
+						freeNames.add(name);
 					} else if (local.kind !== 'definition' || inlining.has(symbolId)) {
 						refusal = { kind: 'render-local', name };
 					} else if (

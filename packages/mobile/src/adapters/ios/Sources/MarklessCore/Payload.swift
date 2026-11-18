@@ -95,6 +95,8 @@ public struct NativeNode: Equatable, Sendable {
 		case branch(tests: [NativeExpr?])
 		/// A keyed `@for`: one row per item of `list`, keyed by `String()` of the item at `key`.
 		case `repeat`(list: NativeExpr, key: [String])
+		/// The platform's own sheet: its content (the nodes whose parent it is) is built at mount and kept while closed.
+		case sheet(open: NativeExpr, snapPoints: [Double], dismissible: Bool, modal: Bool)
 	}
 
 	public let id: String
@@ -104,6 +106,8 @@ public struct NativeNode: Equatable, Sendable {
 	/// Set when the node belongs to a list row: the `repeat` node's id.
 	public let row: String?
 	public let kind: Kind
+	/// For a `camera` element: the device object it shows.
+	public var object: String? = nil
 
 	public var isElement: Bool { if case .element = kind { true } else { false } }
 	public var isText: Bool { if case .text = kind { true } else { false } }
@@ -112,6 +116,8 @@ public struct NativeNode: Equatable, Sendable {
 public enum NativeEventName: String, Sendable {
 	case activate
 	case input
+	/// The platform closed a system sheet; it is already closed when the handler runs.
+	case dismiss
 }
 
 public enum NativeOp: Equatable, Sendable {
@@ -120,6 +126,9 @@ public enum NativeOp: Equatable, Sendable {
 	/// Opens the page at `route` with these params (fixed, or evaluated when the op runs); ops after it do not run.
 	/// `replace` takes the current screen's place instead of pushing.
 	case navigate(route: String, params: [NativeOpParam], replace: Bool)
+	/// A device call (`haptics.tap`), on `object` when it names one; with `result` it settles that task cell, with `then`
+	/// the host answers with `resume` and those ops run with the answer as a local.
+	case call(call: String, object: String?, arguments: [NativeExpr], result: String?, then: NativeContinuation?)
 }
 
 /// A navigate op's param: a string fixed at build time, or an expression evaluated in the activated element's scope.
@@ -130,6 +139,21 @@ public struct NativeOpParam: Equatable, Sendable {
 	}
 	public let name: String
 	public let value: Value
+}
+
+/// What a handler does after a device call it awaited answers: `ops` with the answer read as `{ local: as }`.
+public struct NativeContinuation: Equatable, Sendable {
+	public let id: String
+	public let `as`: String
+	public let ops: [NativeOp]
+	/// The cell of the nearest `@catch` around the handler's element: it takes the error when the call fails.
+	public var `catch`: String? = nil
+}
+
+/// A device call a task cell starts at mount.
+public struct NativeTask: Equatable, Sendable {
+	public let call: String
+	public let arguments: [NativeExpr]
 }
 
 public struct NativeRouteParam: Equatable, Sendable {
@@ -168,6 +192,12 @@ public struct NativeCell: Equatable, Sendable {
 	public let storageKey: String?
 	/// A class binding reads this cell, so its changes are journalled as `state`.
 	public let styled: Bool
+	/// A live device value (`network.online`) the host fills at mount and on every change.
+	public var device: String? = nil
+	/// For a device object's field (`cam.ready`): the object.
+	public var object: String? = nil
+	/// An async device call started at mount; the cell holds `{ state: 'pending' | 'value' | 'error', ... }`.
+	public var task: NativeTask? = nil
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -191,6 +221,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public let handlers: [NativeHandler]
 	/// The page's `<title>` as text parts: the screen's navigation bar title.
 	public var title: [NativeTextPart]? = nil
+	/// Device objects the page's components make.
+	public var objects: [NativeDeviceObject] = []
 
 	public static func decode(_ data: Data) throws -> NativeViewPayload {
 		try decode(JSONValue.parse(data))
@@ -198,13 +230,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object"])
 			let initial = NativeValue(json: try field["initial"].value)
 			var styled = false
 			if field.has("styled") {
@@ -213,14 +245,20 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 			return NativeCell(
 				id: try field["id"].string(), name: try field["name"].string(), initial: initial,
-				storageKey: field.has("storage") ? try field["storage"].object(["key"])["key"].string() : nil, styled: styled)
+				storageKey: field.has("storage") ? try field["storage"].object(["key"])["key"].string() : nil, styled: styled,
+				device: field.has("device") ? try field["device"].string() : nil,
+				object: field.has("object") ? try field["object"].string() : nil,
+				task: field.has("task") ? try {
+					let task = try field["task"].object(["call", "arguments"])
+					return NativeTask(call: try task["call"].string(), arguments: try task["arguments"].array().map(decodeExpr))
+				}() : nil)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()
 			let place = ["arm", "row"]
 			switch kind {
 			case "element":
-				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings"] + place)
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object"] + place)
 				var attributes: [String: String] = [:]
 				if field.has("attributes") {
 					let reader = try field["attributes"]
@@ -238,7 +276,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 				} : []
 				return NativeNode(
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
-					row: try decodeRow(field), kind: .element(element: try field["element"].string(), attributes: attributes, bindings: bindings))
+					row: try decodeRow(field), kind: .element(element: try field["element"].string(), attributes: attributes, bindings: bindings),
+					object: field.has("object") ? try field["object"].string() : nil)
 			case "text":
 				let field = try node.object(required: ["kind", "id", "parent", "parts"], optional: place)
 				let parts = try decodeParts(try field["parts"])
@@ -269,6 +308,20 @@ public struct NativeViewPayload: Equatable, Sendable {
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
 					row: try decodeRow(field),
 					kind: .repeat(list: try decodeExpr(try field["list"]), key: try field["key"].array().map { try $0.string() }))
+			case "sheet":
+				let field = try node.object(["kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"])
+				let snapPoints = try field["snapPoints"].array().map { try $0.number() }
+				let valid = switch snapPoints.count {
+				case 1: snapPoints[0] == 1
+				case 2: snapPoints[0] > 0 && snapPoints[0] < 1 && snapPoints[1] == 1
+				default: false
+				}
+				guard valid else { throw PayloadError(path: node.path + ".snapPoints", reason: "a sheet rests at [1] or [x, 1] with 0 < x < 1") }
+				return NativeNode(
+					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: nil, row: nil,
+					kind: .sheet(
+						open: try decodeExpr(try field["open"]), snapPoints: snapPoints, dismissible: try field["dismissible"].bool(),
+						modal: try field["modal"].bool()))
 			default:
 				throw PayloadError(path: node.path + ".kind", reason: "unknown node kind \"\(kind)\"")
 			}
@@ -283,7 +336,14 @@ public struct NativeViewPayload: Equatable, Sendable {
 		}
 		let handlers = try fields["handlers"].array().map { handler in
 			let field = try handler.object(["id", "ops"])
-			let ops = try field["ops"].array().map { op -> NativeOp in
+			let ops = try field["ops"].array().map(decodeOp)
+			return NativeHandler(id: try field["id"].string(), ops: ops)
+		}
+		let objects = fields.has("objects") ? try fields["objects"].array().map { object -> NativeDeviceObject in
+			let f = try object.object(["id", "device", "owner"])
+			return NativeDeviceObject(id: try f["id"].string(), device: try f["device"].string(), owner: try f["owner"].string())
+		} : []
+		func decodeOp(_ op: Reader) throws -> NativeOp {
 				let name = try op.field("op").string()
 				switch name {
 				case "assign":
@@ -299,11 +359,21 @@ public struct NativeViewPayload: Equatable, Sendable {
 							return NativeOpParam(name: name, value: value.isString ? .string(try value.string()) : .expr(try decodeExpr(value)))
 						},
 						replace: try decodeReplace(opField))
+				case "call":
+					let opField = try op.object(required: ["op", "call", "arguments"], optional: ["result", "object", "after"])
+					let then: NativeContinuation? = opField.has("after") ? try {
+						let t = try opField["after"].object(required: ["id", "as", "ops"], optional: ["catch"])
+						return NativeContinuation(
+							id: try t["id"].string(), as: try t["as"].string(), ops: try t["ops"].array().map(decodeOp),
+							catch: t.has("catch") ? try t["catch"].string() : nil)
+					}() : nil
+					return .call(
+						call: try opField["call"].string(), object: opField.has("object") ? try opField["object"].string() : nil,
+						arguments: try opField["arguments"].array().map(decodeExpr),
+						result: opField.has("result") ? try opField["result"].string() : nil, then: then)
 				default:
 					throw PayloadError(path: op.path + ".op", reason: "unknown op \"\(name)\"")
 				}
-			}
-			return NativeHandler(id: try field["id"].string(), ops: ops)
 		}
 		let route: NativeRoute? = fields.has("route") ? try {
 			let r = try fields["route"].object(["pattern", "params"])
@@ -311,7 +381,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 		}() : nil
 		let payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
-			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil)
+			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
+			objects: objects)
 		try payload.check()
 		return payload
 	}
@@ -421,6 +492,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		var elements = Set<String>()
 		var branchArms: [String: Int] = [:]
 		var repeats = Set<String>()
+		var sheets = Set<String>()
 		var seen = Set<String>()
 		func checkCells(_ node: NativeNode, _ expressions: [NativeExpr]) throws {
 			for cell in expressions.flatMap(\.cells) where !cellIds.contains(cell) {
@@ -429,8 +501,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 		}
 		for node in nodes {
 			guard seen.insert(node.id).inserted else { throw PayloadError(path: "payload.nodes", reason: "duplicate node \(node.id)") }
-			if let parent = node.parent, !elements.contains(parent) {
-				throw PayloadError(path: "payload.nodes", reason: "\(node.id)'s parent \(parent) is not an earlier element")
+			if let parent = node.parent, !elements.contains(parent), !sheets.contains(parent) {
+				throw PayloadError(path: "payload.nodes", reason: "\(node.id)'s parent \(parent) is not an earlier element or sheet")
 			}
 			if let arm = node.arm {
 				guard let arms = branchArms[arm.branch], arm.index < arms else {
@@ -458,6 +530,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 			case let .repeat(list, _):
 				repeats.insert(node.id)
 				try checkCells(node, [list])
+			case let .sheet(open, _, _, _):
+				sheets.insert(node.id)
+				try checkCells(node, [open])
 			}
 		}
 		var handlerIds = Set<String>()
@@ -468,9 +543,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 			for case let .assign(cell, value) in handler.ops where !cellIds.contains(cell) || !value.cells.allSatisfy(cellIds.contains) {
 				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) names an unknown cell")
 			}
+			for case let .call(_, _, arguments, result, _) in handler.ops
+			where !arguments.flatMap(\.cells).allSatisfy(cellIds.contains) || !(result.map { id in cells.contains { $0.id == id && $0.task != nil } } ?? true) {
+				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) calls the device with an unknown cell or a result cell that is not a task")
+			}
 		}
 		for event in events {
-			guard elements.contains(event.host) else { throw PayloadError(path: "payload.events", reason: "event on unknown element \(event.host)") }
+			guard (event.event == .dismiss ? sheets : elements).contains(event.host) else {
+				throw PayloadError(path: "payload.events", reason: "\(event.event.rawValue) event on \(event.host), which is not \(event.event == .dismiss ? "a sheet" : "an element")")
+			}
 			guard handlerIds.contains(event.handler) else {
 				throw PayloadError(path: "payload.events", reason: "event on \(event.host) names unknown handler \(event.handler)")
 			}
@@ -641,4 +722,12 @@ public enum NativePayload: Sendable {
 		let version = try Reader(json, at: "payload").field("version").string()
 		return version == nativeAppVersion ? .app(try NativeAppPayload.decode(json)) : .page(try NativeViewPayload.decode(json))
 	}
+}
+
+/// A device object a component makes (`const cam = camera()`), by its payload id. It lives while `owner` is shown.
+public struct NativeDeviceObject: Equatable, Sendable {
+	public let id: String
+	public let device: String
+	/// The first node of the component instance that made it.
+	public let owner: String
 }

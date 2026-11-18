@@ -65,6 +65,8 @@ class MarklessHost(
 	store: Store = PreferencesStore(context),
 	/** The route params the page opens with. */
 	params: Map<String, String> = emptyMap(),
+	/** Where device values come from and device calls go; required for a payload that names device features. */
+	private val device: NativeDevice? = null,
 ) {
 	constructor(
 		context: Context,
@@ -73,7 +75,8 @@ class MarklessHost(
 		fonts: FontSource = AssetFonts(context),
 		store: Store = PreferencesStore(context),
 		params: Map<String, String> = emptyMap(),
-	) : this(context, Payload.decode(payloadBytes), styleExportBytes?.let { StyleExport.decode(it) }, fonts, store, params)
+		device: NativeDevice? = null,
+	) : this(context, Payload.decode(payloadBytes), styleExportBytes?.let { StyleExport.decode(it) }, fonts, store, params, device)
 
 	val runtime = Runtime(payload, store, params)
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
@@ -83,6 +86,7 @@ class MarklessHost(
 	private val textViews = HashMap<String, TextView>()
 	private var assignment = style?.start(payload.cells.filter { it.styled }.map { it.id }, runtime::value, isDark(context.resources.configuration)) ?: 0
 	private val expanded = HashMap<View, Boolean?>()
+	private val sheets = LinkedHashMap<String, SystemSheet>()
 	private val dpr = context.resources.displayMetrics.density.toDouble()
 	private val absolutes: List<Map<String, Pair<Double, Double>>> = style?.let {
 		if (Math.abs(dpr - it.dpr) > 1e-3) throw MarklessHostError("style export is for pixel ratio ${it.dpr}; this device is $dpr")
@@ -108,8 +112,52 @@ class MarklessHost(
 		val top = payload.nodes.firstOrNull() as? Node.Element ?: throw MarklessHostError("payload does not start with its root element")
 		if (top.parent != null || top.arm != null) throw MarklessHostError("the root element has a parent or sits in an arm")
 		if (payload.nodes.count { it.parent == null } != 1) throw MarklessHostError("payload has more than one root")
+		for (sheet in payload.nodes.filterIsInstance<Node.Sheet>()) {
+			if (sheet.dismissible && runtime.handlerFor(sheet.id, EventName.Dismiss) == null) throw MarklessHostError("\"${sheet.id}\" is dismissible but has no dismiss handler")
+			val content = MarklessBox(context).apply { named(this, sheet.id) }
+			views[sheet.id] = content
+			sheets[sheet.id] = SystemSheet(context, sheet, content) { closedByPlatform(sheet.id) }
+		}
+		for (cell in payload.cells) cell.device?.let { runtime.device(cell.id, needDevice().read(it, cell.obj)) }
 		buildShown()
 		root = views.getValue(top.id)
+		for ((id, open) in runtime.sheets()) if (open) root.post { sheets.getValue(id).open() }
+		for (cell in payload.cells) cell.device?.let { name -> needDevice().watch(name, cell.obj) { if (!released) apply(runtime.device(cell.id, it)) } }
+		for (call in runtime.tasks()) runCall(call)
+	}
+
+	/** Set when another page replaces this one: device answers that arrive later change nothing. */
+	var released = false
+		private set
+
+	/** Another page replaces this one: its device objects end, and device answers that arrive later change nothing. */
+	fun release() {
+		released = true
+		for (o in payload.objects) device?.release(o.id)
+	}
+
+	private fun needDevice(): NativeDevice = device ?: throw MarklessHostError("the payload names device features and this host was given no device")
+
+	private fun runCall(call: JournalEntry.Call) {
+		val cell = call.result
+		val continuation = call.resume
+		val settle: ((DeviceOutcome) -> Unit)? = when {
+			cell != null -> { outcome ->
+				if (!released) apply(when (outcome) {
+					is DeviceOutcome.Value -> runtime.settle(cell, outcome.value)
+					is DeviceOutcome.Error -> runtime.settleError(cell, outcome.name, outcome.message)
+				})
+			}
+			// An awaited call from a handler: the rest of the handler runs with the answer; a failure goes to its `@catch`.
+			continuation != null -> { outcome ->
+				if (!released) apply(when (outcome) {
+					is DeviceOutcome.Value -> runtime.resume(continuation, outcome.value)
+					is DeviceOutcome.Error -> runtime.reject(continuation, outcome.name, outcome.message)
+				})
+			}
+			else -> null
+		}
+		needDevice().call(call.node, call.obj, call.arguments, settle)
 	}
 
 	fun view(id: String): View = views[id] ?: throw MarklessHostError("no view for \"$id\"")
@@ -120,6 +168,14 @@ class MarklessHost(
 	fun viewIds(): Set<String> = built.keys.toSet()
 
 	fun textView(id: String): TextView = textViews[id] ?: throw MarklessHostError("no text view for \"$id\"")
+
+	/** Whether the sheet's dialog is on screen. */
+	fun sheetShowing(id: String): Boolean = (sheets[id] ?: throw MarklessHostError("no sheet \"$id\"")).showing
+
+	/** The platform closed the sheet (swipe, back, a tap on the dimmed page): runs its `dismiss` handler. */
+	fun closedByPlatform(id: String) {
+		if (runtime.handlerFor(id, EventName.Dismiss) != null) apply(runtime.dispatch(id, EventName.Dismiss))
+	}
 
 	/** The journal applier: the only code that changes a retained view after the first build. */
 	fun apply(journal: List<JournalEntry>) {
@@ -146,6 +202,9 @@ class MarklessHost(
 					return
 				}
 				is JournalEntry.Title -> (onTitle ?: throw MarklessHostError("title \"${entry.value}\" with no title bar")).invoke(entry.value)
+				is JournalEntry.Sheet -> (sheets[entry.node] ?: throw MarklessHostError("journal names \"${entry.node}\", which is not a sheet")).let { if (entry.open) it.open() else it.close() }
+				is JournalEntry.Call -> runCall(entry)
+				is JournalEntry.Release -> needDevice().release(entry.node)
 				is JournalEntry.Rows -> {
 					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
 					rebuild()
@@ -278,6 +337,16 @@ class MarklessHost(
 				gravity = Gravity.TOP or Gravity.START
 				named(this, inst.id)
 			}
+			"camera" -> {
+				val obj = node.obj ?: throw MarklessHostError("<camera> \"${node.id}\" shows no device object")
+				val device = payload.objects.firstOrNull { it.id == obj }?.device ?: throw MarklessHostError("<camera> \"${node.id}\" names unknown object \"$obj\"")
+				needDevice().view(obj, device).also { named(it, inst.id) }
+			}
+			"img" -> SizedImage(context).also { named(it, inst.id) }
+			"audio" -> AudioButton(context).apply {
+				visibility = View.GONE
+				named(this, inst.id)
+			}
 			"input" -> EditText(context).apply {
 				isSingleLine = true
 				includeFontPadding = false
@@ -290,6 +359,7 @@ class MarklessHost(
 		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
+			EventName.Dismiss -> throw MarklessHostError("dismiss event on \"${node.id}\", which is not a sheet")
 			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -326,7 +396,13 @@ class MarklessHost(
 	private fun attribute(id: String, name: String, value: String?) {
 		val view = view(id)
 		when (name) {
-			"aria-label" -> view.contentDescription = value
+			"aria-label" -> if (view is AudioButton) view.label(value) else view.contentDescription = value
+			"alt" -> if (view is SizedImage) view.contentDescription = value
+			"src" -> when (view) {
+				is SizedImage -> view.show(value)
+				is AudioButton -> view.source(value)
+			}
+			"controls" -> if (view is AudioButton) view.visibility = if (value == null) View.GONE else View.VISIBLE
 			"disabled" -> view.isEnabled = value == null
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }

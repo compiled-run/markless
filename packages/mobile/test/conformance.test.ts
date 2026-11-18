@@ -40,6 +40,7 @@ describe('native conformance vectors', () => {
 			const { payload } = await compileNativeComponent({
 				filename: `src/${entry.name}.tsrx`,
 				...(entry.page ? { page: entry.page } : {}),
+				...(entry.device ? { device: entry.device } : {}),
 				source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
 			});
 			expect(committed(`${entry.name}.json`), entry.name).toEqual(
@@ -166,9 +167,14 @@ describe('imported components', () => {
 	});
 
 	it('refuses an imported component when the build cannot read its module', async () => {
-		const build = await compileNativeComponent({ filename: 'src/Basket.tsrx', source: fixture('Basket.tsrx') });
+		const build = await compileNativeComponent({
+			filename: 'src/Basket.tsrx',
+			source: fixture('Basket.tsrx'),
+		});
 		expect(build.payload).toBeNull();
-		expect(build.diagnostics.map((d) => d.message)).toContain('<Stepper>, a component from another module');
+		expect(build.diagnostics.map((d) => d.message)).toContain(
+			'<Stepper>, a component from another module',
+		);
 	});
 });
 
@@ -177,10 +183,20 @@ describe('@else if chains and @switch', () => {
 		const build = await compileNativeComponent({ filename: 'src/Pick.tsrx', source });
 		expect(build.diagnostics).toEqual([]);
 		const runtime = createNativeRuntime(build.payload!);
-		const shown = [runtime.texts().map(([, text]) => text).join(' | ')];
+		const shown = [
+			runtime
+				.texts()
+				.map(([, text]) => text)
+				.join(' | '),
+		];
 		for (let i = 0; i < clicks; i++) {
 			runtime.dispatch({ event: 'activate', host: build.payload!.events[0]!.host });
-			shown.push(runtime.texts().map(([, text]) => text).join(' | '));
+			shown.push(
+				runtime
+					.texts()
+					.map(([, text]) => text)
+					.join(' | '),
+			);
 		}
 		return shown;
 	};

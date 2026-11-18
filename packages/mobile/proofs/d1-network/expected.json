@@ -1,0 +1,37 @@
+{
+	"rung": "D1",
+	"name": "A live device value read in markup follows the device",
+	"steps": [
+		{
+			"visible": ["Connection", "Online"],
+			"absent": ["Offline", "Changes will sync later"]
+		},
+		{
+			"do": {
+				"device": {
+					"network.online": false
+				}
+			},
+			"visible": ["Offline", "Changes will sync later"],
+			"absent": ["Online"]
+		},
+		{
+			"do": {
+				"device": {
+					"network.online": true
+				}
+			},
+			"visible": ["Online"],
+			"absent": ["Offline", "Changes will sync later"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Connection", "Online"],
+				"absent": ["Offline", "Changes will sync later"]
+			}
+		],
+		"absentFromOutput": ["Changes will sync later", "Offline", "@markless/device"]
+	}
+}

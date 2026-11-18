@@ -1,3 +1,10 @@
+import {
+	DEVICE_MODULE,
+	type NativeDeviceCall,
+	type NativeDeviceObject,
+	type NativeDeviceValue,
+} from './native-device.ts';
+
 // The target-neutral view a native host builds retained views from: no HTML, no DOM positions, no script.
 export const NATIVE_VIEW_VERSION = 'markless.native-view/0';
 
@@ -107,6 +114,8 @@ export type NativeNode = NativePlace &
 				readonly parent: string | null;
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
+				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */
+				readonly object?: string;
 				/** Attributes that follow state, written as the web writes them (absent, bare or a string), and an input's `value`. */
 				readonly bindings?: ReadonlyArray<
 					| { readonly attribute: string; readonly value: NativeExpr }
@@ -141,14 +150,54 @@ export type NativeNode = NativePlace &
 				readonly list: NativeExpr;
 				readonly key: ReadonlyArray<string>;
 		  }
+		| {
+				/**
+				 * The platform's own sheet (`<native.sheet>`): its content is the nodes whose parent is this id, built at mount
+				 * and kept; the host presents them in its system sheet while `open` is truthy (iOS `UISheetPresentationController`,
+				 * Android Material `BottomSheetDialog`; absent on the web).
+				 */
+				readonly kind: 'sheet';
+				readonly id: string;
+				readonly parent: string | null;
+				readonly open: NativeExpr;
+				/** Resting heights as fractions of the screen's height, ascending; the last is 1. */
+				readonly snapPoints: ReadonlyArray<number>;
+				/** Swipe, back and a tap on the dimmed page close it, as a `dismiss` action. */
+				readonly dismissible: boolean;
+				/** The page behind is dimmed and cannot be reached while it shows. */
+				readonly modal: boolean;
+		  }
 	);
 
 /** Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click). */
-export type NativeEventName = 'activate' | 'input';
+export type NativeEventName = 'activate' | 'input' | 'dismiss';
 
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
 export type NativeOp =
 	| { readonly op: 'assign'; readonly cell: string; readonly value: NativeExpr }
+	/**
+	 * A device call (`haptics.tap`), its arguments evaluated in order; the host runs it when the `call` journal entry
+	 * arrives. With `result`, the host settles that task cell with what the call gives.
+	 */
+	| {
+			readonly op: 'call';
+			readonly call: NativeDeviceCall;
+			/** The device object the call is made on (`object:cam`). */
+			readonly object?: string;
+			readonly arguments: ReadonlyArray<NativeExpr>;
+			readonly result?: string;
+			/**
+			 * What the handler does once the call answers: `ops` run with the answer read as `{ local: as }`. The host
+			 * answers the journal entry's `resume` with a `resume` action, or a `reject` action when the call fails;
+			 * `catch` is the cell of the nearest `@catch` around the handler's element, which then takes the error.
+			 */
+			readonly after?: {
+				readonly id: string;
+				readonly as: string;
+				readonly ops: ReadonlyArray<NativeOp>;
+				readonly catch?: string;
+			};
+	  }
 	/**
 	 * Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. A param
 	 * is a string fixed at build time or an expression evaluated when the op runs (a row's item inside a list row).
@@ -174,6 +223,18 @@ export type NativeViewPayload = {
 		readonly storage?: { readonly key: string };
 		/** A class or `ui-*` attribute binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
 		readonly styled?: true;
+		/** A live device value (`network.online`): the host fills it at mount and sends a `device` action when it changes. */
+		readonly device?: NativeDeviceValue;
+		/** For a device object's field (`cam.ready`): the object (`object:cam`). */
+		readonly object?: string;
+		/**
+		 * An async value from a device call: the host starts the call at mount and settles the cell. Its value is
+		 * `{ state: 'pending' }`, `{ state: 'value', value }` or `{ state: 'error', error: { name, message } }`.
+		 */
+		readonly task?: {
+			readonly call: NativeDeviceCall;
+			readonly arguments: ReadonlyArray<NativeExpr>;
+		};
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;
@@ -185,6 +246,15 @@ export type NativeViewPayload = {
 	readonly handlers: ReadonlyArray<{
 		readonly id: string;
 		readonly ops: ReadonlyArray<NativeOp>;
+	}>;
+	/**
+	 * Device objects the page's components make. Each lives while `owner`, the first node of the component instance that
+	 * made it, is shown (a `release` entry ends it); a camera's picture runs while its element is shown.
+	 */
+	readonly objects?: ReadonlyArray<{
+		readonly id: string;
+		readonly device: NativeDeviceObject;
+		readonly owner: string;
 	}>;
 	/** The page's `<title>`, as text parts: what the system navigation bar shows for this screen. */
 	readonly title?: ReadonlyArray<NativeTextPart>;
@@ -228,6 +298,21 @@ export type NativeJournalEntry =
 	| { readonly op: 'rows'; readonly node: string; readonly keys: ReadonlyArray<string> }
 	/** Shows arm `index` of a branch (null: none), building its nodes from current values and removing the old arm's. */
 	| { readonly op: 'arm'; readonly node: string; readonly index: number | null }
+	/** A system sheet's `open` turned truthy (present it) or falsy (dismiss it, unless the platform already has). */
+	| { readonly op: 'sheet'; readonly node: string; readonly open: boolean }
+	/** Run a device call now; with `result`, settle that task cell with what it gives (an action `settle`). */
+	| {
+			readonly op: 'call';
+			/** A device call, or a writable device setting the handler wrote (`camera.facing`). */
+			readonly call: NativeDeviceCall | NativeDeviceValue;
+			readonly object?: string;
+			readonly arguments: ReadonlyArray<NativeValue>;
+			readonly result?: string;
+			/** Answer with a `resume` action naming this continuation once the call settles, or `reject` when it fails. */
+			readonly resume?: string;
+	  }
+	/** The component that made this device object is no longer shown: the host stops it and lets the device go. */
+	| { readonly op: 'release'; readonly object: string }
 	/**
 	 * Leave this page for the page at `route` with `params`, built from scratch. In an app the host pushes it as a new
 	 * screen, keeping this one as it is for Back, or with `replace` puts it in this screen's place.
@@ -240,3 +325,7 @@ export type NativeJournalEntry =
 	  }
 	/** The page's `<title>` text changed: the host writes it to the screen's navigation bar. */
 	| { readonly op: 'title'; readonly value: string };
+
+/** The package and export that name the platform's own pieces (`<native.sheet>`); one place, so the name is cheap to change. */
+export const PLATFORM_PIECES_PACKAGE = DEVICE_MODULE;
+export const PLATFORM_PIECES_NAMESPACE = 'native';

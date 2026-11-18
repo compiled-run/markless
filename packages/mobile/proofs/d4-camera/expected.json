@@ -1,0 +1,48 @@
+{
+	"rung": "D4",
+	"name": "A camera object: its preview, ready, a writable facing, a photo after an await, release",
+	"permissions": { "camera": "unset" },
+	"steps": [
+		{
+			"prompt": "camera",
+			"visible": ["Camera", "Access unknown", "Camera starting", "Facing back", "Photos 0"],
+			"absent": ["Camera ready"]
+		},
+		{
+			"do": { "answer": "allow" },
+			"visible": ["Access granted", "Camera ready", "Facing back", "Photos 0"],
+			"absent": ["Camera starting", "Access unknown"],
+			"camera": "on"
+		},
+		{
+			"do": { "tap": "Take photo" },
+			"visible": ["Photos 1", "Last photo"],
+			"absent": ["Photos 0"],
+			"calls": ["camera.takePhoto"]
+		},
+		{
+			"do": { "tap": "Hide preview" },
+			"visible": ["Show preview", "Photos 1"],
+			"absent": ["Hide preview"],
+			"camera": "off"
+		},
+		{
+			"do": { "tap": "Show preview" },
+			"visible": ["Hide preview", "Camera ready"],
+			"absent": ["Show preview"],
+			"camera": "on"
+		},
+		{
+			"do": { "tap": "Flip" },
+			"visible": [],
+			"visibleOn": { "ios": ["Facing front"], "android": ["Facing back"] },
+			"calls": ["camera.takePhoto", "camera.facing"]
+		}
+	],
+	"web": {
+		"steps": [
+			{ "visible": ["Camera", "No camera here"], "absent": ["Take photo", "Camera starting"] }
+		],
+		"absentFromOutput": ["Take photo", "takePhoto", "Camera starting", "@markless/device"]
+	}
+}

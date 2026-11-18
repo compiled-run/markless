@@ -11,15 +11,19 @@ public final class MarklessNavigationController: UINavigationController {
 	private let store: NativeStore
 	private let styles: [String: StyleExport]
 	private let fonts: [String: Data]
+	private let device: NativeDevice
 
 	/// `path`: where the app opens; the stack holds every route above it (`/`, `/orders`, `/orders/42`).
 	/// `style`: the app's `markless.native-app-style/0`, each styled route's styles; `fonts`: the faces it names, by id.
-	public init(app: Data, style: Data? = nil, fonts: [String: Data] = [:], path: String? = nil, store: NativeStore = UserDefaultsStore()) throws {
+	public init(app: Data, style: Data? = nil, fonts: [String: Data] = [:], path: String? = nil, store: NativeStore = UserDefaultsStore(),
+		device: NativeDevice? = nil
+	) throws {
 		let decoded = try NativeAppPayload.decode(app)
 		self.app = decoded
 		self.store = store
 		styles = try style.map { try StyleExport.decodeApp($0) } ?? [:]
 		self.fonts = fonts
+		self.device = device ?? PlatformDevice()
 		if let unknown = styles.keys.first(where: { pattern in !decoded.routes.contains { $0.pattern == pattern } }) {
 			throw HostError("the app style has a route \(unknown) that the app does not")
 		}
@@ -41,7 +45,7 @@ public final class MarklessNavigationController: UINavigationController {
 
 	private func screen(_ route: String, _ params: [NativeRouteParam]) throws -> MarklessViewController {
 		guard let entry = app.routes.first(where: { $0.pattern == route }) else { throw HostError("no page for \(route)") }
-		let controller = try MarklessViewController(page: entry.page, params: params, store: store, style: styles[route], fonts: fonts)
+		let controller = try MarklessViewController(page: entry.page, params: params, store: store, style: styles[route], fonts: fonts, device: device)
 		controller.navigator = { [weak self] route, params, replace in
 			guard let self else { return }
 			let next = try self.screen(route, params)

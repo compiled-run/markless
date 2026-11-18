@@ -53,6 +53,8 @@ export function compileCacheKey(input: CompileTsrxModuleInput): string | null {
 			input.elementOnlyAttributes ?? null,
 			input.routeRoot === true,
 			input.nativeFacts !== undefined,
+			input.target ?? 'web',
+			input.deviceTargetFacts !== undefined,
 			input.symbols,
 		])}${sortedRecordJson(input.importedModuleInterfaces)}${sortedRecordJson(
 			input.importedModuleConstants,

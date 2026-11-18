@@ -432,4 +432,68 @@ export function Toggle() @{
 			},
 		]);
 	});
+
+	it('lowers <native.sheet> to a sheet node whose content is the markup between its tags, under any import name', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+import { native as platformUi } from '@markless/device';
+export function Picker() @{
+	let choosing = state(false);
+	let fruit = state('none');
+	<section>
+		<p>Fruit {fruit}</p>
+		<platformUi.sheet open={choosing} onChange={(shown) => (choosing = shown)} snapPoints={[1, 0.4]}>
+			<button onClick={() => { fruit = 'fig'; choosing = false; }}>Fig</button>
+		</platformUi.sheet>
+	</section>
+}`);
+		expect(diagnostics).toEqual([]);
+		const sheet = payload?.nodes.find((node) => node.kind === 'sheet');
+		expect(sheet).toEqual({
+			kind: 'sheet',
+			id: 'sheet:component-edge:0',
+			parent: 'h0',
+			open: { cell: 'state:choosing' },
+			snapPoints: [0.4, 1],
+			dismissible: true,
+			modal: true,
+		});
+		expect(payload?.nodes.filter((node) => node.parent === sheet?.id).map((node) => node.id)).toEqual(['h2']);
+		expect(payload?.events).toContainEqual({ host: sheet?.id, event: 'dismiss', handler: `handler:${sheet?.id}` });
+		expect(payload?.handlers.find((handler) => handler.id === `handler:${sheet?.id}`)?.ops).toEqual([
+			{ op: 'assign', cell: 'state:choosing', value: { literal: false } },
+		]);
+	});
+
+	it('refuses a <native.sheet> the platforms cannot all present, naming the reason', async () => {
+		const refusal = async (props: string) =>
+			(
+				await nativeView(`import { state } from '@markless/core';
+import { native } from '@markless/device';
+export function App() @{
+	let open = state(false);
+	<main>
+		<native.sheet open={open} ${props}><p>Hi</p></native.sheet>
+	</main>
+}`)
+			).diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.message]);
+		expect(await refusal('')).toEqual([
+			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('dismissible <native.sheet> without `onChange`')],
+		]);
+		expect(await refusal('dismissible={false}')).toEqual([]);
+		expect(await refusal('dismissible={false} snapPoints={[0.3, 0.6, 1]}')).toEqual([
+			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('`snapPoints` of <native.sheet>')],
+		]);
+		expect(await refusal('dismissible={false} snapPoints={[0.5]}')).toEqual([
+			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('the largest 1')],
+		]);
+		expect(await refusal('dismissible={false} modal={false}')).toEqual([
+			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('`modal={false}`')],
+		]);
+		expect(await refusal('dismissible={false} class="frame"')).toEqual([
+			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('the `class` prop of <native.sheet>')],
+		]);
+		expect(await refusal('dismissible={open}')).toEqual([
+			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('must be fixed at build time')],
+		]);
+	});
 });

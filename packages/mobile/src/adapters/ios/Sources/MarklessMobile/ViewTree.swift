@@ -1,10 +1,11 @@
 #if canImport(UIKit)
+import AVFoundation
 import MarklessCore
 import UIKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"audio", "canvas", "details", "dialog", "embed", "form", "iframe", "img", "label", "object", "option",
+	"canvas", "details", "dialog", "embed", "form", "iframe", "label", "object", "option",
 	"picture", "select", "summary", "svg", "textarea", "video",
 ]
 
@@ -25,6 +26,8 @@ final class ViewTree {
 	private let layout: StyleLayout?
 	private let faces: [String: UIFontDescriptor]
 	private let onAction: (NativeAction) -> Void
+	/// The view of a device object (a camera's preview), made by the page's device.
+	private let objectView: (_ object: String, _ device: String) throws -> UIView
 	private let nodes: [String: NativeNode]
 	/// The nodes each element, root (`""`), branch arm (`branch#index`) or list row (`repeat id`) places directly.
 	private let slots: [String: [String]]
@@ -36,6 +39,9 @@ final class ViewTree {
 	private var attributes: [String: [String: String]] = [:]
 	private var branches: [String: (anchor: UIView, index: Int?, built: [String])] = [:]
 	private var lists: [String: (anchor: UIView, keys: [String], built: [String: [String]])] = [:]
+	private(set) var sheets: [String: SystemSheet] = [:]
+	/// The controller that presents the page's system sheets.
+	weak var presenter: UIViewController?
 	private var anchors = Set<ObjectIdentifier>()
 	private var assignment: Int
 	/// Taps and drags on the page dismiss the keyboard; a stack makes them wait for its edge-swipe Back.
@@ -43,9 +49,11 @@ final class ViewTree {
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 
 	init(
-		runtime: NativeRuntime, layout: StyleLayout?, faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void
+		runtime: NativeRuntime, layout: StyleLayout?, faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void,
+		objectView: @escaping (_ object: String, _ device: String) throws -> UIView = { object, _ in throw HostError("no device to show \(object)") }
 	) throws {
 		self.runtime = runtime
+		self.objectView = objectView
 		self.layout = layout
 		self.faces = faces
 		self.onAction = onAction
@@ -76,7 +84,19 @@ final class ViewTree {
 			gesture.addTarget(keyboard, action: #selector(KeyboardDismisser.dismiss))
 			root.addGestureRecognizer(gesture)
 		}
-		if layout == nil { stackTree(root) }
+		if layout == nil {
+			stackTree(root)
+			for sheet in sheets.values { stackTree(sheet.content) }
+		}
+	}
+
+	func pageAppeared(_ host: UIViewController) {
+		for sheet in sheets.values { sheet.hostAppeared(host) }
+	}
+
+	/// Before the page is rebuilt: its sheets go with it, without a `dismiss` action.
+	func closeSheets() {
+		for sheet in sheets.values { sheet.close(animated: false) }
 	}
 
 	func mount(in screen: UIView) {
@@ -109,8 +129,13 @@ final class ViewTree {
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				attributes[node, default: [:]][name] = value
 				applyAttributes(node, view)
+			case let .sheet(node, open):
+				guard let sheet = sheets[node] else { throw HostError("journal names sheet \(node), which is not built") }
+				if open { sheet.open(from: presenter) } else { sheet.close() }
 			case .navigate, .title:
 				throw HostError("navigate and title entries reach the screen's controller, not its views")
+			case .call, .release:
+				throw HostError("a \(entry.json.jsonText) entry reaches the page's device, not its views")
 			case let .state(cell, value):
 				guard let layout else { continue }
 				assignment = try layout.next(from: assignment, cell: cell, value: value)
@@ -201,6 +226,34 @@ final class ViewTree {
 					control.isAccessibilityElement = true
 					control.accessibilityTraits = element == "a" ? .link : .button
 					view = control
+				} else if element == "camera" {
+					guard let object = nodes[template]?.object, let device = runtime.payload.objects.first(where: { $0.id == object })?.device else {
+						throw HostError("<camera> \(id) shows no device object")
+					}
+					view = try objectView(object, device)
+					if layout == nil {
+						view.widthAnchor.constraint(equalToConstant: 240).isActive = true
+						view.heightAnchor.constraint(equalToConstant: 180).isActive = true
+					}
+				} else if element == "audio" {
+					if context.button != nil { throw HostError("<audio> \(id) is inside a button") }
+					if !(slots[template] ?? []).isEmpty { throw HostError("<audio> \(id)'s children have no iOS view yet") }
+					let audio = AudioButton()
+					if layout == nil {
+						audio.widthAnchor.constraint(equalToConstant: 120).isActive = true
+						audio.heightAnchor.constraint(equalToConstant: 44).isActive = true
+					}
+					view = audio
+				} else if element == "img" {
+					let image = UIImageView()
+					image.contentMode = .scaleAspectFit
+					image.isAccessibilityElement = true
+					image.accessibilityTraits = .image
+					if layout == nil {
+						image.widthAnchor.constraint(equalToConstant: 120).isActive = true
+						image.heightAnchor.constraint(equalToConstant: 90).isActive = true
+					}
+					view = image
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = UITextField()
@@ -271,6 +324,19 @@ final class ViewTree {
 					rows[row.key] = try buildRow(template, key: row.key, item: row.item, in: container, at: &index, context)
 				}
 				lists[id] = (marker, keys, rows)
+			case let .sheet(open, snapPoints, dismissible, modal):
+				if !context.suffix.isEmpty || context.button != nil { throw HostError("a system sheet inside a list row or a control (\(id)) has no iOS host support") }
+				let dismissedBy = (events[template] ?? []).filter { $0.event == .dismiss }
+				if dismissible && dismissedBy.isEmpty { throw HostError("system sheet \(id) can be closed by the platform but has no dismiss handler") }
+				let onAction = onAction
+				let sheet = SystemSheet(snapPoints: snapPoints, dismissible: dismissible, modal: modal) {
+					if !dismissedBy.isEmpty { onAction(NativeAction(event: .dismiss, host: id)) }
+				}
+				sheet.content.accessibilityIdentifier = id
+				var childIndex = 0
+				_ = try build(template, in: sheet.content, at: &childIndex, Context())
+				sheets[id] = sheet
+				if try runtime.evaluate(open).isTruthy { sheet.open(from: nil) }
 			}
 		}
 		return built
@@ -318,10 +384,16 @@ final class ViewTree {
 	/// Static and bound attributes as platform state; `class` reaches views only through the style export.
 	private func applyAttributes(_ id: String, _ view: UIView) {
 		let current = attributes[id] ?? [:]
-		if let button = view as? UIButton {
+		if let audio = view as? AudioButton {
+			audio.isHidden = current["controls"] == nil
+			audio.update(source: current["src"], label: current["aria-label"])
+		} else if let button = view as? UIButton {
 			button.isEnabled = current["disabled"] == nil
 			if button.isEnabled { button.accessibilityTraits.remove(.notEnabled) } else { button.accessibilityTraits.insert(.notEnabled) }
 			refreshLabel(of: button)
+		} else if let image = view as? UIImageView {
+			image.accessibilityLabel = current["aria-label"] ?? current["alt"]
+			image.image = current["src"].flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }
 		} else {
 			view.accessibilityLabel = current["aria-label"]
 		}
@@ -349,7 +421,7 @@ final class ViewTree {
 	}
 
 	private func stackTree(_ view: UIView) {
-		guard !(view is UILabel || view is UITextField) else { return }
+		guard !(view is UILabel || view is UITextField || view is AudioButton) else { return }
 		stack(view)
 		for child in view.subviews where !anchors.contains(ObjectIdentifier(child)) { stackTree(child) }
 	}
@@ -371,6 +443,60 @@ final class ViewTree {
 		constraints.append(above.constraint(equalTo: container.bottomAnchor))
 		NSLayoutConstraint.activate(constraints)
 		stackConstraints[ObjectIdentifier(container)] = constraints
+	}
+}
+
+/// `<audio controls>`: a button reading "Play", or "Pause" while its file plays.
+@MainActor
+final class AudioButton: UIButton, AVAudioPlayerDelegate {
+	private var player: AVAudioPlayer?
+	private var source: String?
+	private var label: String?
+
+	init() {
+		super.init(frame: .zero)
+		configuration = .plain()
+		isAccessibilityElement = true
+		accessibilityTraits = .button
+		addAction(UIAction { [weak self] _ in self?.toggle() }, for: .touchUpInside)
+		refresh()
+	}
+
+	@available(*, unavailable)
+	required init?(coder: NSCoder) { fatalError("AudioButton is made in code") }
+
+	/// A new `src` replaces the player; `label` (`aria-label`) is read instead of the title.
+	func update(source: String?, label: String?) {
+		self.label = label
+		if source != self.source {
+			self.source = source
+			player?.stop()
+			player = nil
+		}
+		refresh()
+	}
+
+	private func toggle() {
+		if let player, player.isPlaying {
+			player.pause()
+		} else {
+			if player == nil, let url = source.flatMap(URL.init(string:)) {
+				player = try? AVAudioPlayer(contentsOf: url)
+				player?.delegate = self
+			}
+			player?.play()
+		}
+		refresh()
+	}
+
+	private func refresh() {
+		let title = player?.isPlaying == true ? "Pause" : "Play"
+		configuration?.title = title
+		accessibilityLabel = label ?? title
+	}
+
+	nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+		Task { @MainActor in self.refresh() }
 	}
 }
 

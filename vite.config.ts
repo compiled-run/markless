@@ -109,6 +109,7 @@ const buildOrder: PackUserConfig[] = [
 			'record-templates': './src/protocol-record-templates.ts',
 			'render-data-hosts': './src/render-data-hosts.ts',
 			'native-view': './src/native-view.ts',
+			'native-device': './src/native-device.ts',
 		},
 	}),
 	marklessPack({
