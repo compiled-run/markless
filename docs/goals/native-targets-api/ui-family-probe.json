@@ -373,10 +373,8 @@
 		]
 	},
 	"pagination": {
-		"payload": false,
-		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `event.preventDefault`, which needs a script engine"
-		]
+		"payload": true,
+		"diagnostics": []
 	},
 	"popover": {
 		"payload": false,

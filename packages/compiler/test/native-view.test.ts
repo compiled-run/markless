@@ -368,6 +368,37 @@ export function Page() @{
 		expect(elsewhere.payload).toBeNull();
 	});
 
+	it('drops preventDefault() in a click handler where a click has no default action, and refuses it where it has one', async () => {
+		const quiet = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let count = state(0);
+	<main>
+		<a onClick={(event) => { event.preventDefault(); count++; }}>Next</a>
+		<button onClick={(event) => { event.preventDefault(); count++; }}>Add</button>
+		<p>{count}</p>
+	</main>
+}`);
+		expect(quiet.diagnostics).toEqual([]);
+		expect(quiet.payload?.handlers.map((handler) => handler.ops)).toEqual([
+			[{ op: 'assign', cell: 'state:count', value: { binary: '+', left: { unary: '+', value: { cell: 'state:count' } }, right: { literal: 1 } } }],
+			[{ op: 'assign', cell: 'state:count', value: { binary: '+', left: { unary: '+', value: { cell: 'state:count' } }, right: { literal: 1 } } }],
+		]);
+		for (const host of [
+			'<a href="/next" onClick={(event) => { event.preventDefault(); count++; }}>Next</a>',
+			'<input type="checkbox" aria-label="Keep" onClick={(event) => { event.preventDefault(); count++; }} />',
+		]) {
+			const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let count = state(0);
+	<main>${host}<p>{count}</p></main>
+}`);
+			expect(payload).toBeNull();
+			expect(diagnostics.map((d) => d.message)).toContain(
+				'the click handler uses a call to `event.preventDefault`, which needs a script engine',
+			);
+		}
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{
