@@ -794,9 +794,9 @@ class MarklessHost(
 
 	/** `focus()`: a text field takes the keyboard, anything else TalkBack's cursor; `scrollIntoView()`: its scrolling ancestors bring it on screen. */
 	private fun command(view: View, command: String, preventScroll: Boolean) {
-		// As on the web, focus brings the element into view unless told not to.
-		if (command == "scrollIntoView" || !preventScroll) view.requestRectangleOnScreen(android.graphics.Rect(0, 0, view.width, view.height), true)
-		if (command == "scrollIntoView") return
+		// As on the web: scrollIntoView aligns the element to the start; focus brings it into view unless told not to.
+		if (command == "scrollIntoView") return bringIntoView(view, dev.markless.mobile.core.SCROLL_INTO_VIEW)
+		if (!preventScroll) bringIntoView(view, dev.markless.mobile.core.FOCUS_INTO_VIEW)
 		if (view is EditText) {
 			view.requestFocus()
 			(context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).showSoftInput(view, 0)

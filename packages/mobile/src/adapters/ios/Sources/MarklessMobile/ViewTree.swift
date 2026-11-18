@@ -378,13 +378,6 @@ final class ViewTree {
 		UIAccessibility.post(notification: .announcement, argument: text)
 	}
 
-	/// Brings a view into sight; only a scrolling ancestor can.
-	private func reveal(_ view: UIView) {
-		var ancestor = view.superview
-		while let candidate = ancestor, !(candidate is UIScrollView) { ancestor = candidate.superview }
-		if let scroll = ancestor as? UIScrollView { scroll.scrollRectToVisible(view.convert(view.bounds, to: scroll), animated: false) }
-	}
-
 	/// The colour behind the page in the current assignment: the export's canvas, else the web canvas's white.
 	var canvas: UIColor? { layout.map { $0.canvases[assignment].map(uiColor) ?? .white } }
 
@@ -464,10 +457,13 @@ final class ViewTree {
 			case let .command(node, command, preventScroll):
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				root.layoutIfNeeded()
-				// As on the web, focus brings the element into view unless told not to.
-				if command == "scrollIntoView" || !preventScroll { reveal(view) }
+				// As on the web: scrollIntoView aligns the element to the start; focus brings it into view unless told not to.
 				if command == "scrollIntoView" {
-				} else if view is UITextField {
+					bringIntoView(view, block: scrollIntoViewAlign.block, inline: scrollIntoViewAlign.inline)
+					break
+				}
+				if !preventScroll { bringIntoView(view, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline) }
+				if view is UITextField {
 					view.becomeFirstResponder()
 				} else {
 					UIAccessibility.post(notification: .layoutChanged, argument: view)
@@ -476,7 +472,7 @@ final class ViewTree {
 				guard let view = elements[node] else { throw HostError("journal names field \(node), which is not shown") }
 				if let field = view as? UITextField {
 					root.layoutIfNeeded()
-					reveal(field)
+					bringIntoView(field, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
 					field.becomeFirstResponder()
 				}
 				show(text)
