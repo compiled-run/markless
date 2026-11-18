@@ -236,6 +236,7 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	br: { flow: 'break' },
 	button: {},
 	input: {},
+	textarea: {},
 	a: {},
 	img: {},
 	audio: {},

@@ -365,6 +365,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'notes',
+		fixture: 'test/fixtures/Notes.tsrx',
+		actions: [
+			{ event: 'input', host: 'h1', value: 'First line\nSecond line' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'input', host: 'h1', value: 'Again' },
+		],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [

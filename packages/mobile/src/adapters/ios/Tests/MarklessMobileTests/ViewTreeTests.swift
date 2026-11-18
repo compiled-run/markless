@@ -110,6 +110,26 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(store.read("k") == nil)
 }
 
+@MainActor @Test func aTextareaSendsEachEditAndTakesWritesFromOtherHandlers() throws {
+	var sent: [NativeAction] = []
+	let controller = try MarklessViewController(payload: vectorPayload("notes"), store: MemoryStore())
+	let views = try tree(controller)
+	let area = try #require(views.elements["h1"] as? TextArea)
+	#expect(area.text == "First line")
+	#expect(area.accessibilityLabel == "Notes")
+	#expect(area.isEditable)
+	controller.view.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+	controller.view.layoutIfNeeded()
+	// Two lines tall, as Chrome's default rows="2".
+	#expect(area.frame.height > 2 * (area.font?.lineHeight ?? 17))
+	area.onChange.append { sent.append(NativeAction(event: .input, host: "h1", value: $0)) }
+	area.text = "First line\nSecond line"
+	area.delegate?.textViewDidChange?(area)
+	#expect(sent.last?.value == "First line\nSecond line")
+	try views.apply([.property(node: "h1", name: "value", value: "")])
+	#expect(area.text == "")
+}
+
 @MainActor @Test func aTextFieldSendsItsTextAndTakesWritesFromOtherHandlers() throws {
 	let controller = try MarklessViewController(payload: vectorPayload("input"), store: MemoryStore())
 	let views = try tree(controller)
