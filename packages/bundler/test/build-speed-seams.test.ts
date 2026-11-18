@@ -11,7 +11,7 @@ import {
 import { scanEmittedDynamicImports } from '../src/build/dynamic-import-scan.ts';
 import { moduleSpecifiers } from '../src/hooks/transform-emit.ts';
 import { factorRenderDataLiterals } from '../src/render-data-literals.ts';
-import { marklessServer } from '../src/rolldown.ts';
+import { marklessClient, marklessServer } from '../src/rolldown.ts';
 import { serverSharedSourceRequest } from '../src/virtual-ids.ts';
 
 describe('module-record readers answer without the chunk tree', () => {
@@ -209,6 +209,38 @@ test('a production build carries no debug region comments', async () => {
 			const { output } = await build.generate({ format: 'es' });
 			const code = output.map((item) => (item.type === 'chunk' ? item.code : '')).join('\n');
 			expect(code).toContain('hello');
+			expect(code).not.toContain('//#region');
+		} finally {
+			await build.close();
+		}
+	} finally {
+		await rm(directory, { recursive: true, force: true });
+	}
+});
+
+// The client write fails the build when any emitted file spells the checkout path.
+test('an unminified client build that asks for simple debug info writes no checkout path', async () => {
+	const directory = await realpath(await mkdtemp(join(tmpdir(), 'markless-regions-client-')));
+	try {
+		await writeFile(
+			join(directory, 'Page.tsrx'),
+			"import { state } from '@markless/core';\nexport default function Page() @{\n\tlet taps = state(0);\n\t<button onClick={() => taps++}>{taps}</button>\n}\n",
+		);
+		await writeFile(join(directory, 'entry.js'), "export { default } from './Page.tsrx';\n");
+		const build = await rolldown({
+			input: join(directory, 'entry.js'),
+			cwd: directory,
+			external: [/^@markless\//],
+			experimental: { attachDebugInfo: 'simple' },
+			plugins: [marklessClient({ rootDir: directory })],
+		});
+		try {
+			const { output } = await build.write({
+				dir: join(directory, 'out'),
+				format: 'es',
+				minify: false,
+			});
+			const code = output.map((item) => (item.type === 'chunk' ? item.code : '')).join('\n');
 			expect(code).not.toContain('//#region');
 		} finally {
 			await build.close();
