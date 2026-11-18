@@ -46,9 +46,20 @@ export default function Checkout() @{
   it like any other state, and a value picked inside lands in the page's state directly (no result channel).
 - **On the web it does not exist.** Every `native.*` element must sit inside a `platform` check the analyzer can see, in
   the component that renders it (`@if (!platform.web)`, `@if (platform.ios || platform.android)`); a web build removes the
-  guarded markup and everything it alone uses, and refuses an unguarded use with `MARKLESS_DEVICE_WEB_ABSENT`: "`<native.sheet>`
-  is the platform's own piece and does not exist on the web; put it inside a `platform` check, such as `@if
-  (!platform.web)`, in the component that renders it, and use `drawer`, `modal` or `<dialog>` for the web".
+  guarded markup and everything it alone uses, and refuses an unguarded use with `MARKLESS_DEVICE_WEB_ABSENT`, whose
+  message teaches the fix:
+
+  ```text
+  `<native.sheet>` does not exist on the web: everything under `native.*` is drawn by iOS or Android. Guard it in the component that renders it, and draw the web's version with `drawer` from @markless/ui:
+
+  	@if (!platform.web) {
+  		<native.sheet …>…</native.sheet>
+  	} @else {
+  		<drawer.root …>…</drawer.root>
+  	}
+
+  `platform` comes from @markless/device. `modal` or a plain `<dialog>` also work for the web.
+  ```
 - **`onChange(open)`** runs when the platform closes the sheet (a swipe, the back gesture, a tap on the dimmed page),
   always with `false`. It does not run when the page itself writes `open = false`. It is the same
   word and shape as `drawer`'s and `modal`'s `onChange`; the difference is that a sheet has no trigger part, so opening is
@@ -121,14 +132,15 @@ inside a package, which a reader of that spec may still trip on.
 Owner decision (2026-11-18): `native.*` follows the rule `@markless/device` features already follow on the web
 (`cw/device-slice`, `cw/device-more`). It is implemented once, in that analysis (`collectWebDeviceAbsence` in
 `packages/compiler/src/passes/semantic-graph/device-target.ts`): any element whose tag is a member of the module's import
-of `native` from `@markless/device` (under any local name), in code the web build keeps, is refused; one inside a
+of `native` from `@markless/device` (under any local name), in code the web build keeps, is refused with the message
+above; one inside a
 `platform` arm the build folds away is removed with the rest of that arm. `native.camera` falls under the same case
 when it moves in. The web module `packages/device/src/native/index.ts` only declares the elements (typed, throwing if
 ever run) so an author's code type-checks; a web build never reaches it. Proven:
 
 - `packages/mobile/test/device-web-absence.test.ts`: a guarded `<native.sheet>` and `<native.camera>` build, and neither
   client nor server code carries the tag or its content (client code names no `@markless/device`); an unguarded one, and
-  one under a renamed import, is refused with the message above.
+  one under a renamed import, is refused with the message above, naming its own tag.
 - The ladder's web column (`ladder-web.test.ts`): rungs Y1 to Y4 render their `@else` arm on the web, and no file of the
   built output contains the sheet's content or `@markless/device` (`web.absentFromOutput`).
 - Byte-identical: device-slice's location rung page (it imports `location` and `platform`), built as a production web app
@@ -253,6 +265,9 @@ and notifications are launched, not placed: calls in `@markless/device`, not ele
 HTML (`<input type="date">` shows the native picker on phones).
 
 ## Found on the way
+
+Filed: #817 (a page-wide `onIdle` hook starts every client-rendered mount at idle) and #818 (a client-rendered `attach`
+whose input reads state never re-runs).
 
 - **Not fixed, `@markless/web`:** a page-wide `onIdle` hook starts every client-rendered mount at idle, including mounts with
   no idle record (above). A fix (wake only a mount holding an idle record) was on this branch and is reverted: it moved a

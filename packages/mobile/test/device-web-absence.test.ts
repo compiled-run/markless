@@ -141,7 +141,17 @@ export default function App() @{
 		const compiled = await web(page(tag, false, imports));
 		expect(codes(compiled)).toEqual(['MARKLESS_DEVICE_WEB_ABSENT']);
 		expect(compiled.semanticGraph.diagnostics[0]!.message).toBe(
-			`\`<${tag}>\` is the platform's own piece and does not exist on the web; put it inside a \`platform\` check, such as \`@if (!platform.web)\`, in the component that renders it, and use \`drawer\`, \`modal\` or \`<dialog>\` for the web`,
+			[
+				`\`<${tag}>\` does not exist on the web: everything under \`native.*\` is drawn by iOS or Android. Guard it in the component that renders it, and draw the web's version with \`drawer\` from @markless/ui:`,
+				'',
+				'\t@if (!platform.web) {',
+				`\t\t<${tag} …>…</${tag}>`,
+				'\t} @else {',
+				'\t\t<drawer.root …>…</drawer.root>',
+				'\t}',
+				'',
+				'`platform` comes from @markless/device. `modal` or a plain `<dialog>` also work for the web.',
+			].join('\n'),
 		);
 	});
 });

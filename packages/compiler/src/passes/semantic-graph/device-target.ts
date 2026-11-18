@@ -364,7 +364,17 @@ function refuseNativeOnWeb(tag: AnyNode, state: WalkState): void {
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'A native element does not exist on the web',
-		message: `\`<${name}>\` is the platform's own piece and does not exist on the web; put it inside a \`platform\` check, such as \`@if (!platform.web)\`, in the component that renders it, and use \`drawer\`, \`modal\` or \`<dialog>\` for the web`,
+		message: [
+			`\`<${name}>\` does not exist on the web: everything under \`native.*\` is drawn by iOS or Android. Guard it in the component that renders it, and draw the web's version with \`drawer\` from @markless/ui:`,
+			'',
+			'\t@if (!platform.web) {',
+			`\t\t<${name} …>…</${name}>`,
+			'\t} @else {',
+			'\t\t<drawer.root …>…</drawer.root>',
+			'\t}',
+			'',
+			"`platform` comes from @markless/device. `modal` or a plain `<dialog>` also work for the web.",
+		].join('\n'),
 		why: 'Everything under native.* is drawn by iOS or Android; a web build removes a guarded use and has nothing to draw for any other.',
 		primarySpan: { filename: state.filename, start: tag.start as number, end: tag.end as number },
 		passId: 'tsrx-semantic-graph',
@@ -372,7 +382,7 @@ function refuseNativeOnWeb(tag: AnyNode, state: WalkState): void {
 		suggestions: [
 			{
 				message:
-					'Wrap it in @if (!platform.web) { ... } @else { ... } and draw the web version with drawer, modal or <dialog> from @markless/ui.',
+					"Wrap it in @if (!platform.web) { … } @else { <drawer.root …>…</drawer.root> }, with platform imported from @markless/device.",
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_DEVICE_WEB_ABSENT',
