@@ -761,6 +761,39 @@ const isScalar = (value: unknown): value is NativeScalar | null =>
 	(typeof value === 'number' && Number.isFinite(value));
 
 /** Every cell an expression reads. */
+/** Whether an expression reads a row's item and nothing that changes after the row is built (no event, local or route). */
+function readsItemOnly(expr: NativeExpr): boolean {
+	let item = false;
+	const walk = (node: unknown): boolean => {
+		if (!node || typeof node !== 'object') return true;
+		if (Array.isArray(node)) return node.every(walk);
+		if ('item' in node) {
+			item = true;
+			return true;
+		}
+		if ('event' in node || 'local' in node || 'route' in node || 'element' in node) return false;
+		return Object.values(node).every(walk);
+	};
+	return walk(expr) && item;
+}
+
+/** `for (const row of rows) if (row.contains(x)) return row;`: a loop that only finds the element holding `x`. */
+function findsHolder(loop: Extract<SemanticFunctionStatement, { kind: 'each' }>): boolean {
+	const [only, ...more] = loop.body;
+	if (more.length > 0 || only?.kind !== 'if' || only.whenFalse.length > 0 || only.whenTrue.length !== 1) return false;
+	const test = only.test;
+	const exit = only.whenTrue[0]!;
+	return (
+		test.kind === 'method' &&
+		test.method === 'contains' &&
+		test.object.kind === 'read' &&
+		test.object.name === loop.name &&
+		exit.kind === 'return' &&
+		exit.value.kind === 'read' &&
+		exit.value.name === loop.name
+	);
+}
+
 function cellsOf(expr: NativeExpr, into = new Set<string>()): Set<string> {
 	if ('cell' in expr) into.add(expr.cell);
 	for (const child of Object.values(expr)) {
@@ -1395,6 +1428,12 @@ export function createNativeViewPayload(
 		);
 		if (!lowered) return;
 		const folded = foldConstant(lowered, initialOf);
+		const rowCell = cells[cellIndex.get(cell)!]!;
+		// A part in a row seeds its state from what the row passes: the row's item, read once when the row is built.
+		if (!folded && cellsOf(lowered).size === 0 && rowCell.row !== undefined && readsItemOnly(lowered)) {
+			cells[cellIndex.get(cell)!] = { ...rowCell, first: lowered };
+			return;
+		}
 		if (!folded || cellsOf(lowered).size > 0 || !isNativeValue(folded.value)) {
 			refuse(
 				`${what} sets \`${statement.target}.${fieldName}\` from a value that follows state; pass a fixed value or leave the prop out`,
@@ -1623,6 +1662,12 @@ export function createNativeViewPayload(
 	let lateLowering = false;
 	/** Set while an `@if` test that is one bare name is lowered: there, children the caller passed are only present. */
 	let childrenAsTest = false;
+	/** The @for row whose element a tap run is lowered for, while it is. */
+	let pressedRow: string | undefined;
+	/** Set while a tap's handler is lowered for where the tap landed. */
+	let tapRun = false;
+	/** Handles read in such a run as the tapped row's copy alone: how many rows there are is not known then. */
+	const rowCopies = new WeakSet<object>();
 	/** Whether the handler being lowered read the element a tap landed on. */
 	let pressedTargetRead = false;
 	/** The text field whose input handler is being lowered: its `value` there is what was typed. */
@@ -1634,8 +1679,15 @@ export function createNativeViewPayload(
 		if (!lateLowering) return refuse(`${what} as a value outside a handler`);
 		const bound = boundHandles.get(key) ?? [];
 		const byId = nodeById();
-		if (bound.some((id) => byId.get(id)?.row))
-			return refuse(`${what}, a handle bound inside a @for row`);
+		if (bound.some((id) => byId.get(id)?.row)) {
+			// In the run of a tap on one row, the row's copy is the only one that holds what was tapped.
+			const rows = new Set(bound.map((id) => byId.get(id)?.row));
+			if (!plural || !tapRun || rows.size !== 1 || (pressedRow !== undefined && !rows.has(pressedRow)))
+				return refuse(`${what}, a handle bound inside a @for row`);
+			const copies: NativeExpr = { array: bound.map((id) => ({ spread: false, value: elementValue(id) })) };
+			rowCopies.add(copies);
+			return copies;
+		}
 		if (plural)
 			return { array: bound.map((id) => ({ spread: false, value: elementValue(id) })) };
 		if (bound.length > 1) return refuse(`${what}, a handle bound to more than one element`);
@@ -1880,6 +1932,9 @@ export function createNativeViewPayload(
 			case 'each': {
 				const list = exprOf(first.list, what, scope);
 				if (!list) return null;
+				// Row copies stand for the tapped row alone, which is right only for asking which row holds what was tapped.
+				if (rowCopies.has(list) && !findsHolder(first))
+					return refuse(`${what} loops over the elements of a @for's rows for something other than which one holds what was tapped`);
 				const known = buildTime(list);
 				if (!known || !Array.isArray(known.value))
 					return refuse(`${what} loops over a list known only while the app runs`);
@@ -2382,6 +2437,8 @@ export function createNativeViewPayload(
 				if (!object) return null;
 				const member: NativeExpr = { member: object, property: expression.property };
 				// A field of an object or array known when the app is built is that field's value.
+				if (rowCopies.has(object))
+					return refuse(`${what} counts or indexes the elements of a @for's rows, which a native build does not know when it is built`);
 				const field = 'array' in object || 'object' in object ? buildTime(member) : undefined;
 				return field && isScalar(field.value) ? { literal: field.value } : member;
 			}
@@ -4793,6 +4850,7 @@ export function createNativeViewPayload(
 	lateLowering = true;
 	for (const { handler, event, scope, host } of pendingHandlers) {
 		pressedTargetRead = false;
+		tapRun = SEMANTIC_EVENTS[event.eventName] === 'activate';
 		handler.ops = handlerOps(event, scope, handler.id, { target: host, currentTarget: host });
 		if (!pressedTargetRead || SEMANTIC_EVENTS[event.eventName] !== 'activate') continue;
 		const named = new Set([...boundHandles.values()].flat());
@@ -4811,7 +4869,6 @@ export function createNativeViewPayload(
 				node.kind !== 'element' ||
 				node.id === host ||
 				!named.has(node.id) ||
-				node.row ||
 				!isWithin(node.id, host)
 			)
 				continue;
@@ -4829,15 +4886,20 @@ export function createNativeViewPayload(
 				for (const dropped of cells.splice(marks.cells)) cellIndex.delete(dropped.id);
 			};
 			// Lowered as the run it would reach, kept values and all: the same ops mean it needs no handler of its own.
+			pressedRow = node.row;
 			const around = reached(node.id);
 			if (around) {
 				const same =
 					JSON.stringify(handlerOps(event, scope, around.id, pressed)) === around.spelled;
 				rollBack();
-				if (same) continue;
+				if (same) {
+					pressedRow = undefined;
+					continue;
+				}
 			}
 			const id = `${handler.id}@${node.id}`;
 			const ops = handlerOps(event, scope, id, pressed);
+			pressedRow = undefined;
 			// The same refusal once per tapped element says nothing new.
 			const seen = new Set(
 				diagnostics.slice(0, marks.diagnostics).map((diagnostic) => diagnostic.message),
@@ -4862,6 +4924,7 @@ export function createNativeViewPayload(
 			handlers.splice(handlers.indexOf(handler), 1);
 		}
 	}
+	tapRun = false;
 	wireTicks();
 	const forms = wireForms();
 	for (const handler of handlers) {

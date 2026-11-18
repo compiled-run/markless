@@ -403,6 +403,19 @@ export function createNativeRuntime(
 			scope: { ...base, items: new Map([[repeat.id, item]]), keys: new Map([[repeat.id, key]]) },
 		}));
 	};
+	/** A row's state with a `first` takes it once, from the row's item, when the row is built. */
+	const seedRows = () => {
+		for (const cell of payload.cells) {
+			if (!cell.row || !cell.first) continue;
+			const repeat = repeats.get(cell.row);
+			if (!repeat || !shown(repeat)) continue;
+			for (const { key, item } of rowsOf(repeat)) {
+				const slot = `${cell.id}@${key}`;
+				if (values.has(slot)) continue;
+				values.set(slot, evaluate(cell.first, undefined, { ...base, items: new Map([[repeat.id, item]]), keys: new Map([[repeat.id, key]]) }));
+			}
+		}
+	};
 	const render = (parts: ReadonlyArray<NativeTextPart>, scope: NativeScope): string =>
 		parts
 			.map((part) =>
@@ -612,6 +625,7 @@ export function createNativeRuntime(
 			if (!node || !instances(node).some((shownNow) => shownNow.id === id)) fired.delete(key);
 		}
 	};
+	seedRows();
 
 	return {
 		texts,
@@ -884,6 +898,7 @@ export function createNativeRuntime(
 		apply: () => NativeJournalEntry[],
 	): ReadonlyArray<NativeJournalEntry> {
 		{
+			seedRows();
 			const cellsBefore = new Map(values);
 			const beforeTexts = new Map(texts());
 			const beforeAttributes = keyed(attributes());
@@ -913,6 +928,7 @@ export function createNativeRuntime(
 				const list = at < 0 ? undefined : rowOfCell.get(slot.slice(0, at));
 				if (list !== undefined && !kept.has(`${list}\0${slot.slice(at + 1)}`)) values.delete(slot);
 			}
+			seedRows();
 			forgetHidden();
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());

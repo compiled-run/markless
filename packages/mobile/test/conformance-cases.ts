@@ -389,6 +389,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'row-seed',
+		fixture: 'test/fixtures/RowSeed.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0@a' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'component-edge:0/h0@c' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'component-edge:0/h0@b' },
+		],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [

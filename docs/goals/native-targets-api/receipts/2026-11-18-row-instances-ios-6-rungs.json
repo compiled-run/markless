@@ -1,0 +1,42 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u27-table-rows",
+			"failure": null,
+			"installSeconds": 3.098900541999996,
+			"flowSeconds": 24.339334750000003
+		},
+		{
+			"name": "u26-table",
+			"failure": null,
+			"installSeconds": 0.3463789999999863,
+			"flowSeconds": 21.362599458
+		},
+		{
+			"name": "u6-base-rows",
+			"failure": null,
+			"installSeconds": 0.27006466699999876,
+			"flowSeconds": 35.586215417
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 0.3293330840000126,
+			"flowSeconds": 19.890402833
+		},
+		{
+			"name": "15-long-list",
+			"failure": null,
+			"installSeconds": 0.26292775000000257,
+			"flowSeconds": 84.70972204099998
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 0.33984566699998686,
+			"flowSeconds": 24.07540075000003
+		}
+	]
+}

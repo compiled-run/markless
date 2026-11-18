@@ -165,6 +165,7 @@ public final class NativeRuntime {
 	private let params: [NativeRouteParam]
 	/// Row state's list by cell id: its values are kept as `<cell>@<key>`.
 	private let rowOfCell: [String: String]
+	private let firstOfCell: [String: NativeExpr]
 	private var eventValue: String?
 	private let forms: [String: NativeForm]
 	/// A field's text a person typed since its `value` binding last changed it.
@@ -211,6 +212,7 @@ public final class NativeRuntime {
 		for handler in payload.handlers { collect(handler.ops) }
 		self.continuations = continuations
 		rowOfCell = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.row.map { (cell.id, $0) } })
+		firstOfCell = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.first.map { (cell.id, $0) } })
 		nodesById = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
 		forms = Dictionary(payload.forms.map { ($0.node, $0) }, uniquingKeysWith: { first, _ in first })
 		ticked = payload.nodes.filter { node in
@@ -236,10 +238,23 @@ public final class NativeRuntime {
 		return "\(cell)@\(key)"
 	}
 
-	/// A row's state reads its first value until the row writes it.
+	/// A row's state reads its first value until the row writes it; one taken from the row's item is seeded before any change
+	/// (`seedRows`), so until the first change it reads the item as the row was built.
 	private func read(_ cell: String, in scope: NativeScope = .empty) throws -> NativeValue {
 		guard let value = values[cell] else { throw RuntimeError(reason: "unknown cell \(cell)") }
-		return values[try slot(of: cell, in: scope)] ?? value
+		if let seeded = values[try slot(of: cell, in: scope)] { return seeded }
+		if let first = firstOfCell[cell] { return try evaluate(first, in: scope) }
+		return value
+	}
+
+	/// A row's state with a `first` takes it once, from the row's item, when the row is built.
+	private func seedRows() throws {
+		for cell in payload.cells {
+			guard let row = cell.row, let first = cell.first, let list = nodesById[row], try isShown(list.arm) else { continue }
+			for (key, item) in try rows(of: row) where values["\(cell.id)@\(key)"] == nil {
+				values["\(cell.id)@\(key)"] = try evaluate(first, in: NativeScope(items: [row: item], keys: [row: key]))
+			}
+		}
 	}
 
 	/// The current value of a cell.
@@ -753,6 +768,7 @@ public final class NativeRuntime {
 		let keyed = { (list: [(node: String, name: String, value: String?)]) in
 			Dictionary(list.map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { $1 })
 		}
+		try seedRows()
 		let cellsBefore = values
 		let beforeTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let beforeAttributes = keyed(try boundAttributes())
@@ -778,6 +794,7 @@ public final class NativeRuntime {
 			guard let at = slot.firstIndex(of: "@"), let list = rowOfCell[String(slot[..<at])] else { continue }
 			if !kept.contains("\(list)\u{0}\(slot[slot.index(after: at)...])") { values.removeValue(forKey: slot) }
 		}
+		try seedRows()
 		try forgetHidden()
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let afterAttributes = keyed(try boundAttributes())

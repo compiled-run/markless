@@ -521,6 +521,58 @@ export function Page() @{
 		]);
 	});
 
+	it("seeds a row part's state from the row's item, and reads a handle bound in rows only to find the tapped row", async () => {
+		const source = (find: string) => `import { element, shared, state } from '@markless/core';
+const listState = shared(() => {
+	const list = state({ picked: '' });
+	const rowEls = element<HTMLElement[]>();
+	return { ...list, rowEls };
+}, { scope: 'subtree' });
+const rowState = shared(() => {
+	const row = state({ value: '' });
+	return { ...row };
+}, { scope: 'subtree' });
+function holder(rows: HTMLElement[] | undefined, target: Node | null): HTMLElement | null {
+${find}
+}
+function Row({ value }: { readonly value: string }) @{
+	const list = listState();
+	const row = rowState();
+	row.value = value;
+	<li el={list.rowEls} ui-value={row.value}>{row.value}</li>
+}
+export function Page() @{
+	const list = listState();
+	const items = state([{ id: 'a' }, { id: 'b' }]);
+	<main>
+		<ul onClick={(event) => {
+			const found = holder(list.rowEls, event.target as Node);
+			if (found !== null) list.picked = found.getAttribute('ui-value') ?? '';
+		}}>
+			@for (const item of items; key item.id) {
+				<Row value={item.id} />
+			}
+		</ul>
+		<p>{list.picked}</p>
+	</main>
+}`;
+		const found = await nativeView(
+			source(`	for (const row of rows ?? []) if (row.contains(target)) return row;
+	return null;`),
+		);
+		expect(found.diagnostics.filter((d) => d.code === NATIVE_UNSUPPORTED_CODE)).toEqual([]);
+		expect(found.payload?.cells.find((cell) => cell.name === 'row.value')).toMatchObject({
+			initial: '',
+			row: 'repeat:0',
+			first: { member: { item: 'repeat:0' }, property: 'id' },
+		});
+		const counted = await nativeView(
+			source(`	return rows && rows.length > 1 ? rows[1]! : null;`),
+		);
+		expect(counted.payload).toBeNull();
+		expect(counted.diagnostics.map((d) => d.message).join('\n')).toContain('a @for');
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{

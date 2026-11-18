@@ -1,0 +1,301 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "RowSeed",
+		"cells": [
+			{
+				"id": "state:items",
+				"name": "items",
+				"initial": [
+					{
+						"id": "a",
+						"name": "Apple"
+					},
+					{
+						"id": "b",
+						"name": "Berry"
+					}
+				]
+			},
+			{
+				"id": "component-edge:0/shared:src/row-seed.tsrx#tagState/state:tag.label",
+				"name": "tag.label",
+				"initial": "",
+				"row": "repeat:0",
+				"first": {
+					"member": {
+						"item": "repeat:0"
+					},
+					"property": "name"
+				}
+			},
+			{
+				"id": "component-edge:0/shared:src/row-seed.tsrx#tagState/state:tag.taps",
+				"name": "tag.taps",
+				"initial": 0,
+				"row": "repeat:0"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "repeat",
+				"id": "repeat:0",
+				"parent": "h1",
+				"list": {
+					"cell": "state:items"
+				},
+				"key": ["id"]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "button",
+				"parent": "h1",
+				"row": "repeat:0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h0:text0",
+				"parent": "component-edge:0/h0",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"",
+								{
+									"cell": "component-edge:0/shared:src/row-seed.tsrx#tagState/state:tag.label"
+								},
+								" ",
+								{
+									"cell": "component-edge:0/shared:src/row-seed.tsrx#tagState/state:tag.taps"
+								},
+								""
+							]
+						}
+					}
+				],
+				"row": "repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Add"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Drop"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:0/h0",
+				"event": "activate",
+				"handler": "handler:component-edge:0/event:0"
+			},
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:0/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:0/shared:src/row-seed.tsrx#tagState/state:tag.taps",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "component-edge:0/shared:src/row-seed.tsrx#tagState/state:tag.taps"
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:items",
+						"value": {
+							"array": [
+								{
+									"spread": true,
+									"value": {
+										"cell": "state:items"
+									}
+								},
+								{
+									"spread": false,
+									"value": {
+										"object": [
+											[
+												"id",
+												{
+													"literal": "c"
+												}
+											],
+											[
+												"name",
+												{
+													"literal": "Cherry"
+												}
+											]
+										]
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:items",
+						"value": {
+							"method": "filter",
+							"target": {
+								"cell": "state:items"
+							},
+							"arguments": [
+								{
+									"lambda": ["one"],
+									"body": {
+										"binary": "!==",
+										"left": {
+											"member": {
+												"local": "one"
+											},
+											"property": "id"
+										},
+										"right": {
+											"literal": "a"
+										}
+									}
+								}
+							]
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		["component-edge:0/h0:text0@a", "Apple 0"],
+		["component-edge:0/h0:text0@b", "Berry 0"],
+		["h2:text0", "Add"],
+		["h3:text0", "Drop"]
+	],
+	"initialRows": [["repeat:0", ["a", "b"]]],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h0@a"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0@a",
+					"value": "Apple 1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "rows",
+					"node": "repeat:0",
+					"keys": ["a", "b", "c"]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h0@c"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0@c",
+					"value": "Cherry 1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "rows",
+					"node": "repeat:0",
+					"keys": ["b", "c"]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h0@b"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0@b",
+					"value": "Berry 1"
+				}
+			]
+		}
+	]
+}

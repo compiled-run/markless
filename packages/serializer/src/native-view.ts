@@ -511,6 +511,11 @@ export type NativeViewPayload = {
 		 */
 		readonly row?: string;
 		/**
+		 * On a row's state: its first value as an expression of the row's item, taken once when the row is built (a family part
+		 * in a row seeds its state from a prop the row passes); `initial` is then never read.
+		 */
+		readonly first?: NativeExpr;
+		/**
 		 * The clock when the screen opened, in milliseconds since 1970 (UTC): the host writes it at mount, before the first
 		 * build, as a page's render reads the clock when it is served; `initial` is never shown.
 		 */
