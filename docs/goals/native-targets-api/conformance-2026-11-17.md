@@ -300,7 +300,7 @@ content and scroll containers; the scroll branch's measuring (it skips hidden ch
 #822's per-document `Layout` (the page, and each sheet at each resting height), and the page canvas, scroll containers, the
 page scroll range and hidden inputs now read the page's `Layout`. iOS restyles through `place` (which keeps scroll
 containers right), not only `paint`. A tap on the page dismisses the keyboard; a drag scrolls (#821's rule, over #822's
-tap-and-drag). Dragon: my Dragon worktree also merges dragoncss#594 (#822's Dragon side: boxless markup ancestors and a
+tap-and-drag). Dragon: my Dragon branch (`compiled-run/dragoncss` `cw/native-integration`, pushed, no pull request) also merges dragoncss#594 (#822's Dragon side: boxless markup ancestors and a
 per-target viewport on the style input), ported onto #590's reversible id encoding, which round one kept over the
 `dragonElementIds` renaming; the export Markless uses keeps the light and dark bands. The Z3 and Z5 host-test fixtures are
 rebuilt from the harness's own build of those rungs with this Dragon (it adds the page canvas, which their committed copies
