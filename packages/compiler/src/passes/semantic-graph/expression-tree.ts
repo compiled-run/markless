@@ -8,6 +8,7 @@ import type {
 	SemanticHandlerStatement,
 	SemanticModuleFunction,
 } from '../../artifacts.ts';
+import { scriptFunctionOf, scriptModuleOf } from './script-facts.ts';
 
 const UNARY = new Set(['!', '-', '+', 'typeof']);
 const BINARY = new Set(['+', '-', '*', '/', '%', '===', '!==', '<', '<=', '>', '>=']);
@@ -699,4 +700,6 @@ export const NATIVE_FACT_COLLECTORS: NativeFactCollectors = {
 	parameterNames: parameterNamesOf as NativeFactCollectors['parameterNames'],
 	handlerStatements: handlerStatementsOf as NativeFactCollectors['handlerStatements'],
 	component: componentNativeFactsOf as unknown as NativeFactCollectors['component'],
+	scriptFunction: scriptFunctionOf as unknown as NativeFactCollectors['scriptFunction'],
+	scriptModule: scriptModuleOf as unknown as NativeFactCollectors['scriptModule'],
 };

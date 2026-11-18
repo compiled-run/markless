@@ -151,6 +151,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	}
 	if (state.nativeFacts)
 		graph.moduleFunctions = state.nativeFacts.moduleFunctions(statements as never, state.helperFunctions as never);
+	if (state.nativeFacts) graph.scriptModule = state.nativeFacts.scriptModule(state.semantic() as never, input.filename);
 	graph.moduleGraphInterface = collectModuleGraphInterface({ statements, state });
 
 	for (const statement of statements) {

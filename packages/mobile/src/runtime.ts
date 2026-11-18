@@ -1,7 +1,9 @@
 import type {
 	NativeBuiltin,
 	NativeExpr,
+	NativeFetchResponse,
 	NativeJournalEntry,
+	NativeScriptBindings,
 	NativeNode,
 	NativeOp,
 	NativeTextPart,
@@ -9,6 +11,7 @@ import type {
 	NativeViewPayload,
 } from '@markless/serializer';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
+import type { NativeScriptEngine } from './script-engine.ts';
 
 /** A host-side action: what a person does to a retained view. */
 export type NativeAction =
@@ -35,7 +38,14 @@ export type NativeAction =
 	/** The platform closed a system sheet (swipe, back, a tap on the dimmed page); it is already closed when this runs. */
 	| { readonly event: 'dismiss'; readonly host: string }
 	/** The host's back gesture (or Escape) on an open `<dialog>`: it closes, as the browser's cancel does. */
-	| { readonly event: 'cancel'; readonly host: string };
+	| { readonly event: 'cancel'; readonly host: string }
+	/** A timer the script set (journal entry `timer`) is due. */
+	| { readonly event: 'timer'; readonly id: number }
+	/** The host's answer to a `fetch` entry. */
+	| { readonly event: 'response'; readonly id: number; readonly response: NativeFetchResponse };
+
+/** Runs a script function a `{ script }` expression names, with its bindings resolved where it is read. */
+type Compute = (fn: string, bindings: NativeScriptBindings, scope: NativeScope) => Value;
 
 type Value = NativeValue;
 
@@ -74,6 +84,17 @@ export type NativeRuntime = {
 	readonly title: () => string | null;
 	/** The calls a host starts at mount, one per task cell, each settling its cell. */
 	readonly tasks: () => ReadonlyArray<Extract<NativeJournalEntry, { op: 'call' }>>;
+	/** How many times this runtime started a script engine: 0 for a page whose handlers all ran as data. */
+	readonly engineStarts: () => number;
+	/** What the script wrote to `console`, in order, as `[level, text]`. */
+	readonly logs: () => ReadonlyArray<readonly [level: string, text: string]>;
+};
+
+/** How the runtime gets a script engine and the bytes `crypto` draws from; a host owns both. */
+export type NativeScriptHost = {
+	readonly start: () => NativeScriptEngine;
+	/** 32 random bytes as hex for one engine entry; only asked for when the script uses `crypto`. */
+	readonly seed?: () => string;
 };
 
 /** How a value reads in text, as the web writes it (`marklessCsrText`): null is empty, anything else `String(value)`. */
@@ -96,8 +117,13 @@ export function evaluateNativeExpr(
 	read: (cell: string, scope: NativeScope) => Value,
 	eventValue?: string,
 	scope: NativeScope = EMPTY_SCOPE,
+	compute?: Compute,
 ): Value {
-	const evaluate = (e: NativeExpr): Value => evaluateNativeExpr(e, read, eventValue, scope);
+	const evaluate = (e: NativeExpr): Value => evaluateNativeExpr(e, read, eventValue, scope, compute);
+	if ('script' in expr) {
+		if (!compute) throw new Error(`the script computed ${expr.script} read with no script engine`);
+		return compute(expr.script, expr.bindings, scope);
+	}
 	if ('route' in expr) {
 		if (!scope.params) throw new Error('route params read on a component that is not a page');
 		return { ...scope.params };
@@ -136,7 +162,7 @@ export function evaluateNativeExpr(
 									(name, i) => [name, values[i] ?? null] as const,
 								),
 							]),
-						})
+						}, compute)
 				: evaluate(argument),
 		);
 		const method = (target as unknown as Record<string, unknown> | null)?.[expr.method];
@@ -229,6 +255,8 @@ export function createNativeRuntime(
 	store: Map<string, Value> = new Map(),
 	/** The route params the page opened with. */
 	params: Readonly<Record<string, string>> = {},
+	/** Where a page with JavaScript handlers gets its engine; started on first use, never for a page without a script. */
+	scriptHost?: NativeScriptHost,
 ): NativeRuntime {
 	const base: NativeScope = { ...EMPTY_SCOPE, params };
 	const values = new Map<string, Value>(
@@ -285,8 +313,67 @@ export function createNativeRuntime(
 		const slot = slotOf(cell, scope);
 		return values.has(slot) ? values.get(slot)! : values.get(cell)!;
 	};
+	/** The script engine: none until a script op or script computed first needs it. */
+	let engine: NativeScriptEngine | undefined;
+	let engineStarts = 0;
+	const logs: (readonly [string, string])[] = [];
+	const script = payload.script;
+	const call = (method: 'enter' | 'leave', argument?: unknown): string => {
+		if (!script) throw new Error('a script op in a payload with no script');
+		if (!engine) {
+			if (!scriptHost) throw new Error('a script op with no script engine to run it');
+			engine = scriptHost.start();
+			engineStarts++;
+			engine.evaluate(script.source);
+		}
+		const target = `globalThis.__markless[${JSON.stringify(script.id)}].${method}`;
+		return engine.evaluate(argument === undefined ? `${target}()` : `${target}(${JSON.stringify(JSON.stringify(argument))})`);
+	};
+	/** The names a script function reads, as its engine entry spells them: slots of this scope's cells, and values. */
+	const frameOf = (bindings: NativeScriptBindings, eventValue: string | undefined, scope: NativeScope) =>
+		Object.fromEntries(
+			Object.entries(bindings).map(([name, binding]) => [
+				name,
+				'cell' in binding
+					? { slot: slotOf(binding.cell, scope) }
+					: 'fields' in binding
+						? { fields: Object.fromEntries(Object.entries(binding.fields).map(([field, cell]) => [field, slotOf(cell, scope)])) }
+						: { value: evaluate(binding.value, eventValue, scope) },
+			]),
+		);
+	const entryCells = () => ({
+		cells: Object.fromEntries(values),
+		...(script?.services.includes('crypto') && scriptHost?.seed ? { seed: scriptHost.seed() } : {}),
+	});
+	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
+	const enter = (entry: Record<string, unknown>): NativeJournalEntry[] => {
+		call('enter', { ...entry, ...entryCells() });
+		const result = JSON.parse(call('leave')) as {
+			readonly writes: ReadonlyArray<readonly [string, Value]>;
+			readonly timers: ReadonlyArray<readonly [number, number]>;
+			readonly clears: ReadonlyArray<number>;
+			readonly requests: ReadonlyArray<{ readonly id: number; readonly request: Extract<NativeJournalEntry, { op: 'fetch' }>['request'] }>;
+			readonly logs: ReadonlyArray<readonly [string, string]>;
+		};
+		for (const [slot, value] of result.writes) {
+			const at = slot.indexOf('@');
+			const cell = at < 0 ? slot : slot.slice(0, at);
+			if (!values.has(cell)) throw new Error(`the script wrote unknown cell ${cell}`);
+			values.set(slot, value);
+			const key = storageKeys.get(cell);
+			if (key !== undefined) store.set(key, value);
+		}
+		logs.push(...result.logs);
+		return [
+			...result.clears.map((id): NativeJournalEntry => ({ op: 'clearTimer', id })),
+			...result.timers.map(([id, ms]): NativeJournalEntry => ({ op: 'timer', id, ms })),
+			...result.requests.map(({ id, request }): NativeJournalEntry => ({ op: 'fetch', id, request })),
+		];
+	};
+	const compute: Compute = (fn, bindings, scope) =>
+		JSON.parse(call('enter', { kind: 'compute', fn, frame: frameOf(bindings, undefined, scope), ...entryCells() })) as Value;
 	const evaluate = (expr: NativeExpr, eventValue?: string, scope?: NativeScope): Value =>
-		evaluateNativeExpr(expr, read, eventValue, scope ?? base);
+		evaluateNativeExpr(expr, read, eventValue, scope ?? base, compute);
 	const armOf = (branch: Extract<NativeNode, { kind: 'branch' }>): number | null => {
 		if (branch.test) return evaluate(branch.test) ? 0 : branch.arms > 1 ? 1 : null;
 		const tests = branch.tests ?? [];
@@ -414,7 +501,13 @@ export function createNativeRuntime(
 		rows,
 		title,
 		sheets,
+		engineStarts: () => engineStarts,
+		logs: () => logs,
 		dispatch(action) {
+			if (action.event === 'timer')
+				return change(undefined, undefined, () => enter({ kind: 'timer', timer: action.id }));
+			if (action.event === 'response')
+				return change(undefined, undefined, () => enter({ kind: 'response', request: action.id, response: action.response }));
 			if (action.event === 'resume') {
 				const continuation = continuations.get(action.continuation);
 				if (!continuation) throw new Error(`no continuation ${action.continuation}`);
@@ -543,6 +636,18 @@ export function createNativeRuntime(
 				);
 				if (taken[0]?.op === 'navigate') return taken;
 				calls.push(...taken);
+				continue;
+			}
+			if (op.op === 'script') {
+				calls.push(
+					...enter({
+						kind: 'dispatch',
+						fn: op.fn,
+						frame: frameOf(op.bindings, eventValue, scope),
+						event: eventValue === undefined ? { type: 'click' } : { type: 'input', value: eventValue },
+						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),
+					}),
+				);
 				continue;
 			}
 			if (op.op === 'call') {

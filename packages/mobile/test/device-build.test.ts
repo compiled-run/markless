@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { compileNativeComponent } from '../src/index.ts';
 import { DEVICE_USAGE_MISSING_CODE } from '../src/permissions.ts';
 
-const build = (source: string, usage?: Record<string, string>) =>
+const build = (source: string, usage?: Record<string, string>, scriptHandlers?: 'never') =>
 	compileNativeComponent({
 		filename: 'src/App.tsrx',
 		source,
 		...(usage ? { device: { usage } } : {}),
+		...(scriptHandlers ? { scriptHandlers } : {}),
 	});
 
 const locationApp = readFileSync(
@@ -92,7 +93,7 @@ export default function App() @{
 }
 `;
 	const refusal = async (body: string) =>
-		(await build(handler(body), { location: 'x' })).diagnostics.map((d) => d.message);
+		(await build(handler(body), { location: 'x' }, 'never')).diagnostics.map((d) => d.message);
 
 	it('lowers a device call statement to a call op', async () => {
 		const result = await build(handler('() => { n++; haptics.tap(); }'));
@@ -103,9 +104,29 @@ export default function App() @{
 		});
 	});
 
-	it('still refuses a call to author code by name', async () => {
+	it('still refuses a call to author code by name when handlers are data only', async () => {
 		expect(await refusal('() => save()')).toEqual([
 			'the click handler uses a call to `save`, which needs a script engine',
+		]);
+	});
+
+	it('runs a call to author code as JavaScript by default', async () => {
+		const result = await build(handler('() => save()'));
+		expect(result.diagnostics).toEqual([]);
+		expect(result.payload?.handlers[0]?.ops).toEqual([{ op: 'script', fn: 'fn:0', bindings: {} }]);
+		expect(result.payload?.script?.services).toEqual([]);
+	});
+
+	it('refuses a device call inside JavaScript by name, file and position', async () => {
+		const source = handler('() => (n = location.current())');
+		const result = await build(source, { location: 'x' });
+		const start = source.indexOf('location.current');
+		expect(result.diagnostics.map((d) => [d.code, d.message, d.primarySpan])).toEqual([
+			[
+				'MARKLESS_NATIVE_SCRIPT',
+				'the click handler calls `location` from @markless/device inside JavaScript that runs on the phone, which it cannot reach there yet',
+				{ filename: 'src/App.tsrx', start, end: start + 'location'.length },
+			],
 		]);
 	});
 

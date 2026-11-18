@@ -3,13 +3,17 @@ import {
 	createNativeViewPayload,
 	NATIVE_FACT_COLLECTORS,
 	NATIVE_UNSUPPORTED_CODE,
+	type NativeViewOptions,
 } from '../src/native.ts';
 import { buildSemanticGraph } from '../src/passes/semantic-graph/index.ts';
 
-const nativeView = async (source: string) =>
+const nativeView = async (source: string, options: NativeViewOptions = {}) =>
 	createNativeViewPayload(
 		await buildSemanticGraph({ filename: 'src/App.tsrx', source, nativeFacts: NATIVE_FACT_COLLECTORS }),
+		options,
 	);
+/** The data vocabulary alone, as before handlers could fall back to JavaScript. */
+const dataOnly: NativeViewOptions = { scriptHandlers: 'never' };
 
 describe('native view payload', () => {
 	it('lowers a counter to nodes, a semantic event and an assignment', async () => {
@@ -189,12 +193,12 @@ export function Panel() @{
 		]);
 	});
 
-	it('refuses a value that calls author code, naming the call', async () => {
+	it('refuses a value that calls author code, naming the call when handlers are data only', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Sum() @{
 	let total = state(1);
 	<button onClick={() => (total = double(total))}>Total {total}</button>
-}`);
+}`, dataOnly);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
 			'the click handler uses a call to `double`, which needs a script engine',
@@ -226,12 +230,12 @@ export function Field() @{
 		]);
 	});
 
-	it('refuses a handler that does more than write state', async () => {
+	it('refuses a handler that does more than write state when handlers are data only', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Logger() @{
 	let count = state(0);
 	<button onClick={() => { count++; console.log(count); }}>Count {count}</button>
-}`);
+}`, dataOnly);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => [d.code, d.message])).toEqual([
 			[
@@ -350,12 +354,12 @@ export function List() @{
 		});
 	});
 
-	it('refuses reversing a state array in place', async () => {
+	it('refuses reversing a state array in place when handlers are data only', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function List() @{
 	let items = state([1, 2]);
 	<button onClick={() => (items = items.reverse())}>Flip {items.length}</button>
-}`);
+}`, dataOnly);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
 			'the click handler reverses an array in place; reverse a copy (`[...list].reverse()`)',
@@ -612,7 +616,7 @@ export function Sizes() @{
 		});
 	});
 
-	it('names what a handler const or a computed body uses that has no native lowering', async () => {
+	it('names what a handler const or a computed body uses that has no native lowering when handlers are data only', async () => {
 		const { payload, diagnostics } =
 			await nativeView(`import { computed, state } from '@markless/core';
 export function Odd() @{
@@ -622,7 +626,7 @@ export function Odd() @{
 		return 'x';
 	});
 	<button onClick={() => { { const inner = 1; count = inner; } let moving = count; }}>{label}</button>
-}`);
+}`, dataOnly);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
 			'the computed `label` uses a ForOfStatement, which needs a script engine',

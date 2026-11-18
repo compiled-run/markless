@@ -5,6 +5,8 @@ export { DEVICE_TARGET_FACTS } from './passes/semantic-graph/device-target.ts';
 export {
 	createNativeViewPayload,
 	nativeUnsupported,
+	nativeScriptRefusal,
+	NATIVE_SCRIPT_CODE,
 	NATIVE_UNSUPPORTED_CODE,
 	type NativeViewArtifact,
 	type NativeViewOptions,

@@ -29,6 +29,8 @@ import {
 // The native column before any device: each rung's payload, run by the reference runtime, must show what the
 // web build shows; a rung the compiler cannot lower yet must be refused by name, never emitted half right.
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
+/** What a handler running as JavaScript uses that no phone script has. */
+const NATIVE_SCRIPT = 'MARKLESS_NATIVE_SCRIPT';
 const NATIVE_KEYBOARD_ONLY = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
 const REFUSED_RUNGS = new Set(['11-async', 'y4-sheet-beside-drawer']);
@@ -744,7 +746,7 @@ test.each(
 			).toEqual(
 				build.diagnostics.map((diagnostic) =>
 					diagnostic.severity === 'error'
-						? ['error', NATIVE_UNSUPPORTED]
+						? ['error', diagnostic.code === NATIVE_SCRIPT ? NATIVE_SCRIPT : NATIVE_UNSUPPORTED]
 						: ['warning', NATIVE_KEYBOARD_ONLY],
 				),
 			);

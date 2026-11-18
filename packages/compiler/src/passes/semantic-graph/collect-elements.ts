@@ -2418,9 +2418,10 @@ function expressionField(
 function handlerStatementsField(
 	node: AnyNode | undefined,
 	state: WalkState,
-): Pick<SemanticEvent, 'handlerStatements'> {
+): Pick<SemanticEvent, 'handlerStatements' | 'handlerScript'> {
 	const handlerStatements = node && state.nativeFacts?.handlerStatements(node as never);
-	return handlerStatements ? { handlerStatements } : {};
+	const handlerScript = node && state.nativeFacts?.scriptFunction(node as never, state.semantic() as never, state.filename);
+	return { ...(handlerStatements ? { handlerStatements } : {}), ...(handlerScript ? { handlerScript } : {}) };
 }
 
 function handlerParameterNames(node: AnyNode): string[] {

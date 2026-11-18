@@ -79,6 +79,8 @@ export async function compileNativeComponent(input: {
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
 	readonly target?: 'ios' | 'android';
+	/** Where handlers run (`NativeViewOptions['scriptHandlers']`); the default runs each as data where it lowers. */
+	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
 }): Promise<NativeBuild> {
 	const manifest =
 		input.manifest ?? (input.page ? buildRouteManifestFromFileIds([input.page]) : undefined);
@@ -166,6 +168,7 @@ export async function compileNativeComponent(input: {
 					}
 				: {}),
 			modules: { graphs, resolve },
+			...(input.scriptHandlers ? { scriptHandlers: input.scriptHandlers } : {}),
 			...(input.manifest
 				? {
 						routes: input.manifest.routes.map((entry) => ({

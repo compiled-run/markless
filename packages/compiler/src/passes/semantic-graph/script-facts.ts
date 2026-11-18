@@ -1,0 +1,407 @@
+import { BindingFlags, generate } from '@tsrx/yuku';
+import type { AnyNode } from '../../ast/nodes.ts';
+import type {
+	SemanticScriptExport,
+	SemanticScriptFunction,
+	SemanticScriptGlobal,
+	SemanticScriptModule,
+	SemanticScriptStatement,
+	SourceSpan,
+} from '../../artifacts.ts';
+import type { ModuleSemantics } from './shared-ast.ts';
+
+// Script facts read yuku's scope analysis only: what each name resolves to decides how the emitted JavaScript reaches it.
+
+type Binding = ModuleSemantics['bindings'][number];
+type Reference = ModuleSemantics['references'][number];
+
+const PRINT = { strip: true, format: 'pretty', indent: 1, comments: false } as const;
+const FRAMEWORK_PREFIX = '@markless/';
+const GLOBAL_OBJECTS = new Set(['window', 'globalThis', 'self']);
+
+const isNode = (value: unknown): value is AnyNode =>
+	value !== null && typeof value === 'object' && typeof (value as { type?: unknown }).type === 'string';
+
+const spanOf = (node: { start: number; end: number }, filename: string): SourceSpan => ({
+	filename,
+	start: node.start,
+	end: node.end,
+});
+
+const within = (node: { start: number; end: number }, outer: { start: number; end: number }) =>
+	node.start >= outer.start && node.end <= outer.end;
+
+const identifier = (name: string): AnyNode => ({ type: 'Identifier', name }) as AnyNode;
+const member = (object: AnyNode, property: string | number): AnyNode =>
+	({
+		type: 'MemberExpression',
+		object,
+		property: { type: 'Literal', value: property, raw: JSON.stringify(property) },
+		computed: true,
+		optional: false,
+	}) as unknown as AnyNode;
+const stateName = (name: string): AnyNode =>
+	({ type: 'MemberExpression', object: identifier('__s'), property: identifier(name), computed: false, optional: false }) as unknown as AnyNode;
+
+/** A copy of `node` with each node `replace` answers swapped for its answer. */
+function cloneWith(node: AnyNode, replace: (node: AnyNode) => AnyNode | undefined): AnyNode {
+	const swapped = replace(node);
+	if (swapped) return swapped;
+	const copy: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(node)) {
+		if (Array.isArray(value)) copy[key] = value.map((item) => (isNode(item) ? cloneWith(item, replace) : item));
+		else copy[key] = isNode(value) ? cloneWith(value, replace) : value;
+	}
+	// `{ count }` reads `count`; once `count` is spelled `__s.count`, the property says so.
+	if (copy.type === 'Property' && copy.shorthand === true && copy.value !== node.value) copy.shorthand = false;
+	return copy as AnyNode;
+}
+
+/** The node of the module's own analysis at the same place as a node of another parse of the same source. */
+function semanticNodeOf(semantic: ModuleSemantics, node: AnyNode): AnyNode | undefined {
+	const start = node.start as number;
+	const at = semantic.nodeAt(start);
+	if (!at) return undefined;
+	for (const candidate of semantic.ancestors(at) as Iterable<AnyNode>)
+		if (candidate.start === start && candidate.end === node.end && candidate.type === node.type) return candidate;
+	return undefined;
+}
+
+/** The import record a binding comes from, when it is a value import. */
+function importOf(semantic: ModuleSemantics, binding: Binding) {
+	if (!binding.has(BindingFlags.Import) || binding.has(BindingFlags.TypeImport)) return undefined;
+	return semantic.imports.find((entry) => entry.local?.id === binding.id);
+}
+
+/** The declarator, function or class that declares a binding, through destructuring patterns. */
+function declaringNode(semantic: ModuleSemantics, binding: Binding): AnyNode | undefined {
+	const name = binding.declarations[0] as AnyNode | undefined;
+	if (!name) return undefined;
+	for (let at = semantic.parentOf(name as never) as AnyNode | null; at; at = semantic.parentOf(at as never) as AnyNode | null) {
+		if (
+			at.type === 'VariableDeclarator' ||
+			at.type === 'FunctionDeclaration' ||
+			at.type === 'ClassDeclaration' ||
+			at.type === 'ImportDeclaration'
+		)
+			return at;
+		if (at.type !== 'ObjectPattern' && at.type !== 'ArrayPattern' && at.type !== 'Property' && at.type !== 'AssignmentPattern' && at.type !== 'RestElement')
+			return undefined;
+	}
+	return undefined;
+}
+
+/** Whether a declarator's value is a call to a framework API (`state(0)`, `computed(...)`, `element()`). */
+function isFrameworkCall(semantic: ModuleSemantics, init: AnyNode | null | undefined): boolean {
+	if (init?.type !== 'CallExpression') return false;
+	let callee = init.callee as AnyNode | undefined;
+	while (callee?.type === 'MemberExpression') callee = callee.object as AnyNode;
+	if (callee?.type !== 'Identifier') return false;
+	const binding = semantic.referenceOf(callee as never)?.binding;
+	const entry = binding && importOf(semantic, binding);
+	return !!entry && entry.specifier.startsWith(FRAMEWORK_PREFIX);
+}
+
+/** A component in TSRX: a function whose body is a template (`function App() @{ ... }`). */
+const isComponent = (node: AnyNode | undefined): boolean =>
+	node?.type === 'FunctionDeclaration' && (node.body as AnyNode | undefined)?.type === 'JSXCodeBlock';
+
+/** How the emitted code reaches each import binding: `__i[n].name`, or `__i[n]` for a namespace. */
+function importSlots(semantic: ModuleSemantics) {
+	const specifiers: string[] = [];
+	const spans = new Map<string, AnyNode>();
+	const slot = (specifier: string, node: AnyNode): number => {
+		let index = specifiers.indexOf(specifier);
+		if (index < 0) {
+			index = specifiers.push(specifier) - 1;
+			spans.set(specifier, node);
+		}
+		return index;
+	};
+	const byBinding = new Map<number, { readonly index: number; readonly name: string | null; readonly specifier: string }>();
+	for (const entry of semantic.imports) {
+		if (entry.typeOnly || !entry.local || entry.specifier.startsWith(FRAMEWORK_PREFIX)) continue;
+		if (entry.kind !== 'named' && entry.kind !== 'namespace') continue;
+		byBinding.set(entry.local.id, {
+			index: slot(entry.specifier, entry.node as AnyNode),
+			name: entry.kind === 'namespace' ? null : (entry.name ?? 'default'),
+			specifier: entry.specifier,
+		});
+	}
+	for (const entry of semantic.exports)
+		if (!entry.typeOnly && entry.specifier && !entry.specifier.startsWith(FRAMEWORK_PREFIX)) slot(entry.specifier, entry.node as AnyNode);
+	const record = (binding: Binding) => byBinding.get(binding.id);
+	const reach = (binding: Binding): AnyNode | undefined => {
+		const found = byBinding.get(binding.id);
+		if (!found) return undefined;
+		const module = member(identifier('__i'), found.index);
+		return found.name === null ? module : member(module, found.name);
+	};
+	return { specifiers, spans, reach, slot, record };
+}
+
+function globalOf(semantic: ModuleSemantics, reference: Reference, filename: string): SemanticScriptGlobal {
+	const node = reference.node as unknown as AnyNode;
+	const parent = semantic.parentOf(node as never) as AnyNode | null;
+	const typeofOnly = parent?.type === 'UnaryExpression' && parent.operator === 'typeof';
+	const property =
+		GLOBAL_OBJECTS.has(reference.name) &&
+		parent?.type === 'MemberExpression' &&
+		parent.object === node &&
+		!parent.computed &&
+		typeof (parent.property as AnyNode | undefined)?.name === 'string'
+			? String((parent.property as AnyNode).name)
+			: undefined;
+	return { name: reference.name, span: spanOf(node as never, filename), typeofOnly, ...(property ? { property } : {}) };
+}
+
+/** Constructs type erasure cannot keep (`enum`, `namespace`), and markup, which no script runs. */
+function unsupportedIn(node: AnyNode, filename: string, into: { construct: string; span: SourceSpan }[]): void {
+	if (String(node.type).startsWith('JSX')) {
+		into.push({ construct: 'markup', span: spanOf(node as never, filename) });
+		return;
+	}
+	if (node.type === 'TSEnumDeclaration' || node.type === 'TSModuleDeclaration')
+		into.push({ construct: node.type === 'TSEnumDeclaration' ? 'an `enum`' : 'a `namespace`', span: spanOf(node as never, filename) });
+	for (const value of Object.values(node)) {
+		if (Array.isArray(value)) for (const item of value) if (isNode(item)) unsupportedIn(item, filename, into);
+		if (isNode(value)) unsupportedIn(value, filename, into);
+	}
+}
+
+/**
+ * A handler's or computed's JavaScript: the function itself, the component-local declarations it uses (helpers, consts)
+ * before it, names of the component's state, props and rows read through `__s`, imports through `__i`.
+ */
+export function scriptFunctionOf(
+	graphNode: AnyNode,
+	semantic: ModuleSemantics,
+	filename: string,
+): SemanticScriptFunction | undefined {
+	const root = semanticNodeOf(semantic, graphNode);
+	if (!root) return undefined;
+	const rootScope = semantic.rootScope;
+	const imports = importSlots(semantic);
+	const parts: AnyNode[] = [root];
+	const inlined = new Set<AnyNode>();
+	const viaState = new Map<number, Binding>();
+	const names = new Map<string, { name: string; written: boolean; span: SourceSpan }>();
+	const framework: { name: string; source: string; span: SourceSpan }[] = [];
+	const globals: SemanticScriptGlobal[] = [];
+	const replaced = new Map<AnyNode, AnyNode>();
+	const unsupported: { construct: string; span: SourceSpan }[] = [];
+	const moduleNames = new Set<string>();
+	const usedImports = new Map<string, { slot: number; name: string | null }>();
+	for (let index = 0; index < parts.length; index++) {
+		const part = parts[index]!;
+		for (const reference of semantic.references) {
+			const node = reference.node as unknown as AnyNode;
+			if (reference.inTypePosition || !within(node as never, part as never)) continue;
+			const binding = reference.binding;
+			if (!binding) {
+				globals.push(globalOf(semantic, reference, filename));
+				continue;
+			}
+			const declared = binding.declarations[0] as unknown as AnyNode | undefined;
+			if (declared && parts.some((other) => within(declared as never, other as never))) continue;
+			const entry = importOf(semantic, binding);
+			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
+				framework.push({ name: reference.name, source: entry.specifier, span: spanOf(node as never, filename) });
+				continue;
+			}
+			const imported = imports.reach(binding);
+			if (imported) {
+				replaced.set(node, imported);
+				const slot = imports.record(binding)!;
+				usedImports.set(`${slot.index}\0${slot.name}`, { slot: slot.index, name: slot.name });
+				continue;
+			}
+			const declaring = declaringNode(semantic, binding);
+			const moduleLevel = binding.scope.id === rootScope.id;
+			if (moduleLevel && !isComponent(declaring) && !(declaring?.type === 'VariableDeclarator' && isFrameworkCall(semantic, declaring.init as AnyNode))) {
+				moduleNames.add(binding.name);
+				continue;
+			}
+			const inline =
+				!binding.has(BindingFlags.Parameter) &&
+				!binding.has(BindingFlags.CatchVariable) &&
+				!isComponent(declaring) &&
+				(declaring?.type === 'FunctionDeclaration' ||
+					declaring?.type === 'ClassDeclaration' ||
+					(declaring?.type === 'VariableDeclarator' && !!declaring.init && !isFrameworkCall(semantic, declaring.init as AnyNode)));
+			if (inline && declaring) {
+				if (!inlined.has(declaring)) {
+					inlined.add(declaring);
+					parts.push(declaring);
+				}
+				continue;
+			}
+			viaState.set(binding.id, binding);
+			replaced.set(node, stateName(binding.name));
+			const known = names.get(binding.name);
+			names.set(binding.name, {
+				name: binding.name,
+				written: (known?.written ?? false) || reference.isWrite,
+				span: known?.span ?? spanOf(node as never, filename),
+			});
+		}
+	}
+	const eventReads: { path: string[]; span: SourceSpan }[] = [];
+	const [parameter] = (root.params as AnyNode[] | undefined) ?? [];
+	const eventBinding = parameter?.type === 'Identifier' ? semantic.bindingOf(parameter as never) : null;
+	for (const reference of eventBinding?.references ?? []) {
+		let at = reference.node as unknown as AnyNode;
+		const path: string[] = [];
+		for (;;) {
+			const parent = semantic.parentOf(at as never) as AnyNode | null;
+			const property = parent?.property as AnyNode | undefined;
+			if (parent?.type !== 'MemberExpression' || parent.object !== at || parent.computed || typeof property?.name !== 'string') break;
+			path.push(property.name);
+			at = parent;
+		}
+		eventReads.push({ path, span: spanOf(at as never, filename) });
+	}
+	const print = (node: AnyNode): string => {
+		unsupportedIn(node, filename, unsupported);
+		return generate(cloneWith(node, (candidate) => replaced.get(candidate)) as never, PRINT).code.trim();
+	};
+	const declarations = [...inlined]
+		.sort((a, b) => (a.start as number) - (b.start as number))
+		.map((node) => {
+			if (node.type !== 'VariableDeclarator') return print(node);
+			const declaration = semantic.parentOf(node as never) as AnyNode | null;
+			const kind = declaration?.type === 'VariableDeclaration' ? String(declaration.kind) : 'const';
+			return print({ type: 'VariableDeclaration', kind, declarations: [node] } as unknown as AnyNode);
+		});
+	return {
+		code: [...declarations, `return (${print(root)});`].join('\n'),
+		names: [...names.values()],
+		module: [...moduleNames],
+		imports: [...usedImports.values()],
+		...(eventBinding ? { event: eventReads } : {}),
+		globals,
+		framework,
+		span: spanOf(root as never, filename),
+		unsupported,
+	};
+}
+
+/**
+ * The module's top-level code as a script module, one statement at a time, so a build keeps only what its script
+ * functions reach. Components and top-level framework state are left out (a script reaches state through `__s`);
+ * imports become `__i[n]`; each export is a getter on `exports`, so a cycle sees live values as ES modules do.
+ */
+export function scriptModuleOf(semantic: ModuleSemantics, filename: string): SemanticScriptModule {
+	const imports = importSlots(semantic);
+	const rootScope = semantic.rootScope;
+	const droppedBindings = new Set<number>();
+	for (const binding of semantic.bindings) {
+		if (binding.scope.id !== rootScope.id) continue;
+		const declaring = declaringNode(semantic, binding);
+		if (isComponent(declaring) || (declaring?.type === 'VariableDeclarator' && isFrameworkCall(semantic, declaring.init as AnyNode)))
+			droppedBindings.add(binding.id);
+	}
+	const statements: SemanticScriptStatement[] = [];
+	const exports: SemanticScriptExport[] = [];
+	const describe = (node: AnyNode, declares: string[], effect: boolean): void => {
+		const replaced = new Map<AnyNode, AnyNode>();
+		const uses = new Set<string>();
+		const used = new Map<string, { slot: number; name: string | null }>();
+		const globals: SemanticScriptGlobal[] = [];
+		const dropped: { name: string; span: SourceSpan }[] = [];
+		const framework: { name: string; source: string; span: SourceSpan }[] = [];
+		const unsupported: { construct: string; span: SourceSpan }[] = [];
+		for (const reference of semantic.references) {
+			const at = reference.node as unknown as AnyNode;
+			if (reference.inTypePosition || !within(at as never, node as never)) continue;
+			const binding = reference.binding;
+			if (!binding) {
+				globals.push(globalOf(semantic, reference, filename));
+				continue;
+			}
+			const entry = importOf(semantic, binding);
+			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
+				framework.push({ name: reference.name, source: entry.specifier, span: spanOf(at as never, filename) });
+				continue;
+			}
+			const imported = imports.reach(binding);
+			if (imported) {
+				replaced.set(at, imported);
+				const slot = imports.record(binding)!;
+				used.set(`${slot.index}\0${slot.name}`, { slot: slot.index, name: slot.name });
+			} else if (droppedBindings.has(binding.id)) dropped.push({ name: reference.name, span: spanOf(at as never, filename) });
+			else if (binding.scope.id === rootScope.id && !declares.includes(binding.name)) uses.add(binding.name);
+		}
+		unsupportedIn(node, filename, unsupported);
+		statements.push({
+			code: generate(cloneWith(node, (candidate) => replaced.get(candidate)) as never, PRINT).code.trim(),
+			declares,
+			uses: [...uses],
+			imports: [...used.values()],
+			effect,
+			globals,
+			dropped,
+			framework,
+			unsupported,
+		});
+	};
+	const declaredNames = (node: AnyNode): string[] =>
+		semantic.bindings
+			.filter((binding) => binding.scope.id === rootScope.id && binding.declarations.some((name) => within(name as never, node as never)))
+			.map((binding) => binding.name);
+	for (const statement of (semantic.ast as unknown as { body: AnyNode[] }).body) {
+		if (statement.type === 'ImportDeclaration') continue;
+		if (statement.type === 'ExportAllDeclaration' || (statement.type === 'ExportNamedDeclaration' && statement.source)) continue;
+		if (statement.type === 'ExportNamedDeclaration' && !statement.declaration) continue;
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+				? (statement.declaration as AnyNode)
+				: statement;
+		if (isComponent(declaration) || String(declaration.type).startsWith('TS')) continue;
+		if (declaration.type === 'VariableDeclaration') {
+			for (const declarator of declaration.declarations as AnyNode[]) {
+				if (isFrameworkCall(semantic, declarator.init as AnyNode | undefined)) continue;
+				describe({ ...declaration, declarations: [declarator] } as AnyNode, declaredNames(declarator), false);
+			}
+			continue;
+		}
+		if (statement.type === 'ExportDefaultDeclaration' && !(String(declaration.type).endsWith('Declaration') && declaration.id)) {
+			const value =
+				declaration.type === 'FunctionDeclaration' || declaration.type === 'ClassDeclaration'
+					? { ...declaration, type: declaration.type === 'FunctionDeclaration' ? 'FunctionExpression' : 'ClassExpression' }
+					: declaration;
+			describe(
+				{
+					type: 'VariableDeclaration',
+					kind: 'var',
+					declarations: [{ type: 'VariableDeclarator', id: identifier('__default'), init: value }],
+				} as unknown as AnyNode,
+				['__default'],
+				false,
+			);
+			exports.push({ name: 'default', local: '__default' });
+			continue;
+		}
+		const declares = declaredNames(declaration);
+		describe(declaration, declares, declares.length === 0);
+	}
+	for (const entry of semantic.exports) {
+		if (entry.typeOnly || entry.specifier?.startsWith(FRAMEWORK_PREFIX)) continue;
+		if (entry.kind === 'named') {
+			if (!entry.local || droppedBindings.has(entry.local.id) || !entry.local.has(BindingFlags.ValueSpace)) continue;
+			if (entry.name === 'default' && exports.some((known) => 'name' in known && known.name === 'default')) continue;
+			exports.push({ name: entry.name ?? 'default', local: entry.local.name });
+		} else if (entry.kind === 'reExport' && entry.specifier)
+			exports.push({ name: entry.name ?? 'default', slot: imports.slot(entry.specifier, entry.node as AnyNode), from: entry.fromName ?? 'default' });
+		else if (entry.kind === 'namespace' && entry.specifier)
+			exports.push({ name: entry.name ?? '', slot: imports.slot(entry.specifier, entry.node as AnyNode), from: null });
+		else if (entry.kind === 'star' && entry.specifier) exports.push({ star: imports.slot(entry.specifier, entry.node as AnyNode) });
+	}
+	const flags = semantic.moduleFlags;
+	return {
+		imports: imports.specifiers.map((specifier) => ({ specifier, span: spanOf(imports.spans.get(specifier) as never, filename) })),
+		statements,
+		exports,
+		...(flags.usesRequire || flags.usesModule || flags.usesExports ? { commonjs: true as const } : {}),
+	};
+}

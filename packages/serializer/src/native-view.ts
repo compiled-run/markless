@@ -101,7 +101,34 @@ export type NativeExpr =
 	| { readonly route: 'params' }
 	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> }
 	/** In an `input` handler: the field's text after the edit (`event.currentTarget.value`). */
-	| { readonly event: 'value' };
+	| { readonly event: 'value' }
+	/** A computed whose body runs in the script engine: function `script` of the payload's script, called with `bindings`. */
+	| { readonly script: string; readonly bindings: NativeScriptBindings };
+
+/**
+ * What the names of a script function mean, resolved where it runs: a cell it may write (inside a list row the host reads
+ * and writes that row's value, `<cell>@<key>`), a state object as one cell per field, or a value it only reads.
+ */
+export type NativeScriptBinding =
+	| { readonly cell: string }
+	| { readonly fields: Readonly<Record<string, string>> }
+	| { readonly value: NativeExpr };
+
+export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
+
+/**
+ * Host services a payload's script uses, so a host provides only those: timers (`setTimeout` and the rest, through
+ * `timer` entries), `fetch` (through `fetch` entries), `console`, and `crypto.randomUUID` (from a `seed` the host passes).
+ */
+export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto';
+
+/** The JavaScript a payload's `script` ops and script computeds run, in the platform's engine, started on first use. */
+export type NativeScript = {
+	/** Content hash of `source`: the engine keeps each payload's script under it (`globalThis.__markless[id]`). */
+	readonly id: string;
+	readonly source: string;
+	readonly services: ReadonlyArray<NativeScriptService>;
+};
 
 export type NativeTextPart =
 	| { readonly text: string }
@@ -236,6 +263,17 @@ export type NativeOp =
 			readonly route: string;
 			readonly params: Readonly<Record<string, string | NativeExpr>>;
 			readonly replace?: true;
+	  }
+	/**
+	 * Runs function `fn` of the payload's script in the engine with `event` and `bindings`, then writes the cells it
+	 * changed (the host applies them as `assign` does). A throw, or a rejection of what it returns, writes
+	 * `{ name, message }` to `catch` (the nearest `@catch` around the handler) when there is one.
+	 */
+	| {
+			readonly op: 'script';
+			readonly fn: string;
+			readonly bindings: NativeScriptBindings;
+			readonly catch?: string;
 	  };
 
 /** Element commands a host runs. */
@@ -298,6 +336,8 @@ export type NativeViewPayload = {
 	}>;
 	/** The page's `<title>`, as text parts: what the system navigation bar shows for this screen. */
 	readonly title?: ReadonlyArray<NativeTextPart>;
+	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
+	readonly script?: NativeScript;
 };
 
 export const NATIVE_APP_VERSION = 'markless.native-app/0';
@@ -368,7 +408,31 @@ export type NativeJournalEntry =
 			readonly replace?: true;
 	  }
 	/** The page's `<title>` text changed: the host writes it to the screen's navigation bar. */
-	| { readonly op: 'title'; readonly value: string };
+	| { readonly op: 'title'; readonly value: string }
+	/** The script set a timer: after `ms` the host fires it with a `timer` action (once; an interval asks again). */
+	| { readonly op: 'timer'; readonly id: number; readonly ms: number }
+	/** The script cleared a timer it set: the host drops it. */
+	| { readonly op: 'clearTimer'; readonly id: number }
+	/** The script called `fetch`: the host sends the request and answers with a `response` action naming `id`. */
+	| { readonly op: 'fetch'; readonly id: number; readonly request: NativeFetchRequest };
+
+/** A request as the script made it; `url` is absolute (a relative one rejects in the script, as with no page to resolve it). */
+export type NativeFetchRequest = {
+	readonly url: string;
+	readonly method: string;
+	readonly headers: ReadonlyArray<readonly [string, string]>;
+	readonly body: string | null;
+};
+
+/** What a host answers a `fetch` entry with: the response (its body as text), or the network error's message. */
+export type NativeFetchResponse =
+	| {
+			readonly status: number;
+			readonly statusText: string;
+			readonly headers: ReadonlyArray<readonly [string, string]>;
+			readonly body: string;
+	  }
+	| { readonly error: string };
 
 /** The package and export that name the platform's own pieces (`<native.sheet>`); one place, so the name is cheap to change. */
 export const PLATFORM_PIECES_PACKAGE = DEVICE_MODULE;
@@ -381,3 +445,77 @@ export const PLATFORM_PIECES_NAMESPACE = 'native';
  */
 export const isNativeStyleStateAttribute = (name: string): boolean =>
 	name === 'hidden' || name === 'role' || /^(ui|aria|data)-/.test(name);
+
+/** ECMAScript's own globals, which every engine a host runs has (JavaScriptCore, Hermes); `eval` is left out. */
+export const NATIVE_SCRIPT_LANGUAGE_GLOBALS: ReadonlyArray<string> = [
+	'Object', 'Function', 'Array', 'Number', 'Boolean', 'String', 'Symbol', 'BigInt', 'Date', 'Promise', 'RegExp', 'JSON',
+	'Math', 'Intl', 'Reflect', 'Proxy', 'Map', 'Set', 'WeakMap', 'WeakSet', 'ArrayBuffer', 'DataView', 'Int8Array',
+	'Uint8Array', 'Uint8ClampedArray', 'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array', 'Float32Array',
+	'Float64Array', 'BigInt64Array', 'BigUint64Array', 'Error', 'AggregateError', 'EvalError', 'RangeError',
+	'ReferenceError', 'SyntaxError', 'TypeError', 'URIError', 'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'NaN',
+	'Infinity', 'undefined', 'encodeURI', 'encodeURIComponent', 'decodeURI', 'decodeURIComponent', 'globalThis',
+];
+
+/** Globals a host provides to scripts, by the service that backs each. */
+export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptService | 'engine'>> = {
+	setTimeout: 'timers',
+	clearTimeout: 'timers',
+	setInterval: 'timers',
+	clearInterval: 'timers',
+	queueMicrotask: 'engine',
+	console: 'console',
+	fetch: 'fetch',
+	crypto: 'crypto',
+};
+
+/**
+ * What a script handler's event has on a phone, as member paths: a deeper read below `target.value` is a string's. Any
+ * other member is refused at build time, since the web's event has it and a phone's does not.
+ */
+export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> = [
+	['type'],
+	['key'],
+	['defaultPrevented'],
+	['preventDefault'],
+	['stopPropagation'],
+	['target'],
+	['target', 'value'],
+	['target', 'checked'],
+	['currentTarget'],
+	['currentTarget', 'value'],
+	['currentTarget', 'checked'],
+];
+
+/** Names for the global object itself: `window.setTimeout` reads a provided global, `window.document` does not. */
+export const NATIVE_SCRIPT_GLOBAL_OBJECTS: ReadonlyArray<string> = ['window', 'self', 'globalThis'];
+
+/**
+ * Web globals with no meaning on a phone, or with a framework form a phone has, and what a build refusal says about
+ * each. Any other global that is neither a language nor a host global is refused as one phones do not provide yet.
+ */
+export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
+	document: 'the web page, which a phone does not have',
+	window: 'the browser window, which a phone does not have',
+	navigator: 'the browser, which a phone does not have',
+	location: "the page's address, which a phone does not have; use the router's `navigate` and route params",
+	history: "the browser's history, which a phone does not have; use the router's `navigate`",
+	localStorage: "the browser's storage; use `storage()` from @markless/core, which a phone keeps",
+	sessionStorage: "the browser's storage; use `storage()` from @markless/core, which a phone keeps",
+	matchMedia: 'a CSS media query, which a phone answers in its styles, not in a handler',
+	getComputedStyle: 'computed CSS, which a phone does not have at run time',
+	requestAnimationFrame: 'a browser frame, which a phone does not hand to handlers',
+	cancelAnimationFrame: 'a browser frame, which a phone does not hand to handlers',
+	HTMLElement: 'the DOM, which a phone does not have',
+	Element: 'the DOM, which a phone does not have',
+	Node: 'the DOM, which a phone does not have',
+	Event: 'the DOM, which a phone does not have',
+	CustomEvent: 'the DOM, which a phone does not have',
+	MutationObserver: 'the DOM, which a phone does not have',
+	ResizeObserver: 'the DOM, which a phone does not have',
+	IntersectionObserver: 'the DOM, which a phone does not have',
+	customElements: 'the DOM, which a phone does not have',
+	FormData: 'an HTML form, which a phone does not have',
+	alert: 'a browser dialog, which a phone does not have',
+	confirm: 'a browser dialog, which a phone does not have',
+	prompt: 'a browser dialog, which a phone does not have',
+};
