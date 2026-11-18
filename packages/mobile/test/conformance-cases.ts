@@ -450,6 +450,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h5' },
 		],
 	},
+	{
+		name: 'script-render',
+		fixture: 'proofs/j8-render-values/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		name: 'script-render-list',
+		fixture: 'proofs/j9-render-list/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */
@@ -505,5 +517,14 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		app: 'proofs/n4-deep-link',
 		open: '/orders/42',
 		actions: [{ event: 'back' }, { event: 'back' }, { event: 'activate', host: 'component-edge:0' }],
+	},
+	{
+		name: 'script-first-render',
+		app: 'proofs/j10-first-render',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'component-edge:0' },
+		],
 	},
 ];

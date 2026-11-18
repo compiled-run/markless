@@ -97,13 +97,13 @@ export function App() @{
 		expect(payload?.handlers[0]?.ops).toEqual([{ op: 'assign', cell: 'state:count', value: doubled }]);
 	});
 
-	it('names a value it cannot read, with where it is written', async () => {
+	it('names a value it cannot read, with where it is written when values are data only', async () => {
 		const { diagnostics } = await nativeView(`import { state } from '@markless/core';
 const PATTERN = /x/;
 export function App() @{
 	let text = state('a');
 	<main><p>{PATTERN}</p></main>
-}`);
+}`, { scriptHandlers: 'never' });
 		expect(diagnostics).toHaveLength(1);
 		expect(diagnostics[0]).toMatchObject({
 			message: expect.stringContaining('a text expression through `PATTERN` uses a regular expression'),

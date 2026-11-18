@@ -2,8 +2,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { NativeOp, NativeViewPayload } from '@markless/serializer';
-import { compileNativeComponent, createNativeRuntime, type NativeAction } from '../src/index.ts';
-import { readWorkspaceModule } from '../src/harness/rung.ts';
+import {
+	compileNativeComponent,
+	createNativeAppRuntime,
+	createNativeRuntime,
+	type NativeAction,
+} from '../src/index.ts';
+import { compileRungApp, readWorkspaceModule } from '../src/harness/rung.ts';
 import { nodeScriptHost } from '../src/node-engine.ts';
 import { CONFORMANCE_CASES } from './conformance-cases.ts';
 
@@ -144,5 +149,45 @@ describe('a handler means the same as data and as JavaScript', () => {
 				'document',
 			],
 		]);
+	});
+
+	it('starts no engine for a page with no script, through every vector it renders and dispatches', async () => {
+		let plain = 0;
+		for (const entry of CONFORMANCE_CASES) {
+			const payload = await build(entry);
+			if (payload.script) continue;
+			plain++;
+			const host = nodeScriptHost();
+			const runtime = createNativeRuntime(
+				payload,
+				new Map(),
+				entry.params,
+				entry.preferredLanguages,
+				entry.now === undefined ? undefined : () => entry.now!,
+				host,
+			);
+			runtime.texts();
+			runtime.attributes();
+			runtime.rows();
+			for (const action of entry.actions) runtime.dispatch(action);
+			expect(host.starts(), entry.name).toBe(0);
+		}
+		expect(plain).toBeGreaterThan(20);
+	});
+
+	it('starts the engine for the screen whose first render needs it, at that render, and never for the screen beside it', async () => {
+		const { payload } = await compileRungApp(
+			join(import.meta.dirname, '../proofs/j10-first-render'),
+		);
+		const home = nodeScriptHost();
+		createNativeAppRuntime(payload!, '/', new Map(), home).screens().at(-1)!.runtime.texts();
+		expect(home.starts()).toBe(0);
+		const words = nodeScriptHost();
+		const opened = createNativeAppRuntime(payload!, '/words', new Map(), words)
+			.screens()
+			.at(-1)!.runtime;
+		expect(words.starts()).toBe(0);
+		expect(opened.texts().map(([, text]) => text)).toContain('Initials: KFB');
+		expect(words.starts()).toBe(1);
 	});
 });

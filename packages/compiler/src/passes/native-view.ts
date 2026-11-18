@@ -749,6 +749,7 @@ export function nativeUnsupported(message: string, span?: SourceSpan): CompilerD
 const LANGUAGE_GLOBALS = new Set(NATIVE_SCRIPT_LANGUAGE_GLOBALS);
 // A submit's default action and a box's checkedness are the host's; a script's event cannot report them back yet.
 const DATA_ONLY_EVENTS = new Set(['submit', 'change']);
+const RENDER_UNSTEADY = new Set(['Date', 'crypto', 'performance']);
 const GLOBAL_OBJECTS = new Set(NATIVE_SCRIPT_GLOBAL_OBJECTS);
 
 const isScalar = (value: unknown): value is NativeScalar | null =>
@@ -1694,12 +1695,41 @@ export function createNativeViewPayload(
 		return ok ? bindings : null;
 	}
 
+	/**
+	 * A value the page renders (a text run, an attribute, a `@for` list): data where it lowers, else a call into the script,
+	 * which a host evaluates when it builds the view and again whenever the cells it reads change.
+	 */
+	function renderValue(
+		expression: SemanticExpression | undefined,
+		script: SemanticScriptFunction | undefined,
+		what: string,
+		scope: Scope,
+	): NativeExpr | null {
+		if (scriptMode === 'never' || !script) return exprOf(expression, what, scope);
+		const data = attempt(() => exprOf(expression, what, scope));
+		if (!data.failed) return data.value;
+		data.rollBack();
+		// The web renders the clock and random numbers once; a host evaluates a script value again whenever the page changes.
+		const unsteady = script.globals.filter((global) => !global.typeofOnly && RENDER_UNSTEADY.has(global.property ?? global.name));
+		const fn = attempt(() => scriptFunctionId(script, scope.module, what));
+		const bindings = attempt(() => scriptBindings(script, scope, what));
+		if (fn.value !== null && bindings.value !== null && unsteady.length === 0) return { script: fn.value, bindings: bindings.value };
+		// Neither runs it: the data path's refusal is the specific one; what the script lacks (a global, a framework call) adds to it.
+		const reasons = fn.refusals();
+		bindings.rollBack();
+		fn.rollBack();
+		const value = exprOf(expression, what, scope);
+		diagnostics.push(...reasons);
+		return value;
+	}
+
 	/** A computed whose body is not data, as a call into the script; null with a refusal when no script runs it either. */
 	function scriptComputed(
 		computed: SemanticGraphArtifact['graphBindings'][number],
 		scope: Scope,
 		what: string,
 	): NativeExpr | null {
+		return keepingFunctions(() => {
 		const fact = computed.nativeScript;
 		if (!fact || scriptMode === 'never')
 			return refuse(`${what} reads the computed \`${computed.name}\`, whose body needs a script engine`);
@@ -1707,6 +1737,7 @@ export function createNativeViewPayload(
 		const fn = scriptFunctionId(fact, scope.module, label);
 		const bindings = scriptBindings(fact, scope, label);
 		return fn === null || bindings === null ? null : { script: fn, bindings };
+		});
 	}
 
 	/**
@@ -2855,7 +2886,7 @@ export function createNativeViewPayload(
 				return value ? [{ property: 'value' as const, value }] : [];
 			}
 			if (target.kind === 'attribute') {
-				const value = exprOf(read.expression, `the \`${target.name}\` attribute`, scope);
+				const value = renderValue(read.expression, read.script, `the \`${target.name}\` attribute`, scope);
 				return value ? [{ attribute: target.name, value }] : [];
 			}
 			if (
@@ -2893,7 +2924,7 @@ export function createNativeViewPayload(
 		if (cell) return { cell };
 		const read = scope.module.computedReads.get(graphNodeId);
 		const expr = read
-			? exprOf(read.expression, 'a text expression', readScope(read, scope))
+			? renderValue(read.expression, read.script, 'a text expression', readScope(read, scope))
 			: refuse('a text binding that is not state');
 		return expr && { expr };
 	};
@@ -2984,7 +3015,7 @@ export function createNativeViewPayload(
 				continue;
 			}
 			if (slot.nativeExpression && slot.residue.kind !== 'element-handle-id') {
-				const lowered = exprOf(slot.nativeExpression, 'a text expression', {
+				const lowered = renderValue(slot.nativeExpression, slot.nativeScript, 'a text expression', {
 					...scope,
 					live: slot.residue.kind === 'graph-read',
 					...(slot.nativeSpan ? { span: slot.nativeSpan } : {}),
@@ -3559,7 +3590,7 @@ export function createNativeViewPayload(
 					continue;
 				}
 				const list = repeat?.collectionExpression
-					? exprOf(repeat.collectionExpression, 'the @for list', {
+					? renderValue(repeat.collectionExpression, repeat.collectionScript, 'the @for list', {
 							...scope,
 							live: repeat.collectionGraphNodeId !== undefined,
 						})
@@ -3914,6 +3945,7 @@ export function createNativeViewPayload(
 			features: new Set(features),
 			snapshots: snapshots.count,
 			continuations: continuations.next,
+			functions: new Set(scriptFunctions.keys()),
 		};
 		const value = run();
 		const added = diagnostics.slice(marks.diagnostics);
@@ -3929,11 +3961,24 @@ export function createNativeViewPayload(
 				for (const feature of marks.features) features.add(feature);
 				snapshots.count = marks.snapshots;
 				continuations.next = marks.continuations;
+				for (const key of scriptFunctions.keys()) if (!marks.functions.has(key)) scriptFunctions.delete(key);
 			},
 		};
 	}
 
+	/** Runs `run`; when it gives nothing, the script functions it registered are dropped, so no unused script ships. */
+	function keepingFunctions<T>(run: () => T | null): T | null {
+		const before = new Set(scriptFunctions.keys());
+		const value = run();
+		if (value === null) for (const key of scriptFunctions.keys()) if (!before.has(key)) scriptFunctions.delete(key);
+		return value;
+	}
+
 	function scriptOp(event: SemanticEvent, scope: Scope): NativeOp | null {
+		return keepingFunctions(() => scriptOpOf(event, scope));
+	}
+
+	function scriptOpOf(event: SemanticEvent, scope: Scope): NativeOp | null {
 		const fact = event.handlerScript!;
 		const what = `the ${event.eventName} handler`;
 		let readsMissing = false;

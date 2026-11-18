@@ -11,7 +11,7 @@ import type {
 } from '../../artifacts.ts';
 import { sourceSpan } from '../../ast/source.ts';
 import type { SourceSpan } from '../../diagnostics.ts';
-import { scriptFunctionOf, scriptModuleOf } from './script-facts.ts';
+import { scriptFunctionOf, scriptModuleOf, scriptValueOf } from './script-facts.ts';
 
 const UNARY = new Set(['!', '-', '+', 'typeof']);
 const BINARY = new Set(['+', '-', '*', '/', '%', '===', '!==', '<', '<=', '>', '>=']);
@@ -1034,4 +1034,5 @@ export const NATIVE_FACT_COLLECTORS: NativeFactCollectors = {
 	component: componentNativeFactsOf as unknown as NativeFactCollectors['component'],
 	scriptFunction: scriptFunctionOf as unknown as NativeFactCollectors['scriptFunction'],
 	scriptModule: scriptModuleOf as unknown as NativeFactCollectors['scriptModule'],
+	scriptValue: scriptValueOf as unknown as NativeFactCollectors['scriptValue'],
 };

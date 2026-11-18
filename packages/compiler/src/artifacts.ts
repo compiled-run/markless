@@ -118,6 +118,8 @@ export type NativeFactCollectors = {
 	) => SemanticComponentNativeFacts;
 	/** A handler's or computed's own JavaScript for a phone's script engine; `semantic` is the module's scope analysis. */
 	readonly scriptFunction: (node: never, semantic: never, filename: string) => SemanticScriptFunction | undefined;
+	/** A value a template reads, as a script whose function gives it, for when it is not data. */
+	readonly scriptValue: (node: never, semantic: never, filename: string) => SemanticScriptFunction | undefined;
 	/** The module's own top-level code as a script module (components and framework state left out). */
 	readonly scriptModule: (semantic: never, filename: string) => SemanticScriptModule;
 };
@@ -1001,6 +1003,8 @@ export type SemanticKeyedRepeat = {
 	readonly collectionPath: ReadonlyArray<string>;
 	/** The collection as a tree (native builds only). */
 	readonly collectionExpression?: SemanticExpression;
+	/** The collection as JavaScript for a phone's script engine (native builds only). */
+	readonly collectionScript?: SemanticScriptFunction;
 	readonly keySource: string;
 	// Empty means the item ITSELF is the key (`key row`), which a list of scalars
 	// is; `indexKey` is what says a row has no data identity at all.
@@ -1565,6 +1569,8 @@ export type SemanticTemplateRead = {
 	readonly source: string;
 	/** The read's value as a tree (for a conditional class, its test). */
 	readonly expression?: SemanticExpression;
+	/** The same value as JavaScript for a phone's script engine (native builds only). */
+	readonly script?: SemanticScriptFunction;
 	readonly sourceSpan?: SourceSpan;
 	readonly hostNodeId: string;
 	readonly target: SemanticTemplateBindingTarget;
@@ -1850,6 +1856,8 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly nativeExpression?: SemanticExpression;
 				/** Where the interpolation is written, for native builds only. */
 				readonly nativeSpan?: SourceSpan;
+				/** The interpolation as JavaScript for a phone's script engine, for native builds only. */
+				readonly nativeScript?: SemanticScriptFunction;
 		  }
 		| {
 				readonly kind: 'attribute';

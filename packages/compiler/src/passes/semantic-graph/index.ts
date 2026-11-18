@@ -271,6 +271,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		hostIds: state.hostIds,
 		nestedLocalSource: (expression) => inlineNestedTemplateLocals(expression, state),
 		nativeFacts: state.nativeFacts,
+		...(state.nativeFacts ? { semantic: state.semantic } : {}),
 		foldedIfs: state.foldedIfs,
 		foldedTexts: state.foldedTexts,
 		absentComponents,

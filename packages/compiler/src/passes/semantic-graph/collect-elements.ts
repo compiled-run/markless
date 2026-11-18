@@ -2411,10 +2411,10 @@ function eventHandlerExpression(
 function expressionField(
 	expression: AnyNode | undefined,
 	state: WalkState,
-): Pick<SemanticTemplateRead, 'expression'> {
-	return expression && state.nativeFacts
-		? { expression: state.nativeFacts.expression(expression as never) }
-		: {};
+): Pick<SemanticTemplateRead, 'expression' | 'script'> {
+	if (!expression || !state.nativeFacts) return {};
+	const script = state.nativeFacts.scriptValue(expression as never, state.semantic() as never, state.filename);
+	return { expression: state.nativeFacts.expression(expression as never), ...(script ? { script } : {}) };
 }
 
 function handlerStatementsField(

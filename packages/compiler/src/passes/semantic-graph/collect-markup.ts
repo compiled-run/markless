@@ -55,6 +55,7 @@ import { collectStyleScopes, takesStyleScopeClass } from '../public-render/style
 import { PROJECTION_PROP_NAME } from '../public-render/shared-seed-pass.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
+import type { ModuleSemantics } from './shared-ast.ts';
 import { rawElementText } from '../../ast/raw-text.ts';
 import { aliasedItemPath, repeatItemBinding, type RepeatItemAlias } from './repeat-item-binding.ts';
 import { memberReadPath } from './composite-reads.ts';
@@ -101,6 +102,7 @@ type CollectionContext = {
 	restName: string | null;
 	readonly nestedLocalSource: ((expression: AnyNode) => string | null) | null;
 	readonly nativeFacts: NativeFactCollectors | null;
+	readonly semantic?: () => ModuleSemantics;
 	/** `@if` chains the build's target constants decide: the kept arm is emitted in place, the others not at all. */
 	readonly foldedIfs: ReadonlyMap<AnyNode, number | null>;
 	readonly foldedTexts: ReadonlyMap<AnyNode, string>;
@@ -140,6 +142,8 @@ export function collectSemanticMarkup(input: {
 	readonly hostIds: WeakMap<object, string>;
 	readonly nestedLocalSource?: (expression: AnyNode) => string | null;
 	readonly nativeFacts?: NativeFactCollectors | null;
+	/** The module's scope analysis, which a native build's script facts read. */
+	readonly semantic?: () => ModuleSemantics;
 	readonly foldedIfs?: ReadonlyMap<AnyNode, number | null>;
 	readonly foldedTexts?: ReadonlyMap<AnyNode, string>;
 	/** Components the build's target never renders (named only by removed arms): not collected. */
@@ -161,6 +165,7 @@ export function collectSemanticMarkup(input: {
 		restName: null,
 		nestedLocalSource: input.nestedLocalSource ?? null,
 		nativeFacts: input.nativeFacts ?? null,
+		...(input.semantic ? { semantic: input.semantic } : {}),
 		foldedIfs: input.foldedIfs ?? new Map(),
 		foldedTexts: input.foldedTexts ?? new Map(),
 	};
@@ -307,6 +312,12 @@ function emitTextSlot(
 				? {
 						nativeExpression: context.nativeFacts.expression(expression as never),
 						nativeSpan: sourceSpan(expression, context.filename),
+						...(() => {
+							const nativeScript = context.semantic
+								? context.nativeFacts.scriptValue(expression as never, context.semantic() as never, context.filename)
+								: undefined;
+							return nativeScript ? { nativeScript } : {};
+						})(),
 					}
 				: {}),
 		},

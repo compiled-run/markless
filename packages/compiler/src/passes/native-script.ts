@@ -217,6 +217,21 @@ var eventOf = function (given) {
 	};
 };
 var json = function (value) { return value === undefined ? null : value; };
+// A value the page shows crosses as JSON; anything else (a RegExp, a class instance) as the text the web would show for it.
+var plain = function (value) {
+	if (value === undefined || value === null) return null;
+	var type = typeof value;
+	if (type === 'string' || type === 'boolean') return value;
+	if (type === 'number') return isFinite(value) ? value : String(value);
+	if (Array.isArray(value)) return value.map(plain);
+	var proto = type === 'object' ? Object.getPrototypeOf(value) : undefined;
+	if (proto === Object.prototype || proto === null) {
+		var out = {};
+		for (var key in value) out[key] = plain(value[key]);
+		return out;
+	}
+	return String(value);
+};
 g.__markless[id] = {
 	enter: function (text) {
 		var entry = JSON.parse(text);
@@ -224,7 +239,7 @@ g.__markless[id] = {
 		if (entry.kind === 'compute') {
 			var value = fn(entry.fn)(frameOf(entry.frame))();
 			host.out = null;
-			return JSON.stringify(json(value));
+			return JSON.stringify(plain(value));
 		}
 		if (entry.kind === 'dispatch') {
 			var settled = function (error) { fail(entry['catch'], error); };

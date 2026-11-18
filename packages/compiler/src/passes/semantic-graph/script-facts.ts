@@ -251,6 +251,8 @@ export function scriptFunctionOf(
 	graphNode: AnyNode,
 	semantic: ModuleSemantics,
 	filename: string,
+	/** A value read while rendering, not a function: the code returns a function that gives it. */
+	asValue = false,
 ): SemanticScriptFunction | undefined {
 	const root = semanticNodeOf(semantic, graphNode);
 	if (!root) return undefined;
@@ -380,7 +382,10 @@ export function scriptFunctionOf(
 			} as unknown as AnyNode);
 		});
 	return {
-		code: [...declarations, `return (${print(root)});`].join('\n'),
+		code: [
+			...declarations,
+			asValue ? `return function () {\nreturn (${print(root)});\n};` : `return (${print(root)});`,
+		].join('\n'),
 		names: [...names.values()],
 		module: [...moduleNames],
 		imports: [...usedImports.values()],
@@ -578,3 +583,7 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 			: {}),
 	};
 }
+
+/** A value a template reads (a text run, an attribute, a `@for` list) as a script that gives it. */
+export const scriptValueOf = (node: AnyNode, semantic: ModuleSemantics, filename: string) =>
+	scriptFunctionOf(node, semantic, filename, true);

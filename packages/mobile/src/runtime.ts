@@ -144,9 +144,11 @@ export function evaluateNativeExpr(
 	scope: NativeScope = EMPTY_SCOPE,
 	compute?: Compute,
 ): Value {
-	const evaluate = (e: NativeExpr): Value => evaluateNativeExpr(e, read, eventValue, scope, compute);
+	const evaluate = (e: NativeExpr): Value =>
+		evaluateNativeExpr(e, read, eventValue, scope, compute);
 	if ('script' in expr) {
-		if (!compute) throw new Error(`the script computed ${expr.script} read with no script engine`);
+		if (!compute)
+			throw new Error(`the script computed ${expr.script} read with no script engine`);
 		return compute(expr.script, expr.bindings, scope);
 	}
 	if ('route' in expr) {
@@ -178,19 +180,25 @@ export function evaluateNativeExpr(
 		const args = expr.arguments.map((argument) =>
 			'lambda' in argument
 				? (...values: Value[]) =>
-						evaluateNativeExpr(argument.body, read, eventValue, {
-							items: scope.items,
-							...(scope.params ? { params: scope.params } : {}),
-							...(scope.now ? { now: scope.now } : {}),
-							locals: new Map([
-								...scope.locals,
-								...argument.lambda.map(
-									(name, i) => [name, values[i] ?? null] as const,
-								),
-							]),
-							...(scope.formData ? { formData: scope.formData } : {}),
-							...(scope.checked ? { checked: scope.checked } : {}),
-						}, compute)
+						evaluateNativeExpr(
+							argument.body,
+							read,
+							eventValue,
+							{
+								items: scope.items,
+								...(scope.params ? { params: scope.params } : {}),
+								...(scope.now ? { now: scope.now } : {}),
+								locals: new Map([
+									...scope.locals,
+									...argument.lambda.map(
+										(name, i) => [name, values[i] ?? null] as const,
+									),
+								]),
+								...(scope.formData ? { formData: scope.formData } : {}),
+								...(scope.checked ? { checked: scope.checked } : {}),
+							},
+							compute,
+						)
 				: evaluate(argument),
 		);
 		const method = (target as unknown as Record<string, unknown> | null)?.[expr.method];
@@ -300,6 +308,56 @@ export function evaluateNativeExpr(
 	return BUILTINS[expr.call](...expr.arguments.map(evaluate));
 }
 
+/**
+ * Evaluates an expression with the payload's script where it reads one, outside a running page: for build-time readers of
+ * a payload (Dragon's style input), with the cell values they choose. A script only computes here; it writes nothing.
+ */
+export function evaluateWithScript(
+	payload: NativeViewPayload,
+	host: NativeScriptHost,
+): (expr: NativeExpr, values: ReadonlyMap<string, Value>) => Value {
+	let engine: NativeScriptEngine | undefined;
+	const script = payload.script;
+	const evaluate = (expr: NativeExpr, values: ReadonlyMap<string, Value>): Value =>
+		evaluateNativeExpr(
+			expr,
+			(cell) => values.get(cell) ?? null,
+			undefined,
+			EMPTY_SCOPE,
+			(fn, bindings) => {
+				if (!script)
+					throw new Error(`the script computed ${fn} in a payload with no script`);
+				if (!engine) {
+					engine = host.start();
+					engine.evaluate(script.source);
+				}
+				const frame = Object.fromEntries(
+					Object.entries(bindings).map(([name, binding]) => [
+						name,
+						'cell' in binding
+							? { slot: binding.cell }
+							: 'fields' in binding
+								? { fields: binding.fields }
+								: { value: evaluate(binding.value, values) },
+					]),
+				);
+				const entry = {
+					kind: 'compute',
+					fn,
+					frame,
+					cells: Object.fromEntries(values),
+					...(host.seed ? { seed: host.seed() } : {}),
+				};
+				return JSON.parse(
+					engine.evaluate(
+						`globalThis.__markless[${JSON.stringify(script.id)}].enter(${JSON.stringify(JSON.stringify(entry))})`,
+					),
+				) as Value;
+			},
+		);
+	return evaluate;
+}
+
 /** The reference meaning of a payload's state, ops and journal; the Swift and Kotlin hosts are checked against it. */
 export function createNativeRuntime(
 	payload: NativeViewPayload,
@@ -362,7 +420,9 @@ export function createNativeRuntime(
 	const repeats = new Map(
 		payload.nodes.flatMap((node) => (node.kind === 'repeat' ? [[node.id, node] as const] : [])),
 	);
-	const rowOfCell = new Map(payload.cells.flatMap((cell) => (cell.row ? [[cell.id, cell.row] as const] : [])));
+	const rowOfCell = new Map(
+		payload.cells.flatMap((cell) => (cell.row ? [[cell.id, cell.row] as const] : [])),
+	);
 	/** Where a cell's value is kept: its id, or `<id>@<key>` for a row's own state, read in that row. */
 	const slotOf = (cell: string, scope: NativeScope): string => {
 		const row = rowOfCell.get(cell);
@@ -392,23 +452,40 @@ export function createNativeRuntime(
 			engine.evaluate(script.source);
 		}
 		const target = `globalThis.__markless[${JSON.stringify(script.id)}].${method}`;
-		return engine.evaluate(argument === undefined ? `${target}()` : `${target}(${JSON.stringify(JSON.stringify(argument))})`);
+		return engine.evaluate(
+			argument === undefined
+				? `${target}()`
+				: `${target}(${JSON.stringify(JSON.stringify(argument))})`,
+		);
 	};
 	/** The names a script function reads, as its engine entry spells them: slots of this scope's cells, and values. */
-	const frameOf = (bindings: NativeScriptBindings, eventValue: string | undefined, scope: NativeScope) =>
+	const frameOf = (
+		bindings: NativeScriptBindings,
+		eventValue: string | undefined,
+		scope: NativeScope,
+	) =>
 		Object.fromEntries(
 			Object.entries(bindings).map(([name, binding]) => [
 				name,
 				'cell' in binding
 					? { slot: slotOf(binding.cell, scope) }
 					: 'fields' in binding
-						? { fields: Object.fromEntries(Object.entries(binding.fields).map(([field, cell]) => [field, slotOf(cell, scope)])) }
+						? {
+								fields: Object.fromEntries(
+									Object.entries(binding.fields).map(([field, cell]) => [
+										field,
+										slotOf(cell, scope),
+									]),
+								),
+							}
 						: { value: evaluate(binding.value, eventValue, scope) },
 			]),
 		);
 	const entryCells = () => ({
 		cells: Object.fromEntries(values),
-		...(script?.services.includes('crypto') && scriptHost?.seed ? { seed: scriptHost.seed() } : {}),
+		...(script?.services.includes('crypto') && scriptHost?.seed
+			? { seed: scriptHost.seed() }
+			: {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
 	const enter = (entry: Record<string, unknown>): NativeJournalEntry[] => {
@@ -417,7 +494,10 @@ export function createNativeRuntime(
 			readonly writes: ReadonlyArray<readonly [string, Value]>;
 			readonly timers: ReadonlyArray<readonly [number, number]>;
 			readonly clears: ReadonlyArray<number>;
-			readonly requests: ReadonlyArray<{ readonly id: number; readonly request: Extract<NativeJournalEntry, { op: 'fetch' }>['request'] }>;
+			readonly requests: ReadonlyArray<{
+				readonly id: number;
+				readonly request: Extract<NativeJournalEntry, { op: 'fetch' }>['request'];
+			}>;
 			readonly logs: ReadonlyArray<readonly [string, string]>;
 		};
 		for (const [slot, value] of result.writes) {
@@ -430,13 +510,31 @@ export function createNativeRuntime(
 		}
 		logs.push(...result.logs);
 		return [
-			...result.clears.map((id): NativeJournalEntry => ({ op: 'clearTimer', timer: `${SCRIPT_TIMER}${id}` })),
-			...result.timers.map(([id, ms]): NativeJournalEntry => ({ op: 'timer', timer: `${SCRIPT_TIMER}${id}`, ms })),
-			...result.requests.map(({ id, request }): NativeJournalEntry => ({ op: 'fetch', id, request })),
+			...result.clears.map((id): NativeJournalEntry => ({
+				op: 'clearTimer',
+				timer: `${SCRIPT_TIMER}${id}`,
+			})),
+			...result.timers.map(([id, ms]): NativeJournalEntry => ({
+				op: 'timer',
+				timer: `${SCRIPT_TIMER}${id}`,
+				ms,
+			})),
+			...result.requests.map(({ id, request }): NativeJournalEntry => ({
+				op: 'fetch',
+				id,
+				request,
+			})),
 		];
 	};
 	const compute: Compute = (fn, bindings, scope) =>
-		JSON.parse(call('enter', { kind: 'compute', fn, frame: frameOf(bindings, undefined, scope), ...entryCells() })) as Value;
+		JSON.parse(
+			call('enter', {
+				kind: 'compute',
+				fn,
+				frame: frameOf(bindings, undefined, scope),
+				...entryCells(),
+			}),
+		) as Value;
 	const evaluate = (expr: NativeExpr, eventValue?: string, scope?: NativeScope): Value =>
 		evaluateNativeExpr(expr, read, eventValue, scope ?? base, compute);
 	const armOf = (branch: Extract<NativeNode, { kind: 'branch' }>): number | null => {
@@ -490,7 +588,11 @@ export function createNativeRuntime(
 		if (!repeat || !shown(repeat)) return [];
 		return rowsOf(repeat).map(({ key, item }) => ({
 			id: `${node.id}@${key}`,
-			scope: { ...base, items: new Map([[repeat.id, item]]), keys: new Map([[repeat.id, key]]) },
+			scope: {
+				...base,
+				items: new Map([[repeat.id, item]]),
+				keys: new Map([[repeat.id, key]]),
+			},
 		}));
 	};
 	const render = (parts: ReadonlyArray<NativeTextPart>, scope: NativeScope): string =>
@@ -498,7 +600,11 @@ export function createNativeRuntime(
 			.map((part) =>
 				'text' in part
 					? part.text
-					: formatNativeValue('cell' in part ? read(part.cell, scope) : evaluate(part.expr, undefined, scope)),
+					: formatNativeValue(
+							'cell' in part
+								? read(part.cell, scope)
+								: evaluate(part.expr, undefined, scope),
+						),
 			)
 			.join('');
 
@@ -693,7 +799,9 @@ export function createNativeRuntime(
 		payload.events.flatMap((bound) => {
 			if (bound.event !== event) return [];
 			const node = nodesById.get(bound.host);
-			return node ? instances(node).flatMap(({ id }) => (fired.has(`${event}\0${id}`) ? [] : [id])) : [];
+			return node
+				? instances(node).flatMap(({ id }) => (fired.has(`${event}\0${id}`) ? [] : [id]))
+				: [];
 		});
 	const forgetHidden = () => {
 		for (const key of fired) {
@@ -725,10 +833,15 @@ export function createNativeRuntime(
 		dispatch(action) {
 			if (action.event === 'timer' && action.timer.startsWith(SCRIPT_TIMER))
 				return change(undefined, undefined, () =>
-					enter({ kind: 'timer', timer: Number(action.timer.slice(SCRIPT_TIMER.length)) }),
+					enter({
+						kind: 'timer',
+						timer: Number(action.timer.slice(SCRIPT_TIMER.length)),
+					}),
 				);
 			if (action.event === 'response')
-				return change(undefined, undefined, () => enter({ kind: 'response', request: action.id, response: action.response }));
+				return change(undefined, undefined, () =>
+					enter({ kind: 'response', request: action.id, response: action.response }),
+				);
 			if (action.event === 'resume') {
 				const continuation = continuations.get(action.continuation);
 				if (!continuation) throw new Error(`no continuation ${action.continuation}`);
@@ -782,7 +895,12 @@ export function createNativeRuntime(
 				if (!timer) throw new Error(`no timer ${action.timer} is set`);
 				timers.delete(action.timer);
 				return change(undefined, undefined, () => {
-					const out = run(timer.ops, undefined, { ...base, locals: timer.locals }, timer.submission);
+					const out = run(
+						timer.ops,
+						undefined,
+						{ ...base, locals: timer.locals },
+						timer.submission,
+					);
 					if (timer.submission) {
 						timer.submission.pending--;
 						settled(timer.submission);
@@ -846,7 +964,8 @@ export function createNativeRuntime(
 				continue;
 			}
 			if (op.op === 'tick') {
-				const group = elementOf(op.node).attributes?.['type'] === 'radio' ? groupOf(op.node) : [];
+				const group =
+					elementOf(op.node).attributes?.['type'] === 'radio' ? groupOf(op.node) : [];
 				if (group.length === 0) checkedness.set(op.node, !checkedOf(op.node));
 				else for (const member of group) checkedness.set(member.id, member.id === op.node);
 				continue;
@@ -854,18 +973,25 @@ export function createNativeRuntime(
 			if (op.op === 'after') {
 				const ms = evaluate(op.ms, eventValue, scope);
 				const locals = new Map(scope.locals);
-				for (const [name, value] of op.capture) locals.set(name, evaluate(value, eventValue, scope));
+				for (const [name, value] of op.capture)
+					locals.set(name, evaluate(value, eventValue, scope));
 				const id = `timer:${timerCount++}`;
 				timers.set(id, { ops: op.ops, locals, ...(submission ? { submission } : {}) });
 				if (submission) submission.pending++;
-				calls.push({ op: 'timer', timer: id, ms: typeof ms === 'number' && ms > 0 ? ms : 0 });
+				calls.push({
+					op: 'timer',
+					timer: id,
+					ms: typeof ms === 'number' && ms > 0 ? ms : 0,
+				});
 				continue;
 			}
 			if (op.op === 'navigate') {
 				const params = Object.fromEntries(
 					Object.entries(op.params).map(([name, value]) => [
 						name,
-						typeof value === 'string' ? value : String(evaluate(value, eventValue, scope)),
+						typeof value === 'string'
+							? value
+							: String(evaluate(value, eventValue, scope)),
 					]),
 				);
 				return [
@@ -908,7 +1034,10 @@ export function createNativeRuntime(
 						kind: 'dispatch',
 						fn: op.fn,
 						frame: frameOf(op.bindings, eventValue, scope),
-						event: eventValue === undefined ? { type: op.type } : { type: op.type, value: eventValue },
+						event:
+							eventValue === undefined
+								? { type: op.type }
+								: { type: op.type, value: eventValue },
 						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),
 					}),
 				);
@@ -959,7 +1088,10 @@ export function createNativeRuntime(
 		if (op.submitter !== null && attributeNow(op.submitter, 'disabled') !== null) return [];
 		const invalid = firstInvalid(op.form, op.submitter);
 		if (invalid) {
-			if (!missing) throw new Error(`the payload has no message for a ${invalid.kind} missing its value`);
+			if (!missing)
+				throw new Error(
+					`the payload has no message for a ${invalid.kind} missing its value`,
+				);
 			calls.push({
 				op: 'invalid',
 				node: invalid.node,
@@ -970,7 +1102,9 @@ export function createNativeRuntime(
 		const sent = JSON.stringify(entriesOf(op.form));
 		const runs = running.get(op.form) ?? [];
 		if (runs.some((run) => run.sent === sent && run.submitter === op.submitter)) return [];
-		const handler = payload.events.find((candidate) => candidate.host === op.form && candidate.event === 'submit');
+		const handler = payload.events.find(
+			(candidate) => candidate.host === op.form && candidate.event === 'submit',
+		);
 		if (!handler) throw new Error(`${op.form} has no submit handler`);
 		const submission: Submission = {
 			sent,
@@ -979,7 +1113,12 @@ export function createNativeRuntime(
 			pending: 0,
 		};
 		running.set(op.form, [...runs, submission]);
-		const out = run(handlers.get(handler.handler) ?? [], undefined, { ...base, locals: scope.locals }, submission);
+		const out = run(
+			handlers.get(handler.handler) ?? [],
+			undefined,
+			{ ...base, locals: scope.locals },
+			submission,
+		);
 		settled(submission);
 		return out;
 	}
@@ -1017,11 +1156,14 @@ export function createNativeRuntime(
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
 			// A row that left takes its state with it; a later row with the same key starts from the first values.
-			const kept = new Set(rows().flatMap(([list, keys]) => keys.map((key) => `${list}\0${key}`)));
+			const kept = new Set(
+				rows().flatMap(([list, keys]) => keys.map((key) => `${list}\0${key}`)),
+			);
 			for (const slot of values.keys()) {
 				const at = slot.indexOf('@');
 				const list = at < 0 ? undefined : rowOfCell.get(slot.slice(0, at));
-				if (list !== undefined && !kept.has(`${list}\0${slot.slice(at + 1)}`)) values.delete(slot);
+				if (list !== undefined && !kept.has(`${list}\0${slot.slice(at + 1)}`))
+					values.delete(slot);
 			}
 			forgetHidden();
 			const afterTexts = new Map(texts());
