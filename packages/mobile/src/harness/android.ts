@@ -12,7 +12,14 @@ import {
 } from './proof-app.ts';
 import type { DeviceManifest } from '../permissions.ts';
 import type { ProofAssets } from './rung.ts';
-import { type AndroidTools, cacheRoot, contentKey, filesUnder } from './tools.ts';
+import {
+	type AndroidTools,
+	cachedFolder,
+	cacheRoot,
+	contentKey,
+	filesUnder,
+	SHELL_CACHE_FORMAT,
+} from './tools.ts';
 
 export type BootedEmulator = {
 	readonly serial: string;
@@ -131,7 +138,8 @@ export async function buildAndroidShell(
 	hostSources: string,
 	shellDir: string,
 ): Promise<AndroidShell> {
-	const libraries = await androidLibraries(tools);
+	const hostLock = join(hostSources, '..', 'libraries.lock.json');
+	const libraries = await androidLibraries(tools, existsSync(hostLock) ? hostLock : undefined);
 	const sources = [...filesUnder(hostSources, '.kt'), ...filesUnder(shellDir, '.kt')];
 	const key = contentKey(hostSources, sources, [
 		tools.buildTools,
@@ -139,73 +147,67 @@ export async function buildAndroidShell(
 		tools.kotlinStdlib,
 		libraries.key,
 		androidManifest([]),
+		SHELL_CACHE_FORMAT,
 	]);
-	const root = join(cacheRoot(), 'android-shell', key);
-	const dexDir = join(root, 'dex');
-	const resources = join(root, 'resources.apk');
-	const ids = join(root, 'resource-ids.txt');
-	const shell = () => ({
-		dex: filesUnder(dexDir, '.dex'),
+	const root = await cachedFolder(join(cacheRoot(), 'android-shell', key), async (scratch) => {
+		const classes = join(scratch, 'classes');
+		const generated = join(scratch, 'r-java');
+		mkdirSync(join(scratch, 'dex'), { recursive: true });
+		writeFileSync(join(scratch, 'AndroidManifest.xml'), androidManifest([]));
+		await exec(join(tools.buildTools, 'aapt2'), [
+			'link',
+			'-o',
+			join(scratch, 'resources.apk'),
+			'-I',
+			tools.androidJar,
+			'--manifest',
+			join(scratch, 'AndroidManifest.xml'),
+			'--auto-add-overlay',
+			...libraries.resources.flatMap((archive) => ['-R', archive]),
+			'--extra-packages',
+			libraries.rPackages.join(':'),
+			'--java',
+			generated,
+			'--emit-ids',
+			join(scratch, 'resource-ids.txt'),
+		]);
+		await exec('javac', [
+			'--release',
+			'11',
+			'-nowarn',
+			'-d',
+			classes,
+			...filesUnder(generated, '.java'),
+		]);
+		const classpath = [tools.androidJar, classes, ...libraries.jars].join(':');
+		await exec('kotlinc', [
+			'-classpath',
+			classpath,
+			'-jvm-target',
+			'17',
+			'-nowarn',
+			'-d',
+			classes,
+			...sources,
+		]);
+		await exec(join(tools.buildTools, 'd8'), [
+			'--min-api',
+			'26',
+			'--output',
+			join(scratch, 'dex'),
+			'--lib',
+			tools.androidJar,
+			...filesUnder(classes, '.class'),
+			tools.kotlinStdlib,
+			...libraries.jars,
+		]);
+	});
+	return {
+		dex: filesUnder(join(root, 'dex'), '.dex'),
 		libraryResources: libraries.resources,
 		rPackages: libraries.rPackages,
-		ids,
-	});
-	if (existsSync(join(root, 'done'))) return shell();
-
-	rmSync(root, { recursive: true, force: true });
-	const classes = join(root, 'classes');
-	const generated = join(root, 'r-java');
-	mkdirSync(dexDir, { recursive: true });
-	writeFileSync(join(root, 'AndroidManifest.xml'), androidManifest([]));
-	await exec(join(tools.buildTools, 'aapt2'), [
-		'link',
-		'-o',
-		resources,
-		'-I',
-		tools.androidJar,
-		'--manifest',
-		join(root, 'AndroidManifest.xml'),
-		'--auto-add-overlay',
-		...libraries.resources.flatMap((archive) => ['-R', archive]),
-		'--extra-packages',
-		libraries.rPackages.join(':'),
-		'--java',
-		generated,
-		'--emit-ids',
-		ids,
-	]);
-	await exec('javac', [
-		'--release',
-		'11',
-		'-nowarn',
-		'-d',
-		classes,
-		...filesUnder(generated, '.java'),
-	]);
-	const classpath = [tools.androidJar, classes, ...libraries.jars].join(':');
-	await exec('kotlinc', [
-		'-classpath',
-		classpath,
-		'-jvm-target',
-		'17',
-		'-nowarn',
-		'-d',
-		classes,
-		...sources,
-	]);
-	await exec(join(tools.buildTools, 'd8'), [
-		'--min-api',
-		'26',
-		'--output',
-		dexDir,
-		'--lib',
-		tools.androidJar,
-		...filesUnder(classes, '.class'),
-		tools.kotlinStdlib,
-		...libraries.jars,
-	]);
-	writeFileSync(join(root, 'done'), '');
-	return shell();
+		ids: join(root, 'resource-ids.txt'),
+	};
 }
 
 const androidManifest = (
