@@ -193,7 +193,10 @@ public final class MarklessViewController: UIViewController {
 		}
 		applyBand()
 		var pops = [navigationController?.interactivePopGestureRecognizer]
+		// The content pop gesture exists only in the iOS 26 SDK (Swift 6.2); older Xcodes build without it.
+		#if compiler(>=6.2)
 		if #available(iOS 26, *) { pops.append(navigationController?.interactiveContentPopGestureRecognizer) }
+		#endif
 		for pop in pops.compactMap({ $0 }) {
 			for gesture in tree?.dismissGestures ?? [] { gesture.require(toFail: pop) }
 		}
