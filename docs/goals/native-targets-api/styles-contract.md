@@ -269,6 +269,11 @@ rendering of the same assignment (`screenshots/chrome*/`, from Dragon's `markles
 | `<dialog>` and `::backdrop`                                   | `top-layer-dialog.test.ts`: dialog and contents within 1 device px after `showModal()`, backdrop in Chrome's colour                                        | none     | not run | not run                                                                        | every Markless dialog: Chrome forces `overflow: auto` on a modal dialog, and the export has no scroll containers until `cw/native-scroll` is integrated; `:modal`, `[popover]` |
 | The default link underline                                    | groundwork only (Dragon `cw/dragon-bugs-underline`, not merged): Skia's glyph intercepts ported, 47 of 55,694 underline pixels still differ from Chrome    | none     | not run | not run                                                                        | `skip-ink-intercepts` on every real face; and Dragon's state runtime draws no decoration at all (TDEC-b)                                                                       |
 
+Receipt: one harness run per platform on this branch at `446b88bfe` (simulator `markless-dragon-bugs`, iPhone 17 on iOS 27.2;
+AVD `markless_dragon_bugs`, Pixel 7, API 36; Dragon `cw/dragon-bugs` at `9dbb4b7dc4`): S1 to S6 and every `u` rung (u1 to u6,
+u11 to u15, u17, u18, u20), 20 of 20 on each, "proof passed on iOS and Android" (`receipts/2026-11-18-dragon-bugs-*`). The
+u18 rung (`base.visuallyhidden`, the inline `style` attribute) shows the text hidden on both phones, as in Chrome.
+
 Found on the way:
 
 - **Android button labels.** The u17 "Tap" button draws "Ta" on Android: Dragon gives the label 82.5 device px, the host's
