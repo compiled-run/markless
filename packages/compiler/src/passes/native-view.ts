@@ -3710,19 +3710,6 @@ export function createNativeViewPayload(
 					continue;
 				}
 				const [task] = tasks;
-				// A handler's error shows the @catch arm whatever the value is doing.
-				const noHandlerError = (test: NativeExpr): NativeExpr =>
-					caught
-						? {
-								logical: '&&',
-								left: {
-									binary: '===',
-									left: { cell: catchCell },
-									right: { literal: null },
-								},
-								right: test,
-							}
-						: test;
 				const state = (value: string): NativeExpr =>
 					task === undefined
 						? { literal: value === 'value' }
@@ -3735,9 +3722,44 @@ export function createNativeViewPayload(
 					kind: 'branch',
 					id: branchId,
 					parent,
-					tests: [noHandlerError(state('value')), noHandlerError(state('pending')), null],
+					tests: [state('value'), state('pending'), null],
 					arms: 3,
 				});
+				// A handler that rejects keeps the shown content and opens @catch after it, as the web's spec says (a failed
+				// value on the first load still shows only @catch).
+				if (caught) {
+					const caughtId = `${branchId}:caught`;
+					const shownAfter: NativeExpr = {
+						binary: '!==',
+						left: { cell: catchCell },
+						right: { literal: null },
+					};
+					nodes.push({
+						kind: 'branch',
+						id: caughtId,
+						parent,
+						test:
+							task === undefined
+								? shownAfter
+								: { logical: '&&', left: shownAfter, right: { unary: '!', value: state('error') } },
+						arms: 1,
+					});
+					lowerChunk(
+						scope.module.chunks.get(item.arms.catch)!,
+						parent,
+						{ arm: { branch: caughtId, index: 0 } },
+						{
+							...scope,
+							prefix: `${scope.prefix}${caughtId}/`,
+							boundary: {
+								tasks: new Set(),
+								arm: 'catch',
+								catches,
+								...(boundary?.errorName ? { errorName: boundary.errorName } : {}),
+							},
+						},
+					);
+				}
 				continue;
 			}
 			if (item.kind === 'branch') {

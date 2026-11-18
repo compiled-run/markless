@@ -35,15 +35,15 @@ only the statements the handlers reach, so a module whose other function touches
 
 ## The rungs
 
-| Rung                | What                                                             | Web              | Reference                                     | iOS simulator | Android emulator |
-| ------------------- | ---------------------------------------------------------------- | ---------------- | --------------------------------------------- | ------------- | ---------------- |
-| j1-loop-local       | a loop with a local and string work                              | pass             | pass                                          | pass          | pass             |
-| j2-app-and-library  | a function from another app module, and `scule` from npm         | pass             | pass                                          | pass          | pass             |
-| j3-await-catch      | `await` with code after it; a rejection in `@catch`              | pass (see below) | pass                                          | pass          | pass             |
-| j4-timers-fetch     | `setInterval`/`clearInterval`, `fetch` to the test's echo server | pass             | pass                                          | pass          | pass             |
-| j5-engine-computed  | a computed whose body needs the engine                           | pass             | pass                                          | pass          | pass             |
-| j6-engine-on-demand | a data-only screen beside a JavaScript screen                    | pass             | pass                                          | pass          | pass             |
-| j7-page-refused     | `document.title =` in a handler                                  | pass             | refused at build time, by name, file and line | n/a           | n/a              |
+| Rung                | What                                                             | Web  | Reference                                     | iOS simulator | Android emulator |
+| ------------------- | ---------------------------------------------------------------- | ---- | --------------------------------------------- | ------------- | ---------------- |
+| j1-loop-local       | a loop with a local and string work                              | pass | pass                                          | pass          | pass             |
+| j2-app-and-library  | a function from another app module, and `scule` from npm         | pass | pass                                          | pass          | pass             |
+| j3-await-catch      | `await` with code after it; a rejection in `@catch`              | pass | pass                                          | pass          | pass             |
+| j4-timers-fetch     | `setInterval`/`clearInterval`, `fetch` to the test's echo server | pass | pass                                          | pass          | pass             |
+| j5-engine-computed  | a computed whose body needs the engine                           | pass | pass                                          | pass          | pass             |
+| j6-engine-on-demand | a data-only screen beside a JavaScript screen                    | pass | pass                                          | pass          | pass             |
+| j7-page-refused     | `document.title =` in a handler                                  | pass | refused at build time, by name, file and line | n/a           | n/a              |
 
 Device runs (one harness run per platform, on the simulator `markless-js` and the emulator `markless_js`) also passed
 03-counter, 08-text-input, n1-two-routes and r135-idle as regressions, and r137-clock on iOS. Host conformance: `swift
@@ -55,11 +55,12 @@ with every handler a script can run forced into the engine (`all`); the screens 
 (the clock vector is left out: it fixes the data path's clock, and the engine reads the device's own). J1's own handler is
 outside the data vocabulary: a data-only build refuses it with four named reasons.
 
-**Where phones and the web differ (J3).** When an async handler's await rejects inside `@try`, the web keeps the `@try`
-content and shows the `@catch` arm after it. That is the specified behaviour (`specs/framework/12-arm-rendering.md`,
-"Handler rejection", #540), pinned by the router's `child-async-catch` tests; an earlier draft of this report called it
-a web defect, which was wrong. Phones replace the content, as the data path already does for a failed device call. The
-rung records the difference in `onWeb`; which way phones should go is an open question.
+**A rejected handler in `@try` (J3, and D4b's failed device call).** When an async handler's promise rejects inside
+`@try`, the `@try` content stays and the `@catch` arm opens after it, as the spec says (`specs/framework/12-arm-rendering.md`,
+"Handler rejection", #540) and the web does. Phones now do the same, on both paths: the native pass keeps the boundary
+on its `@try` (or `@pending`) arm and adds a branch after it (`<boundary>:caught`) holding the `@catch` content, shown
+once the boundary's catch cell holds the handler's error. A failed async value on the first load still shows only
+`@catch`. An earlier draft of this report called the web's behaviour a defect; that was wrong, and no issue was opened.
 
 ## Size and first-interaction delay
 
@@ -153,15 +154,15 @@ Only two demos moved. The ports moved none: their calls into app code now run as
 What the JavaScript refusals are, after render values (a page counts once per kind; outside the docusaurus and htmx
 documentation sites in brackets):
 
-| Kind | Pages |
-| --- | --- |
-| the web page: `document`, the window, browser storage, the DOM | 824 (153) |
-| an import the build could not read (packages not installed in the migrate checkout: `nprogress`, `zod`) | 558 (75) |
-| a global no phone script has: `URLSearchParams` 506, `URL` 503, `performance` 486, and DOM classes the page list does not name yet (`HTMLAnchorElement` 486, `HashChangeEvent` 476, other `HTML…Element` and `…Event` classes 10 to 13 each) | 527 (50) |
-| `shared()` objects, device objects or element handles | 248 (60) |
-| a name JavaScript cannot reach (not state, a prop value, a row item or a computed) | 82 (77) |
-| framework state or components used by module code | 10 (10) |
-| an event field a phone lacks | 5 (4) |
+| Kind                                                                                                                                                                                                                                         | Pages     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| the web page: `document`, the window, browser storage, the DOM                                                                                                                                                                               | 824 (153) |
+| an import the build could not read (packages not installed in the migrate checkout: `nprogress`, `zod`)                                                                                                                                      | 558 (75)  |
+| a global no phone script has: `URLSearchParams` 506, `URL` 503, `performance` 486, and DOM classes the page list does not name yet (`HTMLAnchorElement` 486, `HashChangeEvent` 476, other `HTML…Element` and `…Event` classes 10 to 13 each) | 527 (50)  |
+| `shared()` objects, device objects or element handles                                                                                                                                                                                        | 248 (60)  |
+| a name JavaScript cannot reach (not state, a prop value, a row item or a computed)                                                                                                                                                           | 82 (77)   |
+| framework state or components used by module code                                                                                                                                                                                            | 10 (10)   |
+| an event field a phone lacks                                                                                                                                                                                                                 | 5 (4)     |
 
 The 96 pages still refused as "needs a script engine" are mostly class tests, first values of state and submit handlers,
 which stay data by design here.

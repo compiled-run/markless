@@ -53,34 +53,10 @@
 				"parent": "h0",
 				"tests": [
 					{
-						"logical": "&&",
-						"left": {
-							"binary": "===",
-							"left": {
-								"cell": "boundary:0:catch"
-							},
-							"right": {
-								"literal": null
-							}
-						},
-						"right": {
-							"literal": true
-						}
+						"literal": true
 					},
 					{
-						"logical": "&&",
-						"left": {
-							"binary": "===",
-							"left": {
-								"cell": "boundary:0:catch"
-							},
-							"right": {
-								"literal": null
-							}
-						},
-						"right": {
-							"literal": false
-						}
+						"literal": false
 					},
 					null
 				],
@@ -229,6 +205,53 @@
 					"branch": "boundary:0",
 					"index": 2
 				}
+			},
+			{
+				"kind": "branch",
+				"id": "boundary:0:caught",
+				"parent": "h0",
+				"test": {
+					"binary": "!==",
+					"left": {
+						"cell": "boundary:0:catch"
+					},
+					"right": {
+						"literal": null
+					}
+				},
+				"arms": 1
+			},
+			{
+				"kind": "element",
+				"id": "boundary:0:caught/h7",
+				"element": "p",
+				"parent": "h0",
+				"arm": {
+					"branch": "boundary:0:caught",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "boundary:0:caught/h7:text0",
+				"parent": "boundary:0:caught/h7",
+				"parts": [
+					{
+						"text": "Failed: "
+					},
+					{
+						"expr": {
+							"member": {
+								"cell": "boundary:0:catch"
+							},
+							"property": "message"
+						}
+					}
+				],
+				"arm": {
+					"branch": "boundary:0:caught",
+					"index": 0
+				}
 			}
 		],
 		"events": [
@@ -296,7 +319,10 @@
 		["h5:text0", "Look up"],
 		["h6:text0", "Look up a missing word"]
 	],
-	"initialArms": [["boundary:0", 0]],
+	"initialArms": [
+		["boundary:0", 0],
+		["boundary:0:caught", null]
+	],
 	"steps": [
 		{
 			"action": {
@@ -360,8 +386,8 @@
 			"journal": [
 				{
 					"op": "arm",
-					"node": "boundary:0",
-					"index": 2
+					"node": "boundary:0:caught",
+					"index": 0
 				}
 			]
 		}
