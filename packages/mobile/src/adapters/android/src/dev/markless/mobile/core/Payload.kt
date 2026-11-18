@@ -79,9 +79,14 @@ sealed interface Node {
 	data class Branch(override val id: String, override val parent: String?, val test: Expr?, val arms: Int, override val arm: ArmPlace? = null, override val row: String? = null, val tests: List<Expr?>? = null) : Node
 	/** A keyed list: one row per item of [list], keyed by `String()` of the item at the [key] path. */
 	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
+	/** The platform's own sheet: its content is the nodes whose parent is this id, built at mount and kept; shown while [open] is truthy. */
+	data class Sheet(override val id: String, override val parent: String, val open: Expr, val snapPoints: List<Double>, val dismissible: Boolean, val modal: Boolean) : Node {
+		override val arm: ArmPlace? get() = null
+		override val row: String? get() = null
+	}
 }
 
-enum class EventName(val wire: String) { Activate("activate"), Input("input") }
+enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss") }
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
@@ -140,7 +145,7 @@ data class Payload(
 				val p = node.parent
 				if (p != null) {
 					val parent = seen[p] ?: throw MarklessDecodeError("node \"${node.id}\" names parent \"$p\" that does not precede it")
-					if (parent !is Node.Element) throw MarklessDecodeError("node \"${node.id}\" has a ${parent::class.simpleName} node as its parent")
+					if (parent !is Node.Element && (parent !is Node.Sheet || node is Node.Sheet)) throw MarklessDecodeError("node \"${node.id}\" has a ${parent::class.simpleName} node as its parent")
 				} else if (node is Node.Text) throw MarklessDecodeError("text node \"${node.id}\" has no parent")
 				node.arm?.let { a ->
 					val b = seen[a.branch] as? Node.Branch ?: throw MarklessDecodeError("node \"${node.id}\" sits in an arm of \"${a.branch}\", which is not a preceding branch")
@@ -153,6 +158,7 @@ data class Payload(
 					is Node.Element -> node.bindings.map { it.value }
 					is Node.Branch -> listOfNotNull(node.test) + node.tests.orEmpty().filterNotNull()
 					is Node.Repeat -> listOf(node.list)
+					is Node.Sheet -> listOf(node.open)
 				}
 				for (e in reads) for (c in cellsOf(e)) if (c !in cellIds) throw MarklessDecodeError("node \"${node.id}\" reads unknown cell \"$c\"")
 			}
@@ -161,7 +167,10 @@ data class Payload(
 			for (h in handlers) if (!handlerIds.add(h.id)) throw MarklessDecodeError("duplicate handler \"${h.id}\"")
 			val events = root.field("events", "payload").arr("payload.events").mapIndexed { n, e -> event(e, "events[$n]") }
 			for (e in events) {
-				if (seen[e.host] !is Node.Element) throw MarklessDecodeError("event on \"${e.host}\" names no element")
+				val host = seen[e.host]
+				if (e.event == EventName.Dismiss) {
+					if (host !is Node.Sheet) throw MarklessDecodeError("dismiss event on \"${e.host}\" names no sheet")
+				} else if (host !is Node.Element) throw MarklessDecodeError("event on \"${e.host}\" names no element")
 				if (e.handler !in handlerIds) throw MarklessDecodeError("event on \"${e.host}\" names unknown handler \"${e.handler}\"")
 			}
 			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers)
@@ -315,6 +324,14 @@ data class Payload(
 					val parent = o.field("parent", what)
 					val key = o.field("key", what).arr("$what.key").map { it.str("$what.key[]") }
 					Node.Repeat(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("list", what), "$what.list"), key, armPlace(o, what), rowPlace(o, what))
+				}
+				"sheet" -> {
+					o.only(setOf("kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"), what)
+					val snapPoints = o.field("snapPoints", what).arr("$what.snapPoints").map { it.num("$what.snapPoints[]") }
+					val two = snapPoints.size == 2 && snapPoints[0] > 0 && snapPoints[0] < 1 && snapPoints[1] == 1.0
+					if (snapPoints != listOf(1.0) && !two) throw MarklessDecodeError("$what has snapPoints $snapPoints; a sheet rests at [1] or [x, 1] with 0 < x < 1")
+					fun flag(k: String) = (o.field(k, what) as? Json.Bool ?: throw MarklessDecodeError("$what.$k must be a boolean")).value
+					Node.Sheet(id, o.field("parent", what).str("$what.parent"), expr(o.field("open", what), "$what.open"), snapPoints, flag("dismissible"), flag("modal"))
 				}
 				else -> throw MarklessDecodeError("$what has unknown node kind \"$kind\"")
 			}

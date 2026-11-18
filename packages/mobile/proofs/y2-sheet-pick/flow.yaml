@@ -1,0 +1,41 @@
+appId: ${APP_ID}
+name: y2-sheet-pick
+---
+- launchApp:
+      clearState: true
+- assertVisible: Checkout
+- assertVisible: Ship to nowhere yet
+- assertVisible: Choose city
+- assertNotVisible: Choose a city
+- assertNotVisible: Osaka
+- tapOn: Choose city
+- assertVisible: Choose a city
+- assertVisible: Osaka
+- assertVisible: Choose a city
+- assertVisible: Lisbon
+- assertVisible: Osaka
+- assertVisible: Quito
+- tapOn: Osaka
+- assertNotVisible: Choose a city
+- assertNotVisible: Osaka
+- assertVisible: Ship to Osaka
+- assertNotVisible: Choose a city
+- assertNotVisible: Osaka
+- assertNotVisible: Ship to nowhere yet
+- tapOn: Choose city
+- assertVisible: Choose a city
+- assertVisible: Osaka
+- assertVisible: Choose a city
+- assertVisible: Osaka
+- tapOn: City
+- eraseText
+- inputText: Porto
+- assertVisible: Porto
+- assertVisible: Use Porto
+- assertVisible: Porto
+- tapOn: Use Porto
+- assertNotVisible: Use Porto
+- assertVisible: Ship to Porto
+- assertNotVisible: Choose a city
+- assertNotVisible: Use Porto
+- assertNotVisible: Ship to Osaka

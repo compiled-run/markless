@@ -13,7 +13,7 @@ import {
 
 test('the ladder has one proof folder per rung, in rung order', () => {
 	expect(rungFolders().map((folder) => readRung(folder).rung)).toEqual([
-		1, 2, 3, 4, 5, 5.5, 6, 7, 7.5, 7.75, 7.875, 8, 9, 10, 11,
+		1, 2, 3, 4, 5, 5.5, 6, 7, 7.5, 7.75, 7.875, 8, 9, 10, 11, 101, 102, 103, 104,
 	]);
 	for (const folder of rungFolders())
 		expect(existsSync(join(proofsDir, folder, 'App.tsrx'))).toBe(true);
@@ -35,7 +35,13 @@ test.each(rungFolders())(
 	(folder) => {
 		const { steps } = readRung(folder);
 		for (const [index, step] of steps.entries()) {
-			if (index === 0 || (step.do && 'relaunch' in step.do)) continue;
+			// A resting height is not a text: the screenshot after a swipe is its record. Maestro's scrollUntilVisible fails by
+			// itself unless the text comes on screen.
+			if (
+				index === 0 ||
+				(step.do && ('relaunch' in step.do || 'swipe' in step.do || 'scrollTo' in step.do))
+			)
+				continue;
 			expect(
 				witnessCount(changeWitness(steps[index - 1]!, step)),
 				`step ${index}`,

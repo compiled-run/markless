@@ -246,3 +246,57 @@ private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) 
 	#expect(throws: HostError.self) { try MarklessViewController(payload: counterPayload(), style: style, fonts: swapped) }
 }
 #endif
+
+@MainActor @Test func aSystemSheetKeepsItsContentOffThePageAndPresentsAPageSheet() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("sheet"), store: MemoryStore())
+	let views = try tree(controller)
+	let sheet = try #require(views.sheets["sheet:component-edge:0"])
+	let field = try #require(views.elements["h5"] as? UITextField)
+	#expect(field.isDescendant(of: sheet.content))
+	#expect(!sheet.content.isDescendant(of: views.root))
+	#expect(views.labels["h11:text0"]?.text == "Osaka")
+
+	let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+	window.rootViewController = controller
+	window.makeKeyAndVisible()
+	try #require(views.elements["h3"] as? UIButton).sendActions(for: .touchUpInside)
+	guard case let .shown(presented) = sheet.state else { Issue.record("the sheet did not present"); return }
+	#expect(controller.presentedViewController === presented)
+	#expect(presented.modalPresentationStyle == .pageSheet)
+	#expect(!presented.isModalInPresentation)
+	let presentation = try #require(presented.sheetPresentationController)
+	#expect(presentation.detents.map(\.identifier) == [.medium, .large])
+	#expect(presentation.selectedDetentIdentifier == .medium)
+	#expect(presentation.prefersGrabberVisible)
+	#expect(presentation.largestUndimmedDetentIdentifier == nil)
+	presented.loadViewIfNeeded()
+	#expect(sheet.content.isDescendant(of: presented.view))
+
+	// Stands in for the person's swipe: UIKit calls this after the sheet has gone.
+	sheet.presentationControllerDidDismiss(presentation)
+	guard case .closed = sheet.state else { Issue.record("the sheet is not closed after the platform dismissed it"); return }
+
+	field.text = "Porto"
+	field.sendActions(for: .editingChanged)
+	#expect(views.labels["h6:text0"]?.text == "Use Porto")
+	try #require(views.elements["h6"] as? UIButton).sendActions(for: .touchUpInside)
+	#expect(views.labels["h2:text0"]?.text == "Ship to Porto")
+}
+
+@MainActor @Test func aSheetOpenAtMountWaitsForThePageToBeOnScreen() throws {
+	let payload = try JSONValue.parse(vectorPayload("sheet"))
+	guard case var .object(fields) = payload, let cells = fields.firstIndex(where: { $0.0 == "cells" }) else { throw HostError("no cells") }
+	fields[cells].1 = .array([
+		.object([("id", .string("state:picking")), ("name", .string("picking")), ("initial", .bool(true))]),
+		.object([("id", .string("state:city")), ("name", .string("city")), ("initial", .string(""))]),
+		.object([("id", .string("state:shipTo")), ("name", .string("shipTo")), ("initial", .string("nowhere yet"))]),
+	])
+	let controller = try MarklessViewController(payload: Data(JSONValue.object(fields).jsonText.utf8), store: MemoryStore())
+	let sheet = try #require(try tree(controller).sheets["sheet:component-edge:0"])
+	guard case .waitingForWindow = sheet.state else { Issue.record("an open sheet presented before its page was on screen"); return }
+	let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+	window.rootViewController = controller
+	window.makeKeyAndVisible()
+	controller.viewDidAppear(false)
+	guard case .shown = sheet.state else { Issue.record("the sheet did not present when its page appeared"); return }
+}

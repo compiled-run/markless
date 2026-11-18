@@ -997,6 +997,9 @@ importers:
         specifier: workspace:*
         version: link:../tools
     devDependencies:
+      '@markless/serializer':
+        specifier: workspace:*
+        version: link:../../serializer
       '@markless/vitest-browser':
         specifier: workspace:*
         version: link:../../vitest-browser

@@ -126,7 +126,7 @@ async function main(argv: string[]): Promise<number> {
 		platforms.map((platform) => [platform, []]),
 	);
 	try {
-		const [booted, avd, iosApp, androidDex] = await Promise.all([
+		const [booted, avd, iosApp, androidShell] = await Promise.all([
 			runs('ios') ? bootSimulator(values.simulator) : undefined,
 			tools ? bootEmulator(tools, values.avd, Number(values.port)) : undefined,
 			runs('ios') ? buildIosShell(hosts.iosPackage, join(shells, 'ios')) : undefined,
@@ -163,7 +163,7 @@ async function main(argv: string[]): Promise<number> {
 						await installProofApk(
 							tools!,
 							emulator!,
-							androidDex!,
+							androidShell!,
 							rung.assets,
 							join(work, 'android-app'),
 						);

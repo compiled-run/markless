@@ -1,0 +1,30 @@
+{
+	"rung": 102,
+	"name": "A system sheet with a list and a text input hands its value to the page",
+	"steps": [
+		{
+			"visible": ["Checkout", "Ship to nowhere yet", "Choose city"],
+			"absent": ["Choose a city", "Osaka"]
+		},
+		{
+			"do": { "tap": "Choose city" },
+			"visible": ["Choose a city", "Lisbon", "Osaka", "Quito"]
+		},
+		{
+			"do": { "tap": "Osaka" },
+			"visible": ["Ship to Osaka"],
+			"absent": ["Choose a city", "Osaka", "Ship to nowhere yet"]
+		},
+		{ "do": { "tap": "Choose city" }, "visible": ["Choose a city", "Osaka"] },
+		{
+			"do": { "type": { "field": "City", "text": "Porto", "keepKeyboard": true } },
+			"visible": ["Use Porto"],
+			"fields": { "City": "Porto" }
+		},
+		{
+			"do": { "tap": "Use Porto" },
+			"visible": ["Ship to Porto"],
+			"absent": ["Choose a city", "Use Porto", "Ship to Osaka"]
+		}
+	]
+}

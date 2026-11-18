@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { androidLibraries } from './android-libraries.ts';
 import { exec } from './exec.ts';
 import { ANDROID_SHELL_ACTIVITY, PROOF_APP_ID, PROOF_APP_NAME } from './proof-app.ts';
 import type { ProofAssets } from './rung.ts';
@@ -108,46 +109,73 @@ export async function stopEmulator(tools: AndroidTools, emulator: BootedEmulator
 		await exec(tools.adb, ['-s', emulator.serial, 'emu', 'kill'], { allowFailure: true });
 }
 
-/** Compiles the host's Kotlin sources with the shell activity to one classes.dex (once per distinct source set). */
+/** The shell built once per source set: its dex files and the linked resources (the libraries' with the manifest) every rung's APK starts from. */
+export type AndroidShell = { readonly dex: ReadonlyArray<string>; readonly resources: string };
+
+/** Links the libraries' resources, compiles their R classes and the host's Kotlin sources with the shell activity, and dexes it all. */
 export async function buildAndroidShell(
 	tools: AndroidTools,
 	hostSources: string,
 	shellDir: string,
-): Promise<string> {
+): Promise<AndroidShell> {
+	const libraries = await androidLibraries(tools);
 	const sources = [...filesUnder(hostSources, '.kt'), ...filesUnder(shellDir, '.kt')];
 	const key = contentKey(hostSources, sources, [
 		tools.buildTools,
 		tools.androidJar,
 		tools.kotlinStdlib,
+		libraries.key,
+		manifest(),
 	]);
 	const root = join(cacheRoot(), 'android-shell', key);
-	const dex = join(root, 'dex', 'classes.dex');
-	if (existsSync(dex)) return dex;
+	const dexDir = join(root, 'dex');
+	const resources = join(root, 'resources.apk');
+	if (existsSync(join(root, 'done')))
+		return { dex: filesUnder(dexDir, '.dex'), resources };
 
 	rmSync(root, { recursive: true, force: true });
 	const classes = join(root, 'classes');
-	mkdirSync(join(root, 'dex'), { recursive: true });
-	await exec('kotlinc', [
-		'-classpath',
+	const generated = join(root, 'r-java');
+	mkdirSync(dexDir, { recursive: true });
+	writeFileSync(join(root, 'AndroidManifest.xml'), manifest());
+	await exec(join(tools.buildTools, 'aapt2'), [
+		'link',
+		'-o',
+		resources,
+		'-I',
 		tools.androidJar,
-		'-jvm-target',
-		'17',
+		'--manifest',
+		join(root, 'AndroidManifest.xml'),
+		'--auto-add-overlay',
+		...libraries.resources.flatMap((archive) => ['-R', archive]),
+		'--extra-packages',
+		libraries.rPackages.join(':'),
+		'--java',
+		generated,
+	]);
+	await exec('javac', [
+		'--release',
+		'11',
 		'-nowarn',
 		'-d',
 		classes,
-		...sources,
+		...filesUnder(generated, '.java'),
 	]);
+	const classpath = [tools.androidJar, classes, ...libraries.jars].join(':');
+	await exec('kotlinc', ['-classpath', classpath, '-jvm-target', '17', '-nowarn', '-d', classes, ...sources]);
 	await exec(join(tools.buildTools, 'd8'), [
 		'--min-api',
 		'26',
 		'--output',
-		join(root, 'dex'),
+		dexDir,
 		'--lib',
 		tools.androidJar,
 		...filesUnder(classes, '.class'),
 		tools.kotlinStdlib,
+		...libraries.jars,
 	]);
-	return dex;
+	writeFileSync(join(root, 'done'), '');
+	return { dex: filesUnder(dexDir, '.dex'), resources };
 }
 
 const manifest = () => `<?xml version="1.0" encoding="utf-8"?>
@@ -190,14 +218,13 @@ async function signingKey(): Promise<string> {
 	return keystore;
 }
 
-/** Packs the shell's dex with the rung's payload (and style export and fonts) as assets, signs the APK and installs it. */
-export async function installProofApk(
+/** Packs the shell's resources and dex with the rung's payload (and style export and fonts) as assets and signs the APK. */
+export async function packProofApk(
 	tools: AndroidTools,
-	emulator: BootedEmulator,
-	dex: string,
+	shell: AndroidShell,
 	assets: ProofAssets,
 	workDir: string,
-) {
+): Promise<string> {
 	const assetDir = join(workDir, 'assets');
 	rmSync(workDir, { recursive: true, force: true });
 	mkdirSync(assetDir, { recursive: true });
@@ -205,22 +232,12 @@ export async function installProofApk(
 		mkdirSync(join(assetDir, path, '..'), { recursive: true });
 		writeFileSync(join(assetDir, path), bytes);
 	}
-	writeFileSync(join(workDir, 'AndroidManifest.xml'), manifest());
 	const unsigned = join(workDir, 'unsigned.apk');
 	const aligned = join(workDir, 'aligned.apk');
 	const apk = join(workDir, `${PROOF_APP_NAME}.apk`);
-	await exec(join(tools.buildTools, 'aapt2'), [
-		'link',
-		'-o',
-		unsigned,
-		'-I',
-		tools.androidJar,
-		'--manifest',
-		join(workDir, 'AndroidManifest.xml'),
-		'-A',
-		assetDir,
-	]);
-	await exec('zip', ['-q', '-j', unsigned, dex]);
+	copyFileSync(shell.resources, unsigned);
+	await exec('zip', ['-q', '-r', '-0', unsigned, 'assets'], { cwd: workDir });
+	await exec('zip', ['-q', '-j', unsigned, ...shell.dex]);
 	await exec(join(tools.buildTools, 'zipalign'), ['-f', '4', unsigned, aligned]);
 	await exec(join(tools.buildTools, 'apksigner'), [
 		'sign',
@@ -232,6 +249,18 @@ export async function installProofApk(
 		apk,
 		aligned,
 	]);
+	return apk;
+}
+
+/** Packs the rung's APK ([packProofApk]) and installs it in place of any earlier proof app. */
+export async function installProofApk(
+	tools: AndroidTools,
+	emulator: BootedEmulator,
+	shell: AndroidShell,
+	assets: ProofAssets,
+	workDir: string,
+) {
+	const apk = await packProofApk(tools, shell, assets, workDir);
 	await exec(tools.adb, ['-s', emulator.serial, 'uninstall', PROOF_APP_ID], {
 		allowFailure: true,
 	});

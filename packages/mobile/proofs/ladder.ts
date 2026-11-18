@@ -5,9 +5,26 @@ import { stringify } from 'yaml';
 /** One person's action between two looks at the screen. Every target is a visible text or an accessible name. */
 export type LadderAction =
 	| { readonly tap: string }
-	| { readonly type: { readonly field: string; readonly text: string } }
+	| {
+			readonly type: {
+				readonly field: string;
+				readonly text: string;
+				/** Leave the keyboard up afterwards, so the screenshot after the step shows what it covers. */
+				readonly keepKeyboard?: true;
+			};
+	  }
 	| { readonly relaunch: true }
-	| { readonly wait: number };
+	| { readonly wait: number }
+	/**
+	 * Close the open system sheet the platform's way: `swipe` pulls it down; `back` is Android's back gesture (an edge
+	 * swipe). iOS has no back for a sheet, so there `back` is the pull down too; on the web both are Escape, the
+	 * browser's close request.
+	 */
+	| { readonly dismiss: 'swipe' | 'back' }
+	/** Pull the open system sheet up to its next resting height. The web's dialog has none, so there it does nothing. */
+	| { readonly swipe: 'up' }
+	/** Scroll until this text is on screen. */
+	| { readonly scrollTo: string };
 
 /** What the screen shows after a step's action (or at launch, for the first step). */
 export type LadderStep = {
@@ -38,7 +55,7 @@ export const proofsDir = import.meta.dirname;
 
 export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && /^\d\d[a-z]?-/.test(entry.name))
+		.filter((entry) => entry.isDirectory() && /^(\d\d[a-z]?|y\d+)-/.test(entry.name))
 		.map((entry) => entry.name)
 		.sort();
 
@@ -88,6 +105,15 @@ const assertions = (step: LadderStep): unknown[] => [
 	...Object.values(step.fields ?? {}).map((value) => ({ assertVisible: selector(value) })),
 ];
 
+// Inside the sheet at either resting height on both phones. iOS springs a slow pull back, and hands a pull past full height to the content's scroll.
+const pullDown = () => ({ swipe: { start: '50%, 56%', end: '50%, 96%', duration: 150 } });
+const pullUp = { swipe: { start: '50%, 56%', end: '50%, 20%', duration: 600 } };
+// Android's back gesture with gesture navigation (the Pixel 7 AVD's default): a swipe in from the left edge.
+const backGesture = { swipe: { start: '1%, 50%', end: '85%, 50%', duration: 300 } };
+const onPlatform = (platform: 'Android' | 'iOS', commands: unknown[]) => ({
+	runFlow: { when: { platform }, commands },
+});
+
 const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 	if ('tap' in action) return [{ tapOn: selector(action.tap) }];
 	if ('type' in action)
@@ -95,9 +121,23 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			{ tapOn: selector(action.type.field) },
 			'eraseText',
 			{ inputText: action.type.text },
-			'hideKeyboard',
+			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];
 	if ('relaunch' in action) return ['stopApp', 'launchApp'];
+	if ('dismiss' in action)
+		return action.dismiss === 'swipe'
+			? [pullDown()]
+			: [onPlatform('Android', [backGesture]), onPlatform('iOS', [pullDown()])];
+	if ('swipe' in action) return [pullUp];
+	if ('scrollTo' in action)
+		return [
+			{
+				scrollUntilVisible: {
+					element: { text: selector(action.scrollTo) },
+					direction: 'DOWN',
+				},
+			},
+		];
 	return [
 		{
 			extendedWaitUntil: {

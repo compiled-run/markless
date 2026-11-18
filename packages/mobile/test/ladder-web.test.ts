@@ -52,6 +52,7 @@ async function serveRung(folder: string, rung: LadderRung): Promise<string> {
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
+	await symlink(join(packagesRoot, 'headless/components'), join(root, 'node_modules/@markless/ui'), 'dir');
 	const nodeEnv = process.env.NODE_ENV;
 	// Vitest's NODE_ENV=test leaves import.meta.env.DEV true in a build.
 	process.env.NODE_ENV = 'production';
@@ -81,7 +82,10 @@ async function act(page: Page, step: LadderStep) {
 		await field.fill('');
 		await field.pressSequentially(action.type.text);
 	} else if ('relaunch' in action) await page.reload();
-	else await page.clock.runFor(action.wait);
+	else if ('wait' in action) await page.clock.runFor(action.wait);
+	// The browser's close request for the top dialog, the web's swipe and back alike.
+	else if ('dismiss' in action) await page.keyboard.press('Escape');
+	else if ('scrollTo' in action) await shown(page, action.scrollTo).scrollIntoViewIfNeeded();
 }
 
 // Every expectation of a step read at one moment, so a screen the action has not reached yet cannot pass.

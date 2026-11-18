@@ -63,6 +63,9 @@ private fun runVector(file: File) {
 	val arms = runtime.arms().joinToString(",", "[", "]") { (n, i) -> "[${jsonString(n)},${i ?: "null"}]" }
 	val initialArms = vector["initialArms"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialArms", arms == initialArms) { "expected $initialArms\n  actual   $arms" }
+	val sheets = runtime.sheets().joinToString(",", "[", "]") { (n, open) -> "[${jsonString(n)},$open]" }
+	val initialSheets = vector["initialSheets"]?.let(::canonical) ?: "[]"
+	check("${file.name} initialSheets", sheets == initialSheets) { "expected $initialSheets\n  actual   $sheets" }
 	for ((n, step) in field(vector, "steps", file.name).arr("steps").withIndex()) {
 		val s = step.obj("steps[$n]")
 		val action = field(s, "action", "steps[$n]").obj("action")
@@ -101,6 +104,15 @@ private fun decoderStrictness() {
 	refuses("a parent that does not precede", ok.replace("\"parent\":\"h0\"", "\"parent\":\"h9\""), "does not precede")
 	refuses("an unknown cell read", ok.replace("\"parts\":[{\"cell\":\"c\"}]", "\"parts\":[{\"cell\":\"d\"}]"), "unknown cell \"d\"")
 	refuses("trailing bytes", "$ok x", "trailing data")
+	val sheet = ok.replace("]}],\"events\"", "]},{\"kind\":\"sheet\",\"id\":\"s\",\"parent\":\"h0\",\"open\":{\"cell\":\"c\"},\"snapPoints\":[1],\"dismissible\":true,\"modal\":true},{\"kind\":\"element\",\"id\":\"h1\",\"element\":\"p\",\"parent\":\"s\"}],\"events\"")
+		.replace("\"handler\":\"x\"}]", "\"handler\":\"x\"},{\"host\":\"s\",\"event\":\"dismiss\",\"handler\":\"x\"}]")
+	check("decodes a sheet and its content", runCatching { Payload.decode(sheet.toByteArray()) }.getOrNull()?.nodes?.any { it is Node.Sheet && it.snapPoints == listOf(1.0) } == true) { runCatching { Payload.decode(sheet.toByteArray()) }.exceptionOrNull().toString() }
+	refuses("a sheet resting at one height below full", sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0.5]"), "snapPoints")
+	refuses("a sheet whose largest height is not full", sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0.3,0.8]"), "snapPoints")
+	refuses("a sheet in an arm", sheet.replace("\"modal\":true", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}"), "unknown field \"arm\"")
+	refuses("a sheet inside a sheet", sheet.replace("\"parent\":\"s\"}", "\"parent\":\"s\"},{\"kind\":\"sheet\",\"id\":\"s2\",\"parent\":\"s\",\"open\":{\"literal\":false},\"snapPoints\":[1],\"dismissible\":false,\"modal\":true}"), "has a Sheet node as its parent")
+	refuses("a dismiss event on an element", sheet.replace("\"host\":\"s\",\"event\":\"dismiss\"", "\"host\":\"h0\",\"event\":\"dismiss\""), "names no sheet")
+	refuses("an activate event on a sheet", sheet.replace("\"host\":\"s\",\"event\":\"dismiss\"", "\"host\":\"s\",\"event\":\"activate\""), "names no element")
 }
 
 private fun styleExport(fixtures: File) {

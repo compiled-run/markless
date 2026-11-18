@@ -68,6 +68,7 @@ class MarklessHost(
 	private val textViews = HashMap<String, TextView>()
 	private var assignment = style?.initial ?: 0
 	private val expanded = HashMap<View, Boolean?>()
+	private val sheets = LinkedHashMap<String, SystemSheet>()
 	private val dpr = context.resources.displayMetrics.density.toDouble()
 	private val absolutes: List<Map<String, Pair<Double, Double>>> = style?.let {
 		if (Math.abs(dpr - it.dpr) > 1e-3) throw MarklessHostError("style export is for pixel ratio ${it.dpr}; this device is $dpr")
@@ -90,8 +91,15 @@ class MarklessHost(
 		val top = payload.nodes.firstOrNull() as? Node.Element ?: throw MarklessHostError("payload does not start with its root element")
 		if (top.parent != null || top.arm != null) throw MarklessHostError("the root element has a parent or sits in an arm")
 		if (payload.nodes.count { it.parent == null } != 1) throw MarklessHostError("payload has more than one root")
+		for (sheet in payload.nodes.filterIsInstance<Node.Sheet>()) {
+			if (sheet.dismissible && runtime.handlerFor(sheet.id, EventName.Dismiss) == null) throw MarklessHostError("\"${sheet.id}\" is dismissible but has no dismiss handler")
+			val content = MarklessBox(context).apply { named(this, sheet.id) }
+			views[sheet.id] = content
+			sheets[sheet.id] = SystemSheet(context, sheet, content) { closedByPlatform(sheet.id) }
+		}
 		buildShown()
 		root = views.getValue(top.id)
+		for ((id, open) in runtime.sheets()) if (open) root.post { sheets.getValue(id).open() }
 	}
 
 	fun view(id: String): View = views[id] ?: throw MarklessHostError("no view for \"$id\"")
@@ -102,6 +110,14 @@ class MarklessHost(
 	fun viewIds(): Set<String> = built.keys.toSet()
 
 	fun textView(id: String): TextView = textViews[id] ?: throw MarklessHostError("no text view for \"$id\"")
+
+	/** Whether the sheet's dialog is on screen. */
+	fun sheetShowing(id: String): Boolean = (sheets[id] ?: throw MarklessHostError("no sheet \"$id\"")).showing
+
+	/** The platform closed the sheet (swipe, back, a tap on the dimmed page): runs its `dismiss` handler. */
+	fun closedByPlatform(id: String) {
+		if (runtime.handlerFor(id, EventName.Dismiss) != null) apply(runtime.dispatch(id, EventName.Dismiss))
+	}
 
 	/** The journal applier: the only code that changes a retained view after the first build. */
 	fun apply(journal: List<JournalEntry>) {
@@ -128,6 +144,7 @@ class MarklessHost(
 					(onNavigate ?: throw MarklessHostError("navigate to ${entry.node} with no page builder")).invoke(entry.node, entry.params)
 					return
 				}
+				is JournalEntry.Sheet -> (sheets[entry.node] ?: throw MarklessHostError("journal names \"${entry.node}\", which is not a sheet")).let { if (entry.open) it.open() else it.close() }
 				is JournalEntry.Rows -> {
 					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
 					rebuild()
@@ -249,6 +266,7 @@ class MarklessHost(
 		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(e.host, EventName.Activate)) }
+			EventName.Dismiss -> throw MarklessHostError("dismiss event on \"${node.id}\", which is not a sheet")
 			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}

@@ -58,6 +58,7 @@ public final class MarklessViewController: UIViewController {
 		tree = try ViewTree(runtime: runtime, layout: layout, faces: faces) { [weak self] action in
 			self?.perform(action)
 		}
+		tree?.presenter = self
 	}
 
 	@available(*, unavailable)
@@ -75,6 +76,11 @@ public final class MarklessViewController: UIViewController {
 		if let layout, abs(traitCollection.displayScale - layout.dpr) > 0.001 {
 			fatalError("Markless iOS host: the style export was laid out at \(layout.dpr)x, this screen is \(traitCollection.displayScale)x")
 		}
+	}
+
+	public override func viewDidAppear(_ animated: Bool) {
+		super.viewDidAppear(animated)
+		tree?.pageAppeared(self)
 	}
 
 	/// Runs the handler for an action and applies its journal, exactly as a tap does.
@@ -95,9 +101,11 @@ public final class MarklessViewController: UIViewController {
 	private func navigate(_ route: String, _ params: [NativeRouteParam]) throws {
 		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
 		runtime = NativeRuntime(payload: payload, store: store, params: params)
+		tree?.closeSheets()
 		tree?.root.removeFromSuperview()
 		try buildPage()
 		if isViewLoaded { tree?.mount(in: view) }
+		if viewIfLoaded?.window != nil { tree?.pageAppeared(self) }
 	}
 }
 

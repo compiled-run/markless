@@ -10,9 +10,10 @@ import type {
 	NativeTextPart,
 	NativeViewPayload,
 } from '@markless/serializer';
-import { NATIVE_VIEW_VERSION } from '@markless/serializer/native-view';
+import { NATIVE_VIEW_VERSION, PLATFORM_PIECES_NAMESPACE, PLATFORM_PIECES_PACKAGE } from '@markless/serializer/native-view';
 import type {
 	CompilerDiagnostic,
+	SemanticComponentEdge,
 	SemanticEvent,
 	SemanticGraphArtifact,
 	SemanticMarkupChunk,
@@ -122,6 +123,8 @@ type Scope = {
 	readonly locals: ReadonlySet<string>;
 	readonly items: ReadonlyMap<string, string>;
 	readonly props: ReadonlyMap<string, Prop>;
+	/** Callback parameters the caller fixes at build time, such as a sheet's `onChange` reading `false` on dismiss. */
+	readonly bound?: ReadonlyMap<string, NativeExpr>;
 };
 
 /** Methods with JavaScript meaning that return a new value; `reverse` mutates, so only a fresh array may take it. */
@@ -287,6 +290,15 @@ export function createNativeViewPayload(
 		const entry = scope.module.imports.get(name);
 		return entry?.source === '@markless/router' && entry.importedName === 'Link';
 	};
+	const isPlatformSheet = (scope: Scope, edge: SemanticComponentEdge): boolean =>
+		edge.importSource === PLATFORM_PIECES_PACKAGE &&
+		edge.importedName === PLATFORM_PIECES_NAMESPACE &&
+		[...scope.module.imports.values()].some(
+			(entry) =>
+				entry.source === PLATFORM_PIECES_PACKAGE &&
+				entry.importedName === PLATFORM_PIECES_NAMESPACE &&
+				edge.childComponentName === `${entry.localName}.sheet`,
+		);
 	const inlining = new Set<string>();
 	const exprOf = (
 		expression: SemanticExpression | undefined,
@@ -300,6 +312,8 @@ export function createNativeViewPayload(
 		};
 		switch (expression.kind) {
 			case 'read': {
+				const bound = scope.bound?.get(expression.name);
+				if (bound) return bound;
 				if (scope.locals.has(expression.name)) return { local: expression.name };
 				const repeat = scope.items.get(expression.name);
 				if (repeat) return { item: repeat };
@@ -659,6 +673,10 @@ export function createNativeViewPayload(
 					refuse(`the component call ${item.edge}`);
 					continue;
 				}
+				if (isPlatformSheet(scope, edge)) {
+					lowerSheet(edge, item.projection, parent, place, scope);
+					continue;
+				}
 				if (isRouterLink(scope, edge.childComponentName)) {
 					const href = edge.props.find((prop) => prop.name === 'href');
 					const params = edge.props.find((prop) => prop.name === 'params');
@@ -800,6 +818,134 @@ export function createNativeViewPayload(
 		}
 		close();
 	};
+	/** `<native.sheet>`: a sheet node whose content is the markup between its tags, in the caller's scope. */
+	function lowerSheet(
+		edge: SemanticComponentEdge,
+		projection: string | undefined,
+		parent: string | null,
+		place: NativePlace,
+		scope: Scope,
+	) {
+		const what = `<${PLATFORM_PIECES_NAMESPACE}.sheet>`;
+		if (place.arm || place.row) {
+			refuse(`a ${what} inside an @if arm or a @for row`, edge.sourceSpan);
+			return;
+		}
+		const props = new Map(edge.props.map((prop) => [prop.name, prop]));
+		const NOT_FIXED = Symbol('not fixed');
+		const fixed = (name: string): unknown => {
+			const prop = props.get(name);
+			if (!prop) return undefined;
+			if (prop.kind === 'serializable') return prop.value;
+			if (prop.kind === 'opaque' && prop.buildTimeValue) return prop.buildTimeValue.value;
+			refuse(`the \`${name}\` prop of ${what}, which must be fixed at build time`, prop.sourceSpan);
+			return NOT_FIXED;
+		};
+		const flag = (name: string): boolean | null => {
+			const value = fixed(name) ?? true;
+			if (typeof value === 'boolean') return value;
+			if (value !== NOT_FIXED)
+				refuse(`the \`${name}\` prop of ${what}, which must be true or false`, props.get(name)?.sourceSpan);
+			return null;
+		};
+		for (const prop of edge.props)
+			if (
+				!['open', 'onChange', 'snapPoints', 'dismissible', 'modal', 'children'].includes(
+					prop.name,
+				)
+			)
+				refuse(
+					`the \`${prop.name}\` prop of ${what}, which it does not take`,
+					prop.sourceSpan,
+				);
+		const openProp = props.get('open');
+		const open: NativeExpr | null =
+			openProp === undefined
+				? { literal: false }
+				: openProp.kind === 'graph-reference'
+					? scope.cells.byBinding.has(openProp.graphNodeId) && openProp.path.length === 0
+						? { cell: scope.cells.byBinding.get(openProp.graphNodeId)! }
+						: refuse(
+								`the \`open\` prop of ${what} reads something other than this component's state`,
+								openProp.sourceSpan,
+							)
+					: openProp.kind === 'serializable' && typeof openProp.value === 'boolean'
+						? { literal: openProp.value }
+						: refuse(
+								`the \`open\` prop of ${what}, which must be state or true or false`,
+								openProp.sourceSpan,
+							);
+		const points = fixed('snapPoints') ?? [1];
+		const portableHeights =
+			Array.isArray(points) &&
+			points.length >= 1 &&
+			points.length <= 2 &&
+			points.every((point) => typeof point === 'number' && point > 0 && point <= 1) &&
+			Math.max(...(points as number[])) === 1 &&
+			new Set(points).size === points.length;
+		if (points !== NOT_FIXED && !portableHeights)
+			refuse(
+				`\`snapPoints\` of ${what}: one or two fractions of the screen's height, the largest 1 (Android's sheet has one height between collapsed and full)`,
+				props.get('snapPoints')?.sourceSpan,
+			);
+		const snapPoints = portableHeights ? [...(points as number[])].sort((a, b) => a - b) : null;
+		const dismissible = flag('dismissible');
+		const modal = flag('modal');
+		if (modal === false)
+			refuse(
+				`a ${what} with \`modal={false}\`: Android's non-modal sheet sits in the page's own layout, which hosts do not build yet`,
+				props.get('modal')?.sourceSpan,
+			);
+		const onChange = props.get('onChange');
+		if (dismissible === true && !onChange)
+			refuse(
+				`a dismissible ${what} without \`onChange\`: the platform closes it, and the page's state must hear it`,
+				edge.sourceSpan,
+			);
+		if (onChange && onChange.kind !== 'callback')
+			refuse(
+				`the \`onChange\` prop of ${what}, which must be a function written where it is passed`,
+				onChange.sourceSpan,
+			);
+		const projected = projection ? scope.module.chunks.get(projection) : undefined;
+		if (projection && !projected)
+			refuse(`children passed to ${what} that have no markup`, edge.sourceSpan);
+		const id = `sheet:${scope.prefix}${edge.id}`;
+		if (open && snapPoints && dismissible !== null && modal !== null)
+			nodes.push({ kind: 'sheet', id, parent, open, snapPoints, dismissible, modal });
+		if (projected) lowerChunk(projected, id, {}, scope);
+		if (onChange?.kind === 'callback' && dismissible === true) {
+			if (!onChange.nativeStatements) {
+				refuse(
+					`the \`onChange\` of ${what} is defined elsewhere (a named or factory function)`,
+					onChange.sourceSpan,
+				);
+				return;
+			}
+			const [parameter] = onChange.parameters ?? [];
+			const handler = `handler:${id}`;
+			events.push({ host: id, event: 'dismiss', handler });
+			handlers.push({
+				id: handler,
+				ops: statementOps(
+					onChange.nativeStatements,
+					parameter === undefined
+						? scope
+						: {
+								...scope,
+								bound: new Map([
+									...(scope.bound ?? []),
+									[parameter, { literal: false }],
+								]),
+							},
+					`the \`onChange\` of ${what}`,
+					onChange.sourceSpan,
+					0,
+				),
+			});
+		}
+	}
+
 	function handlerOps(event: SemanticEvent, scope: Scope): NativeOp[] {
 		const what = `the ${event.eventName} handler`;
 		const eventParameter = event.eventName === 'input' ? event.handlerParameters[0] : undefined;

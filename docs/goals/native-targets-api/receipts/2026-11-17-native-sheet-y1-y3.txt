@@ -1,0 +1,11 @@
+pnpm --filter @markless/mobile proof --simulator markless-system-sheet --avd markless_system_sheet --port 5578 proofs/y1-sheet-open-close proofs/y2-sheet-pick proofs/y3-sheet-heights
+(mini-2, 2026-11-17 ~19:50; simulator iPhone 17 iOS 27.2, AVD Pixel 7 API 36; run under ~/.claude/bin/heavy with no other emulator running)
+
+devices and shells ready in 36.0 s (simulator markless-system-sheet booted, emulator emulator-5578 booted)
+PASS y1-sheet-open-close ios (install 16.8 s, flow 41.1 s)
+PASS y1-sheet-open-close android (install 6.3 s, flow 32.0 s)
+PASS y2-sheet-pick ios (install 0.5 s, flow 37.7 s)
+PASS y2-sheet-pick android (install 2.3 s, flow 30.9 s)
+PASS y3-sheet-heights ios (install 0.2 s, flow 27.2 s)
+PASS y3-sheet-heights android (install 1.2 s, flow 18.8 s)
+all 3 rung(s) passed on iOS and Android

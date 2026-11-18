@@ -126,10 +126,27 @@ export type NativeNode = NativePlace &
 				readonly list: NativeExpr;
 				readonly key: ReadonlyArray<string>;
 		  }
+		| {
+				/**
+				 * The platform's own sheet (`<native.sheet>`): its content is the nodes whose parent is this id, built at mount
+				 * and kept; the host presents them in its system sheet while `open` is truthy (iOS `UISheetPresentationController`,
+				 * Android Material `BottomSheetDialog`, web a `<dialog>`).
+				 */
+				readonly kind: 'sheet';
+				readonly id: string;
+				readonly parent: string | null;
+				readonly open: NativeExpr;
+				/** Resting heights as fractions of the screen's height, ascending; the last is 1. */
+				readonly snapPoints: ReadonlyArray<number>;
+				/** Swipe, back and a tap on the dimmed page close it, as a `dismiss` action. */
+				readonly dismissible: boolean;
+				/** The page behind is dimmed and cannot be reached while it shows. */
+				readonly modal: boolean;
+		  }
 	);
 
 /** Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click). */
-export type NativeEventName = 'activate' | 'input';
+export type NativeEventName = 'activate' | 'input' | 'dismiss';
 
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
 export type NativeOp =
@@ -177,5 +194,11 @@ export type NativeJournalEntry =
 	| { readonly op: 'rows'; readonly node: string; readonly keys: ReadonlyArray<string> }
 	/** Shows arm `index` of a branch (null: none), building its nodes from current values and removing the old arm's. */
 	| { readonly op: 'arm'; readonly node: string; readonly index: number | null }
+	/** A system sheet's `open` turned truthy (present it) or falsy (dismiss it, unless the platform already has). */
+	| { readonly op: 'sheet'; readonly node: string; readonly open: boolean }
 	/** Leave this page: the host builds the page at `route` from scratch with `params` (its own state starts over). */
 	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
+
+/** The package and export that name the platform's own pieces (`<native.sheet>`); one place, so the name is cheap to change. */
+export const PLATFORM_PIECES_PACKAGE = '@markless/ui';
+export const PLATFORM_PIECES_NAMESPACE = 'native';

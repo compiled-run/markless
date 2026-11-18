@@ -36,6 +36,9 @@ final class ViewTree {
 	private var attributes: [String: [String: String]] = [:]
 	private var branches: [String: (anchor: UIView, index: Int?, built: [String])] = [:]
 	private var lists: [String: (anchor: UIView, keys: [String], built: [String: [String]])] = [:]
+	private(set) var sheets: [String: SystemSheet] = [:]
+	/// The controller that presents the page's system sheets.
+	weak var presenter: UIViewController?
 	private var anchors = Set<ObjectIdentifier>()
 	private var assignment: Int
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
@@ -74,7 +77,19 @@ final class ViewTree {
 			gesture.addTarget(keyboard, action: #selector(KeyboardDismisser.dismiss))
 			root.addGestureRecognizer(gesture)
 		}
-		if layout == nil { stackTree(root) }
+		if layout == nil {
+			stackTree(root)
+			for sheet in sheets.values { stackTree(sheet.content) }
+		}
+	}
+
+	func pageAppeared(_ host: UIViewController) {
+		for sheet in sheets.values { sheet.hostAppeared(host) }
+	}
+
+	/// Before the page is rebuilt: its sheets go with it, without a `dismiss` action.
+	func closeSheets() {
+		for sheet in sheets.values { sheet.close(animated: false) }
 	}
 
 	func mount(in screen: UIView) {
@@ -104,6 +119,9 @@ final class ViewTree {
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				attributes[node, default: [:]][name] = value
 				applyAttributes(node, view)
+			case let .sheet(node, open):
+				guard let sheet = sheets[node] else { throw HostError("journal names sheet \(node), which is not built") }
+				if open { sheet.open(from: presenter) } else { sheet.close() }
 			case .navigate:
 				throw HostError("a navigate entry reaches the page's controller, not its views")
 			case let .state(cell, value):
@@ -266,6 +284,19 @@ final class ViewTree {
 					rows[row.key] = try buildRow(template, key: row.key, item: row.item, in: container, at: &index, context)
 				}
 				lists[id] = (marker, keys, rows)
+			case let .sheet(open, snapPoints, dismissible, modal):
+				if !context.suffix.isEmpty || context.button != nil { throw HostError("a system sheet inside a list row or a control (\(id)) has no iOS host support") }
+				let dismissedBy = (events[template] ?? []).filter { $0.event == .dismiss }
+				if dismissible && dismissedBy.isEmpty { throw HostError("system sheet \(id) can be closed by the platform but has no dismiss handler") }
+				let onAction = onAction
+				let sheet = SystemSheet(snapPoints: snapPoints, dismissible: dismissible, modal: modal) {
+					if !dismissedBy.isEmpty { onAction(NativeAction(event: .dismiss, host: id)) }
+				}
+				sheet.content.accessibilityIdentifier = id
+				var childIndex = 0
+				_ = try build(template, in: sheet.content, at: &childIndex, Context())
+				sheets[id] = sheet
+				if try runtime.evaluate(open).isTruthy { sheet.open(from: nil) }
 			}
 		}
 		return built

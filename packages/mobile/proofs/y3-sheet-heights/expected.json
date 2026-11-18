@@ -1,0 +1,15 @@
+{
+	"rung": 103,
+	"name": "A system sheet rests at half and full height, and its content scrolls",
+	"steps": [
+		{ "visible": ["Catalog", "Browse"], "absent": ["All items", "Item 1"] },
+		{ "do": { "tap": "Browse" }, "visible": ["All items", "Item 1"] },
+		{ "do": { "swipe": "up" }, "visible": ["All items", "Item 1"] },
+		{ "do": { "scrollTo": "Item 70" }, "visible": ["Item 70", "Close"] },
+		{
+			"do": { "tap": "Close" },
+			"visible": ["Catalog", "Browse"],
+			"absent": ["All items", "Item 70", "Close"]
+		}
+	]
+}

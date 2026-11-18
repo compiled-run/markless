@@ -39,6 +39,11 @@ sealed interface JournalEntry {
 	data class Arm(override val node: String, val index: Int?) : JournalEntry {
 		override fun toJson() = "{\"op\":\"arm\",\"node\":${jsonString(node)},\"index\":${index ?: "null"}}"
 	}
+
+	/** A system sheet's `open` turned truthy (present it) or falsy (dismiss it, unless the platform already has). */
+	data class Sheet(override val node: String, val open: Boolean) : JournalEntry {
+		override fun toJson() = "{\"op\":\"sheet\",\"node\":${jsonString(node)},\"open\":$open}"
+	}
 }
 
 /** `JSON.stringify` of a value: non-finite numbers are `null`. */
@@ -207,6 +212,9 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 	/** Every shown list's row keys, in order. */
 	fun rows(): List<Pair<String, List<String>>> = payload.nodes.filterIsInstance<Node.Repeat>().filter { isShown(it) }.map { r -> r.id to rowsOf(r).map { it.key } }
 
+	/** Every system sheet and whether its `open` is truthy. */
+	fun sheets(): List<Pair<String, Boolean>> = payload.nodes.filterIsInstance<Node.Sheet>().map { it.id to Js.truthy(evaluate(it.open)) }
+
 	fun handlerFor(host: String, event: EventName): String? = payload.events.firstOrNull { it.host == host && it.event == event }?.handler
 
 	/** Runs the handler for [event] on [host]; an `input` event carries the field's whole text as [value]. */
@@ -222,6 +230,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		if (value != null) beforeProperties[host to "value"] = value
 		val beforeArms = arms().toMap()
 		val beforeRows = rows().toMap()
+		val beforeSheets = sheets().toMap()
 		eventValue = value
 		try {
 			for (op in handler.ops) when (op) {
@@ -240,6 +249,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		val afterProperties = properties().associate { (n, a, v) -> (n to a) to v }
 		val afterArms = arms().toMap()
 		val afterRows = rows().toMap()
+		val afterSheets = sheets().toMap()
 		val journal = ArrayList<JournalEntry>()
 		for (c in payload.cells) if (c.styled && !Js.strictEquals(cellsBefore.getValue(c.id), values.getValue(c.id))) journal.add(JournalEntry.State(c.id, values.getValue(c.id)))
 		for (node in payload.nodes) when (node) {
@@ -247,6 +257,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				val b = beforeRows[node.id]; val a = afterRows[node.id]
 				if (b != null && a != null && b != a) journal.add(JournalEntry.Rows(node.id, a))
 			}
+			is Node.Sheet -> afterSheets.getValue(node.id).let { if (beforeSheets[node.id] != it) journal.add(JournalEntry.Sheet(node.id, it)) }
 			is Node.Branch -> if (node.id in beforeArms && node.id in afterArms && beforeArms[node.id] != afterArms[node.id]) journal.add(JournalEntry.Arm(node.id, afterArms[node.id]))
 			is Node.Text -> for (inst in instances(node)) {
 				val b = beforeTexts[inst.id]; val a = afterTexts[inst.id]

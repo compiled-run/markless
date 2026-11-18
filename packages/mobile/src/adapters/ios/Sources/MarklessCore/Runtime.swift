@@ -25,6 +25,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case rows(node: String, keys: [String])
 	/// Shows arm `index` of a branch (nil: none), built from current values; the old arm's views go.
 	case arm(node: String, index: Int?)
+	/// A system sheet's `open` turned truthy (present it) or falsy (dismiss it, unless the platform already has).
+	case sheet(node: String, open: Bool)
 	/// Leave this page: the host builds the page at `route` from scratch with `params`.
 	case navigate(route: String, params: [NativeRouteParam])
 
@@ -41,6 +43,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("rows")), ("node", .string(node)), ("keys", .array(keys.map(JSONValue.string)))])
 		case let .arm(node, index):
 			return .object([("op", .string("arm")), ("node", .string(node)), ("index", index.map { .number(Double($0)) } ?? .null)])
+		case let .sheet(node, open):
+			return .object([("op", .string("sheet")), ("node", .string(node)), ("open", .bool(open))])
 		case let .navigate(route, params):
 			return .object([("op", .string("navigate")), ("route", .string(route)), ("params", .object(params.map { ($0.name, .string($0.value)) }))])
 		}
@@ -278,6 +282,14 @@ public final class NativeRuntime {
 		}
 	}
 
+	/// Every system sheet and whether its `open` is truthy.
+	public func sheets() throws -> [(node: String, open: Bool)] {
+		try payload.nodes.compactMap { node in
+			guard case let .sheet(open, _, _, _) = node.kind else { return nil }
+			return (node.id, try evaluate(open).isTruthy)
+		}
+	}
+
 	/// Runs the handler bound to the action and returns the journal the host applies.
 	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
 		guard let bound = payload.events.first(where: { $0.host == action.host && $0.event == action.event }) else {
@@ -295,6 +307,7 @@ public final class NativeRuntime {
 		if let eventValue { beforeProperties["\(action.host)\u{0}value"] = eventValue }
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
+		let beforeSheets = Dictionary(uniqueKeysWithValues: try sheets().map { ($0.node, $0.open) })
 		for op in handlers[bound.handler] ?? [] {
 			switch op {
 			case let .navigate(route, params): return [.navigate(route: route, params: params)]
@@ -309,6 +322,7 @@ public final class NativeRuntime {
 		let afterProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
 		let afterArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let afterRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
+		let afterSheets = Dictionary(uniqueKeysWithValues: try sheets().map { ($0.node, $0.open) })
 		let styles = payload.cells.compactMap { cell -> NativeJournalEntry? in
 			guard cell.styled, let before = cellsBefore[cell.id], let after = values[cell.id], !before.strictlyEquals(after) else { return nil }
 			return .state(cell: cell.id, value: after)
@@ -321,6 +335,9 @@ public final class NativeRuntime {
 			case .branch:
 				guard let before = beforeArms[node.id], let after = afterArms[node.id], before != after else { return [] }
 				return [.arm(node: node.id, index: after)]
+			case .sheet:
+				guard let before = beforeSheets[node.id], let after = afterSheets[node.id], before != after else { return [] }
+				return [.sheet(node: node.id, open: after)]
 			case .text:
 				return try instances(of: node).compactMap { instance in
 					guard let before = beforeTexts[instance.id], let after = afterTexts[instance.id], before != after else { return nil }

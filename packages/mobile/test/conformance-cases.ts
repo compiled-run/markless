@@ -98,4 +98,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'input', host: 'h2', value: '' },
 		],
 	},
+	{
+		name: 'sheet',
+		fixture: 'proofs/y2-sheet-pick/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'dismiss', host: 'sheet:component-edge:0' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'input', host: 'h5', value: 'Porto' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h11' },
+		],
+	},
 ];

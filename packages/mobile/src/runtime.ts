@@ -13,7 +13,9 @@ import { marklessAttributeValue } from '@markless/web/dom-attribute';
 export type NativeAction =
 	| { readonly event: 'activate'; readonly host: string }
 	/** The field's whole text after an edit. */
-	| { readonly event: 'input'; readonly host: string; readonly value: string };
+	| { readonly event: 'input'; readonly host: string; readonly value: string }
+	/** The platform closed a system sheet (swipe, back, a tap on the dimmed page); it is already closed when this runs. */
+	| { readonly event: 'dismiss'; readonly host: string };
 
 type Value = NativeValue;
 
@@ -40,6 +42,8 @@ export type NativeRuntime = {
 	readonly arms: () => ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Every shown list's row keys, in order. */
 	readonly rows: () => ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
+	/** Every system sheet and whether its `open` is truthy. */
+	readonly sheets: () => ReadonlyArray<readonly [node: string, open: boolean]>;
 	/** Runs the handler bound to the action and returns the journal the host applies. */
 	readonly dispatch: (action: NativeAction) => ReadonlyArray<NativeJournalEntry>;
 };
@@ -282,6 +286,10 @@ export function createNativeRuntime(
 				? [[node.id, rowsOf(node).map((row) => row.key)] as const]
 				: [],
 		);
+	const sheets = () =>
+		payload.nodes.flatMap((node) =>
+			node.kind === 'sheet' ? [[node.id, Boolean(evaluate(node.open))] as const] : [],
+		);
 	const keyed = <T,>(list: ReadonlyArray<readonly [string, string, T]>) =>
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));
 
@@ -291,6 +299,7 @@ export function createNativeRuntime(
 		properties,
 		arms,
 		rows,
+		sheets,
 		dispatch(action) {
 			const event = payload.events.find((candidate) => candidate.host === action.host && candidate.event === action.event);
 			if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
@@ -303,6 +312,7 @@ export function createNativeRuntime(
 			if (eventValue !== undefined) beforeProperties.set(`${action.host}\0value`, eventValue);
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
+			const beforeSheets = new Map(sheets());
 			for (const op of handlers.get(event.handler) ?? []) {
 				if (op.op === 'navigate') return [{ op: 'navigate', route: op.route, params: op.params }];
 				const value = evaluate(op.value, eventValue);
@@ -315,6 +325,7 @@ export function createNativeRuntime(
 			const afterProperties = keyed(properties());
 			const afterArms = new Map(arms());
 			const afterRows = new Map(rows());
+			const afterSheets = new Map(sheets());
 			const styles = payload.cells.flatMap((cell): NativeJournalEntry[] =>
 				cell.styled && cellsBefore.get(cell.id) !== values.get(cell.id)
 					? [{ op: 'state', cell: cell.id, value: values.get(cell.id)! }]
@@ -328,6 +339,10 @@ export function createNativeRuntime(
 					return before && after && before.join('\0') !== after.join('\0')
 						? [{ op: 'rows', node: node.id, keys: after }]
 						: [];
+				}
+				if (node.kind === 'sheet') {
+					const open = afterSheets.get(node.id)!;
+					return beforeSheets.get(node.id) !== open ? [{ op: 'sheet', node: node.id, open }] : [];
 				}
 				if (node.kind === 'branch') {
 					return beforeArms.has(node.id) && afterArms.has(node.id) && beforeArms.get(node.id) !== afterArms.get(node.id)

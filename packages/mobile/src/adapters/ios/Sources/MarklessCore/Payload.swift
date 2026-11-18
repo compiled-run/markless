@@ -95,6 +95,8 @@ public struct NativeNode: Equatable, Sendable {
 		case branch(tests: [NativeExpr?])
 		/// A keyed `@for`: one row per item of `list`, keyed by `String()` of the item at `key`.
 		case `repeat`(list: NativeExpr, key: [String])
+		/// The platform's own sheet: its content (the nodes whose parent it is) is built at mount and kept while closed.
+		case sheet(open: NativeExpr, snapPoints: [Double], dismissible: Bool, modal: Bool)
 	}
 
 	public let id: String
@@ -112,6 +114,8 @@ public struct NativeNode: Equatable, Sendable {
 public enum NativeEventName: String, Sendable {
 	case activate
 	case input
+	/// The platform closed a system sheet; it is already closed when the handler runs.
+	case dismiss
 }
 
 public enum NativeOp: Equatable, Sendable {
@@ -262,6 +266,20 @@ public struct NativeViewPayload: Equatable, Sendable {
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
 					row: try decodeRow(field),
 					kind: .repeat(list: try decodeExpr(try field["list"]), key: try field["key"].array().map { try $0.string() }))
+			case "sheet":
+				let field = try node.object(["kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"])
+				let snapPoints = try field["snapPoints"].array().map { try $0.number() }
+				let valid = switch snapPoints.count {
+				case 1: snapPoints[0] == 1
+				case 2: snapPoints[0] > 0 && snapPoints[0] < 1 && snapPoints[1] == 1
+				default: false
+				}
+				guard valid else { throw PayloadError(path: node.path + ".snapPoints", reason: "a sheet rests at [1] or [x, 1] with 0 < x < 1") }
+				return NativeNode(
+					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: nil, row: nil,
+					kind: .sheet(
+						open: try decodeExpr(try field["open"]), snapPoints: snapPoints, dismissible: try field["dismissible"].bool(),
+						modal: try field["modal"].bool()))
 			default:
 				throw PayloadError(path: node.path + ".kind", reason: "unknown node kind \"\(kind)\"")
 			}
@@ -390,6 +408,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		var elements = Set<String>()
 		var branchArms: [String: Int] = [:]
 		var repeats = Set<String>()
+		var sheets = Set<String>()
 		var seen = Set<String>()
 		func checkCells(_ node: NativeNode, _ expressions: [NativeExpr]) throws {
 			for cell in expressions.flatMap(\.cells) where !cellIds.contains(cell) {
@@ -398,8 +417,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 		}
 		for node in nodes {
 			guard seen.insert(node.id).inserted else { throw PayloadError(path: "payload.nodes", reason: "duplicate node \(node.id)") }
-			if let parent = node.parent, !elements.contains(parent) {
-				throw PayloadError(path: "payload.nodes", reason: "\(node.id)'s parent \(parent) is not an earlier element")
+			if let parent = node.parent, !elements.contains(parent), !sheets.contains(parent) {
+				throw PayloadError(path: "payload.nodes", reason: "\(node.id)'s parent \(parent) is not an earlier element or sheet")
 			}
 			if let arm = node.arm {
 				guard let arms = branchArms[arm.branch], arm.index < arms else {
@@ -427,6 +446,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 			case let .repeat(list, _):
 				repeats.insert(node.id)
 				try checkCells(node, [list])
+			case let .sheet(open, _, _, _):
+				sheets.insert(node.id)
+				try checkCells(node, [open])
 			}
 		}
 		var handlerIds = Set<String>()
@@ -439,7 +461,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 		}
 		for event in events {
-			guard elements.contains(event.host) else { throw PayloadError(path: "payload.events", reason: "event on unknown element \(event.host)") }
+			guard (event.event == .dismiss ? sheets : elements).contains(event.host) else {
+				throw PayloadError(path: "payload.events", reason: "\(event.event.rawValue) event on \(event.host), which is not \(event.event == .dismiss ? "a sheet" : "an element")")
+			}
 			guard handlerIds.contains(event.handler) else {
 				throw PayloadError(path: "payload.events", reason: "event on \(event.host) names unknown handler \(event.handler)")
 			}

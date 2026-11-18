@@ -24,7 +24,7 @@ func reproducesConformanceVector(file: URL) throws {
 	let vector = try JSONValue.parse(Data(contentsOf: file))
 	guard case let .object(fields) = vector else { Issue.record("vector is not an object"); return }
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
-	let known = ["version", "payload", "params", "initial", "initialAttributes", "initialProperties", "initialArms", "initialRows", "steps"]
+	let known = ["version", "payload", "params", "initial", "initialAttributes", "initialProperties", "initialArms", "initialRows", "initialSheets", "steps"]
 	#expect(fields.map(\.0).allSatisfy(known.contains), "unknown vector fields \(fields.map(\.0))")
 	#expect(field("version") == .string("markless.native-conformance/0"))
 	let params = try field("params").map { try NativeViewPayload.decodeParams(try Reader($0, at: "params")) } ?? []
@@ -40,6 +40,8 @@ func reproducesConformanceVector(file: URL) throws {
 	#expect(rows.isEmpty ? field("initialRows") == nil : JSONValue.array(rows).jsonText == field("initialRows")?.jsonText)
 	let arms = try runtime.arms().map { JSONValue.array([.string($0.node), $0.index.map { .number(Double($0)) } ?? .null]) }
 	#expect(arms.isEmpty ? field("initialArms") == nil : JSONValue.array(arms).jsonText == field("initialArms")?.jsonText)
+	let sheets = try runtime.sheets().map { JSONValue.array([.string($0.node), .bool($0.open)]) }
+	#expect(sheets.isEmpty ? field("initialSheets") == nil : JSONValue.array(sheets).jsonText == field("initialSheets")?.jsonText)
 
 	guard case let .array(steps)? = field("steps") else { Issue.record("steps is not an array"); return }
 	for step in steps {
