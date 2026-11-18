@@ -584,6 +584,7 @@ private func uiColor(_ color: RGBA) -> UIColor {
 	UIColor(red: color.r / 255, green: color.g / 255, blue: color.b / 255, alpha: color.alpha / 255)
 }
 /// One sublayer per side, for borders whose sides differ; Chrome's diagonal corner joins are not drawn.
+@MainActor
 private func paintSides(_ view: UIView, _ sides: [ResolvedStyle.Side]?) {
 	let name = "markless-border-side"
 	view.layer.sublayers?.filter { $0.name == name }.forEach { $0.removeFromSuperlayer() }
