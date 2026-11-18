@@ -6,6 +6,9 @@ import { createNativeRuntime, evaluateNativeExpr, formatNativeValue } from './ru
 
 export const NATIVE_STYLE_INPUT_VERSION = 'markless.native-style-input/0';
 
+/** A styled cell's value: true or false, or one of the strings the compiler found it can hold. */
+export type NativeStyleValue = boolean | string;
+
 /** What Markless hands Dragon for one component: its element tree, each text node's first string and its scoped CSS. */
 export type NativeStyleInput = {
 	readonly version: typeof NATIVE_STYLE_INPUT_VERSION;
@@ -19,7 +22,7 @@ export type NativeStyleInput = {
 				readonly attributes: Readonly<Record<string, string>>;
 				/** The element's class in every combination of `states`, when a binding sets it; null means no class attribute. */
 				readonly classByState?: ReadonlyArray<{
-					readonly when: Readonly<Record<string, boolean>>;
+					readonly when: Readonly<Record<string, NativeStyleValue>>;
 					readonly value: string | null;
 				}>;
 				/**
@@ -30,7 +33,7 @@ export type NativeStyleInput = {
 					Record<
 						string,
 						ReadonlyArray<{
-							readonly when: Readonly<Record<string, boolean>>;
+							readonly when: Readonly<Record<string, NativeStyleValue>>;
 							readonly value: string | null;
 						}>
 					>
@@ -47,11 +50,11 @@ export type NativeStyleInput = {
 	>;
 	/** The stylesheets the page imports (unscoped, in import order), then every shown component's scoped CSS. */
 	readonly css: string;
-	/** The cells class and `ui-*` attribute bindings read; Dragon compiles one style assignment per combination (booleans only for now). */
+	/** The cells class and `ui-*` attribute bindings read, each with every value it can hold; Dragon compiles one style assignment per combination. */
 	readonly states: ReadonlyArray<{
 		readonly cell: string;
-		readonly domain: readonly [false, true];
-		readonly initial: boolean;
+		readonly domain: ReadonlyArray<NativeStyleValue>;
+		readonly initial: NativeStyleValue;
 	}>;
 };
 
@@ -61,15 +64,17 @@ export function nativeStyleInput(
 	stylesheets: ReadonlyArray<NativeStylesheet> = [],
 ): NativeStyleInput {
 	const initial = new Map(createNativeRuntime(payload).texts());
-	const states = payload.cells.flatMap((cell) => {
+	const states = payload.cells.flatMap((cell): NativeStyleInput['states'][number][] => {
 		if (!cell.styled) return [];
-		if (typeof cell.initial !== 'boolean')
-			throw new Error(
-				`${cell.name} decides a class or a ui-* attribute but is not a boolean; Dragon needs a finite domain`,
-			);
-		return [{ cell: cell.id, domain: [false, true] as const, initial: cell.initial }];
+		if (typeof cell.initial === 'boolean')
+			return [{ cell: cell.id, domain: [false, true], initial: cell.initial }];
+		if (typeof cell.initial === 'string' && cell.domain)
+			return [{ cell: cell.id, domain: cell.domain, initial: cell.initial }];
+		throw new Error(
+			`${cell.name} decides a class or a ui-* attribute, but not every value it can hold is known at build time; Dragon needs a finite domain`,
+		);
 	});
-	const combinations: Record<string, boolean>[] = states.reduce<Record<string, boolean>[]>(
+	const combinations: Record<string, NativeStyleValue>[] = states.reduce<Record<string, NativeStyleValue>[]>(
 		(all, state) =>
 			all.flatMap((partial) =>
 				state.domain.map((value) => ({ ...partial, [state.cell]: value })),
@@ -115,7 +120,7 @@ export function nativeStyleInput(
 			);
 			const evaluate = (
 				expr: Parameters<typeof evaluateNativeExpr>[0],
-				when: Record<string, boolean>,
+				when: Record<string, NativeStyleValue>,
 			) =>
 				evaluateNativeExpr(expr, (cell) =>
 					cell in when
@@ -134,7 +139,7 @@ export function nativeStyleInput(
 			const attributes: Record<string, string> = { ...node.attributes };
 			const attributesByState: Record<
 				string,
-				{ when: Record<string, boolean>; value: string | null }[]
+				{ when: Record<string, NativeStyleValue>; value: string | null }[]
 			> = {};
 			for (const binding of node.bindings ?? []) {
 				if (!('attribute' in binding) || !isNativeStyleStateAttribute(binding.attribute))

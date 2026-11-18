@@ -3378,10 +3378,41 @@ export function createNativeViewPayload(
 		op.node = element.id;
 	}
 
-	// Dragon lays out one style assignment per combination of these: every cell a class reads, and every true/false cell
-	// an attribute Dragon receives per state reads (`[ui-open]`, `[hidden]`).
+	// Dragon lays out one style assignment per combination of these: every cell a class reads, and every cell an attribute
+	// Dragon receives per state reads (`[ui-open]`, `[hidden]`) whose values are all known: true/false, or strings.
 	// A cell no handler writes keeps its first value, so it adds no assignment.
 	const written = writesOf(handlers.flatMap((handler) => handler.ops));
+	const assigned = new Map<string, NativeExpr[]>();
+	const collectAssigned = (ops: ReadonlyArray<NativeOp>) => {
+		for (const op of ops) {
+			if (op.op === 'assign') assigned.set(op.cell, [...(assigned.get(op.cell) ?? []), op.value]);
+			else if (op.op === 'if') {
+				collectAssigned(op.whenTrue);
+				collectAssigned(op.whenFalse);
+			} else if (op.op === 'call' && op.after) collectAssigned(op.after.ops);
+		}
+	};
+	collectAssigned(handlers.flatMap((handler) => handler.ops));
+	const changesOnlyByHandlers = (cell: NativeViewPayload['cells'][number]) =>
+		!cell.storage && !cell.device && !cell.task && !cell.object && !cell.row;
+	/** A string cell's values when every one is known at build time: its first value, then each literal or unwritten cell assigned to it. */
+	const stringDomain = (id: string): string[] | undefined => {
+		const cell = cells[cellIndex.get(id) ?? -1];
+		if (!cell || typeof cell.initial !== 'string' || !changesOnlyByHandlers(cell)) return undefined;
+		const values = [cell.initial];
+		for (const value of assigned.get(id) ?? []) {
+			const known =
+				'literal' in value
+					? value.literal
+					: 'cell' in value && !written.has(value.cell) && changesOnlyByHandlers(cells[cellIndex.get(value.cell) ?? -1] ?? cell)
+						? initialOf(value.cell)
+						: undefined;
+			if (typeof known !== 'string') return undefined;
+			if (!values.includes(known)) values.push(known);
+		}
+		return values;
+	};
+	const styledDomains = new Map<string, string[]>();
 	const styledCells = new Set<string>();
 	// A row's state has a value per row, which one style assignment per combination of states cannot follow.
 	const rowCells = new Set(cells.flatMap((cell) => (cell.row ? [cell.id] : [])));
@@ -3392,9 +3423,20 @@ export function createNativeViewPayload(
 				if (binding.attribute === 'class') cellsOf(binding.value, styledCells);
 				else if (isNativeStyleStateAttribute(binding.attribute))
 					for (const cell of cellsOf(binding.value))
-						if (written.has(cell) && typeof initialOf(cell) === 'boolean')
-							styledCells.add(cell);
+						if (written.has(cell) && typeof initialOf(cell) === 'boolean') styledCells.add(cell);
+						else if (written.has(cell)) {
+							const domain = stringDomain(cell);
+							if (domain) {
+								styledCells.add(cell);
+								styledDomains.set(cell, domain);
+							}
+						}
 			}
+	for (const id of styledCells)
+		if (!styledDomains.has(id) && typeof initialOf(id) === 'string') {
+			const domain = stringDomain(id);
+			if (domain) styledDomains.set(id, domain);
+		}
 
 	return done({
 		version: NATIVE_VIEW_VERSION,
@@ -3403,7 +3445,13 @@ export function createNativeViewPayload(
 			? { route: { pattern: options.route.pattern, params: options.route.params } }
 			: {}),
 		cells: cells.map((cell) =>
-			styledCells.has(cell.id) && !rowCells.has(cell.id) ? { ...cell, styled: true as const } : cell,
+			styledCells.has(cell.id) && !rowCells.has(cell.id)
+				? {
+						...cell,
+						styled: true as const,
+						...(styledDomains.has(cell.id) ? { domain: styledDomains.get(cell.id)! } : {}),
+					}
+				: cell,
 		),
 		nodes,
 		events,

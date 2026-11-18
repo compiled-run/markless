@@ -254,6 +254,8 @@ export type NativeViewPayload = {
 		readonly storage?: { readonly key: string };
 		/** A class or `ui-*` attribute binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
 		readonly styled?: true;
+		/** A styled string cell's every value, its first value first, so Dragon lays out one assignment per value. */
+		readonly domain?: ReadonlyArray<string>;
 		/** A live device value (`network.online`): the host fills it at mount and sends a `device` action when it changes. */
 		readonly device?: NativeDeviceValue;
 		/** For a device object's field (`cam.ready`): the object (`object:cam`). */
