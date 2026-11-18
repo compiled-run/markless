@@ -1132,7 +1132,10 @@ function marklessSsrComposedView(
 		...(view.branches ?? []).filter((branch) => renderedAnchorIds.has(idPrefix + branch.id)),
 		...(view.asyncBoundaries ?? []).flatMap((boundary) =>
 			renderedAnchorIds.has(idPrefix + boundary.id)
-				? [boundary.armRecords ?? []].flat().flatMap((set) => set.branches ?? [])
+				? [boundary.armRecords ?? []].flat().flatMap((set) =>
+						// A list under an @if the boundary did not draw reached no served byte; the commit that renders the @if brings its own record.
+						(set.branches ?? []).filter((branch) => renderedAnchorIds.has(idPrefix + branch.id)),
+					)
 				: [],
 		),
 	]))
