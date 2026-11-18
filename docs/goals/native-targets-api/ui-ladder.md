@@ -231,8 +231,14 @@ web runtime behaviour changed; the native pass and the hosts supply what the fam
 
 | Rung | Family | Web | Reference | iOS | Android | Styles |
 |---|---|---|---|---|---|---|
-| u20 | `modal` (and `alert`): trigger, backdrop, content, title, description, close | fails at step 8 (Escape), web defect below; steps 0 to 7 pass | pass | pass | pass (back gesture included) | none: stacking layout, centred top layer |
-| u21 | `popover`: trigger, content, title, description, close | fails at step 2 (outside press), web defect below | pass | pass | see receipt | none |
+| u20 | `modal` (and `alert`): trigger, backdrop, content, title, description, close | pass | pass | pass | pass (back gesture included) | none: stacking layout, centred top layer |
+| u21 | `popover`: trigger, content, title, description, close | pass | pass | pass | pass (back gesture included) | none |
+
+Receipts: one harness run of the fourteen core rungs, u1 to u5, u11, u20 and u21, both platforms, 22 of 22 on each,
+`proof passed on iOS and Android` (`receipts/2026-11-18-ui-overlay-{ios,android}-22-rungs.json`,
+`receipts/2026-11-18-ui-overlay-verdict.txt`; simulator `markless-ui-ov`, AVD `markless_ui_ov`, port 5590). Owner
+answers: a tap focuses the control it presses, as a click does in Chromium; a press on empty screen reports as the
+page's root element, standing in for `body`.
 
 What the families read, and how each is supplied without a change to them:
 
@@ -263,10 +269,12 @@ where focus lands. Drawer was not attempted: its drag is an owner decision not y
 shared state's first value and `style={...}`. Menu is still refused: a `style` binding, `contextmenu`, a helper with a
 script-only body (`takeReturn`) and keyboard handlers.
 
-**Web defect found (pre-existing, reproduced on `bbb807ad8`):** in a router production build the overlay behaviour is
-never installed. The resume runtime reads `globalThis.__marklessOverlay` once at its start, and the app module that
+**Web defect found and fixed (pre-existing, reproduced on `bbb807ad8`; fix `4420442ca`):** in a router production
+build the overlay behaviour was never installed. The resume runtime reads `globalThis.__marklessOverlay` once at its start, and the app module that
 assigns it initializes later; on the u21 page the loader is defined but no element carries `__marklessOverlayInstalled`,
 and a press outside the open popover raises `pointerdown` but no `dismiss`. So on the web, popover's outside press and
-Escape, and modal's Escape, do nothing on router-built pages. Not fixed here (web and bundler code, outside this job).
+Escape, and modal's Escape, did nothing on router-built pages. A root that starts first now waits in
+`__marklessOverlayPending` and the emitted installer line runs it: `resume-runtime-start` +144 B rendered, recorded
+from CI run 44240494177.
 
 Family probe: 3 of 46 families built a payload before, 5 after (modal and popover moved to "works").
