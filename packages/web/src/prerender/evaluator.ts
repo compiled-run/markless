@@ -34,6 +34,7 @@ import { childEdgeSurface } from './owning-surface.ts';
 import { marklessBoundSymbolId, marklessReboundSymbolId } from '../fns/bound-symbol.ts';
 import {
 	marklessInstancePath,
+	marklessInstanceSegments,
 	marklessRecordRowScope,
 	marklessRowFreeSymbolId,
 	marklessRowPath,
@@ -358,7 +359,6 @@ export async function renderPrerenderBoundary(
 	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
 	readonly moduleRootPath?: string;
 }> {
-	const drawnAt = pagePrefix(pageBoundaryId, boundaryId);
 	if (isPrerenderDataSurface(page)) {
 		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
@@ -367,6 +367,10 @@ export async function renderPrerenderBoundary(
 		const ownerName = Object.keys(page.components).find(
 			(name) => !!page.components[name]?.boundaries?.some((boundary) => boundary.boundaryId === boundaryId),
 		);
+		// A @try inside its owner's keyed rows is named by those rows; the owner stands before them.
+		const prefix = marklessInstanceSegments(pagePrefix(pageBoundaryId, boundaryId));
+		const rows = prefix.slice(prefix.length - ownRowDepth(page.renderData.chunks, boundaryId)).join('');
+		const drawnAt = pagePrefix(pageBoundaryId, rows + boundaryId);
 		const owner = branchOwnerPlacement(page, ownerName, graph);
 		if (!owner && ownerName && ownerName !== page.rootComponentName) throw unplacedOwnerError(pageBoundaryId ?? boundaryId);
 		const output = await evaluatePrerenderDataSurface(
@@ -384,7 +388,7 @@ export async function renderPrerenderBoundary(
 				...(pageBoundaryId && { settling: boundaryId }),
 			},
 		);
-		const settled = await settledBoundaryResult(output, drawnAt + boundaryId, boundaryId);
+		const settled = await settledBoundaryResult(output, drawnAt + rows + boundaryId, rows + boundaryId);
 		const cells = freshArmCells(output, freshCellIds);
 		return { ...settled, ...(cells.length > 0 && { cells }), ...(owner && { moduleRootPath: owner.moduleRootPath }) };
 	}
@@ -400,6 +404,33 @@ function unplacedOwnerError(pageId: string): Error {
 // Where the render root stands on the page: the page id of what it renders, less its own id.
 function pagePrefix(pageId: string | undefined, localId: string): string {
 	return pageId?.endsWith(localId) ? pageId.slice(0, pageId.length - localId.length) : '';
+}
+
+// How many keyed rows of its owner's own template enclose a @try, read off the render data.
+function ownRowDepth(chunks: PrerenderRenderData['chunks'], boundaryId: string): number {
+	const parents = new Map<string, { readonly chunkId: string; readonly row: boolean }>();
+	let holder: string | undefined;
+	for (const chunk of chunks)
+		for (const slot of chunk.slots) {
+			if (slot.kind === 'async' && slot.boundaryId === boundaryId) holder = chunk.id;
+			const nested =
+				slot.kind === 'repeat'
+					? [slot.rowTemplateId, slot.emptyTemplateId]
+					: slot.kind === 'branch'
+						? slot.armTemplateIds
+						: slot.kind === 'async'
+							? Object.values(slot.armTemplateIds)
+							: slot.kind === 'dynamic-host'
+								? [slot.childChunkId]
+								: slot.kind === 'child-component'
+									? [slot.projectionChunkId]
+									: [];
+			for (const id of nested)
+				if (id) parents.set(id, { chunkId: chunk.id, row: slot.kind === 'repeat' && id === slot.rowTemplateId });
+		}
+	let depth = 0;
+	for (let at = holder && parents.get(holder); at; at = parents.get(at.chunkId)) if (at.row) depth++;
+	return depth;
 }
 
 /**
@@ -1338,6 +1369,7 @@ export function evaluatePrerenderDataComponent(input: {
 						attributeName: definition.attributeName,
 						idPrefix: input.idPrefix,
 						projectionSegment: definition.rowHosts?.segment,
+						rowSegment: marklessRowPath,
 						...(input.freshBranchSiteId
 							? { freshBranchSiteId: input.freshBranchSiteId }
 							: {}),

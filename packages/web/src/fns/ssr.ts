@@ -1181,11 +1181,14 @@ function marklessSsrComposedView(
 	}
 	locators.sort((a, b) => a.index - b.index);
 	// Every component of a module carries the module's whole view, so a boundary counts only where this render placed it.
-	const renderedBoundaryIds = new Set(
-		structure.anchors.filter((anchor) => anchor.kind === 'async').map((anchor) => anchor.id),
-	);
-	const renderedBoundaries = asyncBoundaries.filter((boundary) =>
-		renderedBoundaryIds.has(idPrefix + boundary.id),
+	// A @try in a keyed row is one boundary per row, each named by the row it rendered in; a child's records already are.
+	const renderedBoundaryIds = new Map<string, Set<string>>();
+	for (const anchor of structure.anchors)
+		if (anchor.kind === 'async')
+			for (const name of new Set([anchor.id, anchor.site ?? anchor.id]))
+				renderedBoundaryIds.set(name, (renderedBoundaryIds.get(name) ?? new Set()).add(anchor.id));
+	const renderedBoundaries = asyncBoundaries.flatMap((boundary) =>
+		[...(renderedBoundaryIds.get(idPrefix + boundary.id) ?? [])].map((id) => ({ ...boundary, id: id.slice(idPrefix.length) })),
 	);
 	// An arm's @if nested in a closed @if drew no anchors, so it has nothing to resume until a flip renders it.
 	const renderedArmBranchIds = new Set(
