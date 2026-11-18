@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import {
 	copyFile,
 	cp,
@@ -18,10 +19,11 @@ import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
 import { buildFixture } from '../../router/test/support/fixture-build.ts';
 import {
+	allRungFolders,
 	callsText,
 	proofsDir,
 	readRung,
-	rungFolders,
+	styleRungFolders,
 	type LadderRung,
 	type LadderStep,
 } from '../proofs/ladder.ts';
@@ -58,12 +60,23 @@ async function serveRung(
 ): Promise<{ origin: string; root: string }> {
 	const root = await mkdtemp(join(tmpdir(), `markless-ladder-${folder}-`));
 	cleanups.push(() => rm(root, { recursive: true, force: true }));
-	const page = join(root, 'pages', `${rung.route ?? 'index'}.tsrx`);
-	await mkdir(dirname(page), { recursive: true });
-	await copyFile(join(proofsDir, folder, 'App.tsrx'), page);
+	// A navigation rung is an app of several routes: its pages/ folder is the app's.
+	if (existsSync(join(proofsDir, folder, 'pages'))) {
+		await cp(join(proofsDir, folder, 'pages'), join(root, 'pages'), { recursive: true });
+	} else {
+		const page = join(root, 'pages', `${rung.route ?? 'index'}.tsrx`);
+		await mkdir(dirname(page), { recursive: true });
+		await copyFile(join(proofsDir, folder, 'App.tsrx'), page);
+	}
 	// Components a rung imports live in proofs/lib, which a page reaches as `../lib/...` from pages/ here too.
 	await cp(join(proofsDir, 'lib'), join(root, 'lib'), { recursive: true });
-	await writeFile(join(root, 'document.tsrx'), documentSource);
+	// An app rung may bring its own components, stylesheets and document (whose stylesheet imports reach every page).
+	for (const own of ['lib', 'styles'])
+		if (existsSync(join(proofsDir, folder, own)))
+			await cp(join(proofsDir, folder, own), join(root, own), { recursive: true });
+	if (existsSync(join(proofsDir, folder, 'document.tsrx')))
+		await copyFile(join(proofsDir, folder, 'document.tsrx'), join(root, 'document.tsrx'));
+	else await writeFile(join(root, 'document.tsrx'), documentSource);
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router', 'device'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
@@ -111,6 +124,8 @@ async function act(page: Page, step: LadderStep) {
 		await field.fill('');
 		await field.pressSequentially(action.type.text);
 	} else if ('relaunch' in action) await page.reload();
+	else if ('back' in action) await page.goBack();
+	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });
 	else if ('wait' in action) await page.clock.runFor(action.wait);
 }
 
@@ -135,6 +150,8 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 		);
 		if (callsText(made) !== callsText(step.calls)) failed.push(`device ${callsText(made)}`);
 	}
+	if (step.title !== undefined && (await page.title()) !== step.title)
+		failed.push(`the title is "${await page.title()}"`);
 	if (step.order) {
 		const tops: number[] = [];
 		for (const text of step.order)
@@ -145,7 +162,27 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 	return failed;
 }
 
-describe.each(rungFolders())('%s', (folder) => {
+// Where a step says the web differs (`onWeb`), the web is held to what it does instead.
+const onWeb = (step: LadderStep): LadderStep =>
+	step.onWeb
+		? {
+				visible: step.onWeb.visible ?? [],
+				...(step.onWeb.absent ? { absent: step.onWeb.absent } : {}),
+				...(step.onWeb.order ? { order: step.onWeb.order } : {}),
+				...(step.title === undefined ? {} : { title: step.title }),
+			}
+		: step;
+
+/** The phones' CSS sizes and ratios (Dragon's proof devices), for the web screenshots a style rung's phone shots are read against. */
+const PHONES = {
+	ios: { viewport: { width: 402, height: 778 }, deviceScaleFactor: 3 },
+	android: { viewport: { width: 411, height: 818 }, deviceScaleFactor: 2.625 },
+} as const;
+
+// Written only when asked (MARKLESS_LADDER_SCREENSHOTS=1), so a test run leaves the proofs folder as it was.
+const screenshotsWanted = process.env.MARKLESS_LADDER_SCREENSHOTS === '1';
+
+describe.each(allRungFolders())('%s', (folder) => {
 	const rung = readRung(folder);
 	let origin = '';
 
@@ -172,12 +209,17 @@ describe.each(rungFolders())('%s', (folder) => {
 		for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 	}, 60_000);
 
-	test(
-		`${rung.name}: the web build shows every step's expected texts`,
+	const styled = styleRungFolders().includes(folder);
+	test.each(styled ? (['ios', 'android'] as const) : ([undefined] as const))(
+		`${rung.name}: the web build shows every step's expected texts%s`,
 		{ timeout: 60_000 },
-		async () => {
-			const context = await browser.newContext();
+		async (phone) => {
+			const context = await browser.newContext(
+				phone ? { ...PHONES[phone], colorScheme: 'light' } : {},
+			);
 			await context.addInitScript(recordDeviceCalls);
+			const shots = phone ? join(proofsDir, folder, 'screenshots', `web-${phone}`) : null;
+			if (shots && screenshotsWanted) await mkdir(shots, { recursive: true });
 			const page = await context.newPage();
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(error.message));
@@ -194,12 +236,24 @@ describe.each(rungFolders())('%s', (folder) => {
 					visible: [...authored.visible, ...(authored.visibleOn?.web ?? [])],
 				};
 				await act(page, step);
+				if (step.onWeb?.leaves) {
+					await expect
+						.poll(() => new URL(page.url()).origin, { message: `step ${index} leaves` })
+						.not.toBe(origin);
+					break;
+				}
 				await expect
-					.poll(() => mismatches(page, step), {
+					.poll(() => mismatches(page, onWeb(step)), {
 						timeout: 10_000,
 						message: `step ${index}`,
 					})
 					.toEqual([]);
+				if (shots && screenshotsWanted) {
+					const action = step.do ? Object.keys(step.do)[0]! : 'launch';
+					await page.screenshot({
+						path: join(shots, `${String(index).padStart(2, '0')}-${action}-after.png`),
+					});
+				}
 			}
 			expect(errors).toEqual([]);
 			await context.close();

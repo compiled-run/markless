@@ -1,0 +1,48 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Home",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "home mk-1fmt85k"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-1fmt85k"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Account"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0",
+			"element": "a",
+			"parent": "h0",
+			"attributes": {
+				"class": "next mk-1fmt85k",
+				"href": "/settings"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0:text0",
+			"parent": "component-edge:0",
+			"text": "Open settings"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.home.mk-1fmt85k {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f8f9fa;\n\t\t\t}\n\t\t\t.heading.mk-1fmt85k {\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #212529;\n\t\t\t}\n\t\t\t.next.mk-1fmt85k {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #264653;\n\t\t\t\tcolor: #ffffff;\n\t\t\t\tfont-size: 17px;\n\t\t\t\ttext-decoration: none;\n\t\t\t}",
+	"states": []
+}

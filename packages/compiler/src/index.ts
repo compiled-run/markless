@@ -105,6 +105,7 @@ export { NATIVE_FACT_COLLECTORS } from './passes/semantic-graph/expression-tree.
 export { DEVICE_TARGET_FACTS } from './passes/semantic-graph/device-target.ts';
 export {
 	createNativeViewPayload,
+	nativeUnsupported,
 	NATIVE_UNSUPPORTED_CODE,
 	type NativeViewArtifact,
 	type NativeViewOptions,

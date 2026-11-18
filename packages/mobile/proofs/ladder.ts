@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
+import { PROOF_URL_SCHEME } from '../src/harness/proof-app.ts';
 
 /** One person's action between two looks at the screen. Every target is a visible text or an accessible name. */
 export type LadderAction =
@@ -22,6 +23,10 @@ export type LadderAction =
 	| { readonly swipe: 'up' }
 	/** Scroll until this text is on screen. */
 	| { readonly scrollTo: string }
+	/** The platform's own way back: the edge-swipe gesture, or the back button (iOS navigation bar, Android system back). */
+	| { readonly back: 'gesture' | 'button' }
+	/** The device's light or dark appearance, switched in the system while the app runs (`prefers-color-scheme` on the web). */
+	| { readonly appearance: 'light' | 'dark' }
 	| {
 			readonly relaunch: true;
 			readonly permissions?: Readonly<Partial<Record<DevicePermission, 'unset'>>>;
@@ -47,7 +52,7 @@ export type DevicePermission = 'location' | 'camera' | 'microphone';
 
 /** The link a phone test build answers by setting a live device value (both shells: `markless-proof://device/<name>?value=<json>`). */
 export const deviceLink = (name: string, value: unknown): string =>
-	`markless-proof://device/${name}?value=${encodeURIComponent(JSON.stringify(value))}`;
+	`${PROOF_URL_SCHEME}://device/${name}?value=${encodeURIComponent(JSON.stringify(value))}`;
 
 /** The prompt button each answer taps, as Maestro text patterns matching iOS's and Android's own wording. */
 export const PERMISSION_BUTTONS = {
@@ -90,6 +95,19 @@ export type LadderStep = {
 	readonly microphone?: 'on' | 'off';
 	/** Texts on screen on one platform only: a `platform` check shows a different arm on each. */
 	readonly visibleOn?: Readonly<Partial<Record<'ios' | 'android' | 'web', readonly string[]>>>;
+	/** The screen's title: the system navigation bar's on a phone, `document.title` on the web. */
+	readonly title?: string;
+	/**
+	 * What the web shows instead, where a browser cannot do what a native stack does; `why` says what differs. With
+	 * `leaves`, the action leaves the site (a Back with no earlier entry) and the web column stops there.
+	 */
+	readonly onWeb?: {
+		readonly why: string;
+		readonly visible?: readonly string[];
+		readonly absent?: readonly string[];
+		readonly order?: readonly string[];
+		readonly leaves?: true;
+	};
 };
 
 /** Each system prompt's title, as a Maestro text pattern matching iOS's and Android's wording. */
@@ -116,7 +134,7 @@ export const callsText = (calls: readonly string[]): string =>
 	`calls: ${calls.length === 0 ? 'none' : calls.join(', ')}`;
 
 export type LadderRung = {
-	/** A number on the view ladder; `D<n>` on the device ladder. */
+	/** A number on the view ladder; `D<n>` on the device ladder, `N1`... on the navigation ladder. */
 	readonly rung: number | string;
 	readonly name: string;
 	/** The route pattern App.tsrx is the page for, relative to the app root; the index route when absent. */
@@ -135,6 +153,8 @@ export type LadderRung = {
 		readonly steps?: readonly LadderStep[];
 		readonly absentFromOutput?: readonly string[];
 	};
+	/** How the app opens at `start`: a launch argument (the default) or a deep link the system hands the app. */
+	readonly open?: 'launch' | 'link';
 	readonly steps: readonly LadderStep[];
 };
 
@@ -145,6 +165,31 @@ export const rungFolders = (): string[] =>
 		.filter((entry) => entry.isDirectory() && /^((\d\d|[dp]\d)[a-z]?|y\d+)-/.test(entry.name))
 		.map((entry) => entry.name)
 		.sort();
+
+/** The navigation ladder: each folder an app (`pages/`) of several routes. */
+export const navRungFolders = (): string[] =>
+	readdirSync(proofsDir, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory() && /^n\d+-/.test(entry.name))
+		.map((entry) => entry.name)
+		.sort();
+
+/** The styles ladder: each folder an app of several pages whose styles reach the phone through Dragon. */
+export const styleRungFolders = (): string[] =>
+	readdirSync(proofsDir, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory() && /^s\d+-/.test(entry.name))
+		.map((entry) => entry.name)
+		.sort();
+
+/** Every proof folder the flows are written for: the one-screen ladder, the navigation ladder, then the styles ladder. */
+export const allRungFolders = (): string[] => [
+	...rungFolders(),
+	...navRungFolders(),
+	...styleRungFolders(),
+];
+
+/** An action that changes only how the screen looks, so no text can witness it; the screenshots after it do. */
+export const looksOnly = (action: LadderAction | undefined): boolean =>
+	action !== undefined && 'appearance' in action;
 
 export const readRung = (folder: string): LadderRung =>
 	JSON.parse(readFileSync(join(proofsDir, folder, 'expected.json'), 'utf8')) as LadderRung;
@@ -177,6 +222,7 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 		...(step.camera && step.camera !== previous.camera && { camera: step.camera }),
 		...(step.microphone &&
 			step.microphone !== previous.microphone && { microphone: step.microphone }),
+		...(step.title !== undefined && step.title !== previous.title && { title: step.title }),
 	};
 }
 
@@ -187,7 +233,8 @@ export const witnessCount = (witness: LadderStep): number =>
 	Object.keys(witness.fields ?? {}).length +
 	(witness.calls ? 1 : 0) +
 	(witness.camera ? 1 : 0) +
-	(witness.microphone ? 1 : 0);
+	(witness.microphone ? 1 : 0) +
+	(witness.title === undefined ? 0 : 1);
 
 const assertions = (step: LadderStep): unknown[] =>
 	step.prompt
@@ -232,6 +279,7 @@ const screenAssertions = (step: LadderStep): unknown[] => [
 	...(step.microphone
 		? [{ assertVisible: { id: MICROPHONE_STATE_ID, text: `microphone ${step.microphone}` } }]
 		: []),
+	...(step.title === undefined ? [] : [{ assertVisible: selector(step.title) }]),
 ];
 
 // Inside the sheet at either resting height on both phones. iOS springs a slow pull back, and hands a pull past full height to the content's scroll.
@@ -242,6 +290,9 @@ const backGesture = { swipe: { start: '1%, 50%', end: '85%, 50%', duration: 300 
 const onPlatform = (platform: 'Android' | 'iOS', commands: unknown[]) => ({
 	runFlow: { when: { platform }, commands },
 });
+
+/** The left-edge swipe both platforms read as Back (iOS's interactive pop, Android's back gesture). */
+const EDGE_SWIPE = { swipe: { start: '1%, 50%', end: '85%, 50%', duration: 400 } };
 
 const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 	if ('tap' in action) return [{ tapOn: selector(action.tap) }];
@@ -298,6 +349,15 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 				},
 			},
 		];
+	if ('appearance' in action)
+		return [{ setDarkMode: action.appearance === 'dark' ? 'enabled' : 'disabled' }];
+	if ('back' in action)
+		return action.back === 'gesture'
+			? [EDGE_SWIPE]
+			: [
+					onPlatform('iOS', [{ tapOn: { id: 'BackButton' } }]),
+					onPlatform('Android', [{ pressKey: 'back' }]),
+				];
 	return [
 		{
 			extendedWaitUntil: {
@@ -310,13 +370,28 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 
 /** The Maestro commands of each step in order: step 0 launches the app, every later step is its action then its checks. */
 export function flowSteps(rung: LadderRung): unknown[][] {
-	const launch = {
-		launchApp: {
-			clearState: true,
-			...(rung.start && { arguments: { route: rung.start } }),
-			...(rung.permissions && { permissions: rung.permissions }),
-		},
-	};
+	const launch =
+		rung.open === 'link'
+			? [
+					{ launchApp: { clearState: true } },
+					'stopApp',
+					{ openLink: `${PROOF_URL_SCHEME}://app${rung.start ?? '/'}` },
+					// iOS asks before an outside caller opens an app by its URL scheme, until the simulator remembers the answer.
+					onPlatform('iOS', [{ tapOn: { text: 'Open', optional: true } }]),
+				]
+			: [
+					{
+						launchApp: {
+							clearState: true,
+							...(rung.start && { arguments: { route: rung.start } }),
+							...(rung.permissions && { permissions: rung.permissions }),
+						},
+					},
+				];
+	// A rung that switches the appearance starts in light, whatever the device was left in.
+	const appearance = rung.steps.some((step) => looksOnly(step.do))
+		? [{ setDarkMode: 'disabled' }]
+		: [];
 	// The Settings app keeps its place between runs; stopping it makes it open at its root every time.
 	const visitsSettings = rung.steps.some((step) => step.do && 'settings' in step.do);
 	return rung.steps.map((step, index) => [
@@ -324,7 +399,7 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 			? [{ runFlow: { when: { platform: 'iOS' }, commands: [{ stopApp: 'com.apple.Preferences' }] } }]
 			: []),
 		...(index === 0 && rung.location ? [{ setLocation: rung.location }] : []),
-		...(index === 0 ? [launch] : []),
+		...(index === 0 ? [...launch, ...appearance] : []),
 		...(step.do ? actionCommands(step.do, step) : []),
 		...(index > 0
 			? assertions({

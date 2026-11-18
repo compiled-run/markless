@@ -1,7 +1,26 @@
-export { compileNativeComponent, type NativeBuild } from './compile.ts';
 export {
+	createNativeAppRuntime,
+	matchNativeRoute,
+	nativeBackStack,
+	nativeRoutePath,
+	type NativeAppAction,
+	type NativeAppRuntime,
+	type NativeScreen,
+} from './app.ts';
+export {
+	compileNativeApp,
+	compileNativeComponent,
+	type NativeAppBuild,
+	type NativeBuild,
+	type NativeStylesheet,
+	type ReadStylesheet,
+} from './compile.ts';
+export {
+	NATIVE_APP_CONFORMANCE_VERSION,
 	NATIVE_CONFORMANCE_VERSION,
+	nativeAppConformance,
 	nativeConformance,
+	type NativeAppConformance,
 	type NativeConformance,
 } from './conformance.ts';
 export {
@@ -16,3 +35,10 @@ export {
 	nativeStyleInput,
 	type NativeStyleInput,
 } from './style-input.ts';
+export {
+	NATIVE_APP_STYLE_VERSION,
+	nativeAppStyle,
+	nativeAppStyleSize,
+	type DragonStyleExport,
+	type NativeAppStyle,
+} from './app-style.ts';

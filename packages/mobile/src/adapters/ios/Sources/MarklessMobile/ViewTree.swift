@@ -44,6 +44,8 @@ final class ViewTree {
 	weak var presenter: UIViewController?
 	private var anchors = Set<ObjectIdentifier>()
 	private var assignment: Int
+	/// Taps and drags on the page dismiss the keyboard; a stack makes them wait for its edge-swipe Back.
+	let dismissGestures: [UIGestureRecognizer] = [UITapGestureRecognizer(), UIPanGestureRecognizer()]
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 
 	init(
@@ -77,7 +79,7 @@ final class ViewTree {
 		events = Dictionary(grouping: payload.events, by: \.host)
 		var index = 0
 		_ = try build("", in: root, at: &index, Context())
-		for gesture in [UITapGestureRecognizer(), UIPanGestureRecognizer()] as [UIGestureRecognizer] {
+		for gesture in dismissGestures {
 			gesture.cancelsTouchesInView = false
 			gesture.addTarget(keyboard, action: #selector(KeyboardDismisser.dismiss))
 			root.addGestureRecognizer(gesture)
@@ -127,8 +129,8 @@ final class ViewTree {
 			case let .sheet(node, open):
 				guard let sheet = sheets[node] else { throw HostError("journal names sheet \(node), which is not built") }
 				if open { sheet.open(from: presenter) } else { sheet.close() }
-			case .navigate:
-				throw HostError("a navigate entry reaches the page's controller, not its views")
+			case .navigate, .title:
+				throw HostError("navigate and title entries reach the screen's controller, not its views")
 			case .call, .release:
 				throw HostError("a \(entry.json.jsonText) entry reaches the page's device, not its views")
 			case let .state(cell, value):
@@ -270,7 +272,7 @@ final class ViewTree {
 				if let style = style(of: id) { try paint(view, style, faces: faces) }
 				container.insertSubview(view, at: index)
 				index += 1
-				try wire(events[template] ?? [], on: view, element: element, id: id, inRow: !context.suffix.isEmpty)
+				try wire(events[template] ?? [], on: view, element: element, id: id)
 				var current = staticAttributes
 				for binding in bindings where !binding.isProperty {
 					current[binding.name] = marklessAttributeValue(binding.name, try runtime.evaluate(binding.value, in: context.scope))
@@ -337,10 +339,9 @@ final class ViewTree {
 		return built
 	}
 
-	private func wire(_ bound: [NativeEvent], on view: UIView, element: String, id: String, inRow: Bool) throws {
+	private func wire(_ bound: [NativeEvent], on view: UIView, element: String, id: String) throws {
 		let onAction = onAction
 		for event in bound {
-			if inRow { throw HostError("a \(event.event.rawValue) handler on a list row (\(id)) has no iOS host support yet") }
 			switch (event.event, view) {
 			case let (.activate, control as UIButton):
 				control.addAction(UIAction { _ in onAction(NativeAction(event: .activate, host: id)) }, for: .touchUpInside)
@@ -512,6 +513,7 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	view.layer.borderWidth = style.borderWidth
 	view.layer.borderColor = style.borderColor.map(uiColor)?.cgColor
 	view.layer.cornerRadius = style.cornerRadius
+	paintSides(view, style.sides)
 	guard let label = view as? UILabel else {
 		if style.font != nil || style.textColor != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") has text styles but is not text") }
 		return
@@ -525,5 +527,25 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 
 private func uiColor(_ color: RGBA) -> UIColor {
 	UIColor(red: color.r / 255, green: color.g / 255, blue: color.b / 255, alpha: color.alpha / 255)
+}
+/// One sublayer per side, for borders whose sides differ; Chrome's diagonal corner joins are not drawn.
+private func paintSides(_ view: UIView, _ sides: [ResolvedStyle.Side]?) {
+	let name = "markless-border-side"
+	view.layer.sublayers?.filter { $0.name == name }.forEach { $0.removeFromSuperlayer() }
+	guard let sides else { return }
+	let b = view.bounds
+	let rects = [
+		CGRect(x: 0, y: 0, width: b.width, height: sides[0].width),
+		CGRect(x: b.width - sides[1].width, y: 0, width: sides[1].width, height: b.height),
+		CGRect(x: 0, y: b.height - sides[2].width, width: b.width, height: sides[2].width),
+		CGRect(x: 0, y: 0, width: sides[3].width, height: b.height),
+	]
+	for (side, rect) in zip(sides, rects) where side.width > 0 {
+		let layer = CALayer()
+		layer.name = name
+		layer.frame = rect
+		layer.backgroundColor = uiColor(side.color).cgColor
+		view.layer.addSublayer(layer)
+	}
 }
 #endif

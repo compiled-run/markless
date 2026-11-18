@@ -8,7 +8,7 @@ import {
 	ANDROID_SHELL_ACTIVITY,
 	PROOF_APP_ID,
 	PROOF_APP_NAME,
-	PROOF_LINK_SCHEME,
+	PROOF_URL_SCHEME,
 } from './proof-app.ts';
 import type { DeviceManifest } from '../permissions.ts';
 import type { ProofAssets } from './rung.ts';
@@ -206,7 +206,7 @@ const androidManifest = (
 	<uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
 ${permissions.map((name) => `\t<uses-permission android:name="${name}" />\n`).join('')}
 	<application android:label="${PROOF_APP_NAME}" android:hasCode="true">
-		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:launchMode="singleTask" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:launchMode="singleTask" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
@@ -215,7 +215,7 @@ ${permissions.map((name) => `\t<uses-permission android:name="${name}" />\n`).jo
 				<action android:name="android.intent.action.VIEW" />
 				<category android:name="android.intent.category.DEFAULT" />
 				<category android:name="android.intent.category.BROWSABLE" />
-				<data android:scheme="${PROOF_LINK_SCHEME}" />
+				<data android:scheme="${PROOF_URL_SCHEME}" />
 			</intent-filter>
 		</activity>
 	</application>

@@ -123,8 +123,9 @@ public enum NativeEventName: String, Sendable {
 public enum NativeOp: Equatable, Sendable {
 	/// The cell takes the expression's value, evaluated before the write.
 	case assign(cell: String, value: NativeExpr)
-	/// Opens the page at `route` with these params; ops after it do not run.
-	case navigate(route: String, params: [NativeRouteParam])
+	/// Opens the page at `route` with these params (fixed, or evaluated when the op runs); ops after it do not run.
+	/// `replace` takes the current screen's place instead of pushing.
+	case navigate(route: String, params: [NativeOpParam], replace: Bool)
 	/// A device call (`haptics.tap`), on `object` when it names one; with `result` it settles that task cell, with `then`
 	/// the host answers with `resume` and those ops run with the answer as a local.
 	case call(call: String, object: String?, arguments: [NativeExpr], result: String?, then: NativeContinuation?)
@@ -143,6 +144,16 @@ public struct NativeContinuation: Equatable, Sendable {
 public struct NativeTask: Equatable, Sendable {
 	public let call: String
 	public let arguments: [NativeExpr]
+}
+
+/// A navigate op's param: a string fixed at build time, or an expression evaluated in the activated element's scope.
+public struct NativeOpParam: Equatable, Sendable {
+	public enum Value: Equatable, Sendable {
+		case string(String)
+		case expr(NativeExpr)
+	}
+	public let name: String
+	public let value: Value
 }
 
 public struct NativeRouteParam: Equatable, Sendable {
@@ -210,6 +221,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public let handlers: [NativeHandler]
 	/// Device objects the page's components make.
 	public var objects: [NativeDeviceObject] = []
+	/// The page's `<title>` as text parts: the screen's navigation bar title.
+	public var title: [NativeTextPart]? = nil
 
 	public static func decode(_ data: Data) throws -> NativeViewPayload {
 		try decode(JSONValue.parse(data))
@@ -217,7 +230,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "objects"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "objects", "title"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
@@ -267,13 +280,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 					object: field.has("object") ? try field["object"].string() : nil)
 			case "text":
 				let field = try node.object(required: ["kind", "id", "parent", "parts"], optional: place)
-				let parts = try field["parts"].array().map { part -> NativeTextPart in
-					let keys = try part.keys()
-					if keys == ["text"] { return .text(try part.field("text").string()) }
-					if keys == ["cell"] { return .cell(try part.field("cell").string()) }
-					if keys == ["expr"] { return .expr(try decodeExpr(try part.field("expr"))) }
-					throw PayloadError(path: part.path, reason: "unknown text part with keys \(keys)")
-				}
+				let parts = try decodeParts(try field["parts"])
 				return NativeNode(
 					id: try field["id"].string(), parent: try field["parent"].string(), arm: try decodeArm(field), row: try decodeRow(field),
 					kind: .text(parts: parts))
@@ -343,8 +350,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 					let opField = try op.object(["op", "cell", "value"])
 					return .assign(cell: try opField["cell"].string(), value: try decodeExpr(try opField["value"]))
 				case "navigate":
-					let opField = try op.object(["op", "route", "params"])
-					return .navigate(route: try opField["route"].string(), params: try decodeParams(try opField["params"]))
+					let opField = try op.object(required: ["op", "route", "params"], optional: ["replace"])
+					let params = try opField["params"]
+					return .navigate(
+						route: try opField["route"].string(),
+						params: try params.keys().map { name in
+							let value = try params.field(name)
+							return NativeOpParam(name: name, value: value.isString ? .string(try value.string()) : .expr(try decodeExpr(value)))
+						},
+						replace: try decodeReplace(opField))
 				case "call":
 					let opField = try op.object(required: ["op", "call", "arguments"], optional: ["result", "object", "after"])
 					let then: NativeContinuation? = opField.has("after") ? try {
@@ -367,9 +381,26 @@ public struct NativeViewPayload: Equatable, Sendable {
 		}() : nil
 		let payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
-			objects: objects)
+			objects: objects,
+			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil)
 		try payload.check()
 		return payload
+	}
+
+	private static func decodeParts(_ reader: Reader) throws -> [NativeTextPart] {
+		try reader.array().map { part -> NativeTextPart in
+			let keys = try part.keys()
+			if keys == ["text"] { return .text(try part.field("text").string()) }
+			if keys == ["cell"] { return .cell(try part.field("cell").string()) }
+			if keys == ["expr"] { return .expr(try decodeExpr(try part.field("expr"))) }
+			throw PayloadError(path: part.path, reason: "unknown text part with keys \(keys)")
+		}
+	}
+
+	static func decodeReplace(_ fields: Fields) throws -> Bool {
+		guard fields.has("replace") else { return false }
+		guard try fields["replace"].bool() else { throw PayloadError(path: try fields["replace"].path, reason: "replace is only ever true") }
+		return true
 	}
 
 	static func decodeParams(_ reader: Reader) throws -> [NativeRouteParam] {
@@ -595,6 +626,7 @@ struct Reader {
 	}
 
 	var isNull: Bool { if case .null = value { return true } else { return false } }
+	var isString: Bool { if case .string = value { return true } else { return false } }
 
 	func scalar() throws -> NativeValue {
 		switch value {
@@ -628,4 +660,74 @@ public struct NativeDeviceObject: Equatable, Sendable {
 	public let device: String
 	/// The first node of the component instance that made it.
 	public let owner: String
+}
+
+public let nativeAppVersion = "markless.native-app/0"
+
+/// A decoded `markless.native-app/0` payload: each route's page, in the router's match order.
+public struct NativeAppPayload: Equatable, Sendable {
+	public struct Route: Equatable, Sendable {
+		public let pattern: String
+		public let params: [String]
+		public let page: NativeViewPayload
+	}
+	public let routes: [Route]
+
+	public static func decode(_ data: Data) throws -> NativeAppPayload { try decode(JSONValue.parse(data)) }
+
+	public static func decode(_ json: JSONValue) throws -> NativeAppPayload {
+		let fields = try Reader(json, at: "app").object(["version", "routes"])
+		let version = try fields["version"].string()
+		guard version == nativeAppVersion else {
+			throw PayloadError(path: "app.version", reason: "unsupported version \"\(version)\", this host reads \(nativeAppVersion)")
+		}
+		return NativeAppPayload(routes: try fields["routes"].array().map { route in
+			let field = try route.object(["pattern", "params", "page"])
+			let page = try NativeViewPayload.decode(try field["page"].value)
+			let pattern = try field["pattern"].string()
+			guard page.route?.pattern == pattern else { throw PayloadError(path: route.path, reason: "the page's route is not \(pattern)") }
+			return Route(pattern: pattern, params: try field["params"].array().map { try $0.string() }, page: page)
+		})
+	}
+
+	/// The route a path opens: the first in payload order whose segments match (a `[name]` segment takes one, URL-decoded).
+	public func match(_ path: String) -> (route: Route, params: [NativeRouteParam])? {
+		for route in routes {
+			if let params = NativeRoute(pattern: route.pattern, params: route.params).match(path) { return (route, params) }
+		}
+		return nil
+	}
+
+	/// The stack an app opens with at `path`: every leading part of the path that is a route, shortest first.
+	public func backStack(_ path: String) throws -> [String] {
+		let segments = path.split(separator: "/", omittingEmptySubsequences: true)
+		let stack = (0...segments.count).map { "/" + segments.prefix($0).joined(separator: "/") }.filter { match($0) != nil }
+		guard stack.last == "/" + segments.joined(separator: "/") else { throw PayloadError(path: "app", reason: "\(path) is not a route of this app") }
+		return stack
+	}
+
+	/// The path a pattern names with these params, each URL-encoded as `encodeURIComponent` does.
+	public static func path(_ pattern: String, _ params: [NativeRouteParam]) throws -> String {
+		let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.!~*'()")
+		return "/" + (try pattern.split(separator: "/", omittingEmptySubsequences: true).map { part -> String in
+			guard part.hasPrefix("["), part.hasSuffix("]") else { return String(part) }
+			let name = String(part.dropFirst().dropLast())
+			guard let value = params.first(where: { $0.name == name })?.value else {
+				throw PayloadError(path: "app", reason: "\(pattern) needs the param \(name)")
+			}
+			return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+		}).joined(separator: "/")
+	}
+}
+
+/// What a shell was given: one page, or an app of several routes.
+public enum NativePayload: Sendable {
+	case page(NativeViewPayload)
+	case app(NativeAppPayload)
+
+	public static func decode(_ data: Data) throws -> NativePayload {
+		let json = try JSONValue.parse(data)
+		let version = try Reader(json, at: "payload").field("version").string()
+		return version == nativeAppVersion ? .app(try NativeAppPayload.decode(json)) : .page(try NativeViewPayload.decode(json))
+	}
 }

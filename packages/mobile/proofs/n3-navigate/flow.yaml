@@ -1,0 +1,40 @@
+appId: ${APP_ID}
+name: n3-navigate
+---
+- launchApp:
+      clearState: true
+- assertVisible: Welcome screen ahead
+- assertVisible: Sign in
+- assertVisible: Home
+- tapOn: Sign in
+- assertNotVisible: Welcome screen ahead
+- assertVisible: Welcome
+- assertVisible: Signed in
+- assertVisible: Continue
+- assertNotVisible: Welcome screen ahead
+- assertVisible: Welcome
+- tapOn: Continue
+- assertNotVisible: Signed in
+- assertVisible: Dashboard
+- assertVisible: Your dashboard
+- assertVisible: The welcome screen was replaced\.
+- assertNotVisible: Signed in
+- assertVisible: Dashboard
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertNotVisible: Your dashboard
+- assertVisible: Home
+- assertVisible: Welcome screen ahead
+- assertVisible: Sign in
+- assertNotVisible: Your dashboard
+- assertNotVisible: Signed in
+- assertVisible: Home

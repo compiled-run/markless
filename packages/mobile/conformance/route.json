@@ -45,7 +45,10 @@
 				"kind": "element",
 				"id": "component-edge:0",
 				"element": "a",
-				"parent": "h0"
+				"parent": "h0",
+				"attributes": {
+					"href": "/[fruit]"
+				}
 			},
 			{
 				"kind": "text",
@@ -61,7 +64,10 @@
 				"kind": "element",
 				"id": "component-edge:1",
 				"element": "a",
-				"parent": "h0"
+				"parent": "h0",
+				"attributes": {
+					"href": "/[fruit]"
+				}
 			},
 			{
 				"kind": "text",

@@ -66,6 +66,8 @@ export type NativeRuntime = {
 	readonly dispatch: (action: NativeAction) => ReadonlyArray<NativeJournalEntry>;
 	/** The calls a host starts at mount, one per task cell, each settling its cell. */
 	readonly tasks: () => ReadonlyArray<Extract<NativeJournalEntry, { op: 'call' }>>;
+	/** The page's `<title>` text, null when it has none. */
+	readonly title: () => string | null;
 };
 
 /** How a value reads in text, as the web writes it (`marklessCsrText`): null is empty, anything else `String(value)`. */
@@ -378,6 +380,21 @@ export function createNativeRuntime(
 	const keyed = <T>(list: ReadonlyArray<readonly [string, string, T]>) =>
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));
 
+	const title = () => (payload.title ? render(payload.title, base) : null);
+	/** The scope an action's element runs in: a row instance (`h6@42`) reads its row's item. */
+	const scopeOf = (host: string): { node: string; scope: NativeScope } => {
+		const at = host.indexOf('@');
+		if (at < 0) return { node: host, scope: base };
+		const node = host.slice(0, at);
+		const key = host.slice(at + 1);
+		const row = payload.nodes.find((candidate) => candidate.id === node)?.row;
+		const repeat = row ? repeats.get(row) : undefined;
+		const found =
+			repeat && shown(repeat) ? rowsOf(repeat).find((entry) => entry.key === key) : undefined;
+		if (!repeat || !found) throw new Error(`${host} is not a shown row instance`);
+		return { node, scope: { ...base, items: new Map([[repeat.id, found.item]]) } };
+	};
+
 	return {
 		texts,
 		attributes,
@@ -385,6 +402,7 @@ export function createNativeRuntime(
 		arms,
 		rows,
 		sheets,
+		title,
 		dispatch(action) {
 			if (action.event === 'resume') {
 				const continuation = continuations.get(action.continuation);
@@ -423,13 +441,14 @@ export function createNativeRuntime(
 					return [];
 				});
 			}
+			const { node: host, scope } = scopeOf(action.host);
 			const event = payload.events.find(
-				(candidate) => candidate.host === action.host && candidate.event === action.event,
+				(candidate) => candidate.host === host && candidate.event === action.event,
 			);
 			if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
 			const eventValue = action.event === 'input' ? action.value : undefined;
 			return change(action.host, eventValue, () =>
-				run(handlers.get(event.handler) ?? [], eventValue, base),
+				run(handlers.get(event.handler) ?? [], eventValue, scope),
 			);
 		},
 		tasks: () =>
@@ -458,7 +477,21 @@ export function createNativeRuntime(
 		const calls: NativeJournalEntry[] = [];
 		for (const op of ops) {
 			if (op.op === 'navigate')
-				return [{ op: 'navigate', route: op.route, params: op.params }];
+				return [
+					{
+						op: 'navigate',
+						route: op.route,
+						params: Object.fromEntries(
+							Object.entries(op.params).map(([name, value]) => [
+								name,
+								typeof value === 'string'
+									? value
+									: String(evaluate(value, eventValue, scope)),
+							]),
+						),
+						...(op.replace ? { replace: true as const } : {}),
+					},
+				];
 			if (op.op === 'call') {
 				calls.push({
 					op: 'call',
@@ -500,6 +533,7 @@ export function createNativeRuntime(
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
 			const beforeSheets = new Map(sheets());
+			const beforeTitle = title();
 			const ownedBefore = new Set(liveObjects());
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
@@ -584,7 +618,16 @@ export function createNativeRuntime(
 					? [{ op: 'release', object: object.id }]
 					: [],
 			);
-			return [...styles, ...nodes, ...releases, ...calls];
+			const afterTitle = title();
+			return [
+				...styles,
+				...nodes,
+				...(afterTitle !== beforeTitle && afterTitle !== null
+					? [{ op: 'title' as const, value: afterTitle }]
+					: []),
+				...releases,
+				...calls,
+			];
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package dev.markless.mobile.view
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
@@ -20,16 +21,21 @@ import android.widget.TextView
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Instance
 import dev.markless.mobile.core.JournalEntry
+import dev.markless.mobile.core.JsValue
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.Store
+import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.StyledNode
 import kotlin.math.roundToInt
 
 class MarklessHostError(message: String) : RuntimeException(message)
+
+private fun isDark(configuration: Configuration): Boolean =
+	configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
 /** Looks up a font face by the id a style export names it with (`sha256:<hex>` of the font file). */
 fun interface FontSource {
@@ -51,8 +57,9 @@ class AssetFonts(private val context: Context) : FontSource {
  */
 class MarklessHost(
 	private val context: Context,
-	payloadBytes: ByteArray,
-	styleExportBytes: ByteArray? = null,
+	val payload: Payload,
+	/** This page's styles: a page's own export, or its route's styles from an app style file. */
+	val style: StyleExport?,
 	private val fonts: FontSource = AssetFonts(context),
 	store: Store = PreferencesStore(context),
 	/** The route params the page opens with. */
@@ -60,15 +67,23 @@ class MarklessHost(
 	/** Where device values come from and device calls go; required for a payload that names device features. */
 	private val device: NativeDevice? = null,
 ) {
-	val payload: Payload = Payload.decode(payloadBytes)
+	constructor(
+		context: Context,
+		payloadBytes: ByteArray,
+		styleExportBytes: ByteArray? = null,
+		fonts: FontSource = AssetFonts(context),
+		store: Store = PreferencesStore(context),
+		params: Map<String, String> = emptyMap(),
+		device: NativeDevice? = null,
+	) : this(context, Payload.decode(payloadBytes), styleExportBytes?.let { StyleExport.decode(it) }, fonts, store, params, device)
+
 	val runtime = Runtime(payload, store, params)
-	val style: StyleExport? = styleExportBytes?.let { StyleExport.decode(it) }
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val events = payload.events.groupBy { it.host }
 	private val views = HashMap<String, View>()
 	private val built = HashMap<String, Instance>()
 	private val textViews = HashMap<String, TextView>()
-	private var assignment = style?.initial ?: 0
+	private var assignment = style?.start(payload.cells.filter { it.styled }.map { it.id }, runtime::value, isDark(context.resources.configuration)) ?: 0
 	private val expanded = HashMap<View, Boolean?>()
 	private val sheets = LinkedHashMap<String, SystemSheet>()
 	private val dpr = context.resources.displayMetrics.density.toDouble()
@@ -81,8 +96,11 @@ class MarklessHost(
 	var rootFrame: Rect? = null
 		private set
 
-	/** Builds the page a `navigate` entry names, from scratch; required for a payload with links. */
-	var onNavigate: ((route: String, params: Map<String, String>) -> Unit)? = null
+	/** Opens the page a `navigate` entry names; required for a payload with links. */
+	var onNavigate: ((JournalEntry.Navigate) -> Unit)? = null
+
+	/** Shows the page's new title; required for a payload with a title that follows state. */
+	var onTitle: ((String) -> Unit)? = null
 
 	/** Called with each journal after it is applied. */
 	var onJournal: ((List<JournalEntry>) -> Unit)? = null
@@ -114,7 +132,13 @@ class MarklessHost(
 	/** Another page replaces this one: its device objects end, and device answers that arrive later change nothing. */
 	fun release() {
 		released = true
+		closeSheets()
 		for (o in payload.objects) device?.release(o.id)
+	}
+
+	/** Closes every open sheet, as the page leaving it does; no `dismiss` action follows. */
+	fun closeSheets() {
+		for (s in sheets.values) s.close()
 	}
 
 	private fun needDevice(): NativeDevice = device ?: throw MarklessHostError("the payload names device features and this host was given no device")
@@ -170,8 +194,7 @@ class MarklessHost(
 				}
 				is JournalEntry.State -> style?.let { st ->
 					assignment = st.next(assignment, st.stateFor(entry.node), entry.value)
-					for (inst in built.values.sortedBy { order.getValue(it.node.id) }) place(inst, views.getValue(inst.id), st)
-					root.requestLayout()
+					repaint(st)
 				}
 				is JournalEntry.Arm -> {
 					if (runtime.node(entry.node) !is Node.Branch) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
@@ -180,12 +203,13 @@ class MarklessHost(
 				is JournalEntry.Navigate -> {
 					Log.i(TAG, "journal ${entry.toJson()}")
 					onJournal?.invoke(journal)
-					(onNavigate ?: throw MarklessHostError("navigate to ${entry.node} with no page builder")).invoke(entry.node, entry.params)
+					(onNavigate ?: throw MarklessHostError("navigate to ${entry.node} with no page builder")).invoke(entry)
 					return
 				}
 				is JournalEntry.Sheet -> (sheets[entry.node] ?: throw MarklessHostError("journal names \"${entry.node}\", which is not a sheet")).let { if (entry.open) it.open() else it.close() }
 				is JournalEntry.Call -> runCall(entry)
 				is JournalEntry.Release -> needDevice().release(entry.node)
+				is JournalEntry.Title -> (onTitle ?: throw MarklessHostError("title \"${entry.value}\" with no title bar")).invoke(entry.value)
 				is JournalEntry.Rows -> {
 					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
 					rebuild()
@@ -194,6 +218,22 @@ class MarklessHost(
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
 		onJournal?.invoke(journal)
+	}
+
+	/** The device's appearance changed: move to the @media band it selects, as a cell's `state` entry moves to its assignment. */
+	fun configurationChanged(configuration: Configuration) {
+		val st = style ?: return
+		if (st.bandState < 0) return
+		val band = st.band(isDark(configuration))
+		if (st.assignments[assignment].values[BAND_KEY] == JsValue.Num(band.toDouble())) return
+		assignment = st.next(assignment, st.bandState, JsValue.Num(band.toDouble()))
+		repaint(st)
+		Log.i(TAG, "band $band (${if (isDark(configuration)) "dark" else "light"}), style assignment $assignment")
+	}
+
+	private fun repaint(st: StyleExport) {
+		for (inst in built.values.sortedBy { order.getValue(it.node.id) }) place(inst, views.getValue(inst.id), st)
+		root.requestLayout()
 	}
 
 	/** After an arm or rows entry: drop instances no longer shown, build the new ones from current values, then put each parent's children in order. */
@@ -283,7 +323,7 @@ class MarklessHost(
 	}
 
 	private fun element(node: Node.Element, inst: Instance): View {
-		if (node.row != null && events[node.id].orEmpty().isNotEmpty()) throw MarklessHostError("\"${node.id}\" handles events inside a list row; native-view/0 has no row handlers")
+		if (node.row != null && events[node.id].orEmpty().any { it.event == EventName.Input }) throw MarklessHostError("\"${node.id}\" handles input inside a list row, which this host does not implement")
 		val view = when (node.element) {
 			"button" -> Button(context).apply {
 				background = null
@@ -316,7 +356,7 @@ class MarklessHost(
 		views[inst.id] = view
 		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
 		for (e in events[node.id].orEmpty()) when (e.event) {
-			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(e.host, EventName.Activate)) }
+			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
 			EventName.Dismiss -> throw MarklessHostError("dismiss event on \"${node.id}\", which is not a sheet")
 			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -462,8 +502,12 @@ class MarklessHost(
 		for (x in st) if (x != "none" && x != "hidden" && x != "solid") throw MarklessHostError("\"${s.id}\" has border style \"$x\"; Android draws solid borders only")
 		val widths = listOf(bw.top, bw.right, bw.bottom, bw.left).mapIndexed { i, w -> if (st[i] == "solid") w else 0.0 }
 		val anyBorder = widths.any { it > 0 }
-		if (anyBorder && (widths.distinct().size != 1 || colors?.distinct()?.size != 1)) throw MarklessHostError("\"${s.id}\" has unequal border sides; not implemented on Android")
 		if ((fill == null || (fill ushr 24) == 0) && !anyBorder) { view.background = null; return }
+		if (anyBorder && (widths.distinct().size != 1 || colors?.distinct()?.size != 1)) {
+			if (radii?.any { it != 0.0 } == true) throw MarklessHostError("\"${s.id}\" has unequal border sides with rounded corners; not implemented on Android")
+			view.background = SideBorders(fill ?: 0, widths.map { it.toFloat() }, colors ?: throw MarklessHostError("\"${s.id}\" has border sides but no colours"))
+			return
+		}
 		view.background = GradientDrawable().apply {
 			setColor(fill ?: 0)
 			if (anyBorder) setStroke(widths[0].roundToInt(), colors!![0])

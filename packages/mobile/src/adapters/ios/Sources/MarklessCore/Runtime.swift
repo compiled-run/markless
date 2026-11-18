@@ -27,13 +27,15 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case arm(node: String, index: Int?)
 	/// A system sheet's `open` turned truthy (present it) or falsy (dismiss it, unless the platform already has).
 	case sheet(node: String, open: Bool)
-	/// Leave this page: the host builds the page at `route` from scratch with `params`.
-	case navigate(route: String, params: [NativeRouteParam])
+	/// Leave this page for the page at `route`, built from scratch with `params`: pushed, or in this screen's place.
+	case navigate(route: String, params: [NativeRouteParam], replace: Bool)
 	/// Run a device call now (on `object` when it names one); with `result`, settle that task cell with what it gives; with
 	/// `resume`, answer with `resume(_:value:)` once the call settles.
 	case call(call: String, object: String?, arguments: [NativeValue], result: String?, resume: String?)
 	/// The device object's owner left the screen: the host stops it and forgets it.
 	case release(object: String)
+	/// The page's title text changed.
+	case title(value: String)
 
 	public var json: JSONValue {
 		switch self {
@@ -50,8 +52,9 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("arm")), ("node", .string(node)), ("index", index.map { .number(Double($0)) } ?? .null)])
 		case let .sheet(node, open):
 			return .object([("op", .string("sheet")), ("node", .string(node)), ("open", .bool(open))])
-		case let .navigate(route, params):
-			return .object([("op", .string("navigate")), ("route", .string(route)), ("params", .object(params.map { ($0.name, .string($0.value)) }))])
+		case let .navigate(route, params, replace):
+			return .object([("op", .string("navigate")), ("route", .string(route)), ("params", .object(params.map { ($0.name, .string($0.value)) }))]
+				+ (replace ? [("replace", .bool(true))] : []))
 		case let .call(call, object, arguments, result, resume):
 			var fields: [(String, JSONValue)] = [("op", .string("call")), ("call", .string(call))]
 			if let object { fields.append(("object", .string(object))) }
@@ -60,6 +63,7 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			if let resume { fields.append(("resume", .string(resume))) }
 			return .object(fields)
 		case let .release(object): return .object([("op", .string("release")), ("object", .string(object))])
+		case let .title(value): return .object([("op", .string("title")), ("value", .string(value))])
 		}
 	}
 }
@@ -313,14 +317,31 @@ public final class NativeRuntime {
 		}
 	}
 
+	/// The page's `<title>` text, nil when it has none.
+	public func title() throws -> String? { try payload.title.map { try text(of: $0) } }
+
+	/// The element an action names and the scope it runs in: a row instance (`h6@42`) reads its row's item.
+	private func target(_ host: String) throws -> (node: String, scope: NativeScope) {
+		guard let at = host.firstIndex(of: "@") else { return (host, .empty) }
+		let node = String(host[..<at])
+		let key = String(host[host.index(after: at)...])
+		guard let repeatId = nodesById[node]?.row, let repeatNode = nodesById[repeatId], try isShown(repeatNode.arm),
+			let row = try rows(of: repeatId).first(where: { $0.key == key })
+		else { throw RuntimeError(reason: "\(host) is not a shown row instance") }
+		var scope = NativeScope()
+		scope.items[repeatId] = row.item
+		return (node, scope)
+	}
+
 	/// Runs the handler bound to the action and returns the journal the host applies.
 	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
-		guard let bound = payload.events.first(where: { $0.host == action.host && $0.event == action.event }) else {
+		let (host, scope) = try target(action.host)
+		guard let bound = payload.events.first(where: { $0.host == host && $0.event == action.event }) else {
 			throw RuntimeError(reason: "no \(action.event.rawValue) handler on \(action.host)")
 		}
 		eventValue = action.event == .input ? action.value ?? "" : nil
 		defer { eventValue = nil }
-		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: .empty) }
+		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
 	}
 
 	/// A device call a handler awaited answered: its continuation runs with the answer as its local.
@@ -354,7 +375,14 @@ public final class NativeRuntime {
 		var calls: [NativeJournalEntry] = []
 		for op in ops {
 			switch op {
-			case let .navigate(route, params): return [.navigate(route: route, params: params)]
+			case let .navigate(route, params, replace):
+				let values = try params.map { param -> NativeRouteParam in
+					switch param.value {
+					case let .string(text): return NativeRouteParam(name: param.name, value: text)
+					case let .expr(expr): return NativeRouteParam(name: param.name, value: try evaluate(expr, in: scope).text)
+					}
+				}
+				return [.navigate(route: route, params: values, replace: replace)]
 			case let .assign(cell, expr):
 				let value = try evaluate(expr, in: scope)
 				values[cell] = value
@@ -408,6 +436,7 @@ public final class NativeRuntime {
 		if let eventValue, let host { beforeProperties["\(host)\u{0}value"] = eventValue }
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
+		let beforeTitle = try title()
 		let beforeSheets = Dictionary(uniqueKeysWithValues: try sheets().map { ($0.node, $0.open) })
 		let ownedBefore = Set(try liveObjects())
 		let calls = try apply()
@@ -453,6 +482,57 @@ public final class NativeRuntime {
 		let releases = payload.objects.compactMap { object -> NativeJournalEntry? in
 			ownedBefore.contains(object.id) && !owned.contains(object.id) ? .release(object: object.id) : nil
 		}
-		return styles + entries + releases + calls
+		let afterTitle = try title()
+		let titles: [NativeJournalEntry] = afterTitle != beforeTitle ? afterTitle.map { [.title(value: $0)] } ?? [] : []
+		return styles + entries + titles + releases + calls
+	}
+}
+
+/// One screen of an app: its route, the path it opened at and its page's runtime.
+public struct NativeScreen {
+	public let route: String
+	public let params: [NativeRouteParam]
+	public let path: String
+	public let runtime: NativeRuntime
+}
+
+/// The reference meaning of an app's stack (`packages/mobile/src/app.ts`): the UIKit stack is checked against it headless.
+public final class NativeAppStack {
+	public let app: NativeAppPayload
+	private let store: NativeStore
+	public private(set) var screens: [NativeScreen]
+
+	public init(app: NativeAppPayload, path: String, store: NativeStore = MemoryStore()) throws {
+		self.app = app
+		self.store = store
+		screens = []
+		screens = try app.backStack(path).map { prefix in
+			guard let (route, params) = app.match(prefix) else { throw RuntimeError(reason: "\(prefix) is not a route") }
+			return try screen(route.pattern, params)
+		}
+	}
+
+	public func screen(_ route: String, _ params: [NativeRouteParam]) throws -> NativeScreen {
+		guard let entry = app.routes.first(where: { $0.pattern == route }) else { throw RuntimeError(reason: "no page for \(route)") }
+		return NativeScreen(
+			route: route, params: params, path: try NativeAppPayload.path(route, params),
+			runtime: NativeRuntime(payload: entry.page, store: store, params: params))
+	}
+
+	/// Runs an action on the top screen; a `navigate` entry pushes the new screen or replaces the top one.
+	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
+		let journal = try screens[screens.count - 1].runtime.dispatch(action)
+		if case let .navigate(route, params, replace)? = journal.last {
+			let next = try screen(route, params)
+			if replace { screens.removeLast() }
+			screens.append(next)
+		}
+		return journal
+	}
+
+	/// The platform's Back: the top screen goes and the one below shows as it was left.
+	public func back() throws {
+		guard screens.count > 1 else { throw RuntimeError(reason: "back on the first screen leaves the app") }
+		screens.removeLast()
 	}
 }

@@ -1,4 +1,4 @@
-import type { NativeAction } from '../src/index.ts';
+import type { NativeAction, NativeAppAction } from '../src/index.ts';
 import type { DeviceAppConfig } from '../src/permissions.ts';
 
 /** Each committed vector file: its component (a path inside packages/mobile) and the actions it records. */
@@ -230,5 +230,41 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h3' },
 			{ event: 'activate', host: 'h11' },
 		],
+	},
+];
+
+/** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */
+export const APP_CONFORMANCE_CASES: ReadonlyArray<{
+	readonly name: string;
+	readonly app: string;
+	readonly open: string;
+	readonly actions: ReadonlyArray<NativeAppAction>;
+}> = [
+	{
+		name: 'navigation',
+		app: 'proofs/n2-orders',
+		open: '/orders',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'component-edge:0@42' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'component-edge:0@108' },
+		],
+	},
+	{
+		name: 'navigation-replace',
+		app: 'proofs/n3-navigate',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'back' },
+		],
+	},
+	{
+		name: 'navigation-deep-link',
+		app: 'proofs/n4-deep-link',
+		open: '/orders/42',
+		actions: [{ event: 'back' }, { event: 'back' }, { event: 'activate', host: 'component-edge:0' }],
 	},
 ];

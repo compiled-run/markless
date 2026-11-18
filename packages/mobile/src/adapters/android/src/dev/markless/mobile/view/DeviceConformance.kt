@@ -44,7 +44,7 @@ object DeviceConformance {
 		}
 		val journal = ArrayList<JournalEntry>()
 		host.onJournal = { journal.addAll(it) }
-		host.onNavigate = { _, _ -> }
+		host.onNavigate = { }
 		for ((n, step) in vector.field("steps", "vector").arr("steps").withIndex()) {
 			val s = step.obj("steps[$n]")
 			val action = s.field("action", "step").obj("action")

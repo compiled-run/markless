@@ -217,7 +217,7 @@ final class ShellSceneDelegate: UIResponder, UIWindowSceneDelegate {
 	func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options: UIScene.ConnectionOptions) {
 		guard let scene = scene as? UIWindowScene else { return }
 		let window = UIWindow(windowScene: scene)
-		window.rootViewController = Self.root()
+		window.rootViewController = Self.root(path: options.urlContexts.first(where: { $0.url.host != "device" }).map { MarklessRoot.path(of: $0.url) })
 		window.makeKeyAndVisible()
 		let label = ProofDevice.shared.label
 		let cameraLabel = ProofDevice.shared.cameraLabel
@@ -238,12 +238,19 @@ final class ShellSceneDelegate: UIResponder, UIWindowSceneDelegate {
 		for context in options.urlContexts { ProofDevice.shared.open(context.url) }
 	}
 
+	/// `markless-proof://device/<name>?value=` fakes a device value; any other link is a deep link into the app.
 	func scene(_ scene: UIScene, openURLContexts contexts: Set<UIOpenURLContext>) {
-		for context in contexts { ProofDevice.shared.open(context.url) }
+		for context in contexts where context.url.host == "device" { ProofDevice.shared.open(context.url) }
+		guard let url = contexts.first(where: { $0.url.host != "device" })?.url, let root = window?.rootViewController else { return }
+		do {
+			try MarklessRoot.open(MarklessRoot.path(of: url), in: root)
+		} catch {
+			NSLog("markless-shell: %@", "\(error)")
+		}
 	}
 
 	@MainActor
-	private static func root() -> UIViewController {
+	private static func root(path: String?) -> UIViewController {
 		do {
 			let bundle = Bundle.main.bundleURL
 			let payload = try Data(contentsOf: bundle.appending(path: "markless/payload.json"))
@@ -253,7 +260,7 @@ final class ShellSceneDelegate: UIResponder, UIWindowSceneDelegate {
 			for file in (try? FileManager.default.contentsOfDirectory(at: fontFolder, includingPropertiesForKeys: nil)) ?? [] {
 				fonts["sha256:" + file.deletingPathExtension().lastPathComponent] = try Data(contentsOf: file)
 			}
-			return try MarklessViewController(payload: payload, style: style, fonts: fonts, device: ProofDevice.shared)
+			return try MarklessRoot.controller(payload: payload, style: style, fonts: fonts, path: path, device: ProofDevice.shared)
 		} catch {
 			NSLog("markless-shell: %@", "\(error)")
 			let controller = UIViewController()

@@ -1,0 +1,27 @@
+{
+	"rung": "S2",
+	"name": "A component with scoped styles used on both pages; its style data is carried once",
+	"steps": [
+		{
+			"visible": ["Seed shelf", "Basil, in stock", "Thyme, low", "Open basil"],
+			"order": ["Seed shelf", "Basil, in stock", "Thyme, low", "Open basil"],
+			"title": "Shelf"
+		},
+		{
+			"do": {
+				"tap": "Open basil"
+			},
+			"visible": ["Sweet basil", "Sow in spring"],
+			"absent": ["Seed shelf", "Thyme, low"],
+			"title": "Basil"
+		},
+		{
+			"do": {
+				"back": "gesture"
+			},
+			"visible": ["Seed shelf", "Thyme, low"],
+			"absent": ["Sweet basil"],
+			"title": "Shelf"
+		}
+	]
+}

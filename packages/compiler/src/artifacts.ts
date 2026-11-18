@@ -88,7 +88,9 @@ export type SemanticDeviceObject = {
 /** The collectors a native build passes to the analysis; their nodes are the parser's ESTree nodes. */
 export type NativeFactCollectors = {
 	readonly expression: (node: never) => SemanticExpression;
-	readonly handlerStatements: (node: never) => ReadonlyArray<SemanticHandlerStatement> | undefined;
+	readonly handlerStatements: (
+		node: never,
+	) => ReadonlyArray<SemanticHandlerStatement> | undefined;
 };
 
 export type ElementOnlyAttribute = {
@@ -198,10 +200,13 @@ export type SemanticComponentPropBinding =
 			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
 			/** A callback's body as statements, collected for native builds only (`nativeFacts`). */
 			readonly nativeStatements?: ReadonlyArray<SemanticHandlerStatement>;
-			/** An opaque prop's value as a tree, for native builds only (`nativeFacts`). */
+			/** An opaque prop's value as a tree, collected for native builds only (`nativeFacts`). */
 			readonly nativeExpression?: SemanticExpression;
 			// `@catch (error, reset)` reset names a callback prop's own source calls, with the boundary each resets.
-			readonly catchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
+			readonly catchResets?: ReadonlyArray<{
+				readonly name: string;
+				readonly boundaryId: string;
+			}>;
 			// An async callback's rejection renders in this boundary's `@catch`, as for an event handler.
 			readonly catchBoundaryId?: string;
 			readonly returnsPromise?: true;
@@ -983,7 +988,10 @@ export type SemanticEvent = {
 	// Body-local definitions spliced into `handlerSource`; their reads are the handler's too.
 	readonly handlerDefinitionSpans?: ReadonlyArray<SourceSpan>;
 	// `@catch (error, reset)` reset names the handler calls, with the boundary each resets.
-	readonly handlerCatchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
+	readonly handlerCatchResets?: ReadonlyArray<{
+		readonly name: string;
+		readonly boundaryId: string;
+	}>;
 	// An async handler's rejection renders in this boundary's `@catch`: the nearest one whose @try arm holds the element.
 	readonly handlerCatchBoundaryId?: string;
 	/** The handler can hand back a promise: it is async, or it returns a value that may be one. */
@@ -1223,10 +1231,25 @@ export type SemanticGraphAlias = {
 export type SemanticExpression =
 	| { readonly kind: 'read'; readonly name: string }
 	| { readonly kind: 'literal'; readonly value: string | number | boolean | null }
-	| { readonly kind: 'unary'; readonly operator: '!' | '-' | '+'; readonly value: SemanticExpression }
+	| {
+			readonly kind: 'unary';
+			readonly operator: '!' | '-' | '+';
+			readonly value: SemanticExpression;
+	  }
 	| {
 			readonly kind: 'binary';
-			readonly operator: '+' | '-' | '*' | '/' | '%' | '===' | '!==' | '<' | '<=' | '>' | '>=';
+			readonly operator:
+				| '+'
+				| '-'
+				| '*'
+				| '/'
+				| '%'
+				| '==='
+				| '!=='
+				| '<'
+				| '<='
+				| '>'
+				| '>=';
 			readonly left: SemanticExpression;
 			readonly right: SemanticExpression;
 	  }
@@ -1255,9 +1278,15 @@ export type SemanticExpression =
 	| { readonly kind: 'await'; readonly value: SemanticExpression }
 	| {
 			readonly kind: 'array';
-			readonly items: ReadonlyArray<{ readonly spread: boolean; readonly value: SemanticExpression }>;
+			readonly items: ReadonlyArray<{
+				readonly spread: boolean;
+				readonly value: SemanticExpression;
+			}>;
 	  }
-	| { readonly kind: 'object'; readonly entries: ReadonlyArray<readonly [string, SemanticExpression]> }
+	| {
+			readonly kind: 'object';
+			readonly entries: ReadonlyArray<readonly [string, SemanticExpression]>;
+	  }
 	/** A method of an array or string value, called with JavaScript's meaning. */
 	| {
 			readonly kind: 'method';
@@ -1266,15 +1295,23 @@ export type SemanticExpression =
 			readonly arguments: ReadonlyArray<SemanticExpression>;
 	  }
 	/** An arrow function passed to a method: its parameters read as names inside `body`. */
-	| { readonly kind: 'lambda'; readonly parameters: ReadonlyArray<string>; readonly body: SemanticExpression }
+	| {
+			readonly kind: 'lambda';
+			readonly parameters: ReadonlyArray<string>;
+			readonly body: SemanticExpression;
+	  }
 	/** Outside the tree: names what would need a script engine. */
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
 /** One statement of a handler body: an assignment to a name (`x++` and `x += 1` arrive desugared), or what is not one. */
 export type SemanticHandlerStatement =
 	| { readonly kind: 'assign'; readonly target: string; readonly value: SemanticExpression }
-	/** `name()`: calls a function the component received, such as a callback prop. */
-	| { readonly kind: 'invoke'; readonly name: string }
+	/** `name(...)`: calls a function by name, such as a callback prop or an import; `arguments` only when it has some. */
+	| {
+			readonly kind: 'invoke';
+			readonly name: string;
+			readonly arguments?: ReadonlyArray<SemanticExpression>;
+	  }
 	/** `name.field = value`: a write to a field of an object the component holds (`cam.facing = 'front'`). */
 	| { readonly kind: 'assign-field'; readonly target: string; readonly field: string; readonly value: SemanticExpression }
 	/** Any other call or awaited call whose value is not kept (`haptics.tap()`, `await save()`). */
@@ -1309,7 +1346,10 @@ export type SemanticTemplateRead = {
 	// The innermost keyed @for whose row holds this read; the row mint decides whether it stays live.
 	readonly keyedRepeatId?: string;
 	// The async values a row expression reads beside its row item, which its @try waits on.
-	readonly asyncGateReads?: ReadonlyArray<{ readonly source: string; readonly graphNodeId: string }>;
+	readonly asyncGateReads?: ReadonlyArray<{
+		readonly source: string;
+		readonly graphNodeId: string;
+	}>;
 	// The component body this read was authored in, for the same reason the branch
 	// site carries one: `{w.label}` in two components is two reads of two different
 	// instances, and without the component they lower to a single node (defect 46).
@@ -2531,7 +2571,11 @@ export type CaptureSlot = {
 };
 
 /** A file, line and column (both from 1), for naming code another module's compile cannot see. */
-export type SourcePosition = { readonly filename: string; readonly line: number; readonly column: number };
+export type SourcePosition = {
+	readonly filename: string;
+	readonly line: number;
+	readonly column: number;
+};
 
 export type ExtractedCaptureSymbol = {
 	readonly symbolId: string;

@@ -5,13 +5,20 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var borderWidth: Double = 0
 	public var borderColor: RGBA?
 	public var cornerRadius: Double = 0
+	/// Solid sides that differ (top, right, bottom, left; width in points, 0 for none), drawn on a square box; nil when uniform.
+	public var sides: [Side]?
 	public var font: (family: String, size: Double)?
 	public var textColor: RGBA?
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
-			&& a.textColor == b.textColor
+			&& a.textColor == b.textColor && a.sides == b.sides
+	}
+
+	public struct Side: Equatable, Sendable {
+		public let width: Double
+		public let color: RGBA
 	}
 }
 
@@ -20,7 +27,7 @@ public struct StyleLayout: Sendable {
 	public let assignments: [[String: ResolvedStyle]]
 	/// The assignment matching the cells' values at mount.
 	public let start: Int
-	/// For each export state, the payload cell it follows.
+	/// For each export state, the payload cell it follows, or `@env#band` for the `@media` band.
 	public let stateCells: [String]
 	public let domains: [[NativeValue]]
 	public let next: [[[Int]]]
@@ -29,6 +36,7 @@ public struct StyleLayout: Sendable {
 	/// Device pixels per point the frames were laid out for; a screen with another scale is refused.
 	public let dpr: Double
 	public let fontFiles: [(id: String, file: String)]
+	public let bands: StyleBands?
 }
 
 extension StyleLayout {
@@ -47,12 +55,14 @@ extension StyleLayout {
 extension StyleExport {
 	/// Pairs every payload node with its export node. Export nodes the payload does not name (Dragon's `html`, `body`) paint
 	/// nothing and only offset their children; a payload node the export lacks, or a write this host cannot express, is an error.
-	/// `value` reads a cell's value at mount, so the starting assignment matches stored values too.
+	/// `value` reads a cell's value at mount, so the starting assignment matches stored values too; `dark` picks the band.
 	public func resolve(
-		for payload: NativeViewPayload, initialTexts: [(node: String, text: String)], value: (String) throws -> NativeValue
+		for payload: NativeViewPayload, initialTexts: [(node: String, text: String)], value: (String) throws -> NativeValue,
+		dark: Bool = false
 	) throws -> StyleLayout {
 		let styledCells = payload.cells.filter(\.styled).map(\.id)
 		let stateCells = try states.map { state in
+			if state.key == StyleBands.state { return state.key }
 			let named = styledCells.filter(state.names)
 			guard named.count == 1 else { throw styleError("style state \(state.key) names \(named.count) styled cells of the payload") }
 			return named[0]
@@ -60,7 +70,11 @@ extension StyleExport {
 		if let unstyled = styledCells.first(where: { !stateCells.contains($0) }) {
 			throw styleError("the payload's styled cell \(unstyled) has no state in the style export")
 		}
-		let current = try stateCells.map(value)
+		let current = try stateCells.map { cell in
+			guard cell == StyleBands.state else { return try value(cell) }
+			guard let bands else { throw styleError("\(cell) is a state, but there are no bands") }
+			return NativeValue.number(Double(try bands.band(dark: dark)))
+		}
 		let matches = { (index: Int) in zip(self.states, current).allSatisfy { state, value in self.assignments[index].values[state.key].map { $0.strictlyEquals(value) } ?? false } }
 		guard let start = matches(initial) ? initial : assignments.indices.first(where: matches) else {
 			throw styleError("no assignment of the style export matches the cells' values \(current.map(\.jsonText))")
@@ -70,7 +84,7 @@ extension StyleExport {
 				try resolveNodes(assignments[index].nodes, for: payload, initialTexts: index == start ? initialTexts : nil)
 			},
 			start: start, stateCells: stateCells, domains: states.map(\.domain), next: next,
-			viewport: viewport, dpr: dpr, fontFiles: fonts)
+			viewport: viewport, dpr: dpr, fontFiles: fonts, bands: bands)
 	}
 
 	private func resolveNodes(
@@ -141,14 +155,19 @@ extension StyleExport {
 		if let widths = node.borderWidths {
 			let all = [widths.top, widths.right, widths.bottom, widths.left]
 			if all.contains(where: { $0 != 0 }) {
-				guard borderStyles == ["solid", "solid", "solid", "solid"] else {
-					throw styleError("\(node.id): border styles \(borderStyles) are not implemented on iOS, only four solid sides")
+				guard borderStyles.count == 4, borderStyles.allSatisfy({ ["solid", "none", "hidden"].contains($0) }), borderColors.count == 4 else {
+					throw styleError("\(node.id): border styles \(borderStyles) are not implemented on iOS, only solid sides")
 				}
-				guard all.allSatisfy({ $0 == all[0] }), borderColors.count == 4, borderColors.allSatisfy({ $0 == borderColors[0] }) else {
-					throw styleError("\(node.id): only a border with one width and one colour on every side is implemented on iOS")
+				let widths = zip(all, borderStyles).map { $1 == "solid" ? $0 : 0 }
+				if widths.allSatisfy({ $0 == widths[0] }), borderColors.allSatisfy({ $0 == borderColors[0] }) {
+					style.borderWidth = widths[0] / dpr
+					style.borderColor = borderColors[0]
+				} else {
+					guard style.cornerRadius == 0 else {
+						throw styleError("\(node.id): border sides that differ, with rounded corners, are not implemented on iOS")
+					}
+					style.sides = zip(widths, borderColors).map { ResolvedStyle.Side(width: $0 / dpr, color: $1) }
 				}
-				style.borderWidth = all[0] / dpr
-				style.borderColor = borderColors[0]
 			}
 		}
 		return style

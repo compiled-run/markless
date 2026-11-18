@@ -8,6 +8,13 @@ import {
 // The target-neutral view a native host builds retained views from: no HTML, no DOM positions, no script.
 export const NATIVE_VIEW_VERSION = 'markless.native-view/0';
 
+/** A bound attribute named with this prefix (`ui-open`, `ui-disabled`) is a style hook: CSS selects it, so Dragon compiles its states. */
+export const NATIVE_STYLE_ATTRIBUTE_PREFIX = 'ui-';
+
+/** Whether a bound attribute decides styles on native: the class, or a `ui-*` attribute. */
+export const nativeStyleAttribute = (name: string): boolean =>
+	name === 'class' || name.startsWith(NATIVE_STYLE_ATTRIBUTE_PREFIX);
+
 export type NativeScalar = number | string | boolean;
 
 /** A cell's value: JSON. */
@@ -191,11 +198,16 @@ export type NativeOp =
 				readonly catch?: string;
 			};
 	  }
-	/** Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. */
+	/**
+	 * Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. A param
+	 * is a string fixed at build time or an expression evaluated when the op runs (a row's item inside a list row).
+	 * `replace` takes the place of the current screen instead of pushing a new one.
+	 */
 	| {
 			readonly op: 'navigate';
 			readonly route: string;
-			readonly params: Readonly<Record<string, string>>;
+			readonly params: Readonly<Record<string, string | NativeExpr>>;
+			readonly replace?: true;
 	  };
 
 export type NativeViewPayload = {
@@ -209,7 +221,7 @@ export type NativeViewPayload = {
 		readonly name: string;
 		readonly initial: NativeValue;
 		readonly storage?: { readonly key: string };
-		/** A class binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
+		/** A class or `ui-*` attribute binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
 		readonly styled?: true;
 		/** A live device value (`network.online`): the host fills it at mount and sends a `device` action when it changes. */
 		readonly device?: NativeDeviceValue;
@@ -243,6 +255,20 @@ export type NativeViewPayload = {
 		readonly id: string;
 		readonly device: NativeDeviceObject;
 		readonly owner: string;
+	}>;
+	/** The page's `<title>`, as text parts: what the system navigation bar shows for this screen. */
+	readonly title?: ReadonlyArray<NativeTextPart>;
+};
+
+export const NATIVE_APP_VERSION = 'markless.native-app/0';
+
+/** An app of several routes: each route's page, in the router's match order (static before `[param]` segments). */
+export type NativeAppPayload = {
+	readonly version: typeof NATIVE_APP_VERSION;
+	readonly routes: ReadonlyArray<{
+		readonly pattern: string;
+		readonly params: ReadonlyArray<string>;
+		readonly page: NativeViewPayload;
 	}>;
 };
 
@@ -287,12 +313,18 @@ export type NativeJournalEntry =
 	  }
 	/** The component that made this device object is no longer shown: the host stops it and lets the device go. */
 	| { readonly op: 'release'; readonly object: string }
-	/** Leave this page: the host builds the page at `route` from scratch with `params` (its own state starts over). */
+	/**
+	 * Leave this page for the page at `route` with `params`, built from scratch. In an app the host pushes it as a new
+	 * screen, keeping this one as it is for Back, or with `replace` puts it in this screen's place.
+	 */
 	| {
 			readonly op: 'navigate';
 			readonly route: string;
 			readonly params: Readonly<Record<string, string>>;
-	  };
+			readonly replace?: true;
+	  }
+	/** The page's `<title>` text changed: the host writes it to the screen's navigation bar. */
+	| { readonly op: 'title'; readonly value: string };
 
 /** The package and export that name the platform's own pieces (`<native.sheet>`); one place, so the name is cheap to change. */
 export const PLATFORM_PIECES_PACKAGE = DEVICE_MODULE;

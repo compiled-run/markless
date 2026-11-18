@@ -12,6 +12,7 @@ import type {
 } from '@markless/serializer';
 import {
 	NATIVE_VIEW_VERSION,
+	nativeStyleAttribute,
 	PLATFORM_PIECES_NAMESPACE,
 	PLATFORM_PIECES_PACKAGE,
 } from '@markless/serializer/native-view';
@@ -224,6 +225,17 @@ export type NativeViewOptions = {
 	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
 	/** The analyses of modules this one imports components from, by import specifier as written. */
 	readonly importedModules?: Readonly<Record<string, SemanticGraphArtifact>>;
+	/** An app build's routes: links and `navigate()` must name one of them, with its params. */
+	readonly routes?: ReadonlyArray<{
+		readonly pattern: string;
+		readonly params: ReadonlyArray<string>;
+	}>;
+	/** Matches a path written in `navigate()` against the app's routes, as the router matches a URL. */
+	readonly resolvePath?: (
+		path: string,
+	) =>
+		| { readonly pattern: string; readonly params: Readonly<Record<string, string>> }
+		| undefined;
 };
 
 /** One module's facts, indexed for lowering its templates. */
@@ -278,24 +290,29 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 	};
 }
 
+/** The refusal a native build reports for a construct with no native lowering yet, named in `message`. */
+export function nativeUnsupported(message: string, span?: SourceSpan): CompilerDiagnostic {
+	return {
+		code: NATIVE_UNSUPPORTED_CODE,
+		severity: 'error',
+		phase: 'serialization',
+		title: 'This component cannot be built for a native target yet',
+		message,
+		why: 'Native hosts build retained views from compiler facts and run handlers as data; this construct has no native lowering yet.',
+		...(span ? { primarySpan: span } : {}),
+		passId: 'native-view',
+		suggestions: [],
+		docsUrl: `https://markless.dev/errors/${NATIVE_UNSUPPORTED_CODE}`,
+	};
+}
+
 export function createNativeViewPayload(
 	graph: SemanticGraphArtifact,
 	options: NativeViewOptions = {},
 ): NativeViewArtifact {
 	const diagnostics: CompilerDiagnostic[] = [];
 	const refuse = (message: string, span?: SourceSpan): null => {
-		diagnostics.push({
-			code: NATIVE_UNSUPPORTED_CODE,
-			severity: 'error',
-			phase: 'serialization',
-			title: 'This component cannot be built for a native target yet',
-			message,
-			why: 'Native hosts build retained views from compiler facts and run handlers as data; this construct has no native lowering yet.',
-			...(span ? { primarySpan: span } : {}),
-			passId: 'native-view',
-			suggestions: [],
-			docsUrl: `https://markless.dev/errors/${NATIVE_UNSUPPORTED_CODE}`,
-		});
+		diagnostics.push(nativeUnsupported(message, span));
 		return null;
 	};
 	const features = new Set<NativeDeviceFeature>();
@@ -510,6 +527,53 @@ export function createNativeViewPayload(
 		Object.hasOwn(DEVICE_VALUES, name);
 	const isDeviceCall = (name: string): name is NativeDeviceCall =>
 		Object.hasOwn(DEVICE_CALLS, name);
+	/** A link's params: strings fixed at build time, or values this build computes when the link is followed. */
+	const linkParams = (
+		prop: SemanticGraphArtifact['componentEdges'][number]['props'][number],
+		scope: Scope,
+	): Record<string, string | NativeExpr> | null => {
+		const fixed =
+			prop.kind === 'opaque'
+				? prop.buildTimeValue?.value
+				: prop.kind === 'serializable'
+					? prop.value
+					: undefined;
+		if (
+			fixed &&
+			typeof fixed === 'object' &&
+			Object.values(fixed).every((value) => typeof value === 'string')
+		)
+			return fixed as Record<string, string>;
+		const tree = 'nativeExpression' in prop ? prop.nativeExpression : undefined;
+		if (tree?.kind !== 'object') return null;
+		const entries: [string, string | NativeExpr][] = [];
+		for (const [name, value] of tree.entries) {
+			const lowered = exprOf(value, `the link param \`${name}\``, scope);
+			if (!lowered) return null;
+			entries.push([
+				name,
+				'literal' in lowered && typeof lowered.literal === 'string'
+					? lowered.literal
+					: lowered,
+			]);
+		}
+		return Object.fromEntries(entries);
+	};
+	/** A link or `navigate()` target as a route pattern and params, checked against the app's routes when they are known. */
+	const linkRoute = (
+		pattern: string,
+		params: Record<string, string | NativeExpr>,
+	): { route: string; params: Record<string, string | NativeExpr> } | null => {
+		const known = options.routes?.find((route) => route.pattern === pattern);
+		if (options.routes && !known)
+			return refuse(`a link to ${pattern}, which is not a route of this app`);
+		const names = Object.keys(params).sort().join(',');
+		if (known && [...known.params].sort().join(',') !== names)
+			return refuse(
+				`a link to ${pattern} with the params ${names || 'none'}, not ${known.params.join(', ') || 'none'}`,
+			);
+		return { route: pattern, params };
+	};
 	const inlining = new Set<string>();
 	const exprOf = (
 		expression: SemanticExpression | undefined,
@@ -948,7 +1012,11 @@ export function createNativeViewPayload(
 				close();
 				const element = scope.module.tagOf.get(item.id);
 				if (!element || element === '*') refuse(`host ${item.id} has no static tag`);
-				else if (!PORTABLE_ELEMENTS.has(element)) refuse(`the <${element}> element`);
+				else if (
+					!PORTABLE_ELEMENTS.has(element) &&
+					!(element === 'title' && scope.module === rootModule && scope.prefix === '')
+				)
+					refuse(`the <${element}> element`);
 				const attributes = (chunk.attributes ?? []).filter(
 					(attribute) => comparePaths(attribute.coordinate.path, item.path) === 0,
 				);
@@ -1063,34 +1131,47 @@ export function createNativeViewPayload(
 				if (isRouterLink(scope, edge.childComponentName)) {
 					const href = edge.props.find((prop) => prop.name === 'href');
 					const params = edge.props.find((prop) => prop.name === 'params');
-					const paramValues =
-						params?.kind === 'opaque'
-							? params.buildTimeValue?.value
-							: params?.kind === 'serializable'
-								? params.value
-								: {};
+					const replace = edge.props.find((prop) => prop.name === 'replace');
+					const className = edge.props.find((prop) => prop.name === 'class');
 					const projection = item.projection
 						? scope.module.chunks.get(item.projection)
 						: undefined;
+					const paramValues = params ? linkParams(params, scope) : {};
 					if (
 						href?.kind !== 'serializable' ||
 						typeof href.value !== 'string' ||
 						!paramValues ||
-						typeof paramValues !== 'object' ||
-						Object.values(paramValues).some((value) => typeof value !== 'string') ||
+						(replace &&
+							(replace.kind !== 'serializable' ||
+								typeof replace.value !== 'boolean')) ||
+						(className &&
+							(className.kind !== 'serializable' ||
+								typeof className.value !== 'string')) ||
 						edge.props.some(
 							(prop) =>
-								prop.name !== 'href' &&
-								prop.name !== 'params' &&
-								prop.name !== 'children',
+								!['href', 'params', 'replace', 'class', 'children'].includes(
+									prop.name,
+								),
 						) ||
 						(item.projection && !projection)
 					) {
-						refuse('a <Link> whose href and params are not fixed at build time');
+						refuse(
+							'a <Link> whose href or class is not fixed at build time, or whose params are not strings this build can compute',
+						);
 						continue;
 					}
+					const route = linkRoute(href.value, paramValues);
+					if (!route) continue;
 					const id = scope.prefix + edge.id;
-					nodes.push({ kind: 'element', id, element: 'a', parent, ...place });
+					// The anchor's attributes as the router renders them, so styles see a link (`:any-link`) as the web does.
+					const attributes = {
+						...(className?.kind === 'serializable' &&
+						typeof className.value === 'string'
+							? { class: className.value }
+							: {}),
+						href: href.value,
+					};
+					nodes.push({ kind: 'element', id, element: 'a', parent, attributes, ...place });
 					if (projection) lowerChunk(projection, id, place, scope);
 					const handler = `handler:${id}`;
 					events.push({ host: id, event: 'activate', handler });
@@ -1099,8 +1180,10 @@ export function createNativeViewPayload(
 						ops: [
 							{
 								op: 'navigate',
-								route: href.value,
-								params: paramValues as Record<string, string>,
+								...route,
+								...(replace?.kind === 'serializable' && replace.value === true
+									? { replace: true as const }
+									: {}),
 							},
 						],
 					});
@@ -1702,10 +1785,18 @@ export function createNativeViewPayload(
 				return [];
 			}
 			if (statement.kind === 'invoke') {
+				const imported = scope.module.imports.get(statement.name);
+				if (imported?.source === '@markless/router' && imported.importedName === 'navigate')
+					return navigateOps(statement.arguments ?? [], what, span);
 				const prop = scope.props.get(
 					scope.module.propNames.get(scope.component)?.get(statement.name) ?? '',
 				);
-				if (prop?.kind !== 'callback' || !prop.statements || depth > 8) {
+				if (
+					prop?.kind !== 'callback' ||
+					!prop.statements ||
+					depth > 8 ||
+					statement.arguments
+				) {
 					refuse(
 						`${what} uses a call to \`${statement.name}\`, which needs a script engine`,
 						span,
@@ -1734,7 +1825,62 @@ export function createNativeViewPayload(
 		}
 	}
 
+	/** `navigate('/orders/42', { replace: true })`: a path fixed at build time, resolved against the app's routes. */
+	function navigateOps(
+		args: ReadonlyArray<SemanticExpression>,
+		what: string,
+		span: SourceSpan | undefined,
+	): NativeOp[] {
+		const [href, settings] = args;
+		const path =
+			href?.kind === 'literal' && typeof href.value === 'string' ? href.value : undefined;
+		const replace =
+			settings === undefined
+				? false
+				: settings.kind === 'object' &&
+					  settings.entries.every(
+							([name, value]) =>
+								name === 'replace' &&
+								value.kind === 'literal' &&
+								typeof value.value === 'boolean',
+					  )
+					? settings.entries.some(
+							([, value]) => value.kind === 'literal' && value.value === true,
+						)
+					: undefined;
+		if (path === undefined || replace === undefined || args.length > 2) {
+			refuse(
+				`${what} calls navigate() with a path or options this build cannot fix at build time`,
+				span,
+			);
+			return [];
+		}
+		const matched = options.resolvePath?.(path);
+		if (!matched) {
+			refuse(`${what} navigates to ${path}, which is not a route of this app`, span);
+			return [];
+		}
+		const route = linkRoute(matched.pattern, matched.params);
+		return route
+			? [{ op: 'navigate', ...route, ...(replace ? { replace: true as const } : {}) }]
+			: [];
+	}
+
 	lowerChunk(rootChunk, null, {}, TOP);
+	const titles = nodes.filter((node) => node.kind === 'element' && node.element === 'title');
+	let title: NativeTextPart[] | undefined;
+	if (titles.length > 1) refuse('more than one <title>');
+	for (const element of titles) {
+		const inside = nodes.filter((node) => node.parent === element.id);
+		if (element.arm || element.row) refuse('a <title> inside an @if arm or a @for row');
+		if (inside.some((node) => node.kind !== 'text'))
+			refuse('a <title> holding something other than text');
+		if (events.some((event) => event.host === element.id))
+			refuse('a <title> with an event handler');
+		title = inside.flatMap((node) => (node.kind === 'text' ? node.parts : []));
+		const removed = new Set([element.id, ...inside.map((node) => node.id)]);
+		nodes.splice(0, nodes.length, ...nodes.filter((node) => !removed.has(node.id)));
+	}
 	rootObjects.own(0);
 	if (graph.markup.chunks.some((chunk) => chunk.kind !== 'template' && !lowered.has(chunk.id)))
 		refuse('markup outside the root template, its @if arms and its @for rows');
@@ -1756,7 +1902,7 @@ export function createNativeViewPayload(
 	for (const node of nodes)
 		if (node.kind === 'element')
 			for (const binding of node.bindings ?? [])
-				if ('attribute' in binding && binding.attribute === 'class')
+				if ('attribute' in binding && nativeStyleAttribute(binding.attribute))
 					collectCells(binding.value);
 
 	return done({
@@ -1772,5 +1918,6 @@ export function createNativeViewPayload(
 		events,
 		handlers,
 		...(objects.length > 0 ? { objects } : {}),
+		...(title ? { title } : {}),
 	});
 }

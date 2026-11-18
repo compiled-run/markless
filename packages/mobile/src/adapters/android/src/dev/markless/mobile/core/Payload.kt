@@ -92,9 +92,8 @@ enum class EventName(val wire: String) { Activate("activate"), Input("input"), D
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
 	data class Assign(val cell: String, val value: Expr) : Op
-	/** Opens the page at [route] with [params]; ops after it do not run. */
-	data class Navigate(val route: String, val params: Map<String, String>) : Op
-	/** A device call (`haptics.tap`); with [result], the call settles that task cell. */
+	/** Opens the page at [route] with [params], each evaluated when the op runs; ops after it do not run. */
+	data class Navigate(val route: String, val params: Map<String, Expr>, val replace: Boolean = false) : Op
 	/** A device call on [obj] when it names one; [result] settles a task cell; [after] runs once the host resumes it. */
 	data class Call(val call: String, val arguments: List<Expr>, val result: String?, val obj: String? = null, val after: Continuation? = null) : Op
 }
@@ -138,13 +137,15 @@ data class Payload(
 	val events: List<Event>,
 	val handlers: List<Handler>,
 	val objects: List<DeviceObject> = emptyList(),
+	/** The page's `<title>` text parts, shown in the screen's action bar. */
+	val title: List<TextPart>? = null,
 ) {
 	companion object {
 		fun decode(bytes: ByteArray): Payload = decode(Json.parse(bytes))
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "objects"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "objects", "title"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -195,7 +196,9 @@ data class Payload(
 				if (owner !in seen) throw MarklessDecodeError("objects[$n] is owned by unknown node \"$owner\"")
 				DeviceObject(o.field("id", "objects[$n]").str("objects[$n].id"), o.field("device", "objects[$n]").str("objects[$n].device"), owner)
 			} ?: emptyList()
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, objects)
+			val title = root["title"]?.arr("payload.title")?.mapIndexed { n, p -> part(p, "payload.title[$n]") }
+			for (p in title.orEmpty()) if (p is TextPart.Value) for (c in cellsOf(p.expr)) if (c !in cellIds) throw MarklessDecodeError("the title reads unknown cell \"$c\"")
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, objects, title)
 		}
 
 		fun cellsOf(e: Expr): List<String> = when (e) {
@@ -392,9 +395,13 @@ data class Payload(
 			val o = v.obj(what)
 			val name = o.field("op", what).str("$what.op")
 			if (name == "navigate") {
-				o.only(setOf("op", "route", "params"), what)
-				val params = o.field("params", what).obj("$what.params").entries.associateTo(LinkedHashMap()) { (k, v) -> k to v.str("$what.params.$k") }
-				return Op.Navigate(o.field("route", what).str("$what.route"), params)
+				o.only(setOf("op", "route", "params", "replace"), what)
+				val params = o.field("params", what).obj("$what.params").entries.associateTo(LinkedHashMap()) { (k, v) ->
+					k to if (v is Json.Str) Expr.Literal(JsValue.Str(v.value)) else expr(v, "$what.params.$k")
+				}
+				for (e in params.values) for (c in cellsOf(e)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				val replace = o["replace"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.replace must be true when present"); true } ?: false
+				return Op.Navigate(o.field("route", what).str("$what.route"), params, replace)
 			}
 			if (name == "call") {
 				o.only(setOf("op", "call", "arguments", "result", "object", "after"), what)
@@ -417,6 +424,64 @@ data class Payload(
 			val value = expr(o.field("value", what), "$what.value")
 			for (c in cellsOf(value)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
 			return Op.Assign(cell, value)
+		}
+	}
+}
+
+const val NATIVE_APP_VERSION = "markless.native-app/0"
+
+/** One route of an app and the page it shows. */
+data class AppRoute(val route: Route, val page: Payload)
+
+/** An app of several routes, in the router's match order: each screen of the stack is one of these pages. */
+data class AppPayload(val routes: List<AppRoute>) {
+	/** The first route [path] matches, in payload order, and its params. */
+	fun match(path: String): Pair<AppRoute, Map<String, String>>? {
+		for (r in routes) r.route.match(path)?.let { return r to it }
+		return null
+	}
+
+	fun page(pattern: String): AppRoute = routes.firstOrNull { it.route.pattern == pattern } ?: throw MarklessDecodeError("no page for $pattern")
+
+	/** Every leading part of [path] that is itself a route, shortest first, ending with [path]. */
+	fun backStack(path: String): List<String> {
+		val segments = path.substringBefore('?').substringBefore('#').split('/').filter { it.isNotEmpty() }
+		val stack = (0..segments.size).map { "/" + segments.take(it).joinToString("/") }.filter { match(it) != null }
+		if (stack.lastOrNull() != "/" + segments.joinToString("/")) throw MarklessDecodeError("$path is not a route of this app")
+		return stack
+	}
+
+	companion object {
+		/** An app payload, or null when [bytes] is a single page payload. */
+		fun decodeOrNull(bytes: ByteArray): AppPayload? = decodeOrNull(Json.parse(bytes))
+
+		fun decodeOrNull(json: Json): AppPayload? {
+			val root = json.obj("payload")
+			val version = root.field("version", "payload").str("payload.version")
+			if (version == NATIVE_VIEW_VERSION) return null
+			if (version != NATIVE_APP_VERSION) throw MarklessDecodeError("unknown payload version \"$version\" (this host reads $NATIVE_VIEW_VERSION and $NATIVE_APP_VERSION)")
+			root.only(setOf("version", "routes"), "app")
+			val routes = root.field("routes", "app").arr("app.routes").mapIndexed { n, r ->
+				val o = r.obj("app.routes[$n]")
+				o.only(setOf("pattern", "params", "page"), "app.routes[$n]")
+				val route = Route(o.field("pattern", "app.routes[$n]").str("app.routes[$n].pattern"), o.field("params", "app.routes[$n]").arr("app.routes[$n].params").map { it.str("app.routes[$n].params[]") })
+				AppRoute(route, Payload.decode(o.field("page", "app.routes[$n]")))
+			}
+			if (routes.isEmpty()) throw MarklessDecodeError("an app payload has no routes")
+			for (r in routes) for (h in r.page.handlers) for (op in h.ops) if (op is Op.Navigate && routes.none { it.route.pattern == op.route }) throw MarklessDecodeError("a link to ${op.route}, which is not a route of this app")
+			return AppPayload(routes)
+		}
+
+		/** The path [pattern] names with [params], each param encoded as `encodeURIComponent` does. */
+		fun path(pattern: String, params: Map<String, String>): String = "/" + pattern.split('/').filter { it.isNotEmpty() }.joinToString("/") { part ->
+			if (part.startsWith("[") && part.endsWith("]")) encodeComponent(params[part.substring(1, part.length - 1)] ?: throw MarklessDecodeError("$pattern needs the param $part")) else part
+		}
+
+		private fun encodeComponent(value: String): String = buildString {
+			for (b in value.toByteArray(Charsets.UTF_8)) {
+				val c = b.toInt() and 0xff
+				if (c.toChar().isLetterOrDigit() && c < 0x80 || c.toChar() in "-_.!~*'()") append(c.toChar()) else append("%" + "%02X".format(c))
+			}
 		}
 	}
 }

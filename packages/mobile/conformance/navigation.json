@@ -1,0 +1,435 @@
+{
+	"version": "markless.native-app-conformance/0",
+	"app": {
+		"version": "markless.native-app/0",
+		"routes": [
+			{
+				"pattern": "/orders",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Orders",
+					"route": {
+						"pattern": "/orders",
+						"params": []
+					},
+					"cells": [
+						{
+							"id": "state:orders",
+							"name": "orders",
+							"initial": [
+								{
+									"id": "7",
+									"name": "Desk lamp"
+								},
+								{
+									"id": "42",
+									"name": "Oak chair"
+								},
+								{
+									"id": "108",
+									"name": "Wool rug"
+								}
+							]
+						}
+					],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Your orders"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h3",
+							"element": "button",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h3:text0",
+							"parent": "h3",
+							"parts": [
+								{
+									"text": "Reverse order"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h4",
+							"element": "ul",
+							"parent": "h0"
+						},
+						{
+							"kind": "repeat",
+							"id": "repeat:0",
+							"parent": "h4",
+							"list": {
+								"cell": "state:orders"
+							},
+							"key": [
+								"id"
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h5",
+							"element": "li",
+							"parent": "h4",
+							"row": "repeat:0"
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0",
+							"element": "a",
+							"parent": "h5",
+							"attributes": {
+								"href": "/orders/[id]"
+							},
+							"row": "repeat:0"
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0:text0",
+							"parent": "component-edge:0",
+							"parts": [
+								{
+									"expr": {
+										"member": {
+											"item": "repeat:0"
+										},
+										"property": "name"
+									}
+								}
+							],
+							"row": "repeat:0"
+						}
+					],
+					"events": [
+						{
+							"host": "h3",
+							"event": "activate",
+							"handler": "handler:event:0"
+						},
+						{
+							"host": "component-edge:0",
+							"event": "activate",
+							"handler": "handler:component-edge:0"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:event:0",
+							"ops": [
+								{
+									"op": "assign",
+									"cell": "state:orders",
+									"value": {
+										"method": "reverse",
+										"target": {
+											"array": [
+												{
+													"spread": true,
+													"value": {
+														"cell": "state:orders"
+													}
+												}
+											]
+										},
+										"arguments": []
+									}
+								}
+							]
+						},
+						{
+							"id": "handler:component-edge:0",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/orders/[id]",
+									"params": {
+										"id": {
+											"member": {
+												"item": "repeat:0"
+											},
+											"property": "id"
+										}
+									}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Orders"
+						}
+					]
+				}
+			},
+			{
+				"pattern": "/orders/[id]",
+				"params": [
+					"id"
+				],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Order",
+					"route": {
+						"pattern": "/orders/[id]",
+						"params": [
+							"id"
+						]
+					},
+					"cells": [],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Details for order "
+								},
+								{
+									"expr": {
+										"member": {
+											"route": "params"
+										},
+										"property": "id"
+									}
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h3",
+							"element": "p",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h3:text0",
+							"parent": "h3",
+							"parts": [
+								{
+									"text": "Shipped to the address on file."
+								}
+							]
+						}
+					],
+					"events": [],
+					"handlers": [],
+					"title": [
+						{
+							"text": "Order "
+						},
+						{
+							"expr": {
+								"member": {
+									"route": "params"
+								},
+								"property": "id"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"open": "/orders",
+	"initial": {
+		"stack": [
+			"/orders"
+		],
+		"title": "Orders",
+		"texts": [
+			[
+				"h2:text0",
+				"Your orders"
+			],
+			[
+				"h3:text0",
+				"Reverse order"
+			],
+			[
+				"component-edge:0:text0@7",
+				"Desk lamp"
+			],
+			[
+				"component-edge:0:text0@42",
+				"Oak chair"
+			],
+			[
+				"component-edge:0:text0@108",
+				"Wool rug"
+			]
+		]
+	},
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "rows",
+					"node": "repeat:0",
+					"keys": [
+						"108",
+						"42",
+						"7"
+					]
+				}
+			],
+			"stack": [
+				"/orders"
+			],
+			"title": "Orders",
+			"texts": [
+				[
+					"h2:text0",
+					"Your orders"
+				],
+				[
+					"h3:text0",
+					"Reverse order"
+				],
+				[
+					"component-edge:0:text0@108",
+					"Wool rug"
+				],
+				[
+					"component-edge:0:text0@42",
+					"Oak chair"
+				],
+				[
+					"component-edge:0:text0@7",
+					"Desk lamp"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0@42"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/orders/[id]",
+					"params": {
+						"id": "42"
+					}
+				}
+			],
+			"stack": [
+				"/orders",
+				"/orders/42"
+			],
+			"title": "Order 42",
+			"texts": [
+				[
+					"h2:text0",
+					"Details for order 42"
+				],
+				[
+					"h3:text0",
+					"Shipped to the address on file."
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "back"
+			},
+			"journal": [],
+			"stack": [
+				"/orders"
+			],
+			"title": "Orders",
+			"texts": [
+				[
+					"h2:text0",
+					"Your orders"
+				],
+				[
+					"h3:text0",
+					"Reverse order"
+				],
+				[
+					"component-edge:0:text0@108",
+					"Wool rug"
+				],
+				[
+					"component-edge:0:text0@42",
+					"Oak chair"
+				],
+				[
+					"component-edge:0:text0@7",
+					"Desk lamp"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0@108"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/orders/[id]",
+					"params": {
+						"id": "108"
+					}
+				}
+			],
+			"stack": [
+				"/orders",
+				"/orders/108"
+			],
+			"title": "Order 108",
+			"texts": [
+				[
+					"h2:text0",
+					"Details for order 108"
+				],
+				[
+					"h3:text0",
+					"Shipped to the address on file."
+				]
+			]
+		}
+	]
+}

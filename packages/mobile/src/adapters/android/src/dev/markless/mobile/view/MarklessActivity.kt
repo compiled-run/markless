@@ -2,14 +2,23 @@ package dev.markless.mobile.view
 
 import android.app.Activity
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.FrameLayout
+import dev.markless.mobile.core.AppPayload
 import dev.markless.mobile.core.Payload
+import dev.markless.mobile.style.StyleExport
 
-/** An Activity that shows one Markless component: override [payloadBytes], and [styleExportBytes] to apply Dragon's styles. */
+/**
+ * An Activity that shows one Markless component: override [payloadBytes], and [styleExportBytes] to apply Dragon's styles
+ * (a page's own export, or for an app payload the app's `markless.native-app-style/0` file).
+ * For an app payload (`markless.native-app/0`) each instance is one screen of the task's back stack: links start the next
+ * screen's activity, and the system back button and gesture finish this one, so the screen below shows as it was left.
+ */
 abstract class MarklessActivity : Activity() {
 	lateinit var host: MarklessHost
 		private set
@@ -36,8 +45,11 @@ abstract class MarklessActivity : Activity() {
 		device.activityResult(requestCode)
 	}
 
-	/** The path the app opens at (`/apple`); the Maestro launch argument `route` arrives as this intent extra. */
-	open fun route(): String? = intent.getStringExtra("route")
+	/** The path this screen opens at: the `route` extra (Maestro's launch argument, or a link), or a deep link's path. */
+	open fun route(): String? = intent.getStringExtra(ROUTE) ?: intent.data?.path
+
+	/** How deep this screen sits in the stack; the bottom screen has no Up arrow. */
+	private val depth get() = intent.getIntExtra(DEPTH, 0)
 
 	/** The params of [route], matched against the payload's route pattern; no route opens a page whose pattern has no params. */
 	private fun launchParams(payload: ByteArray): Map<String, String> {
@@ -48,19 +60,69 @@ abstract class MarklessActivity : Activity() {
 	}
 
 	override fun onCreate(savedInstanceState: Bundle?) {
+		val bytes = payloadBytes()
+		val app = AppPayload.decodeOrNull(bytes)
+		if (app == null) {
+			super.onCreate(savedInstanceState)
+			open(launchParams(bytes))
+			return
+		}
+		setTheme(android.R.style.Theme_Material_Light)
 		super.onCreate(savedInstanceState)
-		open(launchParams(payloadBytes()))
+		val path = route() ?: "/"
+		val stack = app.backStack(path)
+		if (!intent.hasExtra(DEPTH) && stack.size > 1) {
+			val screens = stack.mapIndexed { index, prefix -> screen(prefix, index) }
+			screens[0].addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+			startActivities(screens.toTypedArray())
+			finish()
+			overridePendingTransition(0, 0)
+			return
+		}
+		val (route, params) = app.match(path) ?: throw MarklessHostError("$path is not a route of this app")
+		val styles = styleExportBytes()?.let { StyleExport.decodeApp(it) } ?: emptyMap()
+		for (pattern in styles.keys) if (app.routes.none { it.route.pattern == pattern }) throw MarklessHostError("the app style has styles for $pattern, which is not a route of this app")
+		show(MarklessHost(this, route.page, styles[route.route.pattern], params = params, device = device))
+		title = host.runtime.title() ?: ""
+		host.onTitle = { title = it }
+		host.onNavigate = { entry ->
+			host.closeSheets()
+			startActivity(screen(AppPayload.path(entry.route, entry.params), if (entry.replace) depth else depth + 1))
+			if (entry.replace) finish()
+		}
+		actionBar?.setDisplayHomeAsUpEnabled(depth > 0)
 	}
+
+	override fun onDestroy() {
+		if (::host.isInitialized) host.release()
+		super.onDestroy()
+	}
+
+	override fun onConfigurationChanged(newConfig: Configuration) {
+		super.onConfigurationChanged(newConfig)
+		if (::host.isInitialized) host.configurationChanged(newConfig)
+	}
+
+	override fun onOptionsItemSelected(item: MenuItem): Boolean {
+		if (item.itemId != android.R.id.home) return super.onOptionsItemSelected(item)
+		finish()
+		return true
+	}
+
+	private fun screen(path: String, depth: Int) = Intent(this, javaClass).putExtra(ROUTE, path).putExtra(DEPTH, depth)
 
 	/** Builds the page from scratch with [params]: one page per payload, so a link names this page's own route. */
 	private fun open(params: Map<String, String>) {
-		val bytes = payloadBytes()
 		if (::host.isInitialized) host.release()
-		host = MarklessHost(this, bytes, styleExportBytes(), params = params, device = device)
-		host.onNavigate = { route, next ->
-			if (route != host.payload.route?.pattern) throw MarklessHostError("navigate to $route; this app holds only ${host.payload.route?.pattern}")
-			open(next)
+		show(MarklessHost(this, payloadBytes(), styleExportBytes(), params = params, device = device))
+		host.onNavigate = { entry ->
+			if (entry.route != host.payload.route?.pattern) throw MarklessHostError("navigate to ${entry.route}; this app holds only ${host.payload.route?.pattern}")
+			open(entry.params)
 		}
+	}
+
+	private fun show(next: MarklessHost) {
+		host = next
 		val viewport = object : FrameLayout(this) {
 			override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
 				val f = host.rootFrame
@@ -84,4 +146,9 @@ abstract class MarklessActivity : Activity() {
 	}
 
 	fun contentRoot(): View = host.root
+
+	companion object {
+		const val ROUTE = "route"
+		const val DEPTH = "markless.depth"
+	}
 }
