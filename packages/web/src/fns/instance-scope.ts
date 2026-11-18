@@ -149,12 +149,15 @@ export function marklessRecordRowScope(
  * and row segments trailing it, which the same module spells: a root written
  * inside another component's tag is still the enclosing module's own JSX, so its
  * callback closure is that module's, not the component it was projected into.
+ * A row segment left trailing is the composer's own `@for` row, which the callback reads through its locals, not graph scope.
  */
 export function marklessComposerInstancePath(rootPath: string): string {
 	const segments = rootPath.match(INSTANCE_SEGMENT) ?? [];
 	let end = segments.length;
 	while (end > 0 && !segments[end - 1]!.startsWith('c')) end -= 1;
-	return segments.slice(0, Math.max(end - 1, 0)).join('');
+	end = Math.max(end - 1, 0);
+	while (end > 0 && segments[end - 1]!.startsWith('r:')) end -= 1;
+	return segments.slice(0, end).join('');
 }
 
 export function marklessRowScopedGraphNodeId(
