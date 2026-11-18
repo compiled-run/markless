@@ -1,0 +1,5 @@
+2026-11-17 17:55:57.783 Df Proof[35681:123c63c] (Foundation) MarklessEngine engine javascriptcore started in 3.69 ms, footprint +3504 KiB, script 1934 chars
+2026-11-17 17:55:57.784 Df Proof[35681:123c63c] (Foundation) MarklessEngine tap h1 5.01 ms (first after the engine started)
+2026-11-17 17:56:00.225 Df Proof[35681:123c63c] (Foundation) MarklessEngine tap h1 0.48 ms
+2026-11-17 17:56:00.933 Df Proof[35681:123c63c] (Foundation) MarklessEngine timer 1 0.29 ms
+2026-11-17 17:56:03.375 Df Proof[35681:123c63c] (Foundation) MarklessEngine timer 2 0.40 ms

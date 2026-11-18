@@ -35,6 +35,12 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"navigate\",\"route\":${jsonString(node)},\"params\":${params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}}"
 	}
 
+	/** Proof only: the script asked for timer [id] to fire after [ms]; the host dispatches it with [Runtime.fire]. */
+	data class Timer(val id: Int, val ms: Double) : JournalEntry {
+		override val node: String get() = "timer:$id"
+		override fun toJson() = "{\"op\":\"timer\",\"id\":$id,\"ms\":${JsString.number(ms)}}"
+	}
+
 	/** Shows arm [index] of a branch (null: none). */
 	data class Arm(override val node: String, val index: Int?) : JournalEntry {
 		override fun toJson() = "{\"op\":\"arm\",\"node\":${jsonString(node)},\"index\":${index ?: "null"}}"
@@ -75,8 +81,57 @@ data class Instance(val id: String, val node: Node, val scope: Scope, val rowKey
 /** A list row: its key (`String()` of the item at the key path) and item. */
 data class Row(val key: String, val item: JsValue)
 
+/** Proof only: a JavaScript engine that evaluates one expression of the payload's script and returns its string result. */
+fun interface ScriptEngine {
+	fun call(expression: String): String
+}
+
 /** Runs handler ops on cells and reports what changed on shown nodes as journal entries, in document order. Free of android.*. */
-class Runtime(val payload: Payload, private val store: Store = MemoryStore(), val params: Map<String, String> = emptyMap()) {
+class Runtime(
+	val payload: Payload,
+	private val store: Store = MemoryStore(),
+	val params: Map<String, String> = emptyMap(),
+	/** Starts the engine `script` ops run in, on the first one; never called for a payload whose handlers are all data. */
+	private val startEngine: ((String) -> ScriptEngine)? = null,
+) {
+	private var engine: ScriptEngine? = null
+	val engineStarted: Boolean get() = engine != null
+	/** Starts the engine now (warming at idle) instead of on the first `script` op. */
+	fun warmEngine() { if (payload.script != null) engineOrStart() }
+
+	private fun engineOrStart(): ScriptEngine = engine ?: run {
+		val start = startEngine ?: throw MarklessRuntimeError("a script op, but this host has no script engine")
+		start(payload.script ?: throw MarklessRuntimeError("a script op in a payload with no script")).also { engine = it }
+	}
+
+	/** One script call: writes the cells it changed, in the order it reports them, and returns the timers it asked for. A script that throws changes nothing. */
+	private fun runScript(call: (cells: String) -> String): List<JournalEntry.Timer> {
+		val cells = jsonString(values.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" })
+		val text = try {
+			engineOrStart().call(call(cells))
+		} catch (e: MarklessRuntimeError) {
+			throw e
+		} catch (e: Exception) {
+			onScriptError?.invoke(e)
+			return emptyList()
+		}
+		val result = Json.parse(text.toByteArray()).obj("script result")
+		for (w in result.field("writes", "script result").arr("writes")) {
+			val pair = w.arr("write")
+			val cell = pair[0].str("write cell")
+			if (cell !in values) throw MarklessRuntimeError("the script wrote unknown cell \"$cell\"")
+			val v = JsValue.fromJson(pair[1])
+			values[cell] = v
+			storageKeys[cell]?.let { store.set(it, v) }
+		}
+		return result.field("timers", "script result").arr("timers").map { t ->
+			val pair = t.arr("timer")
+			JournalEntry.Timer(pair[0].num("timer id").toInt(), pair[1].num("timer ms"))
+		}
+	}
+
+	/** Called when a script handler throws; the handler then changes nothing. */
+	var onScriptError: ((Exception) -> Unit)? = null
 	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, c.storageKey?.let(store::get) ?: c.initial) }
 	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
 	private val handlers = payload.handlers.associateBy { it.id }
@@ -214,24 +269,42 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		val handlerId = handlerFor(host, event) ?: throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
-		val cellsBefore = HashMap(values)
-		val beforeTexts = texts().toMap()
-		val beforeAttributes = attributes().associate { (n, a, v) -> (n to a) to v }
-		val beforeProperties = properties().associate { (n, a, v) -> (n to a) to v }.toMutableMap()
-		// The edited field already shows what was typed, so its own value counts as written.
-		if (value != null) beforeProperties[host to "value"] = value
-		val beforeArms = arms().toMap()
-		val beforeRows = rows().toMap()
-		eventValue = value
-		try {
+		return journalOf(host, value) { timers ->
 			for (op in handler.ops) when (op) {
-				is Op.Navigate -> return listOf(JournalEntry.Navigate(op.route, op.params))
+				is Op.Navigate -> return@journalOf listOf(JournalEntry.Navigate(op.route, op.params))
+				is Op.Script -> {
+					val eventJson = jsonString(if (value == null) "{}" else "{\"value\":${jsonString(value)}}")
+					timers += runScript { cells -> "__markless.dispatch(${jsonString(op.handler)}, $cells, $eventJson)" }
+				}
 				is Op.Assign -> {
 					val v = evaluate(op.value)
 					values[op.cell] = v
 					storageKeys[op.cell]?.let { store.set(it, v) }
 				}
 			}
+			null
+		}
+	}
+
+	/** Proof only: timer [id] that a script asked for fires. */
+	fun fire(id: Int): List<JournalEntry> = journalOf(null, null) { timers ->
+		timers += runScript { cells -> "__markless.fire($id, $cells)" }
+		null
+	}
+
+	private fun journalOf(host: String?, value: String?, run: (MutableList<JournalEntry.Timer>) -> List<JournalEntry>?): List<JournalEntry> {
+		val cellsBefore = HashMap(values)
+		val beforeTexts = texts().toMap()
+		val beforeAttributes = attributes().associate { (n, a, v) -> (n to a) to v }
+		val beforeProperties = properties().associate { (n, a, v) -> (n to a) to v }.toMutableMap()
+		// The edited field already shows what was typed, so its own value counts as written.
+		if (value != null && host != null) beforeProperties[host to "value"] = value
+		val beforeArms = arms().toMap()
+		val beforeRows = rows().toMap()
+		val timers = ArrayList<JournalEntry.Timer>()
+		eventValue = value
+		try {
+			run(timers)?.let { return it }
 		} finally {
 			eventValue = null
 		}
@@ -259,6 +332,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				} else if (key in beforeAttributes && key in afterAttributes && beforeAttributes[key] != afterAttributes[key]) journal.add(JournalEntry.Attribute(inst.id, binding.name, afterAttributes[key]))
 			}
 		}
+		journal.addAll(timers)
 		return journal
 	}
 }

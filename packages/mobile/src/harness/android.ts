@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { exec } from './exec.ts';
@@ -109,13 +109,22 @@ export async function stopEmulator(tools: AndroidTools, emulator: BootedEmulator
 }
 
 /** Compiles the host's Kotlin sources with the shell activity to one classes.dex (once per distinct source set). */
+/**
+ * Proof only (handler-boundary.md): a folder with a JavaScript engine for `script` ops, its Java classes as `*.jar` and
+ * its native libraries under `jni/<abi>/`, packed into the APK; and whether the shell starts it once idle.
+ */
+const proofEngine = () => process.env.MARKLESS_PROOF_ANDROID_ENGINE;
+const proofEngineWarm = () => process.env.MARKLESS_PROOF_ENGINE_WARM === '1';
+const EMULATOR_ABI = 'arm64-v8a';
+
 export async function buildAndroidShell(
 	tools: AndroidTools,
 	hostSources: string,
 	shellDir: string,
 ): Promise<string> {
 	const sources = [...filesUnder(hostSources, '.kt'), ...filesUnder(shellDir, '.kt')];
-	const key = contentKey(hostSources, sources, [
+	const engineJars = proofEngine() ? filesUnder(proofEngine()!, '.jar') : [];
+	const key = contentKey(hostSources, [...sources, ...engineJars], [
 		tools.buildTools,
 		tools.androidJar,
 		tools.kotlinStdlib,
@@ -146,6 +155,7 @@ export async function buildAndroidShell(
 		tools.androidJar,
 		...filesUnder(classes, '.class'),
 		tools.kotlinStdlib,
+		...engineJars,
 	]);
 	return dex;
 }
@@ -205,6 +215,7 @@ export async function installProofApk(
 		mkdirSync(join(assetDir, path, '..'), { recursive: true });
 		writeFileSync(join(assetDir, path), bytes);
 	}
+	if (proofEngineWarm()) writeFileSync(join(assetDir, 'markless', 'warm-engine'), '');
 	writeFileSync(join(workDir, 'AndroidManifest.xml'), manifest());
 	const unsigned = join(workDir, 'unsigned.apk');
 	const aligned = join(workDir, 'aligned.apk');
@@ -221,6 +232,14 @@ export async function installProofApk(
 		assetDir,
 	]);
 	await exec('zip', ['-q', '-j', unsigned, dex]);
+	const engine = proofEngine();
+	if (engine) {
+		const libs = join(workDir, 'native');
+		mkdirSync(join(libs, 'lib', EMULATOR_ABI), { recursive: true });
+		for (const library of filesUnder(join(engine, 'jni', EMULATOR_ABI), '.so'))
+			writeFileSync(join(libs, 'lib', EMULATOR_ABI, library.split('/').pop()!), readFileSync(library));
+		await exec('zip', ['-q', '-r', unsigned, 'lib'], { cwd: libs });
+	}
 	await exec(join(tools.buildTools, 'zipalign'), ['-f', '4', unsigned, aligned]);
 	await exec(join(tools.buildTools, 'apksigner'), [
 		'sign',
@@ -232,6 +251,7 @@ export async function installProofApk(
 		apk,
 		aligned,
 	]);
+	console.log(`android apk ${statSync(apk).size} bytes${engine ? ` with the engine in ${engine}` : ''}`);
 	await exec(tools.adb, ['-s', emulator.serial, 'uninstall', PROOF_APP_ID], {
 		allowFailure: true,
 	});

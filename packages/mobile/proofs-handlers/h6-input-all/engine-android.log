@@ -1,0 +1,3 @@
+W/libc    ( 1485): Access denied finding property "ro.hardware.chipname"
+I/MarklessEngine( 5743): engine hermes started in 4.70 ms, native heap +194 KiB, script 1803 chars
+I/MarklessEngine( 5743): tap h4 2.38 ms (first after the engine started)

@@ -135,7 +135,12 @@ export type NativeEventName = 'activate' | 'input';
 export type NativeOp =
 	| { readonly op: 'assign'; readonly cell: string; readonly value: NativeExpr }
 	/** Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. */
-	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
+	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> }
+	/**
+	 * Proof only (handler-boundary.md): runs `handler` of the payload's `script` in a JavaScript engine the host starts on
+	 * first use. The script returns the cells it changed; the host writes them like `assign` ops, then journals as usual.
+	 */
+	| { readonly op: 'script'; readonly handler: string };
 
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;
@@ -159,6 +164,11 @@ export type NativeViewPayload = {
 		readonly handler: string;
 	}>;
 	readonly handlers: ReadonlyArray<{ readonly id: string; readonly ops: ReadonlyArray<NativeOp> }>;
+	/**
+	 * Proof only: the script `script` ops run. It defines `globalThis.__markless` with `dispatch(handler, cells, event)`
+	 * and `fire(timer, cells)`, each taking and returning JSON text: `{ writes: [[cell, value]], timers: [[id, ms]] }`.
+	 */
+	readonly script?: { readonly source: string };
 };
 
 /** One change a host applies to its retained views after a handler runs. */
@@ -178,4 +188,6 @@ export type NativeJournalEntry =
 	/** Shows arm `index` of a branch (null: none), building its nodes from current values and removing the old arm's. */
 	| { readonly op: 'arm'; readonly node: string; readonly index: number | null }
 	/** Leave this page: the host builds the page at `route` from scratch with `params` (its own state starts over). */
-	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
+	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> }
+	/** Proof only: the script asked for timer `id` to fire after `ms`; the host fires it with a `timer` action. */
+	| { readonly op: 'timer'; readonly id: number; readonly ms: number };

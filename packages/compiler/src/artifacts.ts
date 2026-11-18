@@ -56,8 +56,9 @@ export type SemanticGraphInput = {
 
 /** The collectors a native build passes to the analysis; their nodes are the parser's ESTree nodes. */
 export type NativeFactCollectors = {
-	readonly expression: (node: never) => SemanticExpression;
-	readonly handlerStatements: (node: never) => ReadonlyArray<SemanticHandlerStatement> | undefined;
+	/** `semantic` is the module's scope analysis; with it, a construct outside the tree says what its names resolve to. */
+	readonly expression: (node: never, semantic?: never) => SemanticExpression;
+	readonly handlerStatements: (node: never, semantic?: never) => ReadonlyArray<SemanticHandlerStatement> | undefined;
 };
 
 export type ElementOnlyAttribute = {
@@ -1185,7 +1186,8 @@ export type SemanticGraphAlias = {
 
 /** A value as a tree a native host evaluates with JavaScript meaning; names are the component's bindings. */
 export type SemanticExpression =
-	| { readonly kind: 'read'; readonly name: string }
+	/** `global`: the name resolves to no declaration in the module (`document`, `Math`), by its scope analysis. */
+	| { readonly kind: 'read'; readonly name: string; readonly global?: true }
 	| { readonly kind: 'literal'; readonly value: string | number | boolean | null }
 	| { readonly kind: 'unary'; readonly operator: '!' | '-' | '+'; readonly value: SemanticExpression }
 	| {
@@ -1224,14 +1226,84 @@ export type SemanticExpression =
 	/** An arrow function passed to a method: its parameters read as names inside `body`. */
 	| { readonly kind: 'lambda'; readonly parameters: ReadonlyArray<string>; readonly body: SemanticExpression }
 	/** Outside the tree: names what would need a script engine. */
-	| { readonly kind: 'unsupported'; readonly construct: string };
+	| { readonly kind: 'unsupported'; readonly construct: string; readonly gap?: SemanticNativeGap };
+
+/** What a name in a construct outside the native tree resolves to, by the module's scope analysis. */
+export type SemanticNameOrigin =
+	| { readonly kind: 'global' }
+	| { readonly kind: 'import'; readonly source: string; readonly imported: string | null }
+	| { readonly kind: 'parameter' }
+	| {
+			readonly kind: 'function';
+			readonly scope: 'module' | 'local';
+			/** The function's body as statements, when it is declared in this module (followed a few calls deep). */
+			readonly body?: ReadonlyArray<SemanticHandlerStatement>;
+			readonly parameters?: ReadonlyArray<string>;
+	  }
+	| {
+			readonly kind: 'variable';
+			readonly scope: 'module' | 'local';
+			readonly name: string;
+			/** The declaration's value as a tree (`state({...})`, `toggleState()`), followed a few names deep. */
+			readonly initializer?: SemanticExpression;
+	  }
+	| { readonly kind: 'class' };
+
+/**
+ * Why a construct is outside the native tree, as a closed list a later stage can count. Inner parts are trees too, so
+ * a reader can tell what else the construct would need.
+ */
+export type SemanticNativeGap =
+	| { readonly kind: 'await'; readonly value: SemanticExpression }
+	| { readonly kind: 'async-function' ; readonly body: ReadonlyArray<SemanticHandlerStatement> }
+	| {
+			readonly kind: 'control-flow';
+			readonly statement: 'if' | 'return' | 'switch' | 'try' | 'throw' | 'block' | 'break';
+			readonly tests: ReadonlyArray<SemanticExpression>;
+			readonly inner: ReadonlyArray<SemanticHandlerStatement>;
+	  }
+	| {
+			readonly kind: 'loop';
+			readonly tests: ReadonlyArray<SemanticExpression>;
+			readonly inner: ReadonlyArray<SemanticHandlerStatement>;
+	  }
+	| {
+			readonly kind: 'local';
+			readonly declaration: 'const' | 'let' | 'var' | 'destructure';
+			readonly values: ReadonlyArray<SemanticExpression>;
+	  }
+	| {
+			readonly kind: 'call';
+			readonly callee: string | null;
+			readonly origin: SemanticNameOrigin | null;
+			/** For `a.b.c()`, the tree of `a.b`, so a reader can tell a state object's method from a library's. */
+			readonly object?: SemanticExpression;
+			readonly method?: string;
+			readonly optional: boolean;
+			readonly arguments: ReadonlyArray<SemanticExpression>;
+	  }
+	| { readonly kind: 'new'; readonly callee: string | null; readonly origin: SemanticNameOrigin | null }
+	| {
+			readonly kind: 'member-write';
+			/** What the written object's root name resolves to. */
+			readonly origin: SemanticNameOrigin | null;
+			readonly object: SemanticExpression;
+			readonly property: string | null;
+			readonly value: SemanticExpression;
+	  }
+	| { readonly kind: 'computed-member'; readonly object: SemanticExpression; readonly key: SemanticExpression }
+	| { readonly kind: 'function-value' }
+	/** `x as T`, `x!`, `x satisfies T`: erased by the types, so `value` is what runs. */
+	| { readonly kind: 'type-assertion'; readonly value: SemanticExpression }
+	| { readonly kind: 'operator'; readonly operator: string; readonly operands: ReadonlyArray<SemanticExpression> }
+	| { readonly kind: 'other'; readonly nodeType: string };
 
 /** One statement of a handler body: an assignment to a name (`x++` and `x += 1` arrive desugared), or what is not one. */
 export type SemanticHandlerStatement =
 	| { readonly kind: 'assign'; readonly target: string; readonly value: SemanticExpression }
 	/** `name()`: calls a function the component received, such as a callback prop. */
-	| { readonly kind: 'invoke'; readonly name: string }
-	| { readonly kind: 'unsupported'; readonly construct: string };
+	| { readonly kind: 'invoke'; readonly name: string; readonly origin?: SemanticNameOrigin }
+	| { readonly kind: 'unsupported'; readonly construct: string; readonly gap?: SemanticNativeGap };
 
 export type SemanticTemplateRead = {
 	readonly source: string;

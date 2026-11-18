@@ -1,0 +1,12 @@
+{
+	"rung": 100,
+	"name": "A data handler and an engine handler in one payload",
+	"scriptHandlers": "fallback",
+	"steps": [
+		{ "visible": ["Count 0", "Phase idle"] },
+		{ "do": { "tap": "Count 0" }, "visible": ["Count 1"], "absent": ["Count 0"] },
+		{ "do": { "tap": "Phase idle" }, "visible": ["Phase waiting"], "absent": ["Phase idle"] },
+		{ "do": { "wait": 5000 }, "visible": ["Phase done"], "absent": ["Phase waiting"] },
+		{ "do": { "tap": "Count 1" }, "visible": ["Count 2", "Phase done"], "absent": ["Count 1"] }
+	]
+}

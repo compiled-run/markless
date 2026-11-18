@@ -18,11 +18,12 @@ import {
 	type BootedSimulator,
 } from './ios.ts';
 import { runFlow, type FlowFailure } from './maestro.ts';
-import { PROOF_PLATFORMS, type ProofPlatform } from './proof-app.ts';
+import { PROOF_APP_NAME, PROOF_PLATFORMS, type ProofPlatform } from './proof-app.ts';
 import { PROOF_REPORT_VERSION, proofVerdict, type ProofReport } from './report.ts';
 import { loadRung, type ProofRung } from './rung.ts';
 import { verdictCommand } from './verdict.ts';
-import { androidTools, cacheRoot } from './tools.ts';
+import { exec } from './exec.ts';
+import { androidTools, cacheRoot, type AndroidTools } from './tools.ts';
 
 const USAGE = `usage: markless-proof [options] <rung folder>...
        markless-proof verdict <dir>/ios.json <dir>/android.json
@@ -148,6 +149,7 @@ async function main(argv: string[]): Promise<number> {
 		for (const [index, rung] of rungs.entries()) {
 			const flow = flows[index]!;
 			const rungStarted = performance.now();
+			const rungClock = new Date();
 			const work = join(cacheRoot(), 'runs', rung.name);
 			const install = async (platform: ProofPlatform) => {
 				const started = performance.now();
@@ -208,6 +210,11 @@ async function main(argv: string[]): Promise<number> {
 					};
 				}
 				results.get(platform)!.push({ name: rung.name, ...outcome });
+				if (process.env.MARKLESS_PROOF_ENGINE_LOG) {
+					const log = await engineLog(platform, platform === 'ios' ? simulator!.udid : emulator!.serial, tools, rungClock);
+					writeFileSync(join(rung.dir, `engine-${platform}.log`), log);
+					console.log(log.trim().split('\n').map((line) => `  ${platform} | ${line}`).join('\n'));
+				}
 				const timing = `install ${fixed(outcome.installSeconds)} s, flow ${fixed(outcome.flowSeconds)} s`;
 				if (!outcome.failure) console.log(`PASS ${rung.name} ${platform} (${timing})`);
 				else {
@@ -269,3 +276,24 @@ main(process.argv.slice(2)).then(
 		process.exit(1);
 	},
 );
+
+/** Proof only (handler-boundary.md): the script engine's timing lines from the run that just ended, then a clean buffer. */
+async function engineLog(platform: ProofPlatform, device: string, tools: AndroidTools | undefined, since: Date): Promise<string> {
+	if (platform === 'android') {
+		// The engine's own lines, and a crash's (a Java exception or a native abort) when there is one.
+		const { stdout } = await exec(tools!.adb, ['-s', device, 'logcat', '-d', '-v', 'brief', '-s', 'MarklessEngine', 'AndroidRuntime:E', 'DEBUG', 'libc'], { allowFailure: true, timeoutMs: 30_000 }).catch(() => ({ stdout: 'the device did not answer logcat' }));
+		await exec(tools!.adb, ['-s', device, 'logcat', '-c'], { allowFailure: true, timeoutMs: 30_000 }).catch(() => undefined);
+		return stdout.split('\n').filter((line) => /^[A-Z]\//.test(line)).slice(0, 60).join('\n');
+	}
+	const { stdout } = await exec(
+		'xcrun',
+		['simctl', 'spawn', device, 'log', 'show', '--style', 'compact', '--start', localTime(since), '--predicate', `process == "${PROOF_APP_NAME}" AND eventMessage CONTAINS "MarklessEngine"`],
+		{ allowFailure: true },
+	);
+	return stdout.split('\n').filter((line) => line.includes('MarklessEngine')).join('\n');
+}
+
+const localTime = (date: Date) => {
+	const two = (n: number) => String(n).padStart(2, '0');
+	return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}:${two(date.getSeconds())}`;
+};

@@ -1,0 +1,4 @@
+2026-11-17 17:58:16.598 Df Proof[41438:1245082] (Foundation) MarklessEngine engine javascriptcore started in 3.84 ms, footprint +3488 KiB, script 1750 chars
+2026-11-17 17:58:16.605 Df Proof[41438:1245082] (Foundation) MarklessEngine script handler threw: TypeError: window.matchMedia is not a function. (In 'window.matchMedia('(prefers-reduced-motion: reduce)')', 'window.matchMedia' is undefined)
+2026-11-17 17:58:16.605 Df Proof[41438:1245082] (Foundation) MarklessEngine tap h2 10.74 ms (first after the engine started)
+2026-11-17 17:58:18.709 Df Proof[41438:1245082] (Foundation) MarklessEngine tap h3 0.75 ms

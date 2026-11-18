@@ -1,0 +1,54 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 3.772824124999999,
+			"flowSeconds": 12.251057708000001
+		},
+		{
+			"name": "h0-mixed",
+			"failure": null,
+			"installSeconds": 0.8945545829999973,
+			"flowSeconds": 16.676574542
+		},
+		{
+			"name": "h1-timer",
+			"failure": null,
+			"installSeconds": 0.9319936660000094,
+			"flowSeconds": 18.70812000000001
+		},
+		{
+			"name": "h2-regex",
+			"failure": null,
+			"installSeconds": 1.707727459000016,
+			"flowSeconds": 15.314918166999997
+		},
+		{
+			"name": "h3-closure",
+			"failure": null,
+			"installSeconds": 1.2575859159999818,
+			"flowSeconds": 10.524090874999995
+		},
+		{
+			"name": "h4-intl",
+			"failure": null,
+			"installSeconds": 0.9655445000000181,
+			"flowSeconds": 9.335632209000003
+		},
+		{
+			"name": "h5-page",
+			"failure": null,
+			"installSeconds": 0.903385957999999,
+			"flowSeconds": 11.484339000000007
+		},
+		{
+			"name": "h6-input-all",
+			"failure": null,
+			"installSeconds": 0.8265514580000308,
+			"flowSeconds": 17.91103125
+		}
+	]
+}

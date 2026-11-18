@@ -93,6 +93,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			// A rung that is a page compiles as its page file, so the router derives its route.
 			...(expected.route === undefined ? {} : { page: `pages/${expected.route}.tsrx` }),
 			readModule: readRelativeModule,
+			...(expected.scriptHandlers ? { scriptHandlers: expected.scriptHandlers } : {}),
 		});
 		if (!build.payload) {
 			const lines = build.diagnostics.map(

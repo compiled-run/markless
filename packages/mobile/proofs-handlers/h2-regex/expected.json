@@ -1,0 +1,11 @@
+{
+	"rung": 102,
+	"name": "A regular expression in your own function",
+	"scriptHandlers": "fallback",
+	"steps": [
+		{ "visible": ["/blog/hell"] },
+		{ "do": { "tap": "Type O" }, "visible": ["/blog/hello"], "absent": ["/blog/hell"] },
+		{ "do": { "tap": "Type slash" }, "visible": ["/blog/hello"], "absent": ["/blog/hello/"] },
+		{ "do": { "tap": "Backspace" }, "visible": ["/blog/hell"], "absent": ["/blog/hello"] }
+	]
+}

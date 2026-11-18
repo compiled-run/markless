@@ -1,0 +1,11 @@
+{
+	"rung": 101,
+	"name": "Timers: a reload that a second press replaces",
+	"scriptHandlers": "fallback",
+	"steps": [
+		{ "visible": ["Reload 0", "Page done"] },
+		{ "do": { "tap": "Reload 0" }, "visible": ["Reload 1", "Page loading"], "absent": ["Page done"] },
+		{ "do": { "tap": "Reload 1" }, "visible": ["Reload 2", "Page loading"], "absent": ["Reload 1"] },
+		{ "do": { "wait": 5000 }, "visible": ["Reload 2", "Page done"], "absent": ["Page loading"] }
+	]
+}

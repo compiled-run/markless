@@ -1,0 +1,10 @@
+{
+	"rung": 103,
+	"name": "A closure: sorting with a comparator",
+	"scriptHandlers": "fallback",
+	"steps": [
+		{ "visible": ["alpha", "beta", "gamma"], "order": ["alpha", "beta", "gamma"] },
+		{ "do": { "tap": "Sort" }, "visible": ["alpha", "beta", "gamma"], "order": ["alpha", "gamma", "beta"] },
+		{ "do": { "tap": "Sort" }, "visible": ["alpha", "beta", "gamma"], "order": ["beta", "alpha", "gamma"] }
+	]
+}

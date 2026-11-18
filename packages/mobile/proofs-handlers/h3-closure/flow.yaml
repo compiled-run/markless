@@ -1,0 +1,46 @@
+appId: ${APP_ID}
+name: h3-closure
+---
+- launchApp:
+    clearState: true
+- assertVisible: alpha
+- assertVisible: beta
+- assertVisible: gamma
+- assertVisible:
+    text: beta
+    below: alpha
+- assertVisible:
+    text: gamma
+    below: beta
+- tapOn: Sort
+- assertVisible:
+    text: gamma
+    below: alpha
+- assertVisible:
+    text: beta
+    below: gamma
+- assertVisible: alpha
+- assertVisible: beta
+- assertVisible: gamma
+- assertVisible:
+    text: gamma
+    below: alpha
+- assertVisible:
+    text: beta
+    below: gamma
+- tapOn: Sort
+- assertVisible:
+    text: alpha
+    below: beta
+- assertVisible:
+    text: gamma
+    below: alpha
+- assertVisible: alpha
+- assertVisible: beta
+- assertVisible: gamma
+- assertVisible:
+    text: alpha
+    below: beta
+- assertVisible:
+    text: gamma
+    below: alpha
