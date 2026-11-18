@@ -607,6 +607,9 @@ class MarklessHost(
 		var styles: List<String>? = null
 		var colors: List<Int>? = null
 		var radii: List<Double>? = null
+		var clipsChildren = false
+		var clip: Rect? = null
+		var reHosted: String? = null
 		for (w in s.writes) when (w) {
 			is StyleWrite.BackgroundColor -> fill = w.color.argb
 			StyleWrite.BorderWidths -> if (s.borderWidths == null) throw MarklessHostError("\"${s.id}\" writes border widths but has none")
@@ -621,6 +624,23 @@ class MarklessHost(
 				setTextSize(TypedValue.COMPLEX_UNIT_PX, (w.size * dpr).toFloat())
 			}
 			is StyleWrite.TextColor -> (view as? TextView ?: throw MarklessHostError("text colour on \"${s.id}\", which is not text")).setTextColor(w.color.argb)
+			StyleWrite.PaddingBoxClip -> clipsChildren = true
+			is StyleWrite.ClipPathInset -> {
+				val f = s.frame ?: throw MarklessHostError("\"${s.id}\" has a clip-path but no frame")
+				fun edge(k: Int, size: Double) = w.edges[k].let { (value, percent) -> if (percent) value / 100 * size else value * dpr }
+				val l = edge(3, f.width); val t = edge(0, f.height); val r = f.width - edge(1, f.width); val b = f.height - edge(2, f.height)
+				clip = if (r <= l || b <= t) Rect() else Rect(l.roundToInt(), t.roundToInt(), r.roundToInt(), b.roundToInt())
+			}
+			StyleWrite.ClipText -> {}
+			is StyleWrite.PaintOrder -> reHosted = w.host
+		}
+		// Re-hosting a box into another stacking context's order is not built here; a box that paints nothing has no order to keep.
+		if (reHosted != null && clip?.isEmpty != true) throw MarklessHostError("\"${s.id}\" paints in $reHosted's stacking order (a positioned or z-index box), which is not implemented on Android")
+		if (s.kind != "text") {
+			val edges = s.borderWidths
+			if (clipsChildren && edges != null && listOf(edges.top, edges.right, edges.bottom, edges.left).any { it != 0.0 }) throw MarklessHostError("\"${s.id}\" clips overflow to its padding box past borders, which is not implemented on Android")
+			if (view is MarklessBox) view.clip = clip
+			else if (clip != null) throw MarklessHostError("\"${s.id}\" has a clip-path on a ${view.javaClass.simpleName}, which is not implemented on Android")
 		}
 		if (s.kind == "text") {
 			if (view !is Button) view.background = null

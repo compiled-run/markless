@@ -1,6 +1,7 @@
 package dev.markless.mobile.view
 
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Rect
 import android.view.View
 import android.widget.EditText
@@ -9,6 +10,21 @@ import android.widget.FrameLayout
 /** The element view: children stack vertically until a style export assigns frames, then each child sits at its frame. */
 class MarklessBox(context: Context) : FrameLayout(context) {
 	internal val frames = HashMap<View, Rect>()
+	/** clip-path: inset(): the rect in px, relative to the box, it and its children draw inside; empty draws nothing. Accessibility is untouched. */
+	internal var clip: Rect? = null
+		set(value) {
+			if (field != value) invalidate()
+			field = value
+		}
+
+	override fun draw(canvas: Canvas) {
+		val c = clip ?: return super.draw(canvas)
+		if (c.isEmpty) return
+		val saved = canvas.save()
+		canvas.clipRect(c)
+		super.draw(canvas)
+		canvas.restoreToCount(saved)
+	}
 
 	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
 		if (frames.isNotEmpty()) {
