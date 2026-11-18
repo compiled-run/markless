@@ -389,6 +389,10 @@ final class ViewTree {
 			switch (event.event, view) {
 			case let (.activate, control as UIButton):
 				control.addAction(UIAction { _ in onAction(NativeAction(event: .activate, host: id)) }, for: .touchUpInside)
+			case (.activate, _) where !(view is UITextField):
+				// An element that is not a button (a list row): a tap anywhere in it, its text included, presses it.
+				view.isUserInteractionEnabled = true
+				view.addGestureRecognizer(ActivateGesture { onAction(NativeAction(event: .activate, host: id)) })
 			case let (.input, field as UITextField):
 				field.addAction(
 					UIAction { [weak field] _ in onAction(NativeAction(event: .input, host: id, value: field?.text ?? "")) },
@@ -552,3 +556,14 @@ private func uiColor(_ color: RGBA) -> UIColor {
 	UIColor(red: color.r / 255, green: color.g / 255, blue: color.b / 255, alpha: color.alpha / 255)
 }
 #endif
+
+/// A tap that presses an element which is not a button.
+private final class ActivateGesture: UITapGestureRecognizer {
+	private let action: () -> Void
+	init(_ action: @escaping () -> Void) {
+		self.action = action
+		super.init(target: nil, action: nil)
+		addTarget(self, action: #selector(fire))
+	}
+	@objc private func fire() { if state == .ended { action() } }
+}

@@ -19,6 +19,10 @@ simulator and the emulator through the proof harness). No family source was chan
 | u4c | `drawer` (the bottom sheet) | stopped | stopped | stopped | stopped | |
 | u5 | `toggle`: label, switch, thumb, description | pass | pass | pass | pass | none |
 | u11 | `pagination`: root, back and forward, three items with triggers; an author computed with a block body | pass | pass | pass | pass | none |
+| u12 | `buttongroup`: a required single group and a `multiple` one; the family's own helpers `heldValues` and `nextHeld` | pass | pass | see receipt | see receipt | none |
+| u13 | `accordion`: a single accordion and a `multiple` one whose value is a string, then a list (`typeof`) | pass | pass | see receipt | see receipt | none |
+| u14 | `gridlist`: three rows (one disabled), a tap picks the row it landed on (`event.target`) | pass | pass | see receipt | see receipt | none |
+| u15 | `popover` (trigger, content, title, close): `close` hands focus back with `triggerEl.focus()` | stopped | stopped | stopped | stopped | |
 
 Receipts: one harness run of the fourteen core rungs and u1 to u5, both platforms, `proof passed on iOS and Android`,
 19 of 19 on each
@@ -139,6 +143,51 @@ Still refused by name: `let`/`var` declarations, a declaration in a bare `{ }` b
 destructuring with a default, rest or computed key, and in a computed any statement other than `const`, `if` and `return`.
 The app's `label` computed (`const last = shown === 3; if (last) return 'Last page'; return \`Page ${shown}\``) runs on the
 phones; no family's block-bodied computed is free of other blockers yet (most remaining ones use `typeof` or a helper call).
+
+**u12 buttongroup (module helpers).** The family calls functions its own module imports (`heldValues`, `nextHeld` from
+`buttongroup-values.ts`). For native builds the analyzer records each top-level non-component `function` of a module
+(`moduleFunctions`: parameters, body as statements, export names), and a call by bare name that is not a builtin becomes an
+`apply` node. The native pass resolves it through the module's own functions, its named imports and re-exports, and runs the
+body where it is called, with the parameters bound: `const`/`let`, writes to its own locals, `push` onto a local array,
+`if` (one branch when its test is known when the app is built, else both joined by a conditional), `for...of` over a list
+known when the app is built (once per item), and a counted `for (let i = 0; i < list.length; i++)` whose body only returns
+one value, lowered to `list.some((item, i) => ...)`. Also needed: `after[0]`, an array element at a literal index (null past
+the end, as `undefined` on the web), and a root's `{...rest}` passed on to its inner part (`<ButtonGroupBox {...rest}>`).
+The first Android run crashed at launch: a button's bound `value` (its form value) was lowered as a text field's `value`,
+which the Android host rightly refuses on a button. It now lowers as the `value` attribute. Cost: the payload has no `let`,
+so an argument is copied wherever the parameter is read (u12's payload is about 54 KB). Still refused by name: a `while`
+loop, a loop over a list known only while the app runs (other than the counted form above), destructuring declarations,
+`Array.isArray`, regular expressions, `Intl` formatters and `new Date` (calendar's helpers hit these).
+
+**u13 accordion (`typeof`).** `typeof` is a unary operator in the payload, run by the reference runtime and both hosts (vector
+`types.json`). A native value spells `undefined` as null, so `typeof` would answer `'object'` where the web answers
+`'undefined'`: the compiler emits it only compared (`===`, `!==`) with `'string'`, `'number'` or `'boolean'`, where the two
+cannot differ, and refuses any other use by name. The `multiple` accordion starts as `''` and becomes a list, so both
+branches run on the phones. The web harness now taps a button by its name first: the accordion's region is also named
+"Returns" by its heading, and was being clicked instead of the trigger.
+
+**u14 gridlist (which row was tapped).** The grid's click handler reads `event.target` and asks, through helpers that loop
+over the plural `rowEls` and `triggerEls` handles, which row contains it. A tap on a phone lands on the innermost view that
+handles it, so the pass lowers such a handler once per element a handle names inside its host, with `event.target` that
+element; handles, `contains`, `getAttribute` and `hasAttribute` are answered when the app is built (handlers are now lowered
+after the whole tree, so every handle knows its elements). This is exact because every element the handler can ask about is
+one a handle names, and the containment it asks about is the same for every element inside one of them; `target ===` is not
+used. An element whose ops would be the same as the element around it gets no handler (a tap falls through), and the grid
+itself gets none once its rows have theirs, so only the rows are controls. Modifier keys (`shiftKey`, `ctrlKey`, `altKey`,
+`metaKey`) read false on a tap; any other field of a click event (`clientX`, `detail`, `key`, ...) is refused by name. `same()`
+is the counted loop above, with `a[at]` as the new `{ at, of }` read. Still refused: a handle bound inside a `@for` row, an
+element kept as a value past the handler, and `table`, whose `<table>`/`<tr>`/`<th>`/`<td>` elements no host maps.
+
+**u15 popover (element commands, stopped).** `element.focus()` and `element.scrollIntoView()` on a handle lower to a
+`command` op (payload, reference runtime, both hosts; vector `commands.json`), journalled after the handler's other entries
+so focus lands once the views show the new state. A text field takes the keyboard (iOS `becomeFirstResponder`, Android
+`requestFocus` and the soft keyboard); anything else takes the screen reader's cursor (VoiceOver `layoutChanged`, TalkBack
+accessibility focus). `scrollIntoView` scrolls the nearest scrolling ancestor; neither host's page scrolls yet, so today it
+changes nothing on a device, which is also what the web does for an element already on screen. Popover's own close part now
+lowers (`popover.triggerEl?.focus()` is a `command`), but the rung is stopped: `popover.content` handles `dismiss`, which is
+the overlay primitive's (worker ui-overlay holds those files), and that is the only thing the app is refused for. select and
+menu stop on `dismiss` too, and on `<select>`/`<option>` and pointer events. Not provable with Maestro: where screen-reader
+focus is.
 
 ## Handler gaps each proved family hit (against draft #807's handler-boundary study)
 

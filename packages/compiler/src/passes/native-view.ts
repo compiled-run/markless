@@ -2114,15 +2114,30 @@ export function createNativeViewPayload(
 			};
 			if (depth > 8) return notCallable();
 			const command = statement.path?.at(-1);
-			if ((command === 'focus' || command === 'scrollIntoView') && (statement.arguments ?? []).length === 0) {
-				const holder = statement.path!.slice(0, -1).reduce<SemanticExpression>(
+			const receiver = statement.path?.slice(0, -1) ?? [];
+			const receiverField =
+				receiver.length === 1
+					? (() => {
+							const object = scope.objects.get(statement.name);
+							return (object?.kind === 'instance' ? object.instance : object?.instance)?.fields.get(receiver[0]!);
+						})()
+					: undefined;
+			const onElement =
+				(command === 'focus' || command === 'scrollIntoView') &&
+				(receiverField?.kind === 'handle' || (receiver.length === 0 && (scope.args.has(statement.name) || !scope.objects.has(statement.name))));
+			if (onElement) {
+				const holder = receiver.reduce<SemanticExpression>(
 					(object, property) => ({ kind: 'member', object, property }),
 					{ kind: 'read', name: statement.name },
 				);
 				const mark = diagnostics.length;
 				const target = exprOf(holder, `${what}'s call to \`${callee}\``, scope);
 				const element = elementOf(target);
-				if (element !== undefined) return [{ op: 'command', node: element, command }];
+				if (element !== undefined && (statement.arguments ?? []).length > 0) {
+					refuse(`${what} calls \`${callee}()\` with options, which no native host takes yet`, span);
+					return [];
+				}
+				if (element !== undefined) return [{ op: 'command', node: element, command: command as 'focus' | 'scrollIntoView' }];
 				if (target && 'literal' in target && target.literal === null && statement.optional) return [];
 				if (diagnostics.length > mark) return [];
 				return notCallable();
