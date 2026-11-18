@@ -47,7 +47,8 @@ private fun runVector(file: File) {
 	check("${file.name} version", version == CONFORMANCE_VERSION) { "vector version is $version, this test reads $CONFORMANCE_VERSION" }
 	val payload = Payload.decode(field(vector, "payload", file.name))
 	val params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap()
-	val runtime = Runtime(payload, params = params)
+	val languages = vector["preferredLanguages"]?.arr("preferredLanguages")?.map { it.str("preferredLanguages[]") } ?: listOf("en")
+	val runtime = Runtime(payload, params = params, preferredLanguages = languages)
 	val mounted = runtime.texts().joinToString(",", "[", "]") { (n, t) -> "[${jsonString(n)},${jsonString(t)}]" }
 	val initial = canonical(field(vector, "initial", file.name))
 	check("${file.name} initial", mounted == initial) { "expected $initial\n  actual   $mounted" }
@@ -60,6 +61,9 @@ private fun runVector(file: File) {
 	val rows = runtime.rows().joinToString(",", "[", "]") { (n, keys) -> "[${jsonString(n)},${keys.joinToString(",", "[", "]", transform = ::jsonString)}]" }
 	val initialRows = vector["initialRows"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialRows", rows == initialRows) { "expected $initialRows\n  actual   $rows" }
+	val checks = runtime.checks().joinToString(",", "[", "]") { (n, c) -> "[${jsonString(n)},$c]" }
+	val initialChecks = vector["initialChecks"]?.let(::canonical) ?: "[]"
+	check("${file.name} initialChecks", checks == initialChecks) { "expected $initialChecks\n  actual   $checks" }
 	val arms = runtime.arms().joinToString(",", "[", "]") { (n, i) -> "[${jsonString(n)},${i ?: "null"}]" }
 	val initialArms = vector["initialArms"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialArms", arms == initialArms) { "expected $initialArms\n  actual   $arms" }

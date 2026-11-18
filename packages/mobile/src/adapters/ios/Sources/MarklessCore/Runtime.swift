@@ -32,6 +32,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case attribute(node: String, name: String, value: String?)
 	/// An input's text; never sent to the field whose edit caused it while it already shows that text.
 	case property(node: String, name: String, value: String)
+	/// A checkbox's or radio button's checkedness changed (journalled as the `checked` property).
+	case checked(node: String, value: Bool)
 	/// A list's new row order: rows whose key left go, new rows are built from current values, the rest move.
 	case rows(node: String, keys: [String])
 	/// Shows arm `index` of a branch (nil: none), built from current values; the old arm's views go.
@@ -56,6 +58,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("attribute")), ("node", .string(node)), ("name", .string(name)), ("value", value.map(JSONValue.string) ?? .null)])
 		case let .property(node, name, value):
 			return .object([("op", .string("property")), ("node", .string(node)), ("name", .string(name)), ("value", .string(value))])
+		case let .checked(node, value):
+			return .object([("op", .string("property")), ("node", .string(node)), ("name", .string("checked")), ("value", .bool(value))])
 		case let .rows(node, keys):
 			return .object([("op", .string("rows")), ("node", .string(node)), ("keys", .array(keys.map(JSONValue.string)))])
 		case let .arm(node, index):
@@ -140,11 +144,19 @@ public final class NativeRuntime {
 	private var running: [String: [Submission]] = [:]
 	private var timers: [String: (ops: [NativeOp], context: Context)] = [:]
 	private var timerCount = 0
+	/// Every non-row checkbox and radio button, in payload order.
+	private let ticked: [NativeNode]
+	/// Each one's checkedness: its `checked` binding sets it, as does a person's tick.
+	private var checkedness: [String: Bool] = [:]
+	private let missing: NativeValueMissing?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
 
 	/// `params`: the route params the page opened with.
-	public init(payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = []) {
+	/// `preferredLanguages`: the device's, most preferred first; the web's messages are shown in the first one the payload has.
+	public init(
+		payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = [], preferredLanguages: [String] = ["en"]
+	) {
 		self.payload = payload
 		self.params = params
 		self.store = store
@@ -155,10 +167,20 @@ public final class NativeRuntime {
 		handlers = Dictionary(uniqueKeysWithValues: payload.handlers.map { ($0.id, $0.ops) })
 		nodesById = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
 		forms = Dictionary(payload.forms.map { ($0.node, $0) }, uniquingKeysWith: { first, _ in first })
+		ticked = payload.nodes.filter { node in
+			guard node.row == nil, case let .element("input", attributes, _) = node.kind else { return false }
+			return attributes["type"] == "checkbox" || attributes["type"] == "radio"
+		}
+		let locale = nativeLocale(preferredLanguages, payload.valueMissing.map(\.locale))
+		missing = payload.valueMissing.first { $0.locale == locale }?.messages
 		dialogs = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
 			return nil
 		})
+		for node in ticked {
+			guard case let .element(_, attributes, _) = node.kind else { continue }
+			checkedness[node.id] = (try? checkedBinding(node.id)) ?? (attributes["checked"] != nil)
+		}
 	}
 
 	private func read(_ cell: String) throws -> NativeValue {
@@ -203,6 +225,7 @@ public final class NativeRuntime {
 			}
 			return try callMethod(method, on: targetValue, args)
 		case .routeParams: return .object(params.map { (key: $0.name, value: .string($0.value)) })
+		case let .checked(node): return .bool(try isChecked(node))
 		case let .formData(form): return .array(try entries(of: form).map { .array($0.map(NativeValue.string)) })
 		case .eventValue:
 			guard let eventValue else { throw RuntimeError(reason: "the event value read outside an input handler") }
@@ -358,9 +381,34 @@ public final class NativeRuntime {
 		return try attributeNow(id, "value") ?? ""
 	}
 
-	private func isChecked(_ id: String) throws -> Bool {
-		if let binding = try propertyBinding(id, "checked") { return try evaluate(binding.value).isTruthy }
-		return try attributeNow(id, "checked") != nil
+	private func checkedBinding(_ id: String) throws -> Bool? {
+		try propertyBinding(id, "checked").map { try evaluate($0.value).isTruthy }
+	}
+
+	/// A checkbox's or radio button's checkedness now.
+	public func isChecked(_ id: String) throws -> Bool {
+		guard let checked = checkedness[id] else { throw RuntimeError(reason: "\(id) is not a checkbox or radio button") }
+		return checked
+	}
+
+	/// Every shown checkbox's and radio button's checkedness.
+	public func checks() throws -> [(node: String, checked: Bool)] {
+		try ticked.compactMap { node in try isShown(node.arm) ? (node.id, try isChecked(node.id)) : nil }
+	}
+
+	private func formOf(_ id: String) -> String? {
+		payload.forms.first { form in form.fields.contains { $0.node == id } }?.node
+	}
+
+	/// The radio buttons of `id`'s group: the same `name`, in the same form or in none.
+	private func group(of id: String) throws -> [NativeNode] {
+		let name = try attributeNow(id, "name")
+		let form = formOf(id)
+		return try ticked.filter { node in
+			if node.id == id { return true }
+			guard case let .element(_, attributes, _) = node.kind, attributes["type"] == "radio", let name, !name.isEmpty else { return false }
+			return try attributeNow(node.id, "name") == name && formOf(node.id) == form
+		}
 	}
 
 	private func isShownField(_ id: String) throws -> Bool { try isShown(try element(id).node.arm) }
@@ -373,7 +421,7 @@ public final class NativeRuntime {
 				let name = try attributeNow(field.node, "name"), !name.isEmpty
 			else { return nil }
 			switch field.kind {
-			case .checkbox: return try isChecked(field.node) ? [name, try attributeNow(field.node, "value") ?? "on"] : nil
+			case .checkbox, .radio: return try isChecked(field.node) ? [name, try attributeNow(field.node, "value") ?? "on"] : nil
 			case .hidden: return [name, try attributeNow(field.node, "value") ?? ""]
 			case .text: return [name, try textOf(field: field.node)]
 			}
@@ -386,7 +434,13 @@ public final class NativeRuntime {
 		if let submitter, try attributeNow(submitter, "formnovalidate") != nil { return nil }
 		return try form.fields.first { field in
 			guard field.kind != .hidden, try isShownField(field.node) else { return false }
-			guard try attributeNow(field.node, "disabled") == nil, try attributeNow(field.node, "required") != nil else { return false }
+			guard try attributeNow(field.node, "disabled") == nil else { return false }
+			// A radio button is missing its value when any button of its group is required and none is checked.
+			let required = field.kind == .radio
+				? try group(of: field.node).contains { try attributeNow($0.id, "required") != nil }
+				: try attributeNow(field.node, "required") != nil
+			guard required else { return false }
+			if field.kind == .radio { return try group(of: field.node).allSatisfy { !(try isChecked($0.id)) } }
 			return field.kind == .text ? try textOf(field: field.node) == "" : !(try isChecked(field.node))
 		}
 	}
@@ -452,6 +506,8 @@ public final class NativeRuntime {
 		let beforeTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let beforeAttributes = keyed(try boundAttributes())
 		let beforeMarks = keyed(marks())
+		let checkedBefore = checkedness
+		let bindingsBefore = Dictionary(uniqueKeysWithValues: try ticked.map { ($0.id, try checkedBinding($0.id)) })
 		var beforeProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
 		if let eventValue { beforeProperties["\(action.host)\u{0}value"] = eventValue }
 		if action.event == .input { edited[action.host] = action.value ?? "" }
@@ -463,7 +519,13 @@ public final class NativeRuntime {
 			guard let form = forms[formId] else { throw RuntimeError(reason: "\(formId) is not a form") }
 			if let submitter, try attributeNow(submitter, "disabled") != nil { return nil }
 			if let invalid = try firstInvalid(form, submitter: submitter) {
-				later.append(.invalid(node: invalid.node, message: invalid.missing))
+				guard let missing else { throw RuntimeError(reason: "the payload has no message for a \(invalid.kind.rawValue) missing its value") }
+				let message = switch invalid.kind {
+				case .text, .hidden: missing.text
+				case .checkbox: missing.checkbox
+				case .radio: missing.radio
+				}
+				later.append(.invalid(node: invalid.node, message: message))
 				return nil
 			}
 			let sent = try self.entries(of: formId)
@@ -497,6 +559,14 @@ public final class NativeRuntime {
 					commands.append(.command(node: node, command: command, preventScroll: preventScroll))
 				case let .submit(form, submitter):
 					if let taken = try submit(form, submitter, context) { return taken }
+				case let .tick(node):
+					guard case let .element(_, attributes, _) = nodesById[node]?.kind else { throw RuntimeError(reason: "\(node) is not an element") }
+					let members = attributes["type"] == "radio" ? try group(of: node) : []
+					if members.isEmpty {
+						checkedness[node] = !(try isChecked(node))
+					} else {
+						for member in members { checkedness[member.id] = member.id == node }
+					}
 				case let .after(msExpr, capture, ops):
 					let ms = try evaluate(msExpr, in: scope)
 					var locals = context.locals
@@ -555,6 +625,14 @@ public final class NativeRuntime {
 				}
 			}
 		}
+		// A `checked` binding whose value changed sets the checkedness, as the web's property write does.
+		for node in ticked {
+			if let bound = try checkedBinding(node.id), bound != bindingsBefore[node.id] ?? nil { checkedness[node.id] = bound }
+		}
+		let checks = try ticked.compactMap { node -> NativeJournalEntry? in
+			guard try isShown(node.arm), let now = checkedness[node.id], checkedBefore[node.id] != now else { return nil }
+			return .checked(node: node.id, value: now)
+		}
 		let afterMarks = marks()
 		let marked = afterMarks.compactMap { mark -> NativeJournalEntry? in
 			guard beforeMarks["\(mark.node)\u{0}\(mark.name)"] != mark.value else { return nil }
@@ -562,6 +640,6 @@ public final class NativeRuntime {
 		}
 		// A field whose binding wrote it shows that value now, not what was typed before.
 		for case let .property(node, _, _) in entries { edited[node] = nil }
-		return styles + entries + marked + commands + later
+		return styles + entries + checks + marked + commands + later
 	}
 }

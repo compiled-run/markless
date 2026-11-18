@@ -891,13 +891,9 @@ export function Signup() @{
 			{
 				node: 'h0',
 				fields: [
-					{ node: 'h1', kind: 'text', missing: 'Please fill out this field.' },
-					{ node: 'h2', kind: 'hidden', missing: '' },
-					{
-						node: 'h3',
-						kind: 'checkbox',
-						missing: 'Please check this box if you want to proceed.',
-					},
+					{ node: 'h1', kind: 'text' },
+					{ node: 'h2', kind: 'hidden' },
+					{ node: 'h3', kind: 'checkbox' },
 				],
 				submitters: ['h5'],
 			},
@@ -982,7 +978,7 @@ export function Forms() @{
 		<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget, null).get('x')); }}>
 			<input type="email" name="x" />
 			<input name="code" pattern="[0-9]+" />
-			<input type="checkbox" name="agree" />
+			<input type="radio" name={sent} />
 			<button type="reset">Clear</button>
 			<button formaction="/elsewhere">Go</button>
 		</form>
@@ -995,7 +991,7 @@ export function Forms() @{
 			'the submit handler on the <form> h4 does not call `event.preventDefault()` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for',
 			'the <input> h7 in the <form> h6 is an <input type="email">, which no native host draws or checks yet',
 			'the <input> h8 in the <form> h6 has `pattern`, which the web checks before a submit and no native host checks yet',
-			"the <input> h9 in the <form> h6 is a checkbox a person ticks, which no native host draws yet; the checkbox and toggle families' field parts work",
+			'the <input> h9 in the <form> h6 binds the `name` of a radio button, which a native build reads only as written',
 			'the <button> h10 in the <form> h6 is a reset button, which a native build has no lowering for yet',
 			'the <button> h11 in the <form> h6 has `formaction`, which says where the web sends the form; a phone app has no server to send it to',
 		]);
@@ -1102,6 +1098,60 @@ export function Waits() @{
 			'the submit handler awaits inside an `if`, a loop or a called function; a native build awaits only at the top of a handler or of its `try`',
 			'the submit handler awaits inside an expression; a native build awaits only the whole value of a statement',
 			'the submit handler awaits a promise that can fail outside a `try` with a `catch`; on the web the failure shows in the nearest @catch, which a native build has no lowering for yet',
+		]);
+	});
+
+	it('ticks a checkbox or radio button before its click, input and change handlers, and reads its checkedness', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Ticks() @{
+	let note = state('');
+	<main>
+		<input type="checkbox" onClick={() => (note = 'click')} onChange={(event) => (note = \`\${note} \${String(event.currentTarget.checked)} \${event.currentTarget.value}\`)} />
+		<input type="radio" name="size" value="S" onInput={() => (note = 'S')} />
+		<p>{note}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const ops = (host: string) =>
+			payload!.handlers.find(
+				(handler) =>
+					handler.id === payload!.events.find((event) => event.host === host)?.handler,
+			)!.ops;
+		expect(payload!.events.map((event) => [event.host, event.event])).toEqual([
+			['h1', 'activate'],
+			['h2', 'activate'],
+		]);
+		const click = { op: 'assign', cell: 'state:note', value: { literal: 'click' } };
+		expect(ops('h1')).toEqual([
+			{ op: 'tick', node: 'h1' },
+			click,
+			{
+				op: 'assign',
+				cell: 'state:note',
+				value: {
+					template: [
+						'',
+						{ cell: 'state:note' },
+						' ',
+						{ call: 'String', arguments: [{ checked: 'h1' }] },
+						' ',
+						{ logical: '??', left: { literal: null }, right: { literal: 'on' } },
+						'',
+					],
+				},
+			},
+		]);
+		// A radio button already checked is not ticked again, and its input and change handlers do not run.
+		expect(ops('h2')).toEqual([
+			{
+				op: 'if',
+				test: { checked: 'h2' },
+				whenTrue: [],
+				whenFalse: [
+					{ op: 'tick', node: 'h2' },
+					{ op: 'assign', cell: 'state:note', value: { literal: 'S' } },
+				],
+			},
 		]);
 	});
 });

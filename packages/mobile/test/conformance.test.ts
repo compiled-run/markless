@@ -41,7 +41,7 @@ describe('native conformance vectors', () => {
 				source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
 			});
 			expect(committed(`${entry.name}.json`), entry.name).toEqual(
-				nativeConformance(payload!, entry.actions, entry.params),
+				nativeConformance(payload!, entry.actions, entry.params, entry.preferredLanguages),
 			);
 		}
 	});

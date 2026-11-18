@@ -55,6 +55,11 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"timer\",\"timer\":${jsonString(node)},\"ms\":${jsonValue(JsValue.Num(ms))}}"
 	}
 
+	/** A checkbox's or radio button's checkedness changed. */
+	data class Check(override val node: String, val checked: Boolean) : JournalEntry {
+		override fun toJson() = "{\"op\":\"property\",\"node\":${jsonString(node)},\"name\":\"checked\",\"value\":$checked}"
+	}
+
 	/** Shows arm [index] of a branch (null: none). */
 	data class Arm(override val node: String, val index: Int?) : JournalEntry {
 		override fun toJson() = "{\"op\":\"arm\",\"node\":${jsonString(node)},\"index\":${index ?: "null"}}"
@@ -69,6 +74,21 @@ fun jsonValue(v: JsValue): String = when (v) {
 	is JsValue.Num -> if (v.value.isNaN() || v.value.isInfinite()) "null" else JsString.number(v.value)
 	is JsValue.Arr -> v.items.joinToString(",", "[", "]", transform = ::jsonValue)
 	is JsValue.Obj -> v.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" }
+}
+
+/**
+ * The locale a browser with these preferred languages shows its own text in, among [available]: the first preference that
+ * matches exactly, then without its script (`zh-Hant-TW` as `zh-TW`), then by language alone; else `en`.
+ */
+fun nativeLocale(preferred: List<String>, available: Collection<String>): String {
+	val byLower = available.associateBy { it.lowercase() }
+	for (wanted in preferred) {
+		val parts = wanted.replace('_', '-').lowercase().split('-')
+		val language = parts[0]
+		val region = parts.drop(1).firstOrNull { it.length != 4 }
+		for (candidate in listOf(parts.joinToString("-"), if (region != null) "$language-$region" else language, language)) byLower[candidate]?.let { return it }
+	}
+	return "en"
 }
 
 /** Where cells with a storage key keep their values across launches. */
@@ -96,7 +116,13 @@ data class Instance(val id: String, val node: Node, val scope: Scope, val rowKey
 data class Row(val key: String, val item: JsValue)
 
 /** Runs handler ops on cells and reports what changed on shown nodes as journal entries, in document order. Free of android.*. */
-class Runtime(val payload: Payload, private val store: Store = MemoryStore(), val params: Map<String, String> = emptyMap()) {
+class Runtime(
+	val payload: Payload,
+	private val store: Store = MemoryStore(),
+	val params: Map<String, String> = emptyMap(),
+	/** The device's preferred languages, most preferred first: the web's messages show in the first one the payload has. */
+	preferredLanguages: List<String> = listOf("en"),
+) {
 	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, c.storageKey?.let(store::get) ?: c.initial) }
 	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
 	private val handlers = payload.handlers.associateBy { it.id }
@@ -113,6 +139,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 			Expr.RouteParams -> JsValue.Obj(params.entries.associateTo(LinkedHashMap()) { it.key to JsValue.Str(it.value) })
 			Expr.EventValue -> JsValue.Str(eventValue ?: throw MarklessRuntimeError("the event value read outside an input handler"))
 			is Expr.FormData -> entriesOf(e.form)
+			is Expr.Checked -> JsValue.Bool(checkedOf(e.node))
 			is Expr.CellRef -> value(e.cell)
 			is Expr.Literal -> e.value
 			is Expr.Item -> scope.items[e.repeat] ?: throw MarklessRuntimeError("the row item of ${e.repeat} read outside its row")
@@ -258,7 +285,29 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 	/** A text field's text: what was typed since its binding last wrote it, else its `value` binding, else its `value` attribute. */
 	fun textOf(id: String): String = edited[id] ?: propertyBinding(id, "value")?.let(::property) ?: attributeNow(id, "value") ?: ""
 
-	fun checkedOf(id: String): Boolean = propertyBinding(id, "checked")?.let { Js.truthy(evaluate(it.value)) } ?: (attributeNow(id, "checked") != null)
+	/** Every non-row checkbox and radio button, in payload order. */
+	private val ticked = payload.nodes.filterIsInstance<Node.Element>().filter { it.element == "input" && it.row == null && it.attributes["type"].let { t -> t == "checkbox" || t == "radio" } }
+
+	private fun checkedBinding(id: String): Boolean? = propertyBinding(id, "checked")?.let { Js.truthy(evaluate(it.value)) }
+
+	/** Each checkbox's and radio button's checkedness: its `checked` binding sets it, as does a person's tick. */
+	private val checkedness = LinkedHashMap<String, Boolean>().apply { for (n in ticked) put(n.id, checkedBinding(n.id) ?: ("checked" in n.attributes)) }
+
+	fun checkedOf(id: String): Boolean = checkedness[id] ?: throw MarklessRuntimeError("\"$id\" is not a checkbox or radio button")
+
+	/** Every shown checkbox's and radio button's checkedness. */
+	fun checks(): List<Pair<String, Boolean>> = ticked.filter(::isShown).map { it.id to checkedOf(it.id) }
+
+	private fun formOf(id: String): String? = payload.forms.firstOrNull { f -> f.fields.any { it.node == id } }?.node
+
+	/** The radio buttons of [id]'s group: the same `name`, in the same form or in none. */
+	private fun groupOf(id: String): List<Node.Element> {
+		val name = attributeNow(id, "name")
+		val form = formOf(id)
+		return ticked.filter { it.id == id || (it.attributes["type"] == "radio" && !name.isNullOrEmpty() && attributeNow(it.id, "name") == name && formOf(it.id) == form) }
+	}
+
+	private val missing: ValueMissing? = payload.valueMissing[nativeLocale(preferredLanguages, payload.valueMissing.keys)]
 
 	private fun entriesOf(id: String): JsValue {
 		val form = forms[id] ?: throw MarklessRuntimeError("\"$id\" is not a form")
@@ -267,7 +316,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 			val name = attributeNow(node, "name")
 			if (!isShown(elementOf(node)) || attributeNow(node, "disabled") != null || name.isNullOrEmpty()) continue
 			val value = when (kind) {
-				FieldKind.Checkbox -> if (checkedOf(node)) attributeNow(node, "value") ?: "on" else continue
+				FieldKind.Checkbox, FieldKind.Radio -> if (checkedOf(node)) attributeNow(node, "value") ?: "on" else continue
 				FieldKind.Hidden -> attributeNow(node, "value") ?: ""
 				FieldKind.Text -> textOf(node)
 			}
@@ -280,8 +329,14 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 	private fun firstInvalid(form: Form, submitter: String?): Field? {
 		if (form.noValidate || (submitter != null && attributeNow(submitter, "formnovalidate") != null)) return null
 		return form.fields.firstOrNull { (node, kind) ->
-			kind != FieldKind.Hidden && isShown(elementOf(node)) && attributeNow(node, "disabled") == null && attributeNow(node, "required") != null &&
-				if (kind == FieldKind.Text) textOf(node) == "" else !checkedOf(node)
+			if (kind == FieldKind.Hidden || !isShown(elementOf(node)) || attributeNow(node, "disabled") != null) return@firstOrNull false
+			// A radio button is missing its value when any button of its group is required and none is checked.
+			val required = if (kind == FieldKind.Radio) groupOf(node).any { attributeNow(it.id, "required") != null } else attributeNow(node, "required") != null
+			required && when (kind) {
+				FieldKind.Radio -> groupOf(node).none { checkedOf(it.id) }
+				FieldKind.Text -> textOf(node) == ""
+				else -> !checkedOf(node)
+			}
 		}
 	}
 
@@ -350,6 +405,8 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		val beforeTexts = texts().toMap()
 		val beforeAttributes = boundAttributes().associate { (n, a, v) -> (n to a) to v }
 		val beforeMarks = marks()
+		val checkedBefore = HashMap(checkedness)
+		val bindingsBefore = ticked.associate { it.id to checkedBinding(it.id) }
 		val beforeProperties = properties().associate { (n, a, v) -> (n to a) to v }.toMutableMap()
 		// The edited field already shows what was typed, so its own value counts as written.
 		if (value != null) beforeProperties[host!! to "value"] = value
@@ -375,6 +432,11 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				}
 				is Op.Command -> commands.add(JournalEntry.Command(op.node, op.command, op.preventScroll))
 				is Op.Submit -> submit(op, locals, later, ::run)?.let { return it }
+				is Op.Tick -> {
+					val group = if (elementOf(op.node).attributes["type"] == "radio") groupOf(op.node) else emptyList()
+					if (group.isEmpty()) checkedness[op.node] = !checkedOf(op.node)
+					else for (member in group) checkedness[member.id] = member.id == op.node
+				}
 				is Op.After -> {
 					val ms = evaluate(op.ms, scope)
 					val captured = LinkedHashMap(locals)
@@ -419,6 +481,9 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				}
 			}
 		}
+		// A `checked` binding whose value changed sets the checkedness, as the web's property write does.
+		for (n in ticked) checkedBinding(n.id)?.let { if (it != bindingsBefore[n.id]) checkedness[n.id] = it }
+		for (n in ticked) if (isShown(n) && checkedBefore[n.id] != checkedness[n.id]) journal.add(JournalEntry.Check(n.id, checkedness.getValue(n.id)))
 		for ((key, v) in marks()) if (beforeMarks[key] != v) journal.add(JournalEntry.Attribute(key.first, key.second, v))
 		// A field whose binding wrote it shows that value now, not what was typed before.
 		for (entry in journal) if (entry is JournalEntry.Property) edited.remove(entry.node)
@@ -430,7 +495,11 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 	private fun submit(op: Op.Submit, locals: Map<String, JsValue>, later: MutableList<JournalEntry>, run: (List<Op>, Map<String, JsValue>, Submission?) -> JournalEntry.Navigate?): JournalEntry.Navigate? {
 		val form = forms[op.form] ?: throw MarklessRuntimeError("\"${op.form}\" is not a form")
 		if (op.submitter != null && attributeNow(op.submitter, "disabled") != null) return null
-		firstInvalid(form, op.submitter)?.let { later.add(JournalEntry.Invalid(it.node, it.missing)); return null }
+		firstInvalid(form, op.submitter)?.let { field ->
+			val messages = missing ?: throw MarklessRuntimeError("the payload has no message for a ${field.kind.wire} missing its value")
+			later.add(JournalEntry.Invalid(field.node, when (field.kind) { FieldKind.Radio -> messages.radio; FieldKind.Checkbox -> messages.checkbox; else -> messages.text }))
+			return null
+		}
 		val sent = jsonValue(entriesOf(op.form))
 		val runs = running[op.form].orEmpty()
 		// The same entries from the same button as a submission still running: the web drops it before any handler hears it.

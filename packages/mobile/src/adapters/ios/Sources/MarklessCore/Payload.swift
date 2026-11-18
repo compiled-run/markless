@@ -40,11 +40,13 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case routeParams
 	/// `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order.
 	case formData(String)
+	/// A checkbox's or radio button's checkedness now.
+	case checked(String)
 
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .eventValue, .local, .item, .routeParams, .formData: return []
+		case .literal, .eventValue, .local, .item, .routeParams, .formData, .checked: return []
 		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner): return inner.cells
 		case let .array(items): return items.flatMap(\.value.cells)
 		case let .object(fields): return fields.flatMap(\.value.cells)
@@ -141,6 +143,8 @@ public enum NativeOp: Equatable, Sendable {
 	case submit(form: String, submitter: String?)
 	/// After `ms`, `ops` run with each captured name read as a local holding its value when this op ran.
 	indirect case after(ms: NativeExpr, capture: [NativeCapture], ops: [NativeOp])
+	/// A press on a checkbox (it flips) or radio button (it is checked, the rest of its group unchecked).
+	case tick(node: String)
 }
 
 public struct NativeCapture: Equatable, Sendable {
@@ -149,7 +153,29 @@ public struct NativeCapture: Equatable, Sendable {
 }
 
 public enum NativeFieldKind: String, Sendable {
-	case text, checkbox, hidden
+	case text, checkbox, radio, hidden
+}
+
+/// What the web says when a required field has no value, in one language.
+public struct NativeValueMissing: Equatable, Sendable {
+	public let text: String
+	public let checkbox: String
+	public let radio: String
+}
+
+/// The language a browser with these preferred languages shows its own text in, among `available`: an exact match, then
+/// without a script subtag (`zh-Hant-TW` as `zh-TW`), then the language alone; else `en`.
+public func nativeLocale(_ preferred: [String], _ available: [String]) -> String {
+	let byLower = Dictionary(available.map { ($0.lowercased(), $0) }, uniquingKeysWith: { $1 })
+	for wanted in preferred {
+		let parts = wanted.replacingOccurrences(of: "_", with: "-").lowercased().split(separator: "-", omittingEmptySubsequences: false).map(String.init)
+		let language = parts[0]
+		let region = parts.dropFirst().first { $0.count != 4 }
+		for candidate in [parts.joined(separator: "-"), region.map { "\(language)-\($0)" } ?? language, language] {
+			if let found = byLower[candidate] { return found }
+		}
+	}
+	return "en"
 }
 
 /// A form's submittable fields and submit buttons, each in tree order.
@@ -157,8 +183,6 @@ public struct NativeForm: Equatable, Sendable {
 	public struct Field: Equatable, Sendable {
 		public let node: String
 		public let kind: NativeFieldKind
-		/// What the web says when this field is required and has no value.
-		public let missing: String
 	}
 
 	public let node: String
@@ -227,6 +251,14 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public let events: [NativeEvent]
 	public let handlers: [NativeHandler]
 	public let forms: [NativeForm]
+	/// What the web says when a required field has no value, by locale, in payload order.
+	public let valueMissing: [(locale: String, messages: NativeValueMissing)]
+
+	public static func == (a: NativeViewPayload, b: NativeViewPayload) -> Bool {
+		a.component == b.component && a.route == b.route && a.cells == b.cells && a.nodes == b.nodes && a.events == b.events
+			&& a.handlers == b.handlers && a.forms == b.forms && a.valueMissing.map(\.locale) == b.valueMissing.map(\.locale)
+			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages)
+	}
 
 	public static func decode(_ data: Data) throws -> NativeViewPayload {
 		try decode(JSONValue.parse(data))
@@ -234,7 +266,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "forms"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "forms", "valueMissing"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
@@ -353,6 +385,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 				case "submit":
 					let opField = try op.object(["op", "form", "submitter"])
 					return .submit(form: try opField["form"].string(), submitter: try opField["submitter"].optionalString())
+				case "tick":
+					return .tick(node: try op.object(["op", "node"])["node"].string())
 				case "after":
 					let opField = try op.object(["op", "ms", "capture", "ops"])
 					let capture = try opField["capture"].array().map { pair -> NativeCapture in
@@ -384,22 +418,29 @@ public struct NativeViewPayload: Equatable, Sendable {
 			return NativeForm(
 				node: try field["node"].string(),
 				fields: try field["fields"].array().map { entry in
-					let f = try entry.object(["node", "kind", "missing"])
+					let f = try entry.object(["node", "kind"])
 					let kind = try f["kind"].string()
 					guard let fieldKind = NativeFieldKind(rawValue: kind) else {
 						throw PayloadError(path: try f["kind"].path, reason: "unknown field kind \"\(kind)\"")
 					}
-					return NativeForm.Field(node: try f["node"].string(), kind: fieldKind, missing: try f["missing"].string())
+					return NativeForm.Field(node: try f["node"].string(), kind: fieldKind)
 				},
 				submitters: try field["submitters"].array().map { try $0.string() },
 				noValidate: try flag("noValidate"), authoredAriaDisabled: try flag("authoredAriaDisabled"))
 		} : []
+		let valueMissing: [(locale: String, messages: NativeValueMissing)] = fields.has("valueMissing") ? try {
+			let reader = try fields["valueMissing"]
+			return try reader.keys().map { locale in
+				let m = try reader.field(locale).object(["text", "checkbox", "radio"])
+				return (locale, NativeValueMissing(text: try m["text"].string(), checkbox: try m["checkbox"].string(), radio: try m["radio"].string()))
+			}
+		}() : []
 		let route: NativeRoute? = fields.has("route") ? try {
 			let r = try fields["route"].object(["pattern", "params"])
 			return NativeRoute(pattern: try r["pattern"].string(), params: try r["params"].array().map { try $0.string() })
 		}() : nil
 		let payload = NativeViewPayload(
-			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers, forms: forms)
+			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers, forms: forms, valueMissing: valueMissing)
 		try payload.check()
 		return payload
 	}
@@ -479,6 +520,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			return .routeParams
 		case ["item"]: return .item(try field("item").string())
 		case ["formData"]: return .formData(try field("formData").string())
+		case ["checked"]: return .checked(try field("checked").string())
 		case ["arguments", "call"]:
 			let name = try field("call").string()
 			guard let builtin = NativeBuiltin(rawValue: name) else { throw PayloadError(path: reader.path + ".call", reason: "unknown call \"\(name)\"") }

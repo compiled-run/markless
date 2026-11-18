@@ -8,6 +8,7 @@ import type {
 	NativeValue,
 	NativeViewPayload,
 } from '@markless/serializer';
+import { nativeLocale } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 
 /** A host-side action: what a person does to a retained view. */
@@ -32,6 +33,8 @@ export type NativeScope = {
 	readonly params?: Readonly<Record<string, string>>;
 	/** A form's entries now, for `{ formData }`. */
 	readonly formData?: (form: string) => Value;
+	/** A checkbox's or radio button's checkedness now, for `{ checked }`. */
+	readonly checked?: (node: string) => boolean;
 };
 
 const EMPTY_SCOPE: NativeScope = { items: new Map(), locals: new Map() };
@@ -51,6 +54,8 @@ export type NativeRuntime = {
 	readonly arms: () => ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Every shown list's row keys, in order. */
 	readonly rows: () => ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
+	/** Every shown checkbox's and radio button's checkedness. */
+	readonly checks: () => ReadonlyArray<readonly [node: string, checked: boolean]>;
 	/** Runs the handler bound to the action and returns the journal the host applies. */
 	readonly dispatch: (action: NativeAction) => ReadonlyArray<NativeJournalEntry>;
 };
@@ -116,6 +121,7 @@ export function evaluateNativeExpr(
 								),
 							]),
 							...(scope.formData ? { formData: scope.formData } : {}),
+							...(scope.checked ? { checked: scope.checked } : {}),
 						})
 				: evaluate(argument),
 		);
@@ -138,6 +144,11 @@ export function evaluateNativeExpr(
 	}
 	if ('cell' in expr) return read(expr.cell);
 	if ('literal' in expr) return expr.literal;
+	if ('checked' in expr) {
+		if (!scope.checked)
+			throw new Error(`the checkedness of ${expr.checked} read outside a runtime`);
+		return scope.checked(expr.checked);
+	}
 	if ('formData' in expr) {
 		if (!scope.formData)
 			throw new Error(`the entries of ${expr.formData} read outside a runtime`);
@@ -227,8 +238,15 @@ export function createNativeRuntime(
 	store: Map<string, Value> = new Map(),
 	/** The route params the page opened with. */
 	params: Readonly<Record<string, string>> = {},
+	/** The device's preferred languages, most preferred first: the web's messages are shown in the first one it has. */
+	preferredLanguages: ReadonlyArray<string> = ['en'],
 ): NativeRuntime {
-	const base: NativeScope = { ...EMPTY_SCOPE, params, formData: (form) => entriesOf(form) };
+	const base: NativeScope = {
+		...EMPTY_SCOPE,
+		params,
+		formData: (form) => entriesOf(form),
+		checked: (node) => checkedOf(node),
+	};
 	const values = new Map<string, Value>(
 		payload.cells.map((cell) => [
 			cell.id,
@@ -396,10 +414,50 @@ export function createNativeRuntime(
 		const binding = propertyBinding(id, 'value');
 		return binding ? String(evaluate(binding.value) ?? '') : (attributeNow(id, 'value') ?? '');
 	};
-	const checkedOf = (id: string): boolean => {
+	const ticked = payload.nodes.flatMap((node) =>
+		node.kind === 'element' &&
+		node.element === 'input' &&
+		!node.row &&
+		(node.attributes?.['type'] === 'checkbox' || node.attributes?.['type'] === 'radio')
+			? [node]
+			: [],
+	);
+	const checkedBinding = (id: string) => {
 		const binding = propertyBinding(id, 'checked');
-		return binding ? Boolean(evaluate(binding.value)) : attributeNow(id, 'checked') !== null;
+		return binding ? Boolean(evaluate(binding.value)) : undefined;
 	};
+	/** Each checkbox's and radio button's checkedness: its `checked` binding sets it, as does a person's tick. */
+	const checkedness = new Map(
+		ticked.map(
+			(node) =>
+				[
+					node.id,
+					checkedBinding(node.id) ?? node.attributes?.['checked'] !== undefined,
+				] as const,
+		),
+	);
+	const checkedOf = (id: string): boolean => {
+		if (!checkedness.has(id)) throw new Error(`${id} is not a checkbox or radio button`);
+		return checkedness.get(id)!;
+	};
+	const formOf = (id: string) =>
+		(payload.forms ?? []).find((form) => form.fields.some((field) => field.node === id))
+			?.node ?? null;
+	/** The radio buttons of `id`'s group: the same `name`, in the same form or in none. */
+	const groupOf = (id: string) => {
+		const name = attributeNow(id, 'name');
+		const form = formOf(id);
+		return ticked.filter(
+			(node) =>
+				node.id === id ||
+				(node.attributes?.['type'] === 'radio' &&
+					!!name &&
+					attributeNow(node.id, 'name') === name &&
+					formOf(node.id) === form),
+		);
+	};
+	const messages = payload.valueMissing ?? {};
+	const missing = messages[nativeLocale(preferredLanguages, Object.keys(messages))];
 	function entriesOf(id: string): Value {
 		const form = forms.get(id);
 		if (!form) throw new Error(`${id} is not a form`);
@@ -407,7 +465,7 @@ export function createNativeRuntime(
 			const name = attributeNow(node, 'name');
 			if (!shown(elementOf(node)) || attributeNow(node, 'disabled') !== null || !name)
 				return [];
-			if (kind === 'checkbox')
+			if (kind === 'checkbox' || kind === 'radio')
 				return checkedOf(node) ? [[name, attributeNow(node, 'value') ?? 'on']] : [];
 			return [[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : textOf(node)]];
 		});
@@ -422,8 +480,14 @@ export function createNativeRuntime(
 			return undefined;
 		return form.fields.find(({ node, kind }) => {
 			if (kind === 'hidden' || !shown(elementOf(node))) return false;
-			if (attributeNow(node, 'disabled') !== null || attributeNow(node, 'required') === null)
-				return false;
+			if (attributeNow(node, 'disabled') !== null) return false;
+			// A radio button is missing its value when any button of its group is required and none is checked.
+			const required =
+				kind === 'radio'
+					? groupOf(node).some((member) => attributeNow(member.id, 'required') !== null)
+					: attributeNow(node, 'required') !== null;
+			if (!required) return false;
+			if (kind === 'radio') return groupOf(node).every((member) => !checkedOf(member.id));
 			return kind === 'text' ? textOf(node) === '' : !checkedOf(node);
 		});
 	};
@@ -468,6 +532,8 @@ export function createNativeRuntime(
 		arms,
 		dialogs: () => [...dialogs],
 		rows,
+		checks: () =>
+			ticked.flatMap((node) => (shown(node) ? [[node.id, checkedOf(node.id)] as const] : [])),
 		dispatch(action) {
 			const event =
 				action.event === 'timer'
@@ -491,6 +557,10 @@ export function createNativeRuntime(
 			const beforeTexts = new Map(texts());
 			const beforeAttributes = keyed(attributes());
 			const beforeMarks = marks();
+			const checkedBefore = new Map(checkedness);
+			const bindingsBefore = new Map(
+				ticked.map((node) => [node.id, checkedBinding(node.id)] as const),
+			);
 			// The edited field already shows what was typed, so its own value counts as already written.
 			const beforeProperties = keyed(properties());
 			if (action.event === 'input') {
@@ -523,7 +593,15 @@ export function createNativeRuntime(
 					return undefined;
 				const invalid = firstInvalid(op.form, op.submitter);
 				if (invalid) {
-					later.push({ op: 'invalid', node: invalid.node, message: invalid.missing });
+					if (!missing)
+						throw new Error(
+							`the payload has no message for a ${invalid.kind} missing its value`,
+						);
+					later.push({
+						op: 'invalid',
+						node: invalid.node,
+						message: missing[invalid.kind as 'text' | 'checkbox' | 'radio'],
+					});
 					return undefined;
 				}
 				const sent = JSON.stringify(entriesOf(op.form));
@@ -582,6 +660,17 @@ export function createNativeRuntime(
 					if (op.op === 'submit') {
 						const taken = submit(op, context);
 						if (taken) return taken;
+						continue;
+					}
+					if (op.op === 'tick') {
+						const group =
+							elementOf(op.node).attributes?.['type'] === 'radio'
+								? groupOf(op.node)
+								: [];
+						if (group.length === 0) checkedness.set(op.node, !checkedOf(op.node));
+						else
+							for (const member of group)
+								checkedness.set(member.id, member.id === op.node);
 						continue;
 					}
 					if (op.op === 'after') {
@@ -705,6 +794,24 @@ export function createNativeRuntime(
 					),
 				);
 			});
+			// A `checked` binding whose value changed sets the checkedness, as the web's property write does.
+			for (const node of ticked) {
+				const bound = checkedBinding(node.id);
+				if (bound !== undefined && bound !== bindingsBefore.get(node.id))
+					checkedness.set(node.id, bound);
+			}
+			const checks = ticked.flatMap((node): NativeJournalEntry[] =>
+				shown(node) && checkedBefore.get(node.id) !== checkedness.get(node.id)
+					? [
+							{
+								op: 'property',
+								node: node.id,
+								name: 'checked',
+								value: checkedness.get(node.id)!,
+							},
+						]
+					: [],
+			);
 			const afterMarks = marks();
 			const marked = [...afterMarks].flatMap(([key, value]): NativeJournalEntry[] => {
 				if (beforeMarks.get(key) === value) return [];
@@ -713,7 +820,7 @@ export function createNativeRuntime(
 			});
 			// A field whose binding wrote it shows that value now, not what was typed before.
 			for (const entry of nodes) if (entry.op === 'property') edited.delete(entry.node);
-			return [...styles, ...nodes, ...marked, ...commands, ...later];
+			return [...styles, ...nodes, ...checks, ...marked, ...commands, ...later];
 		},
 	};
 }

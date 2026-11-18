@@ -58,6 +58,8 @@ sealed interface Expr {
 	data object RouteParams : Expr
 	/** `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order. */
 	data class FormData(val form: String) : Expr
+	/** A checkbox's or radio button's checkedness now. */
+	data class Checked(val node: String) : Expr
 }
 
 sealed interface TextPart {
@@ -103,6 +105,8 @@ sealed interface Op {
 	data class Submit(val form: String, val submitter: String?) : Op
 	/** After [ms], [ops] run with each [capture] name holding the value it had when this op ran. */
 	data class After(val ms: Expr, val capture: List<Pair<String, Expr>>, val ops: List<Op>) : Op
+	/** A press on a checkbox (it flips) or a radio button (it is checked, the rest of its group unchecked). */
+	data class Tick(val node: String) : Op
 }
 
 /** A page's route as the router spells it (`/[fruit]`) and its param names. */
@@ -126,10 +130,12 @@ data class Cell(val id: String, val name: String, val initial: JsValue, val stor
 data class Event(val host: String, val event: EventName, val handler: String)
 data class Handler(val id: String, val ops: List<Op>)
 
-enum class FieldKind(val wire: String) { Text("text"), Checkbox("checkbox"), Hidden("hidden") }
+enum class FieldKind(val wire: String) { Text("text"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden") }
 
-/** A form field; [missing] is what the web says when it is required and has no value. */
-data class Field(val node: String, val kind: FieldKind, val missing: String)
+data class Field(val node: String, val kind: FieldKind)
+
+/** What the web says when a required field of each kind has no value, in one language. */
+data class ValueMissing(val text: String, val checkbox: String, val radio: String)
 
 /** A form's submittable fields and submit buttons, each in tree order. */
 data class Form(val node: String, val fields: List<Field>, val submitters: List<String>, val noValidate: Boolean = false, val authoredAriaDisabled: Boolean = false)
@@ -142,13 +148,15 @@ data class Payload(
 	val events: List<Event>,
 	val handlers: List<Handler>,
 	val forms: List<Form> = emptyList(),
+	/** [ValueMissing] by the locale the browser shows its own text in. */
+	val valueMissing: Map<String, ValueMissing> = emptyMap(),
 ) {
 	companion object {
 		fun decode(bytes: ByteArray): Payload = decode(Json.parse(bytes))
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "forms"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "forms", "valueMissing"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -190,7 +198,13 @@ data class Payload(
 			}
 			val forms = root["forms"]?.arr("payload.forms")?.mapIndexed { n, f -> form(f, "forms[$n]") } ?: emptyList()
 			for (f in forms) for (id in listOf(f.node) + f.fields.map { it.node } + f.submitters) if (seen[id] !is Node.Element) throw MarklessDecodeError("form \"${f.node}\" names \"$id\", which is not an element")
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, forms)
+			val valueMissing = root["valueMissing"]?.obj("payload.valueMissing")?.entries?.associateTo(LinkedHashMap()) { (locale, m) ->
+				val mo = m.obj("payload.valueMissing.$locale")
+				mo.only(setOf("text", "checkbox", "radio"), "payload.valueMissing.$locale")
+				fun text(k: String) = mo.field(k, "payload.valueMissing.$locale").str("payload.valueMissing.$locale.$k")
+				locale to ValueMissing(text("text"), text("checkbox"), text("radio"))
+			} ?: emptyMap()
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, forms, valueMissing)
 		}
 
 		fun cellsOf(e: Expr): List<String> = when (e) {
@@ -209,7 +223,7 @@ data class Payload(
 			is Expr.Lambda -> cellsOf(e.body)
 			is Expr.Local, is Expr.Item, Expr.RouteParams -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
-			Expr.EventValue, is Expr.FormData -> emptyList()
+			Expr.EventValue, is Expr.FormData, is Expr.Checked -> emptyList()
 		}
 
 		private val UNARY = setOf("!", "-", "+", "typeof")
@@ -270,6 +284,7 @@ data class Payload(
 				}
 				o.containsKey("route") -> { o.only(setOf("route"), what); oneOf(o, "route", setOf("params"), what); Expr.RouteParams }
 				o.containsKey("event") -> { o.only(setOf("event"), what); oneOf(o, "event", setOf("value"), what); Expr.EventValue }
+				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
 				o.containsKey("formData") -> { o.only(setOf("formData"), what); Expr.FormData(o.field("formData", what).str("$what.formData")) }
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")
 			}
@@ -375,9 +390,9 @@ data class Payload(
 			o.only(setOf("node", "fields", "submitters", "noValidate", "authoredAriaDisabled"), what)
 			val fields = o.field("fields", what).arr("$what.fields").mapIndexed { n, f ->
 				val fo = f.obj("$what.fields[$n]")
-				fo.only(setOf("node", "kind", "missing"), "$what.fields[$n]")
+				fo.only(setOf("node", "kind"), "$what.fields[$n]")
 				val kind = oneOf(fo, "kind", FieldKind.entries.mapTo(HashSet()) { it.wire }, "$what.fields[$n]")
-				Field(fo.field("node", what).str("$what.fields[$n].node"), FieldKind.entries.first { it.wire == kind }, fo.field("missing", what).str("$what.fields[$n].missing"))
+				Field(fo.field("node", what).str("$what.fields[$n].node"), FieldKind.entries.first { it.wire == kind })
 			}
 			val submitters = o.field("submitters", what).arr("$what.submitters").map { it.str("$what.submitters[]") }
 			return Form(o.field("node", what).str("$what.node"), fields, submitters, flag(o, "noValidate", what), flag(o, "authoredAriaDisabled", what))
@@ -423,6 +438,10 @@ data class Payload(
 				o.only(setOf("op", "form", "submitter"), what)
 				val submitter = o.field("submitter", what)
 				return Op.Submit(o.field("form", what).str("$what.form"), if (submitter == Json.Null) null else submitter.str("$what.submitter"))
+			}
+			if (name == "tick") {
+				o.only(setOf("op", "node"), what)
+				return Op.Tick(o.field("node", what).str("$what.node"))
 			}
 			if (name == "after") {
 				o.only(setOf("op", "ms", "capture", "ops"), what)

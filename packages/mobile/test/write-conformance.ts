@@ -16,6 +16,6 @@ for (const entry of CONFORMANCE_CASES) {
 	const file = new URL(`../conformance/${entry.name}.json`, import.meta.url);
 	writeFileSync(
 		file,
-		`${JSON.stringify(nativeConformance(payload, entry.actions, entry.params), null, '\t')}\n`,
+		`${JSON.stringify(nativeConformance(payload, entry.actions, entry.params, entry.preferredLanguages), null, '\t')}\n`,
 	);
 }

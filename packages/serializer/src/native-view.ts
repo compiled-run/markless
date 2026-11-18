@@ -93,7 +93,9 @@ export type NativeExpr =
 	 * out when it is disabled or has no name, a checkbox when it is not checked; a checkbox's value is its `value` attribute
 	 * or "on", a text field's its text now, a hidden input's its `value` attribute.
 	 */
-	| { readonly formData: string };
+	| { readonly formData: string }
+	/** A checkbox's or radio button's checkedness now: what its `checked` binding last set, or a person's tick since. */
+	| { readonly checked: string };
 
 export type NativeTextPart =
 	| { readonly text: string }
@@ -206,6 +208,11 @@ export type NativeOp =
 			readonly capture: ReadonlyArray<readonly [string, NativeExpr]>;
 			readonly ops: ReadonlyArray<NativeOp>;
 	  }
+	/**
+	 * A press on a checkbox or radio button, before its handlers run: a checkbox flips its checkedness, a radio button is
+	 * checked and every other radio button of its group (same `name`, same form or none) unchecked.
+	 */
+	| { readonly op: 'tick'; readonly node: string }
 	/** Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. */
 	| {
 			readonly op: 'navigate';
@@ -243,17 +250,23 @@ export type NativeViewPayload = {
 	}>;
 	/** Forms a `submit` op can submit; absent when there are none. */
 	readonly forms?: ReadonlyArray<NativeForm>;
+	/**
+	 * What the web says when a required field has no value, by the language its browser shows its own text in (Chromium's
+	 * wording); the host picks the device's language. Present with `forms`.
+	 */
+	readonly valueMissing?: Readonly<Record<string, NativeValueMissing>>;
+};
+
+export type NativeValueMissing = {
+	readonly text: string;
+	readonly checkbox: string;
+	readonly radio: string;
 };
 
 /** A form's submittable fields and submit buttons, each in tree order. */
 export type NativeForm = {
 	readonly node: string;
-	readonly fields: ReadonlyArray<{
-		readonly node: string;
-		readonly kind: NativeFieldKind;
-		/** What the web says when this field is required and has no value (Chromium's English text). */
-		readonly missing: string;
-	}>;
+	readonly fields: ReadonlyArray<{ readonly node: string; readonly kind: NativeFieldKind }>;
 	readonly submitters: ReadonlyArray<string>;
 	/** The form's `novalidate`: no field is checked before it submits. */
 	readonly noValidate?: true;
@@ -261,14 +274,35 @@ export type NativeForm = {
 	readonly authoredAriaDisabled?: true;
 };
 
-/** A text field (`<input>` of type text, search or tel), a checkbox, or a hidden input. */
-export type NativeFieldKind = 'text' | 'checkbox' | 'hidden';
+/** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, or a hidden input. */
+export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden';
 
-/** Chromium's English `validationMessage` for a required field with no value, by kind. */
-export const NATIVE_VALUE_MISSING: Readonly<Record<Exclude<NativeFieldKind, 'hidden'>, string>> = {
-	text: 'Please fill out this field.',
-	checkbox: 'Please check this box if you want to proceed.',
-};
+export { NATIVE_VALUE_MISSING_BY_LOCALE } from './native-validation-messages.ts';
+
+/**
+ * The language a browser on a device with these preferred languages shows its own text in, among `available`: the first
+ * preference that matches exactly, then without its script (`zh-Hant-TW` as `zh-TW`), then by language alone; else `en`.
+ */
+export function nativeLocale(
+	preferred: ReadonlyArray<string>,
+	available: ReadonlyArray<string>,
+): string {
+	const byLower = new Map(available.map((locale) => [locale.toLowerCase(), locale]));
+	for (const wanted of preferred) {
+		const parts = wanted.replaceAll('_', '-').toLowerCase().split('-');
+		const language = parts[0]!;
+		const region = parts.slice(1).find((part) => part.length !== 4);
+		for (const candidate of [
+			parts.join('-'),
+			region ? `${language}-${region}` : language,
+			language,
+		]) {
+			const found = byLower.get(candidate);
+			if (found) return found;
+		}
+	}
+	return 'en';
+}
 
 /** One change a host applies to its retained views after a handler runs. */
 export type NativeJournalEntry =
@@ -299,6 +333,13 @@ export type NativeJournalEntry =
 			readonly node: string;
 			readonly name: 'value';
 			readonly value: string;
+	  }
+	/** A checkbox's or radio button's checkedness changed: by a tick, by its `checked` binding, or by another radio's tick. */
+	| {
+			readonly op: 'property';
+			readonly node: string;
+			readonly name: 'checked';
+			readonly value: boolean;
 	  }
 	/** A styled cell's new value: the host moves to Dragon's next style assignment (`next[a][s][v]`) and applies it. */
 	| { readonly op: 'state'; readonly cell: string; readonly value: NativeValue }

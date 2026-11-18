@@ -12,6 +12,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
+import android.os.LocaleList
 import android.os.Looper
 import android.util.Log
 import android.util.TypedValue
@@ -25,6 +26,9 @@ import android.view.inputmethod.EditorInfo
 import android.text.Editable
 import android.text.TextWatcher
 import android.widget.Button
+import android.widget.CheckBox
+import android.widget.CompoundButton
+import android.widget.RadioButton
 import android.widget.EditText
 import android.widget.TextView
 import dev.markless.mobile.core.EventName
@@ -67,9 +71,11 @@ class MarklessHost(
 	store: Store = PreferencesStore(context),
 	/** The route params the page opens with. */
 	params: Map<String, String> = emptyMap(),
+	/** The device's preferred languages, most preferred first, for the web's own messages. */
+	preferredLanguages: List<String> = LocaleList.getDefault().let { list -> (0 until list.size()).map { list[it].toLanguageTag() } },
 ) {
 	val payload: Payload = Payload.decode(payloadBytes)
-	val runtime = Runtime(payload, store, params)
+	val runtime = Runtime(payload, store, params, preferredLanguages)
 	val style: StyleExport? = styleExportBytes?.let { StyleExport.decode(it) }
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val events = payload.events.groupBy { it.host }
@@ -146,6 +152,7 @@ class MarklessHost(
 					for (inst in built.values.sortedBy { order.getValue(it.node.id) }) place(inst, views.getValue(inst.id), st)
 					root.requestLayout()
 				}
+				is JournalEntry.Check -> if (entry.node !in inert) (view(entry.node) as? CompoundButton ?: throw MarklessHostError("journal sets the checkedness of \"${entry.node}\", which is not a checkbox or radio button")).isChecked = entry.checked
 				is JournalEntry.Dialog -> dialog(entry.node, entry.open)
 				is JournalEntry.Command -> command(view(entry.node), entry.command, entry.preventScroll)
 				is JournalEntry.Arm -> {
@@ -272,10 +279,18 @@ class MarklessHost(
 		if (node.row != null && events[node.id].orEmpty().isNotEmpty()) throw MarklessHostError("\"${node.id}\" handles events inside a list row; native-view/0 has no row handlers")
 		// A Button holds one text run; a button with an element inside (a switch's thumb) is a box that reads as a Button.
 		val holdsElements = payload.nodes.any { it.parent == node.id && it is Node.Element }
-		val unseen = node.element == "input" && node.attributes["type"] in UNSEEN_INPUTS
+		val type = node.attributes["type"].takeIf { node.element == "input" }
+		// A family's visually hidden checkbox (aria-hidden) draws nothing; a plain one is a platform control.
+		val unseen = type == "hidden" || (type in TICKABLE && node.attributes["aria-hidden"] == "true")
 		if (unseen) inert.add(inst.id)
-		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (unseen) "unseen" else node.element) {
+		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (unseen) "unseen" else if (type in TICKABLE) type else node.element) {
 			"unseen" -> View(context)
+			// The runtime owns checkedness: the widget never toggles itself, a press dispatches and the journal sets it.
+			"checkbox", "radio" -> (if (type == "radio") object : RadioButton(context) { override fun toggle() {} } else object : CheckBox(context) { override fun toggle() {} }).apply {
+				if (style == null) { minWidth = (48 * dpr).roundToInt(); minHeight = (48 * dpr).roundToInt() }
+				if (node.row == null) isChecked = runtime.checkedOf(node.id)
+				named(this, inst.id)
+			}
 			"box-button" -> MarklessBox(context).apply {
 				isClickable = true; isFocusable = true; named(this, inst.id, control = true)
 				// The stacking layout gives a control the platform's 48 dp touch target, so one with no text yet can be pressed.
@@ -306,7 +321,7 @@ class MarklessHost(
 			else -> MarklessBox(context).apply { named(this, inst.id, heading = node.element in HEADINGS, control = events[node.id].orEmpty().any { it.event == EventName.Activate }, link = node.element == "a") }
 		}
 		views[inst.id] = view
-		if (!unseen) for (b in node.bindings) if (b.property && b.name == "value") (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
+		if (!unseen && type !in TICKABLE) for (b in node.bindings) if (b.property && b.name == "value") (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
 		// A field's `value` attribute is its text until something sets it, as on the web.
 		if (view is EditText && node.bindings.none { it.property && it.name == "value" }) node.attributes["value"]?.let { view.setText(it) }
 		for (e in events[node.id].orEmpty()) when (e.event) {
@@ -619,6 +634,6 @@ class MarklessHost(
 	companion object {
 		const val TAG = "MarklessHost"
 		private val HEADINGS = setOf("h1", "h2", "h3", "h4", "h5", "h6")
-		private val UNSEEN_INPUTS = setOf("checkbox", "hidden")
+		private val TICKABLE = setOf("checkbox", "radio")
 	}
 }

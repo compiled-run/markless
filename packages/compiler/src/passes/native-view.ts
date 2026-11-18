@@ -12,7 +12,7 @@ import type {
 } from '@markless/serializer';
 import {
 	isNativeStyleStateAttribute,
-	NATIVE_VALUE_MISSING,
+	NATIVE_VALUE_MISSING_BY_LOCALE,
 	NATIVE_VIEW_VERSION,
 	type NativeFieldKind,
 	type NativeForm,
@@ -80,7 +80,12 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	click: 'activate',
 	input: 'input',
 	submit: 'submit',
+	// A checkbox's or radio button's change runs after its tick, joined into its press by `wireTicks`.
+	change: 'input',
 };
+
+/** `<input>` types a person ticks: a press checks them before their handlers run. */
+const TICKED_TYPES = new Set(['checkbox', 'radio']);
 
 /** `<input>` types a host draws as a single-line text field; each blocks the return key's submit when a form has two. */
 const TEXT_TYPES = new Set(['text', 'search', 'tel']);
@@ -339,9 +344,7 @@ type Lowered = { readonly ops: NativeOp[]; readonly returns: boolean; readonly a
  * The awaited value of a statement that is an `await` (`await x;`, `y = await x`, `const y = await x`) and the statement
  * that reads it once settled as `name`; undefined when it awaits nothing, null when an `await` sits inside an expression.
  */
-function awaitOf(
-	statement: SemanticHandlerStatement,
-):
+function awaitOf(statement: SemanticHandlerStatement):
 	| {
 			readonly value: SemanticExpression;
 			readonly rewrite: (name: string) => SemanticHandlerStatement[];
@@ -1179,6 +1182,16 @@ export function createNativeViewPayload(
 		return bound[0] ? elementValue(bound[0]) : { literal: null };
 	};
 
+	/** Whether a node is an `<input>` a person ticks: a checkbox or a radio button. */
+	const isTicked = (id: string): boolean => {
+		const node = nodeById().get(id);
+		return (
+			node?.kind === 'element' &&
+			node.element === 'input' &&
+			TICKED_TYPES.has(node.attributes?.['type'] ?? '')
+		);
+	};
+
 	/** Whether `inner` is `outer` or inside it. */
 	const isWithin = (inner: string, outer: string): boolean => {
 		const byId = nodeById();
@@ -1630,6 +1643,16 @@ export function createNativeViewPayload(
 							: refuse(
 									`${what} reads \`.${expression.property}\` of an error; a native build reads its \`message\` and \`name\``,
 								);
+				const element = elementOf(object);
+				if (element !== undefined && isTicked(element)) {
+					if (expression.property === 'checked') return { checked: element };
+					if (expression.property === 'value')
+						return {
+							logical: '??',
+							left: attributeOf(element, 'value'),
+							right: { literal: 'on' },
+						};
+				}
 				return object && { member: object, property: expression.property };
 			}
 			case 'call': {
@@ -2534,7 +2557,7 @@ export function createNativeViewPayload(
 		const inner: Scope =
 			parameter === undefined
 				? { ...scope, ...submitting }
-				: event.eventName === 'input'
+				: event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))
 					? { ...scope, event: parameter }
 					: {
 							...scope,
@@ -3338,6 +3361,7 @@ export function createNativeViewPayload(
 			handlers.splice(handlers.indexOf(handler), 1);
 		}
 	}
+	wireTicks();
 	const forms = wireForms();
 	for (const handler of handlers) {
 		if (mentionsElement(handler.ops))
@@ -3396,8 +3420,63 @@ export function createNativeViewPayload(
 		nodes,
 		events,
 		handlers,
-		...(forms.length > 0 ? { forms } : {}),
+		...(forms.length > 0 ? { forms, valueMissing: NATIVE_VALUE_MISSING_BY_LOCALE } : {}),
 	});
+
+	/**
+	 * A checkbox or radio button is pressed as on the web: the press ticks it, then its click handlers run, then (when the
+	 * tick changed it) its input and change handlers. A radio button already checked only runs its click handlers.
+	 */
+	function wireTicks() {
+		for (const node of nodes) {
+			if (node.kind !== 'element' || node.element !== 'input') continue;
+			const own = pendingHandlers.filter((pending) => pending.host === node.id);
+			if (!isTicked(node.id)) {
+				for (const pending of own)
+					if (pending.event.eventName === 'change')
+						refuse(
+							`the change handler on the <input> ${node.id}: a text field raises it when it loses focus, which a native build has no lowering for yet`,
+							pending.event.handlerSpan,
+						);
+				continue;
+			}
+			if (node.row) continue;
+			for (const pending of own) {
+				events.splice(
+					events.findIndex((entry) => entry.handler === pending.handler.id),
+					1,
+				);
+				handlers.splice(handlers.indexOf(pending.handler), 1);
+			}
+			const opsOf = (name: string) =>
+				own
+					.filter((pending) => pending.event.eventName === name)
+					.flatMap((pending) => pending.handler.ops);
+			const click = opsOf('click');
+			const changed: NativeOp[] = [
+				{ op: 'tick', node: node.id },
+				...click,
+				...opsOf('input'),
+				...opsOf('change'),
+			];
+			const handler = {
+				id: `handler:${node.id}/tick`,
+				ops:
+					node.attributes?.['type'] === 'radio'
+						? [
+								{
+									op: 'if' as const,
+									test: { checked: node.id },
+									whenTrue: click,
+									whenFalse: changed,
+								},
+							]
+						: changed,
+			};
+			events.push({ host: node.id, event: 'activate', handler: handler.id });
+			handlers.push(handler);
+		}
+	}
 
 	/**
 	 * Each form's fields and submit buttons, as the web finds them in tree order. A press on a submit button runs its own
@@ -3495,22 +3574,18 @@ export function createNativeViewPayload(
 						);
 				let kind: NativeFieldKind;
 				if (type === undefined || TEXT_TYPES.has(type)) kind = 'text';
-				else if (type === 'checkbox' && node.attributes?.['aria-hidden'] === 'true')
-					kind = 'checkbox';
-				else if (type === 'hidden') kind = 'hidden';
+				else if (type === 'checkbox' || type === 'radio' || type === 'hidden') kind = type;
 				else {
 					refuse(
-						type === 'checkbox'
-							? `${field} is a checkbox a person ticks, which no native host draws yet; the checkbox and toggle families' field parts work`
-							: `${field} is an <input type="${type}">, which no native host draws or checks yet`,
+						`${field} is an <input type="${type}">, which no native host draws or checks yet`,
 					);
 					continue;
 				}
-				fields.push({
-					node: node.id,
-					kind,
-					missing: kind === 'hidden' ? '' : NATIVE_VALUE_MISSING[kind],
-				});
+				if (kind === 'radio' && attribute(node, 'name') === 'bound')
+					refuse(
+						`${field} binds the \`name\` of a radio button, which a native build reads only as written`,
+					);
+				fields.push({ node: node.id, kind });
 				if (kind === 'text') textFields.push(node.id);
 			}
 			if (!submit) {

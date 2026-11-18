@@ -47,6 +47,8 @@ final class ViewTree {
 	/// What a stopped submit says, shown until the person's next action.
 	private var message: UILabel?
 	private var touches: TouchWatcher?
+	/// Each drawn checkbox (false) or radio button (true) and whether it is checked.
+	private var ticks: [String: (radio: Bool, checked: Bool)] = [:]
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void
@@ -154,6 +156,11 @@ final class ViewTree {
 				guard let label = labels[node] else { throw HostError("journal names text node \(node), which is not shown") }
 				label.text = value
 				if let button = contexts[node]?.button { refreshLabel(of: button) }
+			case let .checked(node, checked):
+				if elements[node] is AbsentField { continue }
+				guard let tick = ticks[node], let view = elements[node] else { throw HostError("journal names checkbox \(node), which is not shown") }
+				ticks[node] = (tick.radio, checked)
+				drawTick(node, view)
 			case let .property(node, _, value):
 				if elements[node] is AbsentField { continue }
 				guard let field = elements[node] as? UITextField else { throw HostError("journal names input \(node), which is not a shown field") }
@@ -355,8 +362,18 @@ final class ViewTree {
 					control.isAccessibilityElement = true
 					control.accessibilityTraits = element == "a" ? .link : .button
 					view = control
-				} else if element == "input", ["checkbox", "hidden"].contains(staticAttributes["type"]) {
+				} else if element == "input", staticAttributes["type"] == "hidden"
+					|| (["checkbox", "radio"].contains(staticAttributes["type"]) && staticAttributes["aria-hidden"] == "true")
+				{
 					view = AbsentField()
+				} else if element == "input", ["checkbox", "radio"].contains(staticAttributes["type"]) {
+					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
+					if !context.suffix.isEmpty { throw HostError("a checkbox in a list row (\(id)) has no iOS host support yet") }
+					let control = UIButton(type: .custom)
+					control.isAccessibilityElement = true
+					control.accessibilityTraits = staticAttributes["type"] == "checkbox" ? [.button, .toggleButton] : .button
+					ticks[id] = (staticAttributes["type"] == "radio", try runtime.isChecked(id))
+					view = control
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = UITextField()
@@ -519,17 +536,20 @@ final class ViewTree {
 		} else {
 			view.accessibilityTraits.remove(.notEnabled)
 		}
-		if current["role"] == "switch" {
+		if ticks[id] != nil {
+			drawTick(id, view)
+		} else if current["role"] == "switch" {
 			if #available(iOS 17.0, *) { view.accessibilityTraits.insert(.toggleButton) }
 			view.accessibilityValue = current["aria-checked"] == "true" ? "1" : "0"
 			return
-		}
-		if current["aria-pressed"] == "true" || current["aria-selected"] == "true" {
-			view.accessibilityTraits.insert(.selected)
 		} else {
-			view.accessibilityTraits.remove(.selected)
+			if current["aria-pressed"] == "true" || current["aria-selected"] == "true" {
+				view.accessibilityTraits.insert(.selected)
+			} else {
+				view.accessibilityTraits.remove(.selected)
+			}
+			view.accessibilityValue = current["aria-expanded"].map { $0 == "true" ? "expanded" : "collapsed" }
 		}
-		view.accessibilityValue = current["aria-expanded"].map { $0 == "true" ? "expanded" : "collapsed" }
 		view.accessibilityElementsHidden = current["aria-hidden"] == "true"
 		// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
 		if layout == nil, !dialogIds.contains(id) {
@@ -539,6 +559,13 @@ final class ViewTree {
 				if let parent = view.superview, !(parent is UIButton) { stack(parent) }
 			}
 		}
+	}
+
+	private func drawTick(_ id: String, _ view: UIView) {
+		guard let tick = ticks[id], let button = view as? UIButton else { return }
+		let symbol = tick.radio ? (tick.checked ? "largecircle.fill.circle" : "circle") : (tick.checked ? "checkmark.square.fill" : "square")
+		button.setImage(UIImage(systemName: symbol), for: .normal)
+		button.accessibilityValue = tick.checked ? "1" : "0"
 	}
 
 	/// A button reads as its `aria-label`, or else its text in view order.

@@ -34,6 +34,8 @@ function walk(
 		for (const [node, index] of runtime.arms()) chosen.set(node, index);
 		properties.clear();
 		for (const [node, , value] of runtime.properties()) properties.set(node, value);
+		checks.clear();
+		for (const [node, checked] of runtime.checks()) checks.set(node, checked);
 	};
 	const nodeOf = new Map(payload.nodes.map((node) => [node.id, node]));
 	// A closed <dialog> shows nothing (the UA's dialog:not([open]) rule); the journal opens and closes it.
@@ -104,6 +106,7 @@ function walk(
 			: undefined;
 	};
 	const typed = new Map<string, string>();
+	const checks = new Map(runtime.checks());
 	const attributeNow = (id: string, name: string) => {
 		const bound = attributes.get(`${id}\0${name}`);
 		if (bound !== undefined) return bound;
@@ -123,6 +126,8 @@ function walk(
 			else if (entry.op === 'dialog') openDialogs.set(entry.node, entry.open);
 			else if (entry.op === 'attribute')
 				attributes.set(`${entry.node}\0${entry.name}`, entry.value);
+			else if (entry.op === 'property' && entry.name === 'checked')
+				checks.set(entry.node, entry.value);
 			else if (entry.op === 'property') {
 				properties.set(entry.node, entry.value);
 				typed.delete(entry.node);
@@ -252,6 +257,10 @@ function walk(
 			new Map(runtime.attributes().map(([node, name, value]) => [`${node}\0${name}`, value])),
 			`step ${index}: the journal left an attribute stale`,
 		).toEqual(attributes);
+		expect(
+			new Map(runtime.checks()),
+			`step ${index}: the journal left a checkbox stale`,
+		).toEqual(checks);
 		expect(
 			new Map(runtime.properties().map(([node, , value]) => [node, value])),
 			`step ${index}: the journal left a field stale`,

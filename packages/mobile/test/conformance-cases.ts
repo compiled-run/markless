@@ -7,6 +7,8 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	/** For a page: its page file (the router derives the route) and the params it opens with. */
 	readonly page?: string;
 	readonly params?: Readonly<Record<string, string>>;
+	/** The device's preferred languages, when the vector shows a message in one. */
+	readonly preferredLanguages?: ReadonlyArray<string>;
 	readonly actions: ReadonlyArray<NativeAction>;
 }> = [
 	{
@@ -169,6 +171,22 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'enter', host: 'h2' },
 			{ event: 'activate', host: 'h4' },
 			{ event: 'enter', host: 'h2' },
+		],
+	},
+	{
+		name: 'ticks',
+		fixture: 'test/fixtures/Ticks.tsrx',
+		preferredLanguages: ['fr-CA', 'en'],
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h7' },
 		],
 	},
 	{

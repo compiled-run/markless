@@ -17,7 +17,7 @@ import dev.markless.mobile.core.str
 object DeviceConformance {
 	fun run(context: Context, vectorBytes: ByteArray): List<String> {
 		val vector = Json.parse(vectorBytes).obj("vector")
-		val host = MarklessHost(context, canonical(vector.field("payload", "vector")).toByteArray(), store = dev.markless.mobile.core.MemoryStore(), params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap())
+		val host = MarklessHost(context, canonical(vector.field("payload", "vector")).toByteArray(), store = dev.markless.mobile.core.MemoryStore(), params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap(), preferredLanguages = vector["preferredLanguages"]?.arr("preferredLanguages")?.map { it.str("preferredLanguages[]") } ?: listOf("en"))
 		val failures = ArrayList<String>()
 		fun shownTexts(): String = host.runtime.texts().joinToString(",", "[", "]") { (id, _) -> "[${jsonString(id)},${jsonString(if (host.hasView(id)) host.textView(id).text.toString() else "<no view>")}]" }
 		fun structure(where: String) {
@@ -43,6 +43,13 @@ object DeviceConformance {
 			val shown = (host.view(node.str("node")) as EditText).text.toString()
 			if (shown != value.str("value")) failures.add("initial: ${node.str("node")} field shows \"$shown\", expected \"${value.str("value")}\"")
 		}
+		fun checks(where: String) {
+			for ((node, checked) in host.runtime.checks()) {
+				val box = host.view(node) as? android.widget.CompoundButton ?: continue
+				if (box.isChecked != checked) failures.add("$where: $node shows checked=${box.isChecked}, the runtime holds $checked")
+			}
+		}
+		checks("initial")
 		val journal = ArrayList<JournalEntry>()
 		host.onJournal = { journal.addAll(it) }
 		host.onNavigate = { _, _ -> }
@@ -71,7 +78,7 @@ object DeviceConformance {
 			}
 			val runtimeTexts = host.runtime.texts().joinToString(",", "[", "]") { (id, t) -> "[${jsonString(id)},${jsonString(t)}]" }
 			if (shownTexts() != runtimeTexts) failures.add("steps[$n]: views show ${shownTexts()}, the runtime shows $runtimeTexts")
-			if (journal.none { it is JournalEntry.Navigate }) structure("steps[$n]")
+			if (journal.none { it is JournalEntry.Navigate }) { structure("steps[$n]"); checks("steps[$n]") }
 		}
 		host.dismissMessage()
 		return failures

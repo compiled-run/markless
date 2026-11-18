@@ -40,7 +40,7 @@ public final class MarklessViewController: UIViewController {
 		} else if let page = self.payload.route, !page.params.isEmpty {
 			throw HostError("\(page.pattern) needs a route to open at, and none was given")
 		}
-		runtime = NativeRuntime(payload: self.payload, store: store, params: params)
+		runtime = NativeRuntime(payload: self.payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages)
 		super.init(nibName: nil, bundle: nil)
 		try buildPage()
 	}
@@ -95,7 +95,7 @@ public final class MarklessViewController: UIViewController {
 	/// Builds the page at `route` from scratch with `params`; its state starts over.
 	private func navigate(_ route: String, _ params: [NativeRouteParam]) throws {
 		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
-		runtime = NativeRuntime(payload: payload, store: store, params: params)
+		runtime = NativeRuntime(payload: payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages)
 		tree?.unmount()
 		try buildPage()
 		if isViewLoaded { tree?.mount(in: view) }
