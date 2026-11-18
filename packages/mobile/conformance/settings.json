@@ -301,13 +301,28 @@
 		]
 	},
 	"initial": [
-		["h9:text0", "Where you are"],
-		["component-edge:0/h1:text0", "Access unknown"],
-		["component-edge:0/h7:text0", "Locating"]
+		[
+			"h9:text0",
+			"Where you are"
+		],
+		[
+			"component-edge:0/h1:text0",
+			"Access unknown"
+		],
+		[
+			"component-edge:0/h7:text0",
+			"Locating"
+		]
 	],
 	"initialArms": [
-		["component-edge:0/branch-site:0", 1],
-		["component-edge:0/boundary:0", 1]
+		[
+			"component-edge:0/branch-site:0",
+			1
+		],
+		[
+			"component-edge:0/boundary:0",
+			1
+		]
 	],
 	"tasks": [
 		{

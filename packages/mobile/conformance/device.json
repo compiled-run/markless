@@ -106,8 +106,14 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Online"],
-		["h2:text0", "Tapped 0"]
+		[
+			"h1:text0",
+			"Online"
+		],
+		[
+			"h2:text0",
+			"Tapped 0"
+		]
 	],
 	"steps": [
 		{

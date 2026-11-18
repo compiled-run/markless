@@ -9,11 +9,19 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var sides: [Side]?
 	public var font: (family: String, size: Double)?
 	public var textColor: RGBA?
+	/// A dashed or dotted border: Dragon's operations, the four side colours and the device scale they are drawn at.
+	public var dashedBorder: DashedBorder?
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
-			&& a.textColor == b.textColor && a.sides == b.sides
+			&& a.textColor == b.textColor && a.sides == b.sides && a.dashedBorder == b.dashedBorder
+	}
+
+	public struct DashedBorder: Equatable, Sendable {
+		public let ops: BorderOps
+		public let colors: [RGBA]
+		public let scale: Double
 	}
 
 	public struct Side: Equatable, Sendable {
@@ -27,6 +35,8 @@ public struct StyleLayout: Sendable {
 	public let assignments: [[String: ResolvedStyle]]
 	/// Each assignment's canvas: the colour behind the page and the system bars; nil when the export names none (white).
 	public let canvases: [RGBA?]
+	/// Each assignment's body box in points, when body paints its own background there (under an html background).
+	public let bodies: [(frame: Frame, color: RGBA)?]
 	/// The assignment matching the cells' values at mount.
 	public let start: Int
 	/// For each export state, the payload cell it follows, or `@env#band` for the `@media` band.
@@ -86,6 +96,15 @@ extension StyleExport {
 				try resolveNodes(assignments[index].nodes, for: payload, initialTexts: index == start ? initialTexts : nil)
 			},
 			canvases: assignments.map(\.canvas),
+			bodies: try assignments.map { assignment in
+				guard let color = assignment.body else { return nil }
+				let frame = { (id: String) throws -> Frame in
+					guard let frame = assignment.nodes.first(where: { $0.id == id })?.frame else { throw styleError("body paints a background, but the export gives \(id) no box") }
+					return frame
+				}
+				let html = try frame("html"), body = try frame("body")
+				return (Frame(x: (html.x + body.x) / dpr, y: (html.y + body.y) / dpr, width: body.width / dpr, height: body.height / dpr), color)
+			},
 			start: start, stateCells: stateCells, domains: states.map(\.domain), next: next,
 			viewport: viewport, dpr: dpr, fontFiles: fonts, bands: bands)
 	}
@@ -155,7 +174,12 @@ extension StyleExport {
 			case .syntheticBold: throw styleError("\(node.id): synthetic-bold is not implemented on iOS")
 			}
 		}
-		if let widths = node.borderWidths {
+		if let ops = node.borderOps {
+			guard borderColors.count == 4, style.cornerRadius == 0 else {
+				throw styleError("\(node.id): a dashed or dotted border needs four side colours and square corners")
+			}
+			style.dashedBorder = ResolvedStyle.DashedBorder(ops: ops, colors: borderColors, scale: dpr)
+		} else if let widths = node.borderWidths {
 			let all = [widths.top, widths.right, widths.bottom, widths.left]
 			if all.contains(where: { $0 != 0 }) {
 				guard borderStyles.count == 4, borderStyles.allSatisfy({ ["solid", "none", "hidden"].contains($0) }), borderColors.count == 4 else {

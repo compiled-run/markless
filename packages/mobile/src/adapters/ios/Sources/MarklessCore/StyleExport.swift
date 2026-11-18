@@ -26,6 +26,21 @@ public enum StyleWrite: Sendable {
 	case syntheticBold
 }
 
+/// A dashed or dotted border as Dragon's own native paint draws it (its port of Blink's side painter): operations in device px,
+/// with the box's snapped border box at `origin` (relative to the node's frame); `side` names the side whose colour an operation takes.
+public struct BorderOps: Equatable, Sendable {
+	public struct Op: Equatable, Sendable {
+		public let op: String
+		public let side: Int
+		public let alpha: Double
+		public let antialias: Bool
+		public let points: [Double]
+	}
+	public let originX: Double
+	public let originY: Double
+	public let ops: [Op]
+}
+
 public struct StyleNode: Sendable {
 	public let id: String
 	public let parent: String?
@@ -35,6 +50,7 @@ public struct StyleNode: Sendable {
 	public let frame: Frame?
 	public let borderWidths: (top: Double, right: Double, bottom: Double, left: Double)?
 	public let writes: [StyleWrite]
+	public let borderOps: BorderOps?
 }
 
 /// A style state of Dragon's export: the cell it follows (by key) and the values it can take.
@@ -89,7 +105,7 @@ public struct StyleExport: Sendable {
 	public let states: [StyleState]
 	public let initial: Int
 	/// Every reachable combination of states, each a complete node list, with each state's value in it.
-	public let assignments: [(values: [String: NativeValue], nodes: [StyleNode], canvas: RGBA?)]
+	public let assignments: [(values: [String: NativeValue], nodes: [StyleNode], canvas: RGBA?, body: RGBA?)]
 	/// `next[a][s][v]`: the assignment reached from `a` by setting state `s` to its `v`-th value; -1 when unreachable.
 	public let next: [[[Int]]]
 	/// Why Dragon does not call this target shipping output yet; nil when it is `ready`.
@@ -136,14 +152,15 @@ public struct StyleExport: Sendable {
 			let pattern = try f["pattern"].string()
 			_ = (try f["component"].string(), try f["compiler"].string())
 			let assignments: [JSONValue] = try f["assignments"].array().map { assignment in
-				let a = try assignment.object(["values", "nodes", "canvas"])
+				let a = try assignment.object(required: ["values", "nodes", "canvas"], optional: ["bodyBackground"])
 				let nodes: [JSONValue] = try a["nodes"].array().map { node in
 					guard case let .object(entries) = node.value else { throw node.fail("expected an object") }
 					let index = Int(try node.field("writes").number())
 					guard writes.indices.contains(index) else { throw node.fail("writes \(index) is not in the target's writes") }
 					return .object(entries.map { $0.0 == "writes" ? ("writes", writes[index]) : $0 })
 				}
-				return .object([("values", try a["values"].value), ("nodes", .array(nodes)), ("canvas", try a["canvas"].value)])
+				let body: [(String, JSONValue)] = a.has("bodyBackground") ? [("bodyBackground", try a["bodyBackground"].value)] : []
+				return .object([("values", try a["values"].value), ("nodes", .array(nodes)), ("canvas", try a["canvas"].value)] + body)
 			}
 			let raw = { (fields: Fields, key: String) throws -> (String, JSONValue) in (key, try fields[key].value) }
 			var page: [(String, JSONValue)] = [
@@ -195,7 +212,7 @@ public struct StyleExport: Sendable {
 		}
 		var states: [StyleState] = []
 		var initial = 0
-		var assignments: [(values: [String: NativeValue], nodes: [StyleNode], canvas: RGBA?)]
+		var assignments: [(values: [String: NativeValue], nodes: [StyleNode], canvas: RGBA?, body: RGBA?)]
 		var next: [[[Int]]] = [[]]
 		if perState {
 			states = try targetFields["states"].array().map { state in
@@ -203,14 +220,18 @@ public struct StyleExport: Sendable {
 				return StyleState(key: try f["key"].string(), domain: try f["domain"].array().map { NativeValue(json: $0.value) })
 			}
 			assignments = try targetFields["assignments"].array().map { assignment in
-				let f = try assignment.object(required: ["values", "nodes"], optional: ["canvas"])
+				let f = try assignment.object(required: ["values", "nodes"], optional: ["canvas", "bodyBackground"])
 				let valuesReader = try f["values"]
 				var values: [String: NativeValue] = [:]
 				for key in try valuesReader.keys() { values[key] = NativeValue(json: try valuesReader.field(key).value) }
 				guard Set(values.keys) == Set(states.map(\.key)) else { throw PayloadError(path: valuesReader.path, reason: "an assignment's values must name every state") }
 				let canvas = f.has("canvas") ? try decodeColor(try f["canvas"]) : nil
 				if let canvas, canvas.alpha != 255 { throw PayloadError(path: assignment.path + ".canvas", reason: "the canvas is not opaque") }
-				return (values, try checkedNodes(try f["nodes"]), canvas)
+				// body's own background, painted in its box over the canvas; null when it is the canvas.
+				let bodyReader: Reader? = f.has("bodyBackground") ? try f["bodyBackground"] : nil
+				let body = try bodyReader.flatMap { $0.isNull ? nil : try decodeColor($0) }
+				if let body, body.alpha != 255 { throw PayloadError(path: assignment.path + ".bodyBackground", reason: "body's background is not opaque") }
+				return (values, try checkedNodes(try f["nodes"]), canvas, body)
 			}
 			initial = Int(try targetFields["initial"].number())
 			next = try targetFields["next"].array().map { row in try row.array().map { column in try column.array().map { Int(try $0.number()) } } }
@@ -223,7 +244,7 @@ public struct StyleExport: Sendable {
 				throw PayloadError(path: chosen.path, reason: "the next table and initial do not match the assignments and states")
 			}
 		} else {
-			assignments = [([:], try checkedNodes(try targetFields["nodes"]), nil)]
+			assignments = [([:], try checkedNodes(try targetFields["nodes"]), nil, nil)]
 		}
 		var bands: StyleBands?
 		if targetFields.has("bands") {
@@ -249,7 +270,7 @@ public struct StyleExport: Sendable {
 	}
 
 	private static func decodeNode(_ node: Reader) throws -> StyleNode {
-		let field = try node.object(["id", "parent", "kind", "native", "text", "frame", "borderWidths", "writes"])
+		let field = try node.object(required: ["id", "parent", "kind", "native", "text", "frame", "borderWidths", "writes"], optional: ["borderOps"])
 		let kind = try field["kind"].string()
 		let native = try field["native"].string()
 		var isText = false
@@ -274,7 +295,32 @@ public struct StyleExport: Sendable {
 		return StyleNode(
 			id: try field["id"].string(), parent: try field["parent"].optionalString(), isText: isText, isAnonymous: isAnonymous,
 			text: textReader.isNull ? nil : try textReader.string(), frame: frame, borderWidths: borderWidths,
-			writes: try field["writes"].array().map(decodeWrite))
+			writes: try field["writes"].array().map(decodeWrite),
+			borderOps: field.has("borderOps") ? try decodeBorderOps(try field["borderOps"]) : nil)
+	}
+
+	private static func decodeBorderOps(_ reader: Reader) throws -> BorderOps {
+		let f = try reader.object(["origin", "size", "widths", "ops"])
+		let origin = try f["origin"].object(["x", "y"])
+		_ = try f["size"].object(["width", "height"])
+		guard try f["widths"].array().count == 4 else { throw PayloadError(path: reader.path + ".widths", reason: "expected four sides") }
+		let ops = try f["ops"].array().map { op -> BorderOps.Op in
+			let o = try op.object(["op", "side", "alpha", "antialias", "points"])
+			let kind = try o["op"].string()
+			let points = try o["points"].array().map { try $0.number() }
+			let side = Int(try o["side"].number())
+			let shaped: Bool
+			switch kind {
+			case "begin-layer", "end-layer", "save", "restore": shaped = points.isEmpty
+			case "clip": shaped = points.count >= 6 && points.count % 2 == 0
+			case "fill": shaped = points.count >= 6 && points.count % 2 == 0 && (0...3).contains(side)
+			case "dot": shaped = points.count == 3 && (0...3).contains(side)
+			default: throw PayloadError(path: op.path, reason: "unknown border operation \(kind)")
+			}
+			guard shaped else { throw PayloadError(path: op.path, reason: "\(kind) has the wrong points or side") }
+			return BorderOps.Op(op: kind, side: side, alpha: try o["alpha"].number(), antialias: try o["antialias"].bool(), points: points)
+		}
+		return BorderOps(originX: try origin["x"].number(), originY: try origin["y"].number(), ops: ops)
 	}
 
 	private static func decodeWrite(_ write: Reader) throws -> StyleWrite {

@@ -28,6 +28,8 @@ type DragonTarget = {
 		readonly nodes: ReadonlyArray<DragonNode>;
 		/** The colour Chrome paints behind the page (html's background, else body's, else white). */
 		readonly canvas: Json;
+		/** body's own background in its box, when html's is the canvas; null when body paints none. */
+		readonly bodyBackground?: Json;
 	}>;
 	readonly next: Json;
 	readonly bands?: Json;
@@ -56,6 +58,7 @@ export type NativeAppStyleRoute = Omit<
 		readonly values: Json;
 		readonly nodes: ReadonlyArray<Omit<DragonNode, 'writes'> & { readonly writes: number }>;
 		readonly canvas: Json;
+		readonly bodyBackground?: Json;
 	}>;
 };
 
@@ -150,6 +153,9 @@ export function nativeAppStyle(
 					canvas:
 						assignment.canvas ??
 						fail(`${pattern}: the ${name} export's assignment ${index} has no canvas`),
+					...(assignment.bodyBackground === undefined
+						? {}
+						: { bodyBackground: assignment.bodyBackground }),
 					nodes: assignment.nodes.map((node) => ({
 						...node,
 						writes: intern(node.writes),

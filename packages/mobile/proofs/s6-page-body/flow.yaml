@@ -1,0 +1,41 @@
+appId: ${APP_ID}
+name: s6-page-body
+---
+- launchApp:
+      clearState: true
+- setDarkMode: disabled
+- assertVisible: Tide table
+- assertVisible: Open boats
+- assertVisible: Harbour
+- tapOn: Open boats
+- assertNotVisible: Tide table
+- assertVisible: Boats
+- assertVisible: Moorings
+- assertVisible: Three boats are out
+- assertNotVisible: Tide table
+- assertVisible: Boats
+- setDarkMode: enabled
+- assertVisible: Moorings
+- assertVisible: Three boats are out
+- assertVisible: Boats
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertNotVisible: Moorings
+- assertVisible: Harbour
+- assertVisible: Tide table
+- assertVisible: Open boats
+- assertNotVisible: Moorings
+- assertVisible: Harbour
+- setDarkMode: disabled
+- assertVisible: Tide table
+- assertVisible: Open boats
+- assertVisible: Harbour

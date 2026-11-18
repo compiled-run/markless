@@ -1,0 +1,128 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "mk-1m9j6sq"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-1m9j6sq"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Disabled"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "row mk-1m9j6sq"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "button",
+			"parent": "h2",
+			"attributes": {
+				"class": "btn mk-1m9j6sq",
+				"type": "button"
+			},
+			"attributesByState": {
+				"disabled": [
+					{
+						"when": {
+							"state:locked": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:locked": true
+						},
+						"value": ""
+					}
+				]
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Send"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "button",
+			"parent": "h2",
+			"attributes": {
+				"class": "btn mk-1m9j6sq",
+				"type": "button"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Lock"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-1m9j6sq"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Sent 0"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-1m9j6sq"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Send is open"
+		}
+	],
+	"css": ".row.mk-1m9j6sq {\n\t\t\t\tdisplay: flex;\n\t\t\t\tgap: 8px;\n\t\t\t\tpadding: 8px 0;\n\t\t\t}\n\t\t\t.btn.mk-1m9j6sq {\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #e9ecef;\n\t\t\t}\n\t\t\t.btn.mk-1m9j6sq:disabled {\n\t\t\t\tborder-color: #adb5bd;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "state:locked",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		}
+	]
+}

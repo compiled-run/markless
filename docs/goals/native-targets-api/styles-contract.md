@@ -226,6 +226,8 @@ layout, not the component's look. Sizes per run: `proofs/s<n>-*/style-size.json`
 - **`html`/`body` backgrounds.** Closed by S5 (section 6b): Dragon's export gives each assignment its canvas colour and the
   hosts paint it behind the page and the bars.
 
+Dashed and dotted borders (rung u17, branch `cw/dragon-bugs`): Dragon's export now carries, for each box with a visible dashed or dotted side, the drawing operations its own native paint runs (`borderOps`, its port of Blink 145's side painter, every crisp border pixel equal to Chrome's at both proof devices); both hosts draw those operations as they come (iOS a `CALayer`, Android a `Drawable`) and refuse an unknown one by name. A rounded box with a dashed or dotted side stays refused by Dragon's compile (`rounded dashed borders are PNT1b`).
+
 Host gaps found and closed on the way (both platforms): solid border sides that differ (`border-left: 6px solid`) were
 refused ("only four solid sides"); now drawn as one rectangle per side on square boxes (rounded boxes with differing
 sides stay refused). On iOS 26 and later a styled page's root reaches the screen edge, and its keyboard-dismiss pan took

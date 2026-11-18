@@ -1,0 +1,37 @@
+{
+	"rung": 120,
+	"name": "A styled button's disabled look through Dragon: :disabled and Chrome's disabled text colour follow a cell",
+	"steps": [
+		{
+			"visible": ["Disabled", "Send", "Lock", "Sent 0", "Send is open"]
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent 1", "Send is open"],
+			"absent": ["Sent 0"]
+		},
+		{
+			"do": {
+				"tap": "Lock"
+			},
+			"visible": ["Send is locked", "Sent 1"],
+			"absent": ["Send is open"]
+		},
+		{
+			"do": {
+				"tap": "Lock"
+			},
+			"visible": ["Send is open", "Sent 1"],
+			"absent": ["Send is locked"]
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent 2"],
+			"absent": ["Sent 1"]
+		}
+	]
+}

@@ -1,5 +1,5 @@
 import type { NativeArmPlace, NativeViewPayload } from '@markless/serializer';
-import { isNativeStyleStateAttribute } from '@markless/serializer/native-view';
+import { isNativeStyleStateAttribute, nativeExprCells } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeBuild, NativeStylesheet } from './compile.ts';
 import { createNativeRuntime, evaluateNativeExpr, formatNativeValue } from './runtime.ts';
@@ -45,6 +45,11 @@ export type NativeStyleInput = {
 				readonly id: string;
 				readonly parent: string;
 				readonly text: string;
+				/** The text in every combination of `states`, when it reads a state; Dragon lays out each string where it is shown. */
+				readonly textByState?: ReadonlyArray<{
+					readonly when: Readonly<Record<string, NativeStyleValue>>;
+					readonly value: string;
+				}>;
 				readonly arm?: NativeArmPlace;
 		  }
 	>;
@@ -74,7 +79,9 @@ export function nativeStyleInput(
 			`${cell.name} decides a class or a ui-* attribute, but not every value it can hold is known at build time; Dragon needs a finite domain`,
 		);
 	});
-	const combinations: Record<string, NativeStyleValue>[] = states.reduce<Record<string, NativeStyleValue>[]>(
+	const combinations: Record<string, NativeStyleValue>[] = states.reduce<
+		Record<string, NativeStyleValue>[]
+	>(
 		(all, state) =>
 			all.flatMap((partial) =>
 				state.domain.map((value) => ({ ...partial, [state.cell]: value })),
@@ -105,16 +112,49 @@ export function nativeStyleInput(
 				throw new Error(
 					`${payload.component}: styles reach Dragon as one page; a system sheet's content is a second root it does not lay out yet`,
 				);
-			if (node.kind === 'text')
+			if (node.kind === 'text') {
+				const stateCells = new Set(states.map((state) => state.cell));
+				const reads = node.parts.flatMap((part) =>
+					'text' in part
+						? []
+						: 'cell' in part
+							? [part.cell]
+							: [...nativeExprCells(part.expr)],
+				);
+				const follows =
+					!node.arm && reads.length > 0 && reads.every((cell) => stateCells.has(cell));
+				const textByState = follows
+					? combinations.map((when) => ({
+							when,
+							value: node.parts
+								.map((part) =>
+									'text' in part
+										? part.text
+										: formatNativeValue(
+												'cell' in part
+													? when[part.cell]!
+													: evaluateNativeExpr(
+															part.expr,
+															(cell) => when[cell] ?? null,
+														),
+											),
+								)
+								.join(''),
+						}))
+					: [];
 				return [
 					{
 						kind: 'text',
 						id: node.id,
 						parent: node.parent,
 						text: initial.get(node.id) ?? unshownText(node.parts),
+						...(textByState.some((entry) => entry.value !== textByState[0]!.value)
+							? { textByState }
+							: {}),
 						...place,
 					},
 				];
+			}
 			const classBinding = (node.bindings ?? []).find(
 				(binding) => 'attribute' in binding && binding.attribute === 'class',
 			);

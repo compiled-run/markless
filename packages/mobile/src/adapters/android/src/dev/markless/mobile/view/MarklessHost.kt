@@ -229,6 +229,14 @@ class MarklessHost(
 	/** The colour behind the page in the current assignment (the export's canvas, else the web canvas's white); null unstyled. */
 	val canvasColor: Int? get() = style?.let { it.assignments[assignment].canvas?.argb ?: Color.WHITE }
 
+	/** body's own box and colour in the current assignment, in the page's pixels as [rootFrame]; null when body paints none. */
+	val bodyBox: Pair<Rect, Int>? get() = style?.let { st ->
+		val color = st.assignments[assignment].body ?: return@let null
+		val origin = absolutes[assignment]["body"] ?: throw MarklessHostError("body paints a background, but the style export gives it no box")
+		val frame = st.assignments[assignment].byId.getValue("body").frame!!
+		Rect(origin.first.roundToInt(), origin.second.roundToInt(), (origin.first + frame.width).roundToInt(), (origin.second + frame.height).roundToInt()) to color.argb
+	}
+
 	/** Called with [canvasColor] whenever the assignment changes. */
 	var onCanvas: ((Int) -> Unit)? = null
 
@@ -619,6 +627,11 @@ class MarklessHost(
 			return
 		}
 		val bw = s.borderWidths ?: throw MarklessHostError("element \"${s.id}\" has no border widths")
+		s.borderOps?.let { ops ->
+			if (radii?.any { it != 0.0 } == true) throw MarklessHostError("\"${s.id}\" has a dashed or dotted border with rounded corners; Dragon draws none")
+			view.background = DashedBorder(fill ?: 0, ops, colors?.takeIf { it.size == 4 } ?: throw MarklessHostError("\"${s.id}\" has border operations but not four side colours"))
+			return
+		}
 		val st = styles ?: listOf("none", "none", "none", "none")
 		for (x in st) if (x != "none" && x != "hidden" && x != "solid") throw MarklessHostError("\"${s.id}\" has border style \"$x\"; Android draws solid borders only")
 		val widths = listOf(bw.top, bw.right, bw.bottom, bw.left).mapIndexed { i, w -> if (st[i] == "solid") w else 0.0 }
