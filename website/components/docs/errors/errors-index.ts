@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 327,
+	total: 330,
 	guided: 51,
 	groups: [
 		{
@@ -1052,6 +1052,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a component part was served as a page markless_component_part_as_page a markless runtime error from @markless/web.',
 				},
 				{
+					code: 'MARKLESS_COMPONENT_PROP_TAG_UNSUPPORTED',
+					title: 'A component passed as a prop is rendered as a tag',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'a component passed as a prop is rendered as a tag markless_component_prop_tag_unsupported a component passed as a prop is rendered as a tag: a markless build error.',
+				},
+				{
 					code: 'MARKLESS_COMPONENT_BARREL_UNRESOLVED',
 					title: 'A component re-export points nowhere',
 					chip: 'error',
@@ -1276,6 +1284,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'document.tsrx has an event handler markless_router_document_handlers_unsupported a markless runtime error from @markless/router.',
 				},
 				{
+					code: 'MARKLESS_ROUTER_DOCUMENT_SHARED_UNSUPPORTED',
+					title: 'document.tsrx reads shared()',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'document.tsrx reads shared() markless_router_document_shared_unsupported a markless runtime error from @markless/router.',
+				},
+				{
 					code: 'MARKLESS_ROUTER_DOCUMENT_STORAGE_UNSUPPORTED',
 					title: 'document.tsrx uses storage()',
 					chip: 'error',
@@ -1418,6 +1434,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'build error',
 					guided: false,
 					words: 'the browser build failed markless_client_build_failed a markless build tooling error from @markless/bundler.',
+				},
+				{
+					code: 'MARKLESS_CLIENT_BUILD_STALLED',
+					title: 'The browser build stopped making progress',
+					chip: 'error',
+					kind: 'build error',
+					guided: false,
+					words: 'the browser build stopped making progress markless_client_build_stalled a markless build tooling error from @markless/bundler.',
 				},
 				{
 					code: 'MARKLESS_CLIENT_BUILD_PROCESS',
@@ -1815,9 +1839,9 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_SYMBOL_UNKNOWN',
 					title: 'A piece of code is unknown',
 					chip: 'error',
-					kind: 'build error',
+					kind: 'runtime error',
 					guided: false,
-					words: 'a piece of code is unknown markless_symbol_unknown a markless build tooling error from @markless/compiler.',
+					words: 'a piece of code is unknown markless_symbol_unknown a markless runtime error from @markless/web.',
 				},
 				{
 					code: 'MARKLESS_SSR_DATA_CHUNK_MISSING',

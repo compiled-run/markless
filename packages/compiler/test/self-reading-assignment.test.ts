@@ -45,6 +45,13 @@ async function run(source: string, cells: Cells, options: { shown?: Cells; local
 			else if (shown.has(write.graphNodeId)) put(shown, write.graphNodeId, write.path ?? [], write.value);
 			return write.value;
 		},
+		call: (call: { graphNodeId: string; path?: ReadonlyArray<string>; method: string; args: unknown[] }) => {
+			const path = call.path ?? [];
+			const target = structuredClone(at(values.get(call.graphNodeId), path)) as Record<string, (...args: unknown[]) => unknown>;
+			const result = target[call.method]!(...call.args);
+			put(values, call.graphNodeId, path, target);
+			return result;
+		},
 		update: (update: { graphNodeId: string; path?: ReadonlyArray<string>; update: (value: unknown) => unknown }) => {
 			const path = update.path ?? [];
 			const next = update.update(at(values.get(update.graphNodeId), path));
@@ -124,6 +131,7 @@ const updates: ReadonlyArray<Case> = [
 	{ label: 'a multiplying compound assignment with a call', body: 'let n = state(0);', handler: 'n *= event.count() + 1;', before: { n: 5 }, after: { n: 10 }, shown: { n: 3 }, shownAfter: { n: 6 }, calls: 1 },
 	{ label: 'a compound assignment of another state', body: 'let total = state(0); let price = state(0);', handler: 'total += price;', before: { total: 1, price: 2 }, after: { total: 3, price: 2 }, shown: { total: 0 }, shownAfter: { total: 2 } },
 	{ label: 'a compound assignment through a local with a call', body: 'let box = state({ n: 1, inner: { n: 5 } });', handler: 'const inner = box.inner; inner.n += event.next().length;', before: { box: { n: 1, inner: { n: 5 } } }, after: { box: { n: 1, inner: { n: 8 } } }, shown: {}, shownAfter: {}, calls: 1 },
+	{ label: 'a sum of two calls, which run in the order written', body: "let log = state('');", handler: 'const a = () => event.next(); const b = () => event.next(); log = log + a() + b();', before: { log: 'x' }, after: { log: 'xid1id2' }, shown: { log: '' }, shownAfter: { log: 'id1id2' }, calls: 2 },
 	{
 		label: 'a row item compound assignment with a call',
 		body: rowList,
@@ -182,6 +190,11 @@ const writes: ReadonlyArray<Case> = [
 	{ label: 'an and compound assignment with a call', body: "let label = state('');", handler: 'label &&= event.next();', before: { label: 'a' }, after: { label: 'id1' }, shown: { label: '' }, calls: 1 },
 	{ label: 'a nullish fallback that calls', body: 'let items = state<string[] | null>(null);', handler: 'items = items ?? [event.next()];', before: { items: null }, after: { items: ['id1'] }, shown: { items: null }, calls: 1 },
 	{ label: 'an optional call', body: 'let items = state<string[]>([]);', handler: 'items = [...items, event.next?.()];', before: { items: [] }, after: { items: ['id1'] }, shown: { items: [] }, calls: 1 },
+	{ label: 'a compound assignment calling a handler function that writes the state', body: 'let count = state(0);', handler: 'const bump = () => { count = 0; return 1; }; count += bump();', before: { count: 5 }, after: { count: 6 }, shown: { count: 2 } },
+	{ label: 'a self-read calling a handler function declaration that writes the state', body: 'let count = state(0);', handler: 'function bump() { count = 0; return 1; } count = count + bump();', before: { count: 5 }, after: { count: 6 }, shown: { count: 2 } },
+	{ label: 'a compound assignment calling a handler object method that writes the whole state', body: 'let t = state({ n: 0, other: 0 });', handler: 'const ops = { bump() { t = { n: 0, other: 9 }; return 1; } }; t.n += ops.bump();', before: { t: { n: 5, other: 0 } }, after: { t: { n: 6, other: 9 } }, shown: { t: { n: 2, other: 0 } } },
+	{ label: 'a list spread of a handler function that empties the list', body: 'let items = state<string[]>([]);', handler: "const more = () => { items.splice(0); return ['y']; }; items = [...items, ...more()];", before: { items: ['a'] }, after: { items: ['a', 'y'] }, shown: { items: ['s'] } },
+	{ label: 'a list spread of a handler generator that empties the list', body: 'let items = state<string[]>([]);', handler: "function* more() { items = []; yield 'y'; } const it = more(); items = [...items, ...it];", before: { items: ['a'] }, after: { items: ['a', 'y'] }, shown: { items: ['s'] } },
 	{ label: 'an increment inside a callback', body: 'let items = state<number[]>([]);', handler: 'let i = 0; items = items.map((each) => each + i++);', before: { items: [5, 5] }, after: { items: [5, 6] }, shown: { items: [1] } },
 ];
 for (const { label, body, handler, markup, locals, before, after, shown, shownAfter, calls = 0 } of writes)
@@ -202,4 +215,19 @@ test('a list holding a callback that reads the list stays a plain write, and the
 	const stored = values.cbs as Array<() => unknown>;
 	expect(stored).toHaveLength(1);
 	expect(stored[0]!()).toBe(values.cbs);
+});
+
+test('a compound assignment calling a handler method that writes another field of the state still replays', async () => {
+	const source = await handlerSource('let t = state({ n: 0, other: 0 });', 'const ops = { bump() { t.other = 9; return 1; } }; t.n += ops.bump();');
+	expect(source).toMatch(/\.update\(\{ graphNodeId: "state:t", path: \["n"\]/);
+	const result = await run(source, { t: { n: 5, other: 0 } }, { shown: { t: { n: 2, other: 0 } } });
+	expect(result.values).toEqual({ t: { n: 6, other: 9 } });
+	expect(result.shown).toEqual({ t: { n: 3, other: 9 } });
+});
+
+// The handler's value band matches a node to a state read by its text, so a callback parameter named like the state is lowered as a read of it.
+test.fails('a callback parameter named like the state it adds to is the parameter', async () => {
+	const source = await handlerSource('let n = state(0);', 'n = n + [2].reduce((sum, n) => sum + n, 0);');
+	const result = await run(source, { n: 1 });
+	expect(result.values).toEqual({ n: 3 });
 });

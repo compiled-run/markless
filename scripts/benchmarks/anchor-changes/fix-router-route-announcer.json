@@ -1,0 +1,96 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 378,
+			"reason": "the route announcer is inlined in the fragment swap and in spa-navigation, so a navigation fetches no extra file; bench pages load the swap only (+358 B), docs pages load both copies (+820 B) (measured on CI run 44280002177 at df9a34724 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 378,
+			"reason": "the route announcer is inlined in the fragment swap and in spa-navigation, so a navigation fetches no extra file; bench pages load the swap only (+358 B), docs pages load both copies (+820 B) (measured on CI run 44280002177 at df9a34724 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 378,
+			"reason": "the route announcer is inlined in the fragment swap and in spa-navigation, so a navigation fetches no extra file; bench pages load the swap only (+358 B), docs pages load both copies (+820 B) (measured on CI run 44280002177 at df9a34724 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 820,
+			"reason": "the route announcer is inlined in the fragment swap and in spa-navigation, so a navigation fetches no extra file; bench pages load the swap only (+358 B), docs pages load both copies (+820 B) (measured on CI run 44280002177 at df9a34724 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 820,
+			"reason": "the route announcer is inlined in the fragment swap and in spa-navigation, so a navigation fetches no extra file; bench pages load the swap only (+358 B), docs pages load both copies (+820 B) (measured on CI run 44280002177 at df9a34724 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 820,
+			"reason": "the route announcer is inlined in the fragment swap and in spa-navigation, so a navigation fetches no extra file; bench pages load the swap only (+358 B), docs pages load both copies (+820 B) (measured on CI run 44280002177 at df9a34724 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"router/spa-navigation"
+			],
+			"delta": 1701,
+			"reason": "a #/ route render announces the new page to screen readers with its own inline copy of the route announcer (measured on CI run 44280002177)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"router/vite/entries/fragment-entry"
+			],
+			"delta": 1396,
+			"reason": "a fragment swap announces the new page to screen readers with its own inline copy of the route announcer (measured on CI run 44280002177)",
+			"date": "2026-11-18"
+		}
+	]
+}

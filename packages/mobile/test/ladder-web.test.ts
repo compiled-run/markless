@@ -59,28 +59,25 @@ beforeAll(async () => {
 afterAll(() => browser.close(), 60_000);
 
 /**
- * The one-screen rungs of the script ladder share one build, each its own page at `/<folder>`: they bring no route,
- * document, styles or output checks of their own, so one app per rung would only repeat the same build.
+ * A one-screen rung that brings no route, start path, web-only steps, document, styles or components of its own shares
+ * one build with the others like it, each its own page at `/<folder>`: one app per rung would repeat the same build.
  */
+const owns = (folder: string, name: string) => existsSync(join(proofsDir, folder, name));
 const SHARED = (folder: string, rung: LadderRung): boolean =>
-	/^j\d+-/.test(folder) &&
-	!existsSync(join(proofsDir, folder, 'pages')) &&
+	!['pages', 'document.tsrx', 'styles', 'lib'].some((name) => owns(folder, name)) &&
 	rung.route === undefined &&
 	rung.start === undefined &&
-	rung.web === undefined;
+	rung.web === undefined &&
+	![...styleRungFolders(), ...sheetStyleRungFolders()].includes(folder);
 const sharedCleanups: Array<() => Promise<void> | void> = [];
 let shared: Promise<{ origin: string; root: string }> | undefined;
 const serveShared = () =>
 	(shared ??= (async () => {
 		const folders = allRungFolders().filter((folder) => SHARED(folder, readRung(folder)));
-		return serveRung(folders.join('+'), undefined, sharedCleanups, async (root) => {
-			for (const folder of folders) {
-				await mkdir(join(root, 'pages'), { recursive: true });
-				await copyFile(
-					join(proofsDir, folder, 'App.tsrx'),
-					join(root, 'pages', `${folder}.tsrx`),
-				);
-			}
+		return serveRung('shared', undefined, sharedCleanups, async (root) => {
+			await mkdir(join(root, 'pages'), { recursive: true });
+			for (const folder of folders)
+				await copyFile(join(proofsDir, folder, 'App.tsrx'), join(root, 'pages', `${folder}.tsrx`));
 		});
 	})());
 afterAll(async () => {
@@ -93,7 +90,7 @@ async function serveRung(
 	owned = cleanups,
 	placePages?: (root: string) => Promise<void>,
 ): Promise<{ origin: string; root: string }> {
-	const root = await mkdtemp(join(tmpdir(), `markless-ladder-${folder.slice(0, 40)}-`));
+	const root = await mkdtemp(join(tmpdir(), `markless-ladder-${folder}-`));
 	owned.push(() => rm(root, { recursive: true, force: true }));
 	if (placePages) await placePages(root);
 	// A navigation rung is an app of several routes: its pages/ folder is the app's.

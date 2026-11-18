@@ -59,6 +59,14 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 	const batches = graph.pullBeforeRead && (onReadBatches.get(graph) ?? []);
 	if (batches) onReadBatches.set(graph, [...batches, all]);
 	let byNode: import('./resume-sync-computed.ts').RecordsByNode | undefined;
+	const at = (module: NonNullable<typeof syncComputedModule>, computed: DemandRecord) => ({
+		computed,
+		byNode: (byNode ??= module.indexRecordsByNode(all)),
+		graph,
+		root: input.root,
+		loadSymbol: input.loadSymbol,
+		elementHandles: input.elementHandles,
+	});
 	for (const computed of records) {
 		for (const dependency of computed.dependencies ?? []) {
 			input.storeContainerSubscription(
@@ -70,29 +78,40 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 						const done = graph.asyncPlane?.()?.startDerive(computed.graphNodeId);
 						const module = (syncComputedModule ??=
 							await import('./resume-sync-computed.ts'));
-						const refresh = {
-							computed,
-							byNode: (byNode ??= module.indexRecordsByNode(all)),
-							graph,
-							root: input.root,
-							loadSymbol: input.loadSymbol,
-							elementHandles: input.elementHandles,
-						};
 						await (batches && computed.deriveOnRead
-							? module.refreshWhenShown(refresh, onReadBatches.get(graph)!)
-							: module.refreshSyncComputed(refresh)
+							? module.refreshWhenShown(at(module, computed), onReadBatches.get(graph)!)
+							: module.refreshSyncComputed(at(module, computed))
 						).finally(done);
 					},
 				}),
 			);
 		}
 	}
+	// A module constant reads no node, so no write wakes it and the page does not carry it: its first read derives it.
+	const constant =
+		batches &&
+		records.find(
+			(record) =>
+				record.deriveOnRead &&
+				!record.dependencies?.length &&
+				graph.read(record.graphNodeId, []) === undefined,
+		);
 	// An async value's key may read a sync computed nothing derived yet: the async plane derives it now.
-	return (
+	const keys =
 		asyncPlanes.deriveAsyncKeys?.(
 			{ graph, root: input.root, loadSymbol: input.loadSymbol, elementHandles: input.elementHandles },
 			records as never,
 			all,
-		) ?? Promise.resolve()
-	);
+		) ?? Promise.resolve();
+	return constant
+		? import('./resume-sync-computed.ts')
+				.then((module) =>
+					(syncComputedModule ??= module).refreshWhenShown(
+						at(module, constant),
+						onReadBatches.get(graph)!,
+						true,
+					),
+				)
+				.then(() => keys)
+		: keys;
 }

@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { accept } from './cli.mjs';
 import { BUDGETS } from './config.mjs';
 import { evaluate } from './evaluate.mjs';
-import { criticalPathRounds, routeHtml } from './measure.mjs';
+import { criticalPathRounds, routeHtml, splitLoadFiles } from './measure.mjs';
 import { compareCells } from './timing-guard.mjs';
 
 type Json = Record<string, any>;
@@ -648,6 +648,84 @@ describe('G16 load weight', () => {
 		);
 		expect(next.loadWeight).toEqual({
 			[platform]: { 'bench /records': { executedChars: 1_234, jsGzipBytes: 5_678 } },
+		});
+	});
+});
+
+describe('G16 on a page with a <Code> playground', () => {
+	const platform = `${process.platform}-${process.arch}`;
+	const page = { executedChars: 10_000, jsGzipBytes: 150_000 };
+	const prefetch = { jsGzipBytes: 1_300_000 };
+	const withPlayground = (pageBytes: number, playgroundBytes: number) => {
+		const m = measurement();
+		m.sites.bench.routes['/records'].load = {
+			executedChars: page.executedChars,
+			jsGzipBytes: pageBytes,
+			files: ['/build/page.js'],
+			playground: { jsGzipBytes: playgroundBytes, files: ['/assets/compile-worker.js'] },
+		};
+		return m;
+	};
+	const anchors = {
+		loadWeight: {
+			[platform]: { 'bench /records': page, 'bench /records playground': prefetch },
+		},
+	};
+	const g16 = (m: Json, a: Json = anchors) =>
+		evaluate(m, a as never).failures.filter((f: Json) => f.guard === 'G16');
+
+	test("a compiler change that grows only the playground's prefetch leaves the page's own figure alone", () => {
+		expect(g16(withPlayground(page.jsGzipBytes, prefetch.jsGzipBytes + 1_285))).toEqual([]);
+	});
+
+	test("the page's own code still fails one byte past the composition allowance, whatever the playground does", () => {
+		const over = page.jsGzipBytes + BUDGETS.loadDownloadCompositionBytes + 1;
+		const failures = g16(withPlayground(over, prefetch.jsGzipBytes - 5_000));
+		expect(failures).toHaveLength(1);
+		expect(failures[0].message).toMatch(/^bench \/records \(/);
+	});
+
+	test('the playground fails past its own allowance, and without an anchor', () => {
+		const limit = prefetch.jsGzipBytes + BUDGETS.loadPlaygroundGrowthBytes;
+		expect(g16(withPlayground(page.jsGzipBytes, limit))).toEqual([]);
+		const over = g16(withPlayground(page.jsGzipBytes, limit + 1));
+		expect(over).toHaveLength(1);
+		expect(over[0].message).toContain('bench /records playground');
+		const unanchored = structuredClone(anchors);
+		delete unanchored.loadWeight[platform]['bench /records playground'];
+		expect(g16(withPlayground(page.jsGzipBytes, prefetch.jsGzipBytes), unanchored)).toHaveLength(1);
+	});
+
+	test('accept records the page and its playground as two anchors', () => {
+		const next = accept({}, withPlayground(150_010, 1_300_200), 'load', '*', 'test', '2026-11-17');
+		expect(next.loadWeight[platform]).toEqual({
+			'bench /records': { executedChars: page.executedChars, jsGzipBytes: 150_010 },
+			'bench /records playground': { jsGzipBytes: 1_300_200 },
+		});
+		const only = accept({}, withPlayground(1, 1_300_300), 'load', 'bench /records playground', 'test');
+		expect(only.loadWeight[platform]).toEqual({
+			'bench /records playground': { jsGzipBytes: 1_300_300 },
+		});
+	});
+});
+
+describe('splitting what a page fetches at load', () => {
+	const playground = new Set(['/assets/compile-worker.js', '/build/frame.js', '/build/shared.js']);
+	const loaded = ['/assets/compile-worker.js', '/build/frame.js', '/build/page.js', '/build/shared.js'];
+
+	test("a file the playground lists counts as the playground's unless the page's HTML preloads it too", () => {
+		expect(
+			splitLoadFiles(loaded, { playground, preloaded: ['/build/page.js', '/build/shared.js'] }),
+		).toEqual({
+			page: ['/build/page.js', '/build/shared.js'],
+			playground: ['/assets/compile-worker.js', '/build/frame.js'],
+		});
+	});
+
+	test('a site without a playground keeps every file as its own', () => {
+		expect(splitLoadFiles(loaded, { playground: undefined, preloaded: [] })).toEqual({
+			page: loaded,
+			playground: undefined,
 		});
 	});
 });

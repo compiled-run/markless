@@ -138,9 +138,7 @@ for (const mode of ['CSR', 'SSR'] as const) {
 			await followsAndReads(1);
 		});
 
-	// Known defect: the owner's routed props are not on the page when its arm sits in its own @try, so the arm's DOM
-	// updates find no `prop:props` node and the arm never shows.
-	test.fails(`${mode}: in an arm inside its owner's @try, whose owner shares a file with what placed it, every reader follows the prop`, async () => {
+	test(`${mode}: in an arm inside its owner's @try, whose owner shares a file with what placed it, every reader follows the prop`, async () => {
 		const errors = pageErrors();
 		await pages.tryArm[mode]();
 		click('[data-open]');

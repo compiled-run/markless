@@ -42,6 +42,7 @@ import {
 	type PrerenderBoundaryArmRegistration,
 } from '../prerender/staged-boundary-authority.ts';
 import { marklessInstanceScopedLoadSymbol } from './instance-scope.ts';
+import { pageCommentCensus } from '../resume-anchor-census.ts';
 
 let journal: typeof import('../dom-journal.ts') | undefined;
 
@@ -124,6 +125,8 @@ export function resumePrerenderTriggerGroup(
 			dispatchRegistered: false,
 		};
 		stagedContainers.set(page, container);
+		// Records index the served page's comments; a settled arm holding a @try adds more.
+		input.root.__marklessComments ??= pageCommentCensus(input.root, true);
 		attachPrerenderBoundaryAuthority(input.root);
 		releaseRemovedHosts(input, container);
 	}
@@ -552,6 +555,15 @@ function createStagedGraph(container: StagedContainer, local: GraphSegment): Run
 		changed: (change) => {
 			for (const segment of owners(change.graphNodeId)) segment.graph.changed(change);
 		},
+		...(local.graph.defineAsyncComputed
+			? {
+					// An async value a row or arm brings after resume runs in this group's own segment.
+					defineAsyncComputed: (asyncComputed, factory, held) => {
+						local.graphNodeIds.add(asyncComputed.graphNodeId);
+						return local.graph.defineAsyncComputed!(asyncComputed, factory, held);
+					},
+				}
+			: {}),
 		subscribe: (subscription) => local.graph.subscribe(subscription),
 		subscribeJournal: (listener) => local.graph.subscribeJournal(listener),
 		flush: async () => {

@@ -5,16 +5,27 @@ export const RESIDENT_LOAD_MODULE = '@markless/web/fns/resident-load';
 type BoundRoute = {
 	readonly prefix: string;
 	readonly boundSymbols?: Readonly<Record<string, string>>;
+	readonly forwardedSymbols?: Readonly<Record<string, string>>;
 };
 
 function emitReboundSymbolImport(routes: ReadonlyArray<BoundRoute>, reboundName: string): string {
-	return routes.some(hasBoundSymbols)
-		? `import { marklessReboundSymbol as ${reboundName} } from '@markless/web/fns/rebound-symbol';`
+	const names = [
+		...(routes.some(hasBoundSymbols) ? [`marklessReboundSymbol as ${reboundName}`] : []),
+		...(routes.some(hasForwardedSymbols)
+			? [`marklessForwardedSymbol as ${reboundName}Forwarded`]
+			: []),
+	];
+	return names.length > 0
+		? `import { ${names.join(', ')} } from '@markless/web/fns/rebound-symbol';`
 		: '';
 }
 
 function hasBoundSymbols(route: BoundRoute): boolean {
 	return route.boundSymbols !== undefined && Object.keys(route.boundSymbols).length > 0;
+}
+
+function hasForwardedSymbols(route: BoundRoute): boolean {
+	return route.forwardedSymbols !== undefined && Object.keys(route.forwardedSymbols).length > 0;
 }
 
 /**
@@ -33,10 +44,12 @@ export function emitSymbolRouteTable(input: {
 		...new Set(routes.flatMap((route) => (route.importSource ? [route.importSource] : []))),
 	];
 	const keyLists: string[] = [];
-	const rebinds = hasAnyBound(routes);
+	const forwards = routes.some(hasForwardedSymbols);
+	const binds = hasAnyBound(routes);
+	const rebinds = binds || forwards;
 	const table = routes.map(
 		(route) =>
-			`[${JSON.stringify(route.prefix)}, ${route.importSource ? sources.indexOf(route.importSource) : -1}, ${hasBoundSymbols(route) ? boundEntry(route.boundSymbols!, keyLists) : 0}]`,
+			`[${JSON.stringify(route.prefix)}, ${route.importSource ? sources.indexOf(route.importSource) : -1}, ${hasBoundSymbols(route) ? boundEntry(route.boundSymbols!, keyLists) : 0}${hasForwardedSymbols(route) ? `, ${forwardedEntry(route.forwardedSymbols!)}` : ''}]`,
 	);
 	return [
 		emitReboundSymbolImport(routes, reboundName),
@@ -47,23 +60,27 @@ export function emitSymbolRouteTable(input: {
 		keyLists.length > 0 ? `const ${functionName}BoundKeys = [${keyLists.join(', ')}];` : '',
 		`const ${functionName}Routes = [${table.join(', ')}];`,
 		`${input.exported ? 'export ' : ''}function ${functionName}(symbolId${rebinds ? ", consumed = ''" : ''}) {`,
-		`\tfor (const [prefix, at, bound] of ${functionName}Routes) {`,
+		`\tfor (const [prefix, at, bound${forwards ? ', forwarded' : ''}] of ${functionName}Routes) {`,
 		'\t\tif (!symbolId.startsWith(prefix)) continue;',
 		'\t\tconst rest = symbolId.slice(prefix.length);',
 		// A same-module child re-enters the table: what is left can carry another child's path.
 		`\t\tconst unbound = () => at < 0 ? (prefix ? ${functionName}(rest${rebinds ? ', consumed + prefix' : ''}) : ${fallbackName}(rest)) : ${functionName}WhenLoaded(${functionName}Imports[at](), (mod) => mod.loadSymbol ? mod.loadSymbol(rest) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`,
+		// The child's row for a callback this module handed it to forward gives way to this module's row, which binds that callback.
+		forwards
+			? `\t\tconst answer = forwarded ? () => ${reboundName}Forwarded(unbound(), forwarded, consumed + prefix, ${fallbackName}) : unbound;`
+			: '',
 		// A child symbol its edge binds goes through the edge's bound row, or a callback the
 		// child's own child invokes by instance path never sees the captures this edge supplies.
-		rebinds
+		binds
 			? [
 					keyLists.length > 0
 						? `\t\tconst boundId = !bound ? undefined : Array.isArray(bound) ? (${functionName}BoundKeys[bound[1]].includes(rest) ? \`bound:\${encodeURIComponent(rest)}:\${bound[0]}\` : undefined) : Object.hasOwn(bound, rest) ? bound[rest] : undefined;`
 						: '\t\tconst boundId = bound && Object.hasOwn(bound, rest) ? bound[rest] : undefined;',
 					// A bound row is spelled from its module's root, so it is rescoped under every prefix this module's table consumed.
-					`\t\tif (boundId) return ${reboundName}(${fallbackName}(boundId), consumed + prefix, unbound);`,
+					`\t\tif (boundId) return ${reboundName}(${fallbackName}(boundId), consumed + prefix, unbound, boundId);`,
 				].join('\n')
 			: '',
-		'\t\treturn unbound();',
+		`\t\treturn ${forwards ? 'answer' : 'unbound'}();`,
 		'\t}',
 		`\treturn ${fallbackName}(symbolId);`,
 		'}',
@@ -92,6 +109,18 @@ function boundEntry(boundSymbols: Readonly<Record<string, string>>, keyLists: st
 	let index = keyLists.indexOf(keys);
 	if (index < 0) index = keyLists.push(keys) - 1;
 	return `[${JSON.stringify(suffix)}, ${index}]`;
+}
+
+// The composer's row for a forwarded child row is the child's id under the edge's suffix, so a table ships only that suffix when every row agrees.
+function forwardedEntry(forwardedSymbols: Readonly<Record<string, string>>): string {
+	const entries = Object.entries(forwardedSymbols);
+	const [firstKey, firstId] = entries[0]!;
+	const head = `${protocolBoundSymbolPrefix(firstKey)}:`;
+	const suffix = firstId.startsWith(head) ? firstId.slice(head.length) : undefined;
+	return suffix !== undefined &&
+		entries.every(([key, id]) => id === `${protocolBoundSymbolPrefix(key)}:${suffix}`)
+		? JSON.stringify(suffix)
+		: JSON.stringify(forwardedSymbols);
 }
 
 function hasAnyBound(routes: ReadonlyArray<BoundRoute>): boolean {

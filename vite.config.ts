@@ -3,7 +3,11 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve as pathResolve } from 'node:path';
 import { defineConfig } from 'vite-plus';
 import type { PackUserConfig } from 'vite-plus/pack';
+
 import { vitestInstallCacheKey } from './scripts/test-utils/vitest-install-cache-key.ts';
+
+// Tests that build router apps and drive Chromium for the native ladder: their own lane (mobile-hosts.yml), not the unit shards.
+const NATIVE_WEB_TESTS = ['packages/mobile/test/ladder-web.test.ts'];
 
 // Per-package pack configs (QDS buildOrder shape): each package builds from
 // its own directory into its own ./dist so publishConfig.exports can target
@@ -122,6 +126,7 @@ const buildOrder: PackUserConfig[] = [
 			'graph-async-load': './src/graph-async-load.ts',
 			'graph-async-refresh': './src/graph-async-refresh.ts',
 			'graph-held': './src/graph-held.ts',
+			'graph-kept': './src/graph-kept.ts',
 		},
 	}),
 	marklessPack({
@@ -285,6 +290,7 @@ export default defineConfig({
 						'**/node_modules/**',
 						'packages/typescript-plugin/test/completion-matrix.test.ts',
 						'scripts/experiments/**/results/**',
+						...NATIVE_WEB_TESTS,
 					],
 					// One id per run: the typescript-plugin test files build the same
 					// dist/ from separate workers and lock on it to build it once.
@@ -296,6 +302,15 @@ export default defineConfig({
 							? ['scripts/ci/unit-budget-attribution.ts']
 							: []),
 					],
+				},
+			},
+			{
+				plugins: [vitestInstallCacheKey()],
+				test: {
+					name: 'native-web',
+					environment: 'node',
+					include: [...NATIVE_WEB_TESTS],
+					setupFiles: ['scripts/ci/in-worker-build-slot.ts'],
 				},
 			},
 			'packages/vitest-browser/vitest.config.ts',

@@ -3326,7 +3326,7 @@ export function App() @{
 	expect(output.html).toBe(
 		'<section>' +
 			'<!--markless:branch:branch-site:0--><p>Shown</p><!--/markless:branch:branch-site:0-->' +
-			'<!--markless:async:boundary:0--><em>Loading</em><!--/markless:async:boundary:0-->' +
+			'<!--markless:async:boundary:0--><em>ready</em><!--/markless:async:boundary:0-->' +
 			'</section>',
 	);
 	// The runtime's takenArm merges INTO the payload branch records — it must
@@ -3455,15 +3455,14 @@ export function App() @{
 		}
 	)();
 
-	// Exactly two comments wrap only the @pending branch; @try/@catch content
-	// stays out of SSR html until the runtime resolves the boundary.
+	// Exactly two comments wrap only the served arm; a @try reading no async value is settled, so it serves its content.
 	expect(output.html).toBe(
 		'<section>' +
-			'<!--markless:async:boundary:0--><p>Loading</p><!--/markless:async:boundary:0-->' +
+			'<!--markless:async:boundary:0--><p>ready</p><!--/markless:async:boundary:0-->' +
 			'<footer>Done</footer></section>',
 	);
 	// Comments are not elements: the footer's dom-order element index only
-	// counts section, pending <p>, footer.
+	// counts section, the arm's <p>, footer.
 	expect(output.view.locators).toEqual(
 		expect.arrayContaining([expect.objectContaining({ tagName: 'footer', index: 2 })]),
 	);

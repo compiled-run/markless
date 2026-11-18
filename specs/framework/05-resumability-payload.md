@@ -88,7 +88,12 @@ the HTML:
    only when a dependency is written (`03-state-graph.md`). A served value is
    one more envelope in the state arena, so a subtree it shares with a state
    cell is written once in the arena's shared records rather than twice; each
-   envelope still decodes to its own copy.
+   envelope still decodes to its own copy. A computed whose derive reads no
+   graph node and captures nothing from its component (an imported constant,
+   or one built only from module-scope values) is never served, even there: the
+   browser already has its value in the module the derive loads. Resume derives
+   one that only markup reads at its first read, and a keyed `@for` collection
+   when it wires the list.
 2. **Async snapshots** — demanded async computed IDs, dependency keys, request
    versions, status (`pending`, `resolved`, `rejected`), and settled value/error
    data when available. This prevents resume from refetching data the initial

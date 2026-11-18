@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { applyChanges, CHANGES_DIR } from '../anchor-ledger.mjs';
 import { ANCHORS_PATH, ROOT_DIR } from './config.mjs';
+import { PLAYGROUND } from './evaluate.mjs';
 
 export const BASELINE_ENV = 'MARKLESS_PERF_GUARD_BASELINE';
 
@@ -232,10 +233,11 @@ export function ledgerHistory({ root = ROOT_DIR, depth = 300, rev = 'HEAD' } = {
 	};
 }
 
-/** The measured download bytes of one page, or undefined. */
+/** The measured download bytes of one page (`docs /`) or of its playground (`docs / playground`), or undefined. */
 export function measuredDownload(measurement, subject) {
-	const space = subject.indexOf(' ');
-	return measurement?.sites?.[subject.slice(0, space)]?.routes?.[subject.slice(space + 1)]?.load
+	const [site, route, part] = subject.split(' ');
+	const load = measurement?.sites?.[site]?.routes?.[route]?.load;
+	return (part === PLAYGROUND ? load?.playground : part === undefined ? load : undefined)
 		?.jsGzipBytes;
 }
 

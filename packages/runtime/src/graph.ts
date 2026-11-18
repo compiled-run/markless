@@ -64,6 +64,8 @@ export type AsyncComputedPlaneInternals = {
 	readonly hasPendingFlush?: () => boolean;
 	/** False for a value an @if or @switch arm owns once that arm no longer shows; undefined for a value no arm owns. */
 	readonly armShown?: (graphNodeId: string) => boolean | undefined;
+	/** True while a write waits on a pass that has not yet decided the arms, so a branch test may still read as it did before the write. */
+	readonly armsUndecided?: () => boolean;
 };
 
 /** Async computeds, from `@markless/runtime/graph-async`; a graph without async values never loads it. */
@@ -237,7 +239,11 @@ export type DomJournalEntry =
 
 export type DomJournalResult = DomJournalEntry | ReadonlyArray<DomJournalEntry>;
 
-export type DomJournalListener = (entries: ReadonlyArray<DomJournalEntry>) => void | Promise<void>;
+export type DomJournalListener = {
+	(entries: ReadonlyArray<DomJournalEntry>): void | Promise<void>;
+	/** The code applying `entries` needs, a promise while it still loads: a pass waits for it before its commits land. */
+	readonly code?: (entries: ReadonlyArray<DomJournalEntry>) => unknown;
+};
 
 export type RuntimeGraphInput = {
 	readonly cells: ReadonlyArray<RuntimeGraphCell>;
@@ -695,6 +701,14 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			}),
 		);
 
+	const codeTheJournalWaitsOn = (): PromiseLike<unknown>[] =>
+		journal.length === 0
+			? []
+			: journalListeners.flatMap((listener) => {
+					const code = listener.code?.(journal) as PromiseLike<unknown> | undefined;
+					return typeof code?.then === 'function' ? [code] : [];
+				});
+
 	const openPass = (): void => {
 		let start!: () => void;
 		moveFlush(FLUSH_SCHEDULED);
@@ -749,6 +763,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			return hasPendingFlush();
 		},
 		armShown: (graphNodeId) => armShown?.(graphNodeId),
+		armsUndecided() {
+			return dirtyPaths.length > 0 || flushPhase === FLUSH_SCHEDULED || flushPhase === FLUSH_RUNNING || flushPhase === FLUSH_REARMED;
+		},
 	};
 	// Without a plane a graph behaves as it did before reconciliation existed.
 	const plane = input.reconcile?.(internals);
@@ -832,8 +849,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 							else appendJournalResult(journal, entries);
 						}
 					if (commits.length > 0) {
-						// The next round's code loads first, so its journal paints in the task these commits do.
-						const waits = codeThePassWaitsOn();
+						// The next round's code and the journal's own load first, so the journal paints in the task these commits do.
+						const waits = [...codeThePassWaitsOn(), ...codeTheJournalWaitsOn()];
 						if (waits.length > 0) await Promise.all(waits.map((code) => code.then(undefined, () => {})));
 						const landing = paint(() => commits.map((commit) => landCommit(commit)));
 						await notifyJournalListeners();

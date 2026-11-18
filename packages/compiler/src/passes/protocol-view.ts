@@ -29,6 +29,7 @@ import {
 	resolveRowChunkMint,
 	resolveRowComponentMint,
 	rowComponentReadsIndex,
+	slotReadsRow,
 	stepsAfterNestedRows,
 	type RowComponentMint,
 } from './row-mint.ts';
@@ -155,6 +156,7 @@ export function createProtocolViewPayload(
 				),
 				updateSymbolId: boundaryUpdateSymbols(input).get(boundary.id),
 				...rerendersOnRefreshField(input, boundary.id, keyedRepeats),
+				...rowArmRerenderReadsField(input, boundary.id, boundary.asyncReads),
 				...(catchTargets.has(boundary.id) && { catchesHandlers: true as const }),
 				startAnchor: {
 					...boundary.startAnchor,
@@ -643,7 +645,7 @@ function rowSuffixField(
 	repeatId: string,
 	render: { readonly rowStartOffset?: number | 'unknown'; readonly rowEndOffset?: number },
 	enclosingRow: unknown,
-	rowEvents: ReadonlyArray<{ readonly syncPolicy?: unknown }>,
+	rowEvents: ReadonlyArray<{ readonly syncPolicy?: unknown; readonly relayedProp?: string }>,
 ): { readonly rowEndOffset?: number } {
 	const chunks = input.semanticGraph?.markup.chunks;
 	if (
@@ -651,7 +653,7 @@ function rowSuffixField(
 		enclosingRow ||
 		render.rowEndOffset !== undefined ||
 		render.rowStartOffset === 'unknown' ||
-		!rowEvents.some((event) => event.syncPolicy)
+		!rowEvents.some((event) => event.syncPolicy || event.relayedProp)
 	)
 		return {};
 	const after = repeatRowSiblingElements(chunks, repeatId, 'after');
@@ -753,6 +755,64 @@ function rerendersOnRefreshField(
 		(read) => read.armScopeBoundaryId === boundaryId,
 	);
 	return stale || armText ? { rerendersOnRefresh: true } : {};
+}
+
+// A row holding a @try has no row template, so the arm's own text is re-rendered when what it reads is written.
+function rowArmRerenderReadsField(
+	input: ProtocolViewPayloadInput,
+	boundaryId: string,
+	asyncReads: ReadonlyArray<{ readonly graphNodeId: string }>,
+): {
+	readonly rerenderReads?: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>;
+	readonly rerendersOnRefresh?: true;
+} {
+	const data = renderDataOf(input);
+	const tryChunkId = data.boundaries.find((boundary) => boundary.boundaryId === boundaryId)
+		?.armChunkIds.try;
+	const graph = input.semanticGraph;
+	const enclosing = tryChunkId
+		? data.repeats.filter((repeat) => chunkIdsForChunkTree(input, repeat.rowChunkId).includes(tryChunkId))
+		: [];
+	if (!tryChunkId || !graph || enclosing.length === 0) return {};
+	const rowNames = new Set(
+		enclosing.flatMap((repeat) =>
+			rowBoundNames(graph.keyedRepeats.find((candidate) => candidate.id === repeat.repeatId)),
+		),
+	);
+	const settledBy = new Set(asyncReads.map((read) => read.graphNodeId));
+	const reads = new Map<string, { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>();
+	const add = (read: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }) => {
+		if (!settledBy.has(read.graphNodeId)) reads.set(`${read.graphNodeId}:${read.path.join('.')}`, read);
+	};
+	let readsRow = false;
+	for (const chunkId of chunkIdsForChunkTree(input, tryChunkId, new Set(), false)) {
+		const chunk = data.chunks.find((candidate) => candidate.id === chunkId);
+		const slotValue = (slot: SemanticMarkupSlot) =>
+			mintableSlotValue(slot) ??
+			(chunk?.componentName ? expressionSlotValue(slot, graph, chunk.componentName, rowNames) : null);
+		for (const slot of chunk?.slots ?? []) {
+			const branch =
+				slot.kind === 'branch'
+					? data.branches.find((candidate) => candidate.branchSiteId === slot.branchSiteId)
+					: undefined;
+			if (slot.kind === 'branch' && !branch) continue;
+			const shown = branch ? branchTestSlot(branch, slot.coordinate) : slot;
+			const value = branch ? branchTestValue(input, branch, shown, slotValue) : slotValue(slot);
+			if (value && 'graphNodeId' in value) add({ graphNodeId: value.graphNodeId, path: value.graphPath });
+			else if (value && 'reads' in value) for (const read of value.reads ?? []) add(read);
+			readsRow ||= slotReadsRow(shown, rowNames);
+		}
+	}
+	// An item written under its key keeps its row, so an arm reading it is redrawn from the list's write.
+	const asyncNodes = asyncComputedGraphNodeIds(graph);
+	for (const repeat of readsRow ? enclosing : [])
+		if (repeat.collectionGraphNodeId && !asyncNodes.has(repeat.collectionGraphNodeId))
+			add({ graphNodeId: repeat.collectionGraphNodeId, path: repeat.collectionPath });
+	return {
+		...(reads.size > 0 && { rerenderReads: [...reads.values()] }),
+		// Text reading the row has no record to update in place, so a refresh redraws the arm.
+		...(readsRow && { rerendersOnRefresh: true as const }),
+	};
 }
 
 // A nested record's own parent renders once per enclosing row, so it names the outermost
@@ -1000,20 +1060,7 @@ function rowBranchSlot(
 	);
 	if (!branch || branch.update !== 'range' || branch.asyncBoundaryId) return null;
 	if (branch.kind === 'switch' && !branch.armTests) return null;
-	const test: ProtocolRowTemplateSlotValue | null =
-		branch.testReads.length === 1
-			? {
-					graphNodeId: branch.testReads[0]!.graphNodeId,
-					graphPath: browserTestReads(input, branch.testReads)[0]!.path,
-				}
-			: slotValue({
-					kind: 'text',
-					residue: {
-						kind: 'authored-expression',
-						source: branch.armIndexSource ?? branch.testSource,
-					},
-					coordinate: slot.coordinate,
-				} as SemanticMarkupSlot);
+	const test = branchTestValue(input, branch, branchTestSlot(branch, slot.coordinate), slotValue);
 	if (!test) return null;
 	const root = rowBranchIsRow(rowChunk, slot);
 	const unwired = new Set([
@@ -1056,6 +1103,33 @@ function rowBranchSlot(
 		arms,
 		...test,
 	};
+}
+
+// What a branch's test reads, answered like a row slot when the test reads the row's item.
+function branchTestValue(
+	input: ProtocolViewPayloadInput,
+	branch: RenderDataArtifact['branches'][number],
+	test: SemanticMarkupSlot,
+	slotValue: (slot: SemanticMarkupSlot) => ProtocolRowTemplateSlotValue | null,
+): ProtocolRowTemplateSlotValue | null {
+	return branch.testReads.length === 1
+		? {
+				graphNodeId: branch.testReads[0]!.graphNodeId,
+				graphPath: browserTestReads(input, branch.testReads)[0]!.path,
+			}
+		: slotValue(test);
+}
+
+// A branch's test, read as a text slot at the branch's place.
+function branchTestSlot(
+	branch: RenderDataArtifact['branches'][number],
+	coordinate: SemanticMarkupSlot['coordinate'],
+): SemanticMarkupSlot {
+	return {
+		kind: 'text',
+		residue: { kind: 'authored-expression', source: branch.armIndexSource ?? branch.testSource },
+		coordinate,
+	} as SemanticMarkupSlot;
 }
 
 // The branch is everything the row renders, so the arm it shows is the row itself.
@@ -1458,7 +1532,7 @@ function armScopedBranchHostIds(
 	return new Set(
 		renderDataOf(input)
 			.branches.filter(
-				(branch) => branch.asyncBoundaryId === boundaryId && branch.update !== 'boundary',
+				(branch) => branch.asyncBoundaryId === boundaryId && branch.update === 'range',
 			)
 			.flatMap((branch) =>
 				branch.armChunkIds.flatMap((chunkId) => hostIdsForChunkTree(input, chunkId)),
@@ -1466,18 +1540,28 @@ function armScopedBranchHostIds(
 	);
 }
 
-function hostIdsForChunkTree(
+function hostIdsForChunkTree(input: ProtocolViewPayloadInput, chunkId: string): ReadonlyArray<string> {
+	const chunks = renderDataOf(input).chunks;
+	return chunkIdsForChunkTree(input, chunkId).flatMap(
+		(id) => chunks.find((candidate) => candidate.id === id)?.hosts.map((host) => host.hostNodeId) ?? [],
+	);
+}
+
+// `nested` false stops at the lists and @try blocks inside, which keep their own records.
+function chunkIdsForChunkTree(
 	input: ProtocolViewPayloadInput,
 	chunkId: string,
 	seen = new Set<string>(),
+	nested = true,
 ): ReadonlyArray<string> {
 	if (seen.has(chunkId)) return [];
 	seen.add(chunkId);
-	const data = renderDataOf(input);
-	const chunk = data.chunks.find((candidate) => candidate.id === chunkId);
+	const chunk = renderDataOf(input).chunks.find((candidate) => candidate.id === chunkId);
 	if (!chunk) return [];
 	const childChunkIds = chunk.slots.flatMap((slot) => {
 		if (slot.kind === 'branch') return slot.armTemplateIds;
+		if (slot.kind === 'dynamic-host') return [slot.childChunkId];
+		if (!nested) return [];
 		if (slot.kind === 'repeat')
 			return [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])];
 		if (slot.kind === 'async')
@@ -1486,13 +1570,9 @@ function hostIdsForChunkTree(
 				...(slot.armTemplateIds.pending ? [slot.armTemplateIds.pending] : []),
 				...(slot.armTemplateIds.catch ? [slot.armTemplateIds.catch] : []),
 			];
-		if (slot.kind === 'dynamic-host') return [slot.childChunkId];
 		return [];
 	});
-	return [
-		...chunk.hosts.map((host) => host.hostNodeId),
-		...childChunkIds.flatMap((childChunkId) => hostIdsForChunkTree(input, childChunkId, seen)),
-	];
+	return [chunkId, ...childChunkIds.flatMap((id) => chunkIdsForChunkTree(input, id, seen, nested))];
 }
 
 function armScopedBranchRecords(
@@ -1501,7 +1581,8 @@ function armScopedBranchRecords(
 	arm: number,
 ): ReadonlyArray<NonNullable<ProtocolViewArmRecordSet['branches']>[number]> | undefined {
 	const branches = renderDataOf(input).branches.filter(
-		(branch) => branch.asyncBoundaryId === boundaryId && branch.asyncBoundaryArm === arm,
+		(branch) =>
+			branch.asyncBoundaryId === boundaryId && branch.asyncBoundaryArm === arm && branch.update !== 'row-arm',
 	);
 	if (branches.length === 0) return undefined;
 	const branchSymbols = new Map(
@@ -1785,16 +1866,19 @@ function withBehaviorSymbols<Behavior extends { readonly hostNodeId: string }>(
 }
 
 // The analyzer's submit facts for this event's host, carried on its record so the runtime reads no DOM to learn them.
+// `relayedProp`: the handler is the component's own prop handed over as is, so composition gives the record the cancel its parent passed in that prop.
 function submitEventFacts(
 	input: Pick<ProtocolViewPayloadInput, 'semanticGraph'>,
 	event: { readonly hostNodeId: string; readonly eventName: string },
-): ProtocolSubmitEventFacts {
+): ProtocolSubmitEventFacts & { readonly relayedProp?: string } {
 	const same = input.semanticGraph?.events.filter(
 		(candidate) =>
 			candidate.hostNodeId === event.hostNodeId && candidate.eventName === event.eventName,
 	);
 	const inPlace = same?.find((candidate) => candidate.inPlaceSubmit)?.inPlaceSubmit;
+	const relayedProp = same?.find((candidate) => candidate.relayedPropName)?.relayedPropName;
 	return {
+		...(relayedProp && { relayedProp }),
 		...(same?.some((candidate) => candidate.authoredSubmitAriaDisabled) && {
 			authoredSubmitAriaDisabled: true,
 		}),

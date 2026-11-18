@@ -1,6 +1,7 @@
 import { render } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
 import { virtualDriver } from '../../test-support/virtual-driver.ts';
+import { EMPTY_VALUE_TEXT } from './timebox-math.ts';
 import Basic from './scenarios/basic.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
 import Prefilled from './scenarios/prefilled.tsrx';
@@ -135,6 +136,16 @@ test('each box conveys the spinbutton role and which part of the time it holds',
 	// The period box is named for what a person picks in it, not for the Intl part
 	// type it comes from: "dayperiod input" is a spelling nobody says out loud.
 	expectConveys(await readFor([say.spinbutton, 'AM or PM']), [say.spinbutton, 'AM or PM']);
+});
+
+// An empty box has no aria-valuenow; handed none, a platform reader computes 0 and speaks it as a percentage of the bounds.
+test('an empty box conveys that it is empty, never a number', async () => {
+	await open(Basic);
+	const hour = await readFor([say.spinbutton, 'hour input']);
+	expect(hour, `${sr.name} announced "${hour}"`).toContain(EMPTY_VALUE_TEXT);
+	expect(document.querySelector('[data-testid="hourinput"]')?.hasAttribute('aria-valuenow')).toBe(false);
+	const period = await readFor([say.spinbutton, 'AM or PM']);
+	expect(period, `${sr.name} announced "${period}"`).toContain(EMPTY_VALUE_TEXT);
 });
 
 test('a filled box conveys its value and the two bounds it may move between', async () => {
