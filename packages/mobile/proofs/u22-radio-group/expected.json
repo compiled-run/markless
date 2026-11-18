@@ -1,0 +1,42 @@
+{
+	"rung": 122,
+	"name": "@markless/ui radio group: a radio input's focus and key handlers are keyboard-only, so the group builds, and a tap on a trigger chooses (the indicator is aria-hidden, so its text shows in the screenshots only)",
+	"steps": [
+		{
+			"visible": [
+				"Billing",
+				"Billing period",
+				"Pick monthly",
+				"Pick annual",
+				"Pick lifetime",
+				"Size",
+				"Pick small",
+				"Pick large",
+				"Plan: none",
+				"Size: small"
+			],
+			"absent": ["Plan: monthly", "Plan: annual", "Plan: lifetime", "Size: large"]
+		},
+		{
+			"do": {
+				"tap": "Pick annual"
+			},
+			"visible": ["Plan: annual", "Size: small"],
+			"absent": ["Plan: none", "Plan: monthly", "Plan: lifetime", "Size: large"]
+		},
+		{
+			"do": {
+				"tap": "Pick monthly"
+			},
+			"visible": ["Plan: monthly", "Size: small"],
+			"absent": ["Plan: none", "Plan: annual", "Plan: lifetime", "Size: large"]
+		},
+		{
+			"do": {
+				"tap": "Pick large"
+			},
+			"visible": ["Plan: monthly", "Size: large"],
+			"absent": ["Plan: none", "Plan: annual", "Plan: lifetime", "Size: small"]
+		}
+	]
+}

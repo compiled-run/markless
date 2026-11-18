@@ -264,6 +264,35 @@ export function Field() @{
 		);
 	});
 
+	it('leaves out key and focus handlers on a checkbox or radio button, which a tap ticks and no soft keyboard types in', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Choice() @{
+	let note = state('');
+	<main>
+		<input type="radio" aria-label="Small" onFocus={() => (note = 'focus')} onKeyDown={() => (note = 'key')} onChange={() => (note = 'small')} />
+		<input type="checkbox" aria-label="News" onBlur={() => (note = 'blur')} onChange={() => (note = 'news')} />
+		<input type="text" aria-label="Name" onFocus={() => (note = 'typing')} />
+		<p>{note}</p>
+	</main>
+}`);
+		expect(diagnostics.map((d) => [d.code, d.message])).toEqual([
+			[
+				'MARKLESS_NATIVE_KEYBOARD_ONLY',
+				'the focus handler on <input> h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out',
+			],
+			[
+				'MARKLESS_NATIVE_KEYBOARD_ONLY',
+				'the keydown handler on <input> h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out',
+			],
+			[
+				'MARKLESS_NATIVE_KEYBOARD_ONLY',
+				'the blur handler on <input> h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out',
+			],
+			[NATIVE_UNSUPPORTED_CODE, 'the focus event has no native meaning yet'],
+		]);
+		expect(payload).toBeNull();
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{

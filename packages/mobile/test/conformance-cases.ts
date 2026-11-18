@@ -325,6 +325,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'ticked-keys',
+		fixture: 'test/fixtures/TickedKeys.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [
