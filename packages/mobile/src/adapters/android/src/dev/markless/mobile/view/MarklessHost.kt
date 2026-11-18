@@ -127,7 +127,7 @@ class MarklessHost(
 					root.requestLayout()
 				}
 				is JournalEntry.Dialog -> dialog(entry.node, entry.open)
-				is JournalEntry.Command -> command(view(entry.node), entry.command)
+				is JournalEntry.Command -> command(view(entry.node), entry.command, entry.preventScroll)
 				is JournalEntry.Arm -> {
 					if (runtime.node(entry.node) !is Node.Branch) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
 					rebuild()
@@ -327,11 +327,10 @@ class MarklessHost(
 	}
 
 	/** `focus()`: a text field takes the keyboard, anything else TalkBack's cursor; `scrollIntoView()`: its scrolling ancestors bring it on screen. */
-	private fun command(view: View, command: String) {
-		if (command == "scrollIntoView") {
-			view.requestRectangleOnScreen(android.graphics.Rect(0, 0, view.width, view.height), true)
-			return
-		}
+	private fun command(view: View, command: String, preventScroll: Boolean) {
+		// As on the web, focus brings the element into view unless told not to.
+		if (command == "scrollIntoView" || !preventScroll) view.requestRectangleOnScreen(android.graphics.Rect(0, 0, view.width, view.height), true)
+		if (command == "scrollIntoView") return
 		if (view is EditText) {
 			view.requestFocus()
 			(context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).showSoftInput(view, 0)

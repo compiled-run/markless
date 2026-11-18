@@ -182,8 +182,10 @@ element kept as a value past the handler, and `table`, whose `<table>`/`<tr>`/`<
 `command` op (payload, reference runtime, both hosts; vector `commands.json`), journalled after the handler's other entries
 so focus lands once the views show the new state. A text field takes the keyboard (iOS `becomeFirstResponder`, Android
 `requestFocus` and the soft keyboard); anything else takes the screen reader's cursor (VoiceOver `layoutChanged`, TalkBack
-accessibility focus). `scrollIntoView` scrolls the nearest scrolling ancestor; neither host's page scrolls yet, so today it
-changes nothing on a device, which is also what the web does for an element already on screen. Popover's own close part now
+accessibility focus). As on the web, `focus()` also brings the element into view unless `focus({ preventScroll: true })`
+(the op's `preventScroll`), and `scrollIntoView` scrolls the nearest scrolling ancestor. Neither host's page scrolls yet, so
+today the scroll part changes nothing on a device: that is a host gap (a page taller than the screen cannot scroll at all),
+not a decision to differ from the web. Any other option of `focus` or `scrollIntoView` is refused by name. Popover's own close part now
 lowers (`popover.triggerEl?.focus()` is a `command`), but the rung is stopped: `popover.content` handles `dismiss`, which is
 the overlay primitive's (worker ui-overlay holds those files), and that is the only thing the app is refused for. select and
 menu stop on `dismiss` too, and on `<select>`/`<option>` and pointer events. Not provable with Maestro: where screen-reader

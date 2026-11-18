@@ -157,10 +157,11 @@ export type NativeOp =
 	 */
 	| { readonly op: 'dialog'; readonly node: string; readonly method: 'showModal' | 'close' }
 	/**
-	 * `element.focus()` or `element.scrollIntoView()`: the host moves focus (a text field takes the keyboard; anything else
-	 * the screen reader's cursor) or scrolls the element into view, after the handler's writes have reached the views.
+	 * `element.focus()` or `element.scrollIntoView()`, after the handler's writes have reached the views. Focus moves as on
+	 * the web (a text field takes the keyboard; anything else the screen reader's cursor) and scrolls the element into view
+	 * unless `preventScroll` (`focus({ preventScroll: true })`).
 	 */
-	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand }
+	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand; readonly preventScroll?: true }
 	/** Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. */
 	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
 
@@ -195,7 +196,7 @@ export type NativeViewPayload = {
 export type NativeJournalEntry =
 	| { readonly op: 'text'; readonly node: string; readonly value: string }
 	/** A `command` op the handler ran, in order, after every other entry: the views show the new state first. */
-	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand }
+	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand; readonly preventScroll?: true }
 	/** A `<dialog>` opened in the top layer or closed (by an op, or by the host's back gesture as a `cancel`). */
 	| { readonly op: 'dialog'; readonly node: string; readonly open: boolean }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */

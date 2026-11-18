@@ -333,7 +333,7 @@ export function createNativeRuntime(
 			const run = (ops: ReadonlyArray<NativeOp>): NativeJournalEntry | undefined => {
 				for (const op of ops) {
 					if (op.op === 'command') {
-						commands.push({ op: 'command', node: op.node, command: op.command });
+						commands.push({ op: 'command', node: op.node, command: op.command, ...(op.preventScroll ? { preventScroll: true as const } : {}) });
 						continue;
 					}
 					if (op.op === 'navigate')

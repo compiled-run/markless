@@ -128,7 +128,7 @@ public enum NativeOp: Equatable, Sendable {
 	/// `showModal()` (`open`) or `close()` on a `<dialog>`: the host puts it in its top layer or takes it out.
 	case dialog(node: String, open: Bool)
 	/// `focus()` or `scrollIntoView()` on an element, run once the views show the handler's writes.
-	case command(node: String, command: String)
+	case command(node: String, command: String, preventScroll: Bool)
 }
 
 public struct NativeRouteParam: Equatable, Sendable {
@@ -303,12 +303,14 @@ public struct NativeViewPayload: Equatable, Sendable {
 					}
 					return .dialog(node: try opField["node"].string(), open: method == "showModal")
 				case "command":
-					let opField = try op.object(["op", "node", "command"])
+					let keys = Set(try op.keys())
+					let opField = try op.object(required: ["op", "node", "command"], optional: ["preventScroll"])
 					let command = try opField["command"].string()
 					guard command == "focus" || command == "scrollIntoView" else {
 						throw PayloadError(path: op.path + ".command", reason: "unknown command \"\(command)\"")
 					}
-					return .command(node: try opField["node"].string(), command: command)
+					let preventScroll = keys.contains("preventScroll") ? try opField["preventScroll"].bool() : false
+					return .command(node: try opField["node"].string(), command: command, preventScroll: preventScroll)
 				case "if":
 					let opField = try op.object(["op", "test", "whenTrue", "whenFalse"])
 					return .when(

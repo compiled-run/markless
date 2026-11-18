@@ -41,8 +41,8 @@ sealed interface JournalEntry {
 	}
 
 	/** A `command` op the handler ran, after every other entry, in order. */
-	data class Command(override val node: String, val command: String) : JournalEntry {
-		override fun toJson() = "{\"op\":\"command\",\"node\":${jsonString(node)},\"command\":${jsonString(command)}}"
+	data class Command(override val node: String, val command: String, val preventScroll: Boolean) : JournalEntry {
+		override fun toJson() = "{\"op\":\"command\",\"node\":${jsonString(node)},\"command\":${jsonString(command)}${if (preventScroll) ",\"preventScroll\":true" else ""}}"
 	}
 
 	/** Shows arm [index] of a branch (null: none). */
@@ -267,7 +267,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 					if (op.node !in dialogs) throw MarklessRuntimeError("\"${op.node}\" is not a dialog")
 					dialogs[op.node] = op.open
 				}
-				is Op.Command -> commands.add(JournalEntry.Command(op.node, op.command))
+				is Op.Command -> commands.add(JournalEntry.Command(op.node, op.command, op.preventScroll))
 			}
 			return null
 		}

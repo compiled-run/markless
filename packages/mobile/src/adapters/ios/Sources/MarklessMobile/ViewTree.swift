@@ -113,14 +113,16 @@ final class ViewTree {
 				throw HostError("a navigate entry reaches the page's controller, not its views")
 			case let .dialog(node, open):
 				try present(node, open: open)
-			case let .command(node, command):
+			case let .command(node, command, preventScroll):
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				root.layoutIfNeeded()
-				if command == "scrollIntoView" {
-					// Only a scrolling ancestor can bring it into view; a page that does not scroll already shows it.
+				// As on the web, focus brings the element into view unless told not to; only a scrolling ancestor can.
+				if command == "scrollIntoView" || !preventScroll {
 					var ancestor = view.superview
 					while let candidate = ancestor, !(candidate is UIScrollView) { ancestor = candidate.superview }
 					if let scroll = ancestor as? UIScrollView { scroll.scrollRectToVisible(view.convert(view.bounds, to: scroll), animated: false) }
+				}
+				if command == "scrollIntoView" {
 				} else if view is UITextField {
 					view.becomeFirstResponder()
 				} else {
@@ -555,7 +557,6 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 private func uiColor(_ color: RGBA) -> UIColor {
 	UIColor(red: color.r / 255, green: color.g / 255, blue: color.b / 255, alpha: color.alpha / 255)
 }
-#endif
 
 /// A tap that presses an element which is not a button.
 private final class ActivateGesture: UITapGestureRecognizer {
@@ -567,3 +568,4 @@ private final class ActivateGesture: UITapGestureRecognizer {
 	}
 	@objc private func fire() { if state == .ended { action() } }
 }
+#endif

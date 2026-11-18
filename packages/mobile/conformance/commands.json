@@ -253,6 +253,12 @@
 						"op": "command",
 						"node": "h1",
 						"command": "scrollIntoView"
+					},
+					{
+						"op": "command",
+						"node": "h1",
+						"command": "focus",
+						"preventScroll": true
 					}
 				]
 			}
@@ -306,6 +312,12 @@
 					"op": "command",
 					"node": "h1",
 					"command": "scrollIntoView"
+				},
+				{
+					"op": "command",
+					"node": "h1",
+					"command": "focus",
+					"preventScroll": true
 				}
 			]
 		}

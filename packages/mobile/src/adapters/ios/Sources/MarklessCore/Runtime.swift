@@ -30,7 +30,7 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	/// A `<dialog>` put in the top layer (`open`) or taken out.
 	case dialog(node: String, open: Bool)
 	/// A `command` op the handler ran, after every other entry, in order.
-	case command(node: String, command: String)
+	case command(node: String, command: String, preventScroll: Bool)
 
 	public var json: JSONValue {
 		switch self {
@@ -49,8 +49,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("navigate")), ("route", .string(route)), ("params", .object(params.map { ($0.name, .string($0.value)) }))])
 		case let .dialog(node, open):
 			return .object([("op", .string("dialog")), ("node", .string(node)), ("open", .bool(open))])
-		case let .command(node, command):
-			return .object([("op", .string("command")), ("node", .string(node)), ("command", .string(command))])
+		case let .command(node, command, preventScroll):
+			return .object([("op", .string("command")), ("node", .string(node)), ("command", .string(command))] + (preventScroll ? [("preventScroll", .bool(true))] : []))
 		}
 	}
 }
@@ -336,8 +336,8 @@ public final class NativeRuntime {
 				case let .dialog(node, open):
 					guard dialogs[node] != nil else { throw RuntimeError(reason: "\(node) is not a dialog") }
 					dialogs[node] = open
-				case let .command(node, command):
-					commands.append(.command(node: node, command: command))
+				case let .command(node, command, preventScroll):
+					commands.append(.command(node: node, command: command, preventScroll: preventScroll))
 				}
 			}
 			return nil

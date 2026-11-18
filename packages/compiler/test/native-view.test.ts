@@ -801,13 +801,14 @@ export function Find() @{
 	const field = element<HTMLInputElement>();
 	<main>
 		<input el={field} />
-		<button onClick={() => { count++; field.scrollIntoView(); field.focus(); }}>Go</button>
+		<button onClick={() => { count++; field.scrollIntoView(); field.focus(); field.focus({ preventScroll: true }); }}>Go</button>
 	</main>
 }`);
 		expect(ok?.handlers[0]?.ops).toEqual([
 			{ op: 'assign', cell: 'state:count', value: expect.anything() },
 			{ op: 'command', node: 'h1', command: 'scrollIntoView' },
 			{ op: 'command', node: 'h1', command: 'focus' },
+			{ op: 'command', node: 'h1', command: 'focus', preventScroll: true },
 		]);
 	});
 });

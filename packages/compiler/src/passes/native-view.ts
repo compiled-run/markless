@@ -2133,11 +2133,18 @@ export function createNativeViewPayload(
 				const mark = diagnostics.length;
 				const target = exprOf(holder, `${what}'s call to \`${callee}\``, scope);
 				const element = elementOf(target);
-				if (element !== undefined && (statement.arguments ?? []).length > 0) {
-					refuse(`${what} calls \`${callee}()\` with options, which no native host takes yet`, span);
+				// `focus({ preventScroll })` is the one option a native host keeps; any other option is refused by name.
+				const [options, ...extra] = statement.arguments ?? [];
+				const preventScroll =
+					command === 'focus' && options?.kind === 'object' && extra.length === 0 && options.entries.every(([key, value]) => key === 'preventScroll' && value.kind === 'literal' && typeof value.value === 'boolean')
+						? options.entries.some(([, value]) => value.kind === 'literal' && value.value === true)
+						: undefined;
+				if (element !== undefined && options && preventScroll === undefined) {
+					refuse(`${what} calls \`${callee}()\` with options other than \`{ preventScroll }\`, which no native host takes yet`, span);
 					return [];
 				}
-				if (element !== undefined) return [{ op: 'command', node: element, command: command as 'focus' | 'scrollIntoView' }];
+				if (element !== undefined)
+					return [{ op: 'command', node: element, command: command as 'focus' | 'scrollIntoView', ...(preventScroll ? { preventScroll: true as const } : {}) }];
 				if (target && 'literal' in target && target.literal === null && statement.optional) return [];
 				if (diagnostics.length > mark) return [];
 				return notCallable();

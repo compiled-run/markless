@@ -95,7 +95,7 @@ sealed interface Op {
 	/** `showModal()` ([open] true) or `close()` on a `<dialog>`: the host puts it in its top layer or takes it out. */
 	data class Dialog(val node: String, val open: Boolean) : Op
 	/** `focus()` or `scrollIntoView()` on an element, run once the views show the handler's writes. */
-	data class Command(val node: String, val command: String) : Op
+	data class Command(val node: String, val command: String, val preventScroll: Boolean) : Op
 }
 
 /** A page's route as the router spells it (`/[fruit]`) and its param names. */
@@ -370,10 +370,11 @@ data class Payload(
 				return Op.Dialog(o.field("node", what).str("$what.node"), method == "showModal")
 			}
 			if (name == "command") {
-				o.only(setOf("op", "node", "command"), what)
+				o.only(setOf("op", "node", "command", "preventScroll"), what)
 				val command = o.field("command", what).str("$what.command")
 				if (command != "focus" && command != "scrollIntoView") throw MarklessDecodeError("$what has unknown command \"$command\"")
-				return Op.Command(o.field("node", what).str("$what.node"), command)
+				val preventScroll = if (o.containsKey("preventScroll")) ((o.field("preventScroll", what) as? Json.Bool ?: throw MarklessDecodeError("$what.preventScroll must be a boolean")).value) else false
+				return Op.Command(o.field("node", what).str("$what.node"), command, preventScroll)
 			}
 			if (name == "if") {
 				o.only(setOf("op", "test", "whenTrue", "whenFalse"), what)

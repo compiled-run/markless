@@ -20,6 +20,7 @@ export default function Commands() @{
 		<button onClick={() => {
 			list = ['a'];
 			field.scrollIntoView();
+			field.focus({ preventScroll: true });
 		}}>Reset</button>
 	</main>
 }
