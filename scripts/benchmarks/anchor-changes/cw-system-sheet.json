@@ -67,17 +67,6 @@
 			"delta": 5,
 			"reason": "row-event-repeats moves out of render-csr so the onIdle wake (fns/idle-trigger) can check a mount's row records; render-csr shrinks by the same function",
 			"date": "2026-11-18"
-		},
-		{
-			"surface": "build-scale",
-			"path": [
-				"budgets",
-				"clientModules",
-				"value"
-			],
-			"delta": 1,
-			"reason": "web/row-event-repeats is its own module so the onIdle wake (fns/idle-trigger) can check a mount's row records without importing render-csr; measured 4560 on CI job 134540711763",
-			"date": "2026-11-18"
 		}
 	]
 }
