@@ -275,34 +275,56 @@ test.each([
 	['fulfilled', ASYNC_BOUNDARY_ARM.try, true],
 ] as const)(
 	'a list under an @if in the @try arm leaves the page records when the boundary serves %s',
-	(status, servedArm, travelsWithArm) => {
+	(_served, servedArm, drawn) => {
 		const list = { id: 'repeat:todos', parentHostNodeId: 'h-list', collectionGraphNodeId: 'computed:todos', keyPath: ['id'], rowEvents: [] };
-		const streams = { locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [], keyedRepeats: [list] };
-		const [armized] = marklessSsrArmizeBoundaries(
+		const composed = marklessSsrComposeView(
 			{
 				locators: [],
-				anchors: [{ kind: 'async', id: 'boundary:0', startIndex: 0, endIndex: 1, elementStart: 0, elementEnd: 1, html: '' }],
-				elementCount: 1,
+				anchors: [
+					{ kind: 'async', id: 'boundary:0', startIndex: 0, endIndex: 1, elementStart: 0, elementEnd: 0, html: '', arm: servedArm },
+					...(drawn
+						? [{ kind: 'arm-branch' as const, id: 'branch-site:0', startIndex: 0, endIndex: 0, elementStart: 0, elementEnd: 0, html: '', arm: 1 }]
+						: []),
+				],
+				elementCount: 0,
 			},
-			[
-				{
-					id: 'boundary:0',
-					runnerGraphNodeId: 'computed:todos',
-					startAnchor: { strategy: 'dom-order-comment', index: 0 },
-					endAnchor: { strategy: 'dom-order-comment', index: 1 },
-					armRecords: [
-						{ branches: [{ id: 'branch-site:0', armRecords: [{ repeatParents: [{ repeatId: 'repeat:todos' }] }, {}] }] },
-						{},
-						{},
-					],
-				},
-			],
-			streams,
-			[{ graphNodeId: 'computed:todos', snapshot: { status } }],
+			{
+				version: 1,
+				locators: [],
+				events: [],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				keyedRepeats: [list],
+				branches: [],
+				asyncBoundaries: [
+					{
+						id: 'boundary:0',
+						runnerGraphNodeId: 'computed:todos',
+						initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
+						startAnchor: { strategy: 'dom-order-comment', index: 0 },
+						endAnchor: { strategy: 'dom-order-comment', index: 1 },
+						asyncReads: [],
+						armRecords: [
+							{
+								locators: [],
+								events: [],
+								behaviors: [],
+								elementHandles: [],
+								branches: [{ id: 'branch-site:0', armRecords: [{ repeatParents: [{ repeatId: 'repeat:todos' }] }, {}] }],
+							},
+							{ locators: [], events: [], behaviors: [], elementHandles: [] },
+							{ locators: [], events: [], behaviors: [], elementHandles: [] },
+						],
+					},
+				],
+			},
+			[],
+			[],
 		);
 
-		expect(armized.initiallyServedArm).toBe(servedArm);
-		expect(streams.keyedRepeats).toEqual([]);
-		expect(armized.armRecords.keyedRepeats).toEqual(travelsWithArm ? [list] : undefined);
+		expect(composed.view.keyedRepeats).toEqual([]);
+		expect(composed.view.asyncBoundaries[0]!.armRecords).toMatchObject(drawn ? { keyedRepeats: [list] } : {});
+		if (!drawn) expect(composed.view.asyncBoundaries[0]!.armRecords).not.toHaveProperty('keyedRepeats');
 	},
 );

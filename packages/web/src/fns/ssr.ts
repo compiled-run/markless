@@ -1195,6 +1195,17 @@ function marklessSsrComposedView(
 	const renderedArmBranchIds = new Set(
 		structure.anchors.filter((anchor) => anchor.kind === 'arm-branch').map((anchor) => anchor.id),
 	);
+	// A list under such a branch reached no served byte; the commit that renders the branch brings its own record.
+	const undrawnArmLists = new Set(
+		renderedBoundaries.flatMap((boundary) =>
+			Array.isArray(boundary.armRecords)
+				? boundary.armRecords.flatMap((arm: SsrArmRecordSet) =>
+						marklessSsrArmListIds((arm.branches ?? []).filter((branch) => !renderedArmBranchIds.has(idPrefix + branch.id))),
+					)
+				: [],
+		),
+	);
+	for (let i = keyedRepeats.length - 1; i >= 0; i--) if (undrawnArmLists.has(keyedRepeats[i].id)) keyedRepeats.splice(i, 1);
 	const boundariesWithComposedBranches = renderedBoundaries.map((boundary) => {
 		if (!Array.isArray(boundary.armRecords)) return boundary;
 		const composed = boundaryArmBranches.get(boundary.id);
@@ -1352,13 +1363,10 @@ export function marklessSsrArmizeBoundaries(
 			if (completeArmHostIds.has(streams.keyedRepeats[i].parentHostNodeId))
 				movedKeyedRepeats.unshift(...streams.keyedRepeats.splice(i, 1));
 		}
-		// A list in an arm of a branch here travels with the arm the render painted; one in an arm not painted reached no served byte.
-		const armLists = new Map(plannedArms.flatMap((arm) => marklessSsrArmListIds(arm.branches ?? []).map((id) => [id, arm === planned] as const)));
+		// A list in an arm of a branch here travels with the arm, whichever arm the render painted.
+		const armListIds = new Set(marklessSsrArmListIds(planned.branches ?? []));
 		for (let i = (streams.keyedRepeats ?? []).length - 1; i >= 0; i--)
-			if (armLists.has(streams.keyedRepeats[i].id)) {
-				const [list] = streams.keyedRepeats.splice(i, 1);
-				if (armLists.get(list.id)) movedKeyedRepeats.unshift(list);
-			}
+			if (armListIds.has(streams.keyedRepeats[i].id)) movedKeyedRepeats.unshift(...streams.keyedRepeats.splice(i, 1));
 		const keyedRepeats = [...(planned.keyedRepeats ?? []), ...movedKeyedRepeats];
 		return {
 			...boundary,
