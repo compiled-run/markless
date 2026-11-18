@@ -7,6 +7,7 @@ import type {
 	CompileTsrxModuleInput,
 	CompileTsrxModuleResult,
 } from '@markless/compiler';
+import { DEVICE_TARGET_FACTS } from '@markless/compiler/native';
 import type { PersistentCompileCache } from './compile-store.ts';
 import {
 	runChunkTaskInline,
@@ -244,13 +245,7 @@ function dispatch(lane: Lane): void {
 							code: job.code,
 							context: job.context,
 						}
-					: {
-							kind: 'compile',
-							id: job.id,
-							input: job.input,
-							key: job.key,
-							store: job.store,
-						},
+					: compileMessage(job),
 			);
 		} catch {
 			// An input that cannot be cloned runs on the calling thread.
@@ -259,6 +254,20 @@ function dispatch(lane: Lane): void {
 		}
 	}
 	for (const entry of lane.workers) if (!entry.job) entry.handle.unref();
+}
+
+// The device facts are the compiler's own functions, which cannot cross to a process: the worker attaches them by name.
+function compileMessage(job: CompileJob) {
+	const { deviceTargetFacts, ...input } = job.input;
+	const named = deviceTargetFacts === DEVICE_TARGET_FACTS;
+	return {
+		kind: 'compile',
+		id: job.id,
+		input: named ? input : job.input,
+		...(named && { deviceTargetFacts: true }),
+		key: job.key,
+		store: job.store,
+	};
 }
 
 // A job no worker can run goes back to the calling thread: a compile by answering nothing, a chunk read by running there.
