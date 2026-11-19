@@ -1780,10 +1780,9 @@ function unsupportedCaptureDiagnostic(
 // A shared() factory and a state() initializer both declare the graph fields the
 // payload carries and the SSR module rebuilds. A class instance declares none:
 // the server renders reads against a value that was never built, and the browser
-// gets either an unbound name or a method call with no receiver. A class
-// instance as a factory's result, as a state() value, or as a field of either
-// compiled clean before this and crashed at render or at click, so all refuse
-// here. Nothing else about class usage changes.
+// gets either an unbound name or a method call with no receiver. Both shapes
+// compiled clean before this and crashed at render or at click, so both refuse
+// here. Only these two shapes refuse; nothing else about class usage changes.
 // ---------------------------------------------------------------------------
 
 type ClassInstanceProperty = {
@@ -1817,12 +1816,6 @@ function classInstanceValueDiagnostics(
 		if (binding.kind !== 'state' || binding.initializerSource === undefined) continue;
 		const initializer = parsedExpression(binding.initializerSource);
 		if (!initializer) continue;
-		if (isClassInstanceValue(initializer)) {
-			diagnostics.push(
-				stateInitializerClassInstanceDiagnostic(binding, constructorDisplayName(initializer)),
-			);
-			continue;
-		}
 		for (const property of classInstanceProperties(initializer)) {
 			diagnostics.push(stateInitializerPropertyDiagnostic(binding, property));
 		}
@@ -1879,19 +1872,6 @@ function stateInitializerPropertyDiagnostic(
 		...(binding.sourceSpan ? { primarySpan: binding.sourceSpan } : {}),
 		source: binding.initializerSource ?? '',
 		message: `state "${binding.name}" initializes "${property.path}" with ${property.constructorName}. The payload carries no value for that field, and a method reached through it is read off the graph as a plain property, so it runs with no receiver and \`this\` is undefined.`,
-	};
-}
-
-function stateInitializerClassInstanceDiagnostic(
-	binding: SemanticGraphBinding,
-	constructorName: string,
-): CaptureAnalysisDiagnostic {
-	return {
-		...classInstancePropertyShared({ path: binding.name, constructorName }),
-		...(binding.sourceSpan ? { primarySpan: binding.sourceSpan } : {}),
-		source: binding.initializerSource ?? '',
-		title: 'A class instance cannot be a state() value',
-		message: `state "${binding.name}" holds ${constructorName}. The payload cannot carry a class instance, so the server render stops on it, and in the browser a method call on "${binding.name}" reaches the graph instead of the instance and throws.`,
 	};
 }
 
