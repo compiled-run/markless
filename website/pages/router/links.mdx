@@ -84,6 +84,7 @@ router({
 		viewport: 'none', // every page link while it's on screen
 		idle: 'fast', // once the page is idle, up to six links on screen
 		concurrency: 2, // viewport and idle fetches in flight at once
+		budget: 2 * 1024 * 1024, // bytes viewport and idle may spend per page
 	},
 });
 ```

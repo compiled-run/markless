@@ -628,9 +628,19 @@ export function runFragmentNavigation(
 		const key = pageKey(url);
 		fetched.add(key);
 		const controller = started?.controller ?? new AbortController();
+		// A guess's bytes count against the budget of the page it was guessed from: its declared length, else what Resource Timing saw.
+		const page = speculative === 'idle' ? speculation.page : -1;
+		let counted = false;
+		let target: URL | undefined;
+		let bytes = 0;
+		const spend = (wire: number) => {
+			if (counted) return;
+			counted = true;
+			if (speculation.page === page) speculation.spent += wire;
+		};
 		const read = async (): Promise<FragmentFetched> => {
 			const prefix = config.requestPrefix;
-			const target = new URL(url.href);
+			target = new URL(url.href);
 			target.hash = '';
 			target.pathname = prefix + target.pathname;
 			const response = await (started?.response ??
@@ -660,6 +670,7 @@ export function runFragmentNavigation(
 			finalUrl.hash = url.hash;
 			// A guess stops past the budget in wire bytes: a declared length is that, an uncompressed body counts as it reads.
 			const declared = Number(response.headers.get('content-length') ?? 0);
+			if (declared) spend(declared);
 			if (entry.phase === GUESS && declared > config.idleFragmentBytes)
 				throw new Error('MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET');
 			const counted = declared
@@ -670,7 +681,6 @@ export function runFragmentNavigation(
 			const reader = response.body.getReader();
 			const decoder = new TextDecoder();
 			let text = '';
-			let bytes = 0;
 			for (;;) {
 				if (text.includes(config.regionEndMarker)) {
 					const arrived = fragmentOf(
@@ -698,7 +708,13 @@ export function runFragmentNavigation(
 		};
 		const closed = () => {
 			if (entry.phase < ARRIVED) move(entry, ARRIVED);
-			queueMicrotask(pumpIdle);
+			if (page < 0 || counted) return void queueMicrotask(pumpIdle);
+			// Resource Timing records the transfer once the response has ended, a task later.
+			w.setTimeout(() => {
+				const timing = target && w.performance.getEntriesByName(target.href).at(-1);
+				spend((timing as PerformanceResourceTiming | undefined)?.transferSize || bytes);
+				pumpIdle();
+			});
 		};
 		const entry: FragmentPrefetch = {
 			at: started?.at ?? w.performance.now(),
@@ -799,11 +815,12 @@ export function runFragmentNavigation(
 		ARMED = 1,
 		SCHEDULED = 2,
 		WATCHING = 3;
-	let speculation = { phase: PAUSED, page: 0 };
+	// spent: wire bytes the page shown has guessed so far, against config.guessBudget.
+	let speculation = { phase: PAUSED, page: 0, spent: 0 };
 	const speculate = (phase: number, page = speculation.page) => {
 		if (page === speculation.page && phase !== PAUSED && phase !== speculation.phase + 1)
 			throw new Error(`Markless router: no speculation move from ${speculation.phase} to ${phase}.`);
-		speculation = { phase, page };
+		speculation = { phase, page, spent: page === speculation.page ? speculation.spent : 0 };
 	};
 	let idleQueue: URL[] = [];
 	const unfetched = (url: URL) =>
@@ -812,6 +829,7 @@ export function runFragmentNavigation(
 	const pumpIdle = () => {
 		if (speculation.phase === PAUSED) return;
 		for (;;) {
+			if (speculation.spent >= config.guessBudget) return;
 			let open = 0;
 			for (const entry of state.prefetches.values()) if (inFlight(entry)) open += 1;
 			if (open >= config.prefetchConnections) return;
@@ -1199,6 +1217,8 @@ export const FRAGMENT_HOVER_DWELL_MS = 20;
 export const FRAGMENT_PREFETCH_TTL_MS = 30_000;
 // Unused prefetches still streaming their @pending pieces; older ones are cancelled past this.
 export const FRAGMENT_PREFETCH_CONNECTIONS = 2;
+// Wire bytes viewport and idle fetches may spend per page shown: about what the Next.js original of the shadcn docs prefetched (1.5 MB).
+export const FRAGMENT_GUESS_BUDGET_BYTES = 2 * 1024 * 1024;
 export const FRAGMENT_IDLE_FRAGMENTS = 6;
 // Characters of page text a tab keeps for pages fetched ahead: about 8 MB as one-byte strings, so three of the largest docs pages measured (2.2 MB decoded) and a dozen typical ones (650 kB).
 export const FRAGMENT_HELD_CHARS = 8 * 1024 * 1024;

@@ -247,6 +247,13 @@ networks, `'fast'` ones, or `'none'`:
   rest wait for a free slot. Intent fetches are outside it: a hover or press
   never waits for a slot, and guesses still arriving are cancelled to make
   room for it.
+- `budget` (default 2 MiB, `FRAGMENT_GUESS_BUDGET_BYTES`): wire bytes viewport
+  and idle fetches may spend per page shown, counted from each response's
+  declared length, else from Resource Timing. Once spent, they stop until the
+  next page is shown; intent still fetches. A migrated site sets it from what
+  its original spent before a click.
+- Guessing reads only two things from navigation: a navigation started, and a
+  page is shown; the swap module's own navigation phase stays its own (#569).
 - The viewport trigger observes the page's page links when a page is shown,
   and links the page adds later once it is idle after a click or key press.
 

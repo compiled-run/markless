@@ -10,7 +10,11 @@ import * as routerVite from '../../src/vite/index.ts';
 
 describe('router prefetch policy', () => {
 	test('defaults: intent on every network, idle on fast links, viewport off, two in flight', () => {
-		expect(prefetchPolicy(undefined)).toEqual({ levels: [2, 0, 1], concurrency: 2 });
+		expect(prefetchPolicy(undefined)).toEqual({
+			levels: [2, 0, 1],
+			concurrency: 2,
+			budget: 2 * 1024 * 1024,
+		});
 		expect(prefetchPolicy(true)).toEqual(prefetchPolicy(undefined));
 		expect(prefetchPolicy({})).toEqual(prefetchPolicy(undefined));
 	});
@@ -25,7 +29,8 @@ describe('router prefetch policy', () => {
 	test('each trigger takes its own network class, and omitted ones keep their default', () => {
 		expect(
 			prefetchPolicy({ intent: 'all', viewport: 'all', idle: 'none', concurrency: 5 }),
-		).toEqual({ levels: [2, 2, 0], concurrency: 5 });
+		).toEqual({ levels: [2, 2, 0], concurrency: 5, budget: 2 * 1024 * 1024 });
+		expect(prefetchPolicy({ budget: 500_000 }).budget).toBe(500_000);
 		expect(prefetchPolicy({ viewport: 'fast' }).levels).toEqual([2, 1, 1]);
 		expect(prefetches(prefetchPolicy({ intent: 'none', idle: 'none' }))).toBe(false);
 	});
@@ -39,6 +44,8 @@ describe('router prefetch policy', () => {
 		expect(() => prefetchPolicy(null as never)).toThrow(/prefetch is null/);
 		expect(() => prefetchPolicy([] as never)).toThrow(/prefetch is \[\]/);
 		expect(() => prefetchPolicy({ concurrency: 0 })).toThrow(/concurrency/);
+		expect(() => prefetchPolicy({ budget: -1 })).toThrow(/prefetch\.budget/);
+		expect(() => prefetchPolicy({ budget: '2MB' as never })).toThrow(/prefetch\.budget/);
 		expect(() => prefetchPolicy({ concurrency: 1.5 })).toThrow(/concurrency/);
 	});
 

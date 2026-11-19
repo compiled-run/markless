@@ -1,4 +1,4 @@
-import { FRAGMENT_PREFETCH_CONNECTIONS } from './fragment-navigation.ts';
+import { FRAGMENT_GUESS_BUDGET_BYTES, FRAGMENT_PREFETCH_CONNECTIONS } from './fragment-navigation.ts';
 
 export { PREFETCH_LINK_CHOICES, type PrefetchLinkChoice } from '../link-attributes.ts';
 
@@ -27,6 +27,11 @@ export type RouterPrefetchOptions = {
 } & {
 	/** How many viewport and idle fetches may be in flight at once. Default 2. */
 	readonly concurrency?: number;
+	/**
+	 * Bytes on the wire viewport and idle fetches may spend per page shown; once spent they stop until the next
+	 * page, and intent still fetches. Default 2 MiB.
+	 */
+	readonly budget?: number;
 };
 
 /** `false` (or `'none'`) fetches nothing before a click; links still navigate. */
@@ -38,6 +43,7 @@ export type PrefetchLevels = readonly [intent: number, viewport: number, idle: n
 export interface PrefetchPolicy {
 	readonly levels: PrefetchLevels;
 	readonly concurrency: number;
+	readonly budget: number;
 }
 
 export const PREFETCH_DEFAULTS = {
@@ -45,18 +51,19 @@ export const PREFETCH_DEFAULTS = {
 	viewport: 'none',
 	idle: 'fast',
 	concurrency: FRAGMENT_PREFETCH_CONNECTIONS,
+	budget: FRAGMENT_GUESS_BUDGET_BYTES,
 } as const satisfies Required<RouterPrefetchOptions>;
 
 export function prefetchPolicy(prefetch: RouterPrefetch | undefined): PrefetchPolicy {
 	if (prefetch === false || prefetch === 'none')
-		return { levels: [0, 0, 0], concurrency: PREFETCH_DEFAULTS.concurrency };
+		return { levels: [0, 0, 0], concurrency: PREFETCH_DEFAULTS.concurrency, budget: 0 };
 	if (
 		prefetch !== undefined &&
 		prefetch !== true &&
 		(typeof prefetch !== 'object' || prefetch === null || Array.isArray(prefetch))
 	)
 		throw new Error(
-			`Markless router: prefetch is ${JSON.stringify(prefetch)}; use true, false, 'none' or an object of ${PREFETCH_TRIGGERS.join(', ')} and concurrency.`,
+			`Markless router: prefetch is ${JSON.stringify(prefetch)}; use true, false, 'none' or an object of ${PREFETCH_TRIGGERS.join(', ')}, concurrency and budget.`,
 		);
 	const options = typeof prefetch === 'object' ? prefetch : {};
 	const level = (trigger: PrefetchTrigger) => {
@@ -69,17 +76,26 @@ export function prefetchPolicy(prefetch: RouterPrefetch | undefined): PrefetchPo
 		return at;
 	};
 	for (const key of Object.keys(options))
-		if (key !== 'concurrency' && !(PREFETCH_TRIGGERS as readonly string[]).includes(key))
+		if (
+			key !== 'concurrency' &&
+			key !== 'budget' &&
+			!(PREFETCH_TRIGGERS as readonly string[]).includes(key)
+		)
 			throw new Error(
-				`Markless router: prefetch.${key} is not a trigger; use ${PREFETCH_TRIGGERS.join(', ')} or concurrency.`,
+				`Markless router: prefetch.${key} is not a trigger; use ${PREFETCH_TRIGGERS.join(', ')}, concurrency or budget.`,
 			);
 	const concurrency = options.concurrency ?? PREFETCH_DEFAULTS.concurrency;
 	if (!Number.isInteger(concurrency) || concurrency < 1)
 		throw new Error(
 			`Markless router: prefetch.concurrency is ${JSON.stringify(concurrency)}; use a whole number of at least 1.`,
 		);
+	const budget = options.budget ?? PREFETCH_DEFAULTS.budget;
+	if (!Number.isInteger(budget) || budget < 0)
+		throw new Error(
+			`Markless router: prefetch.budget is ${JSON.stringify(budget)}; use a whole number of bytes, 0 or more.`,
+		);
 	const [intent, viewport, idle] = PREFETCH_TRIGGERS.map(level) as [number, number, number];
-	return { levels: [intent, viewport, idle], concurrency };
+	return { levels: [intent, viewport, idle], concurrency, budget };
 }
 
 export function prefetches(policy: PrefetchPolicy): boolean {

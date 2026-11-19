@@ -93,6 +93,7 @@ function config(setup: Setup): FragmentNavigationConfig {
 		prefetchTtlMs: 30_000,
 		heldChars: setup.heldChars ?? FRAGMENT_HELD_CHARS,
 		prefetchConnections: policy.concurrency,
+		guessBudget: policy.budget,
 		prefetchOn: policy.levels,
 		endpointPrefixes: ['/api'],
 		idleFragments: 6,
@@ -527,6 +528,34 @@ describe('a click', () => {
 		await expect.poll(() => s.aborted.length).toBe(3);
 		await s.page.click('a[href="/"]');
 		await expect.poll(async () => (await s.paths()).slice(4).toSorted()).toEqual(others.toSorted());
+		await s.page.close();
+	});
+});
+
+describe('guess budget', () => {
+	test('once a page has spent its budget, viewport and idle stop; intent still fetches; the next page starts afresh', async () => {
+		const body = `<main>${'x'.repeat(10_000)}</main>${FRAGMENT_REGION_END}`;
+		const size = Buffer.byteLength(body);
+		const s = await open({
+			prefetch: { viewport: 'all', idle: 'all', concurrency: 1, budget: 3 * size - 1 },
+			answer: () => ({ body, headers: { 'content-length': String(size) } }),
+		});
+		await s.measured(true);
+		await expect.poll(async () => (await s.fetches()).length).toBe(3);
+		await expect.poll(s.allArrived).toBe(true);
+		await s.idle();
+		await afterFrames(s.page);
+		expect(await s.fetches()).toHaveLength(3);
+		const guessed = await s.paths();
+		const hovered = inView.find((path) => !guessed.includes(path))!;
+		await s.page.hover(`a[href="${hovered}"]`);
+		await expect.poll(s.paths).toContain(hovered);
+		await s.page.click(`a[href="${hovered}"]`);
+		await expect.poll(async () => (await s.fetches()).length).toBe(7);
+		await expect.poll(s.allArrived).toBe(true);
+		await s.idle();
+		await afterFrames(s.page);
+		expect(await s.fetches()).toHaveLength(7);
 		await s.page.close();
 	});
 });

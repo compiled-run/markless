@@ -1387,6 +1387,7 @@ function fragmentConfig(
 		prefetchTtlMs: FRAGMENT_PREFETCH_TTL_MS,
 		heldChars: FRAGMENT_HELD_CHARS,
 		prefetchConnections: fragment.prefetch.concurrency,
+		guessBudget: fragment.prefetch.budget,
 		prefetchOn: fragment.prefetch.levels,
 		endpointPrefixes: [API_PATHNAME_PREFIX],
 		idleFragments: FRAGMENT_IDLE_FRAGMENTS,

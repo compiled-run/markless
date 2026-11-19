@@ -55,6 +55,8 @@ export interface FragmentNavigationConfig {
 	readonly heldChars: number;
 	// At most this many unused prefetches may still be streaming; starting another cancels the oldest.
 	readonly prefetchConnections: number;
+	// Wire bytes viewport and idle fetches may spend per page shown.
+	readonly guessBudget: number;
 	// [intent, viewport, idle]: 0 never, 1 on a fast link, 2 on any (never under Save-Data or in a hidden tab).
 	readonly prefetchOn: readonly [intent: number, viewport: number, idle: number];
 	// Paths the server answers with endpoints, not pages: never fetched before a click or as a fragment.
