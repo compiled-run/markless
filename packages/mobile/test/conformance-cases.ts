@@ -96,6 +96,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'for-in-arm',
+		fixture: 'proofs/r141-for-in-arm/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
 		name: 'route',
 		fixture: 'proofs/10-url-route/App.tsrx',
 		page: 'pages/[fruit].tsrx',

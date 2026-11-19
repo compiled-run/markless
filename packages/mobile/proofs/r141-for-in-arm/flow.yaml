@@ -1,0 +1,55 @@
+appId: ${APP_ID}
+name: r141-for-in-arm
+---
+- launchApp:
+      clearState: true
+- assertVisible: Show list
+- assertVisible: List hidden
+- assertVisible: 1 in the list
+- assertNotVisible: Apple
+- assertNotVisible: No fruit
+- tapOn: Show list
+- assertVisible: Apple
+- assertNotVisible: List hidden
+- assertVisible: Hide list
+- assertVisible: Apple
+- assertNotVisible: List hidden
+- assertNotVisible: Fruit 1
+- assertNotVisible: No fruit
+- tapOn: Add fruit
+- assertVisible: Fruit 1
+- assertVisible: Apple
+- assertVisible: Fruit 1
+- assertVisible: 2 in the list
+- assertNotVisible: No fruit
+- assertNotVisible: 1 in the list
+- tapOn: Hide list
+- assertNotVisible: Apple
+- assertNotVisible: Fruit 1
+- assertVisible: Show list
+- assertVisible: List hidden
+- assertNotVisible: Apple
+- assertNotVisible: Fruit 1
+- assertNotVisible: 0 in the list
+- tapOn: Clear
+- assertVisible: 0 in the list
+- assertVisible: List hidden
+- assertVisible: 0 in the list
+- assertNotVisible: Apple
+- assertNotVisible: No fruit
+- assertNotVisible: 2 in the list
+- tapOn: Show list
+- assertVisible: No fruit
+- assertNotVisible: List hidden
+- assertVisible: No fruit
+- assertVisible: Hide list
+- assertNotVisible: Apple
+- assertNotVisible: Fruit 1
+- assertNotVisible: List hidden
+- tapOn: Add fruit
+- assertNotVisible: No fruit
+- assertVisible: Fruit 0
+- assertVisible: 1 in the list
+- assertNotVisible: No fruit
+- assertNotVisible: Apple
+- assertNotVisible: 0 in the list

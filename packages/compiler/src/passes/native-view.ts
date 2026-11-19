@@ -3602,8 +3602,8 @@ export function createNativeViewPayload(
 				close();
 				const repeat = scope.module.repeatsById.get(item.id);
 				const rowChunk = scope.module.chunks.get(item.row);
-				if (place.arm || place.row) {
-					refuse('@for inside an @if arm or another @for');
+				if (place.row) {
+					refuse('@for inside another @for');
 					continue;
 				}
 				if (repeat?.indexKey) {
@@ -3623,7 +3623,7 @@ export function createNativeViewPayload(
 					continue;
 				}
 				const repeatId = scope.prefix + item.id;
-				nodes.push({ kind: 'repeat', id: repeatId, parent, list, key: repeat.keyPath });
+				nodes.push({ kind: 'repeat', id: repeatId, parent, list, key: repeat.keyPath, ...place });
 				rowKeys.set(repeatId, repeat.keyPath.reduce<NativeExpr>((object, property) => ({ member: object, property }), { item: repeatId }));
 				lowerChunk(rowChunk, parent, { row: repeatId }, { ...scope, items: new Map([...scope.items, [repeat.itemName, repeatId]]) });
 				if (item.empty) {
@@ -3640,6 +3640,7 @@ export function createNativeViewPayload(
 						parent,
 						test: { binary: '===', left: { member: list, property: 'length' }, right: { literal: 0 } },
 						arms: 1,
+						...place,
 					});
 					lowerChunk(emptyChunk, parent, { arm: { branch: branchId, index: 0 } }, scope);
 				}

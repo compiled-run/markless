@@ -137,8 +137,10 @@ function mirror(
 		const place = nodeOf.get(id)?.arm;
 		return !place || (shownNode(place.branch) && chosen.get(place.branch) === place.index);
 	};
+	// A row's copy (`<id>@<key>`) sits where its list does.
 	const inArm = (id: string, branch: string): boolean => {
-		const node = nodeOf.get(id);
+		const node = nodeOf.get(id.includes('@') ? id.slice(0, id.indexOf('@')) : id);
+		if (node?.row) return inArm(node.row, branch);
 		if (!node?.arm) return false;
 		return node.arm.branch === branch || inArm(node.arm.branch, branch);
 	};
@@ -192,6 +194,8 @@ function mirror(
 				}
 		} else if (entry.op === 'arm') {
 			chosen.set(entry.node, entry.index);
+			for (const [node, index] of runtime.arms())
+				if (inArm(node, entry.node)) chosen.set(node, index);
 			for (const id of texts.keys()) if (inArm(id, entry.node)) texts.delete(id);
 			for (const key of attributes.keys())
 				if (inArm(key.split('\0')[0]!, entry.node)) attributes.delete(key);
@@ -442,8 +446,10 @@ function walk(
 		return open[0]!;
 	};
 	const shownTexts = () => [...texts].filter(([node]) => shownNode(node));
+	// A row's copy (`<id>@<key>`) sits where its list does.
 	const inArm = (id: string, branch: string): boolean => {
-		const node = nodeOf.get(id);
+		const node = nodeOf.get(id.includes('@') ? id.slice(0, id.indexOf('@')) : id);
+		if (node?.row) return inArm(node.row, branch);
 		if (!node?.arm) return false;
 		return node.arm.branch === branch || inArm(node.arm.branch, branch);
 	};
@@ -667,6 +673,8 @@ function walk(
 				}
 			} else if (entry.op === 'arm') {
 				chosen.set(entry.node, entry.index);
+				for (const [node, index] of runtime.arms())
+					if (inArm(node, entry.node)) chosen.set(node, index);
 				for (const id of texts.keys()) if (inArm(id, entry.node)) texts.delete(id);
 				for (const key of attributes.keys())
 					if (inArm(key.split('\0')[0]!, entry.node)) attributes.delete(key);

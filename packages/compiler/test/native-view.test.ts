@@ -967,6 +967,41 @@ export function Find() @{
 		]);
 	});
 
+	it('places a @for inside an @if arm, with its @empty, in that arm, and still refuses one inside another @for', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Shelf() @{
+	let showing = state(true);
+	let books = state([{ isbn: '1', title: 'One' }]);
+	<section>
+		@if (showing) {
+			<ol>
+				@for (const book of books; key book.isbn) { <li>{book.title}</li> } @empty { <li>None</li> }
+			</ol>
+		}
+	</section>
+}`);
+		expect(diagnostics).toEqual([]);
+		const branch = payload!.nodes.find((node) => node.kind === 'branch' && !node.id.endsWith(':empty'))!;
+		const repeat = payload!.nodes.find((node) => node.kind === 'repeat')!;
+		expect(repeat.arm).toEqual({ branch: branch.id, index: 0 });
+		expect(payload!.nodes.find((node) => node.id === `${repeat.id}:empty`)?.arm).toEqual({
+			branch: branch.id,
+			index: 0,
+		});
+		const nested = await nativeView(`import { state } from '@markless/core';
+export function Shelves() @{
+	let shelves = state([{ id: 'a', books: [{ isbn: '1', title: 'One' }] }]);
+	<section>
+		@for (const shelf of shelves; key shelf.id) {
+			<ol>@for (const book of shelf.books; key book.isbn) { <li>{book.title}</li> }</ol>
+		}
+	</section>
+}`);
+		expect(nested.diagnostics.map((diagnostic) => diagnostic.message)).toContain(
+			'@for inside another @for',
+		);
+	});
+
 	it('lowers @empty to a branch shown while the list has no rows', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function List() @{
