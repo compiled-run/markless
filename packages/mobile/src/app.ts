@@ -4,7 +4,12 @@ import type {
 	NativeValue,
 	NativeViewPayload,
 } from '@markless/serializer';
-import { createNativeRuntime, type NativeAction, type NativeRuntime } from './runtime.ts';
+import {
+	createNativeRuntime,
+	type NativeAction,
+	type NativeRuntime,
+	type NativeScriptHost,
+} from './runtime.ts';
 
 /** One screen on the stack: the route it shows, the path it opened at and its page's live runtime. */
 export type NativeScreen = {
@@ -104,6 +109,8 @@ export function createNativeAppRuntime(
 	app: NativeAppPayload,
 	path: string,
 	store: Map<string, NativeValue> = new Map(),
+	/** One engine for the whole app, as a phone has: started by the first screen that needs it. */
+	scriptHost?: NativeScriptHost,
 ): NativeAppRuntime {
 	const open = (route: string, params: Readonly<Record<string, string>>): NativeScreen => {
 		const entry = app.routes.find((candidate) => candidate.pattern === route);
@@ -112,7 +119,14 @@ export function createNativeAppRuntime(
 			route,
 			params,
 			path: nativeRoutePath(route, params),
-			runtime: createNativeRuntime(entry.page as NativeViewPayload, store, params),
+			runtime: createNativeRuntime(
+				entry.page as NativeViewPayload,
+				store,
+				params,
+				undefined,
+				undefined,
+				scriptHost,
+			),
 		};
 	};
 	const screens: NativeScreen[] = nativeBackStack(app, path).map((prefix) => {

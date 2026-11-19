@@ -16,6 +16,7 @@ import { dirname, join, resolve } from 'node:path';
 import { chromium, type Browser, type Locator, type Page } from '@playwright/test';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
+import { startEchoServer } from '../src/harness/echo-server.ts';
 import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
 import { buildFixture } from '../../router/test/support/fixture-build.ts';
 import type { ScrollVectors } from '../src/scroll.ts';
@@ -116,6 +117,12 @@ async function serveRung(
 	await symlink(
 		join(packagesRoot, 'headless/components'),
 		join(root, 'node_modules/@markless/ui'),
+		'dir',
+	);
+	// The third-party package the script ladder imports (J2), as the mobile package depends on it.
+	await symlink(
+		join(packagesRoot, 'mobile/node_modules/scule'),
+		join(root, 'node_modules/scule'),
 		'dir',
 	);
 	const nodeEnv = process.env.NODE_ENV;
@@ -306,6 +313,10 @@ describe.each(allRungFolders())('%s', (folder) => {
 	const start = sharing ? `/${folder}` : (rung.start ?? '/');
 	beforeAll(async () => {
 		({ origin, root: built } = sharing ? await serveShared() : await serveRung(folder, rung));
+		if (rung.server === 'echo') {
+			const echo = await startEchoServer();
+			cleanups.push(() => echo.close());
+		}
 	}, 240_000);
 
 	const absent = rung.web?.absentFromOutput;

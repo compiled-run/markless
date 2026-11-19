@@ -1,5 +1,9 @@
 import type { NativeAction, NativeAppAction } from '../src/index.ts';
 import type { DeviceAppConfig } from '../src/permissions.ts';
+import { nodeScriptHost } from '../src/node-engine.ts';
+
+/** The engine the vectors are written with; `crypto` draws from all-zero seed bytes, which a host's test passes too. */
+export const CONFORMANCE_SCRIPT_HOST = () => nodeScriptHost('00'.repeat(32));
 
 /** Each committed vector file: its component (a path inside packages/mobile) and the actions it records. */
 export const CONFORMANCE_CASES: ReadonlyArray<{
@@ -14,6 +18,8 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	readonly device?: DeviceAppConfig;
 	/** The device's preferred languages, when the vector shows a message in one. */
 	readonly preferredLanguages?: ReadonlyArray<string>;
+	/** Built at its own path with the modules it imports read from the workspace (app modules and packages). */
+	readonly modules?: true;
 	readonly actions: ReadonlyArray<NativeAction>;
 }> = [
 	{
@@ -390,6 +396,84 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'visible', host: 'h3@a' },
 		],
 	},
+	{
+		name: 'script-loop',
+		fixture: 'proofs/j1-loop-local/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'script-modules',
+		fixture: 'proofs/j2-app-and-library/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'script-async',
+		fixture: 'proofs/j3-await-catch/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'timer', timer: 'script:2' },
+		],
+	},
+	{
+		name: 'script-network',
+		fixture: 'proofs/j4-timers-fetch/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'POST /j4/echo?word=native text/plain hello',
+				},
+			},
+			{ event: 'activate', host: 'h5' },
+			{ event: 'response', id: 2, response: { error: 'The network connection was lost.' } },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'timer', timer: 'script:1' },
+		],
+	},
+	{
+		name: 'script-computed',
+		fixture: 'proofs/j5-engine-computed/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'script-render',
+		fixture: 'proofs/j8-render-values/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		name: 'script-render-list',
+		fixture: 'proofs/j9-render-list/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */
@@ -427,6 +511,31 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [
 			{ event: 'back' },
 			{ event: 'back' },
+			{ event: 'activate', host: 'component-edge:0' },
+		],
+	},
+	{
+		name: 'script-app',
+		app: 'proofs/j6-engine-on-demand',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'component-edge:0' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'navigation-deep-link',
+		app: 'proofs/n4-deep-link',
+		open: '/orders/42',
+		actions: [{ event: 'back' }, { event: 'back' }, { event: 'activate', host: 'component-edge:0' }],
+	},
+	{
+		name: 'script-first-render',
+		app: 'proofs/j10-first-render',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'h3' },
 			{ event: 'activate', host: 'component-edge:0' },
 		],
 	},

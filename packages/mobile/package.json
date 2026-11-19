@@ -18,7 +18,8 @@
 		".": "./src/index.ts"
 	},
 	"scripts": {
-		"proof": "node src/harness/cli.ts"
+		"proof": "node src/harness/cli.ts",
+		"phones": "node src/runner/cli.ts"
 	},
 	"dependencies": {
 		"@markless/compiler": "workspace:*",
@@ -29,6 +30,7 @@
 	},
 	"devDependencies": {
 		"@markless/core": "workspace:*",
-		"@markless/ui": "workspace:*"
+		"@markless/ui": "workspace:*",
+		"scule": "1.3.0"
 	}
 }

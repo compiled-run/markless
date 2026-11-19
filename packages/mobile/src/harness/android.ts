@@ -1,7 +1,22 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	openSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+	NATIVE_APP_VERSION,
+	type NativeAppPayload,
+	type NativeScript,
+	type NativeViewPayload,
+} from '@markless/serializer/native-view';
 import { androidLibraries } from './android-libraries.ts';
 import { exec } from './exec.ts';
 import {
@@ -9,10 +24,18 @@ import {
 	PROOF_APP_ID,
 	PROOF_APP_NAME,
 	PROOF_LINK_SCHEME,
+	PROOF_PAYLOAD_PATH,
 } from './proof-app.ts';
 import type { DeviceManifest } from '../permissions.ts';
 import type { ProofAssets } from './rung.ts';
-import { type AndroidTools, cacheRoot, contentKey, filesUnder } from './tools.ts';
+import {
+	type AndroidTools,
+	cachedFolder,
+	cacheRoot,
+	contentKey,
+	filesUnder,
+	SHELL_CACHE_FORMAT,
+} from './tools.ts';
 
 export type BootedEmulator = {
 	readonly serial: string;
@@ -131,7 +154,8 @@ export async function buildAndroidShell(
 	hostSources: string,
 	shellDir: string,
 ): Promise<AndroidShell> {
-	const libraries = await androidLibraries(tools);
+	const hostLock = join(hostSources, '..', 'libraries.lock.json');
+	const libraries = await androidLibraries(tools, existsSync(hostLock) ? hostLock : undefined);
 	const sources = [...filesUnder(hostSources, '.kt'), ...filesUnder(shellDir, '.kt')];
 	const key = contentKey(hostSources, sources, [
 		tools.buildTools,
@@ -139,60 +163,134 @@ export async function buildAndroidShell(
 		tools.kotlinStdlib,
 		libraries.key,
 		androidManifest([]),
+		SHELL_CACHE_FORMAT,
 	]);
-	const root = join(cacheRoot(), 'android-shell', key);
-	const dexDir = join(root, 'dex');
-	const resources = join(root, 'resources.apk');
-	const ids = join(root, 'resource-ids.txt');
-	const shell = () => ({
-		dex: filesUnder(dexDir, '.dex'),
+	const root = await cachedFolder(join(cacheRoot(), 'android-shell', key), async (scratch) => {
+		const classes = join(scratch, 'classes');
+		const generated = join(scratch, 'r-java');
+		mkdirSync(join(scratch, 'dex'), { recursive: true });
+		writeFileSync(join(scratch, 'AndroidManifest.xml'), androidManifest([]));
+		await exec(join(tools.buildTools, 'aapt2'), [
+			'link',
+			'-o',
+			join(scratch, 'resources.apk'),
+			'-I',
+			tools.androidJar,
+			'--manifest',
+			join(scratch, 'AndroidManifest.xml'),
+			'--auto-add-overlay',
+			...libraries.resources.flatMap((archive) => ['-R', archive]),
+			'--extra-packages',
+			libraries.rPackages.join(':'),
+			'--java',
+			generated,
+			'--emit-ids',
+			join(scratch, 'resource-ids.txt'),
+		]);
+		await exec('javac', [
+			'--release',
+			'11',
+			'-nowarn',
+			'-d',
+			classes,
+			...filesUnder(generated, '.java'),
+		]);
+		const classpath = [tools.androidJar, classes, ...libraries.jars].join(':');
+		await exec('kotlinc', [
+			'-classpath',
+			classpath,
+			'-jvm-target',
+			'17',
+			'-nowarn',
+			'-d',
+			classes,
+			...sources,
+		]);
+		await exec(join(tools.buildTools, 'd8'), [
+			'--min-api',
+			'26',
+			'--output',
+			join(scratch, 'dex'),
+			'--lib',
+			tools.androidJar,
+			...filesUnder(classes, '.class'),
+			tools.kotlinStdlib,
+			...libraries.jars,
+		]);
+	});
+	return {
+		dex: filesUnder(join(root, 'dex'), '.dex'),
 		libraryResources: libraries.resources,
 		rPackages: libraries.rPackages,
-		ids,
-	});
-	if (existsSync(join(root, 'done'))) return shell();
+		ids: join(root, 'resource-ids.txt'),
+	};
+}
 
-	rmSync(root, { recursive: true, force: true });
-	const classes = join(root, 'classes');
-	const generated = join(root, 'r-java');
-	mkdirSync(dexDir, { recursive: true });
-	writeFileSync(join(root, 'AndroidManifest.xml'), androidManifest([]));
-	await exec(join(tools.buildTools, 'aapt2'), [
-		'link',
-		'-o',
-		resources,
-		'-I',
+/** The Hermes engine folder: `build-hermes.sh`, its lock, and the sources it compiles. */
+const ANDROID_ENGINE_DIR = resolve(
+	dirname(fileURLToPath(import.meta.url)),
+	'../adapters/android/engine',
+);
+
+/** A test-build asset: `0` turns off warming the engine at idle, so the first entry starts it (cold). */
+const ENGINE_WARM_ASSET = 'markless/engine-warm';
+
+/** The network security config a build whose script fetches gets: cleartext to the test's 127.0.0.1 server only. */
+const NETWORK_CONFIG = 'markless_network';
+const networkConfig = `<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+	<domain-config cleartextTrafficPermitted="true">
+		<domain includeSubdomains="false">127.0.0.1</domain>
+	</domain-config>
+</network-security-config>
+`;
+
+/** The scripts the build's payload runs: a page's, or each page's of an app. */
+function payloadScripts(assets: ProofAssets): NativeScript[] {
+	const bytes = assets.get(PROOF_PAYLOAD_PATH);
+	if (!bytes) return [];
+	const payload = JSON.parse(new TextDecoder().decode(bytes)) as
+		| NativeViewPayload
+		| NativeAppPayload;
+	const pages =
+		payload.version === NATIVE_APP_VERSION ? payload.routes.map((route) => route.page) : [payload];
+	return pages.flatMap((page) => (page.script ? [page.script] : []));
+}
+
+/** The one ABI the proof APK carries the engine for: the emulator's, which is the Mac's. */
+const engineAbi = () => (process.arch === 'arm64' ? 'arm64-v8a' : 'x86_64');
+
+/** The engine folder built by `build-hermes.sh` (cached by its lock and sources) and its classes dexed. */
+async function androidEngine(
+	tools: AndroidTools,
+): Promise<{ readonly dex: ReadonlyArray<string>; readonly libraries: ReadonlyArray<string> }> {
+	const abi = engineAbi();
+	const sources = [
+		...filesUnder(ANDROID_ENGINE_DIR, '.json'),
+		...filesUnder(ANDROID_ENGINE_DIR, '.sh'),
+		...filesUnder(ANDROID_ENGINE_DIR, '.kt'),
+		...filesUnder(ANDROID_ENGINE_DIR, '.cpp'),
+	];
+	const key = contentKey(ANDROID_ENGINE_DIR, sources, [
+		abi,
+		tools.buildTools,
 		tools.androidJar,
-		'--manifest',
-		join(root, 'AndroidManifest.xml'),
-		'--auto-add-overlay',
-		...libraries.resources.flatMap((archive) => ['-R', archive]),
-		'--extra-packages',
-		libraries.rPackages.join(':'),
-		'--java',
-		generated,
-		'--emit-ids',
-		ids,
+		tools.kotlinStdlib,
 	]);
-	await exec('javac', [
-		'--release',
-		'11',
-		'-nowarn',
-		'-d',
-		classes,
-		...filesUnder(generated, '.java'),
-	]);
-	const classpath = [tools.androidJar, classes, ...libraries.jars].join(':');
-	await exec('kotlinc', [
-		'-classpath',
-		classpath,
-		'-jvm-target',
-		'17',
-		'-nowarn',
-		'-d',
-		classes,
-		...sources,
-	]);
+	const root = join(cacheRoot(), 'android-engine', key);
+	const folder = join(root, 'engine');
+	const dexDir = join(root, 'dex');
+	const engine = () => ({
+		dex: filesUnder(dexDir, '.dex'),
+		libraries: filesUnder(join(folder, 'jni', abi), '.so'),
+	});
+	if (existsSync(join(root, 'done'))) return engine();
+	rmSync(root, { recursive: true, force: true });
+	mkdirSync(dexDir, { recursive: true });
+	await exec('sh', [join(ANDROID_ENGINE_DIR, 'build-hermes.sh'), folder, abi], {
+		env: { ...process.env, ANDROID_HOME: tools.sdk, MARKLESS_PROOF_CACHE: cacheRoot() },
+		timeoutMs: 1_800_000,
+	});
 	await exec(join(tools.buildTools, 'd8'), [
 		'--min-api',
 		'26',
@@ -200,21 +298,22 @@ export async function buildAndroidShell(
 		dexDir,
 		'--lib',
 		tools.androidJar,
-		...filesUnder(classes, '.class'),
+		'--classpath',
 		tools.kotlinStdlib,
-		...libraries.jars,
+		join(folder, 'classes.jar'),
 	]);
 	writeFileSync(join(root, 'done'), '');
-	return shell();
+	return engine();
 }
 
 const androidManifest = (
 	permissions: ReadonlyArray<string>,
+	cleartextToTestServer = false,
 ) => `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="${PROOF_APP_ID}" android:versionCode="1" android:versionName="1.0">
 	<uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
 ${permissions.map((name) => `\t<uses-permission android:name="${name}" />\n`).join('')}
-	<application android:label="${PROOF_APP_NAME}" android:hasCode="true">
+	<application android:label="${PROOF_APP_NAME}" android:hasCode="true"${cleartextToTestServer ? ` android:networkSecurityConfig="@xml/${NETWORK_CONFIG}"` : ''}>
 		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:windowSoftInputMode="adjustResize" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
@@ -272,7 +371,28 @@ export async function packProofApk(
 		mkdirSync(join(assetDir, path, '..'), { recursive: true });
 		writeFileSync(join(assetDir, path), bytes);
 	}
-	writeFileSync(join(workDir, 'AndroidManifest.xml'), androidManifest(manifest.android));
+	// The engine ships only in an APK whose payload has a script; one that fetches may reach the test's server.
+	const scripts = payloadScripts(assets);
+	const fetches = scripts.some((script) => script.services.includes('fetch'));
+	if (scripts.length > 0 && process.env.MARKLESS_PROOF_ENGINE_WARM === '0')
+		writeFileSync(join(assetDir, ENGINE_WARM_ASSET), '0');
+	const permissions = [
+		...new Set([...manifest.android, ...(fetches ? ['android.permission.INTERNET'] : [])]),
+	];
+	writeFileSync(
+		join(workDir, 'AndroidManifest.xml'),
+		androidManifest(permissions, fetches),
+	);
+	const networkResources: string[] = [];
+	if (fetches) {
+		const xml = join(workDir, 'res', 'xml', `${NETWORK_CONFIG}.xml`);
+		mkdirSync(dirname(xml), { recursive: true });
+		writeFileSync(xml, networkConfig);
+		const compiled = join(workDir, 'compiled');
+		mkdirSync(compiled, { recursive: true });
+		await exec(join(tools.buildTools, 'aapt2'), ['compile', '-o', compiled, xml]);
+		networkResources.push(...filesUnder(compiled, '.flat'));
+	}
 	const unsigned = join(workDir, 'unsigned.apk');
 	const aligned = join(workDir, 'aligned.apk');
 	const apk = join(workDir, `${PROOF_APP_NAME}.apk`);
@@ -290,10 +410,26 @@ export async function packProofApk(
 		shell.rPackages.join(':'),
 		'--stable-ids',
 		shell.ids,
+		...networkResources.flatMap((flat) => ['-R', flat]),
 		'-A',
 		assetDir,
 	]);
 	await exec('zip', ['-q', '-j', unsigned, ...shell.dex]);
+	if (scripts.length > 0) {
+		const engine = await androidEngine(tools);
+		const staged = join(workDir, 'engine');
+		const libDir = join(staged, 'lib', engineAbi());
+		mkdirSync(libDir, { recursive: true });
+		// The engine's dex files follow the shell's: classes<N+1>.dex onwards.
+		const dex = engine.dex.map((file, index) => {
+			const target = join(staged, `classes${shell.dex.length + index + 1}.dex`);
+			copyFileSync(file, target);
+			return target;
+		});
+		for (const library of engine.libraries) copyFileSync(library, join(libDir, basename(library)));
+		await exec('zip', ['-q', '-j', unsigned, ...dex]);
+		await exec('zip', ['-q', '-r', unsigned, 'lib'], { cwd: staged });
+	}
 	await exec(join(tools.buildTools, 'zipalign'), ['-f', '4', unsigned, aligned]);
 	await exec(join(tools.buildTools, 'apksigner'), [
 		'sign',
