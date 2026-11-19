@@ -551,11 +551,12 @@ and a long press.
 | Rung T1 (touch) | | reference, Chromium, iOS simulator, Android emulator |
 | iOS ladder | 89 of 89 | 90 of 90 |
 | Android ladder | 89 of 89 | 90 of 90 (no reruns) |
-| Family probe (rebased on main after #829) | 12 of 46 build, 628 diagnostics | 12 of 46 build, 608 diagnostics |
+| Family probe (main at `b547d995b`) | 12 of 46 build, 428 diagnostics | 12 of 46 build, 403 diagnostics |
 
 No family builds yet because of pointer events alone. On main, #829 runs a handler the data path refuses as JavaScript,
 and most family pointer handlers land there. A JavaScript pointer handler's event now carries the touch's plain fields
 (`clientX`, `clientY`, `pointerId`, `pointerType`, `button`, `buttons`, `isPrimary`, `timeStamp`; vector
 `touch-script.json`); the elements a touch names (`relatedTarget`, capture on `currentTarget`) stay with data handlers,
 since JavaScript on a phone holds no element yet. The refusal that blocks most families is now a JavaScript handler or
-computed that reads the family's shared state (26 families).
+computed that reads the family's shared state (30 families). Pointer handlers refused for a touch field: 9 families on
+main, 1 here (`relatedTarget`, `pressure`, `getCoalescedEvents` remain).

@@ -1,0 +1,78 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u1-base",
+			"failure": null,
+			"installSeconds": 1.9399029999999984,
+			"flowSeconds": 14.803887583000003
+		},
+		{
+			"name": "u2-collapsible",
+			"failure": null,
+			"installSeconds": 1.8669742499999993,
+			"flowSeconds": 15.815800166
+		},
+		{
+			"name": "u3-tabs",
+			"failure": null,
+			"installSeconds": 1.6091117499999963,
+			"flowSeconds": 18.895874624999998
+		},
+		{
+			"name": "u5-toggle",
+			"failure": null,
+			"installSeconds": 1.5192816670000029,
+			"flowSeconds": 13.65235829199999
+		},
+		{
+			"name": "u6-base-rows",
+			"failure": null,
+			"installSeconds": 1.726512374999991,
+			"flowSeconds": 37.27514570900001
+		},
+		{
+			"name": "u11-pagination",
+			"failure": null,
+			"installSeconds": 1.5859234590000124,
+			"flowSeconds": 21.953276041999985
+		},
+		{
+			"name": "u12-buttongroup",
+			"failure": null,
+			"installSeconds": 1.5950694170000497,
+			"flowSeconds": 44.942935958000014
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 1.772535833000031,
+			"flowSeconds": 44.58375854199997
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 1.538937042000005,
+			"flowSeconds": 20.158108667000082
+		},
+		{
+			"name": "u22-radio-group",
+			"failure": null,
+			"installSeconds": 1.5349536670000525,
+			"flowSeconds": 26.427650250000063
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 1.5605335829999532,
+			"flowSeconds": 29.708575541
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 1.6077162909999023,
+			"flowSeconds": 14.737712792000035
+		}
+	]
+}
