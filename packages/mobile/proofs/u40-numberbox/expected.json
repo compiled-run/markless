@@ -1,0 +1,41 @@
+{
+	"rung": 149,
+	"name": "numberbox: each press of a step button steps once; a press the page's scroll takes steps once and is cancelled",
+	"steps": [
+		{
+			"visible": ["Order", "Ordered 2", "Presses cancelled 0", "Decrease", "Increase"]
+		},
+		{
+			"do": {
+				"tap": "Increase"
+			},
+			"visible": ["Ordered 3"],
+			"absent": ["Ordered 2"]
+		},
+		{
+			"do": {
+				"tap": "Increase"
+			},
+			"visible": ["Ordered 4"],
+			"absent": ["Ordered 3"]
+		},
+		{
+			"do": {
+				"tap": "Decrease"
+			},
+			"visible": ["Ordered 3", "Presses cancelled 0"],
+			"absent": ["Ordered 4"]
+		},
+		{
+			"do": {
+				"drag": {
+					"on": "Increase",
+					"direction": "up",
+					"scrolls": true
+				}
+			},
+			"visible": ["Ordered 4", "Presses cancelled 1"],
+			"absent": ["Ordered 3", "Presses cancelled 0"]
+		}
+	]
+}

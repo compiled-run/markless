@@ -20,7 +20,10 @@
 				"name": "picked",
 				"initial": "nothing",
 				"styled": true,
-				"domain": ["nothing", "red"]
+				"domain": [
+					"nothing",
+					"red"
+				]
 			}
 		],
 		"nodes": [
@@ -135,7 +138,9 @@
 				"open": {
 					"cell": "state:choosing"
 				},
-				"snapPoints": [0.5],
+				"snapPoints": [
+					0.5
+				],
 				"dismissible": true,
 				"modal": true,
 				"arm": {
@@ -321,11 +326,25 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Colours"],
-		["h2:text0", "Picked nothing"],
-		["h3:text0", "Show choices"]
+		[
+			"h1:text0",
+			"Colours"
+		],
+		[
+			"h2:text0",
+			"Picked nothing"
+		],
+		[
+			"h3:text0",
+			"Show choices"
+		]
 	],
-	"initialArms": [["branch-site:0", 1]],
+	"initialArms": [
+		[
+			"branch-site:0",
+			1
+		]
+	],
 	"steps": [
 		{
 			"action": {
