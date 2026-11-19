@@ -138,3 +138,21 @@ test('serializeGraphValue keeps current behavior for supported and function valu
 		valueKind: 'function',
 	});
 });
+
+test('a decoded "__proto__" key is an own field and never replaces the object prototype', async () => {
+	const { deserializeGraphValueForClient } = await import('../src/value-decode-client.ts');
+	const fromRequestBody = JSON.parse('{"profile":{"__proto__":{"admin":true},"name":"ada"}}');
+	const encoded = serializeGraphValue(fromRequestBody);
+	expect(encoded.ok).toBe(true);
+	if (!encoded.ok) return;
+	for (const decoded of [
+		deserializeGraphValue(encoded.payload),
+		await deserializeGraphValueForClient(encoded.payload),
+	]) {
+		const profile = (decoded as { profile: Record<string, unknown> }).profile;
+		expect(Object.getPrototypeOf(profile)).toBe(Object.prototype);
+		expect(profile.admin).toBeUndefined();
+		expect(Object.keys(profile)).toEqual(['__proto__', 'name']);
+		expect(Object.getOwnPropertyDescriptor(profile, '__proto__')?.value).toEqual({ admin: true });
+	}
+});
