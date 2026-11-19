@@ -116,7 +116,7 @@ A release commit runs `pnpm release:check` and `--fast`; a new package additiona
 
 ### Lanes: what each proves and when it runs
 
-Every job in `ci.yml` runs on pull requests, in the merge queue and on pushes to `main`. A content-hashed lane is skipped when its inputs already went green (the `lanes` job decides; section 1), and a push the merge queue already tested runs only the always-on jobs. The required checks are `test`, `typecheck` and `agent-files`.
+Every job in `ci.yml` runs on pull requests, in the merge queue and on pushes to `main`. A content-hashed lane skips its work when its inputs already went green: each lane decides that itself in its first step (`.github/actions/lane-hash`), and on a hit it finishes green in seconds. A push the merge queue already tested does the same in every lane. The required checks are `test`, `typecheck` and `agent-files`.
 
 | Lane                                    | What it proves                                                                                                               | Pull request                                             | Merge queue | `main`                                                                                               |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------- |
@@ -361,7 +361,9 @@ What changed, and the rule going forward:
 
 ### Runner queues and `needs:` layers
 
-The org runs 60 jobs at once across every repository, so every `needs:` hop waits in the runner queue again. Merge group run 40594026312 (2026-10-27) took 68 minutes, about 20 of them running jobs: `lanes` waited 23 minutes, `prepare-playwright` 12, `browser` 14, `receipts` 9 and `test` 8. The gate's path is now `typecheck` and `lanes`, then the lanes, then `test`, which checks the analyzer receipt set itself after its result step finds every lane green.
+The org runs 60 jobs at once across every repository, so every `needs:` hop waits in the runner queue again. Merge group run 40594026312 (2026-10-27) took 68 minutes, about 20 of them running jobs: `lanes` waited 23 minutes, `prepare-playwright` 12, `browser` 14, `receipts` 9 and `test` 8. The gate's path was then `typecheck` and `lanes`, then the lanes, then `test`, which checks the analyzer receipt set itself after its result step finds every lane green.
+
+Since 2026-11-19 the lanes start with the first jobs: each lane runs the lane-hash action after checkout and gates every later step on its verdict, so the path is the lanes, then `test`. The `lanes` job only names each lane's key for the jobs after the lanes (the receipts in `test`, the markers a queue-tested push carries onto `main`). On 2026-11-19, 12:00Z to 18:45Z, the wait it removes, from a run's creation to the moment its lanes could be created, was a median of 9.1 minutes for 61 pull request runs (90th percentile 30.4, worst 90.9; 1.1 at 14h, 22.0 at 17h) and 0.9 minutes for 11 merge-queue runs when runners were free, 12 to 34 under load. Lanes no longer wait for `typecheck`, which failed on none of 79 runs that day; it still gates `test`. A lane whose marker is already green now takes a runner for about half a minute instead of none. `check-workflow.mjs` fails a lane that needs another job, has a job-level `if:`, installs before its probe, or runs a later step that does not start with `steps.lane.outputs.run == 'true'`.
 
 ### Merge queue settings
 
