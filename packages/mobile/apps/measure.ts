@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import type { CompilerDiagnostic } from '@markless/compiler';
 import { buildRouteManifestFromFileIds } from '@markless/router';
 import { compileNativeApp } from '../src/compile.ts';
-import { readRelativeStylesheet, readWorkspaceModule } from '../src/harness/rung.ts';
+import { readAppConfig, readRelativeStylesheet, readWorkspaceModule } from '../src/harness/rung.ts';
 
 export const APPS = ['notes', 'shop', 'checkin'] as const;
 export const appsDir = import.meta.dirname;
@@ -54,24 +54,42 @@ export async function measureApp(app: string): Promise<ScreenResult[]> {
 	const dir = join(appsDir, app);
 	const pages = pageFiles(dir);
 	const document = join(dir, 'document.tsrx');
-	const build = await compileNativeApp({
-		pages: pages.map((page) => ({
-			page,
-			filename: relative(repoRoot, join(dir, page)),
-			source: readFileSync(join(dir, page), 'utf8'),
-		})),
-		...(existsSync(document)
-			? {
-					document: {
-						filename: relative(repoRoot, document),
-						source: readFileSync(document, 'utf8'),
-					},
-				}
-			: {}),
-		readModule: readWorkspaceModule,
-		readStylesheet: readRelativeStylesheet,
-	});
 	const routes = buildRouteManifestFromFileIds(pages).routes;
+	let build: Awaited<ReturnType<typeof compileNativeApp>>;
+	try {
+		build = await compileNativeApp({
+			pages: pages.map((page) => ({
+				page,
+				filename: relative(repoRoot, join(dir, page)),
+				source: readFileSync(join(dir, page), 'utf8'),
+			})),
+			...(existsSync(document)
+				? {
+						document: {
+							filename: relative(repoRoot, document),
+							source: readFileSync(document, 'utf8'),
+						},
+					}
+				: {}),
+			readModule: readWorkspaceModule,
+			readStylesheet: readRelativeStylesheet,
+			...readAppConfig(join(dir, 'pages')),
+		});
+	} catch (error) {
+		const thrown = {
+			code: 'THROWN',
+			message: (error as Error).message,
+			file: null,
+			line: null,
+		};
+		return routes.map((route) => ({
+			page: route.file,
+			route: route.pattern,
+			builds: false,
+			refusals: [thrown],
+			keyboardOnly: 0,
+		}));
+	}
 	return routes.map((route) => {
 		const own = build.diagnostics.filter((diagnostic) => diagnostic.page === route.file);
 		const errors = own.filter((diagnostic) => diagnostic.severity === 'error');
