@@ -229,28 +229,29 @@ function grow(lane: Lane): void {
 
 function dispatch(lane: Lane): void {
 	for (const entry of lane.workers) {
-		if (!entry.online || entry.job) continue;
-		const job = lane.queue.shift();
-		if (!job) break;
-		entry.job = job;
-		entry.handle.ref();
-		try {
-			entry.handle.send(
-				job.kind === 'chunk'
-					? {
-							kind: 'chunk',
-							id: job.id,
-							task: job.task,
-							fileName: job.fileName,
-							code: job.code,
-							context: job.context,
-						}
-					: compileMessage(job),
-			);
-		} catch {
-			// An input that cannot be cloned runs on the calling thread.
-			entry.job = undefined;
-			giveBack(job);
+		// A job that cannot be sent brings no answer to dispatch the next one, so the worker takes the next job now.
+		while (entry.online && !entry.job && lane.queue.length > 0) {
+			const job = lane.queue.shift()!;
+			entry.job = job;
+			entry.handle.ref();
+			try {
+				entry.handle.send(
+					job.kind === 'chunk'
+						? {
+								kind: 'chunk',
+								id: job.id,
+								task: job.task,
+								fileName: job.fileName,
+								code: job.code,
+								context: job.context,
+							}
+						: compileMessage(job),
+				);
+			} catch {
+				// An input that cannot be cloned runs on the calling thread.
+				entry.job = undefined;
+				giveBack(job);
+			}
 		}
 	}
 	for (const entry of lane.workers) if (!entry.job) entry.handle.unref();
