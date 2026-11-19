@@ -4,6 +4,7 @@ import { resolve as pathResolve } from 'node:path';
 import { defineConfig } from 'vite-plus';
 import type { PackUserConfig } from 'vite-plus/pack';
 
+import { useNodeCompileCache } from './scripts/test-utils/node-compile-cache.ts';
 import { vitestInstallCacheKey } from './scripts/test-utils/vitest-install-cache-key.ts';
 
 // Tests that build router apps and drive Chromium for the native ladder and the yardstick apps: their own lane (mobile-hosts.yml), not the unit shards.
@@ -23,6 +24,7 @@ type PackageManifest = {
 };
 
 const rootDir = import.meta.dirname;
+useNodeCompileCache(rootDir);
 const packageDir = (packageName: string) => pathResolve(rootDir, 'packages', packageName);
 
 const readPackageManifest = (packageName: string): PackageManifest =>
