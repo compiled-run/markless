@@ -1359,16 +1359,16 @@ export function Tags() @{
 		]);
 	});
 
-	it('refuses a @for keyed by its index by name', async () => {
+	it('refuses a @for keyed by its index by name, and not again as markup it left out', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Words() @{
 	let words = state(['a', 'b']);
 	<ul>@for (const word of words; index at; key at) { <li>{word}</li> }</ul>
 }`);
 		expect(payload).toBeNull();
-		expect(diagnostics.map((d) => d.message)).toContain(
+		expect(diagnostics.map((d) => d.message)).toEqual([
 			'a @for keyed by its index; a native list keys each row by its item',
-		);
+		]);
 	});
 
 	it('lowers a form: its fields and submit buttons, a press that submits after its own click, and the return key', async () => {
