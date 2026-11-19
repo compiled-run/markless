@@ -30,6 +30,8 @@ export type NativeAppRuntime = {
 	 * the top screen's place); `back` pops the top screen and shows the one below exactly as it was left.
 	 */
 	readonly dispatch: (action: NativeAppAction) => ReadonlyArray<NativeJournalEntry>;
+	/** What starting the screens the app opened with asked for, bottom first (their async values' requests and timers). */
+	readonly started: ReadonlyArray<NativeJournalEntry>;
 };
 
 const decode = (segment: string): string => {
@@ -133,20 +135,23 @@ export function createNativeAppRuntime(
 		const matched = matchNativeRoute(app, prefix)!;
 		return open(matched.route.pattern, matched.params);
 	});
+	const started = screens.flatMap((screen) => screen.runtime.start());
 	return {
 		screens: () => [...screens],
+		started,
+		// A screen that leaves aborts its async values; a new one starts its own after the `navigate` entry.
 		dispatch(action) {
 			if (action.event === 'back') {
 				if (screens.length < 2) throw new Error('back on the first screen leaves the app');
-				screens.pop();
-				return [];
+				return [...screens.pop()!.runtime.leave()];
 			}
 			const journal = screens.at(-1)!.runtime.dispatch(action);
 			const last = journal.at(-1);
 			if (last?.op === 'navigate') {
 				const next = open(last.route, last.params);
-				if (last.replace) screens.pop();
+				const left = last.replace ? screens.pop()!.runtime.leave() : [];
 				screens.push(next);
+				return [...journal, ...left, ...next.runtime.start()];
 			}
 			return journal;
 		},

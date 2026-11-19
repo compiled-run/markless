@@ -473,7 +473,7 @@ final class ViewTree {
 				if open { sheet.open(from: presenter) } else { sheet.close() }
 			case .navigate, .title:
 				throw HostError("navigate and title entries reach the screen's controller, not its views")
-			case .call, .release, .fetch:
+			case .call, .release, .fetch, .abort:
 				throw HostError("a \(entry.json.jsonText) entry reaches the page's device or script services, not its views")
 			case let .dialog(node, open):
 				try present(node, open: open)

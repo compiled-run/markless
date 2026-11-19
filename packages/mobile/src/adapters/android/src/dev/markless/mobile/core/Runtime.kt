@@ -107,6 +107,12 @@ sealed interface JournalEntry {
 		override val node get() = ""
 		override fun toJson() = "{\"op\":\"fetch\",\"id\":$id,\"request\":${request.toJson()}}"
 	}
+
+	/** The script aborted request [id] (its async value was superseded or left the screen): cancel it and send no response. */
+	data class Abort(val id: Int) : JournalEntry {
+		override val node get() = ""
+		override fun toJson() = "{\"op\":\"abort\",\"id\":$id}"
+	}
 }
 
 /** A request as the script made it: an absolute [url], and a text [body] or none. */
@@ -166,6 +172,9 @@ data class Row(val key: String, val item: JsValue)
 
 /** Runs handler ops on cells and reports what changed on shown nodes as journal entries, in document order. Free of android.*. */
 /** [now]: the device's clock, in ms since 1970 (UTC); a conformance run fixes it. */
+/** Each screen's async values run under their own number in an engine the app's screens share. */
+private var screens = 0
+
 class Runtime(
 	val payload: Payload,
 	private val store: Store = MemoryStore(),
@@ -324,12 +333,40 @@ class Runtime(
 		return (engine ?: load(script)).evaluate(if (argument == null) "$target()" else "$target(${jsonString(argument)})")
 	}
 
-	/** The names a script function reads, as its engine entry spells them: slots of this scope's cells, and values. */
-	private fun frameOf(bindings: Map<String, ScriptBinding>, scope: Scope): String = bindings.entries.joinToString(",", "{", "}") { (name, b) ->
+	/** A script function's name as its engine entry spells it: a slot of this scope's cell, slots by field, or a value. */
+	private sealed interface Bound {
+		data class Slot(val slot: String) : Bound
+		data class Fields(val fields: Map<String, String>) : Bound
+		data class Value(val value: JsValue) : Bound
+	}
+
+	private fun bind(bindings: Map<String, ScriptBinding>, scope: Scope): Map<String, Bound> = bindings.mapValuesTo(LinkedHashMap()) { (_, b) ->
+		when (b) {
+			is ScriptBinding.Cell -> Bound.Slot(slot(b.cell, scope))
+			is ScriptBinding.Fields -> Bound.Fields(b.fields.mapValuesTo(LinkedHashMap()) { slot(it.value, scope) })
+			is ScriptBinding.Value -> Bound.Value(evaluate(b.value, scope))
+		}
+	}
+
+	private fun frameJson(frame: Map<String, Bound>): String = frame.entries.joinToString(",", "{", "}") { (name, b) ->
 		jsonString(name) + ":" + when (b) {
-			is ScriptBinding.Cell -> "{\"slot\":${jsonString(slot(b.cell, scope))}}"
-			is ScriptBinding.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(slot(it.value, scope))}" }}}"
-			is ScriptBinding.Value -> "{\"value\":${jsonValue(evaluate(b.value, scope))}}"
+			is Bound.Slot -> "{\"slot\":${jsonString(b.slot)}}"
+			is Bound.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}}"
+			is Bound.Value -> "{\"value\":${jsonValue(b.value)}}"
+		}
+	}
+
+	/** The names a script function reads, as its engine entry spells them: slots of this scope's cells, and values. */
+	private fun frameOf(bindings: Map<String, ScriptBinding>, scope: Scope): String = frameJson(bind(bindings, scope))
+
+	private fun nullish(v: JsValue?): JsValue? = v?.takeIf { it != JsValue.Null }
+
+	/** A frame's names as the values they hold now. */
+	private fun readFrame(frame: Map<String, Bound>): String = frame.values.joinToString(",", "[", "]") { b ->
+		when (b) {
+			is Bound.Slot -> jsonValue(nullish(values[b.slot]) ?: nullish(values[b.slot.substringBefore('@')]) ?: JsValue.Null)
+			is Bound.Fields -> b.fields.values.joinToString(",", "[", "]") { jsonValue(values[it] ?: JsValue.Null) }
+			is Bound.Value -> jsonValue(b.value)
 		}
 	}
 
@@ -365,7 +402,8 @@ class Runtime(
 			logs.add(level to text)
 			onScriptLog?.invoke(level, text)
 		}
-		return list("clears").map { JournalEntry.ClearTimer("$SCRIPT_TIMER${id(it)}") } +
+		return list("aborts").map { JournalEntry.Abort(id(it)) } +
+			list("clears").map { JournalEntry.ClearTimer("$SCRIPT_TIMER${id(it)}") } +
 			list("timers").map { t -> t.arr("leave().timers[]").let { JournalEntry.Timer("$SCRIPT_TIMER${id(it[0])}", it[1].num("leave().timers[][1]")) } } +
 			list("requests").map { r ->
 				val o = r.obj("leave().requests[]")
@@ -380,6 +418,35 @@ class Runtime(
 			}
 	}
 
+
+	private val screen = ++screens
+	private val asyncCells = payload.cells.filter { it.async != null }
+	/** What the async values' runs depend on as last told to the engine; null before the first. */
+	private var asyncSent: String? = null
+
+	/** Tells the engine which async values are shown and what they read, when that moved; it starts and aborts runs. */
+	private fun syncAsync(): List<JournalEntry> {
+		if (asyncCells.isEmpty()) return emptyList()
+		val out = ArrayList<JournalEntry>()
+		// A run that settles at once can show another; the engine is asked again until nothing moves.
+		repeat(16) {
+			val frames = asyncCells.map { bind(it.async!!.bindings, Scope.EMPTY) }
+			val tasks = asyncCells.zip(frames).joinToString(",", "[", "]") { (c, frame) -> "{\"slot\":${jsonString(c.id)},\"fn\":${jsonString(c.async!!.fn)},\"frame\":${frameJson(frame)}}" }
+			val sent = "[$tasks,${frames.joinToString(",", "[", "]", transform = ::readFrame)}]"
+			if (sent == asyncSent) return out
+			asyncSent = sent
+			out.addAll(enter("\"kind\":\"tasks\",\"screen\":$screen,\"tasks\":$tasks"))
+		}
+		throw MarklessRuntimeError("async values that keep starting each other")
+	}
+
+	/** Starts the async values the script computes, once the screen is built; the host applies its journal as an action's. */
+	fun start(): List<JournalEntry> = if (asyncCells.isEmpty()) emptyList() else change(null, null) { emptyList() }
+
+	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
+	fun leave(): List<JournalEntry> =
+		if (asyncSent == null) emptyList()
+		else enter("\"kind\":\"tasks\",\"screen\":$screen,\"tasks\":[],\"leave\":true").filter { it is JournalEntry.Abort }
 
 	/** The host's answer to a `fetch` entry: `{ status, statusText, headers, body }`, or `{ error }` for a network failure. */
 	fun response(id: Int, response: JsValue): List<JournalEntry> =
@@ -851,6 +918,7 @@ class Runtime(
 		val stackBefore = stack
 		val calls = apply()
 		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
+		val synced = calls + syncAsync()
 		val shownNow = shownOverlays()
 		val released = stackBefore.filter { it !in shownNow }
 		val enlisted = shownNow.filter { it !in stackBefore }
@@ -904,7 +972,7 @@ class Runtime(
 		for (o in payload.objects) if (o.id in ownedBefore && o.id !in owned) journal.add(JournalEntry.Release(o.id))
 		for (o in released) journal.add(JournalEntry.Overlay(o, open = false, modal = isModal(o)))
 		for (o in enlisted) journal.add(JournalEntry.Overlay(o, open = true, modal = isModal(o)))
-		journal.addAll(calls)
+		journal.addAll(synced)
 		return journal
 	}
 

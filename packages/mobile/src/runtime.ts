@@ -67,6 +67,9 @@ export type NativeAction =
 /** The prefix of a timer the script set, as its `timer` entries name it (`script:3`); other timers are `after` ops. */
 export const SCRIPT_TIMER = 'script:';
 
+/** Each screen's async values run under their own name in an engine the app's screens share. */
+let screens = 0;
+
 /** Runs a script function a `{ script }` expression names, with its bindings resolved where it is read. */
 type Compute = (fn: string, bindings: NativeScriptBindings, scope: NativeScope) => Value;
 
@@ -142,6 +145,10 @@ export type NativeRuntime = {
 	readonly engineStarts: () => number;
 	/** What the script wrote to `console`, in order, as `[level, text]`. */
 	readonly logs: () => ReadonlyArray<readonly [level: string, text: string]>;
+	/** Starts the async values the script computes, once the screen is built; the host applies its journal as an action's. */
+	readonly start: () => ReadonlyArray<NativeJournalEntry>;
+	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
+	readonly leave: () => ReadonlyArray<NativeJournalEntry>;
 };
 
 /** How the runtime gets a script engine and the bytes `crypto` draws from; a host owns both. */
@@ -548,6 +555,7 @@ export function createNativeRuntime(
 		call('enter', { ...entry, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
 			readonly writes: ReadonlyArray<readonly [string, Value]>;
+			readonly aborts: ReadonlyArray<number>;
 			readonly timers: ReadonlyArray<readonly [number, number]>;
 			readonly clears: ReadonlyArray<number>;
 			readonly requests: ReadonlyArray<{
@@ -566,6 +574,7 @@ export function createNativeRuntime(
 		}
 		logs.push(...result.logs);
 		return [
+			...result.aborts.map((id): NativeJournalEntry => ({ op: 'abort', id })),
 			...result.clears.map((id): NativeJournalEntry => ({
 				op: 'clearTimer',
 				timer: `${SCRIPT_TIMER}${id}`,
@@ -582,6 +591,40 @@ export function createNativeRuntime(
 			})),
 		];
 	};
+	const screen = ++screens;
+	const asyncCells = payload.cells.filter((cell) => cell.async);
+	/** What the async values' runs depend on as last told to the engine; null before the first. */
+	let asyncSent: string | null = null;
+	/** Tells the engine which async values are shown and what they read, when that moved; it starts and aborts runs. */
+	const syncAsync = (): NativeJournalEntry[] => {
+		if (asyncCells.length === 0) return [];
+		const out: NativeJournalEntry[] = [];
+		// A run that settles at once can show another; the engine is asked again until nothing moves.
+		for (let round = 0; round < 16; round++) {
+			const tasks = asyncCells.map((cell) => ({
+				slot: cell.id,
+				fn: cell.async!.script,
+				frame: frameOf(cell.async!.bindings, undefined, base),
+			}));
+			const sent = JSON.stringify([
+				tasks,
+				asyncCells.map((cell) => readFrame(cell.async!.bindings)),
+			]);
+			if (sent === asyncSent) return out;
+			asyncSent = sent;
+			out.push(...enter({ kind: 'tasks', screen, tasks }));
+		}
+		throw new Error('async values that keep starting each other');
+	};
+	/** What a script function's names hold now. */
+	const readFrame = (bindings: NativeScriptBindings) =>
+		Object.values(bindings).map((binding) =>
+			'cell' in binding
+				? read(binding.cell)
+				: 'fields' in binding
+					? Object.values(binding.fields).map((cell) => read(cell))
+					: evaluate(binding.value),
+		);
 	const compute: Compute = (fn, bindings, scope) =>
 		JSON.parse(
 			call('enter', {
@@ -944,6 +987,13 @@ export function createNativeRuntime(
 			ticked.flatMap((node) => (shown(node) ? [[node.id, checkedOf(node.id)] as const] : [])),
 		engineStarts: () => engineStarts,
 		logs: () => logs,
+		start: () => (asyncCells.length === 0 ? [] : change(undefined, undefined, () => [])),
+		leave: () =>
+			asyncSent === null
+				? []
+				: enter({ kind: 'tasks', screen, tasks: [], leave: true }).filter(
+						(entry) => entry.op === 'abort',
+					),
 		dispatch(action) {
 			if (action.event === 'timer' && action.timer.startsWith(SCRIPT_TIMER))
 				return change(undefined, undefined, () =>
@@ -1318,6 +1368,7 @@ export function createNativeRuntime(
 			const stackBefore = stack;
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
+			calls.push(...syncAsync());
 			const shownNow = shownOverlays();
 			const released = stackBefore.filter((overlay) => !shownNow.includes(overlay));
 			const enlisted = shownNow.filter((overlay) => !stackBefore.includes(overlay));

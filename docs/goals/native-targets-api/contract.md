@@ -119,6 +119,25 @@ and the first script entry's duration.
 **Android linking.** The engine (`src/adapters/android/engine/`, built by `build-hermes.sh`) is packed into an APK only
 when one of its payloads has a script; the host finds `dev.markless.mobile.engine.HermesEngine` by class name.
 
+## 0d. Async values the script computes (2026-11-19, `cw/async-try-native`)
+
+`computed(async ...)` whose body is not one device call (a `fetch`-backed loader, an awaited app function) runs as a
+script function, with the web's meaning (`specs/framework/03-state-graph.md` "Async derivation",
+`specs/framework/12-arm-rendering.md` D8). Vectors: `conformance/script-async-value.json`; rung J11.
+
+**Payload.** The cell has `async: { script: fn, bindings }` and starts as `{ state: 'pending' }`. The script writes
+`{ state: 'value', value, error: null }`, `{ state: 'value', value, error }` (a refresh failed: the value it had stays) or
+`{ state: 'error', error }` (the first answer failed). The `@try` branch reads `state` as for a device task; a branch
+`<boundary>:caught` after it shows the `@catch` content while `state` is `value` and `error` is not null.
+
+**Starting and refreshing.** `start()` (after `tasks()` at mount; its journal is applied as an action's) and every change
+send the engine `{ kind: 'tasks', screen, tasks: [{ slot, fn, frame }] }` when the shown async values, or a value their
+bindings read, moved. The engine keys each run by the values its frame reads: a new key aborts the run in flight (its
+signal fires) and starts another while the cell keeps what it shows; an answer for an aborted run is dropped. `leave()`
+(the screen is popped or replaced) sends `{ kind: 'tasks', screen, tasks: [], leave: true }`. `leave` of an entry also
+returns `aborts: [id]`: a request whose signal fired, journalled first as `{ op: 'abort', id }`; the host cancels it and
+never answers it.
+
 ## 1. What I found before building (the owner's picture is weeks old)
 
 - **`docs/goals/native-targets-api/` was not in the repo.** The research board lives only on the planner's machine (copy read

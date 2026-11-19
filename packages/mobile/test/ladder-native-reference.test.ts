@@ -315,12 +315,18 @@ function walkApp(
 		return shown;
 	};
 	const stack = appRuntime.screens().map(open);
+	for (const entry of appRuntime.started) {
+		const answer = services.answer(entry);
+		if (answer) for (const next of appRuntime.dispatch(answer)) stack.at(-1)!.apply(next, -1);
+	}
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
 		if (action && 'back' in action) {
 			expect(
-				appRuntime.dispatch({ event: 'back' }),
-				`step ${index}: Back journals nothing`,
+				appRuntime
+					.dispatch({ event: 'back' })
+					.filter((entry) => entry.op !== 'abort' && entry.op !== 'clearTimer'),
+				`step ${index}: Back journals only what it cancels`,
 			).toEqual([]);
 			stack.pop();
 		} else if (looksOnly(action) || (action && ('swipe' in action || 'scrollTo' in action))) {
@@ -431,6 +437,7 @@ function walk(
 			if (permission === 'unknown') waiting.push(task.result!);
 			else apply(answer(task.result!), -1);
 		}
+		apply(runtime.start(), -1);
 	};
 	const texts = new Map(runtime.texts());
 	const attributes = new Map(

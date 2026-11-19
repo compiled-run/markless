@@ -488,6 +488,55 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// Pending, the value, a refresh that holds it, a change while pending, a stale answer dropped, a failed refresh beside
+		// the value, a refresh that clears it; the vector's `leave` aborts the request still in flight.
+		name: 'script-async-value',
+		fixture: 'proofs/j11-async-fetch/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'timer', timer: 'script:1' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=apple - ',
+				},
+			},
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:3' },
+			{ event: 'activate', host: 'h5' },
+			{
+				event: 'response',
+				id: 2,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=cherry - ',
+				},
+			},
+			{ event: 'timer', timer: 'script:4' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'timer', timer: 'script:5' },
+			{
+				event: 'response',
+				id: 3,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=banana - ',
+				},
+			},
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:6' },
+		],
+	},
+	{
 		name: 'script-computed',
 		fixture: 'proofs/j5-engine-computed/App.tsrx',
 		modules: true,

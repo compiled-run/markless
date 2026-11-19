@@ -67,6 +67,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case clearTimer(timer: String)
 	/// The script called `fetch`: send the request and answer with `response(_:_:)`.
 	case fetch(id: Int, request: NativeFetchRequest)
+	/// The signal of request `id` aborted (its async value was superseded or left the screen): cancel it, send no response.
+	case abort(id: Int)
 	/// An element marked `overlay` joined the overlay stack (`open`) or left it; a modal one goes in the top layer.
 	case overlay(node: String, open: Bool, modal: Bool)
 
@@ -109,6 +111,7 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("timer")), ("timer", .string(timer)), ("ms", .number(ms))])
 		case let .clearTimer(timer): return .object([("op", .string("clearTimer")), ("timer", .string(timer))])
 		case let .fetch(id, request): return .object([("op", .string("fetch")), ("id", .number(Double(id))), ("request", request.json)])
+		case let .abort(id): return .object([("op", .string("abort")), ("id", .number(Double(id)))])
 		case let .overlay(node, open, modal):
 			return .object([("op", .string("overlay")), ("node", .string(node)), ("open", .bool(open)), ("modal", .bool(modal))])
 		}
@@ -167,6 +170,9 @@ private struct Context {
 	let submission: Submission?
 }
 
+/// Each screen's async values run under their own name in an engine the app's screens share.
+nonisolated(unsafe) private var screenCount = 0
+
 /// The payload's state and op interpreter, matching `packages/mobile/src/runtime.ts` exactly.
 public final class NativeRuntime {
 	public let payload: NativeViewPayload
@@ -208,6 +214,10 @@ public final class NativeRuntime {
 	private let now: () -> Double
 	/// `idle` and `visible` handlers that ran, by `<event>\0<instance>`; an instance that leaves the screen is forgotten.
 	private var fired = Set<String>()
+	private let screen: Int
+	private let asyncCells: [NativeCell]
+	/// What the async values' runs depend on as last told to the engine; nil before the first.
+	private var asyncSent: String?
 
 	/// `params`: the route params the page opened with; `now`: the clock (a conformance run fixes it).
 	/// `preferredLanguages`: the device's, most preferred first; the web's messages are shown in the first one the payload has.
@@ -220,6 +230,9 @@ public final class NativeRuntime {
 		self.store = store
 		self.now = now
 		self.scriptHost = scriptHost
+		screenCount += 1
+		screen = screenCount
+		asyncCells = payload.cells.filter { $0.async != nil }
 		let opened = now()
 		values = Dictionary(uniqueKeysWithValues: payload.cells.map { cell in
 			(cell.id, cell.clock ? .number(opened) : cell.storageKey.flatMap(store.read) ?? cell.initial)
@@ -458,7 +471,7 @@ public final class NativeRuntime {
 			_ = try callScript("enter", .object(entry + entryCells()))
 			return try callScript("leave")
 		}
-		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(["writes", "timers", "clears", "requests", "logs"])
+		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(["writes", "aborts", "timers", "clears", "requests", "logs"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
@@ -474,6 +487,7 @@ public final class NativeRuntime {
 			guard pair.count == 2 else { throw line.fail("a log line is [level, text]") }
 			scriptHost?.log(try pair[0].string(), try pair[1].string())
 		}
+		let aborts = try result["aborts"].array().map { NativeJournalEntry.abort(id: try wholeNumber($0)) }
 		let clears = try result["clears"].array().map { NativeJournalEntry.clearTimer(timer: "\(scriptTimer)\(try wholeNumber($0))") }
 		let timers = try result["timers"].array().map { timer -> NativeJournalEntry in
 			let pair = try timer.array()
@@ -487,7 +501,55 @@ public final class NativeRuntime {
 				url: try asked["url"].string(), method: try asked["method"].string(), headers: try decodeHeaders(asked["headers"]),
 				body: try asked["body"].optionalString()))
 		}
-		return clears + timers + requests
+		return aborts + clears + timers + requests
+	}
+
+	/// Tells the engine which async values are shown and what they read, when that moved; it starts and aborts runs.
+	private func syncAsync() throws -> [NativeJournalEntry] {
+		if asyncCells.isEmpty { return [] }
+		let event = eventValue
+		eventValue = nil
+		defer { eventValue = event }
+		var out: [NativeJournalEntry] = []
+		// A run that settles at once can show another; the engine is asked again until nothing moves.
+		for _ in 0..<16 {
+			let tasks = try asyncCells.map { cell -> (slot: String, fn: String, frame: [(String, JSONValue)]) in
+				guard case let .object(names) = try self.frame(of: cell.async!.bindings, in: .empty) else { throw RuntimeError(reason: "a frame is an object") }
+				return (cell.id, cell.async!.script, names)
+			}
+			let listed = JSONValue.array(tasks.map { .object([("slot", .string($0.slot)), ("fn", .string($0.fn)), ("frame", .object($0.frame))]) })
+			let sent = JSONValue.array([listed, .array(tasks.map { .array($0.frame.map { readFrame($0.1) }) })]).jsonText
+			if sent == asyncSent { return out }
+			asyncSent = sent
+			out += try enter([("kind", .string("tasks")), ("screen", .number(Double(screen))), ("tasks", listed)])
+		}
+		throw RuntimeError(reason: "async values that keep starting each other")
+	}
+
+	/// A frame's name as the value it holds now.
+	private func readFrame(_ binding: JSONValue) -> JSONValue {
+		guard case let .object(fields) = binding, let (kind, inner) = fields.first else { return .null }
+		let slotValue = { (slot: String) -> JSONValue in
+			if let value = self.values[slot], value != .null { return value.json }
+			return self.values[String(slot.split(separator: "@", omittingEmptySubsequences: false)[0])]?.json ?? .null
+		}
+		switch (kind, inner) {
+		case let ("slot", .string(slot)): return slotValue(slot)
+		case let ("fields", .object(slots)): return .array(slots.map { if case let .string(slot) = $0.1 { slotValue(slot) } else { .null } })
+		default: return inner
+		}
+	}
+
+	/// Starts the async values the script computes, once the screen is built; the host applies its journal as an action's.
+	public func start() throws -> [NativeJournalEntry] {
+		asyncCells.isEmpty ? [] : try change(host: nil) { [] }
+	}
+
+	/// The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel.
+	public func leave() throws -> [NativeJournalEntry] {
+		guard asyncSent != nil else { return [] }
+		return try enter([("kind", .string("tasks")), ("screen", .number(Double(screen))), ("tasks", .array([])), ("leave", .bool(true))])
+			.filter { if case .abort = $0 { true } else { false } }
 	}
 
 	/// The host's answer to a `fetch` entry.
@@ -990,8 +1052,9 @@ public final class NativeRuntime {
 		let ownedBefore = Set(try liveObjects())
 		let focusBefore = focused
 		let stackBefore = stack
-		let calls = try apply()
+		var calls = try apply()
 		if case .navigate? = calls.first { return calls }
+		calls += try syncAsync()
 		let shownNow = try shownOverlays()
 		let released = stackBefore.filter { !shownNow.contains($0) }
 		let enlisted = shownNow.filter { !stackBefore.contains($0) }
@@ -1083,6 +1146,8 @@ public final class NativeAppStack {
 	private let store: NativeStore
 	private let scriptHost: NativeScriptHost?
 	public private(set) var screens: [NativeScreen]
+	/// What starting the screens the app opened with asked for, bottom first.
+	public private(set) var started: [NativeJournalEntry] = []
 
 	/// `scriptHost`: the app's one engine, shared by every screen.
 	public init(app: NativeAppPayload, path: String, store: NativeStore = MemoryStore(), scriptHost: NativeScriptHost? = nil) throws {
@@ -1094,6 +1159,7 @@ public final class NativeAppStack {
 			guard let (route, params) = app.match(prefix) else { throw RuntimeError(reason: "\(prefix) is not a route") }
 			return try screen(route.pattern, params)
 		}
+		started = try screens.flatMap { try $0.runtime.start() }
 	}
 
 	public func screen(_ route: String, _ params: [NativeRouteParam]) throws -> NativeScreen {
@@ -1108,16 +1174,18 @@ public final class NativeAppStack {
 		let journal = try screens[screens.count - 1].runtime.dispatch(action)
 		if case let .navigate(route, params, replace)? = journal.last {
 			let next = try screen(route, params)
-			if replace { screens.removeLast() }
+			let left = replace ? try screens.removeLast().runtime.leave() : []
 			screens.append(next)
+			return journal + left + (try next.runtime.start())
 		}
 		return journal
 	}
 
-	/// The platform's Back: the top screen goes and the one below shows as it was left.
-	public func back() throws {
+	/// The platform's Back: the top screen goes and the one below shows as it was left; returns what its leaving cancels.
+	@discardableResult
+	public func back() throws -> [NativeJournalEntry] {
 		guard screens.count > 1 else { throw RuntimeError(reason: "back on the first screen leaves the app") }
-		screens.removeLast()
+		return try screens.removeLast().runtime.leave()
 	}
 }
 

@@ -138,6 +138,9 @@ private fun runVector(file: File, vector: Map<String, Json>, runtime: Runtime) {
 	val tasks = runtime.tasks().joinToString(",", "[", "]") { it.toJson() }
 	val initialTasks = vector["tasks"]?.let(::canonical) ?: "[]"
 	check("${file.name} tasks", tasks == initialTasks) { "expected $initialTasks\n  actual   $tasks" }
+	val start = runtime.start().joinToString(",", "[", "]") { it.toJson() }
+	val expectedStart = vector["start"]?.let(::canonical) ?: "[]"
+	check("${file.name} start", start == expectedStart) { "expected $expectedStart\n  actual   $start" }
 	for ((n, step) in field(vector, "steps", file.name).arr("steps").withIndex()) {
 		val s = step.obj("steps[$n]")
 		val action = field(s, "action", "steps[$n]").obj("action")
@@ -192,6 +195,11 @@ private fun runVector(file: File, vector: Map<String, Json>, runtime: Runtime) {
 		val expected = canonical(field(s, "journal", "steps[$n]"))
 		check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
 	}
+	if (runtime.payload.cells.any { it.async != null }) {
+		val leave = runtime.leave().joinToString(",", "[", "]") { it.toJson() }
+		val expectedLeave = vector["leave"]?.let(::canonical) ?: "[]"
+		check("${file.name} leave", leave == expectedLeave) { "expected $expectedLeave\n  actual   $leave" }
+	}
 }
 
 /** One `markless.native-app-conformance/0` vector: after opening and after each action, the stack's paths, the top screen's title and texts, and the journal. */
@@ -210,6 +218,9 @@ private fun runAppVector(file: File, vector: Map<String, Json>, runtime: AppRunt
 		val texts = top.texts().joinToString(",", "[", "]") { (n, t) -> "[${jsonString(n)},${jsonString(t)}]" }
 		check("${file.name} $where texts", texts == canonical(field(expected, "texts", where))) { "expected ${canonical(field(expected, "texts", where))}\n  actual   $texts" }
 	}
+	val started = runtime.started.joinToString(",", "[", "]") { it.toJson() }
+	val expectedStarted = vector["started"]?.let(::canonical) ?: "[]"
+	check("${file.name} started", started == expectedStarted) { "expected $expectedStarted\n  actual   $started" }
 	look("initial", field(vector, "initial", file.name).obj("initial"))
 	for ((n, step) in field(vector, "steps", file.name).arr("steps").withIndex()) {
 		val s = step.obj("steps[$n]")

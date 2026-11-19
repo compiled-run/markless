@@ -580,6 +580,13 @@ export type NativeViewPayload = {
 			readonly arguments: ReadonlyArray<NativeExpr>;
 		};
 		/**
+		 * An async value the payload's script computes (`computed(async ...)` that is not one device call). The host's
+		 * runtime starts it when the screen starts and again whenever a cell its bindings read changes, and the script
+		 * settles the cell: `{ state: 'pending' }` until the first answer, then `{ state: 'value', value, error }` (`error` is
+		 * a failed refresh's error over the value it kept, else null) or `{ state: 'error', error: { name, message } }`.
+		 */
+		readonly async?: { readonly script: string; readonly bindings: NativeScriptBindings };
+		/**
 		 * State of a component a list row renders (`repeat` node id): one value per row, `initial` when the row is built and
 		 * gone with it. A read or write inside the row reaches that row's value.
 		 */
@@ -770,7 +777,9 @@ export type NativeJournalEntry =
 	/** The script cleared a timer it set (`timer` names it, `script:<n>`): the host drops it. */
 	| { readonly op: 'clearTimer'; readonly timer: string }
 	/** The script called `fetch`: the host sends the request and answers with a `response` action naming `id`. */
-	| { readonly op: 'fetch'; readonly id: number; readonly request: NativeFetchRequest };
+	| { readonly op: 'fetch'; readonly id: number; readonly request: NativeFetchRequest }
+	/** The signal of the request `id` aborted (its async value was superseded or left the screen): cancel it, send no response. */
+	| { readonly op: 'abort'; readonly id: number };
 
 /** A request as the script made it; `url` is absolute (a relative one rejects in the script, as with no page to resolve it). */
 export type NativeFetchRequest = {

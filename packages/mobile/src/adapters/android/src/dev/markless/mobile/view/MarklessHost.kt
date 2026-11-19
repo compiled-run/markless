@@ -242,6 +242,8 @@ class MarklessHost(
 		for ((id, open) in runtime.sheets()) if (open) root.post { sheets.getValue(id).open() }
 		for (cell in payload.cells) cell.device?.let { name -> needDevice().watch(name, cell.obj) { if (!released) apply(runtime.device(cell.id, it)) } }
 		for (call in runtime.tasks()) runCall(call)
+		// The activity reads the title after building the host, so a start that retitles needs no title bar yet.
+		apply(runtime.start().filter { it !is JournalEntry.Title || onTitle != null })
 		refreshRelations()
 		root.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
 			override fun onViewAttachedToWindow(view: View) = startLoadEvents()
@@ -322,8 +324,14 @@ class MarklessHost(
 		for (o in payload.objects) device?.release(o.id)
 	}
 
-	/** The screen is gone: no timer fires and no pending request answers after this. */
+	private var left = false
+
+	/** The screen is gone: its async values' runs abort, no timer fires and no pending request answers after this. */
 	fun stopTimersAndRequests() {
+		if (!left) {
+			left = true
+			for (entry in runtime.leave()) if (entry is JournalEntry.Abort) scriptServices.abort(entry.id)
+		}
 		timers.removeCallbacksAndMessages(null)
 		pendingTimers.clear()
 		scriptServices.stop()
@@ -464,7 +472,8 @@ class MarklessHost(
 				is JournalEntry.Call -> runCall(entry)
 				is JournalEntry.Release -> needDevice().release(entry.node)
 				is JournalEntry.ClearTimer -> pendingTimers.remove(entry.node)?.let(timers::removeCallbacks)
-				is JournalEntry.Fetch -> scriptServices.fetch(entry.request) { if (!released) apply(runtime.response(entry.id, it)) }
+				is JournalEntry.Fetch -> scriptServices.fetch(entry.id, entry.request) { if (!released) apply(runtime.response(entry.id, it)) }
+				is JournalEntry.Abort -> scriptServices.abort(entry.id)
 				is JournalEntry.Rows -> {
 					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
 					rebuild()
