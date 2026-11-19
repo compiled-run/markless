@@ -439,6 +439,8 @@ type Scope = {
 	};
 	/** Prefix of every id this component instance emits (`component-edge:0/` inside a child, empty at the root). */
 	readonly prefix: string;
+	/** The list whose rows this instance renders in: its state and async values are per row. */
+	readonly row?: string;
 	readonly event?: string;
 	/** A click handler's event parameter: only the fields a tap has (`pressed`) may be read. */
 	readonly opaque?: string;
@@ -466,6 +468,8 @@ type Scope = {
 	>;
 	/** The nearest `@catch` around this markup: a handler's failed awaited device call writes its error there. */
 	readonly catches?: HandlerCatch;
+	/** In a handler: the names it calls as a `@catch`'s `reset`, by the analyzer's id of that `@try`. */
+	readonly resets?: ReadonlyMap<string, string>;
 	/** Where the expression being lowered is written: a refusal inside it points there. */
 	readonly span?: SourceSpan;
 	/**
@@ -475,6 +479,8 @@ type Scope = {
 	readonly live?: boolean;
 	/** Inside a `@try` arm: the boundary, whose task cells its reads collect, and the name `@catch` binds its error to. */
 	readonly boundary?: {
+		/** The analyzer's id of the `@try`, which a handler's `reset` names. */
+		readonly id: string;
 		readonly tasks: Set<string>;
 		readonly errorName?: string;
 		readonly arm: 'try' | 'pending' | 'catch';
@@ -1473,6 +1479,7 @@ export function createNativeViewPayload(
 			component,
 			cells: { byName, byBinding },
 			prefix,
+			...(row ? { row } : {}),
 			locals: new Set(),
 			items: new Map(),
 			props,
@@ -1848,11 +1855,27 @@ export function createNativeViewPayload(
 		const body = computed.nativeExpression;
 		const call = methodCallSite(body?.kind === 'await' ? body.value : body);
 		const device = call ? deviceName(call.calleePath, scope) : undefined;
-		if (!call || device === undefined || !isDeviceCall(device) || !DEVICE_CALLS[device].async)
-			return refuse(
-				`${what} reads the async value \`${computed.name}\`, whose body is not one device call; it needs a script engine`,
-			);
 		const id = `${scope.prefix}task:${computed.id}`;
+		if (
+			!call ||
+			device === undefined ||
+			!isDeviceCall(device) ||
+			!DEVICE_CALLS[device].async
+		) {
+			if (!cells.some((cell) => cell.id === id)) {
+				const script = scriptAsync(computed, { ...scope, boundary: undefined }, what);
+				if (script === null) return null;
+				addCell({
+					id,
+					name: computed.name,
+					initial: { state: 'pending' },
+					async: { ...script, boundaries: [] },
+					...(scope.row ? { row: scope.row } : {}),
+				});
+			}
+			scope.boundary.tasks.add(id);
+			return { member: { cell: id }, property: 'value' };
+		}
 		if (!cells.some((cell) => cell.id === id)) {
 			const args = call.arguments.map((argument) =>
 				exprOf(argument, `the async value \`${computed.name}\``, {
@@ -2130,6 +2153,25 @@ export function createNativeViewPayload(
 					`${what} reads the computed \`${computed.name}\`, whose body needs a script engine`,
 				);
 			const label = `the computed \`${computed.name}\``;
+			const fn = scriptFunctionId(fact, scope.module, label);
+			const bindings = scriptBindings(fact, scope, label);
+			return fn === null || bindings === null ? null : { script: fn, bindings };
+		});
+	}
+
+	/** An async computed that is not one device call, as the script function a host runs to settle its task cell. */
+	function scriptAsync(
+		computed: SemanticGraphArtifact['graphBindings'][number],
+		scope: Scope,
+		what: string,
+	): { script: string; bindings: Record<string, NativeScriptBinding> } | null {
+		return keepingFunctions(() => {
+			const fact = scriptFacts(scope.module)?.computed(computed.componentName, computed.name);
+			if (!fact || scriptMode === 'never')
+				return refuse(
+					`${what} reads the async value \`${computed.name}\`, whose body needs a script engine`,
+				);
+			const label = `the async value \`${computed.name}\``;
 			const fn = scriptFunctionId(fact, scope.module, label);
 			const bindings = scriptBindings(fact, scope, label);
 			return fn === null || bindings === null ? null : { script: fn, bindings };
@@ -4406,10 +4448,7 @@ export function createNativeViewPayload(
 			if (item.kind === 'boundary') {
 				close();
 				const boundary = scope.module.boundaries.get(item.id);
-				if (place.row || place.arm || scope.boundary) {
-					refuse('a @try inside an @if arm, a @for row or another @try');
-					continue;
-				}
+
 				if (item.arms.catch === undefined) {
 					refuse('a @try with no @catch; its error would leave this screen');
 					continue;
@@ -4441,11 +4480,12 @@ export function createNativeViewPayload(
 					lowerChunk(
 						chunk,
 						parent,
-						{ arm: { branch: branchId, index } },
+						{ ...(place.row ? { row: place.row } : {}), arm: { branch: branchId, index } },
 						{
 							...scope,
 							...(arm === 'try' ? { catches } : {}),
 							boundary: {
+								id: item.id,
 								tasks,
 								arm,
 								catches,
@@ -4464,15 +4504,16 @@ export function createNativeViewPayload(
 							});
 				});
 				const caught = catches.used();
-				if (tasks.size > 1 || (tasks.size === 0 && !caught)) {
-					refuse(
-						tasks.size > 1
-							? `a @try that waits on ${tasks.size} device values; one is supported`
-							: 'a @try that neither reads a device value nor holds a handler that awaits (a device call, or JavaScript)',
-					);
+				if (tasks.size > 1) {
+					refuse(`a @try that waits on ${tasks.size} async values; one is supported`);
 					continue;
 				}
 				const [task] = tasks;
+				// A refresh of a script's async value that fails keeps the value and opens @catch after it, as the web does.
+				const refreshes =
+					task !== undefined &&
+					cellIndex.has(task) &&
+					cells[cellIndex.get(task)!]?.async !== undefined;
 				const state = (value: string): NativeExpr =>
 					task === undefined
 						? { literal: value === 'value' }
@@ -4487,22 +4528,48 @@ export function createNativeViewPayload(
 					parent,
 					tests: [state('value'), state('pending'), null],
 					arms: 3,
+					...place,
 				});
+				// A script's async value runs while a @try that reads it is shown.
+				if (refreshes) {
+					const index = cellIndex.get(task)!;
+					const cell = cells[index]!;
+					cells[index] = {
+						...cell,
+						async: { ...cell.async!, boundaries: [...cell.async!.boundaries, branchId] },
+					};
+				}
 				// A handler that rejects keeps the shown content and opens @catch after it, as the web's spec says (a failed
 				// value on the first load still shows only @catch).
-				if (caught) {
+				if (caught || refreshes) {
 					const caughtId = `${branchId}:caught`;
-					const shownAfter: NativeExpr = {
+					const handlerFailed: NativeExpr = {
 						binary: '!==',
 						left: { cell: catchCell },
 						right: { literal: null },
 					};
+					const failedRefresh: NativeExpr | undefined = refreshes
+						? {
+								logical: '&&',
+								left: state('value'),
+								right: {
+									binary: '!==',
+									left: { member: { cell: task }, property: 'error' },
+									right: { literal: null },
+								},
+							}
+						: undefined;
+					const shownAfter: NativeExpr = !caught
+						? failedRefresh!
+						: failedRefresh
+							? { logical: '||', left: handlerFailed, right: failedRefresh }
+							: handlerFailed;
 					nodes.push({
 						kind: 'branch',
 						id: caughtId,
 						parent,
 						test:
-							task === undefined
+							task === undefined || !caught
 								? shownAfter
 								: {
 										logical: '&&',
@@ -4510,16 +4577,18 @@ export function createNativeViewPayload(
 										right: { unary: '!', value: state('error') },
 									},
 						arms: 1,
+						...place,
 					});
 					lowerChunk(
 						scope.module.chunks.get(item.arms.catch)!,
 						parent,
-						{ arm: { branch: caughtId, index: 0 } },
+						{ ...(place.row ? { row: place.row } : {}), arm: { branch: caughtId, index: 0 } },
 						{
 							...scope,
 							prefix: `${scope.prefix}${caughtId}/`,
 							boundary: {
-								tasks: new Set(),
+								id: item.id,
+								tasks: new Set(refreshes ? [task] : []),
 								arm: 'catch',
 								catches,
 								...(boundary?.errorName ? { errorName: boundary.errorName } : {}),
@@ -4883,6 +4952,10 @@ export function createNativeViewPayload(
 			refuse(`${what} reads its event`, event.handlerSpan);
 			return [];
 		}
+		// `onClick={reset}`: a named function is inlined with its statements, so a handler without any is `reset` itself.
+		const [bareReset, ...otherResets] = event.handlerCatchResets ?? [];
+		if (!event.handlerStatements && bareReset && otherResets.length === 0 && !parameter)
+			return resetOps(bareReset.boundaryId, scope, what, event.handlerSpan);
 		if (!event.handlerStatements) {
 			refuse(`${what} is defined elsewhere (a named or factory function)`, event.handlerSpan);
 			return [];
@@ -4891,6 +4964,9 @@ export function createNativeViewPayload(
 			...scope,
 			live: true,
 			...(event.handlerSpan ? { span: event.handlerSpan } : {}),
+			...(event.handlerCatchResets?.length
+				? { resets: new Map(event.handlerCatchResets.map((reset) => [reset.name, reset.boundaryId])) }
+				: {}),
 		};
 		const submitting =
 			event.eventName === 'submit' && pressed ? { submitting: pressed.currentTarget } : {};
@@ -5645,6 +5721,21 @@ export function createNativeViewPayload(
 		}
 	}
 
+	/** `reset()` of the `@catch` the handler is in: its async values that failed run again, its handler error clears. */
+	function resetOps(boundaryId: string, scope: Scope, what: string, span: SourceSpan | undefined): NativeOp[] {
+		const boundary = scope.boundary;
+		if (boundary?.id !== boundaryId || boundary.arm !== 'catch') {
+			refuse(`${what} calls the \`reset\` of a @catch it is not in (handed to a component), which phones cannot do yet`, span);
+			return [];
+		}
+		const tasks = [...boundary.tasks];
+		if (tasks.some((task) => !cells[cellIndex.get(task) ?? -1]?.async)) {
+			refuse(`${what} calls \`reset\` of a @try that waits on a device call, which phones cannot run again yet`, span);
+			return [];
+		}
+		return [{ op: 'reset', cells: tasks, ...(boundary.catches.used() ? { catch: boundary.catches.cell() } : {}) }];
+	}
+
 	function statementOps(
 		statement: Exclude<
 			SemanticHandlerStatement,
@@ -5737,6 +5828,14 @@ export function createNativeViewPayload(
 				? commandOn(node, command, false, statement.optional === true, what, span)
 				: [];
 		}
+		if (
+			statement.kind === 'invoke' &&
+			!statement.path?.length &&
+			!(statement.arguments ?? []).length &&
+			!scope.locals.has(statement.name) &&
+			scope.resets?.has(statement.name)
+		)
+			return resetOps(scope.resets.get(statement.name)!, scope, what, span);
 		if (statement.kind === 'invoke') {
 			const callee = [statement.name, ...(statement.path ?? [])].join('.');
 			if (

@@ -598,7 +598,13 @@ export type NativeOp =
 			readonly type: string;
 			readonly bindings: NativeScriptBindings;
 			readonly catch?: string;
-	  };
+	  }
+	/**
+	 * `reset` of `@catch (error, reset)`: clears the boundary's handler error (`catch`) and runs again each of its async
+	 * values (`cells`, read where the handler runs) that holds an error, with the same key; until one answers the boundary
+	 * keeps showing what it shows.
+	 */
+	| { readonly op: 'reset'; readonly cells: ReadonlyArray<string>; readonly catch?: string };
 
 /** Element commands a host runs. */
 export type NativeCommand = 'focus' | 'scrollIntoView';
@@ -627,6 +633,18 @@ export type NativeViewPayload = {
 		readonly task?: {
 			readonly call: NativeDeviceCall;
 			readonly arguments: ReadonlyArray<NativeExpr>;
+		};
+		/**
+		 * An async value the payload's script computes (`computed(async ...)` that is not one device call). The host's
+		 * runtime starts it when the screen starts and again whenever a cell its bindings read changes, and the script
+		 * settles the cell: `{ state: 'pending' }` until the first answer, then `{ state: 'value', value, error }` (`error` is
+		 * a failed refresh's error over the value it kept, else null) or `{ state: 'error', error: { name, message } }`.
+		 */
+		readonly async?: {
+			readonly script: string;
+			readonly bindings: NativeScriptBindings;
+			/** The `@try` branches that read it: it runs while one of them is shown, and is aborted when none is. */
+			readonly boundaries: ReadonlyArray<string>;
 		};
 		/**
 		 * State of a component a list row renders (`repeat` node id): one value per row, `initial` when the row is built and
@@ -819,7 +837,9 @@ export type NativeJournalEntry =
 	/** The script cleared a timer it set (`timer` names it, `script:<n>`): the host drops it. */
 	| { readonly op: 'clearTimer'; readonly timer: string }
 	/** The script called `fetch`: the host sends the request and answers with a `response` action naming `id`. */
-	| { readonly op: 'fetch'; readonly id: number; readonly request: NativeFetchRequest };
+	| { readonly op: 'fetch'; readonly id: number; readonly request: NativeFetchRequest }
+	/** The signal of the request `id` aborted (its async value was superseded or left the screen): cancel it, send no response. */
+	| { readonly op: 'abort'; readonly id: number };
 
 /** A request as the script made it; `url` is absolute (a relative one rejects in the script, as with no page to resolve it). */
 export type NativeFetchRequest = {

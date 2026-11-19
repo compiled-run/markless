@@ -188,6 +188,8 @@ sealed interface Op {
 	data class Tick(val node: String) : Op
 	/** Runs function [fn] of the payload's script with [bindings]; a throw or rejection writes `{ name, message }` to [catch] when there is one. */
 	data class Script(val fn: String, val type: String, val bindings: Map<String, ScriptBinding>, val catch: String? = null) : Op
+	/** `reset` of `@catch (error, reset)`: clears [catch] and runs again each of [cells] that holds an error. */
+	data class Reset(val cells: List<String>, val catch: String? = null) : Op
 	/** `setPointerCapture(pointer)` on the element [node] evaluates to, or with [release] `releasePointerCapture(pointer)`. */
 	data class Capture(val node: Expr, val pointer: Expr, val release: Boolean) : Op
 }
@@ -214,7 +216,10 @@ data class Route(val pattern: String, val params: List<String>) {
 
 /** [device]: a live device value the host fills at mount and on change. [task]: an async device call started at mount. [row]: state of a component a list row renders, one value per row of that `repeat`, [initial] when the row is built. */
 /** [clock]: the clock when the screen opened, written at mount before the first build. */
-data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null, val clock: Boolean = false)
+/** [async]: an async value function [AsyncValue.fn] of the payload's script computes while one of its [AsyncValue.boundaries] branches is shown; the script settles the cell. */
+data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null, val clock: Boolean = false, val async: AsyncValue? = null)
+
+data class AsyncValue(val fn: String, val bindings: Map<String, ScriptBinding>, val boundaries: List<String>)
 data class Event(val host: String, val event: EventName, val handler: String)
 data class Handler(val id: String, val ops: List<Op>)
 
@@ -282,6 +287,7 @@ data class Payload(
 				for (e in readsOf(node)) for (c in cellsOf(e)) if (c !in cellIds) throw MarklessDecodeError("node \"${node.id}\" reads unknown cell \"$c\"")
 			}
 			for (c in cells) c.row?.let { r -> if (seen[r] !is Node.Repeat) throw MarklessDecodeError("cell \"${c.id}\" is state of rows of \"$r\", which is not a list") }
+			for (c in cells) c.async?.let { a -> for (r in cellsOf(a.bindings)) if (r !in cellIds) throw MarklessDecodeError("cell \"${c.id}\" reads unknown cell \"$r\"") }
 			val handlers = root.field("handlers", "payload").arr("payload.handlers").mapIndexed { n, h -> handler(h, "handlers[$n]", cellIds) }
 			val handlerIds = HashSet<String>()
 			for (h in handlers) if (!handlerIds.add(h.id)) throw MarklessDecodeError("duplicate handler \"${h.id}\"")
@@ -317,7 +323,7 @@ data class Payload(
 				ScriptSource(o.field("id", "payload.script").str("payload.script.id"), o.field("source", "payload.script").str("payload.script.source"), services)
 			}
 			if (script == null) {
-				val runsScript = handlers.any { h -> scriptOps(h.ops) } || nodes.any { n -> readsOf(n).any(::hasScript) } || title.orEmpty().any { it is TextPart.Value && hasScript(it.expr) }
+				val runsScript = cells.any { it.async != null } || handlers.any { h -> scriptOps(h.ops) } || nodes.any { n -> readsOf(n).any(::hasScript) } || title.orEmpty().any { it is TextPart.Value && hasScript(it.expr) }
 				if (runsScript) throw MarklessDecodeError("a script op or computed in a payload with no script")
 			}
 			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, script)
@@ -361,7 +367,7 @@ data class Payload(
 				is Op.Navigate -> op.params.values.any(::hasScript)
 				is Op.After -> hasScript(op.ms) || op.capture.any { hasScript(it.second) } || scriptOps(op.ops)
 				is Op.Capture -> hasScript(op.node) || hasScript(op.pointer)
-				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick -> false
+				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick, is Op.Reset -> false
 			}
 		}
 
@@ -508,7 +514,7 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled", "device", "task", "object", "row", "clock"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled", "device", "task", "object", "row", "clock", "async"), what)
 			val clock = o["clock"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.clock must be true when present"); true } ?: false
 			val styled = o["styled"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.styled must be true when present"); true } ?: false
 			val storage = o["storage"]?.obj("$what.storage")?.let { it.only(setOf("key"), "$what.storage"); it.field("key", what).str("$what.storage.key") }
@@ -516,7 +522,11 @@ data class Payload(
 				t.only(setOf("call", "arguments"), "$what.task")
 				Task(t.field("call", what).str("$what.task.call"), t.field("arguments", what).arr("$what.task.arguments").mapIndexed { n, a -> expr(a, "$what.task.arguments[$n]") })
 			}
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock)
+			val async = o["async"]?.obj("$what.async")?.let { a ->
+				a.only(setOf("script", "bindings", "boundaries"), "$what.async")
+				AsyncValue(a.field("script", what).str("$what.async.script"), scriptBindings(a.field("bindings", what), "$what.async.bindings"), a.field("boundaries", what).arr("$what.async.boundaries").map { it.str("$what.async.boundaries[]") })
+			}
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, async)
 		}
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
@@ -759,6 +769,14 @@ data class Payload(
 				val catch = o["catch"]?.str("$what.catch")
 				if (catch != null && catch !in cells) throw MarklessDecodeError("$what catches into unknown cell \"$catch\"")
 				return Op.Script(o.field("fn", what).str("$what.fn"), o.field("type", what).str("$what.type"), bindings, catch)
+			}
+			if (name == "reset") {
+				o.only(setOf("op", "cells", "catch"), what)
+				val reset = o.field("cells", what).arr("$what.cells").mapIndexed { n, c -> c.str("$what.cells[$n]") }
+				for (c in reset) if (c !in cells) throw MarklessDecodeError("$what resets unknown cell \"$c\"")
+				val catch = o["catch"]?.str("$what.catch")
+				if (catch != null && catch !in cells) throw MarklessDecodeError("$what clears unknown cell \"$catch\"")
+				return Op.Reset(reset, catch)
 			}
 			if (name != "assign") throw MarklessDecodeError("$what has unknown op \"$name\"")
 			o.only(setOf("op", "cell", "value"), what)

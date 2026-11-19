@@ -80,6 +80,9 @@ export type NativeAction =
 /** The prefix of a timer the script set, as its `timer` entries name it (`script:3`); other timers are `after` ops. */
 export const SCRIPT_TIMER = 'script:';
 
+/** Each screen's async values run under their own name in an engine the app's screens share. */
+let screens = 0;
+
 /** Runs a script function a `{ script }` expression names, with its bindings resolved where it is read. */
 type Compute = (fn: string, bindings: NativeScriptBindings, scope: NativeScope) => Value;
 
@@ -171,6 +174,10 @@ export type NativeRuntime = {
 	readonly engineStarts: () => number;
 	/** What the script wrote to `console`, in order, as `[level, text]`. */
 	readonly logs: () => ReadonlyArray<readonly [level: string, text: string]>;
+	/** Starts the async values the script computes, once the screen is built; the host applies its journal as an action's. */
+	readonly start: () => ReadonlyArray<NativeJournalEntry>;
+	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
+	readonly leave: () => ReadonlyArray<NativeJournalEntry>;
 };
 
 /** How the runtime gets a script engine and the bytes `crypto` draws from; a host owns both. */
@@ -582,6 +589,7 @@ export function createNativeRuntime(
 		call('enter', { ...entry, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
 			readonly writes: ReadonlyArray<readonly [string, Value]>;
+			readonly aborts: ReadonlyArray<number>;
 			readonly timers: ReadonlyArray<readonly [number, number]>;
 			readonly clears: ReadonlyArray<number>;
 			readonly requests: ReadonlyArray<{
@@ -600,6 +608,7 @@ export function createNativeRuntime(
 		}
 		logs.push(...result.logs);
 		return [
+			...result.aborts.map((id): NativeJournalEntry => ({ op: 'abort', id })),
 			...result.clears.map((id): NativeJournalEntry => ({
 				op: 'clearTimer',
 				timer: `${SCRIPT_TIMER}${id}`,
@@ -616,6 +625,55 @@ export function createNativeRuntime(
 			})),
 		];
 	};
+	const screen = ++screens;
+	const asyncCells = payload.cells.filter((cell) => cell.async);
+	/** What the async values' runs depend on as last told to the engine; null before the first. */
+	let asyncSent: string | null = null;
+	/** Async values a `reset` asked to run again, by slot: sent with the next `tasks` entry. */
+	const retry = new Set<string>();
+	/** Tells the engine which async values are shown and what they read, when that moved; it starts and aborts runs. */
+	const syncAsync = (): NativeJournalEntry[] => {
+		if (asyncCells.length === 0) return [];
+		const out: NativeJournalEntry[] = [];
+		// A run that settles at once can show another; the engine is asked again until nothing moves.
+		for (let round = 0; round < 16; round++) {
+			const shownAsync = asyncCells.flatMap((cell) => {
+				const at = new Map<string, NativeScope>();
+				for (const id of cell.async!.boundaries) {
+					const node = nodesById.get(id);
+					for (const instance of node ? instances(node) : []) {
+						const slot = slotOf(cell.id, instance.scope);
+						if (!at.has(slot)) at.set(slot, instance.scope);
+					}
+				}
+				return [...at].map(([slot, scope]) => ({ cell, slot, scope }));
+			});
+			const tasks = shownAsync.map(({ cell, slot, scope }) => ({
+				slot,
+				fn: cell.async!.script,
+				frame: frameOf(cell.async!.bindings, undefined, scope),
+			}));
+			const sent = JSON.stringify([
+				tasks,
+				shownAsync.map(({ cell, scope }) => readFrame(cell.async!.bindings, scope)),
+			]);
+			if (sent === asyncSent && retry.size === 0) return out;
+			asyncSent = sent;
+			const again = [...retry];
+			retry.clear();
+			out.push(...enter({ kind: 'tasks', screen, tasks, ...(again.length > 0 ? { retry: again } : {}) }));
+		}
+		throw new Error('async values that keep starting each other');
+	};
+	/** What a script function's names hold now. */
+	const readFrame = (bindings: NativeScriptBindings, scope: NativeScope) =>
+		Object.values(bindings).map((binding) =>
+			'cell' in binding
+				? read(binding.cell, scope)
+				: 'fields' in binding
+					? Object.values(binding.fields).map((cell) => read(cell, scope))
+					: evaluate(binding.value, undefined, scope),
+		);
 	const compute: Compute = (fn, bindings, scope) =>
 		JSON.parse(
 			call('enter', {
@@ -650,19 +708,26 @@ export function createNativeRuntime(
 		eventValue?: string | NativeEventFields,
 		scope?: NativeScope,
 	): Value => evaluateNativeExpr(expr, read, eventValue, scope ?? base, compute, elements);
-	const armOf = (branch: Extract<NativeNode, { kind: 'branch' }>): number | null => {
-		if (branch.test) return evaluate(branch.test) ? 0 : branch.arms > 1 ? 1 : null;
+	const armOf = (
+		branch: Extract<NativeNode, { kind: 'branch' }>,
+		scope: NativeScope = base,
+	): number | null => {
+		if (branch.test)
+			return evaluate(branch.test, undefined, scope) ? 0 : branch.arms > 1 ? 1 : null;
 		const tests = branch.tests ?? [];
-		const chosen = tests.findIndex((test) => test !== null && evaluate(test));
+		const chosen = tests.findIndex((test) => test !== null && evaluate(test, undefined, scope));
 		if (chosen >= 0) return chosen;
 		const fallback = tests.indexOf(null);
 		return fallback >= 0 ? fallback : null;
 	};
-	const shown = (node: NativeNode): boolean => {
+	/** Whether a node shows where `scope` is: in a list row, the arms around it are that row's. */
+	const shownIn = (node: NativeNode, scope: NativeScope): boolean => {
 		if (!node.arm) return true;
 		const branch = branches.get(node.arm.branch);
-		return !!branch && shown(branch) && armOf(branch) === node.arm.index;
+		return !!branch && shownIn(branch, scope) && armOf(branch, scope) === node.arm.index;
 	};
+	/** Whether any instance of a node shows. */
+	const shown = (node: NativeNode): boolean => instances(node).length > 0;
 	const nodesById = new Map(payload.nodes.map((node) => [node.id, node]));
 	/** Device objects whose owning component is shown. */
 	const liveObjects = (): string[] =>
@@ -695,18 +760,19 @@ export function createNativeRuntime(
 	const instances = (
 		node: NativeNode,
 	): { readonly id: string; readonly scope: NativeScope }[] => {
-		if (!shown(node)) return [];
-		if (!node.row) return [{ id: node.id, scope: base }];
+		if (!node.row) return shownIn(node, base) ? [{ id: node.id, scope: base }] : [];
 		const repeat = repeats.get(node.row);
-		if (!repeat || !shown(repeat)) return [];
-		return rowsOf(repeat).map(({ key, item }) => ({
-			id: `${node.id}@${key}`,
-			scope: {
-				...base,
-				items: new Map([[repeat.id, item]]),
-				keys: new Map([[repeat.id, key]]),
-			},
-		}));
+		if (!repeat || !shownIn(repeat, base)) return [];
+		return rowsOf(repeat)
+			.map(({ key, item }) => ({
+				id: `${node.id}@${key}`,
+				scope: {
+					...base,
+					items: new Map([[repeat.id, item]]),
+					keys: new Map([[repeat.id, key]]),
+				},
+			}))
+			.filter((instance) => shownIn(node, instance.scope));
 	};
 	const render = (parts: ReadonlyArray<NativeTextPart>, scope: NativeScope): string =>
 		parts
@@ -890,7 +956,9 @@ export function createNativeRuntime(
 	};
 	const arms = () =>
 		payload.nodes.flatMap((node) =>
-			node.kind === 'branch' && shown(node) ? [[node.id, armOf(node)] as const] : [],
+			node.kind === 'branch'
+				? instances(node).map(({ id, scope }) => [id, armOf(node, scope)] as const)
+				: [],
 		);
 	const rows = () =>
 		payload.nodes.flatMap((node) =>
@@ -981,6 +1049,13 @@ export function createNativeRuntime(
 			ticked.flatMap((node) => (shown(node) ? [[node.id, checkedOf(node.id)] as const] : [])),
 		engineStarts: () => engineStarts,
 		logs: () => logs,
+		start: () => (asyncCells.length === 0 ? [] : change(undefined, undefined, () => [])),
+		leave: () =>
+			asyncSent === null
+				? []
+				: enter({ kind: 'tasks', screen, tasks: [], leave: true }).filter(
+						(entry) => entry.op === 'abort',
+					),
 		dispatch(action) {
 			if (action.event === 'timer' && action.timer.startsWith(SCRIPT_TIMER))
 				return change(undefined, undefined, () =>
@@ -1231,6 +1306,15 @@ export function createNativeRuntime(
 	): NativeJournalEntry[] {
 		const calls: NativeJournalEntry[] = [];
 		for (const op of ops) {
+			if (op.op === 'reset') {
+				if (op.catch !== undefined) values.set(op.catch, null);
+				for (const cell of op.cells) {
+					const shownNow = read(cell, scope) as { state?: string; error?: unknown } | null;
+					if (shownNow?.state === 'error' || (shownNow?.state === 'value' && shownNow.error != null))
+						retry.add(slotOf(cell, scope));
+				}
+				continue;
+			}
 			if (op.op === 'submit') {
 				const taken = submit(op, scope, calls);
 				if (taken[0]?.op === 'navigate') return taken;
@@ -1458,6 +1542,7 @@ export function createNativeRuntime(
 			const stackBefore = stack;
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
+			calls.push(...syncAsync());
 			const shownNow = shownOverlays();
 			const released = stackBefore.filter((overlay) => !shownNow.includes(overlay));
 			const enlisted = shownNow.filter((overlay) => !stackBefore.includes(overlay));
@@ -1504,13 +1589,14 @@ export function createNativeRuntime(
 						? [{ op: 'sheet', node: node.id, open }]
 						: [];
 				}
-				if (node.kind === 'branch') {
-					return beforeArms.has(node.id) &&
-						afterArms.has(node.id) &&
-						beforeArms.get(node.id) !== afterArms.get(node.id)
-						? [{ op: 'arm', node: node.id, index: afterArms.get(node.id)! }]
-						: [];
-				}
+				if (node.kind === 'branch')
+					return instances(node).flatMap(({ id }): NativeJournalEntry[] =>
+						beforeArms.has(id) &&
+						afterArms.has(id) &&
+						beforeArms.get(id) !== afterArms.get(id)
+							? [{ op: 'arm', node: id, index: afterArms.get(id)! }]
+							: [],
+					);
 				const ids = instances(node).map((instance) => instance.id);
 				const opened = node.kind === 'element' ? dialogs.get(node.id) : undefined;
 				const dialog: NativeJournalEntry[] =

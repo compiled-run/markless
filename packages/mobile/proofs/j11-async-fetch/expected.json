@@ -1,0 +1,66 @@
+{
+	"rung": "J11",
+	"name": "An async value from fetch in @try: pending, the value, a refresh that keeps it, a failed refresh beside it",
+	"server": "echo",
+	"steps": [
+		{
+			"visible": ["Dictionary", "Asked: apple", "Looking up"],
+			"absent": ["Word: apple"],
+			"engineStarts": 1,
+			"onWeb": {
+				"why": "The web's server render waits for the value before it sends the page; a phone renders on the device, so it shows @pending until the first answer, as the web does after a client-side navigation.",
+				"visible": ["Dictionary", "Asked: apple", "Word: apple", "Echo: apple"],
+				"absent": ["Looking up"]
+			}
+		},
+		{
+			"do": {
+				"wait": 5500
+			},
+			"visible": ["Word: apple", "Echo: apple", "Asked: apple"],
+			"absent": ["Looking up", "Asked: banana"]
+		},
+		{
+			"do": {
+				"tap": "Banana"
+			},
+			"visible": ["Asked: banana", "Word: apple"],
+			"absent": ["Asked: apple", "Looking up"]
+		},
+		{
+			"do": {
+				"wait": 5500
+			},
+			"visible": ["Word: banana", "Echo: banana"],
+			"absent": ["Word: apple", "Asked: missing"]
+		},
+		{
+			"do": {
+				"tap": "Missing"
+			},
+			"visible": ["Asked: missing", "Word: banana"],
+			"absent": ["Asked: banana", "Failed: No entry for missing"]
+		},
+		{
+			"do": {
+				"wait": 5500
+			},
+			"visible": ["Word: banana", "Failed: No entry for missing"],
+			"absent": ["Looking up", "Asked: cherry"]
+		},
+		{
+			"do": {
+				"tap": "Cherry"
+			},
+			"visible": ["Asked: cherry", "Word: banana", "Failed: No entry for missing"],
+			"absent": ["Asked: missing", "Looking up"]
+		},
+		{
+			"do": {
+				"wait": 5500
+			},
+			"visible": ["Word: cherry", "Echo: cherry"],
+			"absent": ["Word: banana", "Failed: No entry for missing"]
+		}
+	]
+}

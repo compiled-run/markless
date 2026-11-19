@@ -57,8 +57,9 @@ const look = (
 		arms: runtime.arms(),
 		rows: runtime.rows(),
 	});
+	const start = runtime.start();
 	return {
-		initial: screen(),
+		initial: { start, ...screen() },
 		steps: actions.map((action) => ({ journal: runtime.dispatch(action), ...screen() })),
 	};
 };
