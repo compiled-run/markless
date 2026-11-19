@@ -57,8 +57,12 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case command(node: String, command: String, preventScroll: Bool)
 	/// A submit stopped: focus moves to `node` as `focus()` would and `message` shows until the next action.
 	case invalid(node: String, message: String)
-	/// Dispatch a `timer` action for `timer` in `ms` milliseconds.
+	/// Dispatch a `timer` action for `timer` in `ms` milliseconds (once; a script's interval asks again when it fires).
 	case timer(timer: String, ms: Double)
+	/// The script cleared a timer it set (`script:<n>`): drop it.
+	case clearTimer(timer: String)
+	/// The script called `fetch`: send the request and answer with `response(_:_:)`.
+	case fetch(id: Int, request: NativeFetchRequest)
 
 	public var json: JSONValue {
 		switch self {
@@ -97,6 +101,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("invalid")), ("node", .string(node)), ("message", .string(message))])
 		case let .timer(timer, ms):
 			return .object([("op", .string("timer")), ("timer", .string(timer)), ("ms", .number(ms))])
+		case let .clearTimer(timer): return .object([("op", .string("clearTimer")), ("timer", .string(timer))])
+		case let .fetch(id, request): return .object([("op", .string("fetch")), ("id", .number(Double(id))), ("request", request.json)])
 		}
 	}
 }
@@ -179,6 +185,8 @@ public final class NativeRuntime {
 	private let missing: NativeValueMissing?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
+	/// Where a page with a script gets its engine; asked only when a script op runs or a script computed is read.
+	private let scriptHost: NativeScriptHost?
 
 	/// The device's clock, in milliseconds since 1970 (UTC).
 	private let now: () -> Double
@@ -189,12 +197,13 @@ public final class NativeRuntime {
 	/// `preferredLanguages`: the device's, most preferred first; the web's messages are shown in the first one the payload has.
 	public init(
 		payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = [], preferredLanguages: [String] = ["en"],
-		now: @escaping () -> Double = { (Date().timeIntervalSince1970 * 1000).rounded(.down) }
+		now: @escaping () -> Double = { (Date().timeIntervalSince1970 * 1000).rounded(.down) }, scriptHost: NativeScriptHost? = nil
 	) {
 		self.payload = payload
 		self.params = params
 		self.store = store
 		self.now = now
+		self.scriptHost = scriptHost
 		let opened = now()
 		values = Dictionary(uniqueKeysWithValues: payload.cells.map { cell in
 			(cell.id, cell.clock ? .number(opened) : cell.storageKey.flatMap(store.read) ?? cell.initial)
@@ -325,7 +334,85 @@ public final class NativeRuntime {
 			guard case let .array(array) = try evaluate(list) else { throw RuntimeError(reason: "an index into a value that is not an array") }
 			guard case let .number(at) = try evaluate(index), at >= 0, at.rounded() == at, at < Double(array.items.count) else { return .null }
 			return array.items[Int(at)]
+		case let .script(fn, bindings):
+			let frame = try frame(of: bindings, in: scope)
+			return try scriptHost.unwrap().entry {
+				let text = try callScript("enter", .object([("kind", .string("compute")), ("fn", .string(fn)), ("frame", frame)] + entryCells()))
+				return NativeValue(json: try JSONValue.parse(Data(text.utf8)))
+			}
 		}
+	}
+
+	/// Calls `enter` or `leave` of the payload's script, starting the app's engine (and loading the script) when needed.
+	private func callScript(_ method: String, _ argument: JSONValue? = nil) throws -> String {
+		guard let script = payload.script else { throw RuntimeError(reason: "a script op in a payload with no script") }
+		let engine = try scriptHost.unwrap().load(script)
+		let target = "globalThis.__markless[\(quoteJavaScriptString(script.id))].\(method)"
+		return try engine.evaluate(argument.map { "\(target)(\(quoteJavaScriptString($0.jsonText)))" } ?? "\(target)()")
+	}
+
+	/// The names a script function reads, as its engine entry spells them: slots of this scope's cells, and values.
+	private func frame(of bindings: [NativeScriptBinding], in scope: NativeScope) throws -> JSONValue {
+		.object(try bindings.map { binding -> (String, JSONValue) in
+			switch binding.kind {
+			case let .cell(cell): return (binding.name, .object([("slot", .string(try slot(of: cell, in: scope)))]))
+			case let .fields(fields):
+				return (binding.name, .object([("fields", .object(try fields.map { ($0.name, .string(try slot(of: $0.cell, in: scope))) }))]))
+			case let .value(expr): return (binding.name, .object([("value", try evaluate(expr, in: scope).json)]))
+			}
+		})
+	}
+
+	/// Every current value by slot (the page's cells in payload order, then row slots), and a seed when `crypto` is used.
+	private func entryCells() -> [(String, JSONValue)] {
+		let ids = Set(payload.cells.map(\.id))
+		let cells = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0.json) } }
+			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!.json) }
+		let crypto = payload.script?.services.contains(.crypto) == true
+		return [("cells", .object(cells))] + (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
+	}
+
+	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
+	private func enter(_ entry: [(String, JSONValue)]) throws -> [NativeJournalEntry] {
+		let text = try scriptHost.unwrap().entry { () throws -> String in
+			_ = try callScript("enter", .object(entry + entryCells()))
+			return try callScript("leave")
+		}
+		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(["writes", "timers", "clears", "requests", "logs"])
+		for write in try result["writes"].array() {
+			let pair = try write.array()
+			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
+			let slot = try pair[0].string()
+			let cell = slot.firstIndex(of: "@").map { String(slot[..<$0]) } ?? slot
+			guard values[cell] != nil, payload.cells.contains(where: { $0.id == cell }) else { throw RuntimeError(reason: "the script wrote unknown cell \(cell)") }
+			let value = NativeValue(json: pair[1].value)
+			values[slot] = value
+			if let key = storageKeys[cell] { store.write(key, value) }
+		}
+		for line in try result["logs"].array() {
+			let pair = try line.array()
+			guard pair.count == 2 else { throw line.fail("a log line is [level, text]") }
+			scriptHost?.log(try pair[0].string(), try pair[1].string())
+		}
+		let clears = try result["clears"].array().map { NativeJournalEntry.clearTimer(timer: "\(scriptTimer)\(try wholeNumber($0))") }
+		let timers = try result["timers"].array().map { timer -> NativeJournalEntry in
+			let pair = try timer.array()
+			guard pair.count == 2 else { throw timer.fail("a timer is [id, ms]") }
+			return .timer(timer: "\(scriptTimer)\(try wholeNumber(pair[0]))", ms: try pair[1].number())
+		}
+		let requests = try result["requests"].array().map { request -> NativeJournalEntry in
+			let fields = try request.object(["id", "request"])
+			let asked = try fields["request"].object(["url", "method", "headers", "body"])
+			return .fetch(id: try wholeNumber(fields["id"]), request: NativeFetchRequest(
+				url: try asked["url"].string(), method: try asked["method"].string(), headers: try decodeHeaders(asked["headers"]),
+				body: try asked["body"].optionalString()))
+		}
+		return clears + timers + requests
+	}
+
+	/// The host's answer to a `fetch` entry.
+	public func response(_ id: Int, _ response: NativeFetchResponse) throws -> [NativeJournalEntry] {
+		try change(host: nil) { try self.enter([("kind", .string("response")), ("request", .number(Double(id))), ("response", response.json)]) }
 	}
 
 	/// The arm a branch shows now (nil: none).
@@ -548,6 +635,10 @@ public final class NativeRuntime {
 
 	/// Runs the handler bound to the action and returns the journal the host applies.
 	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
+		if action.event == .timer, let timer = action.timer, timer.hasPrefix(scriptTimer) {
+			guard let id = Int(timer.dropFirst(scriptTimer.count)) else { throw RuntimeError(reason: "no timer \(timer) is set") }
+			return try change(host: nil) { try self.enter([("kind", .string("timer")), ("timer", .number(Double(id)))]) }
+		}
 		if action.event == .timer {
 			guard let id = action.timer, let timer = timers.removeValue(forKey: id) else {
 				throw RuntimeError(reason: "no timer \(action.timer ?? "") is set")
@@ -683,6 +774,11 @@ public final class NativeRuntime {
 				calls.append(.command(node: node, command: command, preventScroll: preventScroll))
 			case let .call(call, object, arguments, result, then):
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
+			case let .script(fn, type, bindings, catchCell):
+				let event: JSONValue = .object([("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? []))
+				calls.append(contentsOf: try enter(
+					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", try frame(of: bindings, in: scope)), ("event", event)]
+						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? [])))
 			}
 		}
 		return calls
@@ -853,11 +949,14 @@ public struct NativeScreen {
 public final class NativeAppStack {
 	public let app: NativeAppPayload
 	private let store: NativeStore
+	private let scriptHost: NativeScriptHost?
 	public private(set) var screens: [NativeScreen]
 
-	public init(app: NativeAppPayload, path: String, store: NativeStore = MemoryStore()) throws {
+	/// `scriptHost`: the app's one engine, shared by every screen.
+	public init(app: NativeAppPayload, path: String, store: NativeStore = MemoryStore(), scriptHost: NativeScriptHost? = nil) throws {
 		self.app = app
 		self.store = store
+		self.scriptHost = scriptHost
 		screens = []
 		screens = try app.backStack(path).map { prefix in
 			guard let (route, params) = app.match(prefix) else { throw RuntimeError(reason: "\(prefix) is not a route") }
@@ -869,7 +968,7 @@ public final class NativeAppStack {
 		guard let entry = app.routes.first(where: { $0.pattern == route }) else { throw RuntimeError(reason: "no page for \(route)") }
 		return NativeScreen(
 			route: route, params: params, path: try NativeAppPayload.path(route, params),
-			runtime: NativeRuntime(payload: entry.page, store: store, params: params))
+			runtime: NativeRuntime(payload: entry.page, store: store, params: params, scriptHost: scriptHost))
 	}
 
 	/// Runs an action on the top screen; a `navigate` entry pushes the new screen or replaces the top one.
@@ -889,3 +988,13 @@ public final class NativeAppStack {
 		screens.removeLast()
 	}
 }
+
+extension Optional where Wrapped == NativeScriptHost {
+	func unwrap() throws -> NativeScriptHost {
+		guard let self else { throw RuntimeError(reason: "a script op with no script engine to run it") }
+		return self
+	}
+}
+
+/// The prefix of a timer the script set, as its `timer` entries name it (`script:3`); other timers are `after` ops.
+public let scriptTimer = "script:"

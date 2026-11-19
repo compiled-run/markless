@@ -1,0 +1,31 @@
+{
+	"rung": "J4",
+	"name": "Timers and fetch as host services, the request echoed back by the test's server",
+	"server": "echo",
+	"steps": [
+		{
+			"visible": ["Network", "Status: idle", "Ticking: no", "Ticks: 0"]
+		},
+		{
+			"do": {
+				"tap": "Fetch"
+			},
+			"visible": ["Status: 200 POST /j4/echo?word=native text/plain hello", "Ticking: no"],
+			"absent": ["Status: idle"]
+		},
+		{
+			"do": {
+				"tap": "Tick"
+			},
+			"visible": ["Ticking: yes"],
+			"absent": ["Ticking: no", "Ticking: done"]
+		},
+		{
+			"do": {
+				"wait": 6000
+			},
+			"visible": ["Ticks: 3", "Ticking: done"],
+			"absent": ["Ticks: 4"]
+		}
+	]
+}

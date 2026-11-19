@@ -75,6 +75,50 @@ reference. Notes and the before and after probe: `element-vocabulary.md`.
 - **`<title>`**: the page's first `<title>` in document order, in any component, is the screen's title (as
   `document.title` reads the first); no `<title>` shows in the page.
 
+## 0c. Handlers that run as JavaScript (2026-11-18, `cw/native-js-fallback`)
+
+A handler that does not lower to data runs as its own JavaScript in the platform's engine (JavaScriptCore on iOS,
+Hermes on Android); rendering stays native. The compiler chooses per handler (`scriptHandlers`: `fallback` by default,
+`all` to force every handler a script can run, `never` for data only). Shared vectors: `conformance/script-*.json`.
+
+**Payload.** `script?: { id, source, services }`, present only when a handler or computed runs as JavaScript; a payload
+without it must never start an engine. An op `{ op: 'script', fn, type, bindings, catch? }` (`type` is the web event's, which the handler's event carries). An expression
+`{ script: fn, bindings }` (a computed whose body needs the engine). A binding is `{ cell }` (read and written),
+`{ fields: { name: cell } }` (a state object, one cell per field) or `{ value: NativeExpr }` (read only).
+
+**Engine.** One per app process, started the first time a screen needs it (a script op runs, or a script expression is
+read), or warmed once the first frame is up and the main loop is idle, for a screen whose payload has a script. Evaluate
+`script.source` once per script id. Each later call evaluates JavaScript text and must let the Promise jobs it queued
+run before the next call (JavaScriptCore does when the call returns; the Hermes glue drains them).
+
+**An entry** is two calls: `globalThis.__markless["<id>"].enter("<json>")`, then `globalThis.__markless["<id>"].leave()`,
+which returns `{ writes: [[slot, value]], timers: [[id, ms]], clears: [id], requests: [{ id, request }], logs: [[level, text]] }`.
+The entry JSON is `{ kind, ..., cells, seed? }`:
+
+- `cells`: every current value by slot, as the host keeps them (a row's own value is `<cell>@<key>`).
+- `seed`: 64 hex characters from the platform's secure random source, only when `services` has `crypto`.
+- `dispatch`: `fn`, `frame` (the op's bindings resolved where it runs: `{ slot }`, `{ fields: { name: slot } }`,
+  `{ value }` evaluated), `event` (`{ type }` from the op, with `value` for a text edit) and
+  `catch` (the catch cell's slot, when the op has one).
+- `timer`: `timer` (the id of a timer that is due). `response`: `request` (an id) and `response`
+  (`{ status, statusText, headers, body }` or `{ error }`).
+- `compute`: `fn` and `frame`; `enter` returns the value as JSON, and no `leave` follows.
+
+**Applying an entry.** Write each `[slot, value]` (a storage cell persists by the cell id before `@`), then journal as
+for any change: styles, nodes, title, releases, then the calls in op order, where a script op's calls are its
+`clearTimer` entries, then `timer` entries, then `fetch` entries. A `timer` or `response` action is journalled the same
+way. The script's timers use the same `timer` entry and action as the data path's (`{ op: 'timer', timer, ms }`), named
+`script:<n>`; the `timer` entry's `timer` for the engine is the number after `script:`.
+
+**Host services.** A `timer` entry: fire a `timer` action naming it after `ms` (once; an interval asks again when it
+fires). A `clearTimer` entry (`{ op: 'clearTimer', timer }`): drop it. A `fetch` entry: send the request and answer with a `response` action (text body; any
+network failure is `{ error }`). `logs`: write each line to the platform log under `MarklessScript`. Test builds show
+the app's engine start count in the label `markless-engine-starts` (`engine starts: <n>`), and log `engine start <ms> ms`
+and the first script entry's duration.
+
+**Android linking.** The engine (`src/adapters/android/engine/`, built by `build-hermes.sh`) is packed into an APK only
+when one of its payloads has a script; the host finds `dev.markless.mobile.engine.HermesEngine` by class name.
+
 ## 1. What I found before building (the owner's picture is weeks old)
 
 - **`docs/goals/native-targets-api/` was not in the repo.** The research board lives only on the planner's machine (copy read

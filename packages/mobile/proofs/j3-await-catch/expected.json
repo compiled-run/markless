@@ -1,0 +1,37 @@
+{
+	"rung": "J3",
+	"name": "await with code after it, and an error that lands in @catch after the content it leaves on screen",
+	"steps": [
+		{
+			"visible": ["Lookup", "Result: none", "Steps: 0"]
+		},
+		{
+			"do": {
+				"tap": "Look up"
+			},
+			"visible": ["Result: none", "Steps: 1"],
+			"absent": ["Steps: 0"]
+		},
+		{
+			"do": {
+				"wait": 7000
+			},
+			"visible": ["Result: FOUND", "Steps: 2"],
+			"absent": ["Result: none"]
+		},
+		{
+			"do": {
+				"tap": "Look up a missing word"
+			},
+			"visible": ["Result: FOUND", "Steps: 3"],
+			"absent": ["Steps: 2", "Failed: No entry for missing"]
+		},
+		{
+			"do": {
+				"wait": 7000
+			},
+			"visible": ["Failed: No entry for missing", "Result: FOUND", "Steps: 3"],
+			"absent": []
+		}
+	]
+}

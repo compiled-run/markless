@@ -1,0 +1,23 @@
+{
+	"rung": "J5",
+	"name": "A computed whose body needs the engine",
+	"steps": [
+		{
+			"visible": ["Words", "Sorted: apple, banana, cherry", "Longest: banana"]
+		},
+		{
+			"do": {
+				"tap": "Add date"
+			},
+			"visible": ["Sorted: apple, banana, cherry, date", "Longest: banana"],
+			"absent": ["Sorted: apple, banana, cherry"]
+		},
+		{
+			"do": {
+				"tap": "Replace"
+			},
+			"visible": ["Sorted: elderberry, fig, kiwi", "Longest: elderberry"],
+			"absent": ["Longest: banana"]
+		}
+	]
+}

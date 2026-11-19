@@ -12,6 +12,17 @@ by applying journal entries. No JavaScript engine, no web view, no custom drawin
 | View factory and journal applier                                                                   | `view/MarklessHost.kt`, `view/MarklessBox.kt`                                 | yes              |
 | Activity base                                                                                      | `view/MarklessActivity.kt`                                                    | yes              |
 
+## Handlers that run as JavaScript
+
+A payload with a `script` runs its `script` ops and `{ script, bindings }` computeds in one Hermes engine per app process
+(`view/AppScriptEngine.kt`), found by class name (`dev.markless.mobile.engine.HermesEngine`, built from `engine/`); a payload
+without a script never starts it, and an APK without one is built without it. The core (`core/Script.kt`, `core/Runtime.kt`)
+sends each entry as the contract's `enter`/`leave` JSON and applies the writes, `clearTimer`, `timer` and `fetch` entries; the
+view layer schedules script timers (`script:<n>`) with the data path's `timer` entries and drops them on `clearTimer`, sends requests with `HttpURLConnection` on a background thread and answers on
+the main thread, and logs `console` lines under `MarklessScript`. `MarklessActivity` warms the engine once the first frame is
+drawn and the main loop is idle (`warmsScriptEngine`); it logs `engine start <ms> ms`, `engine warm <ms> ms` and
+`first script entry <ms> ms (engine cold|warm)`. `test-jvm.sh` runs the script vectors with a long-lived `node` as the engine.
+
 ## Embedding
 
 ```kotlin

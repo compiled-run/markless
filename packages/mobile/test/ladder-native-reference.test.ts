@@ -13,11 +13,14 @@ import {
 	compileNativeComponent,
 	createNativeAppRuntime,
 	createNativeRuntime,
+	type NativeAction,
 	nativeShownTexts,
 	type NativeRuntime,
 	type NativeScreen,
 } from '../src/index.ts';
 import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harness/rung.ts';
+import { echoText } from '../src/harness/echo-server.ts';
+import { nodeScriptHost } from '../src/node-engine.ts';
 import {
 	looksOnly,
 	navRungFolders,
@@ -35,7 +38,59 @@ import {
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
 const NATIVE_KEYBOARD_ONLY = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
-const REFUSED_RUNGS = new Set(['11-async', 'y4-sheet-beside-drawer']);
+const REFUSED_RUNGS = new Set(['11-async', 'y4-sheet-beside-drawer', 'j7-page-refused']);
+
+/**
+ * The script services as a phone's host provides them, on a clock that moves only when a step waits: a timer fires once
+ * its time comes, a request is answered at once with what the test's echo server would say.
+ */
+function scriptServices() {
+	let now = 0;
+	const timers = new Map<string, number>();
+	const host = nodeScriptHost('00'.repeat(32));
+	const answer = (entry: NativeJournalEntry): NativeAction | undefined => {
+		if (entry.op === 'timer') timers.set(entry.timer, now + entry.ms);
+		else if (entry.op === 'clearTimer') timers.delete(entry.timer);
+		else if (entry.op === 'fetch') {
+			const url = new URL(entry.request.url);
+			const contentType =
+				entry.request.headers.find(
+					([name]) => name.toLowerCase() === 'content-type',
+				)?.[1] ?? null;
+			return {
+				event: 'response',
+				id: entry.id,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: echoText({
+						method: entry.request.method,
+						url: url.pathname + url.search,
+						contentType,
+						body: entry.request.body ?? '',
+					}),
+				},
+			};
+		}
+		return undefined;
+	};
+	/** The timers due by `ms` from now, earliest first; each is fired as its time comes. */
+	const advance = (ms: number, fire: (action: NativeAction) => void) => {
+		const end = now + ms;
+		for (;;) {
+			const due = [...timers]
+				.filter(([, at]) => at <= end)
+				.sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))[0];
+			if (!due) break;
+			now = due[1];
+			timers.delete(due[0]);
+			fire({ event: 'timer', timer: due[0] });
+		}
+		now = end;
+	};
+	return { host, answer, advance };
+}
 
 // A mirror host: it keeps what a device shows and changes it only through journal entries, as the hosts must.
 function mirror(
@@ -211,7 +266,8 @@ function walkApp(
 	styled: ReadonlySet<string> = new Set(),
 	position?: LadderRung['location'],
 ) {
-	const appRuntime = createNativeAppRuntime(app, start);
+	const services = scriptServices();
+	const appRuntime = createNativeAppRuntime(app, start, new Map(), services.host);
 	const pageOf = (route: string) => app.routes.find((entry) => entry.pattern === route)!.page;
 	// A screen's device, as a host's when the flow granted every permission: its values when it opens, then its asks answered.
 	const wake = (screen: NativeScreen, shown: ReturnType<typeof mirror>) => {
@@ -260,7 +316,10 @@ function walkApp(
 						? (top.typed(host, action.type.text),
 							appRuntime.dispatch({ event: 'input', host, value: action.type.text }))
 						: [];
+			const answered: NativeAction[] = [];
 			for (const entry of journal) {
+				const answer = services.answer(entry);
+				if (answer) answered.push(answer);
 				if (entry.op !== 'navigate') {
 					top.apply(entry, index);
 					continue;
@@ -270,9 +329,15 @@ function walkApp(
 				if (entry.replace) stack.pop();
 				stack.push(open(opened));
 			}
+			for (const next of answered)
+				for (const entry of appRuntime.dispatch(next)) stack.at(-1)!.apply(entry, index);
 		}
 		expect(stack.length, `step ${index}: the stack`).toBe(appRuntime.screens().length);
 		stack.at(-1)!.check(step, index);
+		if (step.engineStarts !== undefined)
+			expect(services.host.starts(), `step ${index}: the engine starts`).toBe(
+				step.engineStarts,
+			);
 	}
 }
 
@@ -326,10 +391,11 @@ function walk(
 					cell,
 					error: { name: 'NotAllowedError', message: 'Location was refused' },
 				});
+	const services = scriptServices();
 	// The device's clock: a second passes between a person's actions.
 	let clock = Date.now();
 	const start = () => {
-		const r = createNativeRuntime(payload, store, params, undefined, () => clock);
+		const r = createNativeRuntime(payload, store, params, undefined, () => clock, services.host);
 		for (const cell of payload.cells)
 			if (cell.device)
 				r.dispatch({ event: 'device', cell: cell.id, value: deviceValue(cell.device) });
@@ -566,6 +632,7 @@ function walk(
 					)
 						answered.push(() => setObject(object, name, value));
 			} else if (entry.op === 'timer') timers.push({ timer: entry.timer, due: at + entry.ms });
+			else if (entry.op === 'clearTimer') timers = timers.filter((timer) => timer.timer !== entry.timer);
 			else if (entry.op === 'invalid') invalid = entry.message;
 			else if (entry.op === 'text') texts.set(entry.node, entry.value);
 			else if (entry.op === 'dialog') openDialogs.set(entry.node, entry.open);
@@ -622,6 +689,8 @@ function walk(
 				for (const [node, name, value] of runtime.attributes())
 					if (inArm(node, entry.node)) attributes.set(`${node}\0${name}`, value);
 			} else if (entry.op === 'sheet') sheetOpen.set(entry.node, entry.open);
+			const scripted = services.answer(entry);
+			if (scripted) answered.push(() => runtime.dispatch(scripted));
 		}
 		for (const next of answered) apply(next(), index);
 	}
@@ -791,6 +860,10 @@ function walk(
 			expect(host && fieldText(host), `step ${index}: the field "${field}"`).toBe(value);
 		}
 		if (step.calls) expect(calls, `step ${index}: the device calls made`).toEqual(step.calls);
+		if (step.engineStarts !== undefined)
+			expect(services.host.starts(), `step ${index}: the engine starts`).toBe(
+				step.engineStarts,
+			);
 		if (step.microphone)
 			expect(recording.size > 0 ? 'on' : 'off', `step ${index}: the microphone`).toBe(
 				step.microphone,

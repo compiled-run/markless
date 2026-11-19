@@ -40,6 +40,7 @@ public final class MarklessViewController: UIViewController {
 		payload: Data, style: Data? = nil, fonts: [String: Data] = [:], store: NativeStore = UserDefaultsStore(),
 		device: NativeDevice? = nil, route: String? = MarklessViewController.launchRoute()
 	) throws {
+		FirstFrame.controllerCreated()
 		self.device = device ?? PlatformDevice()
 		self.payload = try NativeViewPayload.decode(payload)
 		self.style = try style.map { try StyleExport.decode($0) }
@@ -54,7 +55,8 @@ public final class MarklessViewController: UIViewController {
 		} else if let page = self.payload.route, !page.params.isEmpty {
 			throw HostError("\(page.pattern) needs a route to open at, and none was given")
 		}
-		runtime = NativeRuntime(payload: self.payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages)
+		runtime = NativeRuntime(
+			payload: self.payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages, scriptHost: MarklessScripting.shared.host)
 		super.init(nibName: nil, bundle: nil)
 		try buildPage()
 		try watchDevice()
@@ -66,12 +68,13 @@ public final class MarklessViewController: UIViewController {
 		page: NativeViewPayload, params: [NativeRouteParam], store: NativeStore, style: StyleExport?, fonts: [String: Data],
 		device: NativeDevice
 	) throws {
+		FirstFrame.controllerCreated()
 		self.device = device
 		payload = page
 		self.style = style
 		self.fonts = fonts
 		self.store = store
-		runtime = NativeRuntime(payload: page, store: store, params: params)
+		runtime = NativeRuntime(payload: page, store: store, params: params, scriptHost: MarklessScripting.shared.host)
 		super.init(nibName: nil, bundle: nil)
 		try buildPage()
 		try watchDevice()
@@ -141,10 +144,18 @@ public final class MarklessViewController: UIViewController {
 		try runCalls(try runtime.tasks())
 	}
 
-	/// Hands `release` and `call` entries to the device; a call with a result settles its task cell when the device answers.
+	/// Hands `release` and `call` entries to the device (a call with a result settles its task cell when the device answers),
+	/// and a script's requests to the app's script services, answering this screen's runtime.
 	private func runCalls(_ journal: [NativeJournalEntry]) throws {
 		for entry in journal {
 			if case let .release(object) = entry { device.release(object) }
+			if case let .fetch(id, request) = entry {
+				let runtime = self.runtime
+				MarklessScripting.shared.fetch(request) { [weak self] response in
+					guard let self, self.runtime === runtime else { return }
+					self.apply { try runtime.response(id, response) }
+				}
+			}
 			guard case let .call(name, object, arguments, result, resume) = entry else { continue }
 			let runtime = self.runtime
 			let answer: (@MainActor (DeviceOutcome) -> Void)?
@@ -234,6 +245,7 @@ public final class MarklessViewController: UIViewController {
 
 	public override func viewDidLayoutSubviews() {
 		super.viewDidLayoutSubviews()
+		if view.window != nil { FirstFrame.laidOut() }
 		raiseVisible()
 	}
 
@@ -286,6 +298,7 @@ public final class MarklessViewController: UIViewController {
 		tree?.pageAppeared(self)
 		appeared = true
 		scheduleLoadEvents()
+		if let script = payload.script { MarklessScripting.shared.warm(script) }
 	}
 
 	/// Runs the handler for an action and applies its journal, exactly as a tap does.
@@ -311,7 +324,8 @@ public final class MarklessViewController: UIViewController {
 	private func navigate(_ route: String, _ params: [NativeRouteParam]) throws {
 		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
 		for object in payload.objects { device.release(object.id) }
-		runtime = NativeRuntime(payload: payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages)
+		runtime = NativeRuntime(
+			payload: payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages, scriptHost: MarklessScripting.shared.host)
 		scrollWatches = [:]
 		tree?.unmount()
 		try buildPage()
@@ -340,7 +354,7 @@ extension NativeJournalEntry {
 	/// Every entry but the ones the page's device runs and the title, which the screen's navigation bar shows.
 	var isForViews: Bool {
 		switch self {
-		case .call, .release, .title: false
+		case .call, .release, .title, .fetch: false
 		default: true
 		}
 	}

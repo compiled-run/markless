@@ -1,0 +1,34 @@
+{
+	"rung": "J1",
+	"name": "A handler outside the data vocabulary: a loop with a local, string work",
+	"steps": [
+		{
+			"visible": ["Slugs", "Title: Hello, Native World!", "Slug: none", "Words: 0"]
+		},
+		{
+			"do": {
+				"tap": "Make slug"
+			},
+			"visible": ["Slug: hello-native-world", "Words: 3", "Title: Hello, Native World!"],
+			"absent": ["Slug: none"]
+		},
+		{
+			"do": {
+				"tap": "Longer"
+			},
+			"visible": [
+				"Title: Hello, Native World! Again",
+				"Slug: hello-native-world",
+				"Words: 3"
+			],
+			"absent": ["Title: Hello, Native World!"]
+		},
+		{
+			"do": {
+				"tap": "Make slug"
+			},
+			"visible": ["Slug: hello-native-world-again", "Words: 4"],
+			"absent": ["Words: 3"]
+		}
+	]
+}

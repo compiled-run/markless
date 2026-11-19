@@ -101,6 +101,8 @@ export async function compileNativeComponent(input: {
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
 	readonly target?: 'ios' | 'android';
+	/** Where handlers run (`NativeViewOptions['scriptHandlers']`); the default runs each as data where it lowers. */
+	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
 }): Promise<NativeBuild> {
 	const manifest =
 		input.manifest ?? (input.page ? buildRouteManifestFromFileIds([input.page]) : undefined);
@@ -189,6 +191,8 @@ export async function compileNativeComponent(input: {
 					}
 				: {}),
 			modules: { graphs, resolve },
+			readSource: (file: string) => (file === input.filename ? input.source : read.get(file)?.source),
+			...(input.scriptHandlers ? { scriptHandlers: input.scriptHandlers } : {}),
 			...(input.manifest
 				? {
 						routes: input.manifest.routes.map((entry) => ({
@@ -211,9 +215,13 @@ export async function compileNativeComponent(input: {
 	// A phone build reads only the analysis; what the web's emission passes cannot emit does not bind it.
 	const errors = collectTsrxModuleDiagnostics(compiled).filter(
 		(diagnostic) =>
-			diagnostic.severity === 'error' && (diagnostic.phase === 'parse' || diagnostic.phase === 'semantic-graph'),
+			diagnostic.severity === 'error' &&
+			(diagnostic.phase === 'parse' || diagnostic.phase === 'semantic-graph'),
 	);
-	const { manifest: deviceEntries, diagnostics: usage } = deviceManifest(native.features, input.device);
+	const { manifest: deviceEntries, diagnostics: usage } = deviceManifest(
+		native.features,
+		input.device,
+	);
 	return {
 		payload: errors.length > 0 || usage.length > 0 ? null : native.payload,
 		styles: [...importedStyles, ...compiled.publicRenderPlan.styleScopes].filter(
