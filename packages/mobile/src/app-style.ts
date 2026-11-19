@@ -28,10 +28,18 @@ type DragonTarget = {
 		readonly nodes: ReadonlyArray<DragonNode>;
 		/** The colour Chrome paints behind the page (html's background, else body's, else white). */
 		readonly canvas: Json;
+		/** body's own background in its box, when html's is the canvas; null when body paints none. */
+		readonly bodyBackground?: Json;
 	}>;
 	readonly next: Json;
 	readonly bands?: Json;
 };
+
+/** A face by its `sha256:` id: `file` is in the Dragon checkout, or with `from: 'input'` beside the style input. */
+export type StyleFont = { readonly id: string; readonly file: string; readonly from?: 'input' };
+
+/** A system face Dragon measured at build time: its id, and per target how the host rebuilds the platform's own font. */
+export type StyleSystemFont = { readonly id: string; readonly [target: string]: Json };
 
 /** `dragon.native-style-export/1`, as Dragon's `markless:style-export` writes it for one page. */
 export type DragonStyleExport = {
@@ -40,7 +48,9 @@ export type DragonStyleExport = {
 	readonly compiler: string;
 	readonly component: string;
 	readonly warnings: ReadonlyArray<{ readonly code: string; readonly message: string }>;
-	readonly fonts: ReadonlyArray<{ readonly id: string; readonly file: string }>;
+	readonly fonts: ReadonlyArray<StyleFont>;
+	/** Only when a text is drawn in a system face; nothing of it is bundled. */
+	readonly systemFonts?: ReadonlyArray<StyleSystemFont>;
 	readonly targets: Readonly<Record<string, DragonTarget>>;
 };
 
@@ -49,6 +59,7 @@ type InternedTarget = Omit<DragonTarget, 'backend' | 'viewport' | 'dpr' | 'assig
 		readonly values: Json;
 		readonly nodes: ReadonlyArray<Omit<DragonNode, 'writes'> & { readonly writes: number }>;
 		readonly canvas: Json;
+		readonly bodyBackground?: Json;
 	}>;
 };
 
@@ -91,7 +102,10 @@ export type NativeAppStyle = {
 		readonly code: string;
 		readonly message: string;
 	}>;
+	/** Each face by id, and where its file was at build time; the hosts load a face by its id. */
 	readonly fonts: ReadonlyArray<{ readonly id: string; readonly file: string }>;
+	/** Each system face the pages name, once by id, as Dragon's exports give it. */
+	readonly systemFonts?: ReadonlyArray<StyleSystemFont>;
 	readonly targets: Readonly<
 		Record<
 			string,
@@ -115,7 +129,6 @@ export type NativeAppStyle = {
 export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): NativeAppStyle {
 	if (pages.length === 0) throw new Error('an app style needs at least one styled page');
 	const first = pages[0]!.exported;
-	const fonts = new Map<string, string>();
 	const targets: Record<string, NativeAppStyle['targets'][string]> = {};
 	const exports = pages.flatMap(({ pattern, exported, sheets }) => [
 		{ pattern, exported },
@@ -138,11 +151,6 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 			throw new Error(
 				`${pattern}: style export targets ${names} differ from the other pages'`,
 			);
-		for (const font of exported.fonts) {
-			if ((fonts.get(font.id) ?? font.file) !== font.file)
-				throw new Error(`font ${font.id} names two files`);
-			fonts.set(font.id, font.file);
-		}
 	}
 	for (const name of Object.keys(first.targets)) {
 		const { backend, viewport, dpr } = first.targets[name]!;
@@ -163,7 +171,11 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 				...rest,
 				assignments: assignments.map((assignment, index) => ({
 					values: assignment.values,
-					canvas: assignment.canvas ?? fail(`${what}'s assignment ${index} has no canvas`),
+					canvas:
+						assignment.canvas ?? fail(`${what}'s assignment ${index} has no canvas`),
+					...(assignment.bodyBackground === undefined
+						? {}
+						: { bodyBackground: assignment.bodyBackground }),
 					nodes: assignment.nodes.map((node) => ({
 						...node,
 						writes: intern(node.writes),
@@ -203,7 +215,10 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 										return {
 											snapPoint: sheet.snapPoint,
 											viewport: height.viewport,
-											...interned(height, `${pattern}: ${node}'s ${name} export at ${sheet.snapPoint}`),
+											...interned(
+												height,
+												`${pattern}: ${node}'s ${name} export at ${sheet.snapPoint}`,
+											),
 										};
 									}),
 							})),
@@ -213,15 +228,47 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 		});
 		targets[name] = { backend, viewport, dpr, writes: lists, routes };
 	}
+	const systemFonts = appStyleSystemFonts(pages);
 	return {
 		version: NATIVE_APP_STYLE_VERSION,
 		units: first.units,
 		warnings: exports.flatMap(({ pattern, exported }) =>
 			exported.warnings.map((warning) => ({ pattern, ...warning })),
 		),
-		fonts: [...fonts].sort(([a], [b]) => (a < b ? -1 : 1)).map(([id, file]) => ({ id, file })),
+		fonts: appStyleFonts(pages).map(({ id, file }) => ({ id, file })),
+		...(systemFonts.length > 0 ? { systemFonts } : {}),
 		targets,
 	};
+}
+
+/** Every system face the pages' exports name, once each by id; two exports that rebuild one id differently are an error. */
+export function appStyleSystemFonts(pages: ReadonlyArray<NativeAppStylePage>): StyleSystemFont[] {
+	const faces = new Map<string, StyleSystemFont>();
+	for (const { exported, sheets } of pages)
+		for (const face of [exported, ...(sheets ?? []).map((sheet) => sheet.exported)].flatMap(
+			(e) => e.systemFonts ?? [],
+		)) {
+			const seen = faces.get(face.id);
+			if (seen !== undefined && JSON.stringify(seen) !== JSON.stringify(face))
+				throw new Error(`system face ${face.id} is rebuilt two ways`);
+			faces.set(face.id, face);
+		}
+	return [...faces.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
+}
+
+/** Every face the pages' exports name, once each by id, with where its file is. */
+export function appStyleFonts(pages: ReadonlyArray<NativeAppStylePage>): StyleFont[] {
+	const fonts = new Map<string, StyleFont>();
+	for (const { exported, sheets } of pages)
+		for (const font of [exported, ...(sheets ?? []).map((sheet) => sheet.exported)].flatMap(
+			(e) => e.fonts,
+		)) {
+			const seen = fonts.get(font.id) ?? font;
+			if (seen.file !== font.file || seen.from !== font.from)
+				throw new Error(`font ${font.id} names two files`);
+			fonts.set(font.id, font);
+		}
+	return [...fonts.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
 }
 
 /** Bytes of the app style beside the per-page (and per-sheet-height) exports it replaces, both as compact JSON. */

@@ -51,7 +51,21 @@
 			"kind": "text",
 			"id": "h3:text0",
 			"parent": "h3",
-			"text": "Alerts off"
+			"text": "Alerts off",
+			"textByState": [
+				{
+					"when": {
+						"state:on": false
+					},
+					"value": "Alerts off"
+				},
+				{
+					"when": {
+						"state:on": true
+					},
+					"value": "Alerts on"
+				}
+			]
 		},
 		{
 			"kind": "element",

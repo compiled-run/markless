@@ -7,7 +7,12 @@
 			{
 				"id": "state:name",
 				"name": "name",
-				"initial": "Ada Lovelace"
+				"initial": "Ada Lovelace",
+				"styled": true,
+				"domain": [
+					"Ada Lovelace",
+					"Grace Hopper"
+				]
 			}
 		],
 		"nodes": [
@@ -147,12 +152,30 @@
 		}
 	},
 	"initial": [
-		["h1:text0", "Render"],
-		["h2:text0", "Initials: AL"],
-		["h3:text0", "Vowels: 6"],
-		["h4:text0", "Rename"]
+		[
+			"h1:text0",
+			"Render"
+		],
+		[
+			"h2:text0",
+			"Initials: AL"
+		],
+		[
+			"h3:text0",
+			"Vowels: 6"
+		],
+		[
+			"h4:text0",
+			"Rename"
+		]
 	],
-	"initialAttributes": [["h4", "aria-label", "Rename AL"]],
+	"initialAttributes": [
+		[
+			"h4",
+			"aria-label",
+			"Rename AL"
+		]
+	],
 	"steps": [
 		{
 			"action": {
@@ -160,6 +183,11 @@
 				"host": "h4"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:name",
+					"value": "Grace Hopper"
+				},
 				{
 					"op": "text",
 					"node": "h2:text0",

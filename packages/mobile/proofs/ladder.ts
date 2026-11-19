@@ -233,7 +233,7 @@ export const styleRungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
 		.filter((entry) => entry.isDirectory() && /^s\d+-/.test(entry.name))
 		.map((entry) => entry.name)
-		.sort();
+		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
 /** The styled-sheet ladder: each folder an app whose page opens a system sheet with styled content. */
 export const sheetStyleRungFolders = (): string[] =>
@@ -421,7 +421,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			? [pullDown()]
 			: [onPlatform('Android', [backGesture]), onPlatform('iOS', [pullDown()])];
 	// The screenshot after the step records the height it came to rest at.
-	if ('swipe' in action && action.swipe === 'up') return [pullUp, { waitForAnimationToEnd: { timeout: 5000 } }];
+	if ('swipe' in action && action.swipe === 'up')
+		return [pullUp, { waitForAnimationToEnd: { timeout: 5000 } }];
 	if ('scrollTo' in action)
 		return [
 			{

@@ -1,10 +1,10 @@
 {
 	"perPage": {
-		"/": 16603,
-		"/basil": 10525
+		"/": 19111,
+		"/basil": 11892
 	},
-	"perPageTotal": 27128,
-	"app": 19907,
+	"perPageTotal": 31003,
+	"app": 23753,
 	"targets": {
 		"ios": {
 			"writeLists": 11,

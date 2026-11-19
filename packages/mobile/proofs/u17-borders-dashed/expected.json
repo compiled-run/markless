@@ -1,0 +1,14 @@
+{
+	"rung": 117,
+	"name": "Dashed and dotted borders through Dragon: each side drawn as Chrome draws it, beside solid ones",
+	"steps": [
+		{
+			"visible": ["Borders", "Dashed all round", "Dotted all round", "Mixed sides", "Tap", "Taps 0"]
+		},
+		{
+			"do": { "tap": "Tap" },
+			"visible": ["Taps 1"],
+			"absent": ["Taps 0"]
+		}
+	]
+}

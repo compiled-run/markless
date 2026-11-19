@@ -133,7 +133,8 @@ public final class MarklessViewController: UIViewController {
 		}
 		bands = layout?.bands ?? sheetLayouts.values.joined().lazy.compactMap(\.layout.bands).first
 		band = try bands?.band(dark: dark)
-		let faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts)
+		let systemFaces = sheetLayouts.values.joined().reduce(layout?.systemFaces ?? [:]) { $0.merging($1.layout.systemFaces) { a, _ in a } }
+		let faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts).merging(systemFaces.mapValues { systemFont($0, size: 17) as UIFont }.mapValues(\.fontDescriptor)) { a, _ in a }
 		let device = self.device
 		tree = try ViewTree(
 			runtime: runtime, layout: layout, sheetLayouts: sheetLayouts, faces: faces,

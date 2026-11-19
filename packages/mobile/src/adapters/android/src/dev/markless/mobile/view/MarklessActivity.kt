@@ -193,6 +193,17 @@ abstract class MarklessActivity : Activity() {
 				else host.root.layout(f.left, f.top, f.right, f.bottom)
 			}
 
+			private val bodyPaint = android.graphics.Paint()
+
+			// body's own background, under the page, where the assignment gives it one.
+			override fun dispatchDraw(canvas: android.graphics.Canvas) {
+				host.bodyBox?.let { (rect, color) ->
+					bodyPaint.color = color
+					canvas.drawRect((paddingLeft + rect.left).toFloat(), (paddingTop + rect.top).toFloat(), (paddingLeft + rect.right).toFloat(), (paddingTop + rect.bottom).toFloat(), bodyPaint)
+				}
+				super.dispatchDraw(canvas)
+			}
+
 			override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
 				val f = host.rootFrame
 				val size = host.pageSize()
@@ -214,7 +225,10 @@ abstract class MarklessActivity : Activity() {
 		content.addView(host.root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 		page.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 		host.canvasColor?.let(page::setBackgroundColor)
-		host.onCanvas = page::setBackgroundColor
+		host.onCanvas = { color ->
+			page.setBackgroundColor(color)
+			content.invalidate()
+		}
 		setContentView(FrameLayout(this).apply { addView(page, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)) })
 		if (!firstFrameLogged) logFirstFrame(page)
 		if (warmsScriptEngine) host.warmScriptWhenIdle()
