@@ -15,7 +15,7 @@
 		},
 		{
 			"do": {
-				"wait": 2500
+				"wait": 5500
 			},
 			"visible": ["Word: apple", "Echo: apple", "Asked: apple"],
 			"absent": ["Looking up", "Asked: banana"]
@@ -29,7 +29,7 @@
 		},
 		{
 			"do": {
-				"wait": 2500
+				"wait": 5500
 			},
 			"visible": ["Word: banana", "Echo: banana"],
 			"absent": ["Word: apple", "Asked: missing"]
@@ -43,7 +43,7 @@
 		},
 		{
 			"do": {
-				"wait": 2500
+				"wait": 5500
 			},
 			"visible": ["Word: banana", "Failed: No entry for missing"],
 			"absent": ["Looking up", "Asked: cherry"]
@@ -57,7 +57,7 @@
 		},
 		{
 			"do": {
-				"wait": 2500
+				"wait": 5500
 			},
 			"visible": ["Word: cherry", "Echo: cherry"],
 			"absent": ["Word: banana", "Failed: No entry for missing"]

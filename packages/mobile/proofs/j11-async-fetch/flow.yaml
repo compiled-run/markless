@@ -12,7 +12,7 @@ name: j11-async-fetch
       text: 'engine starts: 1'
 - extendedWaitUntil:
       visible: 'Word: apple'
-      timeout: 12500
+      timeout: 15500
 - assertVisible: 'Word: apple'
 - assertNotVisible: Looking up
 - assertVisible: 'Word: apple'
@@ -29,7 +29,7 @@ name: j11-async-fetch
 - assertNotVisible: Looking up
 - extendedWaitUntil:
       visible: 'Word: banana'
-      timeout: 12500
+      timeout: 15500
 - assertNotVisible: 'Word: apple'
 - assertVisible: 'Word: banana'
 - assertVisible: 'Echo: banana'
@@ -43,7 +43,7 @@ name: j11-async-fetch
 - assertNotVisible: 'Failed: No entry for missing'
 - extendedWaitUntil:
       visible: 'Word: banana'
-      timeout: 12500
+      timeout: 15500
 - assertVisible: 'Failed: No entry for missing'
 - assertVisible: 'Word: banana'
 - assertVisible: 'Failed: No entry for missing'
@@ -58,7 +58,7 @@ name: j11-async-fetch
 - assertNotVisible: Looking up
 - extendedWaitUntil:
       visible: 'Word: cherry'
-      timeout: 12500
+      timeout: 15500
 - assertNotVisible: 'Word: banana'
 - assertNotVisible: 'Failed: No entry for missing'
 - assertVisible: 'Word: cherry'

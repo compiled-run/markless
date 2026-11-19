@@ -11,7 +11,7 @@ export async function lookUp(
 	word: string,
 	signal: AbortSignal,
 ): Promise<{ word: string; echo: string }> {
-	await wait(1500, signal);
+	await wait(4000, signal);
 	if (word === 'missing') throw new Error('No entry for missing');
 	const response = await fetch(`http://127.0.0.1:47608/j11/word?word=${word}`, { signal });
 	if (!response.ok) throw new Error(`The server answered ${response.status}`);
