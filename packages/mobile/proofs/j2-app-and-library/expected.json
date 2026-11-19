@@ -1,0 +1,37 @@
+{
+	"rung": "J2",
+	"name": "A handler that calls a function from another module of the app, and one from a small third-party library",
+	"steps": [
+		{
+			"visible": ["Library", "Heading: none", "Price: none"]
+		},
+		{
+			"do": {
+				"tap": "Title case"
+			},
+			"visible": ["Heading: Native Script Handlers"],
+			"absent": ["Heading: none"]
+		},
+		{
+			"do": {
+				"tap": "Title case"
+			},
+			"visible": ["Heading: Native Script Handlers Again", "Price: none"],
+			"absent": ["Heading: Native Script Handlers"]
+		},
+		{
+			"do": {
+				"tap": "Format price"
+			},
+			"visible": ["Price: $1,234.56"],
+			"absent": ["Price: none"]
+		},
+		{
+			"do": {
+				"tap": "Format price"
+			},
+			"visible": ["Price: $1,234,560.07"],
+			"absent": ["Price: $1,234.56"]
+		}
+	]
+}

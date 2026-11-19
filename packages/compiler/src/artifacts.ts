@@ -118,6 +118,75 @@ export type NativeFactCollectors = {
 	) => SemanticComponentNativeFacts;
 };
 
+/** A name a script reads that no declaration in its module gives (`setTimeout`, `document`). */
+export type SemanticScriptGlobal = {
+	readonly name: string;
+	readonly span: SourceSpan;
+	/** Only `typeof name`: feature detection, which the engine answers by itself. */
+	readonly typeofOnly: boolean;
+	/** `window.x`, `globalThis.x`, `self.x`: the property read off the global object. */
+	readonly property?: string;
+};
+
+/** A handler's or computed's own JavaScript, as a phone's script engine runs it. Native builds only. */
+export type SemanticScriptFunction = {
+	/**
+	 * A function body that returns the handler (or the computed's function): types erased, the local declarations it uses
+	 * first. Each name from the component (state, props, row items) reads as `__s.<name>`, each import as `__i[n]...`
+	 * (`n` indexes the module's `scriptModule.imports`); module-level names are left as written.
+	 */
+	readonly code: string;
+	/** The component's names it reads as `__s.<name>`, and whether it assigns them. */
+	readonly names: ReadonlyArray<{ readonly name: string; readonly written: boolean; readonly span: SourceSpan }>;
+	/** Module-level names it reads as written, which its module's statements declare. */
+	readonly module: ReadonlyArray<string>;
+	/** What it reads from imports: `__i[slot]`, then `name` (null: the whole module). */
+	readonly imports: ReadonlyArray<SemanticScriptImportUse>;
+	/** Each use of its first parameter (the event), as the member path read off it (`['target', 'value']`; empty: whole). */
+	readonly event?: ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly span: SourceSpan }>;
+	readonly globals: ReadonlyArray<SemanticScriptGlobal>;
+	/** Framework imports it uses (`navigate`), which are not JavaScript a script can run. */
+	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
+	readonly span: SourceSpan;
+	/** Constructs the engine cannot run as written (an `enum`), from type erasure. */
+	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
+};
+
+export type SemanticScriptImportUse = { readonly slot: number; readonly name: string | null };
+
+/** One top-level statement of a module as script code, with what it declares and reaches. */
+export type SemanticScriptStatement = {
+	readonly code: string;
+	/** Module-level names it declares. */
+	readonly declares: ReadonlyArray<string>;
+	/** Module-level names of this module it reads. */
+	readonly uses: ReadonlyArray<string>;
+	readonly imports: ReadonlyArray<SemanticScriptImportUse>;
+	/** It declares nothing, so it runs for its effect and is always kept. */
+	readonly effect: boolean;
+	readonly globals: ReadonlyArray<SemanticScriptGlobal>;
+	/** Names it uses that a script leaves out (a component, top-level framework state). */
+	readonly dropped: ReadonlyArray<{ readonly name: string; readonly span: SourceSpan }>;
+	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
+	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
+};
+
+/** An export of a script module: a local name, a name of another module (`from` null: the whole module), or `export *`. */
+export type SemanticScriptExport =
+	| { readonly name: string; readonly local: string }
+	| { readonly name: string; readonly slot: number; readonly from: string | null }
+	| { readonly star: number };
+
+/** A module's top-level code as a script module: imports read through `__i`, exports defined on `exports`. */
+export type SemanticScriptModule = {
+	/** Import specifiers in `__i` order; side-effect imports (stylesheets) are left out. */
+	readonly imports: ReadonlyArray<{ readonly specifier: string; readonly span: SourceSpan }>;
+	readonly statements: ReadonlyArray<SemanticScriptStatement>;
+	readonly exports: ReadonlyArray<SemanticScriptExport>;
+	/** `require`, `module` or `exports`: CommonJS, which the script's modules are not. */
+	readonly commonjs?: true;
+};
+
 export type ElementOnlyAttribute = {
 	/** The attribute as the element carries it. */
 	readonly name: string;

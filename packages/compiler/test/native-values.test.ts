@@ -7,7 +7,10 @@ const analyze = (filename: string, source: string) =>
 	buildSemanticGraph({ filename, source, nativeFacts: NATIVE_FACT_COLLECTORS });
 
 const nativeView = async (source: string, options: NativeViewOptions = {}) =>
-	createNativeViewPayload(await analyze('src/App.tsrx', source), options);
+	createNativeViewPayload(await analyze('src/App.tsrx', source), {
+		readSource: (file) => (file === 'src/App.tsrx' ? source : undefined),
+		...options,
+	});
 
 /** The build with other modules: `files` by name, resolved from `./name`. */
 const withModules = async (source: string, files: Record<string, string>) => {
@@ -97,13 +100,13 @@ export function App() @{
 		expect(payload?.handlers[0]?.ops).toEqual([{ op: 'assign', cell: 'state:count', value: doubled }]);
 	});
 
-	it('names a value it cannot read, with where it is written', async () => {
+	it('names a value it cannot read, with where it is written when values are data only', async () => {
 		const { diagnostics } = await nativeView(`import { state } from '@markless/core';
 const PATTERN = /x/;
 export function App() @{
 	let text = state('a');
 	<main><p>{PATTERN}</p></main>
-}`);
+}`, { scriptHandlers: 'never' });
 		expect(diagnostics).toHaveLength(1);
 		expect(diagnostics[0]).toMatchObject({
 			message: expect.stringContaining('a text expression through `PATTERN` uses a regular expression'),

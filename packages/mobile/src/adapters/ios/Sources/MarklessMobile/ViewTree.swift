@@ -183,6 +183,8 @@ final class ViewTree {
 	private var templates: [String: String] = [:]
 	private var attributes: [String: [String: String]] = [:]
 	private var branches: [String: (anchor: UIView, index: Int?, built: [String])] = [:]
+	/// Timers the page set and has not fired or cleared, by the name its `timer` entries give.
+	private var timers: [String: Task<Void, Never>] = [:]
 	private var lists: [String: (anchor: UIView, keys: [String], built: [String: [String]])] = [:]
 	private(set) var sheets: [String: SystemSheet] = [:]
 	/// The controller that presents the page's system sheets.
@@ -462,8 +464,8 @@ final class ViewTree {
 				if open { sheet.open(from: presenter) } else { sheet.close() }
 			case .navigate, .title:
 				throw HostError("navigate and title entries reach the screen's controller, not its views")
-			case .call, .release:
-				throw HostError("a \(entry.json.jsonText) entry reaches the page's device, not its views")
+			case .call, .release, .fetch:
+				throw HostError("a \(entry.json.jsonText) entry reaches the page's device or script services, not its views")
 			case let .dialog(node, open):
 				try present(node, open: open)
 			case let .command(node, command, preventScroll):
@@ -489,12 +491,16 @@ final class ViewTree {
 				}
 				show(text)
 			case let .timer(timer, ms):
-				Task { @MainActor [weak self] in
+				timers.removeValue(forKey: timer)?.cancel()
+				timers[timer] = Task { @MainActor [weak self] in
 					try? await Task.sleep(for: .milliseconds(ms))
 					// A page left since (or never mounted) has no runtime holding this timer any more.
-					guard let self, self.root.superview != nil else { return }
+					guard !Task.isCancelled, let self, self.root.superview != nil else { return }
+					self.timers[timer] = nil
 					self.onAction(NativeAction(event: .timer, timer: timer))
 				}
+			case let .clearTimer(timer):
+				timers.removeValue(forKey: timer)?.cancel()
 			case let .state(cell, value):
 				if let layout, cell != StyleBands.state || layout.stateCells.contains(cell) {
 					assignment = try layout.next(from: assignment, cell: cell, value: value)

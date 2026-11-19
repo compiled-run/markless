@@ -1,0 +1,12 @@
+{
+	"rung": "J8",
+	"name": "Text and an attribute the page renders through app functions",
+	"steps": [
+		{ "visible": ["Render", "Initials: AL", "Vowels: 6", "Rename AL"] },
+		{
+			"do": { "tap": "Rename AL" },
+			"visible": ["Initials: GH", "Vowels: 4", "Rename GH"],
+			"absent": ["Initials: AL", "Vowels: 6", "Rename AL"]
+		}
+	]
+}

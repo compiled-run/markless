@@ -9,6 +9,9 @@ import {
 	stopEmulator,
 	type BootedEmulator,
 } from './android.ts';
+import { ECHO_SERVER_PORT } from '../../proofs/ladder.ts';
+import { startEchoServer } from './echo-server.ts';
+import { exec } from './exec.ts';
 import { instrumentFlow } from './flow.ts';
 import {
 	androidHostTests,
@@ -240,49 +243,63 @@ async function main(argv: string[]): Promise<number> {
 				}
 			};
 			const installs = await Promise.all(platforms.map(install));
-			// One Maestro run at a time: beside a second Maestro run, Android's run lost its device connection.
-			for (const [at, platform] of platforms.entries()) {
-				const installed = installs[at]!;
-				let outcome: PlatformOutcome;
-				if (installed.error) {
-					outcome = {
-						failure: {
-							step: -1,
-							action: 'install',
-							role: 'unknown',
-							message: installed.error,
-						},
-						installSeconds: installed.seconds,
-						flowSeconds: 0,
-					};
-				} else {
-					const result = await runFlow({
-						platform,
-						device: platform === 'ios' ? simulator!.udid : emulator!.serial,
-						flow,
-						flowName: rung.name,
-						workDir: join(work, `${platform}-flow`),
-						screenshotDir: join(rung.dir, 'screenshots', platform),
-						reinstallDriver: !driverInstalled.has(platform),
-					});
-					driverInstalled.add(platform);
-					outcome = {
-						failure: result.failure,
-						installSeconds: installed.seconds,
-						flowSeconds: result.seconds,
-					};
+			// A rung that fetches reaches the test's echo server; the emulator's 127.0.0.1 is its own, so the port is forwarded.
+			const server = rung.expected.server === 'echo' ? await startEchoServer() : undefined;
+			if (server && emulator && tools)
+				await exec(tools.adb, [
+					'-s',
+					emulator.serial,
+					'reverse',
+					`tcp:${ECHO_SERVER_PORT}`,
+					`tcp:${ECHO_SERVER_PORT}`,
+				]);
+			try {
+				// One Maestro run at a time: beside a second Maestro run, Android's run lost its device connection.
+				for (const [at, platform] of platforms.entries()) {
+					const installed = installs[at]!;
+					let outcome: PlatformOutcome;
+					if (installed.error) {
+						outcome = {
+							failure: {
+								step: -1,
+								action: 'install',
+								role: 'unknown',
+								message: installed.error,
+							},
+							installSeconds: installed.seconds,
+							flowSeconds: 0,
+						};
+					} else {
+						const result = await runFlow({
+							platform,
+							device: platform === 'ios' ? simulator!.udid : emulator!.serial,
+							flow,
+							flowName: rung.name,
+							workDir: join(work, `${platform}-flow`),
+							screenshotDir: join(rung.dir, 'screenshots', platform),
+							reinstallDriver: !driverInstalled.has(platform),
+						});
+						driverInstalled.add(platform);
+						outcome = {
+							failure: result.failure,
+							installSeconds: installed.seconds,
+							flowSeconds: result.seconds,
+						};
+					}
+					results.get(platform)!.push({ name: rung.name, ...outcome });
+					const timing = `install ${fixed(outcome.installSeconds)} s, flow ${fixed(outcome.flowSeconds)} s`;
+					if (!outcome.failure) console.log(`PASS ${rung.name} ${platform} (${timing})`);
+					else {
+						const { step, action, role, command, message } = outcome.failure;
+						const what =
+							role === 'flow' ? `${command ?? 'a command'} failed` : 'maestro failed';
+						console.log(
+							`FAIL ${rung.name} ${platform} at step ${step} (${action}): ${what} (${timing})\n  ${message.split('\n').join('\n  ')}`,
+						);
+					}
 				}
-				results.get(platform)!.push({ name: rung.name, ...outcome });
-				const timing = `install ${fixed(outcome.installSeconds)} s, flow ${fixed(outcome.flowSeconds)} s`;
-				if (!outcome.failure) console.log(`PASS ${rung.name} ${platform} (${timing})`);
-				else {
-					const { step, action, role, command, message } = outcome.failure;
-					const what =
-						role === 'flow' ? `${command ?? 'a command'} failed` : 'maestro failed';
-					console.log(
-						`FAIL ${rung.name} ${platform} at step ${step} (${action}): ${what} (${timing})\n  ${message.split('\n').join('\n  ')}`,
-					);
-				}
+			} finally {
+				await server?.close();
 			}
 			console.log(
 				`  ${rung.name}: ${fixed(seconds(rungStarted))} s; screenshots in ${join(rung.dir, 'screenshots')}`,

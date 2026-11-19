@@ -13,6 +13,8 @@ import dev.markless.mobile.core.MarklessDecodeError
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
+import dev.markless.mobile.core.ScriptEngine
+import dev.markless.mobile.core.ScriptHost
 import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.field
 import dev.markless.mobile.core.num
@@ -53,6 +55,45 @@ fun canonical(j: Json): String = when (j) {
 	Json.Null -> "null"
 }
 
+/** The JVM has no Hermes: each source runs in one `vm` context of a long-lived `node`, as the reference engine runs it. */
+class NodeEngine : ScriptEngine, AutoCloseable {
+	private val process = ProcessBuilder("node", "-e", REPL).redirectError(ProcessBuilder.Redirect.INHERIT).start()
+	private val input = process.outputStream.bufferedWriter(Charsets.UTF_8)
+	private val output = process.inputStream.bufferedReader(Charsets.UTF_8)
+
+	override fun evaluate(source: String): String {
+		input.write(jsonString(source))
+		input.newLine()
+		input.flush()
+		val reply = Json.parse(output.readLine() ?: throw IllegalStateException("node exited")).obj("node's reply")
+		reply["error"]?.let { throw IllegalStateException(it.str("error")) }
+		return field(reply, "ok", "node's reply").str("ok")
+	}
+
+	override fun close() {
+		input.close()
+		process.waitFor()
+	}
+
+	companion object {
+		private const val REPL = "const vm = require('node:vm'); const context = vm.createContext({}, { microtaskMode: 'afterEvaluate' }); require('node:readline').createInterface({ input: process.stdin }).on('line', (line) => { let reply; try { reply = { ok: String(vm.runInContext(JSON.parse(line), context)) }; } catch (error) { reply = { error: String(error) }; } process.stdout.write(JSON.stringify(reply) + '\\n'); });"
+	}
+}
+
+/** One app's engine, started on first ask; `crypto` draws from all-zero seed bytes, as the vectors were written with. */
+class TestScriptHost : ScriptHost, AutoCloseable {
+	private var engine: NodeEngine? = null
+	val started get() = engine != null
+
+	override fun start(): ScriptEngine = engine ?: NodeEngine().also { engine = it }
+
+	override fun seed() = "00".repeat(32)
+
+	override fun close() {
+		engine?.close()
+	}
+}
+
 private fun field(o: Map<String, Json>, name: String, where: String): Json = o[name] ?: throw IllegalStateException("$where has no \"$name\"")
 
 /** One `markless.native-conformance/0` vector: the mounted texts must read `initial`, then each action's journal must match, byte for byte. */
@@ -65,7 +106,14 @@ private fun runVector(file: File) {
 	val params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap()
 	val languages = vector["preferredLanguages"]?.arr("preferredLanguages")?.map { it.str("preferredLanguages[]") } ?: listOf("en")
 	val now = (vector["now"] as? Json.Num)?.value
-	val runtime = if (now == null) Runtime(payload, params = params, preferredLanguages = languages) else Runtime(payload, params = params, preferredLanguages = languages, now = { now })
+	TestScriptHost().use { host ->
+		val runtime = if (now == null) Runtime(payload, params = params, preferredLanguages = languages, scriptHost = host) else Runtime(payload, params = params, preferredLanguages = languages, now = { now }, scriptHost = host)
+		runVector(file, vector, runtime)
+		if (payload.script == null) check("${file.name} starts no engine", !host.started) { "a payload without a script started the engine" }
+	}
+}
+
+private fun runVector(file: File, vector: Map<String, Json>, runtime: Runtime) {
 	val mounted = runtime.texts().joinToString(",", "[", "]") { (n, t) -> "[${jsonString(n)},${jsonString(t)}]" }
 	val initial = canonical(field(vector, "initial", file.name))
 	check("${file.name} initial", mounted == initial) { "expected $initial\n  actual   $mounted" }
@@ -109,6 +157,14 @@ private fun runVector(file: File) {
 			check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
 			continue
 		}
+		if (event == "response") {
+			val id = field(action, "id", "action").num("action.id").toInt()
+			val journal = runtime.response(id, JsValue.fromJson(field(action, "response", "action")))
+			val expected = canonical(field(s, "journal", "steps[$n]"))
+			val actual = journal.joinToString(",", "[", "]") { it.toJson() }
+			check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
+			continue
+		}
 		if (event == "device" || event == "settle") {
 			val cell = field(action, "cell", "action").str("action.cell")
 			val error = action["error"]?.obj("action.error")
@@ -140,7 +196,10 @@ private fun runVector(file: File) {
 /** One `markless.native-app-conformance/0` vector: after opening and after each action, the stack's paths, the top screen's title and texts, and the journal. */
 private fun runAppVector(file: File, vector: Map<String, Json>) {
 	val app = AppPayload.decodeOrNull(field(vector, "app", file.name)) ?: throw IllegalStateException("${file.name}: app is a single page payload")
-	val runtime = AppRuntime(app, field(vector, "open", file.name).str("open"))
+	TestScriptHost().use { runAppVector(file, vector, AppRuntime(app, field(vector, "open", file.name).str("open"), scriptHost = it)) }
+}
+
+private fun runAppVector(file: File, vector: Map<String, Json>, runtime: AppRuntime) {
 	fun look(where: String, expected: Map<String, Json>) {
 		val stack = runtime.screens.joinToString(",", "[", "]") { jsonString(it.path) }
 		check("${file.name} $where stack", stack == canonical(field(expected, "stack", where))) { "expected ${canonical(field(expected, "stack", where))}\n  actual   $stack" }
@@ -200,6 +259,14 @@ private fun decoderStrictness() {
 	refuses("a sheet in an arm", sheet.replace("\"modal\":true", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}"), "unknown field \"arm\"")
 	refuses("a sheet inside a sheet", sheet.replace("\"parent\":\"s\"}", "\"parent\":\"s\"},{\"kind\":\"sheet\",\"id\":\"s2\",\"parent\":\"s\",\"open\":{\"literal\":false},\"snapPoints\":[1],\"dismissible\":false,\"modal\":true}"), "has a Sheet node as its parent")
 	refuses("a dismiss event on an element", sheet.replace("\"host\":\"s\",\"event\":\"dismiss\"", "\"host\":\"h0\",\"event\":\"dismiss\""), "names no sheet")
+	val script = ok.replace("{\"op\":\"assign\",\"cell\":\"c\",\"value\":{\"literal\":1}}", "{\"op\":\"script\",\"fn\":\"fn:0\",\"type\":\"click\",\"bindings\":{\"c\":{\"cell\":\"c\"}}}")
+		.replace("\"component\":\"C\"", "\"component\":\"C\",\"script\":{\"id\":\"s\",\"source\":\"\",\"services\":[\"timers\"]}")
+	check("decodes a script op", runCatching { Payload.decode(script.toByteArray()) }.getOrNull()?.script?.services == listOf("timers")) { runCatching { Payload.decode(script.toByteArray()) }.exceptionOrNull().toString() }
+	refuses("a script op with no script", script.replace(",\"script\":{\"id\":\"s\",\"source\":\"\",\"services\":[\"timers\"]}", ""), "no script")
+	refuses("an unknown script service", script.replace("[\"timers\"]", "[\"workers\"]"), "unknown service \"workers\"")
+	refuses("a script binding of an unknown cell", script.replace("{\"cell\":\"c\"}}}", "{\"cell\":\"d\"}}}"), "unknown cell \"d\"")
+	refuses("an unknown script binding", script.replace("{\"cell\":\"c\"}}}", "{\"slot\":\"c\"}}}"), "unknown script binding")
+	refuses("an unknown script op field", script.replace("\"fn\":\"fn:0\"", "\"fn\":\"fn:0\",\"this\":1"), "unknown field \"this\"")
 	refuses("an activate event on a sheet", sheet.replace("\"host\":\"s\",\"event\":\"dismiss\"", "\"host\":\"s\",\"event\":\"activate\""), "names no element")
 }
 

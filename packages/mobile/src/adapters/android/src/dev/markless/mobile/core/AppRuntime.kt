@@ -4,11 +4,11 @@ package dev.markless.mobile.core
 class Screen(val route: String, val params: Map<String, String>, val path: String, val runtime: Runtime)
 
 /** The stack an app's screens form, without views: what each host's real stack must match. Free of android.*. */
-class AppRuntime(val app: AppPayload, path: String, private val store: Store = MemoryStore()) {
+class AppRuntime(val app: AppPayload, path: String, private val store: Store = MemoryStore(), private val scriptHost: ScriptHost? = null) {
 	val screens: MutableList<Screen> = app.backStack(path).map { open(app.match(it)!!.first.route.pattern, app.match(it)!!.second) }.toMutableList()
 
 	fun open(route: String, params: Map<String, String>): Screen =
-		Screen(route, params, AppPayload.path(route, params), Runtime(app.page(route).page, store, params))
+		Screen(route, params, AppPayload.path(route, params), Runtime(app.page(route).page, store, params, scriptHost = scriptHost))
 
 	/** Runs an action on the top screen; a `navigate` entry pushes the new screen, or replaces the top one. */
 	fun dispatch(host: String, event: EventName, value: String? = null): List<JournalEntry> {
