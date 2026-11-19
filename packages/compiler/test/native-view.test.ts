@@ -303,6 +303,52 @@ export function Choice() @{
 		expect(payload).toBeNull();
 	});
 
+	it('gives a state field whose first value is undefined a null cell, as a native expression spells undefined', async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { shared, state } from '@markless/core';
+const pickState = shared(() => {
+	const pick = state({ chosen: undefined as string | undefined, count: 0 });
+	return { ...pick };
+}, { scope: 'subtree' });
+function Picker() @{
+	const pick = pickState();
+	<p>{pick.chosen === undefined ? 'unset' : pick.chosen}</p>
+}
+export function Page() @{
+	let note = state({ text: undefined as string | undefined });
+	<main>
+		<Picker />
+		<p>{note.text ?? 'no note'}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.cells.map((cell) => [cell.name, cell.initial])).toEqual([
+			['note.text', null],
+			['pick.chosen', null],
+			['pick.count', 0],
+		]);
+	});
+
+	it('refuses a strict comparison that would tell undefined from null where a native cell cannot', async () => {
+		const { payload, diagnostics } = await nativeView(
+			`import { state } from '@markless/core';
+export function Page() @{
+	let draft = state({ given: undefined as string | undefined, held: null as string | null });
+	<main>
+		<p>{draft.given === null ? 'null' : 'not null'}</p>
+		<p>{draft.held === undefined ? 'undefined' : 'defined'}</p>
+		<p>{draft.given === undefined && draft.held === null ? 'both as written' : 'no'}</p>
+	</main>
+}`,
+			dataOnly,
+		);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'a text expression compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null',
+			'a text expression compares with `undefined` a value whose first value is `null`; a native value does not tell undefined from null',
+		]);
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{
@@ -1057,7 +1103,9 @@ export function Shelf() @{
 	</section>
 }`);
 		expect(diagnostics).toEqual([]);
-		const branch = payload!.nodes.find((node) => node.kind === 'branch' && !node.id.endsWith(':empty'))!;
+		const branch = payload!.nodes.find(
+			(node) => node.kind === 'branch' && !node.id.endsWith(':empty'),
+		)!;
 		const repeat = payload!.nodes.find((node) => node.kind === 'repeat')!;
 		expect(repeat.arm).toEqual({ branch: branch.id, index: 0 });
 		expect(payload!.nodes.find((node) => node.id === `${repeat.id}:empty`)?.arm).toEqual({
@@ -1872,7 +1920,6 @@ export function Page() @{
 }`);
 		expect(plain.payload!.script).toBeUndefined();
 	});
-
 });
 
 describe('overlays', () => {
