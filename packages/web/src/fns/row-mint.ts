@@ -41,9 +41,9 @@ export type RowMintGraph = Pick<RuntimeGraph, 'read'>;
 export function renderEmptyArm(
 	parent: ResumeDomElement,
 	repeat: ResumeKeyedRepeatRecord,
-	// Given when the arm is raised: its live values are filled and follow the graph while `arm` holds these nodes.
-	graph?: RuntimeGraph,
-	arm?: { readonly nodes: ReadonlyArray<ResumeDomNode> },
+	// Read by the live-arm render `fns/empty-arm-slots` puts in this one's place on a page that has one.
+	_graph?: RuntimeGraph,
+	_arm?: { readonly nodes: ReadonlyArray<ResumeDomNode> },
 ): ReadonlyArray<ResumeDomNode> {
 	const template = parent.ownerDocument?.createElement?.('template');
 	if (!template)
@@ -63,71 +63,7 @@ export function renderEmptyArm(
 			'MARKLESS_REPEAT_EMPTY_ARM_EMPTY',
 			'rendered an @empty arm of no nodes, so nothing would speak for the emptied list.',
 		);
-	return graph && arm ? fillEmptyArm(parent, repeat, nodes, graph, arm) : nodes;
-}
-
-let raisedArms = 0;
-
-function fillEmptyArm(
-	parent: ResumeDomElement,
-	repeat: ResumeKeyedRepeatRecord,
-	nodes: ReadonlyArray<ResumeDomNode>,
-	graph: RuntimeGraph,
-	arm: { readonly nodes: ReadonlyArray<ResumeDomNode> },
-): ReadonlyArray<ResumeDomNode> {
-	const { textSlots = [], attributeSlots = [] } = repeat.emptyArm!,
-		slots = [...textSlots, ...attributeSlots],
-		host = parent.ownerDocument as MintingDocument | undefined,
-		// Every path is walked before any fill, as a row's are.
-		markers = textSlots.map((slot) => nodeAtPath(nodes, slot.path) as ReplaceableNode | undefined),
-		elements = attributeSlots.map(
-			(slot) => nodeAtPath(nodes, slot.path) as (AttributableNode & Record<string, unknown>) | undefined,
-		);
-	if (
-		markers.some((marker) => !marker?.replaceWith) ||
-		elements.some((element) => !element?.setAttribute) ||
-		(markers.length > 0 && !host?.createTextNode)
-	)
-		throw repeatRuntimeError(
-			repeat,
-			'MARKLESS_REPEAT_EMPTY_ARM_SLOT_MISSING',
-			'cannot find where its @empty arm markup shows a live value.',
-		);
-	const statics = elements.map((element, at) => element!.getAttribute?.(attributeSlots[at]!.name));
-	const texts = markers.map((marker) => {
-		const text = host!.createTextNode!('') as ResumeDomNode & { textContent?: string | null };
-		marker!.replaceWith!(text);
-		return text;
-	});
-	const shown = nodes.map((node) => texts[markers.indexOf(node)] ?? node);
-	let values: ReadonlyArray<unknown> = [];
-	const refresh = (): void => {
-		const next = slots.map((slot) => graph.read(slot.graphNodeId, slot.graphPath));
-		for (const [at, value] of next.entries()) {
-			if (at < values.length && Object.is(value, values[at])) continue;
-			if (at < texts.length) texts[at]!.textContent = String(value ?? '');
-			else {
-				const slot = at - texts.length;
-				writeAttribute(elements[slot]!, attributeSlots[slot]!.name, value, statics[slot]);
-			}
-		}
-		values = next;
-	};
-	refresh();
-	// Released at the first write after the repeat took these nodes back out.
-	const raised = raisedArms++;
-	const releases = slots.map((slot, at) =>
-		graph.subscribe({
-			id: `keyed-repeat:${repeat.id}:empty:${raised}:${at}`,
-			graphNodeId: slot.graphNodeId,
-			path: slot.graphPath,
-			run() {
-				if (arm.nodes === shown) return refresh();
-				for (const release of releases) release();
-			},
-		}),
-	);
-	return shown;
+	return nodes;
 }
 
 // The server painted the arm without markers, so its nodes are found by matching the arm's own markup at the row span.
@@ -499,7 +435,7 @@ function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	}
 	return cursor;
 }
-function repeatRuntimeError(repeat: ResumeKeyedRepeatRecord, code: string, detail: string): Error {
+export function repeatRuntimeError(repeat: ResumeKeyedRepeatRecord, code: string, detail: string): Error {
 	const error = new Error(`${code}: ${repeat.id} ${detail}`) as Error & Record<string, unknown>;
 	error.name = 'KeyedRepeatRuntimeError';
 	error.code = code;

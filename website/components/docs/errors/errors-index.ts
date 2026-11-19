@@ -1540,14 +1540,6 @@ export const errorIndex: ErrorIndex = {
 			blurb: 'Markless checking itself. If you see one, it is a Markless bug: please open an issue.',
 			codes: [
 				{
-					code: 'MARKLESS_REPEAT_EMPTY_ARM_SLOT_MISSING',
-					title: '',
-					chip: 'error',
-					kind: 'runtime error',
-					guided: false,
-					words: ' markless_repeat_empty_arm_slot_missing a markless runtime error from @markless/web.',
-				},
-				{
 					code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
 					title: 'A @catch reset has no graph to re-run values in',
 					chip: 'error',
@@ -2122,6 +2114,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a write through a loop variable found no list markless_write_through_not_a_list a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_REPEAT_EMPTY_ARM_SLOT_MISSING',
+					title: 'An @empty branch cannot find where a live value goes',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'an @empty branch cannot find where a live value goes markless_repeat_empty_arm_slot_missing a markless runtime error from @markless/web.',
 				},
 				{
 					code: 'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',

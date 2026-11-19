@@ -689,6 +689,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly nestedRepeats?: true;
 			/** Present when this component's tree holds a keyed repeat whose rows flip an @if of their own. */
 			readonly rowBranchMint?: true;
+			/** Present when this component's tree holds a keyed repeat whose `@empty` arm shows a live value. */
+			readonly emptyArmSlots?: true;
 			/**
 			 * Present when this component's tree holds an action compiled as a
 			 * closure plan, so a composing page routes plan lookups toward it.

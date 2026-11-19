@@ -22,6 +22,9 @@ import type {
  */
 (globalThis as { __marklessRowMint?: () => Promise<unknown> }).__marklessRowMint = () =>
 	import('../src/fns/row-mint.ts');
+// The live-value half a page with a live @empty arm loads beside the mint.
+(globalThis as { __marklessRowBranches?: () => Promise<unknown> }).__marklessRowBranches = () =>
+	import('../src/fns/empty-arm-slots.ts').then((arms) => arms.marklessEmptyArmSlots());
 
 type Node = {
 	nodeType: number;

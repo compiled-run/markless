@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import {
 	buildSemanticGraph,
+	compileTsrxModule,
 	createProtocolViewPayload,
 	createRenderData,
 	lowerStateAccess,
@@ -133,4 +134,27 @@ export function App() @{
 }
 `);
 	expect(view.keyedRepeats ?? []).toHaveLength(0);
+});
+
+// Pay-per-use: only a repeat whose arm shows a live value names the module that fills one.
+test('only an @empty arm showing a live value demands the empty-arm slot module', async () => {
+	const demand = async (arm: string) => {
+		const result = await compileTsrxModule({
+			filename: 'src/App.tsrx',
+			source: `${preamble}
+export default function App() @{
+	let rows = state([{ id: 'a' }]);
+	let note = state('nothing');
+	<ul><li>header</li>@for (const row of rows; key row.id) { <li>{row.id}</li> } @empty { ${arm} }</ul>
+}
+`,
+			symbols: [],
+		});
+		return result.runtimeDemandMap.payloadRecords?.find((entry) => entry.kind === 'keyed-repeat')
+			?.runtimeModuleIds;
+	};
+	expect(await demand('<li>{note}</li>')).toContain('web/fns/empty-arm-slots');
+	const fixed = await demand('<li>nothing</li>');
+	expect(fixed).toContain('web/fns/row-mint');
+	expect(fixed).not.toContain('web/fns/empty-arm-slots');
 });

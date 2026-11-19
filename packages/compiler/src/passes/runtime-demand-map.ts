@@ -142,11 +142,17 @@ const ROW_SLOT_MINT = ['web/fns/row-slot-mint'];
 const NESTED_REPEATS = ['web/fns/nested-repeats'];
 // The per-row @if flip, folded only into a repeat whose row template carries one.
 const ROW_BRANCH_MINT = ['web/fns/row-branch-mint'];
+// An @empty arm's live values, folded only into a repeat whose arm shows any.
+const EMPTY_ARM_SLOTS = ['web/fns/empty-arm-slots'];
 // Rows that are comment ranges, and rows an @if arm renders, each wired only for a repeat that has them.
 const ROW_RANGES = ['web/fns/served-row-ranges'];
 const ARM_ROWS = ['web/resume-repeat-branch-arm'];
 // The wiring of a list whose parent element an @if or @switch arm renders, folded only into a branch whose arms hold one.
 const ARM_LISTS = ['web/resume-arm-lists'];
+/** Whether a repeat's `@empty` arm shows a live value, which only the empty-arm slot module fills. */
+export const emptyArmShowsValues = (record: {
+	readonly emptyArm?: { readonly textSlots?: unknown; readonly attributeSlots?: unknown };
+}): boolean => !!(record.emptyArm?.textSlots ?? record.emptyArm?.attributeSlots);
 const armsHoldLists = (branches: ReadonlyArray<Pick<ProtocolArmBranchRecord, 'armRecords'>>) =>
 	branches.some((branch) => branch.armRecords?.some((arm) => arm.repeatParents));
 const FULL_RESUME_CORE = ['web/resume-locators'];
@@ -1086,6 +1092,7 @@ function payloadDemandRecords(
 				...(record.rowComponent ? ROW_COMPONENT_MINT : []),
 				...(!record.rowComponent && record.rowTemplate?.componentName ? ROW_SLOT_MINT : []),
 				...(record.rowTemplate?.branchSlots ? ROW_BRANCH_MINT : []),
+				...(emptyArmShowsValues(record) ? EMPTY_ARM_SLOTS : []),
 				...(record.enclosingRow ? NESTED_REPEATS : []),
 				...(record.rowRange ? ROW_RANGES : []),
 				...(record.branchArm ? ARM_ROWS : []),
