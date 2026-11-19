@@ -560,20 +560,15 @@ declare namespace __MarklessTypeService {
 			? Attributes<SVGElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>
 			: never;
 
-	type CamelCaseAttributeSpelling<Tag extends PropertyKey> =
-		Tag extends keyof HTMLElementTagNameMap
+	type CamelCaseAttributeSpelling<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
+		?
+				| HtmlGlobalCamelCaseAttributeName
+				| (Tag extends keyof HtmlCamelCaseAttributeNameByTag ? HtmlCamelCaseAttributeNameByTag[Tag] : never)
+		: Tag extends keyof SVGElementTagNameMap
 			?
-					| HtmlGlobalCamelCaseAttributeName
-					| (Tag extends keyof HtmlCamelCaseAttributeNameByTag
-							? HtmlCamelCaseAttributeNameByTag[Tag]
-							: never)
-			: Tag extends keyof SVGElementTagNameMap
-				?
-						| SvgGlobalCamelCaseAttributeName
-						| (Tag extends keyof SvgCamelCaseAttributeNameByTag
-								? SvgCamelCaseAttributeNameByTag[Tag]
-								: never)
-				: never;
+					| SvgGlobalCamelCaseAttributeName
+					| (Tag extends keyof SvgCamelCaseAttributeNameByTag ? SvgCamelCaseAttributeNameByTag[Tag] : never)
+			: never;
 
 	type PlainAttributeValue<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
 		? AttributeValue
@@ -584,16 +579,13 @@ declare namespace __MarklessTypeService {
 	 * value, and the camelCase spelling of each real attribute, typed as that attribute.
 	 */
 	// Event handlers and Markless's own props are left out: no standard attribute shares their names.
-	type TypedAttributeValues<Tag extends PropertyKey> = GlobalAttributes &
-		TagNameSpecificAttributes<Tag>;
+	type TypedAttributeValues<Tag extends PropertyKey> = GlobalAttributes & TagNameSpecificAttributes<Tag>;
 
 	type StandardAttributes<Tag extends PropertyKey> = {
-		[
-			Name in Exclude<
-				StandardAttributeName<Tag> | CamelCaseAttributeSpelling<Tag>,
-				keyof GlobalAttributes | keyof TagNameSpecificAttributes<Tag>
-			>
-		]?: Name extends keyof CamelCaseAttributeName
+		[Name in Exclude<
+			StandardAttributeName<Tag> | CamelCaseAttributeSpelling<Tag>,
+			keyof GlobalAttributes | keyof TagNameSpecificAttributes<Tag>
+		>]?: Name extends keyof CamelCaseAttributeName
 			? CamelCaseAttributeName[Name] extends keyof TypedAttributeValues<Tag>
 				? TypedAttributeValues<Tag>[CamelCaseAttributeName[Name]]
 				: PlainAttributeValue<Tag>

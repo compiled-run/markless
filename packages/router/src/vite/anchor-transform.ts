@@ -15,6 +15,7 @@ import {
 } from '../link-attributes.ts';
 
 const ROUTE_HREF_HELPER_ID = 'virtual:markless-router/route-href';
+const PREFETCH_HELPER = '__marklessPrefetchAttribute';
 const JSX_FILE_FILTER = /\.(?:[jt]sx|tsrx)(?:$|\?)/;
 const VIRTUAL_MODULE_ID = /^\0/;
 const REWRITE_CACHE_LIMIT = 2048;
@@ -146,7 +147,11 @@ function lowerRouterLinks(code: string, ast: Node): string {
 			}
 		}
 	});
-	return applyEdits(code, edits);
+	const lowered = applyEdits(code, edits);
+	// No line break, so every line the build reports in this file is the line written.
+	return edits.some((edit) => edit.text.includes(PREFETCH_HELPER))
+		? `import { ${PREFETCH_HELPER} } from "@markless/router";${lowered}`
+		: lowered;
 }
 
 /**
@@ -182,10 +187,9 @@ function prefetchEdit(code: string, attribute: Node): Edit {
 			return { ...rangeOf(attribute), text: `${PREFETCH_ATTRIBUTE}="${literal.value}"` };
 		return { ...attributeRemovalRange(code, attribute), text: '' };
 	}
-	const expression = `(${slice(code, jsxExpression(value) ?? value)})`;
 	return {
 		...rangeOf(attribute),
-		text: `${PREFETCH_ATTRIBUTE}={${expression} === false ? 'none' : ${PREFETCH_LINK_CHOICES.map((choice) => `${expression} === '${choice}'`).join(' || ')} ? ${expression} : undefined}`,
+		text: `${PREFETCH_ATTRIBUTE}={${PREFETCH_HELPER}(${slice(code, jsxExpression(value) ?? value)})}`,
 	};
 }
 

@@ -80,6 +80,7 @@ import {
 	FRAGMENT_IDLE_FRAGMENT_DECODED_BYTES,
 	FRAGMENT_IDLE_WITHOUT_CONNECTION_INFO,
 	FRAGMENT_PREFETCH_TTL_MS,
+	FRAGMENT_HELD_CHARS,
 	FRAGMENT_REGION_END,
 	FRAGMENT_PATH_PREFIX,
 	STYLESHEET_KEY_ATTRIBUTE,
@@ -918,11 +919,7 @@ async function renderDocumentShell(
 		const { html, preloads } = takeHeadModulePreloads(
 			insertHeadHtml(authoredRoot ? documentHtml.trim() : documentHtml, rest),
 		);
-		const content = insertHeadModulePreloads(
-			insertImportMap(html, headStart),
-			headStart,
-			preloads,
-		);
+		const content = insertHeadModulePreloads(insertImportMap(html, headStart), headStart, preloads);
 		if (authoredRoot) return `<!doctype html>${content}`;
 		return [
 			'<!doctype html>',
@@ -1015,11 +1012,9 @@ function assertDocumentStorageFree(output: RenderOutput | undefined): void {
 
 // No runtime ever binds the document to a shared() instance, so what it renders from one is the starting value for good.
 function assertDocumentSharedFree(output: RenderOutput | undefined): void {
-	const definitions = (
-		output?.state as
-			| { readonly sharedDefinitions?: ReadonlyArray<{ readonly name: string }> }
-			| undefined
-	)?.sharedDefinitions;
+	const definitions = (output?.state as
+		| { readonly sharedDefinitions?: ReadonlyArray<{ readonly name: string }> }
+		| undefined)?.sharedDefinitions;
 	if (!definitions?.length) return;
 	const names = [...new Set(definitions.map((definition) => definition.name))].join(', ');
 	throw new Error(
@@ -1390,6 +1385,7 @@ function fragmentConfig(
 		documentLoads,
 		hoverDwellMs: FRAGMENT_HOVER_DWELL_MS,
 		prefetchTtlMs: FRAGMENT_PREFETCH_TTL_MS,
+		heldChars: FRAGMENT_HELD_CHARS,
 		prefetchConnections: fragment.prefetch.concurrency,
 		prefetchOn: fragment.prefetch.levels,
 		endpointPrefixes: [API_PATHNAME_PREFIX],

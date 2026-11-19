@@ -50,6 +50,14 @@ export const PREFETCH_DEFAULTS = {
 export function prefetchPolicy(prefetch: RouterPrefetch | undefined): PrefetchPolicy {
 	if (prefetch === false || prefetch === 'none')
 		return { levels: [0, 0, 0], concurrency: PREFETCH_DEFAULTS.concurrency };
+	if (
+		prefetch !== undefined &&
+		prefetch !== true &&
+		(typeof prefetch !== 'object' || prefetch === null || Array.isArray(prefetch))
+	)
+		throw new Error(
+			`Markless router: prefetch is ${JSON.stringify(prefetch)}; use true, false, 'none' or an object of ${PREFETCH_TRIGGERS.join(', ')} and concurrency.`,
+		);
 	const options = typeof prefetch === 'object' ? prefetch : {};
 	const level = (trigger: PrefetchTrigger) => {
 		const value = options[trigger] ?? PREFETCH_DEFAULTS[trigger];

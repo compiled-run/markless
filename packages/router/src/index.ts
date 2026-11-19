@@ -10,10 +10,7 @@ import {
 	SCROLL_ATTRIBUTE,
 	type PrefetchLinkChoice,
 } from './link-attributes.ts';
-import {
-	IN_PLACE_LOCATION_HEADER,
-	IN_PLACE_REQUEST_HEADER,
-} from '@markless/web/fns/in-place-headers';
+import { IN_PLACE_LOCATION_HEADER, IN_PLACE_REQUEST_HEADER } from '@markless/web/fns/in-place-headers';
 import { HTML_ATTRIBUTES_SLOT } from './route-dom.ts';
 import { rememberRequestLocals } from './request-locals.ts';
 
@@ -187,12 +184,7 @@ const CROSS_SITE_WRITE_REFUSED =
 /** The 403 an api/ route answers when a browser sends it a write from another site, so a page elsewhere cannot act for a signed-in visitor. */
 export function __marklessRefuseCrossSiteWrite(event: RuntimeHttpEvent): Response | undefined {
 	const request = event.req;
-	if (
-		!request ||
-		request.method === 'GET' ||
-		request.method === 'HEAD' ||
-		request.method === 'OPTIONS'
-	)
+	if (!request || request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS')
 		return undefined;
 	const site = request.headers.get('sec-fetch-site');
 	const origin = request.headers.get('origin');
@@ -346,6 +338,12 @@ function linkAnchorAttributes(props: LinkProps): Array<readonly [string, string]
 		attributes.set(PREFETCH_ATTRIBUTE, props.prefetch as PrefetchLinkChoice);
 	if (props.scroll === false) attributes.set(SCROLL_ATTRIBUTE, 'manual');
 	return [...attributes];
+}
+
+/** What a link's `prefetch` value lowers to: 'none' for false, a link choice as is, nothing otherwise. */
+export function __marklessPrefetchAttribute(value: unknown): string | undefined {
+	if (value === false) return 'none';
+	return PREFETCH_LINK_CHOICES.includes(value as PrefetchLinkChoice) ? (value as string) : undefined;
 }
 
 function isLinkInternalProp(name: string): boolean {

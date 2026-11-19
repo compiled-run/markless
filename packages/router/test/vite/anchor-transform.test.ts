@@ -73,7 +73,12 @@ export default function Nav({ mode }) @{
 			'<a data-markless-router-link href="/f" data-markless-router-prefetch="viewport">F</a>',
 		);
 		expect(result?.code).toContain(
-			"data-markless-router-prefetch={(mode) === false ? 'none' : (mode) === 'intent' || (mode) === 'viewport' ? (mode) : undefined}",
+			"data-markless-router-prefetch={__marklessPrefetchAttribute(mode)}",
+		);
+		// A dynamic value is read once, through one helper import.
+		expect(result?.code.match(/\(mode\)|\bmode\b(?=\))/g)).toHaveLength(1);
+		expect(result?.code).toMatch(
+			/^import \{ __marklessPrefetchAttribute \} from "@markless\/router";/,
 		);
 	});
 
@@ -95,7 +100,7 @@ export default function Nav({ mode }) @{
 		expect(result?.code).toContain('<a href="/b" data-markless-router-prefetch="none">B</a>');
 		expect(result?.code).toContain('<a href="/c">C</a>');
 		expect(result?.code).toContain(
-			"<a href=\"/d\" data-markless-router-prefetch={(mode) === false ? 'none' : (mode) === 'intent' || (mode) === 'viewport' ? (mode) : undefined}>D</a>",
+			"<a href=\"/d\" data-markless-router-prefetch={__marklessPrefetchAttribute(mode)}>D</a>",
 		);
 	});
 

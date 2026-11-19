@@ -35,6 +35,9 @@ describe('router prefetch policy', () => {
 		expect(() => prefetchPolicy({ hover: 'all' } as never)).toThrow(
 			/prefetch\.hover is not a trigger/,
 		);
+		expect(() => prefetchPolicy('fast' as never)).toThrow(/prefetch is "fast"/);
+		expect(() => prefetchPolicy(null as never)).toThrow(/prefetch is null/);
+		expect(() => prefetchPolicy([] as never)).toThrow(/prefetch is \[\]/);
 		expect(() => prefetchPolicy({ concurrency: 0 })).toThrow(/concurrency/);
 		expect(() => prefetchPolicy({ concurrency: 1.5 })).toThrow(/concurrency/);
 	});

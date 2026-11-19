@@ -424,14 +424,9 @@ export function fragmentNavigationSuite(name: string, browserType: BrowserType):
 			await page.evaluate((deadline) => {
 				const later = window.setTimeout;
 				window.setTimeout = ((callback: () => void, ms?: number) =>
-					ms === deadline
-						? 0
-						: later.call(window, callback, ms)) as typeof window.setTimeout;
+					ms === deadline ? 0 : later.call(window, callback, ms)) as typeof window.setTimeout;
 			}, MARKLESS_NAV_SETTLE_DEADLINE_MS);
-			const failed = page.waitForEvent(
-				'requestfailed',
-				(request) => request === run.request(),
-			);
+			const failed = page.waitForEvent('requestfailed', (request) => request === run.request());
 			holdBack();
 			await page.evaluate(() => history.back());
 			await expect.poll(() => awayAnswers.length, { timeout: 10_000 }).toBe(1);
@@ -1184,8 +1179,7 @@ export function fragmentNavigationSuite(name: string, browserType: BrowserType):
 				// The arriving page's stylesheet goes into the head, unapplied, ahead of the swap: cancel right then.
 				new MutationObserver((records, observer) => {
 					const added = records.flatMap((record) => [...record.addedNodes]);
-					if (!added.some((node) => (node as HTMLLinkElement).rel === 'stylesheet'))
-						return;
+					if (!added.some((node) => (node as HTMLLinkElement).rel === 'stylesheet')) return;
 					observer.disconnect();
 					(document.querySelector('[data-crumb-home]') as HTMLElement).click();
 				}).observe(document.head, { childList: true });
@@ -1196,14 +1190,11 @@ export function fragmentNavigationSuite(name: string, browserType: BrowserType):
 			expect(await page.title()).toBe('Guide home');
 			const head = () =>
 				page.evaluate(() =>
-					[
-						...document.head.querySelectorAll(
-							'title, meta[name], link[rel="canonical"]',
-						),
-					].map((element) =>
-						element.localName === 'title'
-							? element.textContent
-							: (element.getAttribute('content') ?? element.getAttribute('href')),
+					[...document.head.querySelectorAll('title, meta[name], link[rel="canonical"]')].map(
+						(element) =>
+							element.localName === 'title'
+								? element.textContent
+								: (element.getAttribute('content') ?? element.getAttribute('href')),
 					),
 				);
 			expect(await head()).toEqual(['Guide home', 'About Guide home', 'https://guide.test/']);
@@ -1216,11 +1207,7 @@ export function fragmentNavigationSuite(name: string, browserType: BrowserType):
 			).toEqual(['not all']);
 			await page.locator('[data-pager-next]').click();
 			await landedOn(page, 'alpha');
-			expect(await head()).toEqual([
-				'Alpha guide',
-				'About Alpha guide',
-				'https://guide.test/alpha',
-			]);
+			expect(await head()).toEqual(['Alpha guide', 'About Alpha guide', 'https://guide.test/alpha']);
 			expect(errors).toEqual([]);
 			await page.close();
 		});
@@ -1286,8 +1273,7 @@ export function fragmentNavigationSuite(name: string, browserType: BrowserType):
 					'scroll',
 					(event) => {
 						const held = (window as unknown as Record<string, unknown>).__holdBoxScroll;
-						if (held && (event.target as Element).id === 'side')
-							event.stopImmediatePropagation();
+						if (held && (event.target as Element).id === 'side') event.stopImmediatePropagation();
 					},
 					true,
 				);
@@ -1320,9 +1306,7 @@ export function fragmentNavigationSuite(name: string, browserType: BrowserType):
 					count,
 				);
 			const follow = async (link: string, name: string, count: number) => {
-				await page
-					.locator(`[data-side-link="${link}"]`)
-					.evaluate((anchor) => (anchor as HTMLElement).click());
+				await page.locator(`[data-side-link="${link}"]`).evaluate((anchor) => (anchor as HTMLElement).click());
 				await landedOn(page, name);
 				await rendered(count);
 			};

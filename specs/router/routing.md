@@ -244,7 +244,11 @@ networks, `'fast'` ones, or `'none'`:
 - `idle` (default `'fast'`): once the page is idle, up to six page links on
   screen.
 - `concurrency` (default 2): viewport and idle fetches in flight at once; the
-  rest wait for a free slot.
+  rest wait for a free slot. Intent fetches are outside it: a hover or press
+  never waits for a slot, and guesses still arriving are cancelled to make
+  room for it.
+- The viewport trigger observes the page's page links when a page is shown,
+  and links the page adds later once it is idle after a click or key press.
 
 A network is fast when the browser reports no slower link than
 `effectiveType: '4g'` (or reports nothing) and the page's own downloads
@@ -265,6 +269,15 @@ the navigation. A viewport or idle fetch stops once its page passes 256 KiB on
 the wire (4 MiB decoded when a compressed answer declares no length), and that
 page is left for intent. The viewport trigger's code is a bridge file of its
 own, loaded only when the config or a link on the page asks for links in view.
+A page cancelled before it arrived may be fetched ahead again. Pages fetched
+ahead are kept as text (a guess's document is parsed only when a click or
+intent wants it) for 30 s, and up to 8 Mi characters of text in all, the
+oldest to arrive dropped first (`FRAGMENT_HELD_CHARS`).
+
+Guessing (the viewport and idle triggers) has one state per tab: paused while
+a navigation is on its way, then armed, scheduled and watching for the page
+shown. A swap, or a navigation cancelled by a click on the page shown or by
+Back or Forward to it, arms it again for the page that is shown.
 
 ### Kept parts
 

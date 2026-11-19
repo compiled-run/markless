@@ -51,6 +51,8 @@ export interface FragmentNavigationConfig {
 	// A mouse fetches after resting this long on a link; press, focus and touch fetch at once.
 	readonly hoverDwellMs: number;
 	readonly prefetchTtlMs: number;
+	// Characters of page text kept for pages fetched ahead, all together.
+	readonly heldChars: number;
 	// At most this many unused prefetches may still be streaming; starting another cancels the oldest.
 	readonly prefetchConnections: number;
 	// [intent, viewport, idle]: 0 never, 1 on a fast link, 2 on any (never under Save-Data or in a hidden tab).
@@ -89,10 +91,10 @@ export type FragmentPrefetch = {
 	// When the response's Cache-Control ends its reuse (on arrival for no-store and no-cache).
 	expires?: number;
 	readonly result: Promise<FragmentFetched>;
-	// The response is still arriving, so it holds a connection.
-	open: boolean;
-	// Bytes an idle or viewport fetch may read before it gives the page up; Infinity once intent or a click adopts it.
-	budget: number;
+	// 0 a guess (idle or viewport, under the byte budget), 1 wanted (intent or a click), 2 arrived, 3 gone.
+	phase: number;
+	// A guess becomes wanted: no byte budget, and its document is parsed on arrival.
+	readonly want: () => void;
 	readonly abort: () => void;
 };
 
@@ -209,14 +211,14 @@ function take(
 		return {
 			at: now,
 			writes: state.writes,
-			budget: Infinity,
+			phase: 2,
 			result: Promise.resolve(ready ?? state.parse(url.href, cached)),
-			open: false,
+			want: () => {},
 			abort: () => {},
 		};
 	}
 	if (existing && state.fresh(existing, now)) {
-		existing.budget = Infinity;
+		existing.want();
 		return existing;
 	}
 	existing?.abort();
@@ -428,11 +430,7 @@ async function runScripts(
 	}
 }
 
-function loaded(
-	w: Window,
-	links: readonly HTMLLinkElement[],
-	deadlineMs: number,
-): Promise<unknown> {
+function loaded(w: Window, links: readonly HTMLLinkElement[], deadlineMs: number): Promise<unknown> {
 	if (links.length === 0) return Promise.resolve();
 	return Promise.race([
 		Promise.all(
@@ -809,9 +807,7 @@ function keptPairs(
 	const pairs: Array<{ readonly from: string; readonly to: string }> = [];
 	for (const element of outgoing.querySelectorAll(`[${instance}]`)) {
 		const at = arriving.findIndex(
-			(next) =>
-				next.getAttribute(keep) === element.getAttribute(keep) &&
-				!!keptSlots(element, next),
+			(next) => next.getAttribute(keep) === element.getAttribute(keep) && !!keptSlots(element, next),
 		);
 		if (at === -1) continue;
 		const [next] = arriving.splice(at, 1);
@@ -1261,13 +1257,7 @@ export async function navigate(
 		try {
 			wakeShared = await (
 				await sharedSwap
-			).bindSharedSwap({
-				document: d,
-				outgoing,
-				incoming,
-				containerAttribute,
-				resumeAttribute,
-			});
+			).bindSharedSwap({ document: d, outgoing, incoming, containerAttribute, resumeAttribute });
 		} catch (error) {
 			reportAsync(error);
 		}
@@ -1428,8 +1418,7 @@ export async function navigate(
 	if (restored)
 		for (const container of [region, ...region.querySelectorAll(`[${containerAttribute}]`)])
 			if (isContainer(container))
-				(container as unknown as Record<string, unknown>)[state.config.reaskProperty] =
-					true;
+				(container as unknown as Record<string, unknown>)[state.config.reaskProperty] = true;
 	const controller = new AbortController();
 	session.streaming = controller;
 	const host = d as unknown as Record<string, unknown>;
