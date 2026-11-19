@@ -413,6 +413,40 @@ export function Page() @{
 		}
 	});
 
+	it('builds a <textarea> as a text field, and refuses its change handler and its place in a form by name', async () => {
+		const shown = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let note = state('');
+	<main>
+		<textarea aria-label="Notes" value={note} onInput={(event) => (note = event.currentTarget.value)} />
+		<p>{note}</p>
+	</main>
+}`);
+		expect(shown.diagnostics).toEqual([]);
+		expect(shown.payload?.events).toEqual([{ host: 'h1', event: 'input', handler: 'handler:event:0' }]);
+		const changed = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let note = state('');
+	<main><textarea aria-label="Notes" onChange={(event) => (note = event.currentTarget.value)} /><p>{note}</p></main>
+}`);
+		expect(changed.diagnostics.map((d) => d.message)).toContain(
+			'the change handler on the <textarea> h1: a text field raises it when it loses focus, which a native build has no lowering for yet',
+		);
+		const sent = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let note = state('');
+	<form onSubmit={(event) => { event.preventDefault(); note = 'sent'; }}>
+		<textarea aria-label="Notes" name="notes" />
+		<button>Send</button>
+		<p>{note}</p>
+	</form>
+}`);
+		expect(sent.payload).toBeNull();
+		expect(sent.diagnostics.map((d) => d.message)).toContain(
+			'the <textarea> h1 in the <form> h0, whose text a native build does not submit yet',
+		);
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{

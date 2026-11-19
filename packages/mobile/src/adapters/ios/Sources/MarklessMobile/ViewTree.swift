@@ -7,7 +7,7 @@ import UIKit.UIGestureRecognizerSubclass
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
 	"canvas", "details", "embed", "iframe", "object", "option",
-	"picture", "select", "summary", "textarea", "video",
+	"picture", "select", "summary", "video",
 ]
 
 /// Where an instance is built: its row (`@key`, empty outside lists), the names its expressions see, and what encloses it.
@@ -435,7 +435,7 @@ final class ViewTree {
 	}
 
 	/// The focused text field in this page, if any.
-	var focusedField: UITextField? { elements.values.lazy.compactMap { $0 as? UITextField }.first { $0.isFirstResponder } }
+	var focusedField: UIView? { elements.values.first { ($0 is UITextField || $0 is TextArea) && $0.isFirstResponder } }
 
 	/// The journal applier: the only code that changes a retained view after the first build.
 	func apply(_ journal: [NativeJournalEntry]) throws {
@@ -458,6 +458,10 @@ final class ViewTree {
 				drawTick(node, view)
 			case let .property(node, _, value):
 				if elements[node] is AbsentField { continue }
+				if let area = elements[node] as? TextArea {
+					area.text = value
+					continue
+				}
 				guard let field = elements[node] as? UITextField else { throw HostError("journal names input \(node), which is not a shown field") }
 				field.text = value
 			case let .attribute(node, name, value):
@@ -486,17 +490,17 @@ final class ViewTree {
 					break
 				}
 				if !preventScroll { bringIntoView(view, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline) }
-				if view is UITextField {
+				if view is UITextField || view is TextArea {
 					view.becomeFirstResponder()
 				} else {
 					try overlays.focus(node)
 				}
 			case let .invalid(node, text):
 				guard let view = elements[node] else { throw HostError("journal names field \(node), which is not shown") }
-				if let field = view as? UITextField {
+				if view is UITextField || view is TextArea {
 					root.layoutIfNeeded()
-					bringIntoView(field, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
-					field.becomeFirstResponder()
+					bringIntoView(view, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
+					view.becomeFirstResponder()
 				}
 				show(text)
 			case let .timer(timer, ms):
@@ -831,6 +835,24 @@ final class ViewTree {
 					let overlay = OverlayElementView()
 					overlay.onEscape = { [unowned self] in self.overlays.escape() }
 					view = overlay
+				} else if element == "textarea" {
+					if context.button != nil { throw HostError("<textarea> \(id) is inside a button") }
+					let area = TextArea()
+					area.onChange.append { [weak self] _ in self?.dismissMessage() }
+					area.onBegin = { [weak self, weak area] in
+						guard let self, let area else { return }
+						self.bringIntoView(area, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
+					}
+					if layout == nil {
+						area.font = .preferredFont(forTextStyle: .body)
+						area.layer.borderWidth = 1
+						area.layer.borderColor = UIColor.separator.cgColor
+						area.layer.cornerRadius = 5
+						area.widthAnchor.constraint(equalToConstant: 240).isActive = true
+						// Chrome's default `rows="2"`.
+						area.heightAnchor.constraint(equalToConstant: 2 * area.font!.lineHeight + area.textContainerInset.top + area.textContainerInset.bottom).isActive = true
+					}
+					view = area
 				} else {
 					view = UIView()
 					view.isUserInteractionEnabled = context.button == nil
@@ -873,12 +895,13 @@ final class ViewTree {
 					current[binding.name] = marklessAttributeValue(binding.name, try runtime.evaluate(binding.value, in: context.scope))
 				}
 				attributes[id] = current
-				if let field = view as? UITextField {
+				if view is UITextField || view is TextArea {
 					let bound = bindings.first { $0.isProperty && $0.name == "value" }
-					field.text = try bound.map { binding in
+					let text = try bound.map { binding in
 						let value = try runtime.evaluate(binding.value, in: context.scope)
 						return value == .null ? "" : value.text
 					} ?? staticAttributes["value"]
+					if let area = view as? TextArea { area.text = text ?? "" } else { (view as? UITextField)?.text = text }
 				}
 				var childIndex = 0
 				_ = try build(template, in: scrollViews[id] ?? view, at: &childIndex, inner)
@@ -955,7 +978,7 @@ final class ViewTree {
 			switch (event.event, view) {
 			case let (.activate, control as UIButton):
 				control.addAction(UIAction { _ in onAction(NativeAction(event: .activate, host: id)) }, for: .touchUpInside)
-			case (.activate, _) where !(view is UITextField):
+			case (.activate, _) where !(view is UITextField || view is TextArea):
 				// An element that is not a button (a list row): a tap anywhere in it, its text included, presses it.
 				view.isUserInteractionEnabled = true
 				view.addGestureRecognizer(ActivateGesture { onAction(NativeAction(event: .activate, host: id)) })
@@ -963,6 +986,8 @@ final class ViewTree {
 				field.addAction(
 					UIAction { [weak field] _ in onAction(NativeAction(event: .input, host: id, value: field?.text ?? "")) },
 					for: .editingChanged)
+			case let (.input, area as TextArea):
+				area.onChange.append { text in onAction(NativeAction(event: .input, host: id, value: text)) }
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
 			case (.idle, _), (.visible, _), (.dismiss, _), (.pointerdown, _), (.pointerup, _):
@@ -1023,8 +1048,9 @@ final class ViewTree {
 			view.accessibilityLabel = current["aria-label"]
 		}
 		if let field = view as? UITextField { field.isEnabled = current["disabled"] == nil }
+		if let area = view as? TextArea { area.isEditable = current["disabled"] == nil }
 		// aria-disabled only reads as dimmed: a press still reaches the button, as on the web.
-		let disabled = (view is UIButton || view is UITextField) && current["disabled"] != nil
+		let disabled = (view is UIButton || view is UITextField || view is TextArea) && current["disabled"] != nil
 		if disabled || current["aria-disabled"] == "true" {
 			view.accessibilityTraits.insert(.notEnabled)
 		} else {
@@ -1078,7 +1104,7 @@ final class ViewTree {
 	}
 
 	private func stackTree(_ view: UIView) {
-		guard !(view is UILabel || view is UITextField || view is AudioButton), !leaves.contains(ObjectIdentifier(view)) else { return }
+		guard !(view is UILabel || view is UITextField || view is TextArea || view is AudioButton), !leaves.contains(ObjectIdentifier(view)) else { return }
 		stack(view)
 		for child in view.subviews where !anchors.contains(ObjectIdentifier(child)) { stackTree(child) }
 	}
@@ -1576,5 +1602,26 @@ final class ContainerScrollView: UIScrollView {
 		if (toward > 0 && at >= end - 0.5) || (toward < 0 && at <= 0.5) { return false }
 		return super.gestureRecognizerShouldBegin(gesture)
 	}
+}
+
+/// A `<textarea>`: a text view that reports each edit as a text field's `editingChanged` does; Return adds a line.
+final class TextArea: UITextView, UITextViewDelegate {
+	var onChange: [(String) -> Void] = []
+	var onBegin: (() -> Void)?
+
+	init() {
+		super.init(frame: .zero, textContainer: nil)
+		delegate = self
+		isScrollEnabled = true
+	}
+
+	@available(*, unavailable)
+	required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+	func textViewDidChange(_ textView: UITextView) {
+		for change in onChange { change(text) }
+	}
+
+	func textViewDidBeginEditing(_ textView: UITextView) { onBegin?() }
 }
 #endif

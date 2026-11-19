@@ -539,10 +539,8 @@
 		]
 	},
 	"textbox": {
-		"payload": false,
-		"diagnostics": [
-			"MARKLESS_NATIVE_ELEMENT: the <textarea> element has no native view yet"
-		]
+		"payload": true,
+		"diagnostics": []
 	},
 	"timebox": {
 		"payload": false,

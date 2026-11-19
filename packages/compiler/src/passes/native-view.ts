@@ -6124,13 +6124,13 @@ export function createNativeViewPayload(
 	 */
 	function wireTicks() {
 		for (const node of nodes) {
-			if (node.kind !== 'element' || node.element !== 'input') continue;
+			if (node.kind !== 'element' || (node.element !== 'input' && node.element !== 'textarea')) continue;
 			const own = pendingHandlers.filter((pending) => pending.host === node.id);
 			if (!isTicked(node.id)) {
 				for (const pending of own)
 					if (pending.event.eventName === 'change')
 						refuse(
-							`the change handler on the <input> ${node.id}: a text field raises it when it loses focus, which a native build has no lowering for yet`,
+							`the change handler on the <${node.element}> ${node.id}: a text field raises it when it loses focus, which a native build has no lowering for yet`,
 							pending.event.handlerSpan,
 						);
 				continue;
@@ -6229,6 +6229,10 @@ export function createNativeViewPayload(
 				const field = `the <${node.element}> ${node.id} in ${where}`;
 				if (node.element === 'form') {
 					refuse(`${field}, a form inside a form`);
+					continue;
+				}
+				if (node.element === 'textarea') {
+					refuse(`${field}, whose text a native build does not submit yet`);
 					continue;
 				}
 				if (node.element !== 'input' && node.element !== 'button') continue;

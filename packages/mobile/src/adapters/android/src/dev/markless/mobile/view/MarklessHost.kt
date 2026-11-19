@@ -724,9 +724,16 @@ class MarklessHost(
 				visibility = View.GONE
 				named(this, inst.id)
 			}
-			"input" -> EditText(context).apply {
+			"input", "textarea" -> EditText(context).apply {
 				setOnFocusChangeListener { v, focused -> if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW) }
-				isSingleLine = true
+				if (node.element == "input") isSingleLine = true
+				else {
+					// A textarea's Return is a new line, and Chrome's default `rows="2"` shows two lines.
+					inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+					isSingleLine = false
+					minLines = 2
+					gravity = Gravity.TOP or Gravity.START
+				}
 				includeFontPadding = false
 				if (style != null) { background = null; setPadding(0, 0, 0, 0) }
 				addTextChangedListener(object : TextWatcher {
