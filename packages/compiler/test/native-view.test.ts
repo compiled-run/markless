@@ -1953,6 +1953,25 @@ export function Page() @{
 }`);
 		expect(plain.payload!.script).toBeUndefined();
 	});
+
+	it('passes a component a prop that calls app code through the script', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function total(text: string): number {
+	return (JSON.parse(text) as number[]).reduce((sum, n) => sum + n, 0);
+}
+function Badge({ count }: { count: number }) @{
+	<span>{count}</span>
+}
+export function Page() @{
+	let cart = state('[1,2]');
+	<Badge count={total(cart)} />
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.nodes.find((node) => node.kind === 'text')).toMatchObject({
+			parts: [{ expr: { script: expect.any(String), bindings: { cart: { cell: 'state:cart' } } } }],
+		});
+		expect(payload!.script!.source).toContain('function total(text)');
+	});
 });
 
 describe('overlays', () => {

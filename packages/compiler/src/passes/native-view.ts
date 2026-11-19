@@ -4288,9 +4288,10 @@ export function createNativeViewPayload(
 						(prop.kind === 'opaque' || prop.kind === 'graph-reference') &&
 						prop.nativeExpression
 					) {
-						// A value the page renders the child with (a constant, a body const, an item's field): lowered where it is written.
-						const expr = exprOf(
+						// A value the page renders the child with: lowered where it is written, else a call into the script.
+						const expr = renderValue(
 							prop.nativeExpression,
+							() => readScript(scope.module, prop.sourceSpan),
 							`the \`${prop.name}\` prop of <${edge.childComponentName}>`,
 							{
 								...scope,
