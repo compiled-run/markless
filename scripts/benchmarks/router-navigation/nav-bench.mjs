@@ -1,20 +1,28 @@
 // Click-to-new-content for in-place navigations on a built docs site, per network profile.
 // node scripts/benchmarks/router-navigation/nav-bench.mjs --server <.output/server/index.mjs> --label <name> --out <file.json>
 //   [--start /router/links] [--runs 5] [--targets 8] [--revisits 4] [--dwell 150] [--profiles fast,cpu4x,slow]
+//   [--static <.output/public>]: serve a fully prerendered build's files as a static host does (pages and fragments
+//   ETag + max-age=0, built files immutable).
 // The built server sits behind a gzip proxy, as a CDN would compress it. Each run is a fresh browser context:
 // land, wait for idle, then for each target rest the pointer on its sidebar link for --dwell ms and press it;
 // afterwards revisit the first --revisits targets the same way. Times run from pointerdown to the first frame
 // that shows the destination's <h1>.
 import { spawn } from 'node:child_process';
 import { createServer, request as httpRequest } from 'node:http';
+import { readFile } from 'node:fs/promises';
 import { writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { join } from 'node:path';
 import { createGzip } from 'node:zlib';
 import { parseArgs } from 'node:util';
 import { chromium } from '@playwright/test';
+import { MARKLESS_BUILD_PREFIX } from '../../../packages/bundler/src/build/chunking.ts';
+import { LINK_BRIDGE_DIR } from '../../../packages/router/src/vite/runtime/link-bridge-module.ts';
 
 const { values } = parseArgs({
 	options: {
 		server: { type: 'string' },
+		static: { type: 'string' },
 		label: { type: 'string' },
 		out: { type: 'string' },
 		start: { type: 'string', default: '/router/links' },
@@ -53,6 +61,43 @@ async function startServer(entry) {
 	throw new Error(`the built server at ${entry} never answered`);
 }
 
+// A static host: every path is a file or its index.html, revalidated by ETag on every request.
+async function startStatic(dir) {
+	const types = {
+		'.js': 'text/javascript',
+		'.css': 'text/css',
+		'.json': 'application/json',
+		'.svg': 'image/svg+xml',
+		'.woff2': 'font/woff2',
+	};
+	const server = createServer(async (req, res) => {
+		const path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+		for (const file of [join(dir, path), join(dir, path, 'index.html')]) {
+			const body = await readFile(file).catch(() => undefined);
+			if (!body) continue;
+			const etag = `"${createHash('sha1').update(body).digest('base64url')}"`;
+			const type = types[file.slice(file.lastIndexOf('.'))] ?? 'text/html;charset=utf-8';
+			// The two folders the router's Nitro route rules serve immutable.
+			const immutable = [`/${MARKLESS_BUILD_PREFIX}`, `/${LINK_BRIDGE_DIR}/`].some((prefix) =>
+				path.startsWith(prefix),
+			);
+			const headers = {
+				'content-type': type,
+				etag,
+				'cache-control': immutable
+					? 'public, max-age=31536000, immutable'
+					: 'public, max-age=0, must-revalidate',
+			};
+			if (req.headers['if-none-match'] === etag) return res.writeHead(304, headers).end();
+			res.writeHead(200, headers);
+			return res.end(body);
+		}
+		res.writeHead(404).end();
+	});
+	await new Promise((done) => server.listen(0, '127.0.0.1', done));
+	return { origin: `http://127.0.0.1:${server.address().port}`, close: () => server.close() };
+}
+
 // Compresses text answers the server sent uncompressed, streaming, without a length.
 function startProxy(upstream) {
 	const target = new URL(upstream);
@@ -68,6 +113,7 @@ function startProxy(upstream) {
 			(upstreamResponse) => {
 				const type = upstreamResponse.headers['content-type'] ?? '';
 				const compress =
+					upstreamResponse.statusCode === 200 &&
 					/text|javascript|json|svg/.test(type) &&
 					!upstreamResponse.headers['content-encoding'] &&
 					/gzip/.test(req.headers['accept-encoding'] ?? '');
@@ -212,7 +258,7 @@ function summarise(samples) {
 	};
 }
 
-const server = await startServer(values.server);
+const server = values.static ? await startStatic(values.static) : await startServer(values.server);
 const proxy = await startProxy(server.origin);
 const browser = await chromium.launch();
 const result = { label: values.label, dwellMs: dwell, runs, profiles: {} };
