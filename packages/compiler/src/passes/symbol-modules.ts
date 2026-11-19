@@ -7766,7 +7766,10 @@ function localReadNode(
 	const path = staticDottedPath(text);
 	if (!path || !rewrite.localNames.has(path[0] ?? '')) return null;
 
-	return optionalPathNode(memberChainNode('context.locals'), path);
+	return optionalPathNode(memberChainNode('context.locals'), [
+		...rowLocalPath(rewrite.localNames, path[0]!),
+		...path.slice(1),
+	]);
 }
 
 /**
