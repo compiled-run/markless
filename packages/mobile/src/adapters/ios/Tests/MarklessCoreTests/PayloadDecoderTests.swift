@@ -34,6 +34,9 @@ private func rejection(_ text: String) -> String? {
 	("\"parent\":\"h0\"", "\"parent\":\"h9\"", "is not an earlier element"),
 	("{\"cell\":\"state:count\"}", "{\"cell\":\"state:missing\"}", "reads unknown cell"),
 	("{\"literal\":1}", "{\"literal\":[1]}", "expected a number, string, boolean or null"),
+	("\"component\":\"Counter\"", "\"component\":\"Counter\",\"script\":{\"id\":\"a\",\"source\":\"\",\"services\":[\"storage\"]}", "unknown script service \"storage\""),
+	("{\"literal\":1}", "{\"script\":\"fn:0\",\"bindings\":{\"n\":{\"slot\":\"state:count\"}}}", "a script binding is"),
+	("{\"op\":\"assign\"", "{\"op\":\"script\",\"fn\":\"fn:0\",\"bindings\":{},\"then\":[]},{\"op\":\"assign\"", "unknown field \"then\""),
 ])
 func rejectsWhatItDoesNotKnow(find: String, replace: String, reason: String) throws {
 	let mutated = counter.replacingOccurrences(of: find, with: replace)

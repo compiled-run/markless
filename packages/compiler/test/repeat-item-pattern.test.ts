@@ -82,3 +82,35 @@ export function Rows() @{
 		'MARKLESS_REPEAT_KEY_UNSTABLE',
 	]);
 });
+
+// The row's item reaches a handler through context.locals under the compiler's item name; a destructured name is
+// read at its path on that item, also when it is an argument to a function the component declares.
+for (const [header, key, handler, item, args] of [
+	['[face, n]', 'face', 'takeBack(face)', ['up', 2], ['up']],
+	['[face, n]', 'face', 'picked.push(n)', ['up', 2], [2]],
+	['[face, n]', 'face', 'takeBack(face + n)', ['up', 2], ['up2']],
+	['{ id, name: { first } }', 'id', 'takeBack(first)', { id: 'a', name: { first: 'Ada' } }, ['Ada']],
+	['{ code: label }', 'label', 'picked.push(label.length)', { code: 'abc' }, [3]],
+] as const)
+	test(`a handler in @for (const ${header} ...) given ${handler} reads the row's own values`, async () => {
+		const result = await compile(`import { state } from '@markless/core';
+export function Rows() @{
+	let rows = state([] as any[]);
+	let picked = state([] as unknown[]);
+	function takeBack(value: unknown) {
+		picked.push(value);
+	}
+	<ul>@for (const ${header} of rows; key ${key}) { <li><button onClick={() => ${handler}}>x</button></li> }</ul>
+}
+`);
+		expect(result.symbolModules.diagnostics).toEqual([]);
+		const [repeat] = result.semanticGraph.keyedRepeats;
+		const module = result.symbolModules.modules.find((candidate) => candidate.kind === 'event-handler')!;
+		const loaded = await import(`data:text/javascript;base64,${Buffer.from(module.source).toString('base64')}`);
+		const calls: unknown[] = [];
+		(Object.values(loaded)[0] as (context: unknown) => unknown)({
+			locals: { [repeat!.itemName]: item },
+			graph: { read: () => [], call: (call: { args: unknown[] }) => calls.push(call.args) },
+		});
+		expect(calls).toEqual([args]);
+	});

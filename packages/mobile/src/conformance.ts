@@ -1,6 +1,6 @@
 import type { NativeAppPayload, NativeJournalEntry, NativeViewPayload } from '@markless/serializer';
 import { createNativeAppRuntime, type NativeAppAction } from './app.ts';
-import { createNativeRuntime, type NativeAction } from './runtime.ts';
+import { createNativeRuntime, type NativeAction, type NativeScriptHost } from './runtime.ts';
 
 export const NATIVE_CONFORMANCE_VERSION = 'markless.native-conformance/0';
 
@@ -45,8 +45,10 @@ export function nativeConformance(
 	params?: Readonly<Record<string, string>>,
 	preferredLanguages?: ReadonlyArray<string>,
 	now?: number,
+	/** The engine a payload with a script runs in; a host's own (JavaScriptCore, Hermes) must give the same journals. */
+	scriptHost?: NativeScriptHost,
 ): NativeConformance {
-	const runtime = createNativeRuntime(payload, new Map(), params, preferredLanguages, now === undefined ? undefined : () => now);
+	const runtime = createNativeRuntime(payload, new Map(), params, preferredLanguages, now === undefined ? undefined : () => now, scriptHost);
 	const initial = runtime.texts();
 	const initialAttributes = runtime.attributes();
 	const initialArms = runtime.arms();
@@ -103,8 +105,9 @@ export function nativeAppConformance(
 	app: NativeAppPayload,
 	open: string,
 	actions: ReadonlyArray<NativeAppAction>,
+	scriptHost?: NativeScriptHost,
 ): NativeAppConformance {
-	const runtime = createNativeAppRuntime(app, open);
+	const runtime = createNativeAppRuntime(app, open, new Map(), scriptHost);
 	const look = (): NativeAppConformanceScreen => {
 		const screens = runtime.screens();
 		const top = screens.at(-1)!.runtime;

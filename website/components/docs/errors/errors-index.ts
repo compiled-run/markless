@@ -2676,6 +2676,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'this element has no native view yet markless_native_element this element has no native view yet: a markless build error.',
 				},
 				{
+					code: 'MARKLESS_NATIVE_JAVASCRIPT',
+					title: 'This JavaScript cannot run on a phone',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'this javascript cannot run on a phone markless_native_javascript this javascript cannot run on a phone: a markless build error.',
+				},
+				{
 					code: 'MARKLESS_PRERENDER_WAKE_ROUTE_INELIGIBLE',
 					title: 'This route cannot be prerendered',
 					chip: 'error',

@@ -1,4 +1,11 @@
-import { asNodes, childNodes, isNode, unwrapTypeAssertion, type AnyNode } from '../../ast/nodes.ts';
+import {
+	asNodes,
+	childNodes,
+	getIdentifierName,
+	isNode,
+	unwrapTypeAssertion,
+	type AnyNode,
+} from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	graphBindingMap,
@@ -1025,8 +1032,13 @@ function throughField(
 	return through ? { through } : {};
 }
 
-function rowWriteScope(target: AnyNode, state: WalkState): { readonly rowRepeatId?: string } {
+function rowWriteScope(
+	target: AnyNode,
+	state: WalkState,
+): { readonly rowRepeatId?: string; readonly rowItemPath?: ReadonlyArray<string> } {
 	if (state.currentKeyedRepeatScopeIds.length === 0) return {};
+	const indexed = indexedRowWrite(target, state);
+	if (indexed) return indexed;
 	const root = writeTargetRootIdentifier(target);
 	if (!root || typeof root.start !== 'number') return {};
 
@@ -1046,6 +1058,69 @@ function rowWriteScope(target: AnyNode, state: WalkState): { readonly rowRepeatI
 	}
 
 	return {};
+}
+
+/**
+ * `list[i].field` inside a `@for (const item of list; index i; ...)` row, where
+ * `list` and `i` resolve to that row's own collection and index bindings, is a
+ * write through the row item: `item.field`.
+ */
+function indexedRowWrite(
+	target: AnyNode,
+	state: WalkState,
+): { readonly rowRepeatId: string; readonly rowItemPath: ReadonlyArray<string> } | null {
+	const itemPath: string[] = [];
+	let cursor: AnyNode | undefined = target;
+	while (cursor?.type === 'MemberExpression') {
+		const property = cursor.property as AnyNode | undefined;
+		const segment =
+			cursor.computed !== true
+				? getIdentifierName(property)
+				: property?.type === 'Literal' &&
+					  (typeof property.value === 'string' || typeof property.value === 'number')
+					? String(property.value)
+					: null;
+		if (segment === null) {
+			const rowRepeatId = rowIndexedBy(cursor, state);
+			return rowRepeatId ? { rowRepeatId, rowItemPath: itemPath } : null;
+		}
+		itemPath.unshift(segment);
+		cursor = cursor.object as AnyNode | undefined;
+	}
+	return null;
+}
+
+function rowIndexedBy(member: AnyNode, state: WalkState): string | null {
+	const property = member.property as AnyNode | undefined;
+	const object = member.object as AnyNode | undefined;
+	if (property?.type !== 'Identifier' || typeof property.start !== 'number' || !object) return null;
+	const semantic = state.semantic();
+	const indexSymbol = resolvedSymbolAt(semantic, property.start);
+	if (indexSymbol === null) return null;
+	const declared = semantic.bindings[indexSymbol]!.declarations[0]?.start;
+	for (const repeatId of [...state.currentKeyedRepeatScopeIds].reverse()) {
+		const header = state.keyedRepeatIndexes.get(repeatId);
+		if (!header || header.index.start !== declared) continue;
+		return sameReference(object, header.collection, semantic) ? repeatId : null;
+	}
+	return null;
+}
+
+// Same binding at the root and the same static member names after it.
+function sameReference(left: AnyNode, right: AnyNode, semantic: ModuleSemantics): boolean {
+	if (left.type === 'Identifier' && right.type === 'Identifier') {
+		if (typeof left.start !== 'number' || typeof right.start !== 'number') return false;
+		const symbol = resolvedSymbolAt(semantic, left.start);
+		return symbol !== null && symbol === resolvedSymbolAt(semantic, right.start);
+	}
+	if (left.type !== 'MemberExpression' || right.type !== 'MemberExpression') return false;
+	if (left.computed === true || right.computed === true) return false;
+	const name = getIdentifierName(left.property as AnyNode | undefined);
+	return (
+		name !== null &&
+		name === getIdentifierName(right.property as AnyNode | undefined) &&
+		sameReference(left.object as AnyNode, right.object as AnyNode, semantic)
+	);
 }
 
 function writeTargetRootIdentifier(target: AnyNode): (AnyNode & { readonly name: string }) | null {

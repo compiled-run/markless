@@ -24,12 +24,23 @@ for (const folder of readdirSync(families, { withFileTypes: true })
 		filename: relative(repoRoot, index),
 		source: readFileSync(index, 'utf8'),
 	});
-	const parts = (graph.moduleGraphInterface.reexports ?? [])
-		.map((entry) => entry.exportName)
-		.filter(
-			(name) =>
-				name !== 'state' && !name.endsWith('State') && name[0] === name[0]!.toLowerCase(),
-		);
+	// A part is a re-export the source module's analysis lists as a component; state helpers and functions are not rendered.
+	const exportedComponents = new Map<string, Set<string>>();
+	const parts: string[] = [];
+	for (const entry of graph.moduleGraphInterface.reexports ?? []) {
+		const source = join(families, folder, entry.source);
+		if (!exportedComponents.has(source)) {
+			const sourceGraph = await buildSemanticGraph({
+				filename: relative(repoRoot, source),
+				source: readFileSync(source, 'utf8'),
+			});
+			exportedComponents.set(
+				source,
+				new Set(sourceGraph.components.flatMap((component) => component.exportName ?? [])),
+			);
+		}
+		if (exportedComponents.get(source)!.has(entry.importedName)) parts.push(entry.exportName);
+	}
 	const name = namespace(folder);
 	const inner = parts
 		.filter((part) => part !== 'root')

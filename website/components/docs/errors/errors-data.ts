@@ -7934,6 +7934,29 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_NATIVE_JAVASCRIPT',
+		title: 'This JavaScript cannot run on a phone',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'This JavaScript cannot run on a phone: a Markless build error.',
+		printed: [
+			'MARKLESS_NATIVE_JAVASCRIPT: This JavaScript cannot run on a phone',
+			"A handler that is not data runs in the phone's JavaScript engine, which has the language, timers, fetch and console, but no web page.",
+		],
+		structured: true,
+		why: "A handler that is not data runs in the phone's JavaScript engine, which has the language, timers, fetch and console, but no web page.",
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/native-view.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_NATIVE_KEYBOARD_ONLY',
 		title: 'A keyboard-only handler is left out of the native build',
 		area: 'internal',
@@ -7980,10 +8003,10 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description: 'A <script> cannot run in a native app: a Markless build error.',
 		printed: [
 			'MARKLESS_NATIVE_SCRIPT: A <script> cannot run in a native app',
-			'A native app runs no browser engine: its handlers run as data. Write what the script does as Markless code (state, handlers) instead.',
+			'A native app runs no web page: a <script> has no document to run in. Write what the script does as Markless code (state, handlers) instead.',
 		],
 		structured: true,
-		why: 'A native app runs no browser engine: its handlers run as data. Write what the script does as Markless code (state, handlers) instead.',
+		why: 'A native app runs no web page: a <script> has no document to run in. Write what the script does as Markless code (state, handlers) instead.',
 		sources: [
 			{
 				id: 'f0',

@@ -1,5 +1,8 @@
 # The proof harness
 
+On a shared machine, submit rungs to the machine's phone runner instead of booting phones here: see
+[`../runner/README.md`](../runner/README.md).
+
 One command runs ladder rungs end to end on both platforms:
 
 ```sh

@@ -520,7 +520,9 @@ function lowerRowItemWrite(
 	);
 	if (!binding) return null;
 
-	const segments = splitStaticGraphPath(write.target);
+	const segments = write.rowItemPath
+		? [repeat.itemName, ...write.rowItemPath]
+		: splitStaticGraphPath(write.target);
 	if (segments[0] !== repeat.itemName) {
 		return {
 			kind: 'diagnostic',
@@ -1135,6 +1137,10 @@ function dynamicGraphPathWriteDiagnostic(
 			{
 				message:
 					'Use a statically named property path, a literal array index, or a collection method with compiler coverage for this state update.',
+			},
+			{
+				message:
+					"Inside a keyed @for row, write through the row item (`item.field = value`) or through the list at the row's own index binding, unchanged (`list[i].field = value` in `@for (const item of list; index i; key ...)`).",
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_DYNAMIC_PATH_WRITE',

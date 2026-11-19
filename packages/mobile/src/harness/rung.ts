@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { createRequire, findPackageJSON } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
 import { nativeAppStyle, nativeAppStyleSize, type DragonStyleExport } from '../app-style.ts';
@@ -109,13 +110,64 @@ export function compileRungApp(dir: string) {
  */
 export function readWorkspaceModule(specifier: string, importer: string) {
 	if (specifier.startsWith('.')) return readRelativeModule(specifier, importer);
-	let file: string;
+	const file = resolvePackageModule(specifier, resolve(repoRoot, importer));
+	return file === undefined
+		? undefined
+		: { filename: relative(repoRoot, file), source: readFileSync(file, 'utf8') };
+}
+
+/** The ES module conditions a phone's script loads a package by, in the order a bundler for the browser tries them. */
+const IMPORT_CONDITIONS = ['import', 'module', 'browser', 'default'];
+
+/**
+ * A package specifier resolved as an ES module import from `importer` (a phone's script loads ES modules, so a package's
+ * `import` build, not its `require` one), else as Node's `require` resolves it.
+ */
+export function resolvePackageModule(specifier: string, importer: string): string | undefined {
+	const manifestPath = (() => {
+		try {
+			return findPackageJSON(specifier, pathToFileURL(importer));
+		} catch {
+			return undefined;
+		}
+	})();
+	if (manifestPath) {
+		const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+			readonly name?: string;
+			readonly exports?: unknown;
+			readonly module?: string;
+		};
+		const subpath =
+			manifest.name && specifier.startsWith(`${manifest.name}/`)
+				? `.${specifier.slice(manifest.name.length)}`
+				: '.';
+		const pick = (entry: unknown): string | undefined => {
+			if (typeof entry === 'string') return entry;
+			if (entry && typeof entry === 'object' && !Array.isArray(entry))
+				for (const condition of IMPORT_CONDITIONS) {
+					const found = pick((entry as Record<string, unknown>)[condition]);
+					if (found) return found;
+				}
+			return undefined;
+		};
+		const exportsField = manifest.exports;
+		const exported =
+			exportsField &&
+			typeof exportsField === 'object' &&
+			!Array.isArray(exportsField) &&
+			Object.keys(exportsField).some((key) => key.startsWith('.'))
+				? pick((exportsField as Record<string, unknown>)[subpath])
+				: subpath === '.'
+					? pick(exportsField)
+					: undefined;
+		const target = exported ?? (subpath === '.' ? manifest.module : undefined);
+		if (target) return resolve(dirname(manifestPath), target);
+	}
 	try {
-		file = createRequire(resolve(repoRoot, importer)).resolve(specifier);
+		return createRequire(importer).resolve(specifier);
 	} catch {
 		return undefined;
 	}
-	return { filename: relative(repoRoot, file), source: readFileSync(file, 'utf8') };
 }
 /** A hand-made payload, only for the harness's own fixture rungs that prove the machinery without the compiler. */
 const HAND_MADE_PAYLOAD = 'payload.json';

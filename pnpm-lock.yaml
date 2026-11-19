@@ -1102,6 +1102,9 @@ importers:
       '@markless/ui':
         specifier: workspace:*
         version: link:../headless/components
+      scule:
+        specifier: 1.3.0
+        version: 1.3.0
 
   packages/router:
     dependencies:

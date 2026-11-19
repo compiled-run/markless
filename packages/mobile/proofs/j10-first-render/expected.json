@@ -1,0 +1,21 @@
+{
+	"rung": "J10",
+	"name": "A screen that needs the engine to draw its first frame starts it then; the data-only screen beside it never does",
+	"steps": [
+		{ "visible": ["Data only", "Taps 0", "Open words"], "title": "Home", "engineStarts": 0 },
+		{
+			"do": { "tap": "Taps 0" },
+			"visible": ["Taps 1"],
+			"absent": ["Taps 0"],
+			"engineStarts": 0
+		},
+		{
+			"do": { "tap": "Open words" },
+			"visible": ["Words page", "Initials: KFB", "fig", "kiwi", "banana"],
+			"absent": ["Data only"],
+			"order": ["fig", "kiwi", "banana"],
+			"title": "Words",
+			"engineStarts": 1
+		}
+	]
+}
