@@ -7,9 +7,10 @@ export function App() @{
 		{ slug: 'c', title: 'Gamma', done: false, hits: 0 },
 	]);
 	let seats = state([
-		{ id: 's1', picked: false },
+		{ id: 's1', picked: true },
 		{ id: 's2', picked: false },
 		{ id: 's3', picked: false },
+		{ id: 's4', picked: true },
 	]);
 
 	<main>
@@ -31,5 +32,8 @@ export function App() @{
 				</li>
 			}
 		</ol>
+		<button id="seats-reverse" onClick={() => (seats = [...seats].reverse())}>reverse seats</button>
+		<button id="seats-unshift" onClick={() => (seats = [{ id: 's0', picked: true }, ...seats])}>add seat</button>
+		<button id="seats-drop-first" onClick={() => (seats = seats.slice(1))}>drop first seat</button>
 	</main>
 }

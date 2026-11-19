@@ -121,13 +121,32 @@ async function exerciseRowWrites(url: string, ready: (page: Page) => Promise<voi
 		await expect.poll(() => rows(page)).toEqual(['c:yes:0', 'b:no:2', 'a:no:0']);
 		expect(await focusedRow(page)).toEqual({ slug: 'b', className: 'toggle' });
 
-		// `seats[i].picked = !seats[i].picked` at the row's own index writes that row only.
-		expect(await seats(page)).toEqual(['s1:no', 's2:no', 's3:no']);
+		// `seats[i].picked = !seats[i].picked` reads and writes the row's own item, before and after reorders.
+		expect(await seats(page)).toEqual(['s1:yes', 's2:no', 's3:no', 's4:yes']);
 		await page.click('li[data-seat="s2"] .pick');
-		await expect.poll(() => seats(page)).toEqual(['s1:no', 's2:yes', 's3:no']);
+		await expect.poll(() => seats(page)).toEqual(['s1:yes', 's2:yes', 's3:no', 's4:yes']);
+
+		await page.click('#seats-reverse');
+		await expect.poll(() => seats(page)).toEqual(['s4:yes', 's3:no', 's2:yes', 's1:yes']);
 		await page.click('li[data-seat="s3"] .pick');
+		await expect.poll(() => seats(page)).toEqual(['s4:yes', 's3:yes', 's2:yes', 's1:yes']);
+		await page.click('li[data-seat="s4"] .pick');
+		await expect.poll(() => seats(page)).toEqual(['s4:no', 's3:yes', 's2:yes', 's1:yes']);
+
+		await page.click('#seats-unshift');
+		await expect.poll(() => seats(page)).toEqual(['s0:yes', 's4:no', 's3:yes', 's2:yes', 's1:yes']);
+		await page.click('li[data-seat="s4"] .pick');
+		await expect.poll(() => seats(page)).toEqual(['s0:yes', 's4:yes', 's3:yes', 's2:yes', 's1:yes']);
 		await page.click('li[data-seat="s2"] .pick');
-		await expect.poll(() => seats(page)).toEqual(['s1:no', 's2:no', 's3:yes']);
+		await expect.poll(() => seats(page)).toEqual(['s0:yes', 's4:yes', 's3:yes', 's2:no', 's1:yes']);
+
+		await page.click('#seats-drop-first');
+		await page.click('#seats-drop-first');
+		await expect.poll(() => seats(page)).toEqual(['s3:yes', 's2:no', 's1:yes']);
+		await page.click('li[data-seat="s2"] .pick');
+		await expect.poll(() => seats(page)).toEqual(['s3:yes', 's2:yes', 's1:yes']);
+		await page.click('li[data-seat="s3"] .pick');
+		await expect.poll(() => seats(page)).toEqual(['s3:no', 's2:yes', 's1:yes']);
 		expect(errors).toEqual([]);
 	} finally {
 		await browser.close();
