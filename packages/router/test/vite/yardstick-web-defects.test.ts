@@ -229,6 +229,31 @@ export default function Boxed() @{
 	</main>
 }
 `,
+	'prefetched/index.tsrx': `import { storage } from '@markless/core';
+import { Link } from '@markless/router';
+
+export default function Writer() @{
+	let list = storage('prefetched', '["a"]');
+
+	<main>
+		<button onClick={() => (list = JSON.stringify([...(JSON.parse(list) as string[]), 'b']))}>Add</button>
+		<Link href="/prefetched/reader">Read</Link>
+	</main>
+}
+`,
+	'prefetched/reader.tsrx': `import { computed, storage } from '@markless/core';
+
+export default function Reader() @{
+	let list = storage('prefetched', '["a"]');
+	const items = computed(() => JSON.parse(list) as string[]);
+
+	<ul>
+		@for (const item of items; key item) {
+			<li>{item}</li>
+		}
+	</ul>
+}
+`,
 	'size.tsrx': `import { state } from '@markless/core';
 
 export default function Size() @{
@@ -319,6 +344,24 @@ test.fails('an @if arm does not run its expressions once its condition turns fal
 		await page.getByRole('button', { name: 'Delete' }).click();
 		await expect.poll(() => page.locator('main').textContent()).toBe('Deleted');
 	});
+});
+
+test.fails('a page the router prefetched shows a list derived from a storage() value written after the prefetch (#876)', async () => {
+	const context = await browser.newContext({ baseURL: app.origin });
+	try {
+		const page = await context.newPage();
+		const prefetched = page.waitForResponse((response) =>
+			response.url().includes('/prefetched/reader'),
+		);
+		await page.goto('/prefetched');
+		await prefetched;
+		await page.getByRole('button', { name: 'Add' }).click();
+		await page.getByRole('link', { name: 'Read' }).click();
+		await page.waitForURL('**/prefetched/reader');
+		await expect.poll(() => page.locator('li').allTextContents()).toEqual(['a', 'b']);
+	} finally {
+		await context.close();
+	}
 });
 
 test.fails('a storage() value written in a page shows in a component from another module that reads the same key (#867)', async () => {
