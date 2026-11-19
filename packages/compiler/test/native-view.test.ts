@@ -2087,6 +2087,32 @@ export function Drag() @{
 		expect(JSON.stringify(ops(4))).toContain(JSON.stringify({ event: 'relatedTarget' }));
 	});
 
+	it('gives a pointer handler that runs as JavaScript the touch fields, but not the elements it names', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Drag() @{
+	let log = state('');
+	<div
+		onPointermove={(event) => {
+			for (const part of [event.clientX, event.clientY, event.pointerId, event.pointerType]) log = log + part;
+		}}
+	>{log}</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.handlers[0]!.ops.map((op) => op.op)).toEqual(['script']);
+		const related = await nativeView(`import { state } from '@markless/core';
+export function Drag() @{
+	let log = state('');
+	<div
+		onPointerout={(event) => {
+			for (const part of [event.relatedTarget]) log = log + String(part);
+		}}
+	>{log}</div>
+}`);
+		expect(related.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet',
+		]);
+	});
+
 	it('refuses by name a field a touch does not report yet', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Pressure() @{

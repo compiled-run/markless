@@ -11,7 +11,7 @@ import type {
 	NativeValue,
 	NativeViewPayload,
 } from '@markless/serializer';
-import { NATIVE_DOCUMENT_BODY, nativeLocale } from '@markless/serializer/native-view';
+import { NATIVE_DOCUMENT_BODY, NATIVE_SCRIPT_POINTER_FIELDS, nativeLocale } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeScriptEngine } from './script-engine.ts';
 import {
@@ -1322,12 +1322,23 @@ export function createNativeRuntime(
 			}
 			if (op.op === 'script') {
 				const text = typeof eventValue === 'string' ? eventValue : eventValue?.value;
+				const touch =
+					typeof eventValue === 'object'
+						? NATIVE_SCRIPT_POINTER_FIELDS.flatMap((field) => {
+								const value = eventValue[field as keyof NativeEventFields];
+								return value === undefined ? [] : [[field, value] as const];
+							})
+						: [];
 				calls.push(
 					...enter({
 						kind: 'dispatch',
 						fn: op.fn,
 						frame: frameOf(op.bindings, text, scope),
-						event: text === undefined ? { type: op.type } : { type: op.type, value: text },
+						event: {
+							type: op.type,
+							...(text === undefined ? {} : { value: text }),
+							...Object.fromEntries(touch),
+						},
 						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),
 					}),
 				);

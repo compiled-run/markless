@@ -566,6 +566,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'pointerup', host: 'h2', pointerId: 5, x: 30, y: 110, time: 5110 },
 		],
 	},
+	{
+		// The same touch fields, read by pointer handlers that run as JavaScript.
+		name: 'touch-script',
+		fixture: 'test/fixtures/TouchScript.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h2', pointerId: 1, x: 40, y: 120, time: 1000 },
+			{ event: 'pointermove', host: 'h2', pointerId: 1, x: 52.5, y: 118, time: 1016 },
+			{ event: 'pointerup', host: 'h2', pointerId: 1, x: 52.5, y: 118, time: 1032 },
+			{ event: 'pointerdown', host: 'h2', pointerId: 2, x: 30, y: 100, time: 2000 },
+			{ event: 'pointercancel', host: 'h2', pointerId: 2, x: 30, y: 90, time: 2016 },
+		],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */

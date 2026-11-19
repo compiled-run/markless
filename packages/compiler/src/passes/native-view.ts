@@ -24,6 +24,7 @@ import {
 	NATIVE_DOCUMENT_BODY,
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
+	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
 	NATIVE_SCRIPT_HOST_GLOBALS,
 	NATIVE_SCRIPT_LANGUAGE_GLOBALS,
@@ -4324,15 +4325,21 @@ export function createNativeViewPayload(
 		const what = `the ${event.eventName} handler`;
 		if (!fact) return refuseScript(`${what} has no source the build read, so it cannot run as JavaScript`, event.handlerSpan);
 		let readsMissing = false;
+		const semantic = SEMANTIC_EVENTS[event.eventName];
+		const touch = POINTER_EVENTS.has(semantic ?? '');
 		for (const read of fact.event ?? []) {
+			if (touch && NATIVE_SCRIPT_POINTER_FIELDS.includes(read.path[0] ?? '')) continue;
 			const known = NATIVE_SCRIPT_EVENT_MEMBERS.some((members) =>
 				members.every((member, index) => index >= read.path.length || read.path[index] === member) &&
 				(read.path.length <= members.length || members.length === 2),
 			);
 			if (known) continue;
 			readsMissing = true;
-			const semantic = SEMANTIC_EVENTS[event.eventName];
-			const doing = semantic === 'input' ? 'a text edit' : POINTER_EVENTS.has(semantic ?? '') ? 'a touch' : 'a tap';
+			if (touch && read.path[0] && read.path[0] in EVENT_FIELDS.pointer) {
+				refuseScript(`${what} reads \`event.${read.path.join('.')}\`, an element, which JavaScript on a phone cannot hold yet`, read.span);
+				continue;
+			}
+			const doing = semantic === 'input' ? 'a text edit' : touch ? 'a touch' : 'a tap';
 			refuseScript(`${what} reads \`event.${read.path.join('.')}\`, which ${doing} on a phone does not have`, read.span);
 		}
 		const fn = scriptFunctionId(fact, scope.module, what);

@@ -213,6 +213,8 @@ public final class NativeRuntime {
 	private var eventValue: String?
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
+	/// What a touch adds to a script pointer handler's event, in the order the reference writes them.
+	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp]
 	/// The element that has focus, or nil.
 	public private(set) var focused: String?
 	/// The overlay stack, topmost last, and the focus each overlay found when it joined, as the web's overlay behaviour keeps them.
@@ -1020,7 +1022,8 @@ public final class NativeRuntime {
 			case let .call(call, object, arguments, result, then):
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):
-				let event: JSONValue = .object([("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? []))
+				let touch = touchFields.compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
+				let event: JSONValue = .object([("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? []) + touch)
 				calls.append(contentsOf: try enter(
 					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", try frame(of: bindings, in: scope)), ("event", event)]
 						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? [])))

@@ -115,6 +115,9 @@ data class FetchRequest(val url: String, val method: String, val headers: List<P
 }
 
 /** `JSON.stringify` of a value: non-finite numbers are `null`. */
+/** What a touch adds to a script pointer handler's event, in the order the reference writes them. */
+private val TOUCH_FIELDS = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp")
+
 fun jsonValue(v: JsValue): String = when (v) {
 	JsValue.Null -> "null"
 	is JsValue.Str -> jsonString(v.value)
@@ -887,7 +890,8 @@ class Runtime(
 				calls.add(JournalEntry.Command(node.value, op.command, op.preventScroll))
 			}
 			is Op.Script -> {
-				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}}"
+				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
+				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$touch}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"event\":$event$catch"))
 			}

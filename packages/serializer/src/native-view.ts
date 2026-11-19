@@ -939,6 +939,18 @@ export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> =
 	['currentTarget', 'checked'],
 ];
 
+/** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */
+export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [
+	'button',
+	'buttons',
+	'clientX',
+	'clientY',
+	'pointerId',
+	'pointerType',
+	'isPrimary',
+	'timeStamp',
+];
+
 /** Names for the global object itself: `window.setTimeout` reads a provided global, `window.document` does not. */
 export const NATIVE_SCRIPT_GLOBAL_OBJECTS: ReadonlyArray<string> = ['window', 'self', 'globalThis'];
 
