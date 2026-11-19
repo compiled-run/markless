@@ -3,7 +3,7 @@ import { compileTsrxModule } from '../src/index.ts';
 import { compileTsrxModulesWithInterfaces } from './multi-module-compile-support.ts';
 
 // Every id the compiler mints from where a module lives - shared definition ids,
-// storage ids, element ids and the IDREFs that name them, the render-data record,
+// element ids and the IDREFs that name them, the render-data record,
 // the scope class - is spelled from the root-relative `moduleId`, never from the
 // absolute `filename`. The filename stays absolute for diagnostics only.
 
@@ -62,9 +62,10 @@ test('every minted id is spelled from the module id, and nothing emitted carries
 	expect(compiled.semanticGraph.sharedDefinitions.map((definition) => definition.id)).toEqual([
 		`shared:${MODULE_ID}#widgetState`,
 	]);
+	// A storage key is page-wide, so its id names the key and no module.
 	expect(
 		compiled.semanticGraph.graphBindings.find((binding) => binding.storage)?.id,
-	).toBe(`storage:${MODULE_ID}#theme`);
+	).toBe('storage:theme');
 	expect(compiled.renderData.filename).toBe(MODULE_ID);
 	expect(emitted(compiled)).not.toContain(MACHINE_ROOT);
 	// Diagnostics still point at the file on disk.

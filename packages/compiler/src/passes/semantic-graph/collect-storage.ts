@@ -4,12 +4,9 @@ import type { SemanticGraphBinding } from '../../artifacts.ts';
 import { storageKeyStaticDiagnostic } from './diagnostics.ts';
 import type { WalkState } from './types.ts';
 
-// storage(fallback) derives the persistence key from the binding identifier,
-// namespaced (markless:<name>) so cross-module keys never collide by accident.
-// storage(key, fallback) uses the explicit key VERBATIM — the escape hatch for
-// interop with an existing store or deliberate cross-module sharing. The derived
-// key is a compile-time literal baked from the AUTHORED identifier, so it is
-// stable and never depends on a minified runtime name.
+// storage(fallback) derives the persistence key from the AUTHORED identifier
+// (markless:<name>), never a minified runtime name; storage(key, fallback) uses
+// the explicit key verbatim. A key is one value on the page, whichever module reads it.
 export function derivedStorageKey(identifier: string): string {
 	return `markless:${identifier}`;
 }
@@ -50,7 +47,7 @@ export function collectStorageBinding(input: {
 	}
 
 	const binding: SemanticGraphBinding & { readonly initialValueKnown: true } = {
-		id: storageGraphId(input.state.moduleId, key),
+		id: storageGraphId(key),
 		name: input.name,
 		kind: 'state',
 		...input.scope,
@@ -65,8 +62,8 @@ export function collectStorageBinding(input: {
 	input.state.graph.graphBindings.push(binding);
 }
 
-export function storageGraphId(moduleId: string, key: string): string {
-	return `storage:${moduleId}#${key}`;
+export function storageGraphId(key: string): string {
+	return `storage:${key}`;
 }
 
 function stringLiteral(node: AnyNode | undefined): string | null {
