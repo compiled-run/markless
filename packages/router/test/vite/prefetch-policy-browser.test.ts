@@ -10,6 +10,7 @@ import {
 	FRAGMENT_IDLE_FRAGMENT_DECODED_BYTES,
 	FRAGMENT_PATH_PREFIX,
 	FRAGMENT_REGION_END,
+	FRAGMENT_PRERENDERED,
 	PREFETCH_MARKS,
 	fragmentPageUrl,
 	runFragmentNavigation,
@@ -63,6 +64,8 @@ type Setup = {
 	// 'throw': the swap module's navigate rejects.
 	readonly navigation?: 'swap' | 'hang' | 'throw';
 	readonly heldChars?: number;
+	// How long a fetched page counts as fresh.
+	readonly ttlMs?: number;
 };
 
 type Fetch = { readonly path: string; readonly purpose?: string };
@@ -92,6 +95,7 @@ function config(setup: Setup): FragmentNavigationConfig {
 		renderedEvent: 'rendered',
 		requestPrefix: FRAGMENT_PATH_PREFIX,
 		regionEndMarker: FRAGMENT_REGION_END,
+		prerenderedMarker: FRAGMENT_PRERENDERED,
 		appendMarker: '<!--append-->',
 		pageEndComment: 'end',
 		pageStartComment: 'start',
@@ -99,7 +103,7 @@ function config(setup: Setup): FragmentNavigationConfig {
 		keepAttributes: ['', '', '', '', ''],
 		documentLoads: false,
 		hoverDwellMs: 20,
-		prefetchTtlMs: 30_000,
+		prefetchTtlMs: setup.ttlMs ?? 30_000,
 		heldChars: setup.heldChars ?? FRAGMENT_HELD_CHARS,
 		prefetchConnections: policy.concurrency,
 		guessBudget: policy.budget,
@@ -843,3 +847,49 @@ describe('byte budget', () => {
 		await raw.page.close();
 	});
 });
+
+describe('a prerendered fragment', () => {
+	test('fetched ahead but never shown, it keeps the time limit like any other page', async () => {
+		const s = await open({
+			prefetch: { idle: 'none' },
+			ttlMs: 200,
+			answer: (path) => ({
+				body: `<main>${path}</main>${FRAGMENT_PRERENDERED}${FRAGMENT_REGION_END}`,
+			}),
+		});
+		await s.measured(true);
+		await s.page.hover('a[href="/p/2"]');
+		await expect.poll(s.held).toEqual(['/p/2']);
+		await expect.poll(s.held).toEqual([]);
+		await s.page.close();
+	});
+
+	test('shown pages are kept up to eight, and within the cap on held text, the oldest dropped first', async () => {
+		const s = await open({ heldChars: 3.5 * 1024 * 1024 });
+		const kept = (pages: [string, number][]) =>
+			s.page.evaluate((pages) => {
+				const state = (
+					document as unknown as {
+						__marklessFragmentNav: {
+							keep: (key: string, text: string) => void;
+							visited: Map<string, string>;
+						};
+					}
+				).__marklessFragmentNav;
+				for (const [key, size] of pages) state.keep(key, 'x'.repeat(size));
+				return [...state.visited.keys()];
+			}, pages);
+		const small = Array.from({ length: 10 }, (_, i): [string, number] => [`/p/${i}`, 10]);
+		expect(await kept(small)).toEqual(small.slice(2).map(([key]) => key));
+		const large: [string, number][] = [
+			['/p/20', 1024 * 1024],
+			['/p/21', 1024 * 1024],
+			['/p/22', 1024 * 1024],
+			['/p/23', 1024 * 1024],
+		];
+		expect((await kept(large)).slice(-3)).toEqual(['/p/21', '/p/22', '/p/23']);
+		expect(await kept([])).not.toContain('/p/20');
+		await s.page.close();
+	});
+});
+

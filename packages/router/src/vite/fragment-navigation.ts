@@ -778,25 +778,43 @@ export function runFragmentNavigation(
 	const inFlight = (entry: FragmentPrefetch) => entry.phase < ARRIVED;
 	// Pages fetched ahead are kept as text up to config.heldChars in all; past it the earliest started go first.
 	const sizes = new WeakMap<FragmentPrefetch, number>();
-	const hold = (entry: FragmentPrefetch, arrived: FragmentFetched, size: number) => {
-		sizes.set(entry, size);
+	// Pages fetched ahead go first, then the pages the tab showed (at most 8), never the one just added.
+	const trim = (spare?: FragmentPrefetch | string) => {
 		let held = 0;
 		for (const other of state.prefetches.values()) held += sizes.get(other) ?? 0;
+		for (const text of state.visited.values()) held += text.length;
 		for (const [key, other] of state.prefetches) {
 			if (held <= config.heldChars) break;
-			if (other === entry || !sizes.has(other)) continue;
+			if (other === spare || !sizes.has(other)) continue;
 			held -= sizes.get(other)!;
 			state.prefetches.delete(key);
 			other.abort();
 		}
+		for (const [key, text] of state.visited) {
+			if ((held <= config.heldChars && state.visited.size <= 8) || key === spare) break;
+			held -= text.length;
+			state.visited.delete(key);
+		}
+	};
+	const hold = (entry: FragmentPrefetch, arrived: FragmentFetched, size: number) => {
+		sizes.set(entry, size);
+		trim(entry);
 		return arrived;
+	};
+	const keep = (key: string, text: string) => {
+		state.visited.delete(key);
+		state.visited.set(key, text);
+		trim(key);
 	};
 	const prefetch = (url: URL, code = true, started?: FragmentEarly, idle = false) => {
 		const key = pageKey(url);
 		// A hover timer can fire after its link's page is already shown.
 		if (!config.prefetch || key === state.shown) return;
 		const existing = state.prefetches.get(key);
+		const visit = state.visited.get(key);
 		// An idle-fetched page still needs its code on intent, or the swap fetches it a round late.
+		// A page the tab showed, prerendered, is swapped in from the copy it keeps: nothing to fetch.
+		if (visit && prerendered(visit)) return void (code && preloadCode(url, false));
 		if (existing && fresh(existing, w.performance.now())) {
 			if (code) {
 				existing.want();
@@ -991,6 +1009,11 @@ export function runFragmentNavigation(
 	};
 	// A page left for a document load and brought back from the back/forward cache shows again.
 	w.addEventListener('pageshow', (event) => (event as PageTransitionEvent).persisted && resume());
+	// A page's text the prerenderer wrote: one file every visitor gets until the next deploy.
+	const prerendered = (text: string) => {
+		const end = text.indexOf(config.regionEndMarker);
+		return text.slice(0, end === -1 ? text.length : end).endsWith(config.prerenderedMarker);
+	};
 	const fresh = (entry: FragmentPrefetch, now: number) =>
 		entry.writes === state.writes &&
 		now - entry.at < config.prefetchTtlMs &&
@@ -1002,6 +1025,8 @@ export function runFragmentNavigation(
 		visited: new Map(),
 		writes: 0,
 		fresh,
+		prerendered,
+		keep,
 		shown: pageKey(new URL(location.href)),
 		eligible,
 		preloadCode,
@@ -1275,6 +1300,10 @@ export function fragmentPageUrl(url: URL): URL | undefined {
 
 // The response's region document ends here; each streamed @pending arm after it ends with the append marker.
 export const FRAGMENT_REGION_END = '<!--markless:region-end-->';
+// Just before the region end of a fragment the prerenderer wrote: one file every visitor gets until the next deploy.
+export const FRAGMENT_PRERENDERED = '<!--markless:prerendered-->';
+// Nitro's prerenderer names the route it renders in this request header.
+export const NITRO_PRERENDER_HEADER = 'x-nitro-prerender';
 export const FRAGMENT_APPEND_END = '<!--markless:append-end-->';
 export const FRAGMENT_HOVER_DWELL_MS = 20;
 export const FRAGMENT_PREFETCH_TTL_MS = 30_000;

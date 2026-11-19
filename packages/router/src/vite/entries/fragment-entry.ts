@@ -32,6 +32,8 @@ export interface FragmentNavigationConfig {
 	readonly renderedEvent: string;
 	readonly requestPrefix: string;
 	readonly regionEndMarker: string;
+	// Ends the region of a fragment the prerenderer wrote: kept for the session, not refetched.
+	readonly prerenderedMarker: string;
 	readonly appendMarker: string;
 	// Close and open the page's nodes when the document's own element is the container; what is outside is the document's.
 	readonly pageEndComment: string;
@@ -111,9 +113,13 @@ export type FragmentNavigationState = {
 	readonly routes: FragmentRouteCode;
 	readonly prefetches: Map<string, FragmentPrefetch>;
 	readonly visited: Map<string, string>;
+	// Keeps a shown page's text for Back, Forward and prerendered revisits, within the tab's cap on held text.
+	readonly keep: (key: string, text: string) => void;
 	// Writes this page has started or finished: each one makes every page fetched before it stale.
 	writes: number;
 	readonly fresh: (entry: FragmentPrefetch, now: number) => boolean;
+	// A shown page's text the prerenderer wrote: kept for the session and swapped in again on a revisit.
+	readonly prerendered: (text: string) => boolean;
 	shown: string;
 	readonly eligible: (anchor: Element | null | undefined, forClick?: boolean) => URL | undefined;
 	readonly preloadCode: (url: URL, low: boolean) => void;
@@ -209,8 +215,9 @@ function take(
 	const key = pageKey(url);
 	const existing = state.prefetches.get(key);
 	state.prefetches.delete(key);
-	// Back and Forward restore the page as it was left, never waiting on a newer fetch of it.
-	const cached = traverse ? state.visited.get(key) : undefined;
+	// Back and Forward restore the page as it was left, never waiting on a newer fetch of it; a prerendered page is kept for any revisit.
+	const visit = state.visited.get(key);
+	const cached = visit !== undefined && (traverse || state.prerendered(visit)) ? visit : undefined;
 	if (cached !== undefined) {
 		existing?.abort();
 		const ready = parsedVisits.get(state)?.get(key);
@@ -1463,18 +1470,15 @@ export async function navigate(
 		(rest) => {
 			ended();
 			if (rest === undefined) return;
-			state.visited.delete(key);
 			const text = `${fetched.prefix}${state.config.regionEndMarker}${rest}`;
-			state.visited.set(key, text);
-			while (state.visited.size > 8) state.visited.delete(state.visited.keys().next().value!);
+			state.keep(key, text);
 			const parsed = parsedVisits.get(state) ?? new Map<string, FragmentFetched>();
 			parsedVisits.set(state, parsed);
-			// Parsing runs no page code; done at idle, a Back to this page only swaps.
+			// Parsing runs no page code; done at idle, a Back to this page only swaps. Only the page just left is held parsed.
 			const idle = () => {
+				parsed.clear();
 				if (state.visited.get(key) === text)
 					parsed.set(key, state.parse(fetched.url, text));
-				for (const other of parsed.keys())
-					if (!state.visited.has(other)) parsed.delete(other);
 			};
 			if (w.requestIdleCallback) w.requestIdleCallback(idle, { timeout: 2000 });
 			else w.setTimeout(idle, 200);

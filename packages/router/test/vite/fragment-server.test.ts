@@ -4,7 +4,12 @@ import {
 	createServerEntry,
 	type ServerEntryOptions,
 } from '../../src/vite/runtime/create-server-entry.ts';
-import { FRAGMENT_REGION_END, fragmentRequestUrl } from '../../src/vite/fragment-navigation.ts';
+import {
+	FRAGMENT_REGION_END,
+	NITRO_PRERENDER_HEADER,
+	FRAGMENT_PRERENDERED,
+	fragmentRequestUrl,
+} from '../../src/vite/fragment-navigation.ts';
 
 const page = (html: string) => async () => ({
 	default: { renderSsr: () => ({ html, state: { version: 1, cells: [] } }) },
@@ -199,7 +204,9 @@ test('a classic head script keeps every modulepreload ahead of it, even with a s
 	const preloads = [...html.matchAll(/<link rel="modulepreload"[^>]*>/g)];
 	expect(preloads.length).toBeGreaterThan(0);
 	for (const preload of preloads) {
-		expect(preload.index).toBeGreaterThan(html.indexOf('<link rel="stylesheet" href="/a.css">'));
+		expect(preload.index).toBeGreaterThan(
+			html.indexOf('<link rel="stylesheet" href="/a.css">'),
+		);
 		expect(preload.index).toBeLessThan(html.indexOf('<script>window.theme'));
 	}
 });
@@ -316,4 +323,17 @@ test('a destination with nothing to preload is still listed, so the idle tier fe
 	});
 	const html = await (await served.fetch(new Request('https://app.test/'))).text();
 	expect(servedRouteTable(html)).toEqual({ '/next': [] });
+});
+
+test('a fragment the prerenderer asks for is marked prerendered; one rendered per request, or a whole page, is not', async () => {
+	const app = entry();
+	const prerendered = (url: string) =>
+		new Request(url, { headers: { [NITRO_PRERENDER_HEADER]: new URL(url).pathname } });
+	const fragmentUrl = fragmentRequestUrl('https://app.test/next').href;
+	const built = await (await app.fetch(prerendered(fragmentUrl))).text();
+	expect(built.endsWith(FRAGMENT_PRERENDERED + FRAGMENT_REGION_END)).toBe(true);
+	const perRequest = await (await app.fetch(fragmentRequest('https://app.test/next'))).text();
+	expect(perRequest).not.toContain(FRAGMENT_PRERENDERED);
+	const document = await (await app.fetch(prerendered('https://app.test/next'))).text();
+	expect(document).not.toContain(FRAGMENT_PRERENDERED);
 });
