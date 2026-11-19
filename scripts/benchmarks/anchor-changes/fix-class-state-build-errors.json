@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 72,
+			"reason": "the client value decoder defines a decoded __proto__ field instead of assigning it, so state data can never replace an object's prototype",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 72,
+			"reason": "the client value decoder defines a decoded __proto__ field instead of assigning it, so state data can never replace an object's prototype",
+			"date": "2026-11-19"
+		}
+	]
+}
