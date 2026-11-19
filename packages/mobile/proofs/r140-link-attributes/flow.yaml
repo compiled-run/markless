@@ -1,0 +1,45 @@
+appId: ${APP_ID}
+name: r140-link-attributes
+---
+- launchApp:
+      clearState: true
+- assertVisible: Home tab, open
+- assertVisible: About tab
+- assertVisible: Open apple
+- assertNotVisible: Open pear
+- assertVisible: Home
+- tapOn: Choose pear
+- assertVisible: Open pear
+- assertNotVisible: Open apple
+- assertVisible: Open pear
+- assertNotVisible: Open apple
+- tapOn: Open pear
+- assertNotVisible: Open pear
+- assertVisible: Item
+- assertVisible: Item pear
+- assertVisible: Home tab
+- assertVisible: Back home
+- assertNotVisible: Home tab, open
+- assertNotVisible: Open pear
+- assertVisible: Item
+- tapOn: Back home
+- assertVisible: Home tab, open
+- assertNotVisible: Item pear
+- assertNotVisible: Home tab
+- assertVisible: Home
+- assertVisible: Home tab, open
+- assertVisible: Open apple
+- assertNotVisible: Item pear
+- assertNotVisible: Home tab
+- assertVisible: Home
+- tapOn: About tab
+- assertVisible: Home tab
+- assertNotVisible: Open apple
+- assertNotVisible: Home tab, open
+- assertVisible: About
+- assertVisible: About tab, open
+- assertVisible: Home tab
+- assertVisible: About these links
+- assertNotVisible: Open apple
+- assertNotVisible: Home tab, open
+- assertVisible: About
