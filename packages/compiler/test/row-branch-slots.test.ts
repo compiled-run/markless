@@ -124,7 +124,9 @@ export default function Page() @{
 		symbols: [],
 	});
 	const [outer, inner] = result.protocolView.keyedRepeats ?? [];
-	expect(outer?.rowTemplate?.branchSlots?.[0]?.arms[1]?.html).toBe('<ol><!--markless-slot:0--></ol>');
+	expect(outer?.rowTemplate?.branchSlots?.[0]?.arms[1]?.html).toBe(
+		'<ol><!--markless-slot:0--></ol>',
+	);
 	expect(inner?.enclosingRow).toEqual({
 		repeatId: outer?.id,
 		parentHostPath: [0],
@@ -132,8 +134,10 @@ export default function Page() @{
 		arm: { slot: 0, arm: 1 },
 	});
 	expect(
-		result.publicRenderPlan.diagnostics.filter((diagnostic) =>
-			diagnostic.code.startsWith('MARKLESS_ROW_BRANCH') || diagnostic.code === ROW_MINT_UNSUPPORTED,
+		result.publicRenderPlan.diagnostics.filter(
+			(diagnostic) =>
+				diagnostic.code.startsWith('MARKLESS_ROW_BRANCH') ||
+				diagnostic.code === ROW_MINT_UNSUPPORTED,
 		),
 	).toEqual([]);
 });
@@ -143,15 +147,13 @@ test('an arm the row cannot rebuild keeps the served arm and says so', async () 
 		filename: 'src/Page.tsrx',
 		source: `
 import { state } from '@markless/core';
+import Chip from './chip.tsrx';
 export default function Page() @{
 	let open = state(false);
 	let rows = state([{ id: 'a', tags: ['x'] }]);
 	<ul>
 		@for (const row of rows; key row.id) {
-			<li>@if (open) { <ol>
-				// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: tags are positions
-				@for (const tag of row.tags; index at; key at) { <li>{tag}</li> }
-			</ol> } @else { <span>none</span> }</li>
+			<li>@if (open) { <ol><Chip label={row.id} /></ol> } @else { <span>none</span> }</li>
 		}
 	</ul>
 }`,
@@ -187,7 +189,9 @@ export default function Page() @{
 	);
 	expect(record?.runtimeModuleIds).toContain('web/fns/row-branch-mint');
 	expect(result.protocolView.keyedRepeats?.[0]?.indexName).toBe('at');
-	const handler = result.symbolModules.modules.find((module) => module.source.includes('state:slots'));
+	const handler = result.symbolModules.modules.find((module) =>
+		module.source.includes('state:slots'),
+	);
 	expect(handler?.source).toContain('context.locals?.at');
 });
 
@@ -207,11 +211,14 @@ export default function Page() @{
 }`,
 		symbols: [],
 	});
-	const errors = [...result.symbolModules.diagnostics, ...result.publicRenderPlan.diagnostics].filter(
-		(diagnostic) => diagnostic.severity === 'error',
-	);
+	const errors = [
+		...result.symbolModules.diagnostics,
+		...result.publicRenderPlan.diagnostics,
+	].filter((diagnostic) => diagnostic.severity === 'error');
 	expect(errors).toEqual([]);
-	expect(result.protocolView.keyedRepeats?.[0]?.rowTemplate?.branchSlots?.[0]?.arms[0]).toMatchObject({
+	expect(
+		result.protocolView.keyedRepeats?.[0]?.rowTemplate?.branchSlots?.[0]?.arms[0],
+	).toMatchObject({
 		textSlots: [{ itemPath: ['name'] }],
 	});
 });

@@ -6320,7 +6320,7 @@ export function buildEventHandlerEmission(
 						}),
 					]
 				: []),
-			...[WRITE_THROUGH_FN, OBJECT_ASSIGN_FN]
+			...[WRITE_THROUGH_FN, OBJECT_ASSIGN_FN, ELEMENT_PATH_FN]
 				.filter((name) => referenced.has(name))
 				.map((localName) =>
 					moduleImportNode({
@@ -8021,6 +8021,7 @@ function collectIdentifierNames(node: unknown, names: Set<string>): void {
 const ROW_ITEM_PATH_FN = 'marklessRowItemPath';
 const WRITE_THROUGH_FN = 'marklessWriteThrough';
 const OBJECT_ASSIGN_FN = 'marklessObjectAssign';
+const ELEMENT_PATH_FN = 'marklessElementPath';
 const CHANGED_FN = 'marklessChanged';
 const CATCH_RESET_FN = 'marklessCatchReset';
 const REPEATING_TIMER_FN = 'marklessRepeatingTimer';
@@ -8267,10 +8268,19 @@ function catchResetNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNo
 
 // The graph a write through a handler local lands on: where the local's value lives, found at dispatch.
 function writeThroughCall(through: LoweredWriteThrough, graphNodeId: string): EmissionNode {
+	let basePath = stringArrayNode(through.basePath);
+	for (const step of through.enclosing ?? [])
+		basePath = callNode(identifierNode(ELEMENT_PATH_FN), [
+			identifierNode('context'),
+			literalNode(graphNodeId),
+			basePath,
+			identifierNode(step.local),
+			stringArrayNode(step.path),
+		]);
 	return callNode(identifierNode(WRITE_THROUGH_FN), [
 		identifierNode('context'),
 		literalNode(graphNodeId),
-		stringArrayNode(through.basePath),
+		basePath,
 		identifierNode(through.local),
 		literalNode(through.element),
 	]);

@@ -493,11 +493,6 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 			repeat.indexKey === true ? [repeat.id] : [],
 		),
 	);
-	const nestedRepeatIds = new Set(
-		(input.payloadArena.view.keyedRepeats ?? []).flatMap((repeat) =>
-			repeat.enclosingRepeatId ? [repeat.enclosingRepeatId] : [],
-		),
-	);
 	const emitted = new Set<string>();
 	return (input.payloadArena.view.keyedRepeats ?? []).flatMap((repeat) => {
 		const render = renderEntries.get(repeat.id);
@@ -520,10 +515,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 		const positionKeyed = indexKeyed.has(repeat.id);
 		if (
 			!render ||
-			(positionKeyed &&
-				(repeat.enclosingRepeatId !== undefined ||
-					nestedRepeatIds.has(repeat.id) ||
-					liveRowComponentMint(input, repeat, render) !== null)) ||
+			(positionKeyed && liveRowComponentMint(input, repeat, render) !== null) ||
 			(render.rowStartOffset === 'unknown' && render.rowEndOffset === undefined) ||
 			!(render.rowRange || rowRootsOneElement(input, render)) ||
 			enclosingRow === null
@@ -1168,12 +1160,6 @@ function nestedRepeatMints(
 		!render ||
 		(render.rowStartOffset === 'unknown' && render.rowEndOffset === undefined) ||
 		!rowRootsOneElement(input, render)
-	)
-		return false;
-	if (
-		input.semanticGraph?.keyedRepeats.some(
-			(candidate) => candidate.id === repeatId && candidate.indexKey,
-		)
 	)
 		return false;
 	const parents = armChunkId
