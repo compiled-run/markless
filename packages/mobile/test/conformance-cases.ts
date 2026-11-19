@@ -357,6 +357,26 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'ticked-keys',
+		fixture: 'test/fixtures/TickedKeys.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
+		name: 'unset',
+		fixture: 'test/fixtures/Unset.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h4' },
+			{ event: 'activate', host: 'h8' },
+			{ event: 'activate', host: 'component-edge:0/h5' },
+			{ event: 'activate', host: 'h8' },
+		],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [
@@ -615,6 +635,28 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [
 			{ event: 'activate', host: 'h3' },
 			{ event: 'activate', host: 'component-edge:0' },
+		],
+	},
+	{
+		name: 'shell-props',
+		app: 'proofs/r139-shell-props',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:1' },
+			{ event: 'activate', host: 'h0' },
+			{ event: 'activate', host: 'h0' },
+			{ event: 'back' },
+		],
+	},
+	{
+		name: 'link-attributes',
+		app: 'proofs/r140-link-attributes',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'component-edge:1' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'component-edge:0/component-edge:1' },
 		],
 	},
 ];

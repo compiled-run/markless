@@ -1,0 +1,841 @@
+{
+	"version": "markless.native-app-conformance/0",
+	"app": {
+		"version": "markless.native-app/0",
+		"routes": [
+			{
+				"pattern": "/",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Home",
+					"route": {
+						"pattern": "/",
+						"params": []
+					},
+					"cells": [
+						{
+							"id": "state:choice",
+							"name": "choice",
+							"initial": "apple"
+						}
+					],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h0",
+							"element": "nav",
+							"parent": "h0"
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/component-edge:0",
+							"element": "a",
+							"parent": "component-edge:0/h0",
+							"attributes": {
+								"href": "/"
+							},
+							"bindings": [
+								{
+									"attribute": "aria-current",
+									"value": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"literal": "home"
+											},
+											"right": {
+												"literal": "home"
+											}
+										},
+										"whenTrue": {
+											"literal": "page"
+										},
+										"whenFalse": {
+											"literal": null
+										}
+									}
+								},
+								{
+									"attribute": "aria-label",
+									"value": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"literal": "home"
+											},
+											"right": {
+												"literal": "home"
+											}
+										},
+										"whenTrue": {
+											"literal": "Home tab, open"
+										},
+										"whenFalse": {
+											"literal": "Home tab"
+										}
+									}
+								}
+							]
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/component-edge:0:text0",
+							"parent": "component-edge:0/component-edge:0",
+							"parts": [
+								{
+									"text": "Home"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/component-edge:1",
+							"element": "a",
+							"parent": "component-edge:0/h0",
+							"attributes": {
+								"href": "/about"
+							},
+							"bindings": [
+								{
+									"attribute": "aria-current",
+									"value": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"literal": "home"
+											},
+											"right": {
+												"literal": "about"
+											}
+										},
+										"whenTrue": {
+											"literal": "page"
+										},
+										"whenFalse": {
+											"literal": null
+										}
+									}
+								},
+								{
+									"attribute": "aria-label",
+									"value": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"literal": "home"
+											},
+											"right": {
+												"literal": "about"
+											}
+										},
+										"whenTrue": {
+											"literal": "About tab, open"
+										},
+										"whenFalse": {
+											"literal": "About tab"
+										}
+									}
+								}
+							]
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/component-edge:1:text0",
+							"parent": "component-edge:0/component-edge:1",
+							"parts": [
+								{
+									"text": "About"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "button",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Choose pear"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:1",
+							"element": "a",
+							"parent": "h0",
+							"attributes": {},
+							"bindings": [
+								{
+									"attribute": "href",
+									"value": {
+										"template": [
+											"/items/",
+											{
+												"cell": "state:choice"
+											},
+											""
+										]
+									}
+								}
+							]
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:1:text0",
+							"parent": "component-edge:1",
+							"parts": [
+								{
+									"text": "Open "
+								},
+								{
+									"cell": "state:choice"
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "component-edge:0/component-edge:0",
+							"event": "activate",
+							"handler": "handler:component-edge:0/component-edge:0"
+						},
+						{
+							"host": "component-edge:0/component-edge:1",
+							"event": "activate",
+							"handler": "handler:component-edge:0/component-edge:1"
+						},
+						{
+							"host": "h2",
+							"event": "activate",
+							"handler": "handler:event:0"
+						},
+						{
+							"host": "component-edge:1",
+							"event": "activate",
+							"handler": "handler:component-edge:1"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:component-edge:0/component-edge:0",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/",
+									"params": {}
+								}
+							]
+						},
+						{
+							"id": "handler:component-edge:0/component-edge:1",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/about",
+									"params": {}
+								}
+							]
+						},
+						{
+							"id": "handler:event:0",
+							"ops": [
+								{
+									"op": "assign",
+									"cell": "state:choice",
+									"value": {
+										"literal": "pear"
+									}
+								}
+							]
+						},
+						{
+							"id": "handler:component-edge:1",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/items/[id]",
+									"params": {
+										"id": {
+											"template": [
+												{
+													"cell": "state:choice"
+												}
+											]
+										}
+									}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Home"
+						}
+					]
+				}
+			},
+			{
+				"pattern": "/about",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "About",
+					"route": {
+						"pattern": "/about",
+						"params": []
+					},
+					"cells": [],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h0",
+							"element": "nav",
+							"parent": "h0"
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/component-edge:0",
+							"element": "a",
+							"parent": "component-edge:0/h0",
+							"attributes": {
+								"href": "/"
+							},
+							"bindings": [
+								{
+									"attribute": "aria-current",
+									"value": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"literal": "about"
+											},
+											"right": {
+												"literal": "home"
+											}
+										},
+										"whenTrue": {
+											"literal": "page"
+										},
+										"whenFalse": {
+											"literal": null
+										}
+									}
+								},
+								{
+									"attribute": "aria-label",
+									"value": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"literal": "about"
+											},
+											"right": {
+												"literal": "home"
+											}
+										},
+										"whenTrue": {
+											"literal": "Home tab, open"
+										},
+										"whenFalse": {
+											"literal": "Home tab"
+										}
+									}
+								}
+							]
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/component-edge:0:text0",
+							"parent": "component-edge:0/component-edge:0",
+							"parts": [
+								{
+									"text": "Home"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/component-edge:1",
+							"element": "a",
+							"parent": "component-edge:0/h0",
+							"attributes": {
+								"href": "/about"
+							},
+							"bindings": [
+								{
+									"attribute": "aria-current",
+									"value": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"literal": "about"
+											},
+											"right": {
+												"literal": "about"
+											}
+										},
+										"whenTrue": {
+											"literal": "page"
+										},
+										"whenFalse": {
+											"literal": null
+										}
+									}
+								},
+								{
+									"attribute": "aria-label",
+									"value": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"literal": "about"
+											},
+											"right": {
+												"literal": "about"
+											}
+										},
+										"whenTrue": {
+											"literal": "About tab, open"
+										},
+										"whenFalse": {
+											"literal": "About tab"
+										}
+									}
+								}
+							]
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/component-edge:1:text0",
+							"parent": "component-edge:0/component-edge:1",
+							"parts": [
+								{
+									"text": "About"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "p",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "About these links"
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "component-edge:0/component-edge:0",
+							"event": "activate",
+							"handler": "handler:component-edge:0/component-edge:0"
+						},
+						{
+							"host": "component-edge:0/component-edge:1",
+							"event": "activate",
+							"handler": "handler:component-edge:0/component-edge:1"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:component-edge:0/component-edge:0",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/",
+									"params": {}
+								}
+							]
+						},
+						{
+							"id": "handler:component-edge:0/component-edge:1",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/about",
+									"params": {}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "About"
+						}
+					]
+				}
+			},
+			{
+				"pattern": "/items/[id]",
+				"params": ["id"],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Item",
+					"route": {
+						"pattern": "/items/[id]",
+						"params": ["id"]
+					},
+					"cells": [],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h0",
+							"element": "nav",
+							"parent": "h0"
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/component-edge:0",
+							"element": "a",
+							"parent": "component-edge:0/h0",
+							"attributes": {
+								"href": "/"
+							},
+							"bindings": [
+								{
+									"attribute": "aria-current",
+									"value": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"literal": "item"
+											},
+											"right": {
+												"literal": "home"
+											}
+										},
+										"whenTrue": {
+											"literal": "page"
+										},
+										"whenFalse": {
+											"literal": null
+										}
+									}
+								},
+								{
+									"attribute": "aria-label",
+									"value": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"literal": "item"
+											},
+											"right": {
+												"literal": "home"
+											}
+										},
+										"whenTrue": {
+											"literal": "Home tab, open"
+										},
+										"whenFalse": {
+											"literal": "Home tab"
+										}
+									}
+								}
+							]
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/component-edge:0:text0",
+							"parent": "component-edge:0/component-edge:0",
+							"parts": [
+								{
+									"text": "Home"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/component-edge:1",
+							"element": "a",
+							"parent": "component-edge:0/h0",
+							"attributes": {
+								"href": "/about"
+							},
+							"bindings": [
+								{
+									"attribute": "aria-current",
+									"value": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"literal": "item"
+											},
+											"right": {
+												"literal": "about"
+											}
+										},
+										"whenTrue": {
+											"literal": "page"
+										},
+										"whenFalse": {
+											"literal": null
+										}
+									}
+								},
+								{
+									"attribute": "aria-label",
+									"value": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"literal": "item"
+											},
+											"right": {
+												"literal": "about"
+											}
+										},
+										"whenTrue": {
+											"literal": "About tab, open"
+										},
+										"whenFalse": {
+											"literal": "About tab"
+										}
+									}
+								}
+							]
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/component-edge:1:text0",
+							"parent": "component-edge:0/component-edge:1",
+							"parts": [
+								{
+									"text": "About"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "p",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Item "
+								},
+								{
+									"expr": {
+										"member": {
+											"route": "params"
+										},
+										"property": "id"
+									}
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:1/component-edge:0",
+							"element": "a",
+							"parent": "h0",
+							"attributes": {
+								"href": "/"
+							}
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:1/component-edge:0:text0",
+							"parent": "component-edge:1/component-edge:0",
+							"parts": [
+								{
+									"expr": {
+										"literal": "Back home"
+									}
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "component-edge:0/component-edge:0",
+							"event": "activate",
+							"handler": "handler:component-edge:0/component-edge:0"
+						},
+						{
+							"host": "component-edge:0/component-edge:1",
+							"event": "activate",
+							"handler": "handler:component-edge:0/component-edge:1"
+						},
+						{
+							"host": "component-edge:1/component-edge:0",
+							"event": "activate",
+							"handler": "handler:component-edge:1/component-edge:0"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:component-edge:0/component-edge:0",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/",
+									"params": {}
+								}
+							]
+						},
+						{
+							"id": "handler:component-edge:0/component-edge:1",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/about",
+									"params": {}
+								}
+							]
+						},
+						{
+							"id": "handler:component-edge:1/component-edge:0",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/",
+									"params": {}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Item"
+						}
+					]
+				}
+			}
+		]
+	},
+	"open": "/",
+	"initial": {
+		"stack": ["/"],
+		"title": "Home",
+		"texts": [
+			["component-edge:0/component-edge:0:text0", "Home"],
+			["component-edge:0/component-edge:1:text0", "About"],
+			["h2:text0", "Choose pear"],
+			["component-edge:1:text0", "Open apple"]
+		]
+	},
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "component-edge:1",
+					"name": "href",
+					"value": "/items/pear"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:1:text0",
+					"value": "Open pear"
+				}
+			],
+			"stack": ["/"],
+			"title": "Home",
+			"texts": [
+				["component-edge:0/component-edge:0:text0", "Home"],
+				["component-edge:0/component-edge:1:text0", "About"],
+				["h2:text0", "Choose pear"],
+				["component-edge:1:text0", "Open pear"]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/items/[id]",
+					"params": {
+						"id": "pear"
+					}
+				}
+			],
+			"stack": ["/", "/items/pear"],
+			"title": "Item",
+			"texts": [
+				["component-edge:0/component-edge:0:text0", "Home"],
+				["component-edge:0/component-edge:1:text0", "About"],
+				["h2:text0", "Item pear"],
+				["component-edge:1/component-edge:0:text0", "Back home"]
+			]
+		},
+		{
+			"action": {
+				"event": "back"
+			},
+			"journal": [],
+			"stack": ["/"],
+			"title": "Home",
+			"texts": [
+				["component-edge:0/component-edge:0:text0", "Home"],
+				["component-edge:0/component-edge:1:text0", "About"],
+				["h2:text0", "Choose pear"],
+				["component-edge:1:text0", "Open pear"]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/component-edge:1"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/about",
+					"params": {}
+				}
+			],
+			"stack": ["/", "/about"],
+			"title": "About",
+			"texts": [
+				["component-edge:0/component-edge:0:text0", "Home"],
+				["component-edge:0/component-edge:1:text0", "About"],
+				["h2:text0", "About these links"]
+			]
+		}
+	]
+}

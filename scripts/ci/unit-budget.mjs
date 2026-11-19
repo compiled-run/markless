@@ -2,6 +2,7 @@
 // CPU-seconds and peak memory of CI's node unit shards, checked against accepted Linux anchors in unit-budget.json.
 
 import { execFileSync, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
 	mkdirSync,
 	mkdtempSync,
@@ -25,6 +26,7 @@ const USAGE = `usage: node scripts/ci/unit-budget.mjs measure -- <command...>
        node scripts/ci/unit-budget.mjs accept --from <run id | dir>... --reason "<why>" [--budget <file>]
        node scripts/ci/unit-budget.mjs margin --from <run id | dir>... --reason "<why>" [--budget <file>]
        node scripts/ci/unit-budget.mjs models --from <run id | dir>... --reason "<why>" [--budget <file>]
+       node scripts/ci/unit-budget.mjs suite --from <run id | dir>... --reason "<why>" [--budget <file>]
 
   measure  runs the command; with MARKLESS_UNIT_BUDGET_OUT set (CI) it writes the process tree's
            CPU-seconds and sampled peak RSS there, for MARKLESS_UNIT_BUDGET_SHARD (Linux only)
@@ -33,7 +35,9 @@ const USAGE = `usage: node scripts/ci/unit-budget.mjs measure -- <command...>
   accept   takes new anchors from CI artifacts (the median per shard over every attempt of the runs)
   margin   derives the noise band from repeated CI measurements of one test set
   models   derives each CPU model's correction: how far the calibration misjudges its speed on the unit
-           suite, and how much of a calibration swing on that model the suite's CPU-s follow`;
+           suite, and how much of a calibration swing on that model the suite's CPU-s follow
+  suite    derives the suite's own yardstick from landed runs: each test file's reference duration, and
+           each CPU model's CPU-s per unit of the suite's pace`;
 
 const flags = (args, name) => {
 	const values = [];
@@ -151,7 +155,7 @@ const labelOf = ({ pid }) => {
 function readFileOwners(dir, known) {
 	for (const entry of readdirSync(dir)) {
 		const pid = Number(entry);
-		if (known.has(pid)) continue;
+		if (!Number.isInteger(pid) || known.has(pid)) continue;
 		try {
 			const file = readFileSync(join(dir, entry), 'utf8').trim();
 			if (file) known.set(pid, file);
@@ -181,6 +185,24 @@ export function calibrationRound() {
 		throw new Error('calibration workload went wrong');
 	const spent = process.cpuUsage(started);
 	return (spent.user + spent.system) / 1e6;
+}
+
+// How long each test file's tests took, as unit-budget-attribution.ts records them.
+function readFileDurations(dir) {
+	const fileMs = {};
+	let entries = [];
+	try {
+		entries = readdirSync(dir);
+	} catch {
+		return fileMs;
+	}
+	for (const entry of entries)
+		for (const line of readFileSync(join(dir, entry), 'utf8').split('\n'))
+			if (line) {
+				const { file, ms } = JSON.parse(line);
+				fileMs[file] = ms;
+			}
+	return Object.fromEntries(Object.entries(fileMs).sort(([a], [b]) => a.localeCompare(b)));
 }
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -278,6 +300,7 @@ async function measure(command) {
 	const own = process.cpuUsage();
 	const cpuModel =
 		/model name\s*:\s*(.*)/.exec(readFileSync('/proc/cpuinfo', 'utf8'))?.[1] ?? 'unknown';
+	const fileMs = readFileDurations(join(filesDir, 'durations'));
 	const measurement = {
 		version: 2,
 		shard: process.env.MARKLESS_UNIT_BUDGET_SHARD ?? 'all',
@@ -299,6 +322,7 @@ async function measure(command) {
 		wrapperCpuS: round((own.user + own.system) / 1e6, 2),
 		atPeak: peakAt,
 		filePeaksMb: Object.fromEntries([...filePeaks].sort(([, a], [, b]) => b - a).slice(0, 25)),
+		fileMs,
 	};
 	rmSync(filesDir, { recursive: true, force: true });
 	mkdirSync(dirname(out), { recursive: true });
@@ -385,6 +409,81 @@ const correctionOf = (budget) => ({
 const sameCorrection = (recorded, budget) =>
 	JSON.stringify(correctionOf({ models: recorded })) === JSON.stringify(correctionOf(budget));
 
+/** Which suite reference anchors were accepted with; null when the budget has none. */
+export const suiteKey = (budget) =>
+	budget.suite
+		? createHash('sha256').update(JSON.stringify(budget.suite)).digest('hex').slice(0, 12)
+		: null;
+
+const MINIMUM_PACE_FILES = 20;
+
+/**
+ * How slowly this shard's test files ran against the suite's reference: the median, over its files that
+ * have a reference duration, of duration over reference. A few slower files leave it where it is.
+ */
+export function suitePace(suite, m) {
+	if (!suite?.files || !m.fileMs) return null;
+	const ratios = [];
+	for (const [file, ms] of Object.entries(m.fileMs))
+		if (suite.files[file] > 0 && ms > 0) ratios.push(ms / suite.files[file]);
+	return ratios.length >= MINIMUM_PACE_FILES ? median(ratios) : null;
+}
+
+/**
+ * A shard's cost read three ways: through its calibration (`calibration`, CPU-s at the anchors' speed), through
+ * its own test files' pace on its CPU model (`suite`), and at its CPU model's typical speed (`typical`). The
+ * suite reading sees the host's speed while the tests ran but not a change that slows every file alike; the
+ * other two see such a change but misread an unusual host.
+ */
+export function readingsOf(budget, m) {
+	const speed = budget.anchors?.calibrationS ?? 1;
+	const pace = suitePace(budget.suite, m);
+	const modelPace = budget.suite?.pace?.[m.cpuModel];
+	const typical = budget.models?.calibrationS?.[m.cpuModel];
+	return {
+		calibration: workOf(budget, m) * speed,
+		suite: pace && modelPace ? m.cpuS / pace / modelPace : null,
+		typical: typical > 0 ? (m.cpuS / typical / modelFactor(budget, m)) * speed : null,
+	};
+}
+
+/**
+ * Each shard's CPU-s at the anchors' speed. With file timings on every shard, a shard counts as its suite
+ * reading against its anchor, times one scale for the whole run: the median of what each calibration and each
+ * typical-speed reading says against the suite reading of the same shard. One misread calibration or one
+ * unusual host moves that median little, while a change that slows every test file moves all six readings.
+ * Without file timings each shard counts its calibration reading.
+ */
+export function countShards(budget, latest) {
+	const shards = [...latest].sort(([a], [b]) => a.localeCompare(b));
+	const read = shards.map(([shard, m]) => ({
+		shard,
+		m,
+		anchor: budget.anchors?.shards?.[shard],
+		...readingsOf(budget, m),
+	}));
+	const bySuite =
+		suiteKey(budget) !== null &&
+		budget.anchors?.suite === suiteKey(budget) &&
+		read.every((r) => r.suite && r.anchor?.suite > 0 && r.anchor?.cpuS > 0);
+	if (!bySuite) return { shards: read.map((r) => ({ ...r, cpuS: r.calibration })), scale: null };
+	const scales = read.flatMap((r) => {
+		const suite = r.suite / r.anchor.suite;
+		const views = [r.calibration / r.anchor.cpuS / suite];
+		if (r.typical && r.anchor.typical > 0) views.push(r.typical / r.anchor.typical / suite);
+		return views;
+	});
+	const scale = median(scales);
+	return {
+		shards: read.map((r) => ({
+			...r,
+			cpuS: (r.suite / r.anchor.suite) * scale * r.anchor.cpuS,
+		})),
+		scale,
+		readings: scales.length,
+	};
+}
+
 /** The verdict for one run's shards against the budget file. */
 export function evaluate(budget, measurements) {
 	const latest = latestPerShard(measurements);
@@ -404,17 +503,28 @@ export function evaluate(budget, measurements) {
 		failures.push(
 			'stale anchor: the CPU-model correction changed after the anchors were accepted; re-anchor with `unit-budget.mjs accept`',
 		);
+	if (budget.anchors && (budget.anchors.suite ?? null) !== suiteKey(budget))
+		failures.push(
+			'stale anchor: the suite reference changed after the anchors were accepted; re-anchor with `unit-budget.mjs accept`',
+		);
 	if (budget.margin && !sameCorrection(budget.margin.models, budget))
 		failures.push(
 			'stale margin: the CPU-model correction changed after the margin was derived; re-derive it with `unit-budget.mjs margin`',
 		);
-	const speed = budget.anchors?.calibrationS ?? 1;
-	const scaled = (m) => workOf(budget, m) * speed;
-	const cpuS = round([...latest.values()].reduce((sum, m) => sum + scaled(m), 0));
+	const counted = countShards(budget, latest);
+	const cpuS = round(counted.shards.reduce((sum, r) => sum + r.cpuS, 0));
 	const peakRssMb = Math.max(0, ...[...latest.values()].map((m) => m.peakRssMb));
-	for (const [shard, m] of [...latest].sort(([a], [b]) => a.localeCompare(b)))
+	for (const { shard, m, anchor, calibration, suite, cpuS: counts } of counted.shards)
 		lines.push(
-			`  shard ${shard}: ${m.cpuS} CPU-s on ${m.cpuModel} (calibration ${m.calibrationS} CPU-s, ${budget.models?.factors?.[m.cpuModel] ? `counted as ${round(effectiveCalibration(budget, m), 3)}, model factor ${modelFactor(budget, m)}` : 'no factor recorded for this CPU model'}), ${round(scaled(m))} CPU-s at the anchors' speed, peak RSS ${m.peakRssMb} MB, ${m.wallS} s wall${budget.anchors?.shards?.[shard] ? ` (anchor ${budget.anchors.shards[shard].cpuS} CPU-s, ${budget.anchors.shards[shard].peakRssMb} MB)` : ''}`,
+			`  shard ${shard}: ${m.cpuS} CPU-s on ${m.cpuModel} (calibration ${m.calibrationS} CPU-s, ${budget.models?.factors?.[m.cpuModel] ? `counted as ${round(effectiveCalibration(budget, m), 3)}, model factor ${modelFactor(budget, m)}` : 'no factor recorded for this CPU model'}), ${round(calibration)} CPU-s at the anchors' speed by its calibration${suite && anchor?.suite ? `, ${suite >= anchor.suite ? '+' : ''}${round((suite / anchor.suite - 1) * 100)}% against its anchor by its own test files` : ''}, counted ${round(counts)} CPU-s, peak RSS ${m.peakRssMb} MB, ${m.wallS} s wall${anchor ? ` (anchor ${anchor.cpuS} CPU-s, ${anchor.peakRssMb} MB)` : ''}`,
+		);
+	if (counted.scale !== null)
+		lines.push(
+			`  every test file at once: ${counted.scale >= 1 ? '+' : ''}${round((counted.scale - 1) * 100)}%, the median of ${counted.readings} calibration and typical-speed readings against the shards' own test files`,
+		);
+	else if (budget.suite)
+		warnings.push(
+			'a shard has no file timings or no suite reading for its CPU model, so every shard counts its calibration alone',
 		);
 	if (budget.margin && budget.anchors) {
 		const band = (name, value, anchor, margin, unit) => {
@@ -532,6 +642,12 @@ export function acceptAnchors(budget, runs, reason, date = today()) {
 		median([...perShard.values()].flat().map((m) => effectiveCalibration(budget, m))),
 		3,
 	);
+	const at = { ...budget, anchors: { calibrationS: speed } };
+	// Samples on a CPU model with no suite pace or typical calibration have no such reading.
+	const medianOf = (list, key) => {
+		const values = list.map((m) => readingsOf(at, m)[key]).filter((value) => value > 0);
+		return values.length ? round(median(values)) : undefined;
+	};
 	const shards = Object.fromEntries(
 		[...perShard]
 			.sort(([a], [b]) => a.localeCompare(b))
@@ -540,6 +656,8 @@ export function acceptAnchors(budget, runs, reason, date = today()) {
 				{
 					cpuS: round(median(list.map((m) => workOf(budget, m))) * speed),
 					peakRssMb: Math.round(median(list.map((m) => m.peakRssMb))),
+					suite: medianOf(list, 'suite'),
+					typical: medianOf(list, 'typical'),
 				},
 			]),
 	);
@@ -548,6 +666,7 @@ export function acceptAnchors(budget, runs, reason, date = today()) {
 		cpuS: round(Object.values(shards).reduce((sum, s) => sum + s.cpuS, 0)),
 		peakRssMb: Math.max(...Object.values(shards).map((s) => s.peakRssMb)),
 		models: correctionOf(budget),
+		suite: suiteKey(budget),
 		shards,
 		runs: runs.map((r) => r.source),
 		sha: runs.at(-1).measurements[0]?.sha ?? null,
@@ -754,6 +873,106 @@ export function deriveModels(
 	};
 }
 
+/**
+ * The suite's own yardstick, from landed runs' file timings:
+ * - files: each test file's median duration, for files seen `minimumSamples` times at `minimumMs` or more;
+ * - pace: each CPU model's CPU-s per unit of suite pace, fitted against the same shard's median in the
+ *   `neighbours` nearest runs on each side, so the suite's own growth over the fitted runs cancels, normalised to
+ *   a geometric mean of 1. A model with fewer than `minimumSamples` gets none.
+ */
+export function deriveSuite(
+	budget,
+	runs,
+	reason,
+	date = today(),
+	minimumMs = 100,
+	minimumSamples = 5,
+	neighbours = 8,
+) {
+	if (!reason?.trim()) throw new Error('suite needs --reason "<one line: what the samples are>"');
+	const samples = runs
+		.flatMap((r) => r.measurements)
+		.filter((m) => m.exitCode === 0 && m.fileMs && Object.keys(m.fileMs).length);
+	const durations = new Map();
+	for (const m of samples)
+		for (const [file, ms] of Object.entries(m.fileMs))
+			durations.set(file, [...(durations.get(file) ?? []), ms]);
+	const files = Object.fromEntries(
+		[...durations]
+			.filter(([, list]) => list.length >= minimumSamples && median(list) >= minimumMs)
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(([file, list]) => [file, Math.round(median(list))]),
+	);
+	const reference = { files };
+	const paced = samples
+		.map((m) => ({ m, pace: suitePace(reference, m) }))
+		.filter(({ pace }) => pace);
+	const counts = new Map();
+	for (const { m } of paced) counts.set(m.cpuModel, (counts.get(m.cpuModel) ?? 0) + 1);
+	const names = [...counts]
+		.filter(([, count]) => count >= minimumSamples)
+		.map(([name]) => name)
+		.sort((a, b) => a.localeCompare(b));
+	if (!names.length)
+		throw new Error(
+			`no CPU model has ${minimumSamples} samples with file timings; got ${JSON.stringify(Object.fromEntries(counts))}`,
+		);
+	const fitted = paced.filter(({ m }) => names.includes(m.cpuModel));
+	const byShard = new Map();
+	for (const sample of [...fitted].sort(
+		(a, b) => Number(a.m.run) - Number(b.m.run) || a.m.attempt - b.m.attempt,
+	))
+		byShard.set(sample.m.shard, [...(byShard.get(sample.m.shard) ?? []), sample]);
+	const pace = new Map(names.map((name) => [name, 1]));
+	const perPace = ({ m, pace: p }) => m.cpuS / p / pace.get(m.cpuModel);
+	for (let pass = 0; pass < 8; pass += 1) {
+		const near = new Map();
+		for (const list of byShard.values())
+			list.forEach((sample, index) =>
+				near.set(
+					sample,
+					median(list.filter((_, at) => Math.abs(at - index) <= neighbours).map(perPace)),
+				),
+			);
+		for (const name of names)
+			pace.set(
+				name,
+				pace.get(name) *
+					median(
+						fitted
+							.filter(({ m }) => m.cpuModel === name)
+							.map((sample) => perPace(sample) / near.get(sample)),
+					),
+			);
+	}
+	const mean = Math.exp(
+		[...pace.values()].reduce((sum, value) => sum + Math.log(value), 0) / pace.size,
+	);
+	const suite = {
+		minimumMs,
+		pace: Object.fromEntries(names.map((name) => [name, round(pace.get(name) / mean, 3)])),
+		samples: Object.fromEntries([...counts].sort(([a], [b]) => a.localeCompare(b))),
+		files,
+	};
+	return {
+		...budget,
+		suite,
+		history: [
+			...budget.history,
+			{
+				date,
+				change: 'suite',
+				from: budget.suite
+					? { files: Object.keys(budget.suite.files).length, pace: budget.suite.pace }
+					: null,
+				to: { files: Object.keys(files).length, pace: suite.pace },
+				runs: [...new Set(samples.map((m) => m.run).filter(Boolean))],
+				reason: reason.trim(),
+			},
+		],
+	};
+}
+
 async function main(argv) {
 	const separator = argv.indexOf('--');
 	const args = separator === -1 ? argv : argv.slice(0, separator);
@@ -784,7 +1003,12 @@ async function main(argv) {
 		console.error(`To re-anchor after an intended or measured change: ${result.acceptCommand}`);
 		return 1;
 	}
-	if (command === 'accept' || command === 'margin' || command === 'models') {
+	if (
+		command === 'accept' ||
+		command === 'margin' ||
+		command === 'models' ||
+		command === 'suite'
+	) {
 		const sources = flags(args, '--from');
 		if (!sources.length) throw new Error(USAGE);
 		const reason = flags(args, '--reason')[0];
@@ -821,7 +1045,9 @@ async function main(argv) {
 				? acceptAnchors(budget, runs, reason)
 				: command === 'models'
 					? deriveModels(budget, runs, reason)
-					: deriveMargin(budget, runs, reason);
+					: command === 'suite'
+						? deriveSuite(budget, runs, reason)
+						: deriveMargin(budget, runs, reason);
 		writeBudget(budgetPath, next);
 		const entry = next.history.at(-1);
 		console.log(
