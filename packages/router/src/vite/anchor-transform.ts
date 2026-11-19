@@ -8,7 +8,9 @@ import { discoverPageFiles, type RouteTypegenFileSystem } from './route-typegen.
 import {
 	LINK_ATTRIBUTE,
 	PREFETCH_ATTRIBUTE,
+	PREFETCH_LINK_CHOICES,
 	REPLACE_ATTRIBUTE,
+	type PrefetchLinkChoice,
 	SCROLL_ATTRIBUTE,
 } from '../link-attributes.ts';
 
@@ -174,14 +176,16 @@ function prefetchEdit(code: string, attribute: Node): Edit {
 	const value = node(attribute.value)!;
 	const literal = jsxExpression(value) ?? value;
 	if (['Literal', 'StringLiteral', 'BooleanLiteral'].includes(literal.type ?? '')) {
-		return literal.value === false
-			? { ...rangeOf(attribute), text: `${PREFETCH_ATTRIBUTE}="none"` }
-			: { ...attributeRemovalRange(code, attribute), text: '' };
+		if (literal.value === false)
+			return { ...rangeOf(attribute), text: `${PREFETCH_ATTRIBUTE}="none"` };
+		if (PREFETCH_LINK_CHOICES.includes(literal.value as PrefetchLinkChoice))
+			return { ...rangeOf(attribute), text: `${PREFETCH_ATTRIBUTE}="${literal.value}"` };
+		return { ...attributeRemovalRange(code, attribute), text: '' };
 	}
 	const expression = `(${slice(code, jsxExpression(value) ?? value)})`;
 	return {
 		...rangeOf(attribute),
-		text: `${PREFETCH_ATTRIBUTE}={${expression} === false ? 'none' : undefined}`,
+		text: `${PREFETCH_ATTRIBUTE}={${expression} === false ? 'none' : ${PREFETCH_LINK_CHOICES.map((choice) => `${expression} === '${choice}'`).join(' || ')} ? ${expression} : undefined}`,
 	};
 }
 

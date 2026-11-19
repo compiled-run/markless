@@ -53,12 +53,16 @@ export interface FragmentNavigationConfig {
 	readonly prefetchTtlMs: number;
 	// At most this many unused prefetches may still be streaming; starting another cancels the oldest.
 	readonly prefetchConnections: number;
+	// [intent, viewport, idle]: 0 never, 1 on a fast link, 2 on any (never under Save-Data or in a hidden tab).
+	readonly prefetchOn: readonly [intent: number, viewport: number, idle: number];
 	// Paths the server answers with endpoints, not pages: never fetched before a click or as a fragment.
 	readonly endpointPrefixes: readonly string[];
 	// At most this many visible-link fragments are fetched at idle on fast connections, in document order; 0 keeps HTML to intent only.
 	readonly idleFragments: number;
-	// An idle fetch stops once a page's region passes this many bytes, and that page waits for intent.
+	// An idle or viewport fetch stops once a page passes this many bytes on the wire, and that page waits for intent.
 	readonly idleFragmentBytes: number;
+	// The same stop for a compressed response that declares no length, counted on the decoded body.
+	readonly idleFragmentDecodedBytes: number;
 	readonly idleWithoutConnectionInfo: boolean;
 	// false: nothing is fetched before a click.
 	readonly prefetch: boolean;
@@ -106,7 +110,6 @@ export type FragmentNavigationState = {
 	readonly request: (url: URL, speculative: boolean) => FragmentPrefetch;
 	readonly prefetch: (url: URL) => void;
 	readonly parse: (url: string, text: string) => FragmentFetched;
-	readonly idleDownloads: boolean;
 	// Schedules the idle tier: at idle, fetch a few page fragments of the links in view; their code waits for intent.
 	readonly rescan: () => void;
 	// Bumped by Back, Forward, a hash link and a click on the page shown: each cancels a navigation whose page has not swapped in.
@@ -419,7 +422,11 @@ async function runScripts(
 	}
 }
 
-function loaded(w: Window, links: readonly HTMLLinkElement[], deadlineMs: number): Promise<unknown> {
+function loaded(
+	w: Window,
+	links: readonly HTMLLinkElement[],
+	deadlineMs: number,
+): Promise<unknown> {
 	if (links.length === 0) return Promise.resolve();
 	return Promise.race([
 		Promise.all(
@@ -796,7 +803,9 @@ function keptPairs(
 	const pairs: Array<{ readonly from: string; readonly to: string }> = [];
 	for (const element of outgoing.querySelectorAll(`[${instance}]`)) {
 		const at = arriving.findIndex(
-			(next) => next.getAttribute(keep) === element.getAttribute(keep) && !!keptSlots(element, next),
+			(next) =>
+				next.getAttribute(keep) === element.getAttribute(keep) &&
+				!!keptSlots(element, next),
 		);
 		if (at === -1) continue;
 		const [next] = arriving.splice(at, 1);
@@ -1160,9 +1169,11 @@ export async function navigate(
 	const [sharedProperty, resumeAttribute] = state.config.sharedInstances;
 	const sharedSwap = [d, d.querySelector(`[${containerAttribute}]`)].some((place) =>
 		Object.values(
-			(place as { [key: string]: { instances?: Record<string, { shape?: string }> } } | null)?.[
-				sharedProperty
-			]?.instances ?? {},
+			(
+				place as {
+					[key: string]: { instances?: Record<string, { shape?: string }> };
+				} | null
+			)?.[sharedProperty]?.instances ?? {},
 		).some((instance) => instance.shape),
 	)
 		? import('@markless/web/shared-swap')
@@ -1244,7 +1255,13 @@ export async function navigate(
 		try {
 			wakeShared = await (
 				await sharedSwap
-			).bindSharedSwap({ document: d, outgoing, incoming, containerAttribute, resumeAttribute });
+			).bindSharedSwap({
+				document: d,
+				outgoing,
+				incoming,
+				containerAttribute,
+				resumeAttribute,
+			});
 		} catch (error) {
 			reportAsync(error);
 		}
@@ -1405,7 +1422,8 @@ export async function navigate(
 	if (restored)
 		for (const container of [region, ...region.querySelectorAll(`[${containerAttribute}]`)])
 			if (isContainer(container))
-				(container as unknown as Record<string, unknown>)[state.config.reaskProperty] = true;
+				(container as unknown as Record<string, unknown>)[state.config.reaskProperty] =
+					true;
 	const controller = new AbortController();
 	session.streaming = controller;
 	const host = d as unknown as Record<string, unknown>;

@@ -172,6 +172,7 @@
 		"packages/router/test/vite/page-url-prop.test.ts",
 		"packages/router/test/vite/palette-port.test.ts",
 		"packages/router/test/vite/prefetch-placement-build.test.ts",
+		"packages/router/test/vite/prefetch-policy-browser.test.ts",
 		"packages/router/test/vite/prefetched-storage-derived.test.ts",
 		"packages/router/test/vite/prerender-build.test.ts",
 		"packages/router/test/vite/prerender-stale-output.test.ts",

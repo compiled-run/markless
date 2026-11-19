@@ -318,9 +318,10 @@ declare namespace __MarklessTypeService {
 		/**
 		 * `false` keeps the router from requesting this page before the click. Omit it
 		 * and a link to one of your pages is requested early when the reader hovers it,
-		 * or at idle when it is in view.
+		 * or at idle when it is in view. `'intent'` fetches it early only on hover, focus
+		 * or a press; `'viewport'` fetches it while it is in view.
 		 */
-		prefetch?: boolean;
+		prefetch?: boolean | 'intent' | 'viewport';
 		/** Fills the brackets of a route pattern `href`, as in `href="/blog/[slug]" params={{ slug }}`. */
 		params?: Readonly<Record<string, unknown>>;
 	};
@@ -559,15 +560,20 @@ declare namespace __MarklessTypeService {
 			? Attributes<SVGElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>
 			: never;
 
-	type CamelCaseAttributeSpelling<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
-		?
-				| HtmlGlobalCamelCaseAttributeName
-				| (Tag extends keyof HtmlCamelCaseAttributeNameByTag ? HtmlCamelCaseAttributeNameByTag[Tag] : never)
-		: Tag extends keyof SVGElementTagNameMap
+	type CamelCaseAttributeSpelling<Tag extends PropertyKey> =
+		Tag extends keyof HTMLElementTagNameMap
 			?
-					| SvgGlobalCamelCaseAttributeName
-					| (Tag extends keyof SvgCamelCaseAttributeNameByTag ? SvgCamelCaseAttributeNameByTag[Tag] : never)
-			: never;
+					| HtmlGlobalCamelCaseAttributeName
+					| (Tag extends keyof HtmlCamelCaseAttributeNameByTag
+							? HtmlCamelCaseAttributeNameByTag[Tag]
+							: never)
+			: Tag extends keyof SVGElementTagNameMap
+				?
+						| SvgGlobalCamelCaseAttributeName
+						| (Tag extends keyof SvgCamelCaseAttributeNameByTag
+								? SvgCamelCaseAttributeNameByTag[Tag]
+								: never)
+				: never;
 
 	type PlainAttributeValue<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
 		? AttributeValue
@@ -578,13 +584,16 @@ declare namespace __MarklessTypeService {
 	 * value, and the camelCase spelling of each real attribute, typed as that attribute.
 	 */
 	// Event handlers and Markless's own props are left out: no standard attribute shares their names.
-	type TypedAttributeValues<Tag extends PropertyKey> = GlobalAttributes & TagNameSpecificAttributes<Tag>;
+	type TypedAttributeValues<Tag extends PropertyKey> = GlobalAttributes &
+		TagNameSpecificAttributes<Tag>;
 
 	type StandardAttributes<Tag extends PropertyKey> = {
-		[Name in Exclude<
-			StandardAttributeName<Tag> | CamelCaseAttributeSpelling<Tag>,
-			keyof GlobalAttributes | keyof TagNameSpecificAttributes<Tag>
-		>]?: Name extends keyof CamelCaseAttributeName
+		[
+			Name in Exclude<
+				StandardAttributeName<Tag> | CamelCaseAttributeSpelling<Tag>,
+				keyof GlobalAttributes | keyof TagNameSpecificAttributes<Tag>
+			>
+		]?: Name extends keyof CamelCaseAttributeName
 			? CamelCaseAttributeName[Name] extends keyof TypedAttributeValues<Tag>
 				? TypedAttributeValues<Tag>[CamelCaseAttributeName[Name]]
 				: PlainAttributeValue<Tag>

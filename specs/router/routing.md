@@ -229,6 +229,40 @@ URL itself answers the whole document.
   value, so the first frame already shows it. See "Where an instance lives" in
   `specs/framework/03-state-graph.md`.
 
+### Fetching ahead of a click
+
+The router may fetch a linked page's fragment, and preload its code, before
+the click. `router({ prefetch })` sets when, as plain data (`RouterPrefetch` in
+`packages/router/src/vite/prefetch-policy.ts`). Each trigger runs on `'all'`
+networks, `'fast'` ones, or `'none'`:
+
+- `intent` (default `'all'`): a mouse resting on a link, keyboard focus, a
+  press or a touch. The visitor has shown intent, and the fetch is the one the
+  click needs, so it runs on slow links too.
+- `viewport` (default `'none'`): every page link while it is on screen, the one
+  nearest the pointer (else the viewport's centre) first, as links scroll in.
+- `idle` (default `'fast'`): once the page is idle, up to six page links on
+  screen.
+- `concurrency` (default 2): viewport and idle fetches in flight at once; the
+  rest wait for a free slot.
+
+A network is fast when the browser reports no slower link than
+`effectiveType: '4g'` (or reports nothing) and the page's own downloads
+crossed it at Slow 4G speed (250 kB/s) or better; with too few bytes measured
+to tell, only a browser reporting `'4g'` counts as fast.
+`prefetch: false` (or `'none'`) fetches nothing early.
+
+Never early, whatever the config says: under Save-Data, in a hidden tab, to an
+endpoint path, or to a link marked `prefetch={false}`. A link marked
+`prefetch="intent"` is left out of the viewport and idle triggers; one marked
+`prefetch="viewport"` is fetched on screen even with the viewport trigger off
+(on fast links then). A click, Back or Forward cancels every early fetch still
+arriving except its own page's, and drops queued ones, so none competes with
+the navigation. A viewport or idle fetch stops once its page passes 256 KiB on
+the wire (4 MiB decoded when a compressed answer declares no length), and that
+page is left for intent. The viewport trigger's code is a bridge file of its
+own, loaded only when the config or a link on the page asks for links in view.
+
 ### Kept parts
 
 A part of the page that both pages render alike stays on screen across an in-place navigation, as

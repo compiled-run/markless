@@ -11,7 +11,9 @@ their prerequisites exist:
   `chart.update` problem), plus a possible `onHidden` variant. The idle trigger
   is no longer deferred: it is `onIdle`, specified in
   [04-events-symbols-behaviors.md](./04-events-symbols-behaviors.md).
-- Async caching policy beyond "current dependency key" and prefetch policy.
+- Async caching policy beyond "current dependency key". Router prefetch policy
+  is no longer deferred: see "Fetching ahead of a click" in
+  [../router/routing.md](../router/routing.md).
   Stale-while-revalidate on refresh is specified in
   [13-resume-cache.md](./13-resume-cache.md), parked 2026-11-07; manual
   refresh/invalidation stays deferred there as `revalidate(computed)`

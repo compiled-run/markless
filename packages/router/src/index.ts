@@ -5,10 +5,15 @@ import {
 import {
 	LINK_ATTRIBUTE,
 	PREFETCH_ATTRIBUTE,
+	PREFETCH_LINK_CHOICES,
 	REPLACE_ATTRIBUTE,
 	SCROLL_ATTRIBUTE,
+	type PrefetchLinkChoice,
 } from './link-attributes.ts';
-import { IN_PLACE_LOCATION_HEADER, IN_PLACE_REQUEST_HEADER } from '@markless/web/fns/in-place-headers';
+import {
+	IN_PLACE_LOCATION_HEADER,
+	IN_PLACE_REQUEST_HEADER,
+} from '@markless/web/fns/in-place-headers';
 import { HTML_ATTRIBUTES_SLOT } from './route-dom.ts';
 import { rememberRequestLocals } from './request-locals.ts';
 
@@ -84,8 +89,10 @@ export interface LinkNavigationProps {
 	 * `false`: nothing for this link downloads before it is clicked. Only page routes are ever
 	 * prefetched (with a `Purpose: prefetch` header), never `/api` endpoints; set `false` on a link to
 	 * a page whose GET has side effects (a one-time token, a counter) so only the click requests it.
+	 * `'intent'`: only hover, focus or a press fetch it early, never the viewport or idle tiers.
+	 * `'viewport'`: fetched while in view, even when the app's viewport tier is off (on fast links then).
 	 */
-	readonly prefetch?: boolean;
+	readonly prefetch?: boolean | PrefetchLinkChoice;
 	readonly replace?: boolean;
 	readonly scroll?: boolean;
 }
@@ -180,7 +187,12 @@ const CROSS_SITE_WRITE_REFUSED =
 /** The 403 an api/ route answers when a browser sends it a write from another site, so a page elsewhere cannot act for a signed-in visitor. */
 export function __marklessRefuseCrossSiteWrite(event: RuntimeHttpEvent): Response | undefined {
 	const request = event.req;
-	if (!request || request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS')
+	if (
+		!request ||
+		request.method === 'GET' ||
+		request.method === 'HEAD' ||
+		request.method === 'OPTIONS'
+	)
 		return undefined;
 	const site = request.headers.get('sec-fetch-site');
 	const origin = request.headers.get('origin');
@@ -207,7 +219,11 @@ const REDIRECTS_TO_GET: ReadonlySet<number> = new Set([301, 302, 303]);
 export function __marklessAnswerInPlace(event: RuntimeHttpEvent, answer: unknown): unknown {
 	const request = event.req;
 	// A Response, or an answer shaped like one (h3's redirect() returns its own HTTPResponse class).
-	const shaped = answer as { readonly status?: unknown; readonly headers?: unknown; readonly body?: unknown } | null;
+	const shaped = answer as {
+		readonly status?: unknown;
+		readonly headers?: unknown;
+		readonly body?: unknown;
+	} | null;
 	if (typeof shaped?.status !== 'number' || !(shaped.headers instanceof Headers)) return answer;
 	if (!REDIRECTS_TO_GET.has(shaped.status)) return answer;
 	if (request?.method !== 'POST' || !request.headers.get(IN_PLACE_REQUEST_HEADER)) return answer;
@@ -326,6 +342,8 @@ function linkAnchorAttributes(props: LinkProps): Array<readonly [string, string]
 	attributes.set(LINK_ATTRIBUTE, '');
 	if (props.replace) attributes.set(REPLACE_ATTRIBUTE, '');
 	if (props.prefetch === false) attributes.set(PREFETCH_ATTRIBUTE, 'none');
+	else if (PREFETCH_LINK_CHOICES.includes(props.prefetch as PrefetchLinkChoice))
+		attributes.set(PREFETCH_ATTRIBUTE, props.prefetch as PrefetchLinkChoice);
 	if (props.scroll === false) attributes.set(SCROLL_ATTRIBUTE, 'manual');
 	return [...attributes];
 }

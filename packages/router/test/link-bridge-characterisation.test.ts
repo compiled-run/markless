@@ -18,6 +18,10 @@ type BridgeOptions = {
 	readonly idle?: boolean;
 	// What the run half's go() answers for a held click.
 	readonly goes?: boolean;
+	// The app's intent level: 0 none, 1 fast links only, 2 every network (the default).
+	readonly intent?: number;
+	readonly connection?: { readonly effectiveType?: string; readonly saveData?: boolean };
+	readonly hidden?: boolean;
 };
 
 const DWELL_MS = 100;
@@ -47,7 +51,7 @@ function bridge(options: BridgeOptions = {}) {
 	};
 	const w: Record<string, unknown> = {
 		location,
-		navigator: {},
+		navigator: options.connection ? { connection: options.connection } : {},
 		performance: {
 			now: () => clock,
 			getEntriesByName: () => [],
@@ -79,6 +83,7 @@ function bridge(options: BridgeOptions = {}) {
 		defaultView: w,
 		baseURI: 'http://router.test/',
 		readyState: options.idle ? 'complete' : 'loading',
+		visibilityState: options.hidden ? 'hidden' : 'visible',
 		head: {
 			querySelectorAll: () => [],
 			appendChild: (link: { href: string }) => void preloaded.push(link.href),
@@ -117,6 +122,7 @@ function bridge(options: BridgeOptions = {}) {
 			),
 		() => ({
 			code: ['/c/swap.js'],
+			intent: options.intent ?? 2,
 			hoverDwellMs: DWELL_MS,
 			requestPrefix: '/_fragment',
 			prefetchAttribute: PREFETCH,
@@ -197,6 +203,48 @@ function bridge(options: BridgeOptions = {}) {
 const ABOUT = 'http://router.test/about';
 const OTHER = 'http://router.test/other';
 const ABOUT_FRAGMENT = 'http://router.test/_fragment/about';
+
+describe('link bridge prefetch policy', () => {
+	const pressed = (options: BridgeOptions) => {
+		const b = bridge(options);
+		b.dispatch('pointerdown', b.anchor('/about'));
+		return { fetched: b.fetches.map((fetch) => fetch.href), woke: b.loads.length };
+	};
+
+	test('intent on every network fetches on a slow link; intent none never fetches but still wakes the run half', () => {
+		expect(pressed({ connection: { effectiveType: '3g' } })).toEqual({
+			fetched: [ABOUT_FRAGMENT],
+			woke: 1,
+		});
+		expect(pressed({ intent: 0 })).toEqual({ fetched: [], woke: 1 });
+	});
+
+	test('intent on fast links fetches on a 4g link or without connection info, not on a 3g one', () => {
+		expect(pressed({ intent: 1, connection: { effectiveType: '4g' } }).fetched).toEqual([
+			ABOUT_FRAGMENT,
+		]);
+		expect(pressed({ intent: 1 }).fetched).toEqual([ABOUT_FRAGMENT]);
+		expect(pressed({ intent: 1, connection: { effectiveType: '3g' } }).fetched).toEqual([]);
+	});
+
+	test('Save-Data and a hidden tab fetch nothing early, whatever the intent level', () => {
+		expect(pressed({ connection: { effectiveType: '4g', saveData: true } })).toEqual({
+			fetched: [],
+			woke: 1,
+		});
+		expect(pressed({ hidden: true })).toEqual({ fetched: [], woke: 1 });
+	});
+
+	test('a click under Save-Data still swaps in place', async () => {
+		const b = bridge({ connection: { saveData: true } });
+		const link = b.anchor('/about');
+		expect(b.click(link)).toBe(true);
+		expect(b.fetches).toEqual([]);
+		b.loads[0]!.resolve();
+		await b.settled();
+		expect(b.log.at(-1)).toMatch(/^go http:\/\/router.test\/about/);
+	});
+});
 
 describe('link bridge before the run half loads', () => {
 	test('a press fetches its page and code at once, wakes the run half, and hands it that fetch', async () => {
