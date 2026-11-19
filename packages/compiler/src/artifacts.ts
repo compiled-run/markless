@@ -232,6 +232,8 @@ export type SemanticComponentPropBinding =
 			readonly graphBindingKind: SemanticGraphBinding['kind'];
 			readonly path: ReadonlyArray<string>;
 			readonly sourceSpan?: SourceSpan;
+			/** The value as written at the call site, for native builds only (`nativeFacts`). */
+			readonly nativeExpression?: SemanticExpression;
 	  }
 	| {
 			readonly name: string;
