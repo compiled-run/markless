@@ -1,0 +1,32 @@
+{
+	"rung": 142,
+	"name": "An app's page reads the location, names its access through a record, and opens a system sheet behind a platform check, with usage text from the app config",
+	"location": { "latitude": 51.5, "longitude": -0.125 },
+	"steps": [
+		{ "visible": ["Start here", "Find me"], "absent": ["51.5, -0.125"], "title": "Start" },
+		{
+			"do": { "tap": "Find me" },
+			"visible": ["Location Allowed", "51.5, -0.125", "Show details"],
+			"absent": ["Start here", "Details"],
+			"title": "Where"
+		},
+		{ "do": { "tap": "Show details" }, "visible": ["Details", "Close details"] },
+		{
+			"do": { "tap": "Close details" },
+			"visible": ["Show details", "51.5, -0.125"],
+			"absent": ["Details", "Close details"]
+		}
+	],
+	"web": {
+		"steps": [
+			{ "visible": ["Start here", "Find me"], "title": "Start" },
+			{
+				"do": { "tap": "Find me" },
+				"visible": ["Location is not available here"],
+				"absent": ["Start here"],
+				"title": "Where"
+			}
+		],
+		"absentFromOutput": ["Close details", "@markless/device"]
+	}
+}

@@ -2260,6 +2260,28 @@ export function createNativeViewPayload(
 						if (literal) return literal;
 					}
 				}
+				// A record known when the app is built, read by a key that is not: the value of the key it equals, null for none.
+				const record = holder?.value;
+				if (
+					record !== null &&
+					typeof record === 'object' &&
+					!Array.isArray(record) &&
+					!tokenElement.has(record)
+				) {
+					const key: NativeExpr = { call: 'String', arguments: [at] };
+					let chosen: NativeExpr = { literal: null };
+					for (const [name, value] of Object.entries(record).reverse()) {
+						const literal = expressionOfValue(value);
+						if (!literal)
+							return refuse(`${what} reads \`${name}\` of a record whose value is not data`);
+						chosen = {
+							if: { binary: '===', left: key, right: { literal: name } },
+							whenTrue: literal,
+							whenFalse: chosen,
+						};
+					}
+					return chosen;
+				}
 				return { at, of };
 			}
 			case 'apply': {

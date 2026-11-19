@@ -131,6 +131,7 @@ test('the navigation ladder has one app folder per rung, in rung order', () => {
 		'N3',
 		'N4',
 		138,
+		142,
 	]);
 	for (const folder of navRungFolders())
 		expect(existsSync(join(proofsDir, folder, 'pages'))).toBe(true);
