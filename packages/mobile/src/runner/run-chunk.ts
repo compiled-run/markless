@@ -10,6 +10,7 @@ import { buildIosShell, installProofApp } from '../harness/ios.ts';
 import { runFlow } from '../harness/maestro.ts';
 import type { ProofPlatform } from '../harness/proof-app.ts';
 import { androidTools, cacheRoot } from '../harness/tools.ts';
+import { ECHO_SERVER_PORT } from '../../proofs/ladder.ts';
 import { dragonDir } from '../style-export.ts';
 import { type BundledRung, readAssets } from './bundle.ts';
 import {
@@ -123,6 +124,15 @@ try {
 				else
 					await exec(tools!.adb, ['-s', device, 'shell', 'cmd', 'uimode', 'night', 'no']);
 				await install(rung, dir);
+				// The emulator's 127.0.0.1 is its own: the runner's echo server port is forwarded to it.
+				if (rung.server === 'echo' && platform === 'android')
+					await exec(tools!.adb, [
+						'-s',
+						device,
+						'reverse',
+						`tcp:${ECHO_SERVER_PORT}`,
+						`tcp:${ECHO_SERVER_PORT}`,
+					]);
 			} catch (error) {
 				installError = error instanceof Error ? error.message : String(error);
 			}

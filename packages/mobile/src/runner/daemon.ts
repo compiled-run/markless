@@ -4,6 +4,8 @@
 import { spawn } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, openSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { ECHO_SERVER_PORT } from '../../proofs/ladder.ts';
+import { startEchoServer } from '../harness/echo-server.ts';
 import { PROOF_REPORT_VERSION, proofVerdict, type ProofReport } from '../harness/report.ts';
 import { androidTools, type AndroidTools } from '../harness/tools.ts';
 import {
@@ -70,6 +72,13 @@ writeJson(daemonFile(), {
 } satisfies DaemonRecord);
 log(
 	`runner ${process.pid} starts with ${pool.map(phoneId).join(', ')}; machine queue: ${heavyCommand() ?? 'none'}`,
+);
+
+// Rungs that fetch reach the test's echo server; one serves them while the runner runs (a server already there answers alike).
+startEchoServer().then(
+	() => log(`echo server on 127.0.0.1:${ECHO_SERVER_PORT}`),
+	(error: unknown) =>
+		log(`echo server not started: ${error instanceof Error ? error.message : String(error)}`),
 );
 
 const tools: AndroidTools | undefined = pool.some((spec) => spec.platform === 'android')
