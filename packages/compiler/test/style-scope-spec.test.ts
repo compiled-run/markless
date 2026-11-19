@@ -236,9 +236,14 @@ function Bare() @{
 }
 `);
 		expect(result.publicRenderPlan.diagnostics).toEqual([]);
-		const sheets = result.publicRenderPlan.styleScopes.map((scope) => readSheet(scope.scopeId, scope.cssText));
+		const sheets = result.publicRenderPlan.styleScopes.map((scope) =>
+			readSheet(scope.scopeId, scope.cssText),
+		);
 		expect(sheets).toHaveLength(1);
-		expect(sheets[0]!.rules.flatMap((rule) => rule.classes)).toEqual(['page', sheets[0]!.scopeId]);
+		expect(sheets[0]!.rules.flatMap((rule) => rule.classes)).toEqual([
+			'page',
+			sheets[0]!.scopeId,
+		]);
 	});
 
 	test.fails('a scope whose blocks are all self-closing has no hash class of its own', async () => {
@@ -443,7 +448,22 @@ export function App() @{
 			`quoted-${sheet!.scopeId}`,
 		]);
 		expect(animationValues(sheet!)).toEqual([
-			['1s', 'ease-out', '2', writeIn, ',', 'ease', '1s', ease, ',', '300ms', quoted, ',', 'vendor-lib', '1s'],
+			[
+				'1s',
+				'ease-out',
+				'2',
+				writeIn,
+				',',
+				'ease',
+				'1s',
+				ease,
+				',',
+				'300ms',
+				quoted,
+				',',
+				'vendor-lib',
+				'1s',
+			],
 		]);
 	});
 
@@ -469,8 +489,36 @@ export function App() @{
 		const scoped = `pop-${sheet!.scopeId}`;
 		expect(sheet!.keyframes).toEqual([scoped]);
 		expect(animationValues(sheet!).map((value) => value[0])).toEqual([
-			scoped, scoped, scoped, scoped, scoped, scoped,
+			scoped,
+			scoped,
+			scoped,
+			scoped,
+			scoped,
+			scoped,
 		]);
+	});
+
+	test('a name reaching an animation through a custom property, or a var() fallback, follows the renamed keyframe', async () => {
+		const result = await compile(`
+export function App() @{
+	<>
+		<style>
+			@keyframes slide-a { from { opacity: 0; } }
+			@keyframes slide-b { from { opacity: 0; } }
+			.a { --slide: slide-a; --chained: var(--slide); --delay: 200ms; --label: slide-b; }
+			.a[data-b] { --slide: slide-b; }
+			.a { animation: var(--chained) 1s var(--delay) both, var(--missing, slide-b) 2s; }
+		</style>
+		<p class="a">a</p>
+	</>
+}
+`);
+		const { scopeId, cssText } = result.publicRenderPlan.styleScopes[0]!;
+		expect(cssText).toContain(`--slide: slide-a-${scopeId};`);
+		expect(cssText).toContain(`--slide: slide-b-${scopeId};`);
+		expect(cssText).toContain(`var(--missing, slide-b-${scopeId})`);
+		expect(cssText).toContain('--label: slide-b;');
+		expect(cssText).toContain('--delay: 200ms;');
 	});
 
 	test('a name the block references but does not declare is left as written', async () => {
@@ -523,8 +571,36 @@ export function App() @{
 		]);
 	});
 
+	test('script that compares or sets animationName to a scoped keyframe name is reported', async () => {
+		expect(
+			await warnings(
+				`<p onAnimationEnd={(event) => { if (event.animationName === 'pulse') return; }}>a</p>`,
+			),
+		).toEqual([expect.stringContaining('`pulse` is a keyframe name scoped')]);
+		expect(
+			await warnings(
+				`<p onAnimationEnd={(event) => { if ('pulse' != event['animationName']) return; }}>a</p>`,
+			),
+		).toEqual([expect.stringContaining('this exact name never matches')]);
+		expect(
+			await warnings(
+				`<p onClick={(event) => { event.currentTarget.style.animationName = 'pulse'; }}>a</p>`,
+			),
+		).toEqual([expect.stringContaining('this exact name never matches')]);
+	});
+
+	test('script that matches a name by prefix, or a global or undeclared name, is not reported', async () => {
+		expect(
+			await warnings(
+				`<p onAnimationEnd={(event) => { if (event.animationName.startsWith('pulse') || event.animationName === 'shared' || event.animationName === 'other') return; }}>a</p>`,
+			),
+		).toEqual([]);
+	});
+
 	test('global and undeclared names in a style attribute are not reported', async () => {
-		expect(await warnings(`<p style="animation: shared 1s, library-spin 2s">a</p>`)).toEqual([]);
+		expect(await warnings(`<p style="animation: shared 1s, library-spin 2s">a</p>`)).toEqual(
+			[],
+		);
 		expect(await warnings(`<p style={{ color: delay }}>a</p>`)).toEqual([]);
 	});
 });

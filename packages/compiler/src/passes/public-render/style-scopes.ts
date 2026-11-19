@@ -50,7 +50,9 @@ export function collectModuleStyleScopes(
 		styleScopes.push(...compiled.styleScopes);
 		diagnostics.push(...compiled.diagnostics);
 		if (compiled.keyframes.size > 0)
-			diagnostics.push(...inlineKeyframeDiagnostics(root, compiled.keyframes, filename));
+			diagnostics.push(
+				...keyframeNameUseDiagnostics(component.node, compiled.keyframes, filename),
+			);
 	}
 	const strayDiagnostics = findStyleNodes(ast)
 		.filter((styleNode) => !covered.has(styleNode))
@@ -286,46 +288,77 @@ function keyframeNameEdits(
 	};
 	declare(nodes, false);
 	if (local.size === 0) return edits;
-	const reference = (list: readonly CssNode[] | null | undefined): void => {
+	const declarations: CssDeclaration[] = [];
+	const collect = (list: readonly CssNode[] | null | undefined): void => {
 		for (const node of list ?? []) {
-			if (node.type === 'Rule') reference((node as CssRule).block?.children);
+			if (node.type === 'Rule') collect((node as CssRule).block?.children);
 			else if (node.type === 'Atrule') {
 				const atrule = node as CssAtrule;
-				if (unprefixed(atrule.name) !== 'keyframes') reference(atrule.block?.children);
-			} else if (node.type === 'Declaration') {
-				const declaration = node as CssDeclaration;
-				const value = declaration.value;
-				for (const name of animationNamesOf(declaration.property, css.slice(value.start, value.end), value.start)) {
-					if (local.has(cssNameOf(name))) edits.push(scopedNameEdit(name, scopeId));
-				}
-			}
+				if (unprefixed(atrule.name) !== 'keyframes') collect(atrule.block?.children);
+			} else if (node.type === 'Declaration') declarations.push(node as CssDeclaration);
 		}
 	};
-	reference(nodes);
+	collect(nodes);
+	// A custom property an animation value reads through var() carries names too (`--slide: slide-a`).
+	const carriers = new Set<string>();
+	const readDeclaration = (declaration: CssDeclaration, property: string): void => {
+		const value = declaration.value;
+		const found = readAnimationValue(property, css.slice(value.start, value.end), value.start);
+		for (const name of found.names) {
+			if (local.has(cssNameOf(name))) edits.push(scopedNameEdit(name, scopeId));
+		}
+		for (const carrier of found.carriers) carriers.add(carrier);
+	};
+	for (const declaration of declarations) readDeclaration(declaration, declaration.property);
+	const readAsCarrier = new Set<CssDeclaration>();
+	for (let grew = true; grew;) {
+		grew = false;
+		for (const declaration of declarations) {
+			if (!carriers.has(declaration.property) || readAsCarrier.has(declaration)) continue;
+			readAsCarrier.add(declaration);
+			readDeclaration(declaration, 'animation');
+			grew = true;
+		}
+	}
 	return edits;
 }
 
 const GLOBAL_KEYFRAMES_PREFIX = '-global-';
 
-// Style attributes are not renamed with the block, so naming a scoped keyframe there would silently not animate.
-function inlineKeyframeDiagnostics(
-	root: AnyNode,
+// Style attributes and script are not renamed with the block, so naming a scoped keyframe there silently misses.
+function keyframeNameUseDiagnostics(
+	component: AnyNode,
 	keyframes: ReadonlySet<string>,
 	filename: string,
 ): CompilerDiagnostic[] {
 	const diagnostics: CompilerDiagnostic[] = [];
-	const report = (node: AnyNode, message: string): void => {
+	const report = (node: AnyNode, label: string, message: string, suggestion: string): void => {
 		diagnostics.push(
 			unsupportedRenderConstructDiagnostic({
-				label: 'An animation in a style attribute',
+				label,
 				message,
 				node,
 				filename,
 				severity: 'warning',
-				suggestion: `Set the animation from a rule in the component's <style> block, or declare the keyframes as \`@keyframes ${GLOBAL_KEYFRAMES_PREFIX}name\` to keep the name global.`,
+				suggestion,
 			}),
 		);
 	};
+	const globalHint = `declare the keyframes as \`@keyframes ${GLOBAL_KEYFRAMES_PREFIX}name\` to keep the name global`;
+	const reportStyle = (node: AnyNode, message: string): void =>
+		report(
+			node,
+			'An animation in a style attribute',
+			message,
+			`Set the animation from a rule in the component's <style> block, or ${globalHint}.`,
+		);
+	const reportScript = (node: AnyNode, name: string): void =>
+		report(
+			node,
+			'A script reading an animation name',
+			`\`${name}\` is a keyframe name scoped to this component's <style> block; at run time the animation is named \`${name}\` plus the scope hash, so this exact name never matches.`,
+			`Tell the animations apart without the name (event.target, or the element the listener sits on), or ${globalHint}.`,
+		);
 	const scopedNamesIn = (property: string, value: string): string[] =>
 		animationNamesOf(property, value, 0)
 			.map(cssNameOf)
@@ -336,19 +369,19 @@ function inlineKeyframeDiagnostics(
 			if (declaration.type !== 'Declaration') continue;
 			const value = cssText.slice(declaration.value.start, declaration.value.end);
 			for (const name of scopedNamesIn(declaration.property, value))
-				report(node, scopedInlineMessage(name));
+				reportStyle(node, scopedInlineMessage(name));
 		}
 	};
-	for (const attribute of styleAttributes(root)) {
+	const checkStyleAttribute = (attribute: AnyNode): void => {
 		const value = attribute.value as AnyNode | null | undefined;
 		const expression =
 			value?.type === 'JSXExpressionContainer' ? (value.expression as AnyNode) : value;
 		const text = staticString(expression);
 		if (text !== null) {
 			checkCssText(attribute, text);
-			continue;
+			return;
 		}
-		if (expression?.type !== 'ObjectExpression') continue;
+		if (expression?.type !== 'ObjectExpression') return;
 		for (const property of asNodes(expression.properties)) {
 			const key = property.type === 'Property' ? styleObjectKey(property) : null;
 			if (key === null) continue;
@@ -357,29 +390,35 @@ function inlineKeyframeDiagnostics(
 				continue;
 			const literal = staticString(property.value as AnyNode);
 			if (literal === null) {
-				report(
+				reportStyle(
 					property,
 					`The component declares scoped keyframes (${[...keyframes].join(', ')}), and this \`${key}\` value is only known at run time, so the compiler cannot point it at their scoped names.`,
 				);
 				continue;
 			}
 			for (const name of scopedNamesIn(cssName, literal))
-				report(property, scopedInlineMessage(name));
+				reportStyle(property, scopedInlineMessage(name));
 		}
-	}
-	return diagnostics;
-}
-
-function scopedInlineMessage(name: string): string {
-	return `\`${name}\` is a keyframe name scoped to this component's <style> block, so a style attribute that names it finds no keyframes.`;
-}
-
-function styleAttributes(root: AnyNode): AnyNode[] {
-	const found: AnyNode[] = [];
+	};
 	const visit = (node: AnyNode): void => {
 		if (node.type === 'JSXStyleElement') return;
 		if (node.type === 'JSXAttribute' && getIdentifierName(node.name as AnyNode) === 'style')
-			found.push(node);
+			checkStyleAttribute(node);
+		if (node.type === 'BinaryExpression' && EQUALITY_OPERATORS.has(node.operator as string)) {
+			const left = node.left as AnyNode;
+			const right = node.right as AnyNode;
+			const literal = readsAnimationName(left)
+				? staticString(right)
+				: readsAnimationName(right)
+					? staticString(left)
+					: null;
+			if (literal !== null && keyframes.has(literal)) reportScript(node, literal);
+		}
+		if (node.type === 'AssignmentExpression' && readsAnimationName(node.left as AnyNode)) {
+			const literal = staticString(node.right as AnyNode);
+			for (const name of literal === null ? [] : scopedNamesIn('animation-name', literal))
+				reportScript(node, name);
+		}
 		for (const value of Object.values(node)) {
 			for (const item of Array.isArray(value) ? value : [value]) {
 				if (item && typeof item === 'object' && typeof (item as AnyNode).type === 'string')
@@ -387,8 +426,22 @@ function styleAttributes(root: AnyNode): AnyNode[] {
 			}
 		}
 	};
-	visit(root);
-	return found;
+	visit(component);
+	return diagnostics;
+}
+
+const EQUALITY_OPERATORS = new Set(['===', '!==', '==', '!=']);
+
+function readsAnimationName(node: AnyNode): boolean {
+	if (node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression') return false;
+	const property = node.property as AnyNode;
+	return node.computed
+		? staticString(property) === 'animationName'
+		: property.type === 'Identifier' && property.name === 'animationName';
+}
+
+function scopedInlineMessage(name: string): string {
+	return `\`${name}\` is a keyframe name scoped to this component's <style> block, so a style attribute that names it finds no keyframes.`;
 }
 
 function staticString(node: AnyNode | null | undefined): string | null {
@@ -438,14 +491,38 @@ const ANIMATION_KEYWORD_GROUPS = new Map<string, string>([
 ]);
 
 function animationNamesOf(propertyName: string, value: string, offset: number): CssName[] {
-	const property = unprefixed(propertyName);
-	if (property !== 'animation' && property !== 'animation-name') return [];
-	const { ast } = parseCss(value, { context: 'value' });
+	return readAnimationValue(propertyName, value, offset).names;
+}
+
+// The names an `animation`/`animation-name` value gives, and the custom properties it reads through var().
+function readAnimationValue(
+	propertyName: string,
+	value: string,
+	offset: number,
+): { readonly names: CssName[]; readonly carriers: string[] } {
 	const names: CssName[] = [];
+	const carriers: string[] = [];
+	const property = unprefixed(propertyName);
+	if (property !== 'animation' && property !== 'animation-name') return { names, carriers };
+	const { ast } = parseCss(value, { context: 'value' });
 	let claimed = new Set<string>();
-	for (const part of ((ast as CssParent).children ?? []) as CssName[]) {
+	for (const part of ((ast as CssParent).children ?? []) as (CssName & CssParent)[]) {
 		if (part.type === 'Operator' && part.value === ',') {
 			claimed = new Set();
+			continue;
+		}
+		if (part.type === 'Function' && part.name?.toLowerCase() === 'var') {
+			const [custom, , fallback] = (part.children ?? []) as (CssName & CssNode)[];
+			if (custom?.type === 'Identifier' && custom.name) carriers.push(custom.name);
+			if (fallback?.type === 'Raw') {
+				const inner = readAnimationValue(
+					property,
+					value.slice(fallback.start, fallback.end),
+					offset + fallback.start,
+				);
+				names.push(...inner.names);
+				carriers.push(...inner.carriers);
+			}
 			continue;
 		}
 		if (part.type === 'Identifier' && property === 'animation') {
@@ -455,10 +532,9 @@ function animationNamesOf(propertyName: string, value: string, offset: number): 
 				continue;
 			}
 		}
-		if (part.type === 'Identifier' || part.type === 'String')
-			names.push(shifted(part, offset));
+		if (part.type === 'Identifier' || part.type === 'String') names.push(shifted(part, offset));
 	}
-	return names;
+	return { names, carriers };
 }
 
 function cssNameOf(name: CssName): string {
