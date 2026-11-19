@@ -266,8 +266,8 @@ const NOT_ON_PHONES = new Set(['beforematch']);
 
 /**
  * Events a phone raises only from a hardware keyboard (a touch or the screen reader's cursor moves neither key nor keyboard
- * focus), except focus and blur on a text field, which the soft keyboard raises. Hosts have no hardware keyboard yet, so these
- * handlers are left out with a warning that names each one.
+ * focus), except focus and blur on a text field, which the soft keyboard raises; a checkbox or radio button is ticked, not
+ * typed in. Hosts have no hardware keyboard yet, so these handlers are left out with a warning that names each one.
  */
 const KEYBOARD_ONLY = new Set(['keydown', 'keyup', 'focus', 'blur', 'focusin', 'focusout']);
 const TEXT_ENTRY = new Set(['input', 'textarea']);
@@ -3555,7 +3555,10 @@ export function createNativeViewPayload(
 				for (const event of scope.module.eventsByHost.get(item.id) ?? []) {
 					if (scope.module === rootModule) loweredEvents.add(event.id);
 					if (NOT_ON_PHONES.has(event.eventName)) continue;
-					if (KEYBOARD_ONLY.has(event.eventName) && !TEXT_ENTRY.has(element ?? '')) {
+					if (
+						KEYBOARD_ONLY.has(event.eventName) &&
+						(!TEXT_ENTRY.has(element ?? '') || TICKED_TYPES.has(inputType ?? ''))
+					) {
 						keyboardOnly(
 							`the ${event.eventName} handler on <${element}> ${id}`,
 							event.handlerSpan,
