@@ -444,9 +444,12 @@ export type NativeProperty = 'value' | 'checked' | 'indeterminate';
  * after it left, it is a new one): `idle` at the first moment the host is idle after the screen's first frame (or after
  * the element appears), `visible` the first time any of the element is on the screen.
  */
+/** `focus` and `blur` are a text field's: it took the keyboard, or gave it up. */
 export type NativeEventName =
 	| 'activate'
 	| 'input'
+	| 'focus'
+	| 'blur'
 	| 'dismiss'
 	| 'cancel'
 	| 'enter'

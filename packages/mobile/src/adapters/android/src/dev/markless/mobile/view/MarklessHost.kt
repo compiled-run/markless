@@ -726,7 +726,12 @@ class MarklessHost(
 				named(this, inst.id)
 			}
 			"input", "textarea" -> EditText(context).apply {
-				setOnFocusChangeListener { v, focused -> if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW) }
+				val focusEvents = events[node.id].orEmpty().map { it.event }
+				setOnFocusChangeListener { v, focused ->
+					if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW)
+					val event = if (focused) EventName.Focus else EventName.Blur
+					if (event in focusEvents) apply(runtime.dispatch(inst.id, event))
+				}
 				if (node.element == "input") isSingleLine = true
 				else {
 					// A textarea's Return is a new line, and Chrome's default `rows="2"` shows two lines.
@@ -761,6 +766,8 @@ class MarklessHost(
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
 			EventName.Dismiss -> if (OVERLAY_ATTRIBUTE !in node.attributes) throw MarklessHostError("dismiss event on \"${node.id}\", which is neither a sheet nor an overlay")
+			// Raised by the field's focus listener, set where the field is built.
+			EventName.Focus, EventName.Blur -> if (view !is EditText) throw MarklessHostError("${e.event.wire} event on \"${node.id}\", which is not a text field")
 			EventName.Cancel, EventName.PointerDown, EventName.PointerUp, EventName.Submit, EventName.Idle, EventName.Visible -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->

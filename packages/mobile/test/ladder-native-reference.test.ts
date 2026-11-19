@@ -416,6 +416,8 @@ function walk(
 	const services = scriptServices();
 	// The device's clock: a second passes between a person's actions.
 	let clock = Date.now();
+	/** The text field that has the keyboard, if any. */
+	let focused: string | undefined;
 	const start = () => {
 		const r = createNativeRuntime(payload, store, params, undefined, () => clock, services.host);
 		for (const cell of payload.cells)
@@ -881,13 +883,27 @@ function walk(
 			const activates = !!pressed || host.includes('@');
 			if ('tap' in action && !activates && touched.length === 0)
 				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
+			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.
+			const handles = (node: string, event: 'input' | 'focus' | 'blur') =>
+				payload.events.some((candidate) => candidate.host === node.split('@')[0] && candidate.event === event);
+			if ('type' in action && focused !== host) {
+				if (focused && handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+				focused = host;
+				if (handles(host, 'focus')) apply(runtime.dispatch({ event: 'focus', host }), index);
+			}
+			if ('tap' in action && focused && focused !== host) {
+				if (handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+				focused = undefined;
+			}
 			const dispatched =
 				'tap' in action
 					? activates
 						? runtime.dispatch({ event: 'activate', host: pressed ?? host })
 						: []
 					: 'type' in action
-						? runtime.dispatch({ event: 'input', host, value: action.type.text })
+						? handles(host, 'input')
+							? runtime.dispatch({ event: 'input', host, value: action.type.text })
+							: []
 						: returns
 							? runtime.dispatch({ event: 'enter', host })
 							: [];
