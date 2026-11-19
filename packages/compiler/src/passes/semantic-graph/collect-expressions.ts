@@ -14,6 +14,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import {
 	callWritesAssumedDiagnostic,
+	stateClassMethodCallDiagnostic,
 	stateWriteInComputedDiagnostic,
 	stateWriteInTemplateDiagnostic,
 	templateAsValueDiagnostic,
@@ -21,6 +22,7 @@ import {
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { callsSharedInstanceMethod, resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import { getFrameworkApiForCall } from './imports.ts';
+import { stateClassInstanceAt } from './state-class-instance.ts';
 import type {
 	FunctionParameterWrites,
 	ParameterWrite,
@@ -334,6 +336,8 @@ function startsPrimitive(binding: SemanticGraphBinding, path: ReadonlyArray<stri
 export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 	const callee = unwrapChainExpression(node.callee as AnyNode | undefined);
 	if (callee?.type !== 'MemberExpression') return;
+	// A receiver the bindings show is a class instance is not a collection, whatever its method is named.
+	if (refuseStateClassMethodCall(node, callee, state)) return;
 
 	const method = getStaticMemberPropertyName(callee);
 	if (!method || !isMutatingCollectionMethod(method)) return;
@@ -372,6 +376,31 @@ export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 		optional:
 			node.optional === true || callee.optional === true || isChainExpression(node.callee),
 	});
+}
+
+function refuseStateClassMethodCall(node: AnyNode, callee: AnyNode, state: WalkState): boolean {
+	if (callee.computed === true) return false;
+	const held = stateClassInstanceAt(
+		unwrapChainExpression(callee.object as AnyNode | undefined),
+		state,
+	);
+	if (!held) return false;
+	const span = sourceSpan(node, state.filename);
+	const reported = state.graph.diagnostics.some(
+		(diagnostic) =>
+			diagnostic.code === 'MARKLESS_STATE_CLASS_METHOD_CALL' &&
+			diagnostic.primarySpan?.start === span?.start,
+	);
+	if (!reported)
+		state.graph.diagnostics.push(
+			stateClassMethodCallDiagnostic({
+				stateName: held.binding.name,
+				callSource: expressionSource(node, state.source),
+				constructorName: held.instance.constructorName,
+				...(span ? { sourceSpan: span } : {}),
+			}),
+		);
+	return true;
 }
 
 const templateValueTypes = new Set([

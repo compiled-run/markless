@@ -939,6 +939,86 @@ export function stateFunctionValueUnsupportedDiagnostic(input: {
 	};
 }
 
+export function stateClassMethodCallDiagnostic(input: {
+	readonly stateName: string;
+	readonly callSource: string;
+	readonly constructorName: string;
+	readonly sourceSpan?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_STATE_CLASS_METHOD_CALL',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'A method is called on a class instance in state',
+		message: `\`${input.callSource}\` calls a method of the \`${input.constructorName}\` instance state "${input.stateName}" holds. Class instances in state are not supported yet, so Markless cannot see what the method changes and the page would not update.`,
+		why: 'state() crosses from the server to the browser as data, and a class instance\'s methods do not cross with it. A change a method makes through `this` is not a change Markless can record.',
+		primarySpan: input.sourceSpan,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		statePath: input.stateName,
+		source: input.callSource,
+		suggestions: [
+			{
+				message: `Keep the fields as plain data in "${input.stateName}" and turn the method into a function that takes the data, called as \`update(${input.stateName}, ...)\`; or build the ${input.constructorName} inside this handler and write the fields you need back to state.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_CLASS_METHOD_CALL',
+	};
+}
+
+export function stateClassMethodUnboundDiagnostic(input: {
+	readonly attributeName: string;
+	readonly stateName: string;
+	readonly referenceSource: string;
+	readonly sourceSpan?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_STATE_CLASS_METHOD_UNBOUND',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'A method of a state value is passed as a handler',
+		message: `\`${input.attributeName}={${input.referenceSource}}\` hands the event a method read off state "${input.stateName}". A value in state is data, so the handler would have nothing to call, and a method passed without its object runs with no \`this\`.`,
+		why: 'state() crosses from the server to the browser as data; methods do not cross with it. A handler must be a function the compiler can see, so it can run in the browser after resume.',
+		primarySpan: input.sourceSpan,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		statePath: input.stateName,
+		source: input.referenceSource,
+		suggestions: [
+			{
+				message: `Write \`${input.attributeName}={() => ${input.referenceSource}()}\`, so the call is visible where the event runs.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_CLASS_METHOD_UNBOUND',
+	};
+}
+
+export function typeStripParameterPropertyDiagnostic(input: {
+	readonly className: string;
+	readonly parameterName: string;
+	readonly source: string;
+	readonly sourceSpan?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_TYPE_STRIP_PARAMETER_PROPERTY',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'A constructor declares a field in its parameters',
+		message: `The constructor of ${input.className} declares the field "${input.parameterName}" in its parameter list (\`${input.source}\`). That TypeScript form has no JavaScript equivalent once types are removed, and Markless compiles .tsrx code by removing types, so it cannot build this class.`,
+		why: 'A TypeScript parameter property both declares a field and assigns it. With the types removed it would be an ordinary parameter and the field would be gone, so the type remover refuses it.',
+		primarySpan: input.sourceSpan,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.source,
+		suggestions: [
+			{
+				message: `Declare the field in the class body and assign it in the constructor: \`${input.parameterName}: Type;\` and \`constructor(${input.parameterName}: Type) { this.${input.parameterName} = ${input.parameterName}; }\`.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_TYPE_STRIP_PARAMETER_PROPERTY',
+	};
+}
+
 export function templateAsValueDiagnostic(input: {
 	readonly siteSource: string;
 	readonly name?: string;

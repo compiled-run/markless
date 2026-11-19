@@ -77,18 +77,33 @@ export type SerializedRecord =
 			readonly byteLength: number;
 	  };
 
-export type TypedArrayName =
-	| 'Int8Array'
-	| 'Uint8Array'
-	| 'Uint8ClampedArray'
-	| 'Int16Array'
-	| 'Uint16Array'
-	| 'Int32Array'
-	| 'Uint32Array'
-	| 'Float32Array'
-	| 'Float64Array'
-	| 'BigInt64Array'
-	| 'BigUint64Array';
+export const TYPED_ARRAY_NAMES = [
+	'Int8Array',
+	'Uint8Array',
+	'Uint8ClampedArray',
+	'Int16Array',
+	'Uint16Array',
+	'Int32Array',
+	'Uint32Array',
+	'Float32Array',
+	'Float64Array',
+	'BigInt64Array',
+	'BigUint64Array',
+] as const;
+
+export type TypedArrayName = (typeof TYPED_ARRAY_NAMES)[number];
+
+/** The global constructors whose instances `serializeGraphValue` encodes; any other `new X()` is refused. */
+export const SERIALIZABLE_BUILT_IN_CONSTRUCTORS: ReadonlyArray<string> = [
+	'Date',
+	'RegExp',
+	'URL',
+	'ArrayBuffer',
+	'DataView',
+	'Map',
+	'Set',
+	...TYPED_ARRAY_NAMES,
+];
 
 export type SerializedGraphPayload = {
 	readonly version: typeof GRAPH_VALUE_PROTOCOL_VERSION;

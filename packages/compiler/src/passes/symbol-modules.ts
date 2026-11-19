@@ -3561,21 +3561,22 @@ function referencedModuleDeclarations(
 		...moduleDeclarationNames(declaration, filename),
 	}));
 
-	const selected: string[] = [];
+	const selected = new Set<string>();
 	let changed = true;
 	while (changed) {
 		changed = false;
 		for (let index = 0; index < remaining.length; index += 1) {
 			const candidate = remaining[index]!;
 			if (!candidate.names.some((name) => references.has(name))) continue;
-			selected.push(candidate.declaration);
+			selected.add(candidate.declaration);
 			for (const name of candidate.references) references.add(name);
 			remaining.splice(index, 1);
 			index -= 1;
 			changed = true;
 		}
 	}
-	return selected;
+	// Authored order: reachability finds a subclass before the class it extends, which is still in its temporal dead zone.
+	return declarations.filter((declaration) => selected.has(declaration));
 }
 
 const moduleDeclarationNamesMemo = createSourceMemo<{

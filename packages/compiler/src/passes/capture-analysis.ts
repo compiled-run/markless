@@ -13,6 +13,7 @@ import type {
 	SemanticGraphBinding,
 	SemanticLocalBinding,
 	SemanticSharedDefinition,
+	SemanticStateClassInstance,
 	SemanticStateRead,
 	SemanticTemplateRead,
 	SourcePosition,
@@ -56,6 +57,7 @@ export const EVENT_HANDLER_EMIT_UNSUPPORTED_CODE =
 	'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED' as const;
 export const SHARED_FACTORY_CLASS_INSTANCE_CODE = 'MARKLESS_SHARED_FACTORY_CLASS_INSTANCE' as const;
 export const STATE_PROPERTY_CLASS_INSTANCE_CODE = 'MARKLESS_STATE_PROPERTY_CLASS_INSTANCE' as const;
+export const STATE_CLASS_INSTANCE_CODE = 'MARKLESS_STATE_CLASS_INSTANCE' as const;
 
 // Every source this pass re-parses came out of a `.tsrx` module, so it is
 // TypeScript. `parseJavaScriptModule` picks its dialect from the filename and
@@ -1774,20 +1776,12 @@ function unsupportedCaptureDiagnostic(
 	};
 }
 
-// ---------------------------------------------------------------------------
-// Class instances in the values the payload carries.
-//
-// A shared() factory and a state() initializer both declare the graph fields the
-// payload carries and the SSR module rebuilds. A class instance declares none:
-// the server renders reads against a value that was never built, and the browser
-// gets either an unbound name or a method call with no receiver. Both shapes
-// compiled clean before this and crashed at render or at click, so both refuse
-// here. Only these two shapes refuse; nothing else about class usage changes.
-// ---------------------------------------------------------------------------
+// Class instances in the values the payload carries: a shared() factory's return, and a state() initializer.
 
 type ClassInstanceProperty = {
 	readonly path: string;
 	readonly constructorName: string;
+	readonly sourceSpan?: SourceSpan;
 };
 
 function classInstanceValueDiagnostics(
@@ -1813,15 +1807,52 @@ function classInstanceValueDiagnostics(
 	}
 
 	for (const binding of semanticGraph.graphBindings ?? []) {
-		if (binding.kind !== 'state' || binding.initializerSource === undefined) continue;
-		const initializer = parsedExpression(binding.initializerSource);
-		if (!initializer) continue;
-		for (const property of classInstanceProperties(initializer)) {
-			diagnostics.push(stateInitializerPropertyDiagnostic(binding, property));
+		if (binding.kind !== 'state') continue;
+		for (const instance of binding.classInstances ?? []) {
+			diagnostics.push(
+				instance.path.length === 0
+					? stateClassInstanceDiagnostic(binding, instance)
+					: stateInitializerPropertyDiagnostic(binding, {
+							path: instance.path.join('.'),
+							constructorName: `a \`${instance.source}\``,
+							...(instance.sourceSpan ? { sourceSpan: instance.sourceSpan } : {}),
+						}),
+			);
 		}
 	}
 
 	return diagnostics;
+}
+
+function stateClassInstanceDiagnostic(
+	binding: SemanticGraphBinding,
+	instance: SemanticStateClassInstance,
+): CaptureAnalysisDiagnostic {
+	const held = instance.element
+		? `an array of \`${instance.constructorName}\` instances, \`${instance.source}\``
+		: `a \`${instance.constructorName}\` instance, \`${instance.source}\``;
+	return {
+		code: STATE_CLASS_INSTANCE_CODE,
+		severity: 'error',
+		phase: CAPTURE_ANALYSIS_PHASE,
+		passId: CAPTURE_ANALYSIS_PASS_ID,
+		artifactKeys: ['semanticGraph', 'captureAnalysis'],
+		...(instance.sourceSpan ? { primarySpan: instance.sourceSpan } : {}),
+		source: instance.source,
+		statePath: binding.name,
+		title: 'A class instance cannot be stored in state',
+		message: `state "${binding.name}" holds ${held}. Class instances in state are not supported yet: the server render cannot write one into the page, and a method that changes \`this\` records no change, so the page would not update.`,
+		why: 'state() crosses from the server to the browser as data. A class instance is data plus methods, and the methods do not cross: the browser would get a plain object, and a write made inside a method is invisible to Markless.',
+		suggestions: [
+			{
+				message: `Keep the fields as plain data in state and turn each method into a function beside it that takes the data: \`function update(${binding.name}, ...) { ... }\`, called as \`update(${binding.name}, ...)\`. Markless tracks what that function changes.`,
+			},
+			{
+				message: `Or keep plain data in state and build the ${instance.constructorName} inside the handler that needs it: \`const value = new ${instance.constructorName}(...)\`, call its methods, then write the fields you need back to state.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${STATE_CLASS_INSTANCE_CODE}`,
+	};
 }
 
 function sharedFactoryClassInstanceDiagnostic(
@@ -1869,7 +1900,11 @@ function stateInitializerPropertyDiagnostic(
 ): CaptureAnalysisDiagnostic {
 	return {
 		...classInstancePropertyShared(property),
-		...(binding.sourceSpan ? { primarySpan: binding.sourceSpan } : {}),
+		...(property.sourceSpan
+			? { primarySpan: property.sourceSpan }
+			: binding.sourceSpan
+				? { primarySpan: binding.sourceSpan }
+				: {}),
 		source: binding.initializerSource ?? '',
 		message: `state "${binding.name}" initializes "${property.path}" with ${property.constructorName}. The payload carries no value for that field, and a method reached through it is read off the graph as a plain property, so it runs with no receiver and \`this\` is undefined.`,
 	};

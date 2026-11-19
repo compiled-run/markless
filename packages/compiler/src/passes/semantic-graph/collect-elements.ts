@@ -1,6 +1,12 @@
 import { isEventAttribute, normalizeEventName } from '../../ast/events.ts';
 import { ownedModuleAst } from './shared-ast.ts';
-import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
+import {
+	asNodes,
+	getIdentifierName,
+	unwrapTypeAssertion,
+	walkNode,
+	type AnyNode,
+} from '../../ast/nodes.ts';
 import { handlerMayReturnPromise, isFunctionNode } from './handler-returns-promise.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
@@ -99,7 +105,9 @@ import {
 	cssAnchorAttributeDiagnostic,
 	templateExpressionUnsupportedDiagnostic,
 	handlerReadsRenderLocalDiagnostic,
+	stateClassMethodUnboundDiagnostic,
 } from './diagnostics.ts';
+import { stateValueAt } from './state-class-instance.ts';
 import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
@@ -1250,7 +1258,9 @@ function collectAttribute(
 		// written. Each entry is analyzed on its own — its own reads, writes and
 		// sync policy — so nothing about being second changes what a handler is.
 		for (const entry of eventHandlerExpressions(expressionValue)) {
-			const invalidHandler = invalidEventHandlerExpression(attributeName, entry, state);
+			const invalidHandler =
+				invalidEventHandlerExpression(attributeName, entry, state) ??
+				stateMethodHandlerDiagnostic(attributeName, entry, state);
 			if (invalidHandler) {
 				state.graph.diagnostics.push(invalidHandler);
 				continue;
@@ -2492,6 +2502,26 @@ function invalidEventHandlerExpression(
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION',
 	};
+}
+
+// `onClick={cart.add}`: a state cell holds data, so a member of it is never a function the handler can run.
+function stateMethodHandlerDiagnostic(
+	attributeName: string,
+	node: AnyNode | undefined,
+	state: WalkState,
+): SemanticGraphDiagnostic | null {
+	const reference = unwrapTypeAssertion(
+		node?.type === 'ChainExpression' ? (node.expression as AnyNode) : node,
+	);
+	if (reference?.type !== 'MemberExpression') return null;
+	const held = stateValueAt(reference, state);
+	if (!held || held.path.length === 0) return null;
+	return stateClassMethodUnboundDiagnostic({
+		attributeName,
+		stateName: held.binding.name,
+		referenceSource: expressionSource(reference, state.source),
+		sourceSpan: sourceSpan(reference, state.filename),
+	});
 }
 
 function firstInvalidEventHandlerExpression(node: AnyNode | undefined): AnyNode | null {

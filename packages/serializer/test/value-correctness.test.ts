@@ -1,5 +1,9 @@
 import { expect, test } from 'vitest';
-import { deserializeGraphValue, serializeGraphValue } from '../src/index.ts';
+import {
+	deserializeGraphValue,
+	SERIALIZABLE_BUILT_IN_CONSTRUCTORS,
+	serializeGraphValue,
+} from '../src/index.ts';
 
 class AppToken {
 	constructor(readonly label: string) {}
@@ -87,6 +91,19 @@ test('serializeGraphValue diagnoses class and runtime resource instances', () =>
 		expect(result.diagnostics[0].message).toContain(`session.${field}`);
 		expect(result.diagnostics[0].message).toContain(valueKind);
 	}
+});
+
+test('every constructor the build accepts in state encodes, and a constructor outside the list does not', () => {
+	const realm = globalThis as unknown as Record<string, new (...args: unknown[]) => unknown>;
+	const argumentsFor: Record<string, unknown[]> = {
+		URL: ['https://example.test/'],
+		DataView: [new ArrayBuffer(2)],
+	};
+	for (const name of SERIALIZABLE_BUILT_IN_CONSTRUCTORS) {
+		const value = new realm[name]!(...(argumentsFor[name] ?? []));
+		expect(serializeGraphValue({ value }).ok, name).toBe(true);
+	}
+	expect(serializeGraphValue({ value: new AbortController() }).ok).toBe(false);
 });
 
 test('serializeGraphValue keeps current behavior for supported and function values', () => {
