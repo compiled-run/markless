@@ -321,7 +321,7 @@ describe('intent', () => {
 });
 
 describe('never early', () => {
-	test('under Save-Data no trigger fetches, and a click still navigates in place', async () => {
+	test('under Save-Data no trigger fetches until a mouse press, and the click navigates in place', async () => {
 		const s = await open({
 			prefetch: { intent: 'all', viewport: 'all', idle: 'all' },
 			connection: { effectiveType: '4g', saveData: true },
@@ -336,6 +336,8 @@ describe('never early', () => {
 				s.page.evaluate(() => (window as unknown as { __navigated: string[] }).__navigated),
 			)
 			.toEqual(['/p/2']);
+		// The mouse press is the click starting, not a guess: it fetches the page.
+		expect(s.paths()).toEqual(['/p/2']);
 		await s.page.close();
 	});
 

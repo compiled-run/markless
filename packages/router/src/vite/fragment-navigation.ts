@@ -173,15 +173,19 @@ export function startFragmentNavigation(
 	const here = (url: URL) =>
 		url.pathname + url.search === w.location.pathname + w.location.search;
 	// A press, or a mouse resting on a link, fetches its page and code at once, alongside the run half.
-	const press = (anchor: HTMLAnchorElement) => {
+	// A mouse press starts the click itself, so Save-Data does not hold it back: only guesses wait.
+	const press = (anchor: HTMLAnchorElement, clicking = false) => {
 		const intent = intentOf();
 		if (!intent || phase & PRESSED || anchor.getAttribute(intent.prefetchAttribute) === 'none')
 			return;
 		// Save-Data and a hidden tab fetch nothing early; 'fast' intent waits for a fast link.
-		if (connection?.saveData || d.visibilityState === 'hidden') return;
 		if (
-			intent.intent < 2 &&
-			!(intent.intent && fast !== false && (!connection || connection.effectiveType === '4g'))
+			!intent.intent ||
+			(!clicking &&
+				(connection?.saveData ||
+					d.visibilityState === 'hidden' ||
+					(intent.intent < 2 &&
+						!(fast !== false && (!connection || connection.effectiveType === '4g')))))
 		)
 			return;
 		const url = followed(anchor);
@@ -255,7 +259,11 @@ export function startFragmentNavigation(
 			if (!anchor) return;
 			// A router link is taken ahead of page handlers; a plain anchor after them, once its click reaches the document.
 			if (event.type !== 'click') {
-				if (event.type !== 'pointerover') press(anchor);
+				if (event.type !== 'pointerover')
+					press(
+						anchor,
+						event.type === 'pointerdown' && (event as PointerEvent).pointerType !== 'touch',
+					);
 				void wake(event);
 			} else if (anchor.hasAttribute(linkAttributeOf())) early(event);
 			else
@@ -879,7 +887,8 @@ export function runFragmentNavigation(
 
 	// Intent: press, touch and keyboard focus fetch at once. A mouse fetches once it rests on a link:
 	// a pointer crossing a list of links on its way somewhere never rests on the ones it crosses.
-	const intend = (url: URL) => allows(intentLevel) && prefetch(url);
+	const intend = (url: URL, clicking = false) =>
+		(clicking ? intentLevel > 0 : allows(intentLevel)) && prefetch(url);
 	let restTimer = 0;
 	let resting = '';
 	let previous: { x: number; y: number; t: number } | undefined;
@@ -922,7 +931,11 @@ export function runFragmentNavigation(
 		stopRest();
 		const anchor = anchorOf(event);
 		const url = eligible(anchor);
-		if (url) intend(url);
+		if (url)
+			intend(
+				url,
+				event.type === 'pointerdown' && (event as PointerEvent).pointerType !== 'touch',
+			);
 		if (url || eligible(anchor, true)) void load();
 	};
 	for (const type of ['pointerdown', 'touchstart', 'focusin'])

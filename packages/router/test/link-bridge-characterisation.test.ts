@@ -205,9 +205,10 @@ const OTHER = 'http://router.test/other';
 const ABOUT_FRAGMENT = 'http://router.test/_fragment/about';
 
 describe('link bridge prefetch policy', () => {
-	const pressed = (options: BridgeOptions) => {
+	// A focus guesses at the next click; a mouse press is the click starting.
+	const pressed = (options: BridgeOptions, type = 'focusin', extra?: Record<string, unknown>) => {
 		const b = bridge(options);
-		b.dispatch('pointerdown', b.anchor('/about'));
+		b.dispatch(type, b.anchor('/about'), extra);
 		return { fetched: b.fetches.map((fetch) => fetch.href), woke: b.loads.length };
 	};
 
@@ -233,6 +234,24 @@ describe('link bridge prefetch policy', () => {
 			woke: 1,
 		});
 		expect(pressed({ hidden: true })).toEqual({ fetched: [], woke: 1 });
+		expect(
+			pressed({ connection: { saveData: true } }, 'touchstart', { pointerType: 'touch' }),
+		).toEqual({ fetched: [], woke: 1 });
+	});
+
+	test('a mouse press fetches its page under Save-Data and on a slow link with fast-only intent, never with intent none', () => {
+		const mouse = { pointerType: 'mouse' };
+		expect(pressed({ connection: { saveData: true } }, 'pointerdown', mouse).fetched).toEqual([
+			ABOUT_FRAGMENT,
+		]);
+		expect(
+			pressed({ intent: 1, connection: { effectiveType: '3g' } }, 'pointerdown', mouse).fetched,
+		).toEqual([ABOUT_FRAGMENT]);
+		expect(pressed({ intent: 0 }, 'pointerdown', mouse).fetched).toEqual([]);
+		expect(
+			pressed({ connection: { saveData: true } }, 'pointerdown', { pointerType: 'touch' })
+				.fetched,
+		).toEqual([]);
 	});
 
 	test('a click under Save-Data still swaps in place', async () => {

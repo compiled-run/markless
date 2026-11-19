@@ -253,7 +253,10 @@ to tell, only a browser reporting `'4g'` counts as fast.
 `prefetch: false` (or `'none'`) fetches nothing early.
 
 Never early, whatever the config says: under Save-Data, in a hidden tab, to an
-endpoint path, or to a link marked `prefetch={false}`. A link marked
+endpoint path, or to a link marked `prefetch={false}`. A mouse press is the
+click starting, not a guess, so with intent on (any level) it fetches its page
+even under Save-Data or on a slow link; a touch does not, since it may begin a
+scroll. A link marked
 `prefetch="intent"` is left out of the viewport and idle triggers; one marked
 `prefetch="viewport"` is fetched on screen even with the viewport trigger off
 (on fast links then). A click, Back or Forward cancels every early fetch still

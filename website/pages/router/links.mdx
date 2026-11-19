@@ -70,7 +70,7 @@ A pointer resting on a link, a focus or a press starts fetching the next page be
 - The router never fetches other sites or `/api/` paths early.
 - Links with `download`, a `target` or `rel="external"` aren't fetched early either.
 - `router({ prefetch: false })` in `vite.config.ts` turns early fetches off everywhere.
-- Nothing is fetched early when the browser asks to save data, or while the tab is hidden.
+- Nothing is fetched early when the browser asks to save data, or while the tab is hidden. A mouse press still fetches its page: the click has started.
 - A click cancels the other early fetches still arriving, so they don't slow down the page you asked for.
 
 ## Choose when pages are fetched early
