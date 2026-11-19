@@ -365,7 +365,7 @@ class Runtime(
 	private fun readFrame(frame: Map<String, Bound>): String = frame.values.joinToString(",", "[", "]") { b ->
 		when (b) {
 			is Bound.Slot -> jsonValue(nullish(values[b.slot]) ?: nullish(values[b.slot.substringBefore('@')]) ?: JsValue.Null)
-			is Bound.Fields -> b.fields.values.joinToString(",", "[", "]") { jsonValue(values[it] ?: JsValue.Null) }
+			is Bound.Fields -> b.fields.values.joinToString(",", "[", "]") { jsonValue(values[it] ?: values[it.substringBefore('@')] ?: JsValue.Null) }
 			is Bound.Value -> jsonValue(b.value)
 		}
 	}
@@ -430,9 +430,13 @@ class Runtime(
 		val out = ArrayList<JournalEntry>()
 		// A run that settles at once can show another; the engine is asked again until nothing moves.
 		repeat(16) {
-			val cells = asyncCells.filter { c -> c.async!!.boundaries.any { id -> byId[id]?.let(::isShown) == true } }
-			val frames = cells.map { bind(it.async!!.bindings, Scope.EMPTY) }
-			val tasks = cells.zip(frames).joinToString(",", "[", "]") { (c, frame) -> "{\"slot\":${jsonString(c.id)},\"fn\":${jsonString(c.async!!.fn)},\"frame\":${frameJson(frame)}}" }
+			val shown = asyncCells.flatMap { c ->
+				val at = LinkedHashMap<String, Scope>()
+				for (id in c.async!!.boundaries) for (inst in byId[id]?.let(::instances).orEmpty()) at.putIfAbsent(slot(c.id, inst.scope), inst.scope)
+				at.map { (slot, scope) -> Triple(c, slot, bind(c.async.bindings, scope)) }
+			}
+			val frames = shown.map { it.third }
+			val tasks = shown.joinToString(",", "[", "]") { (c, slot, frame) -> "{\"slot\":${jsonString(slot)},\"fn\":${jsonString(c.async!!.fn)},\"frame\":${frameJson(frame)}}" }
 			val sent = "[$tasks,${frames.joinToString(",", "[", "]", transform = ::readFrame)}]"
 			if (sent == asyncSent) return out
 			asyncSent = sent
@@ -453,17 +457,21 @@ class Runtime(
 	fun response(id: Int, response: JsValue): List<JournalEntry> =
 		change(null, null) { enter("\"kind\":\"response\",\"request\":$id,\"response\":${jsonValue(response)}") }
 
-	fun armOf(branch: Node.Branch): Int? {
-		val tests = branch.tests ?: return if (Js.truthy(evaluate(branch.test!!))) 0 else if (branch.arms > 1) 1 else null
-		for ((i, t) in tests.withIndex()) if (t != null && Js.truthy(evaluate(t))) return i
+	fun armOf(branch: Node.Branch, scope: Scope = Scope.EMPTY): Int? {
+		val tests = branch.tests ?: return if (Js.truthy(evaluate(branch.test!!, scope))) 0 else if (branch.arms > 1) 1 else null
+		for ((i, t) in tests.withIndex()) if (t != null && Js.truthy(evaluate(t, scope))) return i
 		return tests.indexOfFirst { it == null }.takeIf { it >= 0 }
 	}
 
-	fun isShown(node: Node): Boolean {
+	/** Whether [node] shows where [scope] is: in a list row, the arms around it are that row's. */
+	fun shownIn(node: Node, scope: Scope): Boolean {
 		val a = node.arm ?: return true
 		val b = byId[a.branch] as? Node.Branch ?: return false
-		return isShown(b) && armOf(b) == a.index
+		return shownIn(b, scope) && armOf(b, scope) == a.index
 	}
+
+	/** Whether any instance of [node] shows. */
+	fun isShown(node: Node): Boolean = instances(node).isNotEmpty()
 
 	fun rowsOf(repeat: Node.Repeat): List<Row> {
 		val list = evaluate(repeat.list) as? JsValue.Arr ?: throw MarklessRuntimeError("${repeat.id} lists a value that is not an array")
@@ -476,11 +484,10 @@ class Runtime(
 
 	/** Every shown instance of [node]: one outside lists, one per row inside one. */
 	fun instances(node: Node): List<Instance> {
-		if (!isShown(node)) return emptyList()
-		val r = node.row ?: return listOf(Instance(node.id, node, Scope.EMPTY))
+		val r = node.row ?: return if (shownIn(node, Scope.EMPTY)) listOf(Instance(node.id, node, Scope.EMPTY)) else emptyList()
 		val repeat = byId[r] as? Node.Repeat ?: return emptyList()
-		if (!isShown(repeat)) return emptyList()
-		return rowsOf(repeat).map { Instance("${node.id}@${it.key}", node, Scope(items = mapOf(repeat.id to it.item), keys = mapOf(repeat.id to it.key)), it.key) }
+		if (!shownIn(repeat, Scope.EMPTY)) return emptyList()
+		return rowsOf(repeat).map { Instance("${node.id}@${it.key}", node, Scope(items = mapOf(repeat.id to it.item), keys = mapOf(repeat.id to it.key)), it.key) }.filter { shownIn(node, it.scope) }
 	}
 
 	fun text(t: Node.Text, scope: Scope): String = text(t.parts, scope)
@@ -617,7 +624,7 @@ class Runtime(
 	}
 
 	/** Every shown branch's chosen arm. */
-	fun arms(): List<Pair<String, Int?>> = payload.nodes.filterIsInstance<Node.Branch>().filter { isShown(it) }.map { it.id to armOf(it) }
+	fun arms(): List<Pair<String, Int?>> = payload.nodes.filterIsInstance<Node.Branch>().flatMap { b -> instances(b).map { it.id to armOf(b, it.scope) } }
 
 	/** Every shown list's row keys, in order. */
 	fun rows(): List<Pair<String, List<String>>> = payload.nodes.filterIsInstance<Node.Repeat>().filter { isShown(it) }.map { r -> r.id to rowsOf(r).map { it.key } }
@@ -946,7 +953,7 @@ class Runtime(
 				if (b != null && a != null && b != a) journal.add(JournalEntry.Rows(node.id, a))
 			}
 			is Node.Sheet -> afterSheets.getValue(node.id).let { if (beforeSheets[node.id] != it) journal.add(JournalEntry.Sheet(node.id, it)) }
-			is Node.Branch -> if (node.id in beforeArms && node.id in afterArms && beforeArms[node.id] != afterArms[node.id]) journal.add(JournalEntry.Arm(node.id, afterArms[node.id]))
+			is Node.Branch -> for (inst in instances(node)) if (inst.id in beforeArms && inst.id in afterArms && beforeArms[inst.id] != afterArms[inst.id]) journal.add(JournalEntry.Arm(inst.id, afterArms[inst.id]))
 			is Node.Text -> for (inst in instances(node)) {
 				val b = beforeTexts[inst.id]; val a = afterTexts[inst.id]
 				if (b != null && a != null && a != b) journal.add(JournalEntry.Text(inst.id, a))

@@ -48,6 +48,7 @@ import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.OVERLAY_ATTRIBUTE
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
+import dev.markless.mobile.core.Scope
 import dev.markless.mobile.core.Store
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.StyleExport
@@ -455,8 +456,12 @@ class MarklessHost(
 				is JournalEntry.Command -> command(view(entry.node), entry.command, entry.preventScroll)
 				is JournalEntry.Overlay -> overlays.show(entry.node, entry.open, entry.modal)
 				is JournalEntry.Arm -> {
-					if (runtime.node(entry.node) !is Node.Branch) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
-					rebuild()
+					val branch = entry.node.substringBefore('@')
+					if (runtime.node(branch) !is Node.Branch) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
+					if ('@' !in entry.node) rebuild() else {
+						val key = entry.node.substringAfter('@')
+						rebuild { it.rowKey == key && inArm(it.node, branch) }
+					}
 				}
 				is JournalEntry.Invalid -> invalid(entry.node, entry.message)
 				is JournalEntry.Timer -> scheduleTimer(entry.node, entry.ms)
@@ -532,10 +537,10 @@ class MarklessHost(
 		for (view in views.values) if (view is MarklessBox) view.requestLayout()
 	}
 
-	/** After an arm or rows entry: drop instances no longer shown, build the new ones from current values, then put each parent's children in order. */
-	private fun rebuild() {
-		removeHidden()
-		buildShown()
+	/** After an arm or rows entry: drop instances no longer shown, build the new ones from current values, then put each parent's children in order; [only] narrows a row arm's entry to that row's arm. */
+	private fun rebuild(only: ((Instance) -> Boolean)? = null) {
+		removeHidden(only)
+		buildShown(only)
 		for (v in views.values.toList() + scrollers.values.map { it.second }) if (v is MarklessBox) reorder(v)
 		pageBox?.let { reorder(it) }
 		refreshMarkers()
@@ -552,14 +557,24 @@ class MarklessHost(
 		}
 	}
 
-	private fun shownInstances(): List<Instance> = payload.nodes.filter { it is Node.Element || it is Node.Text }.flatMap(runtime::instances)
+	private fun shownInstances(only: ((Instance) -> Boolean)? = null): List<Instance> =
+		payload.nodes.filter { it is Node.Element || it is Node.Text }.flatMap(runtime::instances).let { all -> if (only == null) all else all.filter(only) }
 
-	private fun removeHidden() {
-		val live = shownInstances().mapTo(HashSet()) { it.id }
-		members.retainAll(live)
-		heldTexts.keys.retainAll(live)
+	/** Whether [node] sits in an arm of [branch], directly or through nested branches. */
+	private fun inArm(node: Node, branch: String): Boolean {
+		val a = node.arm ?: return false
+		return a.branch == branch || inArm(runtime.node(a.branch), branch)
+	}
+
+	private fun inScope(id: String, only: ((Instance) -> Boolean)?): Boolean =
+		only == null || only(Instance(id, runtime.node(id.substringBefore('@')), Scope.EMPTY, id.substringAfter('@', "").ifEmpty { null }))
+
+	private fun removeHidden(only: ((Instance) -> Boolean)? = null) {
+		val live = shownInstances(only).mapTo(HashSet()) { it.id }
+		members.removeAll { it !in live && inScope(it, only) }
+		heldTexts.keys.removeAll { it !in live && inScope(it, only) }
 		for (inst in built.values.sortedByDescending { order.getValue(it.node.id) }) {
-			if (inst.id in live) continue
+			if (inst.id in live || (only != null && !only(inst))) continue
 			val view = views.remove(inst.id)!!
 			built.remove(inst.id)
 			scrollers.remove(inst.id)
@@ -574,9 +589,9 @@ class MarklessHost(
 		}
 	}
 
-	private fun buildShown() {
+	private fun buildShown(only: ((Instance) -> Boolean)? = null) {
 		val fresh = ArrayList<String>()
-		for (inst in shownInstances()) {
+		for (inst in shownInstances(only)) {
 			val node = inst.node
 			if (flow != null) {
 				if (node is Node.Text && inst.id !in heldTexts) heldTexts[inst.id] = runtime.text(node, inst.scope)

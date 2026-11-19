@@ -513,10 +513,20 @@ public final class NativeRuntime {
 		var out: [NativeJournalEntry] = []
 		// A run that settles at once can show another; the engine is asked again until nothing moves.
 		for _ in 0..<16 {
-			let shownCells = try asyncCells.filter { cell in try cell.async!.boundaries.contains { try nodesById[$0].map { try isShown($0.arm) } ?? false } }
-			let tasks = try shownCells.map { cell -> (slot: String, fn: String, frame: [(String, JSONValue)]) in
-				guard case let .object(names) = try self.frame(of: cell.async!.bindings, in: .empty) else { throw RuntimeError(reason: "a frame is an object") }
-				return (cell.id, cell.async!.script, names)
+			let shownAsync = try asyncCells.flatMap { cell -> [(cell: NativeCell, slot: String, scope: NativeScope)] in
+				var seen = Set<String>()
+				var out: [(cell: NativeCell, slot: String, scope: NativeScope)] = []
+				for id in cell.async!.boundaries {
+					for instance in try nodesById[id].map(instances(of:)) ?? [] {
+						let slot = try slot(of: cell.id, in: instance.scope)
+						if seen.insert(slot).inserted { out.append((cell, slot, instance.scope)) }
+					}
+				}
+				return out
+			}
+			let tasks = try shownAsync.map { shown -> (slot: String, fn: String, frame: [(String, JSONValue)]) in
+				guard case let .object(names) = try self.frame(of: shown.cell.async!.bindings, in: shown.scope) else { throw RuntimeError(reason: "a frame is an object") }
+				return (shown.slot, shown.cell.async!.script, names)
 			}
 			let listed = JSONValue.array(tasks.map { .object([("slot", .string($0.slot)), ("fn", .string($0.fn)), ("frame", .object($0.frame))]) })
 			let sent = JSONValue.array([listed, .array(tasks.map { .array($0.frame.map { readFrame($0.1) }) })]).jsonText
@@ -559,18 +569,19 @@ public final class NativeRuntime {
 	}
 
 	/// The arm a branch shows now (nil: none).
-	public func arm(of branch: String) throws -> Int? {
+	/// In a list row, `scope` is that row's: its tests read the row's item and state.
+	public func arm(of branch: String, in scope: NativeScope = .empty) throws -> Int? {
 		guard let node = nodesById[branch], case let .branch(tests) = node.kind else { throw RuntimeError(reason: "unknown branch \(branch)") }
 		for (index, test) in tests.enumerated() {
-			if let test, try evaluate(test).isTruthy { return index }
+			if let test, try evaluate(test, in: scope).isTruthy { return index }
 		}
 		return tests.firstIndex { $0 == nil }
 	}
 
-	public func isShown(_ place: NativeArmPlace?) throws -> Bool {
+	public func isShown(_ place: NativeArmPlace?, in scope: NativeScope = .empty) throws -> Bool {
 		guard let place else { return true }
 		guard let branch = nodesById[place.branch] else { return false }
-		return try isShown(branch.arm) && arm(of: place.branch) == place.index
+		return try isShown(branch.arm, in: scope) && arm(of: place.branch, in: scope) == place.index
 	}
 
 	/// A list's rows now: each item with its key, `String()` of the item at the key path.
@@ -591,10 +602,10 @@ public final class NativeRuntime {
 
 	/// Every shown copy of a node.
 	public func instances(of node: NativeNode) throws -> [NativeInstance] {
-		guard try isShown(node.arm) else { return [] }
-		guard let row = node.row else { return [NativeInstance(id: node.id, scope: .empty)] }
+		guard let row = node.row else { return try isShown(node.arm) ? [NativeInstance(id: node.id, scope: .empty)] : [] }
 		guard let list = nodesById[row], try isShown(list.arm) else { return [] }
 		return try rows(of: row).map { NativeInstance(id: "\(node.id)@\($0.key)", scope: NativeScope(items: [row: $0.item], keys: [row: $0.key])) }
+			.filter { try isShown(node.arm, in: $0.scope) }
 	}
 
 	public func text(of parts: [NativeTextPart], in scope: NativeScope = .empty) throws -> String {
@@ -749,11 +760,11 @@ public final class NativeRuntime {
 		}
 	}
 
-	/// Every shown branch's chosen arm.
+	/// Every shown branch instance's chosen arm (`<branch>@<key>` in a list row).
 	public func arms() throws -> [(node: String, index: Int?)] {
-		try payload.nodes.compactMap { node in
-			guard case .branch = node.kind, try isShown(node.arm) else { return nil }
-			return (node.id, try arm(of: node.id))
+		try payload.nodes.flatMap { node -> [(node: String, index: Int?)] in
+			guard case .branch = node.kind else { return [] }
+			return try instances(of: node).map { ($0.id, try arm(of: node.id, in: $0.scope)) }
 		}
 	}
 
@@ -1087,8 +1098,10 @@ public final class NativeRuntime {
 				guard let before = beforeRows[node.id], let after = afterRows[node.id], before != after else { return [] }
 				return [.rows(node: node.id, keys: after)]
 			case .branch:
-				guard let before = beforeArms[node.id], let after = afterArms[node.id], before != after else { return [] }
-				return [.arm(node: node.id, index: after)]
+				return try instances(of: node).compactMap { instance in
+					guard let before = beforeArms[instance.id], let after = afterArms[instance.id], before != after else { return nil }
+					return .arm(node: instance.id, index: after)
+				}
 			case .sheet:
 				guard let before = beforeSheets[node.id], let after = afterSheets[node.id], before != after else { return [] }
 				return [.sheet(node: node.id, open: after)]

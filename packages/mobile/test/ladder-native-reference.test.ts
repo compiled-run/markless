@@ -38,7 +38,7 @@ import {
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
 const NATIVE_KEYBOARD_ONLY = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
-const REFUSED_RUNGS = new Set(['11-async', 'y4-sheet-beside-drawer', 'j7-page-refused']);
+const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
 
 /**
  * The script services as a phone's host provides them, on a clock that moves only when a step waits: a timer fires once
@@ -133,17 +133,28 @@ function mirror(
 			inClosedSheet(parent)
 		);
 	};
+	// In a list row the arms around a node are that row's copies (`<branch>@<key>`).
 	const shownNode = (id: string): boolean => {
 		if (inClosedSheet(id)) return false;
-		const place = nodeOf.get(id)?.arm;
-		return !place || (shownNode(place.branch) && chosen.get(place.branch) === place.index);
+		const at = id.indexOf('@');
+		const place = nodeOf.get(at < 0 ? id : id.slice(0, at))?.arm;
+		if (!place) return true;
+		const branch = nodeOf.get(place.branch)?.row
+			? `${place.branch}${id.slice(at)}`
+			: place.branch;
+		return shownNode(branch) && chosen.get(branch) === place.index;
 	};
 	// A row's copy (`<id>@<key>`) sits where its list does.
 	const inArm = (id: string, branch: string): boolean => {
-		const node = nodeOf.get(id.includes('@') ? id.slice(0, id.indexOf('@')) : id);
-		if (node?.row) return inArm(node.row, branch);
-		if (!node?.arm) return false;
-		return node.arm.branch === branch || inArm(node.arm.branch, branch);
+		const at = id.indexOf('@');
+		const node = nodeOf.get(at < 0 ? id : id.slice(0, at));
+		if (node?.arm) {
+			const own = nodeOf.get(node.arm.branch)?.row
+				? `${node.arm.branch}${id.slice(at)}`
+				: node.arm.branch;
+			return own === branch || inArm(own, branch);
+		}
+		return node?.row ? inArm(node.row, branch) : false;
 	};
 	// An element carrying `hidden`, bound or static, hides everything inside it, as the web's `[hidden]` rule does.
 	const hiddenWithin = (id: string): boolean => {
@@ -192,6 +203,8 @@ function mirror(
 			expect(entry.route, `step ${index}: the link's route`).toBe(payload.route?.pattern);
 			mount(createNativeRuntime(payload, store, entry.params));
 		} else if (entry.op === 'rows') {
+			for (const [node, index] of runtime.arms())
+				if (!chosen.has(node)) chosen.set(node, index);
 			const rowNodes = payload.nodes
 				.filter((node) => node.row === entry.node)
 				.map((node) => node.id);
@@ -473,10 +486,16 @@ function walk(
 			inClosedSheet(parent)
 		);
 	};
+	// In a list row the arms around a node are that row's copies (`<branch>@<key>`).
 	const shownNode = (id: string): boolean => {
 		if (inClosedSheet(id)) return false;
-		const place = nodeOf.get(id)?.arm;
-		return !place || (shownNode(place.branch) && chosen.get(place.branch) === place.index);
+		const at = id.indexOf('@');
+		const place = nodeOf.get(at < 0 ? id : id.slice(0, at))?.arm;
+		if (!place) return true;
+		const branch = nodeOf.get(place.branch)?.row
+			? `${place.branch}${id.slice(at)}`
+			: place.branch;
+		return shownNode(branch) && chosen.get(branch) === place.index;
 	};
 	const openSheet = (index: number): string => {
 		const open = [...sheetOpen].filter(([, isOpen]) => isOpen).map(([node]) => node);
@@ -487,10 +506,15 @@ function walk(
 	const shownTexts = () => [...texts].filter(([node]) => shownNode(node));
 	// A row's copy (`<id>@<key>`) sits where its list does.
 	const inArm = (id: string, branch: string): boolean => {
-		const node = nodeOf.get(id.includes('@') ? id.slice(0, id.indexOf('@')) : id);
-		if (node?.row) return inArm(node.row, branch);
-		if (!node?.arm) return false;
-		return node.arm.branch === branch || inArm(node.arm.branch, branch);
+		const at = id.indexOf('@');
+		const node = nodeOf.get(at < 0 ? id : id.slice(0, at));
+		if (node?.arm) {
+			const own = nodeOf.get(node.arm.branch)?.row
+				? `${node.arm.branch}${id.slice(at)}`
+				: node.arm.branch;
+			return own === branch || inArm(own, branch);
+		}
+		return node?.row ? inArm(node.row, branch) : false;
 	};
 	// An element carrying `hidden`, bound or static, hides everything inside it, as the web's `[hidden]` rule does.
 	const hiddenWithin = (id: string): boolean => {
@@ -681,6 +705,7 @@ function walk(
 				runtime = createNativeRuntime(payload, store, entry.params);
 				mount();
 			} else if (entry.op === 'rows') {
+				for (const [node, index] of runtime.arms()) if (!chosen.has(node)) chosen.set(node, index);
 				const rowNodes = payload.nodes.filter((node) => node.row === entry.node).map((node) => node.id);
 				const kept = new Map<string, string>();
 				for (const [id, text] of texts) {

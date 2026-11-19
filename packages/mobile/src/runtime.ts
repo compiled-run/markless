@@ -601,14 +601,25 @@ export function createNativeRuntime(
 		const out: NativeJournalEntry[] = [];
 		// A run that settles at once can show another; the engine is asked again until nothing moves.
 		for (let round = 0; round < 16; round++) {
-			const tasks = asyncCells.filter(boundaryShown).map((cell) => ({
-				slot: cell.id,
+			const shownAsync = asyncCells.flatMap((cell) => {
+				const at = new Map<string, NativeScope>();
+				for (const id of cell.async!.boundaries) {
+					const node = nodesById.get(id);
+					for (const instance of node ? instances(node) : []) {
+						const slot = slotOf(cell.id, instance.scope);
+						if (!at.has(slot)) at.set(slot, instance.scope);
+					}
+				}
+				return [...at].map(([slot, scope]) => ({ cell, slot, scope }));
+			});
+			const tasks = shownAsync.map(({ cell, slot, scope }) => ({
+				slot,
 				fn: cell.async!.script,
-				frame: frameOf(cell.async!.bindings, undefined, base),
+				frame: frameOf(cell.async!.bindings, undefined, scope),
 			}));
 			const sent = JSON.stringify([
 				tasks,
-				asyncCells.filter(boundaryShown).map((cell) => readFrame(cell.async!.bindings)),
+				shownAsync.map(({ cell, scope }) => readFrame(cell.async!.bindings, scope)),
 			]);
 			if (sent === asyncSent) return out;
 			asyncSent = sent;
@@ -616,19 +627,14 @@ export function createNativeRuntime(
 		}
 		throw new Error('async values that keep starting each other');
 	};
-	const boundaryShown = (cell: (typeof asyncCells)[number]) =>
-		cell.async!.boundaries.some((id) => {
-			const node = nodesById.get(id);
-			return node !== undefined && shown(node);
-		});
 	/** What a script function's names hold now. */
-	const readFrame = (bindings: NativeScriptBindings) =>
+	const readFrame = (bindings: NativeScriptBindings, scope: NativeScope) =>
 		Object.values(bindings).map((binding) =>
 			'cell' in binding
-				? read(binding.cell)
+				? read(binding.cell, scope)
 				: 'fields' in binding
-					? Object.values(binding.fields).map((cell) => read(cell))
-					: evaluate(binding.value),
+					? Object.values(binding.fields).map((cell) => read(cell, scope))
+					: evaluate(binding.value, undefined, scope),
 		);
 	const compute: Compute = (fn, bindings, scope) =>
 		JSON.parse(
@@ -661,19 +667,26 @@ export function createNativeRuntime(
 		eventValue?: string | NativeEventFields,
 		scope?: NativeScope,
 	): Value => evaluateNativeExpr(expr, read, eventValue, scope ?? base, compute, elements);
-	const armOf = (branch: Extract<NativeNode, { kind: 'branch' }>): number | null => {
-		if (branch.test) return evaluate(branch.test) ? 0 : branch.arms > 1 ? 1 : null;
+	const armOf = (
+		branch: Extract<NativeNode, { kind: 'branch' }>,
+		scope: NativeScope = base,
+	): number | null => {
+		if (branch.test)
+			return evaluate(branch.test, undefined, scope) ? 0 : branch.arms > 1 ? 1 : null;
 		const tests = branch.tests ?? [];
-		const chosen = tests.findIndex((test) => test !== null && evaluate(test));
+		const chosen = tests.findIndex((test) => test !== null && evaluate(test, undefined, scope));
 		if (chosen >= 0) return chosen;
 		const fallback = tests.indexOf(null);
 		return fallback >= 0 ? fallback : null;
 	};
-	const shown = (node: NativeNode): boolean => {
+	/** Whether a node shows where `scope` is: in a list row, the arms around it are that row's. */
+	const shownIn = (node: NativeNode, scope: NativeScope): boolean => {
 		if (!node.arm) return true;
 		const branch = branches.get(node.arm.branch);
-		return !!branch && shown(branch) && armOf(branch) === node.arm.index;
+		return !!branch && shownIn(branch, scope) && armOf(branch, scope) === node.arm.index;
 	};
+	/** Whether any instance of a node shows. */
+	const shown = (node: NativeNode): boolean => instances(node).length > 0;
 	const nodesById = new Map(payload.nodes.map((node) => [node.id, node]));
 	/** Device objects whose owning component is shown. */
 	const liveObjects = (): string[] =>
@@ -706,18 +719,19 @@ export function createNativeRuntime(
 	const instances = (
 		node: NativeNode,
 	): { readonly id: string; readonly scope: NativeScope }[] => {
-		if (!shown(node)) return [];
-		if (!node.row) return [{ id: node.id, scope: base }];
+		if (!node.row) return shownIn(node, base) ? [{ id: node.id, scope: base }] : [];
 		const repeat = repeats.get(node.row);
-		if (!repeat || !shown(repeat)) return [];
-		return rowsOf(repeat).map(({ key, item }) => ({
-			id: `${node.id}@${key}`,
-			scope: {
-				...base,
-				items: new Map([[repeat.id, item]]),
-				keys: new Map([[repeat.id, key]]),
-			},
-		}));
+		if (!repeat || !shownIn(repeat, base)) return [];
+		return rowsOf(repeat)
+			.map(({ key, item }) => ({
+				id: `${node.id}@${key}`,
+				scope: {
+					...base,
+					items: new Map([[repeat.id, item]]),
+					keys: new Map([[repeat.id, key]]),
+				},
+			}))
+			.filter((instance) => shownIn(node, instance.scope));
 	};
 	const render = (parts: ReadonlyArray<NativeTextPart>, scope: NativeScope): string =>
 		parts
@@ -901,7 +915,9 @@ export function createNativeRuntime(
 	};
 	const arms = () =>
 		payload.nodes.flatMap((node) =>
-			node.kind === 'branch' && shown(node) ? [[node.id, armOf(node)] as const] : [],
+			node.kind === 'branch'
+				? instances(node).map(({ id, scope }) => [id, armOf(node, scope)] as const)
+				: [],
 		);
 	const rows = () =>
 		payload.nodes.flatMap((node) =>
@@ -1420,13 +1436,14 @@ export function createNativeRuntime(
 						? [{ op: 'sheet', node: node.id, open }]
 						: [];
 				}
-				if (node.kind === 'branch') {
-					return beforeArms.has(node.id) &&
-						afterArms.has(node.id) &&
-						beforeArms.get(node.id) !== afterArms.get(node.id)
-						? [{ op: 'arm', node: node.id, index: afterArms.get(node.id)! }]
-						: [];
-				}
+				if (node.kind === 'branch')
+					return instances(node).flatMap(({ id }): NativeJournalEntry[] =>
+						beforeArms.has(id) &&
+						afterArms.has(id) &&
+						beforeArms.get(id) !== afterArms.get(id)
+							? [{ op: 'arm', node: id, index: afterArms.get(id)! }]
+							: [],
+					);
 				const ids = instances(node).map((instance) => instance.id);
 				const opened = node.kind === 'element' ? dialogs.get(node.id) : undefined;
 				const dialog: NativeJournalEntry[] =

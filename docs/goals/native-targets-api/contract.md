@@ -136,7 +136,11 @@ bindings read, moved. The engine keys each run by the values its frame reads: a 
 signal fires) and starts another while the cell keeps what it shows; an answer for an aborted run is dropped. A value runs only while a `@try` that reads it is shown (`async.boundaries`, the branch ids): a `@try` in an `@if` arm
 or inside another `@try` starts when its arm shows, and hiding it aborts a run in flight. Shown again, a finished value is
 kept without a new run, and one whose last refresh failed shows `@catch` alone, as the web does when it mounts the block
-again (rung J12, `conformance/script-async-nested.json`). `leave()`
+again (rung J12, `conformance/script-async-nested.json`).
+A `@try` inside a `@for` row is one branch per row: its node carries `row`, nodes in its arms carry `row` and `arm`, its
+arm is chosen in that row's scope, `arms()` lists `<branch>@<key>`, and an `arm` entry naming `<branch>@<key>` rebuilds
+that row's arm alone. An async value of a component a row renders has `row` too (slot `<cell>@<key>`), so each row waits,
+answers and fails on its own, and a row that leaves aborts its run (rung 11, J13, `conformance/script-async-row*.json`). `leave()`
 (the screen is popped or replaced) sends `{ kind: 'tasks', screen, tasks: [], leave: true }`. `leave` of an entry also
 returns `aborts: [id]`: a request whose signal fired, journalled first as `{ op: 'abort', id }`; the host cancels it and
 never answers it.
@@ -672,7 +676,7 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 8 | Text input and two-way state | passing | passing | **passing** | **passing** | vectors `input.json` |
 | 9 | Storage | passing | passing | **passing** | **passing** | relaunch keeps the value |
 | 10 | State from the URL and one route change | passing | passing | **passing** | **passing** | harness verdict passed on both (opens at `/apple`, the link rebuilds the page at `/pear`); vectors `route.json` |
-| 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not started | not started | stopped by design: owner decision (a declared fetch or a script engine) |
+| 11 | Async value with `@try`/`@pending`/`@catch` | passing | passing | see the PR | see the PR | owner decision 2026-11-19: the script engine computes it (section 0d); vectors `script-async-row.json` |
 
 **Final device receipt (2026-11-17 07:15, tree `760b38b1f`):** one harness run of all fourteen passing rungs (1, 2, 3, 4,
 5, 5b, 6, 7, 7b, 7c, 7d, 8, 9, 10), Android then iOS, then `proof verdict`: **"proof passed on iOS and Android"**, 14 of 14 on

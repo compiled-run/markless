@@ -579,6 +579,51 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A @try per list row: each row waits, answers or fails on its own (the riddle's first answer fails: @catch alone).
+		name: 'script-async-row',
+		fixture: 'proofs/11-async/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'timer', timer: 'script:2' },
+		],
+	},
+	{
+		// Rows that start together and settle apart; a new row starts its own; a row that leaves aborts its lookup.
+		name: 'script-async-rows',
+		fixture: 'proofs/j13-async-rows/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'timer', timer: 'script:2' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=apple - ',
+				},
+			},
+			{ event: 'activate', host: 'h6' },
+			{ event: 'timer', timer: 'script:3' },
+			{ event: 'activate', host: 'h7' },
+			{
+				event: 'response',
+				id: 2,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=cherry - ',
+				},
+			},
+		],
+	},
+	{
 		name: 'script-computed',
 		fixture: 'proofs/j5-engine-computed/App.tsrx',
 		modules: true,

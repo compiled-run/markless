@@ -403,6 +403,8 @@ type Scope = {
 	};
 	/** Prefix of every id this component instance emits (`component-edge:0/` inside a child, empty at the root). */
 	readonly prefix: string;
+	/** The list whose rows this instance renders in: its state and async values are per row. */
+	readonly row?: string;
 	readonly event?: string;
 	/** A click handler's event parameter: only the fields a tap has (`pressed`) may be read. */
 	readonly opaque?: string;
@@ -1437,6 +1439,7 @@ export function createNativeViewPayload(
 			component,
 			cells: { byName, byBinding },
 			prefix,
+			...(row ? { row } : {}),
 			locals: new Set(),
 			items: new Map(),
 			props,
@@ -1816,7 +1819,13 @@ export function createNativeViewPayload(
 			if (!cells.some((cell) => cell.id === id)) {
 				const script = scriptAsync(computed, { ...scope, boundary: undefined }, what);
 				if (script === null) return null;
-				addCell({ id, name: computed.name, initial: { state: 'pending' }, async: { ...script, boundaries: [] } });
+				addCell({
+					id,
+					name: computed.name,
+					initial: { state: 'pending' },
+					async: { ...script, boundaries: [] },
+					...(scope.row ? { row: scope.row } : {}),
+				});
 			}
 			scope.boundary.tasks.add(id);
 			return { member: { cell: id }, property: 'value' };
@@ -4349,10 +4358,7 @@ export function createNativeViewPayload(
 			if (item.kind === 'boundary') {
 				close();
 				const boundary = scope.module.boundaries.get(item.id);
-				if (place.row) {
-					refuse('a @try inside a @for row');
-					continue;
-				}
+
 				if (item.arms.catch === undefined) {
 					refuse('a @try with no @catch; its error would leave this screen');
 					continue;
@@ -4384,7 +4390,7 @@ export function createNativeViewPayload(
 					lowerChunk(
 						chunk,
 						parent,
-						{ arm: { branch: branchId, index } },
+						{ ...(place.row ? { row: place.row } : {}), arm: { branch: branchId, index } },
 						{
 							...scope,
 							...(arm === 'try' ? { catches } : {}),
@@ -4485,7 +4491,7 @@ export function createNativeViewPayload(
 					lowerChunk(
 						scope.module.chunks.get(item.arms.catch)!,
 						parent,
-						{ arm: { branch: caughtId, index: 0 } },
+						{ ...(place.row ? { row: place.row } : {}), arm: { branch: caughtId, index: 0 } },
 						{
 							...scope,
 							prefix: `${scope.prefix}${caughtId}/`,
