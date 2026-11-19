@@ -1208,6 +1208,25 @@ export function Entries() @{
 		]);
 	});
 
+	it('gives shared state its first value when a field reads a module constant', async () => {
+		const { payload, diagnostics } = await nativeView(`import { shared, state } from '@markless/core';
+const SNAPS = [0.5, 1];
+const sheet = shared(() => {
+	const box = state({ open: false, snaps: SNAPS, side: 'end' as string });
+	return box;
+}, { scope: 'subtree' });
+export function Sheet() @{
+	const own = sheet();
+	<button onClick={() => (own.open = !own.open)}>{own.side}</button>
+}`);
+		expect(diagnostics.map((d) => d.message)).toEqual([]);
+		expect(payload?.cells.map((cell) => [cell.name, cell.initial])).toEqual([
+			['box.open', false],
+			['box.snaps', [0.5, 1]],
+			['box.side', 'end'],
+		]);
+	});
+
 	it('refuses an id reference from outside a row to an element inside one', async () => {
 		const { payload, diagnostics } =
 			await nativeView(`import { element, shared, state } from '@markless/core';

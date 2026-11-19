@@ -1,0 +1,44 @@
+appId: ${APP_ID}
+name: 18-seed-follows
+---
+- launchApp:
+    clearState: true
+- assertVisible: Page says closed
+- assertVisible: Panel closed
+- assertVisible: Sizes 2
+- assertVisible: Unrelated 0
+- tapOn: Page toggles
+- assertNotVisible: Page says closed
+- assertNotVisible: Panel closed
+- assertVisible: Page says open
+- assertVisible: Panel open
+- assertNotVisible: Page says closed
+- assertNotVisible: Panel closed
+- tapOn: Panel toggles itself
+- assertVisible: Panel closed
+- assertNotVisible: Panel open
+- assertVisible: Page says open
+- assertVisible: Panel closed
+- assertVisible: Unrelated 0
+- assertNotVisible: Panel open
+- tapOn: Unrelated 0
+- assertNotVisible: Unrelated 0
+- assertVisible: Unrelated 1
+- assertVisible: Page says open
+- assertVisible: Panel closed
+- assertNotVisible: Unrelated 0
+- assertNotVisible: Panel open
+- tapOn: Panel toggles itself
+- assertVisible: Panel open
+- assertNotVisible: Panel closed
+- assertVisible: Page says open
+- assertVisible: Panel open
+- assertNotVisible: Panel closed
+- tapOn: Page toggles
+- assertVisible: Panel closed
+- assertNotVisible: Page says open
+- assertNotVisible: Panel open
+- assertVisible: Page says closed
+- assertVisible: Panel closed
+- assertNotVisible: Page says open
+- assertNotVisible: Panel open

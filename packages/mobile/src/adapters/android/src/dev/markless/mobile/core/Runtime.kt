@@ -492,6 +492,10 @@ class Runtime(
 	/** A text field's text: what was typed since its binding last wrote it, else its `value` binding, else its `value` attribute. */
 	fun textOf(id: String): String = edited[id] ?: propertyBinding(id, "value")?.let(::property) ?: attributeNow(id, "value") ?: ""
 
+	init {
+		for (c in payload.cells) c.follows?.let { values[c.id] = evaluate(it) }
+	}
+
 	/** Every non-row checkbox and radio button, in payload order. */
 	private val ticked = payload.nodes.filterIsInstance<Node.Element>().filter { it.element == "input" && it.row == null && it.attributes["type"].let { t -> t == "checkbox" || t == "radio" } }
 
@@ -927,6 +931,19 @@ class Runtime(
 	fun tasks(): List<JournalEntry.Call> = payload.cells.mapNotNull { c -> c.task?.let { t -> JournalEntry.Call(t.call, t.arguments.map { evaluate(it) }, c.id) } }
 
 	/** Runs [apply] (cell writes, returning its calls or a navigation) and journals styled cells, changed nodes, released objects, then the calls. */
+	/** A seed from a prop that follows state runs again when the prop's value changes, as the web re-runs it. */
+	private fun follow(before: Map<String, JsValue>) {
+		for (c in payload.cells) {
+			val follows = c.follows ?: continue
+			val now = evaluate(follows)
+			val current = LinkedHashMap(values)
+			values.clear()
+			values.putAll(before)
+			val then = try { evaluate(follows) } finally { values.clear(); values.putAll(current) }
+			if (jsonValue(then) != jsonValue(now)) values[c.id] = now
+		}
+	}
+
 	private inline fun change(host: String?, value: String?, apply: () -> List<JournalEntry>): List<JournalEntry> {
 		val cellsBefore = HashMap(values)
 		val beforeTexts = texts().toMap()
@@ -950,6 +967,7 @@ class Runtime(
 		val stackBefore = stack
 		val calls = apply()
 		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
+		follow(cellsBefore)
 		val shownNow = shownOverlays()
 		val released = stackBefore.filter { it !in shownNow }
 		val enlisted = shownNow.filter { it !in stackBefore }

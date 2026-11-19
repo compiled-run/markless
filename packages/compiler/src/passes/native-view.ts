@@ -1251,6 +1251,11 @@ export function createNativeViewPayload(
 		const index = cellIndex.get(cell)!;
 		cells[index] = { ...cells[index]!, initial: value };
 	};
+	const setFollows = (cell: string, follows: NativeExpr, initial: NativeValue) => {
+		const index = cellIndex.get(cell)!;
+		cells[index] = { ...cells[index]!, initial, follows };
+	};
+	const rowOfCell = (cell: string): string | undefined => cells[cellIndex.get(cell)!]?.row;
 	/** A state object becomes one cell per field (`press.pressed`), so each field can change, journal and style on its own. */
 	const splitCells = (
 		id: string,
@@ -1295,12 +1300,34 @@ export function createNativeViewPayload(
 			fields: new Map(),
 			slots: new Map(),
 		};
+		instance.scope = {
+			module: owner,
+			component: '',
+			cells: { byName, byBinding },
+			prefix,
+			locals: new Set(),
+			items: new Map(),
+			props: new Map(),
+			objects,
+			args: new Map(),
+			shared: new Map(),
+			deviceObjects: new Map(),
+		};
 		const objectFields = new Map<string, Map<string, string>>();
 		for (const binding of owner.graph.graphBindings) {
 			if (binding.sharedDefinitionId !== definition.id || binding.kind !== 'state') continue;
 			const id = `${prefix}${binding.id}`;
-			const value = binding.initialValue;
-			if (binding.initialValueKnown !== true || !isNativeValue(value)) {
+			let value: unknown = binding.initialValue;
+			let known = binding.initialValueKnown === true;
+			if (!known && binding.nativeExpression) {
+				const lowered = exprOf(binding.nativeExpression, `the first value of \`${binding.name}\``, instance.scope);
+				const folded = lowered && foldConstant(lowered, initialOf);
+				if (folded && lowered && cellsOf(lowered).size === 0) {
+					value = folded.value;
+					known = true;
+				}
+			}
+			if (!known || !isNativeValue(value)) {
 				refuse(
 					`shared state \`${binding.name}\` of ${definition.name} needs a JSON initial value known at build time`,
 				);
@@ -1351,19 +1378,6 @@ export function createNativeViewPayload(
 					});
 			}
 		}
-		instance.scope = {
-			module: owner,
-			component: '',
-			cells: { byName, byBinding },
-			prefix,
-			locals: new Set(),
-			items: new Map(),
-			props: new Map(),
-			objects,
-			args: new Map(),
-			shared: new Map(),
-			deviceObjects: new Map(),
-		};
 		return instance;
 	};
 
@@ -1529,6 +1543,15 @@ export function createNativeViewPayload(
 		);
 		if (!lowered) return;
 		const folded = foldConstant(lowered, initialOf);
+		if (
+			cellsOf(lowered).size > 0 &&
+			statement.value.kind === 'read' &&
+			isPropName(statement.value.name, scope) &&
+			!rowOfCell(cell)
+		) {
+			setFollows(cell, lowered, folded && isNativeValue(folded.value) ? folded.value : null);
+			return;
+		}
 		if (!folded || cellsOf(lowered).size > 0 || !isNativeValue(folded.value)) {
 			refuse(
 				`${what} sets \`${statement.target}.${fieldName}\` from a value that follows state; pass a fixed value or leave the prop out`,

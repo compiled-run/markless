@@ -479,6 +479,9 @@ export function createNativeRuntime(
 					: cell.initial,
 		]),
 	);
+	const followers = payload.cells.flatMap((cell) =>
+		cell.follows ? [{ cell: cell.id, follows: cell.follows }] : [],
+	);
 	const storageKeys = new Map(
 		payload.cells.flatMap((cell) =>
 			cell.storage ? [[cell.id, cell.storage.key] as const] : [],
@@ -650,6 +653,16 @@ export function createNativeRuntime(
 		eventValue?: string | NativeEventFields,
 		scope?: NativeScope,
 	): Value => evaluateNativeExpr(expr, read, eventValue, scope ?? base, compute, elements);
+	for (const { cell, follows } of followers) values.set(cell, evaluate(follows));
+	/** A seed from a prop that follows state runs again when the prop's value changes, as the web re-runs it. */
+	const follow = (before: ReadonlyMap<string, Value>): void => {
+		const readBefore = (cell: string): Value => (before.has(cell) ? before.get(cell)! : read(cell));
+		for (const { cell, follows } of followers) {
+			const now = evaluate(follows);
+			const then = evaluateNativeExpr(follows, readBefore, undefined, base, compute, elements);
+			if (JSON.stringify(now) !== JSON.stringify(then)) values.set(cell, now);
+		}
+	};
 	const armOf = (branch: Extract<NativeNode, { kind: 'branch' }>): number | null => {
 		if (branch.test) return evaluate(branch.test) ? 0 : branch.arms > 1 ? 1 : null;
 		const tests = branch.tests ?? [];
@@ -1458,6 +1471,7 @@ export function createNativeRuntime(
 			const stackBefore = stack;
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
+			follow(cellsBefore);
 			const shownNow = shownOverlays();
 			const released = stackBefore.filter((overlay) => !shownNow.includes(overlay));
 			const enlisted = shownNow.filter((overlay) => !stackBefore.includes(overlay));

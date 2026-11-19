@@ -283,6 +283,9 @@ public final class NativeRuntime {
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
 			return nil
 		})
+		for cell in payload.cells {
+			if let follows = cell.follows, let value = try? evaluate(follows) { values[cell.id] = value }
+		}
 		for node in ticked {
 			guard case let .element(_, attributes, _) = node.kind else { continue }
 			checkedness[node.id] = (try? checkedBinding(node.id)) ?? (attributes["checked"] != nil)
@@ -1093,6 +1096,23 @@ public final class NativeRuntime {
 
 	/// Runs `apply` (cell writes, returning the calls it made or a navigation) and returns the journal: styled cells,
 	/// then every shown node whose output changed in document order, then released device objects, then the calls.
+	private func evaluated(_ expr: NativeExpr, with cells: [String: NativeValue]) throws -> NativeValue {
+		let current = values
+		values = cells
+		defer { values = current }
+		return try evaluate(expr)
+	}
+
+	/// A seed from a prop that follows state runs again when the prop's value changes, as the web re-runs it.
+	private func follow(_ before: [String: NativeValue]) throws {
+		for cell in payload.cells {
+			guard let follows = cell.follows else { continue }
+			let now = try evaluate(follows)
+			let then = try evaluated(follows, with: before)
+			if then != now { values[cell.id] = now }
+		}
+	}
+
 	private func change(host: String?, _ apply: () throws -> [NativeJournalEntry]) throws -> [NativeJournalEntry] {
 		let keyed = { (list: [(node: String, name: String, value: String?)]) in
 			Dictionary(list.map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { $1 })
@@ -1118,6 +1138,7 @@ public final class NativeRuntime {
 		let stackBefore = stack
 		let calls = try apply()
 		if case .navigate? = calls.first { return calls }
+		try follow(cellsBefore)
 		let shownNow = try shownOverlays()
 		let released = stackBefore.filter { !shownNow.contains($0) }
 		let enlisted = shownNow.filter { !stackBefore.contains($0) }

@@ -289,6 +289,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 						? {
 								...(partialInitial ? { initialValue: partialInitial.value } : {}),
 								initializerSource: expressionSource(initial, state.source),
+								...(NATIVE_FACTS ? nativeInitializer(initial, state) : {}),
 							}
 						: {}),
 			};
@@ -2045,6 +2046,11 @@ function objectPropertyKey(node: AnyNode | undefined): string | null {
 	if (typeof node.name === 'string') return node.name;
 	if (typeof node.value === 'string' || typeof node.value === 'number') return String(node.value);
 	return null;
+}
+
+function nativeInitializer(initial: AnyNode, state: WalkState): Pick<SemanticGraphBinding, 'nativeExpression'> {
+	const nativeExpression = state.nativeFacts && nativeCollectors(state.nativeFacts).expression(initial as never);
+	return nativeExpression ? { nativeExpression } : {};
 }
 
 function nativeComputed(fn: AnyNode | undefined, state: WalkState): Pick<SemanticGraphBinding, 'nativeExpression'> {

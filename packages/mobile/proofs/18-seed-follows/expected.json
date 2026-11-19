@@ -1,0 +1,34 @@
+{
+	"rung": 18,
+	"name": "A shared field a part seeds from a prop that follows state takes the prop's new value when the page changes it; the part's own write stands until then",
+	"steps": [
+		{
+			"visible": ["Page says closed", "Panel closed", "Sizes 2", "Unrelated 0"]
+		},
+		{
+			"do": { "tap": "Page toggles" },
+			"visible": ["Page says open", "Panel open"],
+			"absent": ["Page says closed", "Panel closed"]
+		},
+		{
+			"do": { "tap": "Panel toggles itself" },
+			"visible": ["Page says open", "Panel closed", "Unrelated 0"],
+			"absent": ["Panel open"]
+		},
+		{
+			"do": { "tap": "Unrelated 0" },
+			"visible": ["Unrelated 1", "Page says open", "Panel closed"],
+			"absent": ["Unrelated 0", "Panel open"]
+		},
+		{
+			"do": { "tap": "Panel toggles itself" },
+			"visible": ["Page says open", "Panel open"],
+			"absent": ["Panel closed"]
+		},
+		{
+			"do": { "tap": "Page toggles" },
+			"visible": ["Page says closed", "Panel closed"],
+			"absent": ["Page says open", "Panel open"]
+		}
+	]
+}

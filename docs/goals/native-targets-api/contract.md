@@ -492,6 +492,11 @@ the browser's render-data module).
   `Date.toISOString` formats a time as `toISOString` does. Anything that formats a date in a time zone or locale
   (`toTimeString`, `toLocaleString`, a date shown as text) is refused by name: the web formats it with the server's
   zone. Vectors carry `now`, which a host's test clock returns (`clock.json`).
+- **Seeds that follow a prop.** A part that sets a shared field from one of its props (`drawer.open = open`) when the
+  prop follows state gives the cell `follows`, the prop's value. The host writes it at mount and, after every action,
+  writes it again if that action changed its value; a write in between stands until then, as the web re-runs the seed
+  (`follows.json`, rung 18). Only a direct prop read in a cell outside a `@for` row follows; any other seed that reads
+  state is still refused.
 - **Links.** A `<Link href>` that is not a route pattern is matched with the router's `matchRouteManifest`, as a URL is,
   so `/about/` reaches `/about`.
 

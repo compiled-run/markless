@@ -638,6 +638,12 @@ export type NativeViewPayload = {
 		 * build, as a page's render reads the clock when it is served; `initial` is never shown.
 		 */
 		readonly clock?: true;
+		/**
+		 * A shared field a component seeds from one of its props that follows state, as the web re-runs that seed: at mount,
+		 * and after every action that changes the value, the host writes the value to this cell; a write in between stands
+		 * until the next change.
+		 */
+		readonly follows?: NativeExpr;
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;
