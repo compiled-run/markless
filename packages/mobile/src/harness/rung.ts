@@ -91,9 +91,13 @@ export function readRelativeStylesheet(specifier: string, importer: string) {
 const APP_DOCUMENT = 'document.tsrx';
 
 /** Compiles a navigation rung's app: every page under `pages/`, with repo-relative filenames as for one-screen rungs. */
-export function compileRungApp(dir: string) {
+export function compileRungApp(
+	dir: string,
+	options: { readonly target?: ProofPlatform; readonly device?: DeviceAppConfig } = {},
+) {
 	const document = join(dir, APP_DOCUMENT);
 	return compileNativeApp({
+		...options,
 		pages: pageFiles(dir).map((page) => ({
 			page,
 			filename: relative(repoRoot, join(dir, page)),
@@ -351,22 +355,32 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			}
 		}
 	} else if (existsSync(join(dir, 'pages'))) {
-		const build = await compileRungApp(dir);
-		if (!build.payload) {
-			const lines = build.diagnostics.map(
-				(diagnostic) => `  ${diagnostic.page}: ${diagnostic.code}: ${diagnostic.message}`,
-			);
-			throw new Error(`${name}: the app has no native build\n${lines.join('\n')}`);
+		const payloads: Partial<Record<ProofPlatform, string>> = {};
+		for (const platform of PROOF_PLATFORMS) {
+			const build = await compileRungApp(dir, {
+				target: platform,
+				...(appConfig.device ? { device: appConfig.device } : {}),
+			});
+			if (!build.payload) {
+				const lines = build.diagnostics.map(
+					(diagnostic) => `  ${diagnostic.page}: ${diagnostic.code}: ${diagnostic.message}`,
+				);
+				throw new Error(`${name}: the app has no ${platform} build\n${lines.join('\n')}`);
+			}
+			manifest = build.manifest;
+			payloads[platform] = JSON.stringify(build.payload);
+			assets[platform].push([PROOF_PAYLOAD_PATH, new TextEncoder().encode(payloads[platform])]);
+			if (build.styleInputs.length > 0 && platform === 'android') {
+				// Dragon lays out one input for both phones, so both must build the same views.
+				if (payloads.ios !== payloads.android)
+					throw new Error(
+						`${name}: a styled app whose views differ per phone has no single style export yet`,
+					);
+				const styled = styleAssets(appStyle(dir, name, build.styleInputs), name);
+				assets.ios.push(...styled);
+				assets.android.push(...styled);
+			}
 		}
-		const styled =
-			build.styleInputs.length > 0
-				? styleAssets(appStyle(dir, name, build.styleInputs), name)
-				: [];
-		for (const platform of PROOF_PLATFORMS)
-			assets[platform].push(
-				[PROOF_PAYLOAD_PATH, new TextEncoder().encode(JSON.stringify(build.payload))],
-				...styled,
-			);
 	} else if (existsSync(join(dir, HAND_MADE_PAYLOAD))) {
 		for (const platform of PROOF_PLATFORMS)
 			assets[platform].push([PROOF_PAYLOAD_PATH, readFileSync(join(dir, HAND_MADE_PAYLOAD))]);

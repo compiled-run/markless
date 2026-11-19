@@ -252,6 +252,8 @@ export type NativeAppBuild = {
 			readonly input: NativeStyleInput;
 		}>;
 	}>;
+	/** The Info.plist and AndroidManifest.xml entries for the device features any page uses. */
+	readonly manifest: DeviceManifest;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic & { readonly page: string }>;
 };
 
@@ -270,11 +272,16 @@ export async function compileNativeApp(input: {
 	readonly document?: { readonly filename: string; readonly source: string };
 	readonly readModule?: Parameters<typeof compileNativeComponent>[0]['readModule'];
 	readonly readStylesheet?: ReadStylesheet;
+	/** The app config's `device` section (usage text per feature), for every page. */
+	readonly device?: DeviceAppConfig;
+	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
+	readonly target?: 'ios' | 'android';
 }): Promise<NativeAppBuild> {
 	const manifest = buildRouteManifestFromFileIds(input.pages.map((page) => page.page));
 	const routes: NativeAppPayload['routes'][number][] = [];
 	const styleInputs: NativeAppBuild['styleInputs'][number][] = [];
 	const diagnostics: (CompilerDiagnostic & { readonly page: string })[] = [];
+	const features = new Set<NativeDeviceFeature>();
 	const documentSheets = input.document
 		? stylesheetsOf(
 				(
@@ -295,7 +302,10 @@ export async function compileNativeApp(input: {
 			manifest,
 			...(input.readModule ? { readModule: input.readModule } : {}),
 			...(input.readStylesheet ? { readStylesheet: input.readStylesheet } : {}),
+			...(input.device ? { device: input.device } : {}),
+			...(input.target ? { target: input.target } : {}),
 		});
+		for (const feature of build.features) features.add(feature);
 		diagnostics.push(
 			...build.diagnostics.map((diagnostic) => ({ ...diagnostic, page: page.page })),
 		);
@@ -321,6 +331,7 @@ export async function compileNativeApp(input: {
 	return {
 		payload: diagnostics.length > 0 ? null : { version: NATIVE_APP_VERSION, routes },
 		styleInputs: diagnostics.length > 0 ? [] : styleInputs,
+		manifest: deviceManifest([...features], input.device).manifest,
 		diagnostics,
 	};
 }
