@@ -1,0 +1,40 @@
+{
+	"rung": "S5",
+	"name": "A page background set on body, with a dark-mode variant: it fills the screen behind the page and the system bars on every screen of the stack",
+	"steps": [
+		{
+			"visible": ["Seed tray", "Open notes"],
+			"title": "Garden"
+		},
+		{
+			"do": {
+				"tap": "Open notes"
+			},
+			"visible": ["Watering", "Mist the tray each morning"],
+			"absent": ["Seed tray"],
+			"title": "Notes"
+		},
+		{
+			"do": {
+				"appearance": "dark"
+			},
+			"visible": ["Watering", "Mist the tray each morning"],
+			"title": "Notes"
+		},
+		{
+			"do": {
+				"back": "button"
+			},
+			"visible": ["Seed tray", "Open notes"],
+			"absent": ["Watering"],
+			"title": "Garden"
+		},
+		{
+			"do": {
+				"appearance": "light"
+			},
+			"visible": ["Seed tray", "Open notes"],
+			"title": "Garden"
+		}
+	]
+}

@@ -1,0 +1,43 @@
+appId: ${APP_ID}
+name: 12-long-page
+---
+- launchApp:
+      clearState: true
+- assertVisible: Long page
+- assertVisible: Section 1
+- assertNotVisible: Pressed 1
+- assertNotVisible: Press me
+- assertNotVisible: Page end
+- repeat:
+      times: 80
+      while:
+          notVisible: Page end
+      commands:
+          - swipe:
+                start: 50%, 80%
+                end: 50%, 25%
+- assertVisible: Page end
+- assertVisible: Press me
+- assertNotVisible: Long page
+- assertVisible: Page end
+- assertVisible: Press me
+- assertVisible: Pressed 0
+- assertNotVisible: Long page
+- tapOn: Press me
+- assertNotVisible: Pressed 0
+- assertVisible: Pressed 1
+- assertNotVisible: Pressed 0
+- assertNotVisible: Long page
+- repeat:
+      times: 80
+      while:
+          notVisible: Long page
+      commands:
+          - swipe:
+                start: 50%, 25%
+                end: 50%, 80%
+- assertVisible: Long page
+- assertVisible: Long page
+- assertVisible: Section 1
+- assertNotVisible: Page end
+- assertNotVisible: Press me

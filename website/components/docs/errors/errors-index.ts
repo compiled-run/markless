@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 320,
+	total: 329,
 	guided: 51,
 	groups: [
 		{
@@ -1516,6 +1516,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a @catch reset has no graph to re-run values in markless_catch_reset_graph_missing a markless runtime error from @markless/web.',
 				},
 				{
+					code: 'MARKLESS_NATIVE_SCRIPT',
+					title: 'A <script> cannot run in a native app',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'a <script> cannot run in a native app markless_native_script a <script> cannot run in a native app: a markless build error.',
+				},
+				{
 					code: 'MARKLESS_CSR_BEHAVIOR_HOST_MISSING',
 					title: 'A behavior’s element is missing',
 					chip: 'error',
@@ -1620,6 +1628,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a debug event’s element is missing markless_debug_event_host_missing a markless runtime error from @markless/web.',
 				},
 				{
+					code: 'MARKLESS_DEVICE_USAGE_MISSING',
+					title: 'A device feature has no usage text',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'a device feature has no usage text markless_device_usage_missing a device feature has no usage text: a markless runtime error.',
+				},
+				{
 					code: 'MARKLESS_DYNAMIC_TAG_INVALID',
 					title: 'A dynamic tag name is not a valid element',
 					chip: 'error',
@@ -1674,6 +1690,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'build error',
 					guided: false,
 					words: 'a handler’s code is missing an export markless_resume_dispatch_export_missing a markless build tooling error from @markless/bundler.',
+				},
+				{
+					code: 'MARKLESS_NATIVE_KEYBOARD_ONLY',
+					title: 'A keyboard-only handler is left out of the native build',
+					chip: 'error',
+					kind: 'compile error or warning',
+					guided: false,
+					words: 'a keyboard-only handler is left out of the native build markless_native_keyboard_only a keyboard-only handler is left out of the native build: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_CHILD_SYMBOL_MISSING',
@@ -1778,6 +1802,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a list row reads a widget no one owns markless_repeat_row_component_widget_unresolved a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_DEVICE_WEB_ABSENT',
+					title: 'A native element does not exist on the web',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'a native element does not exist on the web markless_device_web_absent a native element does not exist on the web: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_REPEAT_ROW_MINT_RENDERER_MISSING',
@@ -1994,6 +2026,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a streamed @try rendered nothing markless_stream_arm_render_missing a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_NATIVE_STYLESHEET',
+					title: 'A stylesheet loaded by a <link> does not reach a native app',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'a stylesheet loaded by a <link> does not reach a native app markless_native_stylesheet a stylesheet loaded by a <link> does not reach a native app: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_TEXT_UPDATE_RECORD_MISSING',
@@ -2274,6 +2314,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: false,
 					words: 'only the name and message of a caught error reach the browser markless_catch_error_field_lost only the name and message of a caught error reach the browser: a markless build error.',
+				},
+				{
+					code: 'MARKLESS_NATIVE_SVG',
+					title: 'Part of this <svg> is not drawn natively yet',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'part of this <svg> is not drawn natively yet markless_native_svg part of this <svg> is not drawn natively yet: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_PRERENDER_DATA_COMPONENT_MISSING',
@@ -2588,12 +2636,36 @@ export const errorIndex: ErrorIndex = {
 					words: 'the server sent an @if branch that does not exist markless_ssr_data_served_arm_invalid a markless runtime error from @markless/web.',
 				},
 				{
+					code: 'MARKLESS_NATIVE_TITLE',
+					title: 'This <title> cannot be the screen title',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'this <title> cannot be the screen title markless_native_title this <title> cannot be the screen title: a markless build error.',
+				},
+				{
+					code: 'MARKLESS_NATIVE_UNSUPPORTED',
+					title: 'This component cannot be built for a native target yet',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'this component cannot be built for a native target yet markless_native_unsupported this component cannot be built for a native target yet: a markless build error.',
+				},
+				{
 					code: 'MARKLESS_RESUME_ALREADY_RESUMED',
 					title: 'This container was already resumed',
 					chip: 'warning',
 					kind: 'runtime warning',
 					guided: false,
 					words: 'this container was already resumed markless_resume_already_resumed this container was already resumed: a markless runtime warning.',
+				},
+				{
+					code: 'MARKLESS_NATIVE_ELEMENT',
+					title: 'This element has no native view yet',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'this element has no native view yet markless_native_element this element has no native view yet: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_PRERENDER_WAKE_ROUTE_INELIGIBLE',

@@ -1,0 +1,463 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Arithmetic",
+		"cells": [
+			{
+				"id": "state:n",
+				"name": "n",
+				"initial": 1
+			},
+			{
+				"id": "state:label",
+				"name": "label",
+				"initial": "5"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "section",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "third "
+					},
+					{
+						"expr": {
+							"binary": "/",
+							"left": {
+								"cell": "state:n"
+							},
+							"right": {
+								"literal": 3
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "zero "
+					},
+					{
+						"expr": {
+							"binary": "*",
+							"left": {
+								"cell": "state:n"
+							},
+							"right": {
+								"unary": "-",
+								"value": {
+									"literal": 0
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "big "
+					},
+					{
+						"expr": {
+							"binary": "*",
+							"left": {
+								"cell": "state:n"
+							},
+							"right": {
+								"literal": 1e+21
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "bad "
+					},
+					{
+						"expr": {
+							"call": "Number",
+							"arguments": [
+								{
+									"binary": "+",
+									"left": {
+										"cell": "state:label"
+									},
+									"right": {
+										"literal": "x"
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "joined "
+					},
+					{
+						"expr": {
+							"binary": "+",
+							"left": {
+								"cell": "state:label"
+							},
+							"right": {
+								"cell": "state:n"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "rounded "
+					},
+					{
+						"expr": {
+							"call": "Math.round",
+							"arguments": [
+								{
+									"binary": "*",
+									"left": {
+										"cell": "state:n"
+									},
+									"right": {
+										"literal": 2.5
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"binary": ">",
+								"left": {
+									"cell": "state:n"
+								},
+								"right": {
+									"literal": 2
+								}
+							},
+							"whenTrue": {
+								"literal": "many"
+							},
+							"whenFalse": {
+								"literal": "few"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"expr": {
+							"logical": "??",
+							"left": {
+								"cell": "state:label"
+							},
+							"right": {
+								"literal": "none"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"text": "length "
+					},
+					{
+						"expr": {
+							"member": {
+								"cell": "state:label"
+							},
+							"property": "length"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h10",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h10:text0",
+				"parent": "h10",
+				"parts": [
+					{
+						"text": "Step"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h10",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:n",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:n"
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:label",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:label"
+							},
+							"right": {
+								"cell": "state:n"
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"third 0.3333333333333333"
+		],
+		[
+			"h2:text0",
+			"zero 0"
+		],
+		[
+			"h3:text0",
+			"big 1e+21"
+		],
+		[
+			"h4:text0",
+			"bad NaN"
+		],
+		[
+			"h5:text0",
+			"joined 51"
+		],
+		[
+			"h6:text0",
+			"rounded 3"
+		],
+		[
+			"h7:text0",
+			"few"
+		],
+		[
+			"h8:text0",
+			"5"
+		],
+		[
+			"h9:text0",
+			"length 1"
+		],
+		[
+			"h10:text0",
+			"Step"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h10"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "third 0.6666666666666666"
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "big 2e+21"
+				},
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "joined 522"
+				},
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "rounded 5"
+				},
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "52"
+				},
+				{
+					"op": "text",
+					"node": "h9:text0",
+					"value": "length 2"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h10"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "third 1"
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "big 3e+21"
+				},
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "joined 5233"
+				},
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "rounded 8"
+				},
+				{
+					"op": "text",
+					"node": "h7:text0",
+					"value": "many"
+				},
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "523"
+				},
+				{
+					"op": "text",
+					"node": "h9:text0",
+					"value": "length 3"
+				}
+			]
+		}
+	]
+}

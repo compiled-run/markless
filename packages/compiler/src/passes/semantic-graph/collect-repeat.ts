@@ -41,6 +41,7 @@ import {
 	rowBoundNames,
 } from './repeat-item-binding.ts';
 import type { WalkState } from './types.ts';
+import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | null {
 	const binding = repeatItemBinding(node);
@@ -260,6 +261,9 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 			: {}),
 		...(indexName ? { indexName } : {}),
 		collectionSource,
+		...(NATIVE_FACTS && state.nativeFacts
+			? { collectionExpression: nativeCollectors(state.nativeFacts).expression(collectionNode as never) }
+			: {}),
 		...(collection
 			? {
 					collectionGraphNodeId: collection.graphNodeId,

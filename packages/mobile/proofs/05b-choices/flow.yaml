@@ -1,0 +1,33 @@
+appId: ${APP_ID}
+name: 05b-choices
+---
+- launchApp:
+    clearState: true
+- assertVisible: Not started
+- assertVisible: List view
+- assertNotVisible: Halfway
+- assertNotVisible: Done
+- assertNotVisible: Grid view
+- assertNotVisible: Other view
+- tapOn: Step
+- assertVisible: Halfway
+- assertNotVisible: Not started
+- assertVisible: Halfway
+- assertNotVisible: Not started
+- assertNotVisible: Done
+- tapOn: Step
+- assertVisible: Done
+- assertNotVisible: Halfway
+- assertVisible: Done
+- assertNotVisible: Halfway
+- assertNotVisible: Grid view
+- tapOn: Switch view
+- assertVisible: Grid view
+- assertVisible: Grid view
+- assertNotVisible: List view
+- assertNotVisible: Other view
+- tapOn: Switch view
+- assertVisible: Other view
+- assertNotVisible: Grid view
+- assertVisible: Other view
+- assertNotVisible: Grid view

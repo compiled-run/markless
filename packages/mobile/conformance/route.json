@@ -1,0 +1,160 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"route": {
+			"pattern": "/[fruit]",
+			"params": [
+				"fruit"
+			]
+		},
+		"cells": [],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Fruit "
+					},
+					{
+						"expr": {
+							"member": {
+								"route": "params"
+							},
+							"property": "fruit"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0",
+				"element": "a",
+				"parent": "h0",
+				"attributes": {
+					"href": "/[fruit]"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0:text0",
+				"parent": "component-edge:0",
+				"parts": [
+					{
+						"text": "Go to apple"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1",
+				"element": "a",
+				"parent": "h0",
+				"attributes": {
+					"href": "/[fruit]"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1:text0",
+				"parent": "component-edge:1",
+				"parts": [
+					{
+						"text": "Go to pear"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:0",
+				"event": "activate",
+				"handler": "handler:component-edge:0"
+			},
+			{
+				"host": "component-edge:1",
+				"event": "activate",
+				"handler": "handler:component-edge:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:0",
+				"ops": [
+					{
+						"op": "navigate",
+						"route": "/[fruit]",
+						"params": {
+							"fruit": "apple"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:1",
+				"ops": [
+					{
+						"op": "navigate",
+						"route": "/[fruit]",
+						"params": {
+							"fruit": "pear"
+						}
+					}
+				]
+			}
+		]
+	},
+	"params": {
+		"fruit": "apple"
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Fruit apple"
+		],
+		[
+			"component-edge:0:text0",
+			"Go to apple"
+		],
+		[
+			"component-edge:1:text0",
+			"Go to pear"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/[fruit]",
+					"params": {
+						"fruit": "pear"
+					}
+				}
+			]
+		}
+	]
+}

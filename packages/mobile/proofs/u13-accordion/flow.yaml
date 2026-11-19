@@ -1,0 +1,77 @@
+appId: ${APP_ID}
+name: u13-accordion
+---
+- launchApp:
+      clearState: true
+- assertVisible: Help
+- assertVisible: Shipping
+- assertVisible: Returns
+- assertVisible: Colours
+- assertVisible: Sizes
+- assertVisible: Ships in two days
+- assertVisible: 'Open: none'
+- assertNotVisible: Thirty days to return
+- assertNotVisible: Red and blue
+- assertNotVisible: Small and large
+- assertNotVisible: 'Open: colours'
+- assertNotVisible: 'Open: colours,sizes'
+- assertNotVisible: 'Open: sizes'
+- tapOn: Returns
+- assertVisible: Thirty days to return
+- assertNotVisible: Ships in two days
+- assertVisible: Thirty days to return
+- assertVisible: 'Open: none'
+- assertNotVisible: Ships in two days
+- assertNotVisible: Red and blue
+- assertNotVisible: Small and large
+- assertNotVisible: 'Open: colours'
+- assertNotVisible: 'Open: colours,sizes'
+- assertNotVisible: 'Open: sizes'
+- tapOn: Returns
+- assertNotVisible: Thirty days to return
+- assertVisible: Shipping
+- assertVisible: Returns
+- assertVisible: 'Open: none'
+- assertNotVisible: Ships in two days
+- assertNotVisible: Thirty days to return
+- assertNotVisible: Red and blue
+- assertNotVisible: Small and large
+- assertNotVisible: 'Open: colours'
+- assertNotVisible: 'Open: colours,sizes'
+- assertNotVisible: 'Open: sizes'
+- tapOn: Colours
+- assertVisible: Red and blue
+- assertVisible: 'Open: colours'
+- assertNotVisible: 'Open: none'
+- assertVisible: Red and blue
+- assertVisible: 'Open: colours'
+- assertNotVisible: Ships in two days
+- assertNotVisible: Thirty days to return
+- assertNotVisible: Small and large
+- assertNotVisible: 'Open: none'
+- assertNotVisible: 'Open: colours,sizes'
+- assertNotVisible: 'Open: sizes'
+- tapOn: Sizes
+- assertVisible: Small and large
+- assertVisible: 'Open: colours,sizes'
+- assertNotVisible: 'Open: colours'
+- assertVisible: Red and blue
+- assertVisible: Small and large
+- assertVisible: 'Open: colours,sizes'
+- assertNotVisible: Ships in two days
+- assertNotVisible: Thirty days to return
+- assertNotVisible: 'Open: none'
+- assertNotVisible: 'Open: colours'
+- assertNotVisible: 'Open: sizes'
+- tapOn: Colours
+- assertVisible: 'Open: sizes'
+- assertNotVisible: Red and blue
+- assertNotVisible: 'Open: colours,sizes'
+- assertVisible: Small and large
+- assertVisible: 'Open: sizes'
+- assertNotVisible: Ships in two days
+- assertNotVisible: Thirty days to return
+- assertNotVisible: Red and blue
+- assertNotVisible: 'Open: none'
+- assertNotVisible: 'Open: colours'
+- assertNotVisible: 'Open: colours,sizes'

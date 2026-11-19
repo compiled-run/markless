@@ -8,6 +8,8 @@ type CompileJob = {
 	readonly kind: 'compile';
 	readonly id: number;
 	readonly input: CompileTsrxModuleInput;
+	/** The input compiles with the compiler's `DEVICE_TARGET_FACTS`, which the parent names rather than sends. */
+	readonly deviceTargetFacts?: true;
 	readonly key: string;
 	readonly store?: { readonly directory: string; readonly fingerprint: string };
 };
@@ -25,6 +27,7 @@ type ChunkJob = {
 let chunkTasks: Promise<typeof import('./build/chunk-tasks.ts')> | undefined;
 let chunkAst: Promise<typeof import('./build/chunk-ast.ts')> | undefined;
 let compiler: Promise<typeof import('@markless/compiler')> | undefined;
+let native: Promise<typeof import('@markless/compiler/native')> | undefined;
 
 // A parent that finished its build may exit before this process boots or answers; nothing is left to tell.
 const post = (message: unknown, transfer?: ArrayBuffer[]): void => {
@@ -68,12 +71,22 @@ async function runChunkJob({ id, task, fileName, code, context }: ChunkJob): Pro
 	}
 }
 
-async function runCompileJob({ id, input, key, store }: CompileJob): Promise<void> {
+async function runCompileJob({
+	id,
+	input,
+	deviceTargetFacts,
+	key,
+	store,
+}: CompileJob): Promise<void> {
 	compiler ??= import('@markless/compiler');
+	if (deviceTargetFacts) native ??= import('@markless/compiler/native');
 	const { clearCompileCache, compileTsrxModule } = await compiler;
+	const facts = native && deviceTargetFacts ? (await native).DEVICE_TARGET_FACTS : undefined;
 	let bytes: Buffer;
 	try {
-		bytes = serialize(await compileTsrxModule(input));
+		bytes = serialize(
+			await compileTsrxModule(facts ? { ...input, deviceTargetFacts: facts } : input),
+		);
 	} catch {
 		post({ id, failed: true });
 		return;

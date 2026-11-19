@@ -1,0 +1,105 @@
+{
+	"rung": 112,
+	"name": "@markless/ui buttongroup: the family's own helper functions (heldValues, nextHeld) inlined at build time",
+	"steps": [
+		{
+			"visible": [
+				"Format",
+				"Alignment",
+				"Left",
+				"Center",
+				"Right",
+				"Style",
+				"Bold",
+				"Italic",
+				"Aligned left",
+				"Styled plain"
+			],
+			"absent": [
+				"Aligned center",
+				"Aligned right",
+				"Styled bold",
+				"Styled bold,italic",
+				"Styled italic"
+			]
+		},
+		{
+			"do": {
+				"tap": "Center"
+			},
+			"visible": ["Aligned center", "Styled plain"],
+			"absent": [
+				"Aligned left",
+				"Aligned right",
+				"Styled bold",
+				"Styled bold,italic",
+				"Styled italic"
+			]
+		},
+		{
+			"do": {
+				"tap": "Right"
+			},
+			"visible": ["Aligned right", "Styled plain"],
+			"absent": [
+				"Aligned left",
+				"Aligned center",
+				"Styled bold",
+				"Styled bold,italic",
+				"Styled italic"
+			]
+		},
+		{
+			"do": {
+				"tap": "Bold"
+			},
+			"visible": ["Aligned right", "Styled bold"],
+			"absent": [
+				"Aligned left",
+				"Aligned center",
+				"Styled plain",
+				"Styled bold,italic",
+				"Styled italic"
+			]
+		},
+		{
+			"do": {
+				"tap": "Italic"
+			},
+			"visible": ["Aligned right", "Styled bold,italic"],
+			"absent": [
+				"Aligned left",
+				"Aligned center",
+				"Styled plain",
+				"Styled bold",
+				"Styled italic"
+			]
+		},
+		{
+			"do": {
+				"tap": "Bold"
+			},
+			"visible": ["Aligned right", "Styled italic"],
+			"absent": [
+				"Aligned left",
+				"Aligned center",
+				"Styled plain",
+				"Styled bold",
+				"Styled bold,italic"
+			]
+		},
+		{
+			"do": {
+				"tap": "Italic"
+			},
+			"visible": ["Aligned right", "Styled plain"],
+			"absent": [
+				"Aligned left",
+				"Aligned center",
+				"Styled bold",
+				"Styled bold,italic",
+				"Styled italic"
+			]
+		}
+	]
+}

@@ -1,0 +1,343 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "component-edge:1/state:shots",
+				"name": "shots",
+				"initial": 0
+			},
+			{
+				"id": "device:camera.access",
+				"name": "camera.access",
+				"initial": "unknown",
+				"device": "camera.access"
+			},
+			{
+				"id": "component-edge:1/boundary:0:catch",
+				"name": "error",
+				"initial": null
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "h1",
+				"parent": "h6",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Camera"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h0",
+				"element": "section",
+				"parent": "h6"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h1",
+				"element": "p",
+				"parent": "component-edge:1/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h1:text0",
+				"parent": "component-edge:1/h1",
+				"parts": [
+					{
+						"text": "Access "
+					},
+					{
+						"cell": "device:camera.access"
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "component-edge:1/boundary:0",
+				"parent": "component-edge:1/h0",
+				"tests": [
+					{
+						"logical": "&&",
+						"left": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:1/boundary:0:catch"
+							},
+							"right": {
+								"literal": null
+							}
+						},
+						"right": {
+							"literal": true
+						}
+					},
+					{
+						"logical": "&&",
+						"left": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:1/boundary:0:catch"
+							},
+							"right": {
+								"literal": null
+							}
+						},
+						"right": {
+							"literal": false
+						}
+					},
+					null
+				],
+				"arms": 3
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h2",
+				"element": "div",
+				"parent": "component-edge:1/h0",
+				"arm": {
+					"branch": "component-edge:1/boundary:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/component-edge:0",
+				"element": "camera",
+				"object": "object:component-edge:1/cam",
+				"parent": "component-edge:1/h2",
+				"arm": {
+					"branch": "component-edge:1/boundary:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h3",
+				"element": "button",
+				"parent": "component-edge:1/h2",
+				"arm": {
+					"branch": "component-edge:1/boundary:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h3:text0",
+				"parent": "component-edge:1/h3",
+				"parts": [
+					{
+						"text": "Take photo"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:1/boundary:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h4",
+				"element": "p",
+				"parent": "component-edge:1/h2",
+				"arm": {
+					"branch": "component-edge:1/boundary:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h4:text0",
+				"parent": "component-edge:1/h4",
+				"parts": [
+					{
+						"text": "Photos "
+					},
+					{
+						"cell": "component-edge:1/state:shots"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:1/boundary:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h5",
+				"element": "p",
+				"parent": "component-edge:1/h0",
+				"arm": {
+					"branch": "component-edge:1/boundary:0",
+					"index": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h5:text0",
+				"parent": "component-edge:1/h5",
+				"parts": [
+					{
+						"text": "Photo failed: "
+					},
+					{
+						"expr": {
+							"member": {
+								"cell": "component-edge:1/boundary:0:catch"
+							},
+							"property": "name"
+						}
+					}
+				],
+				"arm": {
+					"branch": "component-edge:1/boundary:0",
+					"index": 2
+				}
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:1/h3",
+				"event": "activate",
+				"handler": "handler:component-edge:1/event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:1/event:0",
+				"ops": [
+					{
+						"op": "call",
+						"call": "camera.takePhoto",
+						"object": "object:component-edge:1/cam",
+						"arguments": [],
+						"after": {
+							"id": "handler:component-edge:1/event:0:after:0",
+							"as": "$0",
+							"ops": [
+								{
+									"op": "assign",
+									"cell": "component-edge:1/state:shots",
+									"value": {
+										"binary": "+",
+										"left": {
+											"unary": "+",
+											"value": {
+												"cell": "component-edge:1/state:shots"
+											}
+										},
+										"right": {
+											"literal": 1
+										}
+									}
+								}
+							],
+							"catch": "component-edge:1/boundary:0:catch"
+						}
+					}
+				]
+			}
+		],
+		"objects": [
+			{
+				"id": "object:component-edge:1/cam",
+				"device": "camera",
+				"owner": "component-edge:1/h0"
+			}
+		]
+	},
+	"initial": [
+		[
+			"h7:text0",
+			"Camera"
+		],
+		[
+			"component-edge:1/h1:text0",
+			"Access unknown"
+		],
+		[
+			"component-edge:1/h3:text0",
+			"Take photo"
+		],
+		[
+			"component-edge:1/h4:text0",
+			"Photos 0"
+		]
+	],
+	"initialArms": [
+		[
+			"component-edge:1/boundary:0",
+			0
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "device",
+				"cell": "device:camera.access",
+				"value": "denied"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h1:text0",
+					"value": "Access denied"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h3"
+			},
+			"journal": [
+				{
+					"op": "call",
+					"call": "camera.takePhoto",
+					"object": "object:component-edge:1/cam",
+					"arguments": [],
+					"resume": "handler:component-edge:1/event:0:after:0"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "reject",
+				"continuation": "handler:component-edge:1/event:0:after:0",
+				"error": {
+					"name": "NotAllowedError",
+					"message": "The camera was refused"
+				}
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "component-edge:1/boundary:0",
+					"index": 2
+				}
+			]
+		}
+	]
+}

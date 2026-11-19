@@ -1,0 +1,2207 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Forms",
+		"cells": [
+			{
+				"id": "state:draft",
+				"name": "draft",
+				"initial": "Bo"
+			},
+			{
+				"id": "state:agreed",
+				"name": "agreed",
+				"initial": false
+			},
+			{
+				"id": "state:sent",
+				"name": "sent",
+				"initial": ""
+			},
+			{
+				"id": "state:pressed",
+				"name": "pressed",
+				"initial": 0
+			},
+			{
+				"id": "state:status",
+				"name": "status",
+				"initial": "Idle"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "form",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "input",
+				"parent": "h1",
+				"attributes": {
+					"aria-label": "First",
+					"name": "first",
+					"value": "Ada",
+					"required": ""
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "input",
+				"parent": "h1",
+				"attributes": {
+					"aria-label": "Nick",
+					"name": "nick"
+				},
+				"bindings": [
+					{
+						"property": "value",
+						"value": {
+							"cell": "state:draft"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "input",
+				"parent": "h1",
+				"attributes": {
+					"aria-label": "Unnamed"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "input",
+				"parent": "h1",
+				"attributes": {
+					"aria-label": "Code",
+					"name": "code",
+					"value": "X",
+					"required": "",
+					"disabled": ""
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "input",
+				"parent": "h1",
+				"attributes": {
+					"type": "hidden",
+					"name": "kind",
+					"value": "person"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "input",
+				"parent": "h1",
+				"attributes": {
+					"type": "checkbox",
+					"aria-hidden": "true",
+					"name": "agree",
+					"required": ""
+				},
+				"bindings": [
+					{
+						"attribute": "tabindex",
+						"value": {
+							"unary": "-",
+							"value": {
+								"literal": 1
+							}
+						}
+					},
+					{
+						"property": "checked",
+						"value": {
+							"cell": "state:agreed"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "input",
+				"parent": "h1",
+				"attributes": {
+					"type": "checkbox",
+					"aria-hidden": "true",
+					"name": "off",
+					"value": "yes"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "button",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"text": "Send"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h10",
+				"element": "button",
+				"parent": "h1",
+				"attributes": {
+					"type": "submit",
+					"formnovalidate": ""
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h10:text0",
+				"parent": "h10",
+				"parts": [
+					{
+						"text": "Send anyway"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h11",
+				"element": "button",
+				"parent": "h1",
+				"attributes": {
+					"type": "button"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h11:text0",
+				"parent": "h11",
+				"parts": [
+					{
+						"text": "Agree"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h12",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h12:text0",
+				"parent": "h12",
+				"parts": [
+					{
+						"cell": "state:sent"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h13",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h13:text0",
+				"parent": "h13",
+				"parts": [
+					{
+						"cell": "state:pressed"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h14",
+				"element": "form",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h15",
+				"element": "input",
+				"parent": "h14",
+				"attributes": {
+					"aria-label": "Search",
+					"name": "q"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h16",
+				"element": "form",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h17",
+				"element": "input",
+				"parent": "h16",
+				"attributes": {
+					"aria-label": "A",
+					"name": "a"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h18",
+				"element": "input",
+				"parent": "h16",
+				"attributes": {
+					"aria-label": "B",
+					"name": "b"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h19",
+				"element": "form",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h20",
+				"element": "input",
+				"parent": "h19",
+				"attributes": {
+					"aria-label": "Who",
+					"name": "who"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h21",
+				"element": "button",
+				"parent": "h19"
+			},
+			{
+				"kind": "text",
+				"id": "h21:text0",
+				"parent": "h21",
+				"parts": [
+					{
+						"text": "Save"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h22",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h22:text0",
+				"parent": "h22",
+				"parts": [
+					{
+						"cell": "state:status"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h23",
+				"element": "form",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h24",
+				"element": "button",
+				"parent": "h23",
+				"attributes": {
+					"aria-disabled": "false"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h24:text0",
+				"parent": "h24",
+				"parts": [
+					{
+						"text": "Mine"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "submit",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "input",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h9",
+				"event": "activate",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h11",
+				"event": "activate",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "h14",
+				"event": "submit",
+				"handler": "handler:event:4"
+			},
+			{
+				"host": "h16",
+				"event": "submit",
+				"handler": "handler:event:5"
+			},
+			{
+				"host": "h19",
+				"event": "submit",
+				"handler": "handler:event:6"
+			},
+			{
+				"host": "h23",
+				"event": "submit",
+				"handler": "handler:event:7"
+			},
+			{
+				"host": "h7",
+				"event": "activate",
+				"handler": "handler:h7/tick"
+			},
+			{
+				"host": "h8",
+				"event": "activate",
+				"handler": "handler:h8/tick"
+			},
+			{
+				"host": "h10",
+				"event": "activate",
+				"handler": "handler:h10/submit"
+			},
+			{
+				"host": "h2",
+				"event": "input",
+				"handler": "handler:h2/edit"
+			},
+			{
+				"host": "h2",
+				"event": "enter",
+				"handler": "handler:h2/return"
+			},
+			{
+				"host": "h3",
+				"event": "enter",
+				"handler": "handler:h3/return"
+			},
+			{
+				"host": "h4",
+				"event": "input",
+				"handler": "handler:h4/edit"
+			},
+			{
+				"host": "h4",
+				"event": "enter",
+				"handler": "handler:h4/return"
+			},
+			{
+				"host": "h5",
+				"event": "input",
+				"handler": "handler:h5/edit"
+			},
+			{
+				"host": "h5",
+				"event": "enter",
+				"handler": "handler:h5/return"
+			},
+			{
+				"host": "h15",
+				"event": "input",
+				"handler": "handler:h15/edit"
+			},
+			{
+				"host": "h15",
+				"event": "enter",
+				"handler": "handler:h15/return"
+			},
+			{
+				"host": "h17",
+				"event": "input",
+				"handler": "handler:h17/edit"
+			},
+			{
+				"host": "h18",
+				"event": "input",
+				"handler": "handler:h18/edit"
+			},
+			{
+				"host": "h21",
+				"event": "activate",
+				"handler": "handler:h21/submit"
+			},
+			{
+				"host": "h20",
+				"event": "input",
+				"handler": "handler:h20/edit"
+			},
+			{
+				"host": "h20",
+				"event": "enter",
+				"handler": "handler:h20/return"
+			},
+			{
+				"host": "h24",
+				"event": "activate",
+				"handler": "handler:h24/submit"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:sent",
+						"value": {
+							"template": [
+								"",
+								{
+									"call": "String",
+									"arguments": [
+										{
+											"if": {
+												"method": "some",
+												"target": {
+													"formData": "h1"
+												},
+												"arguments": [
+													{
+														"lambda": ["formdata:entry"],
+														"body": {
+															"binary": "===",
+															"left": {
+																"member": {
+																	"local": "formdata:entry"
+																},
+																"property": "0"
+															},
+															"right": {
+																"call": "String",
+																"arguments": [
+																	{
+																		"literal": "first"
+																	}
+																]
+															}
+														}
+													}
+												]
+											},
+											"whenTrue": {
+												"member": {
+													"member": {
+														"method": "filter",
+														"target": {
+															"formData": "h1"
+														},
+														"arguments": [
+															{
+																"lambda": ["formdata:entry"],
+																"body": {
+																	"binary": "===",
+																	"left": {
+																		"member": {
+																			"local": "formdata:entry"
+																		},
+																		"property": "0"
+																	},
+																	"right": {
+																		"call": "String",
+																		"arguments": [
+																			{
+																				"literal": "first"
+																			}
+																		]
+																	}
+																}
+															}
+														]
+													},
+													"property": "0"
+												},
+												"property": "1"
+											},
+											"whenFalse": {
+												"literal": null
+											}
+										}
+									]
+								},
+								"|",
+								{
+									"call": "String",
+									"arguments": [
+										{
+											"if": {
+												"method": "some",
+												"target": {
+													"formData": "h1"
+												},
+												"arguments": [
+													{
+														"lambda": ["formdata:entry"],
+														"body": {
+															"binary": "===",
+															"left": {
+																"member": {
+																	"local": "formdata:entry"
+																},
+																"property": "0"
+															},
+															"right": {
+																"call": "String",
+																"arguments": [
+																	{
+																		"literal": "nick"
+																	}
+																]
+															}
+														}
+													}
+												]
+											},
+											"whenTrue": {
+												"member": {
+													"member": {
+														"method": "filter",
+														"target": {
+															"formData": "h1"
+														},
+														"arguments": [
+															{
+																"lambda": ["formdata:entry"],
+																"body": {
+																	"binary": "===",
+																	"left": {
+																		"member": {
+																			"local": "formdata:entry"
+																		},
+																		"property": "0"
+																	},
+																	"right": {
+																		"call": "String",
+																		"arguments": [
+																			{
+																				"literal": "nick"
+																			}
+																		]
+																	}
+																}
+															}
+														]
+													},
+													"property": "0"
+												},
+												"property": "1"
+											},
+											"whenFalse": {
+												"literal": null
+											}
+										}
+									]
+								},
+								"|",
+								{
+									"call": "String",
+									"arguments": [
+										{
+											"if": {
+												"method": "some",
+												"target": {
+													"formData": "h1"
+												},
+												"arguments": [
+													{
+														"lambda": ["formdata:entry"],
+														"body": {
+															"binary": "===",
+															"left": {
+																"member": {
+																	"local": "formdata:entry"
+																},
+																"property": "0"
+															},
+															"right": {
+																"call": "String",
+																"arguments": [
+																	{
+																		"literal": "code"
+																	}
+																]
+															}
+														}
+													}
+												]
+											},
+											"whenTrue": {
+												"member": {
+													"member": {
+														"method": "filter",
+														"target": {
+															"formData": "h1"
+														},
+														"arguments": [
+															{
+																"lambda": ["formdata:entry"],
+																"body": {
+																	"binary": "===",
+																	"left": {
+																		"member": {
+																			"local": "formdata:entry"
+																		},
+																		"property": "0"
+																	},
+																	"right": {
+																		"call": "String",
+																		"arguments": [
+																			{
+																				"literal": "code"
+																			}
+																		]
+																	}
+																}
+															}
+														]
+													},
+													"property": "0"
+												},
+												"property": "1"
+											},
+											"whenFalse": {
+												"literal": null
+											}
+										}
+									]
+								},
+								"|",
+								{
+									"call": "String",
+									"arguments": [
+										{
+											"if": {
+												"method": "some",
+												"target": {
+													"formData": "h1"
+												},
+												"arguments": [
+													{
+														"lambda": ["formdata:entry"],
+														"body": {
+															"binary": "===",
+															"left": {
+																"member": {
+																	"local": "formdata:entry"
+																},
+																"property": "0"
+															},
+															"right": {
+																"call": "String",
+																"arguments": [
+																	{
+																		"literal": "kind"
+																	}
+																]
+															}
+														}
+													}
+												]
+											},
+											"whenTrue": {
+												"member": {
+													"member": {
+														"method": "filter",
+														"target": {
+															"formData": "h1"
+														},
+														"arguments": [
+															{
+																"lambda": ["formdata:entry"],
+																"body": {
+																	"binary": "===",
+																	"left": {
+																		"member": {
+																			"local": "formdata:entry"
+																		},
+																		"property": "0"
+																	},
+																	"right": {
+																		"call": "String",
+																		"arguments": [
+																			{
+																				"literal": "kind"
+																			}
+																		]
+																	}
+																}
+															}
+														]
+													},
+													"property": "0"
+												},
+												"property": "1"
+											},
+											"whenFalse": {
+												"literal": null
+											}
+										}
+									]
+								},
+								"|",
+								{
+									"call": "String",
+									"arguments": [
+										{
+											"if": {
+												"method": "some",
+												"target": {
+													"formData": "h1"
+												},
+												"arguments": [
+													{
+														"lambda": ["formdata:entry"],
+														"body": {
+															"binary": "===",
+															"left": {
+																"member": {
+																	"local": "formdata:entry"
+																},
+																"property": "0"
+															},
+															"right": {
+																"call": "String",
+																"arguments": [
+																	{
+																		"literal": "agree"
+																	}
+																]
+															}
+														}
+													}
+												]
+											},
+											"whenTrue": {
+												"member": {
+													"member": {
+														"method": "filter",
+														"target": {
+															"formData": "h1"
+														},
+														"arguments": [
+															{
+																"lambda": ["formdata:entry"],
+																"body": {
+																	"binary": "===",
+																	"left": {
+																		"member": {
+																			"local": "formdata:entry"
+																		},
+																		"property": "0"
+																	},
+																	"right": {
+																		"call": "String",
+																		"arguments": [
+																			{
+																				"literal": "agree"
+																			}
+																		]
+																	}
+																}
+															}
+														]
+													},
+													"property": "0"
+												},
+												"property": "1"
+											},
+											"whenFalse": {
+												"literal": null
+											}
+										}
+									]
+								},
+								"|",
+								{
+									"member": {
+										"method": "map",
+										"target": {
+											"method": "filter",
+											"target": {
+												"formData": "h1"
+											},
+											"arguments": [
+												{
+													"lambda": ["formdata:entry"],
+													"body": {
+														"binary": "===",
+														"left": {
+															"member": {
+																"local": "formdata:entry"
+															},
+															"property": "0"
+														},
+														"right": {
+															"call": "String",
+															"arguments": [
+																{
+																	"literal": "first"
+																}
+															]
+														}
+													}
+												}
+											]
+										},
+										"arguments": [
+											{
+												"lambda": ["formdata:entry"],
+												"body": {
+													"member": {
+														"local": "formdata:entry"
+													},
+													"property": "1"
+												}
+											}
+										]
+									},
+									"property": "length"
+								},
+								"|",
+								{
+									"call": "String",
+									"arguments": [
+										{
+											"method": "some",
+											"target": {
+												"formData": "h1"
+											},
+											"arguments": [
+												{
+													"lambda": ["formdata:entry"],
+													"body": {
+														"binary": "===",
+														"left": {
+															"member": {
+																"local": "formdata:entry"
+															},
+															"property": "0"
+														},
+														"right": {
+															"call": "String",
+															"arguments": [
+																{
+																	"literal": "off"
+																}
+															]
+														}
+													}
+												}
+											]
+										}
+									]
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:draft",
+						"value": {
+							"event": "value"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:pressed",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:pressed"
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					},
+					{
+						"op": "submit",
+						"form": "h1",
+						"submitter": "h9"
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:agreed",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:agreed"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:4",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:sent",
+						"value": {
+							"template": [
+								"search ",
+								{
+									"call": "String",
+									"arguments": [
+										{
+											"if": {
+												"method": "some",
+												"target": {
+													"formData": "h14"
+												},
+												"arguments": [
+													{
+														"lambda": ["formdata:entry"],
+														"body": {
+															"binary": "===",
+															"left": {
+																"member": {
+																	"local": "formdata:entry"
+																},
+																"property": "0"
+															},
+															"right": {
+																"call": "String",
+																"arguments": [
+																	{
+																		"literal": "q"
+																	}
+																]
+															}
+														}
+													}
+												]
+											},
+											"whenTrue": {
+												"member": {
+													"member": {
+														"method": "filter",
+														"target": {
+															"formData": "h14"
+														},
+														"arguments": [
+															{
+																"lambda": ["formdata:entry"],
+																"body": {
+																	"binary": "===",
+																	"left": {
+																		"member": {
+																			"local": "formdata:entry"
+																		},
+																		"property": "0"
+																	},
+																	"right": {
+																		"call": "String",
+																		"arguments": [
+																			{
+																				"literal": "q"
+																			}
+																		]
+																	}
+																}
+															}
+														]
+													},
+													"property": "0"
+												},
+												"property": "1"
+											},
+											"whenFalse": {
+												"literal": null
+											}
+										}
+									]
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:5",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:sent",
+						"value": {
+							"literal": "two fields"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:6",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:status",
+						"value": {
+							"literal": "Saving"
+						}
+					},
+					{
+						"op": "after",
+						"ms": {
+							"literal": 100
+						},
+						"capture": [
+							[
+								"handler:event:6/await:0",
+								{
+									"call": "String",
+									"arguments": [
+										{
+											"if": {
+												"method": "some",
+												"target": {
+													"formData": "h19"
+												},
+												"arguments": [
+													{
+														"lambda": ["formdata:entry"],
+														"body": {
+															"binary": "===",
+															"left": {
+																"member": {
+																	"local": "formdata:entry"
+																},
+																"property": "0"
+															},
+															"right": {
+																"call": "String",
+																"arguments": [
+																	{
+																		"literal": "who"
+																	}
+																]
+															}
+														}
+													}
+												]
+											},
+											"whenTrue": {
+												"member": {
+													"member": {
+														"method": "filter",
+														"target": {
+															"formData": "h19"
+														},
+														"arguments": [
+															{
+																"lambda": ["formdata:entry"],
+																"body": {
+																	"binary": "===",
+																	"left": {
+																		"member": {
+																			"local": "formdata:entry"
+																		},
+																		"property": "0"
+																	},
+																	"right": {
+																		"call": "String",
+																		"arguments": [
+																			{
+																				"literal": "who"
+																			}
+																		]
+																	}
+																}
+															}
+														]
+													},
+													"property": "0"
+												},
+												"property": "1"
+											},
+											"whenFalse": {
+												"literal": null
+											}
+										}
+									]
+								}
+							],
+							[
+								"handler:event:6/await:1",
+								{
+									"formData": "h19"
+								}
+							]
+						],
+						"ops": [
+							{
+								"op": "if",
+								"test": {
+									"binary": "===",
+									"left": {
+										"local": "handler:event:6/await:0"
+									},
+									"right": {
+										"literal": ""
+									}
+								},
+								"whenTrue": [
+									{
+										"op": "assign",
+										"cell": "state:status",
+										"value": {
+											"call": "String",
+											"arguments": [
+												{
+													"literal": "No name"
+												}
+											]
+										}
+									},
+									{
+										"op": "assign",
+										"cell": "state:pressed",
+										"value": {
+											"binary": "+",
+											"left": {
+												"cell": "state:pressed"
+											},
+											"right": {
+												"literal": 10
+											}
+										}
+									}
+								],
+								"whenFalse": [
+									{
+										"op": "assign",
+										"cell": "state:status",
+										"value": {
+											"template": [
+												"Kept ",
+												{
+													"local": "handler:event:6/await:0"
+												},
+												""
+											]
+										}
+									},
+									{
+										"op": "assign",
+										"cell": "state:pressed",
+										"value": {
+											"binary": "+",
+											"left": {
+												"cell": "state:pressed"
+											},
+											"right": {
+												"literal": 10
+											}
+										}
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "handler:event:7",
+				"ops": [
+					{
+						"op": "after",
+						"ms": {
+							"literal": 50
+						},
+						"capture": [],
+						"ops": [
+							{
+								"op": "assign",
+								"cell": "state:status",
+								"value": {
+									"template": [
+										"Kept ",
+										{
+											"literal": "mine"
+										},
+										""
+									]
+								}
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "handler:h7/tick",
+				"ops": [
+					{
+						"op": "tick",
+						"node": "h7"
+					}
+				]
+			},
+			{
+				"id": "handler:h8/tick",
+				"ops": [
+					{
+						"op": "tick",
+						"node": "h8"
+					}
+				]
+			},
+			{
+				"id": "handler:h10/submit",
+				"ops": [
+					{
+						"op": "submit",
+						"form": "h1",
+						"submitter": "h10"
+					}
+				]
+			},
+			{
+				"id": "handler:h2/edit",
+				"ops": []
+			},
+			{
+				"id": "handler:h2/return",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"literal": null
+							},
+							"right": {
+								"literal": null
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "assign",
+								"cell": "state:pressed",
+								"value": {
+									"binary": "+",
+									"left": {
+										"cell": "state:pressed"
+									},
+									"right": {
+										"literal": 1
+									}
+								}
+							},
+							{
+								"op": "submit",
+								"form": "h1",
+								"submitter": "h9"
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:h3/return",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"literal": null
+							},
+							"right": {
+								"literal": null
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "assign",
+								"cell": "state:pressed",
+								"value": {
+									"binary": "+",
+									"left": {
+										"cell": "state:pressed"
+									},
+									"right": {
+										"literal": 1
+									}
+								}
+							},
+							{
+								"op": "submit",
+								"form": "h1",
+								"submitter": "h9"
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:h4/edit",
+				"ops": []
+			},
+			{
+				"id": "handler:h4/return",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"literal": null
+							},
+							"right": {
+								"literal": null
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "assign",
+								"cell": "state:pressed",
+								"value": {
+									"binary": "+",
+									"left": {
+										"cell": "state:pressed"
+									},
+									"right": {
+										"literal": 1
+									}
+								}
+							},
+							{
+								"op": "submit",
+								"form": "h1",
+								"submitter": "h9"
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:h5/edit",
+				"ops": []
+			},
+			{
+				"id": "handler:h5/return",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"literal": null
+							},
+							"right": {
+								"literal": null
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "assign",
+								"cell": "state:pressed",
+								"value": {
+									"binary": "+",
+									"left": {
+										"cell": "state:pressed"
+									},
+									"right": {
+										"literal": 1
+									}
+								}
+							},
+							{
+								"op": "submit",
+								"form": "h1",
+								"submitter": "h9"
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:h15/edit",
+				"ops": []
+			},
+			{
+				"id": "handler:h15/return",
+				"ops": [
+					{
+						"op": "submit",
+						"form": "h14",
+						"submitter": null
+					}
+				]
+			},
+			{
+				"id": "handler:h17/edit",
+				"ops": []
+			},
+			{
+				"id": "handler:h18/edit",
+				"ops": []
+			},
+			{
+				"id": "handler:h21/submit",
+				"ops": [
+					{
+						"op": "submit",
+						"form": "h19",
+						"submitter": "h21"
+					}
+				]
+			},
+			{
+				"id": "handler:h20/edit",
+				"ops": []
+			},
+			{
+				"id": "handler:h20/return",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"literal": null
+							},
+							"right": {
+								"literal": null
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "submit",
+								"form": "h19",
+								"submitter": "h21"
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:h24/submit",
+				"ops": [
+					{
+						"op": "submit",
+						"form": "h23",
+						"submitter": "h24"
+					}
+				]
+			}
+		],
+		"forms": [
+			{
+				"node": "h1",
+				"fields": [
+					{
+						"node": "h2",
+						"kind": "text"
+					},
+					{
+						"node": "h3",
+						"kind": "text"
+					},
+					{
+						"node": "h4",
+						"kind": "text"
+					},
+					{
+						"node": "h5",
+						"kind": "text"
+					},
+					{
+						"node": "h6",
+						"kind": "hidden"
+					},
+					{
+						"node": "h7",
+						"kind": "checkbox"
+					},
+					{
+						"node": "h8",
+						"kind": "checkbox"
+					}
+				],
+				"submitters": ["h9", "h10"]
+			},
+			{
+				"node": "h14",
+				"fields": [
+					{
+						"node": "h15",
+						"kind": "text"
+					}
+				],
+				"submitters": []
+			},
+			{
+				"node": "h16",
+				"fields": [
+					{
+						"node": "h17",
+						"kind": "text"
+					},
+					{
+						"node": "h18",
+						"kind": "text"
+					}
+				],
+				"submitters": []
+			},
+			{
+				"node": "h19",
+				"fields": [
+					{
+						"node": "h20",
+						"kind": "text"
+					}
+				],
+				"submitters": ["h21"]
+			},
+			{
+				"node": "h23",
+				"fields": [],
+				"submitters": ["h24"],
+				"authoredAriaDisabled": true
+			}
+		],
+		"valueMissing": {
+			"af": {
+				"text": "Vul asseblief hierdie veld in.",
+				"checkbox": "Merk asseblief hierdie blokkie as jy wil voortgaan.",
+				"radio": "Kies asseblief een van hierdie opsies."
+			},
+			"am": {
+				"text": "እባክዎ ይህን መስክ ይሙሉት።",
+				"checkbox": "ለመቀጠል ከፈለጉ እባክዎ ይህ ሳጥን ላይ ምልክት ያድርጉ።",
+				"radio": "እባክዎ ከእነዚህ አማራጮች ውስጥ አንዱን ይምረጡ።"
+			},
+			"ar": {
+				"text": "يُرجى ملء هذا الحقل.",
+				"checkbox": "يُرجى وضع علامة في هذا المربع إذا أردت المتابعة.",
+				"radio": "يُرجى اختيار أحد هذه الخيارات."
+			},
+			"bg": {
+				"text": "Моля, попълнете това поле.",
+				"checkbox": "Моля, поставете отметка в това квадратче, ако искате да продължите.",
+				"radio": "Моля, изберете една от тези опции."
+			},
+			"bn": {
+				"text": "দয়া করে এই ক্ষেত্রটি পূরণ করুন৷",
+				"checkbox": "আপনি এগিয়ে যেতে চাইলে এই বাক্সটি পরীক্ষা করুন৷",
+				"radio": "দয়া করে বিকল্পগুলির একটি নির্বাচন করুন৷"
+			},
+			"ca": {
+				"text": "Empleneu aquest camp.",
+				"checkbox": "Marqueu aquesta casella si voleu continuar.",
+				"radio": "Seleccioneu una d'aquestes opcions."
+			},
+			"cs": {
+				"text": "Vyplňte prosím toto pole.",
+				"checkbox": "Chcete-li pokračovat, zaškrtněte toto políčko.",
+				"radio": "Vyberte jednu z těchto možností."
+			},
+			"da": {
+				"text": "Udfyld dette felt.",
+				"checkbox": "Markér dette felt, hvis du vil fortsætte.",
+				"radio": "Vælg en af disse muligheder."
+			},
+			"de": {
+				"text": "Fülle dieses Feld aus.",
+				"checkbox": "Klicke dieses Kästchen an, wenn du fortfahren möchtest.",
+				"radio": "Wähle eine dieser Optionen aus."
+			},
+			"el": {
+				"text": "Συμπληρώστε αυτό το πεδίο.",
+				"checkbox": "Αν θέλετε να συνεχίσετε, επιλέξτε αυτό το πλαίσιο.",
+				"radio": "Ορίστε μία από αυτές τις επιλογές."
+			},
+			"en": {
+				"text": "Please fill out this field.",
+				"checkbox": "Please check this box if you want to proceed.",
+				"radio": "Please select one of these options."
+			},
+			"en-GB": {
+				"text": "Please fill in this field.",
+				"checkbox": "Please tick this box if you want to proceed.",
+				"radio": "Please select one of these options."
+			},
+			"es": {
+				"text": "Completa este campo",
+				"checkbox": "Selecciona esta casilla de verificación si quieres continuar",
+				"radio": "Selecciona una de estas opciones"
+			},
+			"es-419": {
+				"text": "Completa este campo",
+				"checkbox": "Controla esta casilla si deseas continuar.",
+				"radio": "Selecciona una de estas opciones."
+			},
+			"et": {
+				"text": "Täitke see väli.",
+				"checkbox": "Märkige see ruut, kui soovite jätkata.",
+				"radio": "Tehke üks nendest valikutest."
+			},
+			"fa": {
+				"text": "لطفاً این قسمت را تکمیل کنید.",
+				"checkbox": "درصورتی‌که می‌خواهید ادامه دهید، این کادر را انتخاب کنید.",
+				"radio": "لطفاً یکی از این گزینه‌ها را انتخاب کنید."
+			},
+			"fi": {
+				"text": "Täytä tämä kenttä.",
+				"checkbox": "Valitse tämä ruutu jatkaaksesi.",
+				"radio": "Valitse yksi vaihtoehdoista."
+			},
+			"fil": {
+				"text": "Pakipunan ang field na ito.",
+				"checkbox": "Pakitingnan ang kahon na ito kung gusto mong magpatuloy.",
+				"radio": "Mangyaring pumili ng isa sa mga opsyong ito."
+			},
+			"fr": {
+				"text": "Veuillez renseigner ce champ.",
+				"checkbox": "Veuillez cocher cette case si vous souhaitez continuer.",
+				"radio": "Veuillez sélectionner l'une de ces options."
+			},
+			"gu": {
+				"text": "કૃપા કરીને આ ફીલ્ડ ભરો.",
+				"checkbox": "જો તમે આગળ વધવા માંગતા હો તો કૃપા કરીને આ બૉક્સને ચેક કરો.",
+				"radio": "કૃપા કરીને આ વિકલ્પોમાંથી કોઈ એક પસંદ કરો."
+			},
+			"he": {
+				"text": "זהו שדה חובה.",
+				"checkbox": "יש לסמן את התיבה הזאת כדי להמשיך.",
+				"radio": "יש לבחור אחת מהאפשרויות הבאות."
+			},
+			"hi": {
+				"text": "कृपया इस फ़ील्ड को भरें.",
+				"checkbox": "अगर आप आगे बढ़ना चाहते हैं तो इस बॉक्‍स को सही का निशान लगाकर चुनें.",
+				"radio": "कृपया इनमें से कोई विकल्प चुनें."
+			},
+			"hr": {
+				"text": "Ispunite ovo polje.",
+				"checkbox": "Označite taj okvir ako želite ići dalje.",
+				"radio": "Izaberite jednu od tih opcija."
+			},
+			"hu": {
+				"text": "Kérjük, töltse ki ezt a mezőt.",
+				"checkbox": "Kérjük, jelölje be ezt a jelölőnégyzetet, ha tovább kíván haladni.",
+				"radio": "Kérjük, válassza ki az egyik opciót."
+			},
+			"id": {
+				"text": "Harap isi bidang ini.",
+				"checkbox": "Centang kotak ini jika Anda ingin melanjutkan.",
+				"radio": "Pilih salah satu opsi berikut."
+			},
+			"it": {
+				"text": "Compila questo campo.",
+				"checkbox": "Seleziona questa casella se intendi procedere.",
+				"radio": "Seleziona una di queste opzioni."
+			},
+			"ja": {
+				"text": "このフィールドを入力してください。",
+				"checkbox": "次に進むにはこのチェックボックスをオンにしてください。",
+				"radio": "これらのオプションから 1 つ選択してください。"
+			},
+			"kn": {
+				"text": "ದಯವಿಟ್ಟು ಈ ಕ್ಷೇತ್ರವನ್ನು ಭರ್ತಿ ಮಾಡಿ.",
+				"checkbox": "ನೀವು ಮುಂದುವರೆಯಬೇಕಾದರೆ ದಯವಿಟ್ಟು ಈ ಬಾಕ್ಸ್ ಅನ್ನು ಪರೀಕ್ಷಿಸಿ.",
+				"radio": "ದಯವಿಟ್ಟು ಈ ಕೆಳಗಿನ ಆಯ್ಕೆಗಳಲ್ಲಿ ಒಂದನ್ನು ಆರಿಸಿ."
+			},
+			"ko": {
+				"text": "이 입력란을 작성하세요.",
+				"checkbox": "계속하려면 이 확인란을 선택하세요.",
+				"radio": "다음 옵션 중 하나를 선택하세요."
+			},
+			"lt": {
+				"text": "Užpildykite šį lauką.",
+				"checkbox": "Jei norite tęsti, pažymėkite šį laukelį.",
+				"radio": "Pasirinkite vieną iš šių parinkčių."
+			},
+			"lv": {
+				"text": "Aizpildiet šo lauku.",
+				"checkbox": "Lai turpinātu, atzīmējiet šo izvēles rūtiņu.",
+				"radio": "Lūdzu, atlasiet vienu no šīm opcijām."
+			},
+			"ml": {
+				"text": "ദയവായി ഈ ഫീല്‍ഡ് പൂരിപ്പിക്കുക.",
+				"checkbox": "നിങ്ങള്‍ തുടരാന്‍ താല്‍പ്പര്യപ്പെടുന്നെങ്കില്‍ ഈ ബോക്സ് ദയവായി പരിശോധിക്കുക.",
+				"radio": "ഈ ഓപ്ഷനുകളിലൊന്ന് ദയവായി തിരഞ്ഞെടുക്കുക."
+			},
+			"mr": {
+				"text": "कृपया हे फील्ड भरा.",
+				"checkbox": "कृपया तुम्ही पुढे सुरू ठेवू इच्छित असल्यास हा बॉक्स पहा.",
+				"radio": "कृपया या पर्यायांपैकी एक निवडा."
+			},
+			"ms": {
+				"text": "Sila isikan medan ini.",
+				"checkbox": "Sila tandakan kotak ini jika anda mahu teruskan.",
+				"radio": "Sila pilih salah satu pilihan ini."
+			},
+			"nb": {
+				"text": "Vennligst fyll ut dette feltet.",
+				"checkbox": "Kryss av denne boksen hvis du vil fortsette.",
+				"radio": "Velg ett av følgende alternativer."
+			},
+			"nl": {
+				"text": "Vul dit veld in.",
+				"checkbox": "Vink dit selectievakje aan als je wilt doorgaan.",
+				"radio": "Selecteer een van deze opties."
+			},
+			"pl": {
+				"text": "Wypełnij to pole.",
+				"checkbox": "Zaznacz to pole, jeśli chcesz kontynuować.",
+				"radio": "Wybierz jedną z opcji."
+			},
+			"pt-BR": {
+				"text": "Preencha este campo.",
+				"checkbox": "Marque esta caixa se deseja continuar.",
+				"radio": "Selecione uma das opções."
+			},
+			"pt-PT": {
+				"text": "Preencha este campo.",
+				"checkbox": "Selecione esta caixa se pretender continuar.",
+				"radio": "Selecione uma destas opções."
+			},
+			"ro": {
+				"text": "Completează acest câmp.",
+				"checkbox": "Bifeză caseta dacă vrei să continui.",
+				"radio": "Selectează una dintre aceste opțiuni."
+			},
+			"ru": {
+				"text": "Заполните это поле.",
+				"checkbox": "Чтобы продолжить, установите этот флажок.",
+				"radio": "Выберите один из вариантов."
+			},
+			"sk": {
+				"text": "Vyplňte toto pole.",
+				"checkbox": "Ak chcete pokračovať, začiarknite toto políčko.",
+				"radio": "Vyberte jednu z týchto možností."
+			},
+			"sl": {
+				"text": "Izpolnite to polje",
+				"checkbox": "Potrdite to polje, če želite nadaljevati.",
+				"radio": "Izberite eno od teh možnosti."
+			},
+			"sr": {
+				"text": "Попуните ово поље.",
+				"checkbox": "Потврдите избор у овом пољу за потврду уколико желите да наставите.",
+				"radio": "Изаберите неку од ових опција."
+			},
+			"sv": {
+				"text": "Fyll i det här fältet.",
+				"checkbox": "Markera den här kryssrutan om du vill fortsätta.",
+				"radio": "Välj ett av följande alternativ."
+			},
+			"sw": {
+				"text": "Tafadhali jaza sehemu hii.",
+				"checkbox": "Tafadhali angalia kikasha hiki iwapo unataka kuendelea.",
+				"radio": "Tafadhali chagua moja wapo ya chaguo hizi."
+			},
+			"ta": {
+				"text": "இந்தப் புலத்தை நிரப்புக.",
+				"checkbox": "தொடர விரும்பினால், இந்தப் பெட்டியைத் தேர்ந்தெடுங்கள்.",
+				"radio": "தயவுசெய்து இந்த விருப்பங்களில் ஒன்றைத் தேர்ந்தெடுங்கள்."
+			},
+			"te": {
+				"text": "దయచేసి ఈ ఫీల్డ్‌ను పూర్తి చేయండి.",
+				"checkbox": "మీరు కొనసాగాలనుకుంటే దయచేసి ఈ బాక్స్‌కి టిక్కు పెట్టండి.",
+				"radio": "దయచేసి ఈ ఎంపికలలో ఒకదాన్ని ఎంచుకోండి."
+			},
+			"th": {
+				"text": "โปรดกรอกฟิลด์นี้",
+				"checkbox": "โปรดเลือกช่องนี้หากคุณต้องการดำเนินการต่อ",
+				"radio": "โปรดเลือกตัวเลือกอย่างหนึ่งอย่างใดเหล่านี้"
+			},
+			"tr": {
+				"text": "Lütfen bu alanı doldurun.",
+				"checkbox": "İlerlemek istiyorsanız lütfen bu kutuyu işaretleyin.",
+				"radio": "Lütfen bu seçeneklerden birini belirleyin."
+			},
+			"uk": {
+				"text": "Заповніть це поле.",
+				"checkbox": "Поставте тут прапорець, якщо хочете продовжити.",
+				"radio": "Виберіть один із запропонованих варіантів."
+			},
+			"ur": {
+				"text": "براہ کرم یہ فیلڈ پُر کریں۔",
+				"checkbox": "اگر آپ آگے بڑھنا چاہتے ہیں تو براہ کرم یہ باکس نشان زد کریں۔",
+				"radio": "براہ کرم ان اختیارات میں سے ایک کو منتخب کریں۔"
+			},
+			"vi": {
+				"text": "Vui lòng điền vào trường này.",
+				"checkbox": "Vui lòng chọn hộp kiểm này nếu bạn muốn tiếp tục.",
+				"radio": "Vui lòng chọn một trong các tùy chọn sau."
+			},
+			"zh-CN": {
+				"text": "请填写此字段。",
+				"checkbox": "如果要继续，请选中此框。",
+				"radio": "请从这些选项中选择一个。"
+			},
+			"zh-TW": {
+				"text": "請填寫這個欄位。",
+				"checkbox": "如果你要繼續執行，請勾選這個核取方塊。",
+				"radio": "請選取其中一個選項。"
+			}
+		}
+	},
+	"initial": [
+		["h9:text0", "Send"],
+		["h10:text0", "Send anyway"],
+		["h11:text0", "Agree"],
+		["h12:text0", ""],
+		["h13:text0", "0"],
+		["h21:text0", "Save"],
+		["h22:text0", "Idle"],
+		["h24:text0", "Mine"]
+	],
+	"initialAttributes": [
+		["h7", "tabindex", "-1"],
+		["h1", "aria-busy", null],
+		["h9", "aria-disabled", null],
+		["h10", "aria-disabled", null],
+		["h14", "aria-busy", null],
+		["h16", "aria-busy", null],
+		["h19", "aria-busy", null],
+		["h21", "aria-disabled", null],
+		["h23", "aria-busy", null]
+	],
+	"initialProperties": [["h3", "value", "Bo"]],
+	"initialChecks": [
+		["h7", false],
+		["h8", false]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h9"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h13:text0",
+					"value": "1"
+				},
+				{
+					"op": "invalid",
+					"node": "h7",
+					"message": "Please check this box if you want to proceed."
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h11"
+			},
+			"journal": [
+				{
+					"op": "property",
+					"node": "h7",
+					"name": "checked",
+					"value": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h2",
+				"value": ""
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h9"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h13:text0",
+					"value": "2"
+				},
+				{
+					"op": "invalid",
+					"node": "h2",
+					"message": "Please fill out this field."
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h10"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h12:text0",
+					"value": "|Bo|null|person|on|1|false"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h2",
+				"value": "Grace"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h3",
+				"value": "Cy"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "enter",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h12:text0",
+					"value": "Grace|Cy|null|person|on|1|false"
+				},
+				{
+					"op": "text",
+					"node": "h13:text0",
+					"value": "3"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "enter",
+				"host": "h15"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h12:text0",
+					"value": "search "
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h20",
+				"value": "Lu"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h21"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h22:text0",
+					"value": "Saving"
+				},
+				{
+					"op": "attribute",
+					"node": "h19",
+					"name": "aria-busy",
+					"value": "true"
+				},
+				{
+					"op": "attribute",
+					"node": "h21",
+					"name": "aria-disabled",
+					"value": "true"
+				},
+				{
+					"op": "timer",
+					"timer": "timer:0",
+					"ms": 100
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h21"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h20",
+				"value": ""
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "enter",
+				"host": "h20"
+			},
+			"journal": [
+				{
+					"op": "timer",
+					"timer": "timer:1",
+					"ms": 100
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "timer",
+				"timer": "timer:0"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h13:text0",
+					"value": "13"
+				},
+				{
+					"op": "text",
+					"node": "h22:text0",
+					"value": "Kept Lu"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "timer",
+				"timer": "timer:1"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h13:text0",
+					"value": "23"
+				},
+				{
+					"op": "text",
+					"node": "h22:text0",
+					"value": "No name"
+				},
+				{
+					"op": "attribute",
+					"node": "h19",
+					"name": "aria-busy",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "h21",
+					"name": "aria-disabled",
+					"value": null
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h24"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "h23",
+					"name": "aria-busy",
+					"value": "true"
+				},
+				{
+					"op": "timer",
+					"timer": "timer:2",
+					"ms": 50
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "timer",
+				"timer": "timer:2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h22:text0",
+					"value": "Kept mine"
+				},
+				{
+					"op": "attribute",
+					"node": "h23",
+					"name": "aria-busy",
+					"value": null
+				}
+			]
+		}
+	]
+}

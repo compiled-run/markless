@@ -1,0 +1,34 @@
+{
+	"name": "@markless/mobile",
+	"version": "0.14.0",
+	"private": true,
+	"description": "Markless on iOS and Android: the native view build, the reference update runtime and the platform hosts.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/compiled-run/markless.git",
+		"directory": "packages/mobile"
+	},
+	"files": [
+		"dist"
+	],
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"proof": "node src/harness/cli.ts"
+	},
+	"dependencies": {
+		"@markless/compiler": "workspace:*",
+		"@markless/router": "workspace:*",
+		"@markless/serializer": "workspace:*",
+		"@markless/web": "workspace:*",
+		"yaml": "2.9.1"
+	},
+	"devDependencies": {
+		"@markless/core": "workspace:*",
+		"@markless/ui": "workspace:*"
+	}
+}

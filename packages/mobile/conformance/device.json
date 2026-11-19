@@ -1,0 +1,184 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Device",
+		"cells": [
+			{
+				"id": "state:taps",
+				"name": "taps",
+				"initial": 0
+			},
+			{
+				"id": "device:network.online",
+				"name": "network.online",
+				"initial": true,
+				"device": "network.online"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "device:network.online"
+							},
+							"whenTrue": {
+								"literal": "Online"
+							},
+							"whenFalse": {
+								"literal": "Offline"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Tapped "
+					},
+					{
+						"cell": "state:taps"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:taps",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "state:taps"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					},
+					{
+						"op": "call",
+						"call": "haptics.tap",
+						"arguments": []
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Online"
+		],
+		[
+			"h2:text0",
+			"Tapped 0"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Tapped 1"
+				},
+				{
+					"op": "call",
+					"call": "haptics.tap",
+					"arguments": []
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "device",
+				"cell": "device:network.online",
+				"value": false
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "Offline"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Tapped 2"
+				},
+				{
+					"op": "call",
+					"call": "haptics.tap",
+					"arguments": []
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "device",
+				"cell": "device:network.online",
+				"value": true
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "Online"
+				}
+			]
+		}
+	]
+}

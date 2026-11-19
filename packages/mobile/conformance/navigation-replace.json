@@ -1,0 +1,331 @@
+{
+	"version": "markless.native-app-conformance/0",
+	"app": {
+		"version": "markless.native-app/0",
+		"routes": [
+			{
+				"pattern": "/",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Home",
+					"route": {
+						"pattern": "/",
+						"params": []
+					},
+					"cells": [],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Welcome screen ahead"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h3",
+							"element": "button",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h3:text0",
+							"parent": "h3",
+							"parts": [
+								{
+									"text": "Sign in"
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "h3",
+							"event": "activate",
+							"handler": "handler:event:0"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:event:0",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/welcome",
+									"params": {}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Home"
+						}
+					]
+				}
+			},
+			{
+				"pattern": "/dashboard",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Dashboard",
+					"route": {
+						"pattern": "/dashboard",
+						"params": []
+					},
+					"cells": [],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Your dashboard"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h3",
+							"element": "p",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h3:text0",
+							"parent": "h3",
+							"parts": [
+								{
+									"text": "The welcome screen was replaced."
+								}
+							]
+						}
+					],
+					"events": [],
+					"handlers": [],
+					"title": [
+						{
+							"text": "Dashboard"
+						}
+					]
+				}
+			},
+			{
+				"pattern": "/welcome",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Welcome",
+					"route": {
+						"pattern": "/welcome",
+						"params": []
+					},
+					"cells": [],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Signed in"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h3",
+							"element": "button",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h3:text0",
+							"parent": "h3",
+							"parts": [
+								{
+									"text": "Continue"
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "h3",
+							"event": "activate",
+							"handler": "handler:event:0"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:event:0",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/dashboard",
+									"params": {},
+									"replace": true
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Welcome"
+						}
+					]
+				}
+			}
+		]
+	},
+	"open": "/",
+	"initial": {
+		"stack": [
+			"/"
+		],
+		"title": "Home",
+		"texts": [
+			[
+				"h2:text0",
+				"Welcome screen ahead"
+			],
+			[
+				"h3:text0",
+				"Sign in"
+			]
+		]
+	},
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/welcome",
+					"params": {}
+				}
+			],
+			"stack": [
+				"/",
+				"/welcome"
+			],
+			"title": "Welcome",
+			"texts": [
+				[
+					"h2:text0",
+					"Signed in"
+				],
+				[
+					"h3:text0",
+					"Continue"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/dashboard",
+					"params": {},
+					"replace": true
+				}
+			],
+			"stack": [
+				"/",
+				"/dashboard"
+			],
+			"title": "Dashboard",
+			"texts": [
+				[
+					"h2:text0",
+					"Your dashboard"
+				],
+				[
+					"h3:text0",
+					"The welcome screen was replaced."
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "back"
+			},
+			"journal": [],
+			"stack": [
+				"/"
+			],
+			"title": "Home",
+			"texts": [
+				[
+					"h2:text0",
+					"Welcome screen ahead"
+				],
+				[
+					"h3:text0",
+					"Sign in"
+				]
+			]
+		}
+	]
+}

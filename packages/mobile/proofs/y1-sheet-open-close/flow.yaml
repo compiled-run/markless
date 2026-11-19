@@ -1,0 +1,67 @@
+appId: ${APP_ID}
+name: y1-sheet-open-close
+---
+- launchApp:
+      clearState: true
+- assertVisible: Shop
+- assertVisible: Show filters
+- assertVisible: 'Closed by the platform: 0'
+- assertNotVisible: Filters
+- assertNotVisible: Done
+- tapOn: Show filters
+- assertVisible: Filters
+- assertVisible: Done
+- assertVisible: Filters
+- assertVisible: Pull down to close
+- assertVisible: Done
+- swipe:
+      start: 50%, 56%
+      end: 50%, 96%
+      duration: 150
+- assertNotVisible: Filters
+- assertNotVisible: Done
+- assertVisible: Show filters
+- assertVisible: 'Closed by the platform: 1'
+- assertNotVisible: Filters
+- assertNotVisible: Done
+- assertNotVisible: 'Closed by the platform: 0'
+- tapOn: Show filters
+- assertVisible: Filters
+- assertVisible: Done
+- assertVisible: Filters
+- assertVisible: Done
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - swipe:
+                start: 1%, 50%
+                end: 85%, 50%
+                duration: 300
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - swipe:
+                start: 50%, 56%
+                end: 50%, 96%
+                duration: 150
+- assertNotVisible: Filters
+- assertNotVisible: Done
+- assertVisible: Show filters
+- assertVisible: 'Closed by the platform: 2'
+- assertNotVisible: Filters
+- assertNotVisible: Done
+- assertNotVisible: 'Closed by the platform: 1'
+- tapOn: Show filters
+- assertVisible: Filters
+- assertVisible: Done
+- assertVisible: Filters
+- assertVisible: Done
+- tapOn: Done
+- assertNotVisible: Filters
+- assertNotVisible: Done
+- assertVisible: Show filters
+- assertVisible: 'Closed by the platform: 2'
+- assertNotVisible: Filters
+- assertNotVisible: Done

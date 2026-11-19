@@ -1,0 +1,9 @@
+{
+	"rung": "R114",
+	"name": "A button drawn as an SVG icon is pressed by its label",
+	"steps": [
+		{ "visible": ["Menu", "Menu closed"] },
+		{ "do": { "tap": "Toggle menu" }, "visible": ["Menu open"], "absent": ["Menu closed"] },
+		{ "do": { "tap": "Toggle menu" }, "visible": ["Menu closed"], "absent": ["Menu open"] }
+	]
+}

@@ -1,0 +1,30 @@
+{
+	"rung": 51,
+	"name": "A form with two named text fields and a submit button; the handler reads them with FormData",
+	"steps": [
+		{
+			"visible": ["Sign up", "Send", "Nothing sent"],
+			"fields": { "First name": "", "Last name": "Lovelace" }
+		},
+		{
+			"do": { "type": { "field": "First name", "text": "Ada" } },
+			"visible": ["Nothing sent"],
+			"fields": { "First name": "Ada", "Last name": "Lovelace" }
+		},
+		{
+			"do": { "tap": "Send" },
+			"visible": ["Sent Ada Lovelace, nickname false"],
+			"absent": ["Nothing sent"]
+		},
+		{
+			"do": { "type": { "field": "Last name", "text": "Byron" } },
+			"visible": ["Sent Ada Lovelace, nickname false"],
+			"fields": { "First name": "Ada", "Last name": "Byron" }
+		},
+		{
+			"do": { "tap": "Send" },
+			"visible": ["Sent Ada Byron, nickname false"],
+			"absent": ["Sent Ada Lovelace, nickname false"]
+		}
+	]
+}

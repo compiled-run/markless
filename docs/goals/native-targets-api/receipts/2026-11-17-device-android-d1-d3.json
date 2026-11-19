@@ -1,0 +1,24 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "d1-network",
+			"failure": null,
+			"installSeconds": 1.6034798329999995,
+			"flowSeconds": 27.019015167000006
+		},
+		{
+			"name": "d2-haptics",
+			"failure": null,
+			"installSeconds": 0.8778891670000012,
+			"flowSeconds": 12.076476875
+		},
+		{
+			"name": "d3-location",
+			"failure": null,
+			"installSeconds": 0.6246752500000002,
+			"flowSeconds": 17.289505625000004
+		}
+	]
+}

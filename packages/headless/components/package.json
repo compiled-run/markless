@@ -136,6 +136,7 @@
 	},
 	"dependencies": {
 		"@markless/core": "workspace:*",
+		"@markless/device": "workspace:*",
 		"@markless/icons": "workspace:*",
 		"@markless/ui-tools": "workspace:*"
 	},

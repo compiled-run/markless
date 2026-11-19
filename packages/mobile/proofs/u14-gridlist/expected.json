@@ -1,0 +1,25 @@
+{
+	"rung": 114,
+	"name": "@markless/ui gridlist: which row a tap landed on (event.target), answered when the app is built",
+	"steps": [
+		{
+			"visible": ["Files", "Recent", "README.md", "LICENSE", "NOTES.md", "Picked nothing"],
+			"absent": ["Picked readme", "Picked license"]
+		},
+		{
+			"do": { "tap": "LICENSE" },
+			"visible": ["Picked license"],
+			"absent": ["Picked nothing", "Picked readme"]
+		},
+		{
+			"do": { "tap": "README.md" },
+			"visible": ["Picked readme"],
+			"absent": ["Picked nothing", "Picked license"]
+		},
+		{
+			"do": { "tap": "README.md" },
+			"visible": ["Picked nothing"],
+			"absent": ["Picked readme", "Picked license"]
+		}
+	]
+}

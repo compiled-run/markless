@@ -1,0 +1,18 @@
+{
+	"perPage": {
+		"/": 16603,
+		"/basil": 10525
+	},
+	"perPageTotal": 27128,
+	"app": 19907,
+	"targets": {
+		"ios": {
+			"writeLists": 11,
+			"writeListReferences": 18
+		},
+		"android": {
+			"writeLists": 11,
+			"writeListReferences": 18
+		}
+	}
+}

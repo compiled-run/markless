@@ -1,0 +1,11 @@
+body {
+	margin: 0;
+	font-family: sans-serif;
+	background: #f4efe6;
+}
+
+@media (prefers-color-scheme: dark) {
+	body {
+		background: #1d1b16;
+	}
+}

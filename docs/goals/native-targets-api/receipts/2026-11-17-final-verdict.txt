@@ -1,0 +1,5 @@
+
+> @markless/mobile@0.14.0 proof /Users/jackshelton/wt/markless/native-targets/packages/mobile
+> node src/harness/cli.ts verdict /tmp/nt-scratch/final/ios.json /tmp/nt-scratch/final/android.json
+
+proof passed on iOS and Android

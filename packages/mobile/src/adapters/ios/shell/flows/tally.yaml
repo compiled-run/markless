@@ -1,0 +1,14 @@
+appId: dev.markless.shell.ioshost
+---
+- launchApp
+- assertVisible:
+      text: '10 of 10 open'
+      id: 'h2:text0'
+- assertVisible:
+      text: 'Seats left'
+- tapOn:
+      text: 'Take a seat'
+- assertVisible: '9 of 10 open'
+- tapOn: 'Take a seat'
+- assertVisible: '8 of 10 open'
+- assertNotVisible: '9 of 10 open'

@@ -1,0 +1,114 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 29.92395975,
+			"flowSeconds": 21.594725250000003
+		},
+		{
+			"name": "02-styles",
+			"failure": null,
+			"installSeconds": 0.32328949999999895,
+			"flowSeconds": 19.548127249999997
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.5301816669999971,
+			"flowSeconds": 22.628446209
+		},
+		{
+			"name": "04-attributes",
+			"failure": null,
+			"installSeconds": 0.3783941669999913,
+			"flowSeconds": 23.933610249999997
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 0.3002329169999866,
+			"flowSeconds": 24.080352375000004
+		},
+		{
+			"name": "05b-choices",
+			"failure": null,
+			"installSeconds": 0.3453693750000093,
+			"flowSeconds": 31.704523000000016
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 0.2611085829999938,
+			"flowSeconds": 18.147472249999993
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 0.24674116700000012,
+			"flowSeconds": 15.784234999999986
+		},
+		{
+			"name": "07b-imported-component",
+			"failure": null,
+			"installSeconds": 0.22854799999998068,
+			"flowSeconds": 16.42048850000001
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 0.2349769999999844,
+			"flowSeconds": 16.989716625
+		},
+		{
+			"name": "07d-children",
+			"failure": null,
+			"installSeconds": 0.23701316699999733,
+			"flowSeconds": 16.30515091699999
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.24683633299998473,
+			"flowSeconds": 24.99736970899999
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 0.24001587499998278,
+			"flowSeconds": 24.88355254100001
+		},
+		{
+			"name": "10-url-route",
+			"failure": null,
+			"installSeconds": 0.24945345899998211,
+			"flowSeconds": 14.07024099999998
+		},
+		{
+			"name": "n1-two-routes",
+			"failure": null,
+			"installSeconds": 0.21789399999997114,
+			"flowSeconds": 29.772114624999986
+		},
+		{
+			"name": "n2-orders",
+			"failure": null,
+			"installSeconds": 0.21876320799998938,
+			"flowSeconds": 23.644277499999966
+		},
+		{
+			"name": "n3-navigate",
+			"failure": null,
+			"installSeconds": 0.23617491599998902,
+			"flowSeconds": 20.14792300000001
+		},
+		{
+			"name": "n4-deep-link",
+			"failure": null,
+			"installSeconds": 0.24407712500001072,
+			"flowSeconds": 28.266034125000004
+		}
+	]
+}

@@ -1,0 +1,335 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Commands",
+		"cells": [
+			{
+				"id": "state:list",
+				"name": "list",
+				"initial": [
+					"a"
+				]
+			},
+			{
+				"id": "state:note",
+				"name": "note",
+				"initial": ""
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "input",
+				"parent": "h0",
+				"bindings": [
+					{
+						"property": "value",
+						"value": {
+							"cell": "state:note"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"if": {
+									"binary": "!==",
+									"left": {
+										"member": {
+											"cell": "state:list"
+										},
+										"property": "length"
+									},
+									"right": {
+										"literal": 1
+									}
+								},
+								"whenTrue": {
+									"literal": false
+								},
+								"whenFalse": {
+									"if": {
+										"method": "some",
+										"target": {
+											"cell": "state:list"
+										},
+										"arguments": [
+											{
+												"lambda": [
+													"at:item",
+													"at"
+												],
+												"body": {
+													"if": {
+														"binary": "!==",
+														"left": {
+															"at": {
+																"local": "at"
+															},
+															"of": {
+																"cell": "state:list"
+															}
+														},
+														"right": {
+															"at": {
+																"local": "at"
+															},
+															"of": {
+																"array": [
+																	{
+																		"spread": false,
+																		"value": {
+																			"literal": "a"
+																		}
+																	}
+																]
+															}
+														}
+													},
+													"whenTrue": {
+														"literal": true
+													},
+													"whenFalse": {
+														"literal": false
+													}
+												}
+											}
+										]
+									},
+									"whenTrue": {
+										"literal": false
+									},
+									"whenFalse": {
+										"literal": true
+									}
+								}
+							},
+							"whenTrue": {
+								"literal": "Same"
+							},
+							"whenFalse": {
+								"literal": "Changed"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Grow"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Reset"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "input",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:note",
+						"value": {
+							"event": "value"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:list",
+						"value": {
+							"array": [
+								{
+									"spread": true,
+									"value": {
+										"cell": "state:list"
+									}
+								},
+								{
+									"spread": false,
+									"value": {
+										"literal": "b"
+									}
+								}
+							]
+						}
+					},
+					{
+						"op": "command",
+						"node": "h1",
+						"command": "focus"
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:list",
+						"value": {
+							"array": [
+								{
+									"spread": false,
+									"value": {
+										"literal": "a"
+									}
+								}
+							]
+						}
+					},
+					{
+						"op": "command",
+						"node": "h1",
+						"command": "scrollIntoView"
+					},
+					{
+						"op": "command",
+						"node": "h1",
+						"command": "focus",
+						"preventScroll": true
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h2:text0",
+			"Same"
+		],
+		[
+			"h3:text0",
+			"Grow"
+		],
+		[
+			"h4:text0",
+			"Reset"
+		]
+	],
+	"initialProperties": [
+		[
+			"h1",
+			"value",
+			""
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Changed"
+				},
+				{
+					"op": "command",
+					"node": "h1",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h1",
+				"value": "hi"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Same"
+				},
+				{
+					"op": "command",
+					"node": "h1",
+					"command": "scrollIntoView"
+				},
+				{
+					"op": "command",
+					"node": "h1",
+					"command": "focus",
+					"preventScroll": true
+				}
+			]
+		}
+	]
+}

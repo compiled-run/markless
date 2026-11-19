@@ -1,0 +1,32 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Help",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "help mk-9jjfh3"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-9jjfh3"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "How alerts work"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.help.mk-9jjfh3 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t}\n\t\t\t.heading.mk-9jjfh3 {\n\t\t\t\tfont-size: 24px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #212529;\n\t\t\t}\n\t\t\t@media (prefers-color-scheme: dark) {\n\t\t\t\t.help.mk-9jjfh3 {\n\t\t\t\t\tbackground: #000000;\n\t\t\t\t}\n\t\t\t\t.heading.mk-9jjfh3 {\n\t\t\t\t\tcolor: #ffffff;\n\t\t\t\t}\n\t\t\t}",
+	"states": []
+}

@@ -1,0 +1,47 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "screen mk-1lwf2od"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "title mk-1lwf2od"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Styled counter"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "tap mk-1lwf2od"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Count 0"
+		}
+	],
+	"css": ".screen.mk-1lwf2od {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f4f1ea;\n\t\t\t}\n\t\t\t.title.mk-1lwf2od {\n\t\t\t\tfont-size: 28px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #1d1b16;\n\t\t\t}\n\t\t\t.tap.mk-1lwf2od {\n\t\t\t\tdisplay: block;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 12px 20px;\n\t\t\t\tborder: 2px solid #1d1b16;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #1d1b16;\n\t\t\t\tfont-size: 18px;\n\t\t\t}",
+	"states": []
+}

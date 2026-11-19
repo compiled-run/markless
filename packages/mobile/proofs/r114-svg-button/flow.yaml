@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+name: r114-svg-button
+---
+- launchApp:
+      clearState: true
+- assertVisible: Menu
+- assertVisible: Menu closed
+- tapOn: Toggle menu
+- assertNotVisible: Menu closed
+- assertVisible: Menu open
+- assertNotVisible: Menu closed
+- tapOn: Toggle menu
+- assertVisible: Menu closed
+- assertNotVisible: Menu open
+- assertVisible: Menu closed
+- assertNotVisible: Menu open

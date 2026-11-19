@@ -1,0 +1,8 @@
+appId: ${APP_ID}
+name: r111-svg-icon
+---
+- launchApp:
+      clearState: true
+- assertVisible: Icon
+- assertVisible: GitHub
+- assertVisible: Two icons above

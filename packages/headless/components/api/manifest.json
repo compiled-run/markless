@@ -111,6 +111,19 @@
 				]
 			},
 			{
+				"part": "camera",
+				"component": "Camera",
+				"doc": "The props of `base.camera`, which becomes `native.camera` once `@markless/ui` exports the `native` namespace.",
+				"props": [
+					{
+						"name": "el",
+						"type": "object",
+						"required": false,
+						"doc": "The device object whose picture this shows: `const cam = camera()`."
+					}
+				]
+			},
+			{
 				"part": "label",
 				"component": "Label",
 				"doc": "A plain `<label>`. It wires nothing on its own: `for` is passed straight\nthrough, so the consumer decides what it names. A family that owns its own\ncontrol ships its own label part instead, already pointed at that control.",

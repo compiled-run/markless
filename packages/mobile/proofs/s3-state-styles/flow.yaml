@@ -1,0 +1,57 @@
+appId: ${APP_ID}
+name: s3-state-styles
+---
+- launchApp:
+      clearState: true
+- setDarkMode: disabled
+- assertVisible: Account
+- assertVisible: Open settings
+- assertVisible: Home
+- tapOn: Open settings
+- assertNotVisible: Account
+- assertVisible: Settings
+- assertVisible: Notifications
+- assertVisible: Alerts off
+- assertVisible: Daily summary
+- assertVisible: Open help
+- assertNotVisible: Account
+- assertVisible: Settings
+- tapOn: Alerts off
+- assertNotVisible: Alerts off
+- assertVisible: Alerts on
+- assertVisible: Daily summary
+- assertNotVisible: Alerts off
+- tapOn: Open help
+- assertVisible: Help
+- assertVisible: How alerts work
+- assertNotVisible: Notifications
+- assertVisible: Help
+- setDarkMode: enabled
+- waitForAnimationToEnd:
+      timeout: 5000
+- assertVisible: How alerts work
+- assertVisible: Help
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertNotVisible: How alerts work
+- assertVisible: Settings
+- assertVisible: Notifications
+- assertVisible: Alerts on
+- assertVisible: Daily summary
+- assertNotVisible: How alerts work
+- assertVisible: Settings
+- setDarkMode: disabled
+- waitForAnimationToEnd:
+      timeout: 5000
+- assertVisible: Notifications
+- assertVisible: Alerts on
+- assertVisible: Settings

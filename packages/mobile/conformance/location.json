@@ -1,0 +1,303 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "device:location.access",
+				"name": "location.access",
+				"initial": "unknown",
+				"device": "location.access"
+			},
+			{
+				"id": "task:computed:here",
+				"name": "here",
+				"initial": {
+					"state": "pending"
+				},
+				"task": {
+					"call": "location.current",
+					"arguments": []
+				}
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Location"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Access "
+					},
+					{
+						"cell": "device:location.access"
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "boundary:0",
+				"parent": "h0",
+				"tests": [
+					{
+						"binary": "===",
+						"left": {
+							"member": {
+								"cell": "task:computed:here"
+							},
+							"property": "state"
+						},
+						"right": {
+							"literal": "value"
+						}
+					},
+					{
+						"binary": "===",
+						"left": {
+							"member": {
+								"cell": "task:computed:here"
+							},
+							"property": "state"
+						},
+						"right": {
+							"literal": "pending"
+						}
+					},
+					null
+				],
+				"arms": 3
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0",
+				"arm": {
+					"branch": "boundary:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"member": {
+								"member": {
+									"cell": "task:computed:here"
+								},
+								"property": "value"
+							},
+							"property": "latitude"
+						}
+					},
+					{
+						"text": ", "
+					},
+					{
+						"expr": {
+							"member": {
+								"member": {
+									"cell": "task:computed:here"
+								},
+								"property": "value"
+							},
+							"property": "longitude"
+						}
+					}
+				],
+				"arm": {
+					"branch": "boundary:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "p",
+				"parent": "h0",
+				"arm": {
+					"branch": "boundary:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Locating"
+					}
+				],
+				"arm": {
+					"branch": "boundary:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0",
+				"arm": {
+					"branch": "boundary:0",
+					"index": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"expr": {
+							"member": {
+								"member": {
+									"cell": "task:computed:here"
+								},
+								"property": "error"
+							},
+							"property": "name"
+						}
+					}
+				],
+				"arm": {
+					"branch": "boundary:0",
+					"index": 2
+				}
+			}
+		],
+		"events": [],
+		"handlers": []
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Location"
+		],
+		[
+			"h2:text0",
+			"Access unknown"
+		],
+		[
+			"h5:text0",
+			"Locating"
+		]
+	],
+	"initialArms": [
+		[
+			"boundary:0",
+			1
+		]
+	],
+	"tasks": [
+		{
+			"op": "call",
+			"call": "location.current",
+			"arguments": [],
+			"result": "task:computed:here"
+		}
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "device",
+				"cell": "device:location.access",
+				"value": "granted"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Access granted"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "settle",
+				"cell": "task:computed:here",
+				"value": {
+					"latitude": 51.5,
+					"longitude": -0.125,
+					"accuracy": 5
+				}
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "boundary:0",
+					"index": 0
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "device",
+				"cell": "device:location.access",
+				"value": "denied"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Access denied"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "settle",
+				"cell": "task:computed:here",
+				"error": {
+					"name": "NotAllowedError",
+					"message": "Location was refused"
+				}
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "boundary:0",
+					"index": 2
+				}
+			]
+		}
+	]
+}

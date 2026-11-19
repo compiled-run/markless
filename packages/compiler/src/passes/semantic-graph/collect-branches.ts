@@ -22,6 +22,7 @@ import {
 	templateExpressionUnsupportedDiagnostic,
 } from './diagnostics.ts';
 import type { WalkState } from './types.ts';
+import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 /**
  * What counts as part of the read in a branch condition.
@@ -166,6 +167,9 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			kind: 'if',
 			armCount: (node.consequent ? 1 : 0) + (node.alternate ? 1 : 0),
 			...ifTest,
+			...(NATIVE_FACTS && test && state.nativeFacts
+				? { testExpression: nativeCollectors(state.nativeFacts).expression(test as never) }
+				: {}),
 			...(ifPropTest ? { propTest: ifPropTest } : {}),
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
@@ -200,6 +204,9 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 			armTests: literalArmTests ?? asNodes(node.cases).map((_, index) => index),
+			...(NATIVE_FACTS && state.nativeFacts && discriminant
+				? { armTestExpressions: nativeCollectors(state.nativeFacts).switchArmTests(discriminant as never, node.cases as never) }
+				: {}),
 			...branchKeywordSpan(node, '@switch', state),
 			...branchAsyncBoundary(state),
 			...branchRow(state),
@@ -229,6 +236,14 @@ function collectIfChainSite(node: AnyNode, state: WalkState): void {
 		armIndexSource: indexSource,
 		...armIndexTest(chain.tests, indexSource, state),
 		armTests: chain.arms.map((_, index) => index),
+		...(NATIVE_FACTS && state.nativeFacts
+			? {
+					armTestExpressions: nativeCollectors(state.nativeFacts).ifArmTests(
+						chain.tests as never,
+						Boolean(chain.arms[chain.arms.length - 1]),
+					),
+				}
+			: {}),
 		anchorOrder: state.nextAnchorOrder++,
 		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 		...branchKeywordSpan(node, '@if', state),

@@ -1,0 +1,26 @@
+appId: ${APP_ID}
+name: z3-sheet-size
+---
+- launchApp:
+    clearState: true
+- assertVisible: Fruit
+- assertVisible: Browse fruit
+- assertNotVisible: Apple
+- assertNotVisible: Pinned to the bottom of the sheet
+- tapOn: Browse fruit
+- assertVisible: Apple
+- assertVisible: Pinned to the bottom of the sheet
+- assertVisible: Apple
+- assertVisible: Pear
+- assertVisible: Plum
+- assertVisible: Fig
+- assertVisible: Pinned to the bottom of the sheet
+- swipe:
+    start: 50%, 56%
+    end: 50%, 20%
+    duration: 600
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: Apple
+- assertVisible: Fig
+- assertVisible: Pinned to the bottom of the sheet

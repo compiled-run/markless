@@ -6,6 +6,8 @@ import type {
 	SemanticAsyncArmPlacement,
 	SemanticComponentEdge,
 	SemanticComponentPropBinding,
+	SemanticExpression,
+	SemanticHandlerStatement,
 } from '../../artifacts.ts';
 import {
 	getComponentFunction,
@@ -16,6 +18,7 @@ import {
 	isIgnorableJsxTextNode,
 	isMemberTagName,
 	isSpreadAttribute,
+	memberTagPropertyPath,
 	memberTagRootName,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
@@ -72,6 +75,7 @@ import {
 	uncoveredSyncPolicyCall,
 	unextractableSyncPolicyDiagnostic,
 } from './collect-sync-policy.ts';
+import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 export function collectComponentProps(component: AnyNode, state: WalkState): void {
 	const firstParam = asNodes(component.params)[0];
@@ -370,6 +374,7 @@ function componentPropBindings(
 				name,
 				source: inlined?.source ?? expressionSource(callback, state.source),
 				kind: 'callback',
+				...(NATIVE_FACTS ? nativeStatementsOf(factoryCall ? undefined : callback, state) : {}),
 				...(inlined?.definitionSpans.length
 					? { definitionSpans: inlined.definitionSpans }
 					: {}),
@@ -389,10 +394,12 @@ function componentPropBindings(
 					: {}),
 				...(inlined?.catchResets.size
 					? {
-							catchResets: [...inlined.catchResets].map(([resetName, boundaryId]) => ({
-								name: resetName,
-								boundaryId,
-							})),
+							catchResets: [...inlined.catchResets].map(
+								([resetName, boundaryId]) => ({
+									name: resetName,
+									boundaryId,
+								}),
+							),
 						}
 					: {}),
 			});
@@ -575,7 +582,8 @@ function componentPropBindings(
 			});
 			continue;
 		}
-		const rowRead = expression && opaqueSource === source ? rowItemRead(expression, state) : null;
+		const rowRead =
+			expression && opaqueSource === source ? rowItemRead(expression, state) : null;
 		const fixedValue =
 			!rowRead &&
 			!constant?.value.ok &&
@@ -588,6 +596,7 @@ function componentPropBindings(
 			sourceSpan: span,
 			...(rowRead ? { rowRead } : {}),
 			...(fixedValue ? { fixedValue: true as const } : {}),
+			...(NATIVE_FACTS ? nativeExpressionOf(expression, state) : {}),
 			...(constant?.value.ok ? { buildTimeValue: { value: constant.value.value } } : {}),
 			...(constant && constant.importedConstants.length > 0
 				? { importedConstants: constant.importedConstants }
@@ -694,15 +703,17 @@ function spreadPropBinding(
 function componentImportSource(
 	childComponentName: string,
 	state: WalkState,
-): Pick<SemanticComponentEdge, 'importSource' | 'importKind' | 'importedName'> {
+): Pick<SemanticComponentEdge, 'importSource' | 'importKind' | 'importedName' | 'importedMemberPath'> {
 	// Member tags resolve through their root identifier (`checkbox` in `checkbox.root`).
 	const localName = memberTagRootName(childComponentName);
 	const imported = state.graph.moduleImports.find((item) => item.localName === localName);
+	const memberPath = memberTagPropertyPath(childComponentName);
 	return imported
 		? {
 				importSource: imported.source,
 				importKind: imported.kind,
 				importedName: imported.importedName,
+				...(memberPath.length > 0 ? { importedMemberPath: memberPath } : {}),
 			}
 		: {};
 }
@@ -836,7 +847,9 @@ function relayedHandlerSource(
 	state: WalkState,
 ): { readonly source: string; readonly parameter: string; readonly propName: string } | undefined {
 	const source =
-		expression.type === 'Identifier' ? getIdentifierName(expression) : staticPropsMember(expression);
+		expression.type === 'Identifier'
+			? getIdentifierName(expression)
+			: staticPropsMember(expression);
 	if (!source) return undefined;
 	const root = source.split('.')[0]!;
 	if (repeatRowBindsName(root, state)) return undefined;
@@ -938,4 +951,20 @@ function asyncArmPlacement(state: WalkState): SemanticAsyncArmPlacement {
 				asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
 			}
 		: {};
+}
+
+function nativeExpressionOf(
+	expression: AnyNode | undefined,
+	state: WalkState,
+): { nativeExpression?: SemanticExpression } {
+	const nativeExpression = expression && state.nativeFacts && nativeCollectors(state.nativeFacts).expression(expression as never);
+	return nativeExpression ? { nativeExpression } : {};
+}
+
+function nativeStatementsOf(
+	callback: AnyNode | undefined,
+	state: WalkState,
+): { nativeStatements?: ReadonlyArray<SemanticHandlerStatement> } {
+	const nativeStatements = callback && state.nativeFacts && nativeCollectors(state.nativeFacts).handlerStatements(callback as never);
+	return nativeStatements ? { nativeStatements } : {};
 }

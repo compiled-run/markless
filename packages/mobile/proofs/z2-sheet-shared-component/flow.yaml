@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+name: z2-sheet-shared-component
+---
+- launchApp:
+    clearState: true
+- assertVisible: Basil
+- assertVisible: In season
+- assertVisible: More about basil
+- assertNotVisible: Sweet basil
+- assertNotVisible: Grown nearby
+- tapOn: More about basil
+- assertVisible: Sweet basil
+- assertVisible: Grown nearby
+- assertVisible: Sweet basil
+- assertVisible: Grown nearby

@@ -1,3 +1,4 @@
+import { DEVICE_TARGET_FACTS } from '@markless/compiler/native';
 import type { LiteralComponentInstance } from './prop-flow.ts';
 import type { InputOptions, Plugin } from 'rolldown';
 import {
@@ -98,6 +99,8 @@ export function createMarklessRolldownPlugin(input: {
 }): MarklessRolldownPlugin {
 	const environment = input.environment;
 	const internalOptions = (input.options ?? {}) as InternalMarklessRolldownOptions;
+	// A build compiles for the web: `@markless/device` folds to its constants and its features are absent.
+	internalOptions.deviceTargetFacts ??= DEVICE_TARGET_FACTS;
 	const state = createPluginState();
 	const { importedChildren, clientSymbolEntrySources } = state;
 	const dev = createMarklessDevGraph();

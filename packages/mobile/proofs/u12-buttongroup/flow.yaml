@@ -1,0 +1,80 @@
+appId: ${APP_ID}
+name: u12-buttongroup
+---
+- launchApp:
+      clearState: true
+- assertVisible: Format
+- assertVisible: Alignment
+- assertVisible: Left
+- assertVisible: Center
+- assertVisible: Right
+- assertVisible: Style
+- assertVisible: Bold
+- assertVisible: Italic
+- assertVisible: Aligned left
+- assertVisible: Styled plain
+- assertNotVisible: Aligned center
+- assertNotVisible: Aligned right
+- assertNotVisible: Styled bold
+- assertNotVisible: Styled bold,italic
+- assertNotVisible: Styled italic
+- tapOn: Center
+- assertVisible: Aligned center
+- assertNotVisible: Aligned left
+- assertVisible: Aligned center
+- assertVisible: Styled plain
+- assertNotVisible: Aligned left
+- assertNotVisible: Aligned right
+- assertNotVisible: Styled bold
+- assertNotVisible: Styled bold,italic
+- assertNotVisible: Styled italic
+- tapOn: Right
+- assertVisible: Aligned right
+- assertNotVisible: Aligned center
+- assertVisible: Aligned right
+- assertVisible: Styled plain
+- assertNotVisible: Aligned left
+- assertNotVisible: Aligned center
+- assertNotVisible: Styled bold
+- assertNotVisible: Styled bold,italic
+- assertNotVisible: Styled italic
+- tapOn: Bold
+- assertVisible: Styled bold
+- assertNotVisible: Styled plain
+- assertVisible: Aligned right
+- assertVisible: Styled bold
+- assertNotVisible: Aligned left
+- assertNotVisible: Aligned center
+- assertNotVisible: Styled plain
+- assertNotVisible: Styled bold,italic
+- assertNotVisible: Styled italic
+- tapOn: Italic
+- assertVisible: Styled bold,italic
+- assertNotVisible: Styled bold
+- assertVisible: Aligned right
+- assertVisible: Styled bold,italic
+- assertNotVisible: Aligned left
+- assertNotVisible: Aligned center
+- assertNotVisible: Styled plain
+- assertNotVisible: Styled bold
+- assertNotVisible: Styled italic
+- tapOn: Bold
+- assertVisible: Styled italic
+- assertNotVisible: Styled bold,italic
+- assertVisible: Aligned right
+- assertVisible: Styled italic
+- assertNotVisible: Aligned left
+- assertNotVisible: Aligned center
+- assertNotVisible: Styled plain
+- assertNotVisible: Styled bold
+- assertNotVisible: Styled bold,italic
+- tapOn: Italic
+- assertVisible: Styled plain
+- assertNotVisible: Styled italic
+- assertVisible: Aligned right
+- assertVisible: Styled plain
+- assertNotVisible: Aligned left
+- assertNotVisible: Aligned center
+- assertNotVisible: Styled bold
+- assertNotVisible: Styled bold,italic
+- assertNotVisible: Styled italic

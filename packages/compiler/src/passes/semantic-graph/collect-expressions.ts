@@ -35,6 +35,8 @@ export function collectAssignment(node: AnyNode, state: WalkState): void {
 	const operator = typeof node.operator === 'string' ? node.operator : '=';
 	const value = node.right as AnyNode | undefined;
 	if (diagnoseBannedWriteSite(node, target, state)) return;
+	// `cam.facing = 'front'` sets a device object's field: the device owns it, so it is no state write.
+	if (state.deviceTarget?.writesDeviceObject(target as never, state as never)) return;
 
 	state.graph.stateWrites.push({
 		target: expressionSource(target, state.source),
@@ -1198,3 +1200,4 @@ function isMutatingDateMethod(name: string): boolean {
 		name === 'setYear'
 	);
 }
+

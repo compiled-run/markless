@@ -1,0 +1,535 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:picking",
+				"name": "picking",
+				"initial": false
+			},
+			{
+				"id": "state:city",
+				"name": "city",
+				"initial": ""
+			},
+			{
+				"id": "state:shipTo",
+				"name": "shipTo",
+				"initial": "nowhere yet"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Checkout"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Ship to "
+					},
+					{
+						"cell": "state:shipTo"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Choose city"
+					}
+				]
+			},
+			{
+				"kind": "sheet",
+				"id": "sheet:component-edge:0",
+				"parent": "h0",
+				"open": {
+					"cell": "state:picking"
+				},
+				"snapPoints": [
+					0.5,
+					1
+				],
+				"dismissible": true,
+				"modal": true
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "h2",
+				"parent": "sheet:component-edge:0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 1.5
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Choose a city"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "input",
+				"parent": "sheet:component-edge:0",
+				"attributes": {
+					"aria-label": "City"
+				},
+				"bindings": [
+					{
+						"property": "value",
+						"value": {
+							"cell": "state:city"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "button",
+				"parent": "sheet:component-edge:0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Use "
+					},
+					{
+						"cell": "state:city"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "ul",
+				"parent": "sheet:component-edge:0",
+				"defaultStyle": {
+					"indent": 40,
+					"marker": "disc"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "li",
+				"parent": "h7"
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "button",
+				"parent": "h8"
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"text": "Lisbon"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h10",
+				"element": "li",
+				"parent": "h7"
+			},
+			{
+				"kind": "element",
+				"id": "h11",
+				"element": "button",
+				"parent": "h10"
+			},
+			{
+				"kind": "text",
+				"id": "h11:text0",
+				"parent": "h11",
+				"parts": [
+					{
+						"text": "Osaka"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h12",
+				"element": "li",
+				"parent": "h7"
+			},
+			{
+				"kind": "element",
+				"id": "h13",
+				"element": "button",
+				"parent": "h12"
+			},
+			{
+				"kind": "text",
+				"id": "h13:text0",
+				"parent": "h13",
+				"parts": [
+					{
+						"text": "Quito"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h5",
+				"event": "input",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h6",
+				"event": "activate",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h9",
+				"event": "activate",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "h11",
+				"event": "activate",
+				"handler": "handler:event:4"
+			},
+			{
+				"host": "h13",
+				"event": "activate",
+				"handler": "handler:event:5"
+			},
+			{
+				"host": "sheet:component-edge:0",
+				"event": "dismiss",
+				"handler": "handler:sheet:component-edge:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:picking",
+						"value": {
+							"literal": true
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:city",
+						"value": {
+							"event": "value"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:shipTo",
+						"value": {
+							"cell": "state:city"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:picking",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:shipTo",
+						"value": {
+							"literal": "Lisbon"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:picking",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:4",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:shipTo",
+						"value": {
+							"literal": "Osaka"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:picking",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:5",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:shipTo",
+						"value": {
+							"literal": "Quito"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:picking",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:sheet:component-edge:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:picking",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Checkout"
+		],
+		[
+			"h2:text0",
+			"Ship to nowhere yet"
+		],
+		[
+			"h3:text0",
+			"Choose city"
+		],
+		[
+			"h4:text0",
+			"Choose a city"
+		],
+		[
+			"h6:text0",
+			"Use "
+		],
+		[
+			"h9:text0",
+			"Lisbon"
+		],
+		[
+			"h11:text0",
+			"Osaka"
+		],
+		[
+			"h13:text0",
+			"Quito"
+		]
+	],
+	"initialProperties": [
+		[
+			"h5",
+			"value",
+			""
+		]
+	],
+	"initialSheets": [
+		[
+			"sheet:component-edge:0",
+			false
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "sheet",
+					"node": "sheet:component-edge:0",
+					"open": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "dismiss",
+				"host": "sheet:component-edge:0"
+			},
+			"journal": [
+				{
+					"op": "sheet",
+					"node": "sheet:component-edge:0",
+					"open": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "sheet",
+					"node": "sheet:component-edge:0",
+					"open": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h5",
+				"value": "Porto"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "Use Porto"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Ship to Porto"
+				},
+				{
+					"op": "sheet",
+					"node": "sheet:component-edge:0",
+					"open": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "sheet",
+					"node": "sheet:component-edge:0",
+					"open": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h11"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Ship to Osaka"
+				},
+				{
+					"op": "sheet",
+					"node": "sheet:component-edge:0",
+					"open": false
+				}
+			]
+		}
+	]
+}

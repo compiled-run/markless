@@ -1,0 +1,343 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:fruits",
+				"name": "fruits",
+				"initial": [
+					{
+						"id": "apple",
+						"name": "Apple"
+					},
+					{
+						"id": "pear",
+						"name": "Pear"
+					}
+				]
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Fruits"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Add plum"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Remove apple"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Reverse"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "ul",
+				"parent": "h0",
+				"defaultStyle": {
+					"indent": 40,
+					"marker": "disc"
+				}
+			},
+			{
+				"kind": "repeat",
+				"id": "repeat:0",
+				"parent": "h5",
+				"list": {
+					"cell": "state:fruits"
+				},
+				"key": [
+					"id"
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "li",
+				"parent": "h5",
+				"row": "repeat:0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"expr": {
+							"member": {
+								"item": "repeat:0"
+							},
+							"property": "name"
+						}
+					}
+				],
+				"row": "repeat:0"
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:fruits",
+						"value": {
+							"array": [
+								{
+									"spread": true,
+									"value": {
+										"cell": "state:fruits"
+									}
+								},
+								{
+									"spread": false,
+									"value": {
+										"object": [
+											[
+												"id",
+												{
+													"literal": "plum"
+												}
+											],
+											[
+												"name",
+												{
+													"literal": "Plum"
+												}
+											]
+										]
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:fruits",
+						"value": {
+							"method": "filter",
+							"target": {
+								"cell": "state:fruits"
+							},
+							"arguments": [
+								{
+									"lambda": [
+										"fruit"
+									],
+									"body": {
+										"binary": "!==",
+										"left": {
+											"member": {
+												"local": "fruit"
+											},
+											"property": "id"
+										},
+										"right": {
+											"literal": "apple"
+										}
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:fruits",
+						"value": {
+							"method": "reverse",
+							"target": {
+								"array": [
+									{
+										"spread": true,
+										"value": {
+											"cell": "state:fruits"
+										}
+									}
+								]
+							},
+							"arguments": []
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Fruits"
+		],
+		[
+			"h2:text0",
+			"Add plum"
+		],
+		[
+			"h3:text0",
+			"Remove apple"
+		],
+		[
+			"h4:text0",
+			"Reverse"
+		],
+		[
+			"h6:text0@apple",
+			"Apple"
+		],
+		[
+			"h6:text0@pear",
+			"Pear"
+		]
+	],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"apple",
+				"pear"
+			]
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "rows",
+					"node": "repeat:0",
+					"keys": [
+						"apple",
+						"pear",
+						"plum"
+					]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "rows",
+					"node": "repeat:0",
+					"keys": [
+						"pear",
+						"plum"
+					]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "rows",
+					"node": "repeat:0",
+					"keys": [
+						"plum",
+						"pear"
+					]
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,17 @@
+{
+	"rung": 7,
+	"name": "Child component with props and a callback",
+	"steps": [
+		{ "visible": ["Basket", "Apples 0", "Pears 0", "Total 0"] },
+		{
+			"do": { "tap": "Add one Apples" },
+			"visible": ["Apples 1", "Pears 0", "Total 1"],
+			"absent": ["Apples 0"]
+		},
+		{
+			"do": { "tap": "Add one Pears" },
+			"visible": ["Apples 1", "Pears 1", "Total 2"],
+			"absent": ["Pears 0"]
+		}
+	]
+}

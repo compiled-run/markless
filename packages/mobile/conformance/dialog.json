@@ -1,0 +1,414 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:deleted",
+				"name": "deleted",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Dialog"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Delete draft"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Deleted "
+					},
+					{
+						"cell": "state:deleted"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Sign out"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "dialog",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "h2",
+				"parent": "h5",
+				"defaultStyle": {
+					"bold": true,
+					"size": 1.5
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Delete this draft?"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "button",
+				"parent": "h5"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Delete"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "button",
+				"parent": "h5"
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"text": "Keep"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "dialog",
+				"parent": "h0",
+				"attributes": {
+					"role": "alertdialog"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h10",
+				"element": "h2",
+				"parent": "h9",
+				"defaultStyle": {
+					"bold": true,
+					"size": 1.5
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h10:text0",
+				"parent": "h10",
+				"parts": [
+					{
+						"text": "Sign out now?"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h11",
+				"element": "button",
+				"parent": "h9"
+			},
+			{
+				"kind": "text",
+				"id": "h11:text0",
+				"parent": "h11",
+				"parts": [
+					{
+						"text": "Stay"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h7",
+				"event": "activate",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h8",
+				"event": "activate",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "h11",
+				"event": "activate",
+				"handler": "handler:event:4"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "dialog",
+						"node": "h5",
+						"method": "showModal"
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "dialog",
+						"node": "h9",
+						"method": "showModal"
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:deleted",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "state:deleted"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					},
+					{
+						"op": "dialog",
+						"node": "h5",
+						"method": "close"
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "dialog",
+						"node": "h5",
+						"method": "close"
+					}
+				]
+			},
+			{
+				"id": "handler:event:4",
+				"ops": [
+					{
+						"op": "dialog",
+						"node": "h9",
+						"method": "close"
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Dialog"
+		],
+		[
+			"h2:text0",
+			"Delete draft"
+		],
+		[
+			"h3:text0",
+			"Deleted 0"
+		],
+		[
+			"h4:text0",
+			"Sign out"
+		],
+		[
+			"h6:text0",
+			"Delete this draft?"
+		],
+		[
+			"h7:text0",
+			"Delete"
+		],
+		[
+			"h8:text0",
+			"Keep"
+		],
+		[
+			"h10:text0",
+			"Sign out now?"
+		],
+		[
+			"h11:text0",
+			"Stay"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "dialog",
+					"node": "h5",
+					"open": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h7"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Deleted 1"
+				},
+				{
+					"op": "dialog",
+					"node": "h5",
+					"open": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "dialog",
+					"node": "h5",
+					"open": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "cancel",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "dialog",
+					"node": "h5",
+					"open": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "dialog",
+					"node": "h9",
+					"open": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h11"
+			},
+			"journal": [
+				{
+					"op": "dialog",
+					"node": "h9",
+					"open": false
+				}
+			]
+		}
+	]
+}

@@ -15,6 +15,7 @@
 	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts",
+		"./native": "./src/native.ts",
 		"./type-service": "./src/type-service.ts"
 	},
 	"publishConfig": {
@@ -23,6 +24,10 @@
 			".": {
 				"types": "./dist/index.d.ts",
 				"default": "./dist/index.js"
+			},
+			"./native": {
+				"types": "./dist/native.d.ts",
+				"default": "./dist/native.js"
 			},
 			"./type-service": {
 				"types": "./dist/type-service.d.ts",

@@ -1,0 +1,203 @@
+{
+ "gateDevicePx": 1,
+ "compared": 28,
+ "failed": 0,
+ "rows": [
+  {
+   "target": "ios",
+   "values": {},
+   "id": "html",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "body",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h3",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h4",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h5",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h5:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h6",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h6:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h7",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h7:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h8",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h8:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h9",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h9:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "html",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "body",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h3",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h4",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h5",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h5:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h6",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h6:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h7",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h7:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h8",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h8:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h9",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h9:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  }
+ ]
+}

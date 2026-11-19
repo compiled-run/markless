@@ -1,0 +1,67 @@
+{
+	"rung": "N1",
+	"name": "Two routes: a link pushes the second, Back returns to the first as it was left",
+	"steps": [
+		{
+			"visible": ["Start here", "Taps 0", "Open about"],
+			"absent": ["About this app"],
+			"title": "Home"
+		},
+		{
+			"do": {
+				"tap": "Taps 0"
+			},
+			"visible": ["Taps 1"],
+			"absent": ["Taps 0"]
+		},
+		{
+			"do": {
+				"tap": "Taps 1"
+			},
+			"visible": ["Taps 2"],
+			"absent": ["Taps 1"]
+		},
+		{
+			"do": {
+				"tap": "Open about"
+			},
+			"visible": ["About this app", "Two routes, one stack."],
+			"absent": ["Start here", "Taps 2"],
+			"title": "About"
+		},
+		{
+			"do": {
+				"back": "gesture"
+			},
+			"visible": ["Start here", "Taps 2"],
+			"absent": ["About this app"],
+			"title": "Home",
+			"onWeb": {
+				"why": "the web restores a page on Back from the server HTML it cached, so the page's state starts over; a native stack keeps the screen as it was left",
+				"visible": ["Start here", "Taps 0"],
+				"absent": ["About this app", "Taps 2"]
+			}
+		},
+		{
+			"do": {
+				"tap": "Open about"
+			},
+			"visible": ["About this app"],
+			"absent": ["Start here", "Taps 2"],
+			"title": "About"
+		},
+		{
+			"do": {
+				"back": "button"
+			},
+			"visible": ["Start here", "Taps 2"],
+			"absent": ["About this app"],
+			"title": "Home",
+			"onWeb": {
+				"why": "the web restores a page on Back from the server HTML it cached, so the page's state starts over; a native stack keeps the screen as it was left",
+				"visible": ["Start here", "Taps 0"],
+				"absent": ["About this app", "Taps 2"]
+			}
+		}
+	]
+}

@@ -1,0 +1,36 @@
+appId: ${APP_ID}
+name: s1-page-styles
+---
+- launchApp:
+      clearState: true
+- assertVisible: Your plants
+- assertVisible: Three need water today\.
+- assertVisible: Open care guide
+- assertNotVisible: Watering
+- assertVisible: Plants
+- tapOn: Open care guide
+- assertVisible: Watering
+- assertNotVisible: Your plants
+- assertVisible: Care
+- assertVisible: Watering
+- assertVisible: Soak the soil, then let it dry\.
+- assertNotVisible: Your plants
+- assertVisible: Care
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertVisible: Your plants
+- assertNotVisible: Watering
+- assertVisible: Plants
+- assertVisible: Your plants
+- assertVisible: Open care guide
+- assertNotVisible: Watering
+- assertVisible: Plants

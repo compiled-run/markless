@@ -1,0 +1,42 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 0.443034084,
+			"flowSeconds": 14.671991958
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.24343679200000043,
+			"flowSeconds": 20.646648750000004
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 0.8014214590000047,
+			"flowSeconds": 33.795184833
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 0.3653285419999884,
+			"flowSeconds": 18.451722666000002
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.23658958299999358,
+			"flowSeconds": 24.617135000000008
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 0.23471629199999733,
+			"flowSeconds": 24.389231707999993
+		}
+	]
+}

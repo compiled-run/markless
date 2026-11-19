@@ -1,0 +1,409 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "device:location.access",
+				"name": "location.access",
+				"initial": "unknown",
+				"device": "location.access"
+			},
+			{
+				"id": "component-edge:0/task:computed:here",
+				"name": "here",
+				"initial": {
+					"state": "pending"
+				},
+				"task": {
+					"call": "location.current",
+					"arguments": []
+				}
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "h1",
+				"parent": "h8",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"text": "Where you are"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "section",
+				"parent": "h8"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h1",
+				"element": "p",
+				"parent": "component-edge:0/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h1:text0",
+				"parent": "component-edge:0/h1",
+				"parts": [
+					{
+						"text": "Access "
+					},
+					{
+						"cell": "device:location.access"
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "component-edge:0/branch-site:0",
+				"parent": "component-edge:0/h0",
+				"test": {
+					"logical": "||",
+					"left": {
+						"binary": "===",
+						"left": {
+							"cell": "device:location.access"
+						},
+						"right": {
+							"literal": "denied"
+						}
+					},
+					"right": {
+						"binary": "===",
+						"left": {
+							"cell": "device:location.access"
+						},
+						"right": {
+							"literal": "blocked"
+						}
+					}
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h2",
+				"element": "div",
+				"parent": "component-edge:0/h0",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h3",
+				"element": "p",
+				"parent": "component-edge:0/h2",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h3:text0",
+				"parent": "component-edge:0/h3",
+				"parts": [
+					{
+						"text": "Location is off for this app"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h4",
+				"element": "button",
+				"parent": "component-edge:0/h2",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h4:text0",
+				"parent": "component-edge:0/h4",
+				"parts": [
+					{
+						"text": "Open Settings"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "branch",
+				"id": "component-edge:0/boundary:0",
+				"parent": "component-edge:0/h0",
+				"tests": [
+					{
+						"binary": "===",
+						"left": {
+							"member": {
+								"cell": "component-edge:0/task:computed:here"
+							},
+							"property": "state"
+						},
+						"right": {
+							"literal": "value"
+						}
+					},
+					{
+						"binary": "===",
+						"left": {
+							"member": {
+								"cell": "component-edge:0/task:computed:here"
+							},
+							"property": "state"
+						},
+						"right": {
+							"literal": "pending"
+						}
+					},
+					null
+				],
+				"arms": 3
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h5",
+				"element": "p",
+				"parent": "component-edge:0/h0",
+				"arm": {
+					"branch": "component-edge:0/boundary:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h5:text0",
+				"parent": "component-edge:0/h5",
+				"parts": [
+					{
+						"text": "Found you at "
+					},
+					{
+						"expr": {
+							"member": {
+								"member": {
+									"cell": "component-edge:0/task:computed:here"
+								},
+								"property": "value"
+							},
+							"property": "latitude"
+						}
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/boundary:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h7",
+				"element": "p",
+				"parent": "component-edge:0/h0",
+				"arm": {
+					"branch": "component-edge:0/boundary:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h7:text0",
+				"parent": "component-edge:0/h7",
+				"parts": [
+					{
+						"text": "Locating"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/boundary:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h6",
+				"element": "p",
+				"parent": "component-edge:0/h0",
+				"arm": {
+					"branch": "component-edge:0/boundary:0",
+					"index": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h6:text0",
+				"parent": "component-edge:0/h6",
+				"parts": [
+					{
+						"expr": {
+							"member": {
+								"member": {
+									"cell": "component-edge:0/task:computed:here"
+								},
+								"property": "error"
+							},
+							"property": "name"
+						}
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/boundary:0",
+					"index": 2
+				}
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:0/h4",
+				"event": "activate",
+				"handler": "handler:component-edge:0/event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:0/event:0",
+				"ops": [
+					{
+						"op": "call",
+						"call": "settings.open",
+						"arguments": []
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h9:text0",
+			"Where you are"
+		],
+		[
+			"component-edge:0/h1:text0",
+			"Access unknown"
+		],
+		[
+			"component-edge:0/h7:text0",
+			"Locating"
+		]
+	],
+	"initialArms": [
+		[
+			"component-edge:0/branch-site:0",
+			1
+		],
+		[
+			"component-edge:0/boundary:0",
+			1
+		]
+	],
+	"tasks": [
+		{
+			"op": "call",
+			"call": "location.current",
+			"arguments": [],
+			"result": "component-edge:0/task:computed:here"
+		}
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "device",
+				"cell": "device:location.access",
+				"value": "denied"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h1:text0",
+					"value": "Access denied"
+				},
+				{
+					"op": "arm",
+					"node": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "settle",
+				"cell": "component-edge:0/task:computed:here",
+				"error": {
+					"name": "NotAllowedError",
+					"message": "Location was refused"
+				}
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "component-edge:0/boundary:0",
+					"index": 2
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h4"
+			},
+			"journal": [
+				{
+					"op": "call",
+					"call": "settings.open",
+					"arguments": []
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "device",
+				"cell": "device:location.access",
+				"value": "granted"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h1:text0",
+					"value": "Access granted"
+				},
+				{
+					"op": "arm",
+					"node": "component-edge:0/branch-site:0",
+					"index": 1
+				}
+			]
+		}
+	]
+}

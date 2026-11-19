@@ -1,0 +1,226 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Clock",
+		"cells": [
+			{
+				"id": "state:pressedAt",
+				"name": "pressedAt",
+				"initial": "never"
+			},
+			{
+				"id": "state:since",
+				"name": "since",
+				"initial": 0,
+				"clock": true
+			},
+			{
+				"id": "clock:open",
+				"name": "Date.now()",
+				"initial": 0,
+				"clock": true
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Opened ",
+								{
+									"call": "Date.toISOString",
+									"arguments": [
+										{
+											"cell": "clock:open"
+										}
+									]
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Since 1970 ",
+								{
+									"binary": ">",
+									"left": {
+										"cell": "clock:open"
+									},
+									"right": {
+										"literal": 0
+									}
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Pressed ",
+								{
+									"cell": "state:pressedAt"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Started ",
+								{
+									"cell": "state:since"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Press"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:pressedAt",
+						"value": {
+							"call": "Date.toISOString",
+							"arguments": [
+								{
+									"call": "Date.now",
+									"arguments": []
+								}
+							]
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:since",
+						"value": {
+							"binary": "+",
+							"left": {
+								"call": "Date.now",
+								"arguments": []
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"now": 1795046400123,
+	"initial": [
+		["h1:text0", "Opened 2026-11-19T00:00:00.123Z"],
+		["h2:text0", "Since 1970 true"],
+		["h3:text0", "Pressed never"],
+		["h4:text0", "Started 1795046400123"],
+		["h5:text0", "Press"]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Pressed 2026-11-19T00:00:00.123Z"
+				},
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Started 1795046400124"
+				}
+			]
+		}
+	]
+}

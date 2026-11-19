@@ -39,6 +39,14 @@
 			],
 			"why": "Vite's build API: the importer builds an app in process",
 			"inProcess": true
+		},
+		{
+			"module": "packages/mobile/src/harness/ios.ts",
+			"why": "builds the iOS proof app and boots an iOS simulator"
+		},
+		{
+			"module": "packages/mobile/src/harness/android.ts",
+			"why": "builds the Android proof APK and boots an Android emulator"
 		}
 	],
 	"tests": [

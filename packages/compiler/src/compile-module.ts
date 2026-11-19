@@ -317,6 +317,10 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 					// Every later pass reads this symbol list, so the eager sync policy's
 					// calls must already be lifted out of it here.
 					stripExtractedSyncPolicyCalls(symbolResolver.symbols, semanticGraph);
+					(inputs.source as CompileTsrxModuleInput).deviceTargetFacts?.applyWebDeviceEdits(
+						symbolResolver.symbols,
+						semanticGraph,
+					);
 					return { symbolResolver };
 				},
 			};

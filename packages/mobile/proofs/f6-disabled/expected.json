@@ -1,0 +1,41 @@
+{
+	"rung": 56,
+	"name": "A disabled submit button sends nothing; a disabled field is left out of the form data and of its validation",
+	"steps": [
+		{
+			"visible": ["Notes", "Sending not allowed", "Nothing sent"],
+			"disabled": ["Send", "Code"],
+			"fields": {
+				"Code": "A1"
+			}
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Note",
+					"text": "hi"
+				}
+			},
+			"visible": ["Nothing sent"],
+			"absent": ["Sending allowed"],
+			"disabled": ["Send"],
+			"fields": {
+				"Note": "hi"
+			}
+		},
+		{
+			"do": {
+				"tap": "Allow sending"
+			},
+			"visible": ["Sending allowed", "Send"],
+			"absent": ["Sending not allowed", "Sent hi, code null"]
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent hi, code null"],
+			"absent": ["Nothing sent"]
+		}
+	]
+}

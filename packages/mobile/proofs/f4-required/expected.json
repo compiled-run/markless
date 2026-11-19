@@ -1,0 +1,33 @@
+{
+	"rung": 54,
+	"name": "A required field stops the submit as the web does: the first one missing a value is focused and its message shown",
+	"steps": [
+		{ "visible": ["Membership", "Agree to the rules", "You have not agreed", "Not joined"] },
+		{
+			"do": { "tap": "Join" },
+			"visible": ["Not joined"],
+			"invalid": "Please fill out this field."
+		},
+		{
+			"do": { "type": { "field": "Email", "text": "ada@example.com" } },
+			"visible": ["Not joined"],
+			"fields": { "Email": "ada@example.com" }
+		},
+		{
+			"do": { "tap": "Join" },
+			"visible": ["Not joined"],
+			"absent": ["You agreed"],
+			"invalid": "Please check this box if you want to proceed."
+		},
+		{
+			"do": { "tap": "Agree to the rules" },
+			"visible": ["You agreed", "Not joined"],
+			"absent": ["You have not agreed"]
+		},
+		{
+			"do": { "tap": "Join" },
+			"visible": ["Joined as ada@example.com, rules on"],
+			"absent": ["Not joined"]
+		}
+	]
+}

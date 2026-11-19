@@ -1,0 +1,15 @@
+{
+	"rung": "P1",
+	"name": "A platform check keeps one arm per target, removed from the others' output",
+	"steps": [
+		{
+			"visible": ["Platform"],
+			"visibleOn": {
+				"ios": ["Built for iOS"],
+				"android": ["Built for Android"],
+				"web": ["Built for the web"]
+			}
+		}
+	],
+	"web": { "absentFromOutput": ["Built for iOS", "Built for Android"] }
+}

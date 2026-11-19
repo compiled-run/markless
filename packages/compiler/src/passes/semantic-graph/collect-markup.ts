@@ -57,6 +57,7 @@ import type { MutableSemanticGraphArtifact } from './types.ts';
 import { rawElementText } from '../../ast/raw-text.ts';
 import { aliasedItemPath, repeatItemBinding, type RepeatItemAlias } from './repeat-item-binding.ts';
 import { memberReadPath } from './composite-reads.ts';
+import { NATIVE_FACTS, nativeCollectors, type NativeFactsHandle } from './native-facts-flag.ts';
 
 // HTML void elements: a closing tag for one is parsed as a second element (`</br>` is another `<br>`).
 export const VOID_TAG_NAMES: ReadonlySet<string> = new Set([
@@ -99,6 +100,10 @@ type CollectionContext = {
 	// identifier carries consumer props; any other object is the author's own.
 	restName: string | null;
 	readonly nestedLocalSource: ((expression: AnyNode) => string | null) | null;
+	readonly nativeFacts: NativeFactsHandle | null;
+	/** `@if` chains the build's target constants decide: the kept arm is emitted in place, the others not at all. */
+	readonly foldedIfs: ReadonlyMap<AnyNode, number | null>;
+	readonly foldedTexts: ReadonlyMap<AnyNode, string>;
 };
 
 type ChunkBuilder = {
@@ -108,6 +113,9 @@ type ChunkBuilder = {
 	readonly statics: string[];
 	readonly hosts: SemanticMarkupChunk['hosts'][number][];
 	readonly slots: SemanticMarkupSlot[];
+	/** Static texts and attributes by position, kept for native builds only (null otherwise). */
+	readonly texts?: NonNullable<SemanticMarkupChunk['texts']>[number][] | null;
+	readonly attributes?: NonNullable<SemanticMarkupChunk['attributes']>[number][] | null;
 };
 
 type WithoutStaticIndex<Slot> = Slot extends unknown ? Omit<Slot, 'staticIndex'> : never;
@@ -131,6 +139,11 @@ export function collectSemanticMarkup(input: {
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly hostIds: WeakMap<object, string>;
 	readonly nestedLocalSource?: (expression: AnyNode) => string | null;
+	readonly nativeFacts?: NativeFactsHandle | null;
+	readonly foldedIfs?: ReadonlyMap<AnyNode, number | null>;
+	readonly foldedTexts?: ReadonlyMap<AnyNode, string>;
+	/** Components the build's target never renders (named only by removed arms): not collected. */
+	readonly absentComponents?: ReadonlySet<string>;
 }): SemanticMarkupArtifact {
 	const chunks: SemanticMarkupChunk[] = [];
 	const context: CollectionContext = {
@@ -147,6 +160,9 @@ export function collectSemanticMarkup(input: {
 		destructuredNames: [],
 		restName: null,
 		nestedLocalSource: input.nestedLocalSource ?? null,
+		nativeFacts: NATIVE_FACTS ? (input.nativeFacts ?? null) : null,
+		foldedIfs: input.foldedIfs ?? new Map(),
+		foldedTexts: input.foldedTexts ?? new Map(),
 	};
 	const components: Array<{
 		readonly name: string;
@@ -159,7 +175,7 @@ export function collectSemanticMarkup(input: {
 
 	for (const statement of asNodes(input.ast.body)) {
 		const component = getComponentFunction(statement);
-		if (!component) continue;
+		if (!component || input.absentComponents?.has(component.name)) continue;
 		const root = componentMarkupRoot(component.node);
 		if (!root) continue;
 		components.push({
@@ -181,7 +197,12 @@ export function collectSemanticMarkup(input: {
 		const restSignature = propsRestSignature(component.node);
 		context.destructuredNames = [...(restSignature?.destructuredNames ?? [])];
 		context.restName = restSignature?.restName ?? null;
-		const builder = createChunk(`template:${component.name}`, 'template', component.name);
+		const builder = createChunk(
+			`template:${component.name}`,
+			'template',
+			component.name,
+			NATIVE_FACTS && context.nativeFacts !== null,
+		);
 		emitNode(component.root, [0], builder, context, null);
 		chunks.push(finishChunk(builder));
 	}
@@ -203,12 +224,37 @@ function createChunk(
 	id: string,
 	kind: SemanticMarkupChunk['kind'],
 	componentName: string,
+	native: boolean,
 ): ChunkBuilder {
-	return { id, kind, componentName, statics: [''], hosts: [], slots: [] };
+	return {
+		id,
+		kind,
+		componentName,
+		statics: [''],
+		hosts: [],
+		slots: [],
+		...(NATIVE_FACTS ? { texts: native ? [] : null, attributes: native ? [] : null } : {}),
+	};
 }
 
 function finishChunk(builder: ChunkBuilder): SemanticMarkupChunk {
-	return { ...builder };
+	if (!NATIVE_FACTS) return { ...builder } as SemanticMarkupChunk;
+	const { texts, attributes, ...chunk } = builder;
+	return {
+		...chunk,
+		...(texts?.length ? { texts } : {}),
+		...(attributes?.length ? { attributes } : {}),
+	};
+}
+
+function appendStaticAttribute(
+	builder: ChunkBuilder,
+	path: ReadonlyArray<number>,
+	name: string,
+	value: string,
+): void {
+	append(builder, ` ${name}="${escapeAttribute(value)}"`);
+	if (NATIVE_FACTS) builder.attributes?.push({ coordinate: { kind: 'child-index', path }, name, value });
 }
 
 function append(builder: ChunkBuilder, value: string): void {
@@ -251,7 +297,21 @@ function emitTextSlot(
 	const raw =
 		getIdentifierName(expression) === PROJECTION_PROP_NAME ||
 		readsOwnChildrenProp(residue, context, builder.componentName);
-	addAnchorSlot(builder, { kind: 'text', residue, ...(raw ? { raw: true } : {}) }, path);
+	addAnchorSlot(
+		builder,
+		{
+			kind: 'text',
+			residue,
+			...(raw ? { raw: true } : {}),
+			...(NATIVE_FACTS && context.nativeFacts
+				? {
+						nativeExpression: nativeCollectors(context.nativeFacts).expression(expression as never),
+						nativeSpan: sourceSpan(expression, context.filename),
+					}
+				: {}),
+		},
+		path,
+	);
 	return 1;
 }
 
@@ -296,13 +356,15 @@ function emitNode(
 		const text = staticTextValue(node);
 		if (!text) return 0;
 		append(builder, escapeHtml(text));
+		if (NATIVE_FACTS) builder.texts?.push({ coordinate: { kind: 'child-index', path }, text });
 		return 1;
 	}
 
-	const literal = literalContainerText(node);
+	const literal = context.foldedTexts.get(node) ?? literalContainerText(node);
 	if (literal !== null) {
 		if (!literal) return 0;
 		append(builder, escapeHtml(literal));
+		if (NATIVE_FACTS) builder.texts?.push({ coordinate: { kind: 'child-index', path }, text: literal });
 		return 1;
 	}
 
@@ -317,11 +379,22 @@ function emitNode(
 		return emitNodes(asNodes(node.children), path, builder, context, repeat);
 	}
 
+	const folded = node.type === 'JSXIfExpression' ? context.foldedIfs.get(node) : undefined;
+	if (folded !== undefined)
+		return folded === null
+			? 0
+			: emitNodes(
+					armStatements(ifChainOf(node).arms[folded]),
+					path,
+					builder,
+					context,
+					repeat,
+				);
 	if (node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression') {
 		const branchSiteId = `branch-site:${context.branchIndex++}`;
 		const armTemplateIds = branchArms(node).map((arm, armIndex) => {
 			const id = `branch:${branchSiteId}:arm:${armIndex}`;
-			const armBuilder = createChunk(id, 'branch-arm', builder.componentName);
+			const armBuilder = createChunk(id, 'branch-arm', builder.componentName, NATIVE_FACTS && builder.texts != null);
 			emitNodes(arm, [0], armBuilder, context, repeat);
 			context.chunks.push(finishChunk(armBuilder));
 			return id;
@@ -346,7 +419,7 @@ function emitNode(
 		if (semanticRepeat) context.usedRepeatIds.add(semanticRepeat.id);
 		const repeatId = semanticRepeat?.id ?? `markup-repeat:${node.start ?? 'unknown'}`;
 		const rowTemplateId = `repeat:${repeatId}:row`;
-		const rowBuilder = createChunk(rowTemplateId, 'repeat-row', builder.componentName);
+		const rowBuilder = createChunk(rowTemplateId, 'repeat-row', builder.componentName, NATIVE_FACTS && builder.texts != null);
 		const row: RowNames = { id: repeatId, itemName, aliases: binding?.aliases ?? [] };
 		emitNodes(asNodes((node.body as AnyNode | undefined)?.body), [0], rowBuilder, context, row);
 		context.chunks.push(finishChunk(rowBuilder));
@@ -358,6 +431,7 @@ function emitNode(
 				emptyTemplateId,
 				'repeat-empty',
 				builder.componentName,
+				NATIVE_FACTS && builder.texts != null,
 			);
 			emitNodes(emptyNodes, [0], emptyBuilder, context, repeat);
 			context.chunks.push(finishChunk(emptyBuilder));
@@ -434,6 +508,7 @@ function emitNode(
 				projectionChunkId,
 				'component-projection',
 				builder.componentName,
+				NATIVE_FACTS && builder.texts != null,
 			);
 			emitNodes(projected, [0], projection, context, repeat);
 			context.chunks.push(finishChunk(projection));
@@ -455,10 +530,12 @@ function emitNode(
 	}
 	const hostNodeId = context.hostIds.get(node);
 	if (hostNodeId) {
+		const hostSpan = NATIVE_FACTS && context.nativeFacts ? sourceSpan(node, context.filename) : undefined;
 		builder.hosts.push({
 			hostNodeId,
 			tagName,
 			coordinate: { kind: 'child-index', path },
+			...(hostSpan ? { sourceSpan: hostSpan } : {}),
 		});
 	}
 
@@ -592,9 +669,11 @@ function emitNode(
 		if (literal) {
 			const text = attributeText(name, literal.value);
 			if (text !== null)
-				append(
+				appendStaticAttribute(
 					builder,
-					` ${name}="${escapeAttribute(name === 'class' && context.styleScopeClass ? `${text} ${context.styleScopeClass}` : text)}"`,
+					path,
+					name,
+					name === 'class' && context.styleScopeClass ? `${text} ${context.styleScopeClass}` : text,
 				);
 			continue;
 		}
@@ -637,7 +716,7 @@ function emitNode(
 				alwaysPresent: true,
 			});
 			append(builder, '"');
-		} else append(builder, ` class="${context.styleScopeClass}"`);
+		} else appendStaticAttribute(builder, path, 'class', context.styleScopeClass);
 	}
 	context.styleScopeClass = componentScopeClass;
 	append(builder, '>');
@@ -1007,7 +1086,12 @@ function emitDynamicHost(
 	}
 
 	const childChunkId = `dynamic-host:${builder.id}:${builder.slots.length}:children`;
-	const childBuilder = createChunk(childChunkId, 'dynamic-host-children', builder.componentName);
+	const childBuilder = createChunk(
+		childChunkId,
+		'dynamic-host-children',
+		builder.componentName,
+		NATIVE_FACTS && builder.texts != null,
+	);
 	emitNodes(asNodes(node.children), [0], childBuilder, context, repeat);
 	context.chunks.push(finishChunk(childBuilder));
 	const hostNodeId = context.hostIds.get(node);
@@ -1108,7 +1192,7 @@ function emitAsyncArm(
 	repeat: { readonly id: string; readonly itemName: string } | null,
 ): string {
 	const id = `async:${boundaryId}:arm:${name}`;
-	const builder = createChunk(id, 'async-arm', componentName);
+	const builder = createChunk(id, 'async-arm', componentName, NATIVE_FACTS && context.nativeFacts !== null);
 	emitNodes(nodes, [0], builder, context, repeat);
 	context.chunks.push(finishChunk(builder));
 	return id;

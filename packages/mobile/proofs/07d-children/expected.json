@@ -1,0 +1,9 @@
+{
+	"rung": 7.875,
+	"name": "Children passed into a component",
+	"steps": [
+		{ "visible": ["Wrapped", "Coffee", "Cups 0", "Pour"], "absent": ["Cups 1"] },
+		{ "do": { "tap": "Pour" }, "visible": ["Coffee", "Cups 1"], "absent": ["Cups 0"] },
+		{ "do": { "tap": "Pour" }, "visible": ["Cups 2"], "absent": ["Cups 1"] }
+	]
+}

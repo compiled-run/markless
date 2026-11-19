@@ -1,0 +1,102 @@
+name: Mobile hosts
+
+# The phone hosts' own tests on every pull request that changes a package, and on main: the iOS package's tests, its
+# UIKit ones included, on a simulator, and the Kotlin host's JVM conformance test. A change to the compiler or the web
+# runtime can change what a phone receives, so it runs these too. The proof harness runs the same command before any rung
+# (`node src/harness/cli.ts host-tests`). Without a Dragon checkout here, the two UIKit tests that paint with Dragon's font
+# files are skipped by name and listed in the log; the harness runs them.
+
+on:
+    workflow_dispatch:
+    push:
+        branches: [main]
+    pull_request:
+        paths:
+            - packages/**
+            - pnpm-lock.yaml
+            - .github/workflows/mobile-hosts.yml
+
+concurrency:
+    group: mobile-hosts-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    ios-host:
+        runs-on: macos-15
+        timeout-minutes: 45
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+            - name: The iOS host's tests on a simulator
+              env:
+                  # The runner's pre-created simulator: a fresh one did not boot in 180 s on these runners.
+                  MARKLESS_PROOF_SIMULATOR: iPhone 16
+              working-directory: packages/mobile
+              run: node src/harness/cli.ts host-tests --platform ios
+
+    android-host:
+        runs-on: ubuntu-26.04
+        timeout-minutes: 30
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - uses: actions/setup-java@v4
+              with:
+                  distribution: temurin
+                  java-version: 21
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+            - name: Install Kotlin
+              run: |
+                  curl -fsSL -o "$RUNNER_TEMP/kotlin.zip" https://github.com/JetBrains/kotlin/releases/download/v2.4.21/kotlin-compiler-2.4.21.zip
+                  unzip -q "$RUNNER_TEMP/kotlin.zip" -d "$RUNNER_TEMP"
+                  echo "KOTLIN_HOME=$RUNNER_TEMP/kotlinc" >> "$GITHUB_ENV"
+                  echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
+            - name: The Kotlin host's JVM test
+              working-directory: packages/mobile
+              run: node src/harness/cli.ts host-tests --platform android
+
+    # The native ladder's web column: every rung built as a router app (one shared build for the plain one-screen rungs)
+    # and driven in Chromium through its expected steps. It builds apps and launches a browser, so it runs here, not in
+    # ci.yml's unit shards.
+    native-web:
+        runs-on: ubuntu-26.04
+        timeout-minutes: 30
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+            - name: Install Chromium
+              run: pnpm --dir packages/vitest-browser exec playwright install --with-deps chromium
+            - name: The ladder's web column
+              run: pnpm exec vp test run --project native-web

@@ -1,0 +1,60 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "z1-sheet-scoped-styles",
+			"failure": null,
+			"installSeconds": 6.453240833000003,
+			"flowSeconds": 25.379708207999997
+		},
+		{
+			"name": "z2-sheet-shared-component",
+			"failure": null,
+			"installSeconds": 2.6643450840000007,
+			"flowSeconds": 10.159178125000006
+		},
+		{
+			"name": "z3-sheet-size",
+			"failure": null,
+			"installSeconds": 1.7476441659999982,
+			"flowSeconds": 12.062731042
+		},
+		{
+			"name": "z4-sheet-dark-mode",
+			"failure": null,
+			"installSeconds": 1.4045274169999757,
+			"flowSeconds": 12.731288459000003
+		},
+		{
+			"name": "z5-sheet-state-style",
+			"failure": null,
+			"installSeconds": 1.667431125000003,
+			"flowSeconds": 15.439521458000003
+		},
+		{
+			"name": "z6-sheet-page-selectors",
+			"failure": null,
+			"installSeconds": 1.5068083329999935,
+			"flowSeconds": 9.955636583000015
+		},
+		{
+			"name": "y1-sheet-open-close",
+			"failure": null,
+			"installSeconds": 1.9981064170000027,
+			"flowSeconds": 30.333100124999998
+		},
+		{
+			"name": "y2-sheet-pick",
+			"failure": null,
+			"installSeconds": 2.3175572500000126,
+			"flowSeconds": 35.29259950000001
+		},
+		{
+			"name": "y3-sheet-heights",
+			"failure": null,
+			"installSeconds": 2.4977450000000245,
+			"flowSeconds": 32.09861770900001
+		}
+	]
+}

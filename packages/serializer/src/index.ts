@@ -22,3 +22,5 @@ export * from './storage-cookie.ts';
 export * from './storage-slot.ts';
 export * from './value.ts';
 export { valueAlongPaths } from './value-paths.ts';
+export type * from './native-view.ts';
+export type * from './native-device.ts';

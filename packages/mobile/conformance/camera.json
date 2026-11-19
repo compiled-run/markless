@@ -1,0 +1,560 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "device:camera.access",
+				"name": "camera.access",
+				"initial": "unknown",
+				"device": "camera.access"
+			},
+			{
+				"id": "component-edge:1/state:photo",
+				"name": "photo",
+				"initial": ""
+			},
+			{
+				"id": "component-edge:1/state:shots",
+				"name": "shots",
+				"initial": 0
+			},
+			{
+				"id": "component-edge:1/state:showing",
+				"name": "showing",
+				"initial": true
+			},
+			{
+				"id": "object:component-edge:1/cam:ready",
+				"name": "cam.ready",
+				"initial": false,
+				"device": "camera.ready",
+				"object": "object:component-edge:1/cam"
+			},
+			{
+				"id": "object:component-edge:1/cam:facing",
+				"name": "cam.facing",
+				"initial": "back",
+				"device": "camera.facing",
+				"object": "object:component-edge:1/cam"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "h1",
+				"parent": "h8",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"text": "Camera"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h10",
+				"element": "p",
+				"parent": "h8"
+			},
+			{
+				"kind": "text",
+				"id": "h10:text0",
+				"parent": "h10",
+				"parts": [
+					{
+						"text": "Access "
+					},
+					{
+						"cell": "device:camera.access"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h0",
+				"element": "section",
+				"parent": "h8"
+			},
+			{
+				"kind": "branch",
+				"id": "component-edge:1/branch-site:0",
+				"parent": "component-edge:1/h0",
+				"test": {
+					"cell": "component-edge:1/state:showing"
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/component-edge:0",
+				"element": "camera",
+				"object": "object:component-edge:1/cam",
+				"parent": "component-edge:1/h0",
+				"arm": {
+					"branch": "component-edge:1/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h1",
+				"element": "button",
+				"parent": "component-edge:1/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h1:text0",
+				"parent": "component-edge:1/h1",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "component-edge:1/state:showing"
+							},
+							"whenTrue": {
+								"literal": "Hide preview"
+							},
+							"whenFalse": {
+								"literal": "Show preview"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h2",
+				"element": "p",
+				"parent": "component-edge:1/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h2:text0",
+				"parent": "component-edge:1/h2",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "object:component-edge:1/cam:ready"
+							},
+							"whenTrue": {
+								"literal": "Camera ready"
+							},
+							"whenFalse": {
+								"literal": "Camera starting"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h3",
+				"element": "p",
+				"parent": "component-edge:1/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h3:text0",
+				"parent": "component-edge:1/h3",
+				"parts": [
+					{
+						"text": "Facing "
+					},
+					{
+						"cell": "object:component-edge:1/cam:facing"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h4",
+				"element": "button",
+				"parent": "component-edge:1/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h4:text0",
+				"parent": "component-edge:1/h4",
+				"parts": [
+					{
+						"text": "Flip"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h5",
+				"element": "button",
+				"parent": "component-edge:1/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h5:text0",
+				"parent": "component-edge:1/h5",
+				"parts": [
+					{
+						"text": "Take photo"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h6",
+				"element": "p",
+				"parent": "component-edge:1/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h6:text0",
+				"parent": "component-edge:1/h6",
+				"parts": [
+					{
+						"text": "Photos "
+					},
+					{
+						"cell": "component-edge:1/state:shots"
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "component-edge:1/branch-site:1",
+				"parent": "component-edge:1/h0",
+				"test": {
+					"binary": "!==",
+					"left": {
+						"cell": "component-edge:1/state:photo"
+					},
+					"right": {
+						"literal": ""
+					}
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h7",
+				"element": "img",
+				"parent": "component-edge:1/h0",
+				"attributes": {
+					"alt": "Last photo"
+				},
+				"bindings": [
+					{
+						"attribute": "src",
+						"value": {
+							"cell": "component-edge:1/state:photo"
+						}
+					}
+				],
+				"arm": {
+					"branch": "component-edge:1/branch-site:1",
+					"index": 0
+				}
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:1/h1",
+				"event": "activate",
+				"handler": "handler:component-edge:1/event:0"
+			},
+			{
+				"host": "component-edge:1/h4",
+				"event": "activate",
+				"handler": "handler:component-edge:1/event:1"
+			},
+			{
+				"host": "component-edge:1/h5",
+				"event": "activate",
+				"handler": "handler:component-edge:1/event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:1/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:1/state:showing",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "component-edge:1/state:showing"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:1/event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "object:component-edge:1/cam:facing",
+						"value": {
+							"if": {
+								"binary": "===",
+								"left": {
+									"cell": "object:component-edge:1/cam:facing"
+								},
+								"right": {
+									"literal": "back"
+								}
+							},
+							"whenTrue": {
+								"literal": "front"
+							},
+							"whenFalse": {
+								"literal": "back"
+							}
+						}
+					},
+					{
+						"op": "call",
+						"call": "camera.facing",
+						"object": "object:component-edge:1/cam",
+						"arguments": [
+							{
+								"cell": "object:component-edge:1/cam:facing"
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:1/event:2",
+				"ops": [
+					{
+						"op": "call",
+						"call": "camera.takePhoto",
+						"object": "object:component-edge:1/cam",
+						"arguments": [],
+						"after": {
+							"id": "handler:component-edge:1/event:2:after:0",
+							"as": "$0",
+							"ops": [
+								{
+									"op": "assign",
+									"cell": "component-edge:1/state:photo",
+									"value": {
+										"member": {
+											"local": "$0"
+										},
+										"property": "url"
+									}
+								},
+								{
+									"op": "assign",
+									"cell": "component-edge:1/state:shots",
+									"value": {
+										"binary": "+",
+										"left": {
+											"unary": "+",
+											"value": {
+												"cell": "component-edge:1/state:shots"
+											}
+										},
+										"right": {
+											"literal": 1
+										}
+									}
+								}
+							]
+						}
+					}
+				]
+			}
+		],
+		"objects": [
+			{
+				"id": "object:component-edge:1/cam",
+				"device": "camera",
+				"owner": "component-edge:1/h0"
+			}
+		]
+	},
+	"initial": [
+		[
+			"h9:text0",
+			"Camera"
+		],
+		[
+			"h10:text0",
+			"Access unknown"
+		],
+		[
+			"component-edge:1/h1:text0",
+			"Hide preview"
+		],
+		[
+			"component-edge:1/h2:text0",
+			"Camera starting"
+		],
+		[
+			"component-edge:1/h3:text0",
+			"Facing back"
+		],
+		[
+			"component-edge:1/h4:text0",
+			"Flip"
+		],
+		[
+			"component-edge:1/h5:text0",
+			"Take photo"
+		],
+		[
+			"component-edge:1/h6:text0",
+			"Photos 0"
+		]
+	],
+	"initialArms": [
+		[
+			"component-edge:1/branch-site:0",
+			0
+		],
+		[
+			"component-edge:1/branch-site:1",
+			1
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "device",
+				"cell": "device:camera.access",
+				"value": "granted"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h10:text0",
+					"value": "Access granted"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "device",
+				"cell": "object:component-edge:1/cam:ready",
+				"value": true
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h2:text0",
+					"value": "Camera ready"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h5"
+			},
+			"journal": [
+				{
+					"op": "call",
+					"call": "camera.takePhoto",
+					"object": "object:component-edge:1/cam",
+					"arguments": [],
+					"resume": "handler:component-edge:1/event:2:after:0"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "resume",
+				"continuation": "handler:component-edge:1/event:2:after:0",
+				"value": {
+					"url": "file:///photo.png",
+					"width": 640,
+					"height": 480
+				}
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h6:text0",
+					"value": "Photos 1"
+				},
+				{
+					"op": "arm",
+					"node": "component-edge:1/branch-site:1",
+					"index": 0
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h3:text0",
+					"value": "Facing front"
+				},
+				{
+					"op": "call",
+					"call": "camera.facing",
+					"object": "object:component-edge:1/cam",
+					"arguments": [
+						"front"
+					]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "device",
+				"cell": "object:component-edge:1/cam:facing",
+				"value": "back"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h3:text0",
+					"value": "Facing back"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h1"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "component-edge:1/branch-site:0",
+					"index": 1
+				},
+				{
+					"op": "text",
+					"node": "component-edge:1/h1:text0",
+					"value": "Show preview"
+				}
+			]
+		}
+	]
+}
