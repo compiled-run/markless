@@ -1,0 +1,7 @@
+@import './imported.css';
+@font-face { font-family: 'Repeat Probe'; font-display: swap; src: url('/repeat-probe.woff2') format('woff2'); unicode-range: U+590-5FF; }
+@keyframes repeat-probe-spin { to { transform: rotate(1turn); } }
+@media (min-width: 600px) { .repeat-probe { --repeat-probe-mark: wide; padding: 8px; } }
+.repeat-probe { --repeat-probe-rule: base; font-family: 'Repeat Probe', sans-serif; animation: repeat-probe-spin 1s; }
+.tone { color: rgb(0, 0, 200); }
+.beta-own { --beta-mark: beta; }
