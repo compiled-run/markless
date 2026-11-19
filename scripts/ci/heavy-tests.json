@@ -184,6 +184,7 @@
 		"packages/router/test/vite/unminified-build.test.ts",
 		"packages/router/test/vite/vercel-isr-navigation.test.ts",
 		"packages/router/test/vite/vercel-output.test.ts",
+		"packages/router/test/vite/yardstick-web-defects.test.ts",
 		"packages/vitest-browser/test/ssr-module-cache-rerun.test.ts",
 		"packages/web/test/early-stream-events.test.ts",
 		"packages/web/test/native-census.test.ts",
