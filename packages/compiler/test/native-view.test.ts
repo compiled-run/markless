@@ -847,6 +847,52 @@ export function Page() @{
 		);
 	});
 
+	it('gives a state field whose first value is undefined a null cell, as a native expression spells undefined', async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { shared, state } from '@markless/core';
+const pickState = shared(() => {
+	const pick = state({ chosen: undefined as string | undefined, count: 0 });
+	return { ...pick };
+}, { scope: 'subtree' });
+function Picker() @{
+	const pick = pickState();
+	<p>{pick.chosen === undefined ? 'unset' : pick.chosen}</p>
+}
+export function Page() @{
+	let note = state({ text: undefined as string | undefined });
+	<main>
+		<Picker />
+		<p>{note.text ?? 'no note'}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.cells.map((cell) => [cell.name, cell.initial])).toEqual([
+			['note.text', null],
+			['pick.chosen', null],
+			['pick.count', 0],
+		]);
+	});
+
+	it('refuses a strict comparison that would tell undefined from null where a native cell cannot', async () => {
+		const { payload, diagnostics } = await nativeView(
+			`import { state } from '@markless/core';
+export function Page() @{
+	let draft = state({ given: undefined as string | undefined, held: null as string | null });
+	<main>
+		<p>{draft.given === null ? 'null' : 'not null'}</p>
+		<p>{draft.held === undefined ? 'undefined' : 'defined'}</p>
+		<p>{draft.given === undefined && draft.held === null ? 'both as written' : 'no'}</p>
+	</main>
+}`,
+			dataOnly,
+		);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'a text expression compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null',
+			'a text expression compares with `undefined` a value whose first value is `null`; a native value does not tell undefined from null',
+		]);
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{
@@ -2651,6 +2697,98 @@ export function Tip() @{
 }`);
 		expect(diagnostics.map((d) => d.message)).toEqual([
 			'an `overlay-hint` surface (a tooltip or hovercard), which phones do not show yet',
+		]);
+	});
+});
+
+describe('pointer events', () => {
+	it('lowers each pointer event a touch raises, the fields its handler reads, and capture', async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+export function Drag() @{
+	let x = state(0);
+	let held = state(false);
+	const track = element<HTMLDivElement>();
+	<div
+		el={track}
+		onPointerdown={(event) => {
+			track?.setPointerCapture(event.pointerId);
+			held = track !== undefined && track.hasPointerCapture(event.pointerId);
+		}}
+		onPointermove={(event) => (x = event.clientX + event.clientY + event.timeStamp)}
+		onPointerup={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
+		onPointercancel={(event) => (held = event.isPrimary && event.pointerType === 'touch' && event.buttons === 0)}
+		onPointerover={(event) => (held = event.relatedTarget === null)}
+		onPointerout={() => (x = 0)}
+		onPointerenter={() => (x = 1)}
+		onPointerleave={() => (x = 2)}
+	>{x}</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.events.map((event) => event.event)).toEqual([
+			'pointerdown',
+			'pointermove',
+			'pointerup',
+			'pointercancel',
+			'pointerover',
+			'pointerout',
+			'pointerenter',
+			'pointerleave',
+		]);
+		const ops = (event: number) => payload!.handlers[event]!.ops;
+		expect(ops(0)).toEqual([
+			{ op: 'capture', node: 'h0', pointer: { event: 'pointerId' } },
+			{
+				op: 'assign',
+				cell: 'state:held',
+				// `track !== undefined` on a bound handle is known when the app is built, so only the side that decides is kept.
+				value: { captures: { literal: 'h0' }, pointer: { event: 'pointerId' } },
+			},
+		]);
+		expect(ops(2)).toEqual([
+			{ op: 'capture', node: { event: 'currentTarget' }, pointer: { event: 'pointerId' }, release: true },
+		]);
+		for (const field of ['clientX', 'clientY', 'timeStamp'])
+			expect(JSON.stringify(ops(1))).toContain(JSON.stringify({ event: field }));
+		for (const field of ['isPrimary', 'pointerType', 'buttons'])
+			expect(JSON.stringify(ops(3))).toContain(JSON.stringify({ event: field }));
+		expect(JSON.stringify(ops(4))).toContain(JSON.stringify({ event: 'relatedTarget' }));
+	});
+
+	it('gives a pointer handler that runs as JavaScript the touch fields, but not the elements it names', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Drag() @{
+	let log = state('');
+	<div
+		onPointermove={(event) => {
+			for (const part of [event.clientX, event.clientY, event.pointerId, event.pointerType]) log = log + part;
+		}}
+	>{log}</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.handlers[0]!.ops.map((op) => op.op)).toEqual(['script']);
+		const related = await nativeView(`import { state } from '@markless/core';
+export function Drag() @{
+	let log = state('');
+	<div
+		onPointerout={(event) => {
+			for (const part of [event.relatedTarget]) log = log + String(part);
+		}}
+	>{log}</div>
+}`);
+		expect(related.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet',
+		]);
+	});
+
+	it('refuses by name a field a touch does not report yet', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Pressure() @{
+	let p = state(0);
+	<div onPointermove={(event) => (p = event.pressure)}>{p}</div>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'the pointermove handler reads `event.pressure`, which a touch on a phone does not have',
 		]);
 	});
 });

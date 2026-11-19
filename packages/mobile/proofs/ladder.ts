@@ -66,7 +66,13 @@ export type LadderAction =
 	/** Escape on the web, the back gesture on Android; iOS has none a flow can perform, so the step runs on Android only. */
 	| { readonly escape: true }
 	/** A press that starts and ends on the topmost overlay element itself, beside what it holds (a modal's backdrop). */
-	| { readonly pressBackdrop: true };
+	| { readonly pressBackdrop: true }
+	/**
+	 * A finger pressed on the element showing `on`, dragged toward `direction` and lifted. `scrolls` says the drag runs along
+	 * a box that scrolls that way, so the platform takes the touch for the scroll (the web's `pointercancel`); the phones and
+	 * the browser find that out for themselves, the reference ladder, which lays nothing out, is told.
+	 */
+	| { readonly drag: { readonly on: string; readonly direction: 'right' | 'up'; readonly scrolls?: true } };
 
 /** Where a phone flow presses the backdrop: above a centred surface, below the status bar. */
 export const BACKDROP_POINT = '50%,8%';
@@ -216,7 +222,7 @@ export const rungFolders = (): string[] =>
 		.filter(
 			(entry) =>
 				entry.isDirectory() &&
-				/^((\d\d|[dp]\d)[a-z]?|[fjruy]\d+)-/.test(entry.name),
+				/^((\d\d|[dp]\d)[a-z]?|[fjrtuy]\d+)-/.test(entry.name),
 		)
 		.filter((entry) => !isApp(entry.name))
 		.map((entry) => entry.name)
@@ -464,6 +470,16 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			},
 		];
 	}
+	if ('drag' in action)
+		return [
+			{
+				swipe: {
+					from: { text: selector(action.drag.on) },
+					direction: action.drag.direction === 'right' ? 'RIGHT' : 'UP',
+					duration: 800,
+				},
+			},
+		];
 	if ('escape' in action) return ['back'];
 	if ('pressBackdrop' in action) return [{ tapOn: { point: BACKDROP_POINT } }];
 	return [

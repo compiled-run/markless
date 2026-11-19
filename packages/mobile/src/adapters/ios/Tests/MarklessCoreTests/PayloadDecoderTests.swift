@@ -144,6 +144,7 @@ private let overlay = """
 	#expect(try runtime.overlays().map(\.node) == ["h2"])
 	#expect(try runtime.evaluate(.focusOrigin(.literal(.string("h2")))) == .string("h1"))
 	#expect(try runtime.dispatch(NativeAction(event: .pointerdown, host: "h3")) == [])
+	#expect(try runtime.dispatch(NativeAction(event: .pointerup, host: "h3")) == [])
 	#expect(throws: RuntimeError.self) { try runtime.dispatch(NativeAction(event: .dismiss, host: "h1", reason: "escape")) }
 	#expect(try runtime.dispatch(NativeAction(event: .pointerdown, host: "h0")) == [
 		.attribute(node: "h2", name: "hidden", value: ""), .overlay(node: "h2", open: false, modal: true), .command(node: "h1", command: "focus", preventScroll: false),
@@ -151,4 +152,65 @@ private let overlay = """
 	#expect(try runtime.value(of: "state:why") == .string("outside-press"))
 	#expect(runtime.focused == "h1")
 	#expect(throws: RuntimeError.self) { try runtime.dispatch(NativeAction(event: .activate, host: "h4")) }
+}
+
+private let pad = """
+	{"version":"markless.native-view/0","component":"P","cells":[{"id":"state:log","name":"log","initial":""}],
+	"nodes":[{"kind":"element","id":"h0","element":"main","parent":null},{"kind":"element","id":"h1","element":"div","parent":"h0"},
+	{"kind":"element","id":"h2","element":"div","parent":"h0"}],
+	"events":[{"host":"h1","event":"pointerdown","handler":"handler:down"},{"host":"h1","event":"pointermove","handler":"handler:move"},
+	{"host":"h1","event":"pointercancel","handler":"handler:cancel"},{"host":"h1","event":"pointerleave","handler":"handler:leave"}],
+	"handlers":[{"id":"handler:down","ops":[{"op":"capture","node":{"event":"currentTarget"},"pointer":{"event":"pointerId"}}]},
+	{"id":"handler:move","ops":[{"op":"assign","cell":"state:log","value":{"binary":"+","left":{"cell":"state:log"},"right":{"template":[" move:",{"captures":{"literal":"h1"},"pointer":{"event":"pointerId"}},"/",{"event":"clientY"}]}}},
+	{"op":"capture","node":"h1","pointer":{"event":"pointerId"},"release":true}]},
+	{"id":"handler:cancel","ops":[{"op":"assign","cell":"state:log","value":{"binary":"+","left":{"cell":"state:log"},"right":{"template":[" cancel:",{"event":"target"},"/",{"event":"buttons"},"/",{"event":"clientX"}]}}}]},
+	{"id":"handler:leave","ops":[{"op":"assign","cell":"state:log","value":{"binary":"+","left":{"cell":"state:log"},"right":{"template":[" leave:",{"event":"relatedTarget"}]}}}]}]}
+	"""
+
+@Test func decodesCaptureAndRunsATouchTheCaptureFollows() throws {
+	let payload = try decode(pad)
+	#expect(payload.handlers[0].ops == [.capture(node: .event(.currentTarget), pointer: .event(.pointerId), release: false)])
+	#expect(payload.handlers[1].ops[1] == .capture(node: .literal(.string("h1")), pointer: .event(.pointerId), release: true))
+	let runtime = NativeRuntime(payload: payload)
+	#expect(try runtime.evaluate(.captures(node: .literal(.string("h1")), pointer: .literal(.number(7)))) == .bool(false))
+	#expect(try runtime.dispatch(NativeAction(event: .pointerdown, host: "h1", pointerId: 7, x: 5, y: 6, time: 10)) == [])
+	#expect(try runtime.evaluate(.captures(node: .literal(.string("h1")), pointer: .literal(.number(7)))) == .bool(true))
+	#expect(throws: RuntimeError.self) { try runtime.dispatch(NativeAction(event: .pointerdown, host: "h2", pointerId: 7)) }
+	#expect(throws: RuntimeError.self) { try runtime.dispatch(NativeAction(event: .pointermove, host: "h2", pointerId: 8)) }
+	_ = try runtime.dispatch(NativeAction(event: .pointermove, host: "h2", pointerId: 7, x: 5, y: 40))
+	#expect(try runtime.value(of: "state:log") == .string(" move:true/40"))
+	#expect(try runtime.evaluate(.captures(node: .literal(.string("h1")), pointer: .literal(.number(7)))) == .bool(false))
+	_ = try runtime.dispatch(NativeAction(event: .pointercancel, host: "h2", pointerId: 7, x: 5, y: 50))
+	#expect(try runtime.value(of: "state:log") == .string(" move:true/40 leave:h2"))
+	#expect(throws: RuntimeError.self) { try runtime.dispatch(NativeAction(event: .pointerup, host: "h2", pointerId: 7)) }
+}
+
+@Test func decodesEveryPointerEventAndField() throws {
+	for name in ["pointerdown", "pointermove", "pointerup", "pointercancel", "pointerover", "pointerout", "pointerenter", "pointerleave"] {
+		#expect(try decode(pad.replacingOccurrences(of: "\"event\":\"pointerdown\"", with: "\"event\":\"\(name)\"")).events[0].event.rawValue == name)
+	}
+	for field in ["target", "currentTarget", "relatedTarget", "button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp"] {
+		#expect(try NativeViewPayload.decodeExpression(.object([("event", .string(field))])) == .event(try #require(NativeEventField(rawValue: field))))
+	}
+}
+
+@Test(arguments: [
+	("\"op\":\"capture\",\"node\":\"h1\"", "\"op\":\"capture\",\"node\":1", "expected an object"),
+	("\"op\":\"capture\",\"node\":\"h1\"", "\"op\":\"capture\",\"node\":null", "expected an object"),
+	(",\"release\":true", ",\"release\":false", "release is only ever true"),
+	(",\"release\":true", ",\"release\":1", "expected a boolean"),
+	(",\"release\":true", ",\"release\":true,\"preventScroll\":true", "unknown field \"preventScroll\""),
+	("\"pointer\":{\"event\":\"pointerId\"},\"release\"", "\"release\"", "missing \"pointer\""),
+	("\"node\":\"h1\",\"pointer\":{\"event\":\"pointerId\"}", "\"node\":\"h1\",\"pointer\":\"1\"", "expected an object"),
+	("{\"captures\":{\"literal\":\"h1\"},\"pointer\":{\"event\":\"pointerId\"}}", "{\"captures\":{\"literal\":\"h1\"}}", "unknown expression"),
+	("{\"captures\":{\"literal\":\"h1\"},\"pointer\":{\"event\":\"pointerId\"}}", "{\"captures\":\"h1\",\"pointer\":{\"literal\":1}}", "expected an object"),
+	("{\"captures\":{\"literal\":\"h1\"},\"pointer\":{\"event\":\"pointerId\"}}", "{\"captures\":{\"literal\":\"h1\"},\"pointer\":{\"event\":\"pointerId\"},\"release\":true}", "unknown expression"),
+	("{\"event\":\"clientY\"}", "{\"event\":\"screenY\"}", "unknown event read \"screenY\""),
+	("\"event\":\"pointerleave\"", "\"event\":\"pointerrawupdate\"", "unknown event \"pointerrawupdate\""),
+])
+func rejectsTouchShapesItDoesNotKnow(find: String, replace: String, reason: String) throws {
+	let mutated = pad.replacingOccurrences(of: find, with: replace)
+	#expect(mutated != pad)
+	let message = try #require(rejection(mutated))
+	#expect(message.contains(reason), "\(message)")
 }

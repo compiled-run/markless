@@ -176,8 +176,14 @@
 		]
 	},
 	"initial": [
-		["h2:text0", "Read"],
-		["h3:text0", "nothing"]
+		[
+			"h2:text0",
+			"Read"
+		],
+		[
+			"h3:text0",
+			"nothing"
+		]
 	],
 	"steps": [
 		{

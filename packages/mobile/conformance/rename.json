@@ -172,10 +172,22 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Rename"],
-		["h3:text0", "Name Draft"]
+		[
+			"h1:text0",
+			"Rename"
+		],
+		[
+			"h3:text0",
+			"Name Draft"
+		]
 	],
-	"initialAttributes": [["h2", "hidden", ""]],
+	"initialAttributes": [
+		[
+			"h2",
+			"hidden",
+			""
+		]
+	],
 	"steps": [
 		{
 			"action": {

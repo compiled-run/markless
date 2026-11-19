@@ -204,6 +204,24 @@ async function swipe(page: Page, from: readonly [number, number], to: readonly [
 	await ended;
 }
 
+// A finger's drag as Chrome's touch input takes it: down on the middle of the element showing `on`, ten moves 16 ms apart
+// across 40% of the screen's width (right) or 30% of its height (up), and up.
+async function drag(page: Page, on: string, direction: 'right' | 'up') {
+	const box = await shown(page, on).first().boundingBox();
+	if (!box) throw new Error(`"${on}" is not on screen to drag`);
+	const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+	const by = direction === 'right' ? { x: PHONE.width * 0.4, y: 0 } : { x: 0, y: -PHONE.height * 0.3 };
+	const cdp = await page.context().newCDPSession(page);
+	const at = (n: number) => [{ x: start.x + (by.x * n) / 10, y: start.y + (by.y * n) / 10 }];
+	await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(0) });
+	for (let n = 1; n <= 10; n++) {
+		await page.waitForTimeout(16);
+		await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(n) });
+	}
+	await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+	await cdp.detach();
+}
+
 async function act(page: Page, step: LadderStep) {
 	const action = step.do;
 	if (!action) return;
@@ -240,6 +258,7 @@ async function act(page: Page, step: LadderStep) {
 		for (const type of ['pointerdown', 'pointerup', 'click'])
 			await backdrop!.dispatchEvent(type, { button: 0, isPrimary: true, pointerType: 'touch' });
 	}
+	else if ('drag' in action) await drag(page, action.drag.on, action.drag.direction);
 	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });
 	else if ('swipe' in action && action.swipe !== 'up') {
 		const { from, to, until } = action.swipe;

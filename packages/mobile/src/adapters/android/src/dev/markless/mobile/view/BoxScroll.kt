@@ -2,6 +2,7 @@ package dev.markless.mobile.view
 
 import android.content.Context
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewConfiguration
 import android.widget.HorizontalScrollView
 import android.widget.ScrollView
@@ -40,22 +41,61 @@ private class Latch(context: Context) {
 	}
 }
 
-class BoxScrollView(context: Context) : ScrollView(context) {
+/**
+ * A scroll view that reports the moment it takes a touch to scroll, which is when Chrome sends `pointercancel`: it
+ * intercepts a drag from the views under it, or a drag it already holds starts moving its content.
+ */
+interface TakesTouches {
+	var onTake: (() -> Unit)?
+}
+
+private fun interceptTook(e: MotionEvent, took: Boolean, onTake: (() -> Unit)?): Boolean {
+	if (took && e.actionMasked == MotionEvent.ACTION_MOVE) onTake?.invoke()
+	return took
+}
+
+private fun scrollTook(view: View, e: MotionEvent, x: Int, y: Int, onTake: (() -> Unit)?) {
+	if (e.actionMasked == MotionEvent.ACTION_MOVE && (view.scrollX != x || view.scrollY != y)) onTake?.invoke()
+}
+
+/** The page's own scroll view, as a browser's viewport. */
+class PageScrollView(context: Context) : ScrollView(context), TakesTouches {
+	override var onTake: (() -> Unit)? = null
+	override fun onInterceptTouchEvent(e: MotionEvent) = interceptTook(e, super.onInterceptTouchEvent(e), onTake)
+	override fun onTouchEvent(e: MotionEvent): Boolean {
+		val x = scrollX; val y = scrollY
+		return super.onTouchEvent(e).also { scrollTook(this, e, x, y, onTake) }
+	}
+}
+
+class BoxScrollView(context: Context) : ScrollView(context), TakesTouches {
 	private val latch = Latch(context)
 	private var released = false
+	override var onTake: (() -> Unit)? = null
 	override fun dispatchTouchEvent(e: MotionEvent): Boolean {
 		if (e.actionMasked == MotionEvent.ACTION_DOWN) released = false
 		if (!released && !latch.keep(this, e, vertical = true)) released = true
 		return if (released) false else super.dispatchTouchEvent(e)
 	}
+	override fun onInterceptTouchEvent(e: MotionEvent) = interceptTook(e, super.onInterceptTouchEvent(e), onTake)
+	override fun onTouchEvent(e: MotionEvent): Boolean {
+		val x = scrollX; val y = scrollY
+		return super.onTouchEvent(e).also { scrollTook(this, e, x, y, onTake) }
+	}
 }
 
-class BoxHorizontalScrollView(context: Context) : HorizontalScrollView(context) {
+class BoxHorizontalScrollView(context: Context) : HorizontalScrollView(context), TakesTouches {
 	private val latch = Latch(context)
 	private var released = false
+	override var onTake: (() -> Unit)? = null
 	override fun dispatchTouchEvent(e: MotionEvent): Boolean {
 		if (e.actionMasked == MotionEvent.ACTION_DOWN) released = false
 		if (!released && !latch.keep(this, e, vertical = false)) released = true
 		return if (released) false else super.dispatchTouchEvent(e)
+	}
+	override fun onInterceptTouchEvent(e: MotionEvent) = interceptTook(e, super.onInterceptTouchEvent(e), onTake)
+	override fun onTouchEvent(e: MotionEvent): Boolean {
+		val x = scrollX; val y = scrollY
+		return super.onTouchEvent(e).also { scrollTook(this, e, x, y, onTake) }
 	}
 }

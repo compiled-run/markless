@@ -85,6 +85,7 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		136,
 		137,
 		141,
+		'T1',
 		101,
 		102,
 		103,
@@ -163,6 +164,7 @@ test('the navigation ladder has one app folder per rung, in rung order', () => {
 		'N4',
 		138,
 		139,
+		140,
 		142,
 	]);
 	for (const folder of navRungFolders())

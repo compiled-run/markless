@@ -434,6 +434,8 @@ class MarklessHost(
 		apply(journal)
 		return journal.any { it is JournalEntry.PreventDefault }
 	}
+	/** A scroll view took the touches that are down to scroll ([TakesTouches]): each is cancelled. */
+	fun scrollTookTouches() = overlays.cancelTouches()
 
 	/** The journal applier: the only code that changes a retained view after the first build. */
 	fun apply(journal: List<JournalEntry>) {
@@ -788,7 +790,8 @@ class MarklessHost(
 			EventName.Focus, EventName.Blur -> if (view !is EditText) throw MarklessHostError("${e.event.wire} event on \"${node.id}\", which is not a text field")
 			EventName.Keydown -> (view as? MarklessField ?: throw MarklessHostError("keydown event on \"${node.id}\", which is not a text field")).onKey = { key -> prevents(runtime.dispatch(inst.id, EventName.Keydown, key)) }
 			EventName.Paste -> (view as? MarklessField ?: throw MarklessHostError("paste event on \"${node.id}\", which is not a text field")).onPaste = { text -> prevents(runtime.dispatch(inst.id, EventName.Paste, text)) }
-			EventName.Cancel, EventName.PointerDown, EventName.PointerUp, EventName.Submit, EventName.Idle, EventName.Visible -> {}
+			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
+			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->
 				val now = android.os.SystemClock.uptimeMillis()
@@ -839,8 +842,8 @@ class MarklessHost(
 		val x = w.x && range.maxX > 0
 		val y = w.y && range.maxY > 0
 		val indicators = StyleWrite.ScrollIndicatorsHidden !in styled.writes
-		val vertical = BoxScrollView(context).apply { isVerticalScrollBarEnabled = indicators; isFillViewport = true }
-		val horizontal = BoxHorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = indicators; isFillViewport = true }
+		val vertical = BoxScrollView(context).apply { isVerticalScrollBarEnabled = indicators; isFillViewport = true; onTake = ::scrollTookTouches }
+		val horizontal = BoxHorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = indicators; isFillViewport = true; onTake = ::scrollTookTouches }
 		val chain: List<FrameLayout> = when {
 			x && y -> listOf(vertical, horizontal)
 			x -> listOf(horizontal)

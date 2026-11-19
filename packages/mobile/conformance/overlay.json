@@ -956,7 +956,9 @@
 									},
 									"arguments": [
 										{
-											"lambda": ["kept"],
+											"lambda": [
+												"kept"
+											],
 											"body": {
 												"binary": "!==",
 												"left": {
@@ -1009,7 +1011,9 @@
 							},
 							"arguments": [
 								{
-									"lambda": ["kept"],
+									"lambda": [
+										"kept"
+									],
 									"body": {
 										"binary": "!==",
 										"left": {
@@ -1503,7 +1507,9 @@
 									},
 									"arguments": [
 										{
-											"lambda": ["kept"],
+											"lambda": [
+												"kept"
+											],
 											"body": {
 												"binary": "!==",
 												"left": {
@@ -1556,7 +1562,9 @@
 							},
 							"arguments": [
 								{
-									"lambda": ["kept"],
+									"lambda": [
+										"kept"
+									],
 									"body": {
 										"binary": "!==",
 										"left": {
@@ -1764,49 +1772,203 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Modal"],
-		["h2:text0", "Deleted 0"],
-		["h3:text0", "Changes 0"],
-		["component-edge:1/h1:text0", "Delete draft"],
-		["component-edge:4/h4:text0", "Delete this draft?"],
-		["component-edge:5/h5:text0", "It cannot be undone"],
-		["component-edge:6/h6:text0", "Delete"],
-		["component-edge:8/h1:text0", "Sign out"],
-		["component-edge:11/h4:text0", "Sign out now?"],
-		["component-edge:12/h6:text0", "Stay"]
+		[
+			"h1:text0",
+			"Modal"
+		],
+		[
+			"h2:text0",
+			"Deleted 0"
+		],
+		[
+			"h3:text0",
+			"Changes 0"
+		],
+		[
+			"component-edge:1/h1:text0",
+			"Delete draft"
+		],
+		[
+			"component-edge:4/h4:text0",
+			"Delete this draft?"
+		],
+		[
+			"component-edge:5/h5:text0",
+			"It cannot be undone"
+		],
+		[
+			"component-edge:6/h6:text0",
+			"Delete"
+		],
+		[
+			"component-edge:8/h1:text0",
+			"Sign out"
+		],
+		[
+			"component-edge:11/h4:text0",
+			"Sign out now?"
+		],
+		[
+			"component-edge:12/h6:text0",
+			"Stay"
+		]
 	],
 	"initialAttributes": [
-		["component-edge:0/h0", "ui-open", null],
-		["component-edge:0/h0", "ui-closed", ""],
-		["component-edge:1/h1", "aria-expanded", "false"],
-		["component-edge:1/h1", "ui-open", null],
-		["component-edge:1/h1", "ui-closed", ""],
-		["component-edge:1/h1", "aria-controls", "component-edge:3/h3"],
-		["component-edge:2/h2", "hidden", ""],
-		["component-edge:2/h2", "ui-open", null],
-		["component-edge:2/h2", "ui-closed", ""],
-		["component-edge:3/h3", "role", "dialog"],
-		["component-edge:3/h3", "tabindex", "-1"],
-		["component-edge:3/h3", "ui-open", null],
-		["component-edge:3/h3", "ui-closed", ""],
-		["component-edge:3/h3", "aria-labelledby", "component-edge:4/h4"],
-		["component-edge:3/h3", "aria-describedby", "component-edge:5/h5"],
-		["component-edge:4/h4", "tabindex", "-1"],
-		["component-edge:7/h0", "ui-open", null],
-		["component-edge:7/h0", "ui-closed", ""],
-		["component-edge:8/h1", "aria-expanded", "false"],
-		["component-edge:8/h1", "ui-open", null],
-		["component-edge:8/h1", "ui-closed", ""],
-		["component-edge:8/h1", "aria-controls", "component-edge:10/h3"],
-		["component-edge:9/h2", "hidden", ""],
-		["component-edge:9/h2", "ui-open", null],
-		["component-edge:9/h2", "ui-closed", ""],
-		["component-edge:10/h3", "role", "alertdialog"],
-		["component-edge:10/h3", "tabindex", "-1"],
-		["component-edge:10/h3", "ui-open", null],
-		["component-edge:10/h3", "ui-closed", ""],
-		["component-edge:10/h3", "aria-labelledby", "component-edge:11/h4"],
-		["component-edge:11/h4", "tabindex", "-1"]
+		[
+			"component-edge:0/h0",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:0/h0",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:1/h1",
+			"aria-expanded",
+			"false"
+		],
+		[
+			"component-edge:1/h1",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:1/h1",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:1/h1",
+			"aria-controls",
+			"component-edge:3/h3"
+		],
+		[
+			"component-edge:2/h2",
+			"hidden",
+			""
+		],
+		[
+			"component-edge:2/h2",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:2/h2",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:3/h3",
+			"role",
+			"dialog"
+		],
+		[
+			"component-edge:3/h3",
+			"tabindex",
+			"-1"
+		],
+		[
+			"component-edge:3/h3",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:3/h3",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:3/h3",
+			"aria-labelledby",
+			"component-edge:4/h4"
+		],
+		[
+			"component-edge:3/h3",
+			"aria-describedby",
+			"component-edge:5/h5"
+		],
+		[
+			"component-edge:4/h4",
+			"tabindex",
+			"-1"
+		],
+		[
+			"component-edge:7/h0",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:7/h0",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:8/h1",
+			"aria-expanded",
+			"false"
+		],
+		[
+			"component-edge:8/h1",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:8/h1",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:8/h1",
+			"aria-controls",
+			"component-edge:10/h3"
+		],
+		[
+			"component-edge:9/h2",
+			"hidden",
+			""
+		],
+		[
+			"component-edge:9/h2",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:9/h2",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:10/h3",
+			"role",
+			"alertdialog"
+		],
+		[
+			"component-edge:10/h3",
+			"tabindex",
+			"-1"
+		],
+		[
+			"component-edge:10/h3",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:10/h3",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:10/h3",
+			"aria-labelledby",
+			"component-edge:11/h4"
+		],
+		[
+			"component-edge:11/h4",
+			"tabindex",
+			"-1"
+		]
 	],
 	"steps": [
 		{

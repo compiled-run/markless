@@ -554,7 +554,8 @@ function collectReadsIn(
 		if (
 			callee?.type === 'MemberExpression' &&
 			hasOptionalLink(callee) &&
-			namesABinding(callee)
+			namesABinding(callee) &&
+			!readsElementHandle(callee.object as AnyNode | undefined, state)
 		) {
 			addStateRead(callee, state, region);
 			if (callee.computed === true) {
@@ -602,10 +603,7 @@ function collectReadsIn(
 		}
 
 		addStateRead(node, state, region);
-
-		if (node.computed === true) {
-			collectReadsIn(node.property as AnyNode | undefined, state, region);
-		}
+		collectChainKeyReads(node, state, region);
 		return;
 	}
 
@@ -857,11 +855,39 @@ function keysIntoOneStateCell(node: AnyNode, state: WalkState): boolean {
 		graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
 		semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
 	);
+	if (!resolved) return false;
+	// A handle is one value however it is reached: `els[i]` reads the handle and the key.
+	if (resolved.binding.kind === 'element') return resolved.path.length === 0;
 	return (
-		!!resolved &&
 		(resolved.binding.kind === 'state' || resolved.binding.kind === 'computed') &&
 		resolved.binding.sharedDefinitionId === undefined
 	);
+}
+
+// A DOM method off a handle is no graph callable, so its read stops at the handle like any optional link.
+function readsElementHandle(node: AnyNode | undefined, state: WalkState): boolean {
+	const receiver = unwrapValueWrappers(node);
+	if (!receiver || !namesABinding(receiver)) return false;
+	const source = expressionSource(receiver, state.source);
+	if (!source) return false;
+	return (
+		resolveGraphPath(
+			source,
+			graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+			semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+		)?.binding.kind === 'element'
+	);
+}
+
+// A key anywhere along the chain is evaluated, not only the outermost one: `places[view.i].y` reads `view.i`.
+function collectChainKeyReads(node: AnyNode, state: WalkState, region: ReadRegion | null): void {
+	for (
+		let current: AnyNode | undefined = node;
+		current?.type === 'MemberExpression';
+		current = unwrapValueWrappers(current.object as AnyNode | undefined)
+	)
+		if (current.computed === true)
+			collectReadsIn(current.property as AnyNode | undefined, state, region);
 }
 
 function isChainExpression(node: unknown): boolean {

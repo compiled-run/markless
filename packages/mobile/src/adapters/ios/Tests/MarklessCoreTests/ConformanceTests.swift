@@ -172,16 +172,21 @@ func reproducesConformanceVector(file: URL) throws {
 			case let .object(actionFields)? = stepFields.first(where: { $0.0 == "action" })?.1,
 			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
 			let event = NativeEventName(rawValue: eventName),
-			actionFields.allSatisfy({ (event == .timer ? ["event", "timer"] : ["event", "host", "value", "reason", "key", "text", "detail"]).contains($0.0) }),
+			actionFields.allSatisfy({
+				(event == .timer ? ["event", "timer"] : ["event", "host", "value", "reason", "key", "text", "detail"] + (event.isTouch ? ["pointerId", "x", "y", "time"] : [])).contains($0.0)
+			}),
 			let expected = stepFields.first(where: { $0.0 == "journal" })?.1
 		else { Issue.record("malformed step \(step.jsonText)"); return }
 		let string = { (key: String) -> String? in if case let .string(text)? = actionFields.first(where: { $0.0 == key })?.1 { text } else { nil } }
+		let number = { (key: String) -> Double? in if case let .number(value)? = actionFields.first(where: { $0.0 == key })?.1 { value } else { nil } }
 		let action: NativeAction
 		if event == .timer {
 			action = NativeAction(event: .timer, timer: try #require(string("timer")))
 		} else {
 			let detail: Int? = if case let .number(count)? = actionFields.first(where: { $0.0 == "detail" })?.1 { Int(count) } else { nil }
-			action = NativeAction(event: event, host: try #require(string("host")), value: string(event == .keydown ? "key" : event == .paste ? "text" : "value"), reason: string("reason"), detail: detail)
+			action = NativeAction(
+				event: event, host: try #require(string("host")), value: string(event == .keydown ? "key" : event == .paste ? "text" : "value"), reason: string("reason"),
+				detail: detail, pointerId: number("pointerId"), x: number("x"), y: number("y"), time: number("time"))
 		}
 		let journal = JSONValue.array(try runtime.dispatch(action).map(\.json))
 		#expect(Array(journal.jsonText.utf8) == Array(expected.jsonText.utf8), "\(file.lastPathComponent) \(eventName) on \(action.timer ?? action.host)")

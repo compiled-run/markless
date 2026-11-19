@@ -87,7 +87,12 @@
 			}
 		]
 	},
-	"initial": [["h4:text0", "Size small"]],
+	"initial": [
+		[
+			"h4:text0",
+			"Size small"
+		]
+	],
 	"steps": [
 		{
 			"action": {

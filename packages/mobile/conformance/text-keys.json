@@ -428,12 +428,26 @@
 		]
 	},
 	"initial": [
-		["h3:text0", "0 tags: ; 0 removed; last key none"],
-		["h4:text0", "pasted ; sent "]
+		[
+			"h3:text0",
+			"0 tags: ; 0 removed; last key none"
+		],
+		[
+			"h4:text0",
+			"pasted ; sent "
+		]
 	],
 	"initialProperties": [
-		["h1", "value", ""],
-		["h2", "value", ""]
+		[
+			"h1",
+			"value",
+			""
+		],
+		[
+			"h2",
+			"value",
+			""
+		]
 	],
 	"steps": [
 		{

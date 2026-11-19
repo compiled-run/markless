@@ -341,17 +341,50 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Items: "],
-		["h2:text0", "0 in basket"],
-		["h3:text0", ""],
-		["h5:text0", "Added 0"],
-		["h6:text0", "closed"],
-		["h7:text0", "Panel hidden"],
-		["h8:text0", "Add"],
-		["h9:text0", "Check"],
-		["h10:text0", "Toggle"]
+		[
+			"h1:text0",
+			"Items: "
+		],
+		[
+			"h2:text0",
+			"0 in basket"
+		],
+		[
+			"h3:text0",
+			""
+		],
+		[
+			"h5:text0",
+			"Added 0"
+		],
+		[
+			"h6:text0",
+			"closed"
+		],
+		[
+			"h7:text0",
+			"Panel hidden"
+		],
+		[
+			"h8:text0",
+			"Add"
+		],
+		[
+			"h9:text0",
+			"Check"
+		],
+		[
+			"h10:text0",
+			"Toggle"
+		]
 	],
-	"initialAttributes": [["h7", "role", null]],
+	"initialAttributes": [
+		[
+			"h7",
+			"role",
+			null
+		]
+	],
 	"steps": [
 		{
 			"action": {

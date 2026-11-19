@@ -124,6 +124,9 @@ data class FetchRequest(val url: String, val method: String, val headers: List<P
 }
 
 /** `JSON.stringify` of a value: non-finite numbers are `null`. */
+/** What a touch adds to a script pointer handler's event, in the order the reference writes them. */
+private val TOUCH_FIELDS = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp")
+
 fun jsonValue(v: JsValue): String = when (v) {
 	JsValue.Null -> "null"
 	is JsValue.Str -> jsonString(v.value)
@@ -166,6 +169,9 @@ data class Scope(val items: Map<String, JsValue> = emptyMap(), val locals: Map<S
 		val EMPTY = Scope()
 	}
 }
+
+/** A touch as a host reports it: [pointerId] numbers it (from 1, as a phone browser does), [x] and [y] are its place in points or dp from the screen's top left, [time] the milliseconds since the screen appeared. */
+data class TouchPoint(val pointerId: Double = 1.0, val x: Double = 0.0, val y: Double = 0.0, val time: Double = 0.0)
 
 /** One shown copy of a node: the node itself outside lists, one per row inside one (`<id>@<key>`). */
 data class Instance(val id: String, val node: Node, val scope: Scope, val rowKey: String? = null)
@@ -302,6 +308,11 @@ class Runtime(
 			Expr.Focused -> JsValue.Str(focused ?: NATIVE_DOCUMENT_BODY)
 			is Expr.FocusOrigin -> (eval(e.overlay) as? JsValue.Str)?.let { o -> origins[o.value]?.let(JsValue::Str) } ?: JsValue.Null
 			is Expr.IsElement -> JsValue.Bool((eval(e.value) as? JsValue.Str)?.let { isElement(it.value) } ?: false)
+			is Expr.Captures -> {
+				val node = eval(e.node)
+				val pointer = eval(e.pointer)
+				JsValue.Bool(node is JsValue.Str && touching(pointer)?.capture == node.value)
+			}
 			is Expr.Contains -> {
 				val within = eval(e.within)
 				val node = eval(e.node)
@@ -764,14 +775,15 @@ class Runtime(
 	/**
 	 * Runs the handler for [event] on [host] (a row instance as `<node>@<key>`); an `input` event carries the field's whole
 	 * text as [value], a `keydown` its key and a `paste` the pasted text; a press carries [detail], how many presses in a
-	 * row. A `dismiss` with a [reason] is an overlay's Escape; without one, a sheet's platform close. A pointer
-	 * event reaches [host] and each element it is inside, innermost first, after a `dismiss` of the topmost overlay when a
+	 * row. A `dismiss` with a [reason] is an overlay's Escape; without one, a sheet's platform close. A touch
+	 * ([EventName.touch], at [point]) raises the browser's pointer events, after a `dismiss` of the topmost overlay when a
 	 * `pointerdown` lands outside it.
 	 */
-	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, detail: Int? = null): List<JournalEntry> {
+	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, detail: Int? = null, point: TouchPoint? = null): List<JournalEntry> {
 		if (detail != null && event != EventName.Activate) throw MarklessRuntimeError("a ${event.wire} event carries no press count")
 		if ((event in VALUED) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
+		if (point != null && !event.touch) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
 		if (event == EventName.Dismiss && reason != null) {
 			if (stack.lastOrNull() != host) throw MarklessRuntimeError("\"$host\" is not the topmost overlay")
 			val dismiss = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
@@ -779,30 +791,8 @@ class Runtime(
 				dismiss?.let { withFields(mapOf("reason" to JsValue.Str(reason), "pressTarget" to JsValue.Null)) { run(it.ops, Scope.EMPTY) } } ?: emptyList()
 			}
 		}
-		if (event == EventName.PointerDown || event == EventName.PointerUp) {
-			val template = host.substringBefore('@')
-			val scope = (instances(node(template)).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
-			return change(null, null) {
-				val calls = ArrayList<JournalEntry>()
-				val runs = ArrayList<Pair<String, Map<String, JsValue>>>()
-				// The overlay behaviour's document listener hears the press first: the topmost overlay it landed outside is told.
-				val top = stack.lastOrNull()
-				if (top != null && event == EventName.PointerDown && !contains(top, host))
-					handlerFor(top, EventName.Dismiss)?.let { runs.add(it to mapOf("reason" to JsValue.Str("outside-press"), "pressTarget" to JsValue.Str(host))) }
-				var at: String? = template
-				while (!at.isNullOrEmpty()) {
-					handlerFor(at, event)?.let { runs.add(it to mapOf("target" to JsValue.Str(host), "button" to JsValue.Num(0.0))) }
-					at = byId[at]?.parent
-				}
-				for ((id, f) in runs) {
-					val handler = handlers[id] ?: throw MarklessRuntimeError("unknown handler \"$id\"")
-					val out = withFields(f) { run(handler.ops, scope) }
-					if (out.firstOrNull() is JournalEntry.Navigate) return@change out
-					calls.addAll(out)
-				}
-				calls
-			}
-		}
+		if (event.touch) return touch(host, event, point ?: TouchPoint())
+		if (event.pointer) throw MarklessRuntimeError("${event.wire} is raised by the runtime, not dispatched")
 		if (event == EventName.Cancel) {
 			if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
 			val cancel = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
@@ -832,6 +822,107 @@ class Runtime(
 		}
 		return change(host, if (event == EventName.Input) value else null) {
 			withFields(carried) { run(handler.ops, scope) }
+		}
+	}
+
+	private class Touching(var capture: String?, var over: String, val primary: Boolean)
+
+	/** Each touch that is down: the element it is captured to (null after a release), the one under it, and whether it was first. */
+	private val touches = LinkedHashMap<Double, Touching>()
+
+	private fun touching(pointer: JsValue): Touching? = (pointer as? JsValue.Num)?.let { touches[it.value + 0.0] }
+
+	/** The elements from [id] out to the root, innermost first; a row's copy keeps its own id. */
+	private fun chain(id: String): List<String> {
+		val base = id.substringBefore('@')
+		val out = ArrayList<String>()
+		var at: String? = base
+		while (!at.isNullOrEmpty()) {
+			out.add(if (at == base) id else at)
+			at = byId[at]?.parent
+		}
+		return out
+	}
+
+	private fun touch(host: String, event: EventName, point: TouchPoint): List<JournalEntry> {
+		val scope = (instances(node(host.substringBefore('@'))).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
+		val pointerId = point.pointerId + 0.0
+		val down = touches[pointerId]
+		if (if (event == EventName.PointerDown) down != null else down == null) throw MarklessRuntimeError("touch ${JsString.number(pointerId)} is ${if (down != null) "already" else "not"} down")
+		return change(null, null) {
+			val calls = ArrayList<JournalEntry>()
+			val state = down ?: Touching(host, host, touches.values.none { it.primary }).also { touches[pointerId] = it }
+			fun fieldsOf(type: EventName, target: String, currentTarget: String, related: String?): Map<String, JsValue> {
+				val lifted = type == EventName.PointerUp || type == EventName.PointerCancel || type == EventName.PointerOut || type == EventName.PointerLeave
+				val cancelled = event == EventName.PointerCancel
+				return mapOf(
+					"target" to JsValue.Str(target),
+					"currentTarget" to JsValue.Str(currentTarget),
+					"relatedTarget" to (related?.let(JsValue::Str) ?: JsValue.Null),
+					// Safari's values, which the Pointer Events spec gives; Chrome on Android reports 0 for over, enter, out and leave.
+					"button" to JsValue.Num(if (type == EventName.PointerDown || type == EventName.PointerUp) 0.0 else -1.0),
+					"buttons" to JsValue.Num(if (lifted) 0.0 else 1.0),
+					"clientX" to JsValue.Num(if (cancelled) 0.0 else point.x),
+					"clientY" to JsValue.Num(if (cancelled) 0.0 else point.y),
+					"pointerId" to JsValue.Num(pointerId),
+					"pointerType" to JsValue.Str("touch"),
+					"isPrimary" to JsValue.Bool(state.primary),
+					"timeStamp" to JsValue.Num(point.time),
+				)
+			}
+			val runs = ArrayList<Pair<String, Map<String, JsValue>>>()
+			fun raise(type: EventName, target: String, related: String? = null) {
+				for (node in chain(target)) handlerFor(node.substringBefore('@'), type)?.let { runs.add(it to fieldsOf(type, target, node, related)) }
+			}
+			/** `pointerenter` on each element [target] is in that [from] is not, outermost first; `pointerleave` the other way. */
+			fun crossing(type: EventName, target: String, from: String?, related: String?) {
+				val outside = if (from == null) emptySet() else chain(from).toSet()
+				val nodes = chain(target).filter { it !in outside }
+				for (node in if (type == EventName.PointerEnter) nodes.asReversed() else nodes)
+					handlerFor(node.substringBefore('@'), type)?.let { runs.add(it to fieldsOf(type, node, node, related)) }
+			}
+			fun flush(): List<JournalEntry>? {
+				val taken = runs.toList()
+				runs.clear()
+				for ((id, f) in taken) {
+					val handler = handlers[id] ?: throw MarklessRuntimeError("unknown handler \"$id\"")
+					val out = withFields(f) { run(handler.ops, scope) }
+					if (out.firstOrNull() is JournalEntry.Navigate) return out
+					calls.addAll(out)
+				}
+				return null
+			}
+			if (event == EventName.PointerDown) {
+				raise(EventName.PointerOver, host)
+				crossing(EventName.PointerEnter, host, null, null)
+				// The overlay behaviour's document listener hears the press: the topmost overlay it landed outside is told.
+				val top = stack.lastOrNull()
+				if (top != null && !contains(top, host))
+					handlerFor(top, EventName.Dismiss)?.let { runs.add(it to mapOf("reason" to JsValue.Str("outside-press"), "pressTarget" to JsValue.Str(host))) }
+				raise(EventName.PointerDown, host)
+				return@change flush() ?: calls
+			}
+			// Before the next event the touch counts as over its capturing element (or, released, the one under it), as browsers do.
+			val target = state.capture ?: host
+			if (target != state.over) {
+				val from = state.over
+				raise(EventName.PointerOut, from, target)
+				crossing(EventName.PointerLeave, from, target, target)
+				raise(EventName.PointerOver, target, from)
+				crossing(EventName.PointerEnter, target, from, from)
+				state.over = target
+			}
+			if (event == EventName.PointerMove) {
+				raise(EventName.PointerMove, target)
+				return@change flush() ?: calls
+			}
+			raise(event, target)
+			val early = flush()
+			touches.remove(pointerId)
+			if (early != null) return@change early
+			raise(EventName.PointerOut, target)
+			crossing(EventName.PointerLeave, target, null, null)
+			flush() ?: calls
 		}
 	}
 
@@ -936,6 +1027,13 @@ class Runtime(
 				if (op.node !in dialogs) throw MarklessRuntimeError("\"${op.node}\" is not a dialog")
 				dialogs[op.node] = op.open
 			}
+			is Op.Capture -> {
+				val node = evaluate(op.node, scope)
+				val touch = touching(evaluate(op.pointer, scope))
+				if (node !is JsValue.Str || touch == null) continue
+				if (!op.release) touch.capture = node.value
+				else if (touch.capture == node.value) touch.capture = null
+			}
 			is Op.Command -> {
 				val node = evaluate(op.node, scope)
 				if (node == JsValue.Null || node == JsValue.Str(NATIVE_DOCUMENT_BODY)) continue
@@ -944,7 +1042,8 @@ class Runtime(
 				calls.add(JournalEntry.Command(node.value, op.command, op.preventScroll))
 			}
 			is Op.Script -> {
-				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}}"
+				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
+				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$touch}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope)},\"event\":$event$catch"))
 			}

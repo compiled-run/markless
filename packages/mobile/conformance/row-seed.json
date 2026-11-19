@@ -67,7 +67,9 @@
 				"list": {
 					"cell": "state:items"
 				},
-				"key": ["id"]
+				"key": [
+					"id"
+				]
 			},
 			{
 				"kind": "element",
@@ -240,7 +242,9 @@
 							},
 							"arguments": [
 								{
-									"lambda": ["one"],
+									"lambda": [
+										"one"
+									],
 									"body": {
 										"binary": "!==",
 										"left": {
@@ -272,7 +276,9 @@
 							},
 							"arguments": [
 								{
-									"lambda": ["one"],
+									"lambda": [
+										"one"
+									],
 									"body": {
 										"object": [
 											[
@@ -321,13 +327,36 @@
 		]
 	},
 	"initial": [
-		["component-edge:0/h0:text0@a", "Apple 0"],
-		["component-edge:0/h0:text0@b", "Berry 0"],
-		["h2:text0", "Add"],
-		["h3:text0", "Drop"],
-		["h4:text0", "Rename"]
+		[
+			"component-edge:0/h0:text0@a",
+			"Apple 0"
+		],
+		[
+			"component-edge:0/h0:text0@b",
+			"Berry 0"
+		],
+		[
+			"h2:text0",
+			"Add"
+		],
+		[
+			"h3:text0",
+			"Drop"
+		],
+		[
+			"h4:text0",
+			"Rename"
+		]
 	],
-	"initialRows": [["repeat:0", ["a", "b"]]],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"a",
+				"b"
+			]
+		]
+	],
 	"steps": [
 		{
 			"action": {
@@ -351,7 +380,11 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["a", "b", "c"]
+					"keys": [
+						"a",
+						"b",
+						"c"
+					]
 				}
 			]
 		},
@@ -377,7 +410,10 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["b", "c"]
+					"keys": [
+						"b",
+						"c"
+					]
 				}
 			]
 		},
