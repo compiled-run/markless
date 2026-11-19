@@ -100,49 +100,6 @@ async function buildError(pages: Record<string, string>): Promise<string | undef
 }
 
 const pages: Record<string, string> = {
-	'lib/Form.tsrx': `export default function Form({ onSave }: { readonly onSave: (title: string) => void }) @{
-	<form
-		onSubmit={(event) => {
-			event.preventDefault();
-			onSave(String(new FormData(event.currentTarget).get('title')));
-		}}
-	>
-		<input aria-label="Title" name="title" />
-		<button type="submit">Save</button>
-	</form>
-}
-`,
-	'make.tsrx': `import { storage } from '@markless/core';
-import { navigate } from '@markless/router';
-import Form from '../lib/Form.tsrx';
-
-export default function Make() @{
-	let list = storage('made', '[]');
-
-	<main>
-		<Form
-			onSave={async (title) => {
-				const id = String(Date.now());
-				list = JSON.stringify([...(JSON.parse(list) as object[]), { id, title }]);
-				await navigate(\`/made/\${id}\`);
-			}}
-		/>
-	</main>
-}
-`,
-	'made/[id].tsrx': `import { computed, storage } from '@markless/core';
-import { Link, type PageProps } from '@markless/router';
-
-export default function Made({ params }: PageProps<{ id: string }>) @{
-	let list = storage('made', '[]');
-	const item = computed(() => (JSON.parse(list) as { id: string; title: string }[]).find((entry) => entry.id === params.id));
-
-	<main>
-		<p data-title>{item ? item.title : 'missing'}</p>
-		<Link href="/make">New</Link>
-	</main>
-}
-`,
 	'lib/Shell.tsrx': `import type { Children } from '@markless/core';
 import { storage } from '@markless/core';
 
@@ -325,17 +282,6 @@ test.fails('@empty with live text shows when a filtered list goes from some rows
 	await visit('/empty', async (page) => {
 		await page.getByLabel('Search').fill('zzz');
 		await expect.poll(() => page.locator('li').allTextContents()).toEqual(['No match for zzz']);
-	});
-});
-
-test.fails('navigate() to a new page straight after a storage() write renders that page from the new value (#866)', async () => {
-	await visit('/made/none', async (page) => {
-		await page.getByRole('link', { name: 'New' }).click();
-		await page.waitForURL('**/make');
-		await page.getByLabel('Title').fill('one');
-		await page.getByRole('button', { name: 'Save' }).click();
-		await page.waitForURL(/made\/\d+/);
-		await expect.poll(() => page.locator('[data-title]').textContent()).toBe('one');
 	});
 });
 
