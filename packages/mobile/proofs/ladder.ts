@@ -58,7 +58,14 @@ export type LadderAction =
 	/** The platform's own way back: the edge-swipe gesture, or the back button (iOS navigation bar, Android system back). */
 	| { readonly back: 'gesture' | 'button' }
 	/** The device's light or dark appearance, switched in the system while the app runs (`prefers-color-scheme` on the web). */
-	| { readonly appearance: 'light' | 'dark' };
+	| { readonly appearance: 'light' | 'dark' }
+	/** Escape on the web, the back gesture on Android; iOS has none a flow can perform, so the step runs on Android only. */
+	| { readonly escape: true }
+	/** A press that starts and ends on the topmost overlay element itself, beside what it holds (a modal's backdrop). */
+	| { readonly pressBackdrop: true };
+
+/** Where a phone flow presses the backdrop: above a centred surface, below the status bar. */
+export const BACKDROP_POINT = '50%,8%';
 
 /** Permissions a rung sets or clears, by the name Maestro's `launchApp` takes. */
 export type DevicePermission = 'location' | 'camera' | 'microphone';
@@ -131,6 +138,11 @@ export type LadderStep = {
 	 * focused field's `validationMessage`; on a phone the host's message, on screen.
 	 */
 	readonly invalid?: string;
+	/**
+	 * Phones and the reference runtime: how many times the app has started its script engine since launch, from the test
+	 * build's label `ENGINE_STARTS_ID`. A page whose handlers are all data never starts one.
+	 */
+	readonly engineStarts?: number;
 };
 
 /** Each system prompt's title, as a Maestro text pattern matching iOS's and Android's wording. */
@@ -153,6 +165,11 @@ export const DEVICE_CALLS_ID = 'markless-device-calls';
 export const CAMERA_STATE_ID = 'markless-camera';
 /** The test-build label where a phone shell shows whether a recorder holds the microphone: `microphone on` or `off`. */
 export const MICROPHONE_STATE_ID = 'markless-microphone';
+/** The test-build label where a phone shell shows how many times the app started its script engine: `engine starts: <n>`. */
+export const ENGINE_STARTS_ID = 'markless-engine-starts';
+export const engineStartsText = (starts: number): string => `engine starts: ${starts}`;
+/** The port of the test's echo server, which a rung with `server: 'echo'` fetches from (`echo-server.ts`). */
+export const ECHO_SERVER_PORT = 47608;
 export const callsText = (calls: readonly string[]): string =>
 	`calls: ${calls.length === 0 ? 'none' : calls.join(', ')}`;
 
@@ -183,6 +200,8 @@ export type LadderRung = {
 		readonly steps?: readonly LadderStep[];
 		readonly absentFromOutput?: readonly string[];
 	};
+	/** The test runs the echo server (`ECHO_SERVER_PORT`) while the rung runs, on the web and on phones. */
+	readonly server?: 'echo';
 	readonly steps: readonly LadderStep[];
 };
 
@@ -190,7 +209,11 @@ export const proofsDir = import.meta.dirname;
 
 export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && /^((\d\d|[dp]\d)[a-z]?|[fruy]\d+)-/.test(entry.name))
+		.filter(
+			(entry) =>
+				entry.isDirectory() &&
+				/^((\d\d|[dp]\d)[a-z]?|[fjruy]\d+)-/.test(entry.name),
+		)
 		.filter((entry) => !isApp(entry.name))
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
@@ -198,12 +221,12 @@ export const rungFolders = (): string[] =>
 /** A rung that is an app of several routes (`pages/`) rather than one screen (`App.tsrx`). */
 const isApp = (folder: string): boolean => existsSync(join(proofsDir, folder, 'pages'));
 
-/** The navigation ladder: each folder an app (`pages/`) of several routes; an `r<n>` rung with `pages/` too. */
+/** The navigation ladder: each folder an app (`pages/`) of several routes; an `r<n>` or `j<n>` rung with `pages/` too. */
 export const navRungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && (/^n\d+-/.test(entry.name) || (/^r\d+-/.test(entry.name) && isApp(entry.name))))
+		.filter((entry) => entry.isDirectory() && (/^n\d+-/.test(entry.name) || (/^[jr]\d+-/.test(entry.name) && isApp(entry.name))))
 		.map((entry) => entry.name)
-		.sort();
+		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
 /** The styles ladder: each folder an app of several pages whose styles reach the phone through Dragon. */
 export const styleRungFolders = (): string[] =>
@@ -268,6 +291,8 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 			step.microphone !== previous.microphone && { microphone: step.microphone }),
 		...(step.invalid !== undefined &&
 			step.invalid !== previous.invalid && { invalid: step.invalid }),
+		...(step.engineStarts !== undefined &&
+			step.engineStarts !== previous.engineStarts && { engineStarts: step.engineStarts }),
 	};
 }
 
@@ -280,6 +305,7 @@ export const witnessCount = (witness: LadderStep): number =>
 	(witness.calls ? 1 : 0) +
 	(witness.camera ? 1 : 0) +
 	(witness.microphone ? 1 : 0) +
+	(witness.engineStarts === undefined ? 0 : 1) +
 	(witness.title === undefined ? 0 : 1) +
 	(witness.invalid !== undefined ? 1 : 0);
 
@@ -330,6 +356,9 @@ const screenAssertions = (step: LadderStep): unknown[] => [
 		? [{ assertVisible: { id: MICROPHONE_STATE_ID, text: `microphone ${step.microphone}` } }]
 		: []),
 	...(step.invalid !== undefined ? [{ assertVisible: selector(step.invalid) }] : []),
+	...(step.engineStarts === undefined
+		? []
+		: [{ assertVisible: { id: ENGINE_STARTS_ID, text: engineStartsText(step.engineStarts) } }]),
 ];
 
 const onPlatform = (platform: 'iOS' | 'Android', commands: unknown[]) => ({
@@ -429,6 +458,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			},
 		];
 	}
+	if ('escape' in action) return ['back'];
+	if ('pressBackdrop' in action) return [{ tapOn: { point: BACKDROP_POINT } }];
 	return [
 		{
 			extendedWaitUntil: {
@@ -465,7 +496,8 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 		: [];
 	// The Settings app keeps its place between runs; stopping it makes it open at its root every time.
 	const visitsSettings = rung.steps.some((step) => step.do && 'settings' in step.do);
-	return rung.steps.map((step, index) => [
+	return rung.steps.map((step, index) => {
+		const commands = [
 		...(index === 0 && visitsSettings
 			? [
 					{
@@ -487,7 +519,11 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 				})
 			: []),
 		...assertions(step),
-	]);
+		];
+		return step.do && 'escape' in step.do
+			? [{ runFlow: { when: { platform: 'Android' }, commands } }]
+			: commands;
+	});
 }
 
 /** The one Maestro flow for a rung, written from its expected.json so the two never drift. */

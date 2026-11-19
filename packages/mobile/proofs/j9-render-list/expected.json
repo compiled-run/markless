@@ -1,0 +1,17 @@
+{
+	"rung": "J9",
+	"name": "A @for list the page renders through an app function",
+	"steps": [
+		{
+			"visible": ["Shortest first", "fig", "kiwi", "banana"],
+			"absent": ["date"],
+			"order": ["fig", "kiwi", "banana"]
+		},
+		{
+			"do": { "tap": "Add date" },
+			"visible": ["date"],
+			"absent": [],
+			"order": ["fig", "date", "kiwi", "banana"]
+		}
+	]
+}

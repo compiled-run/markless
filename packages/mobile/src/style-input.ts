@@ -2,7 +2,8 @@ import type { NativeArmPlace, NativeViewPayload } from '@markless/serializer';
 import { isNativeStyleStateAttribute } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeBuild, NativeStylesheet } from './compile.ts';
-import { createNativeRuntime, evaluateNativeExpr, formatNativeValue } from './runtime.ts';
+import { createNativeRuntime, evaluateWithScript, formatNativeValue } from './runtime.ts';
+import { nodeScriptHost } from './node-engine.ts';
 import { isMeasuredSnapPoint, SHEET_AREAS, sheetViewports } from './sheet-areas.ts';
 
 export const NATIVE_STYLE_INPUT_VERSION = 'markless.native-style-input/0';
@@ -168,7 +169,18 @@ export function nativeStyleInput(
 	},
 	cells?: ReadonlySet<string>,
 ): NativeStyleInput {
-	const initial = new Map(createNativeRuntime(payload).texts());
+	// What a script computes at the first render is laid out too: Dragon measures the text it gives.
+	const host = payload.script ? nodeScriptHost() : undefined;
+	const initial = new Map(
+		createNativeRuntime(payload, new Map(), {}, undefined, undefined, host).texts(),
+	);
+	const evaluateAt = host
+		? evaluateWithScript(payload, host)
+		: evaluateWithScript(payload, {
+				start: () => {
+					throw new Error('no script');
+				},
+			});
 	const states = payload.cells.flatMap((cell) => {
 		if (!cell.styled || (cells && !cells.has(cell.id))) return [];
 		if (typeof cell.initial !== 'boolean')
@@ -228,14 +240,9 @@ export function nativeStyleInput(
 				(binding) => 'attribute' in binding && binding.attribute === 'class',
 			);
 			const evaluate = (
-				expr: Parameters<typeof evaluateNativeExpr>[0],
+				expr: Parameters<typeof evaluateAt>[0],
 				when: Record<string, boolean>,
-			) =>
-				evaluateNativeExpr(expr, (cell) =>
-					cell in when
-						? when[cell]!
-						: (payload.cells.find((c) => c.id === cell)?.initial ?? null),
-				);
+			) => evaluateAt(expr, new Map([...initialCells, ...Object.entries(when)]));
 			const classByState = classBinding
 				? combinations.map((when) => {
 						const value = evaluate(classBinding.value, when);

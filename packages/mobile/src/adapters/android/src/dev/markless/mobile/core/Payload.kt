@@ -2,6 +2,9 @@ package dev.markless.mobile.core
 
 const val NATIVE_VIEW_VERSION = "markless.native-view/0"
 
+/** The element id that stands for the document body, which no node has. */
+const val NATIVE_DOCUMENT_BODY = "#body"
+
 /** A JavaScript value a cell or expression holds; arrays and objects compare by identity, as `===` does. */
 sealed interface JsValue {
 	data object Null : JsValue
@@ -52,15 +55,34 @@ sealed interface Expr {
 	/** The current row's item of a list. */
 	data class Item(val repeat: String) : Expr
 	data class Call(val name: String, val arguments: List<Expr>) : Expr
-	/** In an `input` handler: the field's whole text after the edit. */
-	data object EventValue : Expr
+	/** A field of the event running the handler: `value`, `reason`, `pressTarget`, `target` or `button`. */
+	data class Event(val field: String) : Expr
+	/** The focused element's id, or [NATIVE_DOCUMENT_BODY] when none has focus. */
+	data object Focused : Expr
+	/** Whether the element [node] is [within] or inside it. */
+	data class Contains(val within: Expr, val node: Expr) : Expr
+	/** The element that had focus when the overlay [overlay] was last shown, or null. */
+	data class FocusOrigin(val overlay: Expr) : Expr
+	data class IsElement(val value: Expr) : Expr
 	/** The page's route params, an object of strings. */
 	data object RouteParams : Expr
 	/** `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order. */
 	data class FormData(val form: String) : Expr
 	/** A checkbox's or radio button's checkedness now. */
 	data class Checked(val node: String) : Expr
+	/** A computed whose body runs in the script engine: function [fn] of the payload's script, called with [bindings]. */
+	data class Script(val fn: String, val bindings: Map<String, ScriptBinding>) : Expr
 }
+
+/** What a name of a script function means where it runs: a cell it reads and writes, a state object (one cell per field), or a value it only reads. */
+sealed interface ScriptBinding {
+	data class Cell(val cell: String) : ScriptBinding
+	data class Fields(val fields: Map<String, String>) : ScriptBinding
+	data class Value(val value: Expr) : ScriptBinding
+}
+
+/** The JavaScript a payload's script ops and script computeds run, kept in the engine under [id]; [services] are the host services it uses. */
+data class ScriptSource(val id: String, val source: String, val services: List<String>)
 
 sealed interface TextPart {
 	data class Literal(val text: String) : TextPart
@@ -134,8 +156,8 @@ data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boo
 /** An inline `<svg>` compiled to shapes. */
 data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
 
-/** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
-enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible") }
+/** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Dismiss] is a sheet's platform close or an overlay's Escape or outside press. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
+enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"), PointerDown("pointerdown"), PointerUp("pointerup") }
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
@@ -149,14 +171,16 @@ sealed interface Op {
 	data class If(val test: Expr, val then: List<Op>, val otherwise: List<Op>) : Op
 	/** `showModal()` ([open] true) or `close()` on a `<dialog>`: the host puts it in its top layer or takes it out. */
 	data class Dialog(val node: String, val open: Boolean) : Op
-	/** `focus()` or `scrollIntoView()` on an element, run once the views show the handler's writes. */
-	data class Command(val node: String, val command: String, val preventScroll: Boolean) : Op
+	/** `focus()` or `scrollIntoView()` on the element [node] evaluates to (a fixed id is a literal), once the views show the handler's writes; null or the body does nothing. */
+	data class Command(val node: Expr, val command: String, val preventScroll: Boolean) : Op
 	/** Submits [form] as pressing [submitter] does (null: the return key with no submit button). */
 	data class Submit(val form: String, val submitter: String?) : Op
 	/** After [ms], [ops] run with each [capture] name holding the value it had when this op ran. */
 	data class After(val ms: Expr, val capture: List<Pair<String, Expr>>, val ops: List<Op>) : Op
 	/** A press on a checkbox (it flips) or a radio button (it is checked, the rest of its group unchecked). */
 	data class Tick(val node: String) : Op
+	/** Runs function [fn] of the payload's script with [bindings]; a throw or rejection writes `{ name, message }` to [catch] when there is one. */
+	data class Script(val fn: String, val type: String, val bindings: Map<String, ScriptBinding>, val catch: String? = null) : Op
 }
 
 /** A device call a task cell starts at mount. */
@@ -214,13 +238,15 @@ data class Payload(
 	val forms: List<Form> = emptyList(),
 	/** [ValueMissing] by the locale the browser shows its own text in. */
 	val valueMissing: Map<String, ValueMissing> = emptyMap(),
+	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
+	val script: ScriptSource? = null,
 ) {
 	companion object {
 		fun decode(bytes: ByteArray): Payload = decode(Json.parse(bytes))
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "script"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -244,14 +270,7 @@ data class Payload(
 				}
 				node.row?.let { r -> if (seen[r] !is Node.Repeat) throw MarklessDecodeError("node \"${node.id}\" sits in rows of \"$r\", which is not a preceding list") }
 				if (seen.put(node.id, node) != null) throw MarklessDecodeError("duplicate node \"${node.id}\"")
-				val reads = when (node) {
-					is Node.Text -> node.parts.filterIsInstance<TextPart.Value>().map { it.expr }
-					is Node.Element -> node.bindings.map { it.value }
-					is Node.Branch -> listOfNotNull(node.test) + node.tests.orEmpty().filterNotNull()
-					is Node.Repeat -> listOf(node.list)
-					is Node.Sheet -> listOf(node.open)
-				}
-				for (e in reads) for (c in cellsOf(e)) if (c !in cellIds) throw MarklessDecodeError("node \"${node.id}\" reads unknown cell \"$c\"")
+				for (e in readsOf(node)) for (c in cellsOf(e)) if (c !in cellIds) throw MarklessDecodeError("node \"${node.id}\" reads unknown cell \"$c\"")
 			}
 			for (c in cells) c.row?.let { r -> if (seen[r] !is Node.Repeat) throw MarklessDecodeError("cell \"${c.id}\" is state of rows of \"$r\", which is not a list") }
 			val handlers = root.field("handlers", "payload").arr("payload.handlers").mapIndexed { n, h -> handler(h, "handlers[$n]", cellIds) }
@@ -261,7 +280,7 @@ data class Payload(
 			for (e in events) {
 				val host = seen[e.host]
 				if (e.event == EventName.Dismiss) {
-					if (host !is Node.Sheet) throw MarklessDecodeError("dismiss event on \"${e.host}\" names no sheet")
+					if (host !is Node.Sheet && !(host is Node.Element && OVERLAY_ATTRIBUTE in host.attributes)) throw MarklessDecodeError("dismiss event on \"${e.host}\" names no sheet or overlay")
 				} else if (host !is Node.Element) throw MarklessDecodeError("event on \"${e.host}\" names no element")
 				if (e.handler !in handlerIds) throw MarklessDecodeError("event on \"${e.host}\" names unknown handler \"${e.handler}\"")
 			}
@@ -282,7 +301,57 @@ data class Payload(
 				fun text(k: String) = mo.field(k, "payload.valueMissing.$locale").str("payload.valueMissing.$locale.$k")
 				locale to ValueMissing(text("text"), text("checkbox"), text("radio"))
 			} ?: emptyMap()
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing)
+			val script = root["script"]?.obj("payload.script")?.let { o ->
+				o.only(setOf("id", "source", "services"), "payload.script")
+				val services = o.field("services", "payload.script").arr("payload.script.services").map { it.str("payload.script.services[]") }
+				for (s in services) if (s !in SERVICES) throw MarklessDecodeError("payload.script has unknown service \"$s\"")
+				ScriptSource(o.field("id", "payload.script").str("payload.script.id"), o.field("source", "payload.script").str("payload.script.source"), services)
+			}
+			if (script == null) {
+				val runsScript = handlers.any { h -> scriptOps(h.ops) } || nodes.any { n -> readsOf(n).any(::hasScript) } || title.orEmpty().any { it is TextPart.Value && hasScript(it.expr) }
+				if (runsScript) throw MarklessDecodeError("a script op or computed in a payload with no script")
+			}
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, script)
+		}
+
+		private fun readsOf(node: Node): List<Expr> = when (node) {
+			is Node.Text -> node.parts.filterIsInstance<TextPart.Value>().map { it.expr }
+			is Node.Element -> node.bindings.map { it.value }
+			is Node.Branch -> listOfNotNull(node.test) + node.tests.orEmpty().filterNotNull()
+			is Node.Repeat -> listOf(node.list)
+			is Node.Sheet -> listOf(node.open)
+		}
+
+		private fun hasScript(e: Expr): Boolean = when (e) {
+			is Expr.Script -> true
+			is Expr.Unary -> hasScript(e.value)
+			is Expr.Binary -> hasScript(e.left) || hasScript(e.right)
+			is Expr.Logical -> hasScript(e.left) || hasScript(e.right)
+			is Expr.If -> hasScript(e.test) || hasScript(e.whenTrue) || hasScript(e.whenFalse)
+			is Expr.Template -> e.parts.any { it is Expr && hasScript(it) }
+			is Expr.Member -> hasScript(e.value)
+			is Expr.At -> hasScript(e.index) || hasScript(e.list)
+			is Expr.ArrayLit -> e.items.any { hasScript(it.second) }
+			is Expr.ObjectLit -> e.entries.any { hasScript(it.second) }
+			is Expr.Method -> hasScript(e.target) || e.arguments.any(::hasScript)
+			is Expr.Lambda -> hasScript(e.body)
+			is Expr.Call -> e.arguments.any(::hasScript)
+			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked -> false
+			is Expr.Contains -> hasScript(e.within) || hasScript(e.node)
+			is Expr.FocusOrigin -> hasScript(e.overlay)
+			is Expr.IsElement -> hasScript(e.value)
+		}
+
+		private fun scriptOps(ops: List<Op>): Boolean = ops.any { op ->
+			when (op) {
+				is Op.Script -> true
+				is Op.If -> hasScript(op.test) || scriptOps(op.then) || scriptOps(op.otherwise)
+				is Op.Call -> op.arguments.any(::hasScript) || op.after?.let { scriptOps(it.ops) } == true
+				is Op.Assign -> hasScript(op.value)
+				is Op.Navigate -> op.params.values.any(::hasScript)
+				is Op.After -> hasScript(op.ms) || op.capture.any { hasScript(it.second) } || scriptOps(op.ops)
+				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick -> false
+			}
 		}
 
 		fun cellsOf(e: Expr): List<String> = when (e) {
@@ -301,13 +370,41 @@ data class Payload(
 			is Expr.Lambda -> cellsOf(e.body)
 			is Expr.Local, is Expr.Item, Expr.RouteParams -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
-			Expr.EventValue, is Expr.FormData, is Expr.Checked -> emptyList()
+			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked -> emptyList()
+			is Expr.Contains -> cellsOf(e.within) + cellsOf(e.node)
+			is Expr.FocusOrigin -> cellsOf(e.overlay)
+			is Expr.IsElement -> cellsOf(e.value)
+			is Expr.Script -> cellsOf(e.bindings)
+		}
+
+		fun cellsOf(bindings: Map<String, ScriptBinding>): List<String> = bindings.values.flatMap { b ->
+			when (b) {
+				is ScriptBinding.Cell -> listOf(b.cell)
+				is ScriptBinding.Fields -> b.fields.values.toList()
+				is ScriptBinding.Value -> cellsOf(b.value)
+			}
+		}
+
+		private val SERVICES = setOf("timers", "fetch", "console", "crypto")
+
+		private fun scriptBindings(v: Json, what: String): Map<String, ScriptBinding> = v.obj(what).entries.associateTo(LinkedHashMap()) { (name, b) ->
+			val bo = b.obj("$what.$name")
+			name to when {
+				bo.containsKey("cell") -> { bo.only(setOf("cell"), "$what.$name"); ScriptBinding.Cell(bo.field("cell", what).str("$what.$name.cell")) }
+				bo.containsKey("fields") -> {
+					bo.only(setOf("fields"), "$what.$name")
+					ScriptBinding.Fields(bo.field("fields", what).obj("$what.$name.fields").entries.associateTo(LinkedHashMap()) { (f, c) -> f to c.str("$what.$name.fields.$f") })
+				}
+				bo.containsKey("value") -> { bo.only(setOf("value"), "$what.$name"); ScriptBinding.Value(expr(bo.field("value", what), "$what.$name.value")) }
+				else -> throw MarklessDecodeError("$what.$name is an unknown script binding (fields ${bo.keys})")
+			}
 		}
 
 		private val UNARY = setOf("!", "-", "+", "typeof")
 		private val BINARY = setOf("+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=")
 		private val LOGICAL = setOf("&&", "||", "??")
 		private val METHODS = setOf("filter", "map", "findIndex", "some", "every", "includes", "indexOf", "join", "concat", "slice", "reverse", "toReversed", "toUpperCase", "toLowerCase", "trim")
+		private val EVENT_FIELDS = setOf("value", "reason", "pressTarget", "target", "button")
 		private val BUILTINS = setOf("String", "Number", "Boolean", "Math.abs", "Math.floor", "Math.max", "Math.min", "Math.round", "Date.now", "Date.toISOString")
 
 		private fun oneOf(o: Map<String, Json>, key: String, allowed: Set<String>, what: String): String {
@@ -361,9 +458,18 @@ data class Payload(
 					Expr.Call(oneOf(o, "call", BUILTINS, what), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })
 				}
 				o.containsKey("route") -> { o.only(setOf("route"), what); oneOf(o, "route", setOf("params"), what); Expr.RouteParams }
-				o.containsKey("event") -> { o.only(setOf("event"), what); oneOf(o, "event", setOf("value"), what); Expr.EventValue }
+				o.containsKey("event") -> { o.only(setOf("event"), what); Expr.Event(oneOf(o, "event", EVENT_FIELDS, what)) }
+				o.containsKey("focused") -> {
+					o.only(setOf("focused"), what)
+					if (o.field("focused", what) != Json.Bool(true)) throw MarklessDecodeError("$what.focused must be true")
+					Expr.Focused
+				}
+				o.containsKey("contains") -> { o.only(setOf("contains", "node"), what); Expr.Contains(sub("contains"), sub("node")) }
+				o.containsKey("focusOrigin") -> { o.only(setOf("focusOrigin"), what); Expr.FocusOrigin(sub("focusOrigin")) }
+				o.containsKey("isElement") -> { o.only(setOf("isElement"), what); Expr.IsElement(sub("isElement")) }
 				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
 				o.containsKey("formData") -> { o.only(setOf("formData"), what); Expr.FormData(o.field("formData", what).str("$what.formData")) }
+				o.containsKey("script") -> { o.only(setOf("script", "bindings"), what); Expr.Script(o.field("script", what).str("$what.script"), scriptBindings(o.field("bindings", what), "$what.bindings")) }
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")
 			}
 		}
@@ -591,7 +697,10 @@ data class Payload(
 				val command = o.field("command", what).str("$what.command")
 				if (command != "focus" && command != "scrollIntoView") throw MarklessDecodeError("$what has unknown command \"$command\"")
 				val preventScroll = if (o.containsKey("preventScroll")) ((o.field("preventScroll", what) as? Json.Bool ?: throw MarklessDecodeError("$what.preventScroll must be a boolean")).value) else false
-				return Op.Command(o.field("node", what).str("$what.node"), command, preventScroll)
+				val raw = o.field("node", what)
+				val node = if (raw is Json.Str) Expr.Literal(JsValue.Str(raw.value)) else expr(raw, "$what.node")
+				for (c in cellsOf(node)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				return Op.Command(node, command, preventScroll)
 			}
 			if (name == "if") {
 				o.only(setOf("op", "test", "whenTrue", "whenFalse"), what)
@@ -621,6 +730,14 @@ data class Payload(
 				for (e in listOf(ms) + capture.map { it.second }) for (c in cellsOf(e)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
 				val ops = o.field("ops", what).arr("$what.ops").mapIndexed { n, inner -> op(inner, "$what.ops[$n]", cells) }
 				return Op.After(ms, capture, ops)
+			}
+			if (name == "script") {
+				o.only(setOf("op", "fn", "type", "bindings", "catch"), what)
+				val bindings = scriptBindings(o.field("bindings", what), "$what.bindings")
+				for (c in cellsOf(bindings)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				val catch = o["catch"]?.str("$what.catch")
+				if (catch != null && catch !in cells) throw MarklessDecodeError("$what catches into unknown cell \"$catch\"")
+				return Op.Script(o.field("fn", what).str("$what.fn"), o.field("type", what).str("$what.type"), bindings, catch)
 			}
 			if (name != "assign") throw MarklessDecodeError("$what has unknown op \"$name\"")
 			o.only(setOf("op", "cell", "value"), what)

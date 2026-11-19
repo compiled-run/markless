@@ -1,0 +1,31 @@
+appId: ${APP_ID}
+name: r139-shell-props
+---
+- launchApp:
+      clearState: true
+- assertVisible: Pick a topic
+- assertVisible: Open fruit
+- assertNotVisible: 0 picked
+- assertVisible: Topics
+- tapOn: Open fruit
+- assertNotVisible: Pick a topic
+- assertVisible: fruit
+- assertVisible: Few fruit
+- assertVisible: Pick one
+- assertNotVisible: Pick a topic
+- assertNotVisible: 0 picked
+- assertNotVisible: 2 picked
+- assertVisible: fruit
+- tapOn: Pick one
+- assertVisible: 2 picked
+- assertVisible: 2 picked
+- assertVisible: Few fruit
+- assertNotVisible: Many fruit
+- tapOn: Pick one
+- assertVisible: Many fruit
+- assertNotVisible: 2 picked
+- assertNotVisible: Few fruit
+- assertVisible: 4 picked
+- assertVisible: Many fruit
+- assertNotVisible: 2 picked
+- assertNotVisible: Few fruit

@@ -2,6 +2,11 @@ package dev.markless.mobile.core
 
 class MarklessRuntimeError(message: String) : RuntimeException(message)
 
+/** The overlay protocol of `@markless/web/overlay-protocol`: the marker attribute and what makes an overlay modal. */
+const val OVERLAY_ATTRIBUTE = "overlay"
+const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
+const val OVERLAY_MODAL_VALUE = "true"
+
 sealed interface JournalEntry {
 	val node: String
 	fun toJson(): String
@@ -77,6 +82,11 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"property\",\"node\":${jsonString(node)},\"name\":\"checked\",\"value\":$checked}"
 	}
 
+	/** An element marked `overlay` joined the overlay stack ([open]) or left it; a [modal] one goes in the host's top layer. */
+	data class Overlay(override val node: String, val open: Boolean, val modal: Boolean) : JournalEntry {
+		override fun toJson() = "{\"op\":\"overlay\",\"node\":${jsonString(node)},\"open\":$open,\"modal\":$modal}"
+	}
+
 	/** Shows arm [index] of a branch (null: none). */
 	data class Arm(override val node: String, val index: Int?) : JournalEntry {
 		override fun toJson() = "{\"op\":\"arm\",\"node\":${jsonString(node)},\"index\":${index ?: "null"}}"
@@ -86,6 +96,22 @@ sealed interface JournalEntry {
 	data class Sheet(override val node: String, val open: Boolean) : JournalEntry {
 		override fun toJson() = "{\"op\":\"sheet\",\"node\":${jsonString(node)},\"open\":$open}"
 	}
+
+	/** The script cleared the timer [node] (`script:<n>`) it set: the host drops it. */
+	data class ClearTimer(override val node: String) : JournalEntry {
+		override fun toJson() = "{\"op\":\"clearTimer\",\"timer\":${jsonString(node)}}"
+	}
+
+	/** The script called `fetch`: the host sends [request] and answers with [Runtime.response]. */
+	data class Fetch(val id: Int, val request: FetchRequest) : JournalEntry {
+		override val node get() = ""
+		override fun toJson() = "{\"op\":\"fetch\",\"id\":$id,\"request\":${request.toJson()}}"
+	}
+}
+
+/** A request as the script made it: an absolute [url], and a text [body] or none. */
+data class FetchRequest(val url: String, val method: String, val headers: List<Pair<String, String>>, val body: String?) {
+	fun toJson() = "{\"url\":${jsonString(url)},\"method\":${jsonString(method)},\"headers\":${headers.joinToString(",", "[", "]") { "[${jsonString(it.first)},${jsonString(it.second)}]" }},\"body\":${body?.let(::jsonString) ?: "null"}}"
 }
 
 /** `JSON.stringify` of a value: non-finite numbers are `null`. */
@@ -147,6 +173,8 @@ class Runtime(
 	/** The device's preferred languages, most preferred first: the web's messages show in the first one the payload has. */
 	preferredLanguages: List<String> = listOf("en"),
 	private val now: () -> Double = { System.currentTimeMillis().toDouble() },
+	/** Where a page with a script gets the app's engine; never asked for a page without one. */
+	private val scriptHost: ScriptHost? = null,
 ) {
 	private val opened = now()
 	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, if (c.clock) JsValue.Num(opened) else c.storageKey?.let(store::get) ?: c.initial) }
@@ -166,7 +194,8 @@ class Runtime(
 	/** Row state's list by cell id: its values are kept as `<cell>@<key>`. */
 	private val rowOfCell = payload.cells.mapNotNull { c -> c.row?.let { c.id to it } }.toMap()
 	private val byId = payload.nodes.associateBy { it.id }
-	private var eventValue: String? = null
+	/** The fields of the event whose handler is running, by the name an `event` expression reads. */
+	private var fields: Map<String, JsValue>? = null
 
 	fun value(cell: String): JsValue = values[cell] ?: throw MarklessRuntimeError("unknown cell \"$cell\"")
 
@@ -186,10 +215,18 @@ class Runtime(
 		fun eval(x: Expr) = evaluate(x, scope)
 		return when (e) {
 			Expr.RouteParams -> JsValue.Obj(params.entries.associateTo(LinkedHashMap()) { it.key to JsValue.Str(it.value) })
-			Expr.EventValue -> JsValue.Str(eventValue ?: throw MarklessRuntimeError("the event value read outside an input handler"))
+			is Expr.Event -> fields?.get(e.field) ?: throw MarklessRuntimeError("the event's ${e.field} read where the event has none")
 			is Expr.FormData -> entriesOf(e.form)
 			is Expr.Checked -> JsValue.Bool(checkedOf(e.node))
 			is Expr.CellRef -> read(e.cell, scope)
+			Expr.Focused -> JsValue.Str(focused ?: NATIVE_DOCUMENT_BODY)
+			is Expr.FocusOrigin -> (eval(e.overlay) as? JsValue.Str)?.let { o -> origins[o.value]?.let(JsValue::Str) } ?: JsValue.Null
+			is Expr.IsElement -> JsValue.Bool((eval(e.value) as? JsValue.Str)?.let { isElement(it.value) } ?: false)
+			is Expr.Contains -> {
+				val within = eval(e.within)
+				val node = eval(e.node)
+				JsValue.Bool(within is JsValue.Str && node is JsValue.Str && contains(within.value, node.value))
+			}
 			is Expr.Literal -> e.value
 			is Expr.Item -> scope.items[e.repeat] ?: throw MarklessRuntimeError("the row item of ${e.repeat} read outside its row")
 			is Expr.Local -> scope.locals[e.name] ?: throw MarklessRuntimeError("the parameter ${e.name} read outside its function")
@@ -237,8 +274,116 @@ class Runtime(
 				Js.method(e.name, target, args)
 			}
 			is Expr.Call -> Js.call(e.name, e.arguments.map(::eval), now)
+			is Expr.Script -> {
+				val entry = "{\"kind\":\"compute\",\"fn\":${jsonString(e.fn)},\"frame\":${frameOf(e.bindings, scope)}${entryCells()}}"
+				val started = System.nanoTime()
+				val value = JsValue.fromJson(Json.parse(scriptCall("enter", entry)))
+				onScriptEntry?.invoke(System.nanoTime() - started)
+				value
+			}
 		}
 	}
+
+	/** The engine this screen's script runs in: none until a script op or script computed first needs it. */
+	private var engine: ScriptEngine? = null
+
+	/** How many times this screen asked its host for the engine: 0 for a page whose handlers all ran as data, else 1. */
+	var engineStarts = 0
+		private set
+
+	/** What the script wrote to `console`, in order, as `level to text`. */
+	val logs = ArrayList<Pair<String, String>>()
+
+	/** Called with each line the script logs. */
+	var onScriptLog: ((level: String, text: String) -> Unit)? = null
+
+	/** Called with each engine entry's duration in nanoseconds, including starting the engine when the entry had to. */
+	var onScriptEntry: ((nanos: Long) -> Unit)? = null
+
+	/** Starts the engine and loads this screen's script ahead of its first entry; false when there was nothing to load (no script, or already loaded). */
+	fun warm(): Boolean {
+		val script = payload.script ?: return false
+		if (engine != null) return false
+		load(script)
+		return true
+	}
+
+	private fun load(script: ScriptSource): ScriptEngine {
+		val host = scriptHost ?: throw MarklessRuntimeError("a script op with no script engine to run it")
+		val started = host.start()
+		engineStarts++
+		// A shared engine may hold this script already, from another screen of the same page.
+		started.evaluate(script.source)
+		engine = started
+		return started
+	}
+
+	private fun scriptCall(method: String, argument: String?): String {
+		val script = payload.script ?: throw MarklessRuntimeError("a script op in a payload with no script")
+		val target = "globalThis.__markless[${jsonString(script.id)}].$method"
+		return (engine ?: load(script)).evaluate(if (argument == null) "$target()" else "$target(${jsonString(argument)})")
+	}
+
+	/** The names a script function reads, as its engine entry spells them: slots of this scope's cells, and values. */
+	private fun frameOf(bindings: Map<String, ScriptBinding>, scope: Scope): String = bindings.entries.joinToString(",", "{", "}") { (name, b) ->
+		jsonString(name) + ":" + when (b) {
+			is ScriptBinding.Cell -> "{\"slot\":${jsonString(slot(b.cell, scope))}}"
+			is ScriptBinding.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(slot(it.value, scope))}" }}}"
+			is ScriptBinding.Value -> "{\"value\":${jsonValue(evaluate(b.value, scope))}}"
+		}
+	}
+
+	/** Every current value by slot, and the seed `crypto` draws from when the script uses it. */
+	private fun entryCells(): String = buildString {
+		append(",\"cells\":")
+		append(values.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" })
+		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
+	}
+
+	/** One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries, in that order. */
+	private fun enter(fields: String): List<JournalEntry> {
+		val entry = "{$fields${entryCells()}}"
+		val started = System.nanoTime()
+		scriptCall("enter", entry)
+		val result = Json.parse(scriptCall("leave", null)).obj("leave()")
+		onScriptEntry?.invoke(System.nanoTime() - started)
+		fun list(name: String) = result.field(name, "leave()").arr("leave().$name")
+		fun id(j: Json) = j.num("an id").toInt()
+		for (w in list("writes")) {
+			val pair = w.arr("leave().writes[]")
+			val slot = pair[0].str("leave().writes[][0]")
+			val cell = slot.substringBefore('@')
+			if (payload.cells.none { it.id == cell }) throw MarklessRuntimeError("the script wrote unknown cell $cell")
+			val v = JsValue.fromJson(pair[1])
+			values[slot] = v
+			storageKeys[cell]?.let { store.set(it, v) }
+		}
+		for (l in list("logs")) {
+			val pair = l.arr("leave().logs[]")
+			val level = pair[0].str("leave().logs[][0]")
+			val text = pair[1].str("leave().logs[][1]")
+			logs.add(level to text)
+			onScriptLog?.invoke(level, text)
+		}
+		return list("clears").map { JournalEntry.ClearTimer("$SCRIPT_TIMER${id(it)}") } +
+			list("timers").map { t -> t.arr("leave().timers[]").let { JournalEntry.Timer("$SCRIPT_TIMER${id(it[0])}", it[1].num("leave().timers[][1]")) } } +
+			list("requests").map { r ->
+				val o = r.obj("leave().requests[]")
+				val q = o.field("request", "leave().requests[]").obj("request")
+				val request = FetchRequest(
+					q.field("url", "request").str("request.url"),
+					q.field("method", "request").str("request.method"),
+					q.field("headers", "request").arr("request.headers").map { h -> h.arr("request.headers[]").let { it[0].str("a header name") to it[1].str("a header value") } },
+					q.field("body", "request").let { if (it == Json.Null) null else it.str("request.body") },
+				)
+				JournalEntry.Fetch(id(o.field("id", "leave().requests[]")), request)
+			}
+	}
+
+
+	/** The host's answer to a `fetch` entry: `{ status, statusText, headers, body }`, or `{ error }` for a network failure. */
+	fun response(id: Int, response: JsValue): List<JournalEntry> =
+		change(null, null) { enter("\"kind\":\"response\",\"request\":$id,\"response\":${jsonValue(response)}") }
 
 	fun armOf(branch: Node.Branch): Int? {
 		val tests = branch.tests ?: return if (Js.truthy(evaluate(branch.test!!))) 0 else if (branch.arms > 1) 1 else null
@@ -421,14 +566,99 @@ class Runtime(
 
 	fun isDialogOpen(id: String): Boolean = dialogs[id] == true
 
+	private var focused: String? = null
+	/** The overlay stack, topmost last, and the focus each overlay was shown from. */
+	private var stack: List<String> = emptyList()
+	private val origins = HashMap<String, String>()
+
+	fun isElement(id: String): Boolean = id == NATIVE_DOCUMENT_BODY || byId[id.substringBefore('@')] is Node.Element
+
+	/** Whether [node] is [within] or inside it, by the payload's parent chain; everything is inside the body. */
+	fun contains(within: String, node: String): Boolean {
+		if (within == NATIVE_DOCUMENT_BODY) return true
+		val target = within.substringBefore('@')
+		var at: String? = node.substringBefore('@')
+		while (!at.isNullOrEmpty()) {
+			if (at == target) return true
+			at = byId[at]?.parent
+		}
+		return false
+	}
+
+	// An element marked `overlay` joins the stack while its `hidden` binding shows it; one with no such binding never does.
+	private val overlayNodes = payload.nodes.filterIsInstance<Node.Element>().filter { e -> e.row == null && OVERLAY_ATTRIBUTE in e.attributes && e.bindings.any { !it.property && it.name == "hidden" } }
+
+	private fun shownOverlays(): List<String> {
+		val now = attributes().associate { (n, a, v) -> (n to a) to v }
+		return overlayNodes.filter { instances(it).isNotEmpty() && (it.id to "hidden") in now && now[it.id to "hidden"] == null }.map { it.id }
+	}
+
+	/** Whether [overlay] or an element inside it has `aria-modal="true"`, its bound value first, else its static one. */
+	fun isModal(overlay: String): Boolean {
+		val now = attributes().associate { (n, a, v) -> (n to a) to v }
+		return payload.nodes.any { n ->
+			if (n !is Node.Element || !contains(overlay, n.id)) return@any false
+			val key = n.id to OVERLAY_MODAL_ATTRIBUTE
+			(if (key in now) now[key] else n.attributes[OVERLAY_MODAL_ATTRIBUTE]) == OVERLAY_MODAL_VALUE
+		}
+	}
+
+	init {
+		stack = shownOverlays()
+		for (o in stack) origins[o] = NATIVE_DOCUMENT_BODY
+	}
+
+	/** The overlay stack, topmost last, each with whether it is modal. */
+	fun overlays(): List<Pair<String, Boolean>> = stack.map { it to isModal(it) }
+
+	/** The element that has focus, or null. */
+	fun focused(): String? = focused
+
 	fun handlerFor(host: String, event: EventName): String? = payload.events.firstOrNull { it.host == host && it.event == event }?.handler
 
 	/** The page's `<title>` text, null when it has none. */
 	fun title(): String? = payload.title?.let { text(it, Scope.EMPTY) }
 
-	/** Runs the handler for [event] on [host] (a row instance as `<node>@<key>`); an `input` event carries the field's whole text as [value]. */
-	fun dispatch(host: String, event: EventName, value: String? = null): List<JournalEntry> {
+	/**
+	 * Runs the handler for [event] on [host] (a row instance as `<node>@<key>`); an `input` event carries the field's whole
+	 * text as [value]. A `dismiss` with a [reason] is an overlay's Escape; without one, a sheet's platform close. A pointer
+	 * event reaches [host] and each element it is inside, innermost first, after a `dismiss` of the topmost overlay when a
+	 * `pointerdown` lands outside it.
+	 */
+	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null): List<JournalEntry> {
 		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
+		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
+		if (event == EventName.Dismiss && reason != null) {
+			if (stack.lastOrNull() != host) throw MarklessRuntimeError("\"$host\" is not the topmost overlay")
+			val dismiss = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
+			return change(null, null) {
+				dismiss?.let { withFields(mapOf("reason" to JsValue.Str(reason), "pressTarget" to JsValue.Null)) { run(it.ops, Scope.EMPTY) } } ?: emptyList()
+			}
+		}
+		if (event == EventName.PointerDown || event == EventName.PointerUp) {
+			val template = host.substringBefore('@')
+			val scope = (instances(node(template)).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
+			return change(null, null) {
+				val calls = ArrayList<JournalEntry>()
+				val runs = ArrayList<Pair<String, Map<String, JsValue>>>()
+				// The overlay behaviour's document listener hears the press first: the topmost overlay it landed outside is told.
+				val top = stack.lastOrNull()
+				if (top != null && event == EventName.PointerDown && !contains(top, host))
+					handlerFor(top, EventName.Dismiss)?.let { runs.add(it to mapOf("reason" to JsValue.Str("outside-press"), "pressTarget" to JsValue.Str(host))) }
+				var at: String? = template
+				while (!at.isNullOrEmpty()) {
+					handlerFor(at, event)?.let { runs.add(it to mapOf("target" to JsValue.Str(host), "button" to JsValue.Num(0.0))) }
+					at = byId[at]?.parent
+				}
+				for ((id, f) in runs) {
+					val handler = handlers[id] ?: throw MarklessRuntimeError("unknown handler \"$id\"")
+					val out = withFields(f) { run(handler.ops, scope) }
+					if (out.firstOrNull() is JournalEntry.Navigate) return@change out
+					calls.addAll(out)
+				}
+				calls
+			}
+		}
 		if (event == EventName.Cancel) {
 			if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
 			val cancel = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
@@ -447,18 +677,29 @@ class Runtime(
 		val handlerId = handlerFor(template, event) ?: throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
 		val scope = (instances(node(template)).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
+		// A press focuses the control it presses, as the browser does.
+		if (event == EventName.Activate) focused = host
 		return change(host, value) {
-			eventValue = value
-			try {
-				run(handler.ops, scope)
-			} finally {
-				eventValue = null
-			}
+			withFields(value?.let { mapOf("value" to JsValue.Str(it)) }) { run(handler.ops, scope) }
 		}
 	}
 
-	/** Runs the ops of the `after` that the `timer` entry [timer] scheduled, with the values it captured. */
+	private inline fun <T> withFields(f: Map<String, JsValue>?, block: () -> T): T {
+		val outer = fields
+		fields = f
+		try {
+			return block()
+		} finally {
+			fields = outer
+		}
+	}
+
+	/** Runs the ops of the `after` that the `timer` entry [timer] scheduled, with the values it captured, or fires the script's timer (`script:<n>`). */
 	fun timer(timer: String): List<JournalEntry> {
+		if (timer.startsWith(SCRIPT_TIMER)) {
+			val id = timer.removePrefix(SCRIPT_TIMER).toIntOrNull() ?: throw MarklessRuntimeError("no timer $timer is set")
+			return change(null, null) { enter("\"kind\":\"timer\",\"timer\":$id") }
+		}
 		val pending = timers.remove(timer) ?: throw MarklessRuntimeError("no timer $timer is set")
 		return change(null, null) {
 			val taken = run(pending.ops, Scope(locals = pending.locals), pending.submission)
@@ -543,7 +784,18 @@ class Runtime(
 				if (op.node !in dialogs) throw MarklessRuntimeError("\"${op.node}\" is not a dialog")
 				dialogs[op.node] = op.open
 			}
-			is Op.Command -> calls.add(JournalEntry.Command(op.node, op.command, op.preventScroll))
+			is Op.Command -> {
+				val node = evaluate(op.node, scope)
+				if (node == JsValue.Null || node == JsValue.Str(NATIVE_DOCUMENT_BODY)) continue
+				if (node !is JsValue.Str || !isElement(node.value)) throw MarklessRuntimeError("${op.command}() on a value that is not an element")
+				if (op.command == "focus") focused = node.value
+				calls.add(JournalEntry.Command(node.value, op.command, op.preventScroll))
+			}
+			is Op.Script -> {
+				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}}"
+				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
+				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"event\":$event$catch"))
+			}
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)
 				values[slot(op.cell, scope)] = v
@@ -595,8 +847,15 @@ class Runtime(
 		val dialogsBefore = HashMap(dialogs)
 		val beforeSheets = sheets().toMap()
 		val ownedBefore = liveObjects()
+		val focusBefore = focused
+		val stackBefore = stack
 		val calls = apply()
 		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
+		val shownNow = shownOverlays()
+		val released = stackBefore.filter { it !in shownNow }
+		val enlisted = shownNow.filter { it !in stackBefore }
+		stack = stackBefore.filter { it in shownNow } + enlisted
+		for (o in enlisted) origins[o] = focusBefore ?: NATIVE_DOCUMENT_BODY
 		// A row that left takes its state with it; a later row with the same key starts from the first values.
 		val kept = rows().flatMap { (list, keys) -> keys.map { "$list\u0000$it" } }.toSet()
 		values.keys.removeAll { slot ->
@@ -643,6 +902,8 @@ class Runtime(
 		if (afterTitle != null && afterTitle != beforeTitle) journal.add(JournalEntry.Title(afterTitle))
 		val owned = liveObjects()
 		for (o in payload.objects) if (o.id in ownedBefore && o.id !in owned) journal.add(JournalEntry.Release(o.id))
+		for (o in released) journal.add(JournalEntry.Overlay(o, open = false, modal = isModal(o)))
+		for (o in enlisted) journal.add(JournalEntry.Overlay(o, open = true, modal = isModal(o)))
 		journal.addAll(calls)
 		return journal
 	}

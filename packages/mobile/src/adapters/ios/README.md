@@ -1,14 +1,22 @@
 # MarklessMobile (iOS host)
 
 The UIKit host for `markless.native-view/0` payloads. It builds real retained UIKit views once, runs handlers as data and
-changes views only by applying journal entries. There is no JavaScript engine, no SwiftUI and no custom drawing.
+changes views only by applying journal entries. There is no SwiftUI and no custom drawing. A handler or computed the
+compiler could not lower to data runs as JavaScript in JavaScriptCore (a system framework, so the app ships no engine);
+rendering stays native.
 
 - `Sources/MarklessCore` (Foundation only, so `swift test` runs on macOS): the strict JSON reader, the payload decoder, the op
   interpreter (`NativeRuntime`, the same meaning as `packages/mobile/src/runtime.ts`, including JavaScript `String(value)`
   for numbers) and the reader for Dragon's `dragon.native-style-export/0`, which it resolves to points. An unknown version,
   field, node kind, op, event or style write is an error, never skipped.
 - `Sources/MarklessMobile` (UIKit): the view factory and journal applier (`ViewTree`) and the entry point,
-  `MarklessViewController`.
+  `MarklessViewController`. `MarklessScripting.shared` is the app's one script engine (`JavaScriptCoreEngine`), started
+  the first time a screen needs it, plus the `fetch` and `console` (system log category `MarklessScript`) its scripts
+  use; a script's timers are `timer` entries (`script:<n>`) the view tree schedules like a data timer. A screen whose payload has a script warms the engine once its first frame is up and the main run loop is
+  idle; the Info.plist boolean `MarklessEngineWarm` set to false turns that off (the proof harness does this when
+  `MARKLESS_PROOF_ENGINE_WARM=0`). The log also carries `engine start <ms> ms` and `first script entry <ms> ms (engine
+  cold|warm)`, and once per launch `first frame <ms> ms (process start), <ms> ms (first controller created)`, taken
+  after the run-loop turn that committed the first screen's views.
 
 ## Embedding
 

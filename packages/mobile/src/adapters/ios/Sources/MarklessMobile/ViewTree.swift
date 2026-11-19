@@ -183,6 +183,8 @@ final class ViewTree {
 	private var templates: [String: String] = [:]
 	private var attributes: [String: [String: String]] = [:]
 	private var branches: [String: (anchor: UIView, index: Int?, built: [String])] = [:]
+	/// Timers the page set and has not fired or cleared, by the name its `timer` entries give.
+	private var timers: [String: Task<Void, Never>] = [:]
 	private var lists: [String: (anchor: UIView, keys: [String], built: [String: [String]])] = [:]
 	private(set) var sheets: [String: SystemSheet] = [:]
 	/// The controller that presents the page's system sheets.
@@ -230,6 +232,7 @@ final class ViewTree {
 	private var touches: TouchWatcher?
 	/// Each drawn checkbox (false) or radio button (true) and whether it is checked.
 	private var ticks: [String: (radio: Bool, checked: Bool)] = [:]
+	private var overlays: OverlayHost!
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:],
@@ -287,6 +290,13 @@ final class ViewTree {
 			try sizePage()
 		}
 		refreshRelations()
+		overlays = OverlayHost(
+			runtime: runtime, root: root, onAction: onAction,
+			nodeOf: { [unowned self] view in
+				view.accessibilityIdentifier.flatMap { id in self.elements[id] === view ? self.templates[id] : nil }
+			},
+			viewOf: { [unowned self] id in self.elements[id] },
+			restack: { [unowned self] container in if self.layout == nil { self.stack(container) } })
 	}
 
 	/// Whether any of `view`'s box is inside `frame` (in `screen`'s space): an IntersectionObserver with no threshold, where a
@@ -338,6 +348,7 @@ final class ViewTree {
 		let watcher = TouchWatcher { [weak self] in self?.dismissMessage() }
 		screen.addGestureRecognizer(watcher)
 		touches = watcher
+		do { try overlays.mount(in: screen) } catch { fatalError("Markless iOS host: \(error)") }
 		guard layout == nil else { return }
 		root.translatesAutoresizingMaskIntoConstraints = false
 		let content = page.contentLayoutGuide
@@ -462,8 +473,8 @@ final class ViewTree {
 				if open { sheet.open(from: presenter) } else { sheet.close() }
 			case .navigate, .title:
 				throw HostError("navigate and title entries reach the screen's controller, not its views")
-			case .call, .release:
-				throw HostError("a \(entry.json.jsonText) entry reaches the page's device, not its views")
+			case .call, .release, .fetch:
+				throw HostError("a \(entry.json.jsonText) entry reaches the page's device or script services, not its views")
 			case let .dialog(node, open):
 				try present(node, open: open)
 			case let .command(node, command, preventScroll):
@@ -478,7 +489,7 @@ final class ViewTree {
 				if view is UITextField {
 					view.becomeFirstResponder()
 				} else {
-					UIAccessibility.post(notification: .layoutChanged, argument: view)
+					try overlays.focus(node)
 				}
 			case let .invalid(node, text):
 				guard let view = elements[node] else { throw HostError("journal names field \(node), which is not shown") }
@@ -489,12 +500,18 @@ final class ViewTree {
 				}
 				show(text)
 			case let .timer(timer, ms):
-				Task { @MainActor [weak self] in
+				timers.removeValue(forKey: timer)?.cancel()
+				timers[timer] = Task { @MainActor [weak self] in
 					try? await Task.sleep(for: .milliseconds(ms))
 					// A page left since (or never mounted) has no runtime holding this timer any more.
-					guard let self, self.root.superview != nil else { return }
+					guard !Task.isCancelled, let self, self.root.superview != nil else { return }
+					self.timers[timer] = nil
 					self.onAction(NativeAction(event: .timer, timer: timer))
 				}
+			case let .clearTimer(timer):
+				timers.removeValue(forKey: timer)?.cancel()
+			case let .overlay(node, open, modal):
+				if open { try overlays.open(node, modal: modal) } else { overlays.close(node) }
 			case let .state(cell, value):
 				if let layout, cell != StyleBands.state || layout.stateCells.contains(cell) {
 					assignment = try layout.next(from: assignment, cell: cell, value: value)
@@ -544,6 +561,7 @@ final class ViewTree {
 		}
 		refreshRelations()
 		if layout == nil { alignTables() }
+		overlays.flush()
 	}
 
 	/// The top layer: a full-screen view above the page and the bars holding the dialog's own view (styled by its CSS, not a
@@ -809,6 +827,10 @@ final class ViewTree {
 						field.widthAnchor.constraint(equalToConstant: 240).isActive = true
 					}
 					view = field
+				} else if OverlayHost.isOverlay(staticAttributes) {
+					let overlay = OverlayElementView()
+					overlay.onEscape = { [unowned self] in self.overlays.escape() }
+					view = overlay
 				} else {
 					view = UIView()
 					view.isUserInteractionEnabled = context.button == nil
@@ -943,8 +965,8 @@ final class ViewTree {
 					for: .editingChanged)
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
-			case (.idle, _), (.visible, _):
-				// Raised by the screen's controller when the run loop goes idle or the element comes on screen.
+			case (.idle, _), (.visible, _), (.dismiss, _), (.pointerdown, _), (.pointerup, _):
+				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host.
 				continue
 			default:
 				throw HostError("\(event.event.rawValue) on <\(element)> \(id) has no iOS control event yet")
@@ -1028,7 +1050,7 @@ final class ViewTree {
 			let hidden = current["hidden"] != nil
 			if view.isHidden != hidden {
 				view.isHidden = hidden
-				if let parent = view.superview, !(parent is UIButton) { stack(parent) }
+				if let parent = view.superview, !(parent is UIButton || parent is OverlayCard) { stack(parent) }
 			}
 		}
 	}

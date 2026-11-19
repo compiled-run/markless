@@ -1,0 +1,67 @@
+appId: ${APP_ID}
+name: u21-popover
+---
+- launchApp:
+    clearState: true
+- assertVisible: Popover
+- assertVisible: Filters
+- assertVisible: Changes 0
+- assertNotVisible: Show only
+- assertNotVisible: Pick what the list shows
+- assertNotVisible: Done
+- tapOn: Filters
+- assertVisible: Show only
+- assertVisible: Pick what the list shows
+- assertVisible: Done
+- assertVisible: Show only
+- assertVisible: Pick what the list shows
+- assertVisible: Done
+- assertVisible: Changes 1
+- tapOn: Changes 1
+- assertNotVisible: Show only
+- assertNotVisible: Done
+- assertNotVisible: Changes 1
+- assertVisible: Changes 2
+- assertNotVisible: Show only
+- assertNotVisible: Done
+- assertNotVisible: Changes 1
+- tapOn: Filters
+- assertVisible: Show only
+- assertNotVisible: Changes 2
+- assertVisible: Show only
+- assertVisible: Changes 3
+- assertNotVisible: Changes 2
+- tapOn: Filters
+- assertNotVisible: Show only
+- assertNotVisible: Changes 3
+- assertVisible: Changes 4
+- assertNotVisible: Show only
+- assertNotVisible: Changes 3
+- tapOn: Filters
+- assertVisible: Show only
+- assertNotVisible: Changes 4
+- assertVisible: Show only
+- assertVisible: Changes 5
+- assertNotVisible: Changes 4
+- tapOn: Done
+- assertNotVisible: Show only
+- assertNotVisible: Changes 5
+- assertVisible: Changes 6
+- assertNotVisible: Show only
+- assertNotVisible: Changes 5
+- tapOn: Filters
+- assertVisible: Show only
+- assertNotVisible: Changes 6
+- assertVisible: Show only
+- assertVisible: Changes 7
+- assertNotVisible: Changes 6
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+      - assertNotVisible: Show only
+      - assertNotVisible: Changes 7
+      - assertVisible: Changes 8
+      - assertNotVisible: Show only
+      - assertNotVisible: Changes 7

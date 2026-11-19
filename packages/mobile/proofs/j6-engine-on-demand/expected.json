@@ -1,0 +1,30 @@
+{
+	"rung": "J6",
+	"name": "A screen with only data handlers never starts the engine; the one beside it starts it on first use",
+	"steps": [
+		{ "visible": ["Data only", "Taps 0", "Open script"], "title": "Home", "engineStarts": 0 },
+		{
+			"do": { "tap": "Taps 0" },
+			"visible": ["Taps 1"],
+			"absent": ["Taps 0"],
+			"engineStarts": 0
+		},
+		{
+			"do": { "tap": "Taps 1" },
+			"visible": ["Taps 2"],
+			"absent": ["Taps 1"],
+			"engineStarts": 0
+		},
+		{
+			"do": { "tap": "Open script" },
+			"visible": ["Script page", "Stamp: none"],
+			"title": "Script"
+		},
+		{
+			"do": { "tap": "Stamp" },
+			"visible": ["Stamp: 2026-11-18T00:00:00.000Z"],
+			"absent": ["Stamp: none"],
+			"engineStarts": 1
+		}
+	]
+}

@@ -2,6 +2,21 @@ import Foundation
 
 public let nativeViewVersion = "markless.native-view/0"
 
+/// The document body as an element value (`NATIVE_DOCUMENT_BODY` in `@markless/serializer`): no node has this id.
+public let nativeDocumentBody = "#body"
+
+/// The overlay behaviour's names, as `packages/web/src/overlay-protocol.ts` spells them.
+public enum OverlayProtocol {
+	public static let attribute = "overlay"
+	public static let modalAttribute = "aria-modal"
+	public static let modalValue = "true"
+}
+
+/// What an event carries, by the field an `{ event }` expression names.
+public enum NativeEventField: String, Sendable {
+	case value, reason, pressTarget, target, button
+}
+
 public enum NativeBuiltin: String, Sendable {
 	case string = "String", number = "Number", boolean = "Boolean"
 	case abs = "Math.abs", floor = "Math.floor", max = "Math.max", min = "Math.min", round = "Math.round"
@@ -38,20 +53,31 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	/// The current row's item of a list (`repeat` id).
 	case item(String)
 	case call(NativeBuiltin, [NativeExpr])
-	/// In an `input` handler: the field's text after the edit.
-	case eventValue
+	/// A field of the event running the handler: an `input`'s text, a `dismiss`'s reason and press target, a pointer's target and button.
+	case event(NativeEventField)
+	/// The element that has focus, or the document body when none has.
+	case focused
+	/// Whether `node` is the element `within` or inside it; false unless both are strings.
+	case contains(within: NativeExpr, node: NativeExpr)
+	/// The element that had focus when the overlay was last shown, or null.
+	case focusOrigin(NativeExpr)
+	/// Whether the value is an element id or the document body.
+	case isElement(NativeExpr)
 	/// The page's route params, an object of strings.
 	case routeParams
 	/// `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order.
 	case formData(String)
 	/// A checkbox's or radio button's checkedness now.
 	case checked(String)
+	/// A computed whose body runs in the script engine: function `fn` of the payload's script, called with `bindings`.
+	case script(fn: String, bindings: [NativeScriptBinding])
 
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .eventValue, .local, .item, .routeParams, .formData, .checked: return []
-		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner): return inner.cells
+		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked: return []
+		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
+		case let .contains(within, node): return within.cells + node.cells
 		case let .array(items): return items.flatMap(\.value.cells)
 		case let .object(fields): return fields.flatMap(\.value.cells)
 		case let .method(_, target, arguments): return target.cells + arguments.flatMap(\.cells)
@@ -59,6 +85,7 @@ public indirect enum NativeExpr: Equatable, Sendable {
 		case let .conditional(test, whenTrue, whenFalse): return test.cells + whenTrue.cells + whenFalse.cells
 		case let .template(parts): return parts.flatMap { if case let .expr(e) = $0 { e.cells } else { [String]() } }
 		case let .call(_, arguments): return arguments.flatMap(\.cells)
+		case let .script(_, bindings): return bindings.flatMap(\.cells)
 		}
 	}
 }
@@ -200,6 +227,8 @@ public enum NativeEventName: String, Sendable {
 	case idle
 	/// Some of the element is on the screen; once for each shown instance.
 	case visible
+	/// A touch going down or up: it reaches the element under it and each element it is inside, innermost first.
+	case pointerdown, pointerup
 }
 
 public enum NativeOp: Equatable, Sendable {
@@ -215,14 +244,18 @@ public enum NativeOp: Equatable, Sendable {
 	indirect case when(test: NativeExpr, then: [NativeOp], otherwise: [NativeOp])
 	/// `showModal()` (`open`) or `close()` on a `<dialog>`: the host puts it in its top layer or takes it out.
 	case dialog(node: String, open: Bool)
-	/// `focus()` or `scrollIntoView()` on an element, run once the views show the handler's writes.
-	case command(node: String, command: String, preventScroll: Bool)
+	/// `focus()` or `scrollIntoView()` on an element, run once the views show the handler's writes. `node` is a fixed id
+	/// (a string literal) or an expression evaluated when the op runs; null or the body does nothing.
+	case command(node: NativeExpr, command: String, preventScroll: Bool)
 	/// Submits `form` as if `submitter` were pressed (nil: the return key with no submit button).
 	case submit(form: String, submitter: String?)
 	/// After `ms`, `ops` run with each captured name read as a local holding its value when this op ran.
 	indirect case after(ms: NativeExpr, capture: [NativeCapture], ops: [NativeOp])
 	/// A press on a checkbox (it flips) or radio button (it is checked, the rest of its group unchecked).
 	case tick(node: String)
+	/// Runs function `fn` of the payload's script with the event (`type`, the web event's) and `bindings`, then writes the
+	/// cells it changed. A throw, or a rejection of what it returns, writes `{ name, message }` to `catch` when there is one.
+	case script(fn: String, type: String, bindings: [NativeScriptBinding], catch: String?)
 }
 
 public struct NativeCapture: Equatable, Sendable {
@@ -374,8 +407,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public static func == (a: NativeViewPayload, b: NativeViewPayload) -> Bool {
 		a.component == b.component && a.route == b.route && a.cells == b.cells && a.nodes == b.nodes && a.events == b.events
 			&& a.handlers == b.handlers && a.title == b.title && a.objects == b.objects && a.forms == b.forms && a.valueMissing.map(\.locale) == b.valueMissing.map(\.locale)
-			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages)
+			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages) && a.script == b.script
 	}
+	/// The JavaScript the page's script ops and computeds run; absent when every handler is data.
+	public var script: NativeScript? = nil
 
 	public static func decode(_ data: Data) throws -> NativeViewPayload {
 		try decode(JSONValue.parse(data))
@@ -383,7 +418,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "script"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
@@ -546,7 +581,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 						throw PayloadError(path: op.path + ".command", reason: "unknown command \"\(command)\"")
 					}
 					let preventScroll = keys.contains("preventScroll") ? try opField["preventScroll"].bool() : false
-					return .command(node: try opField["node"].string(), command: command, preventScroll: preventScroll)
+					let node = try opField["node"]
+					let target: NativeExpr = if let fixed = try? node.string() { .literal(.string(fixed)) } else { try decodeExpr(node) }
+					return .command(node: target, command: command, preventScroll: preventScroll)
 				case "submit":
 					let opField = try op.object(["op", "form", "submitter"])
 					return .submit(form: try opField["form"].string(), submitter: try opField["submitter"].optionalString())
@@ -560,6 +597,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 						return NativeCapture(name: try items[0].string(), value: try decodeExpr(items[1]))
 					}
 					return .after(ms: try decodeExpr(try opField["ms"]), capture: capture, ops: try opField["ops"].array().map(decodeOp))
+				case "script":
+					let opField = try op.object(required: ["op", "fn", "type", "bindings"], optional: ["catch"])
+					return .script(
+						fn: try opField["fn"].string(), type: try opField["type"].string(), bindings: try decodeBindings(try opField["bindings"]),
+						catch: opField.has("catch") ? try opField["catch"].string() : nil)
 				case "if":
 					let opField = try op.object(["op", "test", "whenTrue", "whenFalse"])
 					return .when(
@@ -604,7 +646,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 		let payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
 			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
-			objects: objects, forms: forms, valueMissing: valueMissing)
+			objects: objects, forms: forms, valueMissing: valueMissing,
+			script: fields.has("script") ? try decodeScript(try fields["script"]) : nil)
 		try payload.check()
 		return payload
 	}
@@ -669,6 +712,31 @@ public struct NativeViewPayload: Equatable, Sendable {
 			em: field.has("em") ? try field["em"].bool() : false)
 	}
 
+	private static func decodeScript(_ reader: Reader) throws -> NativeScript {
+		let fields = try reader.object(["id", "source", "services"])
+		return NativeScript(
+			id: try fields["id"].string(), source: try fields["source"].string(),
+			services: try fields["services"].array().map { service in
+				let name = try service.string()
+				guard let known = NativeScriptService(rawValue: name) else { throw service.fail("unknown script service \"\(name)\"") }
+				return known
+			})
+	}
+
+	private static func decodeBindings(_ reader: Reader) throws -> [NativeScriptBinding] {
+		try reader.keys().map { name in
+			let binding = try reader.field(name)
+			switch try binding.keys() {
+			case ["cell"]: return NativeScriptBinding(name: name, kind: .cell(try binding.field("cell").string()))
+			case ["fields"]:
+				let fields = try binding.field("fields")
+				return NativeScriptBinding(name: name, kind: .fields(try fields.keys().map { NativeScriptField(name: $0, cell: try fields.field($0).string()) }))
+			case ["value"]: return NativeScriptBinding(name: name, kind: .value(try decodeExpr(try binding.field("value"))))
+			default: throw binding.fail("a script binding is { cell }, { fields } or { value }")
+			}
+		}
+	}
+
 	private static func decodeParts(_ reader: Reader) throws -> [NativeTextPart] {
 		try reader.array().map { part -> NativeTextPart in
 			let keys = try part.keys()
@@ -715,8 +783,14 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["cell"]: return .cell(try field("cell").string())
 		case ["event"]:
 			let name = try field("event").string()
-			guard name == "value" else { throw PayloadError(path: reader.path + ".event", reason: "unknown event read \"\(name)\"") }
-			return .eventValue
+			guard let read = NativeEventField(rawValue: name) else { throw PayloadError(path: reader.path + ".event", reason: "unknown event read \"\(name)\"") }
+			return .event(read)
+		case ["focused"]:
+			guard try field("focused").bool() else { throw PayloadError(path: reader.path + ".focused", reason: "focused is only ever true") }
+			return .focused
+		case ["contains", "node"]: return .contains(within: try decodeExpr(try field("contains")), node: try decodeExpr(try field("node")))
+		case ["focusOrigin"]: return .focusOrigin(try decodeExpr(try field("focusOrigin")))
+		case ["isElement"]: return .isElement(try decodeExpr(try field("isElement")))
 		case ["literal"]: return .literal(try field("literal").scalar())
 		case ["unary", "value"]: return .unary(try oneOf("unary", ["!", "-", "+", "typeof"]), try decodeExpr(try field("value")))
 		case ["binary", "left", "right"]:
@@ -761,6 +835,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["item"]: return .item(try field("item").string())
 		case ["formData"]: return .formData(try field("formData").string())
 		case ["checked"]: return .checked(try field("checked").string())
+		case ["bindings", "script"]: return .script(fn: try field("script").string(), bindings: try decodeBindings(try field("bindings")))
 		case ["arguments", "call"]:
 			let name = try field("call").string()
 			guard let builtin = NativeBuiltin(rawValue: name) else { throw PayloadError(path: reader.path + ".call", reason: "unknown call \"\(name)\"") }
@@ -778,6 +853,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 		var branchArms: [String: Int] = [:]
 		var repeats = Set<String>()
 		var sheets = Set<String>()
+		let overlays = Set(nodes.compactMap { node -> String? in
+			if case let .element(_, attributes, _) = node.kind, attributes[OverlayProtocol.attribute] != nil { return node.id }
+			return nil
+		})
 		var seen = Set<String>()
 		func checkCells(_ node: NativeNode, _ expressions: [NativeExpr]) throws {
 			for cell in expressions.flatMap(\.cells) where !cellIds.contains(cell) {
@@ -832,6 +911,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 			where !arguments.flatMap(\.cells).allSatisfy(cellIds.contains) || !(result.map { id in cells.contains { $0.id == id && $0.task != nil } } ?? true) {
 				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) calls the device with an unknown cell or a result cell that is not a task")
 			}
+			for case let .script(_, _, bindings, catchCell) in handler.ops where !(bindings.flatMap(\.cells) + (catchCell.map { [$0] } ?? [])).allSatisfy(cellIds.contains) {
+				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) runs a script with an unknown cell")
+			}
 		}
 		for cell in cells {
 			if let row = cell.row, !repeats.contains(row) {
@@ -844,8 +926,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 		}
 		for event in events {
-			guard (event.event == .dismiss ? sheets : elements).contains(event.host) else {
-				throw PayloadError(path: "payload.events", reason: "\(event.event.rawValue) event on \(event.host), which is not \(event.event == .dismiss ? "a sheet" : "an element")")
+			guard (event.event == .dismiss ? sheets.union(overlays) : elements).contains(event.host) else {
+				throw PayloadError(path: "payload.events", reason: "\(event.event.rawValue) event on \(event.host), which is not \(event.event == .dismiss ? "a sheet or an element marked overlay" : "an element")")
 			}
 			guard handlerIds.contains(event.handler) else {
 				throw PayloadError(path: "payload.events", reason: "event on \(event.host) names unknown handler \(event.handler)")

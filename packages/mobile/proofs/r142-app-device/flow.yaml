@@ -1,0 +1,33 @@
+appId: ${APP_ID}
+name: r142-app-device
+---
+- setLocation:
+      latitude: 51.5
+      longitude: -0.125
+- launchApp:
+      clearState: true
+- assertVisible: Start here
+- assertVisible: Find me
+- assertNotVisible: 51\.5, -0\.125
+- assertVisible: Start
+- tapOn: Find me
+- assertVisible: 51\.5, -0\.125
+- assertNotVisible: Start here
+- assertVisible: Where
+- assertVisible: Location Allowed
+- assertVisible: 51\.5, -0\.125
+- assertVisible: Show details
+- assertNotVisible: Start here
+- assertNotVisible: Details
+- assertVisible: Where
+- tapOn: Show details
+- assertVisible: Details
+- assertVisible: Details
+- assertVisible: Close details
+- tapOn: Close details
+- assertNotVisible: Details
+- assertNotVisible: Close details
+- assertVisible: Show details
+- assertVisible: 51\.5, -0\.125
+- assertNotVisible: Details
+- assertNotVisible: Close details

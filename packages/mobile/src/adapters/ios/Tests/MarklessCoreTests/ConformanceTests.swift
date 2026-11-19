@@ -1,6 +1,12 @@
 import Foundation
 @testable import MarklessCore
+import MarklessMobile
 import Testing
+
+/// The app's engine as the vectors were written: JavaScriptCore here, `crypto` drawing from an all-zero seed.
+private func conformanceScriptHost() -> NativeScriptHost {
+	NativeScriptHost(engine: { try JavaScriptCoreEngine() }, seed: { String(repeating: "0", count: 64) })
+}
 
 private let conformanceDirectory: URL = {
 	if let override = ProcessInfo.processInfo.environment["MARKLESS_CONFORMANCE_DIR"] { return URL(fileURLWithPath: override) }
@@ -35,7 +41,7 @@ func reproducesAppConformanceVector(file: URL) throws {
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
 	#expect(fields.map(\.0) == ["version", "app", "open", "initial", "steps"])
 	guard case let .string(open)? = field("open") else { Issue.record("open is not a path"); return }
-	let stack = try NativeAppStack(app: try NativeAppPayload.decode(try #require(field("app"))), path: open)
+	let stack = try NativeAppStack(app: try NativeAppPayload.decode(try #require(field("app"))), path: open, scriptHost: conformanceScriptHost())
 	let look = { () throws -> [(String, JSONValue)] in
 		let top = stack.screens[stack.screens.count - 1].runtime
 		return [
@@ -80,7 +86,7 @@ func reproducesConformanceVector(file: URL) throws {
 	let now: Double? = if case let .number(time)? = field("now") { time } else { nil }
 	let runtime = NativeRuntime(
 		payload: try NativeViewPayload.decode(try #require(field("payload"))), params: params, preferredLanguages: languages,
-		now: { now ?? (Date().timeIntervalSince1970 * 1000).rounded(.down) })
+		now: { now ?? (Date().timeIntervalSince1970 * 1000).rounded(.down) }, scriptHost: conformanceScriptHost())
 
 	let initial = JSONValue.array(try runtime.texts().map { .array([.string($0.node), .string($0.text)]) })
 	#expect(initial.jsonText == field("initial")?.jsonText)
@@ -102,6 +108,17 @@ func reproducesConformanceVector(file: URL) throws {
 
 	guard case let .array(steps)? = field("steps") else { Issue.record("steps is not an array"); return }
 	for step in steps {
+		if case let .object(stepFields) = step,
+			case let .object(actionFields)? = stepFields.first(where: { $0.0 == "action" })?.1,
+			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
+			eventName == "response",
+			case let .number(id)? = actionFields.first(where: { $0.0 == "id" })?.1,
+			let expected = stepFields.first(where: { $0.0 == "journal" })?.1
+		{
+			let journal = try runtime.response(Int(id), try NativeFetchResponse.decode(try Reader(try #require(actionFields.first(where: { $0.0 == "response" })?.1), at: "response")))
+			#expect(Array(JSONValue.array(journal.map(\.json)).jsonText.utf8) == Array(expected.jsonText.utf8), "\(file.lastPathComponent) \(eventName) \(id)")
+			continue
+		}
 		if case let .object(stepFields) = step,
 			case let .object(actionFields)? = stepFields.first(where: { $0.0 == "action" })?.1,
 			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
@@ -155,7 +172,7 @@ func reproducesConformanceVector(file: URL) throws {
 			case let .object(actionFields)? = stepFields.first(where: { $0.0 == "action" })?.1,
 			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
 			let event = NativeEventName(rawValue: eventName),
-			actionFields.allSatisfy({ (event == .timer ? ["event", "timer"] : ["event", "host", "value"]).contains($0.0) }),
+			actionFields.allSatisfy({ (event == .timer ? ["event", "timer"] : ["event", "host", "value", "reason"]).contains($0.0) }),
 			let expected = stepFields.first(where: { $0.0 == "journal" })?.1
 		else { Issue.record("malformed step \(step.jsonText)"); return }
 		let string = { (key: String) -> String? in if case let .string(text)? = actionFields.first(where: { $0.0 == key })?.1 { text } else { nil } }
@@ -163,9 +180,24 @@ func reproducesConformanceVector(file: URL) throws {
 		if event == .timer {
 			action = NativeAction(event: .timer, timer: try #require(string("timer")))
 		} else {
-			action = NativeAction(event: event, host: try #require(string("host")), value: string("value"))
+			action = NativeAction(event: event, host: try #require(string("host")), value: string("value"), reason: string("reason"))
 		}
 		let journal = JSONValue.array(try runtime.dispatch(action).map(\.json))
 		#expect(Array(journal.jsonText.utf8) == Array(expected.jsonText.utf8), "\(file.lastPathComponent) \(eventName) on \(action.timer ?? action.host)")
 	}
+}
+
+/// A page whose handlers are all data never starts the engine; a script page starts the app's one engine on first use.
+@Test func engineStartsOnFirstScriptUseOnly() throws {
+	let file = conformanceDirectory.appendingPathComponent("script-app.json")
+	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: file)) else { Issue.record("vector is not an object"); return }
+	let host = conformanceScriptHost()
+	let stack = try NativeAppStack(app: try NativeAppPayload.decode(try #require(fields.first { $0.0 == "app" }?.1)), path: "/", scriptHost: host)
+	_ = try stack.dispatch(NativeAction(event: .activate, host: "h3"))
+	#expect(host.starts == 0)
+	_ = try stack.dispatch(NativeAction(event: .activate, host: "component-edge:0"))
+	#expect(host.starts == 0)
+	_ = try stack.dispatch(NativeAction(event: .activate, host: "h4"))
+	_ = try stack.dispatch(NativeAction(event: .activate, host: "h4"))
+	#expect(host.starts == 1)
 }

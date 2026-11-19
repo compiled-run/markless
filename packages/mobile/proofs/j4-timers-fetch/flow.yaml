@@ -1,0 +1,26 @@
+appId: ${APP_ID}
+name: j4-timers-fetch
+---
+- launchApp:
+      clearState: true
+- assertVisible: Network
+- assertVisible: 'Status: idle'
+- assertVisible: 'Ticking: no'
+- assertVisible: 'Ticks: 0'
+- tapOn: Fetch
+- assertNotVisible: 'Status: idle'
+- assertVisible: "Status: 200 POST /j4/echo\\?word=native text/plain hello"
+- assertVisible: 'Ticking: no'
+- assertNotVisible: 'Status: idle'
+- tapOn: Tick
+- assertNotVisible: 'Ticking: no'
+- assertVisible: 'Ticking: yes'
+- assertNotVisible: 'Ticking: no'
+- assertNotVisible: 'Ticking: done'
+- extendedWaitUntil:
+      visible: 'Ticks: 3'
+      timeout: 16000
+- assertVisible: 'Ticking: done'
+- assertVisible: 'Ticks: 3'
+- assertVisible: 'Ticking: done'
+- assertNotVisible: 'Ticks: 4'

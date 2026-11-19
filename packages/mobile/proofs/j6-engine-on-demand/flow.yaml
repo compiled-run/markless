@@ -1,0 +1,41 @@
+appId: ${APP_ID}
+name: j6-engine-on-demand
+---
+- launchApp:
+      clearState: true
+- assertVisible: Data only
+- assertVisible: Taps 0
+- assertVisible: Open script
+- assertVisible: Home
+- assertVisible:
+      id: markless-engine-starts
+      text: 'engine starts: 0'
+- tapOn: Taps 0
+- assertNotVisible: Taps 0
+- assertVisible: Taps 1
+- assertNotVisible: Taps 0
+- assertVisible:
+      id: markless-engine-starts
+      text: 'engine starts: 0'
+- tapOn: Taps 1
+- assertNotVisible: Taps 1
+- assertVisible: Taps 2
+- assertNotVisible: Taps 1
+- assertVisible:
+      id: markless-engine-starts
+      text: 'engine starts: 0'
+- tapOn: Open script
+- assertVisible: Script
+- assertVisible: Script page
+- assertVisible: 'Stamp: none'
+- assertVisible: Script
+- tapOn: Stamp
+- assertNotVisible: 'Stamp: none'
+- assertVisible:
+      id: markless-engine-starts
+      text: 'engine starts: 1'
+- assertVisible: "Stamp: 2026-11-18T00:00:00\\.000Z"
+- assertNotVisible: 'Stamp: none'
+- assertVisible:
+      id: markless-engine-starts
+      text: 'engine starts: 1'

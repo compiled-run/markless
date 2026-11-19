@@ -1,0 +1,66 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u22-radio-group",
+			"failure": {
+				"step": 0,
+				"action": "launch",
+				"role": "flow",
+				"command": "assertConditionCommand",
+				"message": "Assertion is false: \"Monthly plan\" is visible"
+			},
+			"installSeconds": 3.5484609169999968,
+			"flowSeconds": 32.208789875
+		},
+		{
+			"name": "u5-toggle",
+			"failure": null,
+			"installSeconds": 0.3340863329999993,
+			"flowSeconds": 20.352838457999997
+		},
+		{
+			"name": "u12-buttongroup",
+			"failure": null,
+			"installSeconds": 0.3448872089999786,
+			"flowSeconds": 48.07448550000001
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 0.3215105830000248,
+			"flowSeconds": 46.4842225
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 0.3411433749999851,
+			"flowSeconds": 37.797306584000005
+		},
+		{
+			"name": "f3-families",
+			"failure": null,
+			"installSeconds": 0.40859316600003515,
+			"flowSeconds": 27.072329041999996
+		},
+		{
+			"name": "f4-required",
+			"failure": null,
+			"installSeconds": 0.3455983750000014,
+			"flowSeconds": 31.709878582999984
+		},
+		{
+			"name": "f6-disabled",
+			"failure": null,
+			"installSeconds": 0.3376888329999638,
+			"flowSeconds": 28.435366417000072
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.3414304590000538,
+			"flowSeconds": 18.41225229199999
+		}
+	]
+}

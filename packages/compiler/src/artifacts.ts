@@ -118,6 +118,75 @@ export type NativeFactCollectors = {
 	) => SemanticComponentNativeFacts;
 };
 
+/** A name a script reads that no declaration in its module gives (`setTimeout`, `document`). */
+export type SemanticScriptGlobal = {
+	readonly name: string;
+	readonly span: SourceSpan;
+	/** Only `typeof name`: feature detection, which the engine answers by itself. */
+	readonly typeofOnly: boolean;
+	/** `window.x`, `globalThis.x`, `self.x`: the property read off the global object. */
+	readonly property?: string;
+};
+
+/** A handler's or computed's own JavaScript, as a phone's script engine runs it. Native builds only. */
+export type SemanticScriptFunction = {
+	/**
+	 * A function body that returns the handler (or the computed's function): types erased, the local declarations it uses
+	 * first. Each name from the component (state, props, row items) reads as `__s.<name>`, each import as `__i[n]...`
+	 * (`n` indexes the module's `scriptModule.imports`); module-level names are left as written.
+	 */
+	readonly code: string;
+	/** The component's names it reads as `__s.<name>`, and whether it assigns them. */
+	readonly names: ReadonlyArray<{ readonly name: string; readonly written: boolean; readonly span: SourceSpan }>;
+	/** Module-level names it reads as written, which its module's statements declare. */
+	readonly module: ReadonlyArray<string>;
+	/** What it reads from imports: `__i[slot]`, then `name` (null: the whole module). */
+	readonly imports: ReadonlyArray<SemanticScriptImportUse>;
+	/** Each use of its first parameter (the event), as the member path read off it (`['target', 'value']`; empty: whole). */
+	readonly event?: ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly span: SourceSpan }>;
+	readonly globals: ReadonlyArray<SemanticScriptGlobal>;
+	/** Framework imports it uses (`navigate`), which are not JavaScript a script can run. */
+	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
+	readonly span: SourceSpan;
+	/** Constructs the engine cannot run as written (an `enum`), from type erasure. */
+	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
+};
+
+export type SemanticScriptImportUse = { readonly slot: number; readonly name: string | null };
+
+/** One top-level statement of a module as script code, with what it declares and reaches. */
+export type SemanticScriptStatement = {
+	readonly code: string;
+	/** Module-level names it declares. */
+	readonly declares: ReadonlyArray<string>;
+	/** Module-level names of this module it reads. */
+	readonly uses: ReadonlyArray<string>;
+	readonly imports: ReadonlyArray<SemanticScriptImportUse>;
+	/** It declares nothing, so it runs for its effect and is always kept. */
+	readonly effect: boolean;
+	readonly globals: ReadonlyArray<SemanticScriptGlobal>;
+	/** Names it uses that a script leaves out (a component, top-level framework state). */
+	readonly dropped: ReadonlyArray<{ readonly name: string; readonly span: SourceSpan }>;
+	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
+	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
+};
+
+/** An export of a script module: a local name, a name of another module (`from` null: the whole module), or `export *`. */
+export type SemanticScriptExport =
+	| { readonly name: string; readonly local: string }
+	| { readonly name: string; readonly slot: number; readonly from: string | null }
+	| { readonly star: number };
+
+/** A module's top-level code as a script module: imports read through `__i`, exports defined on `exports`. */
+export type SemanticScriptModule = {
+	/** Import specifiers in `__i` order; side-effect imports (stylesheets) are left out. */
+	readonly imports: ReadonlyArray<{ readonly specifier: string; readonly span: SourceSpan }>;
+	readonly statements: ReadonlyArray<SemanticScriptStatement>;
+	readonly exports: ReadonlyArray<SemanticScriptExport>;
+	/** `require`, `module` or `exports`: CommonJS, which the script's modules are not. */
+	readonly commonjs?: true;
+};
+
 export type ElementOnlyAttribute = {
 	/** The attribute as the element carries it. */
 	readonly name: string;
@@ -232,6 +301,8 @@ export type SemanticComponentPropBinding =
 			readonly graphBindingKind: SemanticGraphBinding['kind'];
 			readonly path: ReadonlyArray<string>;
 			readonly sourceSpan?: SourceSpan;
+			/** The value as written at the call site, for native builds only (`nativeFacts`). */
+			readonly nativeExpression?: SemanticExpression;
 	  }
 	| {
 			readonly name: string;
@@ -1226,6 +1297,8 @@ export type SemanticStateWrite = {
 	readonly argumentSources?: ReadonlyArray<string>;
 	/** Set when the target is rooted in the item of an enclosing keyed `@for`; names that repeat. */
 	readonly rowRepeatId?: string;
+	/** Set when the target reaches that row's item as `list[index]`: the path written below the item. */
+	readonly rowItemPath?: ReadonlyArray<string>;
 	/** Set when the target is rooted in a local declared inside a nested function. */
 	readonly through?: SemanticWriteThrough;
 	/** `Object.assign(target, ...sources)`: `target` is the first argument, `argumentSources` the rest. */
@@ -1244,6 +1317,8 @@ export type SemanticStateWrite = {
  * - `element`: one element of a state array (a `for...of` variable, a `find()`
  *   result, an array-callback parameter). `local` names the variable holding the
  *   element; `path` is the member path inside it.
+ *   `enclosing` is present when that array lives inside an element of an
+ *   enclosing state array (`row.seats` inside `for (const row of rows)`).
  * - `untracked`: state reached in a way no graph path can name.
  */
 export type SemanticWriteThrough =
@@ -1259,6 +1334,7 @@ export type SemanticWriteThrough =
 			readonly local: string;
 			readonly collection: string;
 			readonly path: ReadonlyArray<string>;
+			readonly enclosing?: ReadonlyArray<EnclosingWriteElement>;
 	  }
 	| {
 			readonly kind: 'untracked';
@@ -1268,12 +1344,23 @@ export type SemanticWriteThrough =
 				| 'copy'
 				| 'destructured'
 				| 'dynamic-key'
+				| 'enclosing-rebound'
+				| 'flattened'
 				| 'map-entry'
 				| 'nested-element'
+				| 'nested-unknown'
 				| 'reassigned'
 				| 'row-item';
 			readonly source: string;
+			/** `enclosing-rebound`: the enclosing loop name that no longer holds its element at the write. */
+			readonly enclosingLocal?: string;
 	  };
+
+/** A local holding an element of an enclosing array, and the path from it to the next array in, outermost first. */
+export type EnclosingWriteElement = {
+	readonly local: string;
+	readonly path: ReadonlyArray<string>;
+};
 
 export type SemanticStateRead = {
 	readonly source: string;
@@ -1311,6 +1398,8 @@ export type SemanticModuleFunction = {
 		/** Its body; a defaulted parameter `p = d` starts it as `let p = p ?? d`. */
 		readonly statements: ReadonlyArray<SemanticFunctionStatement>;
 	};
+	/** Its body as handler statements, for a call made for what it does (`focusIntoSurface(...)`) rather than its value. */
+	readonly effects?: ReadonlyArray<SemanticHandlerStatement>;
 };
 
 /** A top-level `const` of a module that no statement writes through: what a native build reads where a name reads it. */
@@ -1441,6 +1530,8 @@ export type SemanticExpression =
 			readonly parameters: ReadonlyArray<string>;
 			readonly body: SemanticExpression;
 	  }
+	/** `value instanceof HTMLElement` (or `Element`): whether the value is an element. */
+	| { readonly kind: 'instanceof'; readonly value: SemanticExpression; readonly type: string }
 	/** `new Callee(...)` by a bare name (`new FormData(form)`, `new Promise(...)`, `new Error(message)`). */
 	| {
 			readonly kind: 'new';
@@ -1485,14 +1576,22 @@ export type SemanticHandlerStatement =
 			readonly arguments?: ReadonlyArray<SemanticExpression>;
 			readonly optional?: true;
 	  }
+	/** `(a ?? b)?.focus()`: a method called on a value that is not a name or a member path. */
+	| {
+			readonly kind: 'method-call';
+			readonly object: SemanticExpression;
+			readonly method: string;
+			readonly arguments?: ReadonlyArray<SemanticExpression>;
+			readonly optional?: true;
+	  }
 	| {
 			readonly kind: 'if';
 			readonly test: SemanticExpression;
 			readonly whenTrue: ReadonlyArray<SemanticHandlerStatement>;
 			readonly whenFalse: ReadonlyArray<SemanticHandlerStatement>;
 	  }
-	/** `return;` with no value: the rest of the body does not run. */
-	| { readonly kind: 'return' }
+	/** `return` or `return value`: the rest of the body does not run, and a caller that reads the call's value gets `value`. */
+	| { readonly kind: 'return'; readonly value?: SemanticExpression }
 	/** `const name = value`: the statements after it in its block read `name` as the value it had here. */
 	| { readonly kind: 'const'; readonly name: string; readonly value: SemanticExpression }
 	/** `await value;` as a statement. */
@@ -2199,6 +2298,7 @@ export type LoweredWriteThrough = {
 	readonly element: boolean;
 	readonly basePath: ReadonlyArray<string>;
 	readonly path: ReadonlyArray<string>;
+	readonly enclosing?: ReadonlyArray<EnclosingWriteElement>;
 };
 
 /** A nested row's `enclosing` finds the collection inside the enclosing row's item. */

@@ -1,0 +1,40 @@
+{
+	"rung": 141,
+	"name": "A keyed @for with @empty inside an @if arm: its rows while the arm is shown, kept up while it is hidden",
+	"steps": [
+		{
+			"visible": ["Show list", "List hidden", "1 in the list"],
+			"absent": ["Apple", "No fruit"]
+		},
+		{
+			"do": { "tap": "Show list" },
+			"visible": ["Hide list", "Apple"],
+			"absent": ["List hidden", "Fruit 1", "No fruit"]
+		},
+		{
+			"do": { "tap": "Add fruit" },
+			"visible": ["Apple", "Fruit 1", "2 in the list"],
+			"absent": ["No fruit", "1 in the list"]
+		},
+		{
+			"do": { "tap": "Hide list" },
+			"visible": ["Show list", "List hidden"],
+			"absent": ["Apple", "Fruit 1", "0 in the list"]
+		},
+		{
+			"do": { "tap": "Clear" },
+			"visible": ["List hidden", "0 in the list"],
+			"absent": ["Apple", "No fruit", "2 in the list"]
+		},
+		{
+			"do": { "tap": "Show list" },
+			"visible": ["No fruit", "Hide list"],
+			"absent": ["Apple", "Fruit 1", "List hidden"]
+		},
+		{
+			"do": { "tap": "Add fruit" },
+			"visible": ["Fruit 0", "1 in the list"],
+			"absent": ["No fruit", "Apple", "0 in the list"]
+		}
+	]
+}
