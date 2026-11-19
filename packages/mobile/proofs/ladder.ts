@@ -174,8 +174,12 @@ export const MICROPHONE_STATE_ID = 'markless-microphone';
 /** The test-build label where a phone shell shows how many times the app started its script engine: `engine starts: <n>`. */
 export const ENGINE_STARTS_ID = 'markless-engine-starts';
 export const engineStartsText = (starts: number): string => `engine starts: ${starts}`;
-/** The port of the test's echo server, which a rung with `server: 'echo'` fetches from (`echo-server.ts`). */
-export const ECHO_SERVER_PORT = 47608;
+/**
+ * The port of the test's echo server, which a rung with `server: 'echo'` fetches from (`echo-server.ts`). Fixed, since
+ * the rung's App.tsrx names it, and below every OS's ephemeral range (Linux 32768-60999, macOS and Windows 49152-65535),
+ * where any outgoing connection on the machine can already hold it.
+ */
+export const ECHO_SERVER_PORT = 28761;
 export const callsText = (calls: readonly string[]): string =>
 	`calls: ${calls.length === 0 ? 'none' : calls.join(', ')}`;
 

@@ -12,7 +12,7 @@ export default function App() @{
 		<button
 			onClick={async () => {
 				status = 'loading';
-				const response = await fetch('http://127.0.0.1:47608/j4/echo?word=native', {
+				const response = await fetch('http://127.0.0.1:28761/j4/echo?word=native', {
 					method: 'POST',
 					headers: { 'content-type': 'text/plain' },
 					body: 'hello',
