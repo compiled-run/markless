@@ -1452,7 +1452,12 @@ export type SemanticFunctionStatement =
 /** A value as a tree a native host evaluates with JavaScript meaning; names are the component's bindings. */
 export type SemanticExpression =
 	| { readonly kind: 'read'; readonly name: string }
-	| { readonly kind: 'literal'; readonly value: string | number | boolean | null }
+	| {
+			readonly kind: 'literal';
+			readonly value: string | number | boolean | null;
+			/** Written `undefined`, which a native value spells as null. */
+			readonly undefined?: true;
+	  }
 	| {
 			readonly kind: 'unary';
 			readonly operator: '!' | '-' | '+' | 'typeof';
