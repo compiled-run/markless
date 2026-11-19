@@ -544,7 +544,7 @@ public final class NativeRuntime {
 			_ = try callScript("enter", .object(entry + entryCells()))
 			return try callScript("leave")
 		}
-		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(required: ["writes", "timers", "clears", "requests", "logs"], optional: ["commands"])
+		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(required: ["writes", "timers", "clears", "requests", "logs"], optional: ["commands", "raises"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
@@ -592,7 +592,68 @@ public final class NativeRuntime {
 			if name == "focus" { focused = node }
 			return .command(node: node, command: name, preventScroll: try parts[2].bool())
 		}
-		return clears + timers + requests + commands
+		var raised: [NativeJournalEntry] = []
+		for event in try result.has("raises") ? result["raises"].array() : [] {
+			let taken = try raise(event)
+			if case .navigate? = taken.first { return taken }
+			raised += taken
+		}
+		let entries: [NativeJournalEntry] = clears + timers + requests
+		return entries + commands + raised
+	}
+
+	/// How deep events raised from JavaScript may nest.
+	private let raiseDepth = 32
+	private var raising = 0
+
+	/// An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press on
+	/// the innermost element from it outwards that has one; any other type on the element, then its ancestors when it
+	/// bubbles, each running its own handler for that type.
+	private func raise(_ reader: Reader) throws -> [NativeJournalEntry] {
+		guard raising < raiseDepth else { throw RuntimeError(reason: "events raised from JavaScript nest deeper than \(raiseDepth)") }
+		raising += 1
+		defer { raising -= 1 }
+		let event = try reader.object(
+			required: ["node", "type", "bubbles"],
+			optional: ["reason", "relatedTarget", "pointerId", "pointerType", "isPrimary", "button", "buttons", "clientX", "clientY"])
+		let target = try event["node"].string()
+		let type = try event["type"].string()
+		var chain: [String] = []
+		var at: String? = nodeOf(target)
+		while let node = at {
+			chain.append(node == nodeOf(target) ? target : node)
+			at = nodesById[node]?.parent
+		}
+		let scopeOf = { (id: String) throws -> NativeScope? in
+			guard let node = self.nodesById[self.nodeOf(id)] else { return nil }
+			return try self.instances(of: node).first { $0.id == id }?.scope
+		}
+		let handlerOf = { (id: String, name: NativeEventName) in self.payload.events.first { $0.host == self.nodeOf(id) && $0.event == name } }
+		if type == "click" {
+			guard let pressed = chain.first(where: { handlerOf($0, .activate) != nil }), let scope = try scopeOf(pressed) else { return [] }
+			return try run(handlers[handlerOf(pressed, .activate)!.handler] ?? [], in: scope)
+		}
+		guard let name = NativeEventName(rawValue: type) else { return [] }
+		let optional = { (key: String, fallback: NativeValue) throws -> NativeValue in event.has(key) ? try event[key].scalar() : fallback }
+		var calls: [NativeJournalEntry] = []
+		let bubbles = try event["bubbles"].bool()
+		for node in bubbles ? chain : Array(chain.prefix(1)) {
+			guard let own = handlerOf(node, name), let scope = try scopeOf(node) else { continue }
+			eventFields = name == .dismiss
+				? [.reason: try optional("reason", .string("")), .pressTarget: .null]
+				: [
+					.target: .string(target), .currentTarget: .string(node), .relatedTarget: try optional("relatedTarget", .null),
+					.button: try optional("button", .number(0)), .buttons: try optional("buttons", .number(0)),
+					.clientX: try optional("clientX", .number(0)), .clientY: try optional("clientY", .number(0)),
+					.pointerId: try optional("pointerId", .number(0)), .pointerType: try optional("pointerType", .string("")),
+					.isPrimary: try optional("isPrimary", .bool(false)), .timeStamp: .number(0),
+				]
+			defer { eventFields = nil }
+			let taken = try run(handlers[own.handler] ?? [], in: scope)
+			if case .navigate? = taken.first { return taken }
+			calls += taken
+		}
+		return calls
 	}
 
 	/// The host's answer to a `fetch` entry.

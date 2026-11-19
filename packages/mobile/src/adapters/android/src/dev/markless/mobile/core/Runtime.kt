@@ -5,6 +5,9 @@ class MarklessRuntimeError(message: String) : RuntimeException(message)
 /** The overlay protocol of `@markless/web/overlay-protocol`: the marker attribute, the hint mark, and what makes an overlay modal. */
 const val OVERLAY_ATTRIBUTE = "overlay"
 const val OVERLAY_HINT_ATTRIBUTE = "overlay-hint"
+
+/** How deep events raised from JavaScript may nest. */
+const val RAISE_DEPTH = 32
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
@@ -417,6 +420,12 @@ class Runtime(
 			logs.add(level to text)
 			onScriptLog?.invoke(level, text)
 		}
+		val raised = ArrayList<JournalEntry>()
+		for (event in result["raises"]?.arr("leave().raises") ?: emptyList()) {
+			val taken = raise(event.obj("leave().raises[]"))
+			if (taken.firstOrNull() is JournalEntry.Navigate) return taken
+			raised.addAll(taken)
+		}
 		return list("clears").map { JournalEntry.ClearTimer("$SCRIPT_TIMER${id(it)}") } +
 			list("timers").map { t -> t.arr("leave().timers[]").let { JournalEntry.Timer("$SCRIPT_TIMER${id(it[0])}", it[1].num("leave().timers[][1]")) } } +
 			list("requests").map { r ->
@@ -447,7 +456,53 @@ class Runtime(
 				}
 				if (command == "focus") focused = node
 				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
+			} +
+			raised
+	}
+
+	/** How deep events raised from JavaScript nest now. */
+	private var raising = 0
+
+	/**
+	 * An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press on
+	 * the innermost element from it outwards that has one; any other type on the element, then its ancestors when it
+	 * bubbles, each running its own handler for that type.
+	 */
+	private fun raise(event: Map<String, Json>): List<JournalEntry> {
+		if (raising >= RAISE_DEPTH) throw MarklessRuntimeError("events raised from JavaScript nest deeper than $RAISE_DEPTH")
+		raising++
+		try {
+			val target = (event["node"] ?: Json.Null).str("a raised event's node")
+			val type = (event["type"] ?: Json.Null).str("a raised event's type")
+			val chain = chain(target)
+			fun scopeOf(id: String): Scope? = byId[id.substringBefore('@')]?.let { node -> instances(node).firstOrNull { it.id == id }?.scope }
+			if (type == "click") {
+				val pressed = chain.firstOrNull { handlerFor(it.substringBefore('@'), EventName.Activate) != null } ?: return emptyList()
+				val scope = scopeOf(pressed) ?: return emptyList()
+				return run(handlers[handlerFor(pressed.substringBefore('@'), EventName.Activate)]?.ops.orEmpty(), scope)
 			}
+			val name = EventName.entries.firstOrNull { it.wire == type } ?: return emptyList()
+			fun optional(key: String, fallback: JsValue): JsValue = event[key]?.let { JsValue.fromJson(it) } ?: fallback
+			val calls = ArrayList<JournalEntry>()
+			for (node in if ((event["bubbles"] as? Json.Bool)?.value == true) chain else chain.take(1)) {
+				val own = handlerFor(node.substringBefore('@'), name) ?: continue
+				val scope = scopeOf(node) ?: continue
+				val f = if (name == EventName.Dismiss) mapOf("reason" to optional("reason", JsValue.Str("")), "pressTarget" to JsValue.Null)
+				else mapOf(
+					"target" to JsValue.Str(target), "currentTarget" to JsValue.Str(node), "relatedTarget" to optional("relatedTarget", JsValue.Null),
+					"button" to optional("button", JsValue.Num(0.0)), "buttons" to optional("buttons", JsValue.Num(0.0)),
+					"clientX" to optional("clientX", JsValue.Num(0.0)), "clientY" to optional("clientY", JsValue.Num(0.0)),
+					"pointerId" to optional("pointerId", JsValue.Num(0.0)), "pointerType" to optional("pointerType", JsValue.Str("")),
+					"isPrimary" to optional("isPrimary", JsValue.Bool(false)), "timeStamp" to JsValue.Num(0.0),
+				)
+				val taken = withFields(f) { run(handlers[own]?.ops.orEmpty(), scope) }
+				if (taken.firstOrNull() is JournalEntry.Navigate) return taken
+				calls.addAll(taken)
+			}
+			return calls
+		} finally {
+			raising--
+		}
 	}
 
 

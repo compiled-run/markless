@@ -15,6 +15,7 @@ import { NATIVE_DOCUMENT_BODY, NATIVE_SCRIPT_POINTER_FIELDS, nativeLocale } from
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeScriptEngine } from './script-engine.ts';
 import {
+	DISMISS_EVENT,
 	OVERLAY_ATTRIBUTE,
 	OVERLAY_HINT_ATTRIBUTE,
 	OVERLAY_MODAL_ATTRIBUTE,
@@ -90,6 +91,23 @@ type Value = NativeValue;
 export type NativeTouch = 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel';
 const TOUCHES: ReadonlySet<string> = new Set<NativeTouch>(['pointerdown', 'pointermove', 'pointerup', 'pointercancel']);
 const RAISED: ReadonlySet<string> = new Set(['pointerover', 'pointerout', 'pointerenter', 'pointerleave']);
+
+/** An event a script dispatched on an element, as the script's `leave` reports it. */
+type Raised = {
+	readonly node: string;
+	readonly type: string;
+	readonly bubbles: boolean;
+	readonly reason?: string;
+	readonly relatedTarget?: string;
+	readonly pointerId?: number;
+	readonly pointerType?: string;
+	readonly isPrimary?: boolean;
+	readonly button?: number;
+	readonly buttons?: number;
+	readonly clientX?: number;
+	readonly clientY?: number;
+};
+const RAISE_DEPTH = 32;
 
 /** What the event running a handler carries, by the field a `{ event }` expression names. */
 export type NativeEventFields = {
@@ -652,6 +670,7 @@ export function createNativeRuntime(
 				| readonly [string, 'focus' | 'scrollIntoView' | 'showModal' | 'close', boolean]
 				| readonly [string, 'setPointerCapture' | 'releasePointerCapture', number]
 			>;
+			readonly raises?: ReadonlyArray<Raised>;
 		};
 		for (const [slot, value] of result.writes) {
 			const at = slot.indexOf('@');
@@ -662,6 +681,12 @@ export function createNativeRuntime(
 			if (key !== undefined) store.set(key, value);
 		}
 		logs.push(...result.logs);
+		const raised: NativeJournalEntry[] = [];
+		for (const event of result.raises ?? []) {
+			const out = raise(event);
+			if (out[0]?.op === 'navigate') return out;
+			raised.push(...out);
+		}
 		return [
 			...result.clears.map((id): NativeJournalEntry => ({
 				op: 'clearTimer',
@@ -695,7 +720,57 @@ export function createNativeRuntime(
 				if (command === 'focus') focused = node;
 				return [{ op: 'command', node, command, ...(preventScroll ? { preventScroll: true as const } : {}) }];
 			}),
+			...raised,
 		];
+	};
+	/** How deep events raised from JavaScript may nest (a handler that raises one that raises another...). */
+	let raising = 0;
+	/**
+	 * An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press
+	 * on the innermost element from it outwards that has one; any other type on the element, then its ancestors when it
+	 * bubbles, each running its own handler for that type.
+	 */
+	const raise = (event: Raised): NativeJournalEntry[] => {
+		if (raising >= RAISE_DEPTH) throw new Error(`events raised from JavaScript nest deeper than ${RAISE_DEPTH}`);
+		raising++;
+		try {
+			const chain: string[] = [];
+			for (let node: string | null | undefined = nodeOf(event.node); node; node = nodesById.get(node)?.parent)
+				chain.push(node === nodeOf(event.node) ? event.node : node);
+			const calls: NativeJournalEntry[] = [];
+			if (event.type === 'click') {
+				const pressed = chain.find((node) => handlerOf(nodeOf(node), 'activate'));
+				const scope = pressed && scopeOf(pressed);
+				return pressed && scope ? run(handlers.get(handlerOf(nodeOf(pressed), 'activate')!.handler) ?? [], undefined, scope) : [];
+			}
+			for (const node of event.bubbles ? chain : chain.slice(0, 1)) {
+				const own = handlerOf(nodeOf(node), event.type as NativePointerEventName);
+				const scope = scopeOf(node);
+				if (!own || !scope) continue;
+				const fields: NativeEventFields =
+					event.type === DISMISS_EVENT
+						? { reason: event.reason ?? '', pressTarget: null }
+						: {
+								target: event.node,
+								currentTarget: node,
+								relatedTarget: event.relatedTarget ?? null,
+								button: event.button ?? 0,
+								buttons: event.buttons ?? 0,
+								clientX: event.clientX ?? 0,
+								clientY: event.clientY ?? 0,
+								pointerId: event.pointerId ?? 0,
+								pointerType: event.pointerType ?? '',
+								isPrimary: event.isPrimary ?? false,
+								timeStamp: 0,
+							};
+				const out = run(handlers.get(own.handler) ?? [], fields, scope);
+				if (out[0]?.op === 'navigate') return out;
+				calls.push(...out);
+			}
+			return calls;
+		} finally {
+			raising--;
+		}
 	};
 	const compute: Compute = (fn, bindings, scope) =>
 		JSON.parse(

@@ -929,6 +929,10 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		console: 'console',
 		fetch: 'fetch',
 		crypto: 'crypto',
+		Event: 'engine',
+		CustomEvent: 'engine',
+		MouseEvent: 'engine',
+		PointerEvent: 'engine',
 	};
 
 /**

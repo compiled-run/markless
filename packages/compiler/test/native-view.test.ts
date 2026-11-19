@@ -2140,6 +2140,29 @@ export function Tip() @{
 });
 
 describe('pointer events', () => {
+	it('runs a handler that makes an event and dispatches it on an element as JavaScript; a KeyboardEvent stays refused', async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+export function Raise() @{
+	let hover = state('none');
+	const box = element<HTMLDivElement>();
+	<div>
+		<div el={box} onPointerover={() => (hover = 'over')}>{hover}</div>
+		<button onClick={() => { setTimeout(() => box?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })), 0); }}>Later</button>
+		<button onClick={() => box?.dispatchEvent(new CustomEvent('dismiss', { detail: { reason: 'escape' } }))}>Close</button>
+	</div>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(payload!.handlers.slice(1).map((handler) => handler.ops.map((op) => op.op))).toEqual([['script'], ['script']]);
+		const keys = await nativeView(`import { element } from '@markless/core';
+export function Keys() @{
+	const box = element<HTMLDivElement>();
+	<button onClick={() => box?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home' }))}>Home</button>
+}`);
+		expect(keys.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			"the click handler uses `KeyboardEvent`, which a phone's script engine does not provide",
+		]);
+	});
+
 	it("runs a pointer handler that keeps its event's elements as JavaScript, each element a proxy", async () => {
 		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
 export function Hover() @{

@@ -488,6 +488,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A CustomEvent, click() and a PointerEvent dispatched from JavaScript, each raised on its element after the script.
+		name: 'script-events',
+		fixture: 'proofs/u63-script-events/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h11' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
 		name: 'script-loop',
 		fixture: 'proofs/j1-loop-local/App.tsrx',
 		modules: true,

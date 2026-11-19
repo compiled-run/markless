@@ -53,6 +53,31 @@ if (!host) {
 		else out.clears.push(id);
 	};
 	if (typeof g.queueMicrotask !== 'function') g.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
+	// Events a script makes and dispatches on an element: the host raises them on that element once the script returns.
+	var EventBase = function (type, init) {
+		init = init || {};
+		this.type = String(type);
+		this.bubbles = init.bubbles === true;
+		this.cancelable = init.cancelable === true;
+		this.defaultPrevented = false;
+		this.isTrusted = false;
+		this.target = null;
+		this.currentTarget = null;
+	};
+	EventBase.prototype.preventDefault = function () { if (this.cancelable) this.defaultPrevented = true; };
+	EventBase.prototype.stopPropagation = function () {};
+	var eventKind = function (parent, fields) {
+		var Kind = function (type, init) {
+			parent.call(this, type, init);
+			for (var name in fields) this[name] = init && init[name] !== undefined ? init[name] : fields[name];
+		};
+		Kind.prototype = Object.create(parent.prototype);
+		return Kind;
+	};
+	g.Event = EventBase;
+	g.CustomEvent = eventKind(EventBase, { detail: null });
+	g.MouseEvent = eventKind(EventBase, { detail: 0, button: 0, buttons: 0, clientX: 0, clientY: 0, relatedTarget: null });
+	g.PointerEvent = eventKind(g.MouseEvent, { pointerId: 0, pointerType: '', isPrimary: false });
 	var Headers = function (pairs) {
 		this.get = function (name) {
 			var key = String(name).toLowerCase(), found = [];
@@ -218,6 +243,18 @@ var elementOf = function (id) {
 			return node === id || (!!elementFacts[node] && elementFacts[node].ancestors.indexOf(id) >= 0);
 		},
 		focus: function (options) { command('focus', !!(options && options.preventScroll)); },
+		click: function () { host.out.raises.push({ node: id, type: 'click', bubbles: true }); },
+		dispatchEvent: function (event) {
+			var raised = { node: id, type: String(event.type), bubbles: event.bubbles === true };
+			if (event.detail !== null && typeof event.detail === 'object' && typeof event.detail.reason === 'string')
+				raised.reason = event.detail.reason;
+			if (event.relatedTarget && typeof event.relatedTarget.__node === 'string') raised.relatedTarget = event.relatedTarget.__node;
+			['pointerId', 'pointerType', 'isPrimary', 'button', 'buttons', 'clientX', 'clientY'].forEach(function (field) {
+				if (field in event) raised[field] = event[field];
+			});
+			host.out.raises.push(raised);
+			return !event.defaultPrevented;
+		},
 		hasPointerCapture: function (pointerId) {
 			return pointerId in captured ? captured[pointerId] === id : (facts().captures || []).indexOf(pointerId) >= 0;
 		},
@@ -245,7 +282,7 @@ var begin = function (entry) {
 	cells = entry.cells;
 	before = {};
 	for (var slot in cells) before[slot] = JSON.stringify(cells[slot]);
-	host.out = { timers: [], clears: [], requests: [], logs: [], commands: [] };
+	host.out = { timers: [], clears: [], requests: [], logs: [], commands: [], raises: [] };
 	host.seed = entry.seed || null;
 	host.counter = 0;
 };
@@ -333,7 +370,7 @@ g.__markless[id] = {
 		}
 		var out = host.out;
 		host.out = null;
-		return JSON.stringify({ writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, logs: out.logs, commands: out.commands });
+		return JSON.stringify({ writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, logs: out.logs, commands: out.commands, raises: out.raises });
 	},
 };`;
 
