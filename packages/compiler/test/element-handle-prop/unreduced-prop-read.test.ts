@@ -61,7 +61,8 @@ export function RowBar({ entries, pick }) @{
 	expect(codes).toContain(CAPTURE_OPAQUE_PROP_CODE);
 	expect(
 		result.captureAnalysis.diagnostics.map((diagnostic) => diagnostic.propName).sort(),
-	).toEqual(['entries', 'pick']);
+	// `pick` is a plain prop read as the key, so only the indexed `entries` path refuses.
+	).toEqual(['entries']);
 });
 
 test('a plain dotted prop path still compiles and lowers to a capture read', async () => {

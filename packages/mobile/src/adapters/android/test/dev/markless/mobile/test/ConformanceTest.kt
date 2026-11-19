@@ -15,6 +15,7 @@ import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.ScriptEngine
 import dev.markless.mobile.core.ScriptHost
+import dev.markless.mobile.core.TouchPoint
 import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.field
 import dev.markless.mobile.core.num
@@ -95,6 +96,13 @@ class TestScriptHost : ScriptHost, AutoCloseable {
 }
 
 private fun field(o: Map<String, Json>, name: String, where: String): Json = o[name] ?: throw IllegalStateException("$where has no \"$name\"")
+
+/** An action's touch fields, or null when it names none. */
+private fun touchOf(action: Map<String, Json>): TouchPoint? {
+	if (listOf("pointerId", "x", "y", "time").none { it in action }) return null
+	fun n(name: String, default: Double) = action[name]?.num("action.$name") ?: default
+	return TouchPoint(n("pointerId", 1.0), n("x", 0.0), n("y", 0.0), n("time", 0.0))
+}
 
 /** One `markless.native-conformance/0` vector: the mounted texts must read `initial`, then each action's journal must match, byte for byte. */
 private fun runVector(file: File) {
@@ -191,7 +199,7 @@ private fun runVector(file: File, vector: Map<String, Json>, runtime: Runtime) {
 		val name = EventName.entries.firstOrNull { it.wire == event } ?: throw IllegalStateException("steps[$n] has unknown event $event")
 		val value = action["value"]?.str("action.value")
 		val reason = action["reason"]?.str("action.reason")
-		val actual = runtime.dispatch(field(action, "host", "action").str("host"), name, value, reason).joinToString(",", "[", "]") { it.toJson() }
+		val actual = runtime.dispatch(field(action, "host", "action").str("host"), name, value, reason, touchOf(action)).joinToString(",", "[", "]") { it.toJson() }
 		val expected = canonical(field(s, "journal", "steps[$n]"))
 		check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
 	}
@@ -220,7 +228,7 @@ private fun runAppVector(file: File, vector: Map<String, Json>, runtime: AppRunt
 		val event = field(action, "event", "action").str("event")
 		val journal = if (event == "back") runtime.back() else {
 			val name = EventName.entries.firstOrNull { it.wire == event } ?: throw IllegalStateException("steps[$n] has unknown event $event")
-			runtime.dispatch(field(action, "host", "action").str("host"), name, action["value"]?.str("action.value"))
+			runtime.dispatch(field(action, "host", "action").str("host"), name, action["value"]?.str("action.value"), touchOf(action))
 		}
 		val actual = journal.joinToString(",", "[", "]") { it.toJson() }
 		val expected = canonical(field(s, "journal", "steps[$n]"))
@@ -272,6 +280,39 @@ private fun decoderStrictness() {
 	refuses("an unknown script binding", script.replace("{\"cell\":\"c\"}}}", "{\"slot\":\"c\"}}}"), "unknown script binding")
 	refuses("an unknown script op field", script.replace("\"fn\":\"fn:0\"", "\"fn\":\"fn:0\",\"this\":1"), "unknown field \"this\"")
 	refuses("an activate event on a sheet", sheet.replace("\"host\":\"s\",\"event\":\"dismiss\"", "\"host\":\"s\",\"event\":\"activate\""), "names no element")
+	pointerDecoding()
+}
+
+private fun pointerDecoding() {
+	fun page(ops: String, host: String = "h0", event: String = "pointermove") = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"c","name":"c","initial":0}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null},{"kind":"text","id":"h0:text0","parent":"h0","parts":[{"cell":"c"}]}],"events":[{"host":"$host","event":"$event","handler":"x"}],"handlers":[{"id":"x","ops":[$ops]}]}"""
+	fun read(field: String, captures: String = """{"captures":{"event":"target"},"pointer":{"event":"pointerId"}}""") = """{"op":"assign","cell":"c","value":{"if":$captures,"whenTrue":{"event":"$field"},"whenFalse":{"literal":"free"}}}"""
+	val capture = """{"op":"capture","node":{"event":"currentTarget"},"pointer":{"event":"pointerId"}}"""
+	val release = """{"op":"capture","node":"h0","pointer":{"literal":1},"release":true}"""
+	val fields = listOf("target", "currentTarget", "relatedTarget", "button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp")
+	val decoded = runCatching { Payload.decode(page((listOf(capture) + fields.map { read(it) } + release).joinToString(",")).toByteArray()) }
+	check("decodes every pointer field, captures and the capture op", decoded.getOrNull()?.handlers?.single()?.ops?.size == fields.size + 2) { decoded.exceptionOrNull().toString() }
+	for (name in listOf("pointerdown", "pointermove", "pointerup", "pointercancel", "pointerover", "pointerout", "pointerenter", "pointerleave"))
+		check("decodes the $name event", runCatching { Payload.decode(page(read("clientX"), event = name).toByteArray()) }.isSuccess) { "" }
+	refuses("a pointer event on a text", page(read("clientX"), host = "h0:text0"), "names no element")
+	refuses("an unknown pointer field", page(read("offsetX")), "unknown event \"offsetX\"")
+	refuses("captures without a pointer", page(read("clientX", """{"captures":{"event":"target"}}""")), "is missing \"pointer\"")
+	refuses("captures with another field", page(read("clientX", """{"captures":{"event":"target"},"pointer":{"literal":1},"node":{"literal":1}}""")), "unknown field \"node\"")
+	refuses("a capture op without a pointer", page("""{"op":"capture","node":"h0"}"""), "is missing \"pointer\"")
+	refuses("a capture op without a node", page("""{"op":"capture","pointer":{"literal":1}}"""), "is missing \"node\"")
+	refuses("a capture op with release false", page("""{"op":"capture","node":"h0","pointer":{"literal":1},"release":false}"""), "release must be true")
+	refuses("a capture op with another field", page("""{"op":"capture","node":"h0","pointer":{"literal":1},"capture":true}"""), "unknown field \"capture\"")
+	refuses("a capture op with a numeric node", page("""{"op":"capture","node":1,"pointer":{"literal":1}}"""), "must be an object")
+	refuses("a capture op reading an unknown cell", page("""{"op":"capture","node":"h0","pointer":{"cell":"d"}}"""), "unknown cell \"d\"")
+	val r = Runtime(Payload.decode(page("${read("clientX")},$release").toByteArray()))
+	check("a move with no touch down is an error", runCatching { r.dispatch("h0", EventName.PointerMove) }.exceptionOrNull()?.message == "touch 1 is not down") { "" }
+	check("pointerover is not dispatched", runCatching { r.dispatch("h0", EventName.PointerOver) }.exceptionOrNull()?.message == "pointerover is raised by the runtime, not dispatched") { "" }
+	check("an activate carries no touch", runCatching { r.dispatch("h0", EventName.Activate, point = TouchPoint()) }.exceptionOrNull()?.message == "a activate event carries no touch") { "" }
+	r.dispatch("h0", EventName.PointerDown)
+	check("a second down of one touch is an error", runCatching { r.dispatch("h0", EventName.PointerDown) }.exceptionOrNull()?.message == "touch 1 is already down") { "" }
+	val held = r.dispatch("h0", EventName.PointerMove, point = TouchPoint(1.0, 12.5, 3.0)).joinToString(",") { it.toJson() }
+	check("a touch is captured to the element it went down on", held == """{"op":"text","node":"h0:text0","value":"12.5"}""") { held }
+	val freed = r.dispatch("h0", EventName.PointerMove, point = TouchPoint(1.0, 20.0)).joinToString(",") { it.toJson() }
+	check("a release frees it", freed == """{"op":"text","node":"h0:text0","value":"free"}""") { freed }
 }
 
 private fun styleExport(fixtures: File) {

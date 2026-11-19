@@ -851,6 +851,19 @@ function walk(
 			if (!choice || choice.disabled)
 				throw new Error(`step ${index}: "${action.choose.field}" has no option "${action.choose.option}" to pick`);
 			apply(runtime.dispatch({ event: 'choose', host: choice.option }), index);
+		} else if (action && 'drag' in action) {
+			const host = elementReading(action.drag.on);
+			if (!host) throw new Error(`step ${index}: nothing reads "${action.drag.on}" to drag`);
+			// A finger's drag as a phone reports it: down, a move every 16 ms of 20 points, and up; the platform takes a drag along
+			// a box that scrolls after a few moves, as both phones' browsers do.
+			const step = action.drag.direction === 'right' ? { x: 20, y: 0 } : { x: 0, y: -20 };
+			const touch = (event: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel', n: number) =>
+				runtime.dispatch({ event, host, pointerId: 1, x: 100 + step.x * n, y: 300 + step.y * n, time: 16 * n });
+			const out = [...touch('pointerdown', 0)];
+			const moves = action.drag.scrolls ? 3 : 10;
+			for (let n = 1; n <= moves; n++) out.push(...touch('pointermove', n));
+			out.push(...touch(action.drag.scrolls ? 'pointercancel' : 'pointerup', moves));
+			apply(out, index);
 		} else if (action && !('tap' in action) && !('type' in action) && !('submit' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
