@@ -3,9 +3,10 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { readFile, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { chromium, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterAll, expect, test } from 'vitest';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 // @try on a page woken from prerender records: a nested @try and a @try in each keyed row.
 const exec = promisify(execFile);
@@ -37,7 +38,7 @@ async function withWokenPage(page: string, run: (tab: Page) => Promise<void>): P
 	});
 	await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
 	const { port } = server.address() as AddressInfo;
-	const browser = await chromium.launch();
+	const browser = await launchBrowser();
 	try {
 		const tab = await browser.newPage();
 		const errors: string[] = [];
