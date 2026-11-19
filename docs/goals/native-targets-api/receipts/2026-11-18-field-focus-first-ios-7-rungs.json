@@ -1,0 +1,54 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u29-field-focus",
+			"failure": {
+				"step": 1,
+				"action": "type",
+				"role": "flow",
+				"command": "assertConditionCommand",
+				"message": "Assertion is false: \"Editing email\" is visible"
+			},
+			"installSeconds": 3.0701814159999996,
+			"flowSeconds": 45.5200625
+		},
+		{
+			"name": "u22-radio-group",
+			"failure": null,
+			"installSeconds": 0.3225429170000134,
+			"flowSeconds": 30.078897541999993
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 0.27939749999999186,
+			"flowSeconds": 38.524060667000015
+		},
+		{
+			"name": "f4-required",
+			"failure": null,
+			"installSeconds": 0.2830751250000321,
+			"flowSeconds": 31.59745537500002
+		},
+		{
+			"name": "u23-textbox",
+			"failure": null,
+			"installSeconds": 0.2766653749999823,
+			"flowSeconds": 25.314367625000013
+		},
+		{
+			"name": "u25-textbox-textarea",
+			"failure": null,
+			"installSeconds": 0.2800649589999812,
+			"flowSeconds": 25.04230033400003
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.275612041000044,
+			"flowSeconds": 27.109633499999997
+		}
+	]
+}
