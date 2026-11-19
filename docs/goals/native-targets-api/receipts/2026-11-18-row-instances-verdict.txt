@@ -1,0 +1,7 @@
+proof passed on iOS and Android (6 rungs, u27-table-rows included)
+
+Android in-app device conformance (ProofActivity --ez conformance true, AVD markless_mac):
+pass live.json
+pass row-seed.json
+pass rows.json
+pass types.json
