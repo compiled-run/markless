@@ -34,6 +34,7 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 	const reads: LoweredStateRead[] = [];
 	const writes: LoweredStateWrite[] = [];
 	const diagnostics: StateLoweringDiagnostic[] = [];
+	const lookups: GraphLookups = new Map();
 
 	for (const read of input.semanticGraph.templateReads) {
 		if (read.computedGraphNodeId) {
@@ -53,7 +54,7 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		// The reading component scopes the instance resolver: two parts spelling
 		// their instance locals alike are two reads of two different cells, and
 		// module-wide resolution collapsed them onto the last-declared one.
-		const lookup = scopedGraphLookup(input, null, read.componentName);
+		const lookup = scopedGraphLookup(input, lookups, null, read.componentName);
 		const resolved = resolveStateGraphPath(
 			input,
 			templateReadPath(read),
@@ -95,7 +96,7 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 
 	for (const read of input.semanticGraph.stateReads) {
 		const sharedDefinitionId = read.sharedDefinitionId ?? null;
-		const lookup = scopedGraphLookup(input, sharedDefinitionId, read.componentName);
+		const lookup = scopedGraphLookup(input, lookups, sharedDefinitionId, read.componentName);
 		const resolved = resolveStateGraphPath(
 			input,
 			read.source,
@@ -160,7 +161,7 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 
 	for (const write of input.semanticGraph.stateWrites) {
 		const sharedDefinitionId = write.sharedDefinitionId ?? null;
-		const lookup = scopedGraphLookup(input, sharedDefinitionId, write.componentName);
+		const lookup = scopedGraphLookup(input, lookups, sharedDefinitionId, write.componentName);
 
 		if (write.optional === true) {
 			diagnostics.push(optionalChainWriteDiagnostic(write, input.semanticGraph.filename));
@@ -648,15 +649,26 @@ type ResolvedStateGraphPath = {
 	readonly componentName?: string;
 };
 
+// The semantic graph is finished before this pass runs, so one pass run builds each scope's lookup once.
+type GraphLookups = Map<string | null, Map<string | undefined, GraphLookup>>;
+
 function scopedGraphLookup(
 	input: StateLoweringInput,
+	lookups: GraphLookups,
 	sharedDefinitionId: string | null,
 	componentName?: string,
 ): GraphLookup {
-	return {
-		bindings: graphBindingMap(input.semanticGraph, sharedDefinitionId, componentName),
-		aliases: semanticAliasMap(input.semanticGraph, sharedDefinitionId, componentName),
-	};
+	let byComponent = lookups.get(sharedDefinitionId);
+	if (!byComponent) lookups.set(sharedDefinitionId, (byComponent = new Map()));
+	let lookup = byComponent.get(componentName);
+	if (!lookup) {
+		lookup = {
+			bindings: graphBindingMap(input.semanticGraph, sharedDefinitionId, componentName),
+			aliases: semanticAliasMap(input.semanticGraph, sharedDefinitionId, componentName),
+		};
+		byComponent.set(componentName, lookup);
+	}
+	return lookup;
 }
 
 function resolveStateGraphPath(
