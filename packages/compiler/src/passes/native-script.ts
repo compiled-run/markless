@@ -1,5 +1,5 @@
 import type { NativeScript, NativeScriptService } from '@markless/serializer';
-import { NATIVE_SCRIPT_POINTER_FIELDS } from '@markless/serializer/native-view';
+import { NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS, NATIVE_SCRIPT_POINTER_FIELDS } from '@markless/serializer/native-view';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
@@ -198,6 +198,8 @@ var frameOf = function (bindings) {
 // element, and the commands a handler's data can run. No tree walking, no selectors, no layout.
 var elementFacts = {};
 var proxies = {};
+// Which element holds each touch, as this entry's own capture calls left it; the host's facts answer the rest.
+var captured = {};
 var elementOf = function (id) {
 	if (typeof id !== 'string') return id;
 	if (proxies[id]) return proxies[id];
@@ -216,6 +218,14 @@ var elementOf = function (id) {
 			return node === id || (!!elementFacts[node] && elementFacts[node].ancestors.indexOf(id) >= 0);
 		},
 		focus: function (options) { command('focus', !!(options && options.preventScroll)); },
+		hasPointerCapture: function (pointerId) {
+			return pointerId in captured ? captured[pointerId] === id : (facts().captures || []).indexOf(pointerId) >= 0;
+		},
+		setPointerCapture: function (pointerId) { captured[pointerId] = id; host.out.commands.push([id, 'setPointerCapture', pointerId]); },
+		releasePointerCapture: function (pointerId) {
+			if (proxy.hasPointerCapture(pointerId)) captured[pointerId] = null;
+			host.out.commands.push([id, 'releasePointerCapture', pointerId]);
+		},
 		scrollIntoView: function () { command('scrollIntoView', false); },
 		showModal: function () { command('showModal', false); },
 		close: function () { command('close', false); },
@@ -231,6 +241,7 @@ var elementsOf = function (value) { return Array.isArray(value) ? value.map(elem
 var begin = function (entry) {
 	elementFacts = entry.elements || {};
 	proxies = {};
+	captured = {};
 	cells = entry.cells;
 	before = {};
 	for (var slot in cells) before[slot] = JSON.stringify(cells[slot]);
@@ -258,6 +269,10 @@ var eventOf = function (given) {
 		stopPropagation: function () {},
 	};
 	${JSON.stringify(NATIVE_SCRIPT_POINTER_FIELDS)}.forEach(function (field) { if (field in given) event[field] = given[field]; });
+	if (given.nodes)
+		${JSON.stringify(NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS)}.forEach(function (field) {
+			event[field] = given.nodes[field] == null ? null : elementOf(given.nodes[field]);
+		});
 	return event;
 };
 var json = function (value) { return value === undefined ? null : value; };

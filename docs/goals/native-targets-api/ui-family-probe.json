@@ -37,8 +37,7 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:5/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:5/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: the wheel event has no native meaning yet",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`carouselState.show` runs as data), so this handler stays data",
-			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet"
+			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`carouselState.show` runs as data), so this handler stays data"
 		]
 	},
 	"checkbox": {
@@ -199,10 +198,8 @@
 		"diagnostics": [
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focusin handler on <div> component-edge:0/h0 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focusout handler on <div> component-edge:0/h0 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler uses `PointerEvent`, which a phone's script engine does not provide",
 			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`hovercardState.setOpen` runs as data), so this handler stays data",
-			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler uses `document`: the web page, which a phone does not have",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler uses `PointerEvent`, which a phone's script engine does not provide"
 		]
@@ -242,7 +239,6 @@
 			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`menuState.show` runs as data), so this handler stays data",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerdown handler uses `MouseEvent`, which a phone's script engine does not provide",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler uses `PointerEvent`, which a phone's script engine does not provide",
-			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler uses `PointerEvent`, which a phone's script engine does not provide",
 			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/menu/menu-walk.ts uses `CustomEvent`: the DOM, which a phone does not have"
 		]
@@ -273,10 +269,8 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:2/h3 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <a> component-edge:3/h5 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler uses `PointerEvent`, which a phone's script engine does not provide",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`navbarState.show` runs as data), so this handler stays data",
-			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet"
+			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`navbarState.show` runs as data), so this handler stays data"
 		]
 	},
 	"numberbox": {
@@ -477,10 +471,8 @@
 		"diagnostics": [
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:2/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the blur handler on <button> component-edge:2/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler uses `PointerEvent`, which a phone's script engine does not provide",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`tooltipState.setOpen` runs as data), so this handler stays data",
-			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet"
+			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`tooltipState.setOpen` runs as data), so this handler stays data"
 		]
 	},
 	"tour": {

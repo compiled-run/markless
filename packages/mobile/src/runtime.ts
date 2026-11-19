@@ -590,8 +590,8 @@ export function createNativeRuntime(
 	 * What the host tells a script about the elements its frame passes as proxies: each one's attributes now and the
 	 * elements it is inside, nearest first.
 	 */
-	const elementFacts = (frame: Record<string, unknown>) => {
-		const facts: Record<string, { attributes: Record<string, string>; ancestors: string[] }> = {};
+	const elementFacts = (frame: Record<string, unknown>, also: readonly string[] = []) => {
+		const facts: Record<string, { attributes: Record<string, string>; ancestors: string[]; captures?: number[] }> = {};
 		const add = (id: unknown) => {
 			if (typeof id !== 'string' || facts[id] || !elements.isElement(id)) return;
 			const at = id.indexOf('@');
@@ -609,7 +609,8 @@ export function createNativeRuntime(
 			const ancestors: string[] = [];
 			for (let up = node?.parent; up; up = nodesById.get(up)?.parent)
 				ancestors.push(key && nodesById.get(up)?.row ? `${up}${key}` : up);
-			facts[id] = { attributes, ancestors };
+			const captures = [...touches].flatMap(([pointer, touch]) => (touch.capture === id ? [pointer] : []));
+			facts[id] = { attributes, ancestors, ...(captures.length > 0 ? { captures } : {}) };
 		};
 		const visit = (names: Record<string, unknown>) => {
 			for (const entry of Object.values(names)) {
@@ -626,6 +627,7 @@ export function createNativeRuntime(
 			}
 		};
 		visit(frame);
+		also.forEach(add);
 		return facts;
 	};
 	const entryCells = () => ({
@@ -646,7 +648,10 @@ export function createNativeRuntime(
 				readonly request: Extract<NativeJournalEntry, { op: 'fetch' }>['request'];
 			}>;
 			readonly logs: ReadonlyArray<readonly [string, string]>;
-			readonly commands?: ReadonlyArray<readonly [string, 'focus' | 'scrollIntoView' | 'showModal' | 'close', boolean]>;
+			readonly commands?: ReadonlyArray<
+				| readonly [string, 'focus' | 'scrollIntoView' | 'showModal' | 'close', boolean]
+				| readonly [string, 'setPointerCapture' | 'releasePointerCapture', number]
+			>;
 		};
 		for (const [slot, value] of result.writes) {
 			const at = slot.indexOf('@');
@@ -672,7 +677,15 @@ export function createNativeRuntime(
 				id,
 				request,
 			})),
-			...(result.commands ?? []).flatMap(([node, command, preventScroll]): NativeJournalEntry[] => {
+			...(result.commands ?? []).flatMap(([node, command, argument]): NativeJournalEntry[] => {
+				if (command === 'setPointerCapture' || command === 'releasePointerCapture') {
+					const touch = touches.get(argument as number);
+					if (!touch) return [];
+					if (command === 'setPointerCapture') touch.capture = node;
+					else if (touch.capture === node) touch.capture = null;
+					return [];
+				}
+				const preventScroll = argument === true;
 				// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
 				if (command === 'showModal' || command === 'close') {
 					if (!dialogs.has(node)) throw new Error(`${command}() on ${node}, which is not a dialog`);
@@ -1401,16 +1414,28 @@ export function createNativeRuntime(
 							})
 						: [];
 				const frame = frameOf(op.bindings, text, scope);
+				const nodes =
+					typeof eventValue === 'object' && eventValue.currentTarget !== undefined
+						? {
+								target: eventValue.target ?? null,
+								currentTarget: eventValue.currentTarget,
+								relatedTarget: eventValue.relatedTarget ?? null,
+							}
+						: undefined;
 				calls.push(
 					...enter({
 						kind: 'dispatch',
 						fn: op.fn,
 						frame,
-						elements: elementFacts(frame),
+						elements: elementFacts(
+							frame,
+							Object.values(nodes ?? {}).filter((node): node is string => node !== null),
+						),
 						event: {
 							type: op.type,
 							...(text === undefined ? {} : { value: text }),
 							...Object.fromEntries(touch),
+							...(nodes ? { nodes } : {}),
 						},
 						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),
 					}),

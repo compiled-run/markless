@@ -473,6 +473,21 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A tap on each child of the card, its handler reading the event's elements as proxies.
+		name: 'pointer-elements',
+		fixture: 'proofs/u62-pointer-elements/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'pointerdown', host: 'h3' },
+			{ event: 'pointerup', host: 'h3' },
+			{ event: 'pointerdown', host: 'h5' },
+			{ event: 'pointerup', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'pointerdown', host: 'h4' },
+			{ event: 'pointerup', host: 'h4' },
+		],
+	},
+	{
 		name: 'script-loop',
 		fixture: 'proofs/j1-loop-local/App.tsrx',
 		modules: true,

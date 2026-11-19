@@ -24,6 +24,7 @@ import {
 	NATIVE_DOCUMENT_BODY,
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
+	NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
 	NATIVE_SCRIPT_HOST_GLOBALS,
@@ -4946,6 +4947,7 @@ export function createNativeViewPayload(
 		const touch = POINTER_EVENTS.has(semantic ?? '');
 		for (const read of fact.event ?? []) {
 			if (touch && NATIVE_SCRIPT_POINTER_FIELDS.includes(read.path[0] ?? '')) continue;
+			if (touch && NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS.includes(read.path[0] ?? '')) continue;
 			const known = NATIVE_SCRIPT_EVENT_MEMBERS.some(
 				(members) =>
 					members.every(
@@ -4955,13 +4957,6 @@ export function createNativeViewPayload(
 			);
 			if (known) continue;
 			readsMissing = true;
-			if (touch && read.path[0] && read.path[0] in EVENT_FIELDS.pointer) {
-				refuseScript(
-					`${what} reads \`event.${read.path.join('.')}\`, an element, which JavaScript on a phone cannot hold yet`,
-					read.span,
-				);
-				continue;
-			}
 			const doing = semantic === 'input' ? 'a text edit' : touch ? 'a touch' : 'a tap';
 			refuseScript(
 				`${what} reads \`event.${read.path.join('.')}\`, which ${doing} on a phone does not have`,

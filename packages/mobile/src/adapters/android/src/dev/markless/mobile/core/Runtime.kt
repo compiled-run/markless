@@ -349,7 +349,7 @@ class Runtime(
 	}
 
 	/** What the host tells a script about the elements its frame passes as proxies: each one's attributes now and the elements it is inside, nearest first. */
-	private fun elementFacts(bindings: Map<String, ScriptBinding>, scope: Scope): String {
+	private fun elementFacts(bindings: Map<String, ScriptBinding>, scope: Scope, also: List<String> = emptyList()): String {
 		val facts = LinkedHashMap<String, String>()
 		fun add(value: JsValue) {
 			if (value !is JsValue.Str) return
@@ -365,7 +365,9 @@ class Runtime(
 				ancestors.add(jsonString(if (key.isNotEmpty() && byId[up]?.row != null) up + key else up))
 				up = byId[up]?.parent
 			}
-			facts[id] = "{\"attributes\":${attributes.joinToString(",", "{", "}")},\"ancestors\":${ancestors.joinToString(",", "[", "]")}}"
+			val captures = touches.filterValues { it.capture == id }.keys.sorted().map { jsonValue(JsValue.Num(it)) }
+			val held = if (captures.isEmpty()) "" else ",\"captures\":${captures.joinToString(",", "[", "]")}"
+			facts[id] = "{\"attributes\":${attributes.joinToString(",", "{", "}")},\"ancestors\":${ancestors.joinToString(",", "[", "]")}$held}"
 		}
 		fun visit(named: Map<String, ScriptBinding>) {
 			for (b in named.values) when (b) {
@@ -379,6 +381,7 @@ class Runtime(
 			}
 		}
 		visit(bindings)
+		also.forEach { add(JsValue.Str(it)) }
 		return facts.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value}" }
 	}
 
@@ -431,6 +434,11 @@ class Runtime(
 				val parts = c.arr("leave().commands[]")
 				val node = parts[0].str("leave().commands[][0]")
 				val command = parts[1].str("leave().commands[][1]")
+				if (command == "setPointerCapture" || command == "releasePointerCapture") {
+					val touch = (parts[2] as? Json.Num)?.let { touches[it.value + 0.0] } ?: return@mapNotNull null
+					if (command == "setPointerCapture") touch.capture = node else if (touch.capture == node) touch.capture = null
+					return@mapNotNull null
+				}
 				// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
 				if (command == "showModal" || command == "close") {
 					if (node !in dialogs) throw MarklessRuntimeError("$command() on $node, which is not a dialog")
@@ -946,9 +954,11 @@ class Runtime(
 			}
 			is Op.Script -> {
 				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
-				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$touch}"
+				val named = if (fields?.get("currentTarget") is JsValue.Str) listOf("target", "currentTarget", "relatedTarget").associateWith { (fields?.get(it) as? JsValue.Str)?.value } else null
+				val nodes = named?.let { n -> ",\"nodes\":" + n.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value?.let(::jsonString) ?: "null"}" } } ?: ""
+				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$touch$nodes}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
-				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope)},\"event\":$event$catch"))
+				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope, named?.values?.filterNotNull().orEmpty())},\"event\":$event$catch"))
 			}
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)

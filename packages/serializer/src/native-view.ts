@@ -961,6 +961,9 @@ export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [
 	'timeStamp',
 ];
 
+/** A script pointer handler's event's elements, which reach JavaScript as proxies (`relatedTarget` null when none). */
+export const NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS: ReadonlyArray<string> = ['target', 'currentTarget', 'relatedTarget'];
+
 /** Names for the global object itself: `window.setTimeout` reads a provided global, `window.document` does not. */
 export const NATIVE_SCRIPT_GLOBAL_OBJECTS: ReadonlyArray<string> = ['window', 'self', 'globalThis'];
 

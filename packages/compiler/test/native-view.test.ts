@@ -2140,6 +2140,26 @@ export function Tip() @{
 });
 
 describe('pointer events', () => {
+	it("runs a pointer handler that keeps its event's elements as JavaScript, each element a proxy", async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+export function Hover() @{
+	let crossings = state(0);
+	const box = element<HTMLDivElement>();
+	<div
+		el={box}
+		onPointerover={(event) => {
+			const came = event.relatedTarget as Node | null;
+			for (const inside of [box]) if (inside !== undefined && came !== null && inside.contains(came)) return;
+			if (event.target === event.currentTarget) crossings = crossings + 1;
+		}}
+	><span>Inside</span></div>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(payload!.handlers[0]?.ops).toEqual([
+			{ op: 'script', fn: expect.any(String), type: 'pointerover', bindings: expect.objectContaining({ box: { elements: { literal: 'h0' } } }) },
+		]);
+	});
+
 	it('lowers each pointer event a touch raises, the fields its handler reads, and capture', async () => {
 		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
 export function Drag() @{
@@ -2195,7 +2215,7 @@ export function Drag() @{
 		expect(JSON.stringify(ops(4))).toContain(JSON.stringify({ event: 'relatedTarget' }));
 	});
 
-	it('gives a pointer handler that runs as JavaScript the touch fields, but not the elements it names', async () => {
+	it('gives a pointer handler that runs as JavaScript the touch fields and the elements it names', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Drag() @{
 	let log = state('');
@@ -2216,9 +2236,8 @@ export function Drag() @{
 		}}
 	>{log}</div>
 }`);
-		expect(related.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
-			'the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet',
-		]);
+		expect(related.diagnostics).toEqual([]);
+		expect(related.payload!.handlers[0]!.ops.map((op) => op.op)).toEqual(['script']);
 	});
 
 	it('refuses by name a field a touch does not report yet', async () => {

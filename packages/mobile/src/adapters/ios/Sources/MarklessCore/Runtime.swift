@@ -494,7 +494,7 @@ public final class NativeRuntime {
 
 	/// What the host tells a script about the elements its frame passes as proxies: each one's attributes now and the
 	/// elements it is inside, nearest first.
-	private func elementFacts(_ frame: JSONValue) throws -> JSONValue {
+	private func elementFacts(_ frame: JSONValue, also: [String] = []) throws -> JSONValue {
 		var facts: [(String, JSONValue)] = []
 		var seen = Set<String>()
 		func add(_ value: JSONValue) throws {
@@ -512,7 +512,8 @@ public final class NativeRuntime {
 				ancestors.append(.string(!key.isEmpty && nodesById[parent]?.row != nil ? parent + key : parent))
 				up = nodesById[parent]?.parent
 			}
-			facts.append((id, .object([("attributes", .object(attributes)), ("ancestors", .array(ancestors))])))
+			let captures = touches.filter { $0.value.capture == id }.keys.sorted().map { JSONValue.number($0) }
+			facts.append((id, .object([("attributes", .object(attributes)), ("ancestors", .array(ancestors))] + (captures.isEmpty ? [] : [("captures", .array(captures))]))))
 		}
 		func visit(_ frame: JSONValue) throws {
 			guard case let .object(names) = frame else { return }
@@ -524,6 +525,7 @@ public final class NativeRuntime {
 			}
 		}
 		try visit(frame)
+		for id in also { try add(.string(id)) }
 		return .object(facts)
 	}
 
@@ -573,9 +575,14 @@ public final class NativeRuntime {
 		}
 		let commands = try (result.has("commands") ? result["commands"].array() : []).compactMap { command -> NativeJournalEntry? in
 			let parts = try command.array()
-			guard parts.count == 3 else { throw command.fail("a command is [node, command, preventScroll]") }
+			guard parts.count == 3 else { throw command.fail("a command is [node, command, preventScroll or pointerId]") }
 			let node = try parts[0].string()
 			let name = try parts[1].string()
+			if name == "setPointerCapture" || name == "releasePointerCapture" {
+				guard let touch = touches[try parts[2].number()] else { return nil }
+				if name == "setPointerCapture" { touch.capture = node } else if touch.capture == node { touch.capture = nil }
+				return nil
+			}
 			// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
 			if name == "showModal" || name == "close" {
 				guard dialogs[node] != nil else { throw RuntimeError(reason: "\(name)() on \(node), which is not a dialog") }
@@ -1082,10 +1089,20 @@ public final class NativeRuntime {
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):
 				let touch = touchFields.compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
-				let event: JSONValue = .object([("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? []) + touch)
+				var fields: [(String, JSONValue)] = [("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? []) + touch
+				var named: [String] = []
+				if case .string? = eventFields?[.currentTarget] {
+					let nodes: [(String, JSONValue)] = [NativeEventField.target, .currentTarget, .relatedTarget].map { field in
+						guard case let .string(node)? = eventFields?[field] else { return (field.rawValue, JSONValue.null) }
+						named.append(node)
+						return (field.rawValue, .string(node))
+					}
+					fields.append(("nodes", .object(nodes)))
+				}
+				let event: JSONValue = .object(fields)
 				let frame = try frame(of: bindings, in: scope)
 				calls.append(contentsOf: try enter(
-					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame)), ("event", event)]
+					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame, also: named)), ("event", event)]
 						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? [])))
 			}
 		}
