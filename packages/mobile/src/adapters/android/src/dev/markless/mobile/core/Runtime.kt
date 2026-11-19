@@ -206,8 +206,53 @@ class Runtime(
 		return "$cell@$key"
 	}
 
-	/** A row's state reads its first value until the row writes it. */
-	private fun read(cell: String, scope: Scope): JsValue = value(cell).let { values[slot(cell, scope)] ?: it }
+	private val firstOfCell = payload.cells.mapNotNull { c -> c.first?.let { c.id to it } }.toMap()
+
+	/**
+	 * A row's state reads its first value until the row writes it; one taken from the row's item is seeded before any change
+	 * ([seedRows]), so until the first change it reads the item as the row was built.
+	 */
+	private fun read(cell: String, scope: Scope): JsValue {
+		val initial = value(cell)
+		values[slot(cell, scope)]?.let { return it }
+		firstOfCell[cell]?.let { return evaluate(it, scope) }
+		return initial
+	}
+
+	/** For each row's state that has `rebuiltBy`, by slot (`<cell>@<key>`): those values now, as JSON. */
+	private fun rowSignatures(): Map<String, String> {
+		val signatures = HashMap<String, String>()
+		for (cell in payload.cells) {
+			val row = cell.row ?: continue
+			val rebuiltBy = cell.rebuiltBy ?: continue
+			val list = byId[row] as? Node.Repeat ?: continue
+			if (!isShown(list)) continue
+			for (r in rowsOf(list)) {
+				val scope = Scope(items = mapOf(row to r.item), keys = mapOf(row to r.key))
+				signatures["${cell.id}@${r.key}"] = rebuiltBy.joinToString(",") { jsonValue(evaluate(it, scope)) }
+			}
+		}
+		return signatures
+	}
+
+	/** As on the web, a part a row passes a changed value to is built again: that row's state starts over. */
+	private fun resetChangedRows(before: Map<String, String>) {
+		for ((slot, now) in rowSignatures()) if (before[slot]?.let { it != now } == true) values.remove(slot)
+	}
+
+	/** A row's state with a `first` takes it once, from the row's item, when the row is built. */
+	private fun seedRows() {
+		for (cell in payload.cells) {
+			val row = cell.row ?: continue
+			val first = cell.first ?: continue
+			val list = byId[row] as? Node.Repeat ?: continue
+			if (!isShown(list)) continue
+			for (r in rowsOf(list)) {
+				val slot = "${cell.id}@${r.key}"
+				if (slot !in values) values[slot] = evaluate(first, Scope(items = mapOf(row to r.item), keys = mapOf(row to r.key)))
+			}
+		}
+	}
 
 	fun node(id: String): Node = byId[id] ?: throw MarklessRuntimeError("unknown node \"$id\"")
 
@@ -829,6 +874,7 @@ class Runtime(
 
 	/** Runs [apply] (cell writes, returning its calls or a navigation) and journals styled cells, changed nodes, released objects, then the calls. */
 	private inline fun change(host: String?, value: String?, apply: () -> List<JournalEntry>): List<JournalEntry> {
+		seedRows()
 		val cellsBefore = HashMap(values)
 		val beforeTexts = texts().toMap()
 		val beforeAttributes = boundAttributes().associate { (n, a, v) -> (n to a) to v }
@@ -849,6 +895,7 @@ class Runtime(
 		val ownedBefore = liveObjects()
 		val focusBefore = focused
 		val stackBefore = stack
+		val signaturesBefore = rowSignatures()
 		val calls = apply()
 		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
 		val shownNow = shownOverlays()
@@ -862,6 +909,8 @@ class Runtime(
 			val list = rowOfCell[slot.substringBefore('@')]
 			list != null && '@' in slot && "$list\u0000${slot.substringAfter('@')}" !in kept
 		}
+		resetChangedRows(signaturesBefore)
+		seedRows()
 		forgetHidden()
 		val afterTexts = texts().toMap()
 		val afterAttributes = boundAttributes().associate { (n, a, v) -> (n to a) to v }

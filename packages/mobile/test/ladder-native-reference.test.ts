@@ -860,14 +860,19 @@ function walk(
 						]
 					: [];
 			apply(touched, index);
+			// A touch reaches the nearest element around it that handles a press, as on a phone; a row's copy (`<id>@<key>`)
+			// climbs through its node's parents, keeping the key while they are in the same row.
+			const at = host.indexOf('@');
+			const key = at < 0 ? '' : host.slice(at);
+			let node: string | null | undefined = at < 0 ? host : host.slice(0, at);
 			let pressed: string | null | undefined = host;
 			while (
-				pressed &&
-				!payload.events.some(
-					(event) => event.host === pressed && event.event === 'activate',
-				)
-			)
-				pressed = nodeOf.get(pressed)?.parent;
+				node &&
+				!payload.events.some((event) => event.host === node && event.event === 'activate')
+			) {
+				node = nodeOf.get(node)?.parent;
+				pressed = node && nodeOf.get(node)?.row ? `${node}${key}` : node;
+			}
 			// The return key in a field that submits nothing only puts the keyboard away.
 			const returns = payload.events.some(
 				(event) => event.host === host && event.event === 'enter',

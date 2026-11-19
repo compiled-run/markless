@@ -671,6 +671,40 @@ export function createNativeRuntime(
 			},
 		}));
 	};
+	/** For each row's state that has `rebuiltBy`, by slot (`<cell>@<key>`): those values now, as JSON. */
+	const rowSignatures = () => {
+		const signatures = new Map<string, string>();
+		for (const cell of payload.cells) {
+			if (!cell.row || !cell.rebuiltBy) continue;
+			const repeat = repeats.get(cell.row);
+			if (!repeat || !shown(repeat)) continue;
+			for (const { key, item } of rowsOf(repeat)) {
+				const scope = { ...base, items: new Map([[repeat.id, item]]), keys: new Map([[repeat.id, key]]) };
+				signatures.set(`${cell.id}@${key}`, JSON.stringify(cell.rebuiltBy.map((expr) => evaluate(expr, undefined, scope))));
+			}
+		}
+		return signatures;
+	};
+	/** As on the web, a part a row passes a changed value to is built again: that row's state starts over. */
+	const resetChangedRows = (before: Map<string, string>) => {
+		for (const [slot, now] of rowSignatures()) {
+			const was = before.get(slot);
+			if (was !== undefined && was !== now) values.delete(slot);
+		}
+	};
+	/** A row's state with a `first` takes it once, from the row's item, when the row is built. */
+	const seedRows = () => {
+		for (const cell of payload.cells) {
+			if (!cell.row || !cell.first) continue;
+			const repeat = repeats.get(cell.row);
+			if (!repeat || !shown(repeat)) continue;
+			for (const { key, item } of rowsOf(repeat)) {
+				const slot = `${cell.id}@${key}`;
+				if (values.has(slot)) continue;
+				values.set(slot, evaluate(cell.first, undefined, { ...base, items: new Map([[repeat.id, item]]), keys: new Map([[repeat.id, key]]) }));
+			}
+		}
+	};
 	const render = (parts: ReadonlyArray<NativeTextPart>, scope: NativeScope): string =>
 		parts
 			.map((part) =>
@@ -922,6 +956,7 @@ export function createNativeRuntime(
 			if (!node || !instances(node).some((shownNow) => shownNow.id === id)) fired.delete(key);
 		}
 	};
+	seedRows();
 
 	return {
 		texts,
@@ -1294,6 +1329,7 @@ export function createNativeRuntime(
 		apply: () => NativeJournalEntry[],
 	): ReadonlyArray<NativeJournalEntry> {
 		{
+			seedRows();
 			const cellsBefore = new Map(values);
 			const beforeTexts = new Map(texts());
 			const beforeAttributes = keyed(attributes());
@@ -1316,6 +1352,7 @@ export function createNativeRuntime(
 			const ownedBefore = new Set(liveObjects());
 			const focusBefore = focused;
 			const stackBefore = stack;
+			const itemsBefore = rowSignatures();
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
 			const shownNow = shownOverlays();
@@ -1337,6 +1374,8 @@ export function createNativeRuntime(
 				if (list !== undefined && !kept.has(`${list}\0${slot.slice(at + 1)}`))
 					values.delete(slot);
 			}
+			resetChangedRows(itemsBefore);
+			seedRows();
 			forgetHidden();
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());
