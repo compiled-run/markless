@@ -105,7 +105,12 @@ export type NativeExpr =
 	| { readonly route: 'params' }
 	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> }
 	/** In an `input` handler: the field's text after the edit (`event.currentTarget.value`). */
-	| { readonly event: 'value' }
+	/**
+	 * What the event that runs the handler carries: an `input` handler's field text after the edit
+	 * (`event.currentTarget.value`); a `dismiss` handler's `event.detail.reason` and `event.detail.pressTarget` (an element,
+	 * or null for Escape); a pointer handler's `event.target` (an element) and `event.button` (0, a touch).
+	 */
+	| { readonly event: 'value' | 'reason' | 'pressTarget' | 'target' | 'button' }
 	/**
 	 * `new FormData(form)`: the form's entry list as the web builds it, `[name, value]` pairs in tree order. A field is left
 	 * out when it is disabled or has no name, a checkbox when it is not checked; a checkbox's value is its `value` attribute
@@ -113,7 +118,21 @@ export type NativeExpr =
 	 */
 	| { readonly formData: string }
 	/** A checkbox's or radio button's checkedness now: what its `checked` binding last set, or a person's tick since. */
-	| { readonly checked: string };
+	| { readonly checked: string }
+	/** The element that has focus (`document.activeElement`), or the document body when none has. */
+	| { readonly focused: true }
+	/** Whether the element `node` is `within` or inside it (`within.contains(node)`); false when either is not an element. */
+	| { readonly contains: NativeExpr; readonly node: NativeExpr }
+	/** The element that had focus when the overlay element `overlay` was last shown, or null if it never was. */
+	| { readonly focusOrigin: NativeExpr }
+	/** Whether the value is an element (`value instanceof HTMLElement`). */
+	| { readonly isElement: NativeExpr };
+
+/**
+ * Elements are values: an element is its node id, and the document body (what `document.activeElement` answers when no
+ * element has focus, and `element.ownerDocument.body`) is this id, which no node has.
+ */
+export const NATIVE_DOCUMENT_BODY = '#body';
 
 export type NativeTextPart =
 	| { readonly text: string }
@@ -383,12 +402,28 @@ export type NativeProperty = 'value' | 'checked' | 'indeterminate';
 
 /**
  * Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click).
+ * `dismiss` is a sheet's platform dismissal, or the overlay behaviour's report on an element marked `overlay` while it is
+ * shown: Escape (the host's back gesture) or a press outside it. `pointerdown` and `pointerup` are a touch going down and
+ * up; they reach the element the touch is on and each element it is inside, innermost first, as on the web.
  * `enter` is the keyboard's return key in a single-line text field. `submit` is a form's, raised only by a `submit` op.
  * `idle` and `visible` mean what the web runtime gives them, once for each shown instance of their element (shown again
  * after it left, it is a new one): `idle` at the first moment the host is idle after the screen's first frame (or after
  * the element appears), `visible` the first time any of the element is on the screen.
  */
-export type NativeEventName = 'activate' | 'input' | 'dismiss' | 'cancel' | 'enter' | 'submit' | 'idle' | 'visible';
+export type NativeEventName =
+	| 'activate'
+	| 'input'
+	| 'dismiss'
+	| 'cancel'
+	| 'enter'
+	| 'submit'
+	| 'idle'
+	| 'visible'
+	| 'pointerdown'
+	| 'pointerup';
+
+/** Why the overlay behaviour reported a dismissal; the vocabulary of `OverlayGestureReason` in `@markless/web`. */
+export type NativeDismissReason = 'escape' | 'outside-press';
 
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
 export type NativeOp =
@@ -431,9 +466,15 @@ export type NativeOp =
 	/**
 	 * `element.focus()` or `element.scrollIntoView()`, after the handler's writes have reached the views. Focus moves as on
 	 * the web (a text field takes the keyboard; anything else the screen reader's cursor) and scrolls the element into view
-	 * unless `preventScroll` (`focus({ preventScroll: true })`).
+	 * unless `preventScroll` (`focus({ preventScroll: true })`). `node` is an element fixed at build time, or an expression
+	 * evaluated when the op runs (modal's "back to the trigger or the opener"); one that gives null or the body does nothing.
 	 */
-	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand; readonly preventScroll?: true }
+	| {
+			readonly op: 'command';
+			readonly node: string | NativeExpr;
+			readonly command: NativeCommand;
+			readonly preventScroll?: true;
+	  }
 	/**
 	 * Submits `form` as the web does when `submitter` is pressed, or the return key submits it with no submit button (null):
 	 * nothing when the submitter is disabled; then, unless the form has `novalidate` or the submitter `formnovalidate`,
@@ -619,6 +660,11 @@ export type NativeJournalEntry =
 	| { readonly op: 'invalid'; readonly node: string; readonly message: string }
 	/** Run the `after` op `timer` names in `ms` milliseconds, by dispatching a `timer` action for it. */
 	| { readonly op: 'timer'; readonly timer: string; readonly ms: number }
+	/**
+	 * An element marked `overlay` joined the overlay stack (its `hidden` binding showed it) or left it. A `modal` one (it or
+	 * an element inside it carries `aria-modal="true"`) goes in the host's top layer with the page behind inert.
+	 */
+	| { readonly op: 'overlay'; readonly node: string; readonly open: boolean; readonly modal: boolean }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
 	| {
 			readonly op: 'attribute';

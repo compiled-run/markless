@@ -293,6 +293,28 @@ export function Counter() @{
   `{ op: 'dialog', node, method }`; the journal says `{ op: 'dialog', node, open }`; the action `{ event: 'cancel', host }`
   closes an open dialog (the host raises it from Android back and the VoiceOver escape gesture). Hosts show an open
   dialog's own views in a top layer above the page with the page behind inert. Vector `dialog.json`.
+- **Overlays:** an element marked `overlay` (the analyzer's overlay fact, written as the static attribute `overlay`) with a
+  `hidden` binding joins the runtime's overlay stack when that binding shows it, as the web's overlay behaviour enlists it;
+  it is modal when it or an element inside it says `aria-modal="true"`. The journal says
+  `{ op: 'overlay', node, open, modal }`; hosts lift a modal one into a top layer (centred, page behind inert) and leave a
+  non-modal one in place. `dismiss` handlers are events: the host sends `{ event: 'dismiss', host, reason: 'escape' }` from
+  Android back and the VoiceOver escape gesture; an outside press is reported by the runtime from `pointerdown`, to the
+  topmost overlay the press landed outside, before the pointer handlers run. `event.detail.reason` and
+  `event.detail.pressTarget` are `{ event: 'reason' | 'pressTarget' }`. Vectors `overlay.json` (modal), `popover.json`.
+- **Elements as values:** an element is its node id; `document.activeElement` is `{ focused: true }` (the document body,
+  `#body`, when nothing has focus), `a.contains(b)` is `{ contains, node }`, `x instanceof HTMLElement` is `{ isElement }`,
+  `x.ownerDocument.body` is `#body`, and the overlay behaviour's focus-origin property (`OVERLAY_FOCUS_ORIGIN_PROPERTY`
+  in `@markless/web`) is `{ focusOrigin }`, the focus as it was when that overlay last joined the stack. `el.focus()` is
+  the `command` op, whose `node` is a fixed id or an expression evaluated when it runs (null or the body does nothing);
+  the journal's `command` entry names the resolved element. A press focuses the control it presses, as Chromium does on a
+  click.
+- **Pointer events:** `pointerdown`/`pointerup` with `{ event: 'target' | 'button' }` (the element the touch is on; 0).
+  Hosts report every touch's down and up on the innermost element under it; the runtime runs the handlers on it and each
+  element it is inside, innermost first.
+- **Plain functions and module sets:** a module function is evaluated for its value where an expression calls it
+  (`apply`), and run as ops where a handler statement calls it for its effects (`invoke`, through its `effects` body);
+  one with effects whose value a `const` reads runs as ops and leaves its value in a cell. A module-level empty
+  `new WeakSet()`/`new Set()` is one cell holding its members (`add`, `delete`, `has`; any other method is refused).
 - **Styled cells:** a true/false cell some handler writes is `styled` when any attribute binding reads it, not only `class`;
   the style input carries those attributes per state (`attributesByState`).
 

@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compileNativeComponent, nativeAppConformance, nativeConformance } from '../src/index.ts';
 import { compileRungApp } from '../src/harness/rung.ts';
-import { APP_CONFORMANCE_CASES, CONFORMANCE_CASES } from './conformance-cases.ts';
+import { APP_CONFORMANCE_CASES, CONFORMANCE_CASES, readCaseModule } from './conformance-cases.ts';
 import { scrollVectors } from '../src/scroll.ts';
 import { SCROLL_CASES } from './scroll-cases.ts';
 
@@ -14,6 +14,7 @@ for (const entry of CONFORMANCE_CASES) {
 		...(entry.page ? { page: entry.page } : {}),
 		...(entry.device ? { device: entry.device } : {}),
 		source,
+		readModule: readCaseModule,
 	});
 	if (!payload)
 		throw new Error(`${entry.fixture}: ${diagnostics.map((d) => d.message).join('; ')}`);

@@ -1,0 +1,64 @@
+appId: ${APP_ID}
+name: u20-modal
+---
+- launchApp:
+      clearState: true
+- assertVisible: Modal
+- assertVisible: Delete draft
+- assertVisible: Sign out
+- assertVisible: Deleted 0
+- assertVisible: Changes 0
+- assertNotVisible: Delete this draft\?
+- assertNotVisible: It cannot be undone
+- assertNotVisible: Sign out now\?
+- assertNotVisible: Stay
+- tapOn: Delete draft
+- assertVisible: Delete this draft\?
+- assertVisible: It cannot be undone
+- assertVisible: Delete this draft\?
+- assertVisible: It cannot be undone
+- assertVisible: Delete
+- tapOn:
+      point: 50%,8%
+- assertNotVisible: Delete this draft\?
+- assertNotVisible: It cannot be undone
+- assertVisible: Delete draft
+- assertVisible: Deleted 0
+- assertVisible: Changes 2
+- assertNotVisible: Delete this draft\?
+- assertNotVisible: It cannot be undone
+- tapOn: Delete draft
+- assertVisible: Delete this draft\?
+- assertVisible: Delete this draft\?
+- tapOn: Delete
+- assertNotVisible: Delete this draft\?
+- assertVisible: Deleted 1
+- assertVisible: Changes 4
+- assertNotVisible: Delete this draft\?
+- assertNotVisible: Deleted 0
+- assertNotVisible: Sign out now\?
+- tapOn: Sign out
+- assertVisible: Sign out now\?
+- assertVisible: Sign out now\?
+- assertVisible: Stay
+- tapOn: Stay
+- assertNotVisible: Sign out now\?
+- assertNotVisible: Stay
+- assertVisible: Sign out
+- assertVisible: Deleted 1
+- assertNotVisible: Sign out now\?
+- assertNotVisible: Stay
+- assertNotVisible: Delete this draft\?
+- tapOn: Delete draft
+- assertVisible: Delete this draft\?
+- assertVisible: Delete this draft\?
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - back
+          - assertNotVisible: Delete this draft\?
+          - assertVisible: Delete draft
+          - assertVisible: Changes 6
+          - assertNotVisible: Delete this draft\?
+          - assertNotVisible: Changes 4

@@ -69,6 +69,9 @@ object DeviceConformance {
 			when (val event = action.field("event", "action").str("event")) {
 				"activate" -> if (!target.performClick()) failures.add("steps[$n]: the view took no click")
 				"cancel" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Cancel))
+				"dismiss" -> action["reason"]?.let { host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Dismiss, reason = it.str("reason"))) }
+					?: host.closedByPlatform(action.field("host", "action").str("host"))
+				"pointerdown", "pointerup" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.entries.first { it.wire == event }))
 				"input" -> (target as? EditText ?: throw MarklessHostError("steps[$n] types into a view that is not an input")).setText(action.field("value", "action").str("value"))
 				"dismiss" -> host.closedByPlatform(action.field("host", "action").str("host"))
 				"enter" -> (target as? EditText ?: throw MarklessHostError("steps[$n] presses return in a view that is not an input")).onEditorAction(EditorInfo.IME_ACTION_GO)

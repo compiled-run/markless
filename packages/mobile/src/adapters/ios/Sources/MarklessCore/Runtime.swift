@@ -9,12 +9,15 @@ public struct NativeAction: Equatable, Sendable {
 	public let value: String?
 	/// For `timer`: the journalled timer whose time has come.
 	public let timer: String?
+	/// For an overlay's `dismiss`: why (`escape`; an outside press arrives as `pointerdown`). A sheet's has none.
+	public let reason: String?
 
-	public init(event: NativeEventName, host: String, value: String? = nil) {
+	public init(event: NativeEventName, host: String, value: String? = nil, reason: String? = nil) {
 		self.event = event
 		self.host = host
 		self.value = value
 		timer = nil
+		self.reason = reason
 	}
 
 	public init(event: NativeEventName, timer: String) {
@@ -22,6 +25,7 @@ public struct NativeAction: Equatable, Sendable {
 		host = ""
 		value = nil
 		self.timer = timer
+		reason = nil
 	}
 }
 
@@ -59,6 +63,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case invalid(node: String, message: String)
 	/// Dispatch a `timer` action for `timer` in `ms` milliseconds.
 	case timer(timer: String, ms: Double)
+	/// An element marked `overlay` joined the overlay stack (`open`) or left it; a modal one goes in the top layer.
+	case overlay(node: String, open: Bool, modal: Bool)
 
 	public var json: JSONValue {
 		switch self {
@@ -97,6 +103,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("invalid")), ("node", .string(node)), ("message", .string(message))])
 		case let .timer(timer, ms):
 			return .object([("op", .string("timer")), ("timer", .string(timer)), ("ms", .number(ms))])
+		case let .overlay(node, open, modal):
+			return .object([("op", .string("overlay")), ("node", .string(node)), ("open", .bool(open)), ("modal", .bool(modal))])
 		}
 	}
 }
@@ -166,6 +174,14 @@ public final class NativeRuntime {
 	/// Row state's list by cell id: its values are kept as `<cell>@<key>`.
 	private let rowOfCell: [String: String]
 	private var eventValue: String?
+	/// What a dismiss or pointer event carries while its handlers run.
+	private var eventFields: [NativeEventField: NativeValue]?
+	/// The element that has focus, or nil.
+	public private(set) var focused: String?
+	/// The overlay stack, topmost last, and the focus each overlay found when it joined, as the web's overlay behaviour keeps them.
+	private var stack: [String] = []
+	private var origins: [String: String] = [:]
+	private var overlayNodes: [NativeNode] = []
 	private let forms: [String: NativeForm]
 	/// A field's text a person typed since its `value` binding last changed it.
 	private var edited: [String: String] = [:]
@@ -227,6 +243,55 @@ public final class NativeRuntime {
 			guard case let .element(_, attributes, _) = node.kind else { continue }
 			checkedness[node.id] = (try? checkedBinding(node.id)) ?? (attributes["checked"] != nil)
 		}
+		overlayNodes = payload.nodes.filter { node in
+			guard node.row == nil, case let .element(_, attributes, bindings) = node.kind else { return false }
+			return attributes[OverlayProtocol.attribute] != nil && bindings.contains { !$0.isProperty && $0.name == "hidden" }
+		}
+		// Shown at mount: the document's focus is the body.
+		if let shown = try? shownOverlays() {
+			stack = shown
+			for overlay in shown { origins[overlay] = nativeDocumentBody }
+		}
+	}
+
+	/// A row's copy (`<node>@<key>`) sits where its node does in the tree.
+	private func nodeOf(_ id: String) -> String { id.firstIndex(of: "@").map { String(id[..<$0]) } ?? id }
+
+	public func isElement(_ id: String) -> Bool { id == nativeDocumentBody || nodesById[nodeOf(id)]?.isElement == true }
+
+	/// `within.contains(node)`, read from the payload's parent chain; everything is inside the body.
+	public func contains(_ within: String, _ node: String) -> Bool {
+		if within == nativeDocumentBody { return true }
+		var at: String? = nodeOf(node)
+		while let current = at {
+			if current == nodeOf(within) { return true }
+			at = nodesById[current]?.parent
+		}
+		return false
+	}
+
+	private func keyedAttributes() throws -> [String: String?] {
+		Dictionary(try attributes().map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { $1 })
+	}
+
+	private func shownOverlays() throws -> [String] {
+		let now = try keyedAttributes()
+		return try overlayNodes.filter { node in try !instances(of: node).isEmpty && now["\(node.id)\u{0}hidden"] == .some(nil) }.map(\.id)
+	}
+
+	/// An overlay is modal when it or an element inside it has `aria-modal="true"`, bound or else static.
+	private func isModal(_ overlay: String, _ now: [String: String?]) -> Bool {
+		payload.nodes.contains { node in
+			guard case let .element(_, attributes, _) = node.kind, contains(overlay, node.id) else { return false }
+			let value = now["\(node.id)\u{0}\(OverlayProtocol.modalAttribute)"] ?? attributes[OverlayProtocol.modalAttribute]
+			return value == OverlayProtocol.modalValue
+		}
+	}
+
+	/// The overlay stack, topmost last, with whether each is modal.
+	public func overlays() throws -> [(node: String, modal: Bool)] {
+		let now = try keyedAttributes()
+		return stack.map { ($0, isModal($0, now)) }
 	}
 
 	/// Where a cell's value is kept: its id, or `<id>@<key>` for a row's own state, read in that row.
@@ -281,9 +346,24 @@ public final class NativeRuntime {
 		case .routeParams: return .object(params.map { (key: $0.name, value: .string($0.value)) })
 		case let .checked(node): return .bool(try isChecked(node))
 		case let .formData(form): return .array(try entries(of: form).map { .array($0.map(NativeValue.string)) })
-		case .eventValue:
-			guard let eventValue else { throw RuntimeError(reason: "the event value read outside an input handler") }
+		case .event(.value):
+			guard let eventValue else { throw RuntimeError(reason: "the event's value read where the event has none") }
 			return .string(eventValue)
+		case let .event(name):
+			guard let value = eventFields?[name] else { throw RuntimeError(reason: "the event's \(name.rawValue) read where the event has none") }
+			return value
+		case .focused: return .string(focused ?? nativeDocumentBody)
+		case let .focusOrigin(inner):
+			guard case let .string(overlay) = try evaluate(inner) else { return .null }
+			return origins[overlay].map(NativeValue.string) ?? .null
+		case let .isElement(inner):
+			guard case let .string(id) = try evaluate(inner) else { return .bool(false) }
+			return .bool(isElement(id))
+		case let .contains(within, node):
+			let outer = try evaluate(within)
+			let inner = try evaluate(node)
+			guard case let .string(a) = outer, case let .string(b) = inner else { return .bool(false) }
+			return .bool(contains(a, b))
 		case let .unary(op, inner):
 			let value = try evaluate(inner)
 			switch op {
@@ -576,6 +656,42 @@ public final class NativeRuntime {
 			guard !fired.contains(key), try due(action.event).contains(action.host) else { return [] }
 			fired.insert(key)
 		}
+		let handlerOf = { (host: String, name: NativeEventName) in self.payload.events.first { $0.host == host && $0.event == name } }
+		if action.event == .dismiss, let reason = action.reason {
+			guard stack.last == action.host else { throw RuntimeError(reason: "\(action.host) is not the topmost overlay") }
+			let dismiss = handlerOf(action.host, .dismiss)
+			return try change(host: nil) {
+				self.eventFields = [.reason: .string(reason), .pressTarget: .null]
+				defer { self.eventFields = nil }
+				return try dismiss.map { try self.run(self.handlers[$0.handler] ?? [], in: .empty) } ?? []
+			}
+		}
+		if action.event == .pointerdown || action.event == .pointerup {
+			guard let node = nodesById[nodeOf(action.host)], let instance = try instances(of: node).first(where: { $0.id == action.host }) else {
+				throw RuntimeError(reason: "\(action.host) is not shown")
+			}
+			return try change(host: nil) {
+				var runs: [(handler: String, fields: [NativeEventField: NativeValue])] = []
+				// The behaviour's document listener hears the press first: the topmost overlay it landed outside is told.
+				if action.event == .pointerdown, let top = self.stack.last, !self.contains(top, action.host), let dismiss = handlerOf(top, .dismiss) {
+					runs.append((dismiss.handler, [.reason: .string("outside-press"), .pressTarget: .string(action.host)]))
+				}
+				var at: String? = self.nodeOf(action.host)
+				while let current = at {
+					if let own = handlerOf(current, action.event) { runs.append((own.handler, [.target: .string(action.host), .button: .number(0)])) }
+					at = self.nodesById[current]?.parent
+				}
+				defer { self.eventFields = nil }
+				var calls: [NativeJournalEntry] = []
+				for step in runs {
+					self.eventFields = step.fields
+					let taken = try self.run(self.handlers[step.handler] ?? [], in: instance.scope)
+					if case .navigate? = taken.first { return taken }
+					calls.append(contentsOf: taken)
+				}
+				return calls
+			}
+		}
 		// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 		let host = action.host.firstIndex(of: "@").map { String(action.host[..<$0]) } ?? action.host
 		guard let bound = payload.events.first(where: { $0.host == host && $0.event == action.event }), let node = nodesById[host] else {
@@ -585,6 +701,8 @@ public final class NativeRuntime {
 			throw RuntimeError(reason: "\(action.host) is not shown")
 		}
 		let scope = instance.scope
+		// A press focuses the control it presses, as the browser does.
+		if action.event == .activate { focused = action.host }
 		eventValue = action.event == .input ? action.value ?? "" : nil
 		defer { eventValue = nil }
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
@@ -679,7 +797,11 @@ public final class NativeRuntime {
 			case let .dialog(node, open):
 				guard dialogs[node] != nil else { throw RuntimeError(reason: "\(node) is not a dialog") }
 				dialogs[node] = open
-			case let .command(node, command, preventScroll):
+			case let .command(target, command, preventScroll):
+				let value = try evaluate(target, in: scope)
+				if value == .null || value == .string(nativeDocumentBody) { continue }
+				guard case let .string(node) = value, isElement(node) else { throw RuntimeError(reason: "\(command)() on a value that is not an element") }
+				if command == "focus" { focused = node }
 				calls.append(.command(node: node, command: command, preventScroll: preventScroll))
 			case let .call(call, object, arguments, result, then):
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
@@ -770,8 +892,18 @@ public final class NativeRuntime {
 		let dialogsBefore = dialogs
 		let beforeSheets = Dictionary(uniqueKeysWithValues: try sheets().map { ($0.node, $0.open) })
 		let ownedBefore = Set(try liveObjects())
+		let focusBefore = focused
+		let stackBefore = stack
 		let calls = try apply()
 		if case .navigate? = calls.first { return calls }
+		let shownNow = try shownOverlays()
+		let released = stackBefore.filter { !shownNow.contains($0) }
+		let enlisted = shownNow.filter { !stackBefore.contains($0) }
+		stack = stackBefore.filter(shownNow.contains) + enlisted
+		for overlay in enlisted { origins[overlay] = focusBefore ?? nativeDocumentBody }
+		let overlayAttributes = try keyedAttributes()
+		let overlays = released.map { NativeJournalEntry.overlay(node: $0, open: false, modal: isModal($0, overlayAttributes)) }
+			+ enlisted.map { NativeJournalEntry.overlay(node: $0, open: true, modal: isModal($0, overlayAttributes)) }
 		// A row that left takes its state with it; a later row with the same key starts from the first values.
 		let kept = Set(try rows().flatMap { list in list.keys.map { "\(list.node)\u{0}\($0)" } })
 		for slot in values.keys {
@@ -837,7 +969,7 @@ public final class NativeRuntime {
 			ownedBefore.contains(object.id) && !owned.contains(object.id) ? .release(object: object.id) : nil
 		}
 		let afterTitle = try title()
-		return styles + entries + checks + marked + (afterTitle != beforeTitle ? afterTitle.map { [.title(value: $0)] } ?? [] : []) + releases + calls
+		return styles + entries + checks + marked + (afterTitle != beforeTitle ? afterTitle.map { [.title(value: $0)] } ?? [] : []) + releases + overlays + calls
 	}
 }
 

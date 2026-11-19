@@ -8,8 +8,13 @@ import type {
 	NativeValue,
 	NativeViewPayload,
 } from '@markless/serializer';
-import { nativeLocale } from '@markless/serializer/native-view';
+import { NATIVE_DOCUMENT_BODY, nativeLocale } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
+import {
+	OVERLAY_ATTRIBUTE,
+	OVERLAY_MODAL_ATTRIBUTE,
+	OVERLAY_MODAL_VALUE,
+} from '@markless/web/overlay-protocol';
 
 /** A host-side action: what a person does to a retained view. */
 export type NativeAction =
@@ -35,6 +40,13 @@ export type NativeAction =
 	  }
 	/** The platform closed a system sheet (swipe, back, a tap on the dimmed page); it is already closed when this runs. */
 	| { readonly event: 'dismiss'; readonly host: string }
+	/**
+	 * The host's back gesture (Escape) while an overlay is open: reported to `host`, the topmost one. An outside press is
+	 * not sent: the runtime reports it from `pointerdown`, as the web's overlay behaviour does.
+	 */
+	| { readonly event: 'dismiss'; readonly host: string; readonly reason: 'escape' }
+	/** A touch going down or up on the element `host` (the innermost element under it). */
+	| { readonly event: 'pointerdown' | 'pointerup'; readonly host: string }
 	/** The host's back gesture (or Escape) on an open `<dialog>`: it closes, as the browser's cancel does. */
 	| { readonly event: 'cancel'; readonly host: string }
 	/** The keyboard's return key in a single-line text field. */
@@ -48,6 +60,23 @@ export type NativeAction =
 	| { readonly event: 'idle' | 'visible'; readonly host: string };
 
 type Value = NativeValue;
+
+/** What the event running a handler carries, by the field a `{ event }` expression names. */
+export type NativeEventFields = {
+	readonly value?: string;
+	readonly reason?: string;
+	readonly pressTarget?: string | null;
+	readonly target?: string;
+	readonly button?: number;
+};
+
+/** The element facts an expression reads: focus, each overlay's focus origin, and the element tree. */
+export type NativeElements = {
+	readonly focused: () => string | null;
+	readonly focusOrigin: (overlay: string) => string | null;
+	readonly isElement: (id: string) => boolean;
+	readonly contains: (within: string, node: string) => boolean;
+};
 
 /** What names mean inside a list row or an arrow function: the row items by repeat id, the function's parameters. */
 export type NativeScope = {
@@ -78,6 +107,10 @@ export type NativeRuntime = {
 	readonly properties: () => ReadonlyArray<readonly [node: string, name: 'value', value: string]>;
 	/** Every `<dialog>` and whether it is open in the top layer. */
 	readonly dialogs: () => ReadonlyArray<readonly [node: string, open: boolean]>;
+	/** The overlay stack, topmost last: each element marked `overlay` that is shown, and whether it is modal. */
+	readonly overlays: () => ReadonlyArray<readonly [node: string, modal: boolean]>;
+	/** The element that has focus, or null. */
+	readonly focused: () => string | null;
 	/** Every shown branch's chosen arm (null: none). */
 	readonly arms: () => ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Every shown list's row keys, in order. */
@@ -117,10 +150,30 @@ const BUILTINS: { readonly [name in NativeBuiltin]: (...args: Value[]) => Value 
 export function evaluateNativeExpr(
 	expr: NativeExpr,
 	read: (cell: string, scope: NativeScope) => Value,
-	eventValue?: string,
+	/** The event's fields; a string is an `input` event's text. */
+	eventValue?: string | NativeEventFields,
 	scope: NativeScope = EMPTY_SCOPE,
+	elements?: NativeElements,
 ): Value {
-	const evaluate = (e: NativeExpr): Value => evaluateNativeExpr(e, read, eventValue, scope);
+	const evaluate = (e: NativeExpr): Value => evaluateNativeExpr(e, read, eventValue, scope, elements);
+	const dom = (): NativeElements => {
+		if (!elements) throw new Error('an element read where there are no elements');
+		return elements;
+	};
+	if ('focused' in expr) return dom().focused() ?? NATIVE_DOCUMENT_BODY;
+	if ('focusOrigin' in expr) {
+		const overlay = evaluate(expr.focusOrigin);
+		return typeof overlay === 'string' ? dom().focusOrigin(overlay) : null;
+	}
+	if ('isElement' in expr) {
+		const value = evaluate(expr.isElement);
+		return typeof value === 'string' && dom().isElement(value);
+	}
+	if ('contains' in expr) {
+		const within = evaluate(expr.contains);
+		const node = evaluate(expr.node);
+		return typeof within === 'string' && typeof node === 'string' && dom().contains(within, node);
+	}
 	if ('route' in expr) {
 		if (!scope.params) throw new Error('route params read on a component that is not a page');
 		return { ...scope.params };
@@ -150,19 +203,25 @@ export function evaluateNativeExpr(
 		const args = expr.arguments.map((argument) =>
 			'lambda' in argument
 				? (...values: Value[]) =>
-						evaluateNativeExpr(argument.body, read, eventValue, {
-							items: scope.items,
-							...(scope.params ? { params: scope.params } : {}),
-							...(scope.now ? { now: scope.now } : {}),
-							locals: new Map([
-								...scope.locals,
-								...argument.lambda.map(
-									(name, i) => [name, values[i] ?? null] as const,
-								),
-							]),
-							...(scope.formData ? { formData: scope.formData } : {}),
-							...(scope.checked ? { checked: scope.checked } : {}),
-						})
+						evaluateNativeExpr(
+							argument.body,
+							read,
+							eventValue,
+							{
+								items: scope.items,
+								...(scope.params ? { params: scope.params } : {}),
+								...(scope.now ? { now: scope.now } : {}),
+								locals: new Map([
+									...scope.locals,
+									...argument.lambda.map(
+										(name, i) => [name, values[i] ?? null] as const,
+									),
+								]),
+								...(scope.formData ? { formData: scope.formData } : {}),
+								...(scope.checked ? { checked: scope.checked } : {}),
+							},
+							elements,
+						)
 				: evaluate(argument),
 		);
 		const method = (target as unknown as Record<string, unknown> | null)?.[expr.method];
@@ -195,9 +254,11 @@ export function evaluateNativeExpr(
 		return scope.formData(expr.formData);
 	}
 	if ('event' in expr) {
-		if (eventValue === undefined)
-			throw new Error('the event value read outside an input handler');
-		return eventValue;
+		const fields: NativeEventFields | undefined =
+			typeof eventValue === 'string' ? { value: eventValue } : eventValue;
+		const value = fields?.[expr.event];
+		if (value === undefined) throw new Error(`the event's ${expr.event} read where the event has none`);
+		return value;
 	}
 	if ('unary' in expr) {
 		const value = evaluate(expr.value);
@@ -347,8 +408,28 @@ export function createNativeRuntime(
 		const slot = slotOf(cell, scope);
 		return values.has(slot) ? values.get(slot)! : values.get(cell)!;
 	};
-	const evaluate = (expr: NativeExpr, eventValue?: string, scope?: NativeScope): Value =>
-		evaluateNativeExpr(expr, read, eventValue, scope ?? base);
+	/** Focus, the overlay stack (topmost last) and each overlay's focus origin, kept as the web's overlay behaviour keeps them. */
+	let focused: string | null = null;
+	let stack: string[] = [];
+	const origins = new Map<string, string>();
+	/** A row's copy (`<node>@<key>`) sits where its node does in the tree. */
+	const nodeOf = (id: string) => (id.includes('@') ? id.slice(0, id.indexOf('@')) : id);
+	const elements: NativeElements = {
+		focused: () => focused,
+		focusOrigin: (overlay) => origins.get(overlay) ?? null,
+		isElement: (id) => id === NATIVE_DOCUMENT_BODY || nodesById.get(nodeOf(id))?.kind === 'element',
+		contains: (within, node) => {
+			if (within === NATIVE_DOCUMENT_BODY) return true;
+			for (let at: string | null | undefined = nodeOf(node); at; at = nodesById.get(at)?.parent)
+				if (at === nodeOf(within)) return true;
+			return false;
+		},
+	};
+	const evaluate = (
+		expr: NativeExpr,
+		eventValue?: string | NativeEventFields,
+		scope?: NativeScope,
+	): Value => evaluateNativeExpr(expr, read, eventValue, scope ?? base, elements);
 	const armOf = (branch: Extract<NativeNode, { kind: 'branch' }>): number | null => {
 		if (branch.test) return evaluate(branch.test) ? 0 : branch.arms > 1 ? 1 : null;
 		const tests = branch.tests ?? [];
@@ -597,6 +678,40 @@ export function createNativeRuntime(
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));
 
 	const title = () => (payload.title ? render(payload.title, base) : null);
+	// The overlay behaviour enlists an element marked `overlay` whose `hidden` binding shows it; one with no such binding never.
+	const overlayNodes = payload.nodes.filter(
+		(node): node is Extract<NativeNode, { kind: 'element' }> =>
+			node.kind === 'element' &&
+			!node.row &&
+			node.attributes?.[OVERLAY_ATTRIBUTE] !== undefined &&
+			(node.bindings ?? []).some((binding) => 'attribute' in binding && binding.attribute === 'hidden'),
+	);
+	const shownOverlays = (): string[] => {
+		const now = keyed(attributes());
+		return overlayNodes.flatMap((node) =>
+			instances(node).length > 0 && now.get(`${node.id}\0hidden`) === null ? [node.id] : [],
+		);
+	};
+	const isModal = (overlay: string): boolean => {
+		const now = keyed(attributes());
+		return payload.nodes.some((node) => {
+			if (node.kind !== 'element' || !elements.contains(overlay, node.id)) return false;
+			const bound = now.get(`${node.id}\0${OVERLAY_MODAL_ATTRIBUTE}`);
+			return (bound !== undefined ? bound : node.attributes?.[OVERLAY_MODAL_ATTRIBUTE]) === OVERLAY_MODAL_VALUE;
+		});
+	};
+	// Served shown: the document's focus is the body.
+	for (const overlay of shownOverlays()) {
+		stack.push(overlay);
+		origins.set(overlay, NATIVE_DOCUMENT_BODY);
+	}
+	const handlerOf = (host: string, name: NativeAction['event']) =>
+		payload.events.find((candidate) => candidate.host === host && candidate.event === name);
+	/** The scope a shown instance's handlers run in (its row's), or undefined when it is not shown. */
+	const scopeOf = (id: string): NativeScope | undefined =>
+		payload.nodes
+			.flatMap((node) => (node.id === nodeOf(id) ? instances(node) : []))
+			.find((instance) => instance.id === id)?.scope;
 	/** `idle` and `visible` handlers that ran, by `<event>\0<instance>`; an instance that leaves the screen is forgotten. */
 	const fired = new Set<string>();
 	const due = (event: 'idle' | 'visible'): string[] =>
@@ -625,6 +740,8 @@ export function createNativeRuntime(
 		properties,
 		arms,
 		dialogs: () => [...dialogs],
+		overlays: () => stack.map((overlay) => [overlay, isModal(overlay)] as const),
+		focused: () => focused,
 		rows,
 		title,
 		sheets,
@@ -692,6 +809,44 @@ export function createNativeRuntime(
 					return out;
 				});
 			}
+			if (action.event === 'dismiss' && 'reason' in action) {
+				if (stack.at(-1) !== action.host) throw new Error(`${action.host} is not the topmost overlay`);
+				const dismiss = handlerOf(action.host, 'dismiss');
+				const fields: NativeEventFields = { reason: action.reason, pressTarget: null };
+				return change(undefined, undefined, () =>
+					dismiss ? run(handlers.get(dismiss.handler) ?? [], fields, base) : [],
+				);
+			}
+			if (action.event === 'pointerdown' || action.event === 'pointerup') {
+				const press = action.event;
+				const scope = scopeOf(action.host);
+				if (!scope) throw new Error(`${action.host} is not shown`);
+				return change(undefined, undefined, () => {
+					const calls: NativeJournalEntry[] = [];
+					// The behaviour's document listener hears the press first: the topmost overlay it landed outside is told.
+					const top = stack.at(-1);
+					const dismiss =
+						top !== undefined && press === 'pointerdown' && !elements.contains(top, action.host)
+							? handlerOf(top, 'dismiss')
+							: undefined;
+					const runs: { readonly handler: string; readonly fields: NativeEventFields }[] = [];
+					if (dismiss)
+						runs.push({
+							handler: dismiss.handler,
+							fields: { reason: 'outside-press', pressTarget: action.host },
+						});
+					for (let at: string | null | undefined = nodeOf(action.host); at; at = nodesById.get(at)?.parent) {
+						const own = handlerOf(at, press);
+						if (own) runs.push({ handler: own.handler, fields: { target: action.host, button: 0 } });
+					}
+					for (const step of runs) {
+						const out = run(handlers.get(step.handler) ?? [], step.fields, scope);
+						if (out[0]?.op === 'navigate') return out;
+						calls.push(...out);
+					}
+					return calls;
+				});
+			}
 			if (action.event === 'idle' || action.event === 'visible') {
 				const key = `${action.event}\0${action.host}`;
 				if (fired.has(key) || !due(action.event).includes(action.host)) return [];
@@ -710,6 +865,8 @@ export function createNativeRuntime(
 			if (!instance) throw new Error(`${action.host} is not shown`);
 			const scope = instance.scope;
 			const eventValue = action.event === 'input' ? action.value : undefined;
+			// A press focuses the control it presses, as the browser does.
+			if (action.event === 'activate') focused = action.host;
 			return change(action.host, eventValue, () =>
 				run(handlers.get(event.handler) ?? [], eventValue, scope),
 			);
@@ -735,7 +892,7 @@ export function createNativeRuntime(
 	/** Runs ops in order: writes cells, collects the calls (a continuation's id rides on its call), stops at a navigation. */
 	function run(
 		ops: ReadonlyArray<NativeOp>,
-		eventValue: string | undefined,
+		eventValue: string | NativeEventFields | undefined,
 		scope: NativeScope,
 		submission?: Submission,
 	): NativeJournalEntry[] {
@@ -780,9 +937,18 @@ export function createNativeRuntime(
 				];
 			}
 			if (op.op === 'command') {
+				let node = op.node;
+				if (typeof node !== 'string') {
+					const value = evaluate(node, eventValue, scope);
+					if (value === null || value === NATIVE_DOCUMENT_BODY) continue;
+					if (typeof value !== 'string' || !elements.isElement(value))
+						throw new Error(`${op.command}() on a value that is not an element`);
+					node = value;
+				}
+				if (op.command === 'focus') focused = node;
 				calls.push({
 					op: 'command',
-					node: op.node,
+					node,
 					command: op.command,
 					...(op.preventScroll ? { preventScroll: true as const } : {}),
 				});
@@ -904,8 +1070,19 @@ export function createNativeRuntime(
 			const dialogsBefore = new Map(dialogs);
 			const beforeSheets = new Map(sheets());
 			const ownedBefore = new Set(liveObjects());
+			const focusBefore = focused;
+			const stackBefore = stack;
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
+			const shownNow = shownOverlays();
+			const released = stackBefore.filter((overlay) => !shownNow.includes(overlay));
+			const enlisted = shownNow.filter((overlay) => !stackBefore.includes(overlay));
+			stack = [...stackBefore.filter((overlay) => shownNow.includes(overlay)), ...enlisted];
+			for (const overlay of enlisted) origins.set(overlay, focusBefore ?? NATIVE_DOCUMENT_BODY);
+			const overlays: NativeJournalEntry[] = [
+				...released.map((node): NativeJournalEntry => ({ op: 'overlay', node, open: false, modal: isModal(node) })),
+				...enlisted.map((node): NativeJournalEntry => ({ op: 'overlay', node, open: true, modal: isModal(node) })),
+			];
 			// A row that left takes its state with it; a later row with the same key starts from the first values.
 			const kept = new Set(rows().flatMap(([list, keys]) => keys.map((key) => `${list}\0${key}`)));
 			for (const slot of values.keys()) {
@@ -1041,6 +1218,7 @@ export function createNativeRuntime(
 					? [{ op: 'title' as const, value: afterTitle }]
 					: []),
 				...releases,
+				...overlays,
 				...calls,
 			];
 		}

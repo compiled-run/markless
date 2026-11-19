@@ -155,7 +155,7 @@ func reproducesConformanceVector(file: URL) throws {
 			case let .object(actionFields)? = stepFields.first(where: { $0.0 == "action" })?.1,
 			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
 			let event = NativeEventName(rawValue: eventName),
-			actionFields.allSatisfy({ (event == .timer ? ["event", "timer"] : ["event", "host", "value"]).contains($0.0) }),
+			actionFields.allSatisfy({ (event == .timer ? ["event", "timer"] : ["event", "host", "value", "reason"]).contains($0.0) }),
 			let expected = stepFields.first(where: { $0.0 == "journal" })?.1
 		else { Issue.record("malformed step \(step.jsonText)"); return }
 		let string = { (key: String) -> String? in if case let .string(text)? = actionFields.first(where: { $0.0 == key })?.1 { text } else { nil } }
@@ -163,7 +163,7 @@ func reproducesConformanceVector(file: URL) throws {
 		if event == .timer {
 			action = NativeAction(event: .timer, timer: try #require(string("timer")))
 		} else {
-			action = NativeAction(event: event, host: try #require(string("host")), value: string("value"))
+			action = NativeAction(event: event, host: try #require(string("host")), value: string("value"), reason: string("reason"))
 		}
 		let journal = JSONValue.array(try runtime.dispatch(action).map(\.json))
 		#expect(Array(journal.jsonText.utf8) == Array(expected.jsonText.utf8), "\(file.lastPathComponent) \(eventName) on \(action.timer ?? action.host)")

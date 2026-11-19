@@ -45,6 +45,7 @@ import dev.markless.mobile.core.Instance
 import dev.markless.mobile.core.JournalEntry
 import dev.markless.mobile.core.JsValue
 import dev.markless.mobile.core.Node
+import dev.markless.mobile.core.OVERLAY_ATTRIBUTE
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.Store
@@ -175,6 +176,8 @@ class MarklessHost(
 
 	private fun allLayouts(): List<Layout> = listOfNotNull(page) + sheetLayouts.values.flatMap { it.layouts }
 
+	private val overlays = Overlays(this, context, dpr)
+
 	/** The root's frame inside the viewport, when a style export placed it. */
 	var rootFrame: Rect? = null
 		private set
@@ -230,6 +233,7 @@ class MarklessHost(
 			override fun onViewAttachedToWindow(view: View) = startLoadEvents()
 			override fun onViewDetachedFromWindow(view: View) = stopLoadEvents()
 		})
+		if (runtime.overlays().isNotEmpty()) root.post { overlays.mount() }
 	}
 
 	private val onLayout = android.view.ViewTreeObserver.OnGlobalLayoutListener { raiseVisible() }
@@ -365,6 +369,14 @@ class MarklessHost(
 		if (runtime.handlerFor(id, EventName.Dismiss) != null) apply(runtime.dispatch(id, EventName.Dismiss))
 	}
 
+	/** Each element view and the instance it shows, for finding the element under a touch. */
+	internal fun elementNodes(): Map<View, String> = java.util.IdentityHashMap<View, String>().apply {
+		for ((id, inst) in built) if (inst.node is Node.Element) views[id]?.let { put(it, id) }
+	}
+
+	/** Reports a touch in window coordinates to the runtime as pointer events; call it before the views see the touch. */
+	fun touch(event: android.view.MotionEvent) = overlays.touch(event)
+
 	/** The journal applier: the only code that changes a retained view after the first build. */
 	fun apply(journal: List<JournalEntry>) {
 		dismissMessage()
@@ -391,6 +403,7 @@ class MarklessHost(
 				is JournalEntry.Check -> if (entry.node !in inert) (view(entry.node) as? CompoundButton ?: throw MarklessHostError("journal sets the checkedness of \"${entry.node}\", which is not a checkbox or radio button")).isChecked = entry.checked
 				is JournalEntry.Dialog -> dialog(entry.node, entry.open)
 				is JournalEntry.Command -> command(view(entry.node), entry.command, entry.preventScroll)
+				is JournalEntry.Overlay -> overlays.show(entry.node, entry.open, entry.modal)
 				is JournalEntry.Arm -> {
 					if (runtime.node(entry.node) !is Node.Branch) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
 					rebuild()
@@ -695,8 +708,8 @@ class MarklessHost(
 		if (view is EditText && node.bindings.none { it.property && it.name == "value" }) node.attributes["value"]?.let { view.setText(it) }
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
-			EventName.Dismiss -> throw MarklessHostError("dismiss event on \"${node.id}\", which is not a sheet")
-			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible -> {}
+			EventName.Dismiss -> if (OVERLAY_ATTRIBUTE !in node.attributes) throw MarklessHostError("dismiss event on \"${node.id}\", which is neither a sheet nor an overlay")
+			EventName.Cancel, EventName.PointerDown, EventName.PointerUp, EventName.Submit, EventName.Idle, EventName.Visible -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->
 				val now = android.os.SystemClock.uptimeMillis()
