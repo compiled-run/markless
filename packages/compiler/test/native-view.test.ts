@@ -384,19 +384,21 @@ export function Rename() @{
 		]);
 	});
 
-	it('refuses a paste handler off a text field, and a clipboard read other than plain text', async () => {
+	it('leaves out a paste handler on an element a phone does not edit, refuses one on an editable element, and a clipboard read other than plain text', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Paste() @{
 	let text = state('');
 	<div>
-		<span onPaste={() => (text = 'pasted')}>{text}</span>
+		<span role="spinbutton" tabindex="0" onPaste={() => (text = 'pasted')}>{text}</span>
+		<div contenteditable="true" onPaste={() => (text = 'edited')} />
 		<input onPaste={(event) => (text = event.clipboardData?.getData('text/html') ?? '')} />
 	</div>
 }`);
 		expect(payload).toBeNull();
-		expect(diagnostics.map((d) => d.message)).toEqual([
-			'a paste handler on <span>; a native build runs one only on a text field',
-			"the paste handler reads the clipboard other than as plain text (`getData('text')`), which a phone's paste does not give",
+		expect(diagnostics.map((d) => [d.severity, d.message])).toEqual([
+			['warning', 'the paste handler on <span> h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out'],
+			['error', 'a paste handler on an editable <div>; a native build runs one only on a text field'],
+			['error', "the paste handler reads the clipboard other than as plain text (`getData('text')`), which a phone's paste does not give"],
 		]);
 	});
 

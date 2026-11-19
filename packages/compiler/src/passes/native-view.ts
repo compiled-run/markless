@@ -4048,10 +4048,16 @@ export function createNativeViewPayload(
 						semantic === 'paste' &&
 						(!TEXT_ENTRY.has(element ?? '') || TICKED_TYPES.has(inputType ?? ''))
 					) {
-						refuse(
-							`a paste handler on <${element}>; a native build runs one only on a text field`,
-							event.handlerSpan,
-						);
+						const editable =
+							'contenteditable' in attributes ||
+							bindings.some((binding) => 'attribute' in binding && binding.attribute === 'contenteditable');
+						// A phone's browser offers Paste only where text can be edited; elsewhere a paste is Cmd+V from a hardware keyboard.
+						if (!editable) keyboardOnly(`the paste handler on <${element}> ${id}`, event.handlerSpan);
+						else
+							refuse(
+								`a paste handler on an editable <${element}>; a native build runs one only on a text field`,
+								event.handlerSpan,
+							);
 						continue;
 					}
 					if (semantic === 'submit' && element !== 'form') {
