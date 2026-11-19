@@ -2234,6 +2234,8 @@ export function createNativeViewPayload(
 	};
 	/** Set while handlers are lowered, after the whole tree: only then does every handle know the elements it is bound to. */
 	let lateLowering = false;
+	/** Set while an `@if` test that is one bare name is lowered: there, children the caller passed are only present. */
+	let childrenAsTest = false;
 	/** Whether the handler being lowered read the element a tap landed on. */
 	let pressedTargetRead = false;
 	/** The text field whose input handler is being lowered: its `value` there is what was typed. */
@@ -2705,6 +2707,13 @@ export function createNativeViewPayload(
 				if (repeat) return { item: repeat };
 				const prop = propOf(expression.name, scope);
 				if (prop?.kind === 'value') return prop.expr;
+				if (prop?.kind === 'children') {
+					// The web passes children that are one run of plain text as that string; other markup is no value.
+					const chunk = prop.chunk;
+					if (chunk.hosts.length === 0 && chunk.slots.length === 0 && chunk.texts?.length === 1)
+						return { literal: chunk.texts[0]!.text };
+					if (childrenAsTest) return { literal: true };
+				}
 				if (prop)
 					return refuse(`${what} reads the callback \`${expression.name}\` as a value`);
 				if (isPropName(expression.name, scope)) {
@@ -4365,13 +4374,10 @@ export function createNativeViewPayload(
 					continue;
 				}
 				const plain = site.kind === 'if' && site.armIndexSource === undefined;
-				const testScope: Scope = {
-					...scope,
-					live: site.testComputedGraphNodeId !== undefined,
-				};
-				const test = plain
-					? exprOf(site.testExpression, 'the @if test', testScope)
-					: undefined;
+				const testScope: Scope = { ...scope, live: site.testComputedGraphNodeId !== undefined };
+				childrenAsTest = site.testExpression?.kind === 'read';
+				const test = plain ? exprOf(site.testExpression, 'the @if test', testScope) : undefined;
+				childrenAsTest = false;
 				const recorded = site.armTestExpressions?.map((expression) =>
 					expression === null
 						? null

@@ -406,6 +406,11 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'projected',
+		fixture: 'test/fixtures/Projected.tsrx',
+		actions: [{ event: 'activate', host: 'h6' }],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [

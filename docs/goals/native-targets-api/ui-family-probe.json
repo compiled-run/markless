@@ -33,7 +33,7 @@
 			"MARKLESS_NATIVE_JAVASCRIPT: the computed `inSpan` reads `calendarState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the computed `isSpanStart` reads `calendarState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the computed `isSpanEnd` reads `calendarState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
-			"MARKLESS_NATIVE_UNSUPPORTED: the @if test reads the callback `children` as a value",
+			"MARKLESS_NATIVE_UNSUPPORTED: calendarState.title makes a date from a value (`new Date(…)`); only the clock (`new Date()`, `Date.now()`) has a native meaning yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `calendarState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)"
 		]
 	},
@@ -105,7 +105,7 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:9/h9 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_ELEMENT: the <output> element has no native view yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the computed `labelShown` reads `colorpickerState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
-			"MARKLESS_NATIVE_UNSUPPORTED: the @if test reads the callback `children` as a value",
+			"MARKLESS_NATIVE_JAVASCRIPT: the computed `labelText` reads `colorpickerState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerdown handler reads `event.button`, which a tap on a phone does not have",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerdown handler reads `event.clientX`, which a tap on a phone does not have",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerdown handler reads `event.clientY`, which a tap on a phone does not have",
@@ -255,7 +255,6 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the drop event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: FileUploadItem while rendering sets `item.id` from a value that follows state; pass a fixed value or leave the prop out",
 			"MARKLESS_NATIVE_UNSUPPORTED: FileUploadItem while rendering sets `item.name` from a value that follows state; pass a fixed value or leave the prop out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the @if test reads the callback `children` as a value",
 			"MARKLESS_NATIVE_UNSUPPORTED: the change handler's `if` test reads `fieldEl`, which is not state of this component",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `fileuploadState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `fileuploadItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
@@ -437,9 +436,7 @@
 	"progress": {
 		"payload": false,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: a style binding",
-			"MARKLESS_NATIVE_UNSUPPORTED: ProgressValueLabel while rendering, `progress.ownText` reads the callback `children` as a value",
-			"MARKLESS_NATIVE_UNSUPPORTED: the @if test reads the callback `children` as a value"
+			"MARKLESS_NATIVE_UNSUPPORTED: a style binding"
 		]
 	},
 	"qr-code": {
@@ -531,7 +528,6 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:6/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:6/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: the blur event has no native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: the @if test reads the callback `children` as a value",
 			"MARKLESS_NATIVE_JAVASCRIPT: the input handler reads `taglistState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `event.detail`, which a tap on a phone does not have",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `taglistState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
@@ -580,7 +576,6 @@
 			"MARKLESS_NATIVE_JAVASCRIPT: the computed `isFront` reads `toasterState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the computed `isFront` reads `toasterItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_UNSUPPORTED: a style binding",
-			"MARKLESS_NATIVE_UNSUPPORTED: the @if test reads the callback `children` as a value",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `toasterState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `toasterItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)"
 		]
@@ -600,7 +595,6 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keyup handler on <div> component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <div> component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: a @for keyed by its index; a native list keys each row by its item",
-			"MARKLESS_NATIVE_UNSUPPORTED: the @if test reads the callback `children` as a value",
 			"MARKLESS_NATIVE_JAVASCRIPT: the input handler reads `tokenboxState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `tokenboxState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `tokenboxItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)"
@@ -633,7 +627,6 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <div> component-edge:6/component-edge:0/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:6/component-edge:0/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_JAVASCRIPT: the computed `labelCount` reads `tourState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
-			"MARKLESS_NATIVE_UNSUPPORTED: the @if test reads the callback `children` as a value",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `tourState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler reads `event.detail`, which a tap on a phone does not have",
 			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler reads `tourItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
