@@ -1005,6 +1005,14 @@ final class ViewTree {
 					for: .editingChanged)
 			case let (.input, area as TextArea):
 				area.onChange.append { text in onAction(NativeAction(event: .input, host: id, value: text)) }
+			case let (.focus, field as UITextField):
+				field.addAction(UIAction { _ in onAction(NativeAction(event: .focus, host: id)) }, for: .editingDidBegin)
+			case let (.blur, field as UITextField):
+				field.addAction(UIAction { _ in onAction(NativeAction(event: .blur, host: id)) }, for: .editingDidEnd)
+			case let (.focus, area as TextArea):
+				area.onFocus.append { onAction(NativeAction(event: .focus, host: id)) }
+			case let (.blur, area as TextArea):
+				area.onBlur.append { onAction(NativeAction(event: .blur, host: id)) }
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
 			case (.idle, _), (.visible, _):
@@ -1625,6 +1633,8 @@ final class ContainerScrollView: UIScrollView {
 final class TextArea: UITextView, UITextViewDelegate {
 	var onChange: [(String) -> Void] = []
 	var onBegin: (() -> Void)?
+	var onFocus: [() -> Void] = []
+	var onBlur: [() -> Void] = []
 
 	init() {
 		super.init(frame: .zero, textContainer: nil)
@@ -1639,6 +1649,13 @@ final class TextArea: UITextView, UITextViewDelegate {
 		for change in onChange { change(text) }
 	}
 
-	func textViewDidBeginEditing(_ textView: UITextView) { onBegin?() }
+	func textViewDidBeginEditing(_ textView: UITextView) {
+		onBegin?()
+		for focus in onFocus { focus() }
+	}
+
+	func textViewDidEndEditing(_ textView: UITextView) {
+		for blur in onBlur { blur() }
+	}
 }
 #endif

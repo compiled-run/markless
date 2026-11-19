@@ -11,6 +11,8 @@ import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.view.ContextThemeWrapper
 import android.view.MenuItem
+import android.view.MotionEvent
+import android.view.inputmethod.InputMethodManager
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -33,6 +35,25 @@ import kotlin.math.roundToInt
 abstract class MarklessActivity : Activity() {
 	lateinit var host: MarklessHost
 		private set
+
+	/** A touch that starts outside the focused text field takes its focus and keyboard away, as a tap elsewhere does on the web. */
+	override fun dispatchTouchEvent(e: MotionEvent): Boolean {
+		if (e.actionMasked == MotionEvent.ACTION_DOWN && ::host.isInitialized) host.focusedField()?.let { field ->
+			val at = IntArray(2).also { field.getLocationOnScreen(it) }
+			val inside = e.rawX >= at[0] && e.rawX < at[0] + field.width && e.rawY >= at[1] && e.rawY < at[1] + field.height
+			if (!inside) {
+				// The window takes the focus itself: offered to its views first, it would land on the first focusable one, maybe this field.
+				(window.decorView as ViewGroup).apply {
+					isFocusableInTouchMode = true
+					descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
+					requestFocus()
+					descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+				}
+				(getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(field.windowToken, 0)
+			}
+		}
+		return super.dispatchTouchEvent(e)
+	}
 
 	abstract fun payloadBytes(): ByteArray
 

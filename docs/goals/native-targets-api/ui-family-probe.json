@@ -98,7 +98,6 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `parseHexEntry` uses a call to `text.charAt`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `parseChannelEntry` uses a call to `(value).replace`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown event has no native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: the blur event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:9/h9 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `landFocus`, which needs a script engine"
 		]
@@ -208,9 +207,9 @@
 		"payload": false,
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown event has no native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: the blur event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:6/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's `if` test reads `event.detail`, which a tap on a phone does not have"
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's `if` test reads `event.detail`, which a tap on a phone does not have",
+			"MARKLESS_NATIVE_UNSUPPORTED: handler:component-edge:4/event:4 keeps an element as a value, which a native host has no use for yet"
 		]
 	},
 	"fileupload": {
@@ -341,8 +340,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the pointercancel event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `currencyScale` uses a TryStatement, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown event has no native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: the focus event has no native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: the blur event has no native meaning yet"
+			"MARKLESS_NATIVE_UNSUPPORTED: the focus handler uses a call to `input.setSelectionRange`, which needs a script engine"
 		]
 	},
 	"otp": {
@@ -350,9 +348,9 @@
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: a style binding",
 			"MARKLESS_NATIVE_UNSUPPORTED: the computed `boxes` reads `otp.itemEls` as a value outside a handler",
-			"MARKLESS_NATIVE_UNSUPPORTED: the focus event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the computed `at` reads `otp.itemEls` as a value outside a handler",
-			"MARKLESS_NATIVE_UNSUPPORTED: the computed `at` reads `mine` as a value outside a handler"
+			"MARKLESS_NATIVE_UNSUPPORTED: the computed `at` reads `mine` as a value outside a handler",
+			"MARKLESS_NATIVE_UNSUPPORTED: the focus handler's `if` test uses the `instanceof` operator, which needs a script engine"
 		]
 	},
 	"pad": {
@@ -464,10 +462,10 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:5/h4 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:6/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:6/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the blur event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the input handler's `if` test reads `event`, which is not state of this component",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `elementForValue` uses a call to `elements.find`, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `afterRemoval`'s `if` test compares with `undefined` a value whose first value is `null`; a native value does not tell undefined from null"
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `afterRemoval`'s `if` test compares with `undefined` a value whose first value is `null`; a native value does not tell undefined from null",
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `rename` uses a write to something other than a local, which needs a script engine"
 		]
 	},
 	"textbox": {

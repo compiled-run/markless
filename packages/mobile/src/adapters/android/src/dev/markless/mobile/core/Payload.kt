@@ -135,7 +135,7 @@ data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boo
 data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
 
 /** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
-enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible") }
+enum class EventName(val wire: String) { Activate("activate"), Input("input"), Focus("focus"), Blur("blur"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible") }
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */

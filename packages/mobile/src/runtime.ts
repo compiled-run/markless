@@ -14,6 +14,8 @@ import { marklessAttributeValue } from '@markless/web/dom-attribute';
 /** A host-side action: what a person does to a retained view. */
 export type NativeAction =
 	| { readonly event: 'activate'; readonly host: string }
+	/** A text field took the keyboard (`focus`) or gave it up (`blur`). */
+	| { readonly event: 'focus' | 'blur'; readonly host: string }
 	/** The field's whole text after an edit. */
 	| { readonly event: 'input'; readonly host: string; readonly value: string }
 	/** A live device value changed (connectivity, permission): the host writes the device cell. */

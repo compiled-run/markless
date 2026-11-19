@@ -78,6 +78,8 @@ object DeviceConformance {
 				"dismiss" -> host.closedByPlatform(action.field("host", "action").str("host"))
 				"enter" -> (target as? EditText ?: throw MarklessHostError("steps[$n] presses return in a view that is not an input")).onEditorAction(EditorInfo.IME_ACTION_GO)
 				"timer" -> host.apply(host.runtime.timer(action.field("timer", "action").str("timer")))
+				"focus" -> if (!target.requestFocus()) failures.add("steps[$n]: the field took no focus")
+				"blur" -> target.clearFocus()
 				"idle" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Idle))
 				"visible" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Visible))
 				else -> throw MarklessHostError("steps[$n] has an action this check cannot perform: $event")

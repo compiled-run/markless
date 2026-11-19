@@ -188,6 +188,8 @@ public struct NativeDrawing: Equatable, Sendable {
 public enum NativeEventName: String, Sendable {
 	case activate
 	case input
+	/// A text field took the keyboard, or gave it up.
+	case focus, blur
 	/// The platform closed a system sheet; it is already closed when the handler runs.
 	case dismiss
 	/// The host's back gesture or Escape on an open `<dialog>`: it closes, as the browser's cancel does.

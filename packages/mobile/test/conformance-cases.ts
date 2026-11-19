@@ -418,6 +418,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'field-focus',
+		fixture: 'test/fixtures/FieldFocus.tsrx',
+		actions: [
+			{ event: 'focus', host: 'h1' },
+			{ event: 'blur', host: 'h1' },
+			{ event: 'focus', host: 'h2' },
+			{ event: 'blur', host: 'h2' },
+			{ event: 'focus', host: 'h1' },
+		],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [

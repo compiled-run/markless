@@ -264,7 +264,7 @@ export function Field() @{
 		);
 	});
 
-	it('leaves out key and focus handlers on a checkbox or radio button, which a tap ticks and no soft keyboard types in', async () => {
+	it('leaves out key and focus handlers on a checkbox or radio button, and runs a text field\'s focus handler', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Choice() @{
 	let note = state('');
@@ -288,9 +288,10 @@ export function Choice() @{
 				'MARKLESS_NATIVE_KEYBOARD_ONLY',
 				'the blur handler on <input> h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out',
 			],
-			[NATIVE_UNSUPPORTED_CODE, 'the focus event has no native meaning yet'],
 		]);
-		expect(payload).toBeNull();
+		expect(payload?.events.filter((event) => event.event === 'focus')).toEqual([
+			{ host: 'h3', event: 'focus', handler: 'handler:event:5' },
+		]);
 	});
 
 	it('gives a state field whose first value is undefined a null cell, as a native expression spells undefined', async () => {

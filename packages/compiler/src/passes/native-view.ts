@@ -139,6 +139,11 @@ function defaultStyleOf(
 const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][number]['event']>> = {
 	click: 'activate',
 	input: 'input',
+	// Only a text field gets here; anywhere else they are keyboard-only. On a field `focusin` comes with `focus`.
+	focus: 'focus',
+	focusin: 'focus',
+	blur: 'blur',
+	focusout: 'blur',
 	submit: 'submit',
 	// A checkbox's or radio button's change runs after its tick, joined into its press by `wireTicks`.
 	change: 'input',
