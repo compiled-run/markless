@@ -195,11 +195,6 @@ jobs:
             run_build_scale: ${{ steps.queue.outputs.tested != 'true' && (steps.build_scale.outputs.cache-hit != 'true') }}
             key_build_warnings: ${{ steps.build_warnings.outputs.cache-primary-key }}
             run_build_warnings: ${{ steps.queue.outputs.tested != 'true' && (steps.build_warnings.outputs.cache-hit != 'true') }}
-            run_playwright: ${{ steps.queue.outputs.tested != 'true' && (steps.unit.outputs.cache-hit != 'true' || steps.browser.outputs.cache-hit != 'true' ||
-                steps.boxes_bundler.outputs.cache-hit != 'true' ||
-                steps.website_boxes.outputs.cache-hit != 'true' ||
-                steps.perf_guards.outputs.cache-hit != 'true' ||
-                steps.demo_boxes.outputs.cache-hit != 'true') }}
 
         steps:
             - uses: actions/checkout@v4
@@ -452,9 +447,10 @@ jobs:
     # node tests that drive both engines; the browsers sit beside the checkout, so a lint of the tree never sees them.
     # No lane needs this job: waiting on it cost a merge group a second runner queue (12 minutes on
     # 2026-10-27), and only a Playwright bump misses the cache, when each lane installs its own copy.
+    # Only main fills it: a cache saved by a pull request or merge-queue run is readable by that ref alone.
     prepare-playwright:
         needs: lanes
-        if: needs.lanes.outputs.run_playwright == 'true'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         runs-on: ubuntu-26.04
         timeout-minutes: 15
         env:
