@@ -508,7 +508,7 @@ function joinTextParts(
 	);
 	const source = `\`${parts.join('')}\``;
 	const composite = mintTemplateExpressionComputed(
-		`() => ${source}`,
+		source,
 		readSources,
 		state,
 		caught ? scope : undefined,
@@ -1705,7 +1705,7 @@ function mintStyleObjectComputed(
 	])!;
 	if (sources.length === 0) return null;
 
-	return mintTemplateExpressionComputed(`() => ${lowering.expressionSource}`, sources, state);
+	return mintTemplateExpressionComputed(lowering.expressionSource, sources, state);
 }
 
 function collectDuplicateAttributeDiagnostics(

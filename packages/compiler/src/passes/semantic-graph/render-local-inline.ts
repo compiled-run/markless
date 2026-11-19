@@ -474,7 +474,7 @@ export function liftRenderLocalComposite(
 		),
 		...inlined.definitions.map((definition) => collectGraphDependencies(definition, state)),
 	])!;
-	const lifted = mintTemplateExpressionComputed(`() => ${inlined.source}`, sources, state);
+	const lifted = mintTemplateExpressionComputed(inlined.source, sources, state);
 	if (lifted)
 		for (const definition of new Set(inlined.definitions))
 			collectDefinitionReads(definition, state);
@@ -580,7 +580,6 @@ export function liftArmRenderLocalValue(
 		return null;
 	const guard = armGuardCondition(state);
 	if (!guard) return null;
-	const definitions = [...guard.definitions, ...inlined.definitions];
 	const shownDependencies = [expression, ...inlined.definitions].flatMap((node) =>
 		collectGraphDependencies(node, state),
 	);
@@ -601,24 +600,39 @@ export function liftArmRenderLocalValue(
 	)
 		return null;
 	const lifted = mintTemplateExpressionComputed(
-		guard.source === null
-			? `() => ${inlined.source}`
-			: `() => (${guard.source}) ? ${inlined.source} : undefined`,
-		joinReadSources([dependencies])!,
+		inlined.source,
+		joinReadSources([shownDependencies])!,
 		state,
 		undefined,
 		true,
 	);
-	if (lifted) {
-		for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
-		markArmGuardDependencies(
-			lifted.graphNodeId,
-			shownDependencies,
-			dependencies.slice(shownDependencies.length),
-			state,
-		);
-	}
+	if (lifted)
+		for (const definition of new Set(inlined.definitions)) collectDefinitionReads(definition, state);
 	return lifted;
+}
+
+/** The enclosing arms' tests as one condition and the graph reads it makes; null outside an arm, in a row, or when a test cannot be read again there. */
+export function armShownGuard(state: WalkState): {
+	readonly source: string;
+	readonly reads: ReadonlyArray<SemanticGraphDependency>;
+	readonly definitions: ReadonlyArray<AnyNode>;
+} | null {
+	if (
+		!state.currentArmScope ||
+		state.currentKeyedRepeatScopeIds.length > 0 ||
+		state.currentSharedDefinitionId
+	)
+		return null;
+	const guard = armGuardCondition(state);
+	if (!guard?.source) return null;
+	const reads = [...guard.nodes, ...guard.definitions].flatMap((node) =>
+		collectGraphDependencies(node, state),
+	);
+	const asyncNodeIds = new Set(
+		state.graph.graphBindings.flatMap((binding) => (binding.asyncCapable ? [binding.id] : [])),
+	);
+	if (reads.some((read) => asyncNodeIds.has(read.graphNodeId))) return null;
+	return { source: guard.source, reads, definitions: guard.definitions };
 }
 
 // A read of the same cell at a path prefix reads this one too: `props` covers `props.subject`.
@@ -628,7 +642,7 @@ const covers = (reader: SemanticGraphDependency, read: SemanticGraphDependency) 
 	reader.path.every((segment, index) => segment === read.path[index]);
 
 // Only a cell the arm test reads and the shown value does not is the guard's alone.
-function markArmGuardDependencies(
+export function markArmGuardDependencies(
 	graphNodeId: string,
 	shown: ReadonlyArray<SemanticGraphDependency>,
 	guard: ReadonlyArray<SemanticGraphDependency>,
