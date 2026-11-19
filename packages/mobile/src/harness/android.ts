@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { androidLibraries } from './android-libraries.ts';
+import { focusedWindowIn, waitButtonIn } from './emulator-screen.ts';
 import { exec } from './exec.ts';
 import {
 	ANDROID_SHELL_ACTIVITY,
@@ -37,6 +38,68 @@ async function waitForBoot(tools: AndroidTools, serial: string): Promise<void> {
 		serial,
 		['shell', 'while [ "$(getprop sys.boot_completed)" != 1 ]; do sleep 1; done'],
 		300_000,
+	);
+}
+
+/** Whether the emulator still answers: an adb `device` that finished booting. */
+export async function emulatorAnswers(tools: AndroidTools, serial: string): Promise<boolean> {
+	const booted = await exec(tools.adb, ['-s', serial, 'shell', 'getprop', 'sys.boot_completed'], {
+		allowFailure: true,
+		timeoutMs: 20_000,
+	}).catch(() => ({ code: 1, stdout: '' }));
+	return booted.code === 0 && booted.stdout.trim() === '1';
+}
+
+const shell = (tools: AndroidTools, serial: string, command: string) =>
+	exec(tools.adb, ['-s', serial, 'shell', command], { allowFailure: true, timeoutMs: 20_000 })
+		.then((result) => (result.code === 0 ? result.stdout : undefined))
+		.catch(() => undefined);
+
+/** Presses the "Wait" button of a not-responding dialog; Back when the screen cannot be read. */
+async function waitOutNotResponding(tools: AndroidTools, serial: string): Promise<void> {
+	const screen = await shell(
+		tools,
+		serial,
+		'uiautomator dump /data/local/tmp/settle.xml >/dev/null && cat /data/local/tmp/settle.xml',
+	);
+	const wait = screen === undefined ? undefined : waitButtonIn(screen);
+	await shell(
+		tools,
+		serial,
+		wait ? `input tap ${wait.x} ${wait.y}` : 'input keyevent KEYCODE_BACK',
+	);
+}
+
+/**
+ * Waits until the emulator answers and an ordinary window holds focus on two reads in a row, waiting out any
+ * "isn't responding" dialog meanwhile: on a loaded CI runner System UI can stall after boot and its dialog then covers every page.
+ */
+export async function settleEmulator(
+	tools: AndroidTools,
+	serial: string,
+	timeoutMs = 180_000,
+): Promise<{ readonly dismissed: number }> {
+	const deadline = Date.now() + timeoutMs;
+	let dismissed = 0;
+	let calm = 0;
+	let last = 'no answer';
+	while (Date.now() < deadline) {
+		const windows = (await emulatorAnswers(tools, serial))
+			? await shell(tools, serial, 'dumpsys window displays')
+			: undefined;
+		const focus = windows === undefined ? undefined : focusedWindowIn(windows);
+		last = focus ?? 'no focused window';
+		if (focus?.includes('Application Not Responding')) {
+			calm = 0;
+			dismissed++;
+			await waitOutNotResponding(tools, serial);
+		} else if (focus) {
+			if (++calm === 2) return { dismissed };
+		} else calm = 0;
+		await new Promise((resolve) => setTimeout(resolve, calm > 0 ? 2000 : 3000));
+	}
+	throw new Error(
+		`${serial} did not settle in ${timeoutMs / 1000} s (focus: ${last}; not-responding dialogs waited out: ${dismissed})`,
 	);
 }
 
@@ -111,9 +174,11 @@ export async function bootEmulator(
 			throw new Error(
 				`the emulator exited (${ended.code}) before booting; its log ends:\n${logTail()}`,
 			);
+		await settleEmulator(tools, serial);
 		return { serial, avd, bootedHere };
 	}
 	await waitForBoot(tools, serial);
+	await settleEmulator(tools, serial);
 	return { serial, avd, bootedHere };
 }
 

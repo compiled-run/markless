@@ -6,6 +6,7 @@ import {
 	bootEmulator,
 	buildAndroidShell,
 	installProofApk,
+	settleEmulator,
 	stopEmulator,
 	type BootedEmulator,
 } from './android.ts';
@@ -239,6 +240,17 @@ async function main(argv: string[]): Promise<number> {
 					};
 				}
 			};
+			// A not-responding dialog raised during the host tests or an earlier rung would cover this rung's page.
+			if (emulator) {
+				const settled = await settleEmulator(tools!, emulator.serial).catch(
+					(error: unknown) => (error instanceof Error ? error.message : String(error)),
+				);
+				if (typeof settled === 'string') console.log(settled);
+				else if (settled.dismissed > 0)
+					console.log(
+						`${emulator.serial} waited out ${settled.dismissed} not-responding dialog(s) before ${rung.name}`,
+					);
+			}
 			const installs = await Promise.all(platforms.map(install));
 			// One Maestro run at a time: beside a second Maestro run, Android's run lost its device connection.
 			for (const [at, platform] of platforms.entries()) {
