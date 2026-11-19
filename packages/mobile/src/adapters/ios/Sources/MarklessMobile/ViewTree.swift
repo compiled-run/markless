@@ -6,8 +6,8 @@ import UIKit.UIGestureRecognizerSubclass
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"canvas", "details", "embed", "iframe", "object", "option",
-	"picture", "select", "summary", "textarea", "video",
+	"canvas", "details", "embed", "iframe", "object",
+	"picture", "summary", "textarea", "video",
 ]
 
 /// Where an instance is built: its row (`@key`, empty outside lists), the names its expressions see, and what encloses it.
@@ -290,6 +290,7 @@ final class ViewTree {
 			try sizePage()
 		}
 		refreshRelations()
+		refreshSelects()
 		overlays = OverlayHost(
 			runtime: runtime, root: root, onAction: onAction,
 			nodeOf: { [unowned self] view in
@@ -451,6 +452,9 @@ final class ViewTree {
 				guard let label = labels[node] else { throw HostError("journal names text node \(node), which is not shown") }
 				label.text = value
 				if let button = contexts[node]?.button { refreshLabel(of: button) }
+			case .selected:
+				// Each select's shown choice is read again once the whole journal is applied.
+				continue
 			case let .checked(node, checked):
 				if elements[node] is AbsentField { continue }
 				guard let tick = ticks[node], let view = elements[node] else { throw HostError("journal names checkbox \(node), which is not shown") }
@@ -560,6 +564,7 @@ final class ViewTree {
 			}
 		}
 		refreshRelations()
+		refreshSelects()
 		if layout == nil { alignTables() }
 		overlays.flush()
 	}
@@ -798,6 +803,33 @@ final class ViewTree {
 						image.heightAnchor.constraint(equalToConstant: 90).isActive = true
 					}
 					view = image
+				} else if element == "select" {
+					if context.button != nil { throw HostError("<select> \(id) is inside a button") }
+					let runtime = runtime
+					let onAction = onAction
+					let select = SelectButton { [weak self] in
+						guard let self else { return [] }
+						do {
+							return try runtime.choices(of: template).map { choice in
+								UIAction(title: choice.label, attributes: choice.disabled ? .disabled : [], state: choice.selected ? .on : .off) { _ in
+									self.dismissMessage()
+									onAction(NativeAction(event: .choose, host: choice.option))
+								}
+							}
+						} catch { fatalError("Markless iOS host: \(error)") }
+					}
+					if layout == nil {
+						select.layer.borderWidth = 1
+						select.layer.borderColor = UIColor.separator.cgColor
+						select.layer.cornerRadius = 6
+						select.widthAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
+						select.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+					}
+					view = select
+				} else if element == "option" {
+					// The select's list shows its options; their views only keep their text current.
+					view = UIView()
+					view.isHidden = true
 				} else if element == "input", staticAttributes["type"] == "hidden"
 					|| (["checkbox", "radio"].contains(staticAttributes["type"]) && staticAttributes["aria-hidden"] == "true")
 				{
@@ -836,7 +868,7 @@ final class ViewTree {
 					view.isUserInteractionEnabled = context.button == nil
 				}
 				var inner = context
-				inner.button = (view as? UIButton) ?? context.button
+				inner.button = view is SelectButton ? nil : (view as? UIButton) ?? context.button
 				inner.heading = context.heading || headings.contains(element)
 				inner.look = context.look.applying(node.defaultStyle)
 				if layout == nil, let style = node.defaultStyle { applyBlockStyle(style, to: view) }
@@ -1047,7 +1079,8 @@ final class ViewTree {
 		view.accessibilityElementsHidden = current["aria-hidden"] == "true"
 		// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
 		if layout == nil, !dialogIds.contains(id) {
-			let hidden = current["hidden"] != nil
+			// An option shows only in its select's list.
+			let hidden = current["hidden"] != nil || view.superview is SelectButton
 			if view.isHidden != hidden {
 				view.isHidden = hidden
 				if let parent = view.superview, !(parent is UIButton || parent is OverlayCard) { stack(parent) }
@@ -1062,8 +1095,22 @@ final class ViewTree {
 		button.accessibilityValue = tick.checked ? "1" : "0"
 	}
 
-	/// A button reads as its `aria-label`, or else its text in view order.
+	/// Each select shows its chosen option's label, as the web's closed `<select>` does.
+	private func refreshSelects() {
+		for (id, view) in elements {
+			guard let select = view as? SelectButton, let template = templates[id] else { continue }
+			do {
+				select.show(try runtime.choices(of: template).first { $0.selected }?.label ?? "")
+			} catch { fatalError("Markless iOS host: \(error)") }
+		}
+	}
+
+	/// A button reads as its `aria-label`, or else its text in view order; a select reads as its `aria-label` and its choice.
 	private func refreshLabel(of button: UIButton) {
+		if button is SelectButton {
+			button.accessibilityLabel = button.accessibilityIdentifier.flatMap { attributes[$0]?["aria-label"] }
+			return
+		}
 		if let id = button.accessibilityIdentifier, let label = attributes[id]?["aria-label"] {
 			button.accessibilityLabel = label
 			return
@@ -1420,6 +1467,31 @@ final class AudioButton: UIButton, AVAudioPlayerDelegate {
 }
 
 /// The top layer's view: VoiceOver's escape gesture (two-finger scrub) on it closes the dialog.
+/// A closed `<select>`: its chosen option's label; a press opens the list of its options as a menu, as Safari shows one.
+final class SelectButton: UIButton {
+	private let display = UILabel()
+
+	init(choices: @escaping () -> [UIAction]) {
+		super.init(frame: .zero)
+		isAccessibilityElement = true
+		accessibilityTraits = .button
+		display.numberOfLines = 1
+		display.isAccessibilityElement = false
+		display.isUserInteractionEnabled = false
+		addSubview(display)
+		showsMenuAsPrimaryAction = true
+		menu = UIMenu(children: [UIDeferredMenuElement.uncached { completion in completion(choices()) }])
+	}
+
+	@available(*, unavailable)
+	required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+	func show(_ label: String) {
+		display.text = label
+		accessibilityValue = label
+	}
+}
+
 final class TopLayerView: UIView {
 	var onEscape: (() -> Void)?
 	override func accessibilityPerformEscape() -> Bool {

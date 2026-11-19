@@ -155,8 +155,12 @@ function recordDeviceCalls() {
 }
 
 // A visible text or an accessible name, the two ways a Maestro selector finds a view.
+// A closed select shows its chosen option's label, as the phones draw it.
 const shown = (page: Page, text: string): Locator =>
-	page.getByText(text, { exact: true }).or(page.getByLabel(text, { exact: true }));
+	page
+		.getByText(text, { exact: true })
+		.or(page.getByLabel(text, { exact: true }))
+		.or(page.getByRole('combobox').filter({ has: page.locator('option:checked').getByText(text, { exact: true }) }));
 
 // The phone the style exports lay out for (Dragon's iOS viewport): a rung that scrolls scrolls here as on the phones.
 const PHONE = { width: 402, height: 778 };
@@ -225,6 +229,10 @@ async function act(page: Page, step: LadderStep) {
 		await field.pressSequentially(action.type.text);
 	} else if ('submit' in action)
 		await page.getByRole('textbox', { name: action.submit, exact: true }).press('Enter');
+	else if ('choose' in action)
+		await page
+			.getByRole('combobox', { name: action.choose.field, exact: true })
+			.selectOption({ label: action.choose.option });
 	else if ('relaunch' in action) await page.reload();
 	else if ('back' in action) await page.goBack();
 	else if ('escape' in action) await page.keyboard.press('Escape');

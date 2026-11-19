@@ -78,7 +78,7 @@ func reproducesConformanceVector(file: URL) throws {
 	let vector = try JSONValue.parse(Data(contentsOf: file))
 	guard case let .object(fields) = vector else { Issue.record("vector is not an object"); return }
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
-	let known = ["version", "payload", "params", "preferredLanguages", "now", "initial", "initialChecks", "initialAttributes", "initialProperties", "initialArms", "initialRows", "initialSheets", "tasks", "steps"]
+	let known = ["version", "payload", "params", "preferredLanguages", "now", "initial", "initialChecks", "initialSelections", "initialAttributes", "initialProperties", "initialArms", "initialRows", "initialSheets", "tasks", "steps"]
 	#expect(fields.map(\.0).allSatisfy(known.contains), "unknown vector fields \(fields.map(\.0))")
 	#expect(field("version") == .string("markless.native-conformance/0"))
 	let params = try field("params").map { try NativeViewPayload.decodeParams(try Reader($0, at: "params")) } ?? []
@@ -98,6 +98,8 @@ func reproducesConformanceVector(file: URL) throws {
 	#expect(rows.isEmpty ? field("initialRows") == nil : JSONValue.array(rows).jsonText == field("initialRows")?.jsonText)
 	let checks = try runtime.checks().map { JSONValue.array([.string($0.node), .bool($0.checked)]) }
 	#expect(checks.isEmpty ? field("initialChecks") == nil : JSONValue.array(checks).jsonText == field("initialChecks")?.jsonText)
+	let selections = try runtime.selections().map { JSONValue.array([.string($0.node), .bool($0.selected)]) }
+	#expect(selections.isEmpty ? field("initialSelections") == nil : JSONValue.array(selections).jsonText == field("initialSelections")?.jsonText)
 	let arms = try runtime.arms().map { JSONValue.array([.string($0.node), $0.index.map { .number(Double($0)) } ?? .null]) }
 	#expect(arms.isEmpty ? field("initialArms") == nil : JSONValue.array(arms).jsonText == field("initialArms")?.jsonText)
 	let sheets = try runtime.sheets().map { JSONValue.array([.string($0.node), .bool($0.open)]) }

@@ -11,7 +11,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 
 /** The element view: children stack vertically until a style export assigns frames, then each child sits at its frame. */
-class MarklessBox(context: Context) : FrameLayout(context) {
+open class MarklessBox(context: Context) : FrameLayout(context) {
 	internal val frames = HashMap<View, Rect>()
 	/** A scroll container's content box, or a sheet's styled content: its size in px whatever its parent offers. */
 	internal var fixedSize: Pair<Int, Int>? = null

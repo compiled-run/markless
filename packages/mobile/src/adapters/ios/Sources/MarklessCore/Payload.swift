@@ -118,7 +118,7 @@ public struct NativeArmPlace: Equatable, Hashable, Sendable {
 }
 
 public struct NativeBinding: Equatable, Sendable {
-	/// The attribute's name, or the property (`value`, `checked` or `indeterminate`).
+	/// The attribute's name, or the property (`value`, `checked`, `indeterminate` or an option's `selected`).
 	public let name: String
 	public let isProperty: Bool
 	public let value: NativeExpr
@@ -229,6 +229,8 @@ public enum NativeEventName: String, Sendable {
 	case visible
 	/// A touch going down or up: it reaches the element under it and each element it is inside, innermost first.
 	case pointerdown, pointerup
+	/// A person chose an option (its instance id is the action's host) in its `<select>`'s list; never a payload event.
+	case choose
 }
 
 public enum NativeOp: Equatable, Sendable {
@@ -264,7 +266,7 @@ public struct NativeCapture: Equatable, Sendable {
 }
 
 public enum NativeFieldKind: String, Sendable {
-	case text, checkbox, radio, hidden
+	case text, checkbox, radio, hidden, select
 }
 
 /// What the web says when a required field has no value, in one language.
@@ -461,7 +463,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 					if try binding.keys().contains("property") {
 						let b = try binding.object(["property", "value"])
 						let property = try b["property"].string()
-						guard ["value", "checked", "indeterminate"].contains(property) else { throw PayloadError(path: binding.path, reason: "unknown property \"\(property)\"") }
+						guard ["value", "checked", "indeterminate", "selected"].contains(property) else { throw PayloadError(path: binding.path, reason: "unknown property \"\(property)\"") }
 						return NativeBinding(name: property, isProperty: true, value: try decodeExpr(try b["value"]))
 					}
 					let b = try binding.object(["attribute", "value"])

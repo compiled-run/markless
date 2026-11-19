@@ -91,7 +91,7 @@ sealed interface TextPart {
 
 data class ArmPlace(val branch: String, val index: Int)
 
-/** An attribute that follows state, or (when [property]) an input's `value`, `checked` or `indeterminate` property. */
+/** An attribute that follows state, or (when [property]) an input's `value`, `checked` or `indeterminate`, or an option's `selected`. */
 data class Binding(val name: String, val value: Expr, val property: Boolean = false)
 
 sealed interface Node {
@@ -157,7 +157,7 @@ data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boo
 data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
 
 /** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Dismiss] is a sheet's platform close or an overlay's Escape or outside press. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
-enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"), PointerDown("pointerdown"), PointerUp("pointerup") }
+enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"), PointerDown("pointerdown"), PointerUp("pointerup"), Choose("choose") }
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
@@ -215,7 +215,7 @@ data class Continuation(val id: String, val local: String, val ops: List<Op>, va
 /** A device object a component makes (`const cam = camera()`); it lives while its [owner] node is shown. */
 data class DeviceObject(val id: String, val device: String, val owner: String)
 
-enum class FieldKind(val wire: String) { Text("text"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden") }
+enum class FieldKind(val wire: String) { Text("text"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden"), Select("select") }
 
 data class Field(val node: String, val kind: FieldKind)
 
@@ -576,7 +576,7 @@ data class Payload(
 						val value = expr(bo.field("value", what), "$what.bindings[$n].value")
 						if (bo.containsKey("property")) {
 							bo.only(setOf("property", "value"), "$what.bindings[$n]")
-							Binding(oneOf(bo, "property", setOf("value", "checked", "indeterminate"), "$what.bindings[$n]"), value, property = true)
+							Binding(oneOf(bo, "property", setOf("value", "checked", "indeterminate", "selected"), "$what.bindings[$n]"), value, property = true)
 						} else {
 							bo.only(setOf("attribute", "value"), "$what.bindings[$n]")
 							Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), value)
