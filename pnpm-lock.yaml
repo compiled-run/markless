@@ -621,6 +621,9 @@ importers:
       yuku:
         specifier: 0.20.1
         version: 0.20.1
+      yuku-css:
+        specifier: 0.1.0
+        version: 0.1.0
     devDependencies:
       '@markless/analyzer':
         specifier: workspace:*
