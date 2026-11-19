@@ -367,6 +367,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'unset',
+		fixture: 'test/fixtures/Unset.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h4' },
+			{ event: 'activate', host: 'h8' },
+			{ event: 'activate', host: 'component-edge:0/h5' },
+			{ event: 'activate', host: 'h8' },
+		],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [
