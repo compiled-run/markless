@@ -2537,11 +2537,12 @@ export function buildDomBindingEmission(input: DomBindingEmissionInput): Emissio
 					? [
 							moduleImportNode({
 								kind: 'named',
-								localName:
-									input.symbol.target.textNode !== undefined
-										? 'marklessTextNode'
-										: 'marklessSiblingText',
-								source: '@markless/web/fns/text-node',
+								...(input.symbol.target.textNode !== undefined
+									? { localName: 'marklessTextNode', source: '@markless/web/fns/text-node' }
+									: {
+											localName: 'marklessSiblingText',
+											source: '@markless/web/fns/sibling-text',
+										}),
 							}),
 						]
 					: []),

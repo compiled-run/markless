@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { marklessSiblingText, marklessTextNode } from '../src/fns/text-node.ts';
+import { marklessSiblingText } from '../src/fns/sibling-text.ts';
+import { marklessTextNode } from '../src/fns/text-node.ts';
 
 type FakeNode = { nodeType: number; name: string };
 

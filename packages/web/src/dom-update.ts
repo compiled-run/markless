@@ -1,6 +1,7 @@
 import type { ProtocolViewPayload } from '@markless/serializer';
 import type { DomJournalEntry } from '@markless/runtime';
-import { marklessSiblingText, marklessTextNode } from './fns/text-node.ts';
+import { marklessSiblingText } from './fns/sibling-text.ts';
+import { marklessTextNode } from './fns/text-node.ts';
 
 export type DomUpdateEntryInput = {
 	readonly locator: string;
