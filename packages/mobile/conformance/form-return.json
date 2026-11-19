@@ -154,7 +154,9 @@
 										},
 										"arguments": [
 											{
-												"lambda": ["formdata:entry"],
+												"lambda": [
+													"formdata:entry"
+												],
 												"body": {
 													"binary": "===",
 													"left": {
@@ -184,7 +186,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -364,7 +368,9 @@
 						"kind": "text"
 					}
 				],
-				"submitters": ["h3"]
+				"submitters": [
+					"h3"
+				]
 			}
 		],
 		"valueMissing": {
@@ -646,14 +652,35 @@
 		}
 	},
 	"initial": [
-		["h3:text0", "Send"],
-		["h4:text0", "Ready"],
-		["h5:text0", "none 0"]
+		[
+			"h3:text0",
+			"Send"
+		],
+		[
+			"h4:text0",
+			"Ready"
+		],
+		[
+			"h5:text0",
+			"none 0"
+		]
 	],
 	"initialAttributes": [
-		["h3", "disabled", ""],
-		["h1", "aria-busy", null],
-		["h3", "aria-disabled", null]
+		[
+			"h3",
+			"disabled",
+			""
+		],
+		[
+			"h1",
+			"aria-busy",
+			null
+		],
+		[
+			"h3",
+			"aria-disabled",
+			null
+		]
 	],
 	"steps": [
 		{

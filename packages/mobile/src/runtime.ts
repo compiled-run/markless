@@ -555,7 +555,7 @@ export function createNativeRuntime(
 	 * What the host tells a script about the elements its frame passes as proxies: each one's attributes now and the
 	 * elements it is inside, nearest first.
 	 */
-	const elementFacts = (frame: Record<string, unknown>) => {
+	const elementFacts = (frame: Record<string, unknown>, also: readonly string[] = []) => {
 		const facts: Record<string, { attributes: Record<string, string>; ancestors: string[] }> = {};
 		const add = (id: unknown) => {
 			if (typeof id !== 'string' || facts[id] || !elements.isElement(id)) return;
@@ -591,6 +591,7 @@ export function createNativeRuntime(
 			}
 		};
 		visit(frame);
+		also.forEach(add);
 		return facts;
 	};
 	const entryCells = () => ({
@@ -1259,13 +1260,19 @@ export function createNativeRuntime(
 			if (op.op === 'script') {
 				const text = typeof eventValue === 'string' ? eventValue : eventValue?.value;
 				const frame = frameOf(op.bindings, text, scope);
+				const reason = typeof eventValue === 'object' ? eventValue.reason : undefined;
+				const pressTarget = typeof eventValue === 'object' ? (eventValue.pressTarget ?? null) : null;
 				calls.push(
 					...enter({
 						kind: 'dispatch',
 						fn: op.fn,
 						frame,
-						elements: elementFacts(frame),
-						event: text === undefined ? { type: op.type } : { type: op.type, value: text },
+						elements: elementFacts(frame, pressTarget === null ? [] : [pressTarget]),
+						event: {
+							type: op.type,
+							...(text === undefined ? {} : { value: text }),
+							...(reason === undefined ? {} : { detail: { reason, pressTarget } }),
+						},
 						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),
 					}),
 				);

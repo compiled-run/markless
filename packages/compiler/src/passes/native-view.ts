@@ -23,6 +23,7 @@ import {
 	NATIVE_ELEMENTS,
 	NATIVE_DOCUMENT_BODY,
 	NATIVE_UNSHOWN_ELEMENTS,
+	NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
 	NATIVE_SCRIPT_HOST_GLOBALS,
@@ -4367,8 +4368,12 @@ export function createNativeViewPayload(
 		const what = `the ${event.eventName} handler`;
 		if (!fact) return refuseScript(`${what} has no source the build read, so it cannot run as JavaScript`, event.handlerSpan);
 		let readsMissing = false;
+		const eventMembers =
+			SEMANTIC_EVENTS[event.eventName] === 'dismiss'
+				? [...NATIVE_SCRIPT_EVENT_MEMBERS, ...NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS]
+				: NATIVE_SCRIPT_EVENT_MEMBERS;
 		for (const read of fact.event ?? []) {
-			const known = NATIVE_SCRIPT_EVENT_MEMBERS.some((members) =>
+			const known = eventMembers.some((members) =>
 				members.every((member, index) => index >= read.path.length || read.path[index] === member) &&
 				(read.path.length <= members.length || members.length === 2),
 			);

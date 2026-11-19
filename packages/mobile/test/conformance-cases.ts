@@ -433,6 +433,21 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'dismiss-detail',
+		fixture: 'proofs/u60-dismiss-detail/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'pointerdown', host: 'h5' },
+			{ event: 'pointerdown', host: 'h3' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'pointerdown', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'dismiss', host: 'h4', reason: 'escape' },
+		],
+	},
+	{
 		name: 'script-loop',
 		fixture: 'proofs/j1-loop-local/App.tsrx',
 		modules: true,

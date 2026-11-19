@@ -1,0 +1,43 @@
+appId: ${APP_ID}
+name: u60-dismiss-detail
+---
+- launchApp:
+      clearState: true
+- assertVisible: Dismiss
+- assertVisible: Guide
+- assertVisible: Last nothing yet
+- assertNotVisible: Step one
+- tapOn: Guide
+- assertVisible: Step one
+- assertVisible: Step one
+- assertVisible: Last nothing yet
+- tapOn: Last nothing yet
+- assertNotVisible: Step one
+- assertNotVisible: Last nothing yet
+- assertVisible: Last outside-press
+- assertNotVisible: Step one
+- assertNotVisible: Last nothing yet
+- tapOn: Guide
+- assertVisible: Step one
+- assertVisible: Step one
+- assertVisible: Last outside-press
+- tapOn: Guide
+- assertNotVisible: Step one
+- assertNotVisible: Last outside-press
+- assertVisible: Last outside-press on Guide
+- assertNotVisible: Step one
+- assertNotVisible: Last outside-press
+- tapOn: Guide
+- assertVisible: Step one
+- assertVisible: Step one
+- assertVisible: Last outside-press on Guide
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - back
+          - assertNotVisible: Step one
+          - assertNotVisible: Last outside-press on Guide
+          - assertVisible: Last escape
+          - assertNotVisible: Step one
+          - assertNotVisible: Last outside-press on Guide
