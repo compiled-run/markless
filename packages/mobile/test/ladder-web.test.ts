@@ -200,18 +200,19 @@ async function swipe(page: Page, from: readonly [number, number], to: readonly [
 async function act(page: Page, step: LadderStep) {
 	const action = step.do;
 	if (!action) return;
-	if ('tap' in action) {
+	if ('tap' in action || 'doubleTap' in action) {
+		const tap = 'tap' in action ? action.tap : action.doubleTap;
 		// A text that is also a control's accessible name (a label and the switch it names) taps the control, as on a phone;
 		// a button named by its own text comes first, over a region its heading also names.
-		const button = page.getByRole('button', { name: action.tap, exact: true });
-		const named = page.getByLabel(action.tap, { exact: true });
-		await (
+		const button = page.getByRole('button', { name: tap, exact: true });
+		const named = page.getByLabel(tap, { exact: true });
+		const target =
 			(await button.count()) === 1
 				? button
 				: (await named.count()) === 1
 					? named
-					: shown(page, action.tap)
-		).click();
+					: shown(page, tap);
+		await ('tap' in action ? target.click() : target.dblclick());
 	} else if ('type' in action) {
 		const field = page.getByRole('textbox', { name: action.type.field, exact: true });
 		await field.fill('');

@@ -208,7 +208,7 @@
 		"payload": false,
 		"diagnostics": [
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:6/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's `if` test reads `event.detail`, which a tap on a phone does not have"
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `landCaret`, which needs a script engine"
 		]
 	},
 	"fileupload": {
@@ -301,8 +301,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the contextmenu event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the dismiss event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:2/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's `if` test reads `event.isTrusted`, which a tap on a phone does not have",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's `if` test reads `event.detail`, which a tap on a phone does not have"
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's `if` test reads `event.isTrusted`, which a tap on a phone does not have"
 		]
 	},
 	"modal": {
@@ -407,8 +406,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `isChecked` uses a call to `Math.ceil`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the pointermove event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:4/h4 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's call to `rating.pressAt` reads `event.clientX`, which a tap on a phone does not have",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's call to `rating.pressAt` reads `event.detail`, which a tap on a phone does not have"
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's call to `rating.pressAt` reads `event.clientX`, which a tap on a phone does not have"
 		]
 	},
 	"resizable": {

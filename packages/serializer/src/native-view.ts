@@ -110,6 +110,8 @@ export type NativeExpr =
 	| { readonly event: 'key' }
 	/** In a text field's `paste` handler: the pasted plain text (`event.clipboardData.getData('text')`). */
 	| { readonly event: 'text' }
+	/** In a click handler: `event.detail`, how many presses in a row on the element (a double tap's second press is 2). */
+	| { readonly event: 'detail' }
 	/**
 	 * `new FormData(form)`: the form's entry list as the web builds it, `[name, value]` pairs in tree order. A field is left
 	 * out when it is disabled or has no name, a checkbox when it is not checked; a checkbox's value is its `value` attribute

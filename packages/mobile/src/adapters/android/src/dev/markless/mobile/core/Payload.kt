@@ -365,7 +365,7 @@ data class Payload(
 					Expr.Call(oneOf(o, "call", BUILTINS, what), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })
 				}
 				o.containsKey("route") -> { o.only(setOf("route"), what); oneOf(o, "route", setOf("params"), what); Expr.RouteParams }
-				o.containsKey("event") -> { o.only(setOf("event"), what); oneOf(o, "event", setOf("value", "key", "text"), what); Expr.EventValue }
+				o.containsKey("event") -> { o.only(setOf("event"), what); oneOf(o, "event", setOf("value", "key", "text", "detail"), what); Expr.EventValue }
 				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
 				o.containsKey("field") -> { o.only(setOf("field"), what); Expr.Field(o.field("field", what).str("$what.field")) }
 				o.containsKey("formData") -> { o.only(setOf("formData"), what); Expr.FormData(o.field("formData", what).str("$what.formData")) }

@@ -429,6 +429,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'press-count',
+		fixture: 'test/fixtures/PressCount.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h1', detail: 1 },
+			{ event: 'activate', host: 'h1', detail: 2 },
+			{ event: 'activate', host: 'h1', detail: 3 },
+		],
+	},
+	{
 		name: 'field-text',
 		fixture: 'test/fixtures/FieldText.tsrx',
 		actions: [

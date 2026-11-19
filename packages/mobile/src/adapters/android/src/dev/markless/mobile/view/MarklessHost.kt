@@ -365,6 +365,16 @@ class MarklessHost(
 		if (runtime.handlerFor(id, EventName.Dismiss) != null) apply(runtime.dispatch(id, EventName.Dismiss))
 	}
 
+	private var lastPress: Triple<String, Long, Int>? = null
+
+	/** A press's count (`event.detail`): a second press on the same view within the double-tap time is 2, as Chrome counts a double tap. */
+	private fun pressCount(id: String): Int {
+		val now = android.os.SystemClock.uptimeMillis()
+		val count = lastPress?.let { (last, at, n) -> if (last == id && now - at < android.view.ViewConfiguration.getDoubleTapTimeout()) n + 1 else 1 } ?: 1
+		lastPress = Triple(id, now, count)
+		return count
+	}
+
 	/** Applies a key's or paste's journal and answers whether its handler called `preventDefault()`. */
 	private fun prevents(journal: List<JournalEntry>): Boolean {
 		apply(journal)
@@ -715,7 +725,7 @@ class MarklessHost(
 		// A field's `value` attribute is its text until something sets it, as on the web.
 		if (view is EditText && node.bindings.none { it.property && it.name == "value" }) node.attributes["value"]?.let { view.setText(it) }
 		for (e in events[node.id].orEmpty()) when (e.event) {
-			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
+			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate, detail = pressCount(inst.id))) }
 			EventName.Dismiss -> throw MarklessHostError("dismiss event on \"${node.id}\", which is not a sheet")
 			// Raised by the field's focus listener, set where the field is built.
 			EventName.Focus, EventName.Blur -> if (view !is EditText) throw MarklessHostError("${e.event.wire} event on \"${node.id}\", which is not a text field")

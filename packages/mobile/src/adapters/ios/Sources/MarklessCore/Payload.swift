@@ -742,7 +742,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["cell"]: return .cell(try field("cell").string())
 		case ["event"]:
 			let name = try field("event").string()
-			guard ["value", "key", "text"].contains(name) else { throw PayloadError(path: reader.path + ".event", reason: "unknown event read \"\(name)\"") }
+			guard ["value", "key", "text", "detail"].contains(name) else { throw PayloadError(path: reader.path + ".event", reason: "unknown event read \"\(name)\"") }
 			return .eventValue
 		case ["literal"]: return .literal(try field("literal").scalar())
 		case ["unary", "value"]: return .unary(try oneOf("unary", ["!", "-", "+", "typeof"]), try decodeExpr(try field("value")))

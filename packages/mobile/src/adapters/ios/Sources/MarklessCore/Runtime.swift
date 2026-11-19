@@ -9,11 +9,14 @@ public struct NativeAction: Equatable, Sendable {
 	public let value: String?
 	/// For `timer`: the journalled timer whose time has come.
 	public let timer: String?
+	/// For `activate`: how many presses in a row on the element (a double tap's second is 2); nil reads as 1.
+	public let detail: Int?
 
-	public init(event: NativeEventName, host: String, value: String? = nil) {
+	public init(event: NativeEventName, host: String, value: String? = nil, detail: Int? = nil) {
 		self.event = event
 		self.host = host
 		self.value = value
+		self.detail = detail
 		timer = nil
 	}
 
@@ -21,6 +24,7 @@ public struct NativeAction: Equatable, Sendable {
 		self.event = event
 		host = ""
 		value = nil
+		detail = nil
 		self.timer = timer
 	}
 }
@@ -169,7 +173,7 @@ public final class NativeRuntime {
 	/// Row state's list by cell id: its values are kept as `<cell>@<key>`.
 	private let rowOfCell: [String: String]
 	private let firstOfCell: [String: NativeExpr]
-	private var eventValue: String?
+	private var eventValue: NativeValue?
 	/// In an `input` dispatch: the field's text, which it already shows.
 	private var edit: String?
 	private let forms: [String: NativeForm]
@@ -321,8 +325,8 @@ public final class NativeRuntime {
 		case let .field(node): return .string(try textOf(field: node))
 		case let .formData(form): return .array(try entries(of: form).map { .array($0.map(NativeValue.string)) })
 		case .eventValue:
-			guard let eventValue else { throw RuntimeError(reason: "the event value read outside an input, keydown or paste handler") }
-			return .string(eventValue)
+			guard let eventValue else { throw RuntimeError(reason: "the event value read outside an input, keydown, paste or click handler") }
+			return eventValue
 		case let .unary(op, inner):
 			let value = try evaluate(inner)
 			switch op {
@@ -624,8 +628,10 @@ public final class NativeRuntime {
 			throw RuntimeError(reason: "\(action.host) is not shown")
 		}
 		let scope = instance.scope
-		eventValue = [.input, .keydown, .paste].contains(action.event) ? action.value ?? "" : nil
-		edit = action.event == .input ? eventValue : nil
+		eventValue = [.input, .keydown, .paste].contains(action.event)
+			? .string(action.value ?? "")
+			: action.event == .activate ? .number(Double(action.detail ?? 1)) : nil
+		edit = action.event == .input ? action.value ?? "" : nil
 		defer { eventValue = nil; edit = nil }
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
 	}

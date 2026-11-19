@@ -325,6 +325,8 @@ type Scope = {
 	readonly pressed?: { readonly target: string; readonly currentTarget: string };
 	/** In a text field's keydown or paste handler: `event.key` or the pasted text is the event's, and `preventDefault()` an op. */
 	readonly typing?: 'keydown' | 'paste';
+	/** In a click handler: `event.detail` is the number of presses in a row. */
+	readonly clicking?: true;
 	/** In a form's submit handler: the form, which `event.preventDefault()` keeps from being sent. */
 	readonly submitting?: string;
 	readonly locals: ReadonlySet<string>;
@@ -2394,6 +2396,7 @@ export function createNativeViewPayload(
 				) {
 					if (TOUCH_MODIFIERS.has(expression.property)) return { literal: false };
 					if (scope.typing === 'keydown' && expression.property === 'key') return { event: 'key' };
+					if (scope.clicking && expression.property === 'detail') return { event: 'detail' };
 					if (scope.typing === 'keydown' && expression.property === 'isComposing')
 						return { literal: false };
 					if (
@@ -3936,6 +3939,7 @@ export function createNativeViewPayload(
 			event.eventName === 'submit' && pressed ? { submitting: pressed.currentTarget } : {};
 		const semantic = SEMANTIC_EVENTS[event.eventName];
 		const typing = semantic === 'keydown' || semantic === 'paste' ? { typing: semantic } : {};
+		const clicking = semantic === 'activate' && event.eventName === 'click' ? { clicking: true as const } : {};
 		const inner: Scope =
 			parameter === undefined
 				? { ...running, ...submitting, ...typing }
@@ -3947,6 +3951,7 @@ export function createNativeViewPayload(
 							...(pressed ? { pressed } : {}),
 							...submitting,
 							...typing,
+							...clicking,
 						};
 		snapshots = { handler, count: 0 };
 		continuations = { base: handler, next: 0 };

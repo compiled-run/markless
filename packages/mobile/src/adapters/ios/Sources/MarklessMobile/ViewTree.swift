@@ -1002,11 +1002,15 @@ final class ViewTree {
 			if event.event == .submit { continue }
 			switch (event.event, view) {
 			case let (.activate, control as UIButton):
-				control.addAction(UIAction { _ in onAction(NativeAction(event: .activate, host: id)) }, for: .touchUpInside)
+				// UIKit's own count of quick taps in one place: a touch down starts it, a repeated touch down adds one.
+				let taps = TapCount()
+				control.addAction(UIAction { _ in taps.value = 1 }, for: .touchDown)
+				control.addAction(UIAction { _ in taps.value += 1 }, for: .touchDownRepeat)
+				control.addAction(UIAction { _ in onAction(NativeAction(event: .activate, host: id, detail: taps.value)) }, for: .touchUpInside)
 			case (.activate, _) where !(view is UITextField || view is TextArea):
 				// An element that is not a button (a list row): a tap anywhere in it, its text included, presses it.
 				view.isUserInteractionEnabled = true
-				view.addGestureRecognizer(ActivateGesture { onAction(NativeAction(event: .activate, host: id)) })
+				view.addGestureRecognizer(ActivateGesture { taps in onAction(NativeAction(event: .activate, host: id, detail: taps)) })
 			case let (.input, field as UITextField):
 				field.addAction(
 					UIAction { [weak field] _ in onAction(NativeAction(event: .input, host: id, value: field?.text ?? "")) },
@@ -1603,14 +1607,23 @@ private final class TouchWatcher: UIGestureRecognizer {
 
 /// A tap that presses an element which is not a button.
 private final class ActivateGesture: UITapGestureRecognizer {
-	private let action: () -> Void
-	init(_ action: @escaping () -> Void) {
+	private let action: (Int) -> Void
+	/// UIKit's own count of quick taps in one place (`UITouch.tapCount`), which is a press's `event.detail`.
+	private var taps = 1
+	init(_ action: @escaping (Int) -> Void) {
 		self.action = action
 		super.init(target: nil, action: nil)
 		addTarget(self, action: #selector(fire))
 	}
-	@objc private func fire() { if state == .ended { action() } }
+	override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+		taps = touches.first?.tapCount ?? 1
+		super.touchesEnded(touches, with: event)
+	}
+	@objc private func fire() { if state == .ended { action(taps) } }
 }
+
+/// How many quick taps in one place a button's current press is: its `event.detail`.
+final class TapCount { var value = 1 }
 
 /// A scroll container's scroll view over its padding box. A drag that starts toward an edge it is already at goes to the
 /// scroll view around it, as the web chains a scroll to the page once a box is at its end.

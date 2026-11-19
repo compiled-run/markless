@@ -13,7 +13,8 @@ import { marklessAttributeValue } from '@markless/web/dom-attribute';
 
 /** A host-side action: what a person does to a retained view. */
 export type NativeAction =
-	| { readonly event: 'activate'; readonly host: string }
+	/** A press; `detail` is how many presses in a row on it (a double tap's second is 2), 1 when left out. */
+	| { readonly event: 'activate'; readonly host: string; readonly detail?: number }
 	/** A text field took the keyboard (`focus`) or gave it up (`blur`). */
 	| { readonly event: 'focus' | 'blur'; readonly host: string }
 	/** The field's whole text after an edit. */
@@ -125,7 +126,7 @@ const BUILTINS: { readonly [name in NativeBuiltin]: (...args: Value[]) => Value 
 export function evaluateNativeExpr(
 	expr: NativeExpr,
 	read: (cell: string, scope: NativeScope) => Value,
-	eventValue?: string,
+	eventValue?: string | number,
 	scope: NativeScope = EMPTY_SCOPE,
 ): Value {
 	const evaluate = (e: NativeExpr): Value => evaluateNativeExpr(e, read, eventValue, scope);
@@ -361,7 +362,7 @@ export function createNativeRuntime(
 		const slot = slotOf(cell, scope);
 		return values.has(slot) ? values.get(slot)! : values.get(cell)!;
 	};
-	const evaluate = (expr: NativeExpr, eventValue?: string, scope?: NativeScope): Value =>
+	const evaluate = (expr: NativeExpr, eventValue?: string | number, scope?: NativeScope): Value =>
 		evaluateNativeExpr(expr, read, eventValue, scope ?? base);
 	const armOf = (branch: Extract<NativeNode, { kind: 'branch' }>): number | null => {
 		if (branch.test) return evaluate(branch.test) ? 0 : branch.arms > 1 ? 1 : null;
@@ -764,7 +765,9 @@ export function createNativeRuntime(
 					? action.key
 					: action.event === 'paste'
 						? action.text
-						: edit;
+						: action.event === 'activate'
+							? (action.detail ?? 1)
+							: edit;
 			return change(action.host, edit, () =>
 				run(handlers.get(event.handler) ?? [], eventValue, scope),
 			);
@@ -790,7 +793,7 @@ export function createNativeRuntime(
 	/** Runs ops in order: writes cells, collects the calls (a continuation's id rides on its call), stops at a navigation. */
 	function run(
 		ops: ReadonlyArray<NativeOp>,
-		eventValue: string | undefined,
+		eventValue: string | number | undefined,
 		scope: NativeScope,
 		submission?: Submission,
 	): NativeJournalEntry[] {

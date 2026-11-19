@@ -175,7 +175,7 @@ class Runtime(
 	/** Row state's list by cell id: its values are kept as `<cell>@<key>`. */
 	private val rowOfCell = payload.cells.mapNotNull { c -> c.row?.let { c.id to it } }.toMap()
 	private val byId = payload.nodes.associateBy { it.id }
-	private var eventValue: String? = null
+	private var eventValue: JsValue? = null
 
 	fun value(cell: String): JsValue = values[cell] ?: throw MarklessRuntimeError("unknown cell \"$cell\"")
 
@@ -240,7 +240,7 @@ class Runtime(
 		fun eval(x: Expr) = evaluate(x, scope)
 		return when (e) {
 			Expr.RouteParams -> JsValue.Obj(params.entries.associateTo(LinkedHashMap()) { it.key to JsValue.Str(it.value) })
-			Expr.EventValue -> JsValue.Str(eventValue ?: throw MarklessRuntimeError("the event value read outside an input, keydown or paste handler"))
+			Expr.EventValue -> eventValue ?: throw MarklessRuntimeError("the event value read outside an input, keydown, paste or click handler")
 			is Expr.FormData -> entriesOf(e.form)
 			is Expr.Checked -> JsValue.Bool(checkedOf(e.node))
 			is Expr.Field -> JsValue.Str(textOf(e.node))
@@ -483,9 +483,10 @@ class Runtime(
 
 	/**
 	 * Runs the handler for [event] on [host] (a row instance as `<node>@<key>`); an `input` event carries the field's whole
-	 * text as [value], a `keydown` its key and a `paste` the pasted text.
+	 * text as [value], a `keydown` its key and a `paste` the pasted text; a press carries [detail], how many presses in a row.
 	 */
-	fun dispatch(host: String, event: EventName, value: String? = null): List<JournalEntry> {
+	fun dispatch(host: String, event: EventName, value: String? = null, detail: Int? = null): List<JournalEntry> {
+		if (detail != null && event != EventName.Activate) throw MarklessRuntimeError("a ${event.wire} event carries no press count")
 		if ((event in VALUED) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (event == EventName.Cancel) {
 			if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
@@ -506,7 +507,7 @@ class Runtime(
 		val scope = (instances(node(template)).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
 		return change(host, if (event == EventName.Input) value else null) {
-			eventValue = value
+			eventValue = if (event == EventName.Activate) JsValue.Num((detail ?: 1).toDouble()) else value?.let { JsValue.Str(it) }
 			try {
 				run(handler.ops, scope)
 			} finally {

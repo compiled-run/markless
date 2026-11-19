@@ -707,7 +707,7 @@ function walk(
 			openSheet(index);
 			if (!shownTexts().some(([, text]) => text === action.scrollTo))
 				throw new Error(`step ${index}: "${action.scrollTo}" is not in the open sheet`);
-		} else if (action && !('tap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
+		} else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
@@ -720,7 +720,9 @@ function walk(
 			const name =
 				'tap' in action
 					? action.tap
-					: 'type' in action
+					: 'doubleTap' in action
+						? action.doubleTap
+						: 'type' in action
 						? action.type.field
 						: 'erase' in action
 							? action.erase
@@ -762,7 +764,7 @@ function walk(
 				focused = host;
 				if (handles(host, 'focus')) apply(runtime.dispatch({ event: 'focus', host }), index);
 			}
-			if ('tap' in action && focused && focused !== host) {
+			if (('tap' in action || 'doubleTap' in action) && focused && focused !== host) {
 				if (handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
 				focused = undefined;
 			}
@@ -781,9 +783,14 @@ function walk(
 				return journal.some((entry) => entry.op === 'preventDefault');
 			};
 			if ('type' in action) for (const key of action.type.text) keyed(key);
+			// A double tap is two presses, the second counted 2.
+			if ('doubleTap' in action)
+				apply(runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 1 }), index);
 			const dispatched =
 				'tap' in action
 					? runtime.dispatch({ event: 'activate', host: pressed ?? host })
+					: 'doubleTap' in action
+						? runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 2 })
 					: 'type' in action
 						? handles(host, 'input')
 							? runtime.dispatch({ event: 'input', host, value: action.type.text })

@@ -72,7 +72,11 @@ object DeviceConformance {
 			val target by lazy { host.view(action.field("host", "action").str("host")) }
 			journal.clear()
 			when (val event = action.field("event", "action").str("event")) {
-				"activate" -> if (!target.performClick()) failures.add("steps[$n]: the view took no click")
+				"activate" -> {
+					val detail = (action["detail"] as? Json.Num)?.value?.toInt()
+					if (detail != null) host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Activate, detail = detail))
+					else if (!target.performClick()) failures.add("steps[$n]: the view took no click")
+				}
 				"cancel" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Cancel))
 				"input" -> (target as? EditText ?: throw MarklessHostError("steps[$n] types into a view that is not an input")).setText(action.field("value", "action").str("value"))
 				"dismiss" -> host.closedByPlatform(action.field("host", "action").str("host"))

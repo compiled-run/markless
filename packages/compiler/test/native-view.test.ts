@@ -330,6 +330,26 @@ export function Trip() @{
 		expect(payload?.events).toContainEqual({ host: 'h1', event: 'input', handler: 'handler:h1/edit' });
 	});
 
+	it("reads a click's event.detail as the number of presses in a row", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Like() @{
+	let note = state('');
+	<button onClick={(event) => (note = event.detail === 2 ? 'liked' : 'once')}>Like</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{
+				op: 'assign',
+				cell: 'state:note',
+				value: {
+					if: { binary: '===', left: { event: 'detail' }, right: { literal: 2 } },
+					whenTrue: { literal: 'liked' },
+					whenFalse: { literal: 'once' },
+				},
+			},
+		]);
+	});
+
 	it('refuses a paste handler off a text field, and a clipboard read other than plain text', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Paste() @{
