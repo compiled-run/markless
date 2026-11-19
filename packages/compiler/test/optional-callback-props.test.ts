@@ -402,6 +402,34 @@ test.each([
 	expect(await absentItem(handler)).toEqual([]);
 });
 
+test('every handler in one module is placed at its own line and column', async () => {
+	const result = await compile(
+		'src/buttons.tsrx',
+		`import { state } from '@markless/core';
+export default function Buttons() @{
+	let count = state(0);
+	<div>
+		<button onClick={() => count++}>One</button>
+		<p>
+			<button onClick={() => {
+				count = 0;
+			}}>Reset</button>
+		</p>
+			<i onClick={() => count--}>{count}</i>
+	</div>
+}
+`,
+	);
+	const starts = result.captureAnalysis.extractedSymbols
+		.filter((symbol) => symbol.kind === 'event-handler')
+		.map((symbol) => symbol.sourceStart);
+	expect(starts).toEqual([
+		{ filename: 'src/buttons.tsrx', line: 5, column: 20 },
+		{ filename: 'src/buttons.tsrx', line: 7, column: 21 },
+		{ filename: 'src/buttons.tsrx', line: 11, column: 16 },
+	]);
+});
+
 test('a child from another file names its own line when the page leaves the prop out', async () => {
 	const child = await compile(
 		'src/card.tsrx',

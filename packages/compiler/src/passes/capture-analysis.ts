@@ -31,7 +31,7 @@ import {
 import { componentEdgeInstancePath, componentEdgePathsEndingAt } from '../component-edge-instance.ts';
 import { asNodes, childNodes, unwrapTypeAssertion, type AnyNode } from '../ast/nodes.ts';
 import { isEventAttribute } from '../ast/events.ts';
-import { parseJavaScriptModule } from '../js-ast.ts';
+import { lineStarts, parseJavaScriptModule, sourcePosition } from '../js-ast.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
 import {
 	createSymbolSourceSemanticsReader,
@@ -1531,9 +1531,16 @@ function handlerSourceStart(symbol: PlannedSymbol, input: CaptureAnalysisInput):
 	const span = 'sourceSpan' in symbol ? symbol.sourceSpan : undefined;
 	const module = input.moduleSource;
 	if (!span || module === undefined || module.slice(span.start, span.end) !== symbolSource(symbol)) return undefined;
-	const lines = module.slice(0, span.start).split('\n');
-	return { filename: span.filename, line: lines.length, column: lines.at(-1)!.length + 1 };
+	const { line, column } = sourcePosition(
+		moduleLineStarts('', module, () => lineStarts(module)),
+		module.length,
+		span.start,
+	);
+	return { filename: span.filename, line, column: column + 1 };
 }
+
+// Built once per module: splitting the prefix for every handler made a many-handler file quadratic.
+const moduleLineStarts = createSourceMemo<ReadonlyArray<number>>();
 
 function lazySymbolRole(kind: string | undefined): string {
 	if (kind === 'event-handler') return 'an event handler';
