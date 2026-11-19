@@ -3652,13 +3652,7 @@ export function createNativeViewPayload(
 			})),
 		];
 		for (const slot of chunk.slots) {
-			// A selected option is the select's value written into HTML; a native view reads that value itself.
-			if (
-				slot.kind === 'attribute' ||
-				slot.kind === 'spread-attributes' ||
-				slot.kind === 'selected-option'
-			)
-				continue;
+			if (slot.kind === 'attribute' || slot.kind === 'spread-attributes') continue;
 			if (slot.kind === 'child-component') {
 				items.push({
 					kind: 'child',

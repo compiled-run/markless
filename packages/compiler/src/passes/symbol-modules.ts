@@ -1806,7 +1806,7 @@ function renderChunkParts(
 			(candidate) => candidate.staticIndex === staticIndex,
 		)) {
 			// A rebuilt select takes its value from its own `value` write, not from its options.
-			if (slot.kind === 'selected-option') continue;
+			if (slot.kind === 'attribute' && slot.selectedOption) continue;
 			if (slot.kind === 'text' && slot.residue.kind === 'graph-read') {
 				const scoped = scopedPropPart(scope, slot.residue.graphNodeId, slot.residue.path);
 				if (scoped === 'unsupported')
@@ -1886,7 +1886,7 @@ function renderChunkParts(
 					for (const rowSlot of row.slots.filter(
 						(candidate) => candidate.staticIndex === rowIndex,
 					)) {
-						if (rowSlot.kind === 'selected-option') continue;
+						if (rowSlot.kind === 'attribute' && rowSlot.selectedOption) continue;
 						if (
 							rowAttributes &&
 							rowSlot.kind === 'attribute' &&

@@ -1930,6 +1930,9 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				// The name and quotes are already in the statics: this value can
 				// never be absent, so the slot renders the value alone.
 				readonly alwaysPresent?: true;
+				// An option's `selected`, true when its select's value names it: written by the
+				// server render only, since the browser writes `select.value` itself.
+				readonly selectedOption?: true;
 				readonly directClassMatch?: {
 					readonly stateGraphNodeId: string;
 					readonly statePath: ReadonlyArray<string>;
@@ -1937,16 +1940,6 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 					readonly trueClass: string;
 					readonly falseClass: string;
 				};
-		  }
-		| {
-				/**
-				 * An `<option>` inside a `<select value>`: the server writes ` selected=""` when the select's value
-				 * names the option's (its value attribute, else its text); `residue` and `equals` are the two, in
-				 * either order. The browser leaves the option alone and writes `select.value`.
-				 */
-				readonly kind: 'selected-option';
-				readonly residue: SemanticMarkupResidue;
-				readonly equals: string | SemanticMarkupResidue;
 		  }
 		| {
 				readonly kind: 'spread-attributes';

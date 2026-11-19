@@ -135,13 +135,6 @@ type ArmElementLayout = {
 	readonly rowElements: ReadonlyArray<number>;
 };
 
-// The slots the browser's settle kernel writes into markup itself.
-const settledSlotKinds = new Set<SemanticMarkupChunk['slots'][number]['kind']>([
-	'text',
-	'attribute',
-	'selected-option',
-]);
-
 // Document order: elements outside rows count once, each repeat contributes rows times its row size.
 function armElementLayout(
 	renderData: RenderDataArtifact,
@@ -167,12 +160,12 @@ function armElementLayout(
 				(candidate) => candidate.repeatId === slot.repeatId,
 			);
 			const row = renderData.chunks.find((candidate) => candidate.id === repeat?.rowChunkId);
-			if (!row || row.slots.some((rowSlot) => !settledSlotKinds.has(rowSlot.kind)))
+			if (!row || row.slots.some((rowSlot) => rowSlot.kind !== 'text' && rowSlot.kind !== 'attribute'))
 				return null;
 			rowElements.push(row.hosts.length);
 			continue;
 		}
-		if (!settledSlotKinds.has(slot.kind)) return null;
+		if (slot.kind !== 'text' && slot.kind !== 'attribute') return null;
 	}
 	return { hosts, rowElements };
 }

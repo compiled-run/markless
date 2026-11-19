@@ -1,5 +1,5 @@
 import { PROJECTION_MARK_PATTERN, PROJECTION_MARK_PREFIX } from '../fns/projection-html.ts';
-import { marklessAttributeValue, marklessOptionSelected } from '../dom-attribute.ts';
+import { marklessAttributeValue } from '../dom-attribute.ts';
 import type { KeepParts } from '../fns/keep-parts-hook.ts';
 import { PROTOCOL_ROW_COMMENT } from '../../../serializer/src/protocol-page-markers.ts';
 import {
@@ -61,11 +61,6 @@ export type SsrDataSlot = LocatedSlot &
 				readonly name: string;
 				readonly residue: SsrDataResidue;
 				readonly alwaysPresent?: true;
-		  }
-		| {
-				readonly kind: 'selected-option';
-				readonly residue: SsrDataResidue;
-				readonly equals: string | SsrDataResidue;
 		  }
 		| {
 				readonly kind: 'spread-attributes';
@@ -672,16 +667,6 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 						: renderAttribute(slot.name, value),
 					tokens: [],
 				}));
-			case 'selected-option':
-				return marklessThen(input.read(slot.residue, context), (select) =>
-					marklessThen(
-						typeof slot.equals === 'string' ? slot.equals : input.read(slot.equals, context),
-						(option) => ({
-							html: marklessOptionSelected(select, option) ? ' selected=""' : '',
-							tokens: [],
-						}),
-					),
-				);
 			case 'spread-attributes':
 				return marklessThen(input.read(slot.residue, context), (value) => ({
 					html: renderSpreadAttributes(value, slot.excludeNames, input.attributeName),

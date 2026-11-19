@@ -100,7 +100,7 @@ type CollectionContext = {
 	// identifier carries consumer props; any other object is the author's own.
 	restName: string | null;
 	// The value of the `<select>` being emitted, which its options are matched against.
-	selectValue: string | SemanticMarkupResidue | null;
+	selectValue: MarkupValue | null;
 	readonly nestedLocalSource: ((expression: AnyNode) => string | null) | null;
 	readonly nativeFacts: NativeFactsHandle | null;
 	/** `@if` chains the build's target constants decide: the kept arm is emitted in place, the others not at all. */
@@ -761,31 +761,47 @@ function emitTextareaValue(
 	});
 }
 
+type MarkupValue =
+	| { readonly literal: string }
+	| { readonly source: string; readonly repeatId: string | null; readonly readsRow: boolean };
+
 function selectValue(
 	attributes: ReadonlyArray<AnyNode>,
 	context: CollectionContext,
 	repeat: { readonly id: string; readonly itemName: string } | null,
 	componentName: string,
-): string | SemanticMarkupResidue | null {
+): MarkupValue | null {
 	const attribute = attributes.find(
 		(candidate) =>
 			!isSpreadAttribute(candidate) &&
 			getIdentifierName(candidate.name as AnyNode | undefined) === 'value',
 	);
-	return attribute ? attributeValue(attribute, context, repeat, componentName) : null;
-}
-
-function attributeValue(
-	attribute: AnyNode,
-	context: CollectionContext,
-	repeat: { readonly id: string; readonly itemName: string } | null,
-	componentName: string,
-): string | SemanticMarkupResidue | null {
+	if (!attribute) return null;
 	const value = attribute.value as AnyNode | undefined;
 	const expression = unwrapExpressionContainer(value);
 	const literal = staticAttributeValue('value', value, expression);
-	if (literal) return attributeText('value', literal.value);
-	return expression ? expressionResidue(expression, context, repeat, componentName, 'value') : null;
+	if (literal) {
+		const text = attributeText('value', literal.value);
+		return text === null ? null : { literal: text };
+	}
+	return expression ? markupValue(expression, context, repeat, componentName) : null;
+}
+
+function markupValue(
+	expression: AnyNode,
+	context: CollectionContext,
+	repeat: { readonly id: string; readonly itemName: string } | null,
+	componentName: string,
+): MarkupValue {
+	const residue = expressionResidue(expression, context, repeat, componentName);
+	return {
+		source:
+			residue.kind === 'authored-expression'
+				? residue.source
+				: expressionSource(expression, context.source),
+		repeatId: repeat?.id ?? null,
+		readsRow: residue.kind !== 'graph-read',
+	};
 }
 
 // HTML names an option by its value attribute, else by its text with whitespace stripped and collapsed.
@@ -795,18 +811,16 @@ function optionValue(
 	context: CollectionContext,
 	repeat: { readonly id: string; readonly itemName: string } | null,
 	componentName: string,
-): string | SemanticMarkupResidue | null {
+): MarkupValue | null {
 	if (attributes.some(isSpreadAttribute)) return null;
-	const attribute = attributes.find(
-		(candidate) => getIdentifierName(candidate.name as AnyNode | undefined) === 'value',
-	);
-	if (attribute) return attributeValue(attribute, context, repeat, componentName);
+	if (attributes.some((candidate) => getIdentifierName(candidate.name as AnyNode | undefined) === 'value'))
+		return selectValue(attributes, context, repeat, componentName);
 	const children = asNodes(node.children).filter((child) => !isIgnorableStaticTextNode(child));
 	const texts = children.map((child) =>
 		isStaticTextNode(child) ? staticTextValue(child) : literalContainerText(child),
 	);
 	if (texts.every((text) => text !== null))
-		return texts.join('').replace(/[\t\n\f\r ]+/g, ' ').trim();
+		return { literal: texts.join('').replace(/[\t\n\f\r ]+/g, ' ').trim() };
 	const [only] = children;
 	const expression =
 		children.length === 1 && only
@@ -814,7 +828,11 @@ function optionValue(
 				? (only.expression as AnyNode | undefined)
 				: markupInterpolationExpression(only)
 			: undefined;
-	return expression ? expressionResidue(expression, context, repeat, componentName) : null;
+	return expression ? markupValue(expression, context, repeat, componentName) : null;
+}
+
+function valueSource(value: MarkupValue): string {
+	return 'literal' in value ? JSON.stringify(value.literal) : `(${value.source})`;
 }
 
 function emitSelectedOption(
@@ -827,21 +845,23 @@ function emitSelectedOption(
 ): void {
 	const select = context.selectValue;
 	if (select === null) return;
-	// A row item read only answers inside the row that holds the select.
-	if (typeof select !== 'string' && select.kind === 'repeat-item' && select.repeatId !== repeat?.id)
-		return;
+	// A value read off a row only answers inside that row.
+	if ('source' in select && select.readsRow && select.repeatId !== (repeat?.id ?? null)) return;
 	const option = optionValue(node, attributes, context, repeat, builder.componentName);
 	if (option === null) return;
-	if (typeof select === 'string' && typeof option === 'string') {
-		if (select === option) appendStaticAttribute(builder, path, 'selected', '');
+	if ('literal' in select && 'literal' in option) {
+		if (select.literal === option.literal) appendStaticAttribute(builder, path, 'selected', '');
 		return;
 	}
 	addSlot(builder, {
-		kind: 'selected-option',
+		kind: 'attribute',
+		name: 'selected',
 		coordinate: { kind: 'child-index', path },
-		...(typeof select === 'string'
-			? { residue: option as SemanticMarkupResidue, equals: select }
-			: { residue: select, equals: option }),
+		residue: {
+			kind: 'authored-expression',
+			source: `String(${valueSource(select)})===String(${valueSource(option)})`,
+		},
+		selectedOption: true,
 	});
 }
 

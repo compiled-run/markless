@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import type { SemanticMarkupSlot } from '../src/artifacts.ts';
 import { compileTsrxModule } from '../src/index.ts';
 import { createNativeViewPayload, NATIVE_FACT_COLLECTORS } from '../src/native.ts';
 import { buildSemanticGraph } from '../src/passes/semantic-graph/index.ts';
@@ -26,7 +27,12 @@ const template = async (markup: string) =>
 	(await chunks(markup)).find((chunk) => chunk.kind === 'template')!;
 const row = async (markup: string) =>
 	(await chunks(markup)).find((chunk) => chunk.kind === 'repeat-row')!;
-const sizeRead = { kind: 'graph-read', graphNodeId: 'state:size', path: [] };
+const selected = (chunk: { readonly slots: ReadonlyArray<SemanticMarkupSlot> }) =>
+	chunk.slots.flatMap((slot) =>
+		slot.kind === 'attribute' && slot.selectedOption
+			? [slot.name, slot.residue.kind === 'authored-expression' ? slot.residue.source : slot.residue]
+			: [],
+	);
 
 test('each static option of a bound select is marked selected when the select value names it', async () => {
 	const chunk = await template(
@@ -35,9 +41,11 @@ test('each static option of a bound select is marked selected when the select va
 	expect(chunk.statics.join('|')).toBe(
 		'<main><select|><option value="s"|>Small</option><optgroup label="Big"><option value="m"|>Medium</option></optgroup></select></main>',
 	);
-	expect(chunk.slots.filter((slot) => slot.kind === 'selected-option')).toEqual([
-		expect.objectContaining({ residue: sizeRead, equals: 's' }),
-		expect.objectContaining({ residue: sizeRead, equals: 'm' }),
+	expect(selected(chunk)).toEqual([
+		'selected',
+		'String((size))===String("s")',
+		'selected',
+		'String((size))===String("m")',
 	]);
 });
 
@@ -45,9 +53,11 @@ test('an option without a value attribute is named by its text, whitespace colla
 	const chunk = await template(
 		'<select value={size}><option>  Extra\n\t large </option><option label="L" /></select>',
 	);
-	expect(chunk.slots.filter((slot) => slot.kind === 'selected-option')).toEqual([
-		expect.objectContaining({ equals: 'Extra large' }),
-		expect.objectContaining({ equals: '' }),
+	expect(selected(chunk)).toEqual([
+		'selected',
+		'String((size))===String("Extra large")',
+		'selected',
+		'String((size))===String("")',
 	]);
 });
 
@@ -55,20 +65,11 @@ test('options from a @for are named by the row value or the row text', async () 
 	const byValue = await row(
 		'<select value={size}>@for (const option of sizes; key option.id) {<option value={option.id}>{option.label}</option>}</select>',
 	);
-	expect(byValue.slots.filter((slot) => slot.kind === 'selected-option')).toEqual([
-		expect.objectContaining({
-			residue: sizeRead,
-			equals: expect.objectContaining({ kind: 'repeat-item', path: ['id'] }),
-		}),
-	]);
+	expect(selected(byValue)).toEqual(['selected', 'String((size))===String((option.id))']);
 	const byText = await row(
 		'<select value={size}>@for (const name of names; key name) {<option>{name}</option>}</select>',
 	);
-	expect(byText.slots.filter((slot) => slot.kind === 'selected-option')).toEqual([
-		expect.objectContaining({
-			equals: expect.objectContaining({ kind: 'repeat-item', path: [] }),
-		}),
-	]);
+	expect(selected(byText)).toEqual(['selected', 'String((size))===String((name))']);
 });
 
 test('a literal select value marks its option in the statics', async () => {
@@ -85,7 +86,7 @@ test('an option the author marked, or outside a valued select, is left as writte
 	const authored = await template(
 		'<select value={size}><option value="s" selected>Small</option></select>',
 	);
-	expect(authored.slots.filter((slot) => slot.kind === 'selected-option')).toEqual([]);
+	expect(selected(authored)).toEqual([]);
 	const unvalued = await template('<select><option value="s">Small</option></select>');
 	expect(unvalued.slots).toEqual([]);
 });
@@ -94,12 +95,7 @@ test('a literal select value with options from a @for compares each row value to
 	const chunk = await row(
 		'<select value="m">@for (const option of sizes; key option.id) {<option value={option.id}>{option.label}</option>}</select>',
 	);
-	expect(chunk.slots.filter((slot) => slot.kind === 'selected-option')).toEqual([
-		expect.objectContaining({
-			residue: expect.objectContaining({ kind: 'repeat-item', path: ['id'] }),
-			equals: 'm',
-		}),
-	]);
+	expect(selected(chunk)).toEqual(['selected', 'String("m")===String((option.id))']);
 });
 
 test('a phone build refuses a select and its options by element, as before', async () => {

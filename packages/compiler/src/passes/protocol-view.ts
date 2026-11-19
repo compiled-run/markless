@@ -1082,7 +1082,7 @@ function mintableRowTemplate(
 			continue;
 		}
 		// A minted option leaves its selection to the select's own `value` write.
-		if (slot.kind === 'selected-option') continue;
+		if (slot.kind === 'attribute' && slot.selectedOption) continue;
 		// Every slot that is neither text nor an attribute is wiring the mint does
 		// not do, and a value only the render can produce has no channel at all.
 		if (slot.kind !== 'text' && slot.kind !== 'attribute') return {};
@@ -1155,7 +1155,7 @@ function rowBranchSlot(
 		for (const armSlot of chunk.slots) {
 			if (armSlot.kind === 'repeat' && nestedRepeatMints(input, render, armSlot.repeatId, chunkId))
 				continue;
-			if (armSlot.kind === 'selected-option') continue;
+			if (armSlot.kind === 'attribute' && armSlot.selectedOption) continue;
 			if (armSlot.kind !== 'text' && armSlot.kind !== 'attribute') return null;
 			const value = slotValue(armSlot);
 			if (!value) return null;
