@@ -515,8 +515,7 @@
 	"textbox": {
 		"payload": false,
 		"diagnostics": [
-			"MARKLESS_NATIVE_ELEMENT: the <textarea> element has no native view yet",
-			"MARKLESS_NATIVE_JAVASCRIPT: the input handler reads `textboxState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)"
+			"MARKLESS_NATIVE_ELEMENT: the <textarea> element has no native view yet"
 		]
 	},
 	"timebox": {

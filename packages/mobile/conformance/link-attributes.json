@@ -493,13 +493,17 @@
 			},
 			{
 				"pattern": "/items/[id]",
-				"params": ["id"],
+				"params": [
+					"id"
+				],
 				"page": {
 					"version": "markless.native-view/0",
 					"component": "Item",
 					"route": {
 						"pattern": "/items/[id]",
-						"params": ["id"]
+						"params": [
+							"id"
+						]
 					},
 					"cells": [],
 					"nodes": [
@@ -743,13 +747,27 @@
 	},
 	"open": "/",
 	"initial": {
-		"stack": ["/"],
+		"stack": [
+			"/"
+		],
 		"title": "Home",
 		"texts": [
-			["component-edge:0/component-edge:0:text0", "Home"],
-			["component-edge:0/component-edge:1:text0", "About"],
-			["h2:text0", "Choose pear"],
-			["component-edge:1:text0", "Open apple"]
+			[
+				"component-edge:0/component-edge:0:text0",
+				"Home"
+			],
+			[
+				"component-edge:0/component-edge:1:text0",
+				"About"
+			],
+			[
+				"h2:text0",
+				"Choose pear"
+			],
+			[
+				"component-edge:1:text0",
+				"Open apple"
+			]
 		]
 	},
 	"steps": [
@@ -771,13 +789,27 @@
 					"value": "Open pear"
 				}
 			],
-			"stack": ["/"],
+			"stack": [
+				"/"
+			],
 			"title": "Home",
 			"texts": [
-				["component-edge:0/component-edge:0:text0", "Home"],
-				["component-edge:0/component-edge:1:text0", "About"],
-				["h2:text0", "Choose pear"],
-				["component-edge:1:text0", "Open pear"]
+				[
+					"component-edge:0/component-edge:0:text0",
+					"Home"
+				],
+				[
+					"component-edge:0/component-edge:1:text0",
+					"About"
+				],
+				[
+					"h2:text0",
+					"Choose pear"
+				],
+				[
+					"component-edge:1:text0",
+					"Open pear"
+				]
 			]
 		},
 		{
@@ -794,13 +826,28 @@
 					}
 				}
 			],
-			"stack": ["/", "/items/pear"],
+			"stack": [
+				"/",
+				"/items/pear"
+			],
 			"title": "Item",
 			"texts": [
-				["component-edge:0/component-edge:0:text0", "Home"],
-				["component-edge:0/component-edge:1:text0", "About"],
-				["h2:text0", "Item pear"],
-				["component-edge:1/component-edge:0:text0", "Back home"]
+				[
+					"component-edge:0/component-edge:0:text0",
+					"Home"
+				],
+				[
+					"component-edge:0/component-edge:1:text0",
+					"About"
+				],
+				[
+					"h2:text0",
+					"Item pear"
+				],
+				[
+					"component-edge:1/component-edge:0:text0",
+					"Back home"
+				]
 			]
 		},
 		{
@@ -808,13 +855,27 @@
 				"event": "back"
 			},
 			"journal": [],
-			"stack": ["/"],
+			"stack": [
+				"/"
+			],
 			"title": "Home",
 			"texts": [
-				["component-edge:0/component-edge:0:text0", "Home"],
-				["component-edge:0/component-edge:1:text0", "About"],
-				["h2:text0", "Choose pear"],
-				["component-edge:1:text0", "Open pear"]
+				[
+					"component-edge:0/component-edge:0:text0",
+					"Home"
+				],
+				[
+					"component-edge:0/component-edge:1:text0",
+					"About"
+				],
+				[
+					"h2:text0",
+					"Choose pear"
+				],
+				[
+					"component-edge:1:text0",
+					"Open pear"
+				]
 			]
 		},
 		{
@@ -829,12 +890,24 @@
 					"params": {}
 				}
 			],
-			"stack": ["/", "/about"],
+			"stack": [
+				"/",
+				"/about"
+			],
 			"title": "About",
 			"texts": [
-				["component-edge:0/component-edge:0:text0", "Home"],
-				["component-edge:0/component-edge:1:text0", "About"],
-				["h2:text0", "About these links"]
+				[
+					"component-edge:0/component-edge:0:text0",
+					"Home"
+				],
+				[
+					"component-edge:0/component-edge:1:text0",
+					"About"
+				],
+				[
+					"h2:text0",
+					"About these links"
+				]
 			]
 		}
 	]
