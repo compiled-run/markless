@@ -228,8 +228,15 @@ function appStyle(dir: string, name: string, inputs: NativeAppBuild['styleInputs
 }
 
 /** A styled page whose scroll range Dragon cannot decide is a build error naming the file and the element. */
-function checkPageScroll(bytes: Uint8Array, build: NativeBuild, filename: string, name: string): Uint8Array {
-	const exported = JSON.parse(new TextDecoder().decode(bytes)) as Parameters<typeof pageScrollDiagnostics>[0];
+function checkPageScroll(
+	bytes: Uint8Array,
+	build: NativeBuild,
+	filename: string,
+	name: string,
+): Uint8Array {
+	const exported = JSON.parse(new TextDecoder().decode(bytes)) as Parameters<
+		typeof pageScrollDiagnostics
+	>[0];
 	const unscrollable = pageScrollDiagnostics(exported, build, filename);
 	if (unscrollable.length > 0)
 		throw new Error(

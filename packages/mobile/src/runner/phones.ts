@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { bootEmulator } from '../harness/android.ts';
+import { bootEmulator, emulatorAnswers } from '../harness/android.ts';
 import { exec } from '../harness/exec.ts';
 import { bootSimulator } from '../harness/ios.ts';
 import type { AndroidTools } from '../harness/tools.ts';
@@ -40,13 +40,7 @@ export async function phoneAnswers(
 			(device) => device.udid === address.device && device.state === 'Booted',
 		);
 	}
-	if (!tools) return false;
-	const booted = await exec(
-		tools.adb,
-		['-s', address.device, 'shell', 'getprop', 'sys.boot_completed'],
-		{ allowFailure: true, timeoutMs: 20_000 },
-	).catch(() => ({ code: 1, stdout: '' }));
-	return booted.code === 0 && booted.stdout.trim() === '1';
+	return tools !== undefined && emulatorAnswers(tools, address.device);
 }
 
 /** Whether the phone is up already (booted by an earlier runner): reusing it needs no boot. */

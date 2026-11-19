@@ -6,6 +6,7 @@ import {
 	bootEmulator,
 	buildAndroidShell,
 	installProofApk,
+	settleEmulator,
 	stopEmulator,
 	type BootedEmulator,
 } from './android.ts';
@@ -242,6 +243,17 @@ async function main(argv: string[]): Promise<number> {
 					};
 				}
 			};
+			// A not-responding dialog raised during the host tests or an earlier rung would cover this rung's page.
+			if (emulator) {
+				const settled = await settleEmulator(tools!, emulator.serial).catch(
+					(error: unknown) => (error instanceof Error ? error.message : String(error)),
+				);
+				if (typeof settled === 'string') console.log(settled);
+				else if (settled.dismissed > 0)
+					console.log(
+						`${emulator.serial} waited out ${settled.dismissed} not-responding dialog(s) before ${rung.name}`,
+					);
+			}
 			const installs = await Promise.all(platforms.map(install));
 			// A rung that fetches reaches the test's echo server; the emulator's 127.0.0.1 is its own, so the port is forwarded.
 			const server = rung.expected.server === 'echo' ? await startEchoServer() : undefined;
