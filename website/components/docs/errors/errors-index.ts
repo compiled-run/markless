@@ -1508,14 +1508,6 @@ export const errorIndex: ErrorIndex = {
 			blurb: 'Markless checking itself. If you see one, it is a Markless bug: please open an issue.',
 			codes: [
 				{
-					code: 'MARKLESS_WRITE_THROUGH_NOT_A_LIST',
-					title: '',
-					chip: 'error',
-					kind: 'runtime error',
-					guided: false,
-					words: ' markless_write_through_not_a_list a markless runtime error from @markless/web.',
-				},
-				{
 					code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
 					title: 'A @catch reset has no graph to re-run values in',
 					chip: 'error',
@@ -2082,6 +2074,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a write has the wrong shape markless_scalar_write_shape a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_WRITE_THROUGH_NOT_A_LIST',
+					title: 'A write through a loop variable found no list',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'a write through a loop variable found no list markless_write_through_not_a_list a markless runtime error from @markless/web.',
 				},
 				{
 					code: 'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',

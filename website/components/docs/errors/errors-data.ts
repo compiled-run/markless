@@ -15969,7 +15969,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_WRITE_THROUGH_NOT_A_LIST',
-		title: '',
+		title: 'A write through a loop variable found no list',
 		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
