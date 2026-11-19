@@ -110,6 +110,27 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(store.read("k") == nil)
 }
 
+@MainActor @Test func aLiveRegionAnnouncesItsChangeOnceAJournalIsApplied() throws {
+	var spoken: [(text: String, assertive: Bool)] = []
+	let controller = try MarklessViewController(payload: vectorPayload("live"), store: MemoryStore())
+	let views = try tree(controller)
+	views.announce = { spoken.append(($0, $1)) }
+	// An atomic region (an <output>) is read whole; a polite region without aria-atomic reads only what changed.
+	try views.apply([
+		.text(node: "h2:text0", value: "1 in basket"),
+		.text(node: "h5:text0", value: "Added 1"),
+	])
+	#expect(spoken.map(\.text) == ["1 in basket", "Added 1"])
+	#expect(spoken.allSatisfy { !$0.assertive })
+	spoken = []
+	try views.apply([.text(node: "h3:text0", value: "Too many")])
+	#expect(spoken.map(\.text) == ["Too many"])
+	#expect(spoken.first?.assertive == true)
+	spoken = []
+	try views.apply([.text(node: "h7:text0", value: "Panel shown")])
+	#expect(spoken.isEmpty)
+}
+
 @MainActor @Test func aTextareaSendsEachEditAndTakesWritesFromOtherHandlers() throws {
 	var sent: [NativeAction] = []
 	let controller = try MarklessViewController(payload: vectorPayload("notes"), store: MemoryStore())

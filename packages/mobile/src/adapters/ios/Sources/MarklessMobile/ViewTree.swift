@@ -439,9 +439,11 @@ final class ViewTree {
 
 	/// The journal applier: the only code that changes a retained view after the first build.
 	func apply(_ journal: [NativeJournalEntry]) throws {
+		var liveChanges: [(region: String, text: String)] = []
 		for entry in journal {
 			switch entry {
 			case let .text(node, value):
+				if let region = liveRegion(around: node) { liveChanges.append((region, value)) }
 				if let paragraph = paragraphs[node] {
 					paragraphTexts[node] = value
 					try render(paragraph)
@@ -566,6 +568,43 @@ final class ViewTree {
 		refreshRelations()
 		if layout == nil { alignTables() }
 		overlays.flush()
+		announce(liveChanges)
+	}
+
+	/// How a live region's change is spoken; replaced in tests.
+	var announce: (_ text: String, _ assertive: Bool) -> Void = { text, assertive in
+		UIAccessibility.post(
+			notification: .announcement,
+			argument: assertive ? text as Any : NSAttributedString(string: text, attributes: [.accessibilitySpeechQueueAnnouncement: true]))
+	}
+
+	/// The live region holding a text node (a row's copy keeps its `@key`), if any.
+	private func liveRegion(around text: String) -> String? {
+		let at = text.firstIndex(of: "@")
+		let base = at.map { String(text[..<$0]) } ?? text
+		let suffix = at.map { String(text[$0...]) } ?? ""
+		var parent = nodes[base]?.parent
+		while let id = parent, let node = nodes[id] {
+			if node.live != nil { return id + suffix }
+			parent = node.parent
+		}
+		return nil
+	}
+
+	/// Each live region a journal changed, spoken once: whole when atomic, else the text that changed.
+	private func announce(_ changes: [(region: String, text: String)]) {
+		var order: [String] = []
+		var changed: [String: [String]] = [:]
+		for (region, text) in changes {
+			if changed[region] == nil { order.append(region) }
+			changed[region, default: []].append(text)
+		}
+		for region in order {
+			let base = region.split(separator: "@").first.map(String.init) ?? region
+			guard let live = nodes[base]?.live, let view = elements[region] ?? paragraphs[region]?.view else { continue }
+			let spoken = live.atomic ? text(within: view) : changed[region, default: []].joined(separator: " ")
+			if !spoken.isEmpty { announce(spoken, live.assertive) }
+		}
 	}
 
 	/// The top layer: a full-screen view above the page and the bars holding the dialog's own view (styled by its CSS, not a

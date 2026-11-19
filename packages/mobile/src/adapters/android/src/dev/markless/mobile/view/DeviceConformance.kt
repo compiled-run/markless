@@ -38,6 +38,11 @@ object DeviceConformance {
 			}
 		}
 		structure("initial")
+		for (node in host.payload.nodes) {
+			val live = (node as? Node.Element)?.live ?: continue
+			val wanted = if (live.assertive) android.view.View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE else android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE
+			for (inst in host.runtime.instances(node)) if (host.view(inst.id).accessibilityLiveRegion != wanted) failures.add("initial: ${inst.id} is not ${if (live.assertive) "an assertive" else "a polite"} live region")
+		}
 		val initial = canonical(vector.field("initial", "vector"))
 		if (shownTexts() != initial) failures.add("initial: views show ${shownTexts()}, expected $initial")
 		for (item in vector["initialAttributes"]?.arr("initialAttributes").orEmpty()) {

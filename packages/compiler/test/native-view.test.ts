@@ -468,6 +468,40 @@ export function Page() @{
 		);
 	});
 
+	it('marks live regions as ARIA defines them, and refuses one whose politeness follows state', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let open = state(false);
+	<main>
+		<output>{open ? 'on' : 'off'}</output>
+		<p role="alert">x</p>
+		<div aria-live="polite">y</div>
+		<div role="status" aria-live="off">z</div>
+		<div role={open ? 'region' : undefined}>w</div>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const live = Object.fromEntries(
+			(payload?.nodes ?? []).flatMap((node) => (node.kind === 'element' ? [[node.element + node.id, node.live ?? null]] : [])),
+		);
+		expect(live).toEqual({
+			mainh0: null,
+			outputh1: { politeness: 'polite', atomic: true },
+			ph2: { politeness: 'assertive', atomic: true },
+			divh3: { politeness: 'polite', atomic: false },
+			divh4: null,
+			divh5: null,
+		});
+		const dynamic = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let paused = state(false);
+	<div aria-live={paused ? 'off' : 'polite'}>news</div>
+}`);
+		expect(dynamic.diagnostics.map((d) => d.message)).toContain(
+			'the `aria-live` of a <div> follows state; a native host makes a live region when it builds the view',
+		);
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{
