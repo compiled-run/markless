@@ -16,6 +16,7 @@ type CssNode = {
 	readonly prelude?: CssNode | null;
 	readonly block?: CssNode | null;
 	readonly value?: CssNode | string | null;
+	readonly unit?: string;
 };
 
 type ScopedRule = {
@@ -33,6 +34,7 @@ type Sheet = {
 	readonly keyframes: ReadonlyArray<string>;
 	/** Identifiers in `animation` and `animation-name` values, vendor-prefixed forms included. */
 	readonly animationNames: ReadonlyArray<string>;
+	readonly animationValues: ReadonlyArray<ReadonlyArray<string>>;
 };
 
 async function compile(source: string, filename = 'src/Scopes.tsrx') {
@@ -47,10 +49,11 @@ async function sheetsOf(source: string, filename?: string): Promise<ReadonlyArra
 }
 
 function readSheet(scopeId: string, cssText: string): Sheet {
-	const { ast } = parseCss(cssText, { parseAtrulePrelude: false });
+	const { ast } = parseCss(cssText);
 	const rules: ScopedRule[] = [];
 	const keyframes: string[] = [];
 	const animationNames: string[] = [];
+	const animationValues: string[][] = [];
 	const visit = (nodes: ReadonlyArray<CssNode> | null | undefined): void => {
 		for (const node of nodes ?? []) {
 			if (node.type === 'Rule') {
@@ -59,9 +62,9 @@ function readSheet(scopeId: string, cssText: string): Sheet {
 				visit(node.block?.children);
 			} else if (node.type === 'Atrule') {
 				if (node.name?.toLowerCase().endsWith('keyframes')) {
-					const prelude = node.prelude as CssNode | null;
-					if (prelude && typeof prelude.value === 'string')
-						keyframes.push(prelude.value.trim());
+					const name = node.prelude?.children?.[0];
+					const text = name?.name ?? name?.value;
+					if (typeof text === 'string') keyframes.push(text);
 					continue;
 				}
 				visit(node.block?.children);
@@ -73,11 +76,18 @@ function readSheet(scopeId: string, cssText: string): Sheet {
 				for (const part of value?.children ?? []) {
 					if (part.type === 'Identifier' && part.name) animationNames.push(part.name);
 				}
+				animationValues.push((value?.children ?? []).map(componentValueText));
 			}
 		}
 	};
 	visit(ast.children as ReadonlyArray<CssNode>);
-	return { scopeId, rules, keyframes, animationNames };
+	return { scopeId, rules, keyframes, animationNames, animationValues };
+}
+
+function componentValueText(part: CssNode): string {
+	if (part.name) return part.name;
+	if (part.type === 'Dimension') return `${String(part.value)}${part.unit ?? ''}`;
+	return typeof part.value === 'string' ? part.value : part.type;
 }
 
 function readSelector(selector: CssNode): ScopedRule {
@@ -348,7 +358,7 @@ export function App() @{
 }
 `;
 
-	test.fails('a keyframe name is renamed with the block hash, in the at-rule and in animation values, vendor-prefixed forms included', async () => {
+	test('a keyframe name is renamed with the block hash, in the at-rule and in animation values, vendor-prefixed forms included', async () => {
 		const [sheet] = await sheetsOf(keyframesSource);
 		const local = sheet!.keyframes.filter((name) => name !== 'fade');
 		expect(local).toHaveLength(2);
@@ -360,7 +370,7 @@ export function App() @{
 		]);
 	});
 
-	test.fails('a keyframe name beginning -global- is emitted without the prefix and without a hash', async () => {
+	test('a keyframe name beginning -global- is emitted without the prefix and without a hash', async () => {
 		const [sheet] = await sheetsOf(keyframesSource);
 		expect(sheet!.keyframes).toContain('fade');
 		expect(sheet!.keyframes).not.toContain('-global-fade');
@@ -379,7 +389,150 @@ export function App() @{
 		const [sheet] = await sheetsOf(keyframesSource);
 		expect(ruleWith(sheet!, 'b')!.subjectClasses).toEqual(['b', sheet!.scopeId]);
 	});
+
+	test('two components that each declare the same keyframe name get two names, each referenced by its own rules', async () => {
+		const sheets = await sheetsOf(`
+export function Popup() @{
+	<div>
+		<style>
+			@keyframes fade-out { to { opacity: 0.25; } }
+			.popup { animation: fade-out 1s both; }
+		</style>
+		<p class="popup">a</p>
+		<Name />
+	</div>
+}
+
+function Name() @{
+	<div>
+		<style>
+			@keyframes fade-out { to { opacity: 0; } }
+			.name { animation-name: fade-out; }
+		</style>
+		<p class="name">b</p>
+	</div>
+}
+`);
+		const popup = sheetWith(sheets, 'popup');
+		const name = sheetWith(sheets, 'name');
+		expect(popup.keyframes).toHaveLength(1);
+		expect(name.keyframes).toHaveLength(1);
+		expect(popup.keyframes[0]).not.toBe(name.keyframes[0]);
+		expect(animationValues(popup)).toEqual([[popup.keyframes[0], '1s', 'both']]);
+		expect(animationValues(name)).toEqual([[name.keyframes[0]]]);
+	});
+
+	test('every animation in a shorthand list is renamed wherever its name sits, and keywords keep their meaning', async () => {
+		const [sheet] = await sheetsOf(`
+export function App() @{
+	<>
+		<style>
+			@keyframes write-in { from { opacity: 0; } }
+			@keyframes ease { from { opacity: 0; } }
+			@keyframes "quoted" { from { opacity: 0; } }
+			.a { animation: 1s ease-out 2 write-in, ease 1s ease, 300ms "quoted", vendor-lib 1s; }
+		</style>
+		<p class="a">a</p>
+	</>
+}
+`);
+		const [writeIn, ease, quoted] = sheet!.keyframes;
+		expect([writeIn, ease, quoted]).toEqual([
+			`write-in-${sheet!.scopeId}`,
+			`ease-${sheet!.scopeId}`,
+			`quoted-${sheet!.scopeId}`,
+		]);
+		expect(animationValues(sheet!)).toEqual([
+			['1s', 'ease-out', '2', writeIn, ',', 'ease', '1s', ease, ',', '300ms', quoted, ',', 'vendor-lib', '1s'],
+		]);
+	});
+
+	test('references inside nested rules and conditional at-rules follow the renamed keyframe', async () => {
+		const [sheet] = await sheetsOf(`
+export function App() @{
+	<>
+		<style>
+			@keyframes pop { from { opacity: 0; } }
+			.a {
+				.b { animation-name: pop; }
+				@media (min-width: 1px) { animation: pop 1s; }
+			}
+			@supports (display: grid) { .a { animation: pop 2s; } }
+			@layer base { .a { animation: pop 3s; } }
+			@container (min-width: 1px) { .a { -webkit-animation: pop 4s; } }
+			@starting-style { .a { animation: pop 5s; } }
+		</style>
+		<p class="a"><span class="b">b</span></p>
+	</>
+}
+`);
+		const scoped = `pop-${sheet!.scopeId}`;
+		expect(sheet!.keyframes).toEqual([scoped]);
+		expect(animationValues(sheet!).map((value) => value[0])).toEqual([
+			scoped, scoped, scoped, scoped, scoped, scoped,
+		]);
+	});
+
+	test('a name the block references but does not declare is left as written', async () => {
+		const [sheet] = await sheetsOf(`
+export function App() @{
+	<>
+		<style>
+			@keyframes local { from { opacity: 0; } }
+			.a { animation: library-spin 1s, local 2s; animation-name: elsewhere; }
+		</style>
+		<p class="a">a</p>
+	</>
+}
+`);
+		expect(animationValues(sheet!)).toEqual([
+			['library-spin', '1s', ',', `local-${sheet!.scopeId}`, '2s'],
+			['elsewhere'],
+		]);
+	});
 });
+
+describe('style attributes that name a scoped keyframe', () => {
+	async function warnings(markup: string) {
+		const result = await compile(`
+export function App() @{
+	const delay = '1s';
+	<>
+		<style>@keyframes pulse { from { opacity: 0; } } @keyframes -global-shared { from { opacity: 0; } }</style>
+		${markup}
+	</>
+}
+`);
+		return result.publicRenderPlan.diagnostics
+			.filter((diagnostic) => diagnostic.severity === 'warning')
+			.map((diagnostic) => diagnostic.message);
+	}
+
+	test('a static style string or style object that names the scoped keyframe is reported', async () => {
+		expect(await warnings(`<p style="animation: pulse 1s">a</p>`)).toEqual([
+			expect.stringContaining('`pulse` is a keyframe name scoped'),
+		]);
+		expect(await warnings(`<p style={{ animationName: 'pulse' }}>a</p>`)).toEqual([
+			expect.stringContaining('`pulse` is a keyframe name scoped'),
+		]);
+	});
+
+	test('a style object animation value known only at run time is reported', async () => {
+		expect(await warnings(`<p style={{ animation: delay }}>a</p>`)).toEqual([
+			expect.stringContaining('only known at run time'),
+		]);
+	});
+
+	test('global and undeclared names in a style attribute are not reported', async () => {
+		expect(await warnings(`<p style="animation: shared 1s, library-spin 2s">a</p>`)).toEqual([]);
+		expect(await warnings(`<p style={{ color: delay }}>a</p>`)).toEqual([]);
+	});
+});
+
+/** Each `animation`/`animation-name` value in source order, as its component values. */
+function animationValues(sheet: Sheet): ReadonlyArray<ReadonlyArray<string>> {
+	return sheet.animationValues;
+}
 
 describe('attributes, assigned blocks and apply', () => {
 	test.fails('an assigned block is a theme: it compiles to a stylesheet and evaluates to an object with $class', async () => {
