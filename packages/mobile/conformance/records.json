@@ -198,10 +198,22 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Stopped"],
-		["h2:text0", "Start"],
-		["h3:text0", "Number"],
-		["h4:text0", "Unknown"]
+		[
+			"h1:text0",
+			"Stopped"
+		],
+		[
+			"h2:text0",
+			"Start"
+		],
+		[
+			"h3:text0",
+			"Number"
+		],
+		[
+			"h4:text0",
+			"Unknown"
+		]
 	],
 	"steps": [
 		{

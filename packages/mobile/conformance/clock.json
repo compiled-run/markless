@@ -197,11 +197,26 @@
 	},
 	"now": 1795046400123,
 	"initial": [
-		["h1:text0", "Opened 2026-11-19T00:00:00.123Z"],
-		["h2:text0", "Since 1970 true"],
-		["h3:text0", "Pressed never"],
-		["h4:text0", "Started 1795046400123"],
-		["h5:text0", "Press"]
+		[
+			"h1:text0",
+			"Opened 2026-11-19T00:00:00.123Z"
+		],
+		[
+			"h2:text0",
+			"Since 1970 true"
+		],
+		[
+			"h3:text0",
+			"Pressed never"
+		],
+		[
+			"h4:text0",
+			"Started 1795046400123"
+		],
+		[
+			"h5:text0",
+			"Press"
+		]
 	],
 	"steps": [
 		{

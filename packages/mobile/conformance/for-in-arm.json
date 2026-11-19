@@ -139,7 +139,9 @@
 				"list": {
 					"cell": "state:fruits"
 				},
-				"key": ["id"],
+				"key": [
+					"id"
+				],
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 0
@@ -343,13 +345,33 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Show list"],
-		["h2:text0", "Add fruit"],
-		["h3:text0", "Clear"],
-		["h4:text0", "1 in the list"],
-		["h8:text0", "List hidden"]
+		[
+			"h1:text0",
+			"Show list"
+		],
+		[
+			"h2:text0",
+			"Add fruit"
+		],
+		[
+			"h3:text0",
+			"Clear"
+		],
+		[
+			"h4:text0",
+			"1 in the list"
+		],
+		[
+			"h8:text0",
+			"List hidden"
+		]
 	],
-	"initialArms": [["branch-site:0", 1]],
+	"initialArms": [
+		[
+			"branch-site:0",
+			1
+		]
+	],
 	"steps": [
 		{
 			"action": {
@@ -383,7 +405,10 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["a", "f1"]
+					"keys": [
+						"a",
+						"f1"
+					]
 				}
 			]
 		},
@@ -450,7 +475,9 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["f0"]
+					"keys": [
+						"f0"
+					]
 				},
 				{
 					"op": "arm",
