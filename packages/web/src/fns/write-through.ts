@@ -64,7 +64,14 @@ function locate(
 	if (!basePath || local === null || typeof local !== 'object') return null;
 	const base = context.graph.read(graphNodeId, basePath);
 	if (!element) return base === local ? [...basePath] : null;
-	if (!Array.isArray(base)) return null;
+	if (base == null) return null;
+	if (!Array.isArray(base))
+		throw Object.assign(
+			new Error(
+				`A write through a loop variable expected a list at "${basePath.join('.')}".`,
+			),
+			{ code: 'MARKLESS_WRITE_THROUGH_NOT_A_LIST', graphNodeId },
+		);
 	const index = base.indexOf(local);
 	return index < 0 ? null : [...basePath, String(index)];
 }

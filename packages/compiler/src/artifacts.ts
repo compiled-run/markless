@@ -1271,12 +1271,16 @@ export type SemanticWriteThrough =
 				| 'copy'
 				| 'destructured'
 				| 'dynamic-key'
+				| 'enclosing-rebound'
 				| 'flattened'
 				| 'map-entry'
 				| 'nested-element'
+				| 'nested-unknown'
 				| 'reassigned'
 				| 'row-item';
 			readonly source: string;
+			/** `enclosing-rebound`: the enclosing loop name that no longer holds its element at the write. */
+			readonly enclosingLocal?: string;
 	  };
 
 /** A local holding an element of an enclosing array, and the path from it to the next array in, outermost first. */

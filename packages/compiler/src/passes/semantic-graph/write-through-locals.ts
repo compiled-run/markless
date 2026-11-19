@@ -9,6 +9,7 @@ import {
 import type { SemanticWriteThrough } from '../../artifacts.ts';
 import { resolvedSymbolAt } from './collect-expressions.ts';
 import type { ModuleSemantics } from './shared-ast.ts';
+import { stateValueShape } from './state-value-shape.ts';
 import type { WalkState } from './types.ts';
 
 type Binding = ModuleSemantics['bindings'][number];
@@ -118,12 +119,16 @@ export function writeThroughLocal(
 	if (origin.kind === 'path') {
 		return { kind: 'path', local: binding.name, target: origin.target, path: segments };
 	}
-	if (!enclosingReachable(origin.enclosing, root, state)) {
+	const lost = lostEnclosingStep(origin.enclosing, root, state);
+	if (lost) {
 		return {
 			kind: 'untracked',
 			local: binding.name,
-			reason: 'nested-element',
-			source: expressionSource(target, state.source),
+			reason: 'enclosing-rebound',
+			source: lost.path.length
+				? [lost.anchor, ...lost.path].reduce(appendSegment)
+				: lost.anchor,
+			enclosingLocal: lost.anchor,
 		};
 	}
 	return {
@@ -143,17 +148,18 @@ export function writeThroughLocal(
 }
 
 // The write finds each enclosing element again by name, so the name must still mean that unreassigned local there.
-function enclosingReachable(
+function lostEnclosingStep(
 	enclosing: ReadonlyArray<EnclosingElement>,
 	writeRoot: AnyNode,
 	state: WalkState,
-): boolean {
-	if (enclosing.length === 0) return true;
+): EnclosingElement | undefined {
+	if (enclosing.length === 0) return undefined;
 	const semantic = state.semantic();
 	const node = semantic.nodeAt(writeRoot.start as number);
 	const from = node ? semantic.scopeOf(node) : null;
-	return enclosing.every((step) => {
-		const binding = from && semantic.lookup(step.anchor, { from });		return binding?.id === step.anchorId && !isReassigned(binding);
+	return enclosing.find((step) => {
+		const binding = from && semantic.lookup(step.anchor, { from });
+		return binding?.id !== step.anchorId || isReassigned(binding);
 	});
 }
 
@@ -423,6 +429,8 @@ function elementOrigin(
 		return { kind: 'untracked', reason: collection.reason, source: collection.source };
 	}
 	if (collection.kind === 'element') {
+		const notArray = innerNotArray(collection, collectionNode, state);
+		if (notArray) return notArray;
 		return (
 			innerElement(collection, binding.name, binding.id) ?? {
 				kind: 'untracked',
@@ -445,7 +453,11 @@ function elementOrigin(
 }
 
 // `row.seats` inside `for (const row of rows)`: its elements are found through the named element `row`.
-function innerElement(outer: ElementOrigin, anchor: string, anchorId: number): ElementOrigin | null {
+function innerElement(
+	outer: ElementOrigin,
+	anchor: string,
+	anchorId: number,
+): ElementOrigin | null {
 	if (outer.anchorId < 0) return null;
 	return {
 		kind: 'element',
@@ -458,6 +470,35 @@ function innerElement(outer: ElementOrigin, anchor: string, anchorId: number): E
 			{ anchor: outer.anchor, anchorId: outer.anchorId, path: outer.itemPath },
 		],
 	};
+}
+
+// The array a nested element is found in must be an array by its starting value or its type: a Map, a Set or an unknown value has no index to write at.
+function innerNotArray(
+	outer: ElementOrigin,
+	innerNode: AnyNode,
+	state: WalkState,
+): LocalOrigin | null {
+	if (outer.anchorId < 0) return null;
+	const semantic = state.semantic();
+	const outermost = semantic.bindings[outer.enclosing[0]?.anchorId ?? outer.anchorId];
+	const [root, ...properties] = splitStaticGraphPath(outer.collection);
+	const property = (name: string) => ({ property: name });
+	const steps = [
+		...properties.map(property),
+		...outer.enclosing.flatMap((step) => [
+			{ element: true as const },
+			...step.path.map(property),
+		]),
+		{ element: true as const },
+		...outer.itemPath.map(property),
+	];
+	const shape =
+		outermost && root ? stateValueShape(semantic, root, outermost.scope, steps) : 'unknown';
+	if (shape === 'array') return null;
+	const source = expressionSource(innerNode, state.source);
+	return shape === 'keyed'
+		? { kind: 'untracked', reason: 'map-entry', source }
+		: { kind: 'untracked', reason: 'nested-unknown', source };
 }
 
 function copyReason(method: string): 'copy' | 'flattened' {
@@ -500,11 +541,18 @@ function originOfExpression(node: AnyNode, state: WalkState, seen: Set<number>):
 					}
 					if (!keyed && method === 'values') return owner;
 					if (COPYING_METHODS.has(method) || method === 'entries') {
-						return { kind: 'container', reason: copyReason(method), source: owner.target };
+						return {
+							kind: 'container',
+							reason: copyReason(method),
+							source: owner.target,
+						};
 					}
 				}
 				if (owner.kind !== 'plain' && owner.kind !== 'path') {
 					if (ELEMENT_RETURNING_METHODS.has(method)) {
+						const notArray =
+							owner.kind === 'element' ? innerNotArray(owner, receiver, state) : null;
+						if (notArray) return notArray;
 						const inner = owner.kind === 'element' ? innerElement(owner, '', -1) : null;
 						if (inner) return inner;
 						return {

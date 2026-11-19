@@ -5,8 +5,81 @@ import ArmTags from './arm-tags.tsrx';
 import NamedRows from './named-rows.tsrx';
 import SeatGrid from './seat-grid.tsrx';
 import SpanRows from './span-rows.tsrx';
+import Halls from './halls.tsrx';
+import TypedNotAList from './typed-not-a-list.tsrx';
 
 afterEach(cleanup);
+
+async function pageErrors(run: () => Promise<void>): Promise<unknown[]> {
+	const errors: unknown[] = [];
+	const onError = (event: ErrorEvent) => {
+		errors.push(event.error ?? event.message);
+		event.preventDefault();
+	};
+	const onRejection = (event: PromiseRejectionEvent) => {
+		errors.push(event.reason);
+		event.preventDefault();
+	};
+	window.addEventListener('error', onError);
+	window.addEventListener('unhandledrejection', onRejection);
+	try {
+		await run();
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		return errors;
+	} finally {
+		window.removeEventListener('error', onError);
+		window.removeEventListener('unhandledrejection', onRejection);
+	}
+}
+
+const picks = () =>
+	[...document.querySelectorAll<HTMLElement>('[data-pick]')].map(
+		(seat) => `${seat.dataset.pick}:${seat.textContent}`,
+	);
+
+async function pinHalls() {
+	const before = [...document.querySelectorAll('[data-seat]')];
+	const taken = () =>
+		[...document.querySelectorAll<HTMLElement>('[data-seat]')]
+			.filter((seat) => seat.getAttribute('aria-pressed') === 'true')
+			.map((seat) => seat.dataset.seat);
+	await userEvent.click(at('[data-seat="h2B2"]'));
+	await expect.poll(taken).toEqual(['h2B2']);
+	await userEvent.click(at('[data-seat="h1A1"]'));
+	await expect.poll(taken).toEqual(['h1A1', 'h2B2']);
+	expect([...document.querySelectorAll('[data-seat]')]).toEqual(before);
+
+	await userEvent.click(at('[data-find]'));
+	await expect.poll(picks).toEqual(['A1:x', 'A2:o', 'B1:x']);
+
+	const errors = await pageErrors(async () => {
+		await userEvent.click(at('[data-drop-then-write]'));
+		await expect.poll(picks).toEqual(['B1:x']);
+	});
+	expect(errors).toEqual([]);
+	expect(picks()).toEqual(['B1:x']);
+}
+
+test('CSR: three levels of nested loops and a find() inside a loop write only their own element', async () => {
+	await render(Halls);
+	await pinHalls();
+});
+
+test('SSR: three levels of nested loops and a find() inside a loop write only their own element', async () => {
+	await renderSSR(Halls);
+	await pinHalls();
+});
+
+test('CSR: a list the type promised but the value is not stops the write with a named error', async () => {
+	await render(TypedNotAList);
+	const errors = await pageErrors(async () => {
+		await userEvent.click(at('[data-mark]'));
+		await expect.poll(() => at('[data-count]').textContent).toBe('1');
+	});
+	expect(errors).toEqual([
+		expect.objectContaining({ code: 'MARKLESS_WRITE_THROUGH_NOT_A_LIST' }),
+	]);
+});
 
 const at = (selector: string) => document.querySelector<HTMLElement>(selector)!;
 const seats = () => [...document.querySelectorAll<HTMLElement>('[data-seat]')];

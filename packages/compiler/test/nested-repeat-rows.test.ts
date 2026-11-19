@@ -178,6 +178,37 @@ test('an enclosing row that is only the nested @for, with no element of its own,
 	);
 });
 
+const staticGrid = (extra: string) => `import { state } from '@markless/core';
+export default function Grid() @{
+	let rows = state([['a', 'b'], ['c']]);
+	let count = state(0);
+	<main>
+		@for (const row of rows; index r; key r) {
+			<p>
+				@for (const cell of row; index at; key at) {
+					<span>{cell}</span>
+				}
+			</p>
+		}
+		<button onClick={() => { count++;${extra} }}>{count}</button>
+	</main>
+}
+`;
+
+test('nested lists keyed by position that nothing changes or clicks ship no records', async () => {
+	const result = await compile(staticGrid(''));
+	expect([...errors(result), ...result.publicRenderPlan.diagnostics]).toEqual([]);
+	expect(result.protocolView.keyedRepeats ?? []).toEqual([]);
+	const modules = (result.runtimeDemandMap.payloadRecords ?? []).flatMap((record) => record.runtimeModuleIds);
+	expect(modules).not.toContain('web/fns/nested-repeats');
+});
+
+test('nested lists keyed by position ship their records once a handler writes their state', async () => {
+	const result = await compile(staticGrid(" rows.push(['d']);"));
+	expect(errors(result)).toEqual([]);
+	expect((result.protocolView.keyedRepeats ?? []).map((repeat) => repeat.id)).toEqual(['repeat:0', 'repeat:1']);
+});
+
 test('a @for inside no other repeat carries no enclosing row', async () => {
 	const result = await compile(`import { state } from '@markless/core';
 export function List() @{
@@ -199,9 +230,8 @@ export function List() @{
 test('only the nested record folds in the per-enclosing-row wiring module', async () => {
 	const result = await compile(library('shelf.books'));
 	const modules = (id: string) =>
-		result.runtimeDemandMap.payloadRecords?.find(
-			(record) => record.recordId === `keyed-repeat:${id}`,
-		)?.runtimeModuleIds ?? [];
+		result.runtimeDemandMap.payloadRecords?.find((record) => record.recordId === `keyed-repeat:${id}`)
+			?.runtimeModuleIds ?? [];
 	expect(modules('repeat:1')).toContain('web/fns/nested-repeats');
 	expect(modules('repeat:0')).not.toContain('web/fns/nested-repeats');
 });
@@ -213,28 +243,18 @@ test('nested rows inside a sync @if arm run in the browser, and fail the compile
 		.replace('<section>', '<section>@if (opened) {<div>')
 		.replace('</section>', '</div>}</section>');
 	const codes = (result: Awaited<ReturnType<typeof compile>>) =>
-		[...errors(result), ...result.publicRenderPlan.diagnostics].map(
-			(diagnostic) => diagnostic.code,
-		);
+		[...errors(result), ...result.publicRenderPlan.diagnostics].map((diagnostic) => diagnostic.code);
 	const shipped = await compile(page);
 	expect(codes(shipped)).not.toContain('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
 	expect(shipped.symbolModules.armEscalationCandidates ?? []).toHaveLength(1);
-	expect(codes(await compile(page + UNLINKED_RENDER))).toContain(
-		'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
-	);
+	expect(codes(await compile(page + UNLINKED_RENDER))).toContain('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
 });
 
 test('an element() handle bound in a nested row fails the compile by naming the nesting', async () => {
 	const result = await compile(
 		library('shelf.books')
-			.replace(
-				"let opened = state('');",
-				"let opened = state('');\n\tconst bookEls = element<HTMLElement[]>();",
-			)
-			.replace(
-				"import { state } from '@markless/core';",
-				"import { element, state } from '@markless/core';",
-			)
+			.replace("let opened = state('');", "let opened = state('');\n\tconst bookEls = element<HTMLElement[]>();")
+			.replace("import { state } from '@markless/core';", "import { element, state } from '@markless/core';")
 			.replace('<li>', '<li el={bookEls}>'),
 	);
 	expect(result.semanticGraph.diagnostics).toContainEqual(

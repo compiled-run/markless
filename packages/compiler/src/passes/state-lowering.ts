@@ -456,6 +456,8 @@ function untrackedLocalWriteDiagnostic(
 		'dynamic-key': `"${local}" holds state read under a key known only when the code runs (\`${through.source}\`), so no graph path names where the write lands`,
 		flattened: `"${local}" comes out of a flat() copy of "${through.source}", and a flat() copy no longer says which inner array each state object came from`,
 		'nested-element': `"${local}" holds an element of an element (\`${through.source}\`) reached through a value with no loop or const name of its own, so Markless cannot find the enclosing element again when the write runs`,
+		'nested-unknown': `"${local}" holds an element of \`${through.source}\`, and neither the state's starting value nor its type says \`${through.source}\` is an array, so Markless cannot tell where the element sits`,
+		'enclosing-rebound': `"${local}" holds an element of \`${through.source}\`, and the write finds that array again through "${through.enclosingLocal}", but "${through.enclosingLocal}" is assigned again or names a different variable where the write runs`,
 		reassigned: `"${local}" holds state but is assigned again later, so the write cannot tell which value it changes`,
 		conditional: `"${local}" holds state chosen by a condition (\`${through.source}\`), so the write cannot tell which state it changes`,
 		'row-item': `"${local}" holds the row item "${through.source}" of a keyed @for under another name, and a write through a row item lowers only under the row's own name`,
@@ -469,6 +471,8 @@ function untrackedLocalWriteDiagnostic(
 		flattened: `Loop over each inner array instead: \`for (const row of ${through.source}) for (const ${local} of row) ${local}.field = value;\`.`,
 		'nested-element':
 			'Name each enclosing element with its own const or loop variable, for example `for (const row of rows) for (const item of row.items) item.field = value;`.',
+		'nested-unknown': `Write the state's starting value out in the component, or give state() a type argument that says \`${through.source}\` is an array, for example \`state<Row[]>(...)\` with \`type Row = { items: Item[] }\`.`,
+		'enclosing-rebound': `Declare "${through.enclosingLocal}" with const and give any other variable inside the loop a different name, so "${through.enclosingLocal}" still holds its element when \`${write.target}\` is written.`,
 		reassigned: `Declare "${local}" with const, or write through the state path directly.`,
 		conditional: 'Write through each state path in its own branch.',
 		'row-item': `Write through the row item itself: \`${through.source}.field = value\`.`,
