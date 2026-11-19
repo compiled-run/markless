@@ -5,7 +5,7 @@ public struct NativeAction: Equatable, Sendable {
 	public let event: NativeEventName
 	/// The element acted on; "" for a `timer`.
 	public let host: String
-	/// For `input`: the field's whole text after the edit.
+	/// For `input`: the field's whole text after the edit; for `keydown`, the key; for `paste`, the pasted text.
 	public let value: String?
 	/// For `timer`: the journalled timer whose time has come.
 	public let timer: String?
@@ -59,6 +59,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case invalid(node: String, message: String)
 	/// Dispatch a `timer` action for `timer` in `ms` milliseconds.
 	case timer(timer: String, ms: Double)
+	/// The `keydown` or `paste` handler called `preventDefault()`: the host leaves out what the key or paste does.
+	case preventDefault
 
 	public var json: JSONValue {
 		switch self {
@@ -97,6 +99,7 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("invalid")), ("node", .string(node)), ("message", .string(message))])
 		case let .timer(timer, ms):
 			return .object([("op", .string("timer")), ("timer", .string(timer)), ("ms", .number(ms))])
+		case .preventDefault: return .object([("op", .string("preventDefault"))])
 		}
 	}
 }
@@ -167,6 +170,8 @@ public final class NativeRuntime {
 	private let rowOfCell: [String: String]
 	private let firstOfCell: [String: NativeExpr]
 	private var eventValue: String?
+	/// In an `input` dispatch: the field's text, which it already shows.
+	private var edit: String?
 	private let forms: [String: NativeForm]
 	/// A field's text a person typed since its `value` binding last changed it.
 	private var edited: [String: String] = [:]
@@ -315,7 +320,7 @@ public final class NativeRuntime {
 		case let .checked(node): return .bool(try isChecked(node))
 		case let .formData(form): return .array(try entries(of: form).map { .array($0.map(NativeValue.string)) })
 		case .eventValue:
-			guard let eventValue else { throw RuntimeError(reason: "the event value read outside an input handler") }
+			guard let eventValue else { throw RuntimeError(reason: "the event value read outside an input, keydown or paste handler") }
 			return .string(eventValue)
 		case let .unary(op, inner):
 			let value = try evaluate(inner)
@@ -618,8 +623,9 @@ public final class NativeRuntime {
 			throw RuntimeError(reason: "\(action.host) is not shown")
 		}
 		let scope = instance.scope
-		eventValue = action.event == .input ? action.value ?? "" : nil
-		defer { eventValue = nil }
+		eventValue = [.input, .keydown, .paste].contains(action.event) ? action.value ?? "" : nil
+		edit = action.event == .input ? eventValue : nil
+		defer { eventValue = nil; edit = nil }
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
 	}
 
@@ -714,6 +720,8 @@ public final class NativeRuntime {
 				dialogs[node] = open
 			case let .command(node, command, preventScroll):
 				calls.append(.command(node: node, command: command, preventScroll: preventScroll))
+			case .preventDefault:
+				calls.append(.preventDefault)
 			case let .call(call, object, arguments, result, then):
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			}
@@ -794,9 +802,9 @@ public final class NativeRuntime {
 		let checkedBefore = checkedness
 		let bindingsBefore = Dictionary(uniqueKeysWithValues: try ticked.map { ($0.id, try checkedBinding($0.id)) })
 		var beforeProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
-		if let eventValue, let host {
-			beforeProperties["\(host)\u{0}value"] = eventValue
-			edited[host] = eventValue
+		if let edit, let host {
+			beforeProperties["\(host)\u{0}value"] = edit
+			edited[host] = edit
 		}
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })

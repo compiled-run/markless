@@ -97,7 +97,6 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `channelName` uses a call to `channel.charAt`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `parseHexEntry` uses a call to `text.charAt`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `parseChannelEntry` uses a call to `(value).replace`, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:9/h9 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `landFocus`, which needs a script engine"
 		]
@@ -107,10 +106,12 @@
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: the pointerenter event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the dismiss event has no native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the keyup event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <div> component-edge:6/h5 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the pointerover event has no native meaning yet"
+			"MARKLESS_NATIVE_UNSUPPORTED: the pointerover event has no native meaning yet",
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `nextHighlightValue` uses a ContinueStatement, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `nextHighlightValue` uses a write to something other than a local, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses a call to `clickOptionWithValue`, which needs a script engine"
 		]
 	},
 	"crop": {
@@ -162,7 +163,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `isoPart` uses a destructuring declaration, which needs a script engine",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:1/component-edge:1/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the blur handler on <span> component-edge:1/component-edge:1/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the paste event has no native meaning yet",
+			"MARKLESS_NATIVE_UNSUPPORTED: a paste handler on <span>; a native build runs one only on a text field",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:6/component-edge:2/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the blur handler on <span> component-edge:6/component-edge:2/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:7/component-edge:3/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
@@ -206,9 +207,9 @@
 	"editable": {
 		"payload": false,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:6/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's `if` test reads `event.detail`, which a tap on a phone does not have",
+			"MARKLESS_NATIVE_UNSUPPORTED: handler:component-edge:4/event:3 keeps an element as a value, which a native host has no use for yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: handler:component-edge:4/event:4 keeps an element as a value, which a native host has no use for yet"
 		]
 	},
@@ -339,7 +340,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the pointerleave event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the pointercancel event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `currencyScale` uses a TryStatement, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown event has no native meaning yet",
+			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null",
 			"MARKLESS_NATIVE_UNSUPPORTED: the focus handler uses a call to `input.setSelectionRange`, which needs a script engine"
 		]
 	},
@@ -457,15 +458,17 @@
 	"taglist": {
 		"payload": false,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: the paste event has no native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:5/h4 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:6/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:6/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: the input handler's `if` test reads `event`, which is not state of this component",
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `elementForValue` uses a call to `elements.find`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `splitPasted` uses a call to `text.split`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses a call to `landCaret`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler's `if` test compares with `undefined` a value whose first value is `null`; a native value does not tell undefined from null",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `afterRemoval`'s `if` test compares with `undefined` a value whose first value is `null`; a native value does not tell undefined from null",
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `rename` uses a write to something other than a local, which needs a script engine"
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `elementForValue` uses a call to `elements.find`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `rename` uses a write to something other than a local, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: handler:component-edge:4/event:2 keeps an element as a value, which a native host has no use for yet"
 		]
 	},
 	"textbox": {
@@ -478,7 +481,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `timeParts` uses a call to `(value).formatToParts`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `localeOrder` uses `new Set`, which needs a script engine",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:1/component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the paste event has no native meaning yet",
+			"MARKLESS_NATIVE_UNSUPPORTED: a paste handler on <span>; a native build runs one only on a text field",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:5/component-edge:1/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:7/component-edge:2/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:8/component-edge:3/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
@@ -513,7 +516,7 @@
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `serialize` uses a call to `JSON.stringify`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the beforeinput event has no native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: the paste event has no native meaning yet",
+			"MARKLESS_NATIVE_UNSUPPORTED: a paste handler on <div>; a native build runs one only on a text field",
 			"MARKLESS_NATIVE_UNSUPPORTED: the compositionstart event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the compositionend event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keyup handler on <div> component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",

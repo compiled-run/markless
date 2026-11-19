@@ -429,6 +429,27 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'text-keys',
+		fixture: 'test/fixtures/TextKeys.tsrx',
+		actions: [
+			{ event: 'keydown', host: 'h1', key: 'a' },
+			{ event: 'input', host: 'h1', value: 'a' },
+			{ event: 'keydown', host: 'h1', key: 'Unidentified' },
+			{ event: 'input', host: 'h1', value: 'ab' },
+			{ event: 'keydown', host: 'h1', key: 'Enter' },
+			{ event: 'keydown', host: 'h1', key: 'Unidentified' },
+			{ event: 'input', host: 'h1', value: 'c' },
+			{ event: 'keydown', host: 'h1', key: 'Backspace' },
+			{ event: 'input', host: 'h1', value: '' },
+			{ event: 'keydown', host: 'h1', key: 'Backspace' },
+			{ event: 'paste', host: 'h1', text: 'x,y' },
+			{ event: 'input', host: 'h2', value: 'hi' },
+			{ event: 'keydown', host: 'h2', key: 'Enter' },
+			{ event: 'keydown', host: 'h2', key: 'Enter' },
+			{ event: 'input', host: 'h2', value: '\n' },
+		],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [

@@ -218,6 +218,11 @@ async function act(page: Page, step: LadderStep) {
 		await field.pressSequentially(action.type.text);
 	} else if ('submit' in action)
 		await page.getByRole('textbox', { name: action.submit, exact: true }).press('Enter');
+	else if ('erase' in action) {
+		const field = page.getByRole('textbox', { name: action.erase, exact: true });
+		await field.press('End');
+		await field.press('Backspace');
+	}
 	else if ('relaunch' in action) await page.reload();
 	else if ('back' in action) await page.goBack();
 	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });

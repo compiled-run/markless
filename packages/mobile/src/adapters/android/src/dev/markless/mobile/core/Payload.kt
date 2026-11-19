@@ -135,7 +135,7 @@ data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boo
 data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
 
 /** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
-enum class EventName(val wire: String) { Activate("activate"), Input("input"), Focus("focus"), Blur("blur"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible") }
+enum class EventName(val wire: String) { Activate("activate"), Input("input"), Focus("focus"), Blur("blur"), Keydown("keydown"), Paste("paste"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible") }
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
@@ -157,6 +157,8 @@ sealed interface Op {
 	data class After(val ms: Expr, val capture: List<Pair<String, Expr>>, val ops: List<Op>) : Op
 	/** A press on a checkbox (it flips) or a radio button (it is checked, the rest of its group unchecked). */
 	data class Tick(val node: String) : Op
+	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler. */
+	data object PreventDefault : Op
 }
 
 /** A device call a task cell starts at mount. */
@@ -361,7 +363,7 @@ data class Payload(
 					Expr.Call(oneOf(o, "call", BUILTINS, what), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })
 				}
 				o.containsKey("route") -> { o.only(setOf("route"), what); oneOf(o, "route", setOf("params"), what); Expr.RouteParams }
-				o.containsKey("event") -> { o.only(setOf("event"), what); oneOf(o, "event", setOf("value"), what); Expr.EventValue }
+				o.containsKey("event") -> { o.only(setOf("event"), what); oneOf(o, "event", setOf("value", "key", "text"), what); Expr.EventValue }
 				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
 				o.containsKey("formData") -> { o.only(setOf("formData"), what); Expr.FormData(o.field("formData", what).str("$what.formData")) }
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")
@@ -594,6 +596,10 @@ data class Payload(
 				val method = o.field("method", what).str("$what.method")
 				if (method != "showModal" && method != "close") throw MarklessDecodeError("$what has unknown dialog method \"$method\"")
 				return Op.Dialog(o.field("node", what).str("$what.node"), method == "showModal")
+			}
+			if (name == "preventDefault") {
+				o.only(setOf("op"), what)
+				return Op.PreventDefault
 			}
 			if (name == "command") {
 				o.only(setOf("op", "node", "command", "preventScroll"), what)

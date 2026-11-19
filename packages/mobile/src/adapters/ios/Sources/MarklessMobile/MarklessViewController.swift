@@ -134,7 +134,8 @@ public final class MarklessViewController: UIViewController {
 		let device = self.device
 		tree = try ViewTree(
 			runtime: runtime, layout: layout, sheetLayouts: sheetLayouts, faces: faces,
-			onAction: { [weak self] action in self?.perform(action) },
+			onAction: { [weak self] action in _ = self?.perform(action) },
+			ask: { [weak self] action in self?.perform(action) ?? false },
 			objectView: { object, kind in try device.view(for: object, device: kind) })
 		tree?.presenter = self
 		navigationItem.title = try runtime.title()
@@ -288,15 +289,17 @@ public final class MarklessViewController: UIViewController {
 		scheduleLoadEvents()
 	}
 
-	/// Runs the handler for an action and applies its journal, exactly as a tap does.
-	public func perform(_ action: NativeAction) {
+	/// Runs the handler for an action and applies its journal, exactly as a tap does; answers whether it called `preventDefault()`.
+	@discardableResult public func perform(_ action: NativeAction) -> Bool {
 		tree?.dismissMessage()
+		var prevented = false
 		do {
 			let journal = try runtime.dispatch(action)
 			if case let .navigate(route, params, replace)? = journal.last {
 				if let navigator { try navigator(route, params, replace) } else { try navigate(route, params) }
-				return
+				return false
 			}
+			prevented = journal.contains(.preventDefault)
 			for case let .title(value) in journal { navigationItem.title = value }
 			try tree?.apply(journal.filter(\.isForViews))
 			try runCalls(journal)
@@ -305,6 +308,7 @@ public final class MarklessViewController: UIViewController {
 			fatalError("Markless iOS host: \(error)")
 		}
 		scheduleLoadEvents()
+		return prevented
 	}
 
 	/// Builds the page at `route` from scratch with `params`; its state starts over.
@@ -340,7 +344,7 @@ extension NativeJournalEntry {
 	/// Every entry but the ones the page's device runs and the title, which the screen's navigation bar shows.
 	var isForViews: Bool {
 		switch self {
-		case .call, .release, .title: false
+		case .call, .release, .title, .preventDefault: false
 		default: true
 		}
 	}

@@ -18,6 +18,10 @@ export type NativeAction =
 	| { readonly event: 'focus' | 'blur'; readonly host: string }
 	/** The field's whole text after an edit. */
 	| { readonly event: 'input'; readonly host: string; readonly value: string }
+	/** A key of the on-screen keyboard in a text field, before it edits the text; `key` as the phone's browser names it. */
+	| { readonly event: 'keydown'; readonly host: string; readonly key: string }
+	/** A paste into a text field from its edit menu, before the text goes in. */
+	| { readonly event: 'paste'; readonly host: string; readonly text: string }
 	/** A live device value changed (connectivity, permission): the host writes the device cell. */
 	| { readonly event: 'device'; readonly cell: string; readonly value: Value }
 	/** A device call the host started has answered: a task cell takes `{ state: 'value', value }` or the error. */
@@ -198,7 +202,7 @@ export function evaluateNativeExpr(
 	}
 	if ('event' in expr) {
 		if (eventValue === undefined)
-			throw new Error('the event value read outside an input handler');
+			throw new Error('the event value read outside an input, keydown or paste handler');
 		return eventValue;
 	}
 	if ('unary' in expr) {
@@ -746,8 +750,14 @@ export function createNativeRuntime(
 				.find((shown) => shown.id === action.host);
 			if (!instance) throw new Error(`${action.host} is not shown`);
 			const scope = instance.scope;
-			const eventValue = action.event === 'input' ? action.value : undefined;
-			return change(action.host, eventValue, () =>
+			const edit = action.event === 'input' ? action.value : undefined;
+			const eventValue =
+				action.event === 'keydown'
+					? action.key
+					: action.event === 'paste'
+						? action.text
+						: edit;
+			return change(action.host, edit, () =>
 				run(handlers.get(event.handler) ?? [], eventValue, scope),
 			);
 		},
@@ -823,6 +833,10 @@ export function createNativeRuntime(
 					command: op.command,
 					...(op.preventScroll ? { preventScroll: true as const } : {}),
 				});
+				continue;
+			}
+			if (op.op === 'preventDefault') {
+				calls.push({ op: 'preventDefault' });
 				continue;
 			}
 			if (op.op === 'dialog') {

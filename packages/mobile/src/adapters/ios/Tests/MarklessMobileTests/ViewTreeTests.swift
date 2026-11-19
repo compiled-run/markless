@@ -151,6 +151,40 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(area.text == "")
 }
 
+@MainActor @Test func aFieldsKeysAndPasteRunItsHandlersAndPreventDefaultLeavesOutWhatTheyDo() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("text-keys"), store: MemoryStore())
+	let views = try tree(controller)
+	let field = try #require(views.elements["h1"] as? TextField)
+	let area = try #require(views.elements["h2"] as? TextArea)
+	let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+	window.rootViewController = controller
+	window.makeKeyAndVisible()
+	#expect(field.becomeFirstResponder())
+	field.insertText("a")
+	#expect(field.text == "a")
+	field.sendActions(for: .editingChanged)
+	#expect(field.delegate?.textFieldShouldReturn?(field) == false)
+	#expect(field.text == "")
+	#expect(views.labels["h3:text0"]?.text == "1 tags: a; 0 removed; last key Enter")
+	// Backspace in the empty field: the handler takes it, and there was nothing to delete anyway.
+	field.deleteBackward()
+	#expect(views.labels["h3:text0"]?.text == "1 tags: a; 1 removed; last key Backspace")
+	// The menu's Paste runs the handler, which prevents it, so nothing goes in (a test may not read the pasteboard).
+	field.paste(nil)
+	#expect(field.text == "")
+	_ = field.onPaste?("x,y")
+	#expect(views.labels["h4:text0"]?.text == "pasted x,y; sent")
+	#expect(area.becomeFirstResponder())
+	area.insertText("hi")
+	area.delegate?.textViewDidChange?(area)
+	area.insertText("\n")
+	#expect(area.text == "")
+	#expect(views.labels["h4:text0"]?.text == "pasted x,y; sent hi")
+	// With the textarea empty, Enter is not prevented and breaks the line.
+	area.insertText("\n")
+	#expect(area.text == "\n")
+}
+
 @MainActor @Test func aTextFieldSendsItsTextAndTakesWritesFromOtherHandlers() throws {
 	let controller = try MarklessViewController(payload: vectorPayload("input"), store: MemoryStore())
 	let views = try tree(controller)

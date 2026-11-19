@@ -2,6 +2,9 @@ package dev.markless.mobile.core
 
 class MarklessRuntimeError(message: String) : RuntimeException(message)
 
+/** The events that carry a string: an `input` the field's text, a `keydown` its key, a `paste` the pasted text. */
+private val VALUED = setOf(EventName.Input, EventName.Keydown, EventName.Paste)
+
 sealed interface JournalEntry {
 	val node: String
 	fun toJson(): String
@@ -65,6 +68,12 @@ sealed interface JournalEntry {
 	/** A submit stopped at the field [node]: focus moves there and [message] shows until the next action. */
 	data class Invalid(override val node: String, val message: String) : JournalEntry {
 		override fun toJson() = "{\"op\":\"invalid\",\"node\":${jsonString(node)},\"message\":${jsonString(message)}}"
+	}
+
+	/** The `keydown` or `paste` handler called `preventDefault()`: the host leaves out what the key or paste does. */
+	data object PreventDefault : JournalEntry {
+		override val node get() = ""
+		override fun toJson() = "{\"op\":\"preventDefault\"}"
 	}
 
 	/** Dispatch a `timer` action for the timer [node] in [ms] milliseconds. */
@@ -231,7 +240,7 @@ class Runtime(
 		fun eval(x: Expr) = evaluate(x, scope)
 		return when (e) {
 			Expr.RouteParams -> JsValue.Obj(params.entries.associateTo(LinkedHashMap()) { it.key to JsValue.Str(it.value) })
-			Expr.EventValue -> JsValue.Str(eventValue ?: throw MarklessRuntimeError("the event value read outside an input handler"))
+			Expr.EventValue -> JsValue.Str(eventValue ?: throw MarklessRuntimeError("the event value read outside an input, keydown or paste handler"))
 			is Expr.FormData -> entriesOf(e.form)
 			is Expr.Checked -> JsValue.Bool(checkedOf(e.node))
 			is Expr.CellRef -> read(e.cell, scope)
@@ -471,9 +480,12 @@ class Runtime(
 	/** The page's `<title>` text, null when it has none. */
 	fun title(): String? = payload.title?.let { text(it, Scope.EMPTY) }
 
-	/** Runs the handler for [event] on [host] (a row instance as `<node>@<key>`); an `input` event carries the field's whole text as [value]. */
+	/**
+	 * Runs the handler for [event] on [host] (a row instance as `<node>@<key>`); an `input` event carries the field's whole
+	 * text as [value], a `keydown` its key and a `paste` the pasted text.
+	 */
 	fun dispatch(host: String, event: EventName, value: String? = null): List<JournalEntry> {
-		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
+		if ((event in VALUED) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (event == EventName.Cancel) {
 			if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
 			val cancel = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
@@ -492,7 +504,7 @@ class Runtime(
 		val handlerId = handlerFor(template, event) ?: throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
 		val scope = (instances(node(template)).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
-		return change(host, value) {
+		return change(host, if (event == EventName.Input) value else null) {
 			eventValue = value
 			try {
 				run(handler.ops, scope)
@@ -589,6 +601,7 @@ class Runtime(
 				dialogs[op.node] = op.open
 			}
 			is Op.Command -> calls.add(JournalEntry.Command(op.node, op.command, op.preventScroll))
+			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)
 				values[slot(op.cell, scope)] = v

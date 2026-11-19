@@ -144,6 +144,9 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	focusin: 'focus',
 	blur: 'blur',
 	focusout: 'blur',
+	// A text field's, as a phone's browser sends them from its on-screen keyboard (anywhere else keydown is keyboard-only).
+	keydown: 'keydown',
+	paste: 'paste',
 	submit: 'submit',
 	// A checkbox's or radio button's change runs after its tick, joined into its press by `wireTicks`.
 	change: 'input',
@@ -320,6 +323,8 @@ type Scope = {
 	readonly opaque?: string;
 	/** The element a tap landed on (`event.target`) and the one whose handler runs (`event.currentTarget`). */
 	readonly pressed?: { readonly target: string; readonly currentTarget: string };
+	/** In a text field's keydown or paste handler: `event.key` or the pasted text is the event's, and `preventDefault()` an op. */
+	readonly typing?: 'keydown' | 'paste';
 	/** In a form's submit handler: the form, which `event.preventDefault()` keeps from being sent. */
 	readonly submitting?: string;
 	readonly locals: ReadonlySet<string>;
@@ -2386,6 +2391,9 @@ export function createNativeViewPayload(
 					!scope.args.has(holder.name)
 				) {
 					if (TOUCH_MODIFIERS.has(expression.property)) return { literal: false };
+					if (scope.typing === 'keydown' && expression.property === 'key') return { event: 'key' };
+					if (scope.typing === 'keydown' && expression.property === 'isComposing')
+						return { literal: false };
 					if (
 						scope.pressed &&
 						(expression.property === 'target' ||
@@ -2569,6 +2577,26 @@ export function createNativeViewPayload(
 					: null;
 			}
 			case 'method': {
+				if (
+					scope.typing === 'paste' &&
+					expression.method === 'getData' &&
+					expression.object.kind === 'member' &&
+					expression.object.property === 'clipboardData' &&
+					expression.object.object.kind === 'read' &&
+					expression.object.object.name === scope.opaque &&
+					!scope.args.has(scope.opaque)
+				) {
+					const [format, ...rest] = expression.arguments;
+					if (
+						rest.length === 0 &&
+						format?.kind === 'literal' &&
+						(format.value === 'text' || format.value === 'text/plain')
+					)
+						return { event: 'text' };
+					return refuse(
+						`${what} reads the clipboard other than as plain text (\`getData('text')\`), which a phone's paste does not give`,
+					);
+				}
 				if (!METHODS.has(expression.method)) {
 					const site = methodCallSite(expression);
 					if (site && isDeviceCallSite(site, scope))
@@ -3270,6 +3298,16 @@ export function createNativeViewPayload(
 						);
 						continue;
 					}
+					if (
+						semantic === 'paste' &&
+						(!TEXT_ENTRY.has(element ?? '') || TICKED_TYPES.has(inputType ?? ''))
+					) {
+						refuse(
+							`a paste handler on <${element}>; a native build runs one only on a text field`,
+							event.handlerSpan,
+						);
+						continue;
+					}
 					if (semantic === 'submit' && element !== 'form') {
 						refuse(
 							`a submit handler on <${element}>; a native build runs one only on a <form>`,
@@ -3880,9 +3918,11 @@ export function createNativeViewPayload(
 		const running: Scope = { ...scope, live: true, ...(event.handlerSpan ? { span: event.handlerSpan } : {}) };
 		const submitting =
 			event.eventName === 'submit' && pressed ? { submitting: pressed.currentTarget } : {};
+		const semantic = SEMANTIC_EVENTS[event.eventName];
+		const typing = semantic === 'keydown' || semantic === 'paste' ? { typing: semantic } : {};
 		const inner: Scope =
 			parameter === undefined
-				? { ...running, ...submitting }
+				? { ...running, ...submitting, ...typing }
 				: event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))
 					? { ...running, event: parameter }
 					: {
@@ -3890,6 +3930,7 @@ export function createNativeViewPayload(
 							opaque: parameter,
 							...(pressed ? { pressed } : {}),
 							...submitting,
+							...typing,
 						};
 		snapshots = { handler, count: 0 };
 		continuations = { base: handler, next: 0 };
@@ -4581,6 +4622,15 @@ export function createNativeViewPayload(
 				(statement.arguments ?? []).length === 0
 			)
 				return [PREVENT];
+			if (
+				scope.typing &&
+				statement.name === scope.opaque &&
+				!scope.args.has(statement.name) &&
+				statement.path?.length === 1 &&
+				statement.path[0] === 'preventDefault' &&
+				(statement.arguments ?? []).length === 0
+			)
+				return [{ op: 'preventDefault' }];
 			if (
 				scope.pressed &&
 				statement.name === scope.opaque &&

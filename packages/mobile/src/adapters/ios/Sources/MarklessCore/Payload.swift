@@ -190,6 +190,8 @@ public enum NativeEventName: String, Sendable {
 	case input
 	/// A text field took the keyboard, or gave it up.
 	case focus, blur
+	/// A key of the on-screen keyboard in a text field, and a paste from its edit menu, before either edits the text.
+	case keydown, paste
 	/// The platform closed a system sheet; it is already closed when the handler runs.
 	case dismiss
 	/// The host's back gesture or Escape on an open `<dialog>`: it closes, as the browser's cancel does.
@@ -227,6 +229,8 @@ public enum NativeOp: Equatable, Sendable {
 	indirect case after(ms: NativeExpr, capture: [NativeCapture], ops: [NativeOp])
 	/// A press on a checkbox (it flips) or radio button (it is checked, the rest of its group unchecked).
 	case tick(node: String)
+	/// `event.preventDefault()` in a text field's `keydown` or `paste` handler.
+	case preventDefault
 }
 
 public struct NativeCapture: Equatable, Sendable {
@@ -549,6 +553,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 						throw PayloadError(path: op.path + ".method", reason: "unknown dialog method \"\(method)\"")
 					}
 					return .dialog(node: try opField["node"].string(), open: method == "showModal")
+				case "preventDefault":
+					_ = try op.object(["op"])
+					return .preventDefault
 				case "command":
 					let keys = Set(try op.keys())
 					let opField = try op.object(required: ["op", "node", "command"], optional: ["preventScroll"])
@@ -733,7 +740,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["cell"]: return .cell(try field("cell").string())
 		case ["event"]:
 			let name = try field("event").string()
-			guard name == "value" else { throw PayloadError(path: reader.path + ".event", reason: "unknown event read \"\(name)\"") }
+			guard ["value", "key", "text"].contains(name) else { throw PayloadError(path: reader.path + ".event", reason: "unknown event read \"\(name)\"") }
 			return .eventValue
 		case ["literal"]: return .literal(try field("literal").scalar())
 		case ["unary", "value"]: return .unary(try oneOf("unary", ["!", "-", "+", "typeof"]), try decodeExpr(try field("value")))

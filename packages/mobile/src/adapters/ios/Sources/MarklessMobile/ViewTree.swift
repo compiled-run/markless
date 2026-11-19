@@ -171,6 +171,8 @@ final class ViewTree {
 	private let layout: StyleLayout?
 	private let faces: [String: UIFontDescriptor]
 	private let onAction: (NativeAction) -> Void
+	/// Runs a text field's `keydown` or `paste` and answers whether its handler called `preventDefault()`.
+	private let ask: (NativeAction) -> Bool
 	/// The view of a device object (a camera's preview), made by the page's device.
 	private let objectView: (_ object: String, _ device: String) throws -> UIView
 	private let nodes: [String: NativeNode]
@@ -234,6 +236,7 @@ final class ViewTree {
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:],
 		faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void,
+		ask: @escaping (NativeAction) -> Bool = { _ in false },
 		objectView: @escaping (_ object: String, _ device: String) throws -> UIView = { object, _ in throw HostError("no device to show \(object)") }
 	) throws {
 		self.runtime = runtime
@@ -241,6 +244,7 @@ final class ViewTree {
 		self.layout = layout
 		self.faces = faces
 		self.onAction = onAction
+		self.ask = ask
 		keyboard = KeyboardDismisser(page)
 		assignment = layout?.start ?? 0
 		let payload = runtime.payload
@@ -494,6 +498,9 @@ final class ViewTree {
 					view.becomeFirstResponder()
 				}
 				show(text)
+			case .preventDefault:
+				// Read by the field that dispatched the key or paste, which leaves out what it would do.
+				continue
 			case let .timer(timer, ms):
 				Task { @MainActor [weak self] in
 					try? await Task.sleep(for: .milliseconds(ms))
@@ -837,7 +844,7 @@ final class ViewTree {
 					view = control
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
-					let field = UITextField()
+					let field = TextField()
 					field.addAction(UIAction { [weak self, weak field] _ in
 						self?.dismissMessage()
 						field?.resignFirstResponder()
@@ -990,6 +997,7 @@ final class ViewTree {
 	/// `id` is the view's own id, a row's copy included (`<node>@<key>`): the runtime runs the handler in that row.
 	private func wire(_ bound: [NativeEvent], on view: UIView, element: String, id: String) throws {
 		let onAction = onAction
+		let ask = ask
 		for event in bound {
 			if event.event == .submit { continue }
 			switch (event.event, view) {
@@ -1013,6 +1021,14 @@ final class ViewTree {
 				area.onFocus.append { onAction(NativeAction(event: .focus, host: id)) }
 			case let (.blur, area as TextArea):
 				area.onBlur.append { onAction(NativeAction(event: .blur, host: id)) }
+			case let (.keydown, field as TextField):
+				field.onKey = { key in ask(NativeAction(event: .keydown, host: id, value: key)) }
+			case let (.keydown, area as TextArea):
+				area.onKey = { key in ask(NativeAction(event: .keydown, host: id, value: key)) }
+			case let (.paste, field as TextField):
+				field.onPaste = { text in ask(NativeAction(event: .paste, host: id, value: text)) }
+			case let (.paste, area as TextArea):
+				area.onPaste = { text in ask(NativeAction(event: .paste, host: id, value: text)) }
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
 			case (.idle, _), (.visible, _):
@@ -1629,9 +1645,56 @@ final class ContainerScrollView: UIScrollView {
 	}
 }
 
+/// Keys and pastes as Safari on iOS reports them for the on-screen keyboard: each typed character is its own key, a delete is
+/// `Backspace` (in an empty field too), Return is `Enter`. Each callback answers whether the handler called `preventDefault()`,
+/// which leaves out what the key or paste would do.
+@MainActor protocol KeyedInput: AnyObject {
+	var onKey: ((String) -> Bool)? { get }
+	var onPaste: ((String) -> Bool)? { get }
+}
+
+extension KeyedInput {
+	func keyLeavesOut(_ text: String) -> Bool { onKey?(text == "\n" ? "Enter" : text) ?? false }
+	func pasteLeavesOut() -> Bool { onPaste?(UIPasteboard.general.string ?? "") ?? false }
+}
+
+/// An `<input>`'s field, whose `keydown` and `paste` handlers run before the key or paste edits it. Return reaches it as
+/// `textFieldShouldReturn`, not as typed text; a prevented Return neither returns nor puts the keyboard away.
+final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
+	var onKey: ((String) -> Bool)?
+	var onPaste: ((String) -> Bool)?
+
+	override init(frame: CGRect) {
+		super.init(frame: frame)
+		delegate = self
+	}
+
+	@available(*, unavailable)
+	required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+	override func insertText(_ text: String) {
+		if text != "\n" && keyLeavesOut(text) { return }
+		super.insertText(text)
+	}
+
+	func textFieldShouldReturn(_ textField: UITextField) -> Bool { !keyLeavesOut("\n") }
+
+	override func deleteBackward() {
+		if onKey?("Backspace") == true { return }
+		super.deleteBackward()
+	}
+
+	override func paste(_ sender: Any?) {
+		if pasteLeavesOut() { return }
+		super.paste(sender)
+	}
+}
+
 /// A `<textarea>`: a text view that reports each edit as a text field's `editingChanged` does; Return adds a line.
-final class TextArea: UITextView, UITextViewDelegate {
+final class TextArea: UITextView, UITextViewDelegate, KeyedInput {
 	var onChange: [(String) -> Void] = []
+	var onKey: ((String) -> Bool)?
+	var onPaste: ((String) -> Bool)?
 	var onBegin: (() -> Void)?
 	var onFocus: [() -> Void] = []
 	var onBlur: [() -> Void] = []
@@ -1644,6 +1707,21 @@ final class TextArea: UITextView, UITextViewDelegate {
 
 	@available(*, unavailable)
 	required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+	override func insertText(_ text: String) {
+		if keyLeavesOut(text) { return }
+		super.insertText(text)
+	}
+
+	override func deleteBackward() {
+		if onKey?("Backspace") == true { return }
+		super.deleteBackward()
+	}
+
+	override func paste(_ sender: Any?) {
+		if pasteLeavesOut() { return }
+		super.paste(sender)
+	}
 
 	func textViewDidChange(_ textView: UITextView) {
 		for change in onChange { change(text) }
