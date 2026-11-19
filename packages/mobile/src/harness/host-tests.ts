@@ -76,7 +76,8 @@ export function iosHostTests(
 				'-destination',
 				`id=${udid}`,
 				'-derivedDataPath',
-				join(cacheRoot(), 'host-tests', 'ios-derived-data'),
+				// One build folder per simulator: runs on two simulators at once must not share xcodebuild's.
+				join(cacheRoot(), 'host-tests', `ios-derived-data-${udid}`),
 				...skipped.map((test) => `-skip-testing:${test}`),
 			],
 			{

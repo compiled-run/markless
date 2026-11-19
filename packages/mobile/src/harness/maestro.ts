@@ -47,6 +47,8 @@ export async function runFlow(input: {
 	readonly flowName: string;
 	readonly workDir: string;
 	readonly screenshotDir: string;
+	/** Maestro reinstalls its driver app before every run unless told not to: once per device per session is enough (about 9 s an iOS run). */
+	readonly reinstallDriver?: boolean;
 }): Promise<FlowResult> {
 	const started = performance.now();
 	const outDir = join(input.workDir, 'maestro');
@@ -60,6 +62,7 @@ export async function runFlow(input: {
 			'--device',
 			input.device,
 			'test',
+			...(input.reinstallDriver === false ? ['--no-reinstall-driver'] : []),
 			'-e',
 			`${PROOF_APP_ID_VARIABLE}=${PROOF_APP_ID}`,
 			'--test-output-dir',

@@ -1,9 +1,16 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exec } from './exec.ts';
-import { type AndroidTools, androidTools, cacheRoot, filesUnder } from './tools.ts';
+import {
+	type AndroidTools,
+	androidTools,
+	cachedFolder,
+	cacheRoot,
+	filesUnder,
+	SHELL_CACHE_FORMAT,
+} from './tools.ts';
 
 export const ANDROID_LIBRARIES_LOCK = resolve(
 	dirname(fileURLToPath(import.meta.url)),
@@ -68,16 +75,16 @@ async function unpackAar(tools: AndroidTools, aar: string, artifact: LockedArtif
 	const root = join(
 		cacheRoot(),
 		'android-libraries',
-		`${artifact.sha256}-${sha256(Buffer.from(tools.buildTools)).slice(0, 8)}`,
+		`${artifact.sha256}-${sha256(Buffer.from(tools.buildTools)).slice(0, 8)}-${SHELL_CACHE_FORMAT}`.replace(
+			'/',
+			'-',
+		),
 	);
-	const done = join(root, 'done');
 	const compiled = join(root, 'res.zip');
-	if (!existsSync(done)) {
-		rmSync(root, { recursive: true, force: true });
-		mkdirSync(root, { recursive: true });
+	await cachedFolder(root, async (scratch) => {
 		await exec(
 			'unzip',
-			['-q', '-o', aar, 'classes.jar', 'libs/*', 'res/*', '-d', join(root, 'aar')],
+			['-q', '-o', aar, 'classes.jar', 'libs/*', 'res/*', '-d', join(scratch, 'aar')],
 			{
 				allowFailure: true,
 			},
@@ -90,12 +97,11 @@ async function unpackAar(tools: AndroidTools, aar: string, artifact: LockedArtif
 			await exec(join(tools.buildTools, 'aapt2'), [
 				'compile',
 				'--dir',
-				join(root, 'aar', 'res'),
+				join(scratch, 'aar', 'res'),
 				'-o',
-				compiled,
+				join(scratch, 'res.zip'),
 			]);
-		writeFileSync(done, '');
-	}
+	});
 	return {
 		jars: [
 			join(root, 'aar', 'classes.jar'),
