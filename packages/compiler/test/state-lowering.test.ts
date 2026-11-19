@@ -538,7 +538,8 @@ test('lowerStateAccess resolves shared instance return property reads and writes
 	expect(lowered.diagnostics).toEqual([]);
 });
 
-test('lowerStateAccess reports dynamic graph path diagnostics for shared instance properties', async () => {
+// An instance that is one state object reads like that state: the whole node, indexed at runtime.
+test('lowerStateAccess refuses a dynamic write through a shared instance and reads it as its state', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/session.tsrx',
 		source: sharedDynamicPathSource,
@@ -546,17 +547,18 @@ test('lowerStateAccess reports dynamic graph path diagnostics for shared instanc
 
 	const lowered = lowerStateAccess({ semanticGraph });
 
-	expect(lowered.diagnostics).toEqual(
-		expect.arrayContaining([
-			expect.objectContaining({
-				code: 'MARKLESS_STATE_DYNAMIC_PATH_READ',
-				source: 'currentSession[statusKey]',
-			}),
-			expect.objectContaining({
-				code: 'MARKLESS_STATE_DYNAMIC_PATH_WRITE',
-				source: 'currentSession[statusKey]',
-			}),
-		]),
+	expect(lowered.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_DYNAMIC_PATH_WRITE',
+			source: 'currentSession[statusKey]',
+		}),
+	]);
+	expect(lowered.reads).toContainEqual(
+		expect.objectContaining({
+			source: 'currentSession',
+			graphNodeId: 'shared:src/session.tsrx#session/state:data',
+			path: [],
+		}),
 	);
 });
 

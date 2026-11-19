@@ -57,6 +57,7 @@
 		"packages/bundler/test/bundle-size-symbol-table.test.ts",
 		"packages/bundler/test/chunk-import-map.test.ts",
 		"packages/bundler/test/compile-cache-size.test.ts",
+		"packages/bundler/test/compiler-warnings.test.ts",
 		"packages/bundler/test/composition-grid-build.test.ts",
 		"packages/bundler/test/computed-chain-growth.test.ts",
 		"packages/bundler/test/dense-async-symbol-table.test.ts",
@@ -76,6 +77,7 @@
 		"packages/bundler/test/prerender-arm-children.test.ts",
 		"packages/bundler/test/prerender-inline-event-record.test.ts",
 		"packages/bundler/test/prerender-late-event-types.test.ts",
+		"packages/bundler/test/prerender-wake-try.test.ts",
 		"packages/bundler/test/projection-live-arm.test.ts",
 		"packages/bundler/test/prop-decided-arm-callers.test.ts",
 		"packages/bundler/test/prop-decided-row-callers.test.ts",
@@ -106,9 +108,9 @@
 		"packages/bundler/test/template-dynamic-import.test.ts",
 		"packages/bundler/test/transform-memos-released.test.ts",
 		"packages/cli/test/starter-build.test.ts",
-		"packages/mobile/test/ladder-web.test.ts",
 		"packages/router/test/navigate-promise.test.ts",
 		"packages/router/test/vite/api-pages.test.ts",
+		"packages/router/test/vite/arm-close-async-run.test.ts",
 		"packages/router/test/vite/async-child-ssr.test.ts",
 		"packages/router/test/vite/async-graph.test.ts",
 		"packages/router/test/vite/back-revalidate.test.ts",
@@ -118,6 +120,7 @@
 		"packages/router/test/vite/compile-error-cascade.test.ts",
 		"packages/router/test/vite/component-link-build.test.ts",
 		"packages/router/test/vite/compressed-assets.test.ts",
+		"packages/router/test/vite/css-repeats.test.ts",
 		"packages/router/test/vite/document-components.test.ts",
 		"packages/router/test/vite/document-html-attributes.test.ts",
 		"packages/router/test/vite/document-html-element-build.test.ts",
@@ -148,6 +151,7 @@
 		"packages/router/test/vite/lookup-table-imports.test.ts",
 		"packages/router/test/vite/many-interactions.test.ts",
 		"packages/router/test/vite/mdx-row-arm-popover.test.ts",
+		"packages/router/test/vite/overlay-dismiss.test.ts",
 		"packages/router/test/vite/migration-defects.test.ts",
 		"packages/router/test/vite/migration-shapes.test.ts",
 		"packages/router/test/vite/native-packing-build.test.ts",
@@ -166,6 +170,7 @@
 		"packages/router/test/vite/route-bound-kept-part.test.ts",
 		"packages/router/test/vite/route-href-build.test.ts",
 		"packages/router/test/vite/route-preload-data.test.ts",
+		"packages/router/test/vite/shared-child-reader.test.ts",
 		"packages/router/test/vite/shared-import.test.ts",
 		"packages/router/test/vite/shared-layout-navigation.test.ts",
 		"packages/router/test/vite/shared-navigation.test.ts",
@@ -182,7 +187,8 @@
 		"packages/vitest-browser/test/ssr-module-cache-rerun.test.ts",
 		"packages/web/test/early-stream-events.test.ts",
 		"packages/web/test/native-census.test.ts",
-		"packages/web/test/served-census.test.ts"
+		"packages/web/test/served-census.test.ts",
+		"scripts/test-utils/built-server.test.ts"
 	],
 	"declared": [
 		{
@@ -228,6 +234,10 @@
 			{
 				"test": "packages/bundler/test/compile-cache-size.test.ts",
 				"why": "reads the compiler's in-process compile cache size from a plugin at buildEnd"
+			},
+			{
+				"test": "packages/bundler/test/compiler-warnings.test.ts",
+				"why": "reads the warnings the build prints through a Vite customLogger written in the test, which cannot cross a process boundary"
 			},
 			{
 				"test": "packages/bundler/test/dense-async-symbol-table.test.ts",

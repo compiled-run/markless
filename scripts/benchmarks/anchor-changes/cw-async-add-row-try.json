@@ -1,0 +1,64 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 21,
+			"reason": "a keyed row added after the page rendered builds its own @try: the runtime docs pages load carries the added-row path; measured on CI runs 44227273647 vs 44225480400",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 21,
+			"reason": "a keyed row added after the page rendered builds its own @try: the runtime docs pages load carries the added-row path; measured on CI runs 44227273647 vs 44225480400",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 21,
+			"reason": "a keyed row added after the page rendered builds its own @try: the runtime docs pages load carries the added-row path; measured on CI runs 44227273647 vs 44225480400",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs / playground",
+				"jsGzipBytes"
+			],
+			"delta": 100,
+			"reason": "a keyed row added after the page rendered builds its own @try: the runtime docs pages load carries the added-row path; measured on CI runs 44227273647 vs 44225480400",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state playground",
+				"jsGzipBytes"
+			],
+			"delta": 100,
+			"reason": "a keyed row added after the page rendered builds its own @try: the runtime docs pages load carries the added-row path; measured on CI runs 44227273647 vs 44225480400",
+			"date": "2026-11-18"
+		}
+	]
+}

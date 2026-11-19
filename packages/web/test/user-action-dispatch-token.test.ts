@@ -66,18 +66,34 @@ function payloadDocument() {
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+function deferred() {
+	let resolve!: () => void;
+	const promise = new Promise<void>((settle) => (resolve = settle));
+	return { promise, resolve };
+}
+
 test('a callback the handler fires and forgets keeps the user action through its own slow load and awaits; one called after the dispatch ended has none', async () => {
 	const save = element('BUTTON');
 	const root = element('SECTION', [save]);
 	root.__marklessDelegatedDispatch = true;
 	const seen: Array<{ readonly at: string; readonly open: boolean }> = [];
 	let handlerContext: Context | undefined;
+	const moduleArrives = deferred();
+	const runs = [
+		{ started: deferred(), released: deferred(), finished: deferred() },
+		{ started: deferred(), released: deferred(), finished: deferred() },
+	];
 	let callbackRuns = 0;
 	const callback = async (context: Context) => {
 		const run = ++callbackRuns;
 		seen.push({ at: `callback ${run} start`, open: context.userActionToken?.open === true });
-		await wait(5);
-		seen.push({ at: `callback ${run} after await`, open: context.userActionToken?.open === true });
+		runs[run - 1]!.started.resolve();
+		await runs[run - 1]!.released.promise;
+		seen.push({
+			at: `callback ${run} after await`,
+			open: context.userActionToken?.open === true,
+		});
+		runs[run - 1]!.finished.resolve();
 	};
 	const loadSymbol = (symbolId: string) => {
 		if (symbolId === 'symbol:click')
@@ -86,8 +102,7 @@ test('a callback the handler fires and forgets keeps the user action through its
 				seen.push({ at: 'handler', open: context.userActionToken?.open === true });
 				void context.invokeSymbol!('symbol:callback', { ...context });
 			};
-		// The callback's module arrives well after the click's dispatch has finished.
-		return wait(20).then(() => callback);
+		return moduleArrives.promise.then(() => callback);
 	};
 	const { runtime } = await resumeFromPayloadDocument({
 		document: payloadDocument(),
@@ -97,9 +112,14 @@ test('a callback the handler fires and forgets keeps the user action through its
 
 	await runtime.dispatch({ type: 'click', target: save } as never, { ignoreUnmatched: true });
 	expect(handlerContext?.userActionToken?.open, 'the dispatch closes its own token').toBe(false);
-	await wait(40);
+	// The callback's module arrives after the click's dispatch has finished, and its await ends later still.
+	moduleArrives.resolve();
+	await runs[0]!.started.promise;
+	runs[0]!.released.resolve();
+	await runs[0]!.finished.promise;
 
 	// A timer reaching the same callback through the handler's context, after the dispatch ended.
+	runs[1]!.released.resolve();
 	await handlerContext!.invokeSymbol!('symbol:callback', { ...handlerContext });
 
 	expect(seen).toEqual([
@@ -111,7 +131,7 @@ test('a callback the handler fires and forgets keeps the user action through its
 	]);
 });
 
-test('the dispatcher marks no turn quiet except a call made from inside a repeating timer\'s quiet turn', async () => {
+test("the dispatcher marks no turn quiet except a call made from inside a repeating timer's quiet turn", async () => {
 	const save = element('BUTTON');
 	const root = element('SECTION', [save]);
 	root.__marklessDelegatedDispatch = true;

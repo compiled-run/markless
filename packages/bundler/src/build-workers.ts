@@ -7,6 +7,7 @@ import type {
 	CompileTsrxModuleInput,
 	CompileTsrxModuleResult,
 } from '@markless/compiler';
+import { DEVICE_TARGET_FACTS } from '@markless/compiler/native';
 import type { PersistentCompileCache } from './compile-store.ts';
 import {
 	runChunkTaskInline,
@@ -228,37 +229,46 @@ function grow(lane: Lane): void {
 
 function dispatch(lane: Lane): void {
 	for (const entry of lane.workers) {
-		if (!entry.online || entry.job) continue;
-		const job = lane.queue.shift();
-		if (!job) break;
-		entry.job = job;
-		entry.handle.ref();
-		try {
-			entry.handle.send(
-				job.kind === 'chunk'
-					? {
-							kind: 'chunk',
-							id: job.id,
-							task: job.task,
-							fileName: job.fileName,
-							code: job.code,
-							context: job.context,
-						}
-					: {
-							kind: 'compile',
-							id: job.id,
-							input: job.input,
-							key: job.key,
-							store: job.store,
-						},
-			);
-		} catch {
-			// An input that cannot be cloned runs on the calling thread.
-			entry.job = undefined;
-			giveBack(job);
+		// A job that cannot be sent brings no answer to dispatch the next one, so the worker takes the next job now.
+		while (entry.online && !entry.job && lane.queue.length > 0) {
+			const job = lane.queue.shift()!;
+			entry.job = job;
+			entry.handle.ref();
+			try {
+				entry.handle.send(
+					job.kind === 'chunk'
+						? {
+								kind: 'chunk',
+								id: job.id,
+								task: job.task,
+								fileName: job.fileName,
+								code: job.code,
+								context: job.context,
+							}
+						: compileMessage(job),
+				);
+			} catch {
+				// An input that cannot be cloned runs on the calling thread.
+				entry.job = undefined;
+				giveBack(job);
+			}
 		}
 	}
 	for (const entry of lane.workers) if (!entry.job) entry.handle.unref();
+}
+
+// The device facts are the compiler's own functions, which cannot cross to a process: the worker attaches them by name.
+function compileMessage(job: CompileJob) {
+	const { deviceTargetFacts, ...input } = job.input;
+	const named = deviceTargetFacts === DEVICE_TARGET_FACTS;
+	return {
+		kind: 'compile',
+		id: job.id,
+		input: named ? input : job.input,
+		...(named && { deviceTargetFacts: true }),
+		key: job.key,
+		store: job.store,
+	};
 }
 
 // A job no worker can run goes back to the calling thread: a compile by answering nothing, a chunk read by running there.
@@ -326,6 +336,16 @@ export async function retireCompileWorkers(): Promise<void> {
 	for (const entry of retired) entry.handle.exit();
 	// A process exits once its store writes land, so the build it served ends with its cache on disk.
 	await Promise.all(retired.map((entry) => entry.handle.exited));
+}
+
+/** Compiles and chunk reads handed to a build worker or waiting for one. */
+export function buildWorkerJobsInFlight(): number {
+	let count = 0;
+	for (const lane of [compiles, chunkReads]) {
+		count += lane.queue.length;
+		for (const entry of lane.workers) if (entry.job) count++;
+	}
+	return count;
 }
 
 /** Process ids of the compile processes running now. */

@@ -185,7 +185,7 @@ export type ProtocolStatePayload = {
 		readonly async: boolean;
 		// Sync computeds only: the update symbol that recomputes this node on resume.
 		readonly deriveSymbolId?: string;
-		// The render's derived value, served only where resume reads it before a dependency write: a handler, a flipped arm or a keyed @for.
+		// The render's derived value, served only where resume reads it before a dependency write (a handler, a flipped arm or a keyed @for) and never for a module constant.
 		readonly value?: unknown;
 		// The same value on the live channel cells use: a CSR mount hands it over
 		// in memory, so it never needs an envelope. Never served — payload
@@ -874,6 +874,15 @@ export type ProtocolViewPayload = {
 		readonly updateSymbolId?: string;
 		/** The @try arm holds keyed rows the browser cannot build, so a refresh that lands re-renders the arm. */
 		readonly rerendersOnRefresh?: true;
+		/**
+		 * The values the @try arm's text reads beside its async ones, for a @try
+		 * inside a keyed row: such a row has no template to patch, so a write to
+		 * one re-renders each row's shown @try arm. Pay-per-use: absent elsewhere.
+		 */
+		readonly rerenderReads?: ReadonlyArray<{
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+		}>;
 		/** A handler inside the @try arm that rejects fails this boundary's own runner, so its @catch shows the error. */
 		readonly catchesHandlers?: true;
 		// A single set is the armized truth for the arm the render actually

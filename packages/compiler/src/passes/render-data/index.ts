@@ -66,7 +66,7 @@ export function createRenderData(input: {
 				boundaryId: boundary.id,
 				anchorOrder: boundary.anchorOrder,
 				runnerGraphNodeId: runner?.runnerGraphNodeId ?? null,
-				initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
+				initiallyServedArm: runner?.waitsOnNothing ? ASYNC_BOUNDARY_ARM.try : ASYNC_BOUNDARY_ARM.pending,
 				reads: runner?.reads ?? [],
 				unresolvedSources: runner?.unresolvedSources ?? [],
 				armChunkIds: slot?.armTemplateIds ?? {
@@ -191,16 +191,23 @@ function branchRecord(
 		...(site.asyncBoundaryArm !== undefined ? { asyncBoundaryArm: site.asyncBoundaryArm } : {}),
 		...(site.armTests ? { armTests: site.armTests } : {}),
 		...(declaredEmptyArms.length > 0 ? { declaredEmptyArms } : {}),
-		update:
-			site.asyncBoundaryId &&
-			(slot?.armTemplateIds ?? []).some((chunkId) =>
-				chunks
-					.find((chunk) => chunk.id === chunkId)
-					?.slots.some((candidate) => candidate.kind === 'child-component'),
-			)
-				? 'boundary'
-				: 'range',
+		update: branchUpdate(site, slot, chunks),
 	};
+}
+
+function branchUpdate(
+	site: SemanticGraphArtifact['branchSites'][number],
+	slot: Extract<SemanticMarkupSlot, { readonly kind: 'branch' }> | undefined,
+	chunks: SemanticGraphArtifact['markup']['chunks'],
+): RenderDataBranch['update'] {
+	if (!site.asyncBoundaryId) return 'range';
+	if (site.keyedRepeatId && site.asyncBoundaryArm === 0) return 'row-arm';
+	const holdsComponent = (slot?.armTemplateIds ?? []).some((chunkId) =>
+		chunks
+			.find((chunk) => chunk.id === chunkId)
+			?.slots.some((candidate) => candidate.kind === 'child-component'),
+	);
+	return holdsComponent ? 'boundary' : 'range';
 }
 
 /**

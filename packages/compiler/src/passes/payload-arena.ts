@@ -450,6 +450,7 @@ function payloadBehavior(
 		constantInputs,
 		functionSpan: _functionSpan,
 		functionParameters: _functionParameters,
+		readSources: _readSources,
 		...record
 	} = behavior;
 	const inputGraphReads = behaviorInputGraphReads(behavior.inputSources, bindings, aliases);

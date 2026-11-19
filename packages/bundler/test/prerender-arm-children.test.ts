@@ -88,6 +88,17 @@ for (const { page, env } of statefulChildPages) {
 	}, 120_000);
 }
 
+test('a component row added to a list on a page woken from prerender records renders and keeps its own state', async () => {
+	await withBuiltPage('arm-children/AddComponentRow.tsrx', { MARKLESS_PRERENDER_WAKE: '1' }, async (tab) => {
+		const tracks = tab.locator('[data-track]');
+		await tab.locator('[data-add]').click();
+		await expect.poll(() => tracks.allTextContents()).toEqual(['intro 0', 'verse 0', 'chorus2 0']);
+		await tracks.nth(2).click();
+		await tracks.nth(2).click();
+		await expect.poll(() => tracks.allTextContents()).toEqual(['intro 0', 'verse 0', 'chorus2 2']);
+	});
+}, 120_000);
+
 // Elements an arm commit replaced are held by nothing once the page lets go: no runtime keeps a binding on them.
 async function trackReplacedElements(tab: Page): Promise<() => Promise<number>> {
 	await tab.evaluate(() => {

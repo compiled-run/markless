@@ -158,6 +158,51 @@ test('a commit waits for code the next round loads, so that round lands in the t
 	expect(tasks).toBeLessThanOrEqual(1);
 });
 
+test('a commit waits for the code its journal listener loads, so the listener applies the journal in the task the commit paints in', async () => {
+	const landed: Array<readonly [string, number]> = [];
+	let tasks = 0;
+	let loaded = false;
+	let loading: Promise<void> | undefined;
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:loading', value: true },
+			{ graphNodeId: 'state:rows', value: 0 },
+		],
+	});
+	graph.subscribe({
+		id: 'branch:loading',
+		graphNodeId: 'state:loading',
+		run: () => ({ type: 'removeRange', locator: 'branch:loading' }),
+	});
+	graph.subscribe({
+		id: 'repeat:rows',
+		graphNodeId: 'state:rows',
+		run: () => () => void landed.push(['rows', tasks]),
+	});
+	const load = () => (loading ??= macrotask().then(() => void (loaded = true)));
+	graph.subscribeJournal(
+		Object.assign(
+			async (entries: ReadonlyArray<{ readonly type: string }>) => {
+				if (!loaded) await load();
+				landed.push(...entries.map((entry) => [entry.type, tasks] as const));
+			},
+			{ code: () => (loaded ? undefined : load()) },
+		),
+	);
+	const counting = setInterval(() => tasks++, 0);
+
+	graph.write({ graphNodeId: 'state:loading', value: false });
+	graph.write({ graphNodeId: 'state:rows', value: 2 });
+	await graph.flush();
+	clearInterval(counting);
+
+	const [, task] = landed[0]!;
+	expect(landed).toEqual([
+		['rows', task],
+		['removeRange', task],
+	]);
+});
+
 test('an async answer leaves rows to the pass instead of a write observer', async () => {
 	const { createAsyncComputedPlane } = await import('../src/graph-async.ts');
 	const landed: string[] = [];

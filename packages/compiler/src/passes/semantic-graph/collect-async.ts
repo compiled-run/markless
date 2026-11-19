@@ -13,6 +13,7 @@ import {
 	uniqueBy,
 	templateReadPath,
 } from '../../artifact-helpers/graph-paths.ts';
+import type { SourceSpan } from '../../diagnostics.ts';
 import { placeAsyncArmText } from './collect-elements.ts';
 import { readLocal } from './composite-reads.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
@@ -239,9 +240,26 @@ function canonicalCycleKey(cycle: ReadonlyArray<string>): string {
 		.sort()[0];
 }
 
-export function collectAsyncBoundaryDiagnostics(graph: MutableSemanticGraphArtifact): void {
+export function collectAsyncBoundaryDiagnostics(
+	graph: MutableSemanticGraphArtifact,
+	repeatCollectionSpans: ReadonlyMap<string, SourceSpan>,
+): void {
 	const bindings = graphBindingMap(graph, null);
 	const aliases = semanticAliasMap(graph, null);
+	const bindingsById = new Map(graph.graphBindings.map((binding) => [binding.id, binding]));
+
+	for (const repeat of graph.keyedRepeats) {
+		if (repeat.asyncBoundaryId || !repeat.collectionGraphNodeId) continue;
+		const binding = bindingsById.get(repeat.collectionGraphNodeId);
+		if (binding?.kind !== 'computed' || binding.asyncCapable !== true) continue;
+		const sourceSpan = repeatCollectionSpans.get(repeat.id);
+		graph.diagnostics.push(
+			asyncBoundaryRequiredDiagnostic(
+				{ source: repeat.collectionSource, ...(sourceSpan ? { sourceSpan } : {}) },
+				binding,
+			),
+		);
+	}
 
 	for (const read of graph.templateReads) {
 		if (read.asyncBoundaryId) continue;

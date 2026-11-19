@@ -178,6 +178,13 @@ export type WalkState = {
 		readonly propName: string;
 	}>;
 	readonly hostIds: WeakMap<object, string>;
+	/** Cancels in event callback props the compiler cannot place, refused once the walk knows the child hands that prop to an event. */
+	readonly relayCancelRefusals: Array<{
+		readonly childComponentName: string;
+		readonly importSource?: string;
+		readonly propName: string;
+		readonly diagnostic: SemanticGraphDiagnostic;
+	}>;
 	/** The host element each host sits directly inside, in its component's own markup. */
 	readonly hostParents: Map<string, string>;
 	/** Template values already refused at their use site; the walk must not treat them as markup again. */
@@ -222,6 +229,7 @@ export type WalkState = {
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
+	repeatCollectionSpans: Map<string, SourceSpan>;
 	authoredAriaBusy: AuthoredAriaBusy[];
 	// aria-disabled written on a control that submits its form.
 	authoredSubmitAriaDisabled: AuthoredAriaBusy[];
@@ -366,6 +374,7 @@ export function createWalkState(input: {
 		deviceTarget: input.deviceTargetFacts ?? null,
 		foldedTexts: new Map(),
 		hostIds: new WeakMap<object, string>(),
+		relayCancelRefusals: [],
 		hostParents: new Map(),
 		handledTemplateValues: new WeakSet<object>(),
 		currentComponentName: null,
@@ -391,6 +400,7 @@ export function createWalkState(input: {
 		currentFunctionSite: null,
 		deferredComputedWrites: [],
 		pendingElementHandleIdrefs: [],
+		repeatCollectionSpans: new Map(),
 		authoredAriaBusy: [],
 		authoredSubmitAriaDisabled: [],
 		postForms: [],

@@ -975,6 +975,7 @@ async function renderDocumentModule(
 	});
 	assertDocumentStorageFree(output);
 	assertDocumentHandlerFree(output);
+	assertDocumentSharedFree(output);
 	return output?.html;
 }
 
@@ -997,6 +998,18 @@ function assertDocumentStorageFree(output: RenderOutput | undefined): void {
 	const keys = storage.map((record) => record.key).join(', ');
 	throw new Error(
 		`MARKLESS_ROUTER_DOCUMENT_STORAGE_UNSUPPORTED: the document declares storage cells (${keys}), but the router serves only the document's HTML, so their state payload never reaches the browser and they can never resume. Declare storage() at module scope in a component the page renders instead.`,
+	);
+}
+
+// No runtime ever binds the document to a shared() instance, so what it renders from one is the starting value for good.
+function assertDocumentSharedFree(output: RenderOutput | undefined): void {
+	const definitions = (output?.state as
+		| { readonly sharedDefinitions?: ReadonlyArray<{ readonly name: string }> }
+		| undefined)?.sharedDefinitions;
+	if (!definitions?.length) return;
+	const names = [...new Set(definitions.map((definition) => definition.name))].join(', ');
+	throw new Error(
+		`MARKLESS_ROUTER_DOCUMENT_SHARED_UNSUPPORTED: the document reads shared() ${names}, but the router serves only the document's HTML and never wires it in the browser, so it would keep showing the starting value after a write. Read the value in a component the page renders, and set the class or attribute on an element there.`,
 	);
 }
 

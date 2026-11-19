@@ -11,11 +11,11 @@ import {
 	readChunkLocalExportSpecifiers,
 	rememberChunkDynamicImports,
 	rememberChunkLocalExportSpecifiers,
-	renderedChunkCount,
 	spansAnyOffset,
 	textOffsets,
 } from './chunk-ast.ts';
 import { RolldownMagicString, type Plugin } from 'rolldown';
+import { everyChunkArrived, watchRenderChunkFailures } from './render-barrier.ts';
 import { CHUNK_WORKER_MIN_CODE_LENGTH, runChunkTask } from './chunk-workers.ts';
 import {
 	PACK_LOAD,
@@ -65,6 +65,10 @@ export function lazyModuleFacadesPlugin(
 	return {
 		name: 'markless-lazy-module-facades',
 		api: { removedChunks: () => removed },
+		options(input) {
+			watchRenderChunkFailures(input.plugins);
+			return null;
+		},
 		renderStart: reset,
 		renderChunk(code, chunk, options, meta) {
 			// Named fields only: spreading the rendered chunk runs every native getter, `modules` included.
@@ -85,7 +89,12 @@ export function lazyModuleFacadesPlugin(
 			return new Promise((resolve, reject) => {
 				pending.set(chunk.fileName, { resolve, reject });
 				// Rolldown renders chunks concurrently; collect their code before changing cross-chunk imports.
-				if (pending.size !== renderedChunkCount(meta.chunks)) return;
+				const waiting = pending;
+				const abandon = () => {
+					for (const wait of waiting.values()) wait.resolve(null);
+					waiting.clear();
+				};
+				if (!everyChunkArrived(meta.chunks, waiting, () => waiting.size, abandon)) return;
 				const collapse = () => {
 					try {
 						const results = new Map<string, { code: string; map: string | null }>();
@@ -169,11 +178,17 @@ export function lazyModuleFacadesPlugin(
 						),
 					),
 					prefetchFacadeChunkFacts(Object.values(chunks)),
-				]).then(() => {
-					collapse();
-					clearFacadeChunkFacts();
-					clearChunkFactCaches();
-				});
+				]).then(
+					() => {
+						collapse();
+						clearFacadeChunkFacts();
+						clearChunkFactCaches();
+					},
+					(error: unknown) => {
+						for (const wait of pending.values()) wait.reject(error);
+						pending.clear();
+					},
+				);
 			});
 		},
 		renderError(error) {

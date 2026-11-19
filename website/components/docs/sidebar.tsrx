@@ -52,6 +52,7 @@ function PageLink({ entry }: { readonly entry: SidebarEntry }) @{
 
 	<Link class="sidebar-link page-link" href={entry.href} tabindex={-1} aria-current={current}>
 		<svg class="nav-icon" viewBox="0 0 108 108" aria-hidden="true">
+			// markless-allow MARKLESS_TEMPLATE_EXPRESSION_STATIC: entry comes from the fixed nav table, so its icon never changes
 			<use href={marks + entry.icon} />
 		</svg>
 		<tree.itemlabel class="sidebar-text">{entry.title}</tree.itemlabel>

@@ -19,15 +19,7 @@ import {
 	type RunCause,
 	type RuntimeAsyncComputedNode,
 } from './graph-async-load.ts';
-
-// The most recent fulfilled value and the key it was fetched for, carried through re-runs and failures.
-function lastGood(
-	snapshot: RuntimeGraphAsyncSnapshot,
-): { readonly value: unknown; readonly valueKey: unknown } | undefined {
-	if (snapshot.status === 'fulfilled') return { value: snapshot.value, valueKey: snapshot.key };
-	if (snapshot.status !== 'idle' && 'valueKey' in snapshot)
-		return { value: snapshot.value, valueKey: snapshot.valueKey };
-}
+import { lastGood } from './graph-kept.ts';
 
 // The publish that ends a save's mark: a failure says so, and a page left behind ends it without a word.
 function saysOutcome(snapshot: RuntimeGraphAsyncSnapshot, outcome: SavesOutcome): RuntimeGraphAsyncSnapshot {
@@ -188,7 +180,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		publish(node, pendingSnapshot(node, version, key));
 
 		const land = (snapshot: Exclude<RuntimeGraphAsyncSnapshot, { readonly status: 'idle' }>): void => {
-			if (node.version !== version) return;
+			if (node.version !== version || controller.signal.aborted) return;
 			const hold = node.entryHold;
 			// A save still being written holds this value: an answer from before it lands only when the save ends, so the mark never drops.
 			if (hold?.writing && snapshot.status !== 'pending') {
@@ -291,8 +283,10 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		}
 
 		const nextKey = node.key(readGraph);
+		// A run a write ended while its arm was undecided starts again on the same key.
 		if (
 			node.phase >= NODE_RUNNING &&
+			!node.controller?.signal.aborted &&
 			Object.is((node.snapshot as { readonly key?: unknown }).key, nextKey)
 		)
 			return;
@@ -301,7 +295,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 	};
 
 	const demand = (node: RuntimeAsyncComputedNode, cause?: RunCause): void => {
-		if (node.phase <= NODE_PLANNED) advance(node, cause);
+		if (node.phase <= NODE_PLANNED && !state.heldForArm(node)) advance(node, cause);
 	};
 
 	// Same key, so the real run the write starts replaces this pending snapshot with no gap.

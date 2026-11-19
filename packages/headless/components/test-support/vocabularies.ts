@@ -110,8 +110,8 @@ export const voiceOverVocabulary: Vocabulary = {
 	radiogroup: 'radio group',
 	// unverified against our markup; aria-at's radiogroup plan says "radio button"
 	radio: 'radio button',
-	// observed on macOS 26: walking into the tabs reads each tab and never names the list
-	tablist: '',
+	// observed on a macos-26 runner: a list named with aria-label reads "Tee one label tab group"; an unnamed one is never named
+	tablist: 'tab group',
 	// unverified against our markup
 	tab: 'tab',
 	// observed on macOS 26: the panel's text is read with no role word
@@ -136,8 +136,7 @@ export const voiceOverVocabulary: Vocabulary = {
 	region: 'region',
 	// unverified against our markup
 	image: 'image',
-	// unverified against our markup; aria-at's modal-dialog plan asserts this role
-	// as "dialog" at priority 1
+	// observed on a macos-26 runner: "Dee one title dialog"
 	dialog: 'dialog',
 	// unverified against our markup; ARIA defines `aria-roledescription` as the
 	// word a reader speaks in place of the role, so the author string is the

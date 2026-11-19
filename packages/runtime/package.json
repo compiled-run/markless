@@ -39,6 +39,10 @@
 			"./graph-held": {
 				"types": "./dist/graph-held.d.ts",
 				"default": "./dist/graph-held.js"
+			},
+			"./graph-kept": {
+				"types": "./dist/graph-kept.d.ts",
+				"default": "./dist/graph-kept.js"
 			}
 		}
 	},
@@ -51,7 +55,8 @@
 		"./graph-async": "./src/graph-async.ts",
 		"./graph-async-load": "./src/graph-async-load.ts",
 		"./graph-async-refresh": "./src/graph-async-refresh.ts",
-		"./graph-held": "./src/graph-held.ts"
+		"./graph-held": "./src/graph-held.ts",
+		"./graph-kept": "./src/graph-kept.ts"
 	},
 	"dependencies": {
 		"@markless/serializer": "workspace:*"

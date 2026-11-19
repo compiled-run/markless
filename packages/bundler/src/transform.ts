@@ -74,6 +74,7 @@ import { createCompileErrorPayload, MarklessCompileError } from './dev-error/ind
 import { modulePropFlow } from './prop-flow.ts';
 import {
 	emitPrerenderBoundaryRendererModule,
+	prerenderRowBoundarySites,
 	emitPrerenderTriggerGroupModule,
 	planPrerenderTriggerGroups,
 	triggerGroupVirtualModuleId,
@@ -315,8 +316,11 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const resumeId = resumeVirtualModuleId(input.filename);
 	const prerenderWakeId = prerenderWakeVirtualModuleId(input.filename);
 	const settleId = settleVirtualModuleId(input.filename);
-	const { compiled: compiledForAllClasses, blockingDiagnostics } =
-		await compileWithBlockingDiagnostics(input);
+	const {
+		compiled: compiledForAllClasses,
+		blockingDiagnostics,
+		warnings: compilerWarnings,
+	} = await compileWithBlockingDiagnostics(input);
 	const linkPendingDiagnostics = linkPendingRefusals(
 		input,
 		compiledForAllClasses,
@@ -447,6 +451,8 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					symbolResolver: compiled.symbolResolver,
 					boundRows: importedBoundRows,
 					componentEdges: compiled.semanticGraph.componentEdges,
+					graphBindings: compiled.semanticGraph.graphBindings,
+					branchSites: compiled.semanticGraph.branchSites,
 					renderData: compiled.renderData,
 				})
 			: [];
@@ -484,6 +490,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		compiled.payloadScripts.state,
 		compiled.moduleGraphInterface.asyncPlanes,
 	);
+	const hasLiveSharedState =
+		hasLiveSharedDefinitions(compiled.payloadScripts.state) ||
+		compiled.moduleGraphInterface.liveShared === true;
 	const rosterDerivation = compiled.moduleGraphInterface.render.components.some(
 		(component) => component.rosterDerivation === true,
 	);
@@ -670,6 +679,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				asyncPlanes,
 				payloadView: containerScopedResumeView(compiled.payloadScripts.view),
 				hasIdleEvents: compiled.moduleGraphInterface.idleRecords === true,
+				rendersOverlay: compiled.moduleGraphInterface.overlayRecords === true,
 				streamsArms: authorsPendingArm(compiled.semanticGraph.markup),
 				runtimeDemandMap: compiled.runtimeDemandMap,
 				servedScalarPlans,
@@ -704,6 +714,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				linkedNestedRepeats: importedNestedRepeats(input.importedModuleInterfaces),
 				linkedRowBranches: importedRowBranchMints(input.importedModuleInterfaces),
 				rosterDerivation,
+				hasLiveSharedState,
 				storageCells,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				boundSymbolDescriptors,
@@ -724,16 +735,27 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 							asyncPlanes,
 							payloadView: containerScopedResumeView(compiled.payloadScripts.view),
 							hasIdleEvents: compiled.moduleGraphInterface.idleRecords === true,
+							rendersOverlay: compiled.moduleGraphInterface.overlayRecords === true,
 							runtimeDemandMap: compiled.runtimeDemandMap,
 							executionLog: input.executionLog,
 							needsFullResume: prerenderClosureNeedsWake,
 							prerenderDataId: renderDataId,
 							lazyRenderDataId,
+							...(servedRenderData
+								? { servedRenderDataId: servedRenderDataEntryId(encodedModuleId) }
+								: {}),
+							renderDataId: canonicalRenderData ? renderDataId : undefined,
+							linkedRowSlotReaders: importedRowSlotReaders(input.importedModuleInterfaces),
+							linkedRowComponents: importedRowComponentMints(input.importedModuleInterfaces),
+							linkedRowTemplates: importedRowTemplateMints(input.importedModuleInterfaces),
+							linkedNestedRepeats: importedNestedRepeats(input.importedModuleInterfaces),
+							linkedRowBranches: importedRowBranchMints(input.importedModuleInterfaces),
 							prerenderTriggerGroups: prerenderTriggerGroups.map((group, index) => ({
 								...group,
 								moduleId: triggerGroupVirtualModuleId(input.filename, index),
 							})),
 							rosterDerivation,
+							hasLiveSharedState,
 							storageCells,
 							installResumeSummary: true,
 							recordsOnly: true,
@@ -777,7 +799,13 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					{
 						id: selfWakeArmRendererId,
 						type: 'trigger-group' as const,
-						source: emitPrerenderBoundaryRendererModule(renderDataId),
+						source: emitPrerenderBoundaryRendererModule(
+							renderDataId,
+							prerenderRowBoundarySites(
+								containerScopedResumeView(compiled.protocolView),
+								input.prerenderRecordData?.boundarySites,
+							),
+						),
 					},
 				]
 			: []),
@@ -906,7 +934,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					hasOverlayMarks: compiled.runtimeDemandMap.payloadRecords.some(
 						(record) => record.kind === 'overlay',
 					),
-					hasLiveSharedState: hasLiveSharedDefinitions(compiled.payloadScripts.state),
+					hasLiveSharedState,
 					hasIdleEvents: moduleHasIdleEvents(compiled.semanticGraph),
 					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,
@@ -944,6 +972,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		map: null,
 		virtualModules,
 		manifest,
+		compilerWarnings,
 		moduleGraphInterface: compiled.moduleGraphInterface,
 		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
@@ -1381,6 +1410,7 @@ type CompiledTransformInput = Pick<
 	| 'elementOnlyAttributes'
 	| 'deviceTargetFacts'
 	| 'routeRoot'
+	| 'dev'
 >;
 
 /** The compiler input a transform compiles; anything else that only needs a module's interface asks for the same one. */
@@ -1412,6 +1442,14 @@ async function compileWithBlockingDiagnostics(input: CompiledTransformInput) {
 	const compiled = await compileTsrxModule(transformCompileInput(input));
 	return {
 		compiled,
+		warnings: moduleDiagnostics(compiled).filter(
+			(diagnostic) =>
+				diagnostic.severity === 'warning' &&
+				diagnostic.suppressed !== true &&
+				// A build fails at bundle time on a caller that can change these props, so what it ships is proven fixed.
+				!(diagnostic.decidedByProps &&
+					(input.dev !== true || diagnostic.decidedByProps.props.length === 0)),
+		),
 		blockingDiagnostics: moduleDiagnostics(compiled).filter(
 			(diagnostic) => diagnostic.severity === 'error',
 		),

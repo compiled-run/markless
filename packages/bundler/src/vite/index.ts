@@ -40,6 +40,7 @@ import { unwrapAsyncImportWrappers } from '../build/async-import-wrappers.ts';
 import { collapseInitFacadeImports } from '../build/init-facade-imports.ts';
 import { deferredRuntimePlugin } from '../build/deferred-runtime.ts';
 import { clearChunkFactCaches } from '../build/chunk-ast.ts';
+import { dropRepeatedStylesheetRules } from '../build/stylesheet-repeats.ts';
 import { prefetchChunkDynamicImports } from '../build/chunk-workers.ts';
 import { nativePackingPlugins } from '../build/native-packing.ts';
 import { DEPRECATED_NATIVE_PACKING_WARNING, nativePackingEnabled } from '../packing-option.ts';
@@ -557,6 +558,17 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				async handler(source, importer) {
 					const shared = sharedReachedRenderDataRequest(source);
 					return shared ? await this.resolve(shared, importer, { skipSelf: true }) : null;
+				},
+			},
+		} satisfies Plugin,
+		{
+			name: 'markless:stylesheet-repeats',
+			apply: 'build',
+			// Before any plugin reads the stylesheets, the router's inlined copies among them.
+			generateBundle: {
+				order: 'pre',
+				handler(_options, bundle) {
+					dropRepeatedStylesheetRules(bundle);
 				},
 			},
 		} satisfies Plugin,
