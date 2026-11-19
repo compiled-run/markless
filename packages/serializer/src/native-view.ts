@@ -117,7 +117,9 @@ export type NativeExpr =
 	 */
 	| { readonly formData: string }
 	/** A checkbox's or radio button's checkedness now: what its `checked` binding last set, or a person's tick since. */
-	| { readonly checked: string };
+	| { readonly checked: string }
+	/** A text field's text now (`field.value`): what a person typed since, else its `value` binding, else its `value` attribute. */
+	| { readonly field: string };
 
 export type NativeTextPart =
 	| { readonly text: string }

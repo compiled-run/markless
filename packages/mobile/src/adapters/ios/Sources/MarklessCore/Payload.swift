@@ -46,11 +46,13 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case formData(String)
 	/// A checkbox's or radio button's checkedness now.
 	case checked(String)
+	/// A text field's text now: what a person typed since, else its `value` binding, else its `value` attribute.
+	case field(String)
 
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .eventValue, .local, .item, .routeParams, .formData, .checked: return []
+		case .literal, .eventValue, .local, .item, .routeParams, .formData, .checked, .field: return []
 		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner): return inner.cells
 		case let .array(items): return items.flatMap(\.value.cells)
 		case let .object(fields): return fields.flatMap(\.value.cells)
@@ -786,6 +788,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["item"]: return .item(try field("item").string())
 		case ["formData"]: return .formData(try field("formData").string())
 		case ["checked"]: return .checked(try field("checked").string())
+		case ["field"]: return .field(try field("field").string())
 		case ["arguments", "call"]:
 			let name = try field("call").string()
 			guard let builtin = NativeBuiltin(rawValue: name) else { throw PayloadError(path: reader.path + ".call", reason: "unknown call \"\(name)\"") }

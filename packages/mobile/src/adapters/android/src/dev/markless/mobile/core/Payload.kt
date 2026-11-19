@@ -60,6 +60,8 @@ sealed interface Expr {
 	data class FormData(val form: String) : Expr
 	/** A checkbox's or radio button's checkedness now. */
 	data class Checked(val node: String) : Expr
+	/** A text field's text now: what a person typed since, else its `value` binding, else its `value` attribute. */
+	data class Field(val node: String) : Expr
 }
 
 sealed interface TextPart {
@@ -303,7 +305,7 @@ data class Payload(
 			is Expr.Lambda -> cellsOf(e.body)
 			is Expr.Local, is Expr.Item, Expr.RouteParams -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
-			Expr.EventValue, is Expr.FormData, is Expr.Checked -> emptyList()
+			Expr.EventValue, is Expr.FormData, is Expr.Checked, is Expr.Field -> emptyList()
 		}
 
 		private val UNARY = setOf("!", "-", "+", "typeof")
@@ -365,6 +367,7 @@ data class Payload(
 				o.containsKey("route") -> { o.only(setOf("route"), what); oneOf(o, "route", setOf("params"), what); Expr.RouteParams }
 				o.containsKey("event") -> { o.only(setOf("event"), what); oneOf(o, "event", setOf("value", "key", "text"), what); Expr.EventValue }
 				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
+				o.containsKey("field") -> { o.only(setOf("field"), what); Expr.Field(o.field("field", what).str("$what.field")) }
 				o.containsKey("formData") -> { o.only(setOf("formData"), what); Expr.FormData(o.field("formData", what).str("$what.formData")) }
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")
 			}

@@ -318,6 +318,7 @@ public final class NativeRuntime {
 			return try callMethod(method, on: targetValue, args)
 		case .routeParams: return .object(params.map { (key: $0.name, value: .string($0.value)) })
 		case let .checked(node): return .bool(try isChecked(node))
+		case let .field(node): return .string(try textOf(field: node))
 		case let .formData(form): return .array(try entries(of: form).map { .array($0.map(NativeValue.string)) })
 		case .eventValue:
 			guard let eventValue else { throw RuntimeError(reason: "the event value read outside an input, keydown or paste handler") }

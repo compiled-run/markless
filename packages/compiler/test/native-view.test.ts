@@ -311,6 +311,25 @@ export function Tags() @{
 		]);
 	});
 
+	it("reads a text field's text through its handle or the event's target, and has the field report its edits", async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+export function Trip() @{
+	const city = element<HTMLInputElement>();
+	let shown = state('');
+	<div>
+		<input el={city} value="Lima" onBlur={(event) => (shown = (event.target as HTMLInputElement).value)} />
+		<button onClick={() => (shown = city.value)}>Save</button>
+	</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers.map((handler) => handler.ops)).toEqual([
+			[{ op: 'assign', cell: 'state:shown', value: { field: 'h1' } }],
+			[{ op: 'assign', cell: 'state:shown', value: { field: 'h1' } }],
+			[],
+		]);
+		expect(payload?.events).toContainEqual({ host: 'h1', event: 'input', handler: 'handler:h1/edit' });
+	});
+
 	it('refuses a paste handler off a text field, and a clipboard read other than plain text', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Paste() @{

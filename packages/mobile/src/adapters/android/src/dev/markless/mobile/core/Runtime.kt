@@ -243,6 +243,7 @@ class Runtime(
 			Expr.EventValue -> JsValue.Str(eventValue ?: throw MarklessRuntimeError("the event value read outside an input, keydown or paste handler"))
 			is Expr.FormData -> entriesOf(e.form)
 			is Expr.Checked -> JsValue.Bool(checkedOf(e.node))
+			is Expr.Field -> JsValue.Str(textOf(e.node))
 			is Expr.CellRef -> read(e.cell, scope)
 			is Expr.Literal -> e.value
 			is Expr.Item -> scope.items[e.repeat] ?: throw MarklessRuntimeError("the row item of ${e.repeat} read outside its row")
