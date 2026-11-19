@@ -1,5 +1,5 @@
 {
-	"rung": 131,
+	"rung": 139,
 	"name": "a handler reads a text field's text through its handle: what a person typed, or the value it was built with",
 	"steps": [
 		{ "visible": ["Trip", "Nothing saved"] },
