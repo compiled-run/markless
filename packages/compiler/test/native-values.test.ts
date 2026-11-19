@@ -80,6 +80,30 @@ export function App({ id = 'b' }: { id?: string }) @{
 		]);
 	});
 
+	it('reads a record known at build time by a key that follows state, as the value of the key it equals', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+const LABELS: Record<string, string> = { on: 'Running', off: 'Stopped' };
+export function App() @{
+	let mode = state('off');
+	<main><p>{LABELS[mode]}</p><button onClick={() => (mode = 'on')}>Start</button></main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const key = { call: 'String', arguments: [{ cell: 'state:mode' }] };
+		expect(texts(payload)[0]?.[1]).toEqual([
+			{
+				expr: {
+					if: { binary: '===', left: key, right: { literal: 'on' } },
+					whenTrue: { literal: 'Running' },
+					whenFalse: {
+						if: { binary: '===', left: key, right: { literal: 'off' } },
+						whenTrue: { literal: 'Stopped' },
+						whenFalse: { literal: null },
+					},
+				},
+			},
+		]);
+	});
+
 	it('keeps a body const read alone in markup at the value the page rendered with, and follows it where the web re-derives it', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function App() @{

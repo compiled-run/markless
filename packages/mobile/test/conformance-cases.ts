@@ -108,6 +108,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'records',
+		fixture: 'test/fixtures/Records.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'route',
 		fixture: 'proofs/10-url-route/App.tsrx',
 		page: 'pages/[fruit].tsrx',
