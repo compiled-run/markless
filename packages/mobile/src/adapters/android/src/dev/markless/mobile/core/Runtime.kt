@@ -7,6 +7,9 @@ const val OVERLAY_ATTRIBUTE = "overlay"
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
+/** The events that carry a string: an `input` the field's text, a `keydown` its key, a `paste` the pasted text. */
+private val VALUED = setOf(EventName.Input, EventName.Keydown, EventName.Paste)
+
 sealed interface JournalEntry {
 	val node: String
 	fun toJson(): String
@@ -70,6 +73,12 @@ sealed interface JournalEntry {
 	/** A submit stopped at the field [node]: focus moves there and [message] shows until the next action. */
 	data class Invalid(override val node: String, val message: String) : JournalEntry {
 		override fun toJson() = "{\"op\":\"invalid\",\"node\":${jsonString(node)},\"message\":${jsonString(message)}}"
+	}
+
+	/** The `keydown` or `paste` handler called `preventDefault()`: the host leaves out what the key or paste does. */
+	data object PreventDefault : JournalEntry {
+		override val node get() = ""
+		override fun toJson() = "{\"op\":\"preventDefault\"}"
 	}
 
 	/** Dispatch a `timer` action for the timer [node] in [ms] milliseconds. */
@@ -666,12 +675,12 @@ class Runtime(
 
 	/**
 	 * Runs the handler for [event] on [host] (a row instance as `<node>@<key>`); an `input` event carries the field's whole
-	 * text as [value]. A `dismiss` with a [reason] is an overlay's Escape; without one, a sheet's platform close. A pointer
+	 * text as [value], a `keydown` its key and a `paste` the pasted text. A `dismiss` with a [reason] is an overlay's Escape; without one, a sheet's platform close. A pointer
 	 * event reaches [host] and each element it is inside, innermost first, after a `dismiss` of the topmost overlay when a
 	 * `pointerdown` lands outside it.
 	 */
 	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null): List<JournalEntry> {
-		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
+		if ((event in VALUED) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
 		if (event == EventName.Dismiss && reason != null) {
 			if (stack.lastOrNull() != host) throw MarklessRuntimeError("\"$host\" is not the topmost overlay")
@@ -724,8 +733,14 @@ class Runtime(
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
 		// A press focuses the control it presses, as the browser does.
 		if (event == EventName.Activate) focused = host
-		return change(host, value) {
-			withFields(value?.let { mapOf("value" to JsValue.Str(it)) }) { run(handler.ops, scope) }
+		val carried = when (event) {
+			EventName.Input -> value?.let { mapOf("value" to JsValue.Str(it)) }
+			EventName.Keydown -> mapOf("key" to JsValue.Str(value!!))
+			EventName.Paste -> mapOf("text" to JsValue.Str(value!!))
+			else -> null
+		}
+		return change(host, if (event == EventName.Input) value else null) {
+			withFields(carried) { run(handler.ops, scope) }
 		}
 	}
 
@@ -841,6 +856,7 @@ class Runtime(
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"event\":$event$catch"))
 			}
+			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)
 				values[slot(op.cell, scope)] = v

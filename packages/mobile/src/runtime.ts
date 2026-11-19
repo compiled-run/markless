@@ -26,6 +26,10 @@ export type NativeAction =
 	| { readonly event: 'focus' | 'blur'; readonly host: string }
 	/** The field's whole text after an edit. */
 	| { readonly event: 'input'; readonly host: string; readonly value: string }
+	/** A key of the on-screen keyboard in a text field, before it edits the text; `key` as the phone's browser names it. */
+	| { readonly event: 'keydown'; readonly host: string; readonly key: string }
+	/** A paste into a text field from its edit menu, before the text goes in. */
+	| { readonly event: 'paste'; readonly host: string; readonly text: string }
 	/** A live device value changed (connectivity, permission): the host writes the device cell. */
 	| { readonly event: 'device'; readonly cell: string; readonly value: Value }
 	/** A device call the host started has answered: a task cell takes `{ state: 'value', value }` or the error. */
@@ -77,6 +81,10 @@ type Value = NativeValue;
 /** What the event running a handler carries, by the field a `{ event }` expression names. */
 export type NativeEventFields = {
 	readonly value?: string;
+	/** A text field's `keydown`: the key as the phone's browser names it. */
+	readonly key?: string;
+	/** A `paste`: the pasted plain text. */
+	readonly text?: string;
 	readonly reason?: string;
 	readonly pressTarget?: string | null;
 	readonly target?: string;
@@ -1114,10 +1122,16 @@ export function createNativeRuntime(
 				.find((shown) => shown.id === action.host);
 			if (!instance) throw new Error(`${action.host} is not shown`);
 			const scope = instance.scope;
-			const eventValue = action.event === 'input' ? action.value : undefined;
+			const edit = action.event === 'input' ? action.value : undefined;
+			const eventValue: string | NativeEventFields | undefined =
+				action.event === 'keydown'
+					? { key: action.key }
+					: action.event === 'paste'
+						? { text: action.text }
+						: edit;
 			// A press focuses the control it presses, as the browser does.
 			if (action.event === 'activate') focused = action.host;
-			return change(action.host, eventValue, () =>
+			return change(action.host, edit, () =>
 				run(handlers.get(event.handler) ?? [], eventValue, scope),
 			);
 		},
@@ -1210,6 +1224,10 @@ export function createNativeRuntime(
 					command: op.command,
 					...(op.preventScroll ? { preventScroll: true as const } : {}),
 				});
+				continue;
+			}
+			if (op.op === 'preventDefault') {
+				calls.push({ op: 'preventDefault' });
 				continue;
 			}
 			if (op.op === 'dialog') {

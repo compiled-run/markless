@@ -266,12 +266,75 @@ export function Logger() @{
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Field() @{
 	let text = state('');
-	<input value={text} onKeyDown={() => (text = '')} />
+	<input value={text} onKeyUp={() => (text = '')} />
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toContain(
-			'the keydown event has no native meaning yet',
+			'the keyup event has no native meaning yet',
 		);
+	});
+
+	it("runs a text field's keydown and paste handlers with the key and the pasted text, and preventDefault() as an op", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Tags() @{
+	let text = state('');
+	let last = state('');
+	<input
+		value={text}
+		onKeyDown={(event) => {
+			if (event.key === 'Enter' && !event.isComposing) event.preventDefault();
+			last = event.key;
+		}}
+		onPaste={(event) => {
+			event.preventDefault();
+			text = (event as ClipboardEvent).clipboardData?.getData('text') ?? '';
+		}}
+	/>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.events).toEqual([
+			{ host: 'h0', event: 'keydown', handler: 'handler:event:0' },
+			{ host: 'h0', event: 'paste', handler: 'handler:event:1' },
+		]);
+		expect(payload?.handlers.map((handler) => handler.ops)).toEqual([
+			[
+				{
+					op: 'if',
+					test: {
+						logical: '&&',
+						left: { binary: '===', left: { event: 'key' }, right: { literal: 'Enter' } },
+						right: { unary: '!', value: { literal: false } },
+					},
+					whenTrue: [{ op: 'preventDefault' }],
+					whenFalse: [],
+				},
+				{ op: 'assign', cell: 'state:last', value: { event: 'key' } },
+			],
+			[
+				{ op: 'preventDefault' },
+				{
+					op: 'assign',
+					cell: 'state:text',
+					value: { logical: '??', left: { event: 'text' }, right: { literal: '' } },
+				},
+			],
+		]);
+	});
+
+	it('refuses a paste handler off a text field, and a clipboard read other than plain text', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Paste() @{
+	let text = state('');
+	<div>
+		<span onPaste={() => (text = 'pasted')}>{text}</span>
+		<input onPaste={(event) => (text = event.clipboardData?.getData('text/html') ?? '')} />
+	</div>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'a paste handler on <span>; a native build runs one only on a text field',
+			"the paste handler reads the clipboard other than as plain text (`getData('text')`), which a phone's paste does not give",
+		]);
 	});
 
 	it('leaves out key and focus handlers on a checkbox or radio button, and runs a text field\'s focus handler', async () => {

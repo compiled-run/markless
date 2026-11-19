@@ -157,7 +157,7 @@ data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boo
 data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
 
 /** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Dismiss] is a sheet's platform close or an overlay's Escape or outside press. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
-enum class EventName(val wire: String) { Activate("activate"), Input("input"), Focus("focus"), Blur("blur"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"), PointerDown("pointerdown"), PointerUp("pointerup") }
+enum class EventName(val wire: String) { Activate("activate"), Input("input"), Focus("focus"), Blur("blur"), Keydown("keydown"), Paste("paste"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"), PointerDown("pointerdown"), PointerUp("pointerup") }
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
@@ -181,6 +181,8 @@ sealed interface Op {
 	data class Tick(val node: String) : Op
 	/** Runs function [fn] of the payload's script with [bindings]; a throw or rejection writes `{ name, message }` to [catch] when there is one. */
 	data class Script(val fn: String, val type: String, val bindings: Map<String, ScriptBinding>, val catch: String? = null) : Op
+	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler. */
+	data object PreventDefault : Op
 }
 
 /** A device call a task cell starts at mount. */
@@ -350,7 +352,7 @@ data class Payload(
 				is Op.Assign -> hasScript(op.value)
 				is Op.Navigate -> op.params.values.any(::hasScript)
 				is Op.After -> hasScript(op.ms) || op.capture.any { hasScript(it.second) } || scriptOps(op.ops)
-				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick -> false
+				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick, Op.PreventDefault -> false
 			}
 		}
 
@@ -404,7 +406,7 @@ data class Payload(
 		private val BINARY = setOf("+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=")
 		private val LOGICAL = setOf("&&", "||", "??")
 		private val METHODS = setOf("filter", "map", "findIndex", "some", "every", "includes", "indexOf", "join", "concat", "slice", "reverse", "toReversed", "toUpperCase", "toLowerCase", "trim")
-		private val EVENT_FIELDS = setOf("value", "reason", "pressTarget", "target", "button")
+		private val EVENT_FIELDS = setOf("value", "reason", "pressTarget", "target", "button", "key", "text")
 		private val BUILTINS = setOf("String", "Number", "Boolean", "Math.abs", "Math.floor", "Math.max", "Math.min", "Math.round", "Date.now", "Date.toISOString")
 
 		private fun oneOf(o: Map<String, Json>, key: String, allowed: Set<String>, what: String): String {
@@ -700,6 +702,10 @@ data class Payload(
 				val method = o.field("method", what).str("$what.method")
 				if (method != "showModal" && method != "close") throw MarklessDecodeError("$what has unknown dialog method \"$method\"")
 				return Op.Dialog(o.field("node", what).str("$what.node"), method == "showModal")
+			}
+			if (name == "preventDefault") {
+				o.only(setOf("op"), what)
+				return Op.PreventDefault
 			}
 			if (name == "command") {
 				o.only(setOf("op", "node", "command", "preventScroll"), what)

@@ -5,7 +5,7 @@ public struct NativeAction: Equatable, Sendable {
 	public let event: NativeEventName
 	/// The element acted on; "" for a `timer`.
 	public let host: String
-	/// For `input`: the field's whole text after the edit.
+	/// For `input`: the field's whole text after the edit; for `keydown`, the key; for `paste`, the pasted text.
 	public let value: String?
 	/// For `timer`: the journalled timer whose time has come.
 	public let timer: String?
@@ -69,6 +69,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case fetch(id: Int, request: NativeFetchRequest)
 	/// An element marked `overlay` joined the overlay stack (`open`) or left it; a modal one goes in the top layer.
 	case overlay(node: String, open: Bool, modal: Bool)
+	/// The `keydown` or `paste` handler called `preventDefault()`: the host leaves out what the key or paste does.
+	case preventDefault
 
 	public var json: JSONValue {
 		switch self {
@@ -111,6 +113,7 @@ public enum NativeJournalEntry: Equatable, Sendable {
 		case let .fetch(id, request): return .object([("op", .string("fetch")), ("id", .number(Double(id))), ("request", request.json)])
 		case let .overlay(node, open, modal):
 			return .object([("op", .string("overlay")), ("node", .string(node)), ("open", .bool(open)), ("modal", .bool(modal))])
+		case .preventDefault: return .object([("op", .string("preventDefault"))])
 		}
 	}
 }
@@ -181,6 +184,8 @@ public final class NativeRuntime {
 	private let rowOfCell: [String: String]
 	private let firstOfCell: [String: NativeExpr]
 	private var eventValue: String?
+	/// In an `input` dispatch: the field's text, which it already shows.
+	private var edit: String?
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
 	/// The element that has focus, or nil.
@@ -828,7 +833,13 @@ public final class NativeRuntime {
 		// A press focuses the control it presses, as the browser does.
 		if action.event == .activate { focused = action.host }
 		eventValue = action.event == .input ? action.value ?? "" : nil
-		defer { eventValue = nil }
+		edit = eventValue
+		switch action.event {
+		case .keydown: eventFields = [.key: .string(action.value ?? "")]
+		case .paste: eventFields = [.text: .string(action.value ?? "")]
+		default: break
+		}
+		defer { eventValue = nil; edit = nil; eventFields = nil }
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
 	}
 
@@ -927,6 +938,8 @@ public final class NativeRuntime {
 				guard case let .string(node) = value, isElement(node) else { throw RuntimeError(reason: "\(command)() on a value that is not an element") }
 				if command == "focus" { focused = node }
 				calls.append(.command(node: node, command: command, preventScroll: preventScroll))
+			case .preventDefault:
+				calls.append(.preventDefault)
 			case let .call(call, object, arguments, result, then):
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):
@@ -1012,9 +1025,9 @@ public final class NativeRuntime {
 		let checkedBefore = checkedness
 		let bindingsBefore = Dictionary(uniqueKeysWithValues: try ticked.map { ($0.id, try checkedBinding($0.id)) })
 		var beforeProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
-		if let eventValue, let host {
-			beforeProperties["\(host)\u{0}value"] = eventValue
-			edited[host] = eventValue
+		if let edit, let host {
+			beforeProperties["\(host)\u{0}value"] = edit
+			edited[host] = edit
 		}
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })

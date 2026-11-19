@@ -419,6 +419,12 @@ class MarklessHost(
 	/** Reports a touch in window coordinates to the runtime as pointer events; call it before the views see the touch. */
 	fun touch(event: android.view.MotionEvent) = overlays.touch(event)
 
+	/** Applies a key's or paste's journal and answers whether its handler called `preventDefault()`. */
+	private fun prevents(journal: List<JournalEntry>): Boolean {
+		apply(journal)
+		return journal.any { it is JournalEntry.PreventDefault }
+	}
+
 	/** The journal applier: the only code that changes a retained view after the first build. */
 	fun apply(journal: List<JournalEntry>) {
 		dismissMessage()
@@ -452,6 +458,8 @@ class MarklessHost(
 				}
 				is JournalEntry.Invalid -> invalid(entry.node, entry.message)
 				is JournalEntry.Timer -> scheduleTimer(entry.node, entry.ms)
+				// Read by the field that dispatched the key or paste, which leaves out what it would do.
+				JournalEntry.PreventDefault -> {}
 				is JournalEntry.Navigate -> {
 					timers.removeCallbacksAndMessages(null)
 					Log.i(TAG, "journal ${entry.toJson()}")
@@ -725,7 +733,7 @@ class MarklessHost(
 				visibility = View.GONE
 				named(this, inst.id)
 			}
-			"input", "textarea" -> EditText(context).apply {
+			"input", "textarea" -> MarklessField(context).apply {
 				val focusEvents = events[node.id].orEmpty().map { it.event }
 				setOnFocusChangeListener { v, focused ->
 					if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW)
@@ -747,7 +755,7 @@ class MarklessHost(
 					override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
 					override fun afterTextChanged(s: Editable) = dismissMessage()
 				})
-				if (events[node.id].orEmpty().any { it.event == EventName.Enter }) imeOptions = EditorInfo.IME_ACTION_GO
+				if (node.element == "input" && events[node.id].orEmpty().any { it.event == EventName.Enter || it.event == EventName.Keydown }) imeOptions = EditorInfo.IME_ACTION_GO
 				named(this, inst.id)
 			}
 			else -> MarklessBox(context).apply {
@@ -768,6 +776,8 @@ class MarklessHost(
 			EventName.Dismiss -> if (OVERLAY_ATTRIBUTE !in node.attributes) throw MarklessHostError("dismiss event on \"${node.id}\", which is neither a sheet nor an overlay")
 			// Raised by the field's focus listener, set where the field is built.
 			EventName.Focus, EventName.Blur -> if (view !is EditText) throw MarklessHostError("${e.event.wire} event on \"${node.id}\", which is not a text field")
+			EventName.Keydown -> (view as? MarklessField ?: throw MarklessHostError("keydown event on \"${node.id}\", which is not a text field")).onKey = { key -> prevents(runtime.dispatch(inst.id, EventName.Keydown, key)) }
+			EventName.Paste -> (view as? MarklessField ?: throw MarklessHostError("paste event on \"${node.id}\", which is not a text field")).onPaste = { text -> prevents(runtime.dispatch(inst.id, EventName.Paste, text)) }
 			EventName.Cancel, EventName.PointerDown, EventName.PointerUp, EventName.Submit, EventName.Idle, EventName.Visible -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->

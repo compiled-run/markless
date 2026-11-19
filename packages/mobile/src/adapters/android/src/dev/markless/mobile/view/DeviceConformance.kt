@@ -82,6 +82,8 @@ object DeviceConformance {
 				"enter" -> (target as? EditText ?: throw MarklessHostError("steps[$n] presses return in a view that is not an input")).onEditorAction(EditorInfo.IME_ACTION_GO)
 				"timer" -> host.apply(host.runtime.timer(action.field("timer", "action").str("timer")))
 				"focus" -> if (!target.requestFocus()) failures.add("steps[$n]: the field took no focus")
+				"keydown" -> (target as? MarklessField)?.onKey?.invoke(action.field("key", "action").str("key")) ?: throw MarklessHostError("steps[$n] presses a key in a view with no keydown handler")
+				"paste" -> (target as? MarklessField)?.onPaste?.invoke(action.field("text", "action").str("text")) ?: throw MarklessHostError("steps[$n] pastes into a view with no paste handler")
 				"blur" -> target.clearFocus()
 				"idle" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Idle))
 				"visible" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Visible))

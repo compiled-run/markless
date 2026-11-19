@@ -14,7 +14,7 @@ public enum OverlayProtocol {
 
 /// What an event carries, by the field an `{ event }` expression names.
 public enum NativeEventField: String, Sendable {
-	case value, reason, pressTarget, target, button
+	case value, reason, pressTarget, target, button, key, text
 }
 
 public enum NativeBuiltin: String, Sendable {
@@ -217,6 +217,8 @@ public enum NativeEventName: String, Sendable {
 	case input
 	/// A text field took the keyboard, or gave it up.
 	case focus, blur
+	/// A key of the on-screen keyboard in a text field, and a paste from its edit menu, before either edits the text.
+	case keydown, paste
 	/// The platform closed a system sheet; it is already closed when the handler runs.
 	case dismiss
 	/// The host's back gesture or Escape on an open `<dialog>`: it closes, as the browser's cancel does.
@@ -260,6 +262,8 @@ public enum NativeOp: Equatable, Sendable {
 	/// Runs function `fn` of the payload's script with the event (`type`, the web event's) and `bindings`, then writes the
 	/// cells it changed. A throw, or a rejection of what it returns, writes `{ name, message }` to `catch` when there is one.
 	case script(fn: String, type: String, bindings: [NativeScriptBinding], catch: String?)
+	/// `event.preventDefault()` in a text field's `keydown` or `paste` handler.
+	case preventDefault
 }
 
 public struct NativeCapture: Equatable, Sendable {
@@ -584,6 +588,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 						throw PayloadError(path: op.path + ".method", reason: "unknown dialog method \"\(method)\"")
 					}
 					return .dialog(node: try opField["node"].string(), open: method == "showModal")
+				case "preventDefault":
+					_ = try op.object(["op"])
+					return .preventDefault
 				case "command":
 					let keys = Set(try op.keys())
 					let opField = try op.object(required: ["op", "node", "command"], optional: ["preventScroll"])

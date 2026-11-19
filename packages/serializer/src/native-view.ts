@@ -108,9 +108,11 @@ export type NativeExpr =
 	/**
 	 * What the event that runs the handler carries: an `input` handler's field text after the edit
 	 * (`event.currentTarget.value`); a `dismiss` handler's `event.detail.reason` and `event.detail.pressTarget` (an element,
-	 * or null for Escape); a pointer handler's `event.target` (an element) and `event.button` (0, a touch).
+	 * or null for Escape); a pointer handler's `event.target` (an element) and `event.button` (0, a touch); a text field's
+	 * `keydown` handler's `event.key`, as the phone's browser gives it for its on-screen keyboard; a `paste` handler's pasted
+	 * plain text (`event.clipboardData.getData('text')`).
 	 */
-	| { readonly event: 'value' | 'reason' | 'pressTarget' | 'target' | 'button' }
+	| { readonly event: 'value' | 'reason' | 'pressTarget' | 'target' | 'button' | 'key' | 'text' }
 	/**
 	 * `new FormData(form)`: the form's entry list as the web builds it, `[name, value]` pairs in tree order. A field is left
 	 * out when it is disabled or has no name, a checkbox when it is not checked; a checkbox's value is its `value` attribute
@@ -444,12 +446,17 @@ export type NativeProperty = 'value' | 'checked' | 'indeterminate';
  * after it left, it is a new one): `idle` at the first moment the host is idle after the screen's first frame (or after
  * the element appears), `visible` the first time any of the element is on the screen.
  */
-/** `focus` and `blur` are a text field's: it took the keyboard, or gave it up. */
+/**
+ * `focus` and `blur` are a text field's: it took the keyboard, or gave it up. `keydown` and `paste` are a text field's too:
+ * a key of the on-screen keyboard, and a paste from its edit menu.
+ */
 export type NativeEventName =
 	| 'activate'
 	| 'input'
 	| 'focus'
 	| 'blur'
+	| 'keydown'
+	| 'paste'
 	| 'dismiss'
 	| 'cancel'
 	| 'enter'
@@ -512,6 +519,8 @@ export type NativeOp =
 			readonly command: NativeCommand;
 			readonly preventScroll?: true;
 	  }
+	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler: the host leaves out what the key or paste does. */
+	| { readonly op: 'preventDefault' }
 	/**
 	 * Submits `form` as the web does when `submitter` is pressed, or the return key submits it with no submit button (null):
 	 * nothing when the submitter is disabled; then, unless the form has `novalidate` or the submitter `formnovalidate`,
@@ -716,6 +725,8 @@ export type NativeJournalEntry =
 			readonly command: NativeCommand;
 			readonly preventScroll?: true;
 	  }
+	/** The `keydown` or `paste` handler called `preventDefault()`: the host does not delete, break the line, return or paste. */
+	| { readonly op: 'preventDefault' }
 	/** A `<dialog>` opened in the top layer or closed (by an op, or by the host's back gesture as a `cancel`). */
 	| { readonly op: 'dialog'; readonly node: string; readonly open: boolean }
 	/** A submit stopped: the host moves focus to `node` as `focus()` would and shows `message` until the next action. */

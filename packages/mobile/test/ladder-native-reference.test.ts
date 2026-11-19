@@ -828,7 +828,7 @@ function walk(
 						],
 				index,
 			);
-		} else if (action && !('tap' in action) && !('type' in action) && !('submit' in action) && !('dismissSheet' in action))
+		} else if (action && !('tap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
@@ -839,7 +839,13 @@ function walk(
 			apply(runtime.dispatch({ event: 'dismiss', host: sheet }), index);
 		} else if (action) {
 			const name =
-				'tap' in action ? action.tap : 'type' in action ? action.type.field : action.submit;
+				'tap' in action
+					? action.tap
+					: 'type' in action
+						? action.type.field
+						: 'erase' in action
+							? action.erase
+							: action.submit;
 			const host = elementReading(name);
 			if (!host)
 				throw new Error(
@@ -884,7 +890,7 @@ function walk(
 			if ('tap' in action && !activates && touched.length === 0)
 				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
 			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.
-			const handles = (node: string, event: 'input' | 'focus' | 'blur') =>
+			const handles = (node: string, event: 'input' | 'focus' | 'blur' | 'keydown') =>
 				payload.events.some((candidate) => candidate.host === node.split('@')[0] && candidate.event === event);
 			if ('type' in action && focused !== host) {
 				if (focused && handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
@@ -895,6 +901,21 @@ function walk(
 				if (handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
 				focused = undefined;
 			}
+			// Backspace with the cursor at the end takes the last character; the input event then runs the handler.
+			const erased = (field: string): ReturnType<typeof runtime.dispatch> => {
+				const text = [...fieldText(field)].slice(0, -1).join('');
+				if (properties.has(field)) properties.set(field, text);
+				else typed.set(field, text);
+				return handles(field, 'input') ? runtime.dispatch({ event: 'input', host: field, value: text }) : [];
+			};
+			// A key runs the field's keydown handler first; preventDefault() there leaves out what the key does.
+			const keyed = (key: string): boolean => {
+				if (!handles(host, 'keydown')) return false;
+				const journal = runtime.dispatch({ event: 'keydown', host, key });
+				apply(journal, index);
+				return journal.some((entry) => entry.op === 'preventDefault');
+			};
+			if ('type' in action) for (const key of action.type.text) keyed(key);
 			const dispatched =
 				'tap' in action
 					? activates
@@ -904,9 +925,13 @@ function walk(
 						? handles(host, 'input')
 							? runtime.dispatch({ event: 'input', host, value: action.type.text })
 							: []
-						: returns
-							? runtime.dispatch({ event: 'enter', host })
-							: [];
+						: 'erase' in action
+							? keyed('Backspace') || fieldText(host) === ''
+								? []
+								: erased(host)
+							: keyed('Enter') || !returns
+								? []
+								: runtime.dispatch({ event: 'enter', host });
 			apply(dispatched, index);
 		}
 		raiseLoadEvents(index);
