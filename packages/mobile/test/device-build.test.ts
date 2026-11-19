@@ -86,7 +86,10 @@ export default function App() @{
 describe('which handlers run as data', () => {
 	const handler = (body: string) => `import { state } from '@markless/core';
 import { haptics, location } from '@markless/device';
-function save() {}
+function save() {
+	fetch('/save');
+}
+function nothing() {}
 export default function App() @{
 	let n = state(0);
 	<button onClick={${body}}>Go {n}</button>
@@ -106,7 +109,7 @@ export default function App() @{
 
 	it('still refuses a call to author code by name when handlers are data only', async () => {
 		expect(await refusal('() => save()')).toEqual([
-			'the click handler uses a call to `save`, which needs a script engine',
+			'the click handler uses a call to `fetch`, which needs a script engine',
 		]);
 	});
 
@@ -114,7 +117,7 @@ export default function App() @{
 		const result = await build(handler('() => save()'));
 		expect(result.diagnostics).toEqual([]);
 		expect(result.payload?.handlers[0]?.ops).toEqual([{ op: 'script', fn: 'fn:0', type: 'click', bindings: {} }]);
-		expect(result.payload?.script?.services).toEqual([]);
+		expect(result.payload?.script?.services).toEqual(['fetch']);
 	});
 
 	it('refuses a device call inside JavaScript by name, file and position', async () => {
@@ -128,6 +131,12 @@ export default function App() @{
 				{ filename: 'src/App.tsrx', start, end: start + 'location'.length },
 			],
 		]);
+	});
+
+	it('runs a module function called for its effects where it is called', async () => {
+		const result = await build(handler('() => { nothing(); n++; }'));
+		expect(result.diagnostics).toEqual([]);
+		expect(result.payload?.handlers[0]?.ops).toHaveLength(1);
 	});
 
 	it('refuses a device call used as a value', async () => {

@@ -9,7 +9,12 @@ import {
 	nativeStyleInput,
 } from '../src/index.ts';
 import { compileRungApp, readWorkspaceModule } from '../src/harness/rung.ts';
-import { APP_CONFORMANCE_CASES, CONFORMANCE_CASES, CONFORMANCE_SCRIPT_HOST } from './conformance-cases.ts';
+import {
+	APP_CONFORMANCE_CASES,
+	CONFORMANCE_CASES,
+	CONFORMANCE_SCRIPT_HOST,
+	readCaseModule,
+} from './conformance-cases.ts';
 import { scrollVectors } from '../src/scroll.ts';
 import { SCROLL_CASES } from './scroll-cases.ts';
 
@@ -47,8 +52,8 @@ describe('native conformance vectors', () => {
 				filename: entry.modules ? `packages/mobile/${entry.fixture}` : `src/${entry.name}.tsrx`,
 				...(entry.page ? { page: entry.page } : {}),
 				...(entry.device ? { device: entry.device } : {}),
-				...(entry.modules ? { readModule: readWorkspaceModule } : {}),
 				source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
+				readModule: entry.modules ? readWorkspaceModule : readCaseModule,
 			});
 			expect(committed(`${entry.name}.json`), entry.name).toEqual(
 				nativeConformance(payload!, entry.actions, entry.params, entry.preferredLanguages, entry.now, CONFORMANCE_SCRIPT_HOST()),

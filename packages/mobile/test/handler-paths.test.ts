@@ -10,7 +10,7 @@ import {
 } from '../src/index.ts';
 import { compileRungApp, readWorkspaceModule } from '../src/harness/rung.ts';
 import { nodeScriptHost } from '../src/node-engine.ts';
-import { CONFORMANCE_CASES } from './conformance-cases.ts';
+import { CONFORMANCE_CASES, readCaseModule } from './conformance-cases.ts';
 
 // Both meanings of a handler: as data, and as its own JavaScript in the engine. Every committed vector is built twice,
 // once as the compiler chooses and once with every handler a script can run forced into the engine; what each shows and
@@ -24,7 +24,7 @@ const build = async (
 		filename: entry.modules ? `packages/mobile/${entry.fixture}` : `src/${entry.name}.tsrx`,
 		...(entry.page ? { page: entry.page } : {}),
 		...(entry.device ? { device: entry.device } : {}),
-		...(entry.modules ? { readModule: readWorkspaceModule } : {}),
+		readModule: entry.modules ? readWorkspaceModule : readCaseModule,
 		...(scriptHandlers ? { scriptHandlers } : {}),
 		source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
 	});
@@ -91,12 +91,19 @@ describe('a handler means the same as data and as JavaScript', () => {
 	});
 
 	it('forces most handlers of the vectors into the engine, so the comparison covers them', async () => {
+		// The engine has no elements: handlers that read focus, `contains` or an event's target element stay data.
+		const elementCases = new Set(['overlay', 'popover']);
 		let data = 0;
 		let forced = 0;
 		for (const entry of CONFORMANCE_CASES) {
 			const chosen = await build(entry);
+			const moved = scriptOps(await build(entry, 'all')) - scriptOps(chosen);
+			if (elementCases.has(entry.name)) {
+				expect(moved, entry.name).toBe(0);
+				continue;
+			}
 			data += chosen.handlers.length - scriptOps(chosen);
-			forced += scriptOps(await build(entry, 'all')) - scriptOps(chosen);
+			forced += moved;
 		}
 		expect(forced).toBeGreaterThan(data / 2);
 	});

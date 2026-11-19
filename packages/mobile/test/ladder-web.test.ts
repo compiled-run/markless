@@ -227,6 +227,13 @@ async function act(page: Page, step: LadderStep) {
 		await page.getByRole('textbox', { name: action.submit, exact: true }).press('Enter');
 	else if ('relaunch' in action) await page.reload();
 	else if ('back' in action) await page.goBack();
+	else if ('escape' in action) await page.keyboard.press('Escape');
+	else if ('pressBackdrop' in action) {
+		// Unstyled, the backdrop has no area beside its surface to click, so the press is dispatched on the element itself.
+		const backdrop = await page.locator('[overlay]:not([hidden])').last().elementHandle();
+		for (const type of ['pointerdown', 'pointerup', 'click'])
+			await backdrop!.dispatchEvent(type, { button: 0, isPrimary: true, pointerType: 'touch' });
+	}
 	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });
 	else if ('swipe' in action && action.swipe !== 'up') {
 		const { from, to, until } = action.swipe;

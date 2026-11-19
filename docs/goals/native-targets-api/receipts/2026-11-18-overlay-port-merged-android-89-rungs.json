@@ -1,0 +1,640 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 1.9834835410000013,
+			"flowSeconds": 5.678392125000006
+		},
+		{
+			"name": "02-styles",
+			"failure": null,
+			"installSeconds": 1.5975822079999926,
+			"flowSeconds": 8.675481874999997
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 1.5360200829999957,
+			"flowSeconds": 12.479742083000005
+		},
+		{
+			"name": "04-attributes",
+			"failure": null,
+			"installSeconds": 1.5751733749999985,
+			"flowSeconds": 13.188775542000004
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 1.3303222920000117,
+			"flowSeconds": 13.87442479199999
+		},
+		{
+			"name": "05b-choices",
+			"failure": null,
+			"installSeconds": 1.4622822499999892,
+			"flowSeconds": 23.673722124999987
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 1.5438710829999764,
+			"flowSeconds": 14.408793084000004
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 1.4951245000000053,
+			"flowSeconds": 12.057431416000007
+		},
+		{
+			"name": "07b-imported-component",
+			"failure": null,
+			"installSeconds": 1.524303583000001,
+			"flowSeconds": 13.570638458000001
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 1.6990185829999973,
+			"flowSeconds": 13.25595537499999
+		},
+		{
+			"name": "07d-children",
+			"failure": null,
+			"installSeconds": 1.4554447499999952,
+			"flowSeconds": 13.248474916999985
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 1.5403159999999916,
+			"flowSeconds": 19.96451454199999
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 1.5660491249999904,
+			"flowSeconds": 20.469800749999994
+		},
+		{
+			"name": "10-url-route",
+			"failure": null,
+			"installSeconds": 1.719958416999987,
+			"flowSeconds": 9.765534999999975
+		},
+		{
+			"name": "12-long-page",
+			"failure": null,
+			"installSeconds": 1.5552123750000029,
+			"flowSeconds": 33.25673745900003
+		},
+		{
+			"name": "13-scroll-box",
+			"failure": null,
+			"installSeconds": 1.604773332999961,
+			"flowSeconds": 39.113180916999994
+		},
+		{
+			"name": "14-scroll-row",
+			"failure": null,
+			"installSeconds": 1.6067777910000296,
+			"flowSeconds": 26.114142416999968
+		},
+		{
+			"name": "15-long-list",
+			"failure": null,
+			"installSeconds": 1.4387972090000403,
+			"flowSeconds": 56.03087145899999
+		},
+		{
+			"name": "16-keyboard",
+			"failure": null,
+			"installSeconds": 1.3021083750000106,
+			"flowSeconds": 24.631923416999985
+		},
+		{
+			"name": "17-into-view",
+			"failure": null,
+			"installSeconds": 1.7571770419999957,
+			"flowSeconds": 32.844649125
+		},
+		{
+			"name": "d1-network",
+			"failure": null,
+			"installSeconds": 1.745546250000014,
+			"flowSeconds": 28.012821374999998
+		},
+		{
+			"name": "d2-haptics",
+			"failure": null,
+			"installSeconds": 1.7039333340000011,
+			"flowSeconds": 12.822801457999972
+		},
+		{
+			"name": "d3-location",
+			"failure": null,
+			"installSeconds": 1.4302809169999091,
+			"flowSeconds": 17.92447900000005
+		},
+		{
+			"name": "d4-camera",
+			"failure": null,
+			"installSeconds": 1.3700037920000032,
+			"flowSeconds": 27.045972917000064
+		},
+		{
+			"name": "d4b-photo-refused",
+			"failure": null,
+			"installSeconds": 2.070720917000086,
+			"flowSeconds": 14.461407624999993
+		},
+		{
+			"name": "d5-recorder",
+			"failure": null,
+			"installSeconds": 1.588437791999895,
+			"flowSeconds": 56.66007716600003
+		},
+		{
+			"name": "d6-sharesheet",
+			"failure": null,
+			"installSeconds": 1.3693713750001044,
+			"flowSeconds": 10.802099791999906
+		},
+		{
+			"name": "d7-settings",
+			"failure": null,
+			"installSeconds": 1.306004416000098,
+			"flowSeconds": 24.515201457999996
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 1.6980021669999696,
+			"flowSeconds": 28.075738458000007
+		},
+		{
+			"name": "f2-return-key",
+			"failure": null,
+			"installSeconds": 1.6987419169999194,
+			"flowSeconds": 41.51221274999995
+		},
+		{
+			"name": "f3-families",
+			"failure": null,
+			"installSeconds": 1.6076004999999423,
+			"flowSeconds": 23.731963584000013
+		},
+		{
+			"name": "f4-required",
+			"failure": null,
+			"installSeconds": 1.614073583999998,
+			"flowSeconds": 25.615621207999997
+		},
+		{
+			"name": "f5-async",
+			"failure": null,
+			"installSeconds": 1.3733449170000385,
+			"flowSeconds": 44.05249745800008
+		},
+		{
+			"name": "f6-disabled",
+			"failure": null,
+			"installSeconds": 1.6467724170000293,
+			"flowSeconds": 20.17904970799992
+		},
+		{
+			"name": "f7-tick",
+			"failure": null,
+			"installSeconds": 1.5920075829999987,
+			"flowSeconds": 30.84121591700008
+		},
+		{
+			"name": "p1-platform",
+			"failure": null,
+			"installSeconds": 1.5990471660000039,
+			"flowSeconds": 5.732167292000027
+		},
+		{
+			"name": "r101-inline-text",
+			"failure": null,
+			"installSeconds": 1.5613171660000225,
+			"flowSeconds": 9.70482816699997
+		},
+		{
+			"name": "r102-code",
+			"failure": null,
+			"installSeconds": 1.4162207499999786,
+			"flowSeconds": 8.721834417000064
+		},
+		{
+			"name": "r103-pre",
+			"failure": null,
+			"installSeconds": 1.4705535839999793,
+			"flowSeconds": 9.173518917000038
+		},
+		{
+			"name": "r104-line-breaks",
+			"failure": null,
+			"installSeconds": 1.7053180419999407,
+			"flowSeconds": 9.341102541
+		},
+		{
+			"name": "r105-time",
+			"failure": null,
+			"installSeconds": 1.5357140409999992,
+			"flowSeconds": 9.036271999999997
+		},
+		{
+			"name": "r106-blocks",
+			"failure": null,
+			"installSeconds": 1.5610864999999758,
+			"flowSeconds": 5.928658583999961
+		},
+		{
+			"name": "r107-lists",
+			"failure": null,
+			"installSeconds": 1.7379724589999532,
+			"flowSeconds": 6.270019624999957
+		},
+		{
+			"name": "r108-table",
+			"failure": null,
+			"installSeconds": 1.6027589999999619,
+			"flowSeconds": 9.253351333
+		},
+		{
+			"name": "r109-page-text",
+			"failure": null,
+			"installSeconds": 1.5681606250000186,
+			"flowSeconds": 6.044910832999973
+		},
+		{
+			"name": "r110-document-elements",
+			"failure": null,
+			"installSeconds": 1.6579943749998929,
+			"flowSeconds": 10.5868144589999
+		},
+		{
+			"name": "r111-svg-icon",
+			"failure": null,
+			"installSeconds": 1.523795334000024,
+			"flowSeconds": 5.972696416000021
+		},
+		{
+			"name": "r112-svg-shapes",
+			"failure": null,
+			"installSeconds": 1.6035554170000832,
+			"flowSeconds": 6.093399582999991
+		},
+		{
+			"name": "r113-svg-use",
+			"failure": null,
+			"installSeconds": 1.3786477500000038,
+			"flowSeconds": 5.872100166999968
+		},
+		{
+			"name": "r114-svg-button",
+			"failure": null,
+			"installSeconds": 1.528278665999882,
+			"flowSeconds": 12.606056208999828
+		},
+		{
+			"name": "r115-svg-em",
+			"failure": null,
+			"installSeconds": 1.5197383749999571,
+			"flowSeconds": 6.502554749999894
+		},
+		{
+			"name": "r131-module-constants",
+			"failure": null,
+			"installSeconds": 1.672488125000149,
+			"flowSeconds": 13.389023542000213
+		},
+		{
+			"name": "r132-body-constants",
+			"failure": null,
+			"installSeconds": 1.7903657080000266,
+			"flowSeconds": 12.476170374999986
+		},
+		{
+			"name": "r133-props-down",
+			"failure": null,
+			"installSeconds": 1.9474328749999403,
+			"flowSeconds": 9.292631082999986
+		},
+		{
+			"name": "r134-app-functions",
+			"failure": null,
+			"installSeconds": 1.5734805410001427,
+			"flowSeconds": 15.639960750000085
+		},
+		{
+			"name": "r135-idle",
+			"failure": null,
+			"installSeconds": 1.7431576669998468,
+			"flowSeconds": 17.587061292000115
+		},
+		{
+			"name": "r136-visible",
+			"failure": null,
+			"installSeconds": 1.4829872500000056,
+			"flowSeconds": 11.168931957999943
+		},
+		{
+			"name": "r137-clock",
+			"failure": null,
+			"installSeconds": 1.4081890829999466,
+			"flowSeconds": 12.928453625000081
+		},
+		{
+			"name": "u1-base",
+			"failure": null,
+			"installSeconds": 1.5432570840001572,
+			"flowSeconds": 13.08123812500015
+		},
+		{
+			"name": "u2-collapsible",
+			"failure": null,
+			"installSeconds": 1.5423351670000702,
+			"flowSeconds": 14.556173500000034
+		},
+		{
+			"name": "u3-tabs",
+			"failure": null,
+			"installSeconds": 1.555570374999894,
+			"flowSeconds": 17.682129209000152
+		},
+		{
+			"name": "u4-dialog",
+			"failure": null,
+			"installSeconds": 1.375534207999939,
+			"flowSeconds": 29.586635042000097
+		},
+		{
+			"name": "u5-toggle",
+			"failure": null,
+			"installSeconds": 1.5329467500001193,
+			"flowSeconds": 13.271123208000091
+		},
+		{
+			"name": "u6-base-rows",
+			"failure": null,
+			"installSeconds": 1.7037242920000573,
+			"flowSeconds": 35.92714191700006
+		},
+		{
+			"name": "u11-pagination",
+			"failure": null,
+			"installSeconds": 1.5776489589998963,
+			"flowSeconds": 21.41168916700012
+		},
+		{
+			"name": "u12-buttongroup",
+			"failure": null,
+			"installSeconds": 1.4762306669999379,
+			"flowSeconds": 43.93081445900002
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 1.6266804589999373,
+			"flowSeconds": 42.51073462500004
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 1.3382896249999758,
+			"flowSeconds": 19.07415341699985
+		},
+		{
+			"name": "u20-modal",
+			"failure": null,
+			"installSeconds": 1.7103846670000349,
+			"flowSeconds": 33.71305316699995
+		},
+		{
+			"name": "u21-popover",
+			"failure": {
+				"step": -1,
+				"action": "unknown",
+				"role": "unknown",
+				"message": "maestro exited 1\nRunning on emulator-5612\n > Flow u21-popover\nLaunch app \"${APP_ID}\" with clear state... COMPLETED\nAssert that \"Popover\" is visible... COMPLETED\nAssert that \"Filters\" is visible... COMPLETED\nAssert that \"Changes 0\" is visible... COMPLETED\nAssert that \"Show only\" is not visible... COMPLETED\nAssert that \"Pick what the list shows\" is not visible... COMPLETED\nAssert that \"Done\" is not visible... COMPLETED\nTake screenshot 00-launch-after... COMPLETED\nTake screenshot 01-tap-before... COMPLETED\nTap on \"Filters\"... COMPLETED\nAssert that \"Show only\" is visible... COMPLETED\nAssert that \"Pick what the list shows\" is visible... COMPLETED\nAssert that \"Done\" is visible... COMPLETED\nAssert that \"Show only\" is visible... COMPLETED\nAssert that \"Pick what the list shows\" is visible... COMPLETED\nAssert that \"Done\" is visible... COMPLETED\nAssert that \"Changes 1\" is visible... COMPLETED\nTake screenshot 01-tap-after... COMPLETED\nTake screenshot 02-tap-before... COMPLETED\nTap on \"Changes 1\"... COMPLETED\nAssert that \"Show only\" is not visible... COMPLETED\nAssert that \"Done\" is not visible... COMPLETED\nAssert that \"Changes 1\" is not visible... COMPLETED\nAssert that \"Changes 2\" is visible... COMPLETED\nAssert that \"Show only\" is not visible... COMPLETED\nAssert that \"Done\" is not visible... COMPLETED\nAssert that \"Changes 1\" is not visible... COMPLETED\nTake screenshot 02-tap-after... COMPLETED\nTake screenshot 03-tap-before... COMPLETED\nTap on \"Filters\"... COMPLETED\nAssert that \"Show only\" is visible... COMPLETED\nAssert that \"Changes 2\" is not visible... COMPLETED\nAssert that \"Show only\" is visible... COMPLETED\nAssert that \"Changes 3\" is visible... COMPLETED\nAssert that \"Changes 2\" is not visible... COMPLETED\nTake screenshot 03-tap-after... COMPLETED\nTake screenshot 04-tap-before... COMPLETED\nTap on \"Filters\"... COMPLETED\nAssert that \"Show only\" is not visible... COMPLETED\nAssert that \"Changes 3\" is not visible... COMPLETED\nAssert that \"Changes 4\" is visible... COMPLETED\nAssert that \"Show only\" is not visible... COMPLETED\nAssert that \"Changes 3\" is not visible... COMPLETED\nTake screenshot 04-tap-after... COMPLETED\nTake screenshot 05-tap-before... COMPLETED\nTap on \"Filters\"... COMPLETED\nAssert that \"Show only\" is visible... COMPLETED\nAssert that \"Changes 4\" is not visible... COMPLETED\nAssert that \"Show only\" is visible... COMPLETED\nAssert that \"Changes 5\" is visible... COMPLETED\nAssert that \"Changes 4\" is not visible... COMPLETED\nTake screenshot 05-tap-after... COMPLETED\nTake screenshot 06-tap-before... COMPLETED\nTap on \"Done\"...\n==== Debug output (logs & screenshots) ====\n\n/Users/jackshelton/.cache/markless-proof/runs/u21-popover/android-flow/maestro/2026-11-18_093435\nException in thread \"Thread-5\" java.io.IOException: Command failed (host:transport:emulator-5612): device 'emulator-5612' not found\n\tat dadb.adbserver.AdbServer.send$dadb(AdbServer.kt:103)\n\tat dadb.adbserver.AdbServerDadb.open(AdbServer.kt:148)\n\tat dadb.Dadb$DefaultImpls.openShell(Dadb.kt:42)\n\tat dadb.adbserver.AdbServerDadb.openShell(AdbServer.kt:122)\n\tat dadb.Dadb$DefaultImpls.shell(Dadb.kt:35)\n\tat dadb.adbserver.AdbServerDadb.shell(AdbServer.kt:122)\n\tat maestro.android.AndroidDeviceConnection.shell(AndroidDeviceConnection.kt:153)\n\tat maestro.drivers.AndroidDriver.shell(AndroidDriver.kt:1352)\n\tat maestro.drivers.AndroidDriver.isPackageInstalled(AndroidDriver.kt:1335)\n\tat maestro.drivers.AndroidDriver.bestEffortUninstall(AndroidDriver.kt:1310)\n\tat maestro.drivers.AndroidDriver.uninstallMaestroDriverApp$lambda$89(AndroidDriver.kt:1296)\n\tat maestro.utils.Metrics.measured(Metrics.kt:48)\n\tat maestro.drivers.AndroidDriver.uninstallMaestroDriverApp(AndroidDriver.kt:1295)\n\tat maestro.drivers.AndroidDriver.close(AndroidDriver.kt:182)\n\tat maestro.Maestro.close(Maestro.kt:606)\n\tat maestro.cli.session.MaestroSessionManager$MaestroSession.close(MaestroSessionManager.kt:471)\n\tat maestro.cli.session.MaestroSessionManager.newSession$lambda$2(MaestroSessionManager.kt:129)\n\tat kotlin.concurrent.ThreadsKt$thread$thread$1.run(Thread.kt:30)"
+			},
+			"installSeconds": 1.661128749999916,
+			"flowSeconds": 28.32648604199989
+		},
+		{
+			"name": "y1-sheet-open-close",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/y1-sheet-open-close/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.8984804579999763,
+			"flowSeconds": 0
+		},
+		{
+			"name": "y2-sheet-pick",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/y2-sheet-pick/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.8748713750001043,
+			"flowSeconds": 0
+		},
+		{
+			"name": "y3-sheet-heights",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/y3-sheet-heights/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.8796215829998255,
+			"flowSeconds": 0
+		},
+		{
+			"name": "n1-two-routes",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/n1-two-routes/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9378282919998746,
+			"flowSeconds": 0
+		},
+		{
+			"name": "n2-orders",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/n2-orders/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9356516249999404,
+			"flowSeconds": 0
+		},
+		{
+			"name": "n3-navigate",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/n3-navigate/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9346027079999912,
+			"flowSeconds": 0
+		},
+		{
+			"name": "n4-deep-link",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/n4-deep-link/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.8956892089999746,
+			"flowSeconds": 0
+		},
+		{
+			"name": "r138-trailing-slash",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/r138-trailing-slash/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9102603749998379,
+			"flowSeconds": 0
+		},
+		{
+			"name": "s1-page-styles",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/s1-page-styles/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9919180409999099,
+			"flowSeconds": 0
+		},
+		{
+			"name": "s2-shared-component",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/s2-shared-component/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9912215830001514,
+			"flowSeconds": 0
+		},
+		{
+			"name": "s3-state-styles",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/s3-state-styles/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9784871249999851,
+			"flowSeconds": 0
+		},
+		{
+			"name": "s4-global-tokens",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/s4-global-tokens/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.975934499999974,
+			"flowSeconds": 0
+		},
+		{
+			"name": "s5-page-canvas",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/s5-page-canvas/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9770767500000075,
+			"flowSeconds": 0
+		},
+		{
+			"name": "z1-sheet-scoped-styles",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/z1-sheet-scoped-styles/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9649611659999937,
+			"flowSeconds": 0
+		},
+		{
+			"name": "z2-sheet-shared-component",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/z2-sheet-shared-component/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9703438750000205,
+			"flowSeconds": 0
+		},
+		{
+			"name": "z3-sheet-size",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/z3-sheet-size/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9866004160000011,
+			"flowSeconds": 0
+		},
+		{
+			"name": "z4-sheet-dark-mode",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/z4-sheet-dark-mode/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9666379170001019,
+			"flowSeconds": 0
+		},
+		{
+			"name": "z5-sheet-state-style",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/z5-sheet-state-style/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9575521660000086,
+			"flowSeconds": 0
+		},
+		{
+			"name": "z6-sheet-page-selectors",
+			"failure": {
+				"step": -1,
+				"action": "install",
+				"role": "unknown",
+				"message": "/Users/jackshelton/Library/Android/sdk/platform-tools/adb -s emulator-5612 install --no-incremental /Users/jackshelton/.cache/markless-proof/runs/z6-sheet-page-selectors/android-app/Proof.apk exited 1\nadb: device 'emulator-5612' not found"
+			},
+			"installSeconds": 0.9585092080000323,
+			"flowSeconds": 0
+		}
+	]
+}

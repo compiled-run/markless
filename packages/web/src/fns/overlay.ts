@@ -67,14 +67,16 @@ import type {
 	OverlayInstalledRoot,
 	OverlayPrimedDismissalHost,
 } from '../overlay-handoff.ts';
+import type * as Protocol from '../overlay-protocol.ts';
 
 /** The DOM spelling the compiler lowers the `overlay` mark to. */
-const OVERLAY_SELECTOR = '[overlay]';
+const OVERLAY_SELECTOR = '[overlay]' satisfies `[${typeof Protocol.OVERLAY_ATTRIBUTE}]`;
 /** The second mark a hint surface writes beside `overlay`, as authored. */
-export const OVERLAY_HINT_ATTRIBUTE = 'overlay-hint';
+export const OVERLAY_HINT_ATTRIBUTE = 'overlay-hint' satisfies typeof Protocol.OVERLAY_HINT_ATTRIBUTE;
 const HINT_SELECTOR = `[${OVERLAY_HINT_ATTRIBUTE}]`;
-const MODAL_SELECTOR = '[aria-modal="true"]';
-const DISMISS_EVENT = 'dismiss';
+const MODAL_SELECTOR =
+	'[aria-modal="true"]' satisfies `[${typeof Protocol.OVERLAY_MODAL_ATTRIBUTE}="${typeof Protocol.OVERLAY_MODAL_VALUE}"]`;
+const DISMISS_EVENT = 'dismiss' satisfies typeof Protocol.DISMISS_EVENT;
 
 /** The gestures the document produces; the only reasons a primer can hold. */
 export type OverlayGestureReason = 'escape' | 'outside-press';

@@ -1,4 +1,5 @@
 import type {
+	NativeCommand,
 	NativeDefaultStyle,
 	NativeDrawing,
 	NativePlace,
@@ -20,6 +21,7 @@ import {
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 	NATIVE_DATA_SCRIPT_TYPES,
 	NATIVE_ELEMENTS,
+	NATIVE_DOCUMENT_BODY,
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
@@ -44,6 +46,12 @@ import {
 	type NativeDeviceValue,
 } from '@markless/serializer/native-device';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
+import {
+	DISMISS_EVENT,
+	OVERLAY_ATTRIBUTE,
+	OVERLAY_FOCUS_ORIGIN_PROPERTY,
+	OVERLAY_HINT_ATTRIBUTE,
+} from '@markless/web/overlay-protocol';
 import type {
 	CompilerDiagnostic,
 	SemanticComponentEdge,
@@ -160,7 +168,78 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	change: 'input',
 	[PROTOCOL_IDLE_EVENT_NAME]: 'idle',
 	[PROTOCOL_VISIBLE_EVENT_NAME]: 'visible',
+	[DISMISS_EVENT]: 'dismiss',
+	pointerdown: 'pointerdown',
+	pointerup: 'pointerup',
 };
+
+/** The fields a dismiss or pointer event carries, by how a handler reads them off its event parameter. */
+const EVENT_FIELDS: Readonly<
+	Record<'dismiss' | 'pointer', Readonly<Record<string, Extract<NativeExpr, { event: string }>['event']>>>
+> = {
+	dismiss: { 'detail.reason': 'reason', 'detail.pressTarget': 'pressTarget' },
+	pointer: { target: 'target', button: 'button' },
+};
+
+/** `event.detail.reason` as `detail.reason` when `expression` is a member path of the read `event`. */
+function eventFieldOf(expression: SemanticExpression, event: string): string | undefined {
+	const path: string[] = [];
+	let at = expression;
+	while (at.kind === 'member') {
+		path.unshift(at.property);
+		at = at.object;
+	}
+	return at.kind === 'read' && at.name === event && path.length > 0 ? path.join('.') : undefined;
+}
+
+/** Whether a module function's body has a statement only a call for its effects can run. */
+function holdsEffect(statements: ReadonlyArray<SemanticFunctionStatement>): boolean {
+	return statements.some(
+		(statement) =>
+			statement.kind === 'unsupported' ||
+			statement.kind === 'call' ||
+			(statement.kind === 'if' && (holdsEffect(statement.whenTrue) || holdsEffect(statement.whenFalse))) ||
+			((statement.kind === 'each' || statement.kind === 'count') && holdsEffect(statement.body)),
+	);
+}
+
+/** The name a called function's body writes its `return` value to, as one of its cells. */
+const RETURNED = '\0returned';
+
+/** A function body called for its value: each `return value` first writes `value` to `RETURNED`. */
+function returningInto(
+	statements: ReadonlyArray<SemanticHandlerStatement>,
+): SemanticHandlerStatement[] {
+	return statements.flatMap((statement): SemanticHandlerStatement[] => {
+		if (statement.kind === 'return')
+			return [
+				{
+					kind: 'assign',
+					target: RETURNED,
+					value: statement.value ?? { kind: 'literal', value: null },
+				},
+				{ kind: 'return' },
+			];
+		if (statement.kind === 'if')
+			return [
+				{
+					...statement,
+					whenTrue: returningInto(statement.whenTrue),
+					whenFalse: returningInto(statement.whenFalse),
+				},
+			];
+		if (statement.kind === 'try')
+			return [
+				{
+					...statement,
+					body: returningInto(statement.body),
+					...(statement.handler ? { handler: returningInto(statement.handler) } : {}),
+					finalizer: returningInto(statement.finalizer),
+				},
+			];
+		return [statement];
+	});
+}
 
 /** `<input>` types a person ticks: a press checks them before their handlers run. */
 const TICKED_TYPES = new Set(['checkbox', 'radio']);
@@ -302,6 +381,8 @@ type Scope = {
 	readonly opaque?: string;
 	/** The element a tap landed on (`event.target`) and the one whose handler runs (`event.currentTarget`). */
 	readonly pressed?: { readonly target: string; readonly currentTarget: string };
+	/** A dismiss or pointer handler's event parameter, whose fields in `EVENT_FIELDS` it may read. */
+	readonly carried?: { readonly name: string; readonly kind: 'dismiss' | 'pointer' };
 	/** In a form's submit handler: the form, which `event.preventDefault()` keeps from being sent. */
 	readonly submitting?: string;
 	readonly locals: ReadonlySet<string>;
@@ -552,6 +633,37 @@ function mentionsElement(expr: unknown): boolean {
 	);
 }
 
+/**
+ * A handler's element values as the node ids hosts read (elements are values there), or the first place one is read as
+ * something else: a member or method of an element known when the app is built has no meaning a host evaluates.
+ */
+function elementsAsIds(value: unknown): { readonly value: unknown } | { readonly misuse: string } {
+	if (Array.isArray(value)) {
+		const items = value.map(elementsAsIds);
+		const bad = items.find((item) => 'misuse' in item);
+		return bad ?? { value: items.map((item) => (item as { value: unknown }).value) };
+	}
+	if (!value || typeof value !== 'object') return { value };
+	const element = elementOf(value as NativeExpr);
+	if (element !== undefined) return { value: { literal: element } };
+	const shape = value as { member?: NativeExpr; property?: string; method?: string; target?: NativeExpr };
+	if (shape.member && elementOf(shape.member) !== undefined)
+		return { misuse: `\`.${shape.property}\` of an element` };
+	if (shape.method && shape.target && elementOf(shape.target) !== undefined)
+		return { misuse: `\`.${shape.method}()\` of an element` };
+	const out: Record<string, unknown> = {};
+	for (const [key, inner] of Object.entries(value)) {
+		// A `command` op's element known at build time is its node id as a string.
+		const converted =
+			key === 'node' && inner && typeof inner === 'object' && elementOf(inner as NativeExpr) !== undefined
+				? { value: elementOf(inner as NativeExpr) }
+				: elementsAsIds(inner);
+		if ('misuse' in converted) return converted;
+		out[key] = converted.value;
+	}
+	return { value: out };
+}
+
 /** The passes of a `for...of` still to run, and the statements after it. */
 type LoopPass = {
 	readonly items: ReadonlyArray<unknown>;
@@ -689,6 +801,8 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 			),
 		),
 		tagOf: new Map(graph.hostNodes.map((host) => [host.id, host.tagName])),
+		/** Hosts carrying the bare `overlay` mark, which the overlay behaviour enlists. */
+		overlayHosts: new Set(graph.overlays.map((overlay) => overlay.hostNodeId)),
 		hostSpans: new Map(graph.hostNodes.map((host) => [host.id, host.sourceSpan])),
 		branchSites: new Map(graph.branchSites.map((site) => [site.id, site])),
 		propBindingIds: new Set(
@@ -1922,7 +2036,35 @@ export function createNativeViewPayload(
 			locals: new Set([...scope.locals].filter((local) => local !== name)),
 			objects,
 			...(scope.event === name ? { event: undefined } : {}),
+			...(scope.opaque === name ? { opaque: undefined } : {}),
+			...(scope.carried?.name === name ? { carried: undefined } : {}),
 		};
+	};
+	/** Whether `name` means something in `scope` besides a global (`document`). */
+	const isBound = (name: string, scope: Scope): boolean =>
+		scope.locals.has(name) ||
+		scope.args.has(name) ||
+		scope.opaque === name ||
+		scope.carried?.name === name ||
+		scope.event === name ||
+		scope.items.has(name) ||
+		scope.objects.has(name) ||
+		isPropName(name, scope) ||
+		scope.cells.byName.has(name);
+	/** A module's `new WeakSet()` or `new Set()` constant, kept as one cell holding its members, made on first use. */
+	const setCell = (module: ModuleFacts, name: string, scope: Scope): string | undefined => {
+		if (isBound(name, scope)) return undefined;
+		const found = constantAt(module, name);
+		const value = found?.constant.value;
+		if (
+			value?.kind !== 'new' ||
+			(value.callee !== 'WeakSet' && value.callee !== 'Set') ||
+			value.arguments.length > 0
+		)
+			return undefined;
+		const id = `module:${found!.module.graph.filename}#${found!.constant.name}`;
+		addCell({ id, name, initial: [] });
+		return id;
 	};
 	/** Set while handlers are lowered, after the whole tree: only then does every handle know the elements it is bound to. */
 	let lateLowering = false;
@@ -2004,9 +2146,7 @@ export function createNativeViewPayload(
 			const inner = elementOf(other);
 			if (inner !== undefined) return { literal: isWithin(inner, element) };
 			if ('literal' in other && other.literal === null) return { literal: false };
-			return refuse(
-				`${what} asks whether an element contains something other than an element`,
-			);
+			return { contains: elementValue(element), node: other };
 		}
 		if (
 			(method === 'getAttribute' || method === 'hasAttribute') &&
@@ -2229,6 +2369,7 @@ export function createNativeViewPayload(
 		event: undefined,
 		opaque: undefined,
 		pressed: undefined,
+		carried: undefined,
 	});
 	/** Cells whose first value the build knows: what a body `const` the page renders once may be folded over. */
 	const foldable = (cell: string): boolean => {
@@ -2311,7 +2452,8 @@ export function createNativeViewPayload(
 				if (scope.locals.has(expression.name)) return { local: expression.name };
 				const bound = scope.args.get(expression.name);
 				if (bound) return bound;
-				if (scope.opaque === expression.name) return refuse(`${what} reads its event`);
+				if (scope.opaque === expression.name || scope.carried?.name === expression.name)
+					return refuse(`${what} reads its event`);
 				if (scope.deviceObjects.has(expression.name))
 					return refuse(
 						`${what} reads the device object \`${expression.name}\` as a value; read one of its fields`,
@@ -2384,6 +2526,8 @@ export function createNativeViewPayload(
 				}
 				const cell = cellOf(expression.name, scope);
 				if (cell) return { cell };
+				const set = setCell(scope.module, expression.name, scope);
+				if (set) return { cell: set };
 				const ownHandle = scope.module.elementBindings.get(
 					`${scope.component}#${expression.name}`,
 				);
@@ -2489,6 +2633,27 @@ export function createNativeViewPayload(
 					return refuse(
 						`${what} reads \`${holder.name}.${expression.property}\` as a value`,
 					);
+				}
+				const carried = scope.carried && eventFieldOf(expression, scope.carried.name);
+				if (carried && scope.carried) {
+					const field = EVENT_FIELDS[scope.carried.kind][carried];
+					return field
+						? { event: field }
+						: refuse(`${what} reads \`${scope.carried.name}.${carried}\`, which a phone does not report yet`);
+				}
+				if (holder.kind === 'read' && holder.name === 'document' && !isBound('document', scope))
+					return expression.property === 'activeElement'
+						? { focused: true }
+						: refuse(`${what} reads \`document.${expression.property}\``);
+				if (
+					expression.property === 'body' &&
+					holder.kind === 'member' &&
+					holder.property === 'ownerDocument'
+				)
+					return { literal: NATIVE_DOCUMENT_BODY };
+				if (expression.property === OVERLAY_FOCUS_ORIGIN_PROPERTY) {
+					const overlay = exprOf(holder, what, scope);
+					return overlay && { focusOrigin: overlay };
 				}
 				if (
 					holder.kind === 'read' &&
@@ -2646,6 +2811,13 @@ export function createNativeViewPayload(
 					inlining.delete(key);
 				}
 			}
+			case 'instanceof': {
+				const value = exprOf(expression.value, what, scope);
+				if (!value) return null;
+				if (elementOf(value) !== undefined) return { literal: true };
+				if ('literal' in value) return { literal: false };
+				return { isElement: value };
+			}
 			case 'array': {
 				const items = expression.items.map((item) => {
 					const value = exprOf(item.value, what, scope);
@@ -2665,6 +2837,17 @@ export function createNativeViewPayload(
 					: null;
 			}
 			case 'method': {
+				if (
+					expression.method === 'has' &&
+					expression.object.kind === 'read' &&
+					expression.arguments.length === 1
+				) {
+					const set = setCell(scope.module, expression.object.name, scope);
+					if (set) {
+						const member = exprOf(expression.arguments[0], what, scope);
+						return member && { method: 'includes', target: { cell: set }, arguments: [member] };
+					}
+				}
 				if (!METHODS.has(expression.method)) {
 					const site = methodCallSite(expression);
 					if (site && isDeviceCallSite(site, scope))
@@ -2693,6 +2876,15 @@ export function createNativeViewPayload(
 							scope,
 						);
 					const element = elementOf(holder);
+					if (
+						element === undefined &&
+						holder &&
+						expression.method === 'contains' &&
+						expression.arguments.length === 1
+					) {
+						const node = exprOf(expression.arguments[0], what, scope);
+						return node && { contains: holder, node };
+					}
 					if (element === undefined) {
 						if (holder === null && expression.object.kind === 'new') return null;
 						diagnostics.length = mark;
@@ -3214,7 +3406,15 @@ export function createNativeViewPayload(
 						)
 						.map((attribute) => [attribute.name, attribute.value]),
 				);
-				const attributes = { ...restAttributes, ...staticAttributes };
+				const attributes: Record<string, string> = {
+					...restAttributes,
+					...staticAttributes,
+					...(scope.module.overlayHosts.has(item.id) ? { [OVERLAY_ATTRIBUTE]: '' } : {}),
+				};
+				if (OVERLAY_HINT_ATTRIBUTE in attributes)
+					refuse(
+						`an \`${OVERLAY_HINT_ATTRIBUTE}\` surface (a tooltip or hovercard), which phones do not show yet`,
+					);
 				if (
 					element === 'dialog' &&
 					('open' in attributes ||
@@ -4065,9 +4265,14 @@ export function createNativeViewPayload(
 		const running: Scope = { ...scope, live: true, ...(event.handlerSpan ? { span: event.handlerSpan } : {}) };
 		const submitting =
 			event.eventName === 'submit' && pressed ? { submitting: pressed.currentTarget } : {};
+		const semantic = SEMANTIC_EVENTS[event.eventName];
+		const carried =
+			semantic === 'dismiss' || semantic === 'pointerdown' || semantic === 'pointerup';
 		const inner: Scope =
 			parameter === undefined
 				? { ...running, ...submitting }
+				: carried
+					? { ...running, carried: { name: parameter, kind: semantic === 'dismiss' ? 'dismiss' : 'pointer' } }
 				: event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))
 					? { ...running, event: parameter }
 					: {
@@ -4239,6 +4444,90 @@ export function createNativeViewPayload(
 	};
 
 	/**
+	 * `focus()` or `scrollIntoView()` on an element value: an element known when the app is built is its node, any other
+	 * value is evaluated when the op runs (null does nothing, so `?.` costs nothing).
+	 */
+	const commandOn = (
+		target: NativeExpr,
+		command: NativeCommand,
+		preventScroll: boolean,
+		optional: boolean,
+		what: string,
+		span: SourceSpan | undefined,
+	): NativeOp[] => {
+		const element = elementOf(target);
+		if ('literal' in target && target.literal === null) {
+			if (optional) return [];
+			refuse(`${what} calls \`${command}()\` on null`, span);
+			return [];
+		}
+		if (element === undefined && 'literal' in target) {
+			refuse(`${what} calls \`${command}()\` on a value that is not an element`, span);
+			return [];
+		}
+		return [
+			{
+				op: 'command',
+				node: element ?? target,
+				command,
+				...(preventScroll ? { preventScroll: true as const } : {}),
+			},
+		];
+	};
+	/** A module function a `const` calls whose body has effects: its value is its `return`, run as ops into a cell. */
+	const calledForValue = (value: SemanticExpression, scope: Scope): ModuleFunction | undefined => {
+		if (value.kind !== 'apply' || isBound(value.callee, scope) || cellOf(value.callee, scope)) return undefined;
+		const found = functionAt(scope.module, value.callee);
+		return found?.fn.effects && holdsEffect(found.fn.native.statements) ? found : undefined;
+	};
+	/** Runs a called function's body as ops, its `return` value written to a cell of its own first set to null. */
+	function runForValue(
+		found: ModuleFunction,
+		call: Extract<SemanticExpression, { kind: 'apply' }>,
+		scope: Scope,
+		what: string,
+		span: SourceSpan | undefined,
+		depth: number,
+	): { readonly ops: NativeOp[]; readonly cell: string } | null {
+		const key = `${found.module.graph.filename}#${found.fn.name}`;
+		if (depth > 8 || inlining.has(key)) {
+			refuse(`${what} calls \`${found.fn.name}\` inside itself or too deeply`, span);
+			return null;
+		}
+		const { parameters } = found.fn.native;
+		const args = call.arguments
+			.slice(0, parameters.length)
+			.map((argument) => exprOf(argument, `${what}'s call to \`${found.fn.name}\``, scope));
+		if (args.some((argument) => argument === null)) return null;
+		const cell = `${snapshots.handler}/returned:${snapshots.count++}`;
+		addCell({ id: cell, name: found.fn.name, initial: null });
+		inlining.add(key);
+		try {
+			const body = lowerBound(
+				parameters.map((name, index) => [name, args[index] ?? { literal: null }] as const),
+				(values) => {
+					const inner = helperScope(found.module, scope);
+					return lowerStatements(
+						returningInto(found.fn.effects ?? []),
+						{
+							...inner,
+							live: true,
+							cells: { ...inner.cells, byName: new Map([[RETURNED, cell]]) },
+							args: new Map(parameters.map((name, index) => [name, values[index]!])),
+						},
+						what,
+						span,
+						depth + 1,
+					);
+				},
+			);
+			return { ops: [{ op: 'assign', cell, value: { literal: null } }, ...body.ops], cell };
+		} finally {
+			inlining.delete(key);
+		}
+	}
+
+	/**
 	 * Statements as ops. An `if` is an `if` op; a `return` moves the statements after its `if` into the other branch, so
 	 * nothing after it runs. `returns` says whether the list always returns, `awaited` that an `await` took the rest of the
 	 * handler into `after` ops. `k` is where an `await` may stand: absent inside an `if`, a loop or a called function.
@@ -4406,6 +4695,22 @@ export function createNativeViewPayload(
 				continue;
 			}
 			if (statement.kind === 'const') {
+				const called = calledForValue(statement.value, scope);
+				if (called) {
+					const lowered = runForValue(called, statement.value as Extract<SemanticExpression, { kind: 'apply' }>, scope, what, span, depth);
+					if (!lowered) return { ops, returns: true };
+					ops.push(...lowered.ops);
+					const after = lowerStatements(
+						statements.slice(index + 1),
+						bindName(scope, statement.name, { cell: lowered.cell }),
+						what,
+						span,
+						depth,
+						k,
+					);
+					ops.push(...after.ops);
+					return { ...after, ops };
+				}
 				const value = exprOf(statement.value, what, scope);
 				if (!value) return { ops, returns: true };
 				const rest = statements.slice(index + 1);
@@ -4755,6 +5060,15 @@ export function createNativeViewPayload(
 			return [];
 		}
 		if (statement.kind === 'await' || statement.kind === 'try') return [];
+		if (statement.kind === 'method-call') {
+			const command = statement.method;
+			if ((command !== 'focus' && command !== 'scrollIntoView') || (statement.arguments ?? []).length > 0) {
+				refuse(`${what} calls \`.${command}()\` on a value, which needs a script engine`, span);
+				return [];
+			}
+			const node = exprOf(statement.object, what, scope);
+			return node ? commandOn(node, command, false, statement.optional === true, what, span) : [];
+		}
 		if (statement.kind === 'invoke') {
 			const callee = [statement.name, ...(statement.path ?? [])].join('.');
 			if (
@@ -4774,6 +5088,42 @@ export function createNativeViewPayload(
 			const imported = statement.path ? undefined : scope.module.imports.get(statement.name);
 			if (imported?.source === '@markless/router' && imported.importedName === 'navigate')
 				return navigateOps(statement.arguments ?? [], what, span);
+			const set =
+				statement.path?.length === 1 && (statement.arguments ?? []).length === 1
+					? setCell(scope.module, statement.name, scope)
+					: undefined;
+			if (set && (statement.path![0] === 'add' || statement.path![0] === 'delete')) {
+				const member = exprOf(statement.arguments![0], `${what}'s call to \`${callee}\``, scope);
+				if (!member) return [];
+				const members: NativeExpr = { cell: set };
+				return [
+					{
+						op: 'assign',
+						cell: set,
+						value:
+							statement.path![0] === 'add'
+								? {
+										if: { method: 'includes', target: members, arguments: [member] },
+										whenTrue: members,
+										whenFalse: {
+											method: 'concat',
+											target: members,
+											arguments: [{ array: [{ spread: false, value: member }] }],
+										},
+									}
+								: {
+										method: 'filter',
+										target: members,
+										arguments: [
+											{
+												lambda: ['kept'],
+												body: { binary: '!==', left: { local: 'kept' }, right: member },
+											},
+										],
+									},
+					},
+				];
+			}
 			const command = statement.path?.at(-1);
 			const receiver = statement.path?.slice(0, -1) ?? [];
 			const receiverField =
@@ -4833,6 +5183,8 @@ export function createNativeViewPayload(
 				if (target && 'literal' in target && target.literal === null && statement.optional)
 					return [];
 				if (diagnostics.length > mark) return [];
+				if (target && !options)
+					return commandOn(target, command as 'focus' | 'scrollIntoView', false, statement.optional === true, what, span);
 				return notCallable();
 			}
 			let body:
@@ -4862,10 +5214,25 @@ export function createNativeViewPayload(
 				dialogOps.push(op);
 				return [op];
 			}
+			let calling: string | undefined;
 			if (path.length === 0) {
 				const prop = propOf(statement.name, scope);
+				const found =
+					prop || isBound(statement.name, scope) ? undefined : functionAt(scope.module, statement.name);
 				if (prop?.kind === 'callback') body = prop;
 				else if (!prop && isPropName(statement.name, scope)) absent = true;
+				else if (found?.fn.effects) {
+					calling = `${found.module.graph.filename}#${found.fn.name}`;
+					if (inlining.has(calling)) {
+						refuse(`${what} calls \`${callee}\` inside itself`, span);
+						return [];
+					}
+					body = {
+						statements: found.fn.effects,
+						parameters: found.fn.native.parameters,
+						scope: helperScope(found.module, scope),
+					};
+				}
 			} else if (path.length === 1) {
 				const object = scope.objects.get(statement.name);
 				const instance = object?.kind === 'instance' ? object.instance : object?.instance;
@@ -4888,11 +5255,14 @@ export function createNativeViewPayload(
 				return [];
 			}
 			if (!body?.statements) return notCallable();
-			const args = (statement.arguments ?? []).map((argument) =>
-				exprOf(argument, `${what}'s call to \`${callee}\``, scope),
-			);
+			// Arguments past the parameters are never read, so passing the event a callback ignores costs nothing.
+			const args = (statement.arguments ?? [])
+				.slice(0, body.parameters.length)
+				.map((argument) => exprOf(argument, `${what}'s call to \`${callee}\``, scope));
 			if (args.some((argument) => argument === null)) return [];
 			const { statements, parameters, scope: inner } = body;
+			if (calling) inlining.add(calling);
+			try {
 			return lowerBound(
 				parameters.map((name, index) => [name, args[index] ?? { literal: null }] as const),
 				(values) => {
@@ -4907,6 +5277,9 @@ export function createNativeViewPayload(
 					);
 				},
 			).ops;
+			} finally {
+				if (calling) inlining.delete(calling);
+			}
 		}
 		if (statement.path && statement.path.length > 0) {
 			const object = scope.objects.get(statement.target);
@@ -5155,10 +5528,12 @@ export function createNativeViewPayload(
 	wireTicks();
 	const forms = wireForms();
 	for (const handler of handlers) {
-		if (mentionsElement(handler.ops))
-			refuse(
-				`${handler.id} keeps an element as a value, which a native host has no use for yet`,
-			);
+		if (mentionsElement(handler.ops)) {
+			const converted = elementsAsIds(handler.ops);
+			if ('misuse' in converted)
+				refuse(`${handler.id} reads ${converted.misuse}, which a native host has no meaning for yet`);
+			else handler.ops = converted.value as NativeOp[];
+		}
 		if (mentionsBuildValue(handler.ops))
 			refuse(
 				`${handler.id} keeps a promise or an error whole, which a native host has no use for yet`,

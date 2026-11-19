@@ -4,6 +4,11 @@ import { nodeScriptHost } from '../src/node-engine.ts';
 
 /** The engine the vectors are written with; `crypto` draws from all-zero seed bytes, which a host's test passes too. */
 export const CONFORMANCE_SCRIPT_HOST = () => nodeScriptHost('00'.repeat(32));
+import { readWorkspaceModule } from '../src/harness/rung.ts';
+
+/** Resolves what a case imports (`@markless/ui`) from packages/mobile, where the case's `src/<name>.tsrx` stands. */
+export const readCaseModule = (specifier: string, importer: string) =>
+	readWorkspaceModule(specifier, importer.startsWith('src/') ? `packages/mobile/${importer}` : importer);
 
 /** Each committed vector file: its component (a path inside packages/mobile) and the actions it records. */
 export const CONFORMANCE_CASES: ReadonlyArray<{
@@ -461,6 +466,48 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		fixture: 'proofs/j9-render-list/App.tsrx',
 		modules: true,
 		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		// The real modal family: trigger, a press inside the dialog, a press on its backdrop, an alert that refuses one, Escape.
+		name: 'overlay',
+		fixture: 'proofs/u20-modal/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'pointerdown', host: 'component-edge:4/h4' },
+			{ event: 'pointerup', host: 'component-edge:4/h4' },
+			{ event: 'pointerdown', host: 'component-edge:2/h2' },
+			{ event: 'pointerup', host: 'component-edge:2/h2' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'dismiss', host: 'component-edge:2/h2', reason: 'escape' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'pointerdown', host: 'component-edge:6/h6' },
+			{ event: 'pointerup', host: 'component-edge:6/h6' },
+			{ event: 'activate', host: 'component-edge:6/h6' },
+			{ event: 'activate', host: 'component-edge:8/h1' },
+			{ event: 'pointerdown', host: 'component-edge:9/h2' },
+			{ event: 'pointerup', host: 'component-edge:9/h2' },
+			{ event: 'dismiss', host: 'component-edge:9/h2', reason: 'escape' },
+		],
+	},
+	{
+		// The real popover family: not modal; a press outside, a press on its own trigger, Escape, and its close.
+		name: 'popover',
+		fixture: 'proofs/u21-popover/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'pointerdown', host: 'component-edge:3/h3' },
+			{ event: 'pointerup', host: 'component-edge:3/h3' },
+			{ event: 'pointerdown', host: 'h2' },
+			{ event: 'pointerup', host: 'h2' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'pointerdown', host: 'component-edge:1/h1' },
+			{ event: 'pointerup', host: 'component-edge:1/h1' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'dismiss', host: 'component-edge:2/h2', reason: 'escape' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'activate', host: 'component-edge:5/h5' },
+		],
 	},
 ];
 

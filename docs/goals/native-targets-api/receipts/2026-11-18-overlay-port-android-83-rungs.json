@@ -1,0 +1,527 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 6.363157082999998,
+			"flowSeconds": 18.946536334000005
+		},
+		{
+			"name": "02-styles",
+			"failure": null,
+			"installSeconds": 4.117431542000006,
+			"flowSeconds": 14.171924249999996
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 2.784657707999999,
+			"flowSeconds": 13.876710833000004
+		},
+		{
+			"name": "04-attributes",
+			"failure": null,
+			"installSeconds": 1.93545762500001,
+			"flowSeconds": 14.198106916000018
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 1.636713167000009,
+			"flowSeconds": 14.445389500000019
+		},
+		{
+			"name": "05b-choices",
+			"failure": null,
+			"installSeconds": 1.5390033750000003,
+			"flowSeconds": 22.809817167000002
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 1.5052464169999875,
+			"flowSeconds": 14.48691945799999
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 1.4190837920000194,
+			"flowSeconds": 12.050922791999998
+		},
+		{
+			"name": "07b-imported-component",
+			"failure": null,
+			"installSeconds": 1.6361645000000136,
+			"flowSeconds": 13.147927874999993
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 1.3658666249999951,
+			"flowSeconds": 12.862812750000012
+		},
+		{
+			"name": "07d-children",
+			"failure": null,
+			"installSeconds": 1.5888438329999917,
+			"flowSeconds": 12.944243415999983
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 1.467254041999986,
+			"flowSeconds": 18.18101116699999
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 1.4386136660000193,
+			"flowSeconds": 20.451798958999976
+		},
+		{
+			"name": "10-url-route",
+			"failure": null,
+			"installSeconds": 1.3425857500000276,
+			"flowSeconds": 9.144037083000002
+		},
+		{
+			"name": "12-long-page",
+			"failure": null,
+			"installSeconds": 1.4682077080000309,
+			"flowSeconds": 32.722873291999974
+		},
+		{
+			"name": "13-scroll-box",
+			"failure": null,
+			"installSeconds": 1.4860478330000186,
+			"flowSeconds": 38.11540279200004
+		},
+		{
+			"name": "14-scroll-row",
+			"failure": null,
+			"installSeconds": 1.510802416999999,
+			"flowSeconds": 24.241767416000016
+		},
+		{
+			"name": "15-long-list",
+			"failure": null,
+			"installSeconds": 1.292214875000005,
+			"flowSeconds": 53.966606333
+		},
+		{
+			"name": "16-keyboard",
+			"failure": null,
+			"installSeconds": 1.3287555830000202,
+			"flowSeconds": 23.705336749999958
+		},
+		{
+			"name": "17-into-view",
+			"failure": null,
+			"installSeconds": 1.4055488749999785,
+			"flowSeconds": 31.981240457999927
+		},
+		{
+			"name": "d1-network",
+			"failure": null,
+			"installSeconds": 1.3309119590000482,
+			"flowSeconds": 27.325337375000004
+		},
+		{
+			"name": "d2-haptics",
+			"failure": null,
+			"installSeconds": 1.3594859580000629,
+			"flowSeconds": 12.238975542000029
+		},
+		{
+			"name": "d3-location",
+			"failure": null,
+			"installSeconds": 1.2897603329999838,
+			"flowSeconds": 17.119106792000007
+		},
+		{
+			"name": "d4-camera",
+			"failure": null,
+			"installSeconds": 1.312967874999973,
+			"flowSeconds": 25.601763957999996
+		},
+		{
+			"name": "d4b-photo-refused",
+			"failure": null,
+			"installSeconds": 1.36422970799997,
+			"flowSeconds": 14.433442000000039
+		},
+		{
+			"name": "d5-recorder",
+			"failure": null,
+			"installSeconds": 1.511357250000001,
+			"flowSeconds": 57.992589832999975
+		},
+		{
+			"name": "d6-sharesheet",
+			"failure": null,
+			"installSeconds": 1.2842231669999893,
+			"flowSeconds": 10.308061749999993
+		},
+		{
+			"name": "d7-settings",
+			"failure": null,
+			"installSeconds": 1.306206750000012,
+			"flowSeconds": 22.26089070800005
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 1.5302737920000218,
+			"flowSeconds": 28.77558120799996
+		},
+		{
+			"name": "f2-return-key",
+			"failure": null,
+			"installSeconds": 1.3640131670000264,
+			"flowSeconds": 39.935002499999946
+		},
+		{
+			"name": "f3-families",
+			"failure": {
+				"step": 0,
+				"action": "launch",
+				"role": "flow",
+				"command": "launchAppCommand",
+				"message": "Command failed (host:transport:emulator-5612): device offline"
+			},
+			"installSeconds": 1.483456499999971,
+			"flowSeconds": 3.9688632920000235
+		},
+		{
+			"name": "f4-required",
+			"failure": null,
+			"installSeconds": 1.4184442910000217,
+			"flowSeconds": 25.91557241699996
+		},
+		{
+			"name": "f5-async",
+			"failure": null,
+			"installSeconds": 1.4135232919999399,
+			"flowSeconds": 43.13249158299994
+		},
+		{
+			"name": "f6-disabled",
+			"failure": null,
+			"installSeconds": 1.3223445000000065,
+			"flowSeconds": 20.090912499999977
+		},
+		{
+			"name": "f7-tick",
+			"failure": null,
+			"installSeconds": 1.5384746659999946,
+			"flowSeconds": 29.35355929200002
+		},
+		{
+			"name": "p1-platform",
+			"failure": null,
+			"installSeconds": 1.5760394579999848,
+			"flowSeconds": 5.6026893339999955
+		},
+		{
+			"name": "r101-inline-text",
+			"failure": null,
+			"installSeconds": 1.5126332080001013,
+			"flowSeconds": 9.006317666999996
+		},
+		{
+			"name": "r102-code",
+			"failure": null,
+			"installSeconds": 1.3465069170000497,
+			"flowSeconds": 8.609745875000023
+		},
+		{
+			"name": "r103-pre",
+			"failure": null,
+			"installSeconds": 1.5164473749999887,
+			"flowSeconds": 8.64868987500004
+		},
+		{
+			"name": "r104-line-breaks",
+			"failure": null,
+			"installSeconds": 1.3715393749999347,
+			"flowSeconds": 8.719084167000023
+		},
+		{
+			"name": "r105-time",
+			"failure": null,
+			"installSeconds": 1.393875875000027,
+			"flowSeconds": 8.378299833999947
+		},
+		{
+			"name": "r106-blocks",
+			"failure": null,
+			"installSeconds": 1.3552014579999958,
+			"flowSeconds": 6.3073979579999575
+		},
+		{
+			"name": "r107-lists",
+			"failure": null,
+			"installSeconds": 1.307610875000013,
+			"flowSeconds": 6.292399667000049
+		},
+		{
+			"name": "r108-table",
+			"failure": null,
+			"installSeconds": 1.3005218749999767,
+			"flowSeconds": 9.750074207999976
+		},
+		{
+			"name": "r109-page-text",
+			"failure": null,
+			"installSeconds": 1.3116955420000014,
+			"flowSeconds": 5.177838041000069
+		},
+		{
+			"name": "r110-document-elements",
+			"failure": null,
+			"installSeconds": 1.3337516659999964,
+			"flowSeconds": 9.639295292000053
+		},
+		{
+			"name": "r111-svg-icon",
+			"failure": null,
+			"installSeconds": 1.3834310830000323,
+			"flowSeconds": 5.455683166999952
+		},
+		{
+			"name": "r112-svg-shapes",
+			"failure": null,
+			"installSeconds": 1.3658372919999529,
+			"flowSeconds": 5.175244708999991
+		},
+		{
+			"name": "r113-svg-use",
+			"failure": null,
+			"installSeconds": 1.3644329580001067,
+			"flowSeconds": 5.4957022089998935
+		},
+		{
+			"name": "r114-svg-button",
+			"failure": null,
+			"installSeconds": 1.404267625000095,
+			"flowSeconds": 12.002329084000085
+		},
+		{
+			"name": "r115-svg-em",
+			"failure": null,
+			"installSeconds": 1.2751636250000447,
+			"flowSeconds": 5.3641624999998605
+		},
+		{
+			"name": "r131-module-constants",
+			"failure": null,
+			"installSeconds": 1.3726658330000936,
+			"flowSeconds": 12.741833417000016
+		},
+		{
+			"name": "r132-body-constants",
+			"failure": null,
+			"installSeconds": 1.450765124999918,
+			"flowSeconds": 12.24317712499993
+		},
+		{
+			"name": "r133-props-down",
+			"failure": null,
+			"installSeconds": 1.305864082999993,
+			"flowSeconds": 8.960336750000018
+		},
+		{
+			"name": "r134-app-functions",
+			"failure": null,
+			"installSeconds": 1.8802419999998528,
+			"flowSeconds": 18.008673750000074
+		},
+		{
+			"name": "r135-idle",
+			"failure": null,
+			"installSeconds": 1.5060643749998417,
+			"flowSeconds": 16.740902584000025
+		},
+		{
+			"name": "r136-visible",
+			"failure": {
+				"step": -1,
+				"action": "unknown",
+				"role": "unknown",
+				"message": "maestro exited 1\nRunning on emulator-5612\n > Flow r136-visible\nLaunch app \"${APP_ID}\" with clear state... COMPLETED\nAssert that \"Seen T\" is visible... COMPLETED\nAssert that \"Top line\" is visible... COMPLETED\nAssert that \"Reveal\" is visible... COMPLETED\nAssert that \"Seen nothing\" is not visible... COMPLETED\nAssert that \"Seen TB\" is not visible...\n==== Debug output (logs & screenshots) ====\n\n/Users/jackshelton/.cache/markless-proof/runs/r136-visible/android-flow/maestro/2026-11-18_071621\nException in thread \"Thread-5\" java.io.IOException: Command failed (host:transport:emulator-5612): device offline\n\tat dadb.adbserver.AdbServer.send$dadb(AdbServer.kt:103)\n\tat dadb.adbserver.AdbServerDadb.open(AdbServer.kt:148)\n\tat dadb.Dadb$DefaultImpls.openShell(Dadb.kt:42)\n\tat dadb.adbserver.AdbServerDadb.openShell(AdbServer.kt:122)\n\tat dadb.Dadb$DefaultImpls.shell(Dadb.kt:35)\n\tat dadb.adbserver.AdbServerDadb.shell(AdbServer.kt:122)\n\tat maestro.android.AndroidDeviceConnection.shell(AndroidDeviceConnection.kt:153)\n\tat maestro.drivers.AndroidDriver.shell(AndroidDriver.kt:1352)\n\tat maestro.drivers.AndroidDriver.isPackageInstalled(AndroidDriver.kt:1335)\n\tat maestro.drivers.AndroidDriver.bestEffortUninstall(AndroidDriver.kt:1310)\n\tat maestro.drivers.AndroidDriver.uninstallMaestroDriverApp$lambda$89(AndroidDriver.kt:1296)\n\tat maestro.utils.Metrics.measured(Metrics.kt:48)\n\tat maestro.drivers.AndroidDriver.uninstallMaestroDriverApp(AndroidDriver.kt:1295)\n\tat maestro.drivers.AndroidDriver.close(AndroidDriver.kt:182)\n\tat maestro.Maestro.close(Maestro.kt:606)\n\tat maestro.cli.session.MaestroSessionManager$MaestroSession.close(MaestroSessionManager.kt:471)\n\tat maestro.cli.session.MaestroSessionManager.newSession$lambda$2(MaestroSessionManager.kt:129)\n\tat kotlin.concurrent.ThreadsKt$thread$thread$1.run(Thread.kt:30)"
+			},
+			"installSeconds": 1.3872340420000255,
+			"flowSeconds": 5.725513291000156
+		},
+		{
+			"name": "r137-clock",
+			"failure": null,
+			"installSeconds": 1.3818083750000223,
+			"flowSeconds": 12.526200375000014
+		},
+		{
+			"name": "u1-base",
+			"failure": null,
+			"installSeconds": 1.4527962500001304,
+			"flowSeconds": 12.812308541999897
+		},
+		{
+			"name": "u2-collapsible",
+			"failure": null,
+			"installSeconds": 1.7823508750000037,
+			"flowSeconds": 14.503404374999926
+		},
+		{
+			"name": "u3-tabs",
+			"failure": null,
+			"installSeconds": 1.4080062919999472,
+			"flowSeconds": 17.07403224999993
+		},
+		{
+			"name": "u4-dialog",
+			"failure": null,
+			"installSeconds": 1.4029505419998896,
+			"flowSeconds": 29.493676582999992
+		},
+		{
+			"name": "u5-toggle",
+			"failure": null,
+			"installSeconds": 1.3730797079999466,
+			"flowSeconds": 12.57238116599992
+		},
+		{
+			"name": "u6-base-rows",
+			"failure": null,
+			"installSeconds": 1.3938458340000361,
+			"flowSeconds": 35.658848625000104
+		},
+		{
+			"name": "u11-pagination",
+			"failure": null,
+			"installSeconds": 1.4937534590000288,
+			"flowSeconds": 20.65110875000013
+		},
+		{
+			"name": "u12-buttongroup",
+			"failure": null,
+			"installSeconds": 1.4133324579999316,
+			"flowSeconds": 43.680319708999946
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 1.355871291999938,
+			"flowSeconds": 43.27725054099993
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 1.5415023750001564,
+			"flowSeconds": 19.183952917000045
+		},
+		{
+			"name": "u20-modal",
+			"failure": null,
+			"installSeconds": 1.4433670829997864,
+			"flowSeconds": 33.626439375000075
+		},
+		{
+			"name": "u21-popover",
+			"failure": null,
+			"installSeconds": 1.4106762920001057,
+			"flowSeconds": 39.16205662499997
+		},
+		{
+			"name": "y1-sheet-open-close",
+			"failure": {
+				"step": 0,
+				"action": "launch",
+				"role": "flow",
+				"command": "launchAppCommand",
+				"message": "Command failed (host:transport:emulator-5612): device offline"
+			},
+			"installSeconds": 1.4028715830000582,
+			"flowSeconds": 3.9228519579998684
+		},
+		{
+			"name": "y2-sheet-pick",
+			"failure": null,
+			"installSeconds": 1.308646875000093,
+			"flowSeconds": 29.588649749999867
+		},
+		{
+			"name": "y3-sheet-heights",
+			"failure": null,
+			"installSeconds": 1.3996666250000709,
+			"flowSeconds": 20.084164124999894
+		},
+		{
+			"name": "n1-two-routes",
+			"failure": null,
+			"installSeconds": 1.4935279580000789,
+			"flowSeconds": 28.91277512500016
+		},
+		{
+			"name": "n2-orders",
+			"failure": null,
+			"installSeconds": 1.3855741250000428,
+			"flowSeconds": 21.12593429200002
+		},
+		{
+			"name": "n3-navigate",
+			"failure": null,
+			"installSeconds": 1.3809714999999851,
+			"flowSeconds": 16.891918999999994
+		},
+		{
+			"name": "n4-deep-link",
+			"failure": null,
+			"installSeconds": 1.4702574169998988,
+			"flowSeconds": 17.21642958400003
+		},
+		{
+			"name": "r138-trailing-slash",
+			"failure": null,
+			"installSeconds": 1.4880417920001783,
+			"flowSeconds": 9.916774374999804
+		},
+		{
+			"name": "s1-page-styles",
+			"failure": null,
+			"installSeconds": 1.3520449999999256,
+			"flowSeconds": 12.771627542000031
+		},
+		{
+			"name": "s2-shared-component",
+			"failure": null,
+			"installSeconds": 1.536608583000023,
+			"flowSeconds": 14.265856416000053
+		},
+		{
+			"name": "s3-state-styles",
+			"failure": null,
+			"installSeconds": 1.5774549999998417,
+			"flowSeconds": 20.896482084000016
+		},
+		{
+			"name": "s4-global-tokens",
+			"failure": {
+				"step": 0,
+				"action": "launch",
+				"role": "flow",
+				"command": "launchAppCommand",
+				"message": "Command failed (host:transport:emulator-5612): device offline"
+			},
+			"installSeconds": 2.457931542000035,
+			"flowSeconds": 5.711458041999955
+		},
+		{
+			"name": "s5-page-canvas",
+			"failure": null,
+			"installSeconds": 2.0250763340000995,
+			"flowSeconds": 13.629097333000042
+		}
+	]
+}
