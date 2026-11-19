@@ -34,6 +34,8 @@ export type LadderAction =
 	  }
 	/** The keyboard's return key in the text field with this accessible name. */
 	| { readonly submit: string }
+	/** Opens the `<select>` with this accessible name and picks the option with this label from its list. */
+	| { readonly choose: { readonly field: string; readonly option: string } }
 	/** Scroll until this text is on screen. */
 	| { readonly scrollTo: string }
 	| {
@@ -230,7 +232,11 @@ const isApp = (folder: string): boolean => existsSync(join(proofsDir, folder, 'p
 /** The navigation ladder: each folder an app (`pages/`) of several routes; an `r<n>` or `j<n>` rung with `pages/` too. */
 export const navRungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && (/^n\d+-/.test(entry.name) || (/^[jr]\d+-/.test(entry.name) && isApp(entry.name))))
+		.filter(
+			(entry) =>
+				entry.isDirectory() &&
+				(/^n\d+-/.test(entry.name) || (/^[jr]\d+-/.test(entry.name) && isApp(entry.name))),
+		)
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
@@ -390,6 +396,11 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];
 	if ('submit' in action) return [{ tapOn: selector(action.submit) }, { pressKey: 'Enter' }];
+	if ('choose' in action)
+		return [
+			{ tapOn: selector(action.choose.field) },
+			{ tapOn: { text: selector(action.choose.option) } },
+		];
 	if ('relaunch' in action)
 		return [
 			'stopApp',
@@ -427,7 +438,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			? [pullDown()]
 			: [onPlatform('Android', [backGesture]), onPlatform('iOS', [pullDown()])];
 	// The screenshot after the step records the height it came to rest at.
-	if ('swipe' in action && action.swipe === 'up') return [pullUp, { waitForAnimationToEnd: { timeout: 5000 } }];
+	if ('swipe' in action && action.swipe === 'up')
+		return [pullUp, { waitForAnimationToEnd: { timeout: 5000 } }];
 	if ('scrollTo' in action)
 		return [
 			{
@@ -514,27 +526,27 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 	const visitsSettings = rung.steps.some((step) => step.do && 'settings' in step.do);
 	return rung.steps.map((step, index) => {
 		const commands = [
-		...(index === 0 && visitsSettings
-			? [
-					{
-						runFlow: {
-							when: { platform: 'iOS' },
-							commands: [{ stopApp: 'com.apple.Preferences' }],
+			...(index === 0 && visitsSettings
+				? [
+						{
+							runFlow: {
+								when: { platform: 'iOS' },
+								commands: [{ stopApp: 'com.apple.Preferences' }],
+							},
 						},
-					},
-				]
-			: []),
-		...(index === 0 && rung.location ? [{ setLocation: rung.location }] : []),
-		...(index === 0 ? [...launch, ...appearance] : []),
-		...(step.do ? actionCommands(step.do, step) : []),
-		...(index > 0
-			? assertions({
-					...changeWitness(rung.steps[index - 1]!, step),
-					...(step.prompt && { prompt: step.prompt }),
-					...(step.system && { system: step.system }),
-				})
-			: []),
-		...assertions(step),
+					]
+				: []),
+			...(index === 0 && rung.location ? [{ setLocation: rung.location }] : []),
+			...(index === 0 ? [...launch, ...appearance] : []),
+			...(step.do ? actionCommands(step.do, step) : []),
+			...(index > 0
+				? assertions({
+						...changeWitness(rung.steps[index - 1]!, step),
+						...(step.prompt && { prompt: step.prompt }),
+						...(step.system && { system: step.system }),
+					})
+				: []),
+			...assertions(step),
 		];
 		return step.do && 'escape' in step.do
 			? [{ runFlow: { when: { platform: 'Android' }, commands } }]

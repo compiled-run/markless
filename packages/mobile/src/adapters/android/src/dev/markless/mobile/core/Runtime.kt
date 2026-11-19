@@ -82,6 +82,11 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"property\",\"node\":${jsonString(node)},\"name\":\"checked\",\"value\":$checked}"
 	}
 
+	/** An option's selectedness changed; a row's new option arrives unselected. */
+	data class Selected(override val node: String, val selected: Boolean) : JournalEntry {
+		override fun toJson() = "{\"op\":\"property\",\"node\":${jsonString(node)},\"name\":\"selected\",\"value\":$selected}"
+	}
+
 	/** An element marked `overlay` joined the overlay stack ([open]) or left it; a [modal] one goes in the host's top layer. */
 	data class Overlay(override val node: String, val open: Boolean, val modal: Boolean) : JournalEntry {
 		override fun toJson() = "{\"op\":\"overlay\",\"node\":${jsonString(node)},\"open\":$open,\"modal\":$modal}"
@@ -505,6 +510,103 @@ class Runtime(
 	/** Every shown checkbox's and radio button's checkedness. */
 	fun checks(): List<Pair<String, Boolean>> = ticked.filter(::isShown).map { it.id to checkedOf(it.id) }
 
+	private class OptionInstance(val id: String, val node: Node.Element, val scope: Scope)
+
+	/** Every `<select>`, in payload order. */
+	private val selects = payload.nodes.filterIsInstance<Node.Element>().filter { it.element == "select" }
+
+	/** An attribute of one instance as the web has it now: a binding's value in its row, else the attribute as built. */
+	private fun attributeIn(node: Node.Element, name: String, scope: Scope): String? {
+		val binding = node.bindings.firstOrNull { !it.property && it.name == name }
+		return if (binding != null) attribute(binding, scope) else node.attributes[name]
+	}
+
+	/** A select's shown options in tree order: a list's rows where the list stands, each row's options in order. */
+	private fun optionsOf(select: String): List<OptionInstance> {
+		val children = payload.nodes.filterIsInstance<Node.Element>().filter { it.element == "option" && it.parent == select }
+		val listed = HashSet<String>()
+		val found = ArrayList<OptionInstance>()
+		for (node in children) {
+			val row = node.row
+			if (row == null) {
+				instances(node).mapTo(found) { OptionInstance(it.id, node, it.scope) }
+				continue
+			}
+			if (!listed.add(row)) continue
+			val repeat = byId[row] as? Node.Repeat ?: continue
+			if (!isShown(repeat)) continue
+			val siblings = children.filter { it.row == row }
+			val shown = HashMap<String, OptionInstance>()
+			for (child in siblings) for (inst in instances(child)) shown[inst.id] = OptionInstance(inst.id, child, inst.scope)
+			for (r in rowsOf(repeat)) for (child in siblings) shown["${child.id}@${r.key}"]?.let(found::add)
+		}
+		return found
+	}
+
+	/** An option's text: its text with ASCII whitespace stripped and collapsed, as `option.text` gives it. */
+	private fun optionText(option: OptionInstance): String =
+		payload.nodes.filterIsInstance<Node.Text>().filter { it.parent == option.node.id }.joinToString("") { text(it, option.scope) }
+			.split('\t', '\n', '\u000C', '\r', ' ').filter { it.isNotEmpty() }.joinToString(" ")
+
+	private fun optionValue(option: OptionInstance): String = attributeIn(option.node, "value", option.scope) ?: optionText(option)
+
+	private fun selectedBinding(option: OptionInstance): Boolean? =
+		option.node.bindings.firstOrNull { it.property && it.name == "selected" }?.let { Js.truthy(evaluate(it.value, option.scope)) }
+
+	/** Each shown option's selectedness, kept as the web keeps it (HTML's selectedness setting algorithm). */
+	private val selectedness = HashMap<String, Boolean>()
+	/** What each option's `selected` binding last wrote: a binding sets the selectedness only when its value changes. */
+	private val selectedBound = HashMap<String, Boolean?>()
+	/** The option a person chose in the action being dispatched. */
+	private var chosenNow: String? = null
+
+	/** Brings each select's options up to date: rows that came or left, `selected` bindings that changed, then the rule. */
+	private fun settleSelects(chosen: String? = null) {
+		for (select in selects) {
+			val options = optionsOf(select.id)
+			val ids = options.mapTo(HashSet()) { it.id }
+			for (id in selectedBound.keys.filter { byId[it.substringBefore('@')]?.parent == select.id && it !in ids }) {
+				selectedBound.remove(id)
+				selectedness.remove(id)
+			}
+			fun choose(id: String) { for (o in options) selectedness[o.id] = o.id == id }
+			for (option in options) {
+				if (!selectedBound.containsKey(option.id)) {
+					val first = selectedBinding(option)
+					selectedBound[option.id] = first
+					val selected = first ?: (attributeIn(option.node, "selected", option.scope) != null)
+					selectedness[option.id] = selected
+					if (selected) choose(option.id)
+					continue
+				}
+				val bound = selectedBinding(option)
+				if (bound != null && bound != selectedBound[option.id]) {
+					selectedBound[option.id] = bound
+					selectedness[option.id] = bound
+					if (bound) choose(option.id)
+				}
+			}
+			if (chosen != null && chosen in ids) choose(chosen)
+			if (options.none { selectedness[it.id] == true })
+				options.firstOrNull { attributeIn(it.node, "disabled", it.scope) == null }?.let { selectedness[it.id] = true }
+		}
+	}
+
+	init {
+		settleSelects()
+	}
+
+	/** Each shown option of each `<select>`, in tree order, and whether it is selected. */
+	fun selections(): List<Pair<String, Boolean>> = selects.flatMap { s -> optionsOf(s.id).map { it.id to (selectedness[it.id] ?: false) } }
+
+	/** One option as a select's list shows it: its instance id, its label, whether it cannot be chosen, whether it is chosen. */
+	data class Choice(val option: String, val label: String, val disabled: Boolean, val selected: Boolean)
+
+	/** What [select]'s list shows: each shown option in tree order; a label is its `label` attribute when not empty, else its text. */
+	fun choices(select: String): List<Choice> = optionsOf(select).map { o ->
+		Choice(o.id, attributeIn(o.node, "label", o.scope)?.takeIf { it.isNotEmpty() } ?: optionText(o), attributeIn(o.node, "disabled", o.scope) != null, selectedness[o.id] ?: false)
+	}
+
 	private fun formOf(id: String): String? = payload.forms.firstOrNull { f -> f.fields.any { it.node == id } }?.node
 
 	/** The radio buttons of [id]'s group: the same `name`, in the same form or in none. */
@@ -526,6 +628,7 @@ class Runtime(
 				FieldKind.Checkbox, FieldKind.Radio -> if (checkedOf(node)) attributeNow(node, "value") ?: "on" else continue
 				FieldKind.Hidden -> attributeNow(node, "value") ?: ""
 				FieldKind.Text -> textOf(node)
+				FieldKind.Select -> optionsOf(node).firstOrNull { selectedness[it.id] == true }?.let(::optionValue) ?: continue
 			}
 			out.add(JsValue.Arr(mutableListOf(JsValue.Str(name), JsValue.Str(value))))
 		}
@@ -536,7 +639,7 @@ class Runtime(
 	private fun firstInvalid(form: Form, submitter: String?): Field? {
 		if (form.noValidate || (submitter != null && attributeNow(submitter, "formnovalidate") != null)) return null
 		return form.fields.firstOrNull { (node, kind) ->
-			if (kind == FieldKind.Hidden || !isShown(elementOf(node)) || attributeNow(node, "disabled") != null) return@firstOrNull false
+			if (kind == FieldKind.Hidden || kind == FieldKind.Select || !isShown(elementOf(node)) || attributeNow(node, "disabled") != null) return@firstOrNull false
 			// A radio button is missing its value when any button of its group is required and none is checked.
 			val required = if (kind == FieldKind.Radio) groupOf(node).any { attributeNow(it.id, "required") != null } else attributeNow(node, "required") != null
 			required && when (kind) {
@@ -637,6 +740,16 @@ class Runtime(
 	 * `pointerdown` lands outside it.
 	 */
 	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, point: TouchPoint? = null): List<JournalEntry> {
+		if (event == EventName.Choose) {
+			val option = byId[host.substringBefore('@')] as? Node.Element
+			val select = option?.parent
+			if (option?.element != "option" || select == null) throw MarklessRuntimeError("\"$host\" is not an option of a select")
+			val instance = optionsOf(select).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")
+			return change(null, null) {
+				if (attributeNow(select, "disabled") == null && attributeIn(option, "disabled", instance.scope) == null) chosenNow = host
+				emptyList()
+			}
+		}
 		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
 		if (point != null && !event.touch) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
@@ -933,6 +1046,7 @@ class Runtime(
 		val beforeAttributes = boundAttributes().associate { (n, a, v) -> (n to a) to v }
 		val beforeMarks = marks()
 		val checkedBefore = HashMap(checkedness)
+		val selectedBefore = HashMap(selectedness)
 		val bindingsBefore = ticked.associate { it.id to checkedBinding(it.id) }
 		val beforeProperties = properties().associate { (n, a, v) -> (n to a) to v }.toMutableMap()
 		// The edited field already shows what was typed, so its own value counts as written.
@@ -994,6 +1108,10 @@ class Runtime(
 		// A `checked` binding whose value changed sets the checkedness, as the web's property write does.
 		for (n in ticked) checkedBinding(n.id)?.let { if (it != bindingsBefore[n.id]) checkedness[n.id] = it }
 		for (n in ticked) if (isShown(n) && checkedBefore[n.id] != checkedness[n.id]) journal.add(JournalEntry.Check(n.id, checkedness.getValue(n.id)))
+		settleSelects(chosenNow)
+		chosenNow = null
+		// An option a new row builds starts unselected on the host, so only a selected one is sent.
+		for ((id, selected) in selections()) if ((selectedBefore[id] ?: false) != selected) journal.add(JournalEntry.Selected(id, selected))
 		for ((key, v) in marks()) if (beforeMarks[key] != v) journal.add(JournalEntry.Attribute(key.first, key.second, v))
 		// A field whose binding wrote it shows that value now, not what was typed before.
 		for (entry in journal) if (entry is JournalEntry.Property) edited.remove(entry.node)

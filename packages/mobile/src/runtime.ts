@@ -23,6 +23,8 @@ import {
 /** A host-side action: what a person does to a retained view. */
 export type NativeAction =
 	| { readonly event: 'activate'; readonly host: string }
+	/** A person chose the option `host` (an instance id inside a list row) in its `<select>`'s list. */
+	| { readonly event: 'choose'; readonly host: string }
 	/** The field's whole text after an edit. */
 	| { readonly event: 'input'; readonly host: string; readonly value: string }
 	/** A live device value changed (connectivity, permission): the host writes the device cell. */
@@ -159,6 +161,18 @@ export type NativeRuntime = {
 	readonly sheets: () => ReadonlyArray<readonly [node: string, open: boolean]>;
 	/** Every shown checkbox's and radio button's checkedness. */
 	readonly checks: () => ReadonlyArray<readonly [node: string, checked: boolean]>;
+	/** Each shown option of each `<select>`, in tree order, and whether it is selected. */
+	readonly selections: () => ReadonlyArray<readonly [node: string, selected: boolean]>;
+	/**
+	 * What a select's list shows: each shown option in tree order, with its label (its `label` attribute when not empty,
+	 * else its text), whether a person cannot choose it, and whether it is the chosen one.
+	 */
+	readonly choices: (select: string) => ReadonlyArray<{
+		readonly option: string;
+		readonly label: string;
+		readonly disabled: boolean;
+		readonly selected: boolean;
+	}>;
 	/** Runs the handler bound to the action (or writes the device or task cell it names) and returns the journal. */
 	readonly dispatch: (action: NativeAction) => ReadonlyArray<NativeJournalEntry>;
 	/** The page's `<title>` text, null when it has none. */
@@ -838,6 +852,123 @@ export function createNativeRuntime(
 					formOf(node.id) === form),
 		);
 	};
+	// Selects: each shown option's selectedness, kept as the web keeps it (HTML's selectedness setting algorithm).
+	const selects = payload.nodes.filter(
+		(node): node is Extract<NativeNode, { kind: 'element' }> =>
+			node.kind === 'element' && node.element === 'select',
+	);
+	const attributeIn = (
+		node: Extract<NativeNode, { kind: 'element' }>,
+		name: string,
+		scope: NativeScope,
+	): string | null => {
+		const binding = node.bindings?.find((one) => 'attribute' in one && one.attribute === name);
+		return binding
+			? marklessAttributeValue(name, evaluate(binding.value, undefined, scope))
+			: (node.attributes?.[name] ?? null);
+	};
+	type OptionInstance = {
+		readonly id: string;
+		readonly node: Extract<NativeNode, { kind: 'element' }>;
+		readonly scope: NativeScope;
+	};
+	/** A select's shown options in tree order: a list's rows where the list stands, each row's options in order. */
+	const optionsOf = (select: string): OptionInstance[] => {
+		const children = payload.nodes.filter(
+			(node): node is Extract<NativeNode, { kind: 'element' }> =>
+				node.kind === 'element' && node.element === 'option' && node.parent === select,
+		);
+		const listed = new Set<string>();
+		return children.flatMap((node): OptionInstance[] => {
+			if (!node.row) return instances(node).map((instance) => ({ ...instance, node }));
+			if (listed.has(node.row)) return [];
+			listed.add(node.row);
+			const repeat = repeats.get(node.row);
+			if (!repeat || !shown(repeat)) return [];
+			const siblings = children.filter((child) => child.row === node.row);
+			const shownNow = new Map(
+				siblings.flatMap((child) =>
+					instances(child).map((instance) => [instance.id, { ...instance, node: child }] as const),
+				),
+			);
+			return rowsOf(repeat).flatMap(({ key }) =>
+				siblings.flatMap((child) => shownNow.get(`${child.id}@${key}`) ?? []),
+			);
+		});
+	};
+	/** An option's text: its text with ASCII whitespace stripped and collapsed, as `option.text` gives it. */
+	const optionText = (option: OptionInstance) =>
+		payload.nodes
+			.flatMap((node) =>
+				node.kind === 'text' && node.parent === option.node.id
+					? [render(node.parts, option.scope)]
+					: [],
+			)
+			.join('')
+			.replace(/[\t\n\f\r ]+/g, ' ')
+			.trim();
+	const optionValue = (option: OptionInstance) =>
+		attributeIn(option.node, 'value', option.scope) ?? optionText(option);
+	const selectedBinding = (option: OptionInstance) => {
+		const binding = option.node.bindings?.find(
+			(one) => 'property' in one && one.property === 'selected',
+		);
+		return binding ? Boolean(evaluate(binding.value, undefined, option.scope)) : undefined;
+	};
+	const selectedness = new Map<string, boolean>();
+	/** What each option's `selected` binding last wrote: a binding sets the selectedness only when its value changes. */
+	const selectedBound = new Map<string, boolean | undefined>();
+	/** Brings each select's options up to date: rows that came or left, `selected` bindings that changed, then the rule. */
+	const settleSelects = (chosen?: string) => {
+		for (const select of selects) {
+			const options = optionsOf(select.id);
+			const ids = new Set(options.map((option) => option.id));
+			for (const id of selectedBound.keys())
+				if (nodesById.get(nodeOf(id))?.parent === select.id && !ids.has(id)) {
+					selectedness.delete(id);
+					selectedBound.delete(id);
+				}
+			const choose = (id: string) => {
+				for (const option of options) selectedness.set(option.id, option.id === id);
+			};
+			for (const option of options) {
+				if (!selectedBound.has(option.id)) {
+					const first = selectedBinding(option);
+					selectedBound.set(option.id, first);
+					selectedness.set(
+						option.id,
+						first ?? attributeIn(option.node, 'selected', option.scope) !== null,
+					);
+					if (selectedness.get(option.id)) choose(option.id);
+					continue;
+				}
+				const bound = selectedBinding(option);
+				if (bound !== undefined && bound !== selectedBound.get(option.id)) {
+					selectedBound.set(option.id, bound);
+					selectedness.set(option.id, bound);
+					if (bound) choose(option.id);
+				}
+			}
+			if (chosen !== undefined && ids.has(chosen)) choose(chosen);
+			if (!options.some((option) => selectedness.get(option.id))) {
+				const first = options.find(
+					(option) => attributeIn(option.node, 'disabled', option.scope) === null,
+				);
+				if (first) selectedness.set(first.id, true);
+			}
+		}
+	};
+	settleSelects();
+	/** The option a person chose in the action being dispatched. */
+	let chosenNow: string | undefined;
+	/** The option a select has chosen, or undefined when it has none. */
+	const chosenOf = (select: string) =>
+		optionsOf(select).find((option) => selectedness.get(option.id));
+	const selections = () =>
+		selects.flatMap((select) =>
+			optionsOf(select.id).map((option) => [option.id, selectedness.get(option.id)!] as const),
+		);
+
 	const messages = payload.valueMissing ?? {};
 	const missing = messages[nativeLocale(preferredLanguages, Object.keys(messages))];
 	function entriesOf(id: string): Value {
@@ -849,6 +980,10 @@ export function createNativeRuntime(
 				return [];
 			if (kind === 'checkbox' || kind === 'radio')
 				return checkedOf(node) ? [[name, attributeNow(node, 'value') ?? 'on']] : [];
+			if (kind === 'select') {
+				const chosen = chosenOf(node);
+				return chosen ? [[name, optionValue(chosen)]] : [];
+			}
 			return [[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : textOf(node)]];
 		});
 	}
@@ -979,9 +1114,33 @@ export function createNativeRuntime(
 		sheets,
 		checks: () =>
 			ticked.flatMap((node) => (shown(node) ? [[node.id, checkedOf(node.id)] as const] : [])),
+		selections,
+		choices: (select) =>
+			optionsOf(select).map((option) => ({
+				option: option.id,
+				label: attributeIn(option.node, 'label', option.scope) || optionText(option),
+				disabled: attributeIn(option.node, 'disabled', option.scope) !== null,
+				selected: selectedness.get(option.id) ?? false,
+			})),
 		engineStarts: () => engineStarts,
 		logs: () => logs,
 		dispatch(action) {
+			if (action.event === 'choose') {
+				const option = nodesById.get(nodeOf(action.host));
+				const select = option?.parent ? nodesById.get(option.parent) : undefined;
+				if (option?.kind !== 'element' || option.element !== 'option' || select?.kind !== 'element')
+					throw new Error(`${action.host} is not an option of a select`);
+				const instance = optionsOf(select.id).find((one) => one.id === action.host);
+				if (!instance) throw new Error(`${action.host} is not shown`);
+				return change(undefined, undefined, () => {
+					if (
+						attributeNow(select.id, 'disabled') === null &&
+						attributeIn(option, 'disabled', instance.scope) === null
+					)
+						chosenNow = action.host;
+					return [];
+				});
+			}
 			if (action.event === 'timer' && action.timer.startsWith(SCRIPT_TIMER))
 				return change(undefined, undefined, () =>
 					enter({
@@ -1439,6 +1598,7 @@ export function createNativeRuntime(
 			const beforeAttributes = keyed(attributes());
 			const beforeMarks = marks();
 			const checkedBefore = new Map(checkedness);
+			const selectedBefore = new Map(selectedness);
 			const bindingsBefore = new Map(
 				ticked.map((node) => [node.id, checkedBinding(node.id)] as const),
 			);
@@ -1569,6 +1729,14 @@ export function createNativeRuntime(
 				if (bound !== undefined && bound !== bindingsBefore.get(node.id))
 					checkedness.set(node.id, bound);
 			}
+			settleSelects(chosenNow);
+			chosenNow = undefined;
+			// An option a new row builds starts unselected on the host, so only a selected one is sent.
+			const chosen = selections().flatMap(([node, value]): NativeJournalEntry[] =>
+				(selectedBefore.get(node) ?? false) === value
+					? []
+					: [{ op: 'property', node, name: 'selected', value }],
+			);
 			const checks = ticked.flatMap((node): NativeJournalEntry[] =>
 				shown(node) && checkedBefore.get(node.id) !== checkedness.get(node.id)
 					? [
@@ -1600,6 +1768,7 @@ export function createNativeRuntime(
 				...styles,
 				...nodes,
 				...checks,
+				...chosen,
 				...marked,
 				...(afterTitle !== beforeTitle && afterTitle !== null
 					? [{ op: 'title' as const, value: afterTitle }]

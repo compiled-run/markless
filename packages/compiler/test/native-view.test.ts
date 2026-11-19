@@ -2111,6 +2111,69 @@ export function Tip() @{
 	});
 });
 
+describe('selects', () => {
+	const page = (markup: string) => `import { state } from '@markless/core';
+export function Page() @{
+	let size = state('M');
+	let sent = state('');
+${markup}
+}`;
+
+	it('lowers a select of listed options, their `selected` binding, and its place in a form', async () => {
+		const { payload, diagnostics } = await nativeView(
+			page(`	<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget).get('size')); }}>
+		<select name="size" aria-label="Size">
+			@for (const option of ['S', 'M']; key option) {
+				<option value={option} selected={option === size}>{option}</option>
+			}
+		</select>
+		<button>Send</button>
+		<p>{sent}</p>
+	</form>`),
+		);
+		expect(diagnostics).toEqual([]);
+		const option = payload!.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'option',
+		);
+		expect(option).toMatchObject({
+			parent: payload!.nodes.find((node) => node.kind === 'element' && node.element === 'select')!.id,
+			bindings: [
+				{ attribute: 'value', value: { item: 'repeat:0' } },
+				{
+					property: 'selected',
+					value: { binary: '===', left: { item: 'repeat:0' }, right: { cell: 'state:size' } },
+				},
+			],
+		});
+		expect(payload!.forms![0]!.fields).toEqual([{ node: 'h1', kind: 'select' }]);
+	});
+
+	it('refuses by name what a native select does not draw or run yet', async () => {
+		const { payload, diagnostics } = await nativeView(
+			page(`	<main>
+		<select multiple onChange={() => (sent = 'x')}><option>A</option></select>
+		<select value={size}><option>B</option><hr /></select>
+		<select><option><b>C</b></option></select>
+		<option>Loose</option>
+		<form onSubmit={(event) => { event.preventDefault(); sent = 'y'; }}>
+			<select name="r" required><option>D</option></select>
+			<button>Send</button>
+		</form>
+	</main>`),
+		);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'the change handler on the <select> h1, which a native build does not run yet',
+			'the <select> h1 has `multiple`, a list box a native build does not draw yet',
+			'the <select> h3 binds `value`; a native build chooses an option through its `selected`',
+			'the <hr> h5 sits inside a <select>, which a native build shows only <option>s of',
+			'the <b> h8 sits inside an <option>, which a native build shows only text of',
+			'the <option> h9 is not inside a <select>, which a native build does not show yet',
+			'the <select> h11 in the <form> h10 has `required`, which the web checks before a submit and no native host checks yet',
+		]);
+	});
+});
+
 describe('pointer events', () => {
 	it('lowers each pointer event a touch raises, the fields its handler reads, and capture', async () => {
 		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';

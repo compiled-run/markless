@@ -3536,6 +3536,14 @@ export function createNativeViewPayload(
 				const value = exprOf(read.expression, `the \`${target.name}\` property`, scope);
 				return value ? [{ property: target.name, value }] : [];
 			}
+			if (
+				target.kind === 'property' &&
+				target.name === 'selected' &&
+				scope.module.tagOf.get(host) === 'option'
+			) {
+				const value = exprOf(read.expression, 'the `selected` property', scope);
+				return value ? [{ property: 'selected' as const, value }] : [];
+			}
 			// A button's or checkbox's `value` is the form value its `value` attribute reflects; only a text field shows one.
 			if (
 				target.kind === 'property' &&
@@ -6274,6 +6282,7 @@ export function createNativeViewPayload(
 		}
 	}
 	wireTicks();
+	checkSelects();
 	const forms = wireForms();
 	for (const handler of handlers) {
 		if (mentionsElement(handler.ops)) {
@@ -6351,6 +6360,45 @@ export function createNativeViewPayload(
 	 * A checkbox or radio button is pressed as on the web: the press ticks it, then its click handlers run, then (when the
 	 * tick changed it) its input and change handlers. A radio button already checked only runs its click handlers.
 	 */
+	/**
+	 * A `<select>` is a pop-up list of its `<option>`s, one chosen. What a native build does not draw or run yet is refused
+	 * by name: a list box (`multiple`, `size`), a select whose choice a binding sets, handlers on either element, and
+	 * anything but text inside an option or options inside a select.
+	 */
+	function checkSelects() {
+		const byId = nodeById();
+		for (const node of nodes) {
+			if (node.kind !== 'element') continue;
+			const span = nodeSpans.get(node.id);
+			const where = `the <${node.element}> ${node.id}`;
+			if (node.element === 'select' || node.element === 'option')
+				for (const pending of pendingHandlers)
+					if (pending.host === node.id)
+						refuse(
+							`the ${pending.event.eventName} handler on ${where}, which a native build does not run yet`,
+							pending.event.handlerSpan,
+						);
+			if (node.element === 'select') {
+				if (node.row)
+					refuse(`${where} sits inside a @for row, which a native build does not draw yet`, span);
+				for (const name of ['multiple', 'size'])
+					if (node.attributes?.[name] !== undefined || node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === name))
+						refuse(`${where} has \`${name}\`, a list box a native build does not draw yet`, span);
+				if (node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === 'value'))
+					refuse(`${where} binds \`value\`; a native build chooses an option through its \`selected\``, span);
+				continue;
+			}
+			const parent = node.parent === null ? undefined : byId.get(node.parent);
+			const inSelect = parent?.kind === 'element' && parent.element === 'select';
+			if (node.element === 'option' && !inSelect)
+				refuse(`${where} is not inside a <select>, which a native build does not show yet`, span);
+			else if (node.element !== 'option' && inSelect)
+				refuse(`${where} sits inside a <select>, which a native build shows only <option>s of`, span);
+			else if (parent?.kind === 'element' && parent.element === 'option')
+				refuse(`${where} sits inside an <option>, which a native build shows only text of`, span);
+		}
+	}
+
 	function wireTicks() {
 		for (const node of nodes) {
 			if (node.kind !== 'element' || node.element !== 'input') continue;
@@ -6460,7 +6508,8 @@ export function createNativeViewPayload(
 					refuse(`${field}, a form inside a form`);
 					continue;
 				}
-				if (node.element !== 'input' && node.element !== 'button') continue;
+				if (node.element !== 'input' && node.element !== 'button' && node.element !== 'select')
+					continue;
 				if (node.row || JSON.stringify(node.arm) !== JSON.stringify(form.arm)) {
 					refuse(
 						`${field} sits in an @if arm or @for row of its form, which a native build does not submit yet`,
@@ -6474,6 +6523,15 @@ export function createNativeViewPayload(
 					continue;
 				}
 				const type = node.attributes?.['type'];
+				if (node.element === 'select') {
+					for (const name of [...UNCHECKED_CONSTRAINTS, 'required'])
+						if (attribute(node, name))
+							refuse(
+								`${field} has \`${name}\`, which the web checks before a submit and no native host checks yet`,
+							);
+					fields.push({ node: node.id, kind: 'select' });
+					continue;
+				}
 				if (node.element === 'button') {
 					if (type === 'button') continue;
 					if (type === 'reset') {

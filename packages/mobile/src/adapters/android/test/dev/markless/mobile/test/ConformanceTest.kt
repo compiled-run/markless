@@ -137,6 +137,9 @@ private fun runVector(file: File, vector: Map<String, Json>, runtime: Runtime) {
 	val checks = runtime.checks().joinToString(",", "[", "]") { (n, c) -> "[${jsonString(n)},$c]" }
 	val initialChecks = vector["initialChecks"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialChecks", checks == initialChecks) { "expected $initialChecks\n  actual   $checks" }
+	val selections = runtime.selections().joinToString(",", "[", "]") { (n, s) -> "[${jsonString(n)},$s]" }
+	val initialSelections = vector["initialSelections"]?.let(::canonical) ?: "[]"
+	check("${file.name} initialSelections", selections == initialSelections) { "expected $initialSelections\n  actual   $selections" }
 	val arms = runtime.arms().joinToString(",", "[", "]") { (n, i) -> "[${jsonString(n)},${i ?: "null"}]" }
 	val initialArms = vector["initialArms"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialArms", arms == initialArms) { "expected $initialArms\n  actual   $arms" }
