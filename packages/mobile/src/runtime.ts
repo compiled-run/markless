@@ -659,6 +659,8 @@ export function createNativeRuntime(
 			}>;
 			readonly logs: ReadonlyArray<readonly [string, string]>;
 			readonly commands?: ReadonlyArray<readonly [string, 'focus' | 'scrollIntoView' | 'showModal' | 'close', boolean]>;
+			/** The handler called `event.preventDefault()`. */
+			readonly prevented?: boolean;
 		};
 		for (const [slot, value] of result.writes) {
 			const at = slot.indexOf('@');
@@ -694,6 +696,7 @@ export function createNativeRuntime(
 				if (command === 'focus') focused = node;
 				return [{ op: 'command', node, command, ...(preventScroll ? { preventScroll: true as const } : {}) }];
 			}),
+			...(result.prevented ? [{ op: 'preventDefault' } as const] : []),
 		];
 	};
 	// As on the web, a computed is not run again while nothing it reads has changed.
@@ -1412,7 +1415,8 @@ export function createNativeRuntime(
 				continue;
 			}
 			if (op.op === 'script') {
-				const text = typeof eventValue === 'string' ? eventValue : eventValue?.value;
+				const fields = typeof eventValue === 'string' ? { value: eventValue } : eventValue;
+				const text = fields?.value;
 				const frame = frameOf(op.bindings, text, scope);
 				calls.push(
 					...enter({
@@ -1420,7 +1424,13 @@ export function createNativeRuntime(
 						fn: op.fn,
 						frame,
 						elements: elementFacts(frame),
-						event: text === undefined ? { type: op.type } : { type: op.type, value: text },
+						event: {
+							type: op.type,
+							...(text !== undefined ? { value: text } : {}),
+							...(fields?.key !== undefined ? { key: fields.key } : {}),
+							...(fields?.text !== undefined ? { text: fields.text } : {}),
+							...(fields?.detail !== undefined ? { detail: fields.detail } : {}),
+						},
 						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),
 					}),
 				);

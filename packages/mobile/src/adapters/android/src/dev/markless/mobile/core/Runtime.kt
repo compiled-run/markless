@@ -520,7 +520,8 @@ class Runtime(
 				}
 				if (command == "focus") focused = node
 				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
-			}
+			} +
+			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList())
 	}
 
 
@@ -953,7 +954,12 @@ class Runtime(
 				calls.add(JournalEntry.Command(node.value, op.command, op.preventScroll))
 			}
 			is Op.Script -> {
-				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}}"
+				val given = StringBuilder("{\"type\":${jsonString(op.type)}")
+				(fields?.get("value") as? JsValue.Str)?.let { given.append(",\"value\":${jsonString(it.value)}") }
+				(fields?.get("key") as? JsValue.Str)?.let { given.append(",\"key\":${jsonString(it.value)}") }
+				(fields?.get("text") as? JsValue.Str)?.let { given.append(",\"text\":${jsonString(it.value)}") }
+				(fields?.get("detail") as? JsValue.Num)?.let { given.append(",\"detail\":${jsonValue(it)}") }
+				val event = given.append("}").toString()
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope)},\"event\":$event$catch"))
 			}

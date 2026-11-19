@@ -18,6 +18,7 @@ type Reference = ModuleSemantics['references'][number];
 const PRINT = { strip: true, format: 'pretty', indent: 1, comments: false } as const;
 const FRAMEWORK_PREFIX = '@markless/';
 const GLOBAL_OBJECTS = new Set(['window', 'globalThis', 'self']);
+const EVENT_WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'ParenthesizedExpression']);
 
 const isNode = (value: unknown): value is AnyNode =>
 	value !== null &&
@@ -399,7 +400,7 @@ export function scriptFunctionOf(
 			});
 		}
 	}
-	const eventReads: { path: string[]; span: SourceSpan }[] = [];
+	const eventReads: { path: string[]; span: SourceSpan; arguments?: ReadonlyArray<string | null> }[] = [];
 	const [parameter] = (root.params as AnyNode[] | undefined) ?? [];
 	const eventBinding =
 		parameter?.type === 'Identifier' && !method ? semantic.bindingOf(parameter as never) : null;
@@ -408,6 +409,11 @@ export function scriptFunctionOf(
 		const path: string[] = [];
 		for (;;) {
 			const parent = semantic.parentOf(at as never) as AnyNode | null;
+			// `(event as ClipboardEvent).clipboardData`: a cast of the event itself is still the event.
+			if (path.length === 0 && parent && EVENT_WRAPPERS.has(String(parent.type)) && parent.expression === at) {
+				at = parent;
+				continue;
+			}
 			const property = parent?.property as AnyNode | undefined;
 			if (
 				parent?.type !== 'MemberExpression' ||
@@ -419,7 +425,14 @@ export function scriptFunctionOf(
 			path.push(property.name);
 			at = parent;
 		}
-		eventReads.push({ path, span: spanOf(at as never, filename) });
+		const call = semantic.parentOf(at as never) as AnyNode | null;
+		const called =
+			call?.type === 'CallExpression' && call.callee === at
+				? (call.arguments as AnyNode[]).map((argument) =>
+						argument.type === 'Literal' && typeof argument.value === 'string' ? argument.value : null,
+					)
+				: undefined;
+		eventReads.push({ path, span: spanOf(at as never, filename), ...(called ? { arguments: called } : {}) });
 	}
 	const print = (node: AnyNode): string => {
 		unsupportedIn(node, filename, unsupported);

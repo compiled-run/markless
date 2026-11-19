@@ -268,6 +268,16 @@ var eventOf = function (given) {
 		target: target,
 		currentTarget: target,
 		key: given.key,
+		// A press's count of presses in a row; any other event's is 0.
+		detail: given.detail === undefined ? 0 : given.detail,
+		// No composition reaches a phone's browser from its English keyboards.
+		isComposing: false,
+		clipboardData: given.text === undefined ? null : {
+			getData: function (format) {
+				var kind = String(format).toLowerCase();
+				return kind === 'text' || kind === 'text/plain' ? given.text : '';
+			},
+		},
 		// A phone's browser reports a finger as a touch pointer.
 		pointerType: String(given.type).indexOf('pointer') === 0 ? 'touch' : undefined,
 		defaultPrevented: false,
@@ -303,7 +313,10 @@ g.__markless[id] = {
 		if (entry.kind === 'dispatch') {
 			var settled = function (error) { fail(entry['catch'], error); };
 			try {
-				var result = fn(entry.fn)(frameOf(entry.frame))(eventOf(entry.event));
+				var event = eventOf(entry.event);
+				var result = fn(entry.fn)(frameOf(entry.frame))(event);
+				// Only a text field's key and paste have a default a phone's host leaves out when it is prevented.
+				host.out.prevented = (event.type === 'keydown' || event.type === 'paste') && event.defaultPrevented === true;
 				if (result && typeof result.then === 'function') result.then(null, settled);
 			} catch (error) {
 				settled(error);
@@ -333,7 +346,7 @@ g.__markless[id] = {
 		}
 		var out = host.out;
 		host.out = null;
-		return JSON.stringify({ writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, logs: out.logs, commands: out.commands });
+		return JSON.stringify({ writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, logs: out.logs, commands: out.commands, prevented: out.prevented === true });
 	},
 };`;
 

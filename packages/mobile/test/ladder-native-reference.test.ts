@@ -854,9 +854,10 @@ function walk(
 			if (attributeNow(host, 'disabled') != null)
 				throw new Error(`step ${index}: "${name}" is disabled`);
 			// Typing shows the text in the field at once; the input event then runs the handler.
+			const typedText = 'type' in action ? (action.type.append ? fieldText(host) : '') + action.type.text : '';
 			if ('type' in action) {
-				if (properties.has(host)) properties.set(host, action.type.text);
-				else typed.set(host, action.type.text);
+				if (properties.has(host)) properties.set(host, typedText);
+				else typed.set(host, typedText);
 			}
 			// A tap is a touch going down and up on what it lands on, then the activation of the nearest element around it
 			// that handles a press, as on a phone.
@@ -928,7 +929,7 @@ function walk(
 						? runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 2 })
 					: 'type' in action
 						? handles(host, 'input')
-							? runtime.dispatch({ event: 'input', host, value: action.type.text })
+							? runtime.dispatch({ event: 'input', host, value: typedText })
 							: []
 						: 'erase' in action
 							? keyed('Backspace') || fieldText(host) === ''

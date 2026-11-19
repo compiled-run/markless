@@ -577,7 +577,7 @@ public final class NativeRuntime {
 			_ = try callScript("enter", .object(entry + entryCells()))
 			return try callScript("leave")
 		}
-		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(required: ["writes", "timers", "clears", "requests", "logs"], optional: ["commands"])
+		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(required: ["writes", "timers", "clears", "requests", "logs"], optional: ["commands", "prevented"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
@@ -621,7 +621,8 @@ public final class NativeRuntime {
 			if name == "focus" { focused = node }
 			return .command(node: node, command: name, preventScroll: try parts[2].bool())
 		}
-		return clears + timers + requests + commands
+		let prevented: [NativeJournalEntry] = try result.has("prevented") && result["prevented"].bool() ? [.preventDefault] : []
+		return clears + timers + requests + commands + prevented
 	}
 
 	/// The host's answer to a `fetch` entry.
@@ -1059,7 +1060,12 @@ public final class NativeRuntime {
 			case let .call(call, object, arguments, result, then):
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):
-				let event: JSONValue = .object([("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? []))
+				var given: [(String, JSONValue)] = [("type", .string(type))]
+				if let eventValue { given.append(("value", .string(eventValue))) }
+				if case let .string(key)? = eventFields?[.key] { given.append(("key", .string(key))) }
+				if case let .string(text)? = eventFields?[.text] { given.append(("text", .string(text))) }
+				if case let .number(detail)? = eventFields?[.detail] { given.append(("detail", .number(detail))) }
+				let event: JSONValue = .object(given)
 				let frame = try frame(of: bindings, in: scope)
 				calls.append(contentsOf: try enter(
 					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame)), ("event", event)]

@@ -1,0 +1,28 @@
+appId: ${APP_ID}
+name: u41-taglist
+---
+- launchApp:
+      clearState: true
+- assertVisible: Pantry
+- assertVisible: 'Tags: tea'
+- assertVisible: ''
+- tapOn: Topics
+- inputText: milk
+- hideKeyboard
+- assertVisible: milk
+- assertVisible: 'Tags: tea'
+- assertVisible: milk
+- tapOn: Topics
+- pressKey: Enter
+- assertNotVisible: 'Tags: tea'
+- assertVisible: ''
+- assertVisible: 'Tags: tea, milk'
+- assertNotVisible: 'Tags: tea'
+- assertVisible: ''
+- tapOn: Topics
+- inputText: sugar,
+- hideKeyboard
+- assertNotVisible: 'Tags: tea, milk'
+- assertVisible: 'Tags: tea, milk, sugar'
+- assertNotVisible: 'Tags: tea, milk'
+- assertVisible: ''

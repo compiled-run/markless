@@ -2395,12 +2395,24 @@ export function Stepper() @{
 	</main>
 }`;
 
-	it('runs a key handler as data and the method its data cannot spell as JavaScript, reading a page global only past a typeof test', async () => {
+	it('runs a key handler its data cannot spell as JavaScript, reading a page global only past a typeof test', async () => {
 		const { payload, diagnostics } = await nativeView(source);
 		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
 		const keydown = payload!.events.find((event) => event.event === 'keydown');
 		const ops = payload!.handlers.find((handler) => handler.id === keydown?.handler)?.ops;
-		expect(JSON.stringify(ops)).toContain('"op":"preventDefault"');
+		expect(ops).toMatchObject([{ op: 'script', type: 'keydown' }]);
+	});
+
+	it('runs a submit handler as data and the method its data cannot spell as JavaScript', async () => {
+		const { payload, diagnostics } = await nativeView(
+			source.replace(
+				/<input[\s\S]*?\/>/,
+				`<form onSubmit={(event) => { event.preventDefault(); stepper.settle(stepper.low ?? null); }}><button>Go</button></form>`,
+			),
+		);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		const submit = payload!.events.find((event) => event.event === 'submit');
+		const ops = payload!.handlers.find((handler) => handler.id === submit?.handler)?.ops;
 		expect(JSON.stringify(ops)).toMatch(/"op":"script","fn":"[^"]+","type":"call","bindings":\{"__m":\{"method"/);
 	});
 

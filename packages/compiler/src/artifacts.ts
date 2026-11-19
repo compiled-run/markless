@@ -146,7 +146,12 @@ export type SemanticScriptFunction = {
 	/** What it reads from imports: `__i[slot]`, then `name` (null: the whole module). */
 	readonly imports: ReadonlyArray<SemanticScriptImportUse>;
 	/** Each use of its first parameter (the event), as the member path read off it (`['target', 'value']`; empty: whole). */
-	readonly event?: ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly span: SourceSpan }>;
+	readonly event?: ReadonlyArray<{
+		readonly path: ReadonlyArray<string>;
+		readonly span: SourceSpan;
+		/** When the read is called (`event.clipboardData.getData('text')`): each argument's string literal, else null. */
+		readonly arguments?: ReadonlyArray<string | null>;
+	}>;
 	readonly globals: ReadonlyArray<SemanticScriptGlobal>;
 	/** Framework imports it uses (`navigate`), which are not JavaScript a script can run. */
 	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;

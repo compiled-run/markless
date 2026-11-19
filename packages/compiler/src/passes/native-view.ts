@@ -927,8 +927,7 @@ export function nativeUnsupported(message: string, span?: SourceSpan): CompilerD
 
 const LANGUAGE_GLOBALS = new Set(NATIVE_SCRIPT_LANGUAGE_GLOBALS);
 // A submit's default action and a box's checkedness are the host's; a script's event cannot report them back yet.
-// A key's or paste's preventDefault() reaches the host only from data: the engine journals no cancel.
-const DATA_ONLY_EVENTS = new Set(['submit', 'change', 'keydown', 'paste']);
+const DATA_ONLY_EVENTS = new Set(['submit', 'change']);
 const RENDER_UNSTEADY = new Set(['Date', 'crypto', 'performance']);
 const GLOBAL_OBJECTS = new Set(NATIVE_SCRIPT_GLOBAL_OBJECTS);
 
@@ -5003,6 +5002,15 @@ export function createNativeViewPayload(
 				members.every((member, index) => index >= read.path.length || read.path[index] === member) &&
 				(read.path.length <= members.length || members.length === 2),
 			);
+			const plainText = (format: string | null | undefined) => format != null && /^text(\/plain)?$/i.test(format);
+			if (known && read.path.join('.') === 'clipboardData.getData' && !plainText(read.arguments?.[0])) {
+				readsMissing = true;
+				refuseScript(
+					`${what} reads the clipboard other than as plain text (\`getData('text')\`), which a phone's paste does not give`,
+					read.span,
+				);
+				continue;
+			}
 			if (known) continue;
 			readsMissing = true;
 			const doing = SEMANTIC_EVENTS[event.eventName] === 'input' ? 'a text edit' : 'a tap';

@@ -953,6 +953,9 @@ export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> =
 	['currentTarget', 'value'],
 	['currentTarget', 'checked'],
 	['pointerType'],
+	['detail'],
+	['isComposing'],
+	['clipboardData', 'getData'],
 ];
 
 /** Names for the global object itself: `window.setTimeout` reads a provided global, `window.document` does not. */
