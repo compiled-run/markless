@@ -7,6 +7,7 @@ import {
 	decodeProtocolPayloadLists,
 	type RuntimePayloadType,
 } from '@markless/serializer/record-templates';
+import { setDataField } from '../../serializer/src/value-own-field.ts';
 import { marklessAttributeValue, marklessWriteAttribute } from './dom-attribute.ts';
 import { pageNodes } from './resume-anchor-census.ts';
 import {
@@ -742,7 +743,7 @@ function deserializeSlot(
 		if (record.type === 'object') {
 			const object: Record<string, unknown> = {};
 			for (const [key, value] of Array.isArray(record.fields) ? record.fields : []) {
-				if (typeof key === 'string') object[key] = deserializeSlot(value, records);
+				if (typeof key === 'string') setDataField(object, key, deserializeSlot(value, records));
 			}
 			return object;
 		}

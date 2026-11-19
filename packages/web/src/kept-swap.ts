@@ -1,5 +1,6 @@
 // Hands a kept part's live state to the next page of an in-place navigation, still off screen (see PROTOCOL_KEEP_INSTANCE_ATTRIBUTE).
 import { decodePayloadScriptsWithVersion } from '../../serializer/src/protocol-client.ts';
+import { setDataField } from '../../serializer/src/value-own-field.ts';
 import { marklessInstancePath } from './fns/instance-scope.ts';
 import { bindDefinitions, cloneValue, moduleHref, sameValue } from './fns/shared-instances.ts';
 import { readPayloadScriptsFromDocument } from './payload-document-common.ts';
@@ -191,7 +192,11 @@ function carried(live: unknown, before: unknown, next: unknown): unknown {
 	if (!isPlain(live) || !isPlain(before) || !isPlain(next)) return next;
 	const merged: Record<string, unknown> = {};
 	for (const key of Object.keys(next))
-		merged[key] = sameValue(before[key], next[key]) && key in live ? live[key] : next[key];
+		setDataField(
+			merged,
+			key,
+			sameValue(before[key], next[key]) && Object.hasOwn(live, key) ? live[key] : next[key],
+		);
 	return merged;
 }
 
