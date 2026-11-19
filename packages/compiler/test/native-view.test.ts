@@ -1796,4 +1796,161 @@ export function Page() @{
 }`);
 		expect(plain.payload!.script).toBeUndefined();
 	});
+
+});
+
+describe('overlays', () => {
+	it('lowers an overlay sheet: its mark, dismiss and pointer events, element values, focus and a module set its helpers keep', async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { element, state } from '@markless/core';
+const pressing = new WeakSet<HTMLElement>();
+function begin(box: HTMLElement | undefined, target: EventTarget | null) {
+	if (!box) return;
+	if (target === box) {
+		pressing.add(box);
+		return;
+	}
+	pressing.delete(box);
+}
+function finish(box: HTMLElement | undefined, target: EventTarget | null) {
+	const was = box !== undefined && pressing.has(box);
+	if (box) pressing.delete(box);
+	return was && target === box;
+}
+export function Sheet() @{
+	let shown = state(false);
+	const panel = element<HTMLDivElement>();
+	const opener = element<HTMLButtonElement>();
+	<section>
+		<button el={opener} onClick={() => (shown = true)}>Open</button>
+		<div
+			overlay
+			el={panel}
+			hidden={shown !== true}
+			onDismiss={(event) => {
+				if (event.detail.reason === 'escape' && panel !== undefined && panel.contains(document.activeElement)) opener?.focus();
+				shown = false;
+			}}
+			onPointerdown={(event) => begin(panel, event.target)}
+			onPointerup={(event) => {
+				const done = finish(panel, event.target);
+				if (done) shown = false;
+			}}
+		><p>Body</p></div>
+	</section>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.nodes.find((node) => node.id === 'h2')).toMatchObject({
+			element: 'div',
+			attributes: { overlay: '' },
+		});
+		expect(payload!.events.map((event) => [event.host, event.event])).toEqual([
+			['h1', 'activate'],
+			['h2', 'dismiss'],
+			['h2', 'pointerdown'],
+			['h2', 'pointerup'],
+		]);
+		expect(payload!.cells).toContainEqual({
+			id: 'module:src/App.tsrx#pressing',
+			name: 'pressing',
+			initial: [],
+		});
+		const ops = (event: number) => payload!.handlers[event]!.ops;
+		expect(ops(1)).toEqual([
+			{
+				op: 'if',
+				test: {
+					logical: '&&',
+					left: {
+						logical: '&&',
+						left: {
+							binary: '===',
+							left: { event: 'reason' },
+							right: { literal: 'escape' },
+						},
+						right: { binary: '!==', left: { literal: 'h2' }, right: { literal: null } },
+					},
+					right: { contains: { literal: 'h2' }, node: { focused: true } },
+				},
+				whenTrue: [{ op: 'command', node: 'h1', command: 'focus' }],
+				whenFalse: [],
+			},
+			{ op: 'assign', cell: 'state:shown', value: { literal: false } },
+		]);
+		const members = { cell: 'module:src/App.tsrx#pressing' };
+		expect(JSON.stringify(ops(2))).toContain(
+			JSON.stringify({ binary: '===', left: { event: 'target' }, right: { literal: 'h2' } }),
+		);
+		expect(JSON.stringify(ops(2))).toContain(
+			JSON.stringify({
+				method: 'concat',
+				target: members,
+				arguments: [{ array: [{ spread: false, value: { literal: 'h2' } }] }],
+			}),
+		);
+		// The helper's value is left in a cell its ops write first, then read by the `if` after it.
+		expect(ops(3)[0]).toEqual({
+			op: 'assign',
+			cell: 'handler:event:3/returned:0',
+			value: { literal: null },
+		});
+		expect(ops(3).at(-1)).toEqual({
+			op: 'if',
+			test: { cell: 'handler:event:3/returned:0' },
+			whenTrue: [{ op: 'assign', cell: 'state:shown', value: { literal: false } }],
+			whenFalse: [],
+		});
+	});
+
+	it('reads the overlay focus origin, instanceof and the document body as element values', async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { element, state } from '@markless/core';
+function openerOf(layer: HTMLElement | undefined) {
+	const seen = (layer as { __marklessOverlayFocusOrigin?: Element } | undefined)?.__marklessOverlayFocusOrigin;
+	return seen instanceof HTMLElement && seen !== seen.ownerDocument.body ? seen : undefined;
+}
+export function Tray() @{
+	let open = state(true);
+	const layer = element<HTMLDivElement>();
+	<div overlay el={layer} hidden={open !== true}>
+		<button onClick={() => {
+			open = false;
+			openerOf(layer)?.focus();
+		}}>Close</button>
+	</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		const origin = { focusOrigin: { literal: 'h0' } };
+		expect(payload!.handlers[0]!.ops).toEqual([
+			{ op: 'assign', cell: 'state:open', value: { literal: false } },
+			{
+				op: 'command',
+				command: 'focus',
+				node: {
+					if: {
+						logical: '&&',
+						left: { isElement: origin },
+						right: { binary: '!==', left: origin, right: { literal: '#body' } },
+					},
+					whenTrue: origin,
+					whenFalse: { literal: null },
+				},
+			},
+		]);
+	});
+
+	it('refuses a hint surface by name; a set method it has no lowering for runs as JavaScript', async () => {
+		const { diagnostics } = await nativeView(`import { state } from '@markless/core';
+const seen = new Set<string>();
+export function Tip() @{
+	let open = state(false);
+	<div>
+		<button onClick={() => { seen.clear(); open = true; }}>Show</button>
+		<div overlay overlay-hint hidden={open !== true}>Tip</div>
+	</div>
+}`);
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'an `overlay-hint` surface (a tooltip or hovercard), which phones do not show yet',
+		]);
+	});
 });

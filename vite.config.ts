@@ -142,6 +142,7 @@ const buildOrder: PackUserConfig[] = [
 			'event-only-lean/scalar-resume': './src/event-only-lean/scalar-resume.ts',
 			'event-resume': './src/event-resume.ts',
 			'inline/resumer': './src/inline/resumer.ts',
+			'overlay-protocol': './src/overlay-protocol.ts',
 			payload: './src/payload.ts',
 			render: './src/render.ts',
 			'render-to-stream': './src/render-to-stream.ts',

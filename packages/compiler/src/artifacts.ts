@@ -1396,6 +1396,8 @@ export type SemanticModuleFunction = {
 		/** Its body; a defaulted parameter `p = d` starts it as `let p = p ?? d`. */
 		readonly statements: ReadonlyArray<SemanticFunctionStatement>;
 	};
+	/** Its body as handler statements, for a call made for what it does (`focusIntoSurface(...)`) rather than its value. */
+	readonly effects?: ReadonlyArray<SemanticHandlerStatement>;
 };
 
 /** A top-level `const` of a module that no statement writes through: what a native build reads where a name reads it. */
@@ -1526,6 +1528,8 @@ export type SemanticExpression =
 			readonly parameters: ReadonlyArray<string>;
 			readonly body: SemanticExpression;
 	  }
+	/** `value instanceof HTMLElement` (or `Element`): whether the value is an element. */
+	| { readonly kind: 'instanceof'; readonly value: SemanticExpression; readonly type: string }
 	/** `new Callee(...)` by a bare name (`new FormData(form)`, `new Promise(...)`, `new Error(message)`). */
 	| {
 			readonly kind: 'new';
@@ -1570,14 +1574,22 @@ export type SemanticHandlerStatement =
 			readonly arguments?: ReadonlyArray<SemanticExpression>;
 			readonly optional?: true;
 	  }
+	/** `(a ?? b)?.focus()`: a method called on a value that is not a name or a member path. */
+	| {
+			readonly kind: 'method-call';
+			readonly object: SemanticExpression;
+			readonly method: string;
+			readonly arguments?: ReadonlyArray<SemanticExpression>;
+			readonly optional?: true;
+	  }
 	| {
 			readonly kind: 'if';
 			readonly test: SemanticExpression;
 			readonly whenTrue: ReadonlyArray<SemanticHandlerStatement>;
 			readonly whenFalse: ReadonlyArray<SemanticHandlerStatement>;
 	  }
-	/** `return;` with no value: the rest of the body does not run. */
-	| { readonly kind: 'return' }
+	/** `return` or `return value`: the rest of the body does not run, and a caller that reads the call's value gets `value`. */
+	| { readonly kind: 'return'; readonly value?: SemanticExpression }
 	/** `const name = value`: the statements after it in its block read `name` as the value it had here. */
 	| { readonly kind: 'const'; readonly name: string; readonly value: SemanticExpression }
 	/** `await value;` as a statement. */

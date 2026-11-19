@@ -464,3 +464,60 @@ UI rows. Every resolution below is in a merge commit on `cw/native-integration`;
   separate worker (overlay-port). Its size record (`scripts/benchmarks/anchor-changes/cw-ui-overlay.json`) accepts +611 B on
   the docs pages for the compile worker; with the native entry that entry should not be needed (its web runtime entries,
   +144 B for the overlay install fix, are a real web change).
+
+- `cw/sheet-styled-content` (#822): not merged; its CI is red (see round two). Y1 to Y3 on iOS wait for it.
+- `cw/ui-overlay` (#819): not merged, although its CI is green. It branched before #816 and implements the same things
+  differently: it calls any named helper as `call` and inlines it, where #816 (on this branch) has `apply` plus the collected
+  module functions that #825 extends; it whitelists `METHODS`, where #816 lowers method calls as `invoke`. Its element values,
+  `contains`, `activeElement`, `instanceof`, pointer events and the overlay stack would have to be rebuilt on #816's shapes
+  across the analyzer, three runtimes and both hosts (about 130 conflicting hunks), which is a port, not a merge.
+  **Overlay owner:** rebase `cw/ui-overlay` onto `cw/native-integration` (or #816). Also, its size record
+  (`scripts/benchmarks/anchor-changes/cw-ui-overlay.json`) accepts +611 B on the docs pages for the compile worker; with
+  the native entry, that growth should not be needed, so that entry should go when it is rebased (its web runtime
+  entries, +144 B for the overlay install fix, are a real web change).
+
+## Round four (2026-11-18): the overlay port
+
+Branch `cw/overlay-port` (draft PR, base `cw/native-integration`) rebuilds #819's overlay behaviour (modal and popover on
+phones) on this branch's #816 shapes instead of merging it. #819 stays open and is superseded.
+
+**What changed in the port, compared with #819:**
+
+- Helpers: a module function is evaluated for its value through `apply` (as before); a handler statement that calls one
+  for its effects runs its body as ops through `invoke`; the analyzer keeps that body as `effects` beside the value form.
+  #819's `call`-and-inline and its `METHODS` whitelist are gone.
+- Elements: handles stay build-time values (#816); where one meets a run-time element (`event.target` of a pointer
+  event, `pressTarget`, `document.activeElement`, the focus origin) it is written as its node id.
+- Focus: #819's `focus` op and `focus` journal entry are folded into #816's `command`, whose `node` may now be an
+  expression. The overlay and popover vectors match #819's journals at every step (15 and 13), with focus as `command`.
+- Module set: the analyzer's module-constant facts keep an empty `new Set()`/`new WeakSet()` though its methods write it;
+  #819's separate `sets` collection is not needed.
+- Ladder: #819's `back: true` (Escape) is `escape: true`, because this branch's `back` is navigation.
+- Docs size: no size record. #819's +611 B docs record is dropped; the new compiler code is behind the native entry and
+  the injected collectors (the compile worker grows 89 B minified, from the web fix's emitted line, none from native code;
+  `website/tooling/compile-worker-graph.test.ts` passes). The docs pages' growth CI measured (+590 B on `/`) was #819's
+  web fix, not native code: a build of the base with only that fix grows the site's JS by 4,778 B gzip. By the planner's
+  ruling that fix is replaced by its own pull request against `main` (`cw/overlay-late-install`: the page's resume module
+  names the installer when it renders an overlay; the runtime is unchanged), carried here as one commit until it lands.
+
+**Ladder** (83 folders: round two's 81 plus u20 and u21; `11-async` and `y4` refused by name as before), simulator
+`markless-overlay-port` (iPhone 17, iOS 27.2), AVD `markless_overlay_port` (port 5612), Dragon at `e3a0bde12b` (round
+two's merge of dragoncss#590 to #593):
+
+| Phone | Before (round two, `cw/native-integration`) | After (this branch) |
+|---|---|---|
+| iOS | 77 of 81 (rung 17 since fixed: 78) | 80 of 83: Y1 to Y3 fail as before (wait for #822); u20, u21 pass |
+| Android | 80 of 81 (rung 17 since fixed: 81) | 79 of 83 in the full run; the 4 failures (f3, r136, y1, s4) failed at launch or in Maestro before any step, and all 4 pass on a rerun: 83 of 83 |
+
+Receipts: `receipts/2026-11-18-overlay-port-{ios,android}-83-rungs.json`, `-android-rerun-4-rungs.json`, `-verdict.txt`.
+
+After merging round three's `cw/native-integration` (89 folders; Dragon `compiled-run/dragoncss` `cw/native-integration`
+at `3312b9e420`): **iOS 89 of 89**; **Android 69 of 89** in the full run, then the 20 that failed all pass on a rerun
+(the emulator went away during u21: it stopped mid-step at "Tap on Done" and every later rung failed at install), so
+89 of 89. Receipts: `receipts/2026-11-18-overlay-port-merged-{ios,android}-89-rungs.json`,
+`-merged-android-rerun-20-rungs.json`.
+
+**Vectors:** 31 one-screen and 3 navigation files (overlay.json and popover.json new). Reference: every file equals a
+fresh build. Swift: 32 tests pass. Kotlin JVM: 684 of 684 checks over 35 files (the vectors and the scroll vectors).
+
+**Family probe:** 5 of 46 families built before, 7 after (modal, popover); none moved back.

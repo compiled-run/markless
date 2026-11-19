@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { createRequire, findPackageJSON } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { basename, dirname, join, relative, resolve } from 'node:path';
@@ -161,7 +169,8 @@ export function resolvePackageModule(specifier: string, importer: string): strin
 					? pick(exportsField)
 					: undefined;
 		const target = exported ?? (subpath === '.' ? manifest.module : undefined);
-		if (target) return resolve(dirname(manifestPath), target);
+		// Real paths, as `require.resolve` answers: a workspace package is named by its folder, not a node_modules link.
+		if (target) return realpathSync(resolve(dirname(manifestPath), target));
 	}
 	try {
 		return createRequire(importer).resolve(specifier);

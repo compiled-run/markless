@@ -13,6 +13,7 @@ import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.view.ContextThemeWrapper
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
@@ -240,6 +241,12 @@ abstract class MarklessActivity : Activity() {
 	}
 
 	fun contentRoot(): View = host.root
+
+	// Pointer events reach the runtime before the views, so a press is reported before the click it ends in.
+	override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+		if (::host.isInitialized) host.touch(event)
+		return super.dispatchTouchEvent(event)
+	}
 
 	companion object {
 		/** The system's own theme, light or dark with the device. */
