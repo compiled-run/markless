@@ -387,16 +387,24 @@ export function evaluateWithScript(
 					engine = host.start();
 					engine.evaluate(script.source);
 				}
-				const frame = Object.fromEntries(
-					Object.entries(bindings).map(([name, binding]) => [
-						name,
-						'cell' in binding
-							? { slot: binding.cell }
-							: 'fields' in binding
-								? { fields: binding.fields }
-								: { value: evaluate(binding.value, values) },
-					]),
-				);
+				const frameOf = (named: NativeScriptBindings): Record<string, unknown> =>
+					Object.fromEntries(
+						Object.entries(named).map(([name, binding]) => [
+							name,
+							'object' in binding
+								? { object: frameOf(binding.object) }
+								: 'shared' in binding
+									? { shared: frameOf(binding.shared) }
+									: 'cell' in binding
+										? { slot: binding.cell }
+										: 'fields' in binding
+											? { fields: binding.fields }
+											: 'elements' in binding
+												? { elements: evaluate(binding.elements, values) }
+												: { value: evaluate(binding.value, values) },
+						]),
+					);
+				const frame = frameOf(bindings);
 				const entry = {
 					kind: 'compute',
 					fn,
@@ -519,11 +527,15 @@ export function createNativeRuntime(
 		bindings: NativeScriptBindings,
 		eventValue: string | undefined,
 		scope: NativeScope,
-	) =>
+	): Record<string, unknown> =>
 		Object.fromEntries(
 			Object.entries(bindings).map(([name, binding]) => [
 				name,
-				'cell' in binding
+				'object' in binding
+					? { object: frameOf(binding.object, eventValue, scope) }
+					: 'shared' in binding
+						? { shared: frameOf(binding.shared, eventValue, scope) }
+						: 'cell' in binding
 					? { slot: slotOf(binding.cell, scope) }
 					: 'fields' in binding
 						? {
@@ -534,9 +546,53 @@ export function createNativeRuntime(
 									]),
 								),
 							}
-						: { value: evaluate(binding.value, eventValue, scope) },
+						: 'elements' in binding
+							? { elements: evaluate(binding.elements, eventValue, scope) }
+							: { value: evaluate(binding.value, eventValue, scope) },
 			]),
 		);
+	/**
+	 * What the host tells a script about the elements its frame passes as proxies: each one's attributes now and the
+	 * elements it is inside, nearest first.
+	 */
+	const elementFacts = (frame: Record<string, unknown>) => {
+		const facts: Record<string, { attributes: Record<string, string>; ancestors: string[] }> = {};
+		const add = (id: unknown) => {
+			if (typeof id !== 'string' || facts[id] || !elements.isElement(id)) return;
+			const at = id.indexOf('@');
+			const key = at < 0 ? '' : id.slice(at);
+			const node = nodesById.get(nodeOf(id));
+			const attributes: Record<string, string> = {};
+			if (node?.kind === 'element')
+				for (const name of new Set([
+					...Object.keys(node.attributes ?? {}),
+					...(node.bindings ?? []).flatMap((binding) => ('attribute' in binding ? [binding.attribute] : [])),
+				])) {
+					const value = attributeNow(id, name);
+					if (value !== null) attributes[name] = value;
+				}
+			const ancestors: string[] = [];
+			for (let up = node?.parent; up; up = nodesById.get(up)?.parent)
+				ancestors.push(key && nodesById.get(up)?.row ? `${up}${key}` : up);
+			facts[id] = { attributes, ancestors };
+		};
+		const visit = (names: Record<string, unknown>) => {
+			for (const entry of Object.values(names)) {
+				const { elements: given, object, shared } = entry as {
+					elements?: unknown;
+					object?: Record<string, unknown>;
+					shared?: Record<string, unknown>;
+				};
+				if (object) visit(object);
+				if (shared) visit(shared);
+				if (given === undefined) continue;
+				if (Array.isArray(given)) given.forEach(add);
+				else add(given);
+			}
+		};
+		visit(frame);
+		return facts;
+	};
 	const entryCells = () => ({
 		cells: Object.fromEntries(values),
 		...(script?.services.includes('crypto') && scriptHost?.seed
@@ -555,6 +611,7 @@ export function createNativeRuntime(
 				readonly request: Extract<NativeJournalEntry, { op: 'fetch' }>['request'];
 			}>;
 			readonly logs: ReadonlyArray<readonly [string, string]>;
+			readonly commands?: ReadonlyArray<readonly [string, 'focus' | 'scrollIntoView' | 'showModal' | 'close', boolean]>;
 		};
 		for (const [slot, value] of result.writes) {
 			const at = slot.indexOf('@');
@@ -580,16 +637,24 @@ export function createNativeRuntime(
 				id,
 				request,
 			})),
+			...(result.commands ?? []).flatMap(([node, command, preventScroll]): NativeJournalEntry[] => {
+				// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
+				if (command === 'showModal' || command === 'close') {
+					if (!dialogs.has(node)) throw new Error(`${command}() on ${node}, which is not a dialog`);
+					dialogs.set(node, command === 'showModal');
+					return [];
+				}
+				if (command === 'focus') focused = node;
+				return [{ op: 'command', node, command, ...(preventScroll ? { preventScroll: true as const } : {}) }];
+			}),
 		];
 	};
 	const compute: Compute = (fn, bindings, scope) =>
 		JSON.parse(
-			call('enter', {
-				kind: 'compute',
-				fn,
-				frame: frameOf(bindings, undefined, scope),
-				...entryCells(),
-			}),
+			call('enter', (() => {
+				const frame = frameOf(bindings, undefined, scope);
+				return { kind: 'compute', fn, frame, elements: elementFacts(frame), ...entryCells() };
+			})()),
 		) as Value;
 	/** Focus, the overlay stack (topmost last) and each overlay's focus origin, kept as the web's overlay behaviour keeps them. */
 	let focused: string | null = null;
@@ -1193,11 +1258,13 @@ export function createNativeRuntime(
 			}
 			if (op.op === 'script') {
 				const text = typeof eventValue === 'string' ? eventValue : eventValue?.value;
+				const frame = frameOf(op.bindings, text, scope);
 				calls.push(
 					...enter({
 						kind: 'dispatch',
 						fn: op.fn,
-						frame: frameOf(op.bindings, text, scope),
+						frame,
+						elements: elementFacts(frame),
 						event: text === undefined ? { type: op.type } : { type: op.type, value: text },
 						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),
 					}),
