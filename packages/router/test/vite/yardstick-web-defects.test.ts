@@ -292,7 +292,7 @@ test.fails('an @if arm does not run its expressions once its condition turns fal
 	});
 });
 
-test.fails('a page the router prefetched shows a list derived from a storage() value written after the prefetch (#876)', async () => {
+test('a page the router prefetched shows a list derived from a storage() value written after the prefetch (#876)', async () => {
 	const context = await browser.newContext({ baseURL: app.origin });
 	try {
 		const page = await context.newPage();
