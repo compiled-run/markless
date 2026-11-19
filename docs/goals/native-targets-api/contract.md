@@ -133,7 +133,10 @@ script function, with the web's meaning (`specs/framework/03-state-graph.md` "As
 **Starting and refreshing.** `start()` (after `tasks()` at mount; its journal is applied as an action's) and every change
 send the engine `{ kind: 'tasks', screen, tasks: [{ slot, fn, frame }] }` when the shown async values, or a value their
 bindings read, moved. The engine keys each run by the values its frame reads: a new key aborts the run in flight (its
-signal fires) and starts another while the cell keeps what it shows; an answer for an aborted run is dropped. `leave()`
+signal fires) and starts another while the cell keeps what it shows; an answer for an aborted run is dropped. A value runs only while a `@try` that reads it is shown (`async.boundaries`, the branch ids): a `@try` in an `@if` arm
+or inside another `@try` starts when its arm shows, and hiding it aborts a run in flight. Shown again, a finished value is
+kept without a new run, and one whose last refresh failed shows `@catch` alone, as the web does when it mounts the block
+again (rung J12, `conformance/script-async-nested.json`). `leave()`
 (the screen is popped or replaced) sends `{ kind: 'tasks', screen, tasks: [], leave: true }`. `leave` of an entry also
 returns `aborts: [id]`: a request whose signal fired, journalled first as `{ op: 'abort', id }`; the host cancels it and
 never answers it.

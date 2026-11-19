@@ -327,6 +327,8 @@ public struct NativeContinuation: Equatable, Sendable {
 public struct NativeAsync: Equatable, Sendable {
 	public let script: String
 	public let bindings: [NativeScriptBinding]
+	/// The `@try` branches that read it: it runs while one of them is shown.
+	public let boundaries: [String]
 }
 
 /// A device call a task cell starts at mount.
@@ -452,8 +454,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 					return NativeTask(call: try task["call"].string(), arguments: try task["arguments"].array().map(decodeExpr))
 				}() : nil,
 				async: field.has("async") ? try {
-					let async = try field["async"].object(["script", "bindings"])
-					return NativeAsync(script: try async["script"].string(), bindings: try decodeBindings(try async["bindings"]))
+					let async = try field["async"].object(["script", "bindings", "boundaries"])
+					return NativeAsync(script: try async["script"].string(), bindings: try decodeBindings(try async["bindings"]),
+						boundaries: try async["boundaries"].array().map { try $0.string() })
 				}() : nil,
 				row: field.has("row") ? try field["row"].string() : nil,
 				clock: field.has("clock"))

@@ -1816,7 +1816,7 @@ export function createNativeViewPayload(
 			if (!cells.some((cell) => cell.id === id)) {
 				const script = scriptAsync(computed, { ...scope, boundary: undefined }, what);
 				if (script === null) return null;
-				addCell({ id, name: computed.name, initial: { state: 'pending' }, async: script });
+				addCell({ id, name: computed.name, initial: { state: 'pending' }, async: { ...script, boundaries: [] } });
 			}
 			scope.boundary.tasks.add(id);
 			return { member: { cell: id }, property: 'value' };
@@ -4349,8 +4349,8 @@ export function createNativeViewPayload(
 			if (item.kind === 'boundary') {
 				close();
 				const boundary = scope.module.boundaries.get(item.id);
-				if (place.row || place.arm || scope.boundary) {
-					refuse('a @try inside an @if arm, a @for row or another @try');
+				if (place.row) {
+					refuse('a @try inside a @for row');
 					continue;
 				}
 				if (item.arms.catch === undefined) {
@@ -4407,12 +4407,8 @@ export function createNativeViewPayload(
 							});
 				});
 				const caught = catches.used();
-				if (tasks.size > 1 || (tasks.size === 0 && !caught)) {
-					refuse(
-						tasks.size > 1
-							? `a @try that waits on ${tasks.size} async values; one is supported`
-							: 'a @try that neither reads an async value nor holds a handler that awaits (a device call, or JavaScript)',
-					);
+				if (tasks.size > 1) {
+					refuse(`a @try that waits on ${tasks.size} async values; one is supported`);
 					continue;
 				}
 				const [task] = tasks;
@@ -4435,7 +4431,17 @@ export function createNativeViewPayload(
 					parent,
 					tests: [state('value'), state('pending'), null],
 					arms: 3,
+					...place,
 				});
+				// A script's async value runs while a @try that reads it is shown.
+				if (refreshes) {
+					const index = cellIndex.get(task)!;
+					const cell = cells[index]!;
+					cells[index] = {
+						...cell,
+						async: { ...cell.async!, boundaries: [...cell.async!.boundaries, branchId] },
+					};
+				}
 				// A handler that rejects keeps the shown content and opens @catch after it, as the web's spec says (a failed
 				// value on the first load still shows only @catch).
 				if (caught || refreshes) {
@@ -4474,6 +4480,7 @@ export function createNativeViewPayload(
 										right: { unary: '!', value: state('error') },
 									},
 						arms: 1,
+						...place,
 					});
 					lowerChunk(
 						scope.module.chunks.get(item.arms.catch)!,

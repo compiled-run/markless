@@ -513,7 +513,8 @@ public final class NativeRuntime {
 		var out: [NativeJournalEntry] = []
 		// A run that settles at once can show another; the engine is asked again until nothing moves.
 		for _ in 0..<16 {
-			let tasks = try asyncCells.map { cell -> (slot: String, fn: String, frame: [(String, JSONValue)]) in
+			let shownCells = try asyncCells.filter { cell in try cell.async!.boundaries.contains { try nodesById[$0].map { try isShown($0.arm) } ?? false } }
+			let tasks = try shownCells.map { cell -> (slot: String, fn: String, frame: [(String, JSONValue)]) in
 				guard case let .object(names) = try self.frame(of: cell.async!.bindings, in: .empty) else { throw RuntimeError(reason: "a frame is an object") }
 				return (cell.id, cell.async!.script, names)
 			}

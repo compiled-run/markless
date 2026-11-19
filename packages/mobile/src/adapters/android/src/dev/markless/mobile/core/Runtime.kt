@@ -430,8 +430,9 @@ class Runtime(
 		val out = ArrayList<JournalEntry>()
 		// A run that settles at once can show another; the engine is asked again until nothing moves.
 		repeat(16) {
-			val frames = asyncCells.map { bind(it.async!!.bindings, Scope.EMPTY) }
-			val tasks = asyncCells.zip(frames).joinToString(",", "[", "]") { (c, frame) -> "{\"slot\":${jsonString(c.id)},\"fn\":${jsonString(c.async!!.fn)},\"frame\":${frameJson(frame)}}" }
+			val cells = asyncCells.filter { c -> c.async!!.boundaries.any { id -> byId[id]?.let(::isShown) == true } }
+			val frames = cells.map { bind(it.async!!.bindings, Scope.EMPTY) }
+			val tasks = cells.zip(frames).joinToString(",", "[", "]") { (c, frame) -> "{\"slot\":${jsonString(c.id)},\"fn\":${jsonString(c.async!!.fn)},\"frame\":${frameJson(frame)}}" }
 			val sent = "[$tasks,${frames.joinToString(",", "[", "]", transform = ::readFrame)}]"
 			if (sent == asyncSent) return out
 			asyncSent = sent

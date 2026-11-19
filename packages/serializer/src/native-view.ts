@@ -585,7 +585,12 @@ export type NativeViewPayload = {
 		 * settles the cell: `{ state: 'pending' }` until the first answer, then `{ state: 'value', value, error }` (`error` is
 		 * a failed refresh's error over the value it kept, else null) or `{ state: 'error', error: { name, message } }`.
 		 */
-		readonly async?: { readonly script: string; readonly bindings: NativeScriptBindings };
+		readonly async?: {
+			readonly script: string;
+			readonly bindings: NativeScriptBindings;
+			/** The `@try` branches that read it: it runs while one of them is shown, and is aborted when none is. */
+			readonly boundaries: ReadonlyArray<string>;
+		};
 		/**
 		 * State of a component a list row renders (`repeat` node id): one value per row, `initial` when the row is built and
 		 * gone with it. A read or write inside the row reaches that row's value.

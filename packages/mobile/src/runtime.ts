@@ -601,14 +601,14 @@ export function createNativeRuntime(
 		const out: NativeJournalEntry[] = [];
 		// A run that settles at once can show another; the engine is asked again until nothing moves.
 		for (let round = 0; round < 16; round++) {
-			const tasks = asyncCells.map((cell) => ({
+			const tasks = asyncCells.filter(boundaryShown).map((cell) => ({
 				slot: cell.id,
 				fn: cell.async!.script,
 				frame: frameOf(cell.async!.bindings, undefined, base),
 			}));
 			const sent = JSON.stringify([
 				tasks,
-				asyncCells.map((cell) => readFrame(cell.async!.bindings)),
+				asyncCells.filter(boundaryShown).map((cell) => readFrame(cell.async!.bindings)),
 			]);
 			if (sent === asyncSent) return out;
 			asyncSent = sent;
@@ -616,6 +616,11 @@ export function createNativeRuntime(
 		}
 		throw new Error('async values that keep starting each other');
 	};
+	const boundaryShown = (cell: (typeof asyncCells)[number]) =>
+		cell.async!.boundaries.some((id) => {
+			const node = nodesById.get(id);
+			return node !== undefined && shown(node);
+		});
 	/** What a script function's names hold now. */
 	const readFrame = (bindings: NativeScriptBindings) =>
 		Object.values(bindings).map((binding) =>

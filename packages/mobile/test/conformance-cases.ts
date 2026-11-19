@@ -8,7 +8,10 @@ import { readWorkspaceModule } from '../src/harness/rung.ts';
 
 /** Resolves what a case imports (`@markless/ui`) from packages/mobile, where the case's `src/<name>.tsrx` stands. */
 export const readCaseModule = (specifier: string, importer: string) =>
-	readWorkspaceModule(specifier, importer.startsWith('src/') ? `packages/mobile/${importer}` : importer);
+	readWorkspaceModule(
+		specifier,
+		importer.startsWith('src/') ? `packages/mobile/${importer}` : importer,
+	);
 
 /** Each committed vector file: its component (a path inside packages/mobile) and the actions it records. */
 export const CONFORMANCE_CASES: ReadonlyArray<{
@@ -537,6 +540,45 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A @try in an @if arm and one inside it: the inner starts once the outer shows; its failed refresh stays its own;
+		// hidden and shown again, a finished value is kept (the failed one as @catch alone) and a run in flight starts over.
+		name: 'script-async-nested',
+		fixture: 'proofs/j12-async-nested/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'timer', timer: 'script:1' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=apple - ',
+				},
+			},
+			{ event: 'timer', timer: 'script:2' },
+			{
+				event: 'response',
+				id: 2,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=pear - ',
+				},
+			},
+			{ event: 'activate', host: 'h5' },
+			{ event: 'timer', timer: 'script:3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:5' },
+		],
+	},
+	{
 		name: 'script-computed',
 		fixture: 'proofs/j5-engine-computed/App.tsrx',
 		modules: true,
@@ -653,7 +695,11 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		name: 'navigation-deep-link',
 		app: 'proofs/n4-deep-link',
 		open: '/orders/42',
-		actions: [{ event: 'back' }, { event: 'back' }, { event: 'activate', host: 'component-edge:0' }],
+		actions: [
+			{ event: 'back' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'component-edge:0' },
+		],
 	},
 	{
 		name: 'script-first-render',

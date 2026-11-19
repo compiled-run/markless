@@ -337,6 +337,9 @@ g.__markless[id] = {
 			for (var at in runs) {
 				if (at.indexOf(prefix) !== 0 || listed[at]) continue;
 				if (!runs[at].done) host.abort(runs[at].signal);
+				// A @try shown again shows a refresh that failed as @catch alone, as a first answer that failed is.
+				var slot = at.slice(prefix.length), kept = slotValue(slot);
+				if (runs[at].done && kept && kept.state === 'value' && kept.error) cells[slot] = { state: 'error', error: kept.error };
 				if (!runs[at].done || entry.leave) delete runs[at];
 			}
 		} else if (entry.kind === 'response') {
