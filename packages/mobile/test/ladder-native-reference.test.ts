@@ -145,6 +145,22 @@ function mirror(
 		if (!node?.arm) return false;
 		return node.arm.branch === branch || inArm(node.arm.branch, branch);
 	};
+	// An element carrying `hidden`, bound or static, hides everything inside it, as the web's `[hidden]` rule does.
+	const hiddenWithin = (id: string): boolean => {
+		const at = id.indexOf('@');
+		const suffix = at < 0 ? '' : id.slice(at);
+		const node = nodeOf.get(baseOf(id));
+		if (!node) return false;
+		if (node.kind === 'element') {
+			const bound = attributes.get(`${id}\0hidden`);
+			if ((bound !== undefined ? bound : (node.attributes?.['hidden'] ?? null)) !== null)
+				return true;
+		}
+		return (
+			node.parent !== null &&
+			hiddenWithin(`${node.parent}${nodeOf.get(node.parent)?.row ? suffix : ''}`)
+		);
+	};
 	// What a flow can see or tap: shown text, and each shown element's accessible name (aria-label, bound or static).
 	const labels = () =>
 		payload.nodes.flatMap((node) => {
@@ -223,7 +239,9 @@ function mirror(
 				);
 			}
 			// Without a style export a host flows text as the browser's default stylesheet does; with one, Dragon lays it out.
-			const open = new Map([...texts].filter(([id]) => !inClosedSheet(id)));
+			const open = new Map(
+				[...texts].filter(([id]) => !inClosedSheet(id) && !hiddenWithin(id)),
+			);
 			const read = styled ? [...open.values()] : nativeShownTexts(payload, open);
 			const shown = [...read, ...labels().map(([, label]) => label)];
 			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));

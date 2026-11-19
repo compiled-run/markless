@@ -595,4 +595,15 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'component-edge:0' },
 		],
 	},
+	{
+		name: 'shell-props',
+		app: 'proofs/r139-shell-props',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:1' },
+			{ event: 'activate', host: 'h0' },
+			{ event: 'activate', host: 'h0' },
+			{ event: 'back' },
+		],
+	},
 ];
