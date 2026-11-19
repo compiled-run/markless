@@ -186,3 +186,96 @@ export function Inbox() @{
 	expect(diagnostic?.suggestions?.[0]?.message).toContain('"messages"');
 	expect(diagnostic?.primarySpan?.start).toBeGreaterThan(0);
 });
+
+function seatRow(handler: string) {
+	return `
+import { state } from '@markless/core';
+
+export function Seats() @{
+	let seats = state([
+		{ id: 'a', picked: false },
+		{ id: 'b', picked: false },
+	]);
+	let other = state([{ id: 'x', picked: false }]);
+	let j = state(0);
+
+	<ul>
+		@for (const seat of seats; index i; key seat.id) {
+			<li>
+				<button onClick={() => (${handler})}>{seat.id}</button>
+			</li>
+		}
+	</ul>
+}
+`;
+}
+
+test("a write through the list at the row's own index lowers exactly like a write through the row item", async () => {
+	const byItem = await compile(seatRow('seat.picked = true'));
+	const byIndex = await compile(seatRow('seats[i].picked = true'));
+
+	expect(errors(byIndex)).toEqual([]);
+	const [itemWrite] = byItem.stateLowering.writes;
+	const [indexWrite] = byIndex.stateLowering.writes;
+	expect(indexWrite).toEqual({
+		...itemWrite,
+		source: 'seats[i].picked',
+		sourceSpan: expect.anything(),
+	});
+	expect(indexWrite?.row).toEqual({ itemName: 'seat', keyPath: ['id'], itemPath: ['picked'] });
+	expect(eventHandlerSources(byIndex)).toEqual(eventHandlerSources(byItem));
+});
+
+test("a toggle through the list at the row's own index writes that row's element", async () => {
+	const result = await compile(seatRow('seats[i].picked = !seats[i].picked'));
+
+	expect(errors(result)).toEqual([]);
+	const [handler] = eventHandlerSources(result);
+	expect(handler).toContain(
+		'path: marklessRowItemPath(context, "state:seats", [], "seat", ["id"], ["picked"])',
+	);
+});
+
+test('an indexed write that is not the row at its own index stays a dynamic path write', async () => {
+	const refused = [
+		'seats[i + 1].picked = true',
+		'seats[j].picked = true',
+		'other[i].picked = true',
+		'seats[i] = { id: "z", picked: true }',
+		'(() => { const i = 0; seats[i].picked = true; })()',
+	];
+	for (const handler of refused) {
+		const result = await compile(seatRow(handler));
+		expect(
+			result.stateLowering.diagnostics.map((diagnostic) => diagnostic.code),
+			handler,
+		).toContain('MARKLESS_STATE_DYNAMIC_PATH_WRITE');
+	}
+});
+
+test("an outer row's index on an inner row's list stays a dynamic path write", async () => {
+	const nested = (write: string) => `
+import { state } from '@markless/core';
+
+export function Rows() @{
+	let rows = state([{ id: 'r', seats: [{ id: 's', picked: false }] }]);
+
+	@for (const row of rows; index r; key row.id) {
+		<ul>
+			@for (const seat of row.seats; index i; key seat.id) {
+				<li><button onClick={() => (${write})}>{seat.id}</button></li>
+			}
+		</ul>
+	}
+}
+`;
+	const outerIndex = await compile(nested('row.seats[r].picked = true'));
+	expect(outerIndex.stateLowering.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+		'MARKLESS_STATE_DYNAMIC_PATH_WRITE',
+	);
+
+	const byItem = await compile(nested('seat.picked = true'));
+	const byIndex = await compile(nested('row.seats[i].picked = true'));
+	expect(errors(byIndex)).toEqual([]);
+	expect(eventHandlerSources(byIndex)).toEqual(eventHandlerSources(byItem));
+});

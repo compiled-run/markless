@@ -27,7 +27,7 @@ import {
 	getFrameworkApiForCall,
 } from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
-import { componentsWithIdleRecords, componentsWithLiveShared } from './idle-records.ts';
+import { componentsWithIdleRecords, componentsWithLiveShared, componentsWithOverlays } from './idle-records.ts';
 import { collectComponentPropSpends, collectElementRosterCounts } from './roster-count.ts';
 import { collectElementRosterPositions } from './roster-position.ts';
 import { spreadHostsField } from './spread-hosts.ts';
@@ -326,6 +326,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	const rejectingHandlers = componentsWithRejectingHandlers(graph, input.importedModuleInterfaces);
 	const planes = moduleAsyncPlanes(graph, input.importedModuleInterfaces);
 	const idleComponents = componentsWithIdleRecords(graph, input.importedModuleInterfaces);
+	const overlayComponents = componentsWithOverlays(graph, input.importedModuleInterfaces);
 	const liveSharedComponents = componentsWithLiveShared(graph, input.importedModuleInterfaces);
 	const relayedProps = moduleRelayedProps({
 		componentNames: graph.components.map((component) => component.name),
@@ -345,6 +346,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
 		...(planes ? { asyncPlanes: planes } : {}),
 		...(idleComponents.size > 0 ? { idleRecords: true as const } : {}),
+		...(overlayComponents.size > 0 ? { overlayRecords: true as const } : {}),
 		...(liveSharedComponents.size > 0 ? { liveShared: true as const } : {}),
 		render: {
 			version: 1,
@@ -406,6 +408,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 						...armMaterialField(graph, component.name, chunks),
 						...(rejectingHandlers.has(component.name) ? { rejectingHandlers: true as const } : {}),
 						...(idleComponents.has(component.name) ? { idleRecords: true as const } : {}),
+						...(overlayComponents.has(component.name) ? { overlayRecords: true as const } : {}),
 						...(liveSharedComponents.has(component.name) ? { liveShared: true as const } : {}),
 						...(containerRepeats.has(component.name)
 							? { containerRepeat: true as const }
@@ -708,6 +711,10 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 				const left = node.left as AnyNode | undefined;
 				if (typeof left?.start === 'number' && typeof left.end === 'number')
 					state.keyedRepeatItemSpans.set(repeat.id, { start: left.start, end: left.end });
+				const index = node.index as AnyNode | undefined;
+				const collection = node.right as AnyNode | undefined;
+				if (index?.type === 'Identifier' && collection)
+					state.keyedRepeatIndexes.set(repeat.id, { index, collection });
 			}
 			// A row's reads belong to the row template, not to any arm around it.
 			const outerGuards = state.currentArmGuards;

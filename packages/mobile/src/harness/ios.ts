@@ -1,11 +1,11 @@
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { exec } from './exec.ts';
 import { simulatorRuntime, type SimctlRuntime } from './simulator-runtime.ts';
 import { PROOF_APP_ID, PROOF_APP_NAME, PROOF_LINK_SCHEME } from './proof-app.ts';
 import type { DeviceManifest } from '../permissions.ts';
 import type { ProofAssets } from './rung.ts';
-import { cacheRoot, contentKey, filesUnder } from './tools.ts';
+import { cachedFolder, cacheRoot, contentKey, filesUnder, SHELL_CACHE_FORMAT } from './tools.ts';
 
 export type BootedSimulator = {
 	readonly udid: string;
@@ -103,58 +103,56 @@ export async function buildIosShell(hostPackage: string, shellDir: string): Prom
 		await exec('xcrun', ['--sdk', 'iphonesimulator', '--show-sdk-path'])
 	).stdout.trim();
 	const inputs = [...filesUnder(hostPackage, '.swift'), ...filesUnder(shellDir, '.swift')];
-	const key = contentKey(hostPackage, inputs, [sdk, PROOF_APP_ID]);
-	const root = join(cacheRoot(), 'ios-shell', key);
-	const app = join(root, `${PROOF_APP_NAME}.app`);
-	if (existsSync(join(app, PROOF_APP_NAME))) return app;
-
-	rmSync(root, { recursive: true, force: true });
-	const modules = join(root, 'modules');
-	mkdirSync(modules, { recursive: true });
-	mkdirSync(app, { recursive: true });
-	const { ordered, deploymentTarget } = await libraryTargets(hostPackage);
-	const common = [
-		'--sdk',
-		'iphonesimulator',
-		'swiftc',
-		'-sdk',
-		sdk,
-		'-target',
-		`arm64-apple-ios${deploymentTarget}-simulator`,
-	];
-	for (const target of ordered) {
+	const key = contentKey(hostPackage, inputs, [sdk, PROOF_APP_ID, SHELL_CACHE_FORMAT]);
+	const root = await cachedFolder(join(cacheRoot(), 'ios-shell', key), async (scratch) => {
+		const modules = join(scratch, 'modules');
+		const app = join(scratch, `${PROOF_APP_NAME}.app`);
+		mkdirSync(modules, { recursive: true });
+		mkdirSync(app, { recursive: true });
+		const { ordered, deploymentTarget } = await libraryTargets(hostPackage);
+		const common = [
+			'--sdk',
+			'iphonesimulator',
+			'swiftc',
+			'-sdk',
+			sdk,
+			'-target',
+			`arm64-apple-ios${deploymentTarget}-simulator`,
+		];
+		for (const target of ordered) {
+			await exec('xcrun', [
+				...common,
+				'-parse-as-library',
+				'-wmo',
+				'-module-name',
+				target.name,
+				'-emit-module',
+				'-emit-module-path',
+				join(modules, `${target.name}.swiftmodule`),
+				'-emit-library',
+				'-static',
+				'-o',
+				join(modules, `lib${target.name}.a`),
+				'-I',
+				modules,
+				...target.sources.map((source) => join(hostPackage, target.path, source)),
+			]);
+		}
 		await exec('xcrun', [
 			...common,
 			'-parse-as-library',
-			'-wmo',
-			'-module-name',
-			target.name,
-			'-emit-module',
-			'-emit-module-path',
-			join(modules, `${target.name}.swiftmodule`),
-			'-emit-library',
-			'-static',
-			'-o',
-			join(modules, `lib${target.name}.a`),
 			'-I',
 			modules,
-			...target.sources.map((source) => join(hostPackage, target.path, source)),
+			'-L',
+			modules,
+			...ordered.toReversed().map((target) => `-l${target.name}`),
+			...filesUnder(shellDir, '.swift'),
+			'-o',
+			join(app, PROOF_APP_NAME),
 		]);
-	}
-	await exec('xcrun', [
-		...common,
-		'-parse-as-library',
-		'-I',
-		modules,
-		'-L',
-		modules,
-		...ordered.toReversed().map((target) => `-l${target.name}`),
-		...filesUnder(shellDir, '.swift'),
-		'-o',
-		join(app, PROOF_APP_NAME),
-	]);
-	writeFileSync(join(app, 'Info.plist'), infoPlist(deploymentTarget));
-	return app;
+		writeFileSync(join(app, 'Info.plist'), infoPlist(deploymentTarget));
+	});
+	return join(root, `${PROOF_APP_NAME}.app`);
 }
 
 const infoPlist = (minimumOs: string) => `<?xml version="1.0" encoding="UTF-8"?>
