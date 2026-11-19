@@ -206,6 +206,58 @@ export function App() @{
 		]);
 	});
 
+	it('binds a link attribute that follows state, and opens the route an href built from a prop or a value names', async () => {
+		const { payload, diagnostics } = await nativeView(
+			`import { state as cell } from '@markless/core';
+import { Link } from '@markless/router';
+function Tab({ to, current, label }) @{
+	<Link href={to} class={current ? 'tab on' : 'tab'} aria-current={current ? 'page' : undefined} data-tab="x">{label}</Link>
+}
+export function App() @{
+	let user = cell('7');
+	let on = cell(false);
+	<main>
+		<Tab to="/about" current={on} label="About" />
+		<Link href={\`/users/\${user}\`}>User</Link>
+		<button onClick={() => (on = !on)}>Flip</button>
+	</main>
+}`,
+			{ routes, resolvePath },
+		);
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([]);
+		const anchors = payload?.nodes.filter((node) => node.kind === 'element' && node.element === 'a');
+		const current = { cell: 'state:on' };
+		expect(anchors?.[0]).toMatchObject({
+			attributes: { href: '/about', 'data-tab': 'x' },
+			bindings: [
+				{ attribute: 'class', value: { if: current, whenTrue: { literal: 'tab on' }, whenFalse: { literal: 'tab' } } },
+				{ attribute: 'aria-current', value: { if: current, whenTrue: { literal: 'page' }, whenFalse: { literal: null } } },
+			],
+		});
+		const userPath = { template: ['/users/', { cell: 'state:user' }, ''] };
+		expect(anchors?.[1]).toMatchObject({ bindings: [{ attribute: 'href', value: userPath }] });
+		expect(payload?.handlers.map((handler) => handler.ops)).toEqual([
+			[{ op: 'navigate', route: '/about', params: {} }],
+			[{ op: 'navigate', route: '/users/[id]', params: { id: { template: [{ cell: 'state:user' }] } } }],
+			expect.anything(),
+		]);
+	});
+
+	it('refuses an href built while rendering that a fixed route could also match, naming the routes', async () => {
+		const { diagnostics } = await nativeView(
+			`import { state } from '@markless/core';
+import { Link } from '@markless/router';
+export function App() @{
+	let page = state('about');
+	<main><Link href={\`/\${page}\`}>Go</Link></main>
+}`,
+			{ routes: [...routes, { pattern: '/[slug]', params: ['slug'] }], resolvePath },
+		);
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toContain(
+			"a <Link> whose href is built while the page renders that could open /about or /[slug]; the web's router picks one only when it is followed",
+		);
+	});
+
 	it('still refuses a path no route matches, where it is written', async () => {
 		const { diagnostics } = await nativeView(
 			`import { Link } from '@markless/router';

@@ -1420,6 +1420,97 @@ export function createNativeViewPayload(
 			);
 		return { route: pattern, params };
 	};
+	/** A <Link> prop as the anchor's attribute value: fixed, or the expression it follows. */
+	const linkAttribute = (
+		prop: SemanticGraphArtifact['componentEdges'][number]['props'][number],
+		edge: SemanticComponentEdge,
+		scope: Scope,
+	): NativeExpr | null => {
+		const what = `the \`${prop.name}\` prop of a <Link>`;
+		const span = prop.sourceSpan ?? edge.sourceSpan;
+		if (prop.kind === 'serializable')
+			return expressionOfValue(prop.value) ?? refuse(`${what} is not JSON`, span);
+		if (
+			prop.kind === 'graph-reference' &&
+			prop.path.length === 0 &&
+			scope.cells.byBinding.has(prop.graphNodeId)
+		)
+			return { cell: scope.cells.byBinding.get(prop.graphNodeId)! };
+		if ((prop.kind === 'opaque' || prop.kind === 'graph-reference') && prop.nativeExpression)
+			return exprOf(prop.nativeExpression, what, {
+				...scope,
+				...(span ? { span } : {}),
+				...(prop.kind === 'graph-reference' ? { live: true } : {}),
+			});
+		return refuse(what, span);
+	};
+	/**
+	 * The route an href built while rendering (`/notes/${id}`) opens: the one route whose segments it can match, each
+	 * expression filling a whole `[name]` segment. Refused when an expression could also spell a fixed segment of
+	 * another route, since the web's router decides that only when the link is followed.
+	 */
+	const pathRoute = (
+		path: NativeExpr,
+		span: SourceSpan | undefined,
+	): { route: string; params: Record<string, string | NativeExpr> } | null => {
+		const what = 'a <Link> whose href is built while the page renders';
+		const parts = 'template' in path ? path.template : undefined;
+		if (!parts || !options.routes)
+			return refuse(`${what} from something other than a path with fixed segments`, span);
+		const pieces = parts.map((part) =>
+			typeof part !== 'string' && 'literal' in part && typeof part.literal === 'string'
+				? part.literal
+				: part,
+		);
+		if (typeof pieces[0] !== 'string' || !pieces[0].startsWith('/'))
+			return refuse(`${what} that does not start with a fixed \`/\``, span);
+		const segments: (string | NativeExpr)[][] = [[]];
+		for (const piece of pieces) {
+			if (typeof piece !== 'string') {
+				segments.at(-1)!.push(piece);
+				continue;
+			}
+			const [first, ...rest] = piece.split('/');
+			if (first) segments.at(-1)!.push(first);
+			for (const next of rest) segments.push(next ? [next] : []);
+		}
+		const filled = segments.filter((segment) => segment.length > 0);
+		const shapes: (string | NativeExpr)[] = [];
+		for (const segment of filled) {
+			if (segment.every((piece) => typeof piece === 'string')) shapes.push(segment.join(''));
+			else if (segment.length === 1) shapes.push(segment[0]!);
+			else
+				return refuse(
+					`${what} with a segment that mixes fixed text and a value; a route param fills a whole segment`,
+					span,
+				);
+		}
+		const isParam = (part: string) =>
+			part.startsWith('[') && part.endsWith(']') && !part.startsWith('[[') && !part.startsWith('[...');
+		const candidates = options.routes.flatMap((route) => {
+			const pattern = route.pattern.split('/').filter((part) => part.length > 0);
+			if (pattern.some((part) => part.startsWith('[') && !isParam(part)))
+				return [{ route, exact: false, params: {} }];
+			if (pattern.length !== shapes.length) return [];
+			let exact = true;
+			const params: Record<string, string | NativeExpr> = {};
+			for (const [index, part] of pattern.entries()) {
+				const shape = shapes[index]!;
+				if (isParam(part)) params[part.slice(1, -1)] = typeof shape === 'string' ? shape : { template: [shape] };
+				else if (typeof shape !== 'string') exact = false;
+				else if (shape !== part) return [];
+			}
+			return [{ route, exact, params }];
+		});
+		const [only] = candidates;
+		if (candidates.length === 1 && only?.exact) return linkRoute(only.route.pattern, only.params, span);
+		return refuse(
+			candidates.length === 0
+				? `${what} that matches no route of this app`
+				: `${what} that could open ${candidates.map((candidate) => candidate.route.pattern).join(' or ')}; the web's router picks one only when it is followed`,
+			span,
+		);
+	};
 	const isPlatformSheet = (edge: SemanticComponentEdge): boolean =>
 		edge.importSource === PLATFORM_PIECES_PACKAGE &&
 		edge.importedName === PLATFORM_PIECES_NAMESPACE &&
@@ -3080,52 +3171,84 @@ export function createNativeViewPayload(
 					const href = edge.props.find((prop) => prop.name === 'href');
 					const params = edge.props.find((prop) => prop.name === 'params');
 					const replace = edge.props.find((prop) => prop.name === 'replace');
-					const className = edge.props.find((prop) => prop.name === 'class');
 					const projection = item.projection
 						? scope.module.chunks.get(item.projection)
 						: undefined;
 					const paramValues = params ? linkParams(params, scope) : {};
-					if (
-						href?.kind !== 'serializable' ||
-						typeof href.value !== 'string' ||
-						!paramValues ||
-						(replace &&
-							(replace.kind !== 'serializable' ||
-								typeof replace.value !== 'boolean')) ||
-						(className &&
-							(className.kind !== 'serializable' ||
-								typeof className.value !== 'string')) ||
-						edge.props.some(
-							(prop) =>
-								!['href', 'params', 'replace', 'class', 'children'].includes(
-									prop.name,
-								),
-						) ||
-						(item.projection && !projection)
-					) {
-						refuse(
-							'a <Link> whose href or class is not fixed at build time, or whose params are not strings this build can compute',
-						);
+					if (!paramValues) {
+						refuse('a <Link> whose params are not strings this build can compute');
 						continue;
 					}
-					// A route pattern names its route; any other href is a path the router matches as it matches a URL.
-					const matched = options.routes?.some((known) => known.pattern === href.value)
-						? undefined
-						: options.resolvePath?.(href.value);
-					const route = matched
-						? linkRoute(matched.pattern, matched.params, edge.sourceSpan)
-						: linkRoute(href.value, paramValues, edge.sourceSpan);
-					if (!route) continue;
+					if (replace && (replace.kind !== 'serializable' || typeof replace.value !== 'boolean')) {
+						refuse('a <Link> whose `replace` is not fixed at build time');
+						continue;
+					}
+					if (item.projection && !projection) {
+						refuse('children passed to a <Link> that have no markup');
+						continue;
+					}
+					const hrefValue = href ? linkAttribute(href, edge, scope) : null;
+					if (!hrefValue) {
+						if (!href) refuse('a <Link> with no href');
+						continue;
+					}
 					const id = scope.prefix + edge.id;
+					const attributes: Record<string, string> = {};
+					const bindings: { attribute: string; value: NativeExpr }[] = [];
+					let ownAttributes = true;
+					for (const prop of edge.props) {
+						if (['href', 'params', 'replace', 'children'].includes(prop.name)) continue;
+						if (prop.kind === 'callback' || prop.kind === 'spread') {
+							refuse(`the \`${prop.name}\` prop of a <Link>`, prop.sourceSpan ?? edge.sourceSpan);
+							ownAttributes = false;
+							continue;
+						}
+						const value = linkAttribute(prop, edge, scope);
+						if (!value) {
+							ownAttributes = false;
+							continue;
+						}
+						if (!('literal' in value)) bindings.push({ attribute: prop.name, value });
+						else if (value.literal !== null && value.literal !== false)
+							attributes[prop.name] = value.literal === true ? '' : String(value.literal);
+					}
+					if (!ownAttributes) continue;
+					const fixedHref =
+						'literal' in hrefValue && typeof hrefValue.literal === 'string'
+							? hrefValue.literal
+							: undefined;
+					// A route pattern names its route; any other href is a path the router matches as it matches a URL.
+					const matched =
+						fixedHref === undefined
+							? undefined
+							: options.routes?.some((known) => known.pattern === fixedHref)
+								? undefined
+								: options.resolvePath?.(fixedHref);
+					const route =
+						fixedHref === undefined
+							? params
+								? (refuse(
+										'a <Link> with params whose href is not a route pattern fixed at build time',
+										href?.sourceSpan ?? edge.sourceSpan,
+									),
+									null)
+								: pathRoute(hrefValue, href?.sourceSpan ?? edge.sourceSpan)
+							: matched
+								? linkRoute(matched.pattern, matched.params, edge.sourceSpan)
+								: linkRoute(fixedHref, paramValues, edge.sourceSpan);
+					if (!route) continue;
 					// The anchor's attributes as the router renders them, so styles see a link (`:any-link`) as the web does.
-					const attributes = {
-						...(className?.kind === 'serializable' &&
-						typeof className.value === 'string'
-							? { class: className.value }
-							: {}),
-						href: href.value,
-					};
-					nodes.push({ kind: 'element', id, element: 'a', parent, attributes, ...place });
+					if (fixedHref === undefined) bindings.push({ attribute: 'href', value: hrefValue });
+					else attributes['href'] = fixedHref;
+					nodes.push({
+						kind: 'element',
+						id,
+						element: 'a',
+						parent,
+						attributes,
+						...(bindings.length > 0 ? { bindings } : {}),
+						...place,
+					});
 					if (projection) lowerChunk(projection, id, place, scope);
 					const handler = `handler:${id}`;
 					events.push({ host: id, event: 'activate', handler });

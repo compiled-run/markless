@@ -429,4 +429,15 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'back' },
 		],
 	},
+	{
+		name: 'link-attributes',
+		app: 'proofs/r140-link-attributes',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'component-edge:1' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'component-edge:0/component-edge:1' },
+		],
+	},
 ];
