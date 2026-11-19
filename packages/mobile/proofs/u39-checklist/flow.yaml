@@ -1,0 +1,32 @@
+appId: ${APP_ID}
+name: u39-checklist
+---
+- launchApp:
+      clearState: true
+- assertVisible: Sandwich
+- assertVisible: Condiments
+- assertVisible: All
+- assertVisible: Lettuce
+- assertVisible: Tomato
+- assertNotVisible: Lettuce ticked
+- assertNotVisible: Tomato ticked
+- assertNotVisible: All ticked
+- tapOn: Lettuce
+- assertVisible: Lettuce ticked
+- assertVisible: Lettuce ticked
+- assertNotVisible: Tomato ticked
+- tapOn: All
+- assertVisible: Tomato ticked
+- assertVisible: Lettuce ticked
+- assertVisible: Tomato ticked
+- assertVisible: All ticked
+- tapOn: All
+- assertNotVisible: Lettuce ticked
+- assertNotVisible: Tomato ticked
+- assertNotVisible: All ticked
+- assertVisible: All
+- assertVisible: Lettuce
+- assertVisible: Tomato
+- assertNotVisible: Lettuce ticked
+- assertNotVisible: Tomato ticked
+- assertNotVisible: All ticked

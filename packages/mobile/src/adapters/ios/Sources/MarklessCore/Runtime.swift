@@ -181,6 +181,8 @@ public final class NativeRuntime {
 	private var values: [String: NativeValue] { didSet { version &+= 1 } }
 	/// Cells still `undefined` on the web: a script reads them so until one is written.
 	private var unset: Set<String> = []
+	/// Each following cell's last value of what it follows: the write runs again only when that value changes, as on the web.
+	private var followed: [String: NativeValue] = [:]
 	private var version = 0
 	private var computed: [String: NativeValue] = [:]
 	private var computedAt = -1
@@ -274,8 +276,10 @@ public final class NativeRuntime {
 			guard node.row == nil, case let .element(_, attributes, bindings) = node.kind else { return false }
 			return attributes[OverlayProtocol.attribute] != nil && bindings.contains { !$0.isProperty && $0.name == "hidden" }
 		}
-		// Rows take their first values before anything reads them. Shown at mount: the document's focus is the body.
+		// Rows take their first values, and following cells theirs, before anything reads them. Shown at mount: the
+		// document's focus is the body.
 		try? seedRows()
+		try? follow()
 		if let shown = try? shownOverlays() {
 			stack = shown
 			for overlay in shown { origins[overlay] = nativeDocumentBody }
@@ -352,6 +356,24 @@ public final class NativeRuntime {
 	}
 
 	/// A row's state with a `first` takes it once, from the row's item, when the row is built.
+	private func follow() throws {
+		for _ in 0...payload.cells.count {
+			var moved = false
+			for cell in payload.cells {
+				guard let follows = cell.follows else { continue }
+				let now = try evaluate(follows)
+				if followed[cell.id] == now { continue }
+				followed[cell.id] = now
+				if (values[cell.id] ?? .null) == now { continue }
+				values[cell.id] = now
+				unset.remove(cell.id)
+				moved = true
+			}
+			if !moved { return }
+		}
+		throw RuntimeError(reason: "following cells kept changing each other")
+	}
+
 	private func seedRows() throws {
 		for cell in payload.cells {
 			guard let row = cell.row, let first = cell.first, let list = nodesById[row], try isShown(list.arm) else { continue }
@@ -1135,6 +1157,7 @@ public final class NativeRuntime {
 		}
 		try resetChangedRows(signaturesBefore)
 		try seedRows()
+		try follow()
 		let shownNow = try shownOverlays()
 		let released = stackBefore.filter { !shownNow.contains($0) }
 		let enlisted = shownNow.filter { !stackBefore.contains($0) }

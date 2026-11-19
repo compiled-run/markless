@@ -823,6 +823,25 @@ export function createNativeRuntime(
 			}
 		}
 	};
+	/** Each following cell's last value of what it follows: the write runs again only when that value changes, as on the web. */
+	const followed = new Map<string, string>();
+	const follow = () => {
+		for (let round = 0; round <= payload.cells.length; round++) {
+			let moved = false;
+			for (const cell of payload.cells) {
+				if (!cell.follows) continue;
+				const now = evaluate(cell.follows);
+				const text = JSON.stringify(now);
+				if (followed.get(cell.id) === text) continue;
+				followed.set(cell.id, text);
+				if (JSON.stringify(values.get(cell.id) ?? null) === text) continue;
+				values.set(cell.id, now);
+				moved = true;
+			}
+			if (!moved) return;
+		}
+		throw new Error('following cells kept changing each other');
+	};
 	const render = (parts: ReadonlyArray<NativeTextPart>, scope: NativeScope): string =>
 		parts
 			.map((part) =>
@@ -1055,8 +1074,9 @@ export function createNativeRuntime(
 				(node.row ? node.attributes?.[OVERLAY_MODAL_ATTRIBUTE] : attributeNow(node.id, OVERLAY_MODAL_ATTRIBUTE)) === OVERLAY_MODAL_VALUE,
 		);
 	};
-	// Rows take their first values before anything reads them, the overlays served shown included.
+	// Rows take their first values, and following cells theirs, before anything reads them, the overlays served shown included.
 	seedRows();
+	follow();
 	// Served shown: the document's focus is the body.
 	for (const overlay of shownOverlays()) {
 		stack.push(overlay);
@@ -1525,6 +1545,7 @@ export function createNativeRuntime(
 			}
 			resetChangedRows(itemsBefore);
 			seedRows();
+			follow();
 			const shownNow = shownOverlays();
 			const released = stackBefore.filter((overlay) => !shownNow.includes(overlay));
 			const enlisted = shownNow.filter((overlay) => !stackBefore.includes(overlay));

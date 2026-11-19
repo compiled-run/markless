@@ -254,6 +254,27 @@ class Runtime(
 	}
 
 	/** A row's state with a `first` takes it once, from the row's item, when the row is built. */
+	/** Each following cell's last value of what it follows: the write runs again only when that value changes, as on the web. */
+	private val followed = HashMap<String, JsValue>()
+
+	private fun follow() {
+		repeat(payload.cells.size + 1) {
+			var moved = false
+			for (c in payload.cells) {
+				val follows = c.follows ?: continue
+				val now = evaluate(follows, Scope.EMPTY)
+				if (followed[c.id] == now) continue
+				followed[c.id] = now
+				if ((values[c.id] ?: JsValue.Null) == now) continue
+				values[c.id] = now
+				unset.remove(c.id)
+				moved = true
+			}
+			if (!moved) return
+		}
+		throw MarklessRuntimeError("following cells kept changing each other")
+	}
+
 	private fun seedRows() {
 		for (cell in payload.cells) {
 			val row = cell.row ?: continue
@@ -722,8 +743,9 @@ class Runtime(
 	}
 
 	init {
-		// Rows take their first values before anything reads them, the overlays shown at mount included.
+		// Rows take their first values, and following cells theirs, before anything reads them, the overlays shown at mount included.
 		seedRows()
+		follow()
 		stack = shownOverlays()
 		for (o in stack) origins[o] = NATIVE_DOCUMENT_BODY
 	}
@@ -1002,6 +1024,7 @@ class Runtime(
 		}
 		resetChangedRows(signaturesBefore)
 		seedRows()
+		follow()
 		val shownNow = shownOverlays()
 		val released = stackBefore.filter { it !in shownNow }
 		val enlisted = shownNow.filter { it !in stackBefore }

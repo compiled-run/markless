@@ -393,6 +393,8 @@ public struct NativeCell: Equatable, Sendable {
 	public var rebuiltBy: [NativeExpr]? = nil
 	/// Its first value is `undefined` on the web, which `initial` spells as null: a script reads it so until it is written.
 	public var unset = false
+	/// Written while rendering from a value that follows state: at mount, and again whenever that value changes.
+	public var follows: NativeExpr? = nil
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -442,7 +444,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object", "row", "clock", "first", "rebuiltBy", "unset"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
 			}
@@ -468,7 +470,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 				clock: field.has("clock"),
 				first: field.has("first") ? try decodeExpr(try field["first"]) : nil,
 				rebuiltBy: field.has("rebuiltBy") ? try field["rebuiltBy"].array().map(decodeExpr) : nil,
-				unset: field.has("unset"))
+				unset: field.has("unset"),
+				follows: field.has("follows") ? try decodeExpr(try field["follows"]) : nil)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()

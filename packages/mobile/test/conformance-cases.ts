@@ -610,6 +610,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'follows',
+		fixture: 'proofs/u38-follows/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
 		name: 'script-loop',
 		fixture: 'proofs/j1-loop-local/App.tsrx',
 		modules: true,

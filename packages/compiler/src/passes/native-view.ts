@@ -71,6 +71,7 @@ import type {
 import { compileDrawing, type DrawingElement } from './native-drawing.ts';
 import { nativeScriptOf, type NativeScriptModuleInput } from './native-script.ts';
 import { scriptFactsOf, type ScriptFacts } from './semantic-graph/script-facts.ts';
+import { sharedDefinitionId } from './semantic-graph/collect-shared.ts';
 
 export const NATIVE_UNSUPPORTED_CODE = 'MARKLESS_NATIVE_UNSUPPORTED';
 
@@ -1467,6 +1468,28 @@ export function createNativeViewPayload(
 		return instance;
 	};
 
+	const widgetRoots = new Map<string, string | undefined>();
+	/** The component that roots a definition's widgets: the first in its module whose body seeds it. */
+	const widgetRoot = (definition: SemanticSharedDefinition): string | undefined => {
+		if (widgetRoots.has(definition.id)) return widgetRoots.get(definition.id);
+		const owner = [...moduleFactsByFile.values()].find(
+			(facts) => sharedDefinitionId(facts.graph.moduleId, definition.exportedName) === definition.id,
+		);
+		let root: string | undefined;
+		for (const [component, uses] of owner?.sharedInstancesByComponent ?? []) {
+			const local = uses.find((use) => use.definitionId === definition.id)?.localName;
+			if (local === undefined) continue;
+			const seeds = owner!.componentFacts.get(component)?.native?.renderStatements ?? [];
+			if (seeds.some((statement) => statement.kind === 'assign' && statement.target === local)) {
+				root = component;
+				break;
+			}
+		}
+		const found = owner && root ? `${owner.graph.filename}#${root}` : undefined;
+		widgetRoots.set(definition.id, found);
+		return found;
+	};
+
 	/**
 	 * The scope one component instance renders in: its props, its own state (state objects split into cells), the shared
 	 * instances it resolves (reusing the subtree's, or creating them), and the writes its body makes while rendering,
@@ -1515,8 +1538,13 @@ export function createNativeViewPayload(
 				refuse(`${definition.name}: shared() with scope \`${definition.scope ?? 'app'}\``);
 				continue;
 			}
+			// As on the web, each rendered copy of the definition's root component starts a widget of its own (a checkbox inside
+			// a checklist's checkbox), and every other part joins the nearest one above it.
+			const known = subtree.get(definition.id);
 			const instance =
-				subtree.get(definition.id) ?? createInstance(definition, module, prefix, row);
+				known && widgetRoot(definition) !== `${module.graph.filename}#${component}`
+					? known
+					: createInstance(definition, module, prefix, row);
 			subtree.set(definition.id, instance);
 			objects.set(use.localName, { kind: 'instance', instance });
 		}
@@ -1651,6 +1679,11 @@ export function createNativeViewPayload(
 			cells[cellIndex.get(cell)!] = { ...rowCell, first: lowered };
 			return;
 		}
+		if (cellsOf(lowered).size > 0 && rowCell.row === undefined) {
+			cells[cellIndex.get(cell)!] = { ...rowCell, follows: lowered };
+			undefinedFirst.delete(cell);
+			return;
+		}
 		if (!folded || cellsOf(lowered).size > 0 || !isNativeValue(folded.value)) {
 			refuse(
 				`${what} sets \`${statement.target}.${fieldName}\` from a value that follows state; pass a fixed value or leave the prop out`,
@@ -1664,6 +1697,30 @@ export function createNativeViewPayload(
 		setInitial(cell, folded.value);
 	};
 
+	/** A prop given a computed (a template expression, a family's derived member) or a shared state field, lowered where it is written. */
+	const graphValue = (
+		prop: Extract<SemanticGraphArtifact['componentEdges'][number]['props'][number], { kind: 'graph-reference' }>,
+		scope: Scope,
+	): NativeExpr | null => {
+		const what = `the \`${prop.name}\` prop`;
+		const own = scope.module.bindingsById.get(prop.graphNodeId);
+		if (own?.kind === 'computed' && !own.sharedDefinitionId && prop.path.length === 0 && own.nativeExpression)
+			return exprOf(own.nativeExpression, what, scope);
+		const local = own?.kind === 'state' && !own.sharedDefinitionId ? scope.objects.get(own.name) : undefined;
+		if (local?.kind === 'fields' && prop.path.length === 1 && local.cells.has(prop.path[0]!)) return { cell: local.cells.get(prop.path[0]!)! };
+		for (const object of scope.objects.values()) {
+			const instance = object.kind === 'instance' ? object.instance : object.instance;
+			if (!instance || !prop.graphNodeId.startsWith(`shared:${instance.module.graph.filename}#${instance.definition.name}/`)) continue;
+			const binding = instance.module.bindingsById.get(prop.graphNodeId);
+			for (const [name, field] of instance.fields) {
+				if (binding?.kind === 'computed' && field.kind === 'expr' && field.computed === binding.name && prop.path.length === 0)
+					return sharedExpr(instance, name, field.expression, field.computed);
+				if (binding?.kind === 'state' && field.kind === 'cell' && prop.path.length === 1 && name === prop.path[0])
+					return { cell: field.cell };
+			}
+		}
+		return null;
+	};
 	const propOf = (name: string, scope: Scope): Prop | undefined =>
 		scope.props.get(scope.module.propNames.get(scope.component)?.get(name) ?? '');
 	const isPropName = (name: string, scope: Scope): boolean =>
@@ -4230,6 +4287,7 @@ export function createNativeViewPayload(
 				const ownRest = scope.module.componentFacts.get(scope.component)?.native?.restProp;
 				for (const prop of edge.props) {
 					let value: Prop | undefined;
+					let fromGraph: NativeExpr | null = null;
 					if (
 						prop.kind === 'spread' &&
 						ownRest !== undefined &&
@@ -4275,6 +4333,20 @@ export function createNativeViewPayload(
 							kind: 'value',
 							expr: { cell: scope.cells.byBinding.get(prop.graphNodeId)! },
 						};
+					} else if (prop.kind === 'graph-reference' && prop.graphBindingKind === 'prop' && prop.path.length === 1) {
+						// A prop this part was given, passed on; one it was not given stays unset, so the child's default applies.
+						const given = propOf(prop.path[0]!, scope);
+						if (!given) {
+							if (!isPropName(prop.path[0]!, scope)) refuse(`the \`${prop.name}\` prop of <${edge.childComponentName}>`, prop.sourceSpan ?? edge.sourceSpan);
+							continue;
+						}
+						if (given.kind === 'children') {
+							refuse(`the \`${prop.name}\` prop of <${edge.childComponentName}>, which passes on children`, prop.sourceSpan ?? edge.sourceSpan);
+							continue;
+						}
+						value = given;
+					} else if (prop.kind === 'graph-reference' && (fromGraph = graphValue(prop, scope))) {
+						value = { kind: 'value', expr: fromGraph };
 					} else if (prop.kind === 'opaque' && prop.nativeExpression) {
 						// A value the page renders the child with (a constant, a body const, an item's field): lowered where it is written.
 						const expr = exprOf(prop.nativeExpression, `the \`${prop.name}\` prop of <${edge.childComponentName}>`, {
@@ -6298,6 +6370,7 @@ export function createNativeViewPayload(
 	// an attribute Dragon receives per state reads (`[ui-open]`, `[hidden]`).
 	// A cell no handler writes keeps its first value, so it adds no assignment.
 	const written = writesOf(handlers.flatMap((handler) => handler.ops));
+	for (const cell of cells) if (cell.follows) written.add(cell.id);
 	const styledCells = new Set<string>();
 	// A row's state has a value per row, which one style assignment per combination of states cannot follow.
 	const rowCells = new Set(cells.flatMap((cell) => (cell.row ? [cell.id] : [])));

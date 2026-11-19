@@ -644,6 +644,11 @@ export type NativeViewPayload = {
 		 * something writes it.
 		 */
 		readonly unset?: true;
+		/**
+		 * Written while rendering from a value that follows state (a root's `checkbox.checked = checked`): the host writes it
+		 * at mount and again whenever that value changes, as the web runs the write again.
+		 */
+		readonly follows?: NativeExpr;
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;

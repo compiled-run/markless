@@ -1,0 +1,24 @@
+{
+	"rung": 148,
+	"name": "checklist: an item's checkbox follows the list's ticked values, so ticking one item and then the select-all ticks every item, and the select-all again unticks them",
+	"steps": [
+		{
+			"visible": ["Sandwich", "Condiments", "All", "Lettuce", "Tomato"],
+			"absent": ["Lettuce ticked", "Tomato ticked", "All ticked"]
+		},
+		{
+			"do": { "tap": "Lettuce" },
+			"visible": ["Lettuce ticked"],
+			"absent": ["Tomato ticked"]
+		},
+		{
+			"do": { "tap": "All" },
+			"visible": ["Lettuce ticked", "Tomato ticked", "All ticked"]
+		},
+		{
+			"do": { "tap": "All" },
+			"visible": ["All", "Lettuce", "Tomato"],
+			"absent": ["Lettuce ticked", "Tomato ticked", "All ticked"]
+		}
+	]
+}
