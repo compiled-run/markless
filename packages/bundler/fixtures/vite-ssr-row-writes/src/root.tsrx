@@ -6,6 +6,11 @@ export function App() @{
 		{ slug: 'b', title: 'Beta', done: false, hits: 0 },
 		{ slug: 'c', title: 'Gamma', done: false, hits: 0 },
 	]);
+	let seats = state([
+		{ id: 's1', picked: false },
+		{ id: 's2', picked: false },
+		{ id: 's3', picked: false },
+	]);
 
 	<main>
 		<ul>
@@ -19,5 +24,12 @@ export function App() @{
 			}
 		</ul>
 		<button id="reverse" onClick={() => (tasks = [...tasks].reverse())}>reverse</button>
+		<ol>
+			@for (const seat of seats; index i; key seat.id) {
+				<li data-seat={seat.id} data-picked={seat.picked ? 'yes' : 'no'}>
+					<button class="pick" onClick={() => (seats[i].picked = !seats[i].picked)}>pick</button>
+				</li>
+			}
+		</ol>
 	</main>
 }

@@ -17,9 +17,17 @@ let server: ReturnType<typeof createServer> | undefined;
 
 function rows(page: Page) {
 	return page.evaluate(() =>
-		[...document.querySelectorAll('li')].map(
+		[...document.querySelectorAll('li[data-slug]')].map(
 			(row) =>
 				`${row.dataset.slug}:${row.dataset.done}:${row.querySelector('.hits')?.textContent}`,
+		),
+	);
+}
+
+function seats(page: Page) {
+	return page.evaluate(() =>
+		[...document.querySelectorAll('li[data-seat]')].map(
+			(row) => `${(row as HTMLElement).dataset.seat}:${(row as HTMLElement).dataset.picked}`,
 		),
 	);
 }
@@ -27,14 +35,14 @@ function rows(page: Page) {
 // Tags every row element so a later check can tell a kept node from a rebuilt one.
 function tagRows(page: Page) {
 	return page.evaluate(() => {
-		for (const row of document.querySelectorAll('li'))
+		for (const row of document.querySelectorAll('li[data-slug]'))
 			(row as HTMLElement & { __tag?: string }).__tag = row.dataset.slug;
 	});
 }
 
 function taggedRows(page: Page) {
 	return page.evaluate(() =>
-		[...document.querySelectorAll('li')].map(
+		[...document.querySelectorAll('li[data-slug]')].map(
 			(row) => (row as HTMLElement & { __tag?: string }).__tag ?? null,
 		),
 	);
@@ -112,6 +120,14 @@ async function exerciseRowWrites(url: string, ready: (page: Page) => Promise<voi
 		await page.click('li[data-slug="b"] .toggle');
 		await expect.poll(() => rows(page)).toEqual(['c:yes:0', 'b:no:2', 'a:no:0']);
 		expect(await focusedRow(page)).toEqual({ slug: 'b', className: 'toggle' });
+
+		// `seats[i].picked = !seats[i].picked` at the row's own index writes that row only.
+		expect(await seats(page)).toEqual(['s1:no', 's2:no', 's3:no']);
+		await page.click('li[data-seat="s2"] .pick');
+		await expect.poll(() => seats(page)).toEqual(['s1:no', 's2:yes', 's3:no']);
+		await page.click('li[data-seat="s3"] .pick');
+		await page.click('li[data-seat="s2"] .pick');
+		await expect.poll(() => seats(page)).toEqual(['s1:no', 's2:no', 's3:yes']);
 		expect(errors).toEqual([]);
 	} finally {
 		await browser.close();

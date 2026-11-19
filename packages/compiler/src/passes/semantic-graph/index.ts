@@ -663,6 +663,10 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 				const left = node.left as AnyNode | undefined;
 				if (typeof left?.start === 'number' && typeof left.end === 'number')
 					state.keyedRepeatItemSpans.set(repeat.id, { start: left.start, end: left.end });
+				const index = node.index as AnyNode | undefined;
+				const collection = node.right as AnyNode | undefined;
+				if (index?.type === 'Identifier' && collection)
+					state.keyedRepeatIndexes.set(repeat.id, { index, collection });
 			}
 			// A row's reads belong to the row template, not to any arm around it.
 			const outerGuards = state.currentArmGuards;

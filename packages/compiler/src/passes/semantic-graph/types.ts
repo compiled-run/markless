@@ -177,6 +177,8 @@ export type WalkState = {
 	currentKeyedRepeatScopeIds: string[];
 	/** Source span of each keyed repeat's item declaration, by repeat id. */
 	readonly keyedRepeatItemSpans: Map<string, { readonly start: number; readonly end: number }>;
+	/** The `index` identifier and collection expression of each keyed repeat that declares an index, by repeat id. */
+	readonly keyedRepeatIndexes: Map<string, { readonly index: AnyNode; readonly collection: AnyNode }>;
 	currentHostNodeId: string | null;
 	// Set while walking a branch arm's own body. `hostNodeId` is the enclosing
 	// host at arm entry: a read still seeing it has no host of its own inside
@@ -354,6 +356,7 @@ export function createWalkState(input: {
 		currentBranchArms: [],
 		currentKeyedRepeatScopeIds: [],
 		keyedRepeatItemSpans: new Map(),
+		keyedRepeatIndexes: new Map(),
 		currentHostNodeId: null,
 		currentArmScope: null,
 		currentArmGuards: [],

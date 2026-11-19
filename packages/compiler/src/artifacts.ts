@@ -1107,6 +1107,8 @@ export type SemanticStateWrite = {
 	readonly argumentSources?: ReadonlyArray<string>;
 	/** Set when the target is rooted in the item of an enclosing keyed `@for`; names that repeat. */
 	readonly rowRepeatId?: string;
+	/** Set when the target reaches that row's item as `list[index]`: the path written below the item. */
+	readonly rowItemPath?: ReadonlyArray<string>;
 	/** Set when the target is rooted in a local declared inside a nested function. */
 	readonly through?: SemanticWriteThrough;
 	/** `Object.assign(target, ...sources)`: `target` is the first argument, `argumentSources` the rest. */
