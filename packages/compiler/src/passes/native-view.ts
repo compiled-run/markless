@@ -1909,10 +1909,44 @@ export function createNativeViewPayload(
 	}
 
 	/** What each name a script function reads from its component means there: a cell, a state object's cells, or a value. */
+	/**
+	 * A shared object's members as a script reads them: cells it may write, element handles as proxies, and values. Its
+	 * methods run only as data: a handler that has the object stays data (its helpers may still run as JavaScript); a
+	 * computed, which only reads, gets the object without them.
+	 */
+	function sharedMembers(
+		instance: SharedInstance,
+		name: string,
+		reading: boolean,
+		span: SourceSpan | undefined,
+	): Record<string, NativeScriptBinding> | null {
+		const members: Record<string, NativeScriptBinding> = {};
+		for (const [field, member] of instance.fields) {
+			const label = `\`${name}.${field}\``;
+			if (member.kind === 'cell') members[field] = { cell: member.cell };
+			else if (member.kind === 'method') {
+				if (!reading)
+					return refuseScript(`JavaScript on a phone calls no method of a shared object (${label} runs as data), so this handler stays data`, span);
+			} else if (member.kind === 'handle') {
+				// A computed never reads an element handle (the web refuses it), so only a handler's object carries them.
+				if (reading) continue;
+				const value = handleValue(member.key, member.plural, label);
+				if (!value) return null;
+				members[field] = { elements: value };
+			} else if (member.kind === 'expr' && member.expression) {
+				const value = exprOf(member.expression, label, { ...instance.scope, live: true });
+				if (!value) return null;
+				members[field] = mentionsElement(value) ? { elements: value } : { value };
+			}
+		}
+		return members;
+	}
+
 	function scriptBindings(
 		fact: SemanticScriptFunction,
 		scope: Scope,
 		what: string,
+		reading = false,
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
 		let ok = true;
@@ -1922,9 +1956,26 @@ export function createNativeViewPayload(
 				bindings[name] = { fields: Object.fromEntries(object.cells) };
 				continue;
 			}
-			if (object?.kind === 'instance' || scope.deviceObjects.has(name)) {
+			// A family's shared object, or the accessor that returns it, reaches the script member by member.
+			const owned =
+				object?.kind === 'instance'
+					? object.instance
+					: [...scope.objects.values()].find(
+							(candidate): candidate is Extract<ObjectRef, { kind: 'instance' }> =>
+								candidate.kind === 'instance' && candidate.instance.definition.name === name,
+						)?.instance;
+			if (owned && !scope.locals.has(name)) {
+				const members = sharedMembers(owned, name, reading, span);
+				if (!members) {
+					ok = false;
+					continue;
+				}
+				bindings[name] = object?.kind === 'instance' ? { object: members } : { shared: members };
+				continue;
+			}
+			if (scope.deviceObjects.has(name)) {
 				ok = false;
-				refuseScript(`${what} uses \`${name}\` (${object ? 'a shared() object' : 'a device object'}), which JavaScript on a phone cannot reach yet`, span);
+				refuseScript(`${what} uses \`${name}\` (a device object), which JavaScript on a phone cannot reach yet`, span);
 				continue;
 			}
 			const read = attempt(() => exprOf({ kind: 'read', name }, `${what}'s \`${name}\``, scope));
@@ -1976,7 +2027,7 @@ export function createNativeViewPayload(
 		// The web renders the clock and random numbers once; a host evaluates a script value again whenever the page changes.
 		const unsteady = script.globals.filter((global) => !global.typeofOnly && RENDER_UNSTEADY.has(global.property ?? global.name));
 		const fn = attempt(() => scriptFunctionId(script, scope.module, what));
-		const bindings = attempt(() => scriptBindings(script, scope, what));
+		const bindings = attempt(() => scriptBindings(script, scope, what, true));
 		if (fn.value !== null && bindings.value !== null && unsteady.length === 0) return { script: fn.value, bindings: bindings.value };
 		// Neither runs it: the data path's refusal is the specific one; what the script lacks (a global, a framework call) adds to it.
 		const reasons = fn.refusals();
@@ -1999,7 +2050,7 @@ export function createNativeViewPayload(
 			return refuse(`${what} reads the computed \`${computed.name}\`, whose body needs a script engine`);
 		const label = `the computed \`${computed.name}\``;
 		const fn = scriptFunctionId(fact, scope.module, label);
-		const bindings = scriptBindings(fact, scope, label);
+		const bindings = scriptBindings(fact, scope, label, true);
 		return fn === null || bindings === null ? null : { script: fn, bindings };
 		});
 	}

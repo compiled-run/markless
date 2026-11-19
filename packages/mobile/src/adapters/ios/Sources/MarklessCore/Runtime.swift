@@ -460,7 +460,7 @@ public final class NativeRuntime {
 		case let .script(fn, bindings):
 			let frame = try frame(of: bindings, in: scope)
 			return try scriptHost.unwrap().entry {
-				let text = try callScript("enter", .object([("kind", .string("compute")), ("fn", .string(fn)), ("frame", frame)] + entryCells()))
+				let text = try callScript("enter", .object([("kind", .string("compute")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame))] + entryCells()))
 				return NativeValue(json: try JSONValue.parse(Data(text.utf8)))
 			}
 		}
@@ -483,6 +483,8 @@ public final class NativeRuntime {
 				return (binding.name, .object([("fields", .object(try fields.map { ($0.name, .string(try slot(of: $0.cell, in: scope))) }))]))
 			case let .value(expr): return (binding.name, .object([("value", try evaluate(expr, in: scope).json)]))
 			case let .elements(expr): return (binding.name, .object([("elements", try evaluate(expr, in: scope).json)]))
+			case let .object(members): return (binding.name, .object([("object", try frame(of: members, in: scope))]))
+			case let .shared(members): return (binding.name, .object([("shared", try frame(of: members, in: scope))]))
 			}
 		})
 	}
@@ -509,11 +511,16 @@ public final class NativeRuntime {
 			}
 			facts.append((id, .object([("attributes", .object(attributes)), ("ancestors", .array(ancestors))])))
 		}
-		guard case let .object(names) = frame else { return .object([]) }
-		for (_, binding) in names {
-			guard case let .object(fields) = binding, let given = fields.first(where: { $0.0 == "elements" })?.1 else { continue }
-			if case let .array(items) = given { for item in items { try add(item) } } else { try add(given) }
+		func visit(_ frame: JSONValue) throws {
+			guard case let .object(names) = frame else { return }
+			for (_, binding) in names {
+				guard case let .object(fields) = binding else { continue }
+				for (key, inner) in fields where key == "object" || key == "shared" { try visit(inner) }
+				guard let given = fields.first(where: { $0.0 == "elements" })?.1 else { continue }
+				if case let .array(items) = given { for item in items { try add(item) } } else { try add(given) }
+			}
 		}
+		try visit(frame)
 		return .object(facts)
 	}
 

@@ -586,6 +586,7 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [
 			{ event: 'activate', host: 'component-edge:0/h0' },
 			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:1/h4' },
 			{ event: 'activate', host: 'component-edge:0/h0' },
 		],
 	},
