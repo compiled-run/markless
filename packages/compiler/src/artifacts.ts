@@ -587,8 +587,6 @@ export type ModuleGraphInterfaceArtifact = {
 	readonly asyncPlanes?: ModuleAsyncPlanes;
 	/** A component of this module renders an `onIdle` record, itself or through a component it renders, rows and arms included. */
 	readonly idleRecords?: true;
-	/** A component of this module renders an `overlay` mark, itself or through a component it renders. */
-	readonly overlayRecords?: true;
 	/** A component of this module resolves a shared() instance that outlives the page, itself or through a component it renders. */
 	readonly liveShared?: true;
 	readonly render: {
@@ -625,8 +623,6 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly rejectingHandlers?: true;
 			/** This component or one it renders has an `onIdle` record. */
 			readonly idleRecords?: true;
-			/** This component or one it renders carries an `overlay` mark. */
-			readonly overlayRecords?: true;
 			/** This component or one it renders resolves a shared() instance that outlives the page. */
 			readonly liveShared?: true;
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
@@ -1450,7 +1446,12 @@ export type SemanticFunctionStatement =
 /** A value as a tree a native host evaluates with JavaScript meaning; names are the component's bindings. */
 export type SemanticExpression =
 	| { readonly kind: 'read'; readonly name: string }
-	| { readonly kind: 'literal'; readonly value: string | number | boolean | null }
+	| {
+			readonly kind: 'literal';
+			readonly value: string | number | boolean | null;
+			/** Written `undefined`, which a native value spells as null. */
+			readonly undefined?: true;
+	  }
 	| {
 			readonly kind: 'unary';
 			readonly operator: '!' | '-' | '+' | 'typeof';

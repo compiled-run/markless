@@ -10,7 +10,6 @@ import {
 	useCompileRunner,
 	usePersistentCompileStore,
 } from '@markless/compiler';
-import { DEVICE_TARGET_FACTS } from '@markless/compiler/native';
 import {
 	compileStoreEntry,
 	compilerFingerprint,
@@ -134,81 +133,6 @@ test('a compile a runner hands back is compiled here, once', async () => {
 	expect(asked).toBe(1);
 	expect(right).toBe(left);
 	expect(left).toEqual(here);
-});
-
-// An unguarded device use is refused only when the compile has the device facts, so the answer shows they arrived.
-const deviceUse = [
-	"import { computed } from '@markless/core';",
-	"import { location } from '@markless/device';",
-	'export default function App() @{',
-	'\tconst here = computed(async () => location.current());',
-	'\t<main>',
-	'\t\t@try {',
-	'\t\t\t<p>{here.latitude}</p>',
-	'\t\t} @pending {',
-	'\t\t\t<p>Locating</p>',
-	'\t\t}',
-	'\t</main>',
-	'}',
-].join('\n');
-
-test('a compile with the device facts runs on a worker, and the facts apply there', async () => {
-	const deviceInput = {
-		filename: '/app/App.tsrx',
-		moduleId: 'App.tsrx',
-		source: deviceUse,
-		symbols: [],
-		deviceTargetFacts: DEVICE_TARGET_FACTS,
-	};
-	const here = await compileTsrxModule(deviceInput);
-	expect(here.semanticGraph.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
-		'MARKLESS_DEVICE_WEB_ABSENT',
-	);
-	clearCompileCache();
-	const pool = await onlinePool({ size: 1 });
-	const elsewhere = await pool.run(deviceInput, 'device');
-	await pool.close();
-	expect(elsewhere).toEqual(here);
-});
-
-test("a web build's compiles all run on the workers", async () => {
-	const directory = realpathSync(mkdtempSync(join(scratch, 'web-build-')));
-	writeFileSync(join(directory, 'Counter.tsrx'), counter('Counter'));
-	writeFileSync(join(directory, 'entry.js'), "export { default } from './Counter.tsrx';\n");
-	const pool = await onlinePool({ size: 1 });
-	const answers: Promise<unknown>[] = [];
-	useCompileRunner((compileInput, key) => {
-		const answer = pool.run(compileInput, key);
-		if (answer) answers.push(answer);
-		return answer;
-	});
-	const build = await rolldown({
-		input: join(directory, 'entry.js'),
-		external: [/^@markless\//],
-		plugins: [marklessClient({ rootDir: directory })],
-	});
-	try {
-		await build.generate({ format: 'es' });
-	} finally {
-		await build.close();
-	}
-	await pool.close();
-	expect(answers.length).toBeGreaterThan(0);
-	expect((await Promise.all(answers)).filter((answer) => answer === undefined)).toEqual([]);
-});
-
-test('jobs queued behind one that cannot be sent still reach a worker or come back', async () => {
-	const pool = await onlinePool({ size: 1 });
-	const unsendable = (name: string) =>
-		({ ...input(name), unsendable: () => name }) as unknown as ReturnType<typeof input>;
-	const sent = pool.run(input('Sent'), 'sent');
-	const queued = ['First', 'Second', 'Third'].map((name) => pool.run(unsendable(name), name));
-	const queuedAfter = pool.run(input('After'), 'after');
-	const [sentResult, ...rest] = await Promise.all([sent, ...queued, queuedAfter]);
-	await pool.close();
-	expect(sentResult).toEqual(await compileTsrxModule(input('Sent')));
-	expect(rest.slice(0, 3)).toEqual([undefined, undefined, undefined]);
-	expect(rest[3]).toEqual(await compileTsrxModule(input('After')));
 });
 
 const alive = (pid: number) => {

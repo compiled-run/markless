@@ -1,0 +1,78 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u1-base",
+			"failure": null,
+			"installSeconds": 3.615426290999996,
+			"flowSeconds": 22.266882707999997
+		},
+		{
+			"name": "u2-collapsible",
+			"failure": null,
+			"installSeconds": 0.2945605000000069,
+			"flowSeconds": 20.59209324999999
+		},
+		{
+			"name": "u3-tabs",
+			"failure": null,
+			"installSeconds": 0.26160720800000126,
+			"flowSeconds": 24.114927374999986
+		},
+		{
+			"name": "u5-toggle",
+			"failure": null,
+			"installSeconds": 0.338221749999997,
+			"flowSeconds": 19.270037417000015
+		},
+		{
+			"name": "u6-base-rows",
+			"failure": null,
+			"installSeconds": 0.29562320799997543,
+			"flowSeconds": 35.618267292000006
+		},
+		{
+			"name": "u11-pagination",
+			"failure": null,
+			"installSeconds": 0.27483224999997763,
+			"flowSeconds": 24.980268666999997
+		},
+		{
+			"name": "u12-buttongroup",
+			"failure": null,
+			"installSeconds": 0.2727430830000085,
+			"flowSeconds": 46.552654625000024
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 0.2714492919999757,
+			"flowSeconds": 46.27434012499999
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 0.3295799579999875,
+			"flowSeconds": 24.414783875000023
+		},
+		{
+			"name": "u22-radio-group",
+			"failure": null,
+			"installSeconds": 0.2697455409999238,
+			"flowSeconds": 29.924365040999955
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 0.325157750000013,
+			"flowSeconds": 38.35082449999999
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 0.28152941600000486,
+			"flowSeconds": 23.872852208000026
+		}
+	]
+}

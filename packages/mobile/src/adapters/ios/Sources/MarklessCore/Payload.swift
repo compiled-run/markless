@@ -14,7 +14,7 @@ public enum OverlayProtocol {
 
 /// What an event carries, by the field an `{ event }` expression names.
 public enum NativeEventField: String, Sendable {
-	case value, reason, pressTarget, target, button
+	case value, reason, pressTarget, target, button, key, text, detail
 }
 
 public enum NativeBuiltin: String, Sendable {
@@ -71,11 +71,13 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case checked(String)
 	/// A computed whose body runs in the script engine: function `fn` of the payload's script, called with `bindings`.
 	case script(fn: String, bindings: [NativeScriptBinding])
+	/// A text field's text now: what a person typed since, else its `value` binding, else its `value` attribute.
+	case field(String)
 
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked: return []
+		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked, .field: return []
 		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .array(items): return items.flatMap(\.value.cells)
@@ -149,6 +151,8 @@ public struct NativeNode: Equatable, Sendable {
 	public var defaultStyle: NativeDefaultStyle? = nil
 	/// On an `<svg>`: the shapes it draws.
 	public var drawing: NativeDrawing? = nil
+	/// A live region: a change to the text inside is announced.
+	public var live: NativeLive? = nil
 
 	public var isElement: Bool { if case .element = kind { true } else { false } }
 	public var isText: Bool { if case .text = kind { true } else { false } }
@@ -213,6 +217,10 @@ public struct NativeDrawing: Equatable, Sendable {
 public enum NativeEventName: String, Sendable {
 	case activate
 	case input
+	/// A text field took the keyboard, or gave it up.
+	case focus, blur
+	/// A key of the on-screen keyboard in a text field, and a paste from its edit menu, before either edits the text.
+	case keydown, paste
 	/// The platform closed a system sheet; it is already closed when the handler runs.
 	case dismiss
 	/// The host's back gesture or Escape on an open `<dialog>`: it closes, as the browser's cancel does.
@@ -256,6 +264,8 @@ public enum NativeOp: Equatable, Sendable {
 	/// Runs function `fn` of the payload's script with the event (`type`, the web event's) and `bindings`, then writes the
 	/// cells it changed. A throw, or a rejection of what it returns, writes `{ name, message }` to `catch` when there is one.
 	case script(fn: String, type: String, bindings: [NativeScriptBinding], catch: String?)
+	/// `event.preventDefault()` in a text field's `keydown` or `paste` handler.
+	case preventDefault
 }
 
 public struct NativeCapture: Equatable, Sendable {
@@ -375,6 +385,10 @@ public struct NativeCell: Equatable, Sendable {
 	public var row: String? = nil
 	/// The clock when the screen opened: written at mount, before the first build.
 	public var clock = false
+	/// On a row's state: its first value as an expression of the row's item, taken once when the row is built.
+	public var first: NativeExpr? = nil
+	/// On a row's state: the values the row passes to the part that owns it; when one changes the row's state starts over.
+	public var rebuiltBy: [NativeExpr]? = nil
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -424,7 +438,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object", "row", "clock"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object", "row", "clock", "first", "rebuiltBy"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
 			}
@@ -444,14 +458,16 @@ public struct NativeViewPayload: Equatable, Sendable {
 					return NativeTask(call: try task["call"].string(), arguments: try task["arguments"].array().map(decodeExpr))
 				}() : nil,
 				row: field.has("row") ? try field["row"].string() : nil,
-				clock: field.has("clock"))
+				clock: field.has("clock"),
+				first: field.has("first") ? try decodeExpr(try field["first"]) : nil,
+				rebuiltBy: field.has("rebuiltBy") ? try field["rebuiltBy"].array().map(decodeExpr) : nil)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()
 			let place = ["arm", "row"]
 			switch kind {
 			case "element":
-				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing"] + place)
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live"] + place)
 				var attributes: [String: String] = [:]
 				if field.has("attributes") {
 					let reader = try field["attributes"]
@@ -472,7 +488,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 					row: try decodeRow(field), kind: .element(element: try field["element"].string(), attributes: attributes, bindings: bindings),
 					object: field.has("object") ? try field["object"].string() : nil,
 					defaultStyle: field.has("defaultStyle") ? try decodeDefaultStyle(try field["defaultStyle"]) : nil,
-					drawing: field.has("drawing") ? try decodeDrawing(try field["drawing"]) : nil)
+					drawing: field.has("drawing") ? try decodeDrawing(try field["drawing"]) : nil,
+					live: field.has("live") ? try decodeLive(try field["live"]) : nil)
 			case "text":
 				let field = try node.object(required: ["kind", "id", "parent", "parts"], optional: place)
 				let parts = try decodeParts(try field["parts"])
@@ -573,6 +590,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 						throw PayloadError(path: op.path + ".method", reason: "unknown dialog method \"\(method)\"")
 					}
 					return .dialog(node: try opField["node"].string(), open: method == "showModal")
+				case "preventDefault":
+					_ = try op.object(["op"])
+					return .preventDefault
 				case "command":
 					let keys = Set(try op.keys())
 					let opField = try op.object(required: ["op", "node", "command"], optional: ["preventScroll"])
@@ -680,6 +700,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.marker = try oneOf("marker", ["disc", "decimal"])
 		style.table = try oneOf("table", ["table", "row", "cell"])
 		return style
+	}
+
+	private static func decodeLive(_ reader: Reader) throws -> NativeLive {
+		let live = try reader.object(["politeness", "atomic"])
+		let politeness = try live["politeness"].string()
+		guard ["polite", "assertive"].contains(politeness) else { throw PayloadError(path: reader.path, reason: "unknown politeness \"\(politeness)\"") }
+		return NativeLive(assertive: politeness == "assertive", atomic: try live["atomic"].bool())
 	}
 
 	private static func decodeDrawing(_ reader: Reader) throws -> NativeDrawing {
@@ -836,6 +863,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["formData"]: return .formData(try field("formData").string())
 		case ["checked"]: return .checked(try field("checked").string())
 		case ["bindings", "script"]: return .script(fn: try field("script").string(), bindings: try decodeBindings(try field("bindings")))
+		case ["field"]: return .field(try field("field").string())
 		case ["arguments", "call"]:
 			let name = try field("call").string()
 			guard let builtin = NativeBuiltin(rawValue: name) else { throw PayloadError(path: reader.path + ".call", reason: "unknown call \"\(name)\"") }
@@ -1107,4 +1135,10 @@ public struct NativeDeviceObject: Equatable, Sendable {
 	public let device: String
 	/// The first node of the component instance that made it.
 	public let owner: String
+}
+
+/// A live region: an assertive one interrupts the screen reader; an atomic one is read whole.
+public struct NativeLive: Sendable, Equatable {
+	public let assertive: Bool
+	public let atomic: Bool
 }

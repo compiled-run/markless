@@ -1,0 +1,350 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Unset",
+		"cells": [
+			{
+				"id": "state:note.text",
+				"name": "note.text",
+				"initial": null
+			},
+			{
+				"id": "component-edge:0/shared:src/unset.tsrx#pickState/state:pick.chosen",
+				"name": "pick.chosen",
+				"initial": null
+			},
+			{
+				"id": "component-edge:0/shared:src/unset.tsrx#pickState/state:pick.count",
+				"name": "pick.count",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "div",
+				"parent": "h6"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h1",
+				"element": "p",
+				"parent": "component-edge:0/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h1:text0",
+				"parent": "component-edge:0/h1",
+				"parts": [
+					{
+						"expr": {
+							"logical": "??",
+							"left": {
+								"cell": "component-edge:0/shared:src/unset.tsrx#pickState/state:pick.chosen"
+							},
+							"right": {
+								"literal": "nothing"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h2",
+				"element": "p",
+				"parent": "component-edge:0/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h2:text0",
+				"parent": "component-edge:0/h2",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"binary": "===",
+								"left": {
+									"cell": "component-edge:0/shared:src/unset.tsrx#pickState/state:pick.chosen"
+								},
+								"right": {
+									"literal": null
+								}
+							},
+							"whenTrue": {
+								"literal": "unset"
+							},
+							"whenFalse": {
+								"literal": "set"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h3",
+				"element": "p",
+				"parent": "component-edge:0/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h3:text0",
+				"parent": "component-edge:0/h3",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Picked ",
+								{
+									"cell": "component-edge:0/shared:src/unset.tsrx#pickState/state:pick.count"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h4",
+				"element": "button",
+				"parent": "component-edge:0/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h4:text0",
+				"parent": "component-edge:0/h4",
+				"parts": [
+					{
+						"text": "Tea"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h5",
+				"element": "button",
+				"parent": "component-edge:0/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h5:text0",
+				"parent": "component-edge:0/h5",
+				"parts": [
+					{
+						"text": "Clear"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "p",
+				"parent": "h6"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"expr": {
+							"logical": "??",
+							"left": {
+								"cell": "state:note.text"
+							},
+							"right": {
+								"literal": "no note"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "button",
+				"parent": "h6"
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"text": "Note"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:0/h4",
+				"event": "activate",
+				"handler": "handler:component-edge:0/event:0"
+			},
+			{
+				"host": "component-edge:0/h5",
+				"event": "activate",
+				"handler": "handler:component-edge:0/event:1"
+			},
+			{
+				"host": "h8",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:0/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:0/shared:src/unset.tsrx#pickState/state:pick.chosen",
+						"value": {
+							"literal": "tea"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "component-edge:0/shared:src/unset.tsrx#pickState/state:pick.count",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "component-edge:0/shared:src/unset.tsrx#pickState/state:pick.count"
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:0/event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:0/shared:src/unset.tsrx#pickState/state:pick.chosen",
+						"value": {
+							"literal": null
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:note.text",
+						"value": {
+							"if": {
+								"binary": "===",
+								"left": {
+									"cell": "state:note.text"
+								},
+								"right": {
+									"literal": null
+								}
+							},
+							"whenTrue": {
+								"literal": "hello"
+							},
+							"whenFalse": {
+								"literal": null
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		["component-edge:0/h1:text0", "nothing"],
+		["component-edge:0/h2:text0", "unset"],
+		["component-edge:0/h3:text0", "Picked 0"],
+		["component-edge:0/h4:text0", "Tea"],
+		["component-edge:0/h5:text0", "Clear"],
+		["h7:text0", "no note"],
+		["h8:text0", "Note"]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h1:text0",
+					"value": "tea"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h2:text0",
+					"value": "set"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h3:text0",
+					"value": "Picked 1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h8"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h7:text0",
+					"value": "hello"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h1:text0",
+					"value": "nothing"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h2:text0",
+					"value": "unset"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h8"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h7:text0",
+					"value": "no note"
+				}
+			]
+		}
+	]
+}

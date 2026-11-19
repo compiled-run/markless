@@ -13,7 +13,7 @@ pnpm test run components/figures -u    # after a geometry change: rewrite <name>
 pnpm run typecheck                     # the site's TSRX-aware check
 ```
 
-From the repository root: `pnpm run typecheck` and `pnpm ci:local --affected`.
+From the repository root: `pnpm run typecheck` and `pnpm ci:local --fast`.
 
 The figure's test (copy `state/wired.test.ts`) should pin:
 

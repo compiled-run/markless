@@ -1,0 +1,38 @@
+{
+	"rung": 128,
+	"name": "a @for row's part is built again when a value the row passes it changes, and keeps its state when only another field of the item changes, as on the web",
+	"steps": [
+		{
+			"visible": ["Fruit", "Apple tapped 0", "Size 1"],
+			"absent": ["Apple tapped 1", "Apricot tapped 0"]
+		},
+		{
+			"do": {
+				"tap": "Apple tapped 0"
+			},
+			"visible": ["Apple tapped 1"],
+			"absent": ["Apple tapped 0"]
+		},
+		{
+			"do": {
+				"tap": "Rename"
+			},
+			"visible": ["Apricot tapped 0", "Size 1"],
+			"absent": ["Apple tapped 1", "Apricot tapped 1"]
+		},
+		{
+			"do": {
+				"tap": "Apricot tapped 0"
+			},
+			"visible": ["Apricot tapped 1", "Size 1"],
+			"absent": ["Apricot tapped 0"]
+		},
+		{
+			"do": {
+				"tap": "Grow"
+			},
+			"visible": ["Apricot tapped 1", "Size 2"],
+			"absent": ["Apricot tapped 0", "Size 1"]
+		}
+	]
+}

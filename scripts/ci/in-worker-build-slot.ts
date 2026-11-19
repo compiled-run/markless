@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { afterAll, beforeAll, expect } from 'vitest';
-import { holdBuildSlot } from '../../packages/router/test/support/build-slots.ts';
+import { holdBuildSlot } from '../../packages/router/test/support/fixture-build.ts';
 import type { InWorkerBuildRule } from './in-worker-builds.ts';
 
 const repoRoot = resolve(import.meta.dirname, '../..');

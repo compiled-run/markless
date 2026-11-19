@@ -44,19 +44,6 @@ export function componentsWithIdleRecords(
 	);
 }
 
-/** Components that carry an `overlay` mark themselves, or render a component that does. */
-export function componentsWithOverlays(
-	graph: Pick<SemanticGraphArtifact, 'overlays' | 'componentEdges'>,
-	importedModuleInterfaces: ImportedInterfaces,
-): ReadonlySet<string> {
-	return componentsRenderingAny(
-		graph,
-		graph.overlays.flatMap((overlay) => (overlay.componentName ? [overlay.componentName] : [])),
-		importedModuleInterfaces,
-		(component) => component.overlayRecords === true,
-	);
-}
-
 /** Components that resolve a shared() instance outliving the page themselves, or render a component that does. */
 export function componentsWithLiveShared(
 	graph: Pick<SemanticGraphArtifact, 'sharedInstances' | 'sharedDefinitions' | 'componentEdges'>,

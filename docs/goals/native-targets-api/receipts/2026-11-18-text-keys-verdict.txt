@@ -1,0 +1,4 @@
+Text-field keydown and paste (cw/ui-text-keys), simulator markless-mac (iPhone 17, iOS 27.2), AVD markless_mac (port 5580).
+First run: 11 of 12 rungs passed on iOS; u30-text-keys failed at its Return step (UITextField does not take Return as typed text, so the keydown handler never ran). Fixed by running Enter from textFieldShouldReturn. Android 12 of 12.
+Second run, after the fix: 12 of 12 on iOS and 12 of 12 on Android (u30, 08, f1, f2, f4, f5, f6, 16, u23, u25, u29, y2).
+Android in-app vector check (DeviceConformance, MARKLESS_CONFORMANCE_DIR): text-keys, field-focus, input and notes pass (4 of 4).
