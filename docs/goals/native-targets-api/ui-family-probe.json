@@ -412,8 +412,7 @@
 	"textbox": {
 		"payload": false,
 		"diagnostics": [
-			"MARKLESS_NATIVE_ELEMENT: the <textarea> element has no native view yet",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`textboxState.type` runs as data), so this handler stays data"
+			"MARKLESS_NATIVE_ELEMENT: the <textarea> element has no native view yet"
 		]
 	},
 	"timebox": {

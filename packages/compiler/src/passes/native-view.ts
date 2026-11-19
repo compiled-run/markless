@@ -2416,6 +2416,8 @@ export function createNativeViewPayload(
 	let lateLowering = false;
 	/** Whether the handler being lowered read the element a tap landed on. */
 	let pressedTargetRead = false;
+	/** The text field whose input handler is being lowered: its `value` there is what was typed. */
+	let typedField: string | undefined;
 	const nodeById = () => new Map(nodes.map((node) => [node.id, node]));
 
 	/** A handle read as a value in a handler: its element (null when unbound), or its elements in order when plural. */
@@ -3111,6 +3113,16 @@ export function createNativeViewPayload(
 					holder.object.name === scope.event
 				)
 					return { event: 'value' };
+				// An input event's target is the field typed into, as an element its handler can pass on.
+				if (
+					scope.event !== undefined &&
+					typedField !== undefined &&
+					(expression.property === 'currentTarget' || expression.property === 'target') &&
+					holder.kind === 'read' &&
+					holder.name === scope.event &&
+					!scope.locals.has(holder.name)
+				)
+					return elementValue(typedField);
 				if (
 					holder.kind === 'read' &&
 					!scope.locals.has(holder.name) &&
@@ -3152,6 +3164,8 @@ export function createNativeViewPayload(
 									`${what} reads \`.${expression.property}\` of an error; a native build reads its \`message\` and \`name\``,
 								);
 				const element = elementOf(object);
+				if (element !== undefined && element === typedField && expression.property === 'value')
+					return { event: 'value' };
 				if (element !== undefined && isTicked(element)) {
 					if (expression.property === 'checked') return { checked: element };
 					if (expression.property === 'value')
@@ -5032,9 +5046,14 @@ export function createNativeViewPayload(
 							};
 		snapshots = { handler, count: 0 };
 		continuations = { base: handler, next: 0 };
-		return lowerStatements(event.handlerStatements, inner, what, event.handlerSpan, 0, {
-			next: [],
-		}).ops;
+		typedField = 'event' in inner && inner.event !== undefined ? pressed?.currentTarget : undefined;
+		try {
+			return lowerStatements(event.handlerStatements, inner, what, event.handlerSpan, 0, {
+				next: [],
+			}).ops;
+		} finally {
+			typedField = undefined;
+		}
 	}
 
 	/** The one device call a statement awaits, and the statement's value with that await replaced by `as`. */
