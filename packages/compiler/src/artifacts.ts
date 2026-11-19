@@ -1642,6 +1642,11 @@ export type SemanticTemplateRead = {
 	// The component edge whose children hold this read directly. It is projected
 	// into that child, so this module owns no element for it to write.
 	readonly projectedComponentEdgeId?: string;
+	// A projected read whose text sits beside an element of the same children: it writes the text node next to that element.
+	readonly projectedBeside?: {
+		readonly hostNodeId: string;
+		readonly target: SemanticTemplateBindingTarget;
+	};
 	readonly computedGraphNodeId?: string;
 	// On a joined text inside a flipped arm: the computed each composite interpolation rebuilds from.
 	readonly armHoles?: ReadonlyArray<{

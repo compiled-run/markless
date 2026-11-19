@@ -777,7 +777,8 @@ function isScalarTextUpdateSymbol(
 		target?.kind === 'text' &&
 		target.trueValue === undefined &&
 		target.falseValue === undefined &&
-		target.textNode === undefined
+		target.textNode === undefined &&
+		target.sibling === undefined
 	);
 }
 

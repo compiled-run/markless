@@ -485,6 +485,12 @@ export type ProtocolViewPayload = {
 					 * Negative counts back from the end: -1 is the last child node.
 					 */
 					readonly textNode?: number;
+					/**
+					 * The text node just before (`previous`) or after (`next`) the host,
+					 * which this write owns when both are projected into another
+					 * component's element and this module has no element around the text.
+					 */
+					readonly sibling?: 'previous' | 'next';
 			  }
 			| {
 					readonly kind: 'attribute';

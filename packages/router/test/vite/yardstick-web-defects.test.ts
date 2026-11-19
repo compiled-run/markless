@@ -317,7 +317,7 @@ test.fails('a storage() value written in a page shows in a component from anothe
 	});
 });
 
-test.fails("live text beside an element in a component's children follows its state (#864)", async () => {
+test("live text beside an element in a component's children follows its state (#864)", async () => {
 	await visit('/boxed', async (page) => {
 		await page.getByRole('button', { name: 'South' }).click();
 		await expect.poll(() => page.locator('[data-box]').textContent()).toBe('South▾');

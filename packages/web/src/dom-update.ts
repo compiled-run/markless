@@ -1,6 +1,6 @@
 import type { ProtocolViewPayload } from '@markless/serializer';
 import type { DomJournalEntry } from '@markless/runtime';
-import { marklessTextNode } from './fns/text-node.ts';
+import { marklessSiblingText, marklessTextNode } from './fns/text-node.ts';
 
 export type DomUpdateEntryInput = {
 	readonly locator: string;
@@ -11,11 +11,16 @@ export type DomUpdateEntryInput = {
 export function createDomUpdateEntry(input: DomUpdateEntryInput): DomJournalEntry {
 	if (input.target.kind === 'text') {
 		const at = input.target.textNode;
+		const side = input.target.sibling;
 		return {
 			type: 'setText',
 			locator: input.locator,
 			value: textTargetValue(input.target, input.value),
-			...(at === undefined ? {} : { node: (host: unknown) => marklessTextNode(host, at) }),
+			...(at !== undefined
+				? { node: (host: unknown) => marklessTextNode(host, at) }
+				: side !== undefined
+					? { node: (host: unknown) => marklessSiblingText(host, side) }
+					: {}),
 		};
 	}
 
