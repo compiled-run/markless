@@ -169,10 +169,11 @@ export function nativeStyleInput(
 	},
 	cells?: ReadonlySet<string>,
 ): NativeStyleInput {
-	// What a script computes at the first render is laid out too: Dragon measures the text it gives.
+	// What a script computes at the first render is laid out too: Dragon measures the text it gives. A route param reads as ''.
 	const host = payload.script ? nodeScriptHost() : undefined;
+	const params = Object.fromEntries((payload.route?.params ?? []).map((name) => [name, '']));
 	const initial = new Map(
-		createNativeRuntime(payload, new Map(), {}, undefined, undefined, host).texts(),
+		createNativeRuntime(payload, new Map(), params, undefined, undefined, host).texts(),
 	);
 	const evaluateAt = host
 		? evaluateWithScript(payload, host)

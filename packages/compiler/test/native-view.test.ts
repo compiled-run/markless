@@ -349,6 +349,39 @@ export function Page() @{
 		]);
 	});
 
+	it("reads an input event's target as the field typed into, whose value is the typed text, only in that handler", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function textOf(from: EventTarget | null): string {
+	const control = from as HTMLInputElement | null;
+	if (!control) return '';
+	return control.value;
+}
+export function Page() @{
+	let said = state('');
+	<main>
+		<input aria-label="Name" onInput={(event) => (said = textOf(event.target))} />
+		<p>{said}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers).toEqual([
+			{ id: 'handler:event:0', ops: [{ op: 'assign', cell: 'state:said', value: { event: 'value' } }] },
+		]);
+		const elsewhere = await nativeView(`import { state } from '@markless/core';
+function textOf(from: EventTarget | null): string {
+	const control = from as HTMLInputElement | null;
+	return control ? control.value : '';
+}
+export function Page() @{
+	let said = state('');
+	<main>
+		<button onClick={(event) => (said = textOf(event.target))}>Read</button>
+		<p>{said}</p>
+	</main>
+}`);
+		expect(elsewhere.payload).toBeNull();
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{
@@ -2199,6 +2232,101 @@ export function Tip() @{
 }`);
 		expect(diagnostics.map((d) => d.message)).toEqual([
 			'an `overlay-hint` surface (a tooltip or hovercard), which phones do not show yet',
+		]);
+	});
+});
+
+describe('pointer events', () => {
+	it('lowers each pointer event a touch raises, the fields its handler reads, and capture', async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+export function Drag() @{
+	let x = state(0);
+	let held = state(false);
+	const track = element<HTMLDivElement>();
+	<div
+		el={track}
+		onPointerdown={(event) => {
+			track?.setPointerCapture(event.pointerId);
+			held = track !== undefined && track.hasPointerCapture(event.pointerId);
+		}}
+		onPointermove={(event) => (x = event.clientX + event.clientY + event.timeStamp)}
+		onPointerup={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
+		onPointercancel={(event) => (held = event.isPrimary && event.pointerType === 'touch' && event.buttons === 0)}
+		onPointerover={(event) => (held = event.relatedTarget === null)}
+		onPointerout={() => (x = 0)}
+		onPointerenter={() => (x = 1)}
+		onPointerleave={() => (x = 2)}
+	>{x}</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.events.map((event) => event.event)).toEqual([
+			'pointerdown',
+			'pointermove',
+			'pointerup',
+			'pointercancel',
+			'pointerover',
+			'pointerout',
+			'pointerenter',
+			'pointerleave',
+		]);
+		const ops = (event: number) => payload!.handlers[event]!.ops;
+		expect(ops(0)).toEqual([
+			{ op: 'capture', node: 'h0', pointer: { event: 'pointerId' } },
+			{
+				op: 'assign',
+				cell: 'state:held',
+				value: {
+					logical: '&&',
+					left: { binary: '!==', left: { literal: 'h0' }, right: { literal: null } },
+					right: { captures: { literal: 'h0' }, pointer: { event: 'pointerId' } },
+				},
+			},
+		]);
+		expect(ops(2)).toEqual([
+			{ op: 'capture', node: { event: 'currentTarget' }, pointer: { event: 'pointerId' }, release: true },
+		]);
+		for (const field of ['clientX', 'clientY', 'timeStamp'])
+			expect(JSON.stringify(ops(1))).toContain(JSON.stringify({ event: field }));
+		for (const field of ['isPrimary', 'pointerType', 'buttons'])
+			expect(JSON.stringify(ops(3))).toContain(JSON.stringify({ event: field }));
+		expect(JSON.stringify(ops(4))).toContain(JSON.stringify({ event: 'relatedTarget' }));
+	});
+
+	it('gives a pointer handler that runs as JavaScript the touch fields, but not the elements it names', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Drag() @{
+	let log = state('');
+	<div
+		onPointermove={(event) => {
+			for (const part of [event.clientX, event.clientY, event.pointerId, event.pointerType]) log = log + part;
+		}}
+	>{log}</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.handlers[0]!.ops.map((op) => op.op)).toEqual(['script']);
+		const related = await nativeView(`import { state } from '@markless/core';
+export function Drag() @{
+	let log = state('');
+	<div
+		onPointerout={(event) => {
+			for (const part of [event.relatedTarget]) log = log + String(part);
+		}}
+	>{log}</div>
+}`);
+		expect(related.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet',
+		]);
+	});
+
+	it('refuses by name a field a touch does not report yet', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Pressure() @{
+	let p = state(0);
+	<div onPointermove={(event) => (p = event.pressure)}>{p}</div>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'the pointermove handler reads `event.pressure`, which a touch on a phone does not have',
 		]);
 	});
 });

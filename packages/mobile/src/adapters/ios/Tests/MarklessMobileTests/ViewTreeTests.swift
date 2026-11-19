@@ -241,6 +241,34 @@ private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) 
 	#expect(again.superview == nil)
 }
 
+@MainActor @Test func touchesAreNumberedPerScreenAndAScrollTakingOneCancelsIt() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("touch"), store: MemoryStore())
+	let views = try tree(controller)
+	#expect(controller.view.gestureRecognizers?.contains { $0 is PointerObserver && !$0.cancelsTouchesInView } == true)
+	let host = try #require(views.overlays)
+	let log = { views.labels["h1:text0"]?.text ?? "" }
+	let knob = try #require(views.elements["h3"])
+	let other = try #require(views.elements["h4"])
+	let now = ProcessInfo.processInfo.systemUptime
+	let (first, second, third) = (NSObject(), NSObject(), NSObject())
+	host.touch(.pointerdown, ObjectIdentifier(first), under: knob, at: CGPoint(x: 40, y: 120), time: now)
+	#expect(log().contains(" down:pad/touch/1/0/1/40,120/true/"))
+	host.touch(.pointermove, ObjectIdentifier(first), under: other, at: CGPoint(x: 64.5, y: 190), time: now)
+	host.touch(.pointerup, ObjectIdentifier(first), under: other, at: CGPoint(x: 64.5, y: 190), time: now)
+	#expect(log().hasSuffix(" move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main"))
+	host.touch(.pointerdown, ObjectIdentifier(second), under: other, at: CGPoint(x: 40, y: 190), time: now)
+	#expect(log().hasSuffix(" over:other enter:main enter:other"))
+	host.scrollBegan(ObjectIdentifier(UIScrollView()))
+	#expect(log().hasSuffix(" over:other enter:main enter:other"))
+	host.scrollBegan(ObjectIdentifier(views.page))
+	#expect(log().hasSuffix(" cancel:other out:other leave:other leave:main"))
+	host.touch(.pointermove, ObjectIdentifier(second), under: other, at: CGPoint(x: 40, y: 150), time: now)
+	host.touch(.pointerup, ObjectIdentifier(second), under: other, at: CGPoint(x: 40, y: 150), time: now)
+	#expect(log().hasSuffix(" cancel:other out:other leave:other leave:main"))
+	host.touch(.pointerdown, ObjectIdentifier(third), under: knob, at: CGPoint(x: 1, y: 2), time: now)
+	#expect(log().hasSuffix(" down:pad/touch/3/0/1/1,2/true/\(formatJavaScriptNumber((now - host.timeOrigin) * 1000))"))
+}
+
 @MainActor @Test func journalNamingAnUnknownNodeIsAnError() throws {
 	let controller = try MarklessViewController(payload: counterPayload())
 	let views = try tree(controller)

@@ -11,13 +11,27 @@ public struct NativeAction: Equatable, Sendable {
 	public let timer: String?
 	/// For an overlay's `dismiss`: why (`escape`; an outside press arrives as `pointerdown`). A sheet's has none.
 	public let reason: String?
+	/// For a touch (`pointerdown`, `pointermove`, `pointerup`, `pointercancel`): the touch, numbered from 1 as a phone browser
+	/// does (default 1); its place in points from the screen's top left (default 0, 0); the milliseconds since the screen
+	/// appeared (default 0).
+	public let pointerId: Double?
+	public let x: Double?
+	public let y: Double?
+	public let time: Double?
 
-	public init(event: NativeEventName, host: String, value: String? = nil, reason: String? = nil) {
+	public init(
+		event: NativeEventName, host: String, value: String? = nil, reason: String? = nil, pointerId: Double? = nil, x: Double? = nil,
+		y: Double? = nil, time: Double? = nil
+	) {
 		self.event = event
 		self.host = host
 		self.value = value
 		timer = nil
 		self.reason = reason
+		self.pointerId = pointerId
+		self.x = x
+		self.y = y
+		self.time = time
 	}
 
 	public init(event: NativeEventName, timer: String) {
@@ -26,6 +40,23 @@ public struct NativeAction: Equatable, Sendable {
 		value = nil
 		self.timer = timer
 		reason = nil
+		pointerId = nil
+		x = nil
+		y = nil
+		time = nil
+	}
+}
+
+/// A touch that is down: the element it is captured to (nil after a release), the one it counts as over, and whether it was first.
+private final class TouchState {
+	var capture: String?
+	var over: String
+	let primary: Bool
+
+	init(capture: String?, over: String, primary: Bool) {
+		self.capture = capture
+		self.over = over
+		self.primary = primary
 	}
 }
 
@@ -182,11 +213,15 @@ public final class NativeRuntime {
 	private var eventValue: String?
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
+	/// What a touch adds to a script pointer handler's event, in the order the reference writes them.
+	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp]
 	/// The element that has focus, or nil.
 	public private(set) var focused: String?
 	/// The overlay stack, topmost last, and the focus each overlay found when it joined, as the web's overlay behaviour keeps them.
 	private var stack: [String] = []
 	private var origins: [String: String] = [:]
+	/// Each touch that is down, by pointer id.
+	private var touches: [Double: TouchState] = [:]
 	private var overlayNodes: [NativeNode] = []
 	private let forms: [String: NativeForm]
 	/// A field's text a person typed since its `value` binding last changed it.
@@ -373,6 +408,11 @@ public final class NativeRuntime {
 			let inner = try evaluate(node)
 			guard case let .string(a) = outer, case let .string(b) = inner else { return .bool(false) }
 			return .bool(contains(a, b))
+		case let .captures(node, pointer):
+			let element = try evaluate(node)
+			let id = try evaluate(pointer)
+			guard case let .string(a) = element, case let .number(b) = id else { return .bool(false) }
+			return .bool(touches[b]?.capture == a)
 		case let .unary(op, inner):
 			let value = try evaluate(inner)
 			switch op {
@@ -815,31 +855,8 @@ public final class NativeRuntime {
 				return try dismiss.map { try self.run(self.handlers[$0.handler] ?? [], in: .empty) } ?? []
 			}
 		}
-		if action.event == .pointerdown || action.event == .pointerup {
-			guard let node = nodesById[nodeOf(action.host)], let instance = try instances(of: node).first(where: { $0.id == action.host }) else {
-				throw RuntimeError(reason: "\(action.host) is not shown")
-			}
-			return try change(host: nil) {
-				var runs: [(handler: String, fields: [NativeEventField: NativeValue])] = []
-				// The behaviour's document listener hears the press first: the topmost overlay it landed outside is told.
-				if action.event == .pointerdown, let top = self.stack.last, !self.contains(top, action.host), let dismiss = handlerOf(top, .dismiss) {
-					runs.append((dismiss.handler, [.reason: .string("outside-press"), .pressTarget: .string(action.host)]))
-				}
-				var at: String? = self.nodeOf(action.host)
-				while let current = at {
-					if let own = handlerOf(current, action.event) { runs.append((own.handler, [.target: .string(action.host), .button: .number(0)])) }
-					at = self.nodesById[current]?.parent
-				}
-				defer { self.eventFields = nil }
-				var calls: [NativeJournalEntry] = []
-				for step in runs {
-					self.eventFields = step.fields
-					let taken = try self.run(self.handlers[step.handler] ?? [], in: instance.scope)
-					if case .navigate? = taken.first { return taken }
-					calls.append(contentsOf: taken)
-				}
-				return calls
-			}
+		if action.event.isTouch {
+			return try touch(action, handlerOf: handlerOf)
 		}
 		// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 		let host = action.host.firstIndex(of: "@").map { String(action.host[..<$0]) } ?? action.host
@@ -855,6 +872,109 @@ public final class NativeRuntime {
 		eventValue = action.event == .input ? action.value ?? "" : nil
 		defer { eventValue = nil }
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
+	}
+
+	/// A touch as a phone's browser raises it: `pointerover`, `pointerenter` outermost first, the overlay's outside press and
+	/// `pointerdown`; later events go to the capturing element, with boundary events when it changed; `pointerout` and
+	/// `pointerleave` after the touch lifts or is cancelled.
+	private func touch(_ action: NativeAction, handlerOf: @escaping (String, NativeEventName) -> NativeEvent?) throws -> [NativeJournalEntry] {
+		guard let node = nodesById[nodeOf(action.host)], let instance = try instances(of: node).first(where: { $0.id == action.host }) else {
+			throw RuntimeError(reason: "\(action.host) is not shown")
+		}
+		let pointerId = action.pointerId ?? 1
+		let down = touches[pointerId]
+		if action.event == .pointerdown ? down != nil : down == nil {
+			throw RuntimeError(reason: "touch \(textOf(.number(pointerId))) is \(down != nil ? "already" : "not") down")
+		}
+		return try change(host: nil) {
+			var calls: [NativeJournalEntry] = []
+			let state = down ?? TouchState(capture: action.host, over: action.host, primary: self.touches.values.allSatisfy { !$0.primary })
+			if down == nil { self.touches[pointerId] = state }
+			let x = action.x ?? 0, y = action.y ?? 0
+			/// The elements from `id` out to the root, innermost first.
+			let chain = { (id: String) -> [String] in
+				var out: [String] = []
+				var at: String? = self.nodeOf(id)
+				while let current = at {
+					out.append(current == self.nodeOf(id) ? id : current)
+					at = self.nodesById[current]?.parent
+				}
+				return out
+			}
+			let fieldsOf = { (type: NativeEventName, target: String, currentTarget: String, related: String?) -> [NativeEventField: NativeValue] in
+				let lifted = type == .pointerup || type == .pointercancel || type == .pointerout || type == .pointerleave
+				let cancelled = action.event == .pointercancel
+				return [
+					.target: .string(target), .currentTarget: .string(currentTarget), .relatedTarget: related.map(NativeValue.string) ?? .null,
+					// Safari's values, which the Pointer Events spec gives; Chrome on Android reports 0 for over, enter, out and leave.
+					.button: .number(type == .pointerdown || type == .pointerup ? 0 : -1),
+					.buttons: .number(lifted ? 0 : 1),
+					.clientX: .number(cancelled ? 0 : x), .clientY: .number(cancelled ? 0 : y),
+					.pointerId: .number(pointerId), .pointerType: .string("touch"), .isPrimary: .bool(state.primary),
+					.timeStamp: .number(action.time ?? 0),
+				]
+			}
+			var runs: [(handler: String, fields: [NativeEventField: NativeValue])] = []
+			let raise = { (type: NativeEventName, target: String, related: String?) in
+				for node in chain(target) {
+					if let own = handlerOf(self.nodeOf(node), type) { runs.append((own.handler, fieldsOf(type, target, node, related))) }
+				}
+			}
+			/// `pointerenter` on each element `target` is in that `from` is not, outermost first; `pointerleave` the other way.
+			let crossing = { (type: NativeEventName, target: String, from: String?, related: String?) in
+				let outside = Set(from.map(chain) ?? [])
+				let nodes = chain(target).filter { !outside.contains($0) }
+				for node in type == .pointerenter ? nodes.reversed() : nodes {
+					if let own = handlerOf(self.nodeOf(node), type) { runs.append((own.handler, fieldsOf(type, node, node, related))) }
+				}
+			}
+			let flush = { () throws -> [NativeJournalEntry]? in
+				defer { self.eventFields = nil }
+				let steps = runs
+				runs = []
+				for step in steps {
+					self.eventFields = step.fields
+					let taken = try self.run(self.handlers[step.handler] ?? [], in: instance.scope)
+					if case .navigate? = taken.first { return taken }
+					calls.append(contentsOf: taken)
+				}
+				return nil
+			}
+			if action.event == .pointerdown {
+				raise(.pointerover, action.host, nil)
+				crossing(.pointerenter, action.host, nil, nil)
+				// The behaviour's document listener hears the press: the topmost overlay it landed outside is told.
+				if let top = self.stack.last, !self.contains(top, action.host), let dismiss = handlerOf(top, .dismiss) {
+					runs.append((dismiss.handler, [.reason: .string("outside-press"), .pressTarget: .string(action.host)]))
+				}
+				raise(.pointerdown, action.host, nil)
+				return try flush() ?? calls
+			}
+			// Before the next event the pointer counts as over its capturing element (or, released, the one under it): a change
+			// raises the boundary events from the old one to the new, as the browsers do.
+			let target = state.capture ?? action.host
+			if target != state.over {
+				let from = state.over
+				raise(.pointerout, from, target)
+				crossing(.pointerleave, from, target, target)
+				raise(.pointerover, target, from)
+				crossing(.pointerenter, target, from, from)
+				state.over = target
+			}
+			if action.event == .pointermove {
+				raise(.pointermove, target, nil)
+				return try flush() ?? calls
+			}
+			raise(action.event, target, nil)
+			if let early = try flush() {
+				self.touches[pointerId] = nil
+				return early
+			}
+			self.touches[pointerId] = nil
+			raise(.pointerout, target, nil)
+			crossing(.pointerleave, target, nil, nil)
+			return try flush() ?? calls
+		}
 	}
 
 	/// The shown instances with an `idle` (or `visible`) handler that has not run for them, in document order.
@@ -952,10 +1072,16 @@ public final class NativeRuntime {
 				guard case let .string(node) = value, isElement(node) else { throw RuntimeError(reason: "\(command)() on a value that is not an element") }
 				if command == "focus" { focused = node }
 				calls.append(.command(node: node, command: command, preventScroll: preventScroll))
+			case let .capture(target, pointer, release):
+				guard case let .string(node) = try evaluate(target, in: scope), case let .number(id) = try evaluate(pointer, in: scope),
+					let touch = touches[id]
+				else { continue }
+				if !release { touch.capture = node } else if touch.capture == node { touch.capture = nil }
 			case let .call(call, object, arguments, result, then):
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):
-				var fields: [(String, JSONValue)] = [("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? [])
+				let touch = touchFields.compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
+				var fields: [(String, JSONValue)] = [("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? []) + touch
 				var pressed: [String] = []
 				if case let .string(reason)? = eventFields?[.reason] {
 					var press: JSONValue = .null

@@ -55,8 +55,10 @@ sealed interface Expr {
 	/** The current row's item of a list. */
 	data class Item(val repeat: String) : Expr
 	data class Call(val name: String, val arguments: List<Expr>) : Expr
-	/** A field of the event running the handler: `value`, `reason`, `pressTarget`, `target` or `button`. */
+	/** A field of the event running the handler: an input's `value`, a dismissal's `reason` and `pressTarget`, or a pointer field. */
 	data class Event(val field: String) : Expr
+	/** Whether the element [node] has captured the touch [pointer] (`hasPointerCapture`). */
+	data class Captures(val node: Expr, val pointer: Expr) : Expr
 	/** The focused element's id, or [NATIVE_DOCUMENT_BODY] when none has focus. */
 	data object Focused : Expr
 	/** Whether the element [node] is [within] or inside it. */
@@ -163,7 +165,12 @@ data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boo
 data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
 
 /** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Dismiss] is a sheet's platform close or an overlay's Escape or outside press. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
-enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"), PointerDown("pointerdown"), PointerUp("pointerup") }
+/** [pointer]: an event a touch raises; [touch]: one of those a host reports, from which the runtime raises the rest. */
+enum class EventName(val wire: String, val pointer: Boolean = false, val touch: Boolean = false) {
+	Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"),
+	PointerDown("pointerdown", true, true), PointerMove("pointermove", true, true), PointerUp("pointerup", true, true), PointerCancel("pointercancel", true, true),
+	PointerOver("pointerover", true), PointerOut("pointerout", true), PointerEnter("pointerenter", true), PointerLeave("pointerleave", true),
+}
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
@@ -187,6 +194,8 @@ sealed interface Op {
 	data class Tick(val node: String) : Op
 	/** Runs function [fn] of the payload's script with [bindings]; a throw or rejection writes `{ name, message }` to [catch] when there is one. */
 	data class Script(val fn: String, val type: String, val bindings: Map<String, ScriptBinding>, val catch: String? = null) : Op
+	/** `setPointerCapture(pointer)` on the element [node] evaluates to, or with [release] `releasePointerCapture(pointer)`. */
+	data class Capture(val node: Expr, val pointer: Expr, val release: Boolean) : Op
 }
 
 /** A device call a task cell starts at mount. */
@@ -344,6 +353,7 @@ data class Payload(
 			is Expr.Call -> e.arguments.any(::hasScript)
 			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked -> false
 			is Expr.Contains -> hasScript(e.within) || hasScript(e.node)
+			is Expr.Captures -> hasScript(e.node) || hasScript(e.pointer)
 			is Expr.FocusOrigin -> hasScript(e.overlay)
 			is Expr.IsElement -> hasScript(e.value)
 		}
@@ -356,6 +366,7 @@ data class Payload(
 				is Op.Assign -> hasScript(op.value)
 				is Op.Navigate -> op.params.values.any(::hasScript)
 				is Op.After -> hasScript(op.ms) || op.capture.any { hasScript(it.second) } || scriptOps(op.ops)
+				is Op.Capture -> hasScript(op.node) || hasScript(op.pointer)
 				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick -> false
 			}
 		}
@@ -378,6 +389,7 @@ data class Payload(
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
 			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked -> emptyList()
 			is Expr.Contains -> cellsOf(e.within) + cellsOf(e.node)
+			is Expr.Captures -> cellsOf(e.node) + cellsOf(e.pointer)
 			is Expr.FocusOrigin -> cellsOf(e.overlay)
 			is Expr.IsElement -> cellsOf(e.value)
 			is Expr.Script -> cellsOf(e.bindings)
@@ -416,7 +428,7 @@ data class Payload(
 		private val BINARY = setOf("+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=")
 		private val LOGICAL = setOf("&&", "||", "??")
 		private val METHODS = setOf("filter", "map", "findIndex", "some", "every", "includes", "indexOf", "join", "concat", "slice", "reverse", "toReversed", "toUpperCase", "toLowerCase", "trim")
-		private val EVENT_FIELDS = setOf("value", "reason", "pressTarget", "target", "button")
+		private val EVENT_FIELDS = setOf("value", "reason", "pressTarget", "target", "currentTarget", "relatedTarget", "button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp")
 		private val BUILTINS = setOf("String", "Number", "Boolean", "Math.abs", "Math.floor", "Math.max", "Math.min", "Math.round", "Date.now", "Date.toISOString")
 
 		private fun oneOf(o: Map<String, Json>, key: String, allowed: Set<String>, what: String): String {
@@ -477,6 +489,7 @@ data class Payload(
 					Expr.Focused
 				}
 				o.containsKey("contains") -> { o.only(setOf("contains", "node"), what); Expr.Contains(sub("contains"), sub("node")) }
+				o.containsKey("captures") -> { o.only(setOf("captures", "pointer"), what); Expr.Captures(sub("captures"), sub("pointer")) }
 				o.containsKey("focusOrigin") -> { o.only(setOf("focusOrigin"), what); Expr.FocusOrigin(sub("focusOrigin")) }
 				o.containsKey("isElement") -> { o.only(setOf("isElement"), what); Expr.IsElement(sub("isElement")) }
 				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
@@ -713,6 +726,14 @@ data class Payload(
 				val node = if (raw is Json.Str) Expr.Literal(JsValue.Str(raw.value)) else expr(raw, "$what.node")
 				for (c in cellsOf(node)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
 				return Op.Command(node, command, preventScroll)
+			}
+			if (name == "capture") {
+				o.only(setOf("op", "node", "pointer", "release"), what)
+				val raw = o.field("node", what)
+				val node = if (raw is Json.Str) Expr.Literal(JsValue.Str(raw.value)) else expr(raw, "$what.node")
+				val pointer = expr(o.field("pointer", what), "$what.pointer")
+				for (c in cellsOf(node) + cellsOf(pointer)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				return Op.Capture(node, pointer, flag(o, "release", what))
 			}
 			if (name == "if") {
 				o.only(setOf("op", "test", "whenTrue", "whenFalse"), what)

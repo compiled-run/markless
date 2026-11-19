@@ -521,3 +521,42 @@ at `3312b9e420`): **iOS 89 of 89**; **Android 69 of 89** in the full run, then t
 fresh build. Swift: 32 tests pass. Kotlin JVM: 684 of 684 checks over 35 files (the vectors and the scroll vectors).
 
 **Family probe:** 5 of 46 families built before, 7 after (modal, popover); none moved back.
+
+## Round five (2026-11-18): pointer events
+
+What a touch raises on a phone is now what a phone's browser raises. The reference is the recordings in
+`packages/mobile/conformance/recorded/`: a recorder page (`recorder.html`) opened in Safari on the iOS 27.2 simulator,
+driven by a Maestro flow (XCTest touches), and in Chrome 133 on the Android 36 emulator, driven by `adb shell input`. Each
+step was a tap, a tap elsewhere, a tap on the bare page, a drag the element captured, a drag across an element with no
+`touch-action`, a drag whose element released capture, a drag a parent captured from its child, a drag in a scroll box,
+and a long press.
+
+- `pointer-recordings.test.ts` replays each recorded touch through the reference runtime (each down, move, up and cancel
+  on the element the browser hit) and checks the events it raises against the browser's, in order. 14 of 14 pass. The
+  runtime does what Chrome does; where Safari differs the test names the difference: Safari gives no `relatedTarget`
+  on boundary events, sends the first move after a parent's capture to the child before moving over, and after a
+  cancel leaves only the touched element.
+- Hover on a touch: both browsers raise `pointerover`/`pointerenter` before `pointerdown` and `pointerout`/`pointerleave`
+  after `pointerup`, so pointer hover lasts only while the finger is down. The compatibility mouse events after a tap
+  leave the mouse "over" the tapped element until the next tap elsewhere; phones raise no mouse events.
+- Not matched: Chrome cancels a sideways drag on an element with no `touch-action` even when nothing scrolls sideways;
+  Safari does not, and neither do the phones (they cancel when a native scroll view starts scrolling). Chrome's long press
+  raises `contextmenu` then `pointercancel`; the phones raise neither. Android reports no pointer events inside a system
+  sheet's own window. The phones apply no `touch-action` to the page's own scroll (Dragon refuses one that would matter
+  inside a scroll box).
+
+| | Before | After |
+|---|---|---|
+| Vector files | 35 | 36 (`touch.json` new); reproduced by the reference, by Swift (38 core tests) and Kotlin (745 checks) |
+| Rung T1 (touch) | | reference, Chromium, iOS simulator, Android emulator |
+| iOS ladder | 89 of 89 | 90 of 90 |
+| Android ladder | 89 of 89 | 90 of 90 (no reruns) |
+| Family probe (main at `b547d995b`) | 12 of 46 build, 428 diagnostics | 12 of 46 build, 403 diagnostics |
+
+No family builds yet because of pointer events alone. On main, #829 runs a handler the data path refuses as JavaScript,
+and most family pointer handlers land there. A JavaScript pointer handler's event now carries the touch's plain fields
+(`clientX`, `clientY`, `pointerId`, `pointerType`, `button`, `buttons`, `isPrimary`, `timeStamp`; vector
+`touch-script.json`); the elements a touch names (`relatedTarget`, capture on `currentTarget`) stay with data handlers,
+since JavaScript on a phone holds no element yet. The refusal that blocks most families is now a JavaScript handler or
+computed that reads the family's shared state (30 families). Pointer handlers refused for a touch field: 9 families on
+main, 1 here (`relatedTarget`, `pressure`, `getCoalescedEvents` remain).
