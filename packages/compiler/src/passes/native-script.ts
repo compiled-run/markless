@@ -184,15 +184,52 @@ var frameOf = function (bindings) {
 			var object = {};
 			Object.keys(binding.fields).forEach(function (field) { cellProperty(object, field, binding.fields[field]); });
 			Object.defineProperty(names, name, { enumerable: true, value: object });
-		} else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
+		} else if ('elements' in binding) Object.defineProperty(names, name, { enumerable: true, value: elementsOf(binding.elements) });
+		else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
 	});
 	return names;
 };
+// An element is a proxy that offers only what the host answers: the attributes it has now, whether it holds another
+// element, and the commands a handler's data can run. No tree walking, no selectors, no layout.
+var elementFacts = {};
+var proxies = {};
+var elementOf = function (id) {
+	if (typeof id !== 'string') return id;
+	if (proxies[id]) return proxies[id];
+	var facts = function () {
+		if (!elementFacts[id]) throw new Error('the host described no element ' + id);
+		return elementFacts[id];
+	};
+	var own = function (name) { return Object.prototype.hasOwnProperty.call(facts().attributes, String(name).toLowerCase()); };
+	var command = function (name, preventScroll) { host.out.commands.push([id, name, preventScroll]); };
+	var proxy = {
+		getAttribute: function (name) { return own(name) ? facts().attributes[String(name).toLowerCase()] : null; },
+		hasAttribute: own,
+		contains: function (other) {
+			var node = other && other.__node;
+			if (typeof node !== 'string') return false;
+			return node === id || (!!elementFacts[node] && elementFacts[node].ancestors.indexOf(id) >= 0);
+		},
+		focus: function (options) { command('focus', !!(options && options.preventScroll)); },
+		scrollIntoView: function () { command('scrollIntoView', false); },
+		showModal: function () { command('showModal', false); },
+		close: function () { command('close', false); },
+		getBoundingClientRect: function () {
+			throw new Error('getBoundingClientRect() asks the host to measure while JavaScript waits, which a phone does not answer');
+		},
+	};
+	Object.defineProperty(proxy, '__node', { value: id });
+	proxies[id] = proxy;
+	return proxy;
+};
+var elementsOf = function (value) { return Array.isArray(value) ? value.map(elementOf) : elementOf(value); };
 var begin = function (entry) {
+	elementFacts = entry.elements || {};
+	proxies = {};
 	cells = entry.cells;
 	before = {};
 	for (var slot in cells) before[slot] = JSON.stringify(cells[slot]);
-	host.out = { timers: [], clears: [], requests: [], logs: [] };
+	host.out = { timers: [], clears: [], requests: [], logs: [], commands: [] };
 	host.seed = entry.seed || null;
 	host.counter = 0;
 };
@@ -274,7 +311,7 @@ g.__markless[id] = {
 		}
 		var out = host.out;
 		host.out = null;
-		return JSON.stringify({ writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, logs: out.logs });
+		return JSON.stringify({ writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, logs: out.logs, commands: out.commands });
 	},
 };`;
 

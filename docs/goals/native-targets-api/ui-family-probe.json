@@ -259,7 +259,8 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `storeFor` uses a call to `stores.get`, which needs a script engine",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `fileuploadState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `fileuploadItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
-			"MARKLESS_NATIVE_UNSUPPORTED: the change handler on the <input> component-edge:2/h4: a text field raises it when it loses focus, which a native build has no lowering for yet"
+			"MARKLESS_NATIVE_UNSUPPORTED: the change handler on the <input> component-edge:2/h4: a text field raises it when it loses focus, which a native build has no lowering for yet",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/fileupload/fileupload-files.ts uses `DOMException`, which a phone's script engine does not provide"
 		]
 	},
 	"gridlist": {
@@ -329,7 +330,7 @@
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerup handler reads `menuState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `menuItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `menuState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
-			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler reads `menuItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)"
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/menu/menu-walk.ts uses `CustomEvent`: the DOM, which a phone does not have"
 		]
 	},
 	"menubar": {
@@ -489,11 +490,10 @@
 		]
 	},
 	"select": {
-		"payload": false,
+		"payload": true,
 		"diagnostics": [
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:1/h3 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:7/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `selectState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)"
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:7/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
 		]
 	},
 	"slider": {
@@ -633,10 +633,10 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <div> component-edge:6/component-edge:0/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:6/component-edge:0/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_JAVASCRIPT: the computed `labelCount` reads `tourState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
-			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `tourState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler reads `event.detail`, which a tap on a phone does not have",
 			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler reads `tourItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
-			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler reads `tourState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)"
+			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler reads `tourState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/tour/tour-anchor.ts uses `HTMLElement`: the DOM, which a phone does not have"
 		]
 	},
 	"tree": {

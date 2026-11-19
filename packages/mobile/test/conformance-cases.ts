@@ -113,6 +113,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'records',
+		fixture: 'test/fixtures/Records.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'route',
 		fixture: 'proofs/10-url-route/App.tsrx',
 		page: 'pages/[fruit].tsrx',
@@ -557,6 +566,27 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h4' },
 			{ event: 'idle', host: 'h1' },
 			{ event: 'visible', host: 'h3@a' },
+		],
+	},
+	{
+		name: 'element-proxies',
+		fixture: 'test/fixtures/OptionFocus.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'element-proxies-shared',
+		fixture: 'test/fixtures/SharedOptions.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:0/h0' },
 		],
 	},
 	{

@@ -16,6 +16,7 @@ import {
 	type NativeAction,
 	nativeShownTexts,
 	type NativeRuntime,
+	type NativeScreen,
 } from '../src/index.ts';
 import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
@@ -267,15 +268,35 @@ function walkApp(
 	steps: readonly LadderStep[],
 	start: string,
 	styled: ReadonlySet<string> = new Set(),
+	position?: LadderRung['location'],
 ) {
 	const services = scriptServices();
 	const appRuntime = createNativeAppRuntime(app, start, new Map(), services.host);
 	const pageOf = (route: string) => app.routes.find((entry) => entry.pattern === route)!.page;
-	const stack = appRuntime
-		.screens()
-		.map((screen) =>
-			mirror(pageOf(screen.route), screen.runtime, new Map(), styled.has(screen.route)),
-		);
+	// A screen's device, as a host's when the flow granted every permission: its values when it opens, then its asks answered.
+	const wake = (screen: NativeScreen, shown: ReturnType<typeof mirror>) => {
+		const runtime = screen.runtime;
+		for (const cell of pageOf(screen.route).cells) {
+			if (!cell.device) continue;
+			if (cell.device !== 'location.access')
+				throw new Error(`no fake ${cell.device} in an app`);
+			for (const entry of runtime.dispatch({ event: 'device', cell: cell.id, value: 'granted' }))
+				shown.apply(entry, -1);
+		}
+		for (const task of runtime.tasks())
+			for (const entry of runtime.dispatch({
+				event: 'settle',
+				cell: task.result!,
+				value: { ...position!, accuracy: 5 },
+			}))
+				shown.apply(entry, -1);
+	};
+	const open = (screen: NativeScreen) => {
+		const shown = mirror(pageOf(screen.route), screen.runtime, new Map(), styled.has(screen.route));
+		wake(screen, shown);
+		return shown;
+	};
+	const stack = appRuntime.screens().map(open);
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
 		if (action && 'back' in action) {
@@ -310,14 +331,7 @@ function walkApp(
 				const opened = appRuntime.screens().at(-1)!;
 				expect(opened.route, `step ${index}: the screen opened`).toBe(entry.route);
 				if (entry.replace) stack.pop();
-				stack.push(
-					mirror(
-						pageOf(opened.route),
-						opened.runtime,
-						new Map(),
-						styled.has(opened.route),
-					),
-				);
+				stack.push(open(opened));
 			}
 			for (const next of answered)
 				for (const entry of appRuntime.dispatch(next)) stack.at(-1)!.apply(entry, index);
@@ -1076,7 +1090,7 @@ test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders(
 	'%s: the app payload walks the steps as a stack of screens',
 	async (folder) => {
 		const rung = readRung(folder);
-		const build = await compileRungApp(join(proofsDir, folder));
+		const build = await compileRungApp(join(proofsDir, folder), readAppConfig(join(proofsDir, folder)));
 		expect(
 			build.diagnostics.map((diagnostic) => `${diagnostic.page}: ${diagnostic.message}`),
 		).toEqual([]);
@@ -1085,6 +1099,7 @@ test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders(
 			rung.steps,
 			rung.start ?? '/',
 			new Set(build.styleInputs.map((input) => input.pattern)),
+			rung.location,
 		);
 	},
 );
