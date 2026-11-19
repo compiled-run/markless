@@ -3,10 +3,11 @@ import { createServer } from 'node:http';
 import { readdir, readFile, rm } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { chromium, webkit } from '@playwright/test';
+import { webkit } from '@playwright/test';
 import { resolve } from 'pathe';
 import { expect, test, vi } from 'vitest';
 import { listenOnFreePort } from './helpers/listen.ts';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 const exec = promisify(execFile);
 
@@ -85,7 +86,7 @@ test.each([
 			}
 		});
 		const port = await listenOnFreePort(server);
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const errors: string[] = [];
 			const count = (page: import('@playwright/test').Page) =>
@@ -174,7 +175,7 @@ test('WebKit runs onIdle no sooner than 200 ms after load', async () => {
 		}
 	});
 	const port = await listenOnFreePort(server);
-	const browser = await webkit.launch();
+	const browser = await launchBrowser(webkit);
 	try {
 		const page = await browser.newPage();
 		await page.addInitScript(() =>

@@ -301,6 +301,7 @@ export default defineConfig({
 					// One id per run: the typescript-plugin test files build the same
 					// dist/ from separate workers and lock on it to build it once.
 					env: { MARKLESS_TSPLUGIN_CJS_BUILD_RUN: randomUUID() },
+					globalSetup: ['scripts/test-utils/browser-broker-setup.ts'],
 					setupFiles: [
 						'scripts/ci/in-worker-build-slot.ts',
 						// CI's unit budget splits its memory peak by test file.
@@ -316,6 +317,7 @@ export default defineConfig({
 					name: 'native-web',
 					environment: 'node',
 					include: [...NATIVE_WEB_TESTS],
+					globalSetup: ['scripts/test-utils/browser-broker-setup.ts'],
 					setupFiles: ['scripts/ci/in-worker-build-slot.ts'],
 				},
 			},

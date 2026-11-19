@@ -3,11 +3,11 @@ import { createServer } from 'node:http';
 import { readFile, rm } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { chromium } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterAll, expect, test } from 'vitest';
 import { buildFixture } from '../../router/test/support/fixture-build.ts';
 import { listenOnFreePort } from './helpers/listen.ts';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 // The linker keys a composed child by the module it is imported from, not by its declared name.
 
@@ -45,7 +45,7 @@ test('CSR: same-name default and named exports from different directories render
 		}
 	});
 	const port = await listenOnFreePort(server);
-	const browser = await chromium.launch();
+	const browser = await launchBrowser();
 	try {
 		const page = await browser.newPage();
 		const errors: string[] = [];
