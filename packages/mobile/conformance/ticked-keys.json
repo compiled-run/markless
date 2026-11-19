@@ -1,0 +1,295 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "TickedKeys",
+		"cells": [
+			{
+				"id": "state:note",
+				"name": "note",
+				"initial": "none"
+			},
+			{
+				"id": "state:focused",
+				"name": "focused",
+				"initial": "nothing"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "input",
+				"parent": "h0",
+				"attributes": {
+					"type": "radio",
+					"aria-label": "Small",
+					"name": "size"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "input",
+				"parent": "h0",
+				"attributes": {
+					"type": "radio",
+					"aria-label": "Large",
+					"name": "size"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "input",
+				"parent": "h0",
+				"attributes": {
+					"type": "checkbox",
+					"aria-label": "News"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"cell": "state:note"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"cell": "state:focused"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "activate",
+				"handler": "handler:h1/tick"
+			},
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:h2/tick"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:h3/tick"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:h1/tick",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"checked": "h1"
+						},
+						"whenTrue": [],
+						"whenFalse": [
+							{
+								"op": "tick",
+								"node": "h1"
+							},
+							{
+								"op": "assign",
+								"cell": "state:note",
+								"value": {
+									"literal": "small"
+								}
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "handler:h2/tick",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"checked": "h2"
+						},
+						"whenTrue": [],
+						"whenFalse": [
+							{
+								"op": "tick",
+								"node": "h2"
+							},
+							{
+								"op": "assign",
+								"cell": "state:note",
+								"value": {
+									"literal": "large"
+								}
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "handler:h3/tick",
+				"ops": [
+					{
+						"op": "tick",
+						"node": "h3"
+					},
+					{
+						"op": "assign",
+						"cell": "state:note",
+						"value": {
+							"template": [
+								"news ",
+								{
+									"call": "String",
+									"arguments": [
+										{
+											"checked": "h3"
+										}
+									]
+								},
+								""
+							]
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h4:text0",
+			"none"
+		],
+		[
+			"h5:text0",
+			"nothing"
+		]
+	],
+	"initialChecks": [
+		[
+			"h1",
+			false
+		],
+		[
+			"h2",
+			false
+		],
+		[
+			"h3",
+			false
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "small"
+				},
+				{
+					"op": "property",
+					"node": "h1",
+					"name": "checked",
+					"value": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "large"
+				},
+				{
+					"op": "property",
+					"node": "h1",
+					"name": "checked",
+					"value": false
+				},
+				{
+					"op": "property",
+					"node": "h2",
+					"name": "checked",
+					"value": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "news true"
+				},
+				{
+					"op": "property",
+					"node": "h3",
+					"name": "checked",
+					"value": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "news false"
+				},
+				{
+					"op": "property",
+					"node": "h3",
+					"name": "checked",
+					"value": false
+				}
+			]
+		}
+	]
+}

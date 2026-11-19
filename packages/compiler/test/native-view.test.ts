@@ -274,6 +274,81 @@ export function Field() @{
 		);
 	});
 
+	it('leaves out key and focus handlers on a checkbox or radio button, which a tap ticks and no soft keyboard types in', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Choice() @{
+	let note = state('');
+	<main>
+		<input type="radio" aria-label="Small" onFocus={() => (note = 'focus')} onKeyDown={() => (note = 'key')} onChange={() => (note = 'small')} />
+		<input type="checkbox" aria-label="News" onBlur={() => (note = 'blur')} onChange={() => (note = 'news')} />
+		<input type="text" aria-label="Name" onFocus={() => (note = 'typing')} />
+		<p>{note}</p>
+	</main>
+}`);
+		expect(diagnostics.map((d) => [d.code, d.message])).toEqual([
+			[
+				'MARKLESS_NATIVE_KEYBOARD_ONLY',
+				'the focus handler on <input> h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out',
+			],
+			[
+				'MARKLESS_NATIVE_KEYBOARD_ONLY',
+				'the keydown handler on <input> h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out',
+			],
+			[
+				'MARKLESS_NATIVE_KEYBOARD_ONLY',
+				'the blur handler on <input> h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out',
+			],
+			[NATIVE_UNSUPPORTED_CODE, 'the focus event has no native meaning yet'],
+		]);
+		expect(payload).toBeNull();
+	});
+
+	it('gives a state field whose first value is undefined a null cell, as a native expression spells undefined', async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { shared, state } from '@markless/core';
+const pickState = shared(() => {
+	const pick = state({ chosen: undefined as string | undefined, count: 0 });
+	return { ...pick };
+}, { scope: 'subtree' });
+function Picker() @{
+	const pick = pickState();
+	<p>{pick.chosen === undefined ? 'unset' : pick.chosen}</p>
+}
+export function Page() @{
+	let note = state({ text: undefined as string | undefined });
+	<main>
+		<Picker />
+		<p>{note.text ?? 'no note'}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.cells.map((cell) => [cell.name, cell.initial])).toEqual([
+			['note.text', null],
+			['pick.chosen', null],
+			['pick.count', 0],
+		]);
+	});
+
+	it('refuses a strict comparison that would tell undefined from null where a native cell cannot', async () => {
+		const { payload, diagnostics } = await nativeView(
+			`import { state } from '@markless/core';
+export function Page() @{
+	let draft = state({ given: undefined as string | undefined, held: null as string | null });
+	<main>
+		<p>{draft.given === null ? 'null' : 'not null'}</p>
+		<p>{draft.held === undefined ? 'undefined' : 'defined'}</p>
+		<p>{draft.given === undefined && draft.held === null ? 'both as written' : 'no'}</p>
+	</main>
+}`,
+			dataOnly,
+		);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'a text expression compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null',
+			'a text expression compares with `undefined` a value whose first value is `null`; a native value does not tell undefined from null',
+		]);
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{
@@ -337,6 +412,53 @@ export function Bar() @{
 		expect(payload?.handlers[0]?.ops).toEqual([
 			{ op: 'assign', cell: 'state:picked', value: { literal: 'one' } },
 		]);
+	});
+
+	it('passes a prop that follows state as the live expression it was written as: a computed, a sum, a prop passed on', async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { computed, state } from '@markless/core';
+function Badge({ total }) @{
+	<span hidden={total === 0}>{total}</span>
+}
+function Header({ heading, size }) @{
+	<header><h1>{heading}</h1><Badge total={size} /></header>
+}
+export function Page() @{
+	let picks = state(0);
+	const heading = computed(() => (picks > 2 ? 'Many' : 'Few'));
+	<main>
+		<Header heading={heading} size={picks * 2} />
+		<button onClick={() => picks++}>Pick</button>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const elementOf = (tag: string) =>
+			payload?.nodes.find((node) => node.kind === 'element' && node.element === tag);
+		const textIn = (tag: string) =>
+			payload?.nodes.find(
+				(node) => node.kind === 'text' && node.parent === elementOf(tag)?.id,
+			);
+		const doubled = { binary: '*', left: { cell: 'state:picks' }, right: { literal: 2 } };
+		expect(textIn('h1')).toMatchObject({
+			parts: [
+				{
+					expr: {
+						if: { binary: '>', left: { cell: 'state:picks' }, right: { literal: 2 } },
+						whenTrue: { literal: 'Many' },
+						whenFalse: { literal: 'Few' },
+					},
+				},
+			],
+		});
+		expect(textIn('span')).toMatchObject({ parts: [{ expr: doubled }] });
+		expect(elementOf('span')).toMatchObject({
+			bindings: [
+				{
+					attribute: 'hidden',
+					value: { binary: '===', left: doubled, right: { literal: 0 } },
+				},
+			],
+		});
 	});
 
 	it('lowers a keyed @for to a list region whose rows read their item, and array writes to methods', async () => {
@@ -981,7 +1103,9 @@ export function Shelf() @{
 	</section>
 }`);
 		expect(diagnostics).toEqual([]);
-		const branch = payload!.nodes.find((node) => node.kind === 'branch' && !node.id.endsWith(':empty'))!;
+		const branch = payload!.nodes.find(
+			(node) => node.kind === 'branch' && !node.id.endsWith(':empty'),
+		)!;
 		const repeat = payload!.nodes.find((node) => node.kind === 'repeat')!;
 		expect(repeat.arm).toEqual({ branch: branch.id, index: 0 });
 		expect(payload!.nodes.find((node) => node.id === `${repeat.id}:empty`)?.arm).toEqual({
@@ -1796,7 +1920,6 @@ export function Page() @{
 }`);
 		expect(plain.payload!.script).toBeUndefined();
 	});
-
 });
 
 describe('element proxies', () => {

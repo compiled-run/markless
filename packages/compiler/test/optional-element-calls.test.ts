@@ -25,7 +25,10 @@ export function Preference() @{
 			argumentSources: ['{ preventScroll: true }'],
 		}),
 	]);
-	expect(handler.elementHandleReads).toEqual([]);
+	// The receiver is read as the handle, as the non-optional `selected.focus()` reads it.
+	expect(handler.elementHandleReads).toEqual([
+		{ source: 'selected', handleId: 'element:selected', handleName: 'selected' },
+	]);
 	expect(result.symbolModules.diagnostics).toEqual([]);
 	const emitted = result.symbolModules.modules.find((module) => module.kind === 'event-handler');
 	expect(emitted?.source).toContain(
@@ -141,15 +144,25 @@ export function Preference() @{
 	]);
 });
 
-test('unsupported computed optional methods retain unresolved-reference diagnostics', async () => {
-	const result = await compile(`
+test('a computed optional method reads the handle and keeps the authored call', async () => {
+	const { run } = await emittedHandler(`
 import { element } from '@markless/core';
 export function Preference() @{
  let control = element<HTMLButtonElement>();
  <button el={control} onClick={(event) => control?.[event.method]({ preventScroll: true })}>Choose</button>
 }
 `);
-	expect(result.symbolModules.diagnostics).toContainEqual(
-		expect.objectContaining({ code: 'MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE' }),
-	);
+	const events: unknown[] = [];
+	const element = {
+		focus(this: unknown, options: unknown) {
+			expect(this).toBe(element);
+			events.push(['focus', options]);
+		},
+	};
+	for (const mounted of [true, false])
+		await run({
+			event: { method: 'focus' },
+			getElementHandle: () => (mounted ? element : undefined),
+		});
+	expect(events).toEqual([['focus', { preventScroll: true }]]);
 });

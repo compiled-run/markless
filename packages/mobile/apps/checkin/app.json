@@ -1,0 +1,8 @@
+{
+	"device": {
+		"usage": {
+			"camera": "Field notes takes a photo for each check-in.",
+			"location": "Field notes records where each check-in was made."
+		}
+	}
+}

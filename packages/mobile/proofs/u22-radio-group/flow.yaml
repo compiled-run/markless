@@ -1,0 +1,46 @@
+appId: ${APP_ID}
+name: u22-radio-group
+---
+- launchApp:
+      clearState: true
+- assertVisible: Billing
+- assertVisible: Billing period
+- assertVisible: Pick monthly
+- assertVisible: Pick annual
+- assertVisible: Pick lifetime
+- assertVisible: Size
+- assertVisible: Pick small
+- assertVisible: Pick large
+- assertVisible: 'Plan: none'
+- assertVisible: 'Size: small'
+- assertNotVisible: 'Plan: monthly'
+- assertNotVisible: 'Plan: annual'
+- assertNotVisible: 'Plan: lifetime'
+- assertNotVisible: 'Size: large'
+- tapOn: Pick annual
+- assertVisible: 'Plan: annual'
+- assertNotVisible: 'Plan: none'
+- assertVisible: 'Plan: annual'
+- assertVisible: 'Size: small'
+- assertNotVisible: 'Plan: none'
+- assertNotVisible: 'Plan: monthly'
+- assertNotVisible: 'Plan: lifetime'
+- assertNotVisible: 'Size: large'
+- tapOn: Pick monthly
+- assertVisible: 'Plan: monthly'
+- assertNotVisible: 'Plan: annual'
+- assertVisible: 'Plan: monthly'
+- assertVisible: 'Size: small'
+- assertNotVisible: 'Plan: none'
+- assertNotVisible: 'Plan: annual'
+- assertNotVisible: 'Plan: lifetime'
+- assertNotVisible: 'Size: large'
+- tapOn: Pick large
+- assertVisible: 'Size: large'
+- assertNotVisible: 'Size: small'
+- assertVisible: 'Plan: monthly'
+- assertVisible: 'Size: large'
+- assertNotVisible: 'Plan: none'
+- assertNotVisible: 'Plan: annual'
+- assertNotVisible: 'Plan: lifetime'
+- assertNotVisible: 'Size: small'
