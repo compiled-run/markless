@@ -79,6 +79,8 @@ sealed interface ScriptBinding {
 	data class Cell(val cell: String) : ScriptBinding
 	data class Fields(val fields: Map<String, String>) : ScriptBinding
 	data class Value(val value: Expr) : ScriptBinding
+	/** An element, or an array of them, the function reads through proxies the host answers. */
+	data class Elements(val value: Expr) : ScriptBinding
 }
 
 /** The JavaScript a payload's script ops and script computeds run, kept in the engine under [id]; [services] are the host services it uses. */
@@ -382,6 +384,7 @@ data class Payload(
 				is ScriptBinding.Cell -> listOf(b.cell)
 				is ScriptBinding.Fields -> b.fields.values.toList()
 				is ScriptBinding.Value -> cellsOf(b.value)
+				is ScriptBinding.Elements -> cellsOf(b.value)
 			}
 		}
 
@@ -396,6 +399,7 @@ data class Payload(
 					ScriptBinding.Fields(bo.field("fields", what).obj("$what.$name.fields").entries.associateTo(LinkedHashMap()) { (f, c) -> f to c.str("$what.$name.fields.$f") })
 				}
 				bo.containsKey("value") -> { bo.only(setOf("value"), "$what.$name"); ScriptBinding.Value(expr(bo.field("value", what), "$what.$name.value")) }
+				bo.containsKey("elements") -> { bo.only(setOf("elements"), "$what.$name"); ScriptBinding.Elements(expr(bo.field("elements", what), "$what.$name.elements")) }
 				else -> throw MarklessDecodeError("$what.$name is an unknown script binding (fields ${bo.keys})")
 			}
 		}

@@ -330,7 +330,34 @@ class Runtime(
 			is ScriptBinding.Cell -> "{\"slot\":${jsonString(slot(b.cell, scope))}}"
 			is ScriptBinding.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(slot(it.value, scope))}" }}}"
 			is ScriptBinding.Value -> "{\"value\":${jsonValue(evaluate(b.value, scope))}}"
+			is ScriptBinding.Elements -> "{\"elements\":${jsonValue(evaluate(b.value, scope))}}"
 		}
+	}
+
+	/** What the host tells a script about the elements its frame passes as proxies: each one's attributes now and the elements it is inside, nearest first. */
+	private fun elementFacts(bindings: Map<String, ScriptBinding>, scope: Scope): String {
+		val facts = LinkedHashMap<String, String>()
+		fun add(value: JsValue) {
+			if (value !is JsValue.Str) return
+			val id = value.value
+			if (id in facts || id == NATIVE_DOCUMENT_BODY || !isElement(id)) return
+			val key = if ('@' in id) id.substring(id.indexOf('@')) else ""
+			val node = elementOf(id.substringBefore('@'))
+			val names = LinkedHashSet<String>(node.attributes.keys.sorted()).apply { addAll(node.bindings.filter { !it.property }.map { it.name }) }
+			val attributes = names.mapNotNull { name -> attributeNow(node.id, name)?.let { "${jsonString(name)}:${jsonString(it)}" } }
+			val ancestors = ArrayList<String>()
+			var up = node.parent
+			while (up != null) {
+				ancestors.add(jsonString(if (key.isNotEmpty() && byId[up]?.row != null) up + key else up))
+				up = byId[up]?.parent
+			}
+			facts[id] = "{\"attributes\":${attributes.joinToString(",", "{", "}")},\"ancestors\":${ancestors.joinToString(",", "[", "]")}}"
+		}
+		for (b in bindings.values) if (b is ScriptBinding.Elements) when (val v = evaluate(b.value, scope)) {
+			is JsValue.Arr -> v.items.forEach(::add)
+			else -> add(v)
+		}
+		return facts.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value}" }
 	}
 
 	/** Every current value by slot, and the seed `crypto` draws from when the script uses it. */
@@ -377,6 +404,19 @@ class Runtime(
 					q.field("body", "request").let { if (it == Json.Null) null else it.str("request.body") },
 				)
 				JournalEntry.Fetch(id(o.field("id", "leave().requests[]")), request)
+			} +
+			(if (result.containsKey("commands")) list("commands") else emptyList()).mapNotNull { c ->
+				val parts = c.arr("leave().commands[]")
+				val node = parts[0].str("leave().commands[][0]")
+				val command = parts[1].str("leave().commands[][1]")
+				// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
+				if (command == "showModal" || command == "close") {
+					if (node !in dialogs) throw MarklessRuntimeError("$command() on $node, which is not a dialog")
+					dialogs[node] = command == "showModal"
+					return@mapNotNull null
+				}
+				if (command == "focus") focused = node
+				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
 			}
 	}
 
@@ -794,7 +834,7 @@ class Runtime(
 			is Op.Script -> {
 				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
-				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"event\":$event$catch"))
+				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope)},\"event\":$event$catch"))
 			}
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)

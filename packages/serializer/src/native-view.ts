@@ -143,7 +143,13 @@ export const NATIVE_DOCUMENT_BODY = '#body';
 export type NativeScriptBinding =
 	| { readonly cell: string }
 	| { readonly fields: Readonly<Record<string, string>> }
-	| { readonly value: NativeExpr };
+	| { readonly value: NativeExpr }
+	/**
+	 * An element (its node id) or an array of them, which the function reads through proxies: `getAttribute`,
+	 * `hasAttribute`, `contains`, and the commands `focus` and `scrollIntoView`. The host answers each read from the
+	 * entry's `elements`: the attributes each element has now and the elements it is inside.
+	 */
+	| { readonly elements: NativeExpr };
 
 export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
 
