@@ -1,0 +1,224 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "TypedTarget",
+		"cells": [
+			{
+				"id": "component-edge:0/shared:src/typed-target.tsrx#fieldState/state:field.value",
+				"name": "field.value",
+				"initial": ""
+			},
+			{
+				"id": "component-edge:0/shared:src/typed-target.tsrx#fieldState/state:field.changes",
+				"name": "field.changes",
+				"initial": 0
+			},
+			{
+				"id": "component-edge:0/state:loud",
+				"name": "loud",
+				"initial": ""
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "div",
+				"parent": "h4"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h1",
+				"element": "input",
+				"parent": "component-edge:0/h0",
+				"attributes": {
+					"aria-label": "Name"
+				},
+				"bindings": [
+					{
+						"property": "value",
+						"value": {
+							"cell": "component-edge:0/shared:src/typed-target.tsrx#fieldState/state:field.value"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h2",
+				"element": "p",
+				"parent": "component-edge:0/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h2:text0",
+				"parent": "component-edge:0/h2",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Kept ",
+								{
+									"cell": "component-edge:0/shared:src/typed-target.tsrx#fieldState/state:field.value"
+								},
+								" after ",
+								{
+									"cell": "component-edge:0/shared:src/typed-target.tsrx#fieldState/state:field.changes"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h3",
+				"element": "p",
+				"parent": "component-edge:0/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h3:text0",
+				"parent": "component-edge:0/h3",
+				"parts": [
+					{
+						"cell": "component-edge:0/state:loud"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:0/h1",
+				"event": "input",
+				"handler": "handler:component-edge:0/event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:0/event:0",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"event": "value"
+							},
+							"right": {
+								"cell": "component-edge:0/shared:src/typed-target.tsrx#fieldState/state:field.value"
+							}
+						},
+						"whenTrue": [],
+						"whenFalse": [
+							{
+								"op": "assign",
+								"cell": "component-edge:0/shared:src/typed-target.tsrx#fieldState/state:field.value",
+								"value": {
+									"event": "value"
+								}
+							},
+							{
+								"op": "assign",
+								"cell": "component-edge:0/shared:src/typed-target.tsrx#fieldState/state:field.changes",
+								"value": {
+									"binary": "+",
+									"left": {
+										"cell": "component-edge:0/shared:src/typed-target.tsrx#fieldState/state:field.changes"
+									},
+									"right": {
+										"literal": 1
+									}
+								}
+							}
+						]
+					},
+					{
+						"op": "assign",
+						"cell": "component-edge:0/state:loud",
+						"value": {
+							"method": "toUpperCase",
+							"target": {
+								"event": "value"
+							},
+							"arguments": []
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"component-edge:0/h2:text0",
+			"Kept  after 0"
+		],
+		[
+			"component-edge:0/h3:text0",
+			""
+		]
+	],
+	"initialProperties": [
+		[
+			"component-edge:0/h1",
+			"value",
+			""
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "input",
+				"host": "component-edge:0/h1",
+				"value": "ada"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h2:text0",
+					"value": "Kept ada after 1"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h3:text0",
+					"value": "ADA"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "component-edge:0/h1",
+				"value": "ada"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "component-edge:0/h1",
+				"value": "bo"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h2:text0",
+					"value": "Kept bo after 2"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h3:text0",
+					"value": "BO"
+				}
+			]
+		}
+	]
+}

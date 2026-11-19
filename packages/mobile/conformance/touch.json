@@ -1,0 +1,1099 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Touch",
+		"cells": [
+			{
+				"id": "state:log",
+				"name": "log",
+				"initial": ""
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"cell": "state:log"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "div",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h2"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Knob"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "div",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Other"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "div",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Free"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h0",
+				"event": "pointerenter",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h0",
+				"event": "pointerleave",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h2",
+				"event": "pointerover",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h2",
+				"event": "pointerout",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "h2",
+				"event": "pointerenter",
+				"handler": "handler:event:4"
+			},
+			{
+				"host": "h2",
+				"event": "pointerleave",
+				"handler": "handler:event:5"
+			},
+			{
+				"host": "h2",
+				"event": "pointerdown",
+				"handler": "handler:event:6"
+			},
+			{
+				"host": "h2",
+				"event": "pointermove",
+				"handler": "handler:event:7"
+			},
+			{
+				"host": "h2",
+				"event": "pointerup",
+				"handler": "handler:event:8"
+			},
+			{
+				"host": "h2",
+				"event": "pointercancel",
+				"handler": "handler:event:9"
+			},
+			{
+				"host": "h3",
+				"event": "pointerover",
+				"handler": "handler:event:10"
+			},
+			{
+				"host": "h3",
+				"event": "pointerout",
+				"handler": "handler:event:11"
+			},
+			{
+				"host": "h4",
+				"event": "pointerover",
+				"handler": "handler:event:12"
+			},
+			{
+				"host": "h4",
+				"event": "pointerout",
+				"handler": "handler:event:13"
+			},
+			{
+				"host": "h4",
+				"event": "pointerenter",
+				"handler": "handler:event:14"
+			},
+			{
+				"host": "h4",
+				"event": "pointerleave",
+				"handler": "handler:event:15"
+			},
+			{
+				"host": "h4",
+				"event": "pointermove",
+				"handler": "handler:event:16"
+			},
+			{
+				"host": "h4",
+				"event": "pointerup",
+				"handler": "handler:event:17"
+			},
+			{
+				"host": "h4",
+				"event": "pointercancel",
+				"handler": "handler:event:18"
+			},
+			{
+				"host": "h5",
+				"event": "pointerdown",
+				"handler": "handler:event:19"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:log"
+							},
+							"right": {
+								"literal": " enter:main"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:log"
+							},
+							"right": {
+								"literal": " leave:main"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"binary": "+",
+								"left": {
+									"cell": "state:log"
+								},
+								"right": {
+									"literal": " over:pad/"
+								}
+							},
+							"right": {
+								"if": {
+									"binary": "===",
+									"left": {
+										"event": "relatedTarget"
+									},
+									"right": {
+										"literal": null
+									}
+								},
+								"whenTrue": {
+									"literal": "none"
+								},
+								"whenFalse": {
+									"literal": "some"
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"binary": "+",
+								"left": {
+									"cell": "state:log"
+								},
+								"right": {
+									"literal": " out:pad/"
+								}
+							},
+							"right": {
+								"if": {
+									"binary": "===",
+									"left": {
+										"event": "relatedTarget"
+									},
+									"right": {
+										"literal": null
+									}
+								},
+								"whenTrue": {
+									"literal": "none"
+								},
+								"whenFalse": {
+									"literal": "some"
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:4",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:log"
+							},
+							"right": {
+								"literal": " enter:pad"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:5",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:log"
+							},
+							"right": {
+								"literal": " leave:pad"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:6",
+				"ops": [
+					{
+						"op": "capture",
+						"node": {
+							"event": "currentTarget"
+						},
+						"pointer": {
+							"event": "pointerId"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"binary": "+",
+								"left": {
+									"binary": "+",
+									"left": {
+										"binary": "+",
+										"left": {
+											"binary": "+",
+											"left": {
+												"binary": "+",
+												"left": {
+													"binary": "+",
+													"left": {
+														"binary": "+",
+														"left": {
+															"binary": "+",
+															"left": {
+																"binary": "+",
+																"left": {
+																	"binary": "+",
+																	"left": {
+																		"binary": "+",
+																		"left": {
+																			"binary": "+",
+																			"left": {
+																				"binary": "+",
+																				"left": {
+																					"binary": "+",
+																					"left": {
+																						"binary": "+",
+																						"left": {
+																							"cell": "state:log"
+																						},
+																						"right": {
+																							"literal": " down:pad/"
+																						}
+																					},
+																					"right": {
+																						"event": "pointerType"
+																					}
+																				},
+																				"right": {
+																					"literal": "/"
+																				}
+																			},
+																			"right": {
+																				"event": "pointerId"
+																			}
+																		},
+																		"right": {
+																			"literal": "/"
+																		}
+																	},
+																	"right": {
+																		"event": "button"
+																	}
+																},
+																"right": {
+																	"literal": "/"
+																}
+															},
+															"right": {
+																"event": "buttons"
+															}
+														},
+														"right": {
+															"literal": "/"
+														}
+													},
+													"right": {
+														"event": "clientX"
+													}
+												},
+												"right": {
+													"literal": ","
+												}
+											},
+											"right": {
+												"event": "clientY"
+											}
+										},
+										"right": {
+											"literal": "/"
+										}
+									},
+									"right": {
+										"event": "isPrimary"
+									}
+								},
+								"right": {
+									"literal": "/"
+								}
+							},
+							"right": {
+								"event": "timeStamp"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:7",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"binary": "+",
+								"left": {
+									"binary": "+",
+									"left": {
+										"binary": "+",
+										"left": {
+											"binary": "+",
+											"left": {
+												"binary": "+",
+												"left": {
+													"cell": "state:log"
+												},
+												"right": {
+													"literal": " move:pad/"
+												}
+											},
+											"right": {
+												"event": "button"
+											}
+										},
+										"right": {
+											"literal": "/"
+										}
+									},
+									"right": {
+										"event": "buttons"
+									}
+								},
+								"right": {
+									"literal": "/"
+								}
+							},
+							"right": {
+								"event": "clientX"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:8",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"binary": "+",
+								"left": {
+									"binary": "+",
+									"left": {
+										"binary": "+",
+										"left": {
+											"cell": "state:log"
+										},
+										"right": {
+											"literal": " up:pad/"
+										}
+									},
+									"right": {
+										"event": "button"
+									}
+								},
+								"right": {
+									"literal": "/"
+								}
+							},
+							"right": {
+								"event": "buttons"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:9",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"binary": "+",
+								"left": {
+									"binary": "+",
+									"left": {
+										"binary": "+",
+										"left": {
+											"cell": "state:log"
+										},
+										"right": {
+											"literal": " cancel:pad/"
+										}
+									},
+									"right": {
+										"event": "clientX"
+									}
+								},
+								"right": {
+									"literal": ","
+								}
+							},
+							"right": {
+								"event": "clientY"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:10",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:log"
+							},
+							"right": {
+								"literal": " over:knob"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:11",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:log"
+							},
+							"right": {
+								"literal": " out:knob"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:12",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:log"
+							},
+							"right": {
+								"literal": " over:other"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:13",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:log"
+							},
+							"right": {
+								"literal": " out:other"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:14",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:log"
+							},
+							"right": {
+								"literal": " enter:other"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:15",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:log"
+							},
+							"right": {
+								"literal": " leave:other"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:16",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:log"
+							},
+							"right": {
+								"literal": " move:other"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:17",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:log"
+							},
+							"right": {
+								"literal": " up:other"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:18",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:log"
+							},
+							"right": {
+								"literal": " cancel:other"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:19",
+				"ops": [
+					{
+						"op": "capture",
+						"node": {
+							"event": "currentTarget"
+						},
+						"pointer": {
+							"event": "pointerId"
+						},
+						"release": true
+					},
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"binary": "+",
+								"left": {
+									"cell": "state:log"
+								},
+								"right": {
+									"literal": " down:free/"
+								}
+							},
+							"right": {
+								"if": {
+									"captures": {
+										"event": "currentTarget"
+									},
+									"pointer": {
+										"event": "pointerId"
+									}
+								},
+								"whenTrue": {
+									"literal": "held"
+								},
+								"whenFalse": {
+									"literal": "released"
+								}
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			""
+		],
+		[
+			"h3:text0",
+			"Knob"
+		],
+		[
+			"h4:text0",
+			"Other"
+		],
+		[
+			"h5:text0",
+			"Free"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h3",
+				"pointerId": 1,
+				"x": 40,
+				"y": 120,
+				"time": 1000
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h3",
+				"pointerId": 1,
+				"x": 40,
+				"y": 120,
+				"time": 1080
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h3",
+				"pointerId": 2,
+				"x": 40,
+				"y": 120,
+				"time": 2000
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointermove",
+				"host": "h3",
+				"pointerId": 2,
+				"x": 52,
+				"y": 118,
+				"time": 2016
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointermove",
+				"host": "h4",
+				"pointerId": 2,
+				"x": 64.5,
+				"y": 190,
+				"time": 2032
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52 move:pad/-1/1/64.5"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h4",
+				"pointerId": 2,
+				"x": 64.5,
+				"y": 190,
+				"time": 2048
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52 move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h5",
+				"pointerId": 3,
+				"x": 40,
+				"y": 300,
+				"time": 3000
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52 move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main enter:main down:free/released"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointermove",
+				"host": "h4",
+				"pointerId": 3,
+				"x": 40,
+				"y": 200,
+				"time": 3016
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52 move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main enter:main down:free/released over:other enter:other move:other"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointermove",
+				"host": "h4",
+				"pointerId": 3,
+				"x": 40,
+				"y": 190,
+				"time": 3032
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52 move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main enter:main down:free/released over:other enter:other move:other move:other"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h4",
+				"pointerId": 3,
+				"x": 40,
+				"y": 190,
+				"time": 3048
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52 move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main enter:main down:free/released over:other enter:other move:other move:other up:other out:other leave:other leave:main"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h4",
+				"pointerId": 4,
+				"x": 40,
+				"y": 190,
+				"time": 4000
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52 move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main enter:main down:free/released over:other enter:other move:other move:other up:other out:other leave:other leave:main over:other enter:main enter:other"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointermove",
+				"host": "h4",
+				"pointerId": 4,
+				"x": 40,
+				"y": 180,
+				"time": 4016
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52 move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main enter:main down:free/released over:other enter:other move:other move:other up:other out:other leave:other leave:main over:other enter:main enter:other move:other"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointercancel",
+				"host": "h4",
+				"pointerId": 4,
+				"x": 40,
+				"y": 170,
+				"time": 4032
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52 move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main enter:main down:free/released over:other enter:other move:other move:other up:other out:other leave:other leave:main over:other enter:main enter:other move:other cancel:other out:other leave:other leave:main"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h2",
+				"pointerId": 5,
+				"x": 30,
+				"y": 110,
+				"time": 5000
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52 move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main enter:main down:free/released over:other enter:other move:other move:other up:other out:other leave:other leave:main over:other enter:main enter:other move:other cancel:other out:other leave:other leave:main over:pad/none enter:main enter:pad down:pad/touch/5/0/1/30,110/true/5000"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h4",
+				"pointerId": 6,
+				"x": 30,
+				"y": 190,
+				"time": 5010
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52 move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main enter:main down:free/released over:other enter:other move:other move:other up:other out:other leave:other leave:main over:other enter:main enter:other move:other cancel:other out:other leave:other leave:main over:pad/none enter:main enter:pad down:pad/touch/5/0/1/30,110/true/5000 over:other enter:main enter:other"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h4",
+				"pointerId": 6,
+				"x": 30,
+				"y": 190,
+				"time": 5100
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52 move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main enter:main down:free/released over:other enter:other move:other move:other up:other out:other leave:other leave:main over:other enter:main enter:other move:other cancel:other out:other leave:other leave:main over:pad/none enter:main enter:pad down:pad/touch/5/0/1/30,110/true/5000 over:other enter:main enter:other up:other out:other leave:other leave:main"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h2",
+				"pointerId": 5,
+				"x": 30,
+				"y": 110,
+				"time": 5110
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": " over:knob over:pad/none enter:main enter:pad down:pad/touch/1/0/1/40,120/true/1000 out:knob out:pad/some over:pad/some up:pad/0/0 out:pad/none leave:pad leave:main over:knob over:pad/none enter:main enter:pad down:pad/touch/2/0/1/40,120/true/2000 out:knob out:pad/some over:pad/some move:pad/-1/1/52 move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main enter:main down:free/released over:other enter:other move:other move:other up:other out:other leave:other leave:main over:other enter:main enter:other move:other cancel:other out:other leave:other leave:main over:pad/none enter:main enter:pad down:pad/touch/5/0/1/30,110/true/5000 over:other enter:main enter:other up:other out:other leave:other leave:main up:pad/0/0 out:pad/none leave:pad leave:main"
+				}
+			]
+		}
+	]
+}

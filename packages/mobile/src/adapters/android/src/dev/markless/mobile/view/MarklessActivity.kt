@@ -22,7 +22,6 @@ import android.view.WindowInsetsController
 import android.widget.EditText
 import android.widget.FrameLayout
 import dev.markless.mobile.core.AppPayload
-import android.widget.ScrollView
 import dev.markless.mobile.core.FOCUS_INTO_VIEW
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.style.StyleExport
@@ -185,7 +184,7 @@ abstract class MarklessActivity : Activity() {
 	private fun show(next: MarklessHost) {
 		host = next
 		// The page's own scroll view, as a browser's viewport: its content starts inside the system bars and scrolls under them.
-		val page = ScrollView(this).apply { isFillViewport = true; clipToPadding = false }
+		val page = PageScrollView(this).apply { isFillViewport = true; clipToPadding = false; onTake = next::scrollTookTouches }
 		val content = object : FrameLayout(this) {
 			override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
 				val f = host.rootFrame

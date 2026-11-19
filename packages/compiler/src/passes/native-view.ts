@@ -25,6 +25,7 @@ import {
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
+	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
 	NATIVE_SCRIPT_HOST_GLOBALS,
 	NATIVE_SCRIPT_LANGUAGE_GLOBALS,
@@ -32,6 +33,7 @@ import {
 	NATIVE_VIEW_VERSION,
 	type NativeFieldKind,
 	type NativeForm,
+	type NativePointerEventName,
 	PLATFORM_PIECES_NAMESPACE,
 	PLATFORM_PIECES_PACKAGE,
 } from '@markless/serializer/native-view';
@@ -174,8 +176,30 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	[PROTOCOL_VISIBLE_EVENT_NAME]: 'visible',
 	[DISMISS_EVENT]: 'dismiss',
 	pointerdown: 'pointerdown',
+	pointermove: 'pointermove',
 	pointerup: 'pointerup',
+	pointercancel: 'pointercancel',
+	pointerover: 'pointerover',
+	pointerout: 'pointerout',
+	pointerenter: 'pointerenter',
+	pointerleave: 'pointerleave',
 };
+
+const CAPTURE_METHODS: ReadonlySet<string> = new Set([
+	'setPointerCapture',
+	'releasePointerCapture',
+]);
+
+const POINTER_EVENTS: ReadonlySet<string> = new Set<NativePointerEventName>([
+	'pointerdown',
+	'pointermove',
+	'pointerup',
+	'pointercancel',
+	'pointerover',
+	'pointerout',
+	'pointerenter',
+	'pointerleave',
+]);
 
 /** The fields a dismiss or pointer event carries, by how a handler reads them off its event parameter. */
 const EVENT_FIELDS: Readonly<
@@ -185,7 +209,19 @@ const EVENT_FIELDS: Readonly<
 	>
 > = {
 	dismiss: { 'detail.reason': 'reason', 'detail.pressTarget': 'pressTarget' },
-	pointer: { target: 'target', button: 'button' },
+	pointer: {
+		target: 'target',
+		currentTarget: 'currentTarget',
+		relatedTarget: 'relatedTarget',
+		button: 'button',
+		buttons: 'buttons',
+		clientX: 'clientX',
+		clientY: 'clientY',
+		pointerId: 'pointerId',
+		pointerType: 'pointerType',
+		isPrimary: 'isPrimary',
+		timeStamp: 'timeStamp',
+	},
 };
 
 /** `event.detail.reason` as `detail.reason` when `expression` is a member path of the read `event`. */
@@ -1726,7 +1762,10 @@ export function createNativeViewPayload(
 				);
 		}
 		const isParam = (part: string) =>
-			part.startsWith('[') && part.endsWith(']') && !part.startsWith('[[') && !part.startsWith('[...');
+			part.startsWith('[') &&
+			part.endsWith(']') &&
+			!part.startsWith('[[') &&
+			!part.startsWith('[...');
 		const candidates = options.routes.flatMap((route) => {
 			const pattern = route.pattern.split('/').filter((part) => part.length > 0);
 			if (pattern.some((part) => part.startsWith('[') && !isParam(part)))
@@ -1736,14 +1775,17 @@ export function createNativeViewPayload(
 			const params: Record<string, string | NativeExpr> = {};
 			for (const [index, part] of pattern.entries()) {
 				const shape = shapes[index]!;
-				if (isParam(part)) params[part.slice(1, -1)] = typeof shape === 'string' ? shape : { template: [shape] };
+				if (isParam(part))
+					params[part.slice(1, -1)] =
+						typeof shape === 'string' ? shape : { template: [shape] };
 				else if (typeof shape !== 'string') exact = false;
 				else if (shape !== part) return [];
 			}
 			return [{ route, exact, params }];
 		});
 		const [only] = candidates;
-		if (candidates.length === 1 && only?.exact) return linkRoute(only.route.pattern, only.params, span);
+		if (candidates.length === 1 && only?.exact)
+			return linkRoute(only.route.pattern, only.params, span);
 		return refuse(
 			candidates.length === 0
 				? `${what} that matches no route of this app`
@@ -2375,6 +2417,8 @@ export function createNativeViewPayload(
 	let lateLowering = false;
 	/** Whether the handler being lowered read the element a tap landed on. */
 	let pressedTargetRead = false;
+	/** The text field whose input handler is being lowered: its `value` there is what was typed. */
+	let typedField: string | undefined;
 	const nodeById = () => new Map(nodes.map((node) => [node.id, node]));
 
 	/** A handle read as a value in a handler: its element (null when unbound), or its elements in order when plural. */
@@ -2436,6 +2480,29 @@ export function createNativeViewPayload(
 		};
 	};
 
+	/** `setPointerCapture(pointer)` or `releasePointerCapture(pointer)` on an element value. */
+	const captureOn = (
+		node: NativeExpr,
+		pointer: SemanticExpression,
+		method: string,
+		optional: boolean,
+		what: string,
+		scope: Scope,
+	): NativeOp[] => {
+		if ('literal' in node && node.literal === null && optional) return [];
+		const id = exprOf(pointer, what, scope);
+		if (!id) return [];
+		const element = elementOf(node);
+		return [
+			{
+				op: 'capture',
+				node: element ?? node,
+				pointer: id,
+				...(method === 'releasePointerCapture' ? { release: true as const } : {}),
+			},
+		];
+	};
+
 	/** `contains`, `getAttribute` and `hasAttribute` on an element known when the app is built. */
 	const elementMethod = (
 		element: string,
@@ -2445,6 +2512,10 @@ export function createNativeViewPayload(
 		scope: Scope,
 	): NativeExpr | null => {
 		const [first, ...more] = args;
+		if (method === 'hasPointerCapture' && first && more.length === 0) {
+			const pointer = exprOf(first, what, scope);
+			return pointer && { captures: elementValue(element), pointer };
+		}
 		if (method === 'contains' && first && more.length === 0) {
 			const other = exprOf(first, what, scope);
 			if (!other) return null;
@@ -3043,6 +3114,16 @@ export function createNativeViewPayload(
 					holder.object.name === scope.event
 				)
 					return { event: 'value' };
+				// An input event's target is the field typed into, as an element its handler can pass on.
+				if (
+					scope.event !== undefined &&
+					typedField !== undefined &&
+					(expression.property === 'currentTarget' || expression.property === 'target') &&
+					holder.kind === 'read' &&
+					holder.name === scope.event &&
+					!scope.locals.has(holder.name)
+				)
+					return elementValue(typedField);
 				if (
 					holder.kind === 'read' &&
 					!scope.locals.has(holder.name) &&
@@ -3084,6 +3165,8 @@ export function createNativeViewPayload(
 									`${what} reads \`.${expression.property}\` of an error; a native build reads its \`message\` and \`name\``,
 								);
 				const element = elementOf(object);
+				if (element !== undefined && element === typedField && expression.property === 'value')
+					return { event: 'value' };
 				if (element !== undefined && isTicked(element)) {
 					if (expression.property === 'checked') return { checked: element };
 					if (expression.property === 'value')
@@ -3291,6 +3374,15 @@ export function createNativeViewPayload(
 					) {
 						const node = exprOf(expression.arguments[0], what, scope);
 						return node && { contains: holder, node };
+					}
+					if (
+						element === undefined &&
+						holder &&
+						expression.method === 'hasPointerCapture' &&
+						expression.arguments.length === 1
+					) {
+						const pointer = exprOf(expression.arguments[0], what, scope);
+						return pointer && { captures: holder, pointer };
 					}
 					if (element === undefined) {
 						if (holder === null && expression.object.kind === 'new') return null;
@@ -4068,7 +4160,10 @@ export function createNativeViewPayload(
 						refuse('a <Link> whose params are not strings this build can compute');
 						continue;
 					}
-					if (replace && (replace.kind !== 'serializable' || typeof replace.value !== 'boolean')) {
+					if (
+						replace &&
+						(replace.kind !== 'serializable' || typeof replace.value !== 'boolean')
+					) {
 						refuse('a <Link> whose `replace` is not fixed at build time');
 						continue;
 					}
@@ -4088,7 +4183,10 @@ export function createNativeViewPayload(
 					for (const prop of edge.props) {
 						if (['href', 'params', 'replace', 'children'].includes(prop.name)) continue;
 						if (prop.kind === 'callback' || prop.kind === 'spread') {
-							refuse(`the \`${prop.name}\` prop of a <Link>`, prop.sourceSpan ?? edge.sourceSpan);
+							refuse(
+								`the \`${prop.name}\` prop of a <Link>`,
+								prop.sourceSpan ?? edge.sourceSpan,
+							);
 							ownAttributes = false;
 							continue;
 						}
@@ -4099,7 +4197,8 @@ export function createNativeViewPayload(
 						}
 						if (!('literal' in value)) bindings.push({ attribute: prop.name, value });
 						else if (value.literal !== null && value.literal !== false)
-							attributes[prop.name] = value.literal === true ? '' : String(value.literal);
+							attributes[prop.name] =
+								value.literal === true ? '' : String(value.literal);
 					}
 					if (!ownAttributes) continue;
 					const fixedHref =
@@ -4127,7 +4226,8 @@ export function createNativeViewPayload(
 								: linkRoute(fixedHref, paramValues, edge.sourceSpan);
 					if (!route) continue;
 					// The anchor's attributes as the router renders them, so styles see a link (`:any-link`) as the web does.
-					if (fixedHref === undefined) bindings.push({ attribute: 'href', value: hrefValue });
+					if (fixedHref === undefined)
+						bindings.push({ attribute: 'href', value: hrefValue });
 					else attributes['href'] = fixedHref;
 					nodes.push({
 						kind: 'element',
@@ -4857,11 +4957,14 @@ export function createNativeViewPayload(
 				event.handlerSpan,
 			);
 		let readsMissing = false;
+		const semantic = SEMANTIC_EVENTS[event.eventName];
+		const touch = POINTER_EVENTS.has(semantic ?? '');
 		const eventMembers =
-			SEMANTIC_EVENTS[event.eventName] === 'dismiss'
+			semantic === 'dismiss'
 				? [...NATIVE_SCRIPT_EVENT_MEMBERS, ...NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS]
 				: NATIVE_SCRIPT_EVENT_MEMBERS;
 		for (const read of fact.event ?? []) {
+			if (touch && NATIVE_SCRIPT_POINTER_FIELDS.includes(read.path[0] ?? '')) continue;
 			const known = eventMembers.some(
 				(members) =>
 					members.every(
@@ -4871,7 +4974,14 @@ export function createNativeViewPayload(
 			);
 			if (known) continue;
 			readsMissing = true;
-			const doing = SEMANTIC_EVENTS[event.eventName] === 'input' ? 'a text edit' : 'a tap';
+			if (touch && read.path[0] && read.path[0] in EVENT_FIELDS.pointer) {
+				refuseScript(
+					`${what} reads \`event.${read.path.join('.')}\`, an element, which JavaScript on a phone cannot hold yet`,
+					read.span,
+				);
+				continue;
+			}
+			const doing = semantic === 'input' ? 'a text edit' : touch ? 'a touch' : 'a tap';
 			refuseScript(
 				`${what} reads \`event.${read.path.join('.')}\`, which ${doing} on a phone does not have`,
 				read.span,
@@ -4919,8 +5029,7 @@ export function createNativeViewPayload(
 		const submitting =
 			event.eventName === 'submit' && pressed ? { submitting: pressed.currentTarget } : {};
 		const semantic = SEMANTIC_EVENTS[event.eventName];
-		const carried =
-			semantic === 'dismiss' || semantic === 'pointerdown' || semantic === 'pointerup';
+		const carried = semantic === 'dismiss' || POINTER_EVENTS.has(semantic ?? '');
 		const inner: Scope =
 			parameter === undefined
 				? { ...running, ...submitting }
@@ -4942,9 +5051,14 @@ export function createNativeViewPayload(
 							};
 		snapshots = { handler, count: 0 };
 		continuations = { base: handler, next: 0 };
-		return lowerStatements(event.handlerStatements, inner, what, event.handlerSpan, 0, {
-			next: [],
-		}).ops;
+		typedField = 'event' in inner && inner.event !== undefined ? pressed?.currentTarget : undefined;
+		try {
+			return lowerStatements(event.handlerStatements, inner, what, event.handlerSpan, 0, {
+				next: [],
+			}).ops;
+		} finally {
+			typedField = undefined;
+		}
 	}
 
 	/** The one device call a statement awaits, and the statement's value with that await replaced by `as`. */
@@ -5734,6 +5848,19 @@ export function createNativeViewPayload(
 		if (statement.kind === 'await' || statement.kind === 'try') return [];
 		if (statement.kind === 'method-call') {
 			const command = statement.method;
+			if (CAPTURE_METHODS.has(command) && (statement.arguments ?? []).length === 1) {
+				const node = exprOf(statement.object, what, scope);
+				return node
+					? captureOn(
+							node,
+							statement.arguments![0]!,
+							command,
+							statement.optional === true,
+							what,
+							scope,
+						)
+					: [];
+			}
 			if (
 				(command !== 'focus' && command !== 'scrollIntoView') ||
 				(statement.arguments ?? []).length > 0
@@ -5829,6 +5956,33 @@ export function createNativeViewPayload(
 							)?.fields.get(receiver[0]!);
 						})()
 					: undefined;
+			const onAnElement =
+				receiverField?.kind === 'handle' ||
+				(scope.carried?.name === statement.name && receiver.length > 0) ||
+				(receiver.length === 0 &&
+					(scope.args.has(statement.name) || !scope.objects.has(statement.name)));
+			if (
+				command &&
+				CAPTURE_METHODS.has(command) &&
+				(statement.arguments ?? []).length === 1 &&
+				onAnElement
+			) {
+				const holder = receiver.reduce<SemanticExpression>(
+					(object, property) => ({ kind: 'member', object, property }),
+					{ kind: 'read', name: statement.name },
+				);
+				const node = exprOf(holder, `${what}'s call to \`${callee}\``, scope);
+				return node
+					? captureOn(
+							node,
+							statement.arguments![0]!,
+							command,
+							statement.optional === true,
+							what,
+							scope,
+						)
+					: [];
+			}
 			const onElement =
 				(command === 'focus' || command === 'scrollIntoView') &&
 				(receiverField?.kind === 'handle' ||

@@ -108,9 +108,11 @@ export type NativeExpr =
 	/**
 	 * What the event that runs the handler carries: an `input` handler's field text after the edit
 	 * (`event.currentTarget.value`); a `dismiss` handler's `event.detail.reason` and `event.detail.pressTarget` (an element,
-	 * or null for Escape); a pointer handler's `event.target` (an element) and `event.button` (0, a touch).
+	 * or null for Escape); a pointer handler's fields, as a phone's browser reports a touch (`NativePointerField`).
 	 */
-	| { readonly event: 'value' | 'reason' | 'pressTarget' | 'target' | 'button' }
+	| { readonly event: 'value' | 'reason' | 'pressTarget' | NativePointerField }
+	/** Whether the element `node` has captured the pointer `pointer` (`node.hasPointerCapture(pointer)`). */
+	| { readonly captures: NativeExpr; readonly pointer: NativeExpr }
 	/**
 	 * `new FormData(form)`: the form's entry list as the web builds it, `[name, value]` pairs in tree order. A field is left
 	 * out when it is disabled or has no name, a checkbox when it is not checked; a checkbox's value is its `value` attribute
@@ -456,8 +458,44 @@ export type NativeEventName =
 	| 'submit'
 	| 'idle'
 	| 'visible'
+	| NativePointerEventName;
+
+/**
+ * The pointer events a touch raises, in a phone browser's order (Safari on iOS, Chrome on Android): `pointerover`, then
+ * `pointerenter` on each element from the outermost to the one touched, `pointerdown`; `pointermove` while it moves;
+ * `pointerup`, or `pointercancel` when the platform takes the touch for a scroll; then `pointerout` and `pointerleave` on
+ * each element from the innermost out. The touched element captures the pointer until it lifts, so `pointermove` and
+ * `pointerup` reach it wherever the finger goes, unless a handler captures it elsewhere or releases it. Hover lasts only
+ * while the finger is down.
+ */
+export type NativePointerEventName =
 	| 'pointerdown'
-	| 'pointerup';
+	| 'pointermove'
+	| 'pointerup'
+	| 'pointercancel'
+	| 'pointerover'
+	| 'pointerout'
+	| 'pointerenter'
+	| 'pointerleave';
+
+/**
+ * What a pointer handler reads off its event. `target`, `currentTarget` and `relatedTarget` are elements (`relatedTarget`
+ * is null, as a touch has no element it came from); `clientX` and `clientY` are the touch's place in points (iOS) or dp
+ * (Android) from the screen's top left, which a browser's CSS pixels match; `pointerType` is "touch"; `timeStamp` is in
+ * milliseconds since the screen appeared.
+ */
+export type NativePointerField =
+	| 'target'
+	| 'currentTarget'
+	| 'relatedTarget'
+	| 'button'
+	| 'buttons'
+	| 'clientX'
+	| 'clientY'
+	| 'pointerId'
+	| 'pointerType'
+	| 'isPrimary'
+	| 'timeStamp';
 
 /** Why the overlay behaviour reported a dismissal; the vocabulary of `OverlayGestureReason` in `@markless/web`. */
 export type NativeDismissReason = 'escape' | 'outside-press';
@@ -500,6 +538,17 @@ export type NativeOp =
 	 * page, with the page behind inert, or takes it out again.
 	 */
 	| { readonly op: 'dialog'; readonly node: string; readonly method: 'showModal' | 'close' }
+	/**
+	 * `node.setPointerCapture(pointer)`, or with `release` `node.releasePointerCapture(pointer)`: the runtime sends that touch's
+	 * later pointer events to `node` wherever the finger goes, or again to the element under it. A pointer that is not down,
+	 * or (to release) not captured by `node`, changes nothing.
+	 */
+	| {
+			readonly op: 'capture';
+			readonly node: string | NativeExpr;
+			readonly pointer: NativeExpr;
+			readonly release?: true;
+	  }
 	/**
 	 * `element.focus()` or `element.scrollIntoView()`, after the handler's writes have reached the views. Focus moves as on
 	 * the web (a text field takes the keyboard; anything else the screen reader's cursor) and scrolls the element into view
@@ -904,6 +953,18 @@ export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> =
 export const NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> = [
 	['detail', 'reason'],
 	['detail', 'pressTarget'],
+];
+
+/** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */
+export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [
+	'button',
+	'buttons',
+	'clientX',
+	'clientY',
+	'pointerId',
+	'pointerType',
+	'isPrimary',
+	'timeStamp',
 ];
 
 /** Names for the global object itself: `window.setTimeout` reads a provided global, `window.document` does not. */

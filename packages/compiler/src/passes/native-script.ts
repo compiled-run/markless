@@ -1,4 +1,5 @@
 import type { NativeScript, NativeScriptService } from '@markless/serializer';
+import { NATIVE_SCRIPT_POINTER_FIELDS } from '@markless/serializer/native-view';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
@@ -253,7 +254,7 @@ var eventOf = function (given) {
 		// Escape has no press: the key is absent, as on the web.
 		if (given.detail.pressTarget != null) detail.pressTarget = elementOf(given.detail.pressTarget);
 	}
-	return {
+	var event = {
 		type: given.type,
 		detail: detail,
 		target: target,
@@ -263,6 +264,8 @@ var eventOf = function (given) {
 		preventDefault: function () { this.defaultPrevented = true; },
 		stopPropagation: function () {},
 	};
+	${JSON.stringify(NATIVE_SCRIPT_POINTER_FIELDS)}.forEach(function (field) { if (field in given) event[field] = given[field]; });
+	return event;
 };
 var json = function (value) { return value === undefined ? null : value; };
 // A value the page shows crosses as JSON; anything else (a RegExp, a class instance) as the text the web would show for it.

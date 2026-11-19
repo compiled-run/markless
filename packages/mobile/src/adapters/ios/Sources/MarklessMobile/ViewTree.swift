@@ -232,7 +232,7 @@ final class ViewTree {
 	private var touches: TouchWatcher?
 	/// Each drawn checkbox (false) or radio button (true) and whether it is checked.
 	private var ticks: [String: (radio: Bool, checked: Bool)] = [:]
-	private var overlays: OverlayHost!
+	private(set) var overlays: OverlayHost!
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:],
@@ -293,7 +293,7 @@ final class ViewTree {
 		overlays = OverlayHost(
 			runtime: runtime, root: root, onAction: onAction,
 			nodeOf: { [unowned self] view in
-				view.accessibilityIdentifier.flatMap { id in self.elements[id] === view ? self.templates[id] : nil }
+				view.accessibilityIdentifier.flatMap { id in self.elements[id] === view ? id : nil }
 			},
 			viewOf: { [unowned self] id in self.elements[id] },
 			restack: { [unowned self] container in if self.layout == nil { self.stack(container) } })
@@ -313,6 +313,7 @@ final class ViewTree {
 	}
 
 	func pageAppeared(_ host: UIViewController) {
+		overlays.appeared()
 		for sheet in sheets.values { sheet.hostAppeared(host) }
 	}
 
@@ -366,6 +367,7 @@ final class ViewTree {
 		dismissMessage()
 		if let touches { touches.view?.removeGestureRecognizer(touches) }
 		touches = nil
+		overlays.unmount()
 		closeSheets()
 		page.removeFromSuperview()
 	}
@@ -965,7 +967,7 @@ final class ViewTree {
 					for: .editingChanged)
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
-			case (.idle, _), (.visible, _), (.dismiss, _), (.pointerdown, _), (.pointerup, _):
+			case (.idle, _), (.visible, _), (.dismiss, _), (_, _) where event.event.isPointer:
 				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host.
 				continue
 			default:
