@@ -587,6 +587,8 @@ export type ModuleGraphInterfaceArtifact = {
 	readonly asyncPlanes?: ModuleAsyncPlanes;
 	/** A component of this module renders an `onIdle` record, itself or through a component it renders, rows and arms included. */
 	readonly idleRecords?: true;
+	/** A component of this module renders an `overlay` mark, itself or through a component it renders. */
+	readonly overlayRecords?: true;
 	/** A component of this module resolves a shared() instance that outlives the page, itself or through a component it renders. */
 	readonly liveShared?: true;
 	readonly render: {
@@ -623,6 +625,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly rejectingHandlers?: true;
 			/** This component or one it renders has an `onIdle` record. */
 			readonly idleRecords?: true;
+			/** This component or one it renders carries an `overlay` mark. */
+			readonly overlayRecords?: true;
 			/** This component or one it renders resolves a shared() instance that outlives the page. */
 			readonly liveShared?: true;
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;

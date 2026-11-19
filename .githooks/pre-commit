@@ -20,8 +20,12 @@ fi
 
 # CI's fast jobs with the exact commands from ci.yml; the unit job runs the yuku-selected tests unless MARKLESS_HOOK_ALL=1.
 export MARKLESS_CI_JSON_REPORT_DIR="$selection_dir"
-if [ -n "${selection_pid:-}" ]; then
-	wait "$selection_pid"
+[ -n "${selection_pid:-}" ] && wait "$selection_pid"
+# A pass ci:local recorded on exactly this tree, covering the tests this commit selects, is not run again.
+if node scripts/ci/pass-record.mjs check-commit "$selection_dir/selection.json"; then
+	status=0
+	unit_scope=recorded
+elif [ -n "${selection_pid:-}" ]; then
 	node scripts/ci/local.mjs --fast --bail --unit-selection "$selection_dir/selection.json"
 	status=$?
 	unit_scope=selected
@@ -39,7 +43,7 @@ rm -rf "$selection_dir"
 if [ $status -ne 0 ]; then
 	echo ""
 	echo "pre-commit: CI fast jobs failed (see above)."
-	echo "Re-run with: pnpm ci:local --fast   (MARKLESS_HOOK_ALL=1 makes the hook run every unit test)"
+	echo "Re-run with: pnpm ci:local --affected   (MARKLESS_HOOK_ALL=1 makes the hook run every unit test)"
 	exit $status
 fi
 
