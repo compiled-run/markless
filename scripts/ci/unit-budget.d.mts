@@ -21,3 +21,4 @@ export declare function descendants(
 	rootPid: number,
 	pageSize: number,
 ): Array<{ readonly pid: number; readonly ppid: number; readonly rss: number }>;
+export declare function suiteKey(budget: { readonly suite?: unknown }): string | null;

@@ -8,7 +8,10 @@ import { readWorkspaceModule } from '../src/harness/rung.ts';
 
 /** Resolves what a case imports (`@markless/ui`) from packages/mobile, where the case's `src/<name>.tsrx` stands. */
 export const readCaseModule = (specifier: string, importer: string) =>
-	readWorkspaceModule(specifier, importer.startsWith('src/') ? `packages/mobile/${importer}` : importer);
+	readWorkspaceModule(
+		specifier,
+		importer.startsWith('src/') ? `packages/mobile/${importer}` : importer,
+	);
 
 /** Each committed vector file: its component (a path inside packages/mobile) and the actions it records. */
 export const CONFORMANCE_CASES: ReadonlyArray<{
@@ -794,7 +797,11 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		name: 'navigation-deep-link',
 		app: 'proofs/n4-deep-link',
 		open: '/orders/42',
-		actions: [{ event: 'back' }, { event: 'back' }, { event: 'activate', host: 'component-edge:0' }],
+		actions: [
+			{ event: 'back' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'component-edge:0' },
+		],
 	},
 	{
 		name: 'script-first-render',
@@ -803,6 +810,17 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [
 			{ event: 'activate', host: 'h3' },
 			{ event: 'activate', host: 'component-edge:0' },
+		],
+	},
+	{
+		name: 'shell-props',
+		app: 'proofs/r139-shell-props',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:1' },
+			{ event: 'activate', host: 'h0' },
+			{ event: 'activate', host: 'h0' },
+			{ event: 'back' },
 		],
 	},
 ];

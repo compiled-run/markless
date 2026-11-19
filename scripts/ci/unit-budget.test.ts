@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { attribute, describePeak, processLabel } from './unit-budget.mjs';
+import { attribute, describePeak, processLabel, suiteKey } from './unit-budget.mjs';
 
 const script = resolve(import.meta.dirname, 'unit-budget.mjs');
 const scratch: string[] = [];
@@ -22,6 +22,7 @@ type Shard = {
 	attempt?: number;
 	exitCode?: number;
 	platform?: string;
+	fileMs?: Record<string, number>;
 };
 
 const measurementsDir = (shards: Shard[]) => {
@@ -412,6 +413,145 @@ describe('models', () => {
 		const result = run('models', '--budget', path, ...few, '--reason', 'too few');
 		expect(result.status).toBe(2);
 		expect(result.output).toContain('at least two CPU models with 5 samples each');
+	});
+});
+
+describe("the suite's own test files as the yardstick", () => {
+	const files = Array.from({ length: 25 }, (_, index) => `test/file-${index}.test.ts`);
+	const timed = (ms: number, slower: Record<string, number> = {}) =>
+		Object.fromEntries(files.map((file) => [file, slower[file] ?? ms]));
+	const models = {
+		factors: { 'test cpu': 1 },
+		calibrationS: { 'test cpu': 1 },
+		elasticity: { 'test cpu': 1 },
+	};
+	const suite = {
+		minimumMs: 100,
+		pace: { 'test cpu': 1 },
+		samples: { 'test cpu': 10 },
+		files: timed(1000),
+	};
+	const budget = {
+		...anchored,
+		models,
+		suite,
+		margin: { ...anchored.margin, models: correction(models) },
+		anchors: {
+			...anchored.anchors,
+			models: correction(models),
+			suite: suiteKey({ suite }),
+			shards: {
+				'1/2': { cpuS: 100, peakRssMb: 2000, suite: 100, typical: 100 },
+				'2/2': { cpuS: 200, peakRssMb: 1500, suite: 200, typical: 200 },
+			},
+		},
+	};
+
+	test('a shard whose calibration misreads its host counts by its own test files', () => {
+		// The same work on a host whose calibration read 15% fast: by calibration alone, +5.9%.
+		const shards = (fileMs?: Record<string, number>) => [
+			{ shard: '1/2', cpuS: 100, calibrationS: 0.85, peakRssMb: 2000, fileMs },
+			{ shard: '2/2', cpuS: 200, peakRssMb: 1500, fileMs },
+		];
+		const byCalibration = check(budget, shards());
+		expect(byCalibration.status).toBe(1);
+		expect(byCalibration.output).toContain('a shard has no file timings');
+		const byFiles = check(budget, shards(timed(1000)));
+		expect(byFiles.output).toContain("total CPU at the anchors' speed: 300 CPU-s");
+		expect(byFiles.status).toBe(0);
+	});
+
+	test('a slow host whose calibration saw it stays on budget', () => {
+		const result = check(budget, [
+			{ shard: '1/2', cpuS: 120, calibrationS: 1.2, peakRssMb: 2000, fileMs: timed(1200) },
+			{ shard: '2/2', cpuS: 200, peakRssMb: 1500, fileMs: timed(1000) },
+		]);
+		expect(result.output).toContain("total CPU at the anchors' speed: 300 CPU-s");
+		expect(result.status).toBe(0);
+	});
+
+	test('a change that slows every test file alike is over budget', () => {
+		const result = check(budget, [
+			{ shard: '1/2', cpuS: 112, peakRssMb: 2000, fileMs: timed(1120) },
+			{ shard: '2/2', cpuS: 224, peakRssMb: 1500, fileMs: timed(1120) },
+		]);
+		expect(result.output).toContain('every test file at once: +12%');
+		expect(result.status).toBe(1);
+		expect(result.output).toContain("over budget: total CPU at the anchors' speed 336 CPU-s");
+	});
+
+	test('a few slower files are over budget', () => {
+		const slower = { [files[0]]: 5000, [files[1]]: 5000, [files[2]]: 5000 };
+		const result = check(budget, [
+			{ shard: '1/2', cpuS: 136, peakRssMb: 2000, fileMs: timed(1000, slower) },
+			{ shard: '2/2', cpuS: 200, peakRssMb: 1500, fileMs: timed(1000) },
+		]);
+		expect(result.status).toBe(1);
+		expect(result.output).toContain("over budget: total CPU at the anchors' speed 336 CPU-s");
+	});
+
+	test('anchors accepted with another suite reference are stale', () => {
+		const result = check({ ...budget, suite: { ...suite, pace: { 'test cpu': 1.1 } } }, [
+			{ shard: '1/2', cpuS: 100, peakRssMb: 2000, fileMs: timed(1000) },
+			{ shard: '2/2', cpuS: 200, peakRssMb: 1500, fileMs: timed(1000) },
+		]);
+		expect(result.status).toBe(1);
+		expect(result.output).toContain(
+			'stale anchor: the suite reference changed after the anchors were accepted',
+		);
+	});
+
+	test("suite fits each file's reference and each model's CPU-s per unit of pace; accept anchors each reading", () => {
+		// Model B spends 1.5 times A's CPU-s on a shard while its files run 1.2 times slower: 1.25 times the CPU-s per unit of pace.
+		const runs = Array.from({ length: 6 }, (_, index) => [
+			{
+				shard: '1/2',
+				cpuModel: 'A',
+				cpuS: 100,
+				peakRssMb: 1000,
+				run: String(10 + index),
+				fileMs: { ...timed(1000), 'test/rare.test.ts': 500, 'test/quick.test.ts': 50 },
+			},
+			{
+				shard: '2/2',
+				cpuModel: 'B',
+				cpuS: 300,
+				peakRssMb: 1000,
+				run: String(10 + index),
+				fileMs: timed(1200),
+			},
+			{
+				shard: '1/2',
+				cpuModel: 'B',
+				cpuS: 150,
+				peakRssMb: 1000,
+				run: String(10 + index),
+				fileMs: timed(1200),
+			},
+			{
+				shard: '2/2',
+				cpuModel: 'A',
+				cpuS: 200,
+				peakRssMb: 1000,
+				run: String(10 + index),
+				fileMs: timed(1000),
+			},
+		]);
+		runs[0][0].fileMs = { ...runs[0][0].fileMs, 'test/new.test.ts': 800 };
+		const path = budgetFile(anchored);
+		const args = runs.flatMap((shards) => ['--from', measurementsDir(shards)]);
+		expect(run('suite', '--budget', path, ...args).output).toContain('suite needs --reason');
+		expect(run('suite', '--budget', path, ...args, '--reason', 'two models').status).toBe(0);
+		const fitted = JSON.parse(readFileSync(path, 'utf8'));
+		expect(Object.keys(fitted.suite.files)).toEqual([...files, 'test/rare.test.ts'].sort());
+		expect(fitted.suite.files[files[0]]).toBe(1100);
+		expect(fitted.suite.pace.B / fitted.suite.pace.A).toBeCloseTo(1.25, 2);
+		expect(fitted.history.at(-1)).toMatchObject({ change: 'suite', reason: 'two models' });
+		expect(run('accept', '--budget', path, ...args, '--reason', 'anchors').status).toBe(0);
+		const { anchors } = JSON.parse(readFileSync(path, 'utf8'));
+		expect(anchors.suite).toBe(suiteKey(fitted));
+		expect(anchors.shards['1/2'].suite).toBeGreaterThan(0);
+		expect(anchors.shards['2/2'].suite).toBeGreaterThan(0);
 	});
 });
 
