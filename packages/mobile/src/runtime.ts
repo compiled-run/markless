@@ -55,8 +55,11 @@ export type NativeAction =
 	 * not sent: the runtime reports it from `pointerdown`, as the web's overlay behaviour does.
 	 */
 	| { readonly event: 'dismiss'; readonly host: string; readonly reason: 'escape' }
-	/** A touch going down or up on the element `host` (the innermost element under it). */
-	| { readonly event: 'pointerdown' | 'pointerup'; readonly host: string }
+	/**
+	 * A touch going down or up on the element `host` (the innermost element under it), or cancelled there because the
+	 * platform took it for a scroll; after an up or a cancel the runtime raises `pointerleave` itself.
+	 */
+	| { readonly event: 'pointerdown' | 'pointerup' | 'pointercancel'; readonly host: string }
 	/** The host's back gesture (or Escape) on an open `<dialog>`: it closes, as the browser's cancel does. */
 	| { readonly event: 'cancel'; readonly host: string }
 	/** The keyboard's return key in a single-line text field. */
@@ -1082,7 +1085,7 @@ export function createNativeRuntime(
 		stack.push(overlay);
 		origins.set(overlay, NATIVE_DOCUMENT_BODY);
 	}
-	const handlerOf = (host: string, name: NativeAction['event']) =>
+	const handlerOf = (host: string, name: NativeAction['event'] | 'pointerleave') =>
 		payload.events.find((candidate) => candidate.host === host && candidate.event === name);
 	/** The scope a shown instance's handlers run in (its row's), or undefined when it is not shown. */
 	const scopeOf = (id: string): NativeScope | undefined =>
@@ -1213,7 +1216,7 @@ export function createNativeRuntime(
 					dismiss ? run(handlers.get(dismiss.handler) ?? [], fields, base) : [],
 				);
 			}
-			if (action.event === 'pointerdown' || action.event === 'pointerup') {
+			if (action.event === 'pointerdown' || action.event === 'pointerup' || action.event === 'pointercancel') {
 				const press = action.event;
 				const scope = scopeOf(action.host);
 				if (!scope) throw new Error(`${action.host} is not shown`);
@@ -1235,6 +1238,12 @@ export function createNativeRuntime(
 						const own = handlerOf(at, press);
 						if (own) runs.push({ handler: own.handler, fields: { target: action.host, button: 0 } });
 					}
+					// A finger that lifts or is cancelled leaves the element and each element it is inside, innermost first.
+					if (press !== 'pointerdown')
+						for (let at: string | null | undefined = nodeOf(action.host); at; at = nodesById.get(at)?.parent) {
+							const own = handlerOf(at, 'pointerleave');
+							if (own) runs.push({ handler: own.handler, fields: { target: at, button: 0 } });
+						}
 					for (const step of runs) {
 						const out = run(handlers.get(step.handler) ?? [], step.fields, scope);
 						if (out[0]?.op === 'navigate') return out;

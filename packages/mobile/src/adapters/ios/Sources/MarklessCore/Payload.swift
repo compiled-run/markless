@@ -235,8 +235,11 @@ public enum NativeEventName: String, Sendable {
 	case idle
 	/// Some of the element is on the screen; once for each shown instance.
 	case visible
-	/// A touch going down or up: it reaches the element under it and each element it is inside, innermost first.
-	case pointerdown, pointerup
+	/// A touch going down or up, or cancelled because the platform took it for a scroll: it reaches the element under it and
+	/// each element it is inside, innermost first.
+	case pointerdown, pointerup, pointercancel
+	/// Raised by the runtime after a touch's up or cancel, on the element and each element it is inside, innermost first.
+	case pointerleave
 }
 
 public enum NativeOp: Equatable, Sendable {

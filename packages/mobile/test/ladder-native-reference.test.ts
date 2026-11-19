@@ -816,6 +816,16 @@ function walk(
 						],
 				index,
 			);
+		} else if (action && 'dragFrom' in action) {
+			const host = elementReading(action.dragFrom);
+			if (!host) throw new Error(`step ${index}: nothing reads "${action.dragFrom}" to drag from`);
+			apply(
+				[
+					...runtime.dispatch({ event: 'pointerdown', host }),
+					...runtime.dispatch({ event: 'pointercancel', host }),
+				],
+				index,
+			);
 		} else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {

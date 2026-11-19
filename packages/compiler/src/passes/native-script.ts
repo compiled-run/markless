@@ -268,6 +268,8 @@ var eventOf = function (given) {
 		target: target,
 		currentTarget: target,
 		key: given.key,
+		// A phone's browser reports a finger as a touch pointer.
+		pointerType: String(given.type).indexOf('pointer') === 0 ? 'touch' : undefined,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
 		stopPropagation: function () {},

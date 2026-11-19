@@ -38,6 +38,11 @@ export type LadderAction =
 	| { readonly erase: string }
 	/** Two quick taps on this text or accessible name: the second press's `event.detail` is 2. */
 	| { readonly doubleTap: string }
+	/**
+	 * A finger goes down on this text or accessible name and drags the page down, which a phone takes for a scroll: the
+	 * press is cancelled (`pointercancel`, then `pointerleave`), as both phone browsers do.
+	 */
+	| { readonly dragFrom: string }
 	/** Scroll until this text is on screen. */
 	| { readonly scrollTo: string }
 	| {
@@ -390,6 +395,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 	if ('submit' in action) return [{ tapOn: selector(action.submit) }, { pressKey: 'Enter' }];
 	if ('erase' in action) return [{ tapOn: selector(action.erase) }, { pressKey: 'Backspace' }];
 	if ('doubleTap' in action) return [{ doubleTapOn: selector(action.doubleTap) }];
+	if ('dragFrom' in action)
+		return [{ swipe: { from: { text: selector(action.dragFrom) }, direction: 'DOWN' } }, { waitForAnimationToEnd: { timeout: 5000 } }];
 	if ('relaunch' in action)
 		return [
 			'stopApp',

@@ -180,6 +180,8 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	[DISMISS_EVENT]: 'dismiss',
 	pointerdown: 'pointerdown',
 	pointerup: 'pointerup',
+	pointercancel: 'pointercancel',
+	pointerleave: 'pointerleave',
 };
 
 /** The fields a dismiss or pointer event carries, by how a handler reads them off its event parameter. */
@@ -989,6 +991,11 @@ function cellsOf(expr: NativeExpr, into = new Set<string>()): Set<string> {
 		} else if (child && typeof child === 'object') cellsOf(child as NativeExpr, into);
 	}
 	return into;
+}
+
+/** The cells whose undefined or null can be the expression's value: never the left side of `??`. */
+function nullishCellsOf(expr: NativeExpr): Set<string> {
+	return 'logical' in expr && expr.logical === '??' ? nullishCellsOf(expr.right) : cellsOf(expr);
 }
 
 const BUILTIN_CALLS: Readonly<Record<string, (...args: never[]) => unknown>> = {
@@ -1952,7 +1959,7 @@ export function createNativeViewPayload(
 	function checkGlobals(globals: ReadonlyArray<SemanticScriptGlobal>, what: string): boolean {
 		let ok = true;
 		for (const global of globals) {
-			if (global.typeofOnly) continue;
+			if (global.reach === 'typeof') continue;
 			const name = GLOBAL_OBJECTS.has(global.name) && global.property !== undefined ? global.property : global.name;
 			if (GLOBAL_OBJECTS.has(name) && name === 'globalThis' && global.property === undefined) continue;
 			if (LANGUAGE_GLOBALS.has(name)) continue;
@@ -1961,6 +1968,7 @@ export function createNativeViewPayload(
 				if (service !== 'engine') scriptServices.add(service);
 				continue;
 			}
+			if (global.reach === 'ifPresent') continue;
 			ok = false;
 			const page = Object.hasOwn(NATIVE_SCRIPT_PAGE_GLOBALS, name) ? NATIVE_SCRIPT_PAGE_GLOBALS[name] : undefined;
 			const spelled = name === global.name ? name : `${global.name}.${name}`;
@@ -2135,7 +2143,7 @@ export function createNativeViewPayload(
 		if (!script) return data.value;
 		data.rollBack();
 		// The web renders the clock and random numbers once; a host evaluates a script value again whenever the page changes.
-		const unsteady = script.globals.filter((global) => !global.typeofOnly && RENDER_UNSTEADY.has(global.property ?? global.name));
+		const unsteady = script.globals.filter((global) => global.reach !== 'typeof' && RENDER_UNSTEADY.has(global.property ?? global.name));
 		const fn = attempt(() => scriptFunctionId(script, scope.module, what));
 		const bindings = attempt(() => scriptBindings(script, scope, what, true));
 		if (fn.value !== null && bindings.value !== null && unsteady.length === 0) return { script: fn.value, bindings: bindings.value };
@@ -3037,7 +3045,7 @@ export function createNativeViewPayload(
 					] as const) {
 						if (written.kind !== 'literal' || written.value !== null) continue;
 						const spelled = written.undefined ? 'undefined' : 'null';
-						const mixed = [...cellsOf(other)].some((cell) =>
+						const mixed = [...nullishCellsOf(other)].some((cell) =>
 							written.undefined
 								? initialOf(cell) === null && !undefinedFirst.has(cell)
 								: undefinedFirst.has(cell),
@@ -4775,8 +4783,14 @@ export function createNativeViewPayload(
 		handler: string,
 		pressed?: NonNullable<Scope['pressed']>,
 	): NativeOp[] {
-		if (scriptMode === 'never' || !event.handlerSpan || DATA_ONLY_EVENTS.has(event.eventName) || !scriptFacts(scope.module))
+		if (scriptMode === 'never' || !event.handlerSpan || !scriptFacts(scope.module))
 			return dataHandlerOps(event, scope, handler, pressed);
+		if (DATA_ONLY_EVENTS.has(event.eventName)) {
+			const data = attempt(() => dataHandlerOps(event, scope, handler, pressed));
+			if (!data.failed) return data.value;
+			data.rollBack();
+			return mixedHandlerOps(event, scope, handler, pressed);
+		}
 		if (scriptMode === 'all') {
 			// The engine has no field text or press count, and sees an unset cell as null: such a handler stays data.
 			const data = attempt(() => dataHandlerOps(event, scope, handler, pressed));
@@ -4899,6 +4913,45 @@ export function createNativeViewPayload(
 					framework: [],
 					unsupported: [],
 					span: { filename: module.graph.filename, start: 0, end: 0 },
+				},
+			});
+		}
+		const caught = scope.catches ? scope.catches.cell() : undefined;
+		return { op: 'script', fn: id, type: 'call', bindings, ...(caught ? { catch: caught } : {}) };
+	}
+
+	/** `numberbox.commit(event.target)` as one script op: the method runs as JavaScript, given its arguments' values. */
+	function scriptMethodCallOf(
+		method: { readonly instance: SharedInstance; readonly span: SourceSpan; readonly name: string },
+		args: ReadonlyArray<SemanticExpression>,
+		scope: Scope,
+		what: string,
+	): NativeOp | null {
+		const binding = methodBinding(method.instance, method.span, `\`${method.name}\``);
+		if (!binding) return null;
+		const names = args.map((_, index) => `__a${index}`);
+		const bindings: Record<string, NativeScriptBinding> = { __m: binding };
+		for (const [index, argument] of args.entries()) {
+			const value = exprOf(argument, `${what}'s call to \`${method.name}\``, scope);
+			if (!value) return null;
+			bindings[names[index]!] = mentionsElement(value) ? { elements: value } : { value };
+		}
+		const key = `${method.instance.module.graph.filename}\0method/${args.length}`;
+		let id = scriptFunctions.get(key)?.id;
+		if (!id) {
+			id = `fn:${scriptFunctions.size}`;
+			scriptFunctions.set(key, {
+				id,
+				module: method.instance.module,
+				fact: {
+					code: `return function () { return __s.__m(${names.map((name) => `__s.${name}`).join(', ')}); };`,
+					names: [],
+					module: [],
+					imports: [],
+					globals: [],
+					framework: [],
+					unsupported: [],
+					span: { filename: method.instance.module.graph.filename, start: 0, end: 0 },
 				},
 			});
 		}
@@ -5968,6 +6021,7 @@ export function createNativeViewPayload(
 				return [op];
 			}
 			let calling: string | undefined;
+			let method: { readonly instance: SharedInstance; readonly span: SourceSpan; readonly name: string } | undefined;
 			if (path.length === 0) {
 				const prop = propOf(statement.name, scope);
 				const found =
@@ -5990,12 +6044,14 @@ export function createNativeViewPayload(
 				const object = scope.objects.get(statement.name);
 				const instance = object?.kind === 'instance' ? object.instance : object?.instance;
 				const field = instance?.fields.get(path[0]!);
-				if (field?.kind === 'method')
+				if (field?.kind === 'method') {
 					body = {
 						statements: field.statements,
 						parameters: field.parameters,
 						scope: instance!.scope,
 					};
+					if (field.span) method = { instance: instance!, span: field.span, name: `${statement.name}.${path[0]}` };
+				}
 				else if (field?.kind === 'slot') {
 					const slot = instance!.slots.get(path[0]!);
 					if (slot?.kind === 'callback') body = slot;
@@ -6045,6 +6101,14 @@ export function createNativeViewPayload(
 				if (!data.failed) return data.value;
 				data.rollBack();
 				const scripted = attempt(() => scriptCallOf(fn, statement.arguments ?? [], scope, what));
+				if (scripted.value && !scripted.failed) return [scripted.value];
+				scripted.rollBack();
+			}
+			if (method && scriptCalls) {
+				const data = attempt(() => helperOps(body!, calling));
+				if (!data.failed) return data.value;
+				data.rollBack();
+				const scripted = attempt(() => scriptMethodCallOf(method, statement.arguments ?? [], scope, what));
 				if (scripted.value && !scripted.failed) return [scripted.value];
 				scripted.rollBack();
 			}

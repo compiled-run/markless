@@ -1064,7 +1064,7 @@ final class ViewTree {
 				area.onPaste = { text in ask(NativeAction(event: .paste, host: id, value: text)) }
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
-			case (.idle, _), (.visible, _), (.dismiss, _), (.pointerdown, _), (.pointerup, _):
+			case (.idle, _), (.visible, _), (.dismiss, _), (.pointerdown, _), (.pointerup, _), (.pointercancel, _), (.pointerleave, _):
 				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host.
 				continue
 			default:

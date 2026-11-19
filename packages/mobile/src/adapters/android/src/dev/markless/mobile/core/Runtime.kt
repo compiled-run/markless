@@ -766,7 +766,7 @@ class Runtime(
 	 * text as [value], a `keydown` its key and a `paste` the pasted text; a press carries [detail], how many presses in a
 	 * row. A `dismiss` with a [reason] is an overlay's Escape; without one, a sheet's platform close. A pointer
 	 * event reaches [host] and each element it is inside, innermost first, after a `dismiss` of the topmost overlay when a
-	 * `pointerdown` lands outside it.
+	 * `pointerdown` lands outside it; after a `pointerup` or `pointercancel`, `pointerleave` reaches the same elements.
 	 */
 	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, detail: Int? = null): List<JournalEntry> {
 		if (detail != null && event != EventName.Activate) throw MarklessRuntimeError("a ${event.wire} event carries no press count")
@@ -779,7 +779,7 @@ class Runtime(
 				dismiss?.let { withFields(mapOf("reason" to JsValue.Str(reason), "pressTarget" to JsValue.Null)) { run(it.ops, Scope.EMPTY) } } ?: emptyList()
 			}
 		}
-		if (event == EventName.PointerDown || event == EventName.PointerUp) {
+		if (event == EventName.PointerDown || event == EventName.PointerUp || event == EventName.PointerCancel) {
 			val template = host.substringBefore('@')
 			val scope = (instances(node(template)).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
 			return change(null, null) {
@@ -793,6 +793,15 @@ class Runtime(
 				while (!at.isNullOrEmpty()) {
 					handlerFor(at, event)?.let { runs.add(it to mapOf("target" to JsValue.Str(host), "button" to JsValue.Num(0.0))) }
 					at = byId[at]?.parent
+				}
+				// A finger that lifts or is cancelled leaves the element and each element it is inside, innermost first.
+				if (event != EventName.PointerDown) {
+					at = template
+					while (!at.isNullOrEmpty()) {
+						val leaving: String = at
+						handlerFor(leaving, EventName.PointerLeave)?.let { runs.add(it to mapOf("target" to JsValue.Str(leaving), "button" to JsValue.Num(0.0))) }
+						at = byId[leaving]?.parent
+					}
 				}
 				for ((id, f) in runs) {
 					val handler = handlers[id] ?: throw MarklessRuntimeError("unknown handler \"$id\"")

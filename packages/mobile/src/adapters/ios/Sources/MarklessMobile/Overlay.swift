@@ -39,7 +39,7 @@ final class OverlayHost {
 		reportsTouches = payload.nodes.contains { node in
 			if case let .element(_, attributes, _) = node.kind { return attributes[OverlayProtocol.attribute] != nil }
 			return false
-		} || payload.events.contains { $0.event == .pointerdown || $0.event == .pointerup }
+		} || payload.events.contains { [.pointerdown, .pointerup, .pointercancel, .pointerleave].contains($0.event) }
 		pageElement = payload.nodes.first { $0.parent == nil && $0.isElement }?.id
 	}
 
@@ -176,16 +176,44 @@ final class PointerObserver: UIGestureRecognizer {
 		delaysTouchesEnded = false
 	}
 
+	/// Touches down and not yet reported as lifted or cancelled.
+	private var down: [ObjectIdentifier: UITouch] = [:]
+
 	override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-		for touch in touches { report(.pointerdown, touch) }
+		for touch in touches {
+			down[ObjectIdentifier(touch)] = touch
+			report(.pointerdown, touch)
+		}
+	}
+
+	/// A phone's browser cancels a touch it takes for a scroll; here a scroll view's pan recognizing it is that moment.
+	override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+		for touch in touches where down[ObjectIdentifier(touch)] != nil {
+			let scrolling = touch.gestureRecognizers?.contains { $0 !== self && $0 is UIPanGestureRecognizer && ($0.state == .began || $0.state == .changed) } ?? false
+			if scrolling { end(touch, as: .pointercancel) }
+		}
 	}
 
 	override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
-		for touch in touches { report(.pointerup, touch) }
+		for touch in touches { end(touch, as: .pointerup) }
 		if event.allTouches?.allSatisfy({ $0.phase == .ended || $0.phase == .cancelled }) ?? true { state = .failed }
 	}
 
-	override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) { state = .failed }
+	override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+		for touch in touches { end(touch, as: .pointercancel) }
+		state = .failed
+	}
+
+	/// A scroll view's pan that takes the touch can reset this recognizer without a cancel: a touch still down was taken.
+	override func reset() {
+		for touch in Array(down.values) { end(touch, as: .pointercancel) }
+		super.reset()
+	}
+
+	private func end(_ touch: UITouch, as event: NativeEventName) {
+		guard down.removeValue(forKey: ObjectIdentifier(touch)) != nil else { return }
+		report(event, touch)
+	}
 
 	override func canPrevent(_ preventedGestureRecognizer: UIGestureRecognizer) -> Bool { false }
 	override func canBePrevented(by preventingGestureRecognizer: UIGestureRecognizer) -> Bool { false }

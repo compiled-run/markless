@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.FrameLayout
@@ -15,6 +16,7 @@ import android.window.OnBackInvokedDispatcher
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.OVERLAY_ATTRIBUTE
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
@@ -22,9 +24,11 @@ import kotlin.math.roundToInt
  * hidden from TalkBack; a non-modal one stays in place. While any is open the back gesture is its Escape, and every touch on
  * the screen is reported to the runtime as `pointerdown` and `pointerup` on the innermost element under it.
  */
+private val POINTER_EVENTS = setOf(EventName.PointerDown, EventName.PointerUp, EventName.PointerCancel, EventName.PointerLeave)
+
 internal class Overlays(private val host: MarklessHost, private val context: Context, private val dpr: Double) {
 	private val reportsTouches = host.payload.nodes.any { it is Node.Element && OVERLAY_ATTRIBUTE in it.attributes } ||
-		host.payload.events.any { it.event == EventName.PointerDown || it.event == EventName.PointerUp }
+		host.payload.events.any { it.event in POINTER_EVENTS }
 
 	private class Lifted(val id: String, val view: View, val layer: FrameLayout, val parent: ViewGroup, val index: Int, val params: ViewGroup.LayoutParams?, val background: Drawable?, val padding: IntArray)
 
@@ -99,16 +103,37 @@ internal class Overlays(private val host: MarklessHost, private val context: Con
 		lifted = null
 	}
 
+	/** Where the touch went down and on what; null once it lifted or was taken for a scroll. */
+	private var pressed: Triple<Float, Float, String>? = null
+
 	/** Called with every touch in window coordinates before the views see it; nothing is consumed. */
 	fun touch(event: MotionEvent) {
 		if (!reportsTouches) return
-		val name = when (event.actionMasked) {
-			MotionEvent.ACTION_DOWN -> EventName.PointerDown
-			MotionEvent.ACTION_UP -> EventName.PointerUp
-			else -> return
+		when (event.actionMasked) {
+			MotionEvent.ACTION_DOWN -> {
+				val target = hit(event.x.roundToInt(), event.y.roundToInt()) ?: return
+				pressed = Triple(event.x, event.y, target)
+				host.apply(host.runtime.dispatch(target, EventName.PointerDown))
+			}
+			// Chrome cancels a touch once it moves past the touch slop, taking it for a scroll.
+			MotionEvent.ACTION_MOVE -> {
+				val (x, y, target) = pressed ?: return
+				if (hypot(event.x - x, event.y - y) <= ViewConfiguration.get(context).scaledTouchSlop) return
+				pressed = null
+				host.apply(host.runtime.dispatch(target, EventName.PointerCancel))
+			}
+			MotionEvent.ACTION_CANCEL -> {
+				val (_, _, target) = pressed ?: return
+				pressed = null
+				host.apply(host.runtime.dispatch(target, EventName.PointerCancel))
+			}
+			MotionEvent.ACTION_UP -> {
+				if (pressed == null) return
+				pressed = null
+				val target = hit(event.x.roundToInt(), event.y.roundToInt()) ?: return
+				host.apply(host.runtime.dispatch(target, EventName.PointerUp))
+			}
 		}
-		val target = hit(event.x.roundToInt(), event.y.roundToInt()) ?: return
-		host.apply(host.runtime.dispatch(target, name))
 	}
 
 	/** The innermost element under the point; the top layer stands for its overlay's box, and the rest of the screen for the root. */

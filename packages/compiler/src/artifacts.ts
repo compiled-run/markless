@@ -122,8 +122,11 @@ export type NativeFactCollectors = {
 export type SemanticScriptGlobal = {
 	readonly name: string;
 	readonly span: SourceSpan;
-	/** Only `typeof name`: feature detection, which the engine answers by itself. */
-	readonly typeofOnly: boolean;
+	/**
+	 * How the code reaches it: `typeof` only feature-detects, which the engine answers by itself; `ifPresent` reads it
+	 * only past a `typeof name` test that found it defined, so never where it is absent.
+	 */
+	readonly reach: 'typeof' | 'ifPresent' | 'read';
 	/** `window.x`, `globalThis.x`, `self.x`: the property read off the global object. */
 	readonly property?: string;
 };

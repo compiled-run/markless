@@ -240,6 +240,15 @@ async function act(page: Page, step: LadderStep) {
 		for (const type of ['pointerdown', 'pointerup', 'click'])
 			await backdrop!.dispatchEvent(type, { button: 0, isPrimary: true, pointerType: 'touch' });
 	}
+	else if ('dragFrom' in action) {
+		// What both phone browsers send when a drag that starts on the element becomes a scroll (measured 2026-11-19).
+		const button = page.getByRole('button', { name: action.dragFrom, exact: true });
+		const pressed = await ((await button.count()) === 1 ? button : shown(page, action.dragFrom)).elementHandle();
+		const touch = { button: 0, isPrimary: true, pointerType: 'touch' };
+		for (const type of ['pointerdown', 'pointercancel', 'pointerout'])
+			await pressed!.dispatchEvent(type, { ...touch, bubbles: true });
+		await pressed!.dispatchEvent('pointerleave', { ...touch, bubbles: false });
+	}
 	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });
 	else if ('swipe' in action && action.swipe !== 'up') {
 		const { from, to, until } = action.swipe;

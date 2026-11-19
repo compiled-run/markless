@@ -479,7 +479,9 @@ export type NativeEventName =
 	| 'idle'
 	| 'visible'
 	| 'pointerdown'
-	| 'pointerup';
+	| 'pointerup'
+	| 'pointercancel'
+	| 'pointerleave';
 
 /** Why the overlay behaviour reported a dismissal; the vocabulary of `OverlayGestureReason` in `@markless/web`. */
 export type NativeDismissReason = 'escape' | 'outside-press';
@@ -950,6 +952,7 @@ export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> =
 	['currentTarget'],
 	['currentTarget', 'value'],
 	['currentTarget', 'checked'],
+	['pointerType'],
 ];
 
 /** Names for the global object itself: `window.setTimeout` reads a provided global, `window.document` does not. */

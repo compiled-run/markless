@@ -1,0 +1,37 @@
+appId: ${APP_ID}
+name: u40-numberbox
+---
+- launchApp:
+      clearState: true
+- assertVisible: Order
+- assertVisible: Ordered 2
+- assertVisible: Presses cancelled 0
+- assertVisible: Decrease
+- assertVisible: Increase
+- tapOn: Increase
+- assertNotVisible: Ordered 2
+- assertVisible: Ordered 3
+- assertNotVisible: Ordered 2
+- tapOn: Increase
+- assertNotVisible: Ordered 3
+- assertVisible: Ordered 4
+- assertNotVisible: Ordered 3
+- tapOn: Decrease
+- assertVisible: Ordered 3
+- assertNotVisible: Ordered 4
+- assertVisible: Ordered 3
+- assertVisible: Presses cancelled 0
+- assertNotVisible: Ordered 4
+- swipe:
+      from:
+          text: Increase
+      direction: DOWN
+- waitForAnimationToEnd:
+      timeout: 5000
+- assertVisible: Ordered 4
+- assertNotVisible: Ordered 3
+- assertNotVisible: Presses cancelled 0
+- assertVisible: Ordered 4
+- assertVisible: Presses cancelled 1
+- assertNotVisible: Ordered 3
+- assertNotVisible: Presses cancelled 0

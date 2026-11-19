@@ -893,7 +893,7 @@ public final class NativeRuntime {
 				return try dismiss.map { try self.run(self.handlers[$0.handler] ?? [], in: .empty) } ?? []
 			}
 		}
-		if action.event == .pointerdown || action.event == .pointerup {
+		if action.event == .pointerdown || action.event == .pointerup || action.event == .pointercancel {
 			guard let node = nodesById[nodeOf(action.host)], let instance = try instances(of: node).first(where: { $0.id == action.host }) else {
 				throw RuntimeError(reason: "\(action.host) is not shown")
 			}
@@ -907,6 +907,14 @@ public final class NativeRuntime {
 				while let current = at {
 					if let own = handlerOf(current, action.event) { runs.append((own.handler, [.target: .string(action.host), .button: .number(0)])) }
 					at = self.nodesById[current]?.parent
+				}
+				// A finger that lifts or is cancelled leaves the element and each element it is inside, innermost first.
+				if action.event != .pointerdown {
+					at = self.nodeOf(action.host)
+					while let current = at {
+						if let own = handlerOf(current, .pointerleave) { runs.append((own.handler, [.target: .string(current), .button: .number(0)])) }
+						at = self.nodesById[current]?.parent
+					}
 				}
 				defer { self.eventFields = nil }
 				var calls: [NativeJournalEntry] = []
