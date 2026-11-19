@@ -366,6 +366,8 @@ type Prop =
 			readonly statements: ReadonlyArray<SemanticHandlerStatement> | undefined;
 			readonly parameters: ReadonlyArray<string>;
 			readonly scope: Scope;
+			/** Where its function is written, for running it as JavaScript. */
+			readonly span?: SourceSpan;
 	  };
 
 /** One rendered instance of a `shared()` definition: its cells, handles and methods, resolved for one subtree. */
@@ -388,9 +390,15 @@ type Field =
 			readonly kind: 'method';
 			readonly statements: ReadonlyArray<SemanticHandlerStatement> | undefined;
 			readonly parameters: ReadonlyArray<string>;
+			readonly span?: SourceSpan;
 	  }
 	| { readonly kind: 'slot' }
-	| { readonly kind: 'expr'; readonly expression: SemanticExpression | undefined };
+	| {
+			readonly kind: 'expr';
+			readonly expression: SemanticExpression | undefined;
+			/** The factory's `computed(...)` it reads, by name, which can run as a script computed. */
+			readonly computed?: string;
+	  };
 
 /** A name whose members are what a native build reads: a state object split into one cell per field, or a shared instance. */
 type ObjectRef =
@@ -1404,6 +1412,7 @@ export function createNativeViewPayload(
 					kind: 'method',
 					statements: property.nativeStatements,
 					parameters: property.parameters ?? [],
+					...(property.sourceSpan ? { span: property.sourceSpan } : {}),
 				});
 			} else if (property.kind === 'callback-slot') {
 				instance.fields.set(property.name, { kind: 'slot' });
@@ -1430,6 +1439,7 @@ export function createNativeViewPayload(
 					instance.fields.set(property.name, {
 						kind: 'expr',
 						expression: binding.nativeExpression,
+						computed: binding.name,
 					});
 			}
 		}
@@ -1546,6 +1556,21 @@ export function createNativeViewPayload(
 				if (folded && lowered && cellsOf(lowered).size === 0) {
 					value = folded.value;
 					known = true;
+				} else if (lowered && row && !binding.storage && cellsOf(lowered).size === 0 && readsItemOnly(lowered)) {
+					// `state({ value })` in a part a row renders: its first value is the row's item, read when the row is built.
+					if ('object' in lowered) {
+						const fields = new Map<string, string>();
+						for (const [field, expr] of lowered.object) {
+							fields.set(field, `${id}.${field}`);
+							addCell({ id: `${id}.${field}`, name: `${binding.name}.${field}`, initial: null, row, first: expr });
+						}
+						objects.set(binding.name, { kind: 'fields', cells: fields });
+					} else {
+						byName.set(binding.name, id);
+						byBinding.set(binding.id, id);
+						addCell({ id, name: binding.name, initial: null, row, first: lowered });
+					}
+					continue;
 				}
 			}
 			if (!known || !isNativeValue(value)) {
@@ -1903,16 +1928,22 @@ export function createNativeViewPayload(
 			refuseScript(`${what} uses ${construct.construct}, which a phone's script cannot run`, construct.span);
 		}
 		if (!ok) return null;
-		const id = `fn:${scriptFunctions.size}`;
-		scriptFunctions.set(key, { id, module, fact });
-		return id;
+		const entry = { id: `fn:${scriptFunctions.size}`, module, fact };
+		// What the function reaches in its modules is refused now, while the handler can still stay data.
+		const before = diagnostics.length;
+		const services = [...scriptServices];
+		buildScript([entry]);
+		scriptServices.clear();
+		for (const service of services) scriptServices.add(service);
+		if (diagnostics.slice(before).some((diagnostic) => diagnostic.severity === 'error')) return null;
+		scriptFunctions.set(key, entry);
+		return entry.id;
 	}
 
 	/** What each name a script function reads from its component means there: a cell, a state object's cells, or a value. */
 	/**
-	 * A shared object's members as a script reads them: cells it may write, element handles as proxies, and values. Its
-	 * methods run only as data: a handler that has the object stays data (its helpers may still run as JavaScript); a
-	 * computed, which only reads, gets the object without them.
+	 * A shared object's members as a script reads them: cells it may write, element handles as proxies, values, and its
+	 * methods as script functions; a computed, which only reads, gets the object without methods.
 	 */
 	function sharedMembers(
 		instance: SharedInstance,
@@ -1925,8 +1956,11 @@ export function createNativeViewPayload(
 			const label = `\`${name}.${field}\``;
 			if (member.kind === 'cell') members[field] = { cell: member.cell };
 			else if (member.kind === 'method') {
-				if (!reading)
-					return refuseScript(`JavaScript on a phone calls no method of a shared object (${label} runs as data), so this handler stays data`, span);
+				if (reading) continue;
+				if (!member.span) return refuseScript(`${label} has no source the build read, so it cannot run as JavaScript`, span);
+				const method = methodBinding(instance, member.span, label);
+				if (!method) return null;
+				members[field] = method;
 			} else if (member.kind === 'handle') {
 				// A computed never reads an element handle (the web refuses it), so only a handler's object carries them.
 				if (reading) continue;
@@ -1934,7 +1968,7 @@ export function createNativeViewPayload(
 				if (!value) return null;
 				members[field] = { elements: value };
 			} else if (member.kind === 'expr' && member.expression) {
-				const value = exprOf(member.expression, label, { ...instance.scope, live: true });
+				const value = sharedExpr(instance, field, member.expression, member.computed);
 				if (!value) return null;
 				members[field] = mentionsElement(value) ? { elements: value } : { value };
 			}
@@ -1947,6 +1981,21 @@ export function createNativeViewPayload(
 		scope: Scope,
 		what: string,
 		reading = false,
+	): Record<string, NativeScriptBinding> | null {
+		const was = scriptReading;
+		scriptReading = true;
+		try {
+			return scriptBindingsOf(fact, scope, what, reading);
+		} finally {
+			scriptReading = was;
+		}
+	}
+
+	function scriptBindingsOf(
+		fact: SemanticScriptFunction,
+		scope: Scope,
+		what: string,
+		reading: boolean,
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
 		let ok = true;
@@ -2038,6 +2087,36 @@ export function createNativeViewPayload(
 		return value;
 	}
 
+	/**
+	 * A shared object's derived field: data where it lowers, else the factory's `computed(...)` it names, run as a script
+	 * computed over the factory's own state (a date or a locale's spelling, which data has no meaning for).
+	 */
+	function sharedExpr(
+		instance: SharedInstance,
+		field: string,
+		expression: SemanticExpression | undefined,
+		computed: string | undefined,
+	): NativeExpr | null {
+		const label = `${instance.definition.name}.${field}`;
+		const scope = { ...instance.scope, live: true };
+		const data = attempt(() => exprOf(expression, label, scope));
+		if (!data.failed || scriptMode === 'never' || computed === undefined) return data.value;
+		const fact = scriptFacts(instance.module)?.computed(undefined, computed);
+		if (!fact) return data.value;
+		data.rollBack();
+		const script = attempt(() => {
+			const fn = scriptFunctionId(fact, instance.module, `the computed \`${label}\``);
+			const bindings = scriptBindings(fact, scope, `the computed \`${label}\``, true);
+			return fn === null || bindings === null ? null : ({ script: fn, bindings } as NativeExpr);
+		});
+		if (script.value && !script.failed) return script.value;
+		const reasons = script.refusals();
+		script.rollBack();
+		const value = exprOf(expression, label, scope);
+		diagnostics.push(...reasons);
+		return value;
+	}
+
 	/** A computed whose body is not data, as a call into the script; null with a refusal when no script runs it either. */
 	function scriptComputed(
 		computed: SemanticGraphArtifact['graphBindings'][number],
@@ -2060,8 +2139,11 @@ export function createNativeViewPayload(
 	 * module's effects, and the exports something reads. A module the build was not given is asked for (`missingModules`);
 	 * one it cannot read is refused by name.
 	 */
-	function buildScript(): NativeViewPayload['script'] | undefined {
-		if (scriptFunctions.size === 0) return undefined;
+	/** The payload's script, or with `only`, just the walk over what those functions reach, refusing what cannot run. */
+	function buildScript(
+		only?: ReadonlyArray<{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }>,
+	): NativeViewPayload['script'] | undefined {
+		if (!only && scriptFunctions.size === 0) return undefined;
 		type Included = {
 			readonly module: ModuleFacts;
 			readonly index: number;
@@ -2177,13 +2259,13 @@ export function createNativeViewPayload(
 				} else exported(entry, candidate.name);
 			}
 		};
-		for (const { module, fact, id } of scriptFunctions.values()) {
+		for (const { module, fact } of only ?? scriptFunctions.values()) {
 			const entry = enter(module);
 			if (!entry) continue;
 			for (const name of fact.module) local(entry, name);
 			for (const use of fact.imports) imported(entry, use.slot, use.name);
-			void id;
 		}
+		if (only) return undefined;
 		const inputs: NativeScriptModuleInput[] = order.map((entry) => {
 			const facts = factsOf(entry.module)!;
 			const getters = [...entry.exports].filter(([name]) => !name.startsWith('*'));
@@ -2256,6 +2338,8 @@ export function createNativeViewPayload(
 	let tapRun = false;
 	/** Handles read in such a run as the tapped row's copy alone: how many rows there are is not known then. */
 	const rowCopies = new WeakSet<object>();
+	/** While a script's bindings are built: a handle list bound in a row is every row's copy. */
+	let scriptReading = false;
 	/** Whether the handler being lowered read the element a tap landed on. */
 	let pressedTargetRead = false;
 	/** The text field whose input handler is being lowered: its `value` there is what was typed. */
@@ -2272,6 +2356,19 @@ export function createNativeViewPayload(
 		// An element in an @if arm is bound only while its arm shows, which the app knows only while it runs.
 		if (bound.some((id) => byId.get(id)?.arm))
 			return refuse(`${what}, a handle bound inside an @if arm`);
+		if (scriptReading && plural && bound.some((id) => byId.get(id)?.row)) {
+			// JavaScript gets every row's copy, in the rows' order, as the web's handle list holds them.
+			const repeat = byId.get(bound[0]!)?.row;
+			const list = repeat ? byId.get(repeat) : undefined;
+			if (bound.length !== 1 || list?.kind !== 'repeat' || list.row || list.arm)
+				return refuse(`${what}, a handle list bound inside a @for row that JavaScript reaches only for one element of a top-level @for`);
+			const key = list.key.reduce<NativeExpr>((object, property) => ({ member: object, property }), { local: '__row' });
+			return {
+				method: 'map',
+				target: list.list,
+				arguments: [{ lambda: ['__row'], body: { template: [`${bound[0]}@`, key] } }],
+			};
+		}
 		if (bound.some((id) => byId.get(id)?.row)) {
 			// In the run of a tap on one row, the row's copy is the only one that holds what was tapped.
 			const rows = new Set(bound.map((id) => byId.get(id)?.row));
@@ -2930,11 +3027,7 @@ export function createNativeViewPayload(
 					const field = object.instance.fields.get(expression.property);
 					if (field?.kind === 'cell') return { cell: field.cell };
 					if (field?.kind === 'expr')
-						return exprOf(
-							field.expression,
-							`${object.instance.definition.name}.${expression.property}`,
-							{ ...object.instance.scope, live: true },
-						);
+						return sharedExpr(object.instance, expression.property, field.expression, field.computed);
 					if (field?.kind === 'handle')
 						return handleValue(
 							field.key,
@@ -4144,6 +4237,7 @@ export function createNativeViewPayload(
 							statements: prop.nativeStatements,
 							parameters: prop.parameters ?? [],
 							scope,
+							...(prop.sourceSpan ? { span: prop.sourceSpan } : {}),
 						};
 					} else if (prop.kind === 'serializable' && isNativeValue(prop.value)) {
 						const expr = expressionOfValue(prop.value);
@@ -4389,11 +4483,25 @@ export function createNativeViewPayload(
 			}
 			if (item.kind === 'branch') {
 				close();
+				const site = scope.module.branchSites.get(item.id);
 				if (place.row) {
-					refuse('@if inside a @for row');
+					// A test fixed at build time (`@if (children)` in a part) picks its arm once, for every row.
+					childrenAsTest = site?.testExpression?.kind === 'read';
+					const fixed =
+						site?.kind === 'if' && site.armIndexSource === undefined
+							? attempt(() => exprOf(site.testExpression, 'the @if test', scope))
+							: undefined;
+					childrenAsTest = false;
+					const folded = fixed?.value && !fixed.failed && cellsOf(fixed.value).size === 0 ? foldConstant(fixed.value, initialOf) : undefined;
+					fixed?.rollBack();
+					if (!folded) {
+						refuse('@if inside a @for row');
+						continue;
+					}
+					const armChunk = scope.module.chunks.get(item.arms[folded.value ? 0 : 1] ?? '');
+					if (armChunk) lowerChunk(armChunk, parent, place, scope);
 					continue;
 				}
-				const site = scope.module.branchSites.get(item.id);
 				if (!site) {
 					refuse(`the branch ${item.id}`);
 					continue;
@@ -4716,6 +4824,39 @@ export function createNativeViewPayload(
 		return { op: 'script', fn: id, type: 'call', bindings, ...(caught ? { catch: caught } : {}) };
 	}
 
+	/** A shared object's method as a script reaches it: its function and the factory's members it reads. */
+	function methodBinding(instance: SharedInstance, span: SourceSpan, what: string): NativeScriptBinding | null {
+		const fact = scriptFacts(instance.module)?.method(span);
+		if (!fact) return refuseScript(`${what} has no source the build read, so it cannot run as JavaScript`, span);
+		const fn = scriptFunctionId(fact, instance.module, what);
+		const bindings = scriptBindings(fact, instance.scope, what);
+		if (fn === null || bindings === null) return null;
+		// `calendar.onChange?.(iso)`: the callback the root filled the slot with runs as JavaScript where it was written.
+		for (const invocation of instance.module.graph.sharedCallbackInvocations) {
+			const at = invocation.sourceSpan;
+			if (invocation.definitionId !== instance.definition.id || !at || at.start < span.start || at.end > span.end) continue;
+			const slot = instance.slots.get(invocation.slotName);
+			if (slot?.kind !== 'callback') continue;
+			const label = `\`${invocation.calleeSource}\``;
+			const callback = slot.span && scriptFacts(slot.scope.module)?.handler(slot.span);
+			if (!callback) return refuseScript(`${what} calls ${label}, whose function the build did not read, so it cannot run as JavaScript`, at);
+			const callbackFn = scriptFunctionId(callback, slot.scope.module, label);
+			const callbackBindings = scriptBindings(callback, slot.scope, label);
+			if (callbackFn === null || callbackBindings === null) return null;
+			const owner = invocation.calleeSource.split('.')[0]!;
+			const object = bindings[owner];
+			if (!object || !('fields' in object))
+				return refuseScript(`${what} calls ${label}, which JavaScript on a phone reaches only on the factory's state object`, at);
+			bindings[owner] = {
+				object: {
+					...Object.fromEntries(Object.entries(object.fields).map(([field, cell]) => [field, { cell }])),
+					[invocation.slotName]: { method: callbackFn, bindings: callbackBindings },
+				},
+			};
+		}
+		return { method: fn, bindings };
+	}
+
 	function scriptOp(event: SemanticEvent, scope: Scope): NativeOp | null {
 		return keepingFunctions(() => scriptOpOf(event, scope));
 	}
@@ -4942,13 +5083,19 @@ export function createNativeViewPayload(
 				writesOf(op.whenFalse, into);
 			}
 			else if (op.op === 'call' && op.after) writesOf(op.after.ops, into);
-			else if (op.op === 'script')
-				for (const binding of Object.values(op.bindings)) {
-					if ('cell' in binding) into.add(binding.cell);
-					else if ('fields' in binding) for (const cell of Object.values(binding.fields)) into.add(cell);
-				}
+			else if (op.op === 'script') scriptWrites(op.bindings, into);
 		}
 		return into;
+	};
+	/** Cells a script may write through its bindings, inside shared objects and their methods too. */
+	const scriptWrites = (bindings: Readonly<Record<string, NativeScriptBinding>>, into: Set<string>): void => {
+		for (const binding of Object.values(bindings)) {
+			if ('cell' in binding) into.add(binding.cell);
+			else if ('fields' in binding) for (const cell of Object.values(binding.fields)) into.add(cell);
+			else if ('object' in binding) scriptWrites(binding.object, into);
+			else if ('shared' in binding) scriptWrites(binding.shared, into);
+			else if ('method' in binding) scriptWrites(binding.bindings, into);
+		}
 	};
 
 	/**

@@ -186,6 +186,8 @@ class Runtime(
 	private val scriptHost: ScriptHost? = null,
 ) {
 	private val opened = now()
+	private val computed = HashMap<String, JsValue>()
+	private var computedCells: String? = null
 	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, if (c.clock) JsValue.Num(opened) else c.storageKey?.let(store::get) ?: c.initial) }
 	/** `idle` and `visible` handlers that ran, by `<event>\u0000<instance>`; an instance that leaves the screen is forgotten. */
 	private val fired = HashSet<String>()
@@ -330,11 +332,20 @@ class Runtime(
 			}
 			is Expr.Call -> Js.call(e.name, e.arguments.map(::eval), now)
 			is Expr.Script -> {
-				val entry = "{\"kind\":\"compute\",\"fn\":${jsonString(e.fn)},\"frame\":${frameOf(e.bindings, scope)},\"elements\":${elementFacts(e.bindings, scope)}${entryCells()}}"
-				val started = System.nanoTime()
-				val value = JsValue.fromJson(Json.parse(scriptCall("enter", entry)))
-				onScriptEntry?.invoke(System.nanoTime() - started)
-				value
+				val cells = entryCells()
+				// As on the web, a computed is not run again while nothing it reads has changed.
+				if (cells != computedCells) {
+					computed.clear()
+					computedCells = cells
+				}
+				val entry = "{\"kind\":\"compute\",\"fn\":${jsonString(e.fn)},\"frame\":${frameOf(e.bindings, scope)},\"elements\":${elementFacts(e.bindings, scope)}$cells}"
+				computed[entry] ?: run {
+					val started = System.nanoTime()
+					val value = JsValue.fromJson(Json.parse(scriptCall("enter", entry)))
+					onScriptEntry?.invoke(System.nanoTime() - started)
+					computed[entry] = value
+					value
+				}
 			}
 		}
 	}
@@ -388,6 +399,7 @@ class Runtime(
 			is ScriptBinding.Elements -> "{\"elements\":${jsonValue(evaluate(b.value, scope))}}"
 			is ScriptBinding.Object -> "{\"object\":${frameOf(b.members, scope)}}"
 			is ScriptBinding.Shared -> "{\"shared\":${frameOf(b.members, scope)}}"
+			is ScriptBinding.Method -> "{\"method\":${jsonString(b.fn)},\"frame\":${frameOf(b.members, scope)}}"
 		}
 	}
 
@@ -401,7 +413,7 @@ class Runtime(
 			val key = if ('@' in id) id.substring(id.indexOf('@')) else ""
 			val node = elementOf(id.substringBefore('@'))
 			val names = LinkedHashSet<String>(node.attributes.keys.sorted()).apply { addAll(node.bindings.filter { !it.property }.map { it.name }) }
-			val attributes = names.mapNotNull { name -> attributeNow(node.id, name)?.let { "${jsonString(name)}:${jsonString(it)}" } }
+			val attributes = names.mapNotNull { name -> attributeNow(id, name)?.let { "${jsonString(name)}:${jsonString(it)}" } }
 			val ancestors = ArrayList<String>()
 			var up = node.parent
 			while (up != null) {
@@ -418,6 +430,7 @@ class Runtime(
 				}
 				is ScriptBinding.Object -> visit(b.members)
 				is ScriptBinding.Shared -> visit(b.members)
+				is ScriptBinding.Method -> visit(b.members)
 				else -> {}
 			}
 		}
@@ -576,9 +589,10 @@ class Runtime(
 
 	/** An attribute as the web has it now: a binding's value as written, else the attribute the element was built with. */
 	fun attributeNow(id: String, name: String): String? {
-		val e = elementOf(id)
-		val binding = e.bindings.firstOrNull { !it.property && it.name == name }
-		return if (binding != null) attribute(binding) else e.attributes[name]
+		val e = elementOf(id.substringBefore('@'))
+		val binding = e.bindings.firstOrNull { !it.property && it.name == name } ?: return e.attributes[name]
+		// A row's copy (`<node>@<key>`) reads its own row.
+		return attribute(binding, if (id == e.id) Scope.EMPTY else instances(e).firstOrNull { it.id == id }?.scope ?: Scope.EMPTY)
 	}
 
 	private fun propertyBinding(id: String, name: String) = elementOf(id).bindings.firstOrNull { it.property && it.name == name }
@@ -693,22 +707,19 @@ class Runtime(
 	// An element marked `overlay` joins the stack while its `hidden` binding shows it; one with no such binding never does.
 	private val overlayNodes = payload.nodes.filterIsInstance<Node.Element>().filter { e -> e.row == null && OVERLAY_ATTRIBUTE in e.attributes && e.bindings.any { !it.property && it.name == "hidden" } }
 
-	private fun shownOverlays(): List<String> {
-		val now = attributes().associate { (n, a, v) -> (n to a) to v }
-		return overlayNodes.filter { instances(it).isNotEmpty() && (it.id to "hidden") in now && now[it.id to "hidden"] == null }.map { it.id }
-	}
+	private fun shownOverlays(): List<String> =
+		overlayNodes.filter { instances(it).isNotEmpty() && attributeNow(it.id, "hidden") == null }.map { it.id }
 
 	/** Whether [overlay] or an element inside it has `aria-modal="true"`, its bound value first, else its static one. */
-	fun isModal(overlay: String): Boolean {
-		val now = attributes().associate { (n, a, v) -> (n to a) to v }
-		return payload.nodes.any { n ->
-			if (n !is Node.Element || !contains(overlay, n.id)) return@any false
-			val key = n.id to OVERLAY_MODAL_ATTRIBUTE
-			(if (key in now) now[key] else n.attributes[OVERLAY_MODAL_ATTRIBUTE]) == OVERLAY_MODAL_VALUE
-		}
+	fun isModal(overlay: String): Boolean = payload.nodes.any { n ->
+		if (n !is Node.Element || !contains(overlay, n.id)) return@any false
+		// A row's copies are keyed by row, so a row element is read as it was built.
+		(if (n.row != null) n.attributes[OVERLAY_MODAL_ATTRIBUTE] else attributeNow(n.id, OVERLAY_MODAL_ATTRIBUTE)) == OVERLAY_MODAL_VALUE
 	}
 
 	init {
+		// Rows take their first values before anything reads them, the overlays shown at mount included.
+		seedRows()
 		stack = shownOverlays()
 		for (o in stack) origins[o] = NATIVE_DOCUMENT_BODY
 	}
@@ -977,11 +988,6 @@ class Runtime(
 		val signaturesBefore = rowSignatures()
 		val calls = apply()
 		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
-		val shownNow = shownOverlays()
-		val released = stackBefore.filter { it !in shownNow }
-		val enlisted = shownNow.filter { it !in stackBefore }
-		stack = stackBefore.filter { it in shownNow } + enlisted
-		for (o in enlisted) origins[o] = focusBefore ?: NATIVE_DOCUMENT_BODY
 		// A row that left takes its state with it; a later row with the same key starts from the first values.
 		val kept = rows().flatMap { (list, keys) -> keys.map { "$list\u0000$it" } }.toSet()
 		values.keys.removeAll { slot ->
@@ -990,6 +996,11 @@ class Runtime(
 		}
 		resetChangedRows(signaturesBefore)
 		seedRows()
+		val shownNow = shownOverlays()
+		val released = stackBefore.filter { it !in shownNow }
+		val enlisted = shownNow.filter { it !in stackBefore }
+		stack = stackBefore.filter { it in shownNow } + enlisted
+		for (o in enlisted) origins[o] = focusBefore ?: NATIVE_DOCUMENT_BODY
 		forgetHidden()
 		val afterTexts = texts().toMap()
 		val afterAttributes = boundAttributes().associate { (n, a, v) -> (n to a) to v }

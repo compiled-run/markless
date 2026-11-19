@@ -177,7 +177,11 @@ private struct Context {
 /// The payload's state and op interpreter, matching `packages/mobile/src/runtime.ts` exactly.
 public final class NativeRuntime {
 	public let payload: NativeViewPayload
-	private var values: [String: NativeValue]
+	// Each write moves `version`, so a script computed is run again only once a cell may have changed.
+	private var values: [String: NativeValue] { didSet { version &+= 1 } }
+	private var version = 0
+	private var computed: [String: NativeValue] = [:]
+	private var computedAt = -1
 	private let store: NativeStore
 	private let storageKeys: [String: String]
 	private let handlers: [String: [NativeOp]]
@@ -267,7 +271,8 @@ public final class NativeRuntime {
 			guard node.row == nil, case let .element(_, attributes, bindings) = node.kind else { return false }
 			return attributes[OverlayProtocol.attribute] != nil && bindings.contains { !$0.isProperty && $0.name == "hidden" }
 		}
-		// Shown at mount: the document's focus is the body.
+		// Rows take their first values before anything reads them. Shown at mount: the document's focus is the body.
+		try? seedRows()
 		if let shown = try? shownOverlays() {
 			stack = shown
 			for overlay in shown { origins[overlay] = nativeDocumentBody }
@@ -290,28 +295,23 @@ public final class NativeRuntime {
 		return false
 	}
 
-	private func keyedAttributes() throws -> [String: String?] {
-		Dictionary(try attributes().map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { $1 })
-	}
-
 	private func shownOverlays() throws -> [String] {
-		let now = try keyedAttributes()
-		return try overlayNodes.filter { node in try !instances(of: node).isEmpty && now["\(node.id)\u{0}hidden"] == .some(nil) }.map(\.id)
+		try overlayNodes.filter { node in try !instances(of: node).isEmpty && attributeNow(node.id, "hidden") == nil }.map(\.id)
 	}
 
 	/// An overlay is modal when it or an element inside it has `aria-modal="true"`, bound or else static.
-	private func isModal(_ overlay: String, _ now: [String: String?]) -> Bool {
-		payload.nodes.contains { node in
+	private func isModal(_ overlay: String) throws -> Bool {
+		try payload.nodes.contains { node in
 			guard case let .element(_, attributes, _) = node.kind, contains(overlay, node.id) else { return false }
-			let value = now["\(node.id)\u{0}\(OverlayProtocol.modalAttribute)"] ?? attributes[OverlayProtocol.modalAttribute]
+			// A row's copies are keyed by row, so a row element is read as it was built.
+			let value = node.row != nil ? attributes[OverlayProtocol.modalAttribute] : try attributeNow(node.id, OverlayProtocol.modalAttribute)
 			return value == OverlayProtocol.modalValue
 		}
 	}
 
 	/// The overlay stack, topmost last, with whether each is modal.
 	public func overlays() throws -> [(node: String, modal: Bool)] {
-		let now = try keyedAttributes()
-		return stack.map { ($0, isModal($0, now)) }
+		try stack.map { ($0, try isModal($0)) }
 	}
 
 	/// Where a cell's value is kept: its id, or `<id>@<key>` for a row's own state, read in that row.
@@ -458,11 +458,21 @@ public final class NativeRuntime {
 			guard case let .number(at) = try evaluate(index), at >= 0, at.rounded() == at, at < Double(array.items.count) else { return .null }
 			return array.items[Int(at)]
 		case let .script(fn, bindings):
+			// As on the web, a computed is not run again while nothing it reads has changed.
+			if computedAt != version {
+				computed = [:]
+				computedAt = version
+			}
 			let frame = try frame(of: bindings, in: scope)
-			return try scriptHost.unwrap().entry {
-				let text = try callScript("enter", .object([("kind", .string("compute")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame))] + entryCells()))
+			let elements = try elementFacts(frame)
+			let key = JSONValue.array([.string(fn), frame, elements]).jsonText
+			if let known = computed[key] { return known }
+			let value = try scriptHost.unwrap().entry {
+				let text = try callScript("enter", .object([("kind", .string("compute")), ("fn", .string(fn)), ("frame", frame), ("elements", elements)] + entryCells()))
 				return NativeValue(json: try JSONValue.parse(Data(text.utf8)))
 			}
+			computed[key] = value
+			return value
 		}
 	}
 
@@ -485,6 +495,7 @@ public final class NativeRuntime {
 			case let .elements(expr): return (binding.name, .object([("elements", try evaluate(expr, in: scope).json)]))
 			case let .object(members): return (binding.name, .object([("object", try frame(of: members, in: scope))]))
 			case let .shared(members): return (binding.name, .object([("shared", try frame(of: members, in: scope))]))
+			case let .method(fn, members): return (binding.name, .object([("method", .string(fn)), ("frame", try frame(of: members, in: scope))]))
 			}
 		})
 	}
@@ -502,7 +513,7 @@ public final class NativeRuntime {
 			var names: [String] = []
 			for name in found.attributes.keys.sorted() + found.bindings.filter({ !$0.isProperty }).map(\.name) where !names.contains(name) { names.append(name) }
 			var attributes: [(String, JSONValue)] = []
-			for name in names { if let value = try attributeNow(nodeOf(id), name) { attributes.append((name, .string(value))) } }
+			for name in names { if let value = try attributeNow(id, name) { attributes.append((name, .string(value))) } }
 			var ancestors: [JSONValue] = []
 			var up = found.node.parent
 			while let parent = up {
@@ -515,7 +526,7 @@ public final class NativeRuntime {
 			guard case let .object(names) = frame else { return }
 			for (_, binding) in names {
 				guard case let .object(fields) = binding else { continue }
-				for (key, inner) in fields where key == "object" || key == "shared" { try visit(inner) }
+				for (key, inner) in fields where key == "object" || key == "shared" || key == "frame" { try visit(inner) }
 				guard let given = fields.first(where: { $0.0 == "elements" })?.1 else { continue }
 				if case let .array(items) = given { for item in items { try add(item) } } else { try add(given) }
 			}
@@ -680,9 +691,11 @@ public final class NativeRuntime {
 
 	/// An attribute as the web has it now: a binding's value as written, else the attribute the element was built with.
 	private func attributeNow(_ id: String, _ name: String) throws -> String? {
-		let found = try element(id)
+		let found = try element(nodeOf(id))
 		if let binding = found.bindings.first(where: { !$0.isProperty && $0.name == name }) {
-			return marklessAttributeValue(name, try evaluate(binding.value))
+			// A row's copy (`<node>@<key>`) reads its own row.
+			let scope = id == found.node.id ? NativeScope.empty : try instances(of: found.node).first { $0.id == id }?.scope ?? .empty
+			return marklessAttributeValue(name, try evaluate(binding.value, in: scope))
 		}
 		return found.attributes[name]
 	}
@@ -1106,14 +1119,6 @@ public final class NativeRuntime {
 		let signaturesBefore = try rowSignatures()
 		let calls = try apply()
 		if case .navigate? = calls.first { return calls }
-		let shownNow = try shownOverlays()
-		let released = stackBefore.filter { !shownNow.contains($0) }
-		let enlisted = shownNow.filter { !stackBefore.contains($0) }
-		stack = stackBefore.filter(shownNow.contains) + enlisted
-		for overlay in enlisted { origins[overlay] = focusBefore ?? nativeDocumentBody }
-		let overlayAttributes = try keyedAttributes()
-		let overlays = released.map { NativeJournalEntry.overlay(node: $0, open: false, modal: isModal($0, overlayAttributes)) }
-			+ enlisted.map { NativeJournalEntry.overlay(node: $0, open: true, modal: isModal($0, overlayAttributes)) }
 		// A row that left takes its state with it; a later row with the same key starts from the first values.
 		let kept = Set(try rows().flatMap { list in list.keys.map { "\(list.node)\u{0}\($0)" } })
 		for slot in values.keys {
@@ -1122,6 +1127,13 @@ public final class NativeRuntime {
 		}
 		try resetChangedRows(signaturesBefore)
 		try seedRows()
+		let shownNow = try shownOverlays()
+		let released = stackBefore.filter { !shownNow.contains($0) }
+		let enlisted = shownNow.filter { !stackBefore.contains($0) }
+		stack = stackBefore.filter(shownNow.contains) + enlisted
+		for overlay in enlisted { origins[overlay] = focusBefore ?? nativeDocumentBody }
+		let overlays = try released.map { NativeJournalEntry.overlay(node: $0, open: false, modal: try isModal($0)) }
+			+ enlisted.map { NativeJournalEntry.overlay(node: $0, open: true, modal: try isModal($0)) }
 		try forgetHidden()
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let afterAttributes = keyed(try boundAttributes())

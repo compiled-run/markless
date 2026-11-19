@@ -87,6 +87,8 @@ sealed interface ScriptBinding {
 	data class Object(val members: Map<String, ScriptBinding>) : ScriptBinding
 	/** A `shared()` accessor: a function that returns that object. */
 	data class Shared(val members: Map<String, ScriptBinding>) : ScriptBinding
+	/** A shared object's method: the script function [fn] returns it, run over its own [members] when called. */
+	data class Method(val fn: String, val members: Map<String, ScriptBinding>) : ScriptBinding
 }
 
 /** The JavaScript a payload's script ops and script computeds run, kept in the engine under [id]; [services] are the host services it uses. */
@@ -398,6 +400,7 @@ data class Payload(
 				is ScriptBinding.Elements -> cellsOf(b.value)
 				is ScriptBinding.Object -> cellsOf(b.members)
 				is ScriptBinding.Shared -> cellsOf(b.members)
+				is ScriptBinding.Method -> cellsOf(b.members)
 			}
 		}
 
@@ -415,6 +418,10 @@ data class Payload(
 				bo.containsKey("elements") -> { bo.only(setOf("elements"), "$what.$name"); ScriptBinding.Elements(expr(bo.field("elements", what), "$what.$name.elements")) }
 				bo.containsKey("object") -> { bo.only(setOf("object"), "$what.$name"); ScriptBinding.Object(scriptBindings(bo.field("object", what), "$what.$name.object")) }
 				bo.containsKey("shared") -> { bo.only(setOf("shared"), "$what.$name"); ScriptBinding.Shared(scriptBindings(bo.field("shared", what), "$what.$name.shared")) }
+				bo.containsKey("method") -> {
+					bo.only(setOf("method", "bindings"), "$what.$name")
+					ScriptBinding.Method(bo.field("method", what).str("$what.$name.method"), scriptBindings(bo.field("bindings", what), "$what.$name.bindings"))
+				}
 				else -> throw MarklessDecodeError("$what.$name is an unknown script binding (fields ${bo.keys})")
 			}
 		}

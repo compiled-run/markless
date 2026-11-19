@@ -413,6 +413,8 @@ export function evaluateWithScript(
 							name,
 							'object' in binding
 								? { object: frameOf(binding.object) }
+								: 'method' in binding
+									? { method: binding.method, frame: frameOf(binding.bindings) }
 								: 'shared' in binding
 									? { shared: frameOf(binding.shared) }
 									: 'cell' in binding
@@ -464,7 +466,18 @@ export function createNativeRuntime(
 		fieldText: (node) => textOf(node),
 		now,
 	};
-	const values = new Map<string, Value>(
+	// Each write moves `version`, so a script computed is run again only once a cell may have changed.
+	let version = 0;
+	const values = new (class extends Map<string, Value> {
+		override set(key: string, value: Value) {
+			version++;
+			return super.set(key, value);
+		}
+		override delete(key: string) {
+			version++;
+			return super.delete(key);
+		}
+	})(
 		payload.cells.map((cell) => [
 			cell.id,
 			cell.clock
@@ -554,6 +567,8 @@ export function createNativeRuntime(
 				name,
 				'object' in binding
 					? { object: frameOf(binding.object, eventValue, scope) }
+					: 'method' in binding
+						? { method: binding.method, frame: frameOf(binding.bindings, eventValue, scope) }
 					: 'shared' in binding
 						? { shared: frameOf(binding.shared, eventValue, scope) }
 						: 'cell' in binding
@@ -599,12 +614,14 @@ export function createNativeRuntime(
 		};
 		const visit = (names: Record<string, unknown>) => {
 			for (const entry of Object.values(names)) {
-				const { elements: given, object, shared } = entry as {
+				const { elements: given, object, shared, frame } = entry as {
 					elements?: unknown;
 					object?: Record<string, unknown>;
 					shared?: Record<string, unknown>;
+					frame?: Record<string, unknown>;
 				};
 				if (object) visit(object);
+				if (frame) visit(frame);
 				if (shared) visit(shared);
 				if (given === undefined) continue;
 				if (Array.isArray(given)) given.forEach(add);
@@ -670,13 +687,22 @@ export function createNativeRuntime(
 			}),
 		];
 	};
-	const compute: Compute = (fn, bindings, scope) =>
-		JSON.parse(
-			call('enter', (() => {
-				const frame = frameOf(bindings, undefined, scope);
-				return { kind: 'compute', fn, frame, elements: elementFacts(frame), ...entryCells() };
-			})()),
-		) as Value;
+	// As on the web, a computed is not run again while nothing it reads has changed.
+	const computed = new Map<string, Value>();
+	let computedAt = -1;
+	const compute: Compute = (fn, bindings, scope) => {
+		if (computedAt !== version) {
+			computed.clear();
+			computedAt = version;
+		}
+		const frame = frameOf(bindings, undefined, scope);
+		const elements = elementFacts(frame);
+		const key = JSON.stringify([fn, frame, elements]);
+		if (computed.has(key)) return computed.get(key)!;
+		const value = JSON.parse(call('enter', { kind: 'compute', fn, frame, elements, ...entryCells() })) as Value;
+		computed.set(key, value);
+		return value;
+	};
 	/** Focus, the overlay stack (topmost last) and each overlay's focus origin, kept as the web's overlay behaviour keeps them. */
 	let focused: string | null = null;
 	let stack: string[] = [];
@@ -876,10 +902,10 @@ export function createNativeRuntime(
 	};
 	/** An attribute as the web has it now: a binding's value as written, else the attribute the element was built with. */
 	const attributeNow = (id: string, name: string): string | null => {
-		const node = elementOf(id);
+		const node = elementOf(nodeOf(id));
 		const binding = node.bindings?.find((one) => 'attribute' in one && one.attribute === name);
 		return binding
-			? marklessAttributeValue(name, evaluate(binding.value))
+			? marklessAttributeValue(name, evaluate(binding.value, undefined, id === node.id ? undefined : scopeOf(id)))
 			: (node.attributes?.[name] ?? null);
 	};
 	const propertyBinding = (id: string, name: string) =>
@@ -1010,19 +1036,21 @@ export function createNativeRuntime(
 	const shownOverlays = (): string[] => {
 		// Reading every attribute would start a script engine a page with no overlay may not need yet.
 		if (overlayNodes.length === 0) return [];
-		const now = keyed(attributes());
 		return overlayNodes.flatMap((node) =>
-			instances(node).length > 0 && now.get(`${node.id}\0hidden`) === null ? [node.id] : [],
+			instances(node).length > 0 && attributeNow(node.id, 'hidden') === null ? [node.id] : [],
 		);
 	};
 	const isModal = (overlay: string): boolean => {
-		const now = keyed(attributes());
-		return payload.nodes.some((node) => {
-			if (node.kind !== 'element' || !elements.contains(overlay, node.id)) return false;
-			const bound = now.get(`${node.id}\0${OVERLAY_MODAL_ATTRIBUTE}`);
-			return (bound !== undefined ? bound : node.attributes?.[OVERLAY_MODAL_ATTRIBUTE]) === OVERLAY_MODAL_VALUE;
-		});
+		return payload.nodes.some(
+			(node) =>
+				node.kind === 'element' &&
+				elements.contains(overlay, node.id) &&
+				// A row's copies are keyed by row, so a row element is read as it was built.
+				(node.row ? node.attributes?.[OVERLAY_MODAL_ATTRIBUTE] : attributeNow(node.id, OVERLAY_MODAL_ATTRIBUTE)) === OVERLAY_MODAL_VALUE,
+		);
 	};
+	// Rows take their first values before anything reads them, the overlays served shown included.
+	seedRows();
 	// Served shown: the document's focus is the body.
 	for (const overlay of shownOverlays()) {
 		stack.push(overlay);
@@ -1052,8 +1080,6 @@ export function createNativeRuntime(
 			if (!node || !instances(node).some((shownNow) => shownNow.id === id)) fired.delete(key);
 		}
 	};
-	seedRows();
-
 	return {
 		texts,
 		attributes: () => [
@@ -1481,15 +1507,6 @@ export function createNativeRuntime(
 			const itemsBefore = rowSignatures();
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
-			const shownNow = shownOverlays();
-			const released = stackBefore.filter((overlay) => !shownNow.includes(overlay));
-			const enlisted = shownNow.filter((overlay) => !stackBefore.includes(overlay));
-			stack = [...stackBefore.filter((overlay) => shownNow.includes(overlay)), ...enlisted];
-			for (const overlay of enlisted) origins.set(overlay, focusBefore ?? NATIVE_DOCUMENT_BODY);
-			const overlays: NativeJournalEntry[] = [
-				...released.map((node): NativeJournalEntry => ({ op: 'overlay', node, open: false, modal: isModal(node) })),
-				...enlisted.map((node): NativeJournalEntry => ({ op: 'overlay', node, open: true, modal: isModal(node) })),
-			];
 			// A row that left takes its state with it; a later row with the same key starts from the first values.
 			const kept = new Set(
 				rows().flatMap(([list, keys]) => keys.map((key) => `${list}\0${key}`)),
@@ -1502,6 +1519,15 @@ export function createNativeRuntime(
 			}
 			resetChangedRows(itemsBefore);
 			seedRows();
+			const shownNow = shownOverlays();
+			const released = stackBefore.filter((overlay) => !shownNow.includes(overlay));
+			const enlisted = shownNow.filter((overlay) => !stackBefore.includes(overlay));
+			stack = [...stackBefore.filter((overlay) => shownNow.includes(overlay)), ...enlisted];
+			for (const overlay of enlisted) origins.set(overlay, focusBefore ?? NATIVE_DOCUMENT_BODY);
+			const overlays: NativeJournalEntry[] = [
+				...released.map((node): NativeJournalEntry => ({ op: 'overlay', node, open: false, modal: isModal(node) })),
+				...enlisted.map((node): NativeJournalEntry => ({ op: 'overlay', node, open: true, modal: isModal(node) })),
+			];
 			forgetHidden();
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());

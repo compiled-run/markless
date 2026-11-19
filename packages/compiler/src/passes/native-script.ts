@@ -186,6 +186,10 @@ var frameOf = function (bindings) {
 			Object.defineProperty(names, name, { enumerable: true, value: object });
 		} else if ('elements' in binding) Object.defineProperty(names, name, { enumerable: true, value: elementsOf(binding.elements) });
 		else if ('object' in binding) Object.defineProperty(names, name, { enumerable: true, value: frameOf(binding.object) });
+		else if ('method' in binding) {
+			var method = binding.method, own = binding.frame;
+			Object.defineProperty(names, name, { enumerable: true, value: function () { return fn(method)(frameOf(own)).apply(this, arguments); } });
+		}
 		else if ('shared' in binding) {
 			var shared = frameOf(binding.shared);
 			Object.defineProperty(names, name, { enumerable: true, value: function () { return shared; } });

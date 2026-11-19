@@ -155,8 +155,10 @@ export type NativeScriptBinding =
 	 * entry's `elements`: the attributes each element has now and the elements it is inside.
 	 */
 	| { readonly elements: NativeExpr }
-	/** A family's shared object, member by member (its methods run only as data, so a script never gets them). */
+	/** A family's shared object, member by member. */
 	| { readonly object: Readonly<Record<string, NativeScriptBinding>> }
+	/** A shared object's method: the script function `method` returns, run over its own `bindings` when called. */
+	| { readonly method: string; readonly bindings: Readonly<Record<string, NativeScriptBinding>> }
 	/** A `shared()` accessor (`selectState`): a function that returns that object. */
 	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> };
 

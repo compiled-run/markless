@@ -1,0 +1,44 @@
+{
+	"rung": 144,
+	"name": "calendar: the month moves forward and back through the family's own methods, run as JavaScript over its shared state (Date math data cannot do), and a tapped day is picked",
+	"steps": [
+		{
+			"visible": [
+				"Delivery",
+				"Delivery date",
+				"August 2026",
+				"Back",
+				"Forward",
+				"Picked none"
+			]
+		},
+		{
+			"do": {
+				"tap": "Forward"
+			},
+			"visible": ["September 2026"],
+			"absent": ["August 2026"]
+		},
+		{
+			"do": {
+				"tap": "Back"
+			},
+			"visible": ["August 2026"],
+			"absent": ["September 2026"]
+		},
+		{
+			"do": {
+				"tap": "Back"
+			},
+			"visible": ["July 2026", "Picked none"],
+			"absent": ["August 2026"]
+		},
+		{
+			"do": {
+				"tap": "15"
+			},
+			"visible": ["Picked 2026-07-15", "July 2026"],
+			"absent": ["Picked none"]
+		}
+	]
+}

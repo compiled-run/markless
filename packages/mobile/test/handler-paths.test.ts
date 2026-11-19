@@ -91,15 +91,19 @@ describe('a handler means the same as data and as JavaScript', () => {
 	});
 
 	it('forces most handlers of the vectors into the engine, so the comparison covers them', async () => {
-		// The engine has no elements: handlers that read focus, `contains` or an event's target element stay data.
-		const elementCases = new Set(['overlay', 'popover']);
+		// Handlers that read focus, `contains` or an event's target element stay data; the triggers, which call the family's
+		// shared methods, and popover's focus landing, which focuses a handle through its proxy, run as JavaScript.
+		const elementCases = new Map([
+			['overlay', 2],
+			['popover', 2],
+		]);
 		let data = 0;
 		let forced = 0;
 		for (const entry of CONFORMANCE_CASES) {
 			const chosen = await build(entry);
 			const moved = scriptOps(await build(entry, 'all')) - scriptOps(chosen);
 			if (elementCases.has(entry.name)) {
-				expect(moved, entry.name).toBe(0);
+				expect(moved, entry.name).toBe(elementCases.get(entry.name));
 				continue;
 			}
 			data += chosen.handlers.length - scriptOps(chosen);

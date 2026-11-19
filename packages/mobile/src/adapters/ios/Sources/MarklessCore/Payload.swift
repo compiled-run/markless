@@ -769,7 +769,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 			case ["elements"]: return NativeScriptBinding(name: name, kind: .elements(try decodeExpr(try binding.field("elements"))))
 			case ["object"]: return NativeScriptBinding(name: name, kind: .object(try decodeBindings(try binding.field("object"))))
 			case ["shared"]: return NativeScriptBinding(name: name, kind: .shared(try decodeBindings(try binding.field("shared"))))
-			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { elements }, { object } or { shared }")
+			case ["bindings", "method"], ["method", "bindings"]:
+				return NativeScriptBinding(name: name, kind: .method(try binding.field("method").string(), try decodeBindings(try binding.field("bindings"))))
+			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { elements }, { object }, { shared } or { method, bindings }")
 			}
 		}
 	}

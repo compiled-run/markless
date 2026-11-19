@@ -2318,16 +2318,25 @@ export function Picker() @{
 	</main>
 }`;
 
-	it('passes element handles to a JavaScript handler as proxies, and runs a helper data cannot spell as JavaScript beside the data a shared object needs', async () => {
+	it('passes element handles to a JavaScript handler as proxies, and a shared object with its methods, which run as JavaScript over its own state', async () => {
 		const { payload, diagnostics } = await nativeView(source);
 		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
 		const [trigger, all] = payload!.handlers;
-		expect(trigger?.ops.map((op) => op.op)).toEqual(['assign', 'script']);
-		expect(trigger?.ops[1]).toMatchObject({
-			op: 'script',
-			type: 'call',
-			bindings: { __a0: { elements: { array: [{ spread: false, value: { literal: 'component-edge:1/h1' } }] } } },
-		});
+		expect(trigger?.ops).toMatchObject([
+			{
+				op: 'script',
+				type: 'click',
+				bindings: {
+					pickerState: {
+						shared: {
+							open: { cell: expect.any(String) },
+							optionEls: { elements: { array: [{ spread: false, value: { literal: 'component-edge:1/h1' } }] } },
+							setOpen: { method: expect.any(String), bindings: { picker: { fields: { open: expect.any(String) } } } },
+						},
+					},
+				},
+			},
+		]);
 		expect(all?.ops).toEqual([
 			{ op: 'script', fn: expect.any(String), type: 'click', bindings: { list: { elements: { array: [{ spread: false, value: { literal: 'h3' } }] } } } },
 		]);
