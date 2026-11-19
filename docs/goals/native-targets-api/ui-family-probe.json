@@ -427,11 +427,8 @@
 		]
 	},
 	"pagination": {
-		"payload": false,
-		"diagnostics": [
-			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `paginationState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
-			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `paginationItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)"
-		]
+		"payload": true,
+		"diagnostics": []
 	},
 	"popover": {
 		"payload": true,

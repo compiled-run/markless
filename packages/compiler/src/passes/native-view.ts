@@ -2272,6 +2272,25 @@ export function createNativeViewPayload(
 	};
 
 	/** An element's attribute as the web writes it (null when absent), from what it was built with or a binding. */
+	/** Whether a click on the element does nothing on the web beyond its handlers, so `preventDefault()` there changes nothing. */
+	const clickHasNoDefault = (id: string): boolean => {
+		const byId = nodeById();
+		const node = byId.get(id);
+		if (node?.kind !== 'element') return false;
+		const has = (name: string) =>
+			(node.attributes && name in node.attributes) ||
+			node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === name);
+		if (node.element === 'a') return !has('href');
+		if (node.element === 'button') {
+			if (node.attributes?.['type'] === 'button') return true;
+			for (let at = node.parent; at; at = byId.get(at)?.parent ?? null) {
+				const around = byId.get(at);
+				if (around?.kind === 'element' && around.element === 'form') return false;
+			}
+			return !has('form');
+		}
+		return !['input', 'label', 'textarea', 'select', 'option', 'summary', 'details', 'area', 'form'].includes(node.element);
+	};
 	const attributeOf = (element: string, name: string): NativeExpr => {
 		const node = nodeById().get(element);
 		if (node?.kind !== 'element') return { literal: null };
@@ -5536,6 +5555,16 @@ export function createNativeViewPayload(
 				(statement.arguments ?? []).length === 0
 			)
 				return [PREVENT];
+			if (
+				scope.pressed &&
+				statement.name === scope.opaque &&
+				!scope.args.has(statement.name) &&
+				statement.path?.length === 1 &&
+				statement.path[0] === 'preventDefault' &&
+				(statement.arguments ?? []).length === 0 &&
+				clickHasNoDefault(scope.pressed.currentTarget)
+			)
+				return [];
 			const notCallable = () => {
 				refuse(`${what} uses a call to \`${callee}\`, which needs a script engine`, span);
 				return [];
