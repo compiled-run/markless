@@ -125,6 +125,27 @@
 			"delta": 5,
 			"reason": "setDataField keeps a \"__proto__\" key from decoded or copied state data as an own field; graph path writes are unchanged (issue #926)",
 			"date": "2026-11-19"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"serializer/value-own-field"
+			],
+			"set": 302,
+			"reason": "setDataField is the single helper that keeps a __proto__ key from decoded or copied state data as an own field; folding it into an existing module would either duplicate the rule or add a larger module to pages that lack it",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "build-scale",
+			"path": [
+				"budgets",
+				"clientModules",
+				"value"
+			],
+			"delta": 1,
+			"reason": "one new client module: the serializer helper that keeps a __proto__ key from state data as an own field (setDataField)",
+			"date": "2026-11-19"
 		}
 	]
 }
