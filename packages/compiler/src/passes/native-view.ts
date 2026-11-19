@@ -6142,7 +6142,11 @@ export function createNativeViewPayload(
 		nodes[index] = Object.keys(rest).length > 0 ? { ...plain, defaultStyle: rest } : plain;
 	}
 	rootObjects.own(0);
-	if (graph.markup.chunks.some((chunk) => chunk.kind !== 'template' && !lowered.has(chunk.id)))
+	// A backstop for markup nothing lowered: a refused @for or arm already says why its markup was not.
+	if (
+		!diagnostics.some((diagnostic) => diagnostic.severity === 'error') &&
+		graph.markup.chunks.some((chunk) => chunk.kind !== 'template' && !lowered.has(chunk.id))
+	)
 		refuse('markup outside the root template, its @if arms and its @for rows');
 	for (const event of graph.events)
 		if (!loweredEvents.has(event.id))
