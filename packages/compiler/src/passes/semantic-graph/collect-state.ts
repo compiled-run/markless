@@ -59,7 +59,7 @@ import { ownedModuleAst, type ModuleSemantics } from './shared-ast.ts';
 import type { WalkState } from './types.ts';
 import { collectSharedInstance, resolveSharedCall } from './collect-shared.ts';
 import { collectStorageBinding } from './collect-storage.ts';
-import { stateClassInstances } from './state-class-instance.ts';
+import { rememberStateClassBinding, stateClassInstances } from './state-class-instance.ts';
 import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 export function collectVariableDeclaration(node: AnyNode, state: WalkState): void {
@@ -297,6 +297,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				...(classInstances.length > 0 ? { classInstances } : {}),
 			};
 			state.graph.graphBindings.push(binding);
+			rememberStateClassBinding(id, binding, state);
 		}
 
 		// The render lowering already treats an in-body storage() declaration as a state initializer.

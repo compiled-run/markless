@@ -1,3 +1,5 @@
+import { setDataField } from '../../serializer/src/value-own-field.ts';
+
 declare const __MARKLESS_DEBUG_ENABLED__: boolean;
 
 export type MarklessDebugContainerId = string;
@@ -289,7 +291,7 @@ function installDebugChannelLayer(
 		for (const [name, entry] of Object.entries(value)) {
 			const cloned = cloneJson(entry, seen);
 			if (cloned === undefined) return undefined;
-			copy[name] = cloned;
+			setDataField(copy, name, cloned);
 		}
 		return freeze(copy);
 	};

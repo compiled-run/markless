@@ -41,6 +41,8 @@ test.each([
 	['a built-in Map', '', 'new Map()'],
 	['a built-in Set', '', 'new Set()'],
 	['a built-in Date', '', 'new Date(0)'],
+	['new Array()', '', 'new Array(3)'],
+	['new Object()', '', 'new Object()'],
 	['the result of a call', CART, 'Object.freeze({ bags: 0 })'],
 ])('a state() value holding %s builds', async (_, prelude, initial) => {
 	expect(await codes(component(prelude, initial, '<p>{String(cart)}</p>'))).not.toContain(
@@ -141,9 +143,9 @@ test('data with a function beside it, and an instance built inside the handler, 
 	).toEqual([]);
 });
 
-test('a method of a state value used as an event handler fails the build', async () => {
+test('a method of a class instance in state used as an event handler fails the build', async () => {
 	const { diagnostics } = await compiled(
-		component('function makeCart() { return { bags: 0 }; }', 'makeCart()', '<button onClick={cart.add}>{cart.bags}</button>'),
+		component(CART, 'new Cart()', '<button onClick={cart.add}>{cart.bags}</button>'),
 	);
 	const refusal = diagnostics.find(
 		(diagnostic) => diagnostic.code === 'MARKLESS_STATE_CLASS_METHOD_UNBOUND',
@@ -154,11 +156,12 @@ test('a method of a state value used as an event handler fails the build', async
 	expect(refusal?.suggestions?.[0]?.message).toContain('() => cart.add()');
 });
 
-test('a method of a state row item used as an event handler fails the build', async () => {
+test('a method of a class instance a state() row holds, used as an event handler, fails the build', async () => {
 	expect(
 		await codes(`import { state } from '@markless/core';
+class Line { qty = 0; sku = 'a'; bump() { this.qty += 1; } }
 export function App() @{
-	let lines = state([{ sku: 'a' }]);
+	let lines = state([new Line()]);
 	<ul>
 		@for (const line of lines; key line.sku) {
 			<li><button onClick={line.bump}>{line.sku}</button></li>
@@ -168,16 +171,48 @@ export function App() @{
 	).toContain('MARKLESS_STATE_CLASS_METHOD_UNBOUND');
 });
 
-test('a method of a state value wrapped in an arrow is not refused as unbound', async () => {
+test('a method of a class instance in state wrapped in an arrow is not refused as unbound', async () => {
 	expect(
-		await codes(
-			component(
-				'function makeCart() { return { bags: 0 }; }',
-				'makeCart()',
-				'<button onClick={() => cart.add()}>{cart.bags}</button>',
-			),
-		),
+		await codes(component(CART, 'new Cart()', '<button onClick={() => cart.add(1)}>{cart.bags}</button>')),
 	).not.toContain('MARKLESS_STATE_CLASS_METHOD_UNBOUND');
+});
+
+test('a callback parameter that shadows a state name is not that state', async () => {
+	const source = (initial: string) => `import { state } from '@markless/core';
+${CART}
+const others = [{ id: 1, save() {} }];
+export function App() @{
+	let cart = state(${initial});
+	<div>
+		{cart.bags}
+		{others.map((cart) => <button onClick={cart.save}>{'save'}</button>)}
+	</div>
+}`;
+	const onMain = await codes(source('{ bags: 0 }'));
+	expect(onMain).not.toContain('MARKLESS_STATE_CLASS_METHOD_UNBOUND');
+	expect(onMain.filter((code) => code.startsWith('MARKLESS_STATE_CLASS'))).toEqual([]);
+	expect(await codes(source('new Cart()'))).not.toContain('MARKLESS_STATE_CLASS_METHOD_UNBOUND');
+});
+
+test('a field of plain-object state used as a handler is not refused as a class method', async () => {
+	expect(
+		await codes(component('', '{ bags: 0 }', '<button onClick={cart.bags}>{cart.bags}</button>')),
+	).not.toContain('MARKLESS_STATE_CLASS_METHOD_UNBOUND');
+});
+
+test('a constant bound to a class instance, then put in state, fails the build', async () => {
+	const { diagnostics, modules } = await compiled(`import { state } from '@markless/core';
+${CART}
+export function App() @{
+	const inst = new Cart();
+	let cart = state(inst);
+	<button onClick={() => { cart.add(1); }}>{cart.bags}</button>
+}`);
+	const found = diagnostics.map((diagnostic) => diagnostic.code);
+	expect(found).toContain('MARKLESS_STATE_CLASS_INSTANCE');
+	expect(found).toContain('MARKLESS_STATE_CLASS_METHOD_CALL');
+	const handlers = modules.filter((module) => module.kind === 'event-handler');
+	expect(handlers.map((module) => module.source).join('\n')).not.toContain('graph.call(');
 });
 
 test('a carried subclass is printed after the class it extends', async () => {

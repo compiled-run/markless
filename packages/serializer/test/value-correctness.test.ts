@@ -106,6 +106,24 @@ test('every constructor the build accepts in state encodes, and a constructor ou
 	expect(serializeGraphValue({ value: new AbortController() }).ok).toBe(false);
 });
 
+test('every global constructor whose instance encodes is on the list the build accepts', () => {
+	const realm = globalThis as unknown as Record<string, unknown>;
+	const encodes: string[] = [];
+	for (const name of Object.getOwnPropertyNames(globalThis)) {
+		const constructor = realm[name];
+		if (typeof constructor !== 'function' || !/^[A-Z]/.test(name)) continue;
+		let instance: unknown;
+		try {
+			instance = new (constructor as new () => unknown)();
+		} catch {
+			continue;
+		}
+		if (serializeGraphValue({ value: instance }).ok) encodes.push(name);
+	}
+	expect(encodes.length).toBeGreaterThan(0);
+	expect(encodes.filter((name) => !SERIALIZABLE_BUILT_IN_CONSTRUCTORS.includes(name))).toEqual([]);
+});
+
 test('serializeGraphValue keeps current behavior for supported and function values', () => {
 	const nullPrototype = Object.create(null) as Record<string, unknown>;
 	nullPrototype.ready = true;

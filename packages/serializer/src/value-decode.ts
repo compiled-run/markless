@@ -1,4 +1,5 @@
 import type { SerializedGraphPayload, SerializedRecord, SerializedSlot } from './value.ts';
+import { setDataField } from './value-own-field.ts';
 
 export type { SerializedGraphPayload, SerializedRecord, SerializedSlot } from './value.ts';
 
@@ -32,13 +33,7 @@ export function deserializeGraphValue(payload: SerializedGraphPayload): unknown 
 
 		if (record.type === 'object') {
 			const object = shell as Record<string, unknown>;
-			for (const [key, slot] of record.fields) {
-				const value = decodeSlot(slot, shells);
-				// Assigning `__proto__` would replace the prototype; data only ever adds own fields.
-				if (key === '__proto__')
-					Object.defineProperty(object, key, { value, writable: true, enumerable: true, configurable: true });
-				else object[key] = value;
-			}
+			for (const [key, slot] of record.fields) setDataField(object, key, decodeSlot(slot, shells));
 		}
 
 		if (record.type === 'array') {

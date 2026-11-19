@@ -386,12 +386,10 @@ function refuseStateClassMethodCall(node: AnyNode, callee: AnyNode, state: WalkS
 	);
 	if (!held) return false;
 	const span = sourceSpan(node, state.filename);
-	const reported = state.graph.diagnostics.some(
-		(diagnostic) =>
-			diagnostic.code === 'MARKLESS_STATE_CLASS_METHOD_CALL' &&
-			diagnostic.primarySpan?.start === span?.start,
-	);
-	if (!reported)
+	let reported = reportedClassMethodCalls.get(state);
+	if (!reported) reportedClassMethodCalls.set(state, (reported = new WeakSet()));
+	if (!reported.has(node)) {
+		reported.add(node);
 		state.graph.diagnostics.push(
 			stateClassMethodCallDiagnostic({
 				stateName: held.binding.name,
@@ -400,8 +398,12 @@ function refuseStateClassMethodCall(node: AnyNode, callee: AnyNode, state: WalkS
 				...(span ? { sourceSpan: span } : {}),
 			}),
 		);
+	}
 	return true;
 }
+
+// The walk can reach one call twice (a write's value is walked again for nested writes).
+const reportedClassMethodCalls = new WeakMap<WalkState, WeakSet<AnyNode>>();
 
 const templateValueTypes = new Set([
 	'Element',

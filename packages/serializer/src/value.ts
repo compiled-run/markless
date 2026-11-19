@@ -95,6 +95,8 @@ export type TypedArrayName = (typeof TYPED_ARRAY_NAMES)[number];
 
 /** The global constructors whose instances `serializeGraphValue` encodes; any other `new X()` is refused. */
 export const SERIALIZABLE_BUILT_IN_CONSTRUCTORS: ReadonlyArray<string> = [
+	'Object',
+	'Array',
 	'Date',
 	'RegExp',
 	'URL',

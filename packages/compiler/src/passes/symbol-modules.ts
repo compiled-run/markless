@@ -3519,13 +3519,9 @@ export function componentPropReads(
 }
 
 /**
- * The module-scope declarations the initializer transitively needs, in the same
- * order the text path selects them.
- *
- * The AST twin of `referencedModuleDeclarations`: a declaration is pulled in
- * when the accumulated reference set mentions one of the names it declares, and
- * pulling it in adds its own identifiers to that set, until nothing new is
- * reached.
+ * The module-scope declarations the initializer transitively needs, in the order
+ * they were written: `referencedModuleDeclarations` entered from the names the
+ * initializer reads.
  */
 function referencedModuleDeclarationSources(
 	initializerSource: string,

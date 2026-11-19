@@ -107,7 +107,7 @@ import {
 	handlerReadsRenderLocalDiagnostic,
 	stateClassMethodUnboundDiagnostic,
 } from './diagnostics.ts';
-import { stateValueAt } from './state-class-instance.ts';
+import { stateClassValueAt } from './state-class-instance.ts';
 import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
@@ -2504,7 +2504,7 @@ function invalidEventHandlerExpression(
 	};
 }
 
-// `onClick={cart.add}`: a state cell holds data, so a member of it is never a function the handler can run.
+// `onClick={cart.add}` where `cart` holds a class instance: the method crosses to the browser as nothing.
 function stateMethodHandlerDiagnostic(
 	attributeName: string,
 	node: AnyNode | undefined,
@@ -2514,8 +2514,8 @@ function stateMethodHandlerDiagnostic(
 		node?.type === 'ChainExpression' ? (node.expression as AnyNode) : node,
 	);
 	if (reference?.type !== 'MemberExpression') return null;
-	const held = stateValueAt(reference, state);
-	if (!held || held.path.length === 0) return null;
+	const held = stateClassValueAt(reference, state);
+	if (!held || held.member.length === 0) return null;
 	return stateClassMethodUnboundDiagnostic({
 		attributeName,
 		stateName: held.binding.name,
