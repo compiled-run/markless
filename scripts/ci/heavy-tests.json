@@ -112,6 +112,7 @@
 		"packages/router/test/vite/compile-error-cascade.test.ts",
 		"packages/router/test/vite/component-link-build.test.ts",
 		"packages/router/test/vite/compressed-assets.test.ts",
+		"packages/router/test/vite/css-repeats.test.ts",
 		"packages/router/test/vite/document-components.test.ts",
 		"packages/router/test/vite/document-html-attributes.test.ts",
 		"packages/router/test/vite/document-html-element-build.test.ts",
