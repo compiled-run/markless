@@ -502,6 +502,39 @@ export function Page() @{
 		);
 	});
 
+	it('runs only the side of &&, || and ?? that a left side known when the app is built leaves to run', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function check(row: HTMLElement): boolean {
+	return !row.hasAttribute('hidden');
+}
+export function Page() @{
+	let open = state(false);
+	const none = null as HTMLElement | null;
+	<main>
+		<p>{none !== null && check(none) ? 'reached' : 'not reached'}</p>
+		<p>{true && open ? 'open' : 'shut'}</p>
+		<p>{'kept' ?? open}</p>
+		<p>{open && 'yes'}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const parts = (payload?.nodes ?? []).flatMap((node) => (node.kind === 'text' ? [node.parts] : []));
+		expect(parts).toEqual([
+			[
+				{
+					expr: {
+						if: { binary: '!==', left: { literal: null }, right: { literal: null } },
+						whenTrue: { literal: 'reached' },
+						whenFalse: { literal: 'not reached' },
+					},
+				},
+			],
+			[{ expr: { if: { cell: 'state:open' }, whenTrue: { literal: 'open' }, whenFalse: { literal: 'shut' } } }],
+			[{ expr: { literal: 'kept' } }],
+			[{ expr: { logical: '&&', left: { cell: 'state:open' }, right: { literal: 'yes' } } }],
+		]);
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{
@@ -982,7 +1015,9 @@ export function Pager() @{
 		expect(diagnostics).toEqual([]);
 		const page = { cell: 'shared:src/App.tsrx#pagerState/state:pager.page' };
 		const last = 'shared:src/App.tsrx#pagerState/state:pager.last';
-		const stepOf = (passed: object) => ({ logical: '??', left: passed, right: { literal: 1 } });
+		// A step known when the app is built (`null ?? 1`) folds to its value; one read from a kept cell stays a `??`.
+		const stepOf = (passed: object) =>
+			'literal' in passed ? { literal: 1 } : { logical: '??', left: passed, right: { literal: 1 } };
 		expect(payload?.handlers.map((handler) => handler.ops)).toEqual([
 			[
 				{
@@ -1060,11 +1095,7 @@ export function Picks() @{
 				{
 					expr: {
 						if: { binary: '===', left: first, right: { literal: null } },
-						whenTrue: {
-							logical: '??',
-							left: { literal: null },
-							right: { literal: 'none' },
-						},
+						whenTrue: { literal: 'none' },
 						whenFalse: first,
 					},
 				},
@@ -1195,14 +1226,14 @@ export function List() @{
 				{
 					op: 'assign',
 					cell: picked,
-					value: { logical: '??', left: { literal: 'a' }, right: { literal: '' } },
+					value: { literal: 'a' },
 				},
 			],
 			[
 				{
 					op: 'assign',
 					cell: picked,
-					value: { logical: '??', left: { literal: 'b' }, right: { literal: '' } },
+					value: { literal: 'b' },
 				},
 			],
 		]);

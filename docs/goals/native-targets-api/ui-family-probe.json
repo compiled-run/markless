@@ -498,12 +498,10 @@
 		]
 	},
 	"table": {
-		"payload": false,
+		"payload": true,
 		"diagnostics": [
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focusin handler on <table> component-edge:0/component-edge:0/h0 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <table> component-edge:0/component-edge:0/h0 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `event.shiftKey`, which a tap on a phone does not have",
-			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `tableState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)"
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <table> component-edge:0/component-edge:0/h0 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
 		]
 	},
 	"tabs": {
