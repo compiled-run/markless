@@ -281,6 +281,24 @@ export function App() @{
 	expect(diagnostic?.message).toContain('"nav"');
 });
 
+// The whole value is the same hole one level up: SSR cannot serialize it and the browser's method call has no receiver.
+test('a class instance as the whole state() value is refused', async () => {
+	const diagnostic = await refusal(
+		`
+import { state } from '@markless/core';
+${NAV_CLASS}
+export function App() @{
+	let s = state(new Nav());
+	<button onClick={() => { s.next(); }}>{s.index}</button>
+}
+`,
+		STATE_PROPERTY_CLASS_INSTANCE_CODE,
+	);
+
+	expect(diagnostic?.message).toContain('"s" holds a `new Nav()`');
+	expect(diagnostic?.suggestions.map((entry) => entry.message).join(' ')).toContain('plain fields');
+});
+
 /** Same code, the other producer: a class instance on a shared() factory object. */
 test('a class instance on a shared() factory object is refused', async () => {
 	const diagnostic = await refusal(
