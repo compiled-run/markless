@@ -245,9 +245,7 @@
 		"diagnostics": [
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:6/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `event.detail`, which a tap on a phone does not have",
-			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `editableState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
-			"MARKLESS_NATIVE_UNSUPPORTED: handler:component-edge:4/event:3 reads `.value` of an element, which a native host has no meaning for yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: handler:component-edge:4/event:4 reads `.value` of an element, which a native host has no meaning for yet"
+			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `editableState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)"
 		]
 	},
 	"fileupload": {
@@ -533,8 +531,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses an assignment to something other than a name or member, which needs a script engine",
 			"MARKLESS_NATIVE_JAVASCRIPT: the blur handler reads `taglistState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the blur handler reads `taglistItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
-			"MARKLESS_NATIVE_UNSUPPORTED: handler:component-edge:4/event:2 reads `.selectionStart` of an element, which a native host has no meaning for yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: handler:component-edge:7/event:8 reads `.value` of an element, which a native host has no meaning for yet"
+			"MARKLESS_NATIVE_UNSUPPORTED: handler:component-edge:4/event:2 reads `.selectionStart` of an element, which a native host has no meaning for yet"
 		]
 	},
 	"textbox": {

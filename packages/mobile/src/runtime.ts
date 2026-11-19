@@ -111,6 +111,8 @@ export type NativeScope = {
 	readonly formData?: (form: string) => Value;
 	/** A checkbox's or radio button's checkedness now, for `{ checked }`. */
 	readonly checked?: (node: string) => boolean;
+	/** A text field's text now, for `{ field }`. */
+	readonly fieldText?: (node: string) => string;
 	/** The device's clock, in milliseconds since 1970 (UTC). */
 	readonly now?: () => number;
 };
@@ -259,6 +261,7 @@ export function evaluateNativeExpr(
 								]),
 								...(scope.formData ? { formData: scope.formData } : {}),
 								...(scope.checked ? { checked: scope.checked } : {}),
+								...(scope.fieldText ? { fieldText: scope.fieldText } : {}),
 							},
 							compute,
 							elements,
@@ -284,6 +287,10 @@ export function evaluateNativeExpr(
 	}
 	if ('cell' in expr) return read(expr.cell, scope);
 	if ('literal' in expr) return expr.literal;
+	if ('field' in expr) {
+		if (!scope.fieldText) throw new Error(`the text of ${expr.field} read outside a runtime`);
+		return scope.fieldText(expr.field);
+	}
 	if ('checked' in expr) {
 		if (!scope.checked)
 			throw new Error(`the checkedness of ${expr.checked} read outside a runtime`);
@@ -443,6 +450,7 @@ export function createNativeRuntime(
 		params,
 		formData: (form) => entriesOf(form),
 		checked: (node) => checkedOf(node),
+		fieldText: (node) => textOf(node),
 		now,
 	};
 	const values = new Map<string, Value>(

@@ -71,11 +71,13 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case checked(String)
 	/// A computed whose body runs in the script engine: function `fn` of the payload's script, called with `bindings`.
 	case script(fn: String, bindings: [NativeScriptBinding])
+	/// A text field's text now: what a person typed since, else its `value` binding, else its `value` attribute.
+	case field(String)
 
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked: return []
+		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked, .field: return []
 		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .array(items): return items.flatMap(\.value.cells)
@@ -861,6 +863,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["formData"]: return .formData(try field("formData").string())
 		case ["checked"]: return .checked(try field("checked").string())
 		case ["bindings", "script"]: return .script(fn: try field("script").string(), bindings: try decodeBindings(try field("bindings")))
+		case ["field"]: return .field(try field("field").string())
 		case ["arguments", "call"]:
 			let name = try field("call").string()
 			guard let builtin = NativeBuiltin(rawValue: name) else { throw PayloadError(path: reader.path + ".call", reason: "unknown call \"\(name)\"") }

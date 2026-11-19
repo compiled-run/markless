@@ -272,6 +272,7 @@ class Runtime(
 			is Expr.Event -> fields?.get(e.field) ?: throw MarklessRuntimeError("the event's ${e.field} read where the event has none")
 			is Expr.FormData -> entriesOf(e.form)
 			is Expr.Checked -> JsValue.Bool(checkedOf(e.node))
+			is Expr.Field -> JsValue.Str(textOf(e.node))
 			is Expr.CellRef -> read(e.cell, scope)
 			Expr.Focused -> JsValue.Str(focused ?: NATIVE_DOCUMENT_BODY)
 			is Expr.FocusOrigin -> (eval(e.overlay) as? JsValue.Str)?.let { o -> origins[o.value]?.let(JsValue::Str) } ?: JsValue.Null

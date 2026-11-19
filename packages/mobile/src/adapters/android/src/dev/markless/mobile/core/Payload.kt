@@ -70,6 +70,8 @@ sealed interface Expr {
 	data class FormData(val form: String) : Expr
 	/** A checkbox's or radio button's checkedness now. */
 	data class Checked(val node: String) : Expr
+	/** A text field's text now: what a person typed since, else its `value` binding, else its `value` attribute. */
+	data class Field(val node: String) : Expr
 	/** A computed whose body runs in the script engine: function [fn] of the payload's script, called with [bindings]. */
 	data class Script(val fn: String, val bindings: Map<String, ScriptBinding>) : Expr
 }
@@ -338,7 +340,7 @@ data class Payload(
 			is Expr.Method -> hasScript(e.target) || e.arguments.any(::hasScript)
 			is Expr.Lambda -> hasScript(e.body)
 			is Expr.Call -> e.arguments.any(::hasScript)
-			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked -> false
+			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> false
 			is Expr.Contains -> hasScript(e.within) || hasScript(e.node)
 			is Expr.FocusOrigin -> hasScript(e.overlay)
 			is Expr.IsElement -> hasScript(e.value)
@@ -372,7 +374,7 @@ data class Payload(
 			is Expr.Lambda -> cellsOf(e.body)
 			is Expr.Local, is Expr.Item, Expr.RouteParams -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
-			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked -> emptyList()
+			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> emptyList()
 			is Expr.Contains -> cellsOf(e.within) + cellsOf(e.node)
 			is Expr.FocusOrigin -> cellsOf(e.overlay)
 			is Expr.IsElement -> cellsOf(e.value)
@@ -470,6 +472,7 @@ data class Payload(
 				o.containsKey("focusOrigin") -> { o.only(setOf("focusOrigin"), what); Expr.FocusOrigin(sub("focusOrigin")) }
 				o.containsKey("isElement") -> { o.only(setOf("isElement"), what); Expr.IsElement(sub("isElement")) }
 				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
+				o.containsKey("field") -> { o.only(setOf("field"), what); Expr.Field(o.field("field", what).str("$what.field")) }
 				o.containsKey("formData") -> { o.only(setOf("formData"), what); Expr.FormData(o.field("formData", what).str("$what.formData")) }
 				o.containsKey("script") -> { o.only(setOf("script", "bindings"), what); Expr.Script(o.field("script", what).str("$what.script"), scriptBindings(o.field("bindings", what), "$what.bindings")) }
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")

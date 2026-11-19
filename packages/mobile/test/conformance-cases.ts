@@ -461,6 +461,19 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'field-text',
+		fixture: 'test/fixtures/FieldText.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'focus', host: 'h1' },
+			{ event: 'keydown', host: 'h1', key: 'B' },
+			{ event: 'input', host: 'h1', value: 'Bea' },
+			{ event: 'keydown', host: 'h1', key: 'Enter' },
+			{ event: 'blur', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
 		name: 'text-keys',
 		fixture: 'test/fixtures/TextKeys.tsrx',
 		actions: [
