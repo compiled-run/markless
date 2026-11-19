@@ -2,8 +2,9 @@ package dev.markless.mobile.core
 
 class MarklessRuntimeError(message: String) : RuntimeException(message)
 
-/** The overlay protocol of `@markless/web/overlay-protocol`: the marker attribute and what makes an overlay modal. */
+/** The overlay protocol of `@markless/web/overlay-protocol`: the marker attribute, the hint mark, and what makes an overlay modal. */
 const val OVERLAY_ATTRIBUTE = "overlay"
+const val OVERLAY_HINT_ATTRIBUTE = "overlay-hint"
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
@@ -604,6 +605,9 @@ class Runtime(
 		return overlayNodes.filter { instances(it).isNotEmpty() && (it.id to "hidden") in now && now[it.id to "hidden"] == null }.map { it.id }
 	}
 
+	/** Whether [overlay] is a hint (a tooltip, a hovercard): `overlay-hint` beside `overlay`, as authored. */
+	private fun isHint(overlay: String): Boolean = (byId[overlay] as? Node.Element)?.attributes?.containsKey(OVERLAY_HINT_ATTRIBUTE) == true
+
 	/** Whether [overlay] or an element inside it has `aria-modal="true"`, its bound value first, else its static one. */
 	fun isModal(overlay: String): Boolean {
 		val now = attributes().associate { (n, a, v) -> (n to a) to v }
@@ -744,10 +748,11 @@ class Runtime(
 			if (event == EventName.PointerDown) {
 				raise(EventName.PointerOver, host)
 				crossing(EventName.PointerEnter, host, null, null)
-				// The overlay behaviour's document listener hears the press: the topmost overlay it landed outside is told.
-				val top = stack.lastOrNull()
-				if (top != null && !contains(top, host))
+				// The overlay behaviour's document listener hears the press: the topmost hint and the topmost other overlay it landed outside are told.
+				for (top in listOf(stack.lastOrNull { isHint(it) }, stack.lastOrNull { !isHint(it) })) {
+					if (top == null || contains(top, host)) continue
 					handlerFor(top, EventName.Dismiss)?.let { runs.add(it to mapOf("reason" to JsValue.Str("outside-press"), "pressTarget" to JsValue.Str(host))) }
+				}
 				raise(EventName.PointerDown, host)
 				return@change flush() ?: calls
 			}
@@ -948,8 +953,20 @@ class Runtime(
 		val ownedBefore = liveObjects()
 		val focusBefore = focused
 		val stackBefore = stack
-		val calls = apply()
+		val calls = apply().toMutableList()
 		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
+		// An overlay becoming shown supersedes every shown hint it is not inside, before it joins the stack.
+		val shownFirst = shownOverlays()
+		val working = stackBefore.filter { it in shownFirst }.toMutableList()
+		for (newcomer in shownFirst.filter { it !in stackBefore }) {
+			for (hint in working.filter { isHint(it) && !contains(it, newcomer) }) {
+				val handler = handlerFor(hint, EventName.Dismiss)?.let { handlers[it] } ?: continue
+				val taken = withFields(mapOf("reason" to JsValue.Str("superseded"), "pressTarget" to JsValue.Null)) { run(handler.ops, Scope.EMPTY) }
+				if (taken.firstOrNull() is JournalEntry.Navigate) return taken
+				calls.addAll(taken)
+			}
+			working.add(newcomer)
+		}
 		val shownNow = shownOverlays()
 		val released = stackBefore.filter { it !in shownNow }
 		val enlisted = shownNow.filter { it !in stackBefore }

@@ -16,6 +16,7 @@ import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeScriptEngine } from './script-engine.ts';
 import {
 	OVERLAY_ATTRIBUTE,
+	OVERLAY_HINT_ATTRIBUTE,
 	OVERLAY_MODAL_ATTRIBUTE,
 	OVERLAY_MODAL_VALUE,
 } from '@markless/web/overlay-protocol';
@@ -922,6 +923,10 @@ export function createNativeRuntime(
 			instances(node).length > 0 && now.get(`${node.id}\0hidden`) === null ? [node.id] : [],
 		);
 	};
+	const isHint = (overlay: string): boolean => {
+		const node = nodesById.get(overlay);
+		return node?.kind === 'element' && node.attributes?.[OVERLAY_HINT_ATTRIBUTE] !== undefined;
+	};
 	const isModal = (overlay: string): boolean => {
 		const now = keyed(attributes());
 		return payload.nodes.some((node) => {
@@ -1144,12 +1149,13 @@ export function createNativeRuntime(
 					if (touch.event === 'pointerdown') {
 						raise('pointerover', touch.host);
 						crossing('pointerenter', touch.host, null, null);
-						// The behaviour's document listener hears the press: the topmost overlay it landed outside is told.
-						const top = stack.at(-1);
-						const dismiss =
-							top !== undefined && !elements.contains(top, touch.host) ? handlerOf(top, 'dismiss') : undefined;
-						if (dismiss)
-							runs.push({ handler: dismiss.handler, fields: { reason: 'outside-press', pressTarget: touch.host } });
+						// The behaviour's document listener hears the press: the topmost hint and the topmost other overlay it landed outside are told.
+						for (const top of [stack.findLast(isHint), stack.findLast((overlay) => !isHint(overlay))]) {
+							const dismiss =
+								top !== undefined && !elements.contains(top, touch.host) ? handlerOf(top, 'dismiss') : undefined;
+							if (dismiss)
+								runs.push({ handler: dismiss.handler, fields: { reason: 'outside-press', pressTarget: touch.host } });
+						}
 						raise('pointerdown', touch.host);
 						return flush() ?? calls;
 					}
@@ -1458,6 +1464,20 @@ export function createNativeRuntime(
 			const stackBefore = stack;
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
+			// An overlay becoming shown supersedes every shown hint it is not inside, before it joins the stack.
+			const shownFirst = shownOverlays();
+			const working = stackBefore.filter((overlay) => shownFirst.includes(overlay));
+			for (const newcomer of shownFirst.filter((overlay) => !stackBefore.includes(overlay))) {
+				for (const hint of working.filter(isHint)) {
+					if (elements.contains(hint, newcomer)) continue;
+					const dismiss = handlerOf(hint, 'dismiss');
+					if (!dismiss) continue;
+					const out = run(handlers.get(dismiss.handler) ?? [], { reason: 'superseded', pressTarget: null }, base);
+					if (out[0]?.op === 'navigate') return out;
+					calls.push(...out);
+				}
+				working.push(newcomer);
+			}
 			const shownNow = shownOverlays();
 			const released = stackBefore.filter((overlay) => !shownNow.includes(overlay));
 			const enlisted = shownNow.filter((overlay) => !stackBefore.includes(overlay));

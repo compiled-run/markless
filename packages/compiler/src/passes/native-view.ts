@@ -3869,10 +3869,6 @@ export function createNativeViewPayload(
 					...staticAttributes,
 					...(scope.module.overlayHosts.has(item.id) ? { [OVERLAY_ATTRIBUTE]: '' } : {}),
 				};
-				if (OVERLAY_HINT_ATTRIBUTE in attributes)
-					refuse(
-						`an \`${OVERLAY_HINT_ATTRIBUTE}\` surface (a tooltip or hovercard), which phones do not show yet`,
-					);
 				if (
 					element === 'dialog' &&
 					('open' in attributes ||
@@ -3903,6 +3899,10 @@ export function createNativeViewPayload(
 					),
 					...own,
 				];
+				if (bindings.some((binding) => 'attribute' in binding && binding.attribute === OVERLAY_HINT_ATTRIBUTE))
+					refuse(
+						`\`${OVERLAY_HINT_ATTRIBUTE}\` that follows state; the overlay stack reads it once, when the surface shows, so write it bare`,
+					);
 				for (const attribute of handleAttrs) {
 					if (attribute.name === 'id') continue;
 					handleReferences.push({
