@@ -4,29 +4,23 @@ name: u39-checklist
 - launchApp:
       clearState: true
 - assertVisible: Sandwich
-- assertVisible: Condiments
+- assertVisible: Ticked 0
 - assertVisible: All
 - assertVisible: Lettuce
 - assertVisible: Tomato
-- assertNotVisible: Lettuce ticked
-- assertNotVisible: Tomato ticked
-- assertNotVisible: All ticked
 - tapOn: Lettuce
-- assertVisible: Lettuce ticked
-- assertVisible: Lettuce ticked
-- assertNotVisible: Tomato ticked
+- assertNotVisible: Ticked 0
+- assertVisible: Ticked 1
+- assertNotVisible: Ticked 0
 - tapOn: All
-- assertVisible: Tomato ticked
-- assertVisible: Lettuce ticked
-- assertVisible: Tomato ticked
-- assertVisible: All ticked
+- assertNotVisible: Ticked 1
+- assertVisible: Ticked 2
+- assertNotVisible: Ticked 1
 - tapOn: All
-- assertNotVisible: Lettuce ticked
-- assertNotVisible: Tomato ticked
-- assertNotVisible: All ticked
-- assertVisible: All
-- assertVisible: Lettuce
-- assertVisible: Tomato
-- assertNotVisible: Lettuce ticked
-- assertNotVisible: Tomato ticked
-- assertNotVisible: All ticked
+- assertNotVisible: Ticked 2
+- assertVisible: Ticked 0
+- assertNotVisible: Ticked 2
+- tapOn: Tomato
+- assertNotVisible: Ticked 0
+- assertVisible: Ticked 1
+- assertNotVisible: Ticked 0

@@ -4913,29 +4913,26 @@ export function createNativeViewPayload(
 		const fn = scriptFunctionId(fact, instance.module, what);
 		const bindings = scriptBindings(fact, instance.scope, what);
 		if (fn === null || bindings === null) return null;
-		// `calendar.onChange?.(iso)`: the callback the root filled the slot with runs as JavaScript where it was written.
-		for (const invocation of instance.module.graph.sharedCallbackInvocations) {
-			const at = invocation.sourceSpan;
-			if (invocation.definitionId !== instance.definition.id || !at || at.start < span.start || at.end > span.end) continue;
-			const slot = instance.slots.get(invocation.slotName);
-			if (slot?.kind !== 'callback') continue;
-			const label = `\`${invocation.calleeSource}\``;
+		// `calendar.onChange?.(iso)`: a callback the root filled a slot with runs as JavaScript where it was written, reached
+		// on the factory's state objects the method reads.
+		const slots: Record<string, NativeScriptBinding> = {};
+		for (const [slotName, slot] of instance.slots) {
+			if (slot.kind !== 'callback') continue;
+			const label = `\`${slotName}\``;
 			const callback = slot.span && scriptFacts(slot.scope.module)?.handler(slot.span);
-			if (!callback) return refuseScript(`${what} calls ${label}, whose function the build did not read, so it cannot run as JavaScript`, at);
+			if (!callback) return refuseScript(`${what} reaches ${label}, whose function the build did not read, so it cannot run as JavaScript`, span);
 			const callbackFn = scriptFunctionId(callback, slot.scope.module, label);
 			const callbackBindings = scriptBindings(callback, slot.scope, label);
 			if (callbackFn === null || callbackBindings === null) return null;
-			const owner = invocation.calleeSource.split('.')[0]!;
-			const object = bindings[owner];
-			if (!object || !('fields' in object))
-				return refuseScript(`${what} calls ${label}, which JavaScript on a phone reaches only on the factory's state object`, at);
-			bindings[owner] = {
-				object: {
-					...Object.fromEntries(Object.entries(object.fields).map(([field, cell]) => [field, { cell }])),
-					[invocation.slotName]: { method: callbackFn, bindings: callbackBindings },
-				},
-			};
+			slots[slotName] = { method: callbackFn, bindings: callbackBindings };
 		}
+		if (Object.keys(slots).length > 0)
+			for (const [name, binding] of Object.entries(bindings)) {
+				if (!('fields' in binding) || instance.scope.objects.get(name)?.kind !== 'fields') continue;
+				bindings[name] = {
+					object: { ...Object.fromEntries(Object.entries(binding.fields).map(([field, cell]) => [field, { cell }])), ...slots },
+				};
+			}
 		return { method: fn, bindings };
 	}
 
