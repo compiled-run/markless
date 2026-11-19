@@ -262,7 +262,8 @@ export function startFragmentNavigation(
 				if (event.type !== 'pointerover')
 					press(
 						anchor,
-						event.type === 'pointerdown' && (event as PointerEvent).pointerType !== 'touch',
+						event.type === 'pointerdown' &&
+							(event as PointerEvent).pointerType !== 'touch',
 					);
 				void wake(event);
 			} else if (anchor.hasAttribute(linkAttributeOf())) early(event);
@@ -633,14 +634,11 @@ export function runFragmentNavigation(
 			finalUrl.pathname = finalUrl.pathname.slice(prefix.length);
 			finalUrl.hash = url.hash;
 			// The budget is wire bytes: a declared length is that, and an uncompressed body counts as it reads.
+			// A press or click that adopts this fetch lifts it (entry.budget), so read it at every chunk.
 			const declared = Number(response.headers.get('content-length') ?? 0);
-			if (declared > budget) throw new Error('MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET');
-			const limit =
-				budget === Infinity || declared
-					? Infinity
-					: response.headers.get('content-encoding')
-						? config.idleFragmentDecodedBytes
-						: budget;
+			if (declared > entry.budget)
+				throw new Error('MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET');
+			const encoded = !!response.headers.get('content-encoding');
 			const reader = response.body.getReader();
 			const decoder = new TextDecoder();
 			let text = '';
@@ -657,7 +655,11 @@ export function runFragmentNavigation(
 					return parse(finalUrl.href, text + decoder.decode());
 				}
 				bytes += chunk.value.byteLength;
-				if (bytes > limit) {
+				if (
+					entry.budget !== Infinity &&
+					!declared &&
+					bytes > (encoded ? config.idleFragmentDecodedBytes : entry.budget)
+				) {
 					void reader.cancel();
 					throw new Error('MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET');
 				}
@@ -671,6 +673,7 @@ export function runFragmentNavigation(
 		const entry: FragmentPrefetch = {
 			at: started?.at ?? w.performance.now(),
 			writes: state.writes,
+			budget,
 			result: read(),
 			open: true,
 			abort: () => {
@@ -695,8 +698,13 @@ export function runFragmentNavigation(
 		if (!config.prefetch || key === state.shown) return;
 		const existing = state.prefetches.get(key);
 		// An idle-fetched page still needs its code on intent, or the swap fetches it a round late.
-		if (existing && fresh(existing, w.performance.now()))
-			return void (code && preloadCode(url, false));
+		if (existing && fresh(existing, w.performance.now())) {
+			if (code) {
+				existing.budget = Infinity;
+				preloadCode(url, false);
+			}
+			return;
+		}
 		existing?.abort();
 		const open = [...state.prefetches].filter(([, entry]) => entry.open);
 		for (const [stale, entry] of open.slice(

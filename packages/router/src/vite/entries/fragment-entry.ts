@@ -91,6 +91,8 @@ export type FragmentPrefetch = {
 	readonly result: Promise<FragmentFetched>;
 	// The response is still arriving, so it holds a connection.
 	open: boolean;
+	// Bytes an idle or viewport fetch may read before it gives the page up; Infinity once intent or a click adopts it.
+	budget: number;
 	readonly abort: () => void;
 };
 
@@ -207,12 +209,16 @@ function take(
 		return {
 			at: now,
 			writes: state.writes,
+			budget: Infinity,
 			result: Promise.resolve(ready ?? state.parse(url.href, cached)),
 			open: false,
 			abort: () => {},
 		};
 	}
-	if (existing && state.fresh(existing, now)) return existing;
+	if (existing && state.fresh(existing, now)) {
+		existing.budget = Infinity;
+		return existing;
+	}
 	existing?.abort();
 	state.preloadCode(url, false);
 	return state.request(url, false);
