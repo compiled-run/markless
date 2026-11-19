@@ -861,6 +861,15 @@ class Runtime(
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"event\":$event$catch"))
 			}
 			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
+			is Op.FieldText -> {
+				val node = evaluate(op.node, scope)
+				if (node == JsValue.Null) continue
+				if (node !is JsValue.Str || !isElement(node.value)) throw MarklessRuntimeError("a field text written to a value that is not an element")
+				val value = evaluate(op.value, scope)
+				val text = if (value == JsValue.Null) "" else Js.toStr(value)
+				edited[node.value] = text
+				calls.add(JournalEntry.Property(node.value, "value", text))
+			}
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)
 				values[slot(op.cell, scope)] = v

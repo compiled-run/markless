@@ -596,10 +596,11 @@ function readsLive(expr: unknown): boolean {
 	);
 }
 
-/** Whether ops read what only data has: a text field's text (`{ field }`) or a press count (`{ event: 'detail' }`). */
+/** Whether ops use what only data has: a text field's text (`{ field }`, `fieldText`) or a press count (`{ event: 'detail' }`). */
 const mentionsDataOnly = (tree: unknown): boolean => {
 	if (!tree || typeof tree !== 'object') return false;
-	if (!Array.isArray(tree) && ('field' in tree || (tree as { event?: unknown }).event === 'detail')) return true;
+	if (!Array.isArray(tree) && ('field' in tree || (tree as { event?: unknown }).event === 'detail' || (tree as { op?: unknown }).op === 'fieldText'))
+		return true;
 	return Object.values(tree).some(mentionsDataOnly);
 };
 
@@ -5429,7 +5430,7 @@ export function createNativeViewPayload(
 		if (statement.kind === 'await' || statement.kind === 'try') return [];
 		if (statement.kind === 'method-call') {
 			const command = statement.method;
-			if ((command !== 'focus' && command !== 'scrollIntoView') || (statement.arguments ?? []).length > 0) {
+			if ((command !== 'focus' && command !== 'scrollIntoView' && command !== 'select') || (statement.arguments ?? []).length > 0) {
 				refuse(`${what} calls \`.${command}()\` on a value, which needs a script engine`, span);
 				return [];
 			}
@@ -5522,7 +5523,7 @@ export function createNativeViewPayload(
 						})()
 					: undefined;
 			const onElement =
-				(command === 'focus' || command === 'scrollIntoView') &&
+				(command === 'focus' || command === 'scrollIntoView' || command === 'select') &&
 				(receiverField?.kind === 'handle' ||
 					(receiver.length === 0 &&
 						(scope.args.has(statement.name) || !scope.objects.has(statement.name))));
@@ -5562,7 +5563,7 @@ export function createNativeViewPayload(
 						{
 							op: 'command',
 							node: element,
-							command: command as 'focus' | 'scrollIntoView',
+							command: command as NativeCommand,
 							...(preventScroll ? { preventScroll: true as const } : {}),
 						},
 					];
@@ -5570,7 +5571,7 @@ export function createNativeViewPayload(
 					return [];
 				if (diagnostics.length > mark) return [];
 				if (target && !options)
-					return commandOn(target, command as 'focus' | 'scrollIntoView', false, statement.optional === true, what, span);
+					return commandOn(target, command as NativeCommand, false, statement.optional === true, what, span);
 				return notCallable();
 			}
 			let body:
@@ -5681,6 +5682,28 @@ export function createNativeViewPayload(
 									return found?.kind === 'cell' ? found.cell : undefined;
 								})()
 							: undefined;
+			// `field.value = text` on a text field's element: its text, as the web's property write sets it.
+			if (!cell && field === 'value' && (scope.args.has(statement.target) || !scope.objects.has(statement.target))) {
+				const mark = diagnostics.length;
+				const target = exprOf({ kind: 'read', name: statement.target }, what, scope);
+				const element = elementOf(target);
+				const node = element !== undefined ? nodeById().get(element) : undefined;
+				if (
+					node?.kind === 'element' &&
+					TEXT_ENTRY.has(node.element) &&
+					!isTicked(element!) &&
+					node.attributes?.['type'] !== 'hidden'
+				) {
+					if (node.row) {
+						refuse(`${what} writes the text of a field in a @for row, which a native build cannot name yet`, span);
+						return [];
+					}
+					const value = exprOf(statement.value, what, scope);
+					return value ? [{ op: 'fieldText', node: element!, value }] : [];
+				}
+				if (target && 'literal' in target && target.literal === null) return [];
+				diagnostics.length = mark;
+			}
 			if (!cell) {
 				refuse(
 					`${what} assigns \`${statement.target}.${statement.path.join('.')}\`, which is not a field of state`,

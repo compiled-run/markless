@@ -946,6 +946,13 @@ public final class NativeRuntime {
 				calls.append(.command(node: node, command: command, preventScroll: preventScroll))
 			case .preventDefault:
 				calls.append(.preventDefault)
+			case let .fieldText(target, value):
+				let id = try evaluate(target, in: scope)
+				if id == .null { continue }
+				guard case let .string(node) = id, isElement(node) else { throw RuntimeError(reason: "a field text written to a value that is not an element") }
+				let text = textOf(try evaluate(value, in: scope))
+				edited[node] = text
+				calls.append(.property(node: node, name: "value", value: text))
 			case let .call(call, object, arguments, result, then):
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):

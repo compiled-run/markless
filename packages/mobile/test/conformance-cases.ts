@@ -452,6 +452,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'rename',
+		fixture: 'test/fixtures/Rename.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'input', host: 'h2', value: 'Final' },
+			{ event: 'keydown', host: 'h2', key: 'Enter' },
+			{ event: 'activate', host: 'h1' },
+		],
+	},
+	{
 		name: 'press-count',
 		fixture: 'test/fixtures/PressCount.tsrx',
 		actions: [

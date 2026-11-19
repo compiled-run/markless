@@ -495,6 +495,12 @@ final class ViewTree {
 					bringIntoView(view, block: scrollIntoViewAlign.block, inline: scrollIntoViewAlign.inline)
 					break
 				}
+				// `select()` selects a field's whole text; it does not move focus, as on the web.
+				if command == "select" {
+					if let field = view as? UITextField { field.selectedTextRange = field.textRange(from: field.beginningOfDocument, to: field.endOfDocument) }
+					else if let area = view as? TextArea { area.selectedTextRange = area.textRange(from: area.beginningOfDocument, to: area.endOfDocument) }
+					break
+				}
 				if !preventScroll { bringIntoView(view, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline) }
 				if view is UITextField || view is TextArea {
 					view.becomeFirstResponder()

@@ -958,6 +958,8 @@ class MarklessHost(
 	private fun command(view: View, command: String, preventScroll: Boolean) {
 		// As on the web: scrollIntoView aligns the element to the start; focus brings it into view unless told not to.
 		if (command == "scrollIntoView") return bringIntoView(view, dev.markless.mobile.core.SCROLL_INTO_VIEW)
+		// `select()` selects a field's whole text; it does not move focus, as on the web.
+		if (command == "select") return (view as? EditText ?: throw MarklessHostError("select() on a view that is not a text field")).selectAll()
 		if (!preventScroll) bringIntoView(view, dev.markless.mobile.core.FOCUS_INTO_VIEW)
 		if (view is EditText) {
 			view.requestFocus()

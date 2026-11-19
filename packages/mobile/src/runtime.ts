@@ -769,10 +769,20 @@ export function createNativeRuntime(
 		);
 	const attributes = () =>
 		bound('attribute', (name, value) => marklessAttributeValue(name, value));
-	const properties = () =>
-		bound('property', (_name, value) => String(value ?? '')).filter(
+	/** Text fields with no `value` binding whose text a handler wrote (`field.value = text`): their text is journalled too. */
+	const written = new Set<string>();
+	const properties = () => {
+		const fromBindings = bound('property', (_name, value) => String(value ?? '')).filter(
 			([, name]) => name === 'value',
 		) as (readonly [string, 'value', string])[];
+		const boundNodes = new Set(fromBindings.map(([node]) => node));
+		return [
+			...fromBindings,
+			...[...written]
+				.filter((node) => !boundNodes.has(node))
+				.map((node) => [node, 'value', edited.get(node) ?? ''] as const),
+		];
+	};
 
 	// Forms: what each text field holds, which submissions are still running, and the marks they set.
 	const forms = new Map((payload.forms ?? []).map((form) => [form.node, form]));
@@ -1241,6 +1251,22 @@ export function createNativeRuntime(
 			}
 			if (op.op === 'preventDefault') {
 				calls.push({ op: 'preventDefault' });
+				continue;
+			}
+			if (op.op === 'fieldText') {
+				let node = op.node;
+				if (typeof node !== 'string') {
+					const value = evaluate(node, eventValue, scope);
+					if (value === null) continue;
+					if (typeof value !== 'string' || !elements.isElement(value))
+						throw new Error('a field text written to a value that is not an element');
+					node = value;
+				}
+				const text = String(evaluate(op.value, eventValue, scope) ?? '');
+				edited.set(node, text);
+				written.add(node);
+				// An unbound field has no binding to diff, so the write is its own entry.
+				calls.push({ op: 'property', node, name: 'value', value: text });
 				continue;
 			}
 			if (op.op === 'dialog') {

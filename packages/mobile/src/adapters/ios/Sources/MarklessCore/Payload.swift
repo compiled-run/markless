@@ -266,6 +266,8 @@ public enum NativeOp: Equatable, Sendable {
 	case script(fn: String, type: String, bindings: [NativeScriptBinding], catch: String?)
 	/// `event.preventDefault()` in a text field's `keydown` or `paste` handler.
 	case preventDefault
+	/// `field.value = text` on a text field: its text becomes the value, with no input event; `node` evaluates to its id.
+	case fieldText(node: NativeExpr, value: NativeExpr)
 }
 
 public struct NativeCapture: Equatable, Sendable {
@@ -590,6 +592,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 						throw PayloadError(path: op.path + ".method", reason: "unknown dialog method \"\(method)\"")
 					}
 					return .dialog(node: try opField["node"].string(), open: method == "showModal")
+				case "fieldText":
+					let opField = try op.object(["op", "node", "value"])
+					let node = try opField["node"]
+					let target: NativeExpr = if let fixed = try? node.string() { .literal(.string(fixed)) } else { try decodeExpr(node) }
+					return .fieldText(node: target, value: try decodeExpr(try opField["value"]))
 				case "preventDefault":
 					_ = try op.object(["op"])
 					return .preventDefault
@@ -597,7 +604,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 					let keys = Set(try op.keys())
 					let opField = try op.object(required: ["op", "node", "command"], optional: ["preventScroll"])
 					let command = try opField["command"].string()
-					guard command == "focus" || command == "scrollIntoView" else {
+					guard ["focus", "scrollIntoView", "select"].contains(command) else {
 						throw PayloadError(path: op.path + ".command", reason: "unknown command \"\(command)\"")
 					}
 					let preventScroll = keys.contains("preventScroll") ? try opField["preventScroll"].bool() : false

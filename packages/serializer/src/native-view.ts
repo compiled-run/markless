@@ -525,6 +525,11 @@ export type NativeOp =
 	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler: the host leaves out what the key or paste does. */
 	| { readonly op: 'preventDefault' }
 	/**
+	 * `field.value = text` on a text field: its text becomes `value` (as a string), as if typed but with no input event; the
+	 * journal's `property` entry carries it to the field. `node` is a fixed id or an expression giving one (null: nothing).
+	 */
+	| { readonly op: 'fieldText'; readonly node: string | NativeExpr; readonly value: NativeExpr }
+	/**
 	 * Submits `form` as the web does when `submitter` is pressed, or the return key submits it with no submit button (null):
 	 * nothing when the submitter is disabled; then, unless the form has `novalidate` or the submitter `formnovalidate`,
 	 * the first field that is required and empty (or unchecked) stops it with an `invalid` entry; then a submission that
@@ -574,7 +579,8 @@ export type NativeOp =
 	  };
 
 /** Element commands a host runs. */
-export type NativeCommand = 'focus' | 'scrollIntoView';
+/** `select` selects a text field's whole text, as `field.select()` does. */
+export type NativeCommand = 'focus' | 'scrollIntoView' | 'select';
 
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;

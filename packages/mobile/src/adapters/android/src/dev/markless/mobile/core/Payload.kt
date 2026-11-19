@@ -185,6 +185,8 @@ sealed interface Op {
 	data class Script(val fn: String, val type: String, val bindings: Map<String, ScriptBinding>, val catch: String? = null) : Op
 	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler. */
 	data object PreventDefault : Op
+	/** `field.value = text` on a text field: its text becomes [value], with no input event; [node] evaluates to its id. */
+	data class FieldText(val node: Expr, val value: Expr) : Op
 }
 
 /** A device call a task cell starts at mount. */
@@ -355,6 +357,7 @@ data class Payload(
 				is Op.Navigate -> op.params.values.any(::hasScript)
 				is Op.After -> hasScript(op.ms) || op.capture.any { hasScript(it.second) } || scriptOps(op.ops)
 				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick, Op.PreventDefault -> false
+				is Op.FieldText -> hasScript(op.node) || hasScript(op.value)
 			}
 		}
 
@@ -710,10 +713,18 @@ data class Payload(
 				o.only(setOf("op"), what)
 				return Op.PreventDefault
 			}
+			if (name == "fieldText") {
+				o.only(setOf("op", "node", "value"), what)
+				val raw = o.field("node", what)
+				val node = if (raw is Json.Str) Expr.Literal(JsValue.Str(raw.value)) else expr(raw, "$what.node")
+				val value = expr(o.field("value", what), "$what.value")
+				for (c in cellsOf(node) + cellsOf(value)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				return Op.FieldText(node, value)
+			}
 			if (name == "command") {
 				o.only(setOf("op", "node", "command", "preventScroll"), what)
 				val command = o.field("command", what).str("$what.command")
-				if (command != "focus" && command != "scrollIntoView") throw MarklessDecodeError("$what has unknown command \"$command\"")
+				if (command != "focus" && command != "scrollIntoView" && command != "select") throw MarklessDecodeError("$what has unknown command \"$command\"")
 				val preventScroll = if (o.containsKey("preventScroll")) ((o.field("preventScroll", what) as? Json.Bool ?: throw MarklessDecodeError("$what.preventScroll must be a boolean")).value) else false
 				val raw = o.field("node", what)
 				val node = if (raw is Json.Str) Expr.Literal(JsValue.Str(raw.value)) else expr(raw, "$what.node")

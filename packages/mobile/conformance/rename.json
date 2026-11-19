@@ -1,0 +1,284 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Rename",
+		"cells": [
+			{
+				"id": "state:editing",
+				"name": "editing",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "state:name",
+				"name": "name",
+				"initial": "Draft"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Rename"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "input",
+				"parent": "h0",
+				"attributes": {
+					"aria-label": "Name"
+				},
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:editing"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Name ",
+								{
+									"cell": "state:name"
+								},
+								""
+							]
+						}
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h2",
+				"event": "keydown",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h2",
+				"event": "input",
+				"handler": "handler:h2/edit"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:editing",
+						"value": {
+							"literal": true
+						}
+					},
+					{
+						"op": "fieldText",
+						"node": "h2",
+						"value": {
+							"cell": "state:name"
+						}
+					},
+					{
+						"op": "command",
+						"node": "h2",
+						"command": "focus"
+					},
+					{
+						"op": "command",
+						"node": "h2",
+						"command": "select"
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"event": "key"
+							},
+							"right": {
+								"literal": "Enter"
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "assign",
+								"cell": "state:name",
+								"value": {
+									"field": "h2"
+								}
+							},
+							{
+								"op": "assign",
+								"cell": "state:editing",
+								"value": {
+									"literal": false
+								}
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:h2/edit",
+				"ops": []
+			}
+		]
+	},
+	"initial": [
+		["h1:text0", "Rename"],
+		["h3:text0", "Name Draft"]
+	],
+	"initialAttributes": [["h2", "hidden", ""]],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:editing",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "property",
+					"node": "h2",
+					"name": "value",
+					"value": "Draft"
+				},
+				{
+					"op": "command",
+					"node": "h2",
+					"command": "focus"
+				},
+				{
+					"op": "command",
+					"node": "h2",
+					"command": "select"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h2",
+				"value": "Final"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h2",
+				"key": "Enter"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:editing",
+					"value": false
+				},
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Name Final"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:editing",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "property",
+					"node": "h2",
+					"name": "value",
+					"value": "Final"
+				},
+				{
+					"op": "command",
+					"node": "h2",
+					"command": "focus"
+				},
+				{
+					"op": "command",
+					"node": "h2",
+					"command": "select"
+				}
+			]
+		}
+	]
+}
