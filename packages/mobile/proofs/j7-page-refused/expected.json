@@ -1,0 +1,9 @@
+{
+	"rung": "J7",
+	"name": "A handler that touches document: refused at build time by name, file and line",
+	"steps": [
+		{ "visible": ["Page title", "Count 0"] },
+		{ "do": { "tap": "Count 0" }, "visible": ["Count 1"], "absent": ["Count 0"] },
+		{ "do": { "tap": "Rename the page" }, "visible": ["Count 1"], "title": "Count 1" }
+	]
+}

@@ -1,0 +1,18 @@
+appId: ${APP_ID}
+name: j5-engine-computed
+---
+- launchApp:
+      clearState: true
+- assertVisible: Words
+- assertVisible: 'Sorted: apple, banana, cherry'
+- assertVisible: 'Longest: banana'
+- tapOn: Add date
+- assertNotVisible: 'Sorted: apple, banana, cherry'
+- assertVisible: 'Sorted: apple, banana, cherry, date'
+- assertVisible: 'Longest: banana'
+- assertNotVisible: 'Sorted: apple, banana, cherry'
+- tapOn: Replace
+- assertNotVisible: 'Longest: banana'
+- assertVisible: 'Sorted: elderberry, fig, kiwi'
+- assertVisible: 'Longest: elderberry'
+- assertNotVisible: 'Longest: banana'

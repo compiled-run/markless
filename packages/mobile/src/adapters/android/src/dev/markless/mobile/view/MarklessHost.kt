@@ -45,6 +45,7 @@ import dev.markless.mobile.core.Instance
 import dev.markless.mobile.core.JournalEntry
 import dev.markless.mobile.core.JsValue
 import dev.markless.mobile.core.Node
+import dev.markless.mobile.core.OVERLAY_ATTRIBUTE
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.Store
@@ -104,7 +105,11 @@ class MarklessHost(
 		preferredLanguages: List<String> = LocaleList.getDefault().let { list -> (0 until list.size()).map { list[it].toLanguageTag() } },
 	) : this(context, Payload.decode(payloadBytes), styleExportBytes?.let { StyleExport.decode(it) }, fonts, store, params, device, preferredLanguages)
 
-	val runtime = Runtime(payload, store, params, preferredLanguages, now)
+	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
+		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
+		onScriptEntry = AppScriptEngine::entryRan
+	}
+	private val scriptServices = ScriptServices()
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val events = payload.events.groupBy { it.host }
 	private val views = HashMap<String, View>()
@@ -175,6 +180,8 @@ class MarklessHost(
 
 	private fun allLayouts(): List<Layout> = listOfNotNull(page) + sheetLayouts.values.flatMap { it.layouts }
 
+	private val overlays = Overlays(this, context, dpr)
+
 	/** The root's frame inside the viewport, when a style export placed it. */
 	var rootFrame: Rect? = null
 		private set
@@ -192,8 +199,18 @@ class MarklessHost(
 
 	/** Runs a `timer` entry's action after its delay; by default on the main looper, applying its journal. */
 	var scheduleTimer: (timer: String, ms: Double) -> Unit = { timer, ms ->
-		if (ms.isFinite()) timers.postDelayed({ apply(runtime.timer(timer)) }, ms.toLong())
+		if (ms.isFinite()) {
+			val due = Runnable {
+				pendingTimers.remove(timer)
+				if (!released) apply(runtime.timer(timer))
+			}
+			pendingTimers.put(timer, due)?.let(timers::removeCallbacks)
+			timers.postDelayed(due, ms.toLong())
+		}
 	}
+
+	/** Each scheduled timer's runnable by timer id, so a `clearTimer` entry can drop it. */
+	private val pendingTimers = HashMap<String, Runnable>()
 
 	/** Inputs with no visible view (a checkbox or hidden input): GONE and outside the accessibility tree. */
 	private val inert = HashSet<String>()
@@ -230,6 +247,7 @@ class MarklessHost(
 			override fun onViewAttachedToWindow(view: View) = startLoadEvents()
 			override fun onViewDetachedFromWindow(view: View) = stopLoadEvents()
 		})
+		if (runtime.overlays().isNotEmpty()) root.post { overlays.mount() }
 	}
 
 	private val onLayout = android.view.ViewTreeObserver.OnGlobalLayoutListener { raiseVisible() }
@@ -300,7 +318,35 @@ class MarklessHost(
 	/** Another page replaces this one: its device objects end, and device answers that arrive later change nothing. */
 	fun release() {
 		released = true
+		stopTimersAndRequests()
 		for (o in payload.objects) device?.release(o.id)
+	}
+
+	/** The screen is gone: no timer fires and no pending request answers after this. */
+	fun stopTimersAndRequests() {
+		timers.removeCallbacksAndMessages(null)
+		pendingTimers.clear()
+		scriptServices.stop()
+	}
+
+	/** Starts the engine and loads this page's script once the first frame is drawn and the main loop is idle. */
+	fun warmScriptWhenIdle() {
+		if (payload.script == null || !AppScriptEngine.available) return
+		val drawn = object : android.view.ViewTreeObserver.OnDrawListener {
+			var seen = false
+			override fun onDraw() {
+				if (seen) return
+				seen = true
+				// A draw listener cannot remove itself while the draw runs.
+				root.post { root.viewTreeObserver.takeIf { it.isAlive }?.removeOnDrawListener(this) }
+				android.os.Looper.myQueue().addIdleHandler {
+					// Warming only saves time; a failure here shows again, and throws, at the first entry.
+					if (!released) runCatching { AppScriptEngine.warm(runtime) }.onFailure { Log.e(AppScriptEngine.TAG, "engine warm failed", it) }
+					false
+				}
+			}
+		}
+		root.viewTreeObserver.addOnDrawListener(drawn)
 	}
 
 	private fun needDevice(): NativeDevice = device ?: throw MarklessHostError("the payload names device features and this host was given no device")
@@ -365,6 +411,14 @@ class MarklessHost(
 		if (runtime.handlerFor(id, EventName.Dismiss) != null) apply(runtime.dispatch(id, EventName.Dismiss))
 	}
 
+	/** Each element view and the instance it shows, for finding the element under a touch. */
+	internal fun elementNodes(): Map<View, String> = java.util.IdentityHashMap<View, String>().apply {
+		for ((id, inst) in built) if (inst.node is Node.Element) views[id]?.let { put(it, id) }
+	}
+
+	/** Reports a touch in window coordinates to the runtime as pointer events; call it before the views see the touch. */
+	fun touch(event: android.view.MotionEvent) = overlays.touch(event)
+
 	/** The journal applier: the only code that changes a retained view after the first build. */
 	fun apply(journal: List<JournalEntry>) {
 		dismissMessage()
@@ -391,6 +445,7 @@ class MarklessHost(
 				is JournalEntry.Check -> if (entry.node !in inert) (view(entry.node) as? CompoundButton ?: throw MarklessHostError("journal sets the checkedness of \"${entry.node}\", which is not a checkbox or radio button")).isChecked = entry.checked
 				is JournalEntry.Dialog -> dialog(entry.node, entry.open)
 				is JournalEntry.Command -> command(view(entry.node), entry.command, entry.preventScroll)
+				is JournalEntry.Overlay -> overlays.show(entry.node, entry.open, entry.modal)
 				is JournalEntry.Arm -> {
 					if (runtime.node(entry.node) !is Node.Branch) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
 					rebuild()
@@ -408,6 +463,8 @@ class MarklessHost(
 				is JournalEntry.Sheet -> (sheets[entry.node] ?: throw MarklessHostError("journal names \"${entry.node}\", which is not a sheet")).let { if (entry.open) it.open() else it.close() }
 				is JournalEntry.Call -> runCall(entry)
 				is JournalEntry.Release -> needDevice().release(entry.node)
+				is JournalEntry.ClearTimer -> pendingTimers.remove(entry.node)?.let(timers::removeCallbacks)
+				is JournalEntry.Fetch -> scriptServices.fetch(entry.request) { if (!released) apply(runtime.response(entry.id, it)) }
 				is JournalEntry.Rows -> {
 					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
 					rebuild()
@@ -695,8 +752,8 @@ class MarklessHost(
 		if (view is EditText && node.bindings.none { it.property && it.name == "value" }) node.attributes["value"]?.let { view.setText(it) }
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
-			EventName.Dismiss -> throw MarklessHostError("dismiss event on \"${node.id}\", which is not a sheet")
-			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible -> {}
+			EventName.Dismiss -> if (OVERLAY_ATTRIBUTE !in node.attributes) throw MarklessHostError("dismiss event on \"${node.id}\", which is neither a sheet nor an overlay")
+			EventName.Cancel, EventName.PointerDown, EventName.PointerUp, EventName.Submit, EventName.Idle, EventName.Visible -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->
 				val now = android.os.SystemClock.uptimeMillis()

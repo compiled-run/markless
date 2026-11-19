@@ -34,6 +34,12 @@ private func rejection(_ text: String) -> String? {
 	("\"parent\":\"h0\"", "\"parent\":\"h9\"", "is not an earlier element"),
 	("{\"cell\":\"state:count\"}", "{\"cell\":\"state:missing\"}", "reads unknown cell"),
 	("{\"literal\":1}", "{\"literal\":[1]}", "expected a number, string, boolean or null"),
+	("\"component\":\"Counter\"", "\"component\":\"Counter\",\"script\":{\"id\":\"a\",\"source\":\"\",\"services\":[\"storage\"]}", "unknown script service \"storage\""),
+	("{\"literal\":1}", "{\"script\":\"fn:0\",\"bindings\":{\"n\":{\"slot\":\"state:count\"}}}", "a script binding is"),
+	("{\"op\":\"assign\"", "{\"op\":\"script\",\"fn\":\"fn:0\",\"bindings\":{},\"then\":[]},{\"op\":\"assign\"", "unknown field \"then\""),
+	("{\"literal\":1}", "{\"event\":\"detail\"}", "unknown event read \"detail\""),
+	("{\"literal\":1}", "{\"focused\":false}", "focused is only ever true"),
+	("{\"literal\":1}", "{\"contains\":{\"literal\":1}}", "unknown expression"),
 ])
 func rejectsWhatItDoesNotKnow(find: String, replace: String, reason: String) throws {
 	let mutated = counter.replacingOccurrences(of: find, with: replace)
@@ -103,4 +109,46 @@ func rejectsSheetsItCannotPresent(find: String, replace: String, reason: String)
 	#expect(mutated != sheet)
 	let message = try #require(rejection(mutated))
 	#expect(message.contains(reason), "\(message)")
+}
+
+private let overlay = """
+	{"version":"markless.native-view/0","component":"O","cells":[{"id":"state:open","name":"open","initial":false},{"id":"state:why","name":"why","initial":""}],
+	"nodes":[{"kind":"element","id":"h0","element":"main","parent":null},{"kind":"element","id":"h1","element":"button","parent":"h0"},
+	{"kind":"element","id":"h2","element":"div","parent":"h0","attributes":{"overlay":"","aria-modal":"true"},
+	"bindings":[{"attribute":"hidden","value":{"unary":"!","value":{"cell":"state:open"}}}]},
+	{"kind":"element","id":"h3","element":"button","parent":"h2"},{"kind":"element","id":"h4","element":"button","parent":"h0"}],
+	"events":[{"host":"h1","event":"activate","handler":"handler:open"},{"host":"h2","event":"dismiss","handler":"handler:dismiss"},
+	{"host":"h4","event":"activate","handler":"handler:bad"}],
+	"handlers":[{"id":"handler:open","ops":[{"op":"assign","cell":"state:open","value":{"literal":true}},{"op":"command","node":{"literal":"h3"},"command":"focus"}]},
+	{"id":"handler:dismiss","ops":[{"op":"assign","cell":"state:why","value":{"event":"reason"}},{"op":"assign","cell":"state:open","value":{"literal":false}},
+	{"op":"command","command":"focus","node":{"if":{"isElement":{"focusOrigin":{"literal":"h2"}}},"whenTrue":{"focusOrigin":{"literal":"h2"}},"whenFalse":{"literal":null}}}]},
+	{"id":"handler:bad","ops":[{"op":"command","node":{"literal":"nope"},"command":"focus"}]}]}
+	"""
+
+@Test func runsTheOverlayStackFocusAndAnOutsidePress() throws {
+	let runtime = NativeRuntime(payload: try decode(overlay))
+	#expect(try runtime.overlays().isEmpty)
+	#expect(try runtime.evaluate(.focused) == .string(nativeDocumentBody))
+	#expect(try runtime.evaluate(.contains(within: .literal(.string("h2")), node: .literal(.string("h3")))) == .bool(true))
+	#expect(try runtime.evaluate(.contains(within: .literal(.string("h3")), node: .literal(.string("h2")))) == .bool(false))
+	#expect(try runtime.evaluate(.contains(within: .literal(.string(nativeDocumentBody)), node: .literal(.string("h9")))) == .bool(true))
+	#expect(try runtime.evaluate(.contains(within: .literal(.number(1)), node: .literal(.string("h2")))) == .bool(false))
+	#expect(try runtime.evaluate(.isElement(.literal(.string("h0")))) == .bool(true))
+	#expect(try runtime.evaluate(.isElement(.literal(.string("h9")))) == .bool(false))
+	#expect(try runtime.evaluate(.focusOrigin(.literal(.string("h2")))) == .null)
+	#expect(throws: RuntimeError.self) { try runtime.evaluate(.event(.reason)) }
+
+	#expect(try runtime.dispatch(NativeAction(event: .activate, host: "h1")) == [
+		.attribute(node: "h2", name: "hidden", value: nil), .overlay(node: "h2", open: true, modal: true), .command(node: "h3", command: "focus", preventScroll: false),
+	])
+	#expect(try runtime.overlays().map(\.node) == ["h2"])
+	#expect(try runtime.evaluate(.focusOrigin(.literal(.string("h2")))) == .string("h1"))
+	#expect(try runtime.dispatch(NativeAction(event: .pointerdown, host: "h3")) == [])
+	#expect(throws: RuntimeError.self) { try runtime.dispatch(NativeAction(event: .dismiss, host: "h1", reason: "escape")) }
+	#expect(try runtime.dispatch(NativeAction(event: .pointerdown, host: "h0")) == [
+		.attribute(node: "h2", name: "hidden", value: ""), .overlay(node: "h2", open: false, modal: true), .command(node: "h1", command: "focus", preventScroll: false),
+	])
+	#expect(try runtime.value(of: "state:why") == .string("outside-press"))
+	#expect(runtime.focused == "h1")
+	#expect(throws: RuntimeError.self) { try runtime.dispatch(NativeAction(event: .activate, host: "h4")) }
 }

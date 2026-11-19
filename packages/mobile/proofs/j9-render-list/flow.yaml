@@ -1,0 +1,37 @@
+appId: ${APP_ID}
+name: j9-render-list
+---
+- launchApp:
+    clearState: true
+- assertVisible: Shortest first
+- assertVisible: fig
+- assertVisible: kiwi
+- assertVisible: banana
+- assertNotVisible: date
+- assertVisible:
+    text: kiwi
+    below: fig
+- assertVisible:
+    text: banana
+    below: kiwi
+- tapOn: Add date
+- assertVisible: date
+- assertVisible:
+    text: date
+    below: fig
+- assertVisible:
+    text: kiwi
+    below: date
+- assertVisible:
+    text: banana
+    below: kiwi
+- assertVisible: date
+- assertVisible:
+    text: date
+    below: fig
+- assertVisible:
+    text: kiwi
+    below: date
+- assertVisible:
+    text: banana
+    below: kiwi

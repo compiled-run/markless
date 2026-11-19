@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+name: j7-page-refused
+---
+- launchApp:
+      clearState: true
+- assertVisible: Page title
+- assertVisible: Count 0
+- tapOn: Count 0
+- assertNotVisible: Count 0
+- assertVisible: Count 1
+- assertNotVisible: Count 0
+- tapOn: Rename the page
+- assertVisible: Count 1
+- assertVisible: Count 1
+- assertVisible: Count 1

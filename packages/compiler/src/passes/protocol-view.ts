@@ -5,7 +5,13 @@ import {
 	type ProtocolSubmitEventFacts,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
-import { asyncComputedGraphNodeIds, browserGraphReads } from '../artifact-helpers/graph-paths.ts';
+import {
+	asyncComputedGraphNodeIds,
+	browserGraphReads,
+	graphBindingMap,
+	resolveGraphPath,
+	semanticAliasMap,
+} from '../artifact-helpers/graph-paths.ts';
 import { repeatRowSiblingElements } from './render-data/row-position.ts';
 import { elementAddress } from './semantic-graph/projection-placement.ts';
 import type {
@@ -482,6 +488,83 @@ function treeOwnsComputed(input: ProtocolViewPayloadInput, edge: SemanticCompone
 // row-relative host paths to them so resume can dispatch per row instance
 // with keys derived from the serialized collection by row index.
 function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
+	return withoutServedPositionLists(input, keyedRepeatRecords(input));
+}
+
+type KeyedRepeatRecord = ReturnType<typeof keyedRepeatRecords>[number];
+
+// Nested lists keyed by position that nothing in the browser can change or click stay as the server rendered them.
+function withoutServedPositionLists(
+	input: ProtocolViewPayloadInput,
+	records: ReadonlyArray<KeyedRepeatRecord>,
+): KeyedRepeatRecord[] {
+	const graph = input.semanticGraph;
+	if (!graph) return [...records];
+	const byId = new Map(records.map((record) => [record.id, record]));
+	const rootOf = (record: KeyedRepeatRecord): KeyedRepeatRecord => {
+		const enclosing = record.enclosingRow && byId.get(record.enclosingRow.repeatId);
+		return enclosing ? rootOf(enclosing) : record;
+	};
+	const groups = new Map<string, KeyedRepeatRecord[]>();
+	for (const record of records) {
+		const root = rootOf(record).id;
+		groups.set(root, [...(groups.get(root) ?? []), record]);
+	}
+	const served = new Set<string>();
+	for (const group of groups.values()) {
+		if (group.length < 2 || !group.some((record) => record.indexKey)) continue;
+		if (group.every((record) => servedAsRendered(graph, record))) {
+			for (const record of group) served.add(record.id);
+		}
+	}
+	return records.filter((record) => !served.has(record.id));
+}
+
+function servedAsRendered(
+	graph: NonNullable<ProtocolViewPayloadInput['semanticGraph']>,
+	record: KeyedRepeatRecord,
+): boolean {
+	if (record.rowEvents.length > 0 || record.rowElementHandles || 'rowComponent' in record)
+		return false;
+	const template = 'rowTemplate' in record ? record.rowTemplate : undefined;
+	if (template?.branchSlots?.length || template?.componentName) return false;
+	const slots = [...(template?.textSlots ?? []), ...(template?.attributeSlots ?? [])];
+	if (slots.some((slot) => !('itemPath' in slot))) return false;
+	return !!record.collectionGraphNodeId && unchangedInBrowser(graph, record.collectionGraphNodeId);
+}
+
+// A state no write in its component reaches, or a value derived only from such values and props.
+function unchangedInBrowser(
+	graph: NonNullable<ProtocolViewPayloadInput['semanticGraph']>,
+	graphNodeId: string,
+): boolean {
+	const binding = graph.graphBindings.find((candidate) => candidate.id === graphNodeId);
+	if (!binding || binding.sharedDefinitionId !== undefined || binding.storage) return false;
+	if (binding.kind !== 'state')
+		return !!binding.componentName && invariantInBrowser(graph, binding.componentName, graphNodeId);
+	if (binding.armScope || !binding.componentName) return false;
+	const component = binding.componentName;
+	const bindings = graphBindingMap(graph, null, component);
+	const aliases = semanticAliasMap(graph, null, component);
+	const writes = (source: string) => resolveGraphPath(source, bindings, aliases)?.binding.id === graphNodeId;
+	return !graph.stateWrites.some((write) => {
+		if ((write.componentName && write.componentName !== component) || write.sharedDefinitionId)
+			return false;
+		if (write.rowRepeatId) {
+			let repeat = graph.keyedRepeats.find((candidate) => candidate.id === write.rowRepeatId);
+			while (repeat && !repeat.collectionGraphNodeId && repeat.enclosingRepeatId)
+				repeat = graph.keyedRepeats.find((candidate) => candidate.id === repeat!.enclosingRepeatId);
+			return !repeat || repeat.collectionGraphNodeId === graphNodeId;
+		}
+		const through = write.through;
+		if (through?.kind === 'local' || through?.kind === 'untracked') return false;
+		return writes(
+			through?.kind === 'path' ? through.target : through?.kind === 'element' ? through.collection : write.target,
+		);
+	});
+}
+
+function keyedRepeatRecords(input: ProtocolViewPayloadInput) {
 	const boundEventSymbols = boundEventSymbolIds(input);
 	const renderEntries = new Map(
 		renderDataOf(input).repeats.map((entry) => [entry.repeatId, entry]),
@@ -491,11 +574,6 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 	const indexKeyed = new Set(
 		(input.semanticGraph?.keyedRepeats ?? []).flatMap((repeat) =>
 			repeat.indexKey === true ? [repeat.id] : [],
-		),
-	);
-	const nestedRepeatIds = new Set(
-		(input.payloadArena.view.keyedRepeats ?? []).flatMap((repeat) =>
-			repeat.enclosingRepeatId ? [repeat.enclosingRepeatId] : [],
 		),
 	);
 	const emitted = new Set<string>();
@@ -520,10 +598,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 		const positionKeyed = indexKeyed.has(repeat.id);
 		if (
 			!render ||
-			(positionKeyed &&
-				(repeat.enclosingRepeatId !== undefined ||
-					nestedRepeatIds.has(repeat.id) ||
-					liveRowComponentMint(input, repeat, render) !== null)) ||
+			(positionKeyed && liveRowComponentMint(input, repeat, render) !== null) ||
 			(render.rowStartOffset === 'unknown' && render.rowEndOffset === undefined) ||
 			!(render.rowRange || rowRootsOneElement(input, render)) ||
 			enclosingRow === null
@@ -1168,12 +1243,6 @@ function nestedRepeatMints(
 		!render ||
 		(render.rowStartOffset === 'unknown' && render.rowEndOffset === undefined) ||
 		!rowRootsOneElement(input, render)
-	)
-		return false;
-	if (
-		input.semanticGraph?.keyedRepeats.some(
-			(candidate) => candidate.id === repeatId && candidate.indexKey,
-		)
 	)
 		return false;
 	const parents = armChunkId

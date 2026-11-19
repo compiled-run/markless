@@ -10,6 +10,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import dev.markless.mobile.core.JsValue
 import dev.markless.mobile.core.Json
+import dev.markless.mobile.view.AppScriptEngine
 import dev.markless.mobile.view.DeviceOutcome
 import dev.markless.mobile.view.MarklessActivity
 import dev.markless.mobile.view.NativeDevice
@@ -85,6 +86,17 @@ class ShellActivity : MarklessActivity() {
 	private val label by lazy { testLabel("markless-device-calls", "calls: none") }
 	private val cameraLabel by lazy { testLabel("markless-camera", "camera off") }
 	private val microphoneLabel by lazy { testLabel("markless-microphone", "microphone off") }
+	private val engineLabel by lazy { testLabel("markless-engine-starts", "engine starts: ${AppScriptEngine.starts}") }
+	private val engineStarted: (Int) -> Unit = { engineLabel.text = "engine starts: $it" }
+
+	/** A test build can turn warming off (asset `markless/engine-warm` reads `0`) to measure a cold first entry. */
+	override val warmsScriptEngine: Boolean by lazy {
+		try {
+			assets.open("markless/engine-warm").use { String(it.readBytes()).trim() } != "0"
+		} catch (_: FileNotFoundException) {
+			true
+		}
+	}
 
 	override val device: ProofDevice by lazy { ProofDevice(PlatformDevice(this), label, cameraLabel, microphoneLabel) }
 
@@ -109,7 +121,16 @@ class ShellActivity : MarklessActivity() {
 		addContentView(microphoneLabel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply {
 			setMargins(bottom / 2, 0, 0, bottom * 3)
 		})
+		addContentView(engineLabel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply {
+			setMargins(bottom / 2, 0, 0, bottom * 4)
+		})
+		AppScriptEngine.onStart(engineStarted)
 		open(intent)
+	}
+
+	override fun onDestroy() {
+		AppScriptEngine.removeOnStart(engineStarted)
+		super.onDestroy()
 	}
 
 	override fun onNewIntent(intent: Intent) {

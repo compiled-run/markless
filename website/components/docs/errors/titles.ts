@@ -354,4 +354,5 @@ export const TITLES: Readonly<Record<string, string>> = {
 	MARKLESS_TEXT_UPDATE_RECORD_MISSING: 'A text update has no record',
 	MARKLESS_TYPE_STRIP_FAILED: 'TypeScript syntax could not be removed',
 	MARKLESS_WIDGET_INSTANCE_UNRESOLVED: 'A read came from a part no widget owns',
+	MARKLESS_WRITE_THROUGH_NOT_A_LIST: 'A write through a loop variable found no list',
 };

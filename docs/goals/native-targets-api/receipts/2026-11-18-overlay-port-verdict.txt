@@ -1,0 +1,9 @@
+FAIL y1-sheet-open-close failed on ios
+FAIL y2-sheet-pick failed on ios
+FAIL y3-sheet-heights failed on ios
+FAIL f3-families failed on android
+FAIL r136-visible failed on android
+FAIL y1-sheet-open-close failed on android
+FAIL s4-global-tokens failed on android
+proof failed
+Android rerun of those four (2026-11-18-overlay-port-android-rerun-4-rungs.json): f3-families, r136-visible, y1-sheet-open-close, s4-global-tokens all PASS.

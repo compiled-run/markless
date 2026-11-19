@@ -1,6 +1,15 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import {
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
+import { createRequire, findPackageJSON } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
 import { nativeAppStyle, nativeAppStyleSize, type DragonStyleExport } from '../app-style.ts';
@@ -82,9 +91,13 @@ export function readRelativeStylesheet(specifier: string, importer: string) {
 const APP_DOCUMENT = 'document.tsrx';
 
 /** Compiles a navigation rung's app: every page under `pages/`, with repo-relative filenames as for one-screen rungs. */
-export function compileRungApp(dir: string) {
+export function compileRungApp(
+	dir: string,
+	options: { readonly target?: ProofPlatform; readonly device?: DeviceAppConfig } = {},
+) {
 	const document = join(dir, APP_DOCUMENT);
 	return compileNativeApp({
+		...options,
 		pages: pageFiles(dir).map((page) => ({
 			page,
 			filename: relative(repoRoot, join(dir, page)),
@@ -109,13 +122,65 @@ export function compileRungApp(dir: string) {
  */
 export function readWorkspaceModule(specifier: string, importer: string) {
 	if (specifier.startsWith('.')) return readRelativeModule(specifier, importer);
-	let file: string;
+	const file = resolvePackageModule(specifier, resolve(repoRoot, importer));
+	return file === undefined
+		? undefined
+		: { filename: relative(repoRoot, file), source: readFileSync(file, 'utf8') };
+}
+
+/** The ES module conditions a phone's script loads a package by, in the order a bundler for the browser tries them. */
+const IMPORT_CONDITIONS = ['import', 'module', 'browser', 'default'];
+
+/**
+ * A package specifier resolved as an ES module import from `importer` (a phone's script loads ES modules, so a package's
+ * `import` build, not its `require` one), else as Node's `require` resolves it.
+ */
+export function resolvePackageModule(specifier: string, importer: string): string | undefined {
+	const manifestPath = (() => {
+		try {
+			return findPackageJSON(specifier, pathToFileURL(importer));
+		} catch {
+			return undefined;
+		}
+	})();
+	if (manifestPath) {
+		const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+			readonly name?: string;
+			readonly exports?: unknown;
+			readonly module?: string;
+		};
+		const subpath =
+			manifest.name && specifier.startsWith(`${manifest.name}/`)
+				? `.${specifier.slice(manifest.name.length)}`
+				: '.';
+		const pick = (entry: unknown): string | undefined => {
+			if (typeof entry === 'string') return entry;
+			if (entry && typeof entry === 'object' && !Array.isArray(entry))
+				for (const condition of IMPORT_CONDITIONS) {
+					const found = pick((entry as Record<string, unknown>)[condition]);
+					if (found) return found;
+				}
+			return undefined;
+		};
+		const exportsField = manifest.exports;
+		const exported =
+			exportsField &&
+			typeof exportsField === 'object' &&
+			!Array.isArray(exportsField) &&
+			Object.keys(exportsField).some((key) => key.startsWith('.'))
+				? pick((exportsField as Record<string, unknown>)[subpath])
+				: subpath === '.'
+					? pick(exportsField)
+					: undefined;
+		const target = exported ?? (subpath === '.' ? manifest.module : undefined);
+		// Real paths, as `require.resolve` answers: a workspace package is named by its folder, not a node_modules link.
+		if (target) return realpathSync(resolve(dirname(manifestPath), target));
+	}
 	try {
-		file = createRequire(resolve(repoRoot, importer)).resolve(specifier);
+		return createRequire(importer).resolve(specifier);
 	} catch {
 		return undefined;
 	}
-	return { filename: relative(repoRoot, file), source: readFileSync(file, 'utf8') };
 }
 /** A hand-made payload, only for the harness's own fixture rungs that prove the machinery without the compiler. */
 const HAND_MADE_PAYLOAD = 'payload.json';
@@ -176,8 +241,15 @@ function appStyle(dir: string, name: string, inputs: NativeAppBuild['styleInputs
 }
 
 /** A styled page whose scroll range Dragon cannot decide is a build error naming the file and the element. */
-function checkPageScroll(bytes: Uint8Array, build: NativeBuild, filename: string, name: string): Uint8Array {
-	const exported = JSON.parse(new TextDecoder().decode(bytes)) as Parameters<typeof pageScrollDiagnostics>[0];
+function checkPageScroll(
+	bytes: Uint8Array,
+	build: NativeBuild,
+	filename: string,
+	name: string,
+): Uint8Array {
+	const exported = JSON.parse(new TextDecoder().decode(bytes)) as Parameters<
+		typeof pageScrollDiagnostics
+	>[0];
 	const unscrollable = pageScrollDiagnostics(exported, build, filename);
 	if (unscrollable.length > 0)
 		throw new Error(
@@ -283,22 +355,32 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			}
 		}
 	} else if (existsSync(join(dir, 'pages'))) {
-		const build = await compileRungApp(dir);
-		if (!build.payload) {
-			const lines = build.diagnostics.map(
-				(diagnostic) => `  ${diagnostic.page}: ${diagnostic.code}: ${diagnostic.message}`,
-			);
-			throw new Error(`${name}: the app has no native build\n${lines.join('\n')}`);
+		const payloads: Partial<Record<ProofPlatform, string>> = {};
+		for (const platform of PROOF_PLATFORMS) {
+			const build = await compileRungApp(dir, {
+				target: platform,
+				...(appConfig.device ? { device: appConfig.device } : {}),
+			});
+			if (!build.payload) {
+				const lines = build.diagnostics.map(
+					(diagnostic) => `  ${diagnostic.page}: ${diagnostic.code}: ${diagnostic.message}`,
+				);
+				throw new Error(`${name}: the app has no ${platform} build\n${lines.join('\n')}`);
+			}
+			manifest = build.manifest;
+			payloads[platform] = JSON.stringify(build.payload);
+			assets[platform].push([PROOF_PAYLOAD_PATH, new TextEncoder().encode(payloads[platform])]);
+			if (build.styleInputs.length > 0 && platform === 'android') {
+				// Dragon lays out one input for both phones, so both must build the same views.
+				if (payloads.ios !== payloads.android)
+					throw new Error(
+						`${name}: a styled app whose views differ per phone has no single style export yet`,
+					);
+				const styled = styleAssets(appStyle(dir, name, build.styleInputs), name);
+				assets.ios.push(...styled);
+				assets.android.push(...styled);
+			}
 		}
-		const styled =
-			build.styleInputs.length > 0
-				? styleAssets(appStyle(dir, name, build.styleInputs), name)
-				: [];
-		for (const platform of PROOF_PLATFORMS)
-			assets[platform].push(
-				[PROOF_PAYLOAD_PATH, new TextEncoder().encode(JSON.stringify(build.payload))],
-				...styled,
-			);
 	} else if (existsSync(join(dir, HAND_MADE_PAYLOAD))) {
 		for (const platform of PROOF_PLATFORMS)
 			assets[platform].push([PROOF_PAYLOAD_PATH, readFileSync(join(dir, HAND_MADE_PAYLOAD))]);
