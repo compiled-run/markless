@@ -8,6 +8,7 @@ import { parseArgs } from 'node:util';
 import { buildSemanticGraph, type CompilerDiagnostic } from '@markless/compiler';
 import { buildRouteManifestFromFileIds } from '@markless/router';
 import * as compile from '../src/compile.ts';
+import { resolvePackageModule } from '../src/harness/rung.ts';
 
 type Module = { readonly filename: string; readonly source: string };
 type ReadModule = (specifier: string, importer: string) => Module | undefined;
@@ -37,7 +38,7 @@ const compileNativeApp = (compile as Record<string, unknown>).compileNativeApp a
 	| AppCompiler
 	| undefined;
 const SKIP = new Set(['node_modules', 'dist', '.output', '.markless-local', '.migrate', '.git']);
-const EXTENSIONS = ['', '.tsrx', '.ts', '.tsx', '.js', '.mjs', '/index.tsrx', '/index.ts'];
+const EXTENSIONS = ['', '.tsrx', '.ts', '.tsx', '.js', '.mjs', '.json', '/index.tsrx', '/index.ts'];
 
 function files(dir: string, into: string[] = []): string[] {
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -49,8 +50,7 @@ function files(dir: string, into: string[] = []): string[] {
 	return into;
 }
 
-function readerFor(appRoot: string): ReadModule {
-	const requireFromApp = createRequire(join(appRoot, 'package.json'));
+function readerFor(): ReadModule {
 	return (specifier, importer) => {
 		let file: string | undefined;
 		if (specifier.startsWith('.')) {
@@ -59,13 +59,16 @@ function readerFor(appRoot: string): ReadModule {
 				(path) => existsSync(path) && statSync(path).isFile(),
 			);
 		} else {
-			try {
-				file = (
-					specifier.startsWith('@markless/') ? requireFromRepo : requireFromApp
-				).resolve(specifier);
-			} catch {
-				file = undefined;
-			}
+			// A phone's script loads a package's ES module build, as the harness reads one.
+			file = specifier.startsWith('@markless/')
+				? (() => {
+						try {
+							return requireFromRepo.resolve(specifier);
+						} catch {
+							return undefined;
+						}
+					})()
+				: resolvePackageModule(specifier, importer);
 		}
 		if (!file || !/\.(tsrx|ts|tsx|js|mjs|json)$/.test(file)) return undefined;
 		return { filename: file, source: readFileSync(file, 'utf8') };
@@ -159,7 +162,7 @@ function summarize(
 }
 
 async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
-	const read = readerFor(appRoot);
+	const read = readerFor();
 	const all = files(appRoot);
 	const pageIds = all
 		.map((file) => relative(appRoot, file))

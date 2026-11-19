@@ -1,5 +1,14 @@
 import type { NativeAction, NativeAppAction } from '../src/index.ts';
 import type { DeviceAppConfig } from '../src/permissions.ts';
+import { nodeScriptHost } from '../src/node-engine.ts';
+
+/** The engine the vectors are written with; `crypto` draws from all-zero seed bytes, which a host's test passes too. */
+export const CONFORMANCE_SCRIPT_HOST = () => nodeScriptHost('00'.repeat(32));
+import { readWorkspaceModule } from '../src/harness/rung.ts';
+
+/** Resolves what a case imports (`@markless/ui`) from packages/mobile, where the case's `src/<name>.tsrx` stands. */
+export const readCaseModule = (specifier: string, importer: string) =>
+	readWorkspaceModule(specifier, importer.startsWith('src/') ? `packages/mobile/${importer}` : importer);
 
 /** Each committed vector file: its component (a path inside packages/mobile) and the actions it records. */
 export const CONFORMANCE_CASES: ReadonlyArray<{
@@ -14,6 +23,8 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	readonly device?: DeviceAppConfig;
 	/** The device's preferred languages, when the vector shows a message in one. */
 	readonly preferredLanguages?: ReadonlyArray<string>;
+	/** Built at its own path with the modules it imports read from the workspace (app modules and packages). */
+	readonly modules?: true;
 	readonly actions: ReadonlyArray<NativeAction>;
 }> = [
 	{
@@ -87,6 +98,27 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'component-edge:0/h2' },
 			{ event: 'activate', host: 'component-edge:1/h2' },
 			{ event: 'activate', host: 'component-edge:0/h2' },
+		],
+	},
+	{
+		name: 'for-in-arm',
+		fixture: 'proofs/r141-for-in-arm/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
+		name: 'records',
+		fixture: 'test/fixtures/Records.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
 		],
 	},
 	{
@@ -325,6 +357,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'ticked-keys',
+		fixture: 'test/fixtures/TickedKeys.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [
@@ -378,6 +420,126 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'visible', host: 'h3@a' },
 		],
 	},
+	{
+		name: 'script-loop',
+		fixture: 'proofs/j1-loop-local/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'script-modules',
+		fixture: 'proofs/j2-app-and-library/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'script-async',
+		fixture: 'proofs/j3-await-catch/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'timer', timer: 'script:2' },
+		],
+	},
+	{
+		name: 'script-network',
+		fixture: 'proofs/j4-timers-fetch/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'POST /j4/echo?word=native text/plain hello',
+				},
+			},
+			{ event: 'activate', host: 'h5' },
+			{ event: 'response', id: 2, response: { error: 'The network connection was lost.' } },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'timer', timer: 'script:1' },
+		],
+	},
+	{
+		name: 'script-computed',
+		fixture: 'proofs/j5-engine-computed/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'script-render',
+		fixture: 'proofs/j8-render-values/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		name: 'script-render-list',
+		fixture: 'proofs/j9-render-list/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		// The real modal family: trigger, a press inside the dialog, a press on its backdrop, an alert that refuses one, Escape.
+		name: 'overlay',
+		fixture: 'proofs/u20-modal/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'pointerdown', host: 'component-edge:4/h4' },
+			{ event: 'pointerup', host: 'component-edge:4/h4' },
+			{ event: 'pointerdown', host: 'component-edge:2/h2' },
+			{ event: 'pointerup', host: 'component-edge:2/h2' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'dismiss', host: 'component-edge:2/h2', reason: 'escape' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'pointerdown', host: 'component-edge:6/h6' },
+			{ event: 'pointerup', host: 'component-edge:6/h6' },
+			{ event: 'activate', host: 'component-edge:6/h6' },
+			{ event: 'activate', host: 'component-edge:8/h1' },
+			{ event: 'pointerdown', host: 'component-edge:9/h2' },
+			{ event: 'pointerup', host: 'component-edge:9/h2' },
+			{ event: 'dismiss', host: 'component-edge:9/h2', reason: 'escape' },
+		],
+	},
+	{
+		// The real popover family: not modal; a press outside, a press on its own trigger, Escape, and its close.
+		name: 'popover',
+		fixture: 'proofs/u21-popover/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'pointerdown', host: 'component-edge:3/h3' },
+			{ event: 'pointerup', host: 'component-edge:3/h3' },
+			{ event: 'pointerdown', host: 'h2' },
+			{ event: 'pointerup', host: 'h2' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'pointerdown', host: 'component-edge:1/h1' },
+			{ event: 'pointerup', host: 'component-edge:1/h1' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'dismiss', host: 'component-edge:2/h2', reason: 'escape' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'activate', host: 'component-edge:5/h5' },
+		],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */
@@ -416,6 +578,42 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'back' },
 			{ event: 'back' },
 			{ event: 'activate', host: 'component-edge:0' },
+		],
+	},
+	{
+		name: 'script-app',
+		app: 'proofs/j6-engine-on-demand',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'component-edge:0' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'navigation-deep-link',
+		app: 'proofs/n4-deep-link',
+		open: '/orders/42',
+		actions: [{ event: 'back' }, { event: 'back' }, { event: 'activate', host: 'component-edge:0' }],
+	},
+	{
+		name: 'script-first-render',
+		app: 'proofs/j10-first-render',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'component-edge:0' },
+		],
+	},
+	{
+		name: 'shell-props',
+		app: 'proofs/r139-shell-props',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:1' },
+			{ event: 'activate', host: 'h0' },
+			{ event: 'activate', host: 'h0' },
+			{ event: 'back' },
 		],
 	},
 ];

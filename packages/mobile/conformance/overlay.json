@@ -1,0 +1,2797 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:deleted",
+				"name": "deleted",
+				"initial": 0
+			},
+			{
+				"id": "state:changes",
+				"name": "changes",
+				"initial": 0
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+				"name": "modal.open",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.alert",
+				"name": "modal.alert",
+				"initial": false
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened",
+				"name": "modal.isTriggerOpened",
+				"initial": false
+			},
+			{
+				"id": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+				"name": "modal.open",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.alert",
+				"name": "modal.alert",
+				"initial": true
+			},
+			{
+				"id": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened",
+				"name": "modal.isTriggerOpened",
+				"initial": false
+			},
+			{
+				"id": "module:packages/headless/components/src/modal/modal-press.ts#armed",
+				"name": "armed",
+				"initial": []
+			},
+			{
+				"id": "handler:component-edge:2/event:3/returned:0",
+				"name": "isBackdropPressFinished",
+				"initial": null
+			},
+			{
+				"id": "handler:component-edge:2/event:3/kept:1",
+				"name": "isArmed",
+				"initial": null
+			},
+			{
+				"id": "handler:component-edge:9/event:3/returned:0",
+				"name": "isBackdropPressFinished",
+				"initial": null
+			},
+			{
+				"id": "handler:component-edge:9/event:3/kept:1",
+				"name": "isArmed",
+				"initial": null
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Modal"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Deleted "
+					},
+					{
+						"cell": "state:deleted"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Changes "
+					},
+					{
+						"cell": "state:changes"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "div",
+				"parent": "h0",
+				"bindings": [
+					{
+						"attribute": "ui-open",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+						}
+					},
+					{
+						"attribute": "ui-closed",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h1",
+				"element": "button",
+				"parent": "component-edge:0/h0",
+				"attributes": {
+					"type": "button",
+					"aria-haspopup": "dialog"
+				},
+				"bindings": [
+					{
+						"attribute": "aria-expanded",
+						"value": {
+							"if": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": "false"
+							}
+						}
+					},
+					{
+						"attribute": "ui-open",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+						}
+					},
+					{
+						"attribute": "ui-closed",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					},
+					{
+						"attribute": "aria-controls",
+						"value": {
+							"literal": "component-edge:3/h3"
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h1:text0",
+				"parent": "component-edge:1/h1",
+				"parts": [
+					{
+						"text": "Delete draft"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:2/h2",
+				"element": "div",
+				"parent": "component-edge:0/h0",
+				"attributes": {
+					"overlay": ""
+				},
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					},
+					{
+						"attribute": "ui-open",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+						}
+					},
+					{
+						"attribute": "ui-closed",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/h3",
+				"element": "div",
+				"parent": "component-edge:2/h2",
+				"attributes": {
+					"aria-modal": "true"
+				},
+				"bindings": [
+					{
+						"attribute": "role",
+						"value": {
+							"if": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.alert"
+							},
+							"whenTrue": {
+								"literal": "alertdialog"
+							},
+							"whenFalse": {
+								"literal": "dialog"
+							}
+						}
+					},
+					{
+						"attribute": "tabindex",
+						"value": {
+							"unary": "-",
+							"value": {
+								"literal": 1
+							}
+						}
+					},
+					{
+						"attribute": "ui-open",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+						}
+					},
+					{
+						"attribute": "ui-closed",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					},
+					{
+						"attribute": "aria-labelledby",
+						"value": {
+							"literal": "component-edge:4/h4"
+						}
+					},
+					{
+						"attribute": "aria-describedby",
+						"value": {
+							"literal": "component-edge:5/h5"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:4/h4",
+				"element": "h2",
+				"parent": "component-edge:3/h3",
+				"bindings": [
+					{
+						"attribute": "tabindex",
+						"value": {
+							"unary": "-",
+							"value": {
+								"literal": 1
+							}
+						}
+					}
+				],
+				"defaultStyle": {
+					"bold": true,
+					"size": 1.5
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:4/h4:text0",
+				"parent": "component-edge:4/h4",
+				"parts": [
+					{
+						"text": "Delete this draft?"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:5/h5",
+				"element": "p",
+				"parent": "component-edge:3/h3"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:5/h5:text0",
+				"parent": "component-edge:5/h5",
+				"parts": [
+					{
+						"text": "It cannot be undone"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:6/h6",
+				"element": "button",
+				"parent": "component-edge:3/h3",
+				"attributes": {
+					"type": "button"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:6/h6:text0",
+				"parent": "component-edge:6/h6",
+				"parts": [
+					{
+						"text": "Delete"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:7/h0",
+				"element": "div",
+				"parent": "h0",
+				"bindings": [
+					{
+						"attribute": "ui-open",
+						"value": {
+							"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+						}
+					},
+					{
+						"attribute": "ui-closed",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:8/h1",
+				"element": "button",
+				"parent": "component-edge:7/h0",
+				"attributes": {
+					"type": "button",
+					"aria-haspopup": "dialog"
+				},
+				"bindings": [
+					{
+						"attribute": "aria-expanded",
+						"value": {
+							"if": {
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": "false"
+							}
+						}
+					},
+					{
+						"attribute": "ui-open",
+						"value": {
+							"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+						}
+					},
+					{
+						"attribute": "ui-closed",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					},
+					{
+						"attribute": "aria-controls",
+						"value": {
+							"literal": "component-edge:10/h3"
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:8/h1:text0",
+				"parent": "component-edge:8/h1",
+				"parts": [
+					{
+						"text": "Sign out"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:9/h2",
+				"element": "div",
+				"parent": "component-edge:7/h0",
+				"attributes": {
+					"overlay": ""
+				},
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					},
+					{
+						"attribute": "ui-open",
+						"value": {
+							"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+						}
+					},
+					{
+						"attribute": "ui-closed",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:10/h3",
+				"element": "div",
+				"parent": "component-edge:9/h2",
+				"attributes": {
+					"aria-modal": "true"
+				},
+				"bindings": [
+					{
+						"attribute": "role",
+						"value": {
+							"if": {
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.alert"
+							},
+							"whenTrue": {
+								"literal": "alertdialog"
+							},
+							"whenFalse": {
+								"literal": "dialog"
+							}
+						}
+					},
+					{
+						"attribute": "tabindex",
+						"value": {
+							"unary": "-",
+							"value": {
+								"literal": 1
+							}
+						}
+					},
+					{
+						"attribute": "ui-open",
+						"value": {
+							"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+						}
+					},
+					{
+						"attribute": "ui-closed",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					},
+					{
+						"attribute": "aria-labelledby",
+						"value": {
+							"literal": "component-edge:11/h4"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:11/h4",
+				"element": "h2",
+				"parent": "component-edge:10/h3",
+				"bindings": [
+					{
+						"attribute": "tabindex",
+						"value": {
+							"unary": "-",
+							"value": {
+								"literal": 1
+							}
+						}
+					}
+				],
+				"defaultStyle": {
+					"bold": true,
+					"size": 1.5
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:11/h4:text0",
+				"parent": "component-edge:11/h4",
+				"parts": [
+					{
+						"text": "Sign out now?"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:12/h6",
+				"element": "button",
+				"parent": "component-edge:10/h3",
+				"attributes": {
+					"type": "button"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:12/h6:text0",
+				"parent": "component-edge:12/h6",
+				"parts": [
+					{
+						"text": "Stay"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:1/h1",
+				"event": "activate",
+				"handler": "handler:component-edge:1/event:0"
+			},
+			{
+				"host": "component-edge:2/h2",
+				"event": "dismiss",
+				"handler": "handler:component-edge:2/event:1"
+			},
+			{
+				"host": "component-edge:2/h2",
+				"event": "pointerdown",
+				"handler": "handler:component-edge:2/event:2"
+			},
+			{
+				"host": "component-edge:2/h2",
+				"event": "pointerup",
+				"handler": "handler:component-edge:2/event:3"
+			},
+			{
+				"host": "component-edge:6/h6",
+				"event": "activate",
+				"handler": "handler:component-edge:6/event:4"
+			},
+			{
+				"host": "component-edge:8/h1",
+				"event": "activate",
+				"handler": "handler:component-edge:8/event:0"
+			},
+			{
+				"host": "component-edge:9/h2",
+				"event": "dismiss",
+				"handler": "handler:component-edge:9/event:1"
+			},
+			{
+				"host": "component-edge:9/h2",
+				"event": "pointerdown",
+				"handler": "handler:component-edge:9/event:2"
+			},
+			{
+				"host": "component-edge:9/h2",
+				"event": "pointerup",
+				"handler": "handler:component-edge:9/event:3"
+			},
+			{
+				"host": "component-edge:12/h6",
+				"event": "activate",
+				"handler": "handler:component-edge:12/event:4"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:1/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened",
+						"value": {
+							"literal": true
+						}
+					},
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": true
+							}
+						},
+						"whenTrue": [],
+						"whenFalse": [
+							{
+								"op": "assign",
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+								"value": {
+									"literal": true
+								}
+							},
+							{
+								"op": "assign",
+								"cell": "state:changes",
+								"value": {
+									"binary": "+",
+									"left": {
+										"cell": "state:changes"
+									},
+									"right": {
+										"literal": 1
+									}
+								}
+							}
+						]
+					},
+					{
+						"op": "if",
+						"test": {
+							"logical": "&&",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.alert"
+							},
+							"right": {
+								"literal": "component-edge:6/h6"
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "command",
+								"node": "component-edge:6/h6",
+								"command": "focus"
+							}
+						],
+						"whenFalse": [
+							{
+								"op": "command",
+								"node": {
+									"logical": "??",
+									"left": {
+										"literal": "component-edge:4/h4"
+									},
+									"right": {
+										"literal": "component-edge:3/h3"
+									}
+								},
+								"command": "focus"
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:2/event:1",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "!==",
+							"left": {
+								"logical": "&&",
+								"left": {
+									"binary": "===",
+									"left": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.alert"
+									},
+									"right": {
+										"literal": true
+									}
+								},
+								"right": {
+									"binary": "===",
+									"left": {
+										"event": "reason"
+									},
+									"right": {
+										"literal": "outside-press"
+									}
+								}
+							},
+							"right": {
+								"literal": true
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "if",
+								"test": {
+									"binary": "===",
+									"left": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+									},
+									"right": {
+										"literal": false
+									}
+								},
+								"whenTrue": [],
+								"whenFalse": [
+									{
+										"op": "assign",
+										"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+										"value": {
+											"literal": false
+										}
+									},
+									{
+										"op": "assign",
+										"cell": "state:changes",
+										"value": {
+											"binary": "+",
+											"left": {
+												"cell": "state:changes"
+											},
+											"right": {
+												"literal": 1
+											}
+										}
+									}
+								]
+							},
+							{
+								"op": "command",
+								"node": {
+									"if": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened"
+									},
+									"whenTrue": {
+										"literal": "component-edge:1/h1"
+									},
+									"whenFalse": {
+										"if": {
+											"logical": "&&",
+											"left": {
+												"isElement": {
+													"focusOrigin": {
+														"literal": "component-edge:2/h2"
+													}
+												}
+											},
+											"right": {
+												"binary": "!==",
+												"left": {
+													"focusOrigin": {
+														"literal": "component-edge:2/h2"
+													}
+												},
+												"right": {
+													"literal": "#body"
+												}
+											}
+										},
+										"whenTrue": {
+											"focusOrigin": {
+												"literal": "component-edge:2/h2"
+											}
+										},
+										"whenFalse": {
+											"literal": null
+										}
+									}
+								},
+								"command": "focus"
+							},
+							{
+								"op": "assign",
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened",
+								"value": {
+									"literal": false
+								}
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:2/event:2",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"logical": "&&",
+							"left": {
+								"logical": "&&",
+								"left": {
+									"binary": "!==",
+									"left": {
+										"literal": "component-edge:2/h2"
+									},
+									"right": {
+										"literal": null
+									}
+								},
+								"right": {
+									"binary": "===",
+									"left": {
+										"event": "target"
+									},
+									"right": {
+										"literal": "component-edge:2/h2"
+									}
+								}
+							},
+							"right": {
+								"binary": "===",
+								"left": {
+									"event": "button"
+								},
+								"right": {
+									"literal": 0
+								}
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "assign",
+								"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed",
+								"value": {
+									"if": {
+										"method": "includes",
+										"target": {
+											"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed"
+										},
+										"arguments": [
+											{
+												"literal": "component-edge:2/h2"
+											}
+										]
+									},
+									"whenTrue": {
+										"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed"
+									},
+									"whenFalse": {
+										"method": "concat",
+										"target": {
+											"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed"
+										},
+										"arguments": [
+											{
+												"array": [
+													{
+														"spread": false,
+														"value": {
+															"literal": "component-edge:2/h2"
+														}
+													}
+												]
+											}
+										]
+									}
+								}
+							}
+						],
+						"whenFalse": [
+							{
+								"op": "assign",
+								"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed",
+								"value": {
+									"method": "filter",
+									"target": {
+										"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed"
+									},
+									"arguments": [
+										{
+											"lambda": [
+												"kept"
+											],
+											"body": {
+												"binary": "!==",
+												"left": {
+													"local": "kept"
+												},
+												"right": {
+													"literal": "component-edge:2/h2"
+												}
+											}
+										}
+									]
+								}
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:2/event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "handler:component-edge:2/event:3/returned:0",
+						"value": {
+							"literal": null
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "handler:component-edge:2/event:3/kept:1",
+						"value": {
+							"method": "includes",
+							"target": {
+								"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed"
+							},
+							"arguments": [
+								{
+									"literal": "component-edge:2/h2"
+								}
+							]
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed",
+						"value": {
+							"method": "filter",
+							"target": {
+								"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed"
+							},
+							"arguments": [
+								{
+									"lambda": [
+										"kept"
+									],
+									"body": {
+										"binary": "!==",
+										"left": {
+											"local": "kept"
+										},
+										"right": {
+											"literal": "component-edge:2/h2"
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "handler:component-edge:2/event:3/returned:0",
+						"value": {
+							"logical": "&&",
+							"left": {
+								"cell": "handler:component-edge:2/event:3/kept:1"
+							},
+							"right": {
+								"logical": "&&",
+								"left": {
+									"binary": "!==",
+									"left": {
+										"literal": "component-edge:2/h2"
+									},
+									"right": {
+										"literal": null
+									}
+								},
+								"right": {
+									"binary": "===",
+									"left": {
+										"event": "target"
+									},
+									"right": {
+										"literal": "component-edge:2/h2"
+									}
+								}
+							}
+						}
+					},
+					{
+						"op": "if",
+						"test": {
+							"logical": "&&",
+							"left": {
+								"cell": "handler:component-edge:2/event:3/returned:0"
+							},
+							"right": {
+								"binary": "!==",
+								"left": {
+									"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.alert"
+								},
+								"right": {
+									"literal": true
+								}
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "if",
+								"test": {
+									"binary": "===",
+									"left": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+									},
+									"right": {
+										"literal": false
+									}
+								},
+								"whenTrue": [],
+								"whenFalse": [
+									{
+										"op": "assign",
+										"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+										"value": {
+											"literal": false
+										}
+									},
+									{
+										"op": "assign",
+										"cell": "state:changes",
+										"value": {
+											"binary": "+",
+											"left": {
+												"cell": "state:changes"
+											},
+											"right": {
+												"literal": 1
+											}
+										}
+									}
+								]
+							},
+							{
+								"op": "command",
+								"node": {
+									"if": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened"
+									},
+									"whenTrue": {
+										"literal": "component-edge:1/h1"
+									},
+									"whenFalse": {
+										"if": {
+											"logical": "&&",
+											"left": {
+												"isElement": {
+													"focusOrigin": {
+														"literal": "component-edge:2/h2"
+													}
+												}
+											},
+											"right": {
+												"binary": "!==",
+												"left": {
+													"focusOrigin": {
+														"literal": "component-edge:2/h2"
+													}
+												},
+												"right": {
+													"literal": "#body"
+												}
+											}
+										},
+										"whenTrue": {
+											"focusOrigin": {
+												"literal": "component-edge:2/h2"
+											}
+										},
+										"whenFalse": {
+											"literal": null
+										}
+									}
+								},
+								"command": "focus"
+							},
+							{
+								"op": "assign",
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened",
+								"value": {
+									"literal": false
+								}
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:6/event:4",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": false
+							}
+						},
+						"whenTrue": [],
+						"whenFalse": [
+							{
+								"op": "assign",
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+								"value": {
+									"literal": false
+								}
+							},
+							{
+								"op": "assign",
+								"cell": "state:changes",
+								"value": {
+									"binary": "+",
+									"left": {
+										"cell": "state:changes"
+									},
+									"right": {
+										"literal": 1
+									}
+								}
+							}
+						]
+					},
+					{
+						"op": "command",
+						"node": {
+							"if": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened"
+							},
+							"whenTrue": {
+								"literal": "component-edge:1/h1"
+							},
+							"whenFalse": {
+								"if": {
+									"logical": "&&",
+									"left": {
+										"isElement": {
+											"focusOrigin": {
+												"literal": "component-edge:2/h2"
+											}
+										}
+									},
+									"right": {
+										"binary": "!==",
+										"left": {
+											"focusOrigin": {
+												"literal": "component-edge:2/h2"
+											}
+										},
+										"right": {
+											"literal": "#body"
+										}
+									}
+								},
+								"whenTrue": {
+									"focusOrigin": {
+										"literal": "component-edge:2/h2"
+									}
+								},
+								"whenFalse": {
+									"literal": null
+								}
+							}
+						},
+						"command": "focus"
+					},
+					{
+						"op": "assign",
+						"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened",
+						"value": {
+							"literal": false
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:deleted",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "state:deleted"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:8/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened",
+						"value": {
+							"literal": true
+						}
+					},
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": true
+							}
+						},
+						"whenTrue": [],
+						"whenFalse": [
+							{
+								"op": "assign",
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+								"value": {
+									"literal": true
+								}
+							}
+						]
+					},
+					{
+						"op": "if",
+						"test": {
+							"logical": "&&",
+							"left": {
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.alert"
+							},
+							"right": {
+								"literal": "component-edge:12/h6"
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "command",
+								"node": "component-edge:12/h6",
+								"command": "focus"
+							}
+						],
+						"whenFalse": [
+							{
+								"op": "command",
+								"node": {
+									"logical": "??",
+									"left": {
+										"literal": "component-edge:11/h4"
+									},
+									"right": {
+										"literal": "component-edge:10/h3"
+									}
+								},
+								"command": "focus"
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:9/event:1",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "!==",
+							"left": {
+								"logical": "&&",
+								"left": {
+									"binary": "===",
+									"left": {
+										"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.alert"
+									},
+									"right": {
+										"literal": true
+									}
+								},
+								"right": {
+									"binary": "===",
+									"left": {
+										"event": "reason"
+									},
+									"right": {
+										"literal": "outside-press"
+									}
+								}
+							},
+							"right": {
+								"literal": true
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "if",
+								"test": {
+									"binary": "===",
+									"left": {
+										"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+									},
+									"right": {
+										"literal": false
+									}
+								},
+								"whenTrue": [],
+								"whenFalse": [
+									{
+										"op": "assign",
+										"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+										"value": {
+											"literal": false
+										}
+									}
+								]
+							},
+							{
+								"op": "command",
+								"node": {
+									"if": {
+										"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened"
+									},
+									"whenTrue": {
+										"literal": "component-edge:8/h1"
+									},
+									"whenFalse": {
+										"if": {
+											"logical": "&&",
+											"left": {
+												"isElement": {
+													"focusOrigin": {
+														"literal": "component-edge:9/h2"
+													}
+												}
+											},
+											"right": {
+												"binary": "!==",
+												"left": {
+													"focusOrigin": {
+														"literal": "component-edge:9/h2"
+													}
+												},
+												"right": {
+													"literal": "#body"
+												}
+											}
+										},
+										"whenTrue": {
+											"focusOrigin": {
+												"literal": "component-edge:9/h2"
+											}
+										},
+										"whenFalse": {
+											"literal": null
+										}
+									}
+								},
+								"command": "focus"
+							},
+							{
+								"op": "assign",
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened",
+								"value": {
+									"literal": false
+								}
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:9/event:2",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"logical": "&&",
+							"left": {
+								"logical": "&&",
+								"left": {
+									"binary": "!==",
+									"left": {
+										"literal": "component-edge:9/h2"
+									},
+									"right": {
+										"literal": null
+									}
+								},
+								"right": {
+									"binary": "===",
+									"left": {
+										"event": "target"
+									},
+									"right": {
+										"literal": "component-edge:9/h2"
+									}
+								}
+							},
+							"right": {
+								"binary": "===",
+								"left": {
+									"event": "button"
+								},
+								"right": {
+									"literal": 0
+								}
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "assign",
+								"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed",
+								"value": {
+									"if": {
+										"method": "includes",
+										"target": {
+											"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed"
+										},
+										"arguments": [
+											{
+												"literal": "component-edge:9/h2"
+											}
+										]
+									},
+									"whenTrue": {
+										"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed"
+									},
+									"whenFalse": {
+										"method": "concat",
+										"target": {
+											"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed"
+										},
+										"arguments": [
+											{
+												"array": [
+													{
+														"spread": false,
+														"value": {
+															"literal": "component-edge:9/h2"
+														}
+													}
+												]
+											}
+										]
+									}
+								}
+							}
+						],
+						"whenFalse": [
+							{
+								"op": "assign",
+								"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed",
+								"value": {
+									"method": "filter",
+									"target": {
+										"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed"
+									},
+									"arguments": [
+										{
+											"lambda": [
+												"kept"
+											],
+											"body": {
+												"binary": "!==",
+												"left": {
+													"local": "kept"
+												},
+												"right": {
+													"literal": "component-edge:9/h2"
+												}
+											}
+										}
+									]
+								}
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:9/event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "handler:component-edge:9/event:3/returned:0",
+						"value": {
+							"literal": null
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "handler:component-edge:9/event:3/kept:1",
+						"value": {
+							"method": "includes",
+							"target": {
+								"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed"
+							},
+							"arguments": [
+								{
+									"literal": "component-edge:9/h2"
+								}
+							]
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed",
+						"value": {
+							"method": "filter",
+							"target": {
+								"cell": "module:packages/headless/components/src/modal/modal-press.ts#armed"
+							},
+							"arguments": [
+								{
+									"lambda": [
+										"kept"
+									],
+									"body": {
+										"binary": "!==",
+										"left": {
+											"local": "kept"
+										},
+										"right": {
+											"literal": "component-edge:9/h2"
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "handler:component-edge:9/event:3/returned:0",
+						"value": {
+							"logical": "&&",
+							"left": {
+								"cell": "handler:component-edge:9/event:3/kept:1"
+							},
+							"right": {
+								"logical": "&&",
+								"left": {
+									"binary": "!==",
+									"left": {
+										"literal": "component-edge:9/h2"
+									},
+									"right": {
+										"literal": null
+									}
+								},
+								"right": {
+									"binary": "===",
+									"left": {
+										"event": "target"
+									},
+									"right": {
+										"literal": "component-edge:9/h2"
+									}
+								}
+							}
+						}
+					},
+					{
+						"op": "if",
+						"test": {
+							"logical": "&&",
+							"left": {
+								"cell": "handler:component-edge:9/event:3/returned:0"
+							},
+							"right": {
+								"binary": "!==",
+								"left": {
+									"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.alert"
+								},
+								"right": {
+									"literal": true
+								}
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "if",
+								"test": {
+									"binary": "===",
+									"left": {
+										"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+									},
+									"right": {
+										"literal": false
+									}
+								},
+								"whenTrue": [],
+								"whenFalse": [
+									{
+										"op": "assign",
+										"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+										"value": {
+											"literal": false
+										}
+									}
+								]
+							},
+							{
+								"op": "command",
+								"node": {
+									"if": {
+										"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened"
+									},
+									"whenTrue": {
+										"literal": "component-edge:8/h1"
+									},
+									"whenFalse": {
+										"if": {
+											"logical": "&&",
+											"left": {
+												"isElement": {
+													"focusOrigin": {
+														"literal": "component-edge:9/h2"
+													}
+												}
+											},
+											"right": {
+												"binary": "!==",
+												"left": {
+													"focusOrigin": {
+														"literal": "component-edge:9/h2"
+													}
+												},
+												"right": {
+													"literal": "#body"
+												}
+											}
+										},
+										"whenTrue": {
+											"focusOrigin": {
+												"literal": "component-edge:9/h2"
+											}
+										},
+										"whenFalse": {
+											"literal": null
+										}
+									}
+								},
+								"command": "focus"
+							},
+							{
+								"op": "assign",
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened",
+								"value": {
+									"literal": false
+								}
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:12/event:4",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open"
+							},
+							"right": {
+								"literal": false
+							}
+						},
+						"whenTrue": [],
+						"whenFalse": [
+							{
+								"op": "assign",
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+								"value": {
+									"literal": false
+								}
+							}
+						]
+					},
+					{
+						"op": "command",
+						"node": {
+							"if": {
+								"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened"
+							},
+							"whenTrue": {
+								"literal": "component-edge:8/h1"
+							},
+							"whenFalse": {
+								"if": {
+									"logical": "&&",
+									"left": {
+										"isElement": {
+											"focusOrigin": {
+												"literal": "component-edge:9/h2"
+											}
+										}
+									},
+									"right": {
+										"binary": "!==",
+										"left": {
+											"focusOrigin": {
+												"literal": "component-edge:9/h2"
+											}
+										},
+										"right": {
+											"literal": "#body"
+										}
+									}
+								},
+								"whenTrue": {
+									"focusOrigin": {
+										"literal": "component-edge:9/h2"
+									}
+								},
+								"whenFalse": {
+									"literal": null
+								}
+							}
+						},
+						"command": "focus"
+					},
+					{
+						"op": "assign",
+						"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.isTriggerOpened",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Modal"
+		],
+		[
+			"h2:text0",
+			"Deleted 0"
+		],
+		[
+			"h3:text0",
+			"Changes 0"
+		],
+		[
+			"component-edge:1/h1:text0",
+			"Delete draft"
+		],
+		[
+			"component-edge:4/h4:text0",
+			"Delete this draft?"
+		],
+		[
+			"component-edge:5/h5:text0",
+			"It cannot be undone"
+		],
+		[
+			"component-edge:6/h6:text0",
+			"Delete"
+		],
+		[
+			"component-edge:8/h1:text0",
+			"Sign out"
+		],
+		[
+			"component-edge:11/h4:text0",
+			"Sign out now?"
+		],
+		[
+			"component-edge:12/h6:text0",
+			"Stay"
+		]
+	],
+	"initialAttributes": [
+		[
+			"component-edge:0/h0",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:0/h0",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:1/h1",
+			"aria-expanded",
+			"false"
+		],
+		[
+			"component-edge:1/h1",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:1/h1",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:1/h1",
+			"aria-controls",
+			"component-edge:3/h3"
+		],
+		[
+			"component-edge:2/h2",
+			"hidden",
+			""
+		],
+		[
+			"component-edge:2/h2",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:2/h2",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:3/h3",
+			"role",
+			"dialog"
+		],
+		[
+			"component-edge:3/h3",
+			"tabindex",
+			"-1"
+		],
+		[
+			"component-edge:3/h3",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:3/h3",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:3/h3",
+			"aria-labelledby",
+			"component-edge:4/h4"
+		],
+		[
+			"component-edge:3/h3",
+			"aria-describedby",
+			"component-edge:5/h5"
+		],
+		[
+			"component-edge:4/h4",
+			"tabindex",
+			"-1"
+		],
+		[
+			"component-edge:7/h0",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:7/h0",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:8/h1",
+			"aria-expanded",
+			"false"
+		],
+		[
+			"component-edge:8/h1",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:8/h1",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:8/h1",
+			"aria-controls",
+			"component-edge:10/h3"
+		],
+		[
+			"component-edge:9/h2",
+			"hidden",
+			""
+		],
+		[
+			"component-edge:9/h2",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:9/h2",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:10/h3",
+			"role",
+			"alertdialog"
+		],
+		[
+			"component-edge:10/h3",
+			"tabindex",
+			"-1"
+		],
+		[
+			"component-edge:10/h3",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:10/h3",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:10/h3",
+			"aria-labelledby",
+			"component-edge:11/h4"
+		],
+		[
+			"component-edge:11/h4",
+			"tabindex",
+			"-1"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+					"value": true
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Changes 1"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "true"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h3",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h3",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": true,
+					"modal": true
+				},
+				{
+					"op": "command",
+					"node": "component-edge:4/h4",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "component-edge:4/h4"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "component-edge:4/h4"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "component-edge:2/h2"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "component-edge:2/h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Changes 2"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "false"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h3",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h3",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": false,
+					"modal": true
+				},
+				{
+					"op": "command",
+					"node": "component-edge:1/h1",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+					"value": true
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Changes 3"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "true"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h3",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h3",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": true,
+					"modal": true
+				},
+				{
+					"op": "command",
+					"node": "component-edge:4/h4",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "dismiss",
+				"host": "component-edge:2/h2",
+				"reason": "escape"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Changes 4"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "false"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h3",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h3",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": false,
+					"modal": true
+				},
+				{
+					"op": "command",
+					"node": "component-edge:1/h1",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+					"value": true
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Changes 5"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "true"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h3",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h3",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": true,
+					"modal": true
+				},
+				{
+					"op": "command",
+					"node": "component-edge:4/h4",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "component-edge:6/h6"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "component-edge:6/h6"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:6/h6"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Deleted 1"
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Changes 6"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "aria-expanded",
+					"value": "false"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:1/h1",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h2",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h3",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h3",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:2/h2",
+					"open": false,
+					"modal": true
+				},
+				{
+					"op": "command",
+					"node": "component-edge:1/h1",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:8/h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:7/h0",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:7/h0",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:8/h1",
+					"name": "aria-expanded",
+					"value": "true"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:8/h1",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:8/h1",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:9/h2",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:9/h2",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:9/h2",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:10/h3",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:10/h3",
+					"name": "ui-closed",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:9/h2",
+					"open": true,
+					"modal": true
+				},
+				{
+					"op": "command",
+					"node": "component-edge:12/h6",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "component-edge:9/h2"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "component-edge:9/h2"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "dismiss",
+				"host": "component-edge:9/h2",
+				"reason": "escape"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:7/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+					"value": false
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:7/h0",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:7/h0",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:8/h1",
+					"name": "aria-expanded",
+					"value": "false"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:8/h1",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:8/h1",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:9/h2",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:9/h2",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:9/h2",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:10/h3",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:10/h3",
+					"name": "ui-closed",
+					"value": ""
+				},
+				{
+					"op": "overlay",
+					"node": "component-edge:9/h2",
+					"open": false,
+					"modal": true
+				},
+				{
+					"op": "command",
+					"node": "component-edge:8/h1",
+					"command": "focus"
+				}
+			]
+		}
+	]
+}

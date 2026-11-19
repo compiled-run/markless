@@ -80,6 +80,167 @@ test('a loop variable, a find() result and a callback parameter write the elemen
 	]);
 });
 
+async function compileGrid(handlerBody: string) {
+	return compileTsrxModule({
+		filename: 'src/Grid.tsrx',
+		source: `import { state } from '@markless/core';
+
+type Cell = { on: boolean };
+interface Shelf { cells: Cell[] }
+declare function loadShelves(): Array<{ cells: Cell[] }>;
+
+export function Grid() @{
+	let halls = state([{ name: 'h', rows: [{ label: 'A', seats: [{ taken: false }] }] }]);
+	let grid = state([[{ on: false }, { on: true }], [{ on: false }]]);
+	let shelves = state<Shelf[]>([]);
+	let loaded = state(loadShelves());
+	let tagged = state([{ tags: new Set([{ on: false }]) }]);
+	let indexed = state([{ byId: new Map([['a', { on: false }]]) }]);
+	<div>
+		<output>{halls[0].rows[0].seats[0].taken ? 'x' : 'o'}</output>
+		<output>{grid[1][0].on ? 'x' : 'o'}</output>
+		<button onClick={() => { ${handlerBody} }}>go</button>
+	</div>
+}
+`,
+		symbols: [],
+	});
+}
+
+test('an element of an array inside a loop element writes through each enclosing element', async () => {
+	const result = await compileGrid(
+		`for (const hall of halls) { for (const row of hall.rows) { for (const seat of row.seats) seat.taken = true; } } for (const line of grid) line.forEach((cell) => { cell.on = !cell.on; }); for (const line of grid) { const first = line.find((cell) => cell.on); if (first) first.on = false; } for (const shelf of shelves) for (const box of shelf.cells) box.on = true;`,
+	);
+
+	expect(errors(result)).toEqual([]);
+	expect(
+		result.stateLowering.writes.map((write) => [
+			write.source,
+			write.graphNodeId,
+			write.through,
+		]),
+	).toEqual([
+		[
+			'seat.taken',
+			'state:halls',
+			{
+				local: 'seat',
+				element: true,
+				basePath: [],
+				path: ['taken'],
+				enclosing: [
+					{ local: 'hall', path: ['rows'] },
+					{ local: 'row', path: ['seats'] },
+				],
+			},
+		],
+		[
+			'cell.on',
+			'state:grid',
+			{
+				local: 'cell',
+				element: true,
+				basePath: [],
+				path: ['on'],
+				enclosing: [{ local: 'line', path: [] }],
+			},
+		],
+		[
+			'first.on',
+			'state:grid',
+			{
+				local: 'first',
+				element: true,
+				basePath: [],
+				path: ['on'],
+				enclosing: [{ local: 'line', path: [] }],
+			},
+		],
+		[
+			'box.on',
+			'state:shelves',
+			{
+				local: 'box',
+				element: true,
+				basePath: [],
+				path: ['on'],
+				enclosing: [{ local: 'shelf', path: ['cells'] }],
+			},
+		],
+	]);
+	expect(handlerSource(result)).toContain(
+		'marklessWriteThrough(context, "state:halls", marklessElementPath(context, "state:halls", marklessElementPath(context, "state:halls", [], hall, ["rows"]), row, ["seats"]), seat, true)',
+	);
+	expect(handlerSource(result)).toContain(
+		'import { marklessElementPath } from "@markless/web/fns/write-through";',
+	);
+});
+
+test.each([
+	[
+		`for (const s of grid.flat()) s.on = false;`,
+		's.on',
+		'flat() copy of "grid"',
+		'for (const row of grid) for (const s of row)',
+	],
+	[
+		`for (const cell of grid.find((line) => line.length > 1)!) cell.on = true;`,
+		'cell.on',
+		'element of an element',
+		'Name each enclosing element',
+	],
+	[
+		`for (const line of grid) { for (const cell of line) { const line = [cell]; cell.on = line.length > 0; } }`,
+		'cell.on',
+		'finds that array again through "line", but "line" is assigned again or names a different variable',
+		'Declare "line" with const',
+	],
+	[
+		`for (let row of grid) { for (const c of row) { row = grid[0]; c.on = true; } }`,
+		'c.on',
+		'holds an element of `row`, and the write finds that array again through "row", but "row" is assigned again',
+		'Declare "row" with const',
+	],
+	[
+		`for (const row of tagged) for (const t of row.tags) t.on = true;`,
+		't.on',
+		'read out of the Map or Set "row.tags"',
+		'Replace the entry instead',
+	],
+	[
+		`for (const row of indexed) for (const entry of row.byId) entry[1].on = true;`,
+		'entry[1].on',
+		'read out of the Map or Set "row.byId"',
+		'Replace the entry instead',
+	],
+	[
+		`for (const row of indexed) row.byId.forEach((value) => { value.on = true; });`,
+		'value.on',
+		'read out of the Map or Set "row.byId"',
+		'Replace the entry instead',
+	],
+	[
+		`for (const shelf of loaded) for (const box of shelf.cells) box.on = true;`,
+		'box.on',
+		"neither the state's starting value nor its type says `shelf.cells` is an array",
+		'give state() a type argument',
+	],
+])(
+	'a nested element write through %s fails the build naming the fix',
+	async (body, target, reason, fix) => {
+		const result = await compileGrid(body);
+
+		expect(errors(result)).toEqual([
+			expect.objectContaining({
+				code: 'MARKLESS_STATE_LOCAL_WRITE_UNTRACKED',
+				statePath: target,
+				message: expect.stringContaining(reason),
+				suggestions: [{ message: expect.stringContaining(fix) }],
+			}),
+		]);
+	},
+);
+
 test('a handler local that shadows a state name writes only itself', async () => {
 	const result = await compile(
 		`const account = { size: 0 }; account.size = 2; [1].forEach((entries) => { entries += 1; });`,

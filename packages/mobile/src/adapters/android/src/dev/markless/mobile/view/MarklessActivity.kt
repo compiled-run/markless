@@ -6,13 +6,17 @@ import android.content.res.Configuration
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
+import android.os.Process
+import android.os.SystemClock
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.view.ContextThemeWrapper
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.EditText
@@ -37,6 +41,14 @@ abstract class MarklessActivity : Activity() {
 	abstract fun payloadBytes(): ByteArray
 
 	open fun styleExportBytes(): ByteArray? = null
+
+	/** Whether a screen whose page has a script starts the engine once its first frame is up and the main loop is idle. */
+	open val warmsScriptEngine: Boolean get() = true
+
+	override fun onDestroy() {
+		if (::host.isInitialized) host.stopTimersAndRequests()
+		super.onDestroy()
+	}
 
 	/** Where device values come from and device calls go; the phone's own by default. */
 	open val device: NativeDevice by lazy { PlatformDevice(this) }
@@ -70,7 +82,11 @@ abstract class MarklessActivity : Activity() {
 		return route.match(path) ?: throw MarklessHostError("launched at $path, which does not match ${route.pattern}")
 	}
 
+	/** When this screen's onCreate began, on the uptime clock the process start time is read on. */
+	private var createdAt = 0L
+
 	override fun onCreate(savedInstanceState: Bundle?) {
+		createdAt = SystemClock.uptimeMillis()
 		val bytes = payloadBytes()
 		val app = AppPayload.decodeOrNull(bytes)
 		if (app == null) {
@@ -200,10 +216,37 @@ abstract class MarklessActivity : Activity() {
 		host.canvasColor?.let(page::setBackgroundColor)
 		host.onCanvas = page::setBackgroundColor
 		setContentView(FrameLayout(this).apply { addView(page, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)) })
+		if (!firstFrameLogged) logFirstFrame(page)
+		if (warmsScriptEngine) host.warmScriptWhenIdle()
 		if (host.style != null) page.post { android.util.Log.i(MarklessHost.TAG, "frames max gap ${host.frameDeviation()} device px") }
 	}
 
+	private var firstFrameLogged = false
+
+	/** Logs `first frame <ms> ms` when the page first draws: from this screen's onCreate, and from the process start. */
+	private fun logFirstFrame(page: View) {
+		firstFrameLogged = true
+		val drawn = object : ViewTreeObserver.OnDrawListener {
+			var seen = false
+			override fun onDraw() {
+				if (seen) return
+				seen = true
+				val now = SystemClock.uptimeMillis()
+				android.util.Log.i(MarklessHost.TAG, "first frame ${now - createdAt} ms from onCreate, ${now - Process.getStartUptimeMillis()} ms from process start")
+				// A draw listener cannot remove itself while the draw runs.
+				page.post { page.viewTreeObserver.takeIf { it.isAlive }?.removeOnDrawListener(this) }
+			}
+		}
+		page.viewTreeObserver.addOnDrawListener(drawn)
+	}
+
 	fun contentRoot(): View = host.root
+
+	// Pointer events reach the runtime before the views, so a press is reported before the click it ends in.
+	override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+		if (::host.isInitialized) host.touch(event)
+		return super.dispatchTouchEvent(event)
+	}
 
 	companion object {
 		/** The system's own theme, light or dark with the device. */

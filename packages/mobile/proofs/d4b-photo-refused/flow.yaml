@@ -23,15 +23,13 @@ name: d4b-photo-refused
     text: camera off
 - tapOn: Take photo
 - assertVisible: "Photo failed: NotAllowedError"
-- assertNotVisible: Take photo
-- assertNotVisible: Photos 0
 - assertVisible:
     id: markless-device-calls
     text: "calls: camera\\.takePhoto"
 - assertVisible: Access denied
+- assertVisible: Take photo
+- assertVisible: Photos 0
 - assertVisible: "Photo failed: NotAllowedError"
-- assertNotVisible: Take photo
-- assertNotVisible: Photos 0
 - assertVisible:
     id: markless-device-calls
     text: "calls: camera\\.takePhoto"

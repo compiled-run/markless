@@ -9,6 +9,7 @@ import {
 import type { SemanticWriteThrough } from '../../artifacts.ts';
 import { resolvedSymbolAt } from './collect-expressions.ts';
 import type { ModuleSemantics } from './shared-ast.ts';
+import { stateValueShape } from './state-value-shape.ts';
 import type { WalkState } from './types.ts';
 
 type Binding = ModuleSemantics['bindings'][number];
@@ -17,15 +18,31 @@ type Binding = ModuleSemantics['bindings'][number];
 type LocalOrigin =
 	| { readonly kind: 'plain' }
 	| { readonly kind: 'path'; readonly target: string }
-	| {
-			readonly kind: 'element';
-			readonly anchor: string;
-			readonly collection: string;
-			readonly itemPath: ReadonlyArray<string>;
-	  }
+	| ElementOrigin
 	| { readonly kind: 'untracked'; readonly reason: UntrackedReason; readonly source: string }
 	// A new array or object whose members may still be state objects.
-	| { readonly kind: 'container'; readonly source: string };
+	| {
+			readonly kind: 'container';
+			readonly reason: 'copy' | 'flattened';
+			readonly source: string;
+	  };
+
+// `anchorId` is the binding `anchor` names, or -1 while the element has no name yet.
+type ElementOrigin = {
+	readonly kind: 'element';
+	readonly anchor: string;
+	readonly anchorId: number;
+	readonly collection: string;
+	readonly itemPath: ReadonlyArray<string>;
+	readonly enclosing: ReadonlyArray<EnclosingElement>;
+};
+
+// An element of an enclosing array the local's own array is found under, outermost first.
+type EnclosingElement = {
+	readonly anchor: string;
+	readonly anchorId: number;
+	readonly path: ReadonlyArray<string>;
+};
 
 type UntrackedReason = Extract<SemanticWriteThrough, { readonly kind: 'untracked' }>['reason'];
 
@@ -76,7 +93,12 @@ export function writeThroughLocal(
 	if (origin.kind === 'container') {
 		const ownMember = (segments?.length ?? 0) <= (operation === 'call' ? 0 : 1);
 		if (ownMember) return { kind: 'local', local: binding.name };
-		return { kind: 'untracked', local: binding.name, reason: 'copy', source: origin.source };
+		return {
+			kind: 'untracked',
+			local: binding.name,
+			reason: origin.reason,
+			source: origin.source,
+		};
 	}
 	if (origin.kind === 'untracked') {
 		return {
@@ -97,12 +119,48 @@ export function writeThroughLocal(
 	if (origin.kind === 'path') {
 		return { kind: 'path', local: binding.name, target: origin.target, path: segments };
 	}
+	const lost = lostEnclosingStep(origin.enclosing, root, state);
+	if (lost) {
+		return {
+			kind: 'untracked',
+			local: binding.name,
+			reason: 'enclosing-rebound',
+			source: lost.path.length
+				? [lost.anchor, ...lost.path].reduce(appendSegment)
+				: lost.anchor,
+			enclosingLocal: lost.anchor,
+		};
+	}
 	return {
 		kind: 'element',
 		local: origin.anchor,
 		collection: origin.collection,
 		path: [...origin.itemPath, ...segments],
+		...(origin.enclosing.length
+			? {
+					enclosing: origin.enclosing.map((step) => ({
+						local: step.anchor,
+						path: step.path,
+					})),
+				}
+			: {}),
 	};
+}
+
+// The write finds each enclosing element again by name, so the name must still mean that unreassigned local there.
+function lostEnclosingStep(
+	enclosing: ReadonlyArray<EnclosingElement>,
+	writeRoot: AnyNode,
+	state: WalkState,
+): EnclosingElement | undefined {
+	if (enclosing.length === 0) return undefined;
+	const semantic = state.semantic();
+	const node = semantic.nodeAt(writeRoot.start as number);
+	const from = node ? semantic.scopeOf(node) : null;
+	return enclosing.find((step) => {
+		const binding = from && semantic.lookup(step.anchor, { from });
+		return binding?.id !== step.anchorId || isReassigned(binding);
+	});
 }
 
 function rootIdentifier(target: AnyNode): AnyNode | null {
@@ -222,7 +280,7 @@ function originOfBinding(binding: Binding, state: WalkState, seen: Set<number>):
 			return { kind: 'untracked', reason: 'reassigned', source: binding.name };
 		}
 		if (origin.kind === 'element' && origin.anchor === '') {
-			return { ...origin, anchor: binding.name };
+			return { ...origin, anchor: binding.name, anchorId: binding.id };
 		}
 		return origin;
 	}
@@ -331,7 +389,8 @@ function storedStateOrigin(binding: Binding, state: WalkState, seen: Set<number>
 				state,
 				seen,
 			);
-			if (origin.kind !== 'plain') return { kind: 'container', source: originSource(origin) };
+			if (origin.kind !== 'plain')
+				return { kind: 'container', reason: 'copy', source: originSource(origin) };
 		}
 	}
 	return { kind: 'plain' };
@@ -367,19 +426,83 @@ function elementOrigin(
 	if (collection.kind === 'plain') return collection;
 	if (collection.kind === 'untracked') return collection;
 	if (collection.kind === 'container') {
-		return { kind: 'untracked', reason: 'copy', source: collection.source };
+		return { kind: 'untracked', reason: collection.reason, source: collection.source };
 	}
 	if (collection.kind === 'element') {
-		return {
-			kind: 'untracked',
-			reason: 'nested-element',
-			source: expressionSource(collectionNode, state.source),
-		};
+		const notArray = innerNotArray(collection, collectionNode, state);
+		if (notArray) return notArray;
+		return (
+			innerElement(collection, binding.name, binding.id) ?? {
+				kind: 'untracked',
+				reason: 'nested-element',
+				source: expressionSource(collectionNode, state.source),
+			}
+		);
 	}
 	if (isMapOrSetPath(collection.target, state)) {
 		return { kind: 'untracked', reason: 'map-entry', source: collection.target };
 	}
-	return { kind: 'element', anchor: binding.name, collection: collection.target, itemPath: [] };
+	return {
+		kind: 'element',
+		anchor: binding.name,
+		anchorId: binding.id,
+		collection: collection.target,
+		itemPath: [],
+		enclosing: [],
+	};
+}
+
+// `row.seats` inside `for (const row of rows)`: its elements are found through the named element `row`.
+function innerElement(
+	outer: ElementOrigin,
+	anchor: string,
+	anchorId: number,
+): ElementOrigin | null {
+	if (outer.anchorId < 0) return null;
+	return {
+		kind: 'element',
+		anchor,
+		anchorId,
+		collection: outer.collection,
+		itemPath: [],
+		enclosing: [
+			...outer.enclosing,
+			{ anchor: outer.anchor, anchorId: outer.anchorId, path: outer.itemPath },
+		],
+	};
+}
+
+// The array a nested element is found in must be an array by its starting value or its type: a Map, a Set or an unknown value has no index to write at.
+function innerNotArray(
+	outer: ElementOrigin,
+	innerNode: AnyNode,
+	state: WalkState,
+): LocalOrigin | null {
+	if (outer.anchorId < 0) return null;
+	const semantic = state.semantic();
+	const outermost = semantic.bindings[outer.enclosing[0]?.anchorId ?? outer.anchorId];
+	const [root, ...properties] = splitStaticGraphPath(outer.collection);
+	const property = (name: string) => ({ property: name });
+	const steps = [
+		...properties.map(property),
+		...outer.enclosing.flatMap((step) => [
+			{ element: true as const },
+			...step.path.map(property),
+		]),
+		{ element: true as const },
+		...outer.itemPath.map(property),
+	];
+	const shape =
+		outermost && root ? stateValueShape(semantic, root, outermost.scope, steps) : 'unknown';
+	if (shape === 'array') return null;
+	const source = expressionSource(innerNode, state.source);
+	return shape === 'keyed'
+		? { kind: 'untracked', reason: 'map-entry', source }
+		: { kind: 'untracked', reason: 'nested-unknown', source };
+}
+
+function copyReason(method: string): 'copy' | 'flattened' {
+	return method === 'flat' ? 'flattened' : 'copy';
 }
 
 function originOfExpression(node: AnyNode, state: WalkState, seen: Set<number>): LocalOrigin {
@@ -410,30 +533,43 @@ function originOfExpression(node: AnyNode, state: WalkState, seen: Set<number>):
 						return {
 							kind: 'element',
 							anchor: '',
+							anchorId: -1,
 							collection: owner.target,
 							itemPath: [],
+							enclosing: [],
 						};
 					}
 					if (!keyed && method === 'values') return owner;
 					if (COPYING_METHODS.has(method) || method === 'entries') {
-						return { kind: 'container', source: owner.target };
+						return {
+							kind: 'container',
+							reason: copyReason(method),
+							source: owner.target,
+						};
 					}
 				}
 				if (owner.kind !== 'plain' && owner.kind !== 'path') {
 					if (ELEMENT_RETURNING_METHODS.has(method)) {
+						const notArray =
+							owner.kind === 'element' ? innerNotArray(owner, receiver, state) : null;
+						if (notArray) return notArray;
+						const inner = owner.kind === 'element' ? innerElement(owner, '', -1) : null;
+						if (inner) return inner;
 						return {
 							kind: 'untracked',
 							reason:
-								owner.kind === 'untracked'
+								owner.kind === 'untracked' || owner.kind === 'container'
 									? owner.reason
-									: owner.kind === 'container'
-										? 'copy'
-										: 'nested-element',
+									: 'nested-element',
 							source: originSource(owner),
 						};
 					}
 					if (COPYING_METHODS.has(method))
-						return { kind: 'container', source: originSource(owner) };
+						return {
+							kind: 'container',
+							reason: copyReason(method),
+							source: originSource(owner),
+						};
 				}
 			}
 		}
@@ -451,7 +587,8 @@ function originOfExpression(node: AnyNode, state: WalkState, seen: Set<number>):
 			const value = member.type === 'SpreadElement' ? (member.argument as AnyNode) : member;
 			if (!isNode(value)) continue;
 			const origin = originOfExpression(value, state, seen);
-			if (origin.kind !== 'plain') return { kind: 'container', source: originSource(origin) };
+			if (origin.kind !== 'plain')
+				return { kind: 'container', reason: 'copy', source: originSource(origin) };
 		}
 		return { kind: 'plain' };
 	}
@@ -503,7 +640,7 @@ function memberOrigin(node: AnyNode, state: WalkState, seen: Set<number>): Local
 		if (base.kind === 'container') {
 			return segments?.length === 0
 				? base
-				: { kind: 'untracked', reason: 'copy', source: base.source };
+				: { kind: 'untracked', reason: base.reason, source: base.source };
 		}
 		if (!segments) {
 			return dynamicElement(node, base, state, seen);
@@ -514,6 +651,7 @@ function memberOrigin(node: AnyNode, state: WalkState, seen: Set<number>): Local
 		return {
 			...base,
 			anchor: base.anchor || binding.name,
+			anchorId: base.anchor ? base.anchorId : binding.id,
 			itemPath: [...base.itemPath, ...segments],
 		};
 	}

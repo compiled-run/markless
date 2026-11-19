@@ -143,15 +143,13 @@ test('an arm the row cannot rebuild keeps the served arm and says so', async () 
 		filename: 'src/Page.tsrx',
 		source: `
 import { state } from '@markless/core';
+import Chip from './chip.tsrx';
 export default function Page() @{
 	let open = state(false);
 	let rows = state([{ id: 'a', tags: ['x'] }]);
 	<ul>
 		@for (const row of rows; key row.id) {
-			<li>@if (open) { <ol>
-				// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: tags are positions
-				@for (const tag of row.tags; index at; key at) { <li>{tag}</li> }
-			</ol> } @else { <span>none</span> }</li>
+			<li>@if (open) { <ol><Chip label={row.id} /></ol> } @else { <span>none</span> }</li>
 		}
 	</ul>
 }`,

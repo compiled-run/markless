@@ -489,6 +489,7 @@ function componentPropBindings(
 				graphBindingKind: graph.binding.kind,
 				path: graph.path,
 				sourceSpan: span,
+				...(NATIVE_FACTS ? nativeExpressionOf(expression, state) : {}),
 			});
 			continue;
 		}
@@ -530,6 +531,7 @@ function componentPropBindings(
 				graphBindingKind: 'computed',
 				path: [],
 				sourceSpan: span,
+				...(NATIVE_FACTS ? nativeExpressionOf(expression, state) : {}),
 			});
 			continue;
 		}
@@ -579,6 +581,7 @@ function componentPropBindings(
 				graphBindingKind: 'computed',
 				path: [],
 				sourceSpan: span,
+				...(NATIVE_FACTS ? nativeExpressionOf(expression, state) : {}),
 			});
 			continue;
 		}

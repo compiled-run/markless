@@ -26,7 +26,7 @@ type WriteThroughGraph = Pick<WriteThroughContext['graph'], 'write' | 'update' |
 export function marklessWriteThrough(
 	context: WriteThroughContext,
 	graphNodeId: string,
-	basePath: ReadonlyArray<string>,
+	basePath: ReadonlyArray<string> | null,
 	local: unknown,
 	element: boolean,
 ): WriteThroughGraph {
@@ -42,17 +42,36 @@ export function marklessWriteThrough(
 	};
 }
 
+/** The path of an element of an enclosing array, then `path` inside it: where the next array in lives. */
+export function marklessElementPath(
+	context: WriteThroughContext,
+	graphNodeId: string,
+	basePath: ReadonlyArray<string> | null,
+	local: unknown,
+	path: ReadonlyArray<string>,
+): string[] | null {
+	const at = locate(context, graphNodeId, basePath, local, true);
+	return at && [...at, ...path];
+}
+
 function locate(
 	context: WriteThroughContext,
 	graphNodeId: string,
-	basePath: ReadonlyArray<string>,
+	basePath: ReadonlyArray<string> | null,
 	local: unknown,
 	element: boolean,
 ): string[] | null {
-	if (local === null || typeof local !== 'object') return null;
+	if (!basePath || local === null || typeof local !== 'object') return null;
 	const base = context.graph.read(graphNodeId, basePath);
 	if (!element) return base === local ? [...basePath] : null;
-	if (!Array.isArray(base)) return null;
+	if (base == null) return null;
+	if (!Array.isArray(base))
+		throw Object.assign(
+			new Error(
+				`A write through a loop variable expected a list at "${basePath.join('.')}".`,
+			),
+			{ code: 'MARKLESS_WRITE_THROUGH_NOT_A_LIST', graphNodeId },
+		);
 	const index = base.indexOf(local);
 	return index < 0 ? null : [...basePath, String(index)];
 }

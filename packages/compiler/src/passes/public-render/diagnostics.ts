@@ -237,6 +237,7 @@ export function keyedRepeatRowNotOneElementDiagnostic(input: {
 	readonly itemName: string;
 	readonly rowShape: string;
 	readonly reason: string;
+	readonly innerFor?: { readonly itemName: string; readonly collectionSource: string };
 	readonly node: AnyNode;
 	readonly filename: string;
 }): CompilerDiagnostic {
@@ -252,7 +253,9 @@ export function keyedRepeatRowNotOneElementDiagnostic(input: {
 		artifactKeys: ['publicRenderPlan'],
 		suggestions: [
 			{
-				message: `Wrap each row in one element, such as \`<span>...</span>\`, so every row of ${input.itemName} is a single element.`,
+				message: !input.innerFor
+					? `Wrap each row in one element, such as \`<span>...</span>\`, so every row of ${input.itemName} is a single element.`
+					: `Wrap the inner loop in one element, such as \`<div>@for (const ${input.innerFor.itemName} of ${input.innerFor.collectionSource}; ...) { ... }</div>\`, so every row of ${input.itemName} is that single element.`,
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',

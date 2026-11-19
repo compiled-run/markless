@@ -13,10 +13,14 @@ import {
 	compileNativeComponent,
 	createNativeAppRuntime,
 	createNativeRuntime,
+	type NativeAction,
 	nativeShownTexts,
 	type NativeRuntime,
+	type NativeScreen,
 } from '../src/index.ts';
 import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harness/rung.ts';
+import { echoText } from '../src/harness/echo-server.ts';
+import { nodeScriptHost } from '../src/node-engine.ts';
 import {
 	looksOnly,
 	navRungFolders,
@@ -34,7 +38,59 @@ import {
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
 const NATIVE_KEYBOARD_ONLY = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
-const REFUSED_RUNGS = new Set(['11-async', 'y4-sheet-beside-drawer']);
+const REFUSED_RUNGS = new Set(['11-async', 'y4-sheet-beside-drawer', 'j7-page-refused']);
+
+/**
+ * The script services as a phone's host provides them, on a clock that moves only when a step waits: a timer fires once
+ * its time comes, a request is answered at once with what the test's echo server would say.
+ */
+function scriptServices() {
+	let now = 0;
+	const timers = new Map<string, number>();
+	const host = nodeScriptHost('00'.repeat(32));
+	const answer = (entry: NativeJournalEntry): NativeAction | undefined => {
+		if (entry.op === 'timer') timers.set(entry.timer, now + entry.ms);
+		else if (entry.op === 'clearTimer') timers.delete(entry.timer);
+		else if (entry.op === 'fetch') {
+			const url = new URL(entry.request.url);
+			const contentType =
+				entry.request.headers.find(
+					([name]) => name.toLowerCase() === 'content-type',
+				)?.[1] ?? null;
+			return {
+				event: 'response',
+				id: entry.id,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: echoText({
+						method: entry.request.method,
+						url: url.pathname + url.search,
+						contentType,
+						body: entry.request.body ?? '',
+					}),
+				},
+			};
+		}
+		return undefined;
+	};
+	/** The timers due by `ms` from now, earliest first; each is fired as its time comes. */
+	const advance = (ms: number, fire: (action: NativeAction) => void) => {
+		const end = now + ms;
+		for (;;) {
+			const due = [...timers]
+				.filter(([, at]) => at <= end)
+				.sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))[0];
+			if (!due) break;
+			now = due[1];
+			timers.delete(due[0]);
+			fire({ event: 'timer', timer: due[0] });
+		}
+		now = end;
+	};
+	return { host, answer, advance };
+}
 
 // A mirror host: it keeps what a device shows and changes it only through journal entries, as the hosts must.
 function mirror(
@@ -82,10 +138,28 @@ function mirror(
 		const place = nodeOf.get(id)?.arm;
 		return !place || (shownNode(place.branch) && chosen.get(place.branch) === place.index);
 	};
+	// A row's copy (`<id>@<key>`) sits where its list does.
 	const inArm = (id: string, branch: string): boolean => {
-		const node = nodeOf.get(id);
+		const node = nodeOf.get(id.includes('@') ? id.slice(0, id.indexOf('@')) : id);
+		if (node?.row) return inArm(node.row, branch);
 		if (!node?.arm) return false;
 		return node.arm.branch === branch || inArm(node.arm.branch, branch);
+	};
+	// An element carrying `hidden`, bound or static, hides everything inside it, as the web's `[hidden]` rule does.
+	const hiddenWithin = (id: string): boolean => {
+		const at = id.indexOf('@');
+		const suffix = at < 0 ? '' : id.slice(at);
+		const node = nodeOf.get(baseOf(id));
+		if (!node) return false;
+		if (node.kind === 'element') {
+			const bound = attributes.get(`${id}\0hidden`);
+			if ((bound !== undefined ? bound : (node.attributes?.['hidden'] ?? null)) !== null)
+				return true;
+		}
+		return (
+			node.parent !== null &&
+			hiddenWithin(`${node.parent}${nodeOf.get(node.parent)?.row ? suffix : ''}`)
+		);
 	};
 	// What a flow can see or tap: shown text, and each shown element's accessible name (aria-label, bound or static).
 	const labels = () =>
@@ -137,6 +211,8 @@ function mirror(
 				}
 		} else if (entry.op === 'arm') {
 			chosen.set(entry.node, entry.index);
+			for (const [node, index] of runtime.arms())
+				if (inArm(node, entry.node)) chosen.set(node, index);
 			for (const id of texts.keys()) if (inArm(id, entry.node)) texts.delete(id);
 			for (const key of attributes.keys())
 				if (inArm(key.split('\0')[0]!, entry.node)) attributes.delete(key);
@@ -163,7 +239,9 @@ function mirror(
 				);
 			}
 			// Without a style export a host flows text as the browser's default stylesheet does; with one, Dragon lays it out.
-			const open = new Map([...texts].filter(([id]) => !inClosedSheet(id)));
+			const open = new Map(
+				[...texts].filter(([id]) => !inClosedSheet(id) && !hiddenWithin(id)),
+			);
 			const read = styled ? [...open.values()] : nativeShownTexts(payload, open);
 			const shown = [...read, ...labels().map(([, label]) => label)];
 			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
@@ -208,14 +286,35 @@ function walkApp(
 	steps: readonly LadderStep[],
 	start: string,
 	styled: ReadonlySet<string> = new Set(),
+	position?: LadderRung['location'],
 ) {
-	const appRuntime = createNativeAppRuntime(app, start);
+	const services = scriptServices();
+	const appRuntime = createNativeAppRuntime(app, start, new Map(), services.host);
 	const pageOf = (route: string) => app.routes.find((entry) => entry.pattern === route)!.page;
-	const stack = appRuntime
-		.screens()
-		.map((screen) =>
-			mirror(pageOf(screen.route), screen.runtime, new Map(), styled.has(screen.route)),
-		);
+	// A screen's device, as a host's when the flow granted every permission: its values when it opens, then its asks answered.
+	const wake = (screen: NativeScreen, shown: ReturnType<typeof mirror>) => {
+		const runtime = screen.runtime;
+		for (const cell of pageOf(screen.route).cells) {
+			if (!cell.device) continue;
+			if (cell.device !== 'location.access')
+				throw new Error(`no fake ${cell.device} in an app`);
+			for (const entry of runtime.dispatch({ event: 'device', cell: cell.id, value: 'granted' }))
+				shown.apply(entry, -1);
+		}
+		for (const task of runtime.tasks())
+			for (const entry of runtime.dispatch({
+				event: 'settle',
+				cell: task.result!,
+				value: { ...position!, accuracy: 5 },
+			}))
+				shown.apply(entry, -1);
+	};
+	const open = (screen: NativeScreen) => {
+		const shown = mirror(pageOf(screen.route), screen.runtime, new Map(), styled.has(screen.route));
+		wake(screen, shown);
+		return shown;
+	};
+	const stack = appRuntime.screens().map(open);
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
 		if (action && 'back' in action) {
@@ -239,7 +338,10 @@ function walkApp(
 						? (top.typed(host, action.type.text),
 							appRuntime.dispatch({ event: 'input', host, value: action.type.text }))
 						: [];
+			const answered: NativeAction[] = [];
 			for (const entry of journal) {
+				const answer = services.answer(entry);
+				if (answer) answered.push(answer);
 				if (entry.op !== 'navigate') {
 					top.apply(entry, index);
 					continue;
@@ -247,18 +349,17 @@ function walkApp(
 				const opened = appRuntime.screens().at(-1)!;
 				expect(opened.route, `step ${index}: the screen opened`).toBe(entry.route);
 				if (entry.replace) stack.pop();
-				stack.push(
-					mirror(
-						pageOf(opened.route),
-						opened.runtime,
-						new Map(),
-						styled.has(opened.route),
-					),
-				);
+				stack.push(open(opened));
 			}
+			for (const next of answered)
+				for (const entry of appRuntime.dispatch(next)) stack.at(-1)!.apply(entry, index);
 		}
 		expect(stack.length, `step ${index}: the stack`).toBe(appRuntime.screens().length);
 		stack.at(-1)!.check(step, index);
+		if (step.engineStarts !== undefined)
+			expect(services.host.starts(), `step ${index}: the engine starts`).toBe(
+				step.engineStarts,
+			);
 	}
 }
 
@@ -312,10 +413,11 @@ function walk(
 					cell,
 					error: { name: 'NotAllowedError', message: 'Location was refused' },
 				});
+	const services = scriptServices();
 	// The device's clock: a second passes between a person's actions.
 	let clock = Date.now();
 	const start = () => {
-		const r = createNativeRuntime(payload, store, params, undefined, () => clock);
+		const r = createNativeRuntime(payload, store, params, undefined, () => clock, services.host);
 		for (const cell of payload.cells)
 			if (cell.device)
 				r.dispatch({ event: 'device', cell: cell.id, value: deviceValue(cell.device) });
@@ -376,8 +478,10 @@ function walk(
 		return open[0]!;
 	};
 	const shownTexts = () => [...texts].filter(([node]) => shownNode(node));
+	// A row's copy (`<id>@<key>`) sits where its list does.
 	const inArm = (id: string, branch: string): boolean => {
-		const node = nodeOf.get(id);
+		const node = nodeOf.get(id.includes('@') ? id.slice(0, id.indexOf('@')) : id);
+		if (node?.row) return inArm(node.row, branch);
 		if (!node?.arm) return false;
 		return node.arm.branch === branch || inArm(node.arm.branch, branch);
 	};
@@ -552,6 +656,7 @@ function walk(
 					)
 						answered.push(() => setObject(object, name, value));
 			} else if (entry.op === 'timer') timers.push({ timer: entry.timer, due: at + entry.ms });
+			else if (entry.op === 'clearTimer') timers = timers.filter((timer) => timer.timer !== entry.timer);
 			else if (entry.op === 'invalid') invalid = entry.message;
 			else if (entry.op === 'text') texts.set(entry.node, entry.value);
 			else if (entry.op === 'dialog') openDialogs.set(entry.node, entry.open);
@@ -600,6 +705,8 @@ function walk(
 				}
 			} else if (entry.op === 'arm') {
 				chosen.set(entry.node, entry.index);
+				for (const [node, index] of runtime.arms())
+					if (inArm(node, entry.node)) chosen.set(node, index);
 				for (const id of texts.keys()) if (inArm(id, entry.node)) texts.delete(id);
 				for (const key of attributes.keys())
 					if (inArm(key.split('\0')[0]!, entry.node)) attributes.delete(key);
@@ -608,6 +715,8 @@ function walk(
 				for (const [node, name, value] of runtime.attributes())
 					if (inArm(node, entry.node)) attributes.set(`${node}\0${name}`, value);
 			} else if (entry.op === 'sheet') sheetOpen.set(entry.node, entry.open);
+			const scripted = services.answer(entry);
+			if (scripted) answered.push(() => runtime.dispatch(scripted));
 		}
 		for (const next of answered) apply(next(), index);
 	}
@@ -705,6 +814,18 @@ function walk(
 			openSheet(index);
 			if (!shownTexts().some(([, text]) => text === action.scrollTo))
 				throw new Error(`step ${index}: "${action.scrollTo}" is not in the open sheet`);
+		} else if (action && ('escape' in action || 'pressBackdrop' in action)) {
+			const top = runtime.overlays().at(-1)?.[0];
+			if (!top) throw new Error(`step ${index}: no overlay is open to ${Object.keys(action)[0]}`);
+			apply(
+				'escape' in action
+					? runtime.dispatch({ event: 'dismiss', host: top, reason: 'escape' })
+					: [
+							...runtime.dispatch({ event: 'pointerdown', host: top }),
+							...runtime.dispatch({ event: 'pointerup', host: top }),
+						],
+				index,
+			);
 		} else if (action && !('tap' in action) && !('type' in action) && !('submit' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
@@ -729,7 +850,16 @@ function walk(
 				if (properties.has(host)) properties.set(host, action.type.text);
 				else typed.set(host, action.type.text);
 			}
-			// A touch reaches the nearest element around it that handles a press, as on a phone.
+			// A tap is a touch going down and up on what it lands on, then the activation of the nearest element around it
+			// that handles a press, as on a phone.
+			const touched =
+				'tap' in action
+					? [
+							...runtime.dispatch({ event: 'pointerdown', host }),
+							...runtime.dispatch({ event: 'pointerup', host }),
+						]
+					: [];
+			apply(touched, index);
 			let pressed: string | null | undefined = host;
 			while (
 				pressed &&
@@ -742,9 +872,15 @@ function walk(
 			const returns = payload.events.some(
 				(event) => event.host === host && event.event === 'enter',
 			);
+			// A row's copy (`<node>@<key>`) is not in the tree by that id: it activates as itself.
+			const activates = !!pressed || host.includes('@');
+			if ('tap' in action && !activates && touched.length === 0)
+				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
 			const dispatched =
 				'tap' in action
-					? runtime.dispatch({ event: 'activate', host: pressed ?? host })
+					? activates
+						? runtime.dispatch({ event: 'activate', host: pressed ?? host })
+						: []
 					: 'type' in action
 						? runtime.dispatch({ event: 'input', host, value: action.type.text })
 						: returns
@@ -777,6 +913,10 @@ function walk(
 			expect(host && fieldText(host), `step ${index}: the field "${field}"`).toBe(value);
 		}
 		if (step.calls) expect(calls, `step ${index}: the device calls made`).toEqual(step.calls);
+		if (step.engineStarts !== undefined)
+			expect(services.host.starts(), `step ${index}: the engine starts`).toBe(
+				step.engineStarts,
+			);
 		if (step.microphone)
 			expect(recording.size > 0 ? 'on' : 'off', `step ${index}: the microphone`).toBe(
 				step.microphone,
@@ -909,7 +1049,7 @@ test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders(
 	'%s: the app payload walks the steps as a stack of screens',
 	async (folder) => {
 		const rung = readRung(folder);
-		const build = await compileRungApp(join(proofsDir, folder));
+		const build = await compileRungApp(join(proofsDir, folder), readAppConfig(join(proofsDir, folder)));
 		expect(
 			build.diagnostics.map((diagnostic) => `${diagnostic.page}: ${diagnostic.message}`),
 		).toEqual([]);
@@ -918,6 +1058,7 @@ test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders(
 			rung.steps,
 			rung.start ?? '/',
 			new Set(build.styleInputs.map((input) => input.pattern)),
+			rung.location,
 		);
 	},
 );

@@ -101,6 +101,8 @@ export async function compileNativeComponent(input: {
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
 	readonly target?: 'ios' | 'android';
+	/** Where handlers run (`NativeViewOptions['scriptHandlers']`); the default runs each as data where it lowers. */
+	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
 }): Promise<NativeBuild> {
 	const manifest =
 		input.manifest ?? (input.page ? buildRouteManifestFromFileIds([input.page]) : undefined);
@@ -189,6 +191,8 @@ export async function compileNativeComponent(input: {
 					}
 				: {}),
 			modules: { graphs, resolve },
+			readSource: (file: string) => (file === input.filename ? input.source : read.get(file)?.source),
+			...(input.scriptHandlers ? { scriptHandlers: input.scriptHandlers } : {}),
 			...(input.manifest
 				? {
 						routes: input.manifest.routes.map((entry) => ({
@@ -211,9 +215,13 @@ export async function compileNativeComponent(input: {
 	// A phone build reads only the analysis; what the web's emission passes cannot emit does not bind it.
 	const errors = collectTsrxModuleDiagnostics(compiled).filter(
 		(diagnostic) =>
-			diagnostic.severity === 'error' && (diagnostic.phase === 'parse' || diagnostic.phase === 'semantic-graph'),
+			diagnostic.severity === 'error' &&
+			(diagnostic.phase === 'parse' || diagnostic.phase === 'semantic-graph'),
 	);
-	const { manifest: deviceEntries, diagnostics: usage } = deviceManifest(native.features, input.device);
+	const { manifest: deviceEntries, diagnostics: usage } = deviceManifest(
+		native.features,
+		input.device,
+	);
 	return {
 		payload: errors.length > 0 || usage.length > 0 ? null : native.payload,
 		styles: [...importedStyles, ...compiled.publicRenderPlan.styleScopes].filter(
@@ -244,6 +252,8 @@ export type NativeAppBuild = {
 			readonly input: NativeStyleInput;
 		}>;
 	}>;
+	/** The Info.plist and AndroidManifest.xml entries for the device features any page uses. */
+	readonly manifest: DeviceManifest;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic & { readonly page: string }>;
 };
 
@@ -262,11 +272,16 @@ export async function compileNativeApp(input: {
 	readonly document?: { readonly filename: string; readonly source: string };
 	readonly readModule?: Parameters<typeof compileNativeComponent>[0]['readModule'];
 	readonly readStylesheet?: ReadStylesheet;
+	/** The app config's `device` section (usage text per feature), for every page. */
+	readonly device?: DeviceAppConfig;
+	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
+	readonly target?: 'ios' | 'android';
 }): Promise<NativeAppBuild> {
 	const manifest = buildRouteManifestFromFileIds(input.pages.map((page) => page.page));
 	const routes: NativeAppPayload['routes'][number][] = [];
 	const styleInputs: NativeAppBuild['styleInputs'][number][] = [];
 	const diagnostics: (CompilerDiagnostic & { readonly page: string })[] = [];
+	const features = new Set<NativeDeviceFeature>();
 	const documentSheets = input.document
 		? stylesheetsOf(
 				(
@@ -287,7 +302,10 @@ export async function compileNativeApp(input: {
 			manifest,
 			...(input.readModule ? { readModule: input.readModule } : {}),
 			...(input.readStylesheet ? { readStylesheet: input.readStylesheet } : {}),
+			...(input.device ? { device: input.device } : {}),
+			...(input.target ? { target: input.target } : {}),
 		});
+		for (const feature of build.features) features.add(feature);
 		diagnostics.push(
 			...build.diagnostics.map((diagnostic) => ({ ...diagnostic, page: page.page })),
 		);
@@ -313,6 +331,7 @@ export async function compileNativeApp(input: {
 	return {
 		payload: diagnostics.length > 0 ? null : { version: NATIVE_APP_VERSION, routes },
 		styleInputs: diagnostics.length > 0 ? [] : styleInputs,
+		manifest: deviceManifest([...features], input.device).manifest,
 		diagnostics,
 	};
 }

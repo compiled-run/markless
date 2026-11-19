@@ -127,11 +127,25 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 				? null
 				: rowRangeRefusal(input.semanticGraph, repeat.id);
 		if (rangeRefusal) {
+			const rowShape = rowShapeBesidesOneElement(rowNodes);
+			const innerFor = rowShape
+				? undefined
+				: input.semanticGraph.keyedRepeats.find(
+						(candidate) => candidate.enclosingRepeatId === repeat.id,
+					);
 			diagnostics.push({
 				...keyedRepeatRowNotOneElementDiagnostic({
 					itemName: rowItemLabel(repeat),
-					rowShape: rowShapeBesidesOneElement(rowNodes) ?? 'no single element at its top level',
+					rowShape: rowShape ?? 'no single element at its top level',
 					reason: rangeRefusal,
+					...(innerFor
+						? {
+								innerFor: {
+									itemName: innerFor.itemName,
+									collectionSource: innerFor.collectionSource,
+								},
+							}
+						: {}),
 					node,
 					filename: input.filename,
 				}),
@@ -590,7 +604,7 @@ function nestedRepeatMints(input: Parameters<typeof rowMintRefusal>[0], repeatId
 	const nested = input.graph.keyedRepeats.find(
 		(candidate) => candidate.id === repeatId && candidate.enclosingRepeatId === input.repeatId,
 	);
-	if (!nested || nested.indexKey) return false;
+	if (!nested) return false;
 	if (!nested.collectionGraphNodeId && !nested.enclosingItemPath) return false;
 	const chunk = input.chunks.find((candidate) => candidate.id === `repeat:${repeatId}:row`);
 	if (!chunk || chunk.slots.some((slot) => slot.kind === 'child-component')) return false;

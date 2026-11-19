@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	renameSync,
+	rmSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { exec } from './exec.ts';
@@ -16,6 +24,9 @@ export type AndroidTools = {
 	readonly kotlinStdlib: string;
 	readonly systemImage: string;
 };
+
+/** Part of every shell cache key; bumped when the cached folder's layout or completeness rule changes. */
+export const SHELL_CACHE_FORMAT = 'shell-cache/1';
 
 export function cacheRoot(): string {
 	return process.env.MARKLESS_PROOF_CACHE ?? join(homedir(), '.cache', 'markless-proof');
@@ -91,4 +102,28 @@ export function contentKey(
 			.update(readFileSync(file))
 			.update('\0');
 	return hash.digest('hex').slice(0, 24);
+}
+
+/**
+ * A cache folder built once: `build` fills a private scratch folder that is renamed into place when done, so runs from
+ * several checkouts at once never read, or delete, a folder another run is still writing.
+ */
+export async function cachedFolder(
+	root: string,
+	build: (scratch: string) => Promise<void>,
+): Promise<string> {
+	if (existsSync(root)) return root;
+	const scratch = `${root}.building-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+	mkdirSync(scratch, { recursive: true });
+	try {
+		await build(scratch);
+		try {
+			renameSync(scratch, root);
+		} catch (error) {
+			if (!existsSync(root)) throw error;
+		}
+	} finally {
+		rmSync(scratch, { recursive: true, force: true });
+	}
+	return root;
 }

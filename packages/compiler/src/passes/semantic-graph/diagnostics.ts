@@ -2266,8 +2266,8 @@ export function repeatRowHandlersUnwiredDiagnostic(input: {
 	const detail =
 		reason.kind === 'nested'
 			? {
-					message: `${loop} sits inside the rows of an enclosing \`@for (const ${reason.enclosingItemName} of ...)\` and renders rows with an ${input.handlerName} handler, but the browser cannot find these rows again inside each enclosing row. That needs a collection on the graph or a plain property path on \`${reason.enclosingItemName}\`, inside an enclosing @for keyed by its data rather than by position.`,
-					suggestion: `Loop over a property of the enclosing row item, such as \`@for (const ${input.itemName} of ${reason.enclosingItemName}.items; key ...)\`, and key the enclosing @for by its data; or move the inner rows into their own component and render it in the enclosing row.`,
+					message: `${loop} sits inside the rows of an enclosing \`@for (const ${reason.enclosingItemName} of ...)\` and renders rows with an ${input.handlerName} handler, but the browser cannot find these rows again inside each enclosing row. That needs a collection on the graph or a plain property path on \`${reason.enclosingItemName}\`, inside an enclosing @for whose own collection the browser can read again.`,
+					suggestion: `Loop over a property of the enclosing row item, such as \`@for (const ${input.itemName} of ${reason.enclosingItemName}.items; key ...)\`, with the enclosing @for over state; or move the inner rows into their own component and render it in the enclosing row.`,
 				}
 			: reason.kind === 'render-local'
 				? {

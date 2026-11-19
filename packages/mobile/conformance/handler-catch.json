@@ -79,34 +79,10 @@
 				"parent": "component-edge:1/h0",
 				"tests": [
 					{
-						"logical": "&&",
-						"left": {
-							"binary": "===",
-							"left": {
-								"cell": "component-edge:1/boundary:0:catch"
-							},
-							"right": {
-								"literal": null
-							}
-						},
-						"right": {
-							"literal": true
-						}
+						"literal": true
 					},
 					{
-						"logical": "&&",
-						"left": {
-							"binary": "===",
-							"left": {
-								"cell": "component-edge:1/boundary:0:catch"
-							},
-							"right": {
-								"literal": null
-							}
-						},
-						"right": {
-							"literal": false
-						}
+						"literal": false
 					},
 					null
 				],
@@ -215,6 +191,53 @@
 					"branch": "component-edge:1/boundary:0",
 					"index": 2
 				}
+			},
+			{
+				"kind": "branch",
+				"id": "component-edge:1/boundary:0:caught",
+				"parent": "component-edge:1/h0",
+				"test": {
+					"binary": "!==",
+					"left": {
+						"cell": "component-edge:1/boundary:0:catch"
+					},
+					"right": {
+						"literal": null
+					}
+				},
+				"arms": 1
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/component-edge:1/boundary:0:caught/h5",
+				"element": "p",
+				"parent": "component-edge:1/h0",
+				"arm": {
+					"branch": "component-edge:1/boundary:0:caught",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/component-edge:1/boundary:0:caught/h5:text0",
+				"parent": "component-edge:1/component-edge:1/boundary:0:caught/h5",
+				"parts": [
+					{
+						"text": "Photo failed: "
+					},
+					{
+						"expr": {
+							"member": {
+								"cell": "component-edge:1/boundary:0:catch"
+							},
+							"property": "name"
+						}
+					}
+				],
+				"arm": {
+					"branch": "component-edge:1/boundary:0:caught",
+					"index": 0
+				}
 			}
 		],
 		"events": [
@@ -269,28 +292,14 @@
 		]
 	},
 	"initial": [
-		[
-			"h7:text0",
-			"Camera"
-		],
-		[
-			"component-edge:1/h1:text0",
-			"Access unknown"
-		],
-		[
-			"component-edge:1/h3:text0",
-			"Take photo"
-		],
-		[
-			"component-edge:1/h4:text0",
-			"Photos 0"
-		]
+		["h7:text0", "Camera"],
+		["component-edge:1/h1:text0", "Access unknown"],
+		["component-edge:1/h3:text0", "Take photo"],
+		["component-edge:1/h4:text0", "Photos 0"]
 	],
 	"initialArms": [
-		[
-			"component-edge:1/boundary:0",
-			0
-		]
+		["component-edge:1/boundary:0", 0],
+		["component-edge:1/boundary:0:caught", null]
 	],
 	"steps": [
 		{
@@ -334,8 +343,8 @@
 			"journal": [
 				{
 					"op": "arm",
-					"node": "component-edge:1/boundary:0",
-					"index": 2
+					"node": "component-edge:1/boundary:0:caught",
+					"index": 0
 				}
 			]
 		}

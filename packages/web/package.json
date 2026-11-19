@@ -25,6 +25,7 @@
 		"./event-resume": "./src/event-resume.ts",
 		"./inline/resumer": "./src/inline/resumer.ts",
 		"./fns/*": "./src/fns/*.ts",
+		"./overlay-protocol": "./src/overlay-protocol.ts",
 		"./payload": "./src/payload.ts",
 		"./render": "./src/render.ts",
 		"./render-to-stream": "./src/render-to-stream.ts",
@@ -35,7 +36,6 @@
 		"./shared-swap": "./src/shared-swap.ts"
 	},
 	"publishConfig": {
-		"access": "public",
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",
@@ -81,6 +81,10 @@
 				"types": "./dist/fns/*.d.ts",
 				"default": "./dist/fns/*.js"
 			},
+			"./overlay-protocol": {
+				"types": "./dist/overlay-protocol.d.ts",
+				"default": "./dist/overlay-protocol.js"
+			},
 			"./payload": {
 				"types": "./dist/payload.d.ts",
 				"default": "./dist/payload.js"
@@ -114,6 +118,7 @@
 				"default": "./dist/shared-swap.js"
 			}
 		},
+		"access": "public",
 		"provenance": true
 	},
 	"scripts": {

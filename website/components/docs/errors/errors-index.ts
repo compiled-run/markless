@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 329,
+	total: 331,
 	guided: 51,
 	groups: [
 		{
@@ -2076,6 +2076,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a write has the wrong shape markless_scalar_write_shape a markless runtime error from @markless/web.',
 				},
 				{
+					code: 'MARKLESS_WRITE_THROUGH_NOT_A_LIST',
+					title: 'A write through a loop variable found no list',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'a write through a loop variable found no list markless_write_through_not_a_list a markless runtime error from @markless/web.',
+				},
+				{
 					code: 'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',
 					title: 'An @empty branch has nothing to render with',
 					chip: 'error',
@@ -2666,6 +2674,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: false,
 					words: 'this element has no native view yet markless_native_element this element has no native view yet: a markless build error.',
+				},
+				{
+					code: 'MARKLESS_NATIVE_JAVASCRIPT',
+					title: 'This JavaScript cannot run on a phone',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'this javascript cannot run on a phone markless_native_javascript this javascript cannot run on a phone: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_PRERENDER_WAKE_ROUTE_INELIGIBLE',

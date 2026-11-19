@@ -1,0 +1,37 @@
+{
+	"version": "markless.android-engine/0",
+	"engine": "hermes",
+	"ndk": "27.1.12297006",
+	"artifacts": [
+		{
+			"coordinate": "com.facebook.react:hermes-android:0.82.1:release",
+			"url": "https://repo1.maven.org/maven2/com/facebook/react/hermes-android/0.82.1/hermes-android-0.82.1-release.aar",
+			"sha256": "408bbe7be526d0b1a80e10a09893fdcf5f4a456864464ae3456c3bb871374ab7",
+			"libraries": ["libhermesvm.so"],
+			"classes": true,
+			"include": "prefab/modules/hermesvm/include"
+		},
+		{
+			"coordinate": "com.facebook.react:react-android:0.82.1:release",
+			"url": "https://repo1.maven.org/maven2/com/facebook/react/react-android/0.82.1/react-android-0.82.1-release.aar",
+			"sha256": "690c3ec06bc47cc3e9432073844dda1ce05907998c061415d81b3e60d93a4f34",
+			"libraries": ["libjsi.so"],
+			"classes": false,
+			"include": "prefab/modules/jsi/include"
+		},
+		{
+			"coordinate": "com.facebook.fbjni:fbjni:0.7.0",
+			"url": "https://repo1.maven.org/maven2/com/facebook/fbjni/fbjni/0.7.0/fbjni-0.7.0.aar",
+			"sha256": "7e319ae110ac5e5ef18904170aea5c3e753e915d196699d7fd39d36c8e1dfe36",
+			"libraries": ["libfbjni.so"],
+			"classes": true
+		},
+		{
+			"coordinate": "com.facebook.soloader:nativeloader:0.10.5",
+			"url": "https://repo1.maven.org/maven2/com/facebook/soloader/nativeloader/0.10.5/nativeloader-0.10.5.jar",
+			"sha256": "971ded86009c0ac56fb2275e128f852e7dcbc41a40cd799688f8a1aebde5195d",
+			"libraries": [],
+			"classes": true
+		}
+	]
+}
