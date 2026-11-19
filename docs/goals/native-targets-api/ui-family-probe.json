@@ -513,10 +513,10 @@
 		]
 	},
 	"radio-group": {
-		"payload": false,
+		"payload": true,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: the focus event has no native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown event has no native meaning yet"
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <input> component-edge:4/h8 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <input> component-edge:4/h8 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
 		]
 	},
 	"rating": {

@@ -1,0 +1,12 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u22-radio-group",
+			"failure": null,
+			"installSeconds": 5.597911750000003,
+			"flowSeconds": 26.202962584
+		}
+	]
+}
