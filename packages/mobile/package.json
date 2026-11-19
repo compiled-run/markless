@@ -18,7 +18,8 @@
 		".": "./src/index.ts"
 	},
 	"scripts": {
-		"proof": "node src/harness/cli.ts"
+		"proof": "node src/harness/cli.ts",
+		"phones": "node src/runner/cli.ts"
 	},
 	"dependencies": {
 		"@markless/compiler": "workspace:*",
