@@ -339,6 +339,53 @@ export function Bar() @{
 		]);
 	});
 
+	it('passes a prop that follows state as the live expression it was written as: a computed, a sum, a prop passed on', async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { computed, state } from '@markless/core';
+function Badge({ total }) @{
+	<span hidden={total === 0}>{total}</span>
+}
+function Header({ heading, size }) @{
+	<header><h1>{heading}</h1><Badge total={size} /></header>
+}
+export function Page() @{
+	let picks = state(0);
+	const heading = computed(() => (picks > 2 ? 'Many' : 'Few'));
+	<main>
+		<Header heading={heading} size={picks * 2} />
+		<button onClick={() => picks++}>Pick</button>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const elementOf = (tag: string) =>
+			payload?.nodes.find((node) => node.kind === 'element' && node.element === tag);
+		const textIn = (tag: string) =>
+			payload?.nodes.find(
+				(node) => node.kind === 'text' && node.parent === elementOf(tag)?.id,
+			);
+		const doubled = { binary: '*', left: { cell: 'state:picks' }, right: { literal: 2 } };
+		expect(textIn('h1')).toMatchObject({
+			parts: [
+				{
+					expr: {
+						if: { binary: '>', left: { cell: 'state:picks' }, right: { literal: 2 } },
+						whenTrue: { literal: 'Many' },
+						whenFalse: { literal: 'Few' },
+					},
+				},
+			],
+		});
+		expect(textIn('span')).toMatchObject({ parts: [{ expr: doubled }] });
+		expect(elementOf('span')).toMatchObject({
+			bindings: [
+				{
+					attribute: 'hidden',
+					value: { binary: '===', left: doubled, right: { literal: 0 } },
+				},
+			],
+		});
+	});
+
 	it('lowers a keyed @for to a list region whose rows read their item, and array writes to methods', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function List() @{

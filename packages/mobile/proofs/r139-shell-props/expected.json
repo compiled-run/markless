@@ -1,0 +1,23 @@
+{
+	"rung": 139,
+	"name": "A shared shell's props follow the page: a route param, a computed and a sum of state, passed on to a component inside it",
+	"steps": [
+		{ "visible": ["Pick a topic", "Open fruit"], "absent": ["0 picked"], "title": "Topics" },
+		{
+			"do": { "tap": "Open fruit" },
+			"visible": ["Few fruit", "Pick one"],
+			"absent": ["Pick a topic", "0 picked", "2 picked"],
+			"title": "fruit"
+		},
+		{
+			"do": { "tap": "Pick one" },
+			"visible": ["2 picked", "Few fruit"],
+			"absent": ["Many fruit"]
+		},
+		{
+			"do": { "tap": "Pick one" },
+			"visible": ["4 picked", "Many fruit"],
+			"absent": ["2 picked", "Few fruit"]
+		}
+	]
+}

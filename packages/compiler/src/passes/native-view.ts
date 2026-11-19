@@ -3780,11 +3780,15 @@ export function createNativeViewPayload(
 							kind: 'value',
 							expr: { cell: scope.cells.byBinding.get(prop.graphNodeId)! },
 						};
-					} else if (prop.kind === 'opaque' && prop.nativeExpression) {
+					} else if (
+						(prop.kind === 'opaque' || prop.kind === 'graph-reference') &&
+						prop.nativeExpression
+					) {
 						// A value the page renders the child with (a constant, a body const, an item's field): lowered where it is written.
 						const expr = exprOf(prop.nativeExpression, `the \`${prop.name}\` prop of <${edge.childComponentName}>`, {
 							...scope,
 							...((prop.sourceSpan ?? edge.sourceSpan) ? { span: prop.sourceSpan ?? edge.sourceSpan } : {}),
+							...(prop.kind === 'graph-reference' ? { live: true } : {}),
 						});
 						if (!expr) continue;
 						value = { kind: 'value', expr };
