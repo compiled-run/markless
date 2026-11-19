@@ -79,7 +79,8 @@ If you changed that code, restart the runner from your checkout before you submi
 before (`pnpm --filter @markless/mobile proof ...`).
 
 A rung that fetches (`server: 'echo'` in its `expected.json`) reaches the test's echo server, which the runner serves on
-`127.0.0.1:47608` for as long as it runs; on Android the chunk forwards that port to the emulator (`adb reverse`).
+`127.0.0.1:47608` while a chunk holding such a rung runs, and closes after, so a web test or the harness can take the port
+between jobs; on Android the chunk forwards that port to the emulator (`adb reverse`).
 
 ## Which rungs `--affected` picks
 

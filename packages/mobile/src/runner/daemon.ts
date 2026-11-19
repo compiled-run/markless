@@ -17,7 +17,9 @@ import {
 	withAdmission,
 } from './phones.ts';
 import { parsePhone, phoneId, type PhoneSpec, type PhoneState, transitionPhone } from './pool.ts';
+import type { BundledRung } from './bundle.ts';
 import {
+	bundleRung,
 	chunkFile,
 	chunkLog,
 	chunkResultFile,
@@ -74,12 +76,38 @@ log(
 	`runner ${process.pid} starts with ${pool.map(phoneId).join(', ')}; machine queue: ${heavyCommand() ?? 'none'}`,
 );
 
-// Rungs that fetch reach the test's echo server; one serves them while the runner runs (a server already there answers alike).
-startEchoServer().then(
-	() => log(`echo server on 127.0.0.1:${ECHO_SERVER_PORT}`),
-	(error: unknown) =>
-		log(`echo server not started: ${error instanceof Error ? error.message : String(error)}`),
-);
+// A chunk with a rung that fetches holds the test's echo server, open only while such a chunk runs, so a web test or the
+// harness can take the port between jobs; a server already there answers alike.
+let echo:
+	| { users: number; server: Promise<{ close: () => Promise<void> } | undefined> }
+	| undefined;
+const holdEcho = () => {
+	echo ??= {
+		users: 0,
+		server: startEchoServer().then(
+			(server) => (log(`echo server on 127.0.0.1:${ECHO_SERVER_PORT}`), server),
+			(error: unknown) => {
+				log(
+					`echo server not started: ${error instanceof Error ? error.message : String(error)}`,
+				);
+				return undefined;
+			},
+		),
+	};
+	echo.users++;
+	return echo.server;
+};
+const releaseEcho = async () => {
+	if (!echo || --echo.users > 0) return;
+	const { server } = echo;
+	echo = undefined;
+	await (await server)?.close();
+};
+const fetches = (job: string, chunk: Chunk) =>
+	chunk.rungs.some(
+		(rung) =>
+			readJson<BundledRung>(join(bundleRung(job, rung), 'rung.json'))?.server === 'echo',
+	);
 
 const tools: AndroidTools | undefined = pool.some((spec) => spec.platform === 'android')
 	? await androidTools()
@@ -176,6 +204,8 @@ async function run(phone: Phone, job: string, name: string, queued: Chunk): Prom
 		transitionChunk(queued, { type: 'claim', phone: id, at: Date.now() }),
 	);
 	move(phone, { type: 'take', chunk: `${job}/${name}` });
+	const echoed = fetches(job, queued);
+	if (echoed) await holdEcho();
 	try {
 		log(`${id} runs ${job} ${name} (${queued.rungs.length} rungs)`);
 		mkdirSync(join(job, 'logs'), { recursive: true });
@@ -261,6 +291,8 @@ async function run(phone: Phone, job: string, name: string, queued: Chunk): Prom
 			);
 		// Read again: the awaits above may have moved the phone.
 		if ((phone.state as PhoneState).state === 'busy') move(phone, { type: 'release' });
+	} finally {
+		if (echoed) await releaseEcho();
 	}
 	finishJobs();
 }
