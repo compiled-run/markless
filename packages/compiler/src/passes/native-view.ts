@@ -3838,13 +3838,26 @@ export function createNativeViewPayload(
 				else if (!Object.hasOwn(NATIVE_ELEMENTS, element) && element !== 'title') {
 					const written = attributesAt(item.path);
 					const bound = boundAt(item.path);
+					// A <select> hidden from sight and from screen readers only carries a value for its form: outside one it does nothing.
+					const formValueOnly =
+						element === 'select' && written['aria-hidden'] === 'true' && !bound.includes('aria-hidden');
 					if (
 						element === 'script' ||
 						element === 'link' ||
-						NATIVE_UNSHOWN_ELEMENTS.has(element)
+						NATIVE_UNSHOWN_ELEMENTS.has(element) ||
+						formValueOnly
 					)
 						consumed.push(item.path);
-					if (element === 'script') {
+					if (formValueOnly) {
+						const byId = nodeById();
+						for (let at: string | null | undefined = parent; at; at = byId.get(at)?.parent) {
+							const around = byId.get(at);
+							if (around?.kind === 'element' && around.element === 'form') {
+								refuse(`a hidden <select> in the <form> ${around.id}, whose value a native build does not submit yet`, span);
+								break;
+							}
+						}
+					} else if (element === 'script') {
 						const type = written.type?.trim().toLowerCase();
 						if (
 							bound.includes('type') ||

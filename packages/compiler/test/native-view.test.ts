@@ -613,6 +613,30 @@ export function Page() @{
 		);
 	});
 
+	it('leaves out a <select> hidden from sight and screen readers, and refuses one inside a form by name', async () => {
+		const select = '<select aria-hidden="true" tabindex={-1} name="size"><option>{size}</option></select>';
+		const alone = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let size = state('small');
+	<main>${select}<p>{size}</p></main>
+}`);
+		expect(alone.diagnostics).toEqual([]);
+		expect(alone.payload?.nodes.some((node) => node.kind === 'element' && node.element === 'select')).toBe(false);
+		const sent = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let size = state('small');
+	<form onSubmit={(event) => { event.preventDefault(); size = 'sent'; }}>${select}<button>Send</button><p>{size}</p></form>
+}`);
+		expect(sent.payload).toBeNull();
+		expect(sent.diagnostics.map((d) => d.message)).toContain(
+			'a hidden <select> in the <form> h0, whose value a native build does not submit yet',
+		);
+		const shown = await nativeView(`export function Page() @{
+	<main><select name="size"><option>small</option></select></main>
+}`);
+		expect(shown.diagnostics.map((d) => d.message)).toContain('the <select> element has no native view yet');
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{
