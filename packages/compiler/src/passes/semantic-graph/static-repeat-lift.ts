@@ -44,13 +44,13 @@ export function enclosingKeyedRepeat(state: WalkState): SemanticKeyedRepeat | un
 		: undefined;
 }
 
-// `group.items` inside `@for (const group of ...)`: each enclosing row reads its own rows.
+// `group.items` (or `group` itself) inside `@for (const group of ...)`: each enclosing row reads its own rows.
 export function enclosingRowItemPath(
 	collectionSource: string,
 	enclosing: SemanticKeyedRepeat,
 ): ReadonlyArray<string> | null {
 	const [root, ...path] = splitStaticGraphPath(collectionSource);
-	if (root === enclosing.itemName && path.length > 0) return path;
+	if (root === enclosing.itemName) return path;
 	const aliased = aliasedItemPath(enclosing.itemAliases, collectionSource);
 	return aliased?.length ? aliased : null;
 }
@@ -61,8 +61,7 @@ export function nestedRowHandlers(
 	forNode: AnyNode,
 	enclosing: SemanticKeyedRepeat,
 ): RowHandlerCollection | null {
-	if (!enclosing.indexKey && (enclosing.collectionGraphNodeId || enclosing.enclosingItemPath))
-		return null;
+	if (enclosing.collectionGraphNodeId || enclosing.enclosingItemPath) return null;
 	const handlerName = firstRowHandlerName(forNode.body as AnyNode | undefined);
 	return handlerName
 		? {

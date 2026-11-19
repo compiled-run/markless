@@ -15990,4 +15990,23 @@ export const errorEntries: readonly ErrorEntry[] = [
 		],
 		moreSources: 0,
 	},
+	{
+		code: 'MARKLESS_WRITE_THROUGH_NOT_A_LIST',
+		title: 'A write through a loop variable found no list',
+		area: 'internal',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: [],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/fns/write-through.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/write-through.ts',
+			},
+		],
+		moreSources: 0,
+	},
 ];

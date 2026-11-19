@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 330,
+	total: 331,
 	guided: 51,
 	groups: [
 		{
@@ -2074,6 +2074,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a write has the wrong shape markless_scalar_write_shape a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_WRITE_THROUGH_NOT_A_LIST',
+					title: 'A write through a loop variable found no list',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'a write through a loop variable found no list markless_write_through_not_a_list a markless runtime error from @markless/web.',
 				},
 				{
 					code: 'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',

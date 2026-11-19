@@ -104,13 +104,109 @@ test('nested rows reading the enclosing item through an expression fail the comp
 	]);
 });
 
-test('nested rows inside an enclosing @for keyed by position fail the compile', async () => {
+test('nested rows inside an enclosing @for keyed by position wire per enclosing row and mint new ones', async () => {
 	const result = await compile(
 		library('shelf.books').replace('shelves; key shelf.id', 'shelves; index slot; key slot'),
 	);
-	expect(result.semanticGraph.diagnostics).toContainEqual(
-		expect.objectContaining({ code: 'MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED', severity: 'error' }),
+	expect([...errors(result), ...result.publicRenderPlan.diagnostics]).toEqual([]);
+	const [outer, inner] = result.protocolView.keyedRepeats ?? [];
+	expect(outer?.indexKey).toBe(true);
+	expect(outer?.rowTemplate).toBeDefined();
+	expect(inner?.enclosingRow).toEqual({
+		repeatId: outer?.id,
+		parentHostPath: [1],
+		itemPath: ['books'],
+	});
+});
+
+const seats = (row: (inner: string) => string) => `import { state } from '@markless/core';
+type Seat = { sold?: boolean; picked?: boolean };
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+export default function Seats() @{
+	let rows = state<Seat[][]>([[{}, { sold: true }], [{}, {}]]);
+	function clear() {
+		for (const row of rows) for (const s of row) s.picked = false;
+	}
+	<>
+		<div>
+			@for (const row of rows; index r; key r) {
+				${row(`@for (const seat of row; index n; key n) {
+					<button aria-pressed={!!seat.picked} onClick={() => (seat.picked = !seat.picked)}>
+						{LETTERS[r]}{n + 1}
+					</button>
+				}`)}
+			}
+		</div>
+		<button onClick={clear}>Clear</button>
+	</>
+}
+`;
+
+test('a nested @for over the enclosing row item itself, inside rows keyed by position, wires per row', async () => {
+	const result = await compile(seats((inner) => `<p>${inner}</p>`));
+	expect([...errors(result), ...result.publicRenderPlan.diagnostics]).toEqual([]);
+	const [outer, inner] = result.protocolView.keyedRepeats ?? [];
+	expect(outer?.indexKey).toBe(true);
+	expect(outer?.rowTemplate).toBeDefined();
+	expect(inner?.enclosingRow).toEqual({ repeatId: outer?.id, parentHostPath: [], itemPath: [] });
+	expect(inner?.collectionGraphNodeId).toBe('state:rows');
+	expect(inner?.collectionPath).toEqual(['*']);
+	const handlers = result.symbolModules.modules
+		.filter((module) => module.kind === 'event-handler')
+		.map((module) => module.source)
+		.join('\n');
+	expect(handlers).toContain(
+		'marklessRowItemPath(context, "state:rows", marklessRowItemPath(context, "state:rows", [], "row", null, []), "seat", null, ["picked"])',
 	);
+	expect(handlers).toContain('marklessElementPath(context, "state:rows", [], row, [])');
+});
+
+test('an enclosing row that is only the nested @for, with no element of its own, still fails the compile', async () => {
+	const result = await compile(seats((inner) => inner));
+	expect([...errors(result), ...result.publicRenderPlan.diagnostics]).toContainEqual(
+		expect.objectContaining({
+			code: 'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+			severity: 'error',
+			suggestions: [
+				{
+					message: expect.stringContaining(
+						'Wrap the inner loop in one element, such as `<div>@for (const seat of row; ...)',
+					),
+				},
+			],
+		}),
+	);
+});
+
+const staticGrid = (extra: string) => `import { state } from '@markless/core';
+export default function Grid() @{
+	let rows = state([['a', 'b'], ['c']]);
+	let count = state(0);
+	<main>
+		@for (const row of rows; index r; key r) {
+			<p>
+				@for (const cell of row; index at; key at) {
+					<span>{cell}</span>
+				}
+			</p>
+		}
+		<button onClick={() => { count++;${extra} }}>{count}</button>
+	</main>
+}
+`;
+
+test('nested lists keyed by position that nothing changes or clicks ship no records', async () => {
+	const result = await compile(staticGrid(''));
+	expect([...errors(result), ...result.publicRenderPlan.diagnostics]).toEqual([]);
+	expect(result.protocolView.keyedRepeats ?? []).toEqual([]);
+	const modules = (result.runtimeDemandMap.payloadRecords ?? []).flatMap((record) => record.runtimeModuleIds);
+	expect(modules).not.toContain('web/fns/nested-repeats');
+});
+
+test('nested lists keyed by position ship their records once a handler writes their state', async () => {
+	const result = await compile(staticGrid(" rows.push(['d']);"));
+	expect(errors(result)).toEqual([]);
+	expect((result.protocolView.keyedRepeats ?? []).map((repeat) => repeat.id)).toEqual(['repeat:0', 'repeat:1']);
 });
 
 test('a @for inside no other repeat carries no enclosing row', async () => {

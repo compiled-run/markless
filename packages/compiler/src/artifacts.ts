@@ -1315,6 +1315,8 @@ export type SemanticStateWrite = {
  * - `element`: one element of a state array (a `for...of` variable, a `find()`
  *   result, an array-callback parameter). `local` names the variable holding the
  *   element; `path` is the member path inside it.
+ *   `enclosing` is present when that array lives inside an element of an
+ *   enclosing state array (`row.seats` inside `for (const row of rows)`).
  * - `untracked`: state reached in a way no graph path can name.
  */
 export type SemanticWriteThrough =
@@ -1330,6 +1332,7 @@ export type SemanticWriteThrough =
 			readonly local: string;
 			readonly collection: string;
 			readonly path: ReadonlyArray<string>;
+			readonly enclosing?: ReadonlyArray<EnclosingWriteElement>;
 	  }
 	| {
 			readonly kind: 'untracked';
@@ -1339,12 +1342,23 @@ export type SemanticWriteThrough =
 				| 'copy'
 				| 'destructured'
 				| 'dynamic-key'
+				| 'enclosing-rebound'
+				| 'flattened'
 				| 'map-entry'
 				| 'nested-element'
+				| 'nested-unknown'
 				| 'reassigned'
 				| 'row-item';
 			readonly source: string;
+			/** `enclosing-rebound`: the enclosing loop name that no longer holds its element at the write. */
+			readonly enclosingLocal?: string;
 	  };
+
+/** A local holding an element of an enclosing array, and the path from it to the next array in, outermost first. */
+export type EnclosingWriteElement = {
+	readonly local: string;
+	readonly path: ReadonlyArray<string>;
+};
 
 export type SemanticStateRead = {
 	readonly source: string;
@@ -2270,6 +2284,7 @@ export type LoweredWriteThrough = {
 	readonly element: boolean;
 	readonly basePath: ReadonlyArray<string>;
 	readonly path: ReadonlyArray<string>;
+	readonly enclosing?: ReadonlyArray<EnclosingWriteElement>;
 };
 
 /** A nested row's `enclosing` finds the collection inside the enclosing row's item. */
