@@ -99,6 +99,8 @@ type CollectionContext = {
 	// The rest binding those names were taken out of. Only a spread of THIS
 	// identifier carries consumer props; any other object is the author's own.
 	restName: string | null;
+	// The value of the `<select>` being emitted, which its options are matched against.
+	selectValue: string | SemanticMarkupResidue | null;
 	readonly nestedLocalSource: ((expression: AnyNode) => string | null) | null;
 	readonly nativeFacts: NativeFactsHandle | null;
 	/** `@if` chains the build's target constants decide: the kept arm is emitted in place, the others not at all. */
@@ -159,6 +161,7 @@ export function collectSemanticMarkup(input: {
 		styleConstResolver: null,
 		destructuredNames: [],
 		restName: null,
+		selectValue: null,
 		nestedLocalSource: input.nestedLocalSource ?? null,
 		nativeFacts: NATIVE_FACTS ? (input.nativeFacts ?? null) : null,
 		foldedIfs: input.foldedIfs ?? new Map(),
@@ -719,10 +722,16 @@ function emitNode(
 		} else appendStaticAttribute(builder, path, 'class', context.styleScopeClass);
 	}
 	context.styleScopeClass = componentScopeClass;
+	const tag = tagName.toLowerCase();
+	if (tag === 'option' && !declaredAttributeNames.includes('selected'))
+		emitSelectedOption(node, elementAttributes, path, builder, context, repeat);
 	append(builder, '>');
+	const enclosingSelectValue = context.selectValue;
+	if (tag === 'select') context.selectValue = selectValue(elementAttributes, context, repeat, builder.componentName);
 	if (textareaValue) emitTextareaValue(textareaValue, path, builder, context, repeat);
 	else if (tagName === 'script') emitScriptBody(node, path, builder, context, repeat);
 	else emitNodes(asNodes(node.children), [...path, 0], builder, context, repeat);
+	context.selectValue = enclosingSelectValue;
 	if (!VOID_TAG_NAMES.has(tagName.toLowerCase())) append(builder, `</${tagName}>`);
 	return 1;
 }
@@ -749,6 +758,90 @@ function emitTextareaValue(
 		coordinate: { kind: 'child-index', path },
 		residue: expressionResidue(expression, context, repeat, builder.componentName, 'value'),
 		alwaysPresent: true,
+	});
+}
+
+function selectValue(
+	attributes: ReadonlyArray<AnyNode>,
+	context: CollectionContext,
+	repeat: { readonly id: string; readonly itemName: string } | null,
+	componentName: string,
+): string | SemanticMarkupResidue | null {
+	const attribute = attributes.find(
+		(candidate) =>
+			!isSpreadAttribute(candidate) &&
+			getIdentifierName(candidate.name as AnyNode | undefined) === 'value',
+	);
+	return attribute ? attributeValue(attribute, context, repeat, componentName) : null;
+}
+
+function attributeValue(
+	attribute: AnyNode,
+	context: CollectionContext,
+	repeat: { readonly id: string; readonly itemName: string } | null,
+	componentName: string,
+): string | SemanticMarkupResidue | null {
+	const value = attribute.value as AnyNode | undefined;
+	const expression = unwrapExpressionContainer(value);
+	const literal = staticAttributeValue('value', value, expression);
+	if (literal) return attributeText('value', literal.value);
+	return expression ? expressionResidue(expression, context, repeat, componentName, 'value') : null;
+}
+
+// HTML names an option by its value attribute, else by its text with whitespace stripped and collapsed.
+function optionValue(
+	node: AnyNode,
+	attributes: ReadonlyArray<AnyNode>,
+	context: CollectionContext,
+	repeat: { readonly id: string; readonly itemName: string } | null,
+	componentName: string,
+): string | SemanticMarkupResidue | null {
+	if (attributes.some(isSpreadAttribute)) return null;
+	const attribute = attributes.find(
+		(candidate) => getIdentifierName(candidate.name as AnyNode | undefined) === 'value',
+	);
+	if (attribute) return attributeValue(attribute, context, repeat, componentName);
+	const children = asNodes(node.children).filter((child) => !isIgnorableStaticTextNode(child));
+	const texts = children.map((child) =>
+		isStaticTextNode(child) ? staticTextValue(child) : literalContainerText(child),
+	);
+	if (texts.every((text) => text !== null))
+		return texts.join('').replace(/[\t\n\f\r ]+/g, ' ').trim();
+	const [only] = children;
+	const expression =
+		children.length === 1 && only
+			? only.type === 'JSXExpressionContainer'
+				? (only.expression as AnyNode | undefined)
+				: markupInterpolationExpression(only)
+			: undefined;
+	return expression ? expressionResidue(expression, context, repeat, componentName) : null;
+}
+
+function emitSelectedOption(
+	node: AnyNode,
+	attributes: ReadonlyArray<AnyNode>,
+	path: ReadonlyArray<number>,
+	builder: ChunkBuilder,
+	context: CollectionContext,
+	repeat: { readonly id: string; readonly itemName: string } | null,
+): void {
+	const select = context.selectValue;
+	if (select === null) return;
+	// A row item read only answers inside the row that holds the select.
+	if (typeof select !== 'string' && select.kind === 'repeat-item' && select.repeatId !== repeat?.id)
+		return;
+	const option = optionValue(node, attributes, context, repeat, builder.componentName);
+	if (option === null) return;
+	if (typeof select === 'string' && typeof option === 'string') {
+		if (select === option) appendStaticAttribute(builder, path, 'selected', '');
+		return;
+	}
+	addSlot(builder, {
+		kind: 'selected-option',
+		coordinate: { kind: 'child-index', path },
+		...(typeof select === 'string'
+			? { residue: option as SemanticMarkupResidue, equals: select }
+			: { residue: select, equals: option }),
 	});
 }
 

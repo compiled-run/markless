@@ -580,7 +580,7 @@ function rowMintRefusal(input: {
 			)
 		)
 			continue;
-		if (slot.kind === 'child-component') continue;
+		if (slot.kind === 'child-component' || slot.kind === 'selected-option') continue;
 		return { kind: 'nested-construct', label: nestedConstructLabel(slot, input.branchSites) };
 	}
 	return componentSlot?.kind === 'child-component'

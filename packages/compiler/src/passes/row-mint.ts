@@ -371,6 +371,7 @@ export function rowBranchMints(
 		if (chunk.hosts.some((host) => input.unregistrableHostIds?.has(host.hostNodeId))) return false;
 		return chunk.slots.every(
 			(armSlot) =>
+				armSlot.kind === 'selected-option' ||
 				(armSlot.kind === 'repeat' && repeatMints?.(armSlot.repeatId) === true) ||
 				((armSlot.kind === 'text' || armSlot.kind === 'attribute') &&
 					(mintableSlotValue(armSlot) !== null ||

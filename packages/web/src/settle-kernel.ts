@@ -10,7 +10,7 @@
 //     markup-parsing sink, because feed values are server-controlled strings;
 //   - anything it cannot express exactly throws SettleKernelUnsupportedError so
 //     the caller falls back to the full evaluation. Never half-render.
-import { marklessAttributeValue } from './dom-attribute.ts';
+import { marklessAttributeValue, marklessOptionSelected } from './dom-attribute.ts';
 import type { SsrDataChunk, SsrDataResidue, SsrDataSlot } from './ssr-data/renderer.ts';
 
 export const SETTLE_KERNEL_UNSUPPORTED = 'MARKLESS_SETTLE_KERNEL_UNSUPPORTED';
@@ -163,7 +163,13 @@ export type SettleKernelOutput = {
 	readonly moduleRootPath?: string;
 };
 
-const SUPPORTED_SLOT_KINDS = new Set(['text', 'attribute', 'repeat', 'child-component']);
+const SUPPORTED_SLOT_KINDS = new Set([
+	'text',
+	'attribute',
+	'selected-option',
+	'repeat',
+	'child-component',
+]);
 // An element no record addresses: it takes a DOM-order index and is never located.
 const INERT_HOST = { hostNodeId: '', tagName: '' } as const;
 
@@ -386,6 +392,11 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 				return escapeHtml(marklessAttributeValue(slot.name, value) ?? '');
 			const text = marklessAttributeValue(slot.name, value);
 			return text === null ? '' : ` ${slot.name}="${escapeHtml(text)}"`;
+		}
+		if (slot.kind === 'selected-option') {
+			const option =
+				typeof slot.equals === 'string' ? slot.equals : readResidue(slot.equals, item);
+			return marklessOptionSelected(readResidue(slot.residue, item), option) ? ' selected=""' : '';
 		}
 		if (slot.kind === 'repeat') {
 			const record = (surface.renderData.repeats ?? []).find(

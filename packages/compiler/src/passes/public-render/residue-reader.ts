@@ -27,6 +27,8 @@ export function authoredResidueSources(chunks: RenderChunks): ReadonlyArray<stri
 		for (const slot of chunk.slots) {
 			if ('residue' in slot && slot.residue.kind === 'authored-expression')
 				sources.add(slot.residue.source);
+			if (slot.kind === 'selected-option' && typeof slot.equals !== 'string' && slot.equals.kind === 'authored-expression')
+				sources.add(slot.equals.source);
 			if (slot.kind !== 'dynamic-host') continue;
 			if (slot.tag.kind === 'authored-expression') sources.add(slot.tag.source);
 			for (const attribute of slot.attributeSlots)

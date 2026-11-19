@@ -1939,6 +1939,16 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				};
 		  }
 		| {
+				/**
+				 * An `<option>` inside a `<select value>`: the server writes ` selected=""` when the select's value
+				 * names the option's (its value attribute, else its text); `residue` and `equals` are the two, in
+				 * either order. The browser leaves the option alone and writes `select.value`.
+				 */
+				readonly kind: 'selected-option';
+				readonly residue: SemanticMarkupResidue;
+				readonly equals: string | SemanticMarkupResidue;
+		  }
+		| {
 				readonly kind: 'spread-attributes';
 				readonly residue: SemanticMarkupResidue;
 				readonly excludeNames: ReadonlyArray<string>;

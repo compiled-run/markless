@@ -39,3 +39,8 @@ export function marklessWriteAttribute(
 	} else if (text === null) element.removeAttribute?.(name);
 	else element.setAttribute?.(name, text);
 }
+
+// A select's value names the option whose value (its attribute, else its text) is the same string.
+export function marklessOptionSelected(select: unknown, option: unknown): boolean {
+	return select != null && option != null && String(select) === String(option);
+}

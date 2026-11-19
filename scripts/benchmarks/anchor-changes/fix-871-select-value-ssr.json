@@ -1,0 +1,84 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/dom-attribute"
+			],
+			"delta": 131,
+			"reason": "server renderer writes selected on the option a <select value> names (#871): one new slot case",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/ssr-data/renderer"
+			],
+			"delta": 302,
+			"reason": "server renderer writes selected on the option a <select value> names (#871): one new slot case",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 4,
+			"reason": "server renderer writes selected on the option a <select value> names (#871): one new slot case",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/dom-attribute"
+			],
+			"delta": 131,
+			"reason": "server renderer writes selected on the option a <select value> names (#871): one new slot case",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
+			],
+			"delta": 302,
+			"reason": "server renderer writes selected on the option a <select value> names (#871): one new slot case",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -4,
+			"reason": "server renderer writes selected on the option a <select value> names (#871): one new slot case",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 6,
+			"reason": "server renderer writes selected on the option a <select value> names (#871): one new slot case",
+			"date": "2026-11-19"
+		}
+	]
+}

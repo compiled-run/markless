@@ -372,7 +372,7 @@ export default function Page() @{
 	},
 );
 
-test.fails('<select value> selects its option in the server HTML (#871)', async () => {
+test('<select value> selects its option in the server HTML (#871)', async () => {
 	const context = await browser.newContext({ baseURL: app.origin, javaScriptEnabled: false });
 	try {
 		const page = await context.newPage();
