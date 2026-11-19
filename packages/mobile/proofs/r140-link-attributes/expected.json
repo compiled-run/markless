@@ -1,0 +1,30 @@
+{
+	"rung": 140,
+	"name": "Links whose attributes follow a prop (aria-current and aria-label on a tab bar), whose href is a prop, and whose href is built from state",
+	"steps": [
+		{
+			"visible": ["Home tab, open", "About tab", "Open apple"],
+			"absent": ["Open pear"],
+			"title": "Home"
+		},
+		{ "do": { "tap": "Choose pear" }, "visible": ["Open pear"], "absent": ["Open apple"] },
+		{
+			"do": { "tap": "Open pear" },
+			"visible": ["Item pear", "Home tab", "Back home"],
+			"absent": ["Home tab, open", "Open pear"],
+			"title": "Item"
+		},
+		{
+			"do": { "tap": "Back home" },
+			"visible": ["Home tab, open", "Open apple"],
+			"absent": ["Item pear", "Home tab"],
+			"title": "Home"
+		},
+		{
+			"do": { "tap": "About tab" },
+			"visible": ["About tab, open", "Home tab", "About these links"],
+			"absent": ["Open apple", "Home tab, open"],
+			"title": "About"
+		}
+	]
+}
