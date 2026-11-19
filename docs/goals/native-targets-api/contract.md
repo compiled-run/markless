@@ -352,9 +352,20 @@ export function Counter() @{
   the `command` op, whose `node` is a fixed id or an expression evaluated when it runs (null or the body does nothing);
   the journal's `command` entry names the resolved element. A press focuses the control it presses, as Chromium does on a
   click.
-- **Pointer events:** `pointerdown`/`pointerup` with `{ event: 'target' | 'button' }` (the element the touch is on; 0).
-  Hosts report every touch's down and up on the innermost element under it; the runtime runs the handlers on it and each
-  element it is inside, innermost first.
+- **Pointer events:** hosts report each touch as `pointerdown`, `pointermove`, `pointerup` or `pointercancel` on the
+  innermost element under it, with `pointerId` (touches numbered from 1 per screen), `x`/`y` (points or dp from the
+  screen's top left) and `time` (ms since the screen appeared); `pointercancel` when a native scroll view starts
+  scrolling with the touch. The runtime raises what a phone's browser raises for a touch, in its order (recorded from
+  Safari on iOS and Chrome on Android, `packages/mobile/conformance/recorded/`): `pointerover`, `pointerenter` from the
+  outermost element in, `pointerdown`; the touched element captures the pointer; before each later event, a change of
+  capturing element raises `pointerout`/`pointerleave` on the old one and `pointerover`/`pointerenter` on the new one;
+  `pointermove`, then `pointerup` or `pointercancel` to the capturing element; then `pointerout` and `pointerleave` from the
+  innermost element out. Hover lasts only while the finger is down. `setPointerCapture`/`releasePointerCapture` are the
+  `capture` op, `hasPointerCapture` the `{ captures, pointer }` expression. A handler reads `target`, `currentTarget`,
+  `relatedTarget`, `button`, `buttons`, `clientX`, `clientY`, `pointerId`, `pointerType` ("touch"), `isPrimary` and
+  `timeStamp` as `{ event: <field> }`; any other field is refused by name. `button` is Safari's (-1 but on down and up,
+  where it is 0); Chrome reports 0 for over, enter, out and leave too. No compatibility mouse events are raised: a tap
+  still ends in `activate` (the web's click), and a drag or a cancelled touch in none. Vector `touch.json`; rung T1.
 - **Plain functions and module sets:** a module function is evaluated for its value where an expression calls it
   (`apply`), and run as ops where a handler statement calls it for its effects (`invoke`, through its `effects` body);
   one with effects whose value a `const` reads runs as ops and leaves its value in a cell. A module-level empty
