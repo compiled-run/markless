@@ -1212,7 +1212,10 @@ public final class NativeRuntime {
 			ownedBefore.contains(object.id) && !owned.contains(object.id) ? .release(object: object.id) : nil
 		}
 		let afterTitle = try title()
-		return styles + entries + checks + marked + (afterTitle != beforeTitle ? afterTitle.map { [.title(value: $0)] } ?? [] : []) + releases + overlays + calls
+		let titled: [NativeJournalEntry] = afterTitle != beforeTitle ? afterTitle.map { [.title(value: $0)] } ?? [] : []
+		var journal: [NativeJournalEntry] = styles + entries + checks + marked
+		journal += titled + releases + overlays
+		return journal + calls
 	}
 }
 
