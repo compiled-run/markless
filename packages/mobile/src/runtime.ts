@@ -596,13 +596,19 @@ export function createNativeRuntime(
 	};
 	const entryCells = () => ({
 		cells: Object.fromEntries(values),
+
 		...(script?.services.includes('crypto') && scriptHost?.seed
 			? { seed: scriptHost.seed() }
 			: {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
 	const enter = (entry: Record<string, unknown>): NativeJournalEntry[] => {
-		call('enter', { ...entry, ...entryCells() });
+		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
+		const focus =
+			focused !== null && focused !== NATIVE_DOCUMENT_BODY
+				? { focused, focusElements: elementFacts({}, [focused]) }
+				: {};
+		call('enter', { ...entry, ...focus, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
 			readonly writes: ReadonlyArray<readonly [string, Value]>;
 			readonly timers: ReadonlyArray<readonly [number, number]>;

@@ -1974,6 +1974,28 @@ export function Picker() @{
 });
 
 describe('overlays', () => {
+	it('lets a handler\'s JavaScript read document.activeElement alone of the page, never while rendering', async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+export function Focus() @{
+	let where = state('');
+	const card = element<HTMLDivElement>();
+	<main>
+		<div el={card}><button onClick={() => { let held = false; for (const box of [card]) if (box?.contains(document.activeElement)) held = true; where = String(held); }}>Check</button></div>
+		<p>{where}</p>
+	</main>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(payload!.handlers[0]!.ops.map((op) => op.op)).toEqual(['script']);
+		const other = await nativeView(`import { state } from '@markless/core';
+export function Title() @{
+	let title = state('');
+	<button onClick={() => { for (const part of [document.title]) title = part; }}>{title}</button>
+}`);
+		expect(other.diagnostics.map((d) => d.message)).toEqual([
+			'the click handler uses `document`: the web page, which a phone does not have',
+		]);
+	});
+
 	it("runs a dismiss handler that keeps the event's detail as JavaScript, reading why and where the press landed", async () => {
 		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
 export function Card() @{

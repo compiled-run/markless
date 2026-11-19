@@ -205,19 +205,20 @@ function globalOf(
 	const node = reference.node as unknown as AnyNode;
 	const parent = semantic.parentOf(node as never) as AnyNode | null;
 	const typeofOnly = parent?.type === 'UnaryExpression' && parent.operator === 'typeof';
-	const property =
-		GLOBAL_OBJECTS.has(reference.name) &&
+	const member =
 		parent?.type === 'MemberExpression' &&
 		parent.object === node &&
 		!parent.computed &&
 		typeof (parent.property as AnyNode | undefined)?.name === 'string'
 			? String((parent.property as AnyNode).name)
 			: undefined;
+	const property = GLOBAL_OBJECTS.has(reference.name) ? member : undefined;
 	return {
 		name: reference.name,
 		span: spanOf(node as never, filename),
 		typeofOnly,
 		...(property ? { property } : {}),
+		...(member ? { member } : {}),
 	};
 }
 

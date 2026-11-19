@@ -126,6 +126,8 @@ export type SemanticScriptGlobal = {
 	readonly typeofOnly: boolean;
 	/** `window.x`, `globalThis.x`, `self.x`: the property read off the global object. */
 	readonly property?: string;
+	/** `document.activeElement`: the member this use reads straight off the global, when it reads one by name. */
+	readonly member?: string;
 };
 
 /** A handler's or computed's own JavaScript, as a phone's script engine runs it. Native builds only. */

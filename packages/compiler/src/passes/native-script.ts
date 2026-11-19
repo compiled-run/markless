@@ -1,4 +1,5 @@
 import type { NativeScript, NativeScriptService } from '@markless/serializer';
+import { NATIVE_DOCUMENT_BODY } from '@markless/serializer/native-view';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
@@ -138,6 +139,8 @@ if (!host) {
 		},
 	};
 	g.window = g.self = g;
+	// The page's one member a phone answers: the focused element (the body when none is), which the build allows alone.
+	g.document = { get activeElement() { return host.focus(); } };
 	host.Response = Response;
 }`;
 
@@ -196,11 +199,13 @@ var frameOf = function (bindings) {
 // An element is a proxy that offers only what the host answers: the attributes it has now, whether it holds another
 // element, and the commands a handler's data can run. No tree walking, no selectors, no layout.
 var elementFacts = {};
+var BODY = ${JSON.stringify(NATIVE_DOCUMENT_BODY)};
 var proxies = {};
 var elementOf = function (id) {
 	if (typeof id !== 'string') return id;
 	if (proxies[id]) return proxies[id];
 	var facts = function () {
+		if (id === BODY) return { attributes: {}, ancestors: [] };
 		if (!elementFacts[id]) throw new Error('the host described no element ' + id);
 		return elementFacts[id];
 	};
@@ -235,6 +240,9 @@ var begin = function (entry) {
 	for (var slot in cells) before[slot] = JSON.stringify(cells[slot]);
 	host.out = { timers: [], clears: [], requests: [], logs: [], commands: [] };
 	host.seed = entry.seed || null;
+	host.focused = entry.focused || null;
+	for (var known in entry.focusElements || {}) if (!elementFacts[known]) elementFacts[known] = entry.focusElements[known];
+	host.focus = function () { return elementOf(host.focused || BODY); };
 	host.counter = 0;
 };
 var fail = function (slot, error) {

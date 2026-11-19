@@ -29,6 +29,7 @@ import {
 	NATIVE_SCRIPT_HOST_GLOBALS,
 	NATIVE_SCRIPT_LANGUAGE_GLOBALS,
 	NATIVE_SCRIPT_PAGE_GLOBALS,
+	NATIVE_SCRIPT_PAGE_MEMBERS,
 	NATIVE_VIEW_VERSION,
 	type NativeFieldKind,
 	type NativeForm,
@@ -1919,7 +1920,11 @@ export function createNativeViewPayload(
 	};
 
 	/** Whether every global a script reads is one a phone's engine has; refuses each other one by name, file and line. */
-	function checkGlobals(globals: ReadonlyArray<SemanticScriptGlobal>, what: string): boolean {
+	function checkGlobals(
+		globals: ReadonlyArray<SemanticScriptGlobal>,
+		what: string,
+		rendering: boolean,
+	): boolean {
 		let ok = true;
 		for (const global of globals) {
 			if (global.typeofOnly) continue;
@@ -1930,6 +1935,20 @@ export function createNativeViewPayload(
 			if (GLOBAL_OBJECTS.has(name) && name === 'globalThis' && global.property === undefined)
 				continue;
 			if (LANGUAGE_GLOBALS.has(name)) continue;
+			if (
+				name === global.name &&
+				global.member !== undefined &&
+				Object.hasOwn(NATIVE_SCRIPT_PAGE_MEMBERS, name) &&
+				NATIVE_SCRIPT_PAGE_MEMBERS[name]!.includes(global.member)
+			) {
+				if (!rendering) continue;
+				ok = false;
+				refuseScript(
+					`${what} reads \`${name}.${global.member}\` while rendering; a phone answers it only in a handler`,
+					global.span,
+				);
+				continue;
+			}
 			const service = Object.hasOwn(NATIVE_SCRIPT_HOST_GLOBALS, name)
 				? NATIVE_SCRIPT_HOST_GLOBALS[name]
 				: undefined;
@@ -1957,11 +1976,12 @@ export function createNativeViewPayload(
 		fact: SemanticScriptFunction,
 		module: ModuleFacts,
 		what: string,
+		rendering = false,
 	): string | null {
 		const key = `${fact.span.filename}\0${fact.span.start}`;
 		const known = scriptFunctions.get(key);
 		if (known) return known.id;
-		let ok = checkGlobals(fact.globals, what);
+		let ok = checkGlobals(fact.globals, what, rendering);
 		for (const use of fact.framework) {
 			ok = false;
 			refuseScript(
@@ -2110,7 +2130,7 @@ export function createNativeViewPayload(
 		const unsteady = script.globals.filter(
 			(global) => !global.typeofOnly && RENDER_UNSTEADY.has(global.property ?? global.name),
 		);
-		const fn = attempt(() => scriptFunctionId(script, scope.module, what));
+		const fn = attempt(() => scriptFunctionId(script, scope.module, what, true));
 		const bindings = attempt(() => scriptBindings(script, scope, what, true));
 		if (fn.value !== null && bindings.value !== null && unsteady.length === 0)
 			return { script: fn.value, bindings: bindings.value };
@@ -2136,7 +2156,7 @@ export function createNativeViewPayload(
 					`${what} reads the computed \`${computed.name}\`, whose body needs a script engine`,
 				);
 			const label = `the computed \`${computed.name}\``;
-			const fn = scriptFunctionId(fact, scope.module, label);
+			const fn = scriptFunctionId(fact, scope.module, label, true);
 			const bindings = scriptBindings(fact, scope, label, true);
 			return fn === null || bindings === null ? null : { script: fn, bindings };
 		});
@@ -2226,7 +2246,7 @@ export function createNativeViewPayload(
 					`${at} uses ${construct.construct}, which a phone's script cannot run`,
 					construct.span,
 				);
-			checkGlobals(statement.globals, at);
+			checkGlobals(statement.globals, at, true);
 			for (const name of statement.uses) local(entry, name);
 			for (const use of statement.imports) imported(entry, use.slot, use.name);
 		};

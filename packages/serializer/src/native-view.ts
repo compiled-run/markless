@@ -906,6 +906,11 @@ export const NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<st
 	['detail', 'pressTarget'],
 ];
 
+/** Members of a page global a phone answers, read straight off it: the focused element, as a proxy. */
+export const NATIVE_SCRIPT_PAGE_MEMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
+	document: ['activeElement'],
+};
+
 /** Names for the global object itself: `window.setTimeout` reads a provided global, `window.document` does not. */
 export const NATIVE_SCRIPT_GLOBAL_OBJECTS: ReadonlyArray<string> = ['window', 'self', 'globalThis'];
 

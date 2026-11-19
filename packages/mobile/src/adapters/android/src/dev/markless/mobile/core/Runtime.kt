@@ -380,7 +380,9 @@ class Runtime(
 
 	/** One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries, in that order. */
 	private fun enter(fields: String): List<JournalEntry> {
-		val entry = "{$fields${entryCells()}}"
+		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
+		val focus = focused?.takeIf { it != NATIVE_DOCUMENT_BODY }?.let { ",\"focused\":${jsonString(it)},\"focusElements\":${elementFacts(emptyMap(), Scope.EMPTY, listOf(it))}" } ?: ""
+		val entry = "{$fields$focus${entryCells()}}"
 		val started = System.nanoTime()
 		scriptCall("enter", entry)
 		val result = Json.parse(scriptCall("leave", null)).obj("leave()")

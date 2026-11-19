@@ -493,8 +493,13 @@ public final class NativeRuntime {
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
 	private func enter(_ entry: [(String, JSONValue)]) throws -> [NativeJournalEntry] {
+		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
+		var focus: [(String, JSONValue)] = []
+		if let focused, focused != nativeDocumentBody {
+			focus = [("focused", .string(focused)), ("focusElements", try elementFacts(.object([]), also: [focused]))]
+		}
 		let text = try scriptHost.unwrap().entry { () throws -> String in
-			_ = try callScript("enter", .object(entry + entryCells()))
+			_ = try callScript("enter", .object(entry + focus + entryCells()))
 			return try callScript("leave")
 		}
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(required: ["writes", "timers", "clears", "requests", "logs"], optional: ["commands"])
