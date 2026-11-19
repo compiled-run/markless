@@ -254,7 +254,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the drop event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: FileUploadItem while rendering sets `item.id` from a value that follows state; pass a fixed value or leave the prop out",
 			"MARKLESS_NATIVE_UNSUPPORTED: FileUploadItem while rendering sets `item.name` from a value that follows state; pass a fixed value or leave the prop out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the change handler's `if` test reads `fieldEl`, which is not state of this component",
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `storeFor` uses a call to `stores.get`, which needs a script engine",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `fileuploadState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `fileuploadItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_UNSUPPORTED: the change handler on the <input> component-edge:2/h4: a text field raises it when it loses focus, which a native build has no lowering for yet"

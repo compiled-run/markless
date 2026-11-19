@@ -82,24 +82,7 @@
 							"template": [
 								"Spoken: ",
 								{
-									"if": {
-										"binary": "===",
-										"left": {
-											"unary": "typeof",
-											"value": {
-												"literal": "Plain words"
-											}
-										},
-										"right": {
-											"literal": "string"
-										}
-									},
-									"whenTrue": {
-										"literal": "Plain words"
-									},
-									"whenFalse": {
-										"literal": "no text"
-									}
+									"literal": "Plain words"
 								},
 								""
 							]
@@ -258,24 +241,7 @@
 							"template": [
 								"Spoken: ",
 								{
-									"if": {
-										"binary": "===",
-										"left": {
-											"unary": "typeof",
-											"value": {
-												"literal": null
-											}
-										},
-										"right": {
-											"literal": "string"
-										}
-									},
-									"whenTrue": {
-										"literal": null
-									},
-									"whenFalse": {
-										"literal": "no text"
-									}
+									"literal": "no text"
 								},
 								""
 							]

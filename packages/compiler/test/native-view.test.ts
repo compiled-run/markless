@@ -520,15 +520,7 @@ export function Page() @{
 		expect(diagnostics).toEqual([]);
 		const parts = (payload?.nodes ?? []).flatMap((node) => (node.kind === 'text' ? [node.parts] : []));
 		expect(parts).toEqual([
-			[
-				{
-					expr: {
-						if: { binary: '!==', left: { literal: null }, right: { literal: null } },
-						whenTrue: { literal: 'reached' },
-						whenFalse: { literal: 'not reached' },
-					},
-				},
-			],
+			[{ expr: { literal: 'not reached' } }],
 			[{ expr: { if: { cell: 'state:open' }, whenTrue: { literal: 'open' }, whenFalse: { literal: 'shut' } } }],
 			[{ expr: { literal: 'kept' } }],
 			[{ expr: { logical: '&&', left: { cell: 'state:open' }, right: { literal: 'yes' } } }],
@@ -586,6 +578,39 @@ export function Page() @{
 		);
 		expect(counted.payload).toBeNull();
 		expect(counted.diagnostics.map((d) => d.message).join('\n')).toContain('a @for');
+	});
+
+	it("reads a shared() factory's own handle by its name in the factory's methods, and refuses one bound inside an @if arm", async () => {
+		const source = (field: string) => `import { element, shared, state } from '@markless/core';
+const boxState = shared(() => {
+	const box = state({ note: '' });
+	const fieldEl = element<HTMLInputElement>();
+	return {
+		...box,
+		fieldEl,
+		check() {
+			box.note = fieldEl ? 'has field' : 'no field';
+		},
+	};
+}, { scope: 'subtree' });
+export function Page() @{
+	const box = boxState();
+	let shown = state(true);
+	<main>
+		${field}
+		<button onClick={() => box.check()}>{box.note}</button>
+	</main>
+}`;
+		const plain = await nativeView(source('<input aria-label="Field" el={box.fieldEl} />'), dataOnly);
+		expect(plain.diagnostics).toEqual([]);
+		expect(plain.payload?.handlers[0]?.ops).toEqual([
+			{ op: 'assign', cell: 'shared:src/App.tsrx#boxState/state:box.note', value: { literal: 'has field' } },
+		]);
+		const armed = await nativeView(source('@if (shown) { <input aria-label="Field" el={box.fieldEl} /> }'), dataOnly);
+		expect(armed.payload).toBeNull();
+		expect(armed.diagnostics.map((d) => d.message)).toContain(
+			"the click handler reads `fieldEl`, a handle bound inside an @if arm",
+		);
 	});
 
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
