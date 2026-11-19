@@ -238,3 +238,92 @@ test('a page served empty is left exactly as the server painted it', async () =>
 		'nothing',
 	]);
 });
+
+// The arm's live values are filled from the graph as it is raised and written again while it shows.
+test('an @empty arm with live text and an attribute is raised current and follows its reads', async () => {
+	const LIVE_HTML = '<li>No <!--markless-slot:1--> here</li>';
+	const text = (value: string): Node => ({ nodeType: 3, childNodes: [], textContent: value });
+	const buildArm = () => {
+		const attributes = new Map<string, string>();
+		const item = Object.assign(el('LI'), {
+			getAttribute: (name: string) => attributes.get(name) ?? null,
+			setAttribute: (name: string, value: string) => void attributes.set(name, value),
+			removeAttribute: (name: string) => void attributes.delete(name),
+			attributes,
+		});
+		const marker: Node & { replaceWith?: (node: Node) => void } = {
+			nodeType: 8,
+			childNodes: [],
+			replaceWith: (node) => item.childNodes.splice(item.childNodes.indexOf(marker), 1, node),
+		};
+		item.childNodes.push(text('No '), marker, text(' here'));
+		return [item];
+	};
+	let arm: ReturnType<typeof buildArm> = [];
+	const rowA = el('LI', [], 'alpha');
+	const list = el('UL', [rowA]);
+	const root = el('SECTION', [list]);
+	root.ownerDocument = {
+		...documentHost(LIVE_HTML, () => (arm = buildArm())),
+		createTextNode: text,
+	};
+	list.ownerDocument = root.ownerDocument;
+	const view = {
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		keyedRepeats: [
+			{
+				id: 'repeat:0',
+				parentHostNodeId: 'h0',
+				collectionGraphNodeId: 'state:rows',
+				collectionPath: [],
+				keyPath: ['id'],
+				itemName: 'row',
+				rowElementCount: 1,
+				rowStartOffset: 0,
+				emptyArm: {
+					html: LIVE_HTML,
+					textSlots: [{ path: [0, 1], graphNodeId: 'state:filter', graphPath: ['label'] }],
+					attributeSlots: [
+						{ path: [0], name: 'title', graphNodeId: 'state:filter', graphPath: ['label'] },
+					],
+				},
+				rowEvents: [],
+			},
+		],
+	} as unknown as ResumeViewRecord;
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:rows', value: [{ id: 'a' }] },
+			{ graphNodeId: 'state:filter', value: { label: 'pears' } },
+		],
+	});
+	wireKeyedRepeats({
+		graph,
+		view,
+		elementsByHostId: new Map<string, ResumeDomElement>([
+			['h0', list as unknown as ResumeDomElement],
+		]),
+		events: { addRowEvent: () => undefined } as never,
+		storeContainerSubscription: () => undefined,
+	});
+	const shown = () =>
+		list.childNodes.map((child) => [
+			child.childNodes.map((part) => part.textContent).join(''),
+			(child as { getAttribute?: (name: string) => string | null }).getAttribute?.('title'),
+		]);
+
+	graph.write({ graphNodeId: 'state:filter', value: { label: 'plums' } });
+	graph.write({ graphNodeId: 'state:rows', value: [] });
+	await graph.flush();
+	expect(shown()).toEqual([['No plums here', 'plums']]);
+
+	graph.write({ graphNodeId: 'state:filter', path: ['label'], value: 'figs' });
+	await graph.flush();
+	expect(shown()).toEqual([['No figs here', 'figs']]);
+	expect(list.childNodes).toEqual(arm);
+});

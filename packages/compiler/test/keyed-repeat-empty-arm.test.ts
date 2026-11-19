@@ -75,14 +75,32 @@ export function App() @{
 	expect(view.keyedRepeats?.[0]?.emptyArm).toEqual({ html: '<li>nothing</li>' });
 });
 
-// Fail closed: a read inside the arm is a slot, and the mint has no way to fill
-// one. Half an arm is worse than none, so the repeat ships no arm at all.
-test('an @empty arm that reads state ships no markup', async () => {
+// The arm's own reads ride as slots the mint fills, so an arm with live text is raised current.
+test('an @empty arm that reads state ships its markup with the reads it fills', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
 	let note = state('nothing');
-	<ul><li>header</li>@for (const row of rows; key row.id) { <li>{row.id}</li> } @empty { <li>{note}</li> }</ul>
+	<ul><li>header</li>@for (const row of rows; key row.id) { <li>{row.id}</li> } @empty { <li title={note}>No {note} here</li> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]?.emptyArm).toEqual({
+		html: '<li>No <!--markless-slot:1--> here</li>',
+		textSlots: [{ path: [0, 1], graphNodeId: 'state:note', graphPath: [] }],
+		attributeSlots: [{ path: [0], name: 'title', graphNodeId: 'state:note', graphPath: [] }],
+	});
+});
+
+// A value only the render produces has no channel the mint can read, so that arm still ships nothing.
+test('an @empty arm placing a child component ships no markup', async () => {
+	const view = await viewOf(`${preamble}
+function Hint(props: { text: string }) @{
+	<small>{props.text}</small>
+}
+
+export function App() @{
+	let rows = state([{ id: 'a' }]);
+	<ul><li>header</li>@for (const row of rows; key row.id) { <li>{row.id}</li> } @empty { <li><Hint text="none" /></li> }</ul>
 }
 `);
 	expect(view.keyedRepeats).toHaveLength(1);
