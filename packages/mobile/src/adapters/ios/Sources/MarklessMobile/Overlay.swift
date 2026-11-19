@@ -178,19 +178,24 @@ final class PointerObserver: UIGestureRecognizer {
 
 	/// Touches down and not yet reported as lifted or cancelled.
 	private var down: [ObjectIdentifier: UITouch] = [:]
+	/// The pans each touch down reaches; a pan that begins takes the touch for a scroll.
+	private var pans: [ObjectIdentifier: [UIPanGestureRecognizer]] = [:]
 
 	override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
 		for touch in touches {
 			down[ObjectIdentifier(touch)] = touch
+			let reached = (touch.gestureRecognizers ?? []).compactMap { $0 as? UIPanGestureRecognizer }
+			pans[ObjectIdentifier(touch)] = reached
+			for pan in reached { pan.addTarget(self, action: #selector(panChanged(_:))) }
 			report(.pointerdown, touch)
 		}
 	}
 
-	/// A phone's browser cancels a touch it takes for a scroll; here a scroll view's pan recognizing it is that moment.
-	override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
-		for touch in touches where down[ObjectIdentifier(touch)] != nil {
-			let scrolling = touch.gestureRecognizers?.contains { $0 !== self && $0 is UIPanGestureRecognizer && ($0.state == .began || $0.state == .changed) } ?? false
-			if scrolling { end(touch, as: .pointercancel) }
+	/// A phone's browser cancels a touch it takes for a scroll; here a scroll view's pan beginning is that moment.
+	@objc private func panChanged(_ pan: UIPanGestureRecognizer) {
+		guard pan.state == .began else { return }
+		for (id, reached) in pans where reached.contains(where: { $0 === pan }) {
+			if let touch = down[id] { end(touch, as: .pointercancel) }
 		}
 	}
 
@@ -204,14 +209,18 @@ final class PointerObserver: UIGestureRecognizer {
 		state = .failed
 	}
 
-	/// A scroll view's pan that takes the touch can reset this recognizer without a cancel: a touch still down was taken.
+	/// Reset with a touch still down: something took it without telling this recognizer, so it is cancelled.
 	override func reset() {
 		for touch in Array(down.values) { end(touch, as: .pointercancel) }
 		super.reset()
 	}
 
 	private func end(_ touch: UITouch, as event: NativeEventName) {
-		guard down.removeValue(forKey: ObjectIdentifier(touch)) != nil else { return }
+		let id = ObjectIdentifier(touch)
+		guard down.removeValue(forKey: id) != nil else { return }
+		for pan in pans.removeValue(forKey: id) ?? [] where !pans.values.contains(where: { $0.contains { $0 === pan } }) {
+			pan.removeTarget(self, action: #selector(panChanged(_:)))
+		}
 		report(event, touch)
 	}
 
