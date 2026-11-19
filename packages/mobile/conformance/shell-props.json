@@ -1,0 +1,489 @@
+{
+	"version": "markless.native-app-conformance/0",
+	"app": {
+		"version": "markless.native-app/0",
+		"routes": [
+			{
+				"pattern": "/",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Home",
+					"route": {
+						"pattern": "/",
+						"params": []
+					},
+					"cells": [],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "component-edge:0/h0",
+							"element": "div",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h2",
+							"element": "header",
+							"parent": "component-edge:0/h0"
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h3",
+							"element": "h1",
+							"parent": "component-edge:0/h2",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/h3:text0",
+							"parent": "component-edge:0/h3",
+							"parts": [
+								{
+									"expr": {
+										"literal": "Topics"
+									}
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h4",
+							"element": "p",
+							"parent": "component-edge:0/h2"
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/h4:text0",
+							"parent": "component-edge:0/h4",
+							"parts": [
+								{
+									"expr": {
+										"literal": "Pick a topic"
+									}
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/component-edge:0/h6",
+							"element": "p",
+							"parent": "component-edge:0/h2",
+							"bindings": [
+								{
+									"attribute": "hidden",
+									"value": {
+										"binary": "===",
+										"left": {
+											"literal": 0
+										},
+										"right": {
+											"literal": 0
+										}
+									}
+								}
+							]
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/component-edge:0/h6:text0",
+							"parent": "component-edge:0/component-edge:0/h6",
+							"parts": [
+								{
+									"expr": {
+										"template": [
+											"",
+											{
+												"literal": 0
+											},
+											" picked"
+										]
+									}
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h5",
+							"element": "main",
+							"parent": "component-edge:0/h0"
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:1",
+							"element": "a",
+							"parent": "component-edge:0/h5",
+							"attributes": {
+								"href": "/topics/[topic]"
+							}
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:1:text0",
+							"parent": "component-edge:1",
+							"parts": [
+								{
+									"text": "Open fruit"
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "component-edge:1",
+							"event": "activate",
+							"handler": "handler:component-edge:1"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:component-edge:1",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/topics/[topic]",
+									"params": {
+										"topic": "fruit"
+									}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"expr": {
+								"literal": "Topics"
+							}
+						}
+					]
+				}
+			},
+			{
+				"pattern": "/topics/[topic]",
+				"params": ["topic"],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Topic",
+					"route": {
+						"pattern": "/topics/[topic]",
+						"params": ["topic"]
+					},
+					"cells": [
+						{
+							"id": "state:picks",
+							"name": "picks",
+							"initial": 0
+						}
+					],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "component-edge:0/h0",
+							"element": "div",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h2",
+							"element": "header",
+							"parent": "component-edge:0/h0"
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h3",
+							"element": "h1",
+							"parent": "component-edge:0/h2",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/h3:text0",
+							"parent": "component-edge:0/h3",
+							"parts": [
+								{
+									"expr": {
+										"member": {
+											"route": "params"
+										},
+										"property": "topic"
+									}
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h4",
+							"element": "p",
+							"parent": "component-edge:0/h2"
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/h4:text0",
+							"parent": "component-edge:0/h4",
+							"parts": [
+								{
+									"expr": {
+										"if": {
+											"binary": ">",
+											"left": {
+												"cell": "state:picks"
+											},
+											"right": {
+												"literal": 1
+											}
+										},
+										"whenTrue": {
+											"template": [
+												"Many ",
+												{
+													"member": {
+														"route": "params"
+													},
+													"property": "topic"
+												},
+												""
+											]
+										},
+										"whenFalse": {
+											"template": [
+												"Few ",
+												{
+													"member": {
+														"route": "params"
+													},
+													"property": "topic"
+												},
+												""
+											]
+										}
+									}
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/component-edge:0/h6",
+							"element": "p",
+							"parent": "component-edge:0/h2",
+							"bindings": [
+								{
+									"attribute": "hidden",
+									"value": {
+										"binary": "===",
+										"left": {
+											"binary": "*",
+											"left": {
+												"cell": "state:picks"
+											},
+											"right": {
+												"literal": 2
+											}
+										},
+										"right": {
+											"literal": 0
+										}
+									}
+								}
+							]
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/component-edge:0/h6:text0",
+							"parent": "component-edge:0/component-edge:0/h6",
+							"parts": [
+								{
+									"expr": {
+										"template": [
+											"",
+											{
+												"binary": "*",
+												"left": {
+													"cell": "state:picks"
+												},
+												"right": {
+													"literal": 2
+												}
+											},
+											" picked"
+										]
+									}
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h5",
+							"element": "main",
+							"parent": "component-edge:0/h0"
+						},
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "button",
+							"parent": "component-edge:0/h5"
+						},
+						{
+							"kind": "text",
+							"id": "h0:text0",
+							"parent": "h0",
+							"parts": [
+								{
+									"text": "Pick one"
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "h0",
+							"event": "activate",
+							"handler": "handler:event:0"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:event:0",
+							"ops": [
+								{
+									"op": "assign",
+									"cell": "state:picks",
+									"value": {
+										"binary": "+",
+										"left": {
+											"unary": "+",
+											"value": {
+												"cell": "state:picks"
+											}
+										},
+										"right": {
+											"literal": 1
+										}
+									}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"expr": {
+								"member": {
+									"route": "params"
+								},
+								"property": "topic"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"open": "/",
+	"initial": {
+		"stack": ["/"],
+		"title": "Topics",
+		"texts": [
+			["component-edge:0/h3:text0", "Topics"],
+			["component-edge:0/h4:text0", "Pick a topic"],
+			["component-edge:0/component-edge:0/h6:text0", "0 picked"],
+			["component-edge:1:text0", "Open fruit"]
+		]
+	},
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/topics/[topic]",
+					"params": {
+						"topic": "fruit"
+					}
+				}
+			],
+			"stack": ["/", "/topics/fruit"],
+			"title": "fruit",
+			"texts": [
+				["component-edge:0/h3:text0", "fruit"],
+				["component-edge:0/h4:text0", "Few fruit"],
+				["component-edge:0/component-edge:0/h6:text0", "0 picked"],
+				["h0:text0", "Pick one"]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h0"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "component-edge:0/component-edge:0/h6",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/component-edge:0/h6:text0",
+					"value": "2 picked"
+				}
+			],
+			"stack": ["/", "/topics/fruit"],
+			"title": "fruit",
+			"texts": [
+				["component-edge:0/h3:text0", "fruit"],
+				["component-edge:0/h4:text0", "Few fruit"],
+				["component-edge:0/component-edge:0/h6:text0", "2 picked"],
+				["h0:text0", "Pick one"]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h0"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h4:text0",
+					"value": "Many fruit"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/component-edge:0/h6:text0",
+					"value": "4 picked"
+				}
+			],
+			"stack": ["/", "/topics/fruit"],
+			"title": "fruit",
+			"texts": [
+				["component-edge:0/h3:text0", "fruit"],
+				["component-edge:0/h4:text0", "Many fruit"],
+				["component-edge:0/component-edge:0/h6:text0", "4 picked"],
+				["h0:text0", "Pick one"]
+			]
+		},
+		{
+			"action": {
+				"event": "back"
+			},
+			"journal": [],
+			"stack": ["/"],
+			"title": "Topics",
+			"texts": [
+				["component-edge:0/h3:text0", "Topics"],
+				["component-edge:0/h4:text0", "Pick a topic"],
+				["component-edge:0/component-edge:0/h6:text0", "0 picked"],
+				["component-edge:1:text0", "Open fruit"]
+			]
+		}
+	]
+}

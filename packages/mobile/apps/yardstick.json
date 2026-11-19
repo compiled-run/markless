@@ -1,0 +1,599 @@
+{
+	"notes": [
+		{
+			"page": "pages/index.tsrx",
+			"route": "/",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "THROWN",
+					"message": ".tag of a value that has none",
+					"file": null,
+					"line": null
+				}
+			],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/new.tsrx",
+			"route": "/new",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "THROWN",
+					"message": ".tag of a value that has none",
+					"file": null,
+					"line": null
+				}
+			],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/notes/[id].tsrx",
+			"route": "/notes/[id]",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "THROWN",
+					"message": ".tag of a value that has none",
+					"file": null,
+					"line": null
+				}
+			],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/notes/[id]/edit.tsrx",
+			"route": "/notes/[id]/edit",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "THROWN",
+					"message": ".tag of a value that has none",
+					"file": null,
+					"line": null
+				}
+			],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/tags/index.tsrx",
+			"route": "/tags",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "THROWN",
+					"message": ".tag of a value that has none",
+					"file": null,
+					"line": null
+				}
+			],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/tags/[tag].tsrx",
+			"route": "/tags/[tag]",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "THROWN",
+					"message": ".tag of a value that has none",
+					"file": null,
+					"line": null
+				}
+			],
+			"keyboardOnly": 0
+		}
+	],
+	"shop": [
+		{
+			"page": "pages/index.tsrx",
+			"route": "/",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the function `itemCount` uses a call to `(value).reduce`, which needs a script engine",
+					"file": "packages/mobile/apps/shop/pages/index.tsrx",
+					"line": 15
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the @for list reads the async value `products`, whose body is not one device call; it needs a script engine",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a text expression reads the @catch error of a @try that reads no device value",
+					"file": "packages/mobile/apps/shop/pages/index.tsrx",
+					"line": 43
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a @try that neither reads a device value nor holds a handler that awaits (a device call, or JavaScript)",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a <Link> whose href or class is not fixed at build time, or whose params are not strings this build can compute",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "markup outside the root template, its @if arms and its @for rows",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler reads `reset`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+					"file": "packages/mobile/apps/shop/pages/index.tsrx",
+					"line": 44
+				}
+			],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/account.tsrx",
+			"route": "/account",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the function `itemCount` uses a call to `(value).reduce`, which needs a script engine",
+					"file": "packages/mobile/apps/shop/pages/account.tsrx",
+					"line": 11
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a <Link> whose href or class is not fixed at build time, or whose params are not strings this build can compute",
+					"file": null,
+					"line": null
+				}
+			],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/cart.tsrx",
+			"route": "/cart",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the function `itemCount` uses a call to `(value).reduce`, which needs a script engine",
+					"file": "packages/mobile/apps/shop/pages/cart.tsrx",
+					"line": 13
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a <Link> whose href or class is not fixed at build time, or whose params are not strings this build can compute",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler calls `navigate` from @markless/router inside JavaScript that runs on the phone, which it cannot reach there yet",
+					"file": "packages/mobile/apps/shop/pages/cart.tsrx",
+					"line": 127
+				}
+			],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/categories/index.tsrx",
+			"route": "/categories",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the function `itemCount` uses a call to `(value).reduce`, which needs a script engine",
+					"file": "packages/mobile/apps/shop/pages/categories/index.tsrx",
+					"line": 11
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the @for list reads the async value `categories`, whose body is not one device call; it needs a script engine",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a text expression reads the @catch error of a @try that reads no device value",
+					"file": "packages/mobile/apps/shop/pages/categories/index.tsrx",
+					"line": 63
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a @try that neither reads a device value nor holds a handler that awaits (a device call, or JavaScript)",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a <Link> whose href or class is not fixed at build time, or whose params are not strings this build can compute",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "markup outside the root template, its @if arms and its @for rows",
+					"file": null,
+					"line": null
+				}
+			],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/categories/[slug].tsrx",
+			"route": "/categories/[slug]",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the function `itemCount` uses a call to `(value).reduce`, which needs a script engine",
+					"file": "packages/mobile/apps/shop/pages/categories/[slug].tsrx",
+					"line": 13
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the `title` prop of <Shell> through `name` uses a call to `params.slug.charAt`, which needs a script engine",
+					"file": "packages/mobile/apps/shop/pages/categories/[slug].tsrx",
+					"line": 13
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the @for list reads the async value `products`, whose body is not one device call; it needs a script engine",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a text expression reads the @catch error of a @try that reads no device value",
+					"file": "packages/mobile/apps/shop/pages/categories/[slug].tsrx",
+					"line": 41
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a @try that neither reads a device value nor holds a handler that awaits (a device call, or JavaScript)",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a <Link> whose href or class is not fixed at build time, or whose params are not strings this build can compute",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "markup outside the root template, its @if arms and its @for rows",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler reads `reset`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+					"file": "packages/mobile/apps/shop/pages/categories/[slug].tsrx",
+					"line": 42
+				}
+			],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/orders/[id].tsrx",
+			"route": "/orders/[id]",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the function `itemCount` uses a call to `(value).reduce`, which needs a script engine",
+					"file": "packages/mobile/apps/shop/pages/orders/[id].tsrx",
+					"line": 11
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a text expression reads the async value `order`, whose body is not one device call; it needs a script engine",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the @for list reads the async value `order`, whose body is not one device call; it needs a script engine",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a text expression reads the @catch error of a @try that reads no device value",
+					"file": "packages/mobile/apps/shop/pages/orders/[id].tsrx",
+					"line": 56
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a @try that neither reads a device value nor holds a handler that awaits (a device call, or JavaScript)",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a <Link> whose href or class is not fixed at build time, or whose params are not strings this build can compute",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "markup outside the root template, its @if arms and its @for rows",
+					"file": null,
+					"line": null
+				}
+			],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/products/[id].tsrx",
+			"route": "/products/[id]",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the function `itemCount` uses a call to `(value).reduce`, which needs a script engine",
+					"file": "packages/mobile/apps/shop/pages/products/[id].tsrx",
+					"line": 62
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a text expression reads the async value `product`, whose body is not one device call; it needs a script engine",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the `src` attribute reads the async value `product`, whose body is not one device call; it needs a script engine",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the `alt` attribute reads the async value `product`, whose body is not one device call; it needs a script engine",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a <native.sheet> inside an @if arm or a @for row",
+					"file": "packages/mobile/apps/shop/pages/products/[id].tsrx",
+					"line": 154
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler reads `product`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+					"file": "packages/mobile/apps/shop/pages/products/[id].tsrx",
+					"line": 139
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a text expression reads the @catch error of a @try that reads no device value",
+					"file": "packages/mobile/apps/shop/pages/products/[id].tsrx",
+					"line": 194
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a @try that neither reads a device value nor holds a handler that awaits (a device call, or JavaScript)",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a <Link> whose href or class is not fixed at build time, or whose params are not strings this build can compute",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "markup outside the root template, its @if arms and its @for rows",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the click handler on an element this build does not show",
+					"file": null,
+					"line": null
+				}
+			],
+			"keyboardOnly": 0
+		}
+	],
+	"checkin": [
+		{
+			"page": "pages/index.tsrx",
+			"route": "/",
+			"builds": true,
+			"refusals": [],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/checkins/[id].tsrx",
+			"route": "/checkins/[id]",
+			"builds": true,
+			"refusals": [],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/new.tsrx",
+			"route": "/new",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "MARKLESS_NATIVE_ELEMENT",
+					"message": "the <select> element has no native view yet",
+					"file": "packages/mobile/apps/checkin/pages/new.tsrx",
+					"line": 140
+				},
+				{
+					"code": "MARKLESS_NATIVE_ELEMENT",
+					"message": "the <option> element has no native view yet",
+					"file": "packages/mobile/apps/checkin/pages/new.tsrx",
+					"line": 142
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "a property binding (`selected`)",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "<base.camera> needs el={…} naming a camera the component made, and no other props",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_ELEMENT",
+					"message": "the <textarea> element has no native view yet",
+					"file": "packages/mobile/apps/checkin/pages/new.tsrx",
+					"line": 217
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the function `addCheckIn` uses a call to `(value).toString`, which needs a script engine",
+					"file": "packages/mobile/apps/checkin/pages/new.tsrx",
+					"line": 122
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler reads `onPhoto`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+					"file": "packages/mobile/apps/checkin/pages/new.tsrx",
+					"line": 29
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler uses `cam` (a device object), which JavaScript on a phone cannot reach yet",
+					"file": "packages/mobile/apps/checkin/pages/new.tsrx",
+					"line": 29
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler calls `location` from @markless/device inside JavaScript that runs on the phone, which it cannot reach there yet",
+					"file": "packages/mobile/apps/checkin/pages/new.tsrx",
+					"line": 52
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler reads `onFound`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+					"file": "packages/mobile/apps/checkin/pages/new.tsrx",
+					"line": 53
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the <button> component-edge:2/h3 in the <form> h11 sits in an @if arm or @for row of its form, which a native build does not submit yet",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the <button> component-edge:2/h4 in the <form> h11 sits in an @if arm or @for row of its form, which a native build does not submit yet",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the <button> component-edge:3/h8 in the <form> h11 sits in an @if arm or @for row of its form, which a native build does not submit yet",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the <button> component-edge:3/h9 in the <form> h11 sits in an @if arm or @for row of its form, which a native build does not submit yet",
+					"file": null,
+					"line": null
+				}
+			],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/permissions.tsrx",
+			"route": "/permissions",
+			"builds": true,
+			"refusals": [],
+			"keyboardOnly": 0
+		},
+		{
+			"page": "pages/settings.tsrx",
+			"route": "/settings",
+			"builds": false,
+			"refusals": [
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "ToggleRoot while rendering sets `toggle.checked` from a value that follows state; pass a fixed value or leave the prop out",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "RadioGroupRoot while rendering sets `group.value` from a value that follows state; pass a fixed value or leave the prop out",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "SelectRoot while rendering sets `select.value` from a value that follows state; pass a fixed value or leave the prop out",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "SelectItem while rendering sets `item.value` from a value that follows state; pass a fixed value or leave the prop out",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler reads `toggleState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+					"file": "packages/headless/components/src/toggle/toggle.tsrx",
+					"line": 73
+				},
+				{
+					"code": "MARKLESS_NATIVE_UNSUPPORTED",
+					"message": "the change handler reads `value`, which is not state of this component",
+					"file": null,
+					"line": null
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler reads `radiogroupItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+					"file": "packages/headless/components/src/radio-group/radio-group.tsrx",
+					"line": 149
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler reads `radiogroupState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+					"file": "packages/headless/components/src/radio-group/radio-group.tsrx",
+					"line": 148
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler reads `selectState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+					"file": "packages/headless/components/src/select/select.tsrx",
+					"line": 113
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler reads `selectItemState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+					"file": "packages/headless/components/src/select/select.tsrx",
+					"line": 264
+				},
+				{
+					"code": "MARKLESS_NATIVE_JAVASCRIPT",
+					"message": "the click handler reads `selectState`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+					"file": "packages/headless/components/src/select/select.tsrx",
+					"line": 263
+				}
+			],
+			"keyboardOnly": 14
+		}
+	]
+}

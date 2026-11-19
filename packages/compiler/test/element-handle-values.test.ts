@@ -1,6 +1,5 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
-import { SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE } from '../src/passes/symbol-modules.ts';
 
 /**
  * An `element()` handle read as a VALUE.
@@ -137,11 +136,9 @@ export function Page() @{
 	expect(sources[0]).not.toContain('getElementHandle');
 });
 
-test('a handle the lowering cannot name fails the compile instead of reading undefined', async () => {
-	// A dynamic key the read lowering has no name for: the value band declines and
-	// the authored identifier survives into the emitted module. Fail-closed
-	// doctrine says that must be a build error, never a silent `undefined` at the
-	// first click.
+test('a handle read under a computed key lowers the handle and the key apart', async () => {
+	// The handle is one value however it is keyed, so the read lands on `box` and
+	// the key is lowered on its own, here to the inlined constant.
 	const result = await compile(`
 import { element } from '@markless/core';
 import { measure } from './measure.ts';
@@ -157,11 +154,10 @@ export function Page() @{
 }
 `);
 
-	const codes = result.symbolModules.diagnostics.map((diagnostic) => diagnostic.code);
-	expect(codes).toContain(SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE);
-	expect(
-		result.symbolModules.diagnostics.every((diagnostic) => diagnostic.severity === 'error'),
-	).toBe(true);
+	expect(result.symbolModules.diagnostics).toEqual([]);
+	expect(eventSymbolSources(result)).toEqual([
+		expect.stringContaining(`measure(context.getElementHandle("element:box")['tagName'])`),
+	]);
 });
 
 test('a handle under a method call on a built value is named, not refused', async () => {
