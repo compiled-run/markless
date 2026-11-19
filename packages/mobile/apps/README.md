@@ -127,28 +127,28 @@ Reading the table:
 
 ## Web defects found while writing the apps
 
-Each was worked around in the app, and the workaround is the one a web developer would reach for. None was fixed here:
-this job does not change the framework.
+Each was worked around in the app the way a web developer would, and none was fixed here: this job does not change the
+framework. Each has an issue, ranked by how badly it would hurt a real app, and a reduced failing test pinned with
+`test.fails` in #874.
 
-1. An `@if` arm holding `<modal.root>` stops the web build (`MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED`). The confirm
-   modal sits outside the arm, opened by state.
-2. When a filtered `@for` goes from some rows to none in the browser, `@empty` does not appear and the list is left
-   empty. A `hidden` paragraph shows the no-match text.
-3. `storage()` saves its cookie one task after the write, and `navigate()` in the same handler renders the next page on
-   the server from the old cookie. After an edit, the note showed its old title until a reload. Each save waits one task
-   (`setTimeout`) before navigating.
-4. With that stale cookie, the server evaluated `note.updated` inside `@if (note)` while `note` was undefined and failed
-   the render. In the browser, after a delete, the same arm's expressions ran with `note` undefined; the helpers accept
-   `undefined`.
-5. A page the router fetched early (idle prefetch) is shown as it was before a `storage()` write: after a delete, the
-   list still held the deleted note. The apps set `router({ prefetch: false })`.
-6. Two `storage()` calls with the same key in two components of one page do not share their value: the tab bar badge
+1. #863: an `@if (note)` arm keeps running its expressions after `note` turns undefined, so the page throws and never
+   shows `@else`; on the server the same arm fails the render. The helpers called in the arm accept `undefined`.
+2. #864: live text next to an element in a component's children never updates (found on `select.trigger`, but any
+   component shows it). The chosen site shows beside the select.
+3. #876: a page the router prefetched shows lists and totals derived from `storage()` as they were before a later write:
+   after a delete the list still held the note, after adding to the bag the cart total was old. The apps set
+   `router({ prefetch: false })`.
+4. #865: a page reading `url.searchParams` from its `url` prop fails its server render. The app keeps the flag in state.
+5. #866: `navigate()` right after a `storage()` write renders a page the router has not rendered yet from the old cookie:
+   a new note showed "not found" until a reload. Each save waits one task (`setTimeout`) before navigating.
+6. #867: `storage()` with one key in the tab bar (its own module) and in the page does not share the value: the badge
    stayed at 0. Each page owns the cart and passes the count down.
-7. Live text (state or storage) as the children of `select.trigger` does not update. The chosen site shows beside the
-   select.
-8. `state(defaultSite)`, a state initialised from a `storage()` value, fails the build with
-   `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE`, an internal error.
-9. Reading the page's `url` prop in an attribute failed the render of an in-place navigation (`url` undefined).
-10. A computed `@for` key (`lineKey(line)` or a template string of the row's fields) is refused as unstable
-    (`MARKLESS_REPEAT_KEY_UNSTABLE`); cart lines store their own key.
-11. `<select value={x}>` does not select the option in the server's HTML (React habit); the options carry `selected`.
+7. #868: `@empty` holding live text (`No notes match “{query}”`) does not appear when a filtered list becomes empty. A
+   `hidden` paragraph shows the no-match text.
+8. #869: an `@if` arm holding `<modal.root>` stops the build (`MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED`). The modal sits
+   outside the arm, opened by state.
+9. #870: `state(defaultSite)`, a state initialised from a `storage()` value, fails the build with the internal
+   `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE`. Removed.
+10. #871: `<select value={x}>` does not select the option in the server's HTML. The options carry `selected`.
+11. #872: a `@for` key built from the row's own fields is refused as unstable (`MARKLESS_REPEAT_KEY_UNSTABLE`). Cart
+    lines store their own key.
