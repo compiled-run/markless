@@ -14,7 +14,7 @@ import {
 	OVERLAY_ATTRIBUTE,
 	OVERLAY_MODAL_ATTRIBUTE,
 	OVERLAY_MODAL_VALUE,
-} from '@markless/web/fns/overlay-protocol';
+} from '@markless/web/overlay-protocol';
 
 /** A host-side action: what a person does to a retained view. */
 export type NativeAction =

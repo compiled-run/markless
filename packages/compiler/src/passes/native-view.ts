@@ -44,7 +44,7 @@ import {
 	OVERLAY_ATTRIBUTE,
 	OVERLAY_FOCUS_ORIGIN_PROPERTY,
 	OVERLAY_HINT_ATTRIBUTE,
-} from '@markless/web/fns/overlay-protocol';
+} from '@markless/web/overlay-protocol';
 import type {
 	CompilerDiagnostic,
 	SemanticComponentEdge,

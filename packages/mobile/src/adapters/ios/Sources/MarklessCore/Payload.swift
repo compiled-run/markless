@@ -5,7 +5,7 @@ public let nativeViewVersion = "markless.native-view/0"
 /// The document body as an element value (`NATIVE_DOCUMENT_BODY` in `@markless/serializer`): no node has this id.
 public let nativeDocumentBody = "#body"
 
-/// The overlay behaviour's names, as `packages/web/src/fns/overlay-protocol.ts` spells them.
+/// The overlay behaviour's names, as `packages/web/src/overlay-protocol.ts` spells them.
 public enum OverlayProtocol {
 	public static let attribute = "overlay"
 	public static let modalAttribute = "aria-modal"

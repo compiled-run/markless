@@ -317,7 +317,7 @@ What the families read, and how each is supplied without a change to them:
   overlay the press landed outside, and the hosts send Escape from Android back and VoiceOver's escape gesture.
 - **"Which element had focus when this opened".** Modal's `focusBackToOpener` reads the overlay behaviour's
   focus-origin property. The native pass lowers a read of that property (its name imported from
-  `@markless/web/fns/overlay-protocol`) to `{ focusOrigin }`, which the runtime records when the overlay enlists. No new
+  `@markless/web/overlay-protocol`) to `{ focusOrigin }`, which the runtime records when the overlay enlists. No new
   `@markless/core` API was needed.
 - **"A press that starts and ends on the backdrop".** Modal's guard keeps a module-level `WeakSet` across `pointerdown`
   and `pointerup`. The native pass keeps a module-level `new WeakSet()` as one cell holding its members; the hosts report

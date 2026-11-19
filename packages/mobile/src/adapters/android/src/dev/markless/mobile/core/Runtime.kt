@@ -2,7 +2,7 @@ package dev.markless.mobile.core
 
 class MarklessRuntimeError(message: String) : RuntimeException(message)
 
-/** The overlay protocol of `@markless/web/fns/overlay-protocol`: the marker attribute and what makes an overlay modal. */
+/** The overlay protocol of `@markless/web/overlay-protocol`: the marker attribute and what makes an overlay modal. */
 const val OVERLAY_ATTRIBUTE = "overlay"
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
