@@ -686,8 +686,13 @@ final class ViewTree {
 		if let button = context.button { refreshLabel(of: button) }
 		if layout == nil {
 			stack(container)
-			for id in built { if let view = elements[id] { stackTree(view) } }
+			for id in built.flatMap(withArms) { if let view = elements[id] { stackTree(view) } }
 		}
+	}
+
+	/// A branch instance followed by what its shown arm placed, recursively; any other id alone.
+	private func withArms(_ id: String) -> [String] {
+		[id] + (branches[id]?.built.flatMap(withArms) ?? [])
 	}
 
 	private func buildRow(_ list: String, key: String, item: NativeValue, in container: UIView, at index: inout Int, _ context: Context) throws -> [String] {
