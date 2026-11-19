@@ -179,7 +179,7 @@ Seen once in the same window and watched, not listed: `fragment-navigation.test.
 
 ### Stale merge-queue runs
 
-When the merge queue rebuilds its groups (an entry fails, times out or leaves), GitHub deletes the old `gh-readonly-queue/*` branches but leaves their runs queued for runners. `stale-queue-runs.yml` runs every 10 minutes and cancels any `merge_group` run whose branch no longer exists, listing each one in its run summary. On 2026-10-28 five such runs, about 32 jobs each, were waiting behind the live groups.
+When the merge queue rebuilds its groups (an entry fails, times out or leaves), GitHub deletes the old `gh-readonly-queue/*` branches but leaves their runs queued for runners. `stale-queue-runs.yml` cancels any `merge_group` run whose branch no longer exists, listing each one in its run summary. It runs whenever a merge-queue CI run is requested, which is what a rebuild does, and on a 10-minute schedule as a backstop: under load GitHub dropped that schedule to 4 runs in 30 hours (2026-11-18 to 19). On 2026-10-28 five such runs, about 32 jobs each, were waiting behind the live groups.
 
 ## 5. Keeping `main` green
 
