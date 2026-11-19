@@ -185,7 +185,11 @@ var frameOf = function (bindings) {
 			Object.keys(binding.fields).forEach(function (field) { cellProperty(object, field, binding.fields[field]); });
 			Object.defineProperty(names, name, { enumerable: true, value: object });
 		} else if ('elements' in binding) Object.defineProperty(names, name, { enumerable: true, value: elementsOf(binding.elements) });
-		else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
+		else if ('object' in binding) Object.defineProperty(names, name, { enumerable: true, value: frameOf(binding.object) });
+		else if ('shared' in binding) {
+			var shared = frameOf(binding.shared);
+			Object.defineProperty(names, name, { enumerable: true, value: function () { return shared; } });
+		} else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
 	});
 	return names;
 };

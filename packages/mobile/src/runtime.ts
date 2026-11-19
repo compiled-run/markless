@@ -387,18 +387,24 @@ export function evaluateWithScript(
 					engine = host.start();
 					engine.evaluate(script.source);
 				}
-				const frame = Object.fromEntries(
-					Object.entries(bindings).map(([name, binding]) => [
-						name,
-						'cell' in binding
-							? { slot: binding.cell }
-							: 'fields' in binding
-								? { fields: binding.fields }
-								: 'elements' in binding
-									? { elements: evaluate(binding.elements, values) }
-									: { value: evaluate(binding.value, values) },
-					]),
-				);
+				const frameOf = (named: NativeScriptBindings): Record<string, unknown> =>
+					Object.fromEntries(
+						Object.entries(named).map(([name, binding]) => [
+							name,
+							'object' in binding
+								? { object: frameOf(binding.object) }
+								: 'shared' in binding
+									? { shared: frameOf(binding.shared) }
+									: 'cell' in binding
+										? { slot: binding.cell }
+										: 'fields' in binding
+											? { fields: binding.fields }
+											: 'elements' in binding
+												? { elements: evaluate(binding.elements, values) }
+												: { value: evaluate(binding.value, values) },
+						]),
+					);
+				const frame = frameOf(bindings);
 				const entry = {
 					kind: 'compute',
 					fn,
@@ -521,11 +527,15 @@ export function createNativeRuntime(
 		bindings: NativeScriptBindings,
 		eventValue: string | undefined,
 		scope: NativeScope,
-	) =>
+	): Record<string, unknown> =>
 		Object.fromEntries(
 			Object.entries(bindings).map(([name, binding]) => [
 				name,
-				'cell' in binding
+				'object' in binding
+					? { object: frameOf(binding.object, eventValue, scope) }
+					: 'shared' in binding
+						? { shared: frameOf(binding.shared, eventValue, scope) }
+						: 'cell' in binding
 					? { slot: slotOf(binding.cell, scope) }
 					: 'fields' in binding
 						? {
@@ -566,12 +576,21 @@ export function createNativeRuntime(
 				ancestors.push(key && nodesById.get(up)?.row ? `${up}${key}` : up);
 			facts[id] = { attributes, ancestors };
 		};
-		for (const entry of Object.values(frame)) {
-			const given = (entry as { elements?: unknown }).elements;
-			if (given === undefined) continue;
-			if (Array.isArray(given)) given.forEach(add);
-			else add(given);
-		}
+		const visit = (names: Record<string, unknown>) => {
+			for (const entry of Object.values(names)) {
+				const { elements: given, object, shared } = entry as {
+					elements?: unknown;
+					object?: Record<string, unknown>;
+					shared?: Record<string, unknown>;
+				};
+				if (object) visit(object);
+				if (shared) visit(shared);
+				if (given === undefined) continue;
+				if (Array.isArray(given)) given.forEach(add);
+				else add(given);
+			}
+		};
+		visit(frame);
 		return facts;
 	};
 	const entryCells = () => ({
@@ -632,12 +651,10 @@ export function createNativeRuntime(
 	};
 	const compute: Compute = (fn, bindings, scope) =>
 		JSON.parse(
-			call('enter', {
-				kind: 'compute',
-				fn,
-				frame: frameOf(bindings, undefined, scope),
-				...entryCells(),
-			}),
+			call('enter', (() => {
+				const frame = frameOf(bindings, undefined, scope);
+				return { kind: 'compute', fn, frame, elements: elementFacts(frame), ...entryCells() };
+			})()),
 		) as Value;
 	/** Focus, the overlay stack (topmost last) and each overlay's focus origin, kept as the web's overlay behaviour keeps them. */
 	let focused: string | null = null;

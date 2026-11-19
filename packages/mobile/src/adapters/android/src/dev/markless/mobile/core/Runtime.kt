@@ -275,7 +275,7 @@ class Runtime(
 			}
 			is Expr.Call -> Js.call(e.name, e.arguments.map(::eval), now)
 			is Expr.Script -> {
-				val entry = "{\"kind\":\"compute\",\"fn\":${jsonString(e.fn)},\"frame\":${frameOf(e.bindings, scope)}${entryCells()}}"
+				val entry = "{\"kind\":\"compute\",\"fn\":${jsonString(e.fn)},\"frame\":${frameOf(e.bindings, scope)},\"elements\":${elementFacts(e.bindings, scope)}${entryCells()}}"
 				val started = System.nanoTime()
 				val value = JsValue.fromJson(Json.parse(scriptCall("enter", entry)))
 				onScriptEntry?.invoke(System.nanoTime() - started)
@@ -331,6 +331,8 @@ class Runtime(
 			is ScriptBinding.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(slot(it.value, scope))}" }}}"
 			is ScriptBinding.Value -> "{\"value\":${jsonValue(evaluate(b.value, scope))}}"
 			is ScriptBinding.Elements -> "{\"elements\":${jsonValue(evaluate(b.value, scope))}}"
+			is ScriptBinding.Object -> "{\"object\":${frameOf(b.members, scope)}}"
+			is ScriptBinding.Shared -> "{\"shared\":${frameOf(b.members, scope)}}"
 		}
 	}
 
@@ -353,10 +355,18 @@ class Runtime(
 			}
 			facts[id] = "{\"attributes\":${attributes.joinToString(",", "{", "}")},\"ancestors\":${ancestors.joinToString(",", "[", "]")}}"
 		}
-		for (b in bindings.values) if (b is ScriptBinding.Elements) when (val v = evaluate(b.value, scope)) {
-			is JsValue.Arr -> v.items.forEach(::add)
-			else -> add(v)
+		fun visit(named: Map<String, ScriptBinding>) {
+			for (b in named.values) when (b) {
+				is ScriptBinding.Elements -> when (val v = evaluate(b.value, scope)) {
+					is JsValue.Arr -> v.items.forEach(::add)
+					else -> add(v)
+				}
+				is ScriptBinding.Object -> visit(b.members)
+				is ScriptBinding.Shared -> visit(b.members)
+				else -> {}
+			}
 		}
+		visit(bindings)
 		return facts.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value}" }
 	}
 

@@ -149,7 +149,11 @@ export type NativeScriptBinding =
 	 * `hasAttribute`, `contains`, and the commands `focus` and `scrollIntoView`. The host answers each read from the
 	 * entry's `elements`: the attributes each element has now and the elements it is inside.
 	 */
-	| { readonly elements: NativeExpr };
+	| { readonly elements: NativeExpr }
+	/** A family's shared object, member by member (its methods run only as data, so a script never gets them). */
+	| { readonly object: Readonly<Record<string, NativeScriptBinding>> }
+	/** A `shared()` accessor (`selectState`): a function that returns that object. */
+	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> };
 
 export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
 
