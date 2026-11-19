@@ -847,6 +847,8 @@ export function emitResumeModule(input: {
 	readonly servedScalarPlans?: unknown;
 	readonly needsFullResume?: boolean;
 	readonly hasIdleEvents?: boolean;
+	/** This module or a component it renders carries an `overlay` mark (the analyzer's `overlayRecords`). */
+	readonly rendersOverlay?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly symbolRoutes: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly closurePlanRoutes?: ReadonlyArray<SourceLazySymbolRoute>;
@@ -979,7 +981,9 @@ export function emitResumeModule(input: {
 		// the compiler recorded no `overlay` demand for never emits its chunk at
 		// all. The loader stays unresolved until a resumed root turns out to carry
 		// a marked element, so having the mark somewhere is still not fetching it.
-		demandsOverlay(input.runtimeDemandMap) ? emitOverlayLoaderInstall() : null,
+		// A page whose overlay lives in a child component loads that child's module only on interaction, after the runtime
+		// read the installer at its start, so the page's own resume module names it.
+		demandsOverlay(input.runtimeDemandMap) || input.rendersOverlay === true ? emitOverlayLoaderInstall() : null,
 		input.hasLiveSharedState === true ||
 		hasLiveSharedDefinitions(input.payloadState as Parameters<typeof hasLiveSharedDefinitions>[0])
 			? emitSharedInstancesLoaderInstall()
