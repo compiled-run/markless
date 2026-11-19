@@ -39,12 +39,7 @@ test('each interpolation of a text joined inside a flipped arm reads a graph nod
 	const lifted = result.semanticGraph.graphBindings.find(
 		(binding) => first?.kind === 'graph-read' && binding.id === first.graphNodeId,
 	);
-	expect(
-		lifted?.dependencies?.map((dependency) => [dependency.graphNodeId, dependency.armGuard]),
-	).toEqual([
-		['state:at', undefined],
-		['computed:current', true],
-	]);
+	expect(lifted?.dependencies?.map((dependency) => dependency.graphNodeId)).toEqual(['state:at']);
 });
 
 test('two expressions joined under an @if on plain state rebuild from their own graph nodes', async () => {

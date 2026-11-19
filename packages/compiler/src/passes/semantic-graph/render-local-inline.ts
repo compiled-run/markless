@@ -628,11 +628,23 @@ export function armShownGuard(state: WalkState): {
 	const reads = [...guard.nodes, ...guard.definitions].flatMap((node) =>
 		collectGraphDependencies(node, state),
 	);
-	const asyncNodeIds = new Set(
-		state.graph.graphBindings.flatMap((binding) => (binding.asyncCapable ? [binding.id] : [])),
-	);
-	if (reads.some((read) => asyncNodeIds.has(read.graphNodeId))) return null;
+	if (reads.some((read) => readsAsyncValue(read.graphNodeId, state))) return null;
 	return { source: guard.source, reads, definitions: guard.definitions };
+}
+
+// Async capability is settled after the walk, so a computed over an async one is found through its dependencies.
+function readsAsyncValue(graphNodeId: string, state: WalkState, seen = new Set<string>()): boolean {
+	if (seen.has(graphNodeId)) return false;
+	seen.add(graphNodeId);
+	const binding = state.graph.graphBindings.find((candidate) => candidate.id === graphNodeId);
+	return (
+		!!binding &&
+		(binding.async === true ||
+			binding.asyncCapable === true ||
+			(binding.dependencies ?? []).some((dependency) =>
+				readsAsyncValue(dependency.graphNodeId, state, seen),
+			))
+	);
 }
 
 // A read of the same cell at a path prefix reads this one too: `props` covers `props.subject`.
