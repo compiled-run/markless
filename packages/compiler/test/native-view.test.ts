@@ -266,15 +266,117 @@ export function Logger() @{
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Field() @{
 	let text = state('');
-	<input value={text} onKeyDown={() => (text = '')} />
+	<input value={text} onKeyUp={() => (text = '')} />
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toContain(
-			'the keydown event has no native meaning yet',
+			'the keyup event has no native meaning yet',
 		);
 	});
 
-	it('leaves out key and focus handlers on a checkbox or radio button, which a tap ticks and no soft keyboard types in', async () => {
+	it("runs a text field's keydown and paste handlers with the key and the pasted text, and preventDefault() as an op", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Tags() @{
+	let text = state('');
+	let last = state('');
+	<input
+		value={text}
+		onKeyDown={(event) => {
+			if (event.key === 'Enter' && !event.isComposing) event.preventDefault();
+			last = event.key;
+		}}
+		onPaste={(event) => {
+			event.preventDefault();
+			text = (event as ClipboardEvent).clipboardData?.getData('text') ?? '';
+		}}
+	/>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.events).toEqual([
+			{ host: 'h0', event: 'keydown', handler: 'handler:event:0' },
+			{ host: 'h0', event: 'paste', handler: 'handler:event:1' },
+		]);
+		expect(payload?.handlers.map((handler) => handler.ops)).toEqual([
+			[
+				{
+					op: 'if',
+					test: {
+						logical: '&&',
+						left: { binary: '===', left: { event: 'key' }, right: { literal: 'Enter' } },
+						right: { unary: '!', value: { literal: false } },
+					},
+					whenTrue: [{ op: 'preventDefault' }],
+					whenFalse: [],
+				},
+				{ op: 'assign', cell: 'state:last', value: { event: 'key' } },
+			],
+			[
+				{ op: 'preventDefault' },
+				{
+					op: 'assign',
+					cell: 'state:text',
+					value: { logical: '??', left: { event: 'text' }, right: { literal: '' } },
+				},
+			],
+		]);
+	});
+
+	it("reads a text field's text through its handle or the event's target, and has the field report its edits", async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+export function Trip() @{
+	const city = element<HTMLInputElement>();
+	let shown = state('');
+	<div>
+		<input el={city} value="Lima" onBlur={(event) => (shown = (event.target as HTMLInputElement).value)} />
+		<button onClick={() => (shown = city.value)}>Save</button>
+	</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers.map((handler) => handler.ops)).toEqual([
+			[{ op: 'assign', cell: 'state:shown', value: { field: 'h1' } }],
+			[{ op: 'assign', cell: 'state:shown', value: { field: 'h1' } }],
+			[],
+		]);
+		expect(payload?.events).toContainEqual({ host: 'h1', event: 'input', handler: 'handler:h1/edit' });
+	});
+
+	it("reads a click's event.detail as the number of presses in a row", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Like() @{
+	let note = state('');
+	<button onClick={(event) => (note = event.detail === 2 ? 'liked' : 'once')}>Like</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{
+				op: 'assign',
+				cell: 'state:note',
+				value: {
+					if: { binary: '===', left: { event: 'detail' }, right: { literal: 2 } },
+					whenTrue: { literal: 'liked' },
+					whenFalse: { literal: 'once' },
+				},
+			},
+		]);
+	});
+
+	it('refuses a paste handler off a text field, and a clipboard read other than plain text', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Paste() @{
+	let text = state('');
+	<div>
+		<span onPaste={() => (text = 'pasted')}>{text}</span>
+		<input onPaste={(event) => (text = event.clipboardData?.getData('text/html') ?? '')} />
+	</div>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'a paste handler on <span>; a native build runs one only on a text field',
+			"the paste handler reads the clipboard other than as plain text (`getData('text')`), which a phone's paste does not give",
+		]);
+	});
+
+	it('leaves out key and focus handlers on a checkbox or radio button, and runs a text field\'s focus handler', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Choice() @{
 	let note = state('');
@@ -298,9 +400,10 @@ export function Choice() @{
 				'MARKLESS_NATIVE_KEYBOARD_ONLY',
 				'the blur handler on <input> h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out',
 			],
-			[NATIVE_UNSUPPORTED_CODE, 'the focus event has no native meaning yet'],
 		]);
-		expect(payload).toBeNull();
+		expect(payload?.events.filter((event) => event.event === 'focus')).toEqual([
+			{ host: 'h3', event: 'focus', handler: 'handler:event:5' },
+		]);
 	});
 
 	it('gives a state field whose first value is undefined a null cell, as a native expression spells undefined', async () => {
@@ -347,6 +450,294 @@ export function Page() @{
 			'a text expression compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null',
 			'a text expression compares with `undefined` a value whose first value is `null`; a native value does not tell undefined from null',
 		]);
+	});
+
+	it("reads an input event's target as the field typed into, whose value is the typed text, only in that handler", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function textOf(from: EventTarget | null): string {
+	const control = from as HTMLInputElement | null;
+	if (!control) return '';
+	return control.value;
+}
+export function Page() @{
+	let said = state('');
+	<main>
+		<input aria-label="Name" onInput={(event) => (said = textOf(event.target))} />
+		<p>{said}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers).toEqual([
+			{ id: 'handler:event:0', ops: [{ op: 'assign', cell: 'state:said', value: { event: 'value' } }] },
+		]);
+		const elsewhere = await nativeView(`import { state } from '@markless/core';
+function textOf(from: EventTarget | null): string {
+	const control = from as HTMLInputElement | null;
+	return control ? control.value : '';
+}
+export function Page() @{
+	let said = state('');
+	<main>
+		<button onClick={(event) => (said = textOf(event.target))}>Read</button>
+		<p>{said}</p>
+	</main>
+}`);
+		expect(elsewhere.payload).toBeNull();
+	});
+
+	it('drops preventDefault() in a click handler where a click has no default action, and refuses it where it has one', async () => {
+		const quiet = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let count = state(0);
+	<main>
+		<a onClick={(event) => { event.preventDefault(); count++; }}>Next</a>
+		<button onClick={(event) => { event.preventDefault(); count++; }}>Add</button>
+		<p>{count}</p>
+	</main>
+}`, dataOnly);
+		expect(quiet.diagnostics).toEqual([]);
+		expect(quiet.payload?.handlers.map((handler) => handler.ops)).toEqual([
+			[{ op: 'assign', cell: 'state:count', value: { binary: '+', left: { unary: '+', value: { cell: 'state:count' } }, right: { literal: 1 } } }],
+			[{ op: 'assign', cell: 'state:count', value: { binary: '+', left: { unary: '+', value: { cell: 'state:count' } }, right: { literal: 1 } } }],
+		]);
+		for (const host of [
+			'<a href="/next" onClick={(event) => { event.preventDefault(); count++; }}>Next</a>',
+			'<input type="checkbox" aria-label="Keep" onClick={(event) => { event.preventDefault(); count++; }} />',
+		]) {
+			const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let count = state(0);
+	<main>${host}<p>{count}</p></main>
+}`, dataOnly);
+			expect(payload).toBeNull();
+			expect(diagnostics.map((d) => d.message)).toContain(
+				'the click handler uses a call to `event.preventDefault`, which needs a script engine',
+			);
+		}
+	});
+
+	it('builds a <textarea> as a text field, and refuses its change handler and its place in a form by name', async () => {
+		const shown = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let note = state('');
+	<main>
+		<textarea aria-label="Notes" value={note} onInput={(event) => (note = event.currentTarget.value)} />
+		<p>{note}</p>
+	</main>
+}`);
+		expect(shown.diagnostics).toEqual([]);
+		expect(shown.payload?.events).toEqual([{ host: 'h1', event: 'input', handler: 'handler:event:0' }]);
+		const changed = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let note = state('');
+	<main><textarea aria-label="Notes" onChange={(event) => (note = event.currentTarget.value)} /><p>{note}</p></main>
+}`);
+		expect(changed.diagnostics.map((d) => d.message)).toContain(
+			'the change handler on the <textarea> h1: a text field raises it when it loses focus, which a native build has no lowering for yet',
+		);
+		const sent = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let note = state('');
+	<form onSubmit={(event) => { event.preventDefault(); note = 'sent'; }}>
+		<textarea aria-label="Notes" name="notes" />
+		<button>Send</button>
+		<p>{note}</p>
+	</form>
+}`);
+		expect(sent.payload).toBeNull();
+		expect(sent.diagnostics.map((d) => d.message)).toContain(
+			'the <textarea> h1 in the <form> h0, whose text a native build does not submit yet',
+		);
+	});
+
+	it('reads children that are one run of text as that string, and any children as present in a bare @if test', async () => {
+		const source = (badge: string) => `import { computed, type Children } from '@markless/core';
+function Badge({ children }: { readonly children?: Children }) @{
+	const spoken = computed(() => (typeof children === 'string' ? children : 'none'));
+	<div>
+		<p>{spoken}</p>
+		@if (children) { <span>{children}</span> }
+	</div>
+}
+export function Page() @{
+	<main>${badge}</main>
+}`;
+		const text = await nativeView(source('<Badge>Plain</Badge>'), dataOnly);
+		expect(text.diagnostics).toEqual([]);
+		const markup = await nativeView(source('<Badge><b>Bold</b></Badge>'), dataOnly);
+		expect(markup.payload).toBeNull();
+		expect(markup.diagnostics.map((d) => d.message)).toContain(
+			'the computed `spoken` reads the callback `children` as a value',
+		);
+	});
+
+	it('marks live regions as ARIA defines them, and refuses one whose politeness follows state', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let open = state(false);
+	<main>
+		<output>{open ? 'on' : 'off'}</output>
+		<p role="alert">x</p>
+		<div aria-live="polite">y</div>
+		<div role="status" aria-live="off">z</div>
+		<div role={open ? 'region' : undefined}>w</div>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const live = Object.fromEntries(
+			(payload?.nodes ?? []).flatMap((node) => (node.kind === 'element' ? [[node.element + node.id, node.live ?? null]] : [])),
+		);
+		expect(live).toEqual({
+			mainh0: null,
+			outputh1: { politeness: 'polite', atomic: true },
+			ph2: { politeness: 'assertive', atomic: true },
+			divh3: { politeness: 'polite', atomic: false },
+			divh4: null,
+			divh5: null,
+		});
+		const dynamic = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let paused = state(false);
+	<div aria-live={paused ? 'off' : 'polite'}>news</div>
+}`);
+		expect(dynamic.diagnostics.map((d) => d.message)).toContain(
+			'the `aria-live` of a <div> follows state; a native host makes a live region when it builds the view',
+		);
+	});
+
+	it('runs only the side of &&, || and ?? that a left side known when the app is built leaves to run', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function check(row: HTMLElement): boolean {
+	return !row.hasAttribute('hidden');
+}
+export function Page() @{
+	let open = state(false);
+	const none = null as HTMLElement | null;
+	<main>
+		<p>{none !== null && check(none) ? 'reached' : 'not reached'}</p>
+		<p>{true && open ? 'open' : 'shut'}</p>
+		<p>{'kept' ?? open}</p>
+		<p>{open && 'yes'}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const parts = (payload?.nodes ?? []).flatMap((node) => (node.kind === 'text' ? [node.parts] : []));
+		expect(parts).toEqual([
+			[{ expr: { literal: 'not reached' } }],
+			[{ expr: { if: { cell: 'state:open' }, whenTrue: { literal: 'open' }, whenFalse: { literal: 'shut' } } }],
+			[{ expr: { literal: 'kept' } }],
+			[{ expr: { logical: '&&', left: { cell: 'state:open' }, right: { literal: 'yes' } } }],
+		]);
+	});
+
+	it("seeds a row part's state from the row's item, and reads a handle bound in rows only to find the tapped row", async () => {
+		const source = (find: string) => `import { element, shared, state } from '@markless/core';
+const listState = shared(() => {
+	const list = state({ picked: '' });
+	const rowEls = element<HTMLElement[]>();
+	return { ...list, rowEls };
+}, { scope: 'subtree' });
+const rowState = shared(() => {
+	const row = state({ value: '' });
+	return { ...row };
+}, { scope: 'subtree' });
+function holder(rows: HTMLElement[] | undefined, target: Node | null): HTMLElement | null {
+${find}
+}
+function Row({ value }: { readonly value: string }) @{
+	const list = listState();
+	const row = rowState();
+	row.value = value;
+	<li el={list.rowEls} ui-value={row.value}>{row.value}</li>
+}
+export function Page() @{
+	const list = listState();
+	const items = state([{ id: 'a' }, { id: 'b' }]);
+	<main>
+		<ul onClick={(event) => {
+			const found = holder(list.rowEls, event.target as Node);
+			if (found !== null) list.picked = found.getAttribute('ui-value') ?? '';
+		}}>
+			@for (const item of items; key item.id) {
+				<Row value={item.id} />
+			}
+		</ul>
+		<p>{list.picked}</p>
+	</main>
+}`;
+		const found = await nativeView(
+			source(`	for (const row of rows ?? []) if (row.contains(target)) return row;
+	return null;`),
+		);
+		expect(found.diagnostics.filter((d) => d.code === NATIVE_UNSUPPORTED_CODE)).toEqual([]);
+		expect(found.payload?.cells.find((cell) => cell.name === 'row.value')).toMatchObject({
+			initial: '',
+			row: 'repeat:0',
+			first: { member: { item: 'repeat:0' }, property: 'id' },
+		});
+		const counted = await nativeView(
+			source(`	return rows && rows.length > 1 ? rows[1]! : null;`),
+			dataOnly,
+		);
+		expect(counted.payload).toBeNull();
+		expect(counted.diagnostics.map((d) => d.message).join('\n')).toContain('a @for');
+	});
+
+	it("reads a shared() factory's own handle by its name in the factory's methods, and refuses one bound inside an @if arm", async () => {
+		const source = (field: string) => `import { element, shared, state } from '@markless/core';
+const boxState = shared(() => {
+	const box = state({ note: '' });
+	const fieldEl = element<HTMLInputElement>();
+	return {
+		...box,
+		fieldEl,
+		check() {
+			box.note = fieldEl ? 'has field' : 'no field';
+		},
+	};
+}, { scope: 'subtree' });
+export function Page() @{
+	const box = boxState();
+	let shown = state(true);
+	<main>
+		${field}
+		<button onClick={() => box.check()}>{box.note}</button>
+	</main>
+}`;
+		const plain = await nativeView(source('<input aria-label="Field" el={box.fieldEl} />'), dataOnly);
+		expect(plain.diagnostics).toEqual([]);
+		expect(plain.payload?.handlers[0]?.ops).toEqual([
+			{ op: 'assign', cell: 'shared:src/App.tsrx#boxState/state:box.note', value: { literal: 'has field' } },
+		]);
+		const armed = await nativeView(source('@if (shown) { <input aria-label="Field" el={box.fieldEl} /> }'), dataOnly);
+		expect(armed.payload).toBeNull();
+		expect(armed.diagnostics.map((d) => d.message)).toContain(
+			"the click handler reads `fieldEl`, a handle bound inside an @if arm",
+		);
+	});
+
+	it('leaves out a <select> hidden from sight and screen readers, and refuses one inside a form by name', async () => {
+		const select = '<select aria-hidden="true" tabindex={-1} name="size"><option>{size}</option></select>';
+		const alone = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let size = state('small');
+	<main>${select}<p>{size}</p></main>
+}`);
+		expect(alone.diagnostics).toEqual([]);
+		expect(alone.payload?.nodes.some((node) => node.kind === 'element' && node.element === 'select')).toBe(false);
+		const sent = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let size = state('small');
+	<form onSubmit={(event) => { event.preventDefault(); size = 'sent'; }}>${select}<button>Send</button><p>{size}</p></form>
+}`);
+		expect(sent.payload).toBeNull();
+		expect(sent.diagnostics.map((d) => d.message)).toContain(
+			'a hidden <select> in the <form> h0, whose value a native build does not submit yet',
+		);
+		const shown = await nativeView(`export function Page() @{
+	<main><select name="size"><option>small</option></select></main>
+}`);
+		expect(shown.diagnostics.map((d) => d.message)).toContain('the <select> element has no native view yet');
 	});
 
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
@@ -829,7 +1220,9 @@ export function Pager() @{
 		expect(diagnostics).toEqual([]);
 		const page = { cell: 'shared:src/App.tsrx#pagerState/state:pager.page' };
 		const last = 'shared:src/App.tsrx#pagerState/state:pager.last';
-		const stepOf = (passed: object) => ({ logical: '??', left: passed, right: { literal: 1 } });
+		// A step known when the app is built (`null ?? 1`) folds to its value; one read from a kept cell stays a `??`.
+		const stepOf = (passed: object) =>
+			'literal' in passed ? { literal: 1 } : { logical: '??', left: passed, right: { literal: 1 } };
 		expect(payload?.handlers.map((handler) => handler.ops)).toEqual([
 			[
 				{
@@ -907,11 +1300,7 @@ export function Picks() @{
 				{
 					expr: {
 						if: { binary: '===', left: first, right: { literal: null } },
-						whenTrue: {
-							logical: '??',
-							left: { literal: null },
-							right: { literal: 'none' },
-						},
+						whenTrue: { literal: 'none' },
 						whenFalse: first,
 					},
 				},
@@ -1042,14 +1431,14 @@ export function List() @{
 				{
 					op: 'assign',
 					cell: picked,
-					value: { logical: '??', left: { literal: 'a' }, right: { literal: '' } },
+					value: { literal: 'a' },
 				},
 			],
 			[
 				{
 					op: 'assign',
 					cell: picked,
-					value: { logical: '??', left: { literal: 'b' }, right: { literal: '' } },
+					value: { literal: 'b' },
 				},
 			],
 		]);

@@ -34,6 +34,10 @@ export type LadderAction =
 	  }
 	/** The keyboard's return key in the text field with this accessible name. */
 	| { readonly submit: string }
+	/** The keyboard's delete key in the text field with this accessible name, its text cursor at the end. */
+	| { readonly erase: string }
+	/** Two quick taps on this text or accessible name: the second press's `event.detail` is 2. */
+	| { readonly doubleTap: string }
 	/** Scroll until this text is on screen. */
 	| { readonly scrollTo: string }
 	| {
@@ -384,6 +388,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];
 	if ('submit' in action) return [{ tapOn: selector(action.submit) }, { pressKey: 'Enter' }];
+	if ('erase' in action) return [{ tapOn: selector(action.erase) }, { pressKey: 'Backspace' }];
+	if ('doubleTap' in action) return [{ doubleTapOn: selector(action.doubleTap) }];
 	if ('relaunch' in action)
 		return [
 			'stopApp',

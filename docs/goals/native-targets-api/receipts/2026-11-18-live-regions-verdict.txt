@@ -1,0 +1,15 @@
+proof passed on iOS and Android (6 rungs)
+
+Android in-app device conformance (ProofActivity --ez conformance true, AVD markless_mac), 10 vectors:
+pass counter.json
+pass input.json
+pass live.json
+pass notes.json
+pass projected.json
+pass quiet-default.json
+pass rows.json
+pass ticked-keys.json
+pass typed-target.json
+pass unset.json
+With the host line that sets accessibilityLiveRegion removed:
+FAIL live.json: initial: h2 is not a polite live region; initial: h3 is not a assertive live region; initial: h4 is not a polite live region

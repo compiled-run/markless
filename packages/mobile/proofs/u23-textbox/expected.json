@@ -1,0 +1,30 @@
+{
+	"rung": 123,
+	"name": "@markless/ui textbox: the input handler hands its event's target to the family's own method, which reads the typed value",
+	"steps": [
+		{
+			"visible": [
+				"Profile",
+				"As it appears on your card",
+				"Typed: nothing yet",
+				"Changes: 0"
+			],
+			"fields": {
+				"Full name": "Sam"
+			}
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Full name",
+					"text": "Ada"
+				}
+			},
+			"visible": ["Typed: Ada"],
+			"absent": ["Typed: nothing yet", "Typed: Sam"],
+			"fields": {
+				"Full name": "Ada"
+			}
+		}
+	]
+}

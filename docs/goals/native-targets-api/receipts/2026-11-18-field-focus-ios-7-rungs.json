@@ -1,0 +1,48 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u29-field-focus",
+			"failure": null,
+			"installSeconds": 3.583812834,
+			"flowSeconds": 34.129963000000004
+		},
+		{
+			"name": "u23-textbox",
+			"failure": null,
+			"installSeconds": 0.3736529589999991,
+			"flowSeconds": 26.44592766700001
+		},
+		{
+			"name": "u25-textbox-textarea",
+			"failure": null,
+			"installSeconds": 0.28138775000002353,
+			"flowSeconds": 25.440320083
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.3355143749999988,
+			"flowSeconds": 27.367178209000006
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 0.27876074999998673,
+			"flowSeconds": 37.83295404100002
+		},
+		{
+			"name": "f2-return-key",
+			"failure": null,
+			"installSeconds": 0.28774458300002154,
+			"flowSeconds": 51.246104584000015
+		},
+		{
+			"name": "u22-radio-group",
+			"failure": null,
+			"installSeconds": 0.29116970799997216,
+			"flowSeconds": 30.006465457999962
+		}
+	]
+}
