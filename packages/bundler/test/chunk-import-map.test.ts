@@ -1,4 +1,4 @@
-import { chromium } from '@playwright/test';
+
 import { describe, expect, test } from 'vitest';
 import {
 	MARKLESS_CHUNK_SPECIFIER_PREFIX,
@@ -11,6 +11,7 @@ import {
 	unmappedChunkSpecifiers,
 } from '../src/build/content-hash-names.ts';
 import { collapseLazyModuleFacades } from '../src/build/lazy-module-facades.ts';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 type TestChunk = {
 	type: 'chunk';
@@ -219,7 +220,7 @@ describe('the pack registry behind the import map', () => {
 		expect(entry.code).not.toMatch(/chunk-[\w-]+\.js/);
 
 		const origin = 'http://markless-import-map.test';
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage();
 			// A module script, so import.meta.resolve runs against the document's import map.

@@ -1,4 +1,4 @@
-import { chromium } from '@playwright/test';
+
 import { expect, test } from 'vitest';
 import { censusElements } from '../src/resume-census.ts';
 import { marklessFindElementAtDomOrderIndex } from '../src/fns/dom-order.ts';
@@ -6,6 +6,7 @@ import {
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
 } from '../../serializer/src/protocol-page-markers.ts';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 // The recursive childNodes walk the census used before it took the native walker.
 function recursiveCensus(nodes: ArrayLike<Node>): Node[] {
@@ -23,7 +24,7 @@ type PageCensus = (nodes: ArrayLike<Node>) => Node[];
 type PageDomOrder = (root: Element & { __marklessCensus?: Node[] }, index: number) => Node;
 
 test('the native census pins the same root-first order as the recursive walk and dom-order', async () => {
-	const browser = await chromium.launch({ headless: true });
+	const browser = await launchBrowser();
 	try {
 		const page = await browser.newPage();
 		await page.setContent('<!doctype html><body></body>');
