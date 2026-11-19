@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -13,18 +14,32 @@ import android.widget.FrameLayout
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import dev.markless.mobile.core.EventName
+import dev.markless.mobile.core.JournalEntry
+import dev.markless.mobile.core.TouchPoint
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.OVERLAY_ATTRIBUTE
 import kotlin.math.roundToInt
 
 /**
  * The overlay stack on screen. A modal overlay is lifted into a top layer above the page and the bars, with the page behind
- * hidden from TalkBack; a non-modal one stays in place. While any is open the back gesture is its Escape, and every touch on
- * the screen is reported to the runtime as `pointerdown` and `pointerup` on the innermost element under it.
+ * hidden from TalkBack; a non-modal one stays in place. While any is open the back gesture is its Escape. When the page has an
+ * overlay or a pointer handler, each finger on the screen is reported to the runtime as a touch on the innermost element
+ * under it: `pointerdown`, `pointermove`, then `pointerup`, or `pointercancel` once a scroll view takes it.
  */
 internal class Overlays(private val host: MarklessHost, private val context: Context, private val dpr: Double) {
 	private val reportsTouches = host.payload.nodes.any { it is Node.Element && OVERLAY_ATTRIBUTE in it.attributes } ||
-		host.payload.events.any { it.event == EventName.PointerDown || it.event == EventName.PointerUp }
+		host.payload.events.any { it.event.pointer }
+
+	private val appeared = SystemClock.uptimeMillis()
+	/** The next touch's number: from 1 for each screen, one more for each new touch, as Chrome on Android numbers them. */
+	private var nextPointer = 1
+
+	/** A finger that is down: its touch's number and where it last was, in window px. */
+	private class Finger(val pointerId: Int, var x: Float, var y: Float)
+
+	/** Each finger that is down and not cancelled, by its MotionEvent pointer id. */
+	private val fingers = LinkedHashMap<Int, Finger>()
+	private var lastTime = appeared
 
 	private class Lifted(val id: String, val view: View, val layer: FrameLayout, val parent: ViewGroup, val index: Int, val params: ViewGroup.LayoutParams?, val background: Drawable?, val padding: IntArray)
 
@@ -102,13 +117,48 @@ internal class Overlays(private val host: MarklessHost, private val context: Con
 	/** Called with every touch in window coordinates before the views see it; nothing is consumed. */
 	fun touch(event: MotionEvent) {
 		if (!reportsTouches) return
-		val name = when (event.actionMasked) {
-			MotionEvent.ACTION_DOWN -> EventName.PointerDown
-			MotionEvent.ACTION_UP -> EventName.PointerUp
-			else -> return
+		lastTime = event.eventTime
+		when (event.actionMasked) {
+			MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+				// A new gesture: a finger left over from one whose end never arrived is cancelled first.
+				if (event.actionMasked == MotionEvent.ACTION_DOWN) cancelTouches()
+				val i = event.actionIndex
+				val finger = Finger(nextPointer++, event.getX(i), event.getY(i))
+				val target = hit(finger.x.roundToInt(), finger.y.roundToInt()) ?: return
+				fingers[event.getPointerId(i)] = finger
+				report(EventName.PointerDown, target, finger)
+			}
+			MotionEvent.ACTION_MOVE -> for (i in 0 until event.pointerCount) {
+				val finger = fingers[event.getPointerId(i)] ?: continue
+				if (finger.x == event.getX(i) && finger.y == event.getY(i)) continue
+				finger.x = event.getX(i); finger.y = event.getY(i)
+				if (report(EventName.PointerMove, hit(finger.x.roundToInt(), finger.y.roundToInt()) ?: continue, finger)) return
+			}
+			MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+				val i = event.actionIndex
+				val finger = fingers.remove(event.getPointerId(i)) ?: return
+				finger.x = event.getX(i); finger.y = event.getY(i)
+				report(EventName.PointerUp, hit(finger.x.roundToInt(), finger.y.roundToInt()) ?: return, finger)
+			}
+			MotionEvent.ACTION_CANCEL -> cancelTouches()
 		}
-		val target = hit(event.x.roundToInt(), event.y.roundToInt()) ?: return
-		host.apply(host.runtime.dispatch(target, name))
+	}
+
+	/** Sends `pointercancel` for every finger that is down; their later moves and lifts are not reported. */
+	fun cancelTouches() {
+		val cancelled = fingers.values.toList()
+		fingers.clear()
+		for (finger in cancelled) if (report(EventName.PointerCancel, hit(finger.x.roundToInt(), finger.y.roundToInt()) ?: continue, finger)) return
+	}
+
+	/** Dispatches one touch event; true when it navigated, after which this screen reports nothing more. */
+	private fun report(name: EventName, target: String, finger: Finger): Boolean {
+		val point = TouchPoint(finger.pointerId.toDouble(), finger.x / dpr, finger.y / dpr, (lastTime - appeared).toDouble())
+		val journal = host.runtime.dispatch(target, name, point = point)
+		val navigated = journal.any { it is JournalEntry.Navigate }
+		if (navigated) fingers.clear()
+		host.apply(journal)
+		return navigated
 	}
 
 	/** The innermost element under the point; the top layer stands for its overlay's box, and the rest of the screen for the root. */

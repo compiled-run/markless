@@ -1,0 +1,44 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html,body{margin:0;height:100%;font:16px system-ui}
+.band{position:fixed;left:5vw;width:90vw;display:flex;align-items:center;justify-content:center;border:2px solid #333;box-sizing:border-box}
+#tap{top:12vh;height:8vh;background:#cde}
+#other{top:22vh;height:7vh;background:#edc}
+#drag{top:31vh;height:11vh;background:#cec;touch-action:none}
+#release{top:44vh;height:7vh;background:#cce;touch-action:none}
+#parent{top:53vh;height:10vh;background:#ecc;touch-action:none}
+#child{position:absolute;left:10%;top:10%;width:80%;height:80%;background:#c99;display:flex;align-items:center;justify-content:center}
+#scroll{top:65vh;height:20vh;overflow:auto;background:#eee;display:block}
+#scroll div{height:300vh;background:linear-gradient(#fff,#999)}
+#status{position:fixed;top:2vh;left:5vw}
+</style></head><body>
+<div id="status">recorder</div>
+<button id="tap" class="band">tap</button>
+<button id="other" class="band">other</button>
+<div id="drag" class="band">drag (captures)</div>
+<div id="release" class="band">release</div>
+<div id="parent" class="band"><div id="child">child</div></div>
+<div id="scroll" class="band"><div id="scrollInner">scroll</div></div>
+<script>
+const types=['pointerover','pointerenter','pointerdown','pointermove','pointerup','pointercancel','pointerout','pointerleave','gotpointercapture','lostpointercapture','mouseover','mouseenter','mousemove','mousedown','mouseup','mouseout','mouseleave','click','contextmenu','touchstart','touchmove','touchend','touchcancel','focusin','focusout'];
+const ids=new Map(); const idOf=p=>{if(p===undefined)return undefined;if(!ids.has(p))ids.set(p,ids.size+1);return ids.get(p)};
+const name=t=>t&&t.id?t.id:(t===document?'document':t===window?'window':t&&t.nodeName?t.nodeName.toLowerCase():null);
+let buf=[];let seq=0;
+const flush=()=>{if(!buf.length)return;const b=buf;buf=[];fetch('/log',{method:'POST',body:JSON.stringify(b),keepalive:true});};
+setInterval(flush,300);
+for(const type of types) document.addEventListener(type,e=>{
+ const r={seq:seq++,type,target:name(e.target),t:Math.round(e.timeStamp)};
+ if('pointerId' in e){r.pointerType=e.pointerType;r.pointerId=idOf(e.pointerId);r.isPrimary=e.isPrimary;r.width=e.width;r.height=e.height;r.pressure=e.pressure}
+ if('button' in e){r.button=e.button;r.buttons=e.buttons;r.clientX=Math.round(e.clientX);r.clientY=Math.round(e.clientY);r.detail=e.detail}
+ if(e.relatedTarget!==undefined)r.relatedTarget=name(e.relatedTarget);
+ r.cancelable=e.cancelable;r.isTrusted=e.isTrusted;
+ buf.push(r);
+},{capture:true,passive:true});
+document.getElementById('drag').addEventListener('pointerdown',e=>{e.currentTarget.setPointerCapture(e.pointerId);buf.push({seq:seq++,type:'note',text:'setPointerCapture',has:e.currentTarget.hasPointerCapture(e.pointerId)})});
+document.getElementById('parent').addEventListener('pointerdown',e=>{e.currentTarget.setPointerCapture(e.pointerId);buf.push({seq:seq++,type:'note',text:'setPointerCapture parent',has:e.currentTarget.hasPointerCapture(e.pointerId)})});
+document.getElementById('release').addEventListener('pointerdown',e=>{e.currentTarget.releasePointerCapture(e.pointerId);buf.push({seq:seq++,type:'note',text:'releasePointerCapture',has:e.currentTarget.hasPointerCapture(e.pointerId)})});
+window.addEventListener('scroll',()=>{},{passive:true});
+document.getElementById('scroll').addEventListener('scroll',()=>{if(!window.__s){window.__s=1;buf.push({seq:seq++,type:'scroll',target:'scroll'})}});
+buf.push({seq:seq++,type:'load',ua:navigator.userAgent,maxTouchPoints:navigator.maxTouchPoints,hover:matchMedia('(hover: hover)').matches,anyHover:matchMedia('(any-hover: hover)').matches,pointer:matchMedia('(pointer: coarse)').matches?'coarse':'fine',vw:innerWidth,vh:innerHeight});
+document.getElementById('status').textContent='ready '+innerWidth+'x'+innerHeight;
+</script></body></html>

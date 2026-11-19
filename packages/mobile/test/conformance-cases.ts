@@ -572,6 +572,44 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'component-edge:5/h5' },
 		],
 	},
+	{
+		// Touches as a phone's browser delivers them (recorded from Safari on iOS and Chrome on Android, see
+		// conformance/recorded/): a tap on a child of the pad, a drag the pad captures from that child, a press that releases
+		// its capture and moves across elements, a drag a scroll takes, and a second finger.
+		name: 'touch',
+		fixture: 'test/fixtures/Touch.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h3', pointerId: 1, x: 40, y: 120, time: 1000 },
+			{ event: 'pointerup', host: 'h3', pointerId: 1, x: 40, y: 120, time: 1080 },
+			{ event: 'pointerdown', host: 'h3', pointerId: 2, x: 40, y: 120, time: 2000 },
+			{ event: 'pointermove', host: 'h3', pointerId: 2, x: 52, y: 118, time: 2016 },
+			{ event: 'pointermove', host: 'h4', pointerId: 2, x: 64.5, y: 190, time: 2032 },
+			{ event: 'pointerup', host: 'h4', pointerId: 2, x: 64.5, y: 190, time: 2048 },
+			{ event: 'pointerdown', host: 'h5', pointerId: 3, x: 40, y: 300, time: 3000 },
+			{ event: 'pointermove', host: 'h4', pointerId: 3, x: 40, y: 200, time: 3016 },
+			{ event: 'pointermove', host: 'h4', pointerId: 3, x: 40, y: 190, time: 3032 },
+			{ event: 'pointerup', host: 'h4', pointerId: 3, x: 40, y: 190, time: 3048 },
+			{ event: 'pointerdown', host: 'h4', pointerId: 4, x: 40, y: 190, time: 4000 },
+			{ event: 'pointermove', host: 'h4', pointerId: 4, x: 40, y: 180, time: 4016 },
+			{ event: 'pointercancel', host: 'h4', pointerId: 4, x: 40, y: 170, time: 4032 },
+			{ event: 'pointerdown', host: 'h2', pointerId: 5, x: 30, y: 110, time: 5000 },
+			{ event: 'pointerdown', host: 'h4', pointerId: 6, x: 30, y: 190, time: 5010 },
+			{ event: 'pointerup', host: 'h4', pointerId: 6, x: 30, y: 190, time: 5100 },
+			{ event: 'pointerup', host: 'h2', pointerId: 5, x: 30, y: 110, time: 5110 },
+		],
+	},
+	{
+		// The same touch fields, read by pointer handlers that run as JavaScript.
+		name: 'touch-script',
+		fixture: 'test/fixtures/TouchScript.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h2', pointerId: 1, x: 40, y: 120, time: 1000 },
+			{ event: 'pointermove', host: 'h2', pointerId: 1, x: 52.5, y: 118, time: 1016 },
+			{ event: 'pointerup', host: 'h2', pointerId: 1, x: 52.5, y: 118, time: 1032 },
+			{ event: 'pointerdown', host: 'h2', pointerId: 2, x: 30, y: 100, time: 2000 },
+			{ event: 'pointercancel', host: 'h2', pointerId: 2, x: 30, y: 90, time: 2016 },
+		],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */

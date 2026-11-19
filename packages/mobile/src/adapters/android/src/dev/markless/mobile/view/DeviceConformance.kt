@@ -8,9 +8,11 @@ import dev.markless.mobile.core.JournalEntry
 import dev.markless.mobile.core.JsString
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
+import dev.markless.mobile.core.TouchPoint
 import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.field
 import dev.markless.mobile.core.jsonString
+import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
 
@@ -71,7 +73,11 @@ object DeviceConformance {
 				"cancel" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Cancel))
 				"dismiss" -> action["reason"]?.let { host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Dismiss, reason = it.str("reason"))) }
 					?: host.closedByPlatform(action.field("host", "action").str("host"))
-				"pointerdown", "pointerup" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.entries.first { it.wire == event }))
+				"pointerdown", "pointermove", "pointerup", "pointercancel" -> {
+					fun n(name: String, default: Double) = action[name]?.num("action.$name") ?: default
+					val point = TouchPoint(n("pointerId", 1.0), n("x", 0.0), n("y", 0.0), n("time", 0.0))
+					host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.entries.first { it.wire == event }, point = point))
+				}
 				"input" -> (target as? EditText ?: throw MarklessHostError("steps[$n] types into a view that is not an input")).setText(action.field("value", "action").str("value"))
 				"dismiss" -> host.closedByPlatform(action.field("host", "action").str("host"))
 				"enter" -> (target as? EditText ?: throw MarklessHostError("steps[$n] presses return in a view that is not an input")).onEditorAction(EditorInfo.IME_ACTION_GO)

@@ -1,0 +1,39 @@
+appId: ${APP_ID}
+name: t1-touch
+---
+- launchApp:
+    clearState: true
+- assertVisible: Drag me
+- assertVisible: Idle
+- assertVisible: Pointer none
+- assertVisible: Captured no
+- assertVisible: Still
+- assertVisible: Over 0 left 0
+- assertVisible: Not scrolled
+- swipe:
+    from:
+      text: Drag me
+    direction: RIGHT
+    duration: 800
+- assertNotVisible: Idle
+- assertNotVisible: Still
+- assertVisible: Dropped right
+- assertVisible: Pointer touch
+- assertVisible: Captured yes
+- assertVisible: Moved
+- assertVisible: Over 2 left 1
+- assertVisible: Not scrolled
+- assertNotVisible: Idle
+- assertNotVisible: Dragging
+- assertNotVisible: Still
+- swipe:
+    from:
+      text: Scroll me
+    direction: UP
+    duration: 800
+- assertNotVisible: Not scrolled
+- assertVisible: Taken by the scroll
+- assertVisible: Dropped right
+- assertNotVisible: Touching
+- assertNotVisible: Lifted
+- assertNotVisible: Not scrolled

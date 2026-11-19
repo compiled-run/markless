@@ -11,8 +11,8 @@ class AppRuntime(val app: AppPayload, path: String, private val store: Store = M
 		Screen(route, params, AppPayload.path(route, params), Runtime(app.page(route).page, store, params, scriptHost = scriptHost))
 
 	/** Runs an action on the top screen; a `navigate` entry pushes the new screen, or replaces the top one. */
-	fun dispatch(host: String, event: EventName, value: String? = null): List<JournalEntry> {
-		val journal = screens.last().runtime.dispatch(host, event, value)
+	fun dispatch(host: String, event: EventName, value: String? = null, point: TouchPoint? = null): List<JournalEntry> {
+		val journal = screens.last().runtime.dispatch(host, event, value, point = point)
 		val last = journal.lastOrNull()
 		if (last is JournalEntry.Navigate) {
 			val next = open(last.route, last.params)
