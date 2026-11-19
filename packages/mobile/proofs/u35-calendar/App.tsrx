@@ -5,6 +5,7 @@ export default function App() @{
 	const picked = state({ value: 'none' });
 	<main>
 		<h1>Delivery</h1>
+		<p>{`Picked ${picked.value}`}</p>
 		<calendar.root
 			month="2026-08-01"
 			onChange={(next: calendar.CalendarValue) => {
@@ -14,7 +15,6 @@ export default function App() @{
 			<calendar.label>Delivery date</calendar.label>
 			<Month />
 		</calendar.root>
-		<p>{`Picked ${picked.value}`}</p>
 	</main>
 }
 

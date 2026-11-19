@@ -35,9 +35,9 @@
 		},
 		{
 			"do": {
-				"tap": "15"
+				"tap": "9"
 			},
-			"visible": ["Picked 2026-07-15", "July 2026"],
+			"visible": ["Picked 2026-07-09", "July 2026"],
 			"absent": ["Picked none"]
 		}
 	]

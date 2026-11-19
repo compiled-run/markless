@@ -297,7 +297,8 @@ final class ViewTree {
 		overlays = OverlayHost(
 			runtime: runtime, root: root, onAction: onAction,
 			nodeOf: { [unowned self] view in
-				view.accessibilityIdentifier.flatMap { id in self.elements[id] === view ? self.templates[id] : nil }
+				// A row's copy is reported as itself (`<node>@<key>`), which is what the runtime knows it by.
+				view.accessibilityIdentifier.flatMap { id in self.elements[id] === view ? (id.contains("@") ? id : self.templates[id]) : nil }
 			},
 			viewOf: { [unowned self] id in self.elements[id] },
 			restack: { [unowned self] container in if self.layout == nil { self.stack(container) } })

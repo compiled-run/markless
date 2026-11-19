@@ -23,8 +23,8 @@ name: u35-calendar
 - assertVisible: July 2026
 - assertVisible: Picked none
 - assertNotVisible: August 2026
-- tapOn: '15'
+- tapOn: '9'
 - assertNotVisible: Picked none
-- assertVisible: Picked 2026-07-15
+- assertVisible: Picked 2026-07-09
 - assertVisible: July 2026
 - assertNotVisible: Picked none
