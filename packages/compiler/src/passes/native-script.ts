@@ -163,7 +163,10 @@ var fn = function (id) {
 	if (!functions[id]) load(owners[id]);
 	return functions[id];
 };
+// A cell still undefined on the web reads so here until something writes it; a write, even of null, is reported.
+var unset = {}, forced = {};
 var slotValue = function (slot) {
+	if (unset[slot]) return undefined;
 	if (Object.prototype.hasOwnProperty.call(cells, slot)) return cells[slot];
 	var at = slot.indexOf('@');
 	return at < 0 ? undefined : cells[slot.slice(0, at)];
@@ -172,7 +175,13 @@ var cellProperty = function (target, name, slot) {
 	Object.defineProperty(target, name, {
 		enumerable: true,
 		get: function () { return slotValue(slot); },
-		set: function (value) { cells[slot] = value; },
+		set: function (value) {
+			if (unset[slot]) {
+				delete unset[slot];
+				forced[slot] = true;
+			}
+			cells[slot] = value;
+		},
 	});
 };
 var frameOf = function (bindings) {
@@ -235,6 +244,9 @@ var begin = function (entry) {
 	elementFacts = entry.elements || {};
 	proxies = {};
 	cells = entry.cells;
+	unset = {};
+	forced = {};
+	(entry.unset || []).forEach(function (slot) { unset[slot] = true; });
 	before = {};
 	for (var slot in cells) before[slot] = JSON.stringify(cells[slot]);
 	host.out = { timers: [], clears: [], requests: [], logs: [], commands: [] };
@@ -315,7 +327,7 @@ g.__markless[id] = {
 		var writes = [];
 		for (var slot in cells) {
 			var now = JSON.stringify(cells[slot]);
-			if (now !== before[slot]) writes.push([slot, now === undefined ? null : JSON.parse(now)]);
+			if (now !== before[slot] || forced[slot]) writes.push([slot, now === undefined ? null : JSON.parse(now)]);
 		}
 		var out = host.out;
 		host.out = null;

@@ -188,6 +188,8 @@ class Runtime(
 	private val opened = now()
 	private val computed = HashMap<String, JsValue>()
 	private var computedCells: String? = null
+	/** Cells still `undefined` on the web: a script reads them so until one is written. */
+	private val unset = HashSet<String>().apply { for (c in payload.cells) if (c.unset && c.storageKey?.let(store::get) == null) add(c.id) }
 	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, if (c.clock) JsValue.Num(opened) else c.storageKey?.let(store::get) ?: c.initial) }
 	/** `idle` and `visible` handlers that ran, by `<event>\u0000<instance>`; an instance that leaves the screen is forgotten. */
 	private val fired = HashSet<String>()
@@ -442,6 +444,7 @@ class Runtime(
 	private fun entryCells(): String = buildString {
 		append(",\"cells\":")
 		append(values.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" })
+		if (unset.isNotEmpty()) append(",\"unset\":${unset.sorted().joinToString(",", "[", "]") { jsonString(it) }}")
 		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
 	}
 
@@ -461,6 +464,7 @@ class Runtime(
 			if (payload.cells.none { it.id == cell }) throw MarklessRuntimeError("the script wrote unknown cell $cell")
 			val v = JsValue.fromJson(pair[1])
 			values[slot] = v
+			unset.remove(slot)
 			storageKeys[cell]?.let { store.set(it, v) }
 		}
 		for (l in list("logs")) {
@@ -868,6 +872,7 @@ class Runtime(
 		val cell = then.catch ?: return emptyList()
 		return change(null, null) {
 			values[cell] = JsValue.Obj(linkedMapOf("name" to JsValue.Str(name), "message" to JsValue.Str(message)))
+			unset.remove(cell)
 			emptyList()
 		}
 	}
@@ -934,6 +939,7 @@ class Runtime(
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)
 				values[slot(op.cell, scope)] = v
+				unset.remove(op.cell)
 				storageKeys[op.cell]?.let { store.set(it, v) }
 			}
 		}
@@ -943,7 +949,7 @@ class Runtime(
 	/** A live device value changed: writes its device cell and returns the journal. */
 	fun device(cell: String, value: JsValue): List<JournalEntry> {
 		if (payload.cells.none { it.id == cell && it.device != null }) throw MarklessRuntimeError("\"$cell\" is not a device cell")
-		return change(null, null) { values[cell] = value; emptyList() }
+		return change(null, null) { values[cell] = value; unset.remove(cell); emptyList() }
 	}
 
 	/** A device call answered: the task cell takes `{ state: 'value', value }`. */
@@ -956,7 +962,7 @@ class Runtime(
 
 	private fun settleWith(cell: String, value: JsValue): List<JournalEntry> {
 		if (payload.cells.none { it.id == cell && it.task != null }) throw MarklessRuntimeError("\"$cell\" is not a task cell")
-		return change(null, null) { values[cell] = value; emptyList() }
+		return change(null, null) { values[cell] = value; unset.remove(cell); emptyList() }
 	}
 
 	/** The calls a host starts at mount, one per task cell. */

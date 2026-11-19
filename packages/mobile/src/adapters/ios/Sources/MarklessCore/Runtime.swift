@@ -179,6 +179,8 @@ public final class NativeRuntime {
 	public let payload: NativeViewPayload
 	// Each write moves `version`, so a script computed is run again only once a cell may have changed.
 	private var values: [String: NativeValue] { didSet { version &+= 1 } }
+	/// Cells still `undefined` on the web: a script reads them so until one is written.
+	private var unset: Set<String> = []
 	private var version = 0
 	private var computed: [String: NativeValue] = [:]
 	private var computedAt = -1
@@ -239,6 +241,7 @@ public final class NativeRuntime {
 			(cell.id, cell.clock ? .number(opened) : cell.storageKey.flatMap(store.read) ?? cell.initial)
 		})
 		storageKeys = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.storageKey.map { (cell.id, $0) } })
+		unset = Set(payload.cells.filter { $0.unset && $0.storageKey.flatMap(store.read) == nil }.map(\.id))
 		handlers = Dictionary(uniqueKeysWithValues: payload.handlers.map { ($0.id, $0.ops) })
 		var continuations: [String: NativeContinuation] = [:]
 		func collect(_ ops: [NativeOp]) {
@@ -541,7 +544,9 @@ public final class NativeRuntime {
 		let cells = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0.json) } }
 			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!.json) }
 		let crypto = payload.script?.services.contains(.crypto) == true
-		return [("cells", .object(cells))] + (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
+		return [("cells", .object(cells))]
+			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
+			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
@@ -559,6 +564,7 @@ public final class NativeRuntime {
 			guard values[cell] != nil, payload.cells.contains(where: { $0.id == cell }) else { throw RuntimeError(reason: "the script wrote unknown cell \(cell)") }
 			let value = NativeValue(json: pair[1].value)
 			values[slot] = value
+			unset.remove(slot)
 			if let key = storageKeys[cell] { store.write(key, value) }
 		}
 		for line in try result["logs"].array() {
@@ -945,6 +951,7 @@ public final class NativeRuntime {
 		guard let cell = then.catch else { return [] }
 		return try change(host: nil) {
 			self.values[cell] = .object([("name", .string(name)), ("message", .string(message))])
+			self.unset.remove(cell)
 			return []
 		}
 	}
@@ -995,6 +1002,7 @@ public final class NativeRuntime {
 			case let .assign(cell, expr):
 				let value = try evaluate(expr, in: scope)
 				values[try slot(of: cell, in: scope)] = value
+				unset.remove(cell)
 				if let key = storageKeys[cell] { store.write(key, value) }
 			case let .when(test, then, otherwise):
 				let taken = try run(try evaluate(test, in: scope).isTruthy ? then : otherwise, in: scope, submission: submission)
@@ -1064,7 +1072,7 @@ public final class NativeRuntime {
 	/// A live device value changed: writes its device cell and returns the journal.
 	public func device(_ cell: String, _ value: NativeValue) throws -> [NativeJournalEntry] {
 		guard payload.cells.contains(where: { $0.id == cell && $0.device != nil }) else { throw RuntimeError(reason: "\(cell) is not a device cell") }
-		return try change(host: nil) { self.values[cell] = value; return [] }
+		return try change(host: nil) { self.values[cell] = value; self.unset.remove(cell); return [] }
 	}
 
 	/// A device call answered: the task cell takes `{ state: 'value', value }`.
@@ -1079,7 +1087,7 @@ public final class NativeRuntime {
 
 	private func settle(_ cell: String, _ value: NativeValue) throws -> [NativeJournalEntry] {
 		guard payload.cells.contains(where: { $0.id == cell && $0.task != nil }) else { throw RuntimeError(reason: "\(cell) is not a task cell") }
-		return try change(host: nil) { self.values[cell] = value; return [] }
+		return try change(host: nil) { self.values[cell] = value; self.unset.remove(cell); return [] }
 	}
 
 	/// The calls a host starts at mount, one per task cell.

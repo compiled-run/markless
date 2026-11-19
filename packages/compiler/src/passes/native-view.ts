@@ -1304,11 +1304,11 @@ export function createNativeViewPayload(
 	const cellIndex = new Map<string, number>();
 	/** Cells whose first value is `undefined` on the web; a native cell holds null there. */
 	const undefinedFirst = new Set<string>();
-	/** Whether ops read a cell whose first value is `undefined`: the engine would see it as null, where data reads it as unset. */
+	/** Whether ops read a row's cell whose first value is `undefined`: the engine sees a row's value as null there. */
 	const readsUndefinedFirst = (tree: unknown): boolean => {
 		if (!tree || typeof tree !== 'object') return false;
 		const cell = (tree as { cell?: unknown }).cell;
-		if (typeof cell === 'string' && undefinedFirst.has(cell)) return true;
+		if (typeof cell === 'string' && undefinedFirst.has(cell) && cells[cellIndex.get(cell) ?? -1]?.row !== undefined) return true;
 		return Object.values(tree).some(readsUndefinedFirst);
 	};
 	const holdsUndefined = (value: unknown): boolean =>
@@ -1657,6 +1657,10 @@ export function createNativeViewPayload(
 			);
 			return;
 		}
+		// A prop the root was not given is `undefined` there too; any other value replaces the first one.
+		const absent = statement.value.kind === 'read' && isPropName(statement.value.name, scope) && !propOf(statement.value.name, scope);
+		if (absent) undefinedFirst.add(cell);
+		else undefinedFirst.delete(cell);
 		setInitial(cell, folded.value);
 	};
 
@@ -6315,9 +6319,11 @@ export function createNativeViewPayload(
 		...(options.route
 			? { route: { pattern: options.route.pattern, params: options.route.params } }
 			: {}),
-		cells: cells.map((cell) =>
-			styledCells.has(cell.id) && !rowCells.has(cell.id) ? { ...cell, styled: true as const } : cell,
-		),
+		cells: cells.map((cell) => ({
+			...cell,
+			...(styledCells.has(cell.id) && !rowCells.has(cell.id) ? { styled: true as const } : {}),
+			...(undefinedFirst.has(cell.id) && !cell.row && cell.initial === null ? { unset: true as const } : {}),
+		})),
 		nodes,
 		events,
 		handlers,

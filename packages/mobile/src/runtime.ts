@@ -468,9 +468,12 @@ export function createNativeRuntime(
 	};
 	// Each write moves `version`, so a script computed is run again only once a cell may have changed.
 	let version = 0;
+	/** Cells still `undefined` on the web: a script reads them so until one is written. */
+	const unset = new Set<string>();
 	const values = new (class extends Map<string, Value> {
 		override set(key: string, value: Value) {
 			version++;
+			unset.delete(key);
 			return super.set(key, value);
 		}
 		override delete(key: string) {
@@ -487,6 +490,8 @@ export function createNativeRuntime(
 					: cell.initial,
 		]),
 	);
+	for (const cell of payload.cells)
+		if (cell.unset && !(cell.storage && store.has(cell.storage.key))) unset.add(cell.id);
 	const storageKeys = new Map(
 		payload.cells.flatMap((cell) =>
 			cell.storage ? [[cell.id, cell.storage.key] as const] : [],
@@ -633,6 +638,7 @@ export function createNativeRuntime(
 	};
 	const entryCells = () => ({
 		cells: Object.fromEntries(values),
+		...(unset.size > 0 ? { unset: [...unset] } : {}),
 		...(script?.services.includes('crypto') && scriptHost?.seed
 			? { seed: scriptHost.seed() }
 			: {}),

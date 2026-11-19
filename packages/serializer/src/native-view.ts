@@ -639,6 +639,11 @@ export type NativeViewPayload = {
 		 * build, as a page's render reads the clock when it is served; `initial` is never shown.
 		 */
 		readonly clock?: true;
+		/**
+		 * Its first value is `undefined` on the web, which `initial` spells as null: a script reads it as `undefined` until
+		 * something writes it.
+		 */
+		readonly unset?: true;
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;
