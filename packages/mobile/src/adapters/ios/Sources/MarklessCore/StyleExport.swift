@@ -171,7 +171,11 @@ public struct StyleExport: Sendable {
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
 		let root = try Reader(JSONValue.parse(data), at: "style")
-		let fields = try root.object(required: ["schema", "units", "fonts", "targets"], optional: ["compiler", "component", "source", "warnings", "systemFonts"])
+		let fields = try root.object(required: ["schema", "units", "fonts", "targets"], optional: ["compiler", "component", "source", "warnings", "systemFonts", "fontMode"])
+		if fields.has("fontMode") {
+			let fontMode = try fields["fontMode"]
+			guard ["system", "pinned"].contains(try fontMode.string()) else { throw fontMode.fail("is neither system nor pinned") }
+		}
 		let schema = try fields["schema"].string()
 		guard dragonStyleExportSchemas.contains(schema) else {
 			throw PayloadError(path: "style.schema", reason: "unsupported schema \"\(schema)\", this host reads \(dragonStyleExportSchemas)")
