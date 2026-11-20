@@ -1102,7 +1102,13 @@ final class ViewTree {
 		} else {
 			view.accessibilityLabel = current["aria-label"]
 		}
-		if let field = view as? UITextField { field.isEnabled = current["disabled"] == nil }
+		if let field = view as? UITextField {
+			field.isEnabled = current["disabled"] == nil
+			// Shown while the field is empty, in Chrome's placeholder grey (#757575).
+			field.attributedPlaceholder = current["placeholder"].map {
+				NSAttributedString(string: $0, attributes: [.foregroundColor: UIColor(white: 117 / 255, alpha: 1), .font: field.font ?? UIFont.systemFont(ofSize: TextLook.baseSize)])
+			}
+		}
 		// aria-disabled only reads as dimmed: a press still reaches the button, as on the web.
 		let disabled = (view is UIButton || view is UITextField) && current["disabled"] != nil
 		if disabled || current["aria-disabled"] == "true" {

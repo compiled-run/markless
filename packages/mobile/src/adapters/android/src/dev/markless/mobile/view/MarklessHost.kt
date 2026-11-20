@@ -1016,6 +1016,8 @@ class MarklessHost(
 				if (view is DrawingView && current["aria-hidden"] != "true") view.importantForAccessibility = if (value != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO
 			}
 			"alt" -> if (view is SizedImage) { view.contentDescription = value; view.alt(value) }
+			// Shown while the field is empty, in Chrome's placeholder grey (#757575).
+			"placeholder" -> if (view is EditText) { view.hint = value; view.setHintTextColor(0xFF757575.toInt()) }
 			"src" -> when (view) {
 				is SizedImage -> view.show(value)
 				is AudioButton -> view.source(value)
