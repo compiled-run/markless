@@ -78,6 +78,7 @@ type SsrKeyedRepeatRecord = SsrRecord & {
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly rowTemplate?: ComposeRowTemplate;
 	readonly rowEvents: ReadonlyArray<SsrRowEventRecord>;
+	readonly enclosingRow?: { readonly repeatId: string };
 };
 type SsrAnchoredRecord = SsrRecord & {
 	readonly id: string;
@@ -1356,7 +1357,7 @@ export function marklessSsrArmizeBoundaries(
 				movedKeyedRepeats.unshift(...streams.keyedRepeats.splice(i, 1));
 		}
 		// A list in an arm of a branch here travels with the arm, whichever arm the render painted.
-		const armListIds = new Set(marklessSsrArmListIds(planned.branches ?? []));
+		const armListIds = withEnclosedLists(marklessSsrArmListIds(planned.branches ?? []), streams.keyedRepeats ?? []);
 		for (let i = (streams.keyedRepeats ?? []).length - 1; i >= 0; i--)
 			if (armListIds.has(streams.keyedRepeats[i].id)) movedKeyedRepeats.unshift(...streams.keyedRepeats.splice(i, 1));
 		const keyedRepeats = [...(planned.keyedRepeats ?? []), ...movedKeyedRepeats];
@@ -1401,7 +1402,7 @@ export function marklessSsrArmizeBranches(
 			.filter((anchor) => anchor.kind === 'branch')
 			.map((anchor) => [anchor.id, anchor] as const),
 	);
-	const armLists = new Set(marklessSsrArmListIds(branches));
+	const armLists = withEnclosedLists(marklessSsrArmListIds(branches), streams.keyedRepeats);
 	return branches.map((branch) => {
 		const anchor = anchorById.get(idPrefix + branch.id);
 		if (!anchor) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_MISSING: branch:${branch.id}`);
@@ -1420,6 +1421,31 @@ export function marklessSsrArmizeBranches(
 		for (const repeat of projected.keyedRepeats ?? []) streams.keyedRepeats.splice(streams.keyedRepeats.indexOf(repeat), 1);
 		return { ...branch, escalates: true, servedArmRecords: projected };
 	});
+}
+// A list inside another list's rows is wired through its enclosing list, so it stays wherever that list's record goes.
+function withEnclosedLists(ids: ReadonlyArray<string>, repeats: ReadonlyArray<SsrKeyedRepeatRecord>): Set<string> {
+	const lists = new Set(ids);
+	for (let grew = lists.size > 0; grew; ) {
+		grew = false;
+		for (const repeat of repeats) {
+			const enclosing = lists.has(repeat.id) ? undefined : enclosingListId(repeat, repeats);
+			if (enclosing && lists.has(enclosing)) {
+				lists.add(repeat.id);
+				grew = true;
+			}
+		}
+	}
+	return lists;
+}
+// Composition prefixes record ids but not the enclosing id a record names, so the enclosing record is the longest id matching both.
+function enclosingListId(inner: SsrKeyedRepeatRecord, repeats: ReadonlyArray<SsrKeyedRepeatRecord>): string | undefined {
+	const at = inner.enclosingRow?.repeatId;
+	let found: string | undefined;
+	if (at)
+		for (const { id } of repeats)
+			if (id.endsWith(at) && inner.id.startsWith(id.slice(0, id.length - at.length)) && id.length > (found?.length ?? -1))
+				found = id;
+	return found;
 }
 // The page record ids of the lists whose parent element the branches' arms render.
 function marklessSsrArmListIds(branches: ReadonlyArray<SsrBranchRecord>): string[] {
