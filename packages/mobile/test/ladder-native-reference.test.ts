@@ -815,6 +815,11 @@ function walk(
 					if (inArm(id, entry.node)) texts.set(id, text);
 				for (const [node, name, value] of runtime.attributes())
 					if (inArm(node, entry.node)) attributes.set(`${node}\0${name}`, value);
+				// The hosts build an arm's fields fresh: a box reads its checkedness from the runtime, a text field its markup.
+				for (const id of checks.keys()) if (inArm(id, entry.node)) checks.delete(id);
+				for (const [node, checked] of runtime.checks())
+					if (inArm(node, entry.node)) checks.set(node, checked);
+				for (const id of typed.keys()) if (inArm(id, entry.node)) typed.delete(id);
 			} else if (entry.op === 'sheet') sheetOpen.set(entry.node, entry.open);
 			const scripted = services.answer(entry);
 			if (scripted) answered.push(() => runtime.dispatch(scripted));

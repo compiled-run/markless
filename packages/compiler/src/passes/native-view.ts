@@ -4487,10 +4487,6 @@ export function createNativeViewPayload(
 				close();
 				const repeat = scope.module.repeatsById.get(item.id);
 				const rowChunk = scope.module.chunks.get(item.row);
-				if (repeat?.indexKey) {
-					refuse('a @for keyed by its index; a native list keys each row by its item');
-					continue;
-				}
 				const list = repeat?.collectionExpression
 					? renderValue(
 							repeat.collectionExpression,
@@ -4519,16 +4515,20 @@ export function createNativeViewPayload(
 					id: repeatId,
 					parent,
 					list,
-					key: repeat.keyPath,
+					key: repeat.indexKey ? [] : repeat.keyPath,
+					...(repeat.indexKey ? { byIndex: true as const } : {}),
 					...place,
 				});
-				rowKeys.set(repeatId, [
-					...(place.row ? [...rowKeys.get(place.row)!, '@'] : []),
-					repeat.keyPath.reduce<NativeExpr>(
-						(object, property) => ({ member: object, property }),
-						{ item: repeatId },
-					),
-				]);
+				// No expression reads a row's key when it is the row's index: such rows, and rows inside them, have none here.
+				const outerKey = place.row ? rowKeys.get(place.row) : [];
+				if (!repeat.indexKey && outerKey)
+					rowKeys.set(repeatId, [
+						...(place.row ? [...outerKey, '@'] : []),
+						repeat.keyPath.reduce<NativeExpr>(
+							(object, property) => ({ member: object, property }),
+							{ item: repeatId },
+						),
+					]);
 				lowerChunk(
 					rowChunk,
 					parent,
@@ -6400,8 +6400,15 @@ export function createNativeViewPayload(
 				);
 				continue;
 			}
+			const rowKey = row && rowKeys.get(row);
+			if (row && !rowKey) {
+				refuse(
+					`the \`${reference.attribute}\` attribute of ${node.id} names an element in a row of a @for keyed by its index`,
+				);
+				continue;
+			}
 			parts.push(`${position > 0 ? ' ' : ''}${id}${row ? '@' : ''}`);
-			if (row) parts.push(...rowKeys.get(row)!);
+			if (rowKey) parts.push(...rowKey);
 		}
 		const value: NativeExpr = parts.every((part) => typeof part === 'string')
 			? { literal: parts.join('') }
@@ -6722,6 +6729,8 @@ export function createNativeViewPayload(
 			const fields: NativeForm['fields'][number][] = [];
 			const submitters: string[] = [];
 			const textFields: string[] = [];
+			/** Fields and submit buttons in an @if arm inside the form: they take part only while it shows them. */
+			const armed = new Set<string>();
 			for (const node of nodes) {
 				if (node.kind !== 'element' || node.id === form.id || !isWithin(node.id, form.id))
 					continue;
@@ -6732,12 +6741,14 @@ export function createNativeViewPayload(
 				}
 				if (node.element !== 'input' && node.element !== 'button' && node.element !== 'select')
 					continue;
-				if (node.row || JSON.stringify(node.arm) !== JSON.stringify(form.arm)) {
+				if (node.element === 'button' && node.attributes?.['type'] === 'button') continue;
+				if (node.row !== form.row) {
 					refuse(
-						`${field} sits in an @if arm or @for row of its form, which a native build does not submit yet`,
+						`${field} sits in a @for row of its form, which a native build does not submit yet`,
 					);
 					continue;
 				}
+				if (JSON.stringify(node.arm) !== JSON.stringify(form.arm)) armed.add(node.id);
 				if (attribute(node, 'type') === 'bound') {
 					refuse(
 						`${field} binds its \`type\`, which a native build reads only as written`,
@@ -6824,6 +6835,15 @@ export function createNativeViewPayload(
 					form: form.id,
 					submitter,
 				});
+			const steady = textFields.filter((id) => !armed.has(id));
+			if (textFields.length > 0 && submitters[0] !== undefined && armed.has(submitters[0]))
+				refuse(
+					`the first submit button of ${where} sits in an @if arm, so which button the return key presses follows what shows; a native build presses one it knows when it builds`,
+				);
+			else if (submitters.length === 0 && steady.length < 2 && textFields.length > 1)
+				refuse(
+					`${where} has text fields in an @if arm and no submit button, so whether the return key submits it follows how many show; a native build decides that when it builds`,
+				);
 			// The return key clicks the first submit button unless it is disabled; with none, it submits only a form with one text field.
 			const implicit: NativeOp[] =
 				submitters.length > 0
