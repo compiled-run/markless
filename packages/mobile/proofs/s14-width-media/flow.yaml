@@ -1,0 +1,8 @@
+appId: ${APP_ID}
+name: s14-width-media
+---
+- launchApp:
+      clearState: true
+- assertVisible: Seeds sown on Monday
+- assertVisible: Harvest on Saturday
+- assertVisible: Board

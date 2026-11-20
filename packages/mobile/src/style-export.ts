@@ -28,8 +28,11 @@ export function assertDragonPin(dir: string = dragonDir()): void {
 	}
 }
 
-/** The export for one style input file, generated now from the Dragon checkout; throws with Dragon's reasons when it refuses. */
-export function dragonStyleExport(inputPath: string, dir: string = dragonDir()): Uint8Array {
+/**
+ * The export for one style input file, generated now from the Dragon checkout; throws with Dragon's reasons when it refuses.
+ * `plan`: each target also carries Dragon's layout plan, so a phone lays the page out at its own size.
+ */
+export function dragonStyleExport(inputPath: string, dir: string = dragonDir(), plan = false): Uint8Array {
 	const manifest = join(dir, 'package.json');
 	const scripts = existsSync(manifest)
 		? ((JSON.parse(readFileSync(manifest, 'utf8')) as { scripts?: Record<string, string> })
@@ -55,6 +58,7 @@ export function dragonStyleExport(inputPath: string, dir: string = dragonDir()):
 					'--',
 					resolve(inputPath),
 					out,
+					...(plan ? ['--plan'] : []),
 				],
 				{
 					encoding: 'utf8',

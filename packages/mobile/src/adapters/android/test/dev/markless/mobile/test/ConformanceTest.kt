@@ -31,6 +31,9 @@ import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
 import dev.markless.mobile.style.BAND_KEY
+import dev.markless.mobile.style.BandAtom
+import dev.markless.mobile.style.BandComparison
+import dev.markless.mobile.style.Bands
 import dev.markless.mobile.style.Rgba
 import dev.markless.mobile.style.GlyphRun
 import dev.markless.mobile.style.StyleExport
@@ -580,7 +583,11 @@ private fun appStyle(fixtures: File) {
 		check("app style refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
 	}
 	// The fixture may be compact or formatted: each edit allows whitespace after a colon.
-	refusesApp("an atom of another media feature", text.replace(Regex("\"feature\":\\s*\"prefers-color-scheme\""), "\"feature\":\"width\""), "@media (width) is not implemented on Android")
+	val widthBands = Bands(listOf(BandAtom("width", "none", listOf(BandComparison("ge", 600.0, 0.0, 0.0)))), listOf(listOf(false), listOf(true)))
+	val byScheme = runCatching { widthBands.band(dark = false) }.exceptionOrNull()
+	check("a width band needs the page's size", byScheme is MarklessDecodeError && byScheme.message!!.contains("needs the page's size")) { "error was: $byScheme" }
+	val bySize = runCatching { widthBands.band(dark = false, widthPx = 1080.0, heightPx = 2203.0, scale = 2.625) }.exceptionOrNull()
+	check("a width band needs Dragon's lookup, which the JVM test does not link", Bands.library == null && bySize is MarklessDecodeError && bySize.message!!.contains("needs Dragon's band lookup")) { "error was: $bySize" }
 	refusesApp("an unknown version", text.replace("markless.native-app-style/0", "markless.native-app-style/9"), "unknown app style version")
 	refusesApp("a write index out of range", text.replace(Regex("\"writes\":\\s*\\d+(\\s*)}"), "\"writes\":99999$1}"), "not an index of the app's write lists")
 	refusesApp("an unknown route field", text.replace(Regex("\"pattern\":\\s*\"/help\""), "\"pattern\":\"/help\",\"extra\":1"), "unknown field \"extra\"")

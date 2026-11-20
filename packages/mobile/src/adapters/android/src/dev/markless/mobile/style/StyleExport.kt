@@ -11,10 +11,14 @@ import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.only
 import dev.markless.mobile.core.ScrollRange
 import dev.markless.mobile.core.str
+import dev.markless.mobile.core.jsonNumber
+import dev.markless.mobile.core.jsonString
+import dev.markless.mobile.core.text
 
 const val STYLE_EXPORT_SCHEMA_0 = "dragon.native-style-export/0"
 const val STYLE_EXPORT_SCHEMA = "dragon.native-style-export/1"
 const val APP_STYLE_VERSION = "markless.native-app-style/0"
+const val PLAN_VERSION = "dragon.markless-plan/1"
 
 /** The export state that holds the @media band; the host sets it from the device, never from a payload cell. */
 const val BAND_KEY = "@env#band"
@@ -80,23 +84,70 @@ data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNo
 data class StyleState(val key: String, val domain: List<JsValue>)
 
 /** One media feature the host evaluates; only `prefers-color-scheme` is implemented. */
-data class BandAtom(val feature: String, val keyword: String) {
-	fun holds(dark: Boolean): Boolean = when (keyword) {
-		"any" -> true
-		"dark" -> dark
-		"light" -> !dark
-		else -> throw MarklessDecodeError("prefers-color-scheme has no keyword \"$keyword\"")
+/** One comparison of a media feature, as Dragon's `rt-band` reads it. */
+data class BandComparison(val op: String, val value: Double, val num: Double, val den: Double)
+
+/** One media feature of the sheet's @media bands, as Dragon wrote it for the device to evaluate. */
+data class BandAtom(val feature: String, val keyword: String, val comparisons: List<BandComparison> = emptyList()) {
+	/** Whether the atom holds by the colour scheme alone; any other feature needs the page's size. */
+	fun holds(dark: Boolean): Boolean {
+		if (feature != "prefers-color-scheme" || comparisons.isNotEmpty()) throw MarklessDecodeError("the media feature $feature needs the page's size")
+		return when (keyword) {
+			"any" -> true
+			"dark" -> dark
+			"light" -> !dark
+			else -> throw MarklessDecodeError("prefers-color-scheme has no keyword \"$keyword\"")
+		}
 	}
 }
 
 /** The sheet's @media bands: per band, the truth value of every atom. */
 data class Bands(val atoms: List<BandAtom>, val bands: List<List<Boolean>>) {
-	/** The band whose truth vector is the device's. */
+	/** The band whose truth vector is the device's, by the colour scheme alone. */
 	fun band(dark: Boolean): Int {
 		val reading = atoms.map { it.holds(dark) }
 		val at = bands.indexOf(reading)
 		if (at < 0) throw MarklessDecodeError("no @media band holds the device's reading $reading")
 		return at
+	}
+
+	/**
+	 * The band of a page area [widthPx] x [heightPx] device px at [scale]: Dragon's own lookup (Chrome's media evaluation) when any
+	 * atom reads more than the colour scheme, else the colour scheme alone.
+	 */
+	fun band(dark: Boolean, widthPx: Double, heightPx: Double, scale: Double): Int {
+		if (atoms.all { it.feature == "prefers-color-scheme" }) return band(dark)
+		val lookup = library ?: throw MarklessDecodeError("@media ${atoms.map { it.feature }} needs Dragon's band lookup, which this host does not link")
+		fun bits(v: Double) = "\"${java.lang.Long.toHexString(v.toRawBits()).padStart(16, '0')}\""
+		val atomsText = atoms.joinToString(",") { a -> "[${jsonString(a.feature)},${jsonString(a.keyword)},[${a.comparisons.joinToString(",") { "[${jsonString(it.op)},${bits(it.value)},${bits(it.num)},${bits(it.den)}]" }}]]" }
+		val bandsText = bands.joinToString(",") { "[${it.joinToString(",")}]" }
+		// A phone's readings: a coarse primary pointer that does not hover, and no fine pointer.
+		val readings = "[\"coarse\",false,true,false,false,false,$dark]"
+		val line = "[\"rt-band\",[[$atomsText],[$bandsText]],[[${bits(Math.rint(widthPx))},${bits(Math.rint(heightPx))},${bits(scale)},$readings]]]"
+		val answer = lookup(line)
+		val result = Json.parse(answer).arr("band lookup")
+		val size = (result.getOrNull(1) as? Json.Arr)?.items?.firstOrNull()?.arr("band lookup size")
+		if (result.size != 2 || result[0] != Json.Str("ok") || size?.size != 3) throw MarklessDecodeError("Dragon's band lookup failed at $widthPx x $heightPx px: $answer")
+		val hex = (size[2] as? Json.Str)?.value?.takeIf { it.length == 16 } ?: throw MarklessDecodeError("band lookup: ${size[2].text()} is not a number's bit pattern")
+		val index = Double.fromBits(java.lang.Long.parseUnsignedLong(hex, 16))
+		if (index < 0 || index >= bands.size || index != Math.rint(index)) throw MarklessDecodeError("band lookup: band $index is not a band")
+		return index.toInt()
+	}
+
+	companion object {
+		/** Dragon's translated `runLibraryCase`, when the app is built with Dragon's engine; `rt-band` looks a band up by the page's size. */
+		var library: ((String) -> String)? = try {
+			val run = Class.forName("dev.dragon.layout.HarnessKt").getMethod("harness_runLibraryCase", String::class.java)
+			({ line: String ->
+				try {
+					run.invoke(null, line) as String
+				} catch (e: java.lang.reflect.InvocationTargetException) {
+					throw e.cause ?: e
+				}
+			})
+		} catch (_: ClassNotFoundException) {
+			null
+		}
 	}
 }
 
@@ -110,7 +161,12 @@ data class SystemFace(val file: String, val index: Int, val axes: Map<String, Do
 /** A system sheet's content at one resting height: its own document, laid out in the sheet's content area. */
 data class SheetHeight(val snapPoint: Double, val style: StyleExport)
 
-data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val bands: Bands? = null, val pageScrollUndecided: String? = null, val sheets: Map<String, List<SheetHeight>> = emptyMap(), val systemFaces: Map<String, SystemFace> = emptyMap()) {
+data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val bands: Bands? = null, val pageScrollUndecided: String? = null, val sheets: Map<String, List<SheetHeight>> = emptyMap(), val systemFaces: Map<String, SystemFace> = emptyMap(),
+	/** Dragon's layout plan ([PLAN_VERSION]) as JSON text: with it the page lays out at the screen's own size. */
+	val plan: String? = null,
+	/** Per assignment: each Dragon id the plan's geometry names, with the export's id for it (empty: no ids differ). */
+	val planNames: List<Map<String, String>> = emptyList(),
+) {
 
 	/** The index of [BAND_KEY] among [states], or -1 for an export without @media. */
 	val bandState: Int = states.indexOfFirst { it.key == BAND_KEY }
@@ -120,8 +176,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		if (bands != null && states[bandState].domain != bands.bands.indices.map { JsValue.Num(it.toDouble()) }) throw MarklessDecodeError("$BAND_KEY's domain does not name every band")
 	}
 
-	/** The band for the device's appearance; 0 without @media. */
-	fun band(dark: Boolean): Int = bands?.band(dark) ?: 0
+	/** The band for the device's appearance and the page area this export is laid out at; 0 without @media. */
+	fun band(dark: Boolean): Int = bands?.band(dark, viewportWidth * dpr, viewportHeight * dpr, dpr) ?: 0
 
 	/**
 	 * The assignment matching the cells' values at mount and the device's band, [initial] when it matches. Every state but the
@@ -168,8 +224,109 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		return to
 	}
 
+	/**
+	 * This export laid out again by Dragon's plan for a page [width] x [height] dp at [scale]: every assignment's frames, border
+	 * widths, text lines, dashed borders and scroll ranges, in this screen's device px. [layout] is Dragon's translated
+	 * `runMarklessLayout`. Without a plan the export is returned as it is.
+	 */
+	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String): StyleExport {
+		val plan = plan ?: return this
+		val laid = assignments.indices.map { k ->
+			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan}"
+			val result = Json.parse(layout(line))
+			val parts = result.arr("plan layout")
+			if (parts.size != 3 || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
+			val page = parts[1].arr("plan layout page scroll")
+			val pageScroll = if (page.size == 3) null else range(rangeJson(page, "plan layout page scroll"), "plan layout page scroll")
+			val names = planNames.getOrNull(k) ?: emptyMap()
+			val geometry = HashMap<String, List<Json>>()
+			for (g in parts[2].arr("plan layout nodes")) {
+				val f = g.arr("plan layout node")
+				val id = f.firstOrNull()?.str("plan layout node id") ?: throw MarklessDecodeError("plan layout node has no id")
+				geometry[names[id] ?: id] = f
+			}
+			val assignment = assignments[k]
+			assignment.copy(pageScroll = pageScroll, nodes = assignment.nodes.map { node ->
+				if (node.frame == null) return@map node
+				val f = geometry[node.id] ?: throw MarklessDecodeError("Dragon's layout has no box for ${node.id}")
+				val what = "plan layout of ${node.id}"
+				if (f.size != 6) throw MarklessDecodeError("$what: expected id, frame, border widths, lines, border operations and scroll range")
+				val frame = f[1].arr(what).map { planNumber(it) }
+				if (frame.size != 4) throw MarklessDecodeError("$what: expected x, y, width and height")
+				val widths = if (f[2] == Json.Null) null else f[2].arr(what).map { planNumber(it) }.also { if (it.size != 4) throw MarklessDecodeError("$what: border widths are not four sides") }
+				val lines = if (f[3] == Json.Null) null else textLines(Json.Arr(f[3].arr(what).map { l ->
+					val line = l.arr("$what.lines[]")
+					obj("top" to planNumbers(line[0]), "baseline" to planNumbers(line[1]), "runs" to Json.Arr(line[2].arr("$what.runs").map { r ->
+						val run = r.arr("$what.runs[]")
+						obj("face" to run[0], "size" to planNumbers(run[1]), "glyphs" to planNumbers(run[2]), "xs" to planNumbers(run[3]))
+					}))
+				}), "$what.lines")
+				val ops = if (f[4] == Json.Null) null else borderOps(planBorderOps(f[4], what), "$what.borderOps")
+				val scroll = if (f[5] == Json.Null) null else range(rangeJson(f[5].arr(what), what), what)
+				node.copy(
+					frame = Frame(frame[0], frame[1], frame[2], frame[3]), borderWidths = widths?.let { Edges(it[0], it[1], it[2], it[3]) },
+					borderOps = ops, scrollRange = scroll, lines = if (node.kind == "text") lines else null,
+				)
+			})
+		}
+		return copy(dpr = scale, viewportWidth = width, viewportHeight = height, assignments = laid)
+	}
+
 	companion object {
 		const val ANDROID_BACKEND = "android-views"
+
+		/** A number of Dragon's plan layout: its IEEE 754 bit pattern as 16 hex digits. */
+		private fun planNumber(v: Json): Double {
+			val hex = (v as? Json.Str)?.value?.takeIf { it.length == 16 } ?: throw MarklessDecodeError("plan layout: ${v.text()} is not a number's bit pattern")
+			return Double.fromBits(java.lang.Long.parseUnsignedLong(hex, 16))
+		}
+
+		/** Bit patterns as numbers, arrays element by element. */
+		private fun planNumbers(v: Json): Json = if (v is Json.Arr) Json.Arr(v.items.map(::planNumbers)) else Json.Num(planNumber(v))
+
+		private fun obj(vararg fields: Pair<String, Json>): Json = Json.Obj(linkedMapOf(*fields))
+
+		private fun rangeJson(v: List<Json>, what: String): Json {
+			if (v.size != 4) throw MarklessDecodeError("$what: expected minX, maxX, minY and maxY")
+			return obj("minX" to planNumbers(v[0]), "maxX" to planNumbers(v[1]), "minY" to planNumbers(v[2]), "maxY" to planNumbers(v[3]))
+		}
+
+		/** Dragon's border operations of a box, [[origin x, y], [width, height], widths, [[op, side, alpha, antialias, points]]], in the export's shape. */
+		private fun planBorderOps(v: Json, what: String): Json {
+			val p = v.arr("$what.borderOps")
+			if (p.size != 4) throw MarklessDecodeError("$what: expected origin, size, widths and border operations")
+			val origin = p[0].arr(what).map(::planNumber)
+			val size = p[1].arr(what).map(::planNumber)
+			if (origin.size != 2 || size.size != 2) throw MarklessDecodeError("$what: expected a border origin and size")
+			return obj(
+				"origin" to obj("x" to Json.Num(origin[0]), "y" to Json.Num(origin[1])),
+				"size" to obj("width" to Json.Num(size[0]), "height" to Json.Num(size[1])),
+				"widths" to planNumbers(p[2]),
+				"ops" to Json.Arr(p[3].arr(what).map { op ->
+					val o = op.arr("$what.ops[]")
+					if (o.size != 5) throw MarklessDecodeError("$what: expected op, side, alpha, antialias and points")
+					obj("op" to o[0], "side" to o[1], "alpha" to planNumbers(o[2]), "antialias" to o[3], "points" to planNumbers(o[4]))
+				}),
+			)
+		}
+
+		/** A target's or route's optional `plan` and `planNames`. */
+		private fun withPlan(style: StyleExport, t: Map<String, Json>, what: String): StyleExport {
+			val plan = t["plan"]?.let { p ->
+				val version = p.obj("$what.plan").field("version", "$what.plan").str("$what.plan.version")
+				if (version != PLAN_VERSION) throw MarklessDecodeError("$what.plan is $version; this host reads $PLAN_VERSION")
+				p.text()
+			}
+			val names = t["planNames"]?.arr("$what.planNames")?.mapIndexed { a, assignment ->
+				assignment.arr("$what.planNames[$a]").associate { pair ->
+					val n = pair.arr("$what.planNames[$a][]")
+					if (n.size != 2) throw MarklessDecodeError("$what.planNames[$a]: expected a Dragon id and the export's id")
+					n[0].str("$what.planNames[$a][][0]") to n[1].str("$what.planNames[$a][][1]")
+				}
+			} ?: emptyList()
+			if (t.containsKey("planNames") && names.size != style.assignments.size) throw MarklessDecodeError("$what.planNames names ${names.size} assignments; the export has ${style.assignments.size}")
+			return style.copy(plan = plan, planNames = names)
+		}
 
 		fun decode(bytes: ByteArray, target: String = "android"): StyleExport {
 			val root = Json.parse(bytes).obj("style export")
@@ -190,7 +347,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val undecided = root["warnings"]?.arr("warnings")?.map { it.obj("warnings[]") }?.firstOrNull { w ->
 				w.field("code", "warning").str("code") == "DRAGON_PAGE_SCROLL_UNDECIDED" && w.field("message", "warning").str("message").startsWith("$target: ")
 			}?.let { it.getValue("message").str("message").removePrefix("$target: ") }
-			return program(t, target, dpr, width, height, undecided) { w, what -> writes(w, what) }.copy(systemFaces = root["systemFonts"]?.let { systemFaces(it, target) } ?: emptyMap())
+			return withPlan(program(t, target, dpr, width, height, undecided) { w, what -> writes(w, what) }.copy(systemFaces = root["systemFonts"]?.let { systemFaces(it, target) } ?: emptyMap()), t, target)
 		}
 
 		/** `systemFonts`: each system face with this target's file, face index and axes; an entry without this target is an error. */
@@ -248,9 +405,14 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				val f = a.obj("$what.atoms[$n]")
 				f.only(setOf("feature", "comparisons", "keyword"), "$what.atoms[$n]")
 				val feature = f.field("feature", what).str("feature")
-				if (feature != "prefers-color-scheme") throw MarklessDecodeError("$what.atoms[$n]: @media ($feature) is not implemented on Android; this host reads prefers-color-scheme only")
-				if (f.field("comparisons", what).arr("comparisons").isNotEmpty()) throw MarklessDecodeError("$what.atoms[$n]: prefers-color-scheme with comparisons")
-				BandAtom(feature, f.field("keyword", what).str("keyword")).also { it.holds(false) }
+				val comparisons = f.field("comparisons", what).arr("$what.atoms[$n].comparisons").mapIndexed { k, c ->
+					val at = "$what.atoms[$n].comparisons[$k]"
+					val o = c.obj(at)
+					o.only(setOf("op", "value", "num", "den"), at)
+					BandComparison(o.field("op", at).str("$at.op"), o.field("value", at).num("$at.value"), o.field("num", at).num("$at.num"), o.field("den", at).num("$at.den"))
+				}
+				if (feature == "prefers-color-scheme" && comparisons.isNotEmpty()) throw MarklessDecodeError("$what.atoms[$n]: prefers-color-scheme with comparisons")
+				BandAtom(feature, f.field("keyword", what).str("keyword"), comparisons).also { if (feature == "prefers-color-scheme") it.holds(false) }
 			}
 			val table = o.field("bands", what).arr("$what.bands").mapIndexed { n, b -> b.arr("$what.bands[$n]").map { (it as? Json.Bool)?.value ?: throw MarklessDecodeError("$what.bands[$n] holds a non-boolean") } }
 			if (table.isEmpty() || table.any { it.size != atoms.size }) throw MarklessDecodeError("$what: every band needs one truth value per atom")
@@ -286,7 +448,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val routes = LinkedHashMap<String, StyleExport>()
 			for ((n, r) in t.field("routes", target).arr("routes").withIndex()) {
 				val o = r.obj("routes[$n]")
-				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets"), "routes[$n]")
+				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets", "plan", "planNames"), "routes[$n]")
 				val pattern = o.field("pattern", "routes[$n]").str("pattern")
 				if (pattern in routes) throw MarklessDecodeError("app style lists route $pattern twice")
 				val listed = { w: Json, what: String ->
@@ -310,7 +472,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 						SheetHeight(ho.field("snapPoint", at).num("$at.snapPoint"), program(ho, at, dpr, hp.field("width", at).num("width"), hp.field("height", at).num("height"), null, listed))
 					}.also { if (it.isEmpty() || it.map { h -> h.snapPoint }.distinct().size != it.size) throw MarklessDecodeError("$where needs one layout per resting height") }
 				}
-				routes[pattern] = program(o, "routes[$n] ($pattern)", dpr, width, height, null, listed).copy(sheets = sheets, systemFaces = faces)
+				routes[pattern] = withPlan(program(o, "routes[$n] ($pattern)", dpr, width, height, null, listed).copy(sheets = sheets, systemFaces = faces), o, "routes[$n]")
 				val missing = routes.getValue(pattern).assignments.indexOfFirst { it.canvas == null }
 				if (missing >= 0) throw MarklessDecodeError("routes[$n] ($pattern).assignments[$missing] has no canvas")
 			}
