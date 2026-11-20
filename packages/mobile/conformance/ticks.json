@@ -210,7 +210,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -240,7 +242,9 @@
 														},
 														"arguments": [
 															{
-																"lambda": ["formdata:entry"],
+																"lambda": [
+																	"formdata:entry"
+																],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -283,7 +287,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -313,7 +319,9 @@
 														},
 														"arguments": [
 															{
-																"lambda": ["formdata:entry"],
+																"lambda": [
+																	"formdata:entry"
+																],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -500,7 +508,9 @@
 						"kind": "radio"
 					}
 				],
-				"submitters": ["h5"]
+				"submitters": [
+					"h5"
+				]
 			}
 		],
 		"valueMissing": {
@@ -781,22 +791,57 @@
 			}
 		}
 	},
-	"preferredLanguages": ["fr-CA", "en"],
+	"preferredLanguages": [
+		"fr-CA",
+		"en"
+	],
 	"initial": [
-		["h5:text0", "Send"],
-		["h6:text0", "Force"],
-		["h9:text0", ""]
+		[
+			"h5:text0",
+			"Send"
+		],
+		[
+			"h6:text0",
+			"Force"
+		],
+		[
+			"h9:text0",
+			""
+		]
 	],
 	"initialAttributes": [
-		["h1", "aria-busy", null],
-		["h5", "aria-disabled", null]
+		[
+			"h1",
+			"aria-busy",
+			null
+		],
+		[
+			"h5",
+			"aria-disabled",
+			null
+		]
 	],
 	"initialChecks": [
-		["h2", false],
-		["h3", false],
-		["h4", false],
-		["h7", false],
-		["h8", true]
+		[
+			"h2",
+			false
+		],
+		[
+			"h3",
+			false
+		],
+		[
+			"h4",
+			false
+		],
+		[
+			"h7",
+			false
+		],
+		[
+			"h8",
+			true
+		]
 	],
 	"steps": [
 		{

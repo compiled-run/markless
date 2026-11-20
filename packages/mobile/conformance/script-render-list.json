@@ -7,7 +7,11 @@
 			{
 				"id": "state:words",
 				"name": "words",
-				"initial": ["kiwi", "fig", "banana"]
+				"initial": [
+					"kiwi",
+					"fig",
+					"banana"
+				]
 			}
 		],
 		"nodes": [
@@ -141,13 +145,37 @@
 		}
 	},
 	"initial": [
-		["h1:text0", "Shortest first"],
-		["h3:text0@fig", "fig"],
-		["h3:text0@kiwi", "kiwi"],
-		["h3:text0@banana", "banana"],
-		["h4:text0", "Add date"]
+		[
+			"h1:text0",
+			"Shortest first"
+		],
+		[
+			"h3:text0@fig",
+			"fig"
+		],
+		[
+			"h3:text0@kiwi",
+			"kiwi"
+		],
+		[
+			"h3:text0@banana",
+			"banana"
+		],
+		[
+			"h4:text0",
+			"Add date"
+		]
 	],
-	"initialRows": [["repeat:0", ["fig", "kiwi", "banana"]]],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"fig",
+				"kiwi",
+				"banana"
+			]
+		]
+	],
 	"steps": [
 		{
 			"action": {
@@ -158,7 +186,12 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["fig", "date", "kiwi", "banana"]
+					"keys": [
+						"fig",
+						"date",
+						"kiwi",
+						"banana"
+					]
 				}
 			]
 		}

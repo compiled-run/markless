@@ -439,6 +439,22 @@ class MarklessHost(
 	/** A scroll view took the touches that are down to scroll ([TakesTouches]): each is cancelled. */
 	fun scrollTookTouches() = overlays.cancelTouches()
 
+	private var lastPress: Triple<String, Long, Int>? = null
+
+	/** A press's count (`event.detail`): a second press on the same view within the double-tap time is 2, as Chrome counts a double tap. */
+	private fun pressCount(id: String): Int {
+		val now = android.os.SystemClock.uptimeMillis()
+		val count = lastPress?.let { (last, at, n) -> if (last == id && now - at < android.view.ViewConfiguration.getDoubleTapTimeout()) n + 1 else 1 } ?: 1
+		lastPress = Triple(id, now, count)
+		return count
+	}
+
+	/** Applies a key's or paste's journal and answers whether its handler called `preventDefault()`. */
+	private fun prevents(journal: List<JournalEntry>): Boolean {
+		apply(journal)
+		return journal.any { it is JournalEntry.PreventDefault }
+	}
+
 	/** The journal applier: the only code that changes a retained view after the first build. */
 	fun apply(journal: List<JournalEntry>) {
 		dismissMessage()
@@ -478,6 +494,8 @@ class MarklessHost(
 				}
 				is JournalEntry.Invalid -> invalid(entry.node, entry.message)
 				is JournalEntry.Timer -> scheduleTimer(entry.node, entry.ms)
+				// Read by the field that dispatched the key or paste, which leaves out what it would do.
+				JournalEntry.PreventDefault -> {}
 				is JournalEntry.Navigate -> {
 					timers.removeCallbacksAndMessages(null)
 					Log.i(TAG, "journal ${entry.toJson()}")
@@ -621,6 +639,7 @@ class MarklessHost(
 				else -> continue
 			}
 			views[inst.id] = view
+			(node as? Node.Element)?.live?.let { view.accessibilityLiveRegion = if (it.assertive) View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE else View.ACCESSIBILITY_LIVE_REGION_POLITE }
 			built[inst.id] = inst
 			val parentId = parentOf(inst)
 			val outer = if (parentId != null) views[parentId] else pageBox
@@ -778,10 +797,22 @@ class MarklessHost(
 			}
 			// The select's list shows its options; their views only keep their text current.
 			"option" -> MarklessBox(context).apply { visibility = View.GONE }
-			"input" -> EditText(context).apply {
+			"input", "textarea" -> MarklessField(context).apply {
 				filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
-				setOnFocusChangeListener { v, focused -> if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW) }
-				isSingleLine = true
+				val focusEvents = events[node.id].orEmpty().map { it.event }
+				setOnFocusChangeListener { v, focused ->
+					if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW)
+					val event = if (focused) EventName.Focus else EventName.Blur
+					if (event in focusEvents) apply(runtime.dispatch(inst.id, event))
+				}
+				if (node.element == "input") isSingleLine = true
+				else {
+					// A textarea's Return is a new line, and Chrome's default `rows="2"` shows two lines.
+					inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+					isSingleLine = false
+					minLines = 2
+					gravity = Gravity.TOP or Gravity.START
+				}
 				includeFontPadding = false
 				if (style != null) { background = null; setPadding(0, 0, 0, 0) }
 				addTextChangedListener(object : TextWatcher {
@@ -789,7 +820,7 @@ class MarklessHost(
 					override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
 					override fun afterTextChanged(s: Editable) = dismissMessage()
 				})
-				if (events[node.id].orEmpty().any { it.event == EventName.Enter }) imeOptions = EditorInfo.IME_ACTION_GO
+				if (node.element == "input" && events[node.id].orEmpty().any { it.event == EventName.Enter || it.event == EventName.Keydown }) imeOptions = EditorInfo.IME_ACTION_GO
 				named(this, inst.id)
 			}
 			else -> MarklessBox(context).apply {
@@ -807,8 +838,12 @@ class MarklessHost(
 		// A field's `value` attribute is its text until something sets it, as on the web.
 		if (view is EditText && node.bindings.none { it.property && it.name == "value" }) node.attributes["value"]?.let { view.setAppText(it) }
 		for (e in events[node.id].orEmpty()) when (e.event) {
-			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
+			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate, detail = pressCount(inst.id))) }
 			EventName.Dismiss -> if (OVERLAY_ATTRIBUTE !in node.attributes) throw MarklessHostError("dismiss event on \"${node.id}\", which is neither a sheet nor an overlay")
+			// Raised by the field's focus listener, set where the field is built.
+			EventName.Focus, EventName.Blur -> if (view !is EditText) throw MarklessHostError("${e.event.wire} event on \"${node.id}\", which is not a text field")
+			EventName.Keydown -> (view as? MarklessField ?: throw MarklessHostError("keydown event on \"${node.id}\", which is not a text field")).onKey = { key -> prevents(runtime.dispatch(inst.id, EventName.Keydown, key)) }
+			EventName.Paste -> (view as? MarklessField ?: throw MarklessHostError("paste event on \"${node.id}\", which is not a text field")).onPaste = { text -> prevents(runtime.dispatch(inst.id, EventName.Paste, text)) }
 			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
 			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.Choose -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.

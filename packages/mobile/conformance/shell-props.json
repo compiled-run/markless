@@ -170,13 +170,17 @@
 			},
 			{
 				"pattern": "/topics/[topic]",
-				"params": ["topic"],
+				"params": [
+					"topic"
+				],
 				"page": {
 					"version": "markless.native-view/0",
 					"component": "Topic",
 					"route": {
 						"pattern": "/topics/[topic]",
-						"params": ["topic"]
+						"params": [
+							"topic"
+						]
 					},
 					"cells": [
 						{
@@ -399,13 +403,27 @@
 	},
 	"open": "/",
 	"initial": {
-		"stack": ["/"],
+		"stack": [
+			"/"
+		],
 		"title": "Topics",
 		"texts": [
-			["component-edge:0/h3:text0", "Topics"],
-			["component-edge:0/h4:text0", "Pick a topic"],
-			["component-edge:0/component-edge:0/h6:text0", "0 picked"],
-			["component-edge:1:text0", "Open fruit"]
+			[
+				"component-edge:0/h3:text0",
+				"Topics"
+			],
+			[
+				"component-edge:0/h4:text0",
+				"Pick a topic"
+			],
+			[
+				"component-edge:0/component-edge:0/h6:text0",
+				"0 picked"
+			],
+			[
+				"component-edge:1:text0",
+				"Open fruit"
+			]
 		]
 	},
 	"steps": [
@@ -423,13 +441,28 @@
 					}
 				}
 			],
-			"stack": ["/", "/topics/fruit"],
+			"stack": [
+				"/",
+				"/topics/fruit"
+			],
 			"title": "fruit",
 			"texts": [
-				["component-edge:0/h3:text0", "fruit"],
-				["component-edge:0/h4:text0", "Few fruit"],
-				["component-edge:0/component-edge:0/h6:text0", "0 picked"],
-				["h0:text0", "Pick one"]
+				[
+					"component-edge:0/h3:text0",
+					"fruit"
+				],
+				[
+					"component-edge:0/h4:text0",
+					"Few fruit"
+				],
+				[
+					"component-edge:0/component-edge:0/h6:text0",
+					"0 picked"
+				],
+				[
+					"h0:text0",
+					"Pick one"
+				]
 			]
 		},
 		{
@@ -450,13 +483,28 @@
 					"value": "2 picked"
 				}
 			],
-			"stack": ["/", "/topics/fruit"],
+			"stack": [
+				"/",
+				"/topics/fruit"
+			],
 			"title": "fruit",
 			"texts": [
-				["component-edge:0/h3:text0", "fruit"],
-				["component-edge:0/h4:text0", "Few fruit"],
-				["component-edge:0/component-edge:0/h6:text0", "2 picked"],
-				["h0:text0", "Pick one"]
+				[
+					"component-edge:0/h3:text0",
+					"fruit"
+				],
+				[
+					"component-edge:0/h4:text0",
+					"Few fruit"
+				],
+				[
+					"component-edge:0/component-edge:0/h6:text0",
+					"2 picked"
+				],
+				[
+					"h0:text0",
+					"Pick one"
+				]
 			]
 		},
 		{
@@ -476,13 +524,28 @@
 					"value": "4 picked"
 				}
 			],
-			"stack": ["/", "/topics/fruit"],
+			"stack": [
+				"/",
+				"/topics/fruit"
+			],
 			"title": "fruit",
 			"texts": [
-				["component-edge:0/h3:text0", "fruit"],
-				["component-edge:0/h4:text0", "Many fruit"],
-				["component-edge:0/component-edge:0/h6:text0", "4 picked"],
-				["h0:text0", "Pick one"]
+				[
+					"component-edge:0/h3:text0",
+					"fruit"
+				],
+				[
+					"component-edge:0/h4:text0",
+					"Many fruit"
+				],
+				[
+					"component-edge:0/component-edge:0/h6:text0",
+					"4 picked"
+				],
+				[
+					"h0:text0",
+					"Pick one"
+				]
 			]
 		},
 		{
@@ -490,13 +553,27 @@
 				"event": "back"
 			},
 			"journal": [],
-			"stack": ["/"],
+			"stack": [
+				"/"
+			],
 			"title": "Topics",
 			"texts": [
-				["component-edge:0/h3:text0", "Topics"],
-				["component-edge:0/h4:text0", "Pick a topic"],
-				["component-edge:0/component-edge:0/h6:text0", "0 picked"],
-				["component-edge:1:text0", "Open fruit"]
+				[
+					"component-edge:0/h3:text0",
+					"Topics"
+				],
+				[
+					"component-edge:0/h4:text0",
+					"Pick a topic"
+				],
+				[
+					"component-edge:0/component-edge:0/h6:text0",
+					"0 picked"
+				],
+				[
+					"component-edge:1:text0",
+					"Open fruit"
+				]
 			]
 		}
 	]

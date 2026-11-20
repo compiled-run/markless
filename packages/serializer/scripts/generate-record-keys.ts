@@ -16,8 +16,8 @@ export const RECORD_KEYS_FILE = resolve(packageDirectory, 'src/protocol-record-k
 
 // Templated lists that spell their field names out: a key table pays only where records rarely repeat a shape.
 const UNKEYED_LISTS = new Set(['cells', 'sharedRecords', 'locators', 'events', 'keyedRepeats']);
-// Fields only records of async values carry: spelled out, so the table every page downloads stays as it was without them.
-const SPELLED_FIELDS = new Set(['holds', 'asyncFrom', 'boundaryGate']);
+// Fields only rare records carry (async values, text beside a projected element): spelled out, so the table every page downloads stays as it was without them.
+const SPELLED_FIELDS = new Set(['holds', 'asyncFrom', 'boundaryGate', 'sibling']);
 // Fields typed `unknown` that carry a serialized graph value envelope; only state records hold one.
 const ENVELOPE_FIELDS = new Set(['value', 'key', 'error']);
 const PAYLOAD_TYPES = {

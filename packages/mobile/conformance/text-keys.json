@@ -1,0 +1,652 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "TextKeys",
+		"cells": [
+			{
+				"id": "state:draft",
+				"name": "draft",
+				"initial": ""
+			},
+			{
+				"id": "state:tags",
+				"name": "tags",
+				"initial": ""
+			},
+			{
+				"id": "state:count",
+				"name": "count",
+				"initial": 0
+			},
+			{
+				"id": "state:removed",
+				"name": "removed",
+				"initial": 0
+			},
+			{
+				"id": "state:last",
+				"name": "last",
+				"initial": "none"
+			},
+			{
+				"id": "state:pasted",
+				"name": "pasted",
+				"initial": ""
+			},
+			{
+				"id": "state:notes",
+				"name": "notes",
+				"initial": ""
+			},
+			{
+				"id": "state:sent",
+				"name": "sent",
+				"initial": ""
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "input",
+				"parent": "h0",
+				"attributes": {
+					"aria-label": "Tag"
+				},
+				"bindings": [
+					{
+						"property": "value",
+						"value": {
+							"cell": "state:draft"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "textarea",
+				"parent": "h0",
+				"attributes": {
+					"aria-label": "Message"
+				},
+				"bindings": [
+					{
+						"property": "value",
+						"value": {
+							"cell": "state:notes"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"",
+								{
+									"cell": "state:count"
+								},
+								" tags: ",
+								{
+									"cell": "state:tags"
+								},
+								"; ",
+								{
+									"cell": "state:removed"
+								},
+								" removed; last key ",
+								{
+									"cell": "state:last"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"pasted ",
+								{
+									"cell": "state:pasted"
+								},
+								"; sent ",
+								{
+									"cell": "state:sent"
+								},
+								""
+							]
+						}
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "input",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h1",
+				"event": "keydown",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h1",
+				"event": "paste",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h2",
+				"event": "input",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "h2",
+				"event": "keydown",
+				"handler": "handler:event:4"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:draft",
+						"value": {
+							"event": "value"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:last",
+						"value": {
+							"event": "key"
+						}
+					},
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"event": "key"
+							},
+							"right": {
+								"literal": "Enter"
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "preventDefault"
+							},
+							{
+								"op": "if",
+								"test": {
+									"binary": "!==",
+									"left": {
+										"cell": "state:draft"
+									},
+									"right": {
+										"literal": ""
+									}
+								},
+								"whenTrue": [
+									{
+										"op": "assign",
+										"cell": "state:tags",
+										"value": {
+											"if": {
+												"binary": "===",
+												"left": {
+													"cell": "state:tags"
+												},
+												"right": {
+													"literal": ""
+												}
+											},
+											"whenTrue": {
+												"cell": "state:draft"
+											},
+											"whenFalse": {
+												"template": [
+													"",
+													{
+														"cell": "state:tags"
+													},
+													", ",
+													{
+														"cell": "state:draft"
+													},
+													""
+												]
+											}
+										}
+									},
+									{
+										"op": "assign",
+										"cell": "state:count",
+										"value": {
+											"binary": "+",
+											"left": {
+												"cell": "state:count"
+											},
+											"right": {
+												"literal": 1
+											}
+										}
+									},
+									{
+										"op": "assign",
+										"cell": "state:draft",
+										"value": {
+											"literal": ""
+										}
+									}
+								],
+								"whenFalse": []
+							}
+						],
+						"whenFalse": [
+							{
+								"op": "if",
+								"test": {
+									"logical": "&&",
+									"left": {
+										"logical": "&&",
+										"left": {
+											"binary": "===",
+											"left": {
+												"event": "key"
+											},
+											"right": {
+												"literal": "Backspace"
+											}
+										},
+										"right": {
+											"binary": "===",
+											"left": {
+												"cell": "state:draft"
+											},
+											"right": {
+												"literal": ""
+											}
+										}
+									},
+									"right": {
+										"binary": ">",
+										"left": {
+											"cell": "state:count"
+										},
+										"right": {
+											"literal": 0
+										}
+									}
+								},
+								"whenTrue": [
+									{
+										"op": "preventDefault"
+									},
+									{
+										"op": "assign",
+										"cell": "state:removed",
+										"value": {
+											"binary": "+",
+											"left": {
+												"cell": "state:removed"
+											},
+											"right": {
+												"literal": 1
+											}
+										}
+									}
+								],
+								"whenFalse": []
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "preventDefault"
+					},
+					{
+						"op": "assign",
+						"cell": "state:pasted",
+						"value": {
+							"logical": "??",
+							"left": {
+								"event": "text"
+							},
+							"right": {
+								"literal": ""
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:notes",
+						"value": {
+							"event": "value"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:4",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"logical": "&&",
+							"left": {
+								"binary": "===",
+								"left": {
+									"event": "key"
+								},
+								"right": {
+									"literal": "Enter"
+								}
+							},
+							"right": {
+								"binary": "!==",
+								"left": {
+									"cell": "state:notes"
+								},
+								"right": {
+									"literal": ""
+								}
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "preventDefault"
+							},
+							{
+								"op": "assign",
+								"cell": "state:sent",
+								"value": {
+									"cell": "state:notes"
+								}
+							},
+							{
+								"op": "assign",
+								"cell": "state:notes",
+								"value": {
+									"literal": ""
+								}
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h3:text0",
+			"0 tags: ; 0 removed; last key none"
+		],
+		[
+			"h4:text0",
+			"pasted ; sent "
+		]
+	],
+	"initialProperties": [
+		[
+			"h1",
+			"value",
+			""
+		],
+		[
+			"h2",
+			"value",
+			""
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h1",
+				"key": "a"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "0 tags: ; 0 removed; last key a"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h1",
+				"value": "a"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h1",
+				"key": "Unidentified"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "0 tags: ; 0 removed; last key Unidentified"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h1",
+				"value": "ab"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h1",
+				"key": "Enter"
+			},
+			"journal": [
+				{
+					"op": "property",
+					"node": "h1",
+					"name": "value",
+					"value": ""
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "1 tags: ab; 0 removed; last key Enter"
+				},
+				{
+					"op": "preventDefault"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h1",
+				"key": "Unidentified"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "1 tags: ab; 0 removed; last key Unidentified"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h1",
+				"value": "c"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h1",
+				"key": "Backspace"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "1 tags: ab; 0 removed; last key Backspace"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h1",
+				"value": ""
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h1",
+				"key": "Backspace"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "1 tags: ab; 1 removed; last key Backspace"
+				},
+				{
+					"op": "preventDefault"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "paste",
+				"host": "h1",
+				"text": "x,y"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "pasted x,y; sent "
+				},
+				{
+					"op": "preventDefault"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h2",
+				"value": "hi"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h2",
+				"key": "Enter"
+			},
+			"journal": [
+				{
+					"op": "property",
+					"node": "h2",
+					"name": "value",
+					"value": ""
+				},
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "pasted x,y; sent hi"
+				},
+				{
+					"op": "preventDefault"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h2",
+				"key": "Enter"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h2",
+				"value": "\n"
+			},
+			"journal": []
+		}
+	]
+}

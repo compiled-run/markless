@@ -1,0 +1,186 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Notes",
+		"cells": [
+			{
+				"id": "state:note",
+				"name": "note",
+				"initial": "First line"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "textarea",
+				"parent": "h0",
+				"attributes": {
+					"aria-label": "Notes"
+				},
+				"bindings": [
+					{
+						"property": "value",
+						"value": {
+							"cell": "state:note"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Saved: ",
+								{
+									"cell": "state:note"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Clear"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "input",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:note",
+						"value": {
+							"event": "value"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:note",
+						"value": {
+							"literal": ""
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h2:text0",
+			"Saved: First line"
+		],
+		[
+			"h3:text0",
+			"Clear"
+		]
+	],
+	"initialProperties": [
+		[
+			"h1",
+			"value",
+			"First line"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "input",
+				"host": "h1",
+				"value": "First line\nSecond line"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Saved: First line\nSecond line"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "property",
+					"node": "h1",
+					"name": "value",
+					"value": ""
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Saved: "
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h1",
+				"value": "Again"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Saved: Again"
+				}
+			]
+		}
+	]
+}

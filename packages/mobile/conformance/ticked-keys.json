@@ -191,13 +191,28 @@
 		]
 	},
 	"initial": [
-		["h4:text0", "none"],
-		["h5:text0", "nothing"]
+		[
+			"h4:text0",
+			"none"
+		],
+		[
+			"h5:text0",
+			"nothing"
+		]
 	],
 	"initialChecks": [
-		["h1", false],
-		["h2", false],
-		["h3", false]
+		[
+			"h1",
+			false
+		],
+		[
+			"h2",
+			false
+		],
+		[
+			"h3",
+			false
+		]
 	],
 	"steps": [
 		{

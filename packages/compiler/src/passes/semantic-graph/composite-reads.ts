@@ -21,6 +21,11 @@ import {
 } from './collect-expressions.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
+import {
+	armShownGuard,
+	collectDefinitionReads,
+	markArmGuardDependencies,
+} from './render-local-inline.ts';
 import type { WalkState } from './types.ts';
 
 /**
@@ -462,7 +467,7 @@ export function collectCompositeTemplateExpression(
 	if (!readSources) return null;
 
 	return mintTemplateExpressionComputed(
-		`() => ${expressionSource(node, state.source)}`,
+		expressionSource(node, state.source),
 		readSources,
 		state,
 		options.scope,
@@ -499,7 +504,7 @@ export function liftArmModuleValue(
 	});
 	if (readSources?.length !== 0 || isLiteralExpression(expression)) return null;
 	return mintTemplateExpressionComputed(
-		`() => ${expressionSource(expression, state.source)}`,
+		expressionSource(expression, state.source),
 		[],
 		state,
 		undefined,
@@ -509,10 +514,12 @@ export function liftArmModuleValue(
 
 /**
  * Mints the synthetic computed that stands behind one recombined expression, so
- * every graph read inside it wakes a single DOM update instead of none.
+ * every graph read inside it wakes a single DOM update instead of none. Inside an
+ * arm it is computed only while every enclosing test holds: a computed derives
+ * whenever its reads move, shown or not.
  */
 export function mintTemplateExpressionComputed(
-	functionSource: string,
+	expression: string,
 	readSources: ReadonlyArray<GraphReadSource>,
 	state: WalkState,
 	scope?: GraphReadScope,
@@ -534,6 +541,8 @@ export function mintTemplateExpressionComputed(
 	)
 		return null;
 
+	// A value reading only module constants never goes stale under a test that stopped holding.
+	const guard = scope || dependencies.length === 0 ? null : armShownGuard(state);
 	const index = state.graph.graphBindings.filter((binding) =>
 		binding.id.startsWith('computed:templateExpression:'),
 	).length;
@@ -545,11 +554,17 @@ export function mintTemplateExpressionComputed(
 		writable: false,
 		async: false,
 		asyncCapable: false,
-		functionSource,
-		dependencies: uniqueDependencies(dependencies),
+		functionSource: guard
+			? `() => (${guard.source}) ? ${expression} : undefined`
+			: `() => ${expression}`,
+		dependencies: uniqueDependencies(guard ? [...dependencies, ...guard.reads] : dependencies),
 		...(joinsText ? { joinsText: true as const } : {}),
 		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 	});
+	if (guard) {
+		for (const definition of new Set(guard.definitions)) collectDefinitionReads(definition, state);
+		markArmGuardDependencies(graphNodeId, dependencies, guard.reads, state);
+	}
 	return { graphNodeId };
 }
 

@@ -1,0 +1,474 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Live",
+		"cells": [
+			{
+				"id": "state:count",
+				"name": "count",
+				"initial": 0
+			},
+			{
+				"id": "state:problem",
+				"name": "problem",
+				"initial": ""
+			},
+			{
+				"id": "state:open",
+				"name": "open",
+				"initial": false,
+				"styled": true
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "p",
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Items: "
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "output",
+				"parent": "h1",
+				"live": {
+					"politeness": "polite",
+					"atomic": true
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"",
+								{
+									"cell": "state:count"
+								},
+								" in basket"
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0",
+				"attributes": {
+					"role": "alert"
+				},
+				"defaultStyle": {
+					"margin": 1
+				},
+				"live": {
+					"politeness": "assertive",
+					"atomic": true
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"cell": "state:problem"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"aria-live": "polite"
+				},
+				"live": {
+					"politeness": "polite",
+					"atomic": false
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "span",
+				"parent": "h4",
+				"defaultStyle": {
+					"flow": "inline"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Added ",
+								{
+									"cell": "state:count"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "span",
+				"parent": "h4",
+				"defaultStyle": {
+					"flow": "inline"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "state:open"
+							},
+							"whenTrue": {
+								"literal": "open"
+							},
+							"whenFalse": {
+								"literal": "closed"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "div",
+				"parent": "h0",
+				"bindings": [
+					{
+						"attribute": "role",
+						"value": {
+							"if": {
+								"cell": "state:open"
+							},
+							"whenTrue": {
+								"literal": "region"
+							},
+							"whenFalse": {
+								"literal": null
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Panel ",
+								{
+									"if": {
+										"cell": "state:open"
+									},
+									"whenTrue": {
+										"literal": "shown"
+									},
+									"whenFalse": {
+										"literal": "hidden"
+									}
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"text": "Add"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"text": "Check"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h10",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h10:text0",
+				"parent": "h10",
+				"parts": [
+					{
+						"text": "Toggle"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h8",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h9",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h10",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:count",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:count"
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:problem",
+						"value": {
+							"if": {
+								"binary": ">",
+								"left": {
+									"cell": "state:count"
+								},
+								"right": {
+									"literal": 1
+								}
+							},
+							"whenTrue": {
+								"literal": "Too many"
+							},
+							"whenFalse": {
+								"literal": ""
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:open",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:open"
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Items: "
+		],
+		[
+			"h2:text0",
+			"0 in basket"
+		],
+		[
+			"h3:text0",
+			""
+		],
+		[
+			"h5:text0",
+			"Added 0"
+		],
+		[
+			"h6:text0",
+			"closed"
+		],
+		[
+			"h7:text0",
+			"Panel hidden"
+		],
+		[
+			"h8:text0",
+			"Add"
+		],
+		[
+			"h9:text0",
+			"Check"
+		],
+		[
+			"h10:text0",
+			"Toggle"
+		]
+	],
+	"initialAttributes": [
+		[
+			"h7",
+			"role",
+			null
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h8"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "1 in basket"
+				},
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "Added 1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h8"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "2 in basket"
+				},
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "Added 2"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h9"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Too many"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h10"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:open",
+					"value": true
+				},
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "open"
+				},
+				{
+					"op": "attribute",
+					"node": "h7",
+					"name": "role",
+					"value": "region"
+				},
+				{
+					"op": "text",
+					"node": "h7:text0",
+					"value": "Panel shown"
+				}
+			]
+		}
+	]
+}

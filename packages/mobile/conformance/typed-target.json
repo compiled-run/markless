@@ -163,10 +163,22 @@
 		]
 	},
 	"initial": [
-		["component-edge:0/h2:text0", "Kept  after 0"],
-		["component-edge:0/h3:text0", ""]
+		[
+			"component-edge:0/h2:text0",
+			"Kept  after 0"
+		],
+		[
+			"component-edge:0/h3:text0",
+			""
+		]
 	],
-	"initialProperties": [["component-edge:0/h1", "value", ""]],
+	"initialProperties": [
+		[
+			"component-edge:0/h1",
+			"value",
+			""
+		]
+	],
 	"steps": [
 		{
 			"action": {

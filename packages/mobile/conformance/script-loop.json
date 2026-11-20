@@ -207,12 +207,30 @@
 		}
 	},
 	"initial": [
-		["h1:text0", "Slugs"],
-		["h2:text0", "Title: Hello, Native World!"],
-		["h3:text0", "Slug: none"],
-		["h4:text0", "Words: 0"],
-		["h5:text0", "Make slug"],
-		["h6:text0", "Longer"]
+		[
+			"h1:text0",
+			"Slugs"
+		],
+		[
+			"h2:text0",
+			"Title: Hello, Native World!"
+		],
+		[
+			"h3:text0",
+			"Slug: none"
+		],
+		[
+			"h4:text0",
+			"Words: 0"
+		],
+		[
+			"h5:text0",
+			"Make slug"
+		],
+		[
+			"h6:text0",
+			"Longer"
+		]
 	],
 	"steps": [
 		{

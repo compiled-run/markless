@@ -761,15 +761,7 @@
 						"whenFalse": [
 							{
 								"op": "command",
-								"node": {
-									"logical": "??",
-									"left": {
-										"literal": "component-edge:4/h4"
-									},
-									"right": {
-										"literal": "component-edge:3/h3"
-									}
-								},
+								"node": "component-edge:4/h4",
 								"command": "focus"
 							}
 						]
@@ -907,24 +899,12 @@
 						"test": {
 							"logical": "&&",
 							"left": {
-								"logical": "&&",
+								"binary": "===",
 								"left": {
-									"binary": "!==",
-									"left": {
-										"literal": "component-edge:2/h2"
-									},
-									"right": {
-										"literal": null
-									}
+									"event": "target"
 								},
 								"right": {
-									"binary": "===",
-									"left": {
-										"event": "target"
-									},
-									"right": {
-										"literal": "component-edge:2/h2"
-									}
+									"literal": "component-edge:2/h2"
 								}
 							},
 							"right": {
@@ -1068,24 +1048,12 @@
 								"cell": "handler:component-edge:2/event:3/kept:1"
 							},
 							"right": {
-								"logical": "&&",
+								"binary": "===",
 								"left": {
-									"binary": "!==",
-									"left": {
-										"literal": "component-edge:2/h2"
-									},
-									"right": {
-										"literal": null
-									}
+									"event": "target"
 								},
 								"right": {
-									"binary": "===",
-									"left": {
-										"event": "target"
-									},
-									"right": {
-										"literal": "component-edge:2/h2"
-									}
+									"literal": "component-edge:2/h2"
 								}
 							}
 						}
@@ -1357,15 +1325,7 @@
 						"whenFalse": [
 							{
 								"op": "command",
-								"node": {
-									"logical": "??",
-									"left": {
-										"literal": "component-edge:11/h4"
-									},
-									"right": {
-										"literal": "component-edge:10/h3"
-									}
-								},
+								"node": "component-edge:11/h4",
 								"command": "focus"
 							}
 						]
@@ -1490,24 +1450,12 @@
 						"test": {
 							"logical": "&&",
 							"left": {
-								"logical": "&&",
+								"binary": "===",
 								"left": {
-									"binary": "!==",
-									"left": {
-										"literal": "component-edge:9/h2"
-									},
-									"right": {
-										"literal": null
-									}
+									"event": "target"
 								},
 								"right": {
-									"binary": "===",
-									"left": {
-										"event": "target"
-									},
-									"right": {
-										"literal": "component-edge:9/h2"
-									}
+									"literal": "component-edge:9/h2"
 								}
 							},
 							"right": {
@@ -1651,24 +1599,12 @@
 								"cell": "handler:component-edge:9/event:3/kept:1"
 							},
 							"right": {
-								"logical": "&&",
+								"binary": "===",
 								"left": {
-									"binary": "!==",
-									"left": {
-										"literal": "component-edge:9/h2"
-									},
-									"right": {
-										"literal": null
-									}
+									"event": "target"
 								},
 								"right": {
-									"binary": "===",
-									"left": {
-										"event": "target"
-									},
-									"right": {
-										"literal": "component-edge:9/h2"
-									}
+									"literal": "component-edge:9/h2"
 								}
 							}
 						}
