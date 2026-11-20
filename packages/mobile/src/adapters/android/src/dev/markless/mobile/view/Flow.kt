@@ -150,14 +150,17 @@ class RuleView(context: Context) : View(context) {
  * An inline `<svg>`: draws the shapes the compiler compiled, its viewBox centred and fitted in the view (xMidYMid meet).
  * [emPx] is the font size of the text it sits in, in device px, which sizes a drawing measured in ems.
  */
-class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) : View(context) {
+class DrawingView(context: Context, private val base: Drawing, emPx: Double, private val choices: Map<String, Drawing> = emptyMap()) : View(context) {
+	private var drawing: Drawing = base
+	private var picked: String? = null
 	private val density = context.resources.displayMetrics.density
 	/** Device px per unit of the drawing's width and height. */
-	private val unit: Double = if (drawing.em) emPx else density.toDouble()
+	private val unit: Double = if (base.em) emPx else density.toDouble()
 	/** What `currentColor` paints: the svg's text colour from a style export, else black. */
 	var currentColor: Int = Color.BLACK
 		set(value) { field = value; invalidate() }
-	private val paths = drawing.shapes.map { shape ->
+	private var paths = pathsOf(base)
+	private fun pathsOf(drawing: Drawing) = drawing.shapes.map { shape ->
 		Path().apply {
 			fillType = if (shape.evenOdd) Path.FillType.EVEN_ODD else Path.FillType.WINDING
 			val v = shape.path
@@ -176,7 +179,16 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 	private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
 	/** The width over the height the web gives it without a size: the viewBox's, else 300 by 150. */
-	private val ratio: Double = drawing.viewBox?.let { it[3] / it[2] } ?: 0.5
+	private val ratio: Double = base.viewBox?.let { it[3] / it[2] } ?: 0.5
+
+	/** The drawing for a row's `<use>` href: its own symbol, or the base drawing when the sprite has none by that name. */
+	fun pick(href: String?) {
+		if (choices.isEmpty() || href == picked) return
+		picked = href
+		drawing = href?.let { choices[it] } ?: base
+		paths = pathsOf(drawing)
+		invalidate()
+	}
 
 	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
 		val available = MeasureSpec.getSize(widthMeasureSpec).toDouble()
@@ -221,6 +233,7 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 	private fun colorOf(paint: ShapePaint): Int = when (paint) {
 		is ShapePaint.Color -> paint.color.argb
 		ShapePaint.Current -> currentColor
+		is ShapePaint.CurrentSeen -> (currentColor and 0x00FFFFFF) or (Math.round(Color.alpha(currentColor) * paint.alpha / 255.0).toInt() shl 24)
 	}
 }
 

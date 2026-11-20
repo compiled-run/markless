@@ -2058,6 +2058,8 @@ export type SemanticMarkupChunk = {
 export type SemanticMarkupArtifact = {
 	readonly root: { readonly componentName: string; readonly templateId: string } | null;
 	readonly chunks: ReadonlyArray<SemanticMarkupChunk>;
+	/** Native builds: the scope class each component with a <style> adds to every element it renders, by component. */
+	readonly scopeClasses?: Readonly<Record<string, string>>;
 };
 
 export type SemanticGraphArtifact = {

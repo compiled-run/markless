@@ -182,7 +182,7 @@ func reproducesConformanceVector(file: URL) throws {
 			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
 			let event = NativeEventName(rawValue: eventName),
 			actionFields.allSatisfy({
-				(event == .timer ? ["event", "timer"] : ["event", "host", "value", "reason", "key", "text", "detail"] + (event.isTouch ? ["pointerId", "x", "y", "time"] : [])).contains($0.0)
+				(event == .timer ? ["event", "timer"] : ["event", "host", "value", "reason", "key", "text", "detail"] + (event.isTouch ? ["pointerId", "x", "y", "time"] : event == .contextmenu ? ["x", "y", "time"] : [])).contains($0.0)
 			}),
 			let expected = stepFields.first(where: { $0.0 == "journal" })?.1
 		else { Issue.record("malformed step \(step.jsonText)"); return }

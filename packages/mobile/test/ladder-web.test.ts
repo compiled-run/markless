@@ -64,7 +64,7 @@ afterAll(() => browser.close(), 60_000);
  */
 const owns = (folder: string, name: string) => existsSync(join(proofsDir, folder, name));
 const SHARED = (folder: string, rung: LadderRung): boolean =>
-	!['pages', 'document.tsrx', 'styles', 'lib'].some((name) => owns(folder, name)) &&
+	!['pages', 'document.tsrx', 'styles', 'lib', 'public'].some((name) => owns(folder, name)) &&
 	rung.route === undefined &&
 	rung.start === undefined &&
 	rung.web === undefined &&
@@ -103,8 +103,8 @@ async function serveRung(
 	}
 	// Components a rung imports live in proofs/lib, which a page reaches as `../lib/...` from pages/ here too.
 	await cp(join(proofsDir, 'lib'), join(root, 'lib'), { recursive: true });
-	// An app rung may bring its own components, stylesheets and document (whose stylesheet imports reach every page).
-	for (const own of ['lib', 'styles'])
+	// An app rung may bring its own components, stylesheets, served files and document (whose stylesheet imports reach every page).
+	for (const own of ['lib', 'styles', 'public'])
 		if (existsSync(join(proofsDir, folder, own)))
 			await cp(join(proofsDir, folder, own), join(root, own), { recursive: true });
 	if (existsSync(join(proofsDir, folder, 'document.tsrx')))
@@ -226,6 +226,35 @@ async function drag(page: Page, on: string, direction: 'right' | 'up') {
 	await cdp.detach();
 }
 
+/**
+ * A finger held on `on` past a phone's long-press time, then lifted. Chromium raises `contextmenu` for a held touch only
+ * through its touch emulator; CDP touch input ends in a click instead.
+ */
+async function longPress(page: Page, on: string) {
+	const box = await shown(page, on).first().boundingBox();
+	if (!box) throw new Error(`"${on}" is not on screen to press`);
+	const cdp = await page.context().newCDPSession(page);
+	const at = {
+		x: box.x + box.width / 2,
+		y: box.y + box.height / 2,
+		button: 'left' as const,
+		clickCount: 1,
+	};
+	await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+	await cdp.send('Emulation.setEmitTouchEventsForMouse', {
+		enabled: true,
+		configuration: 'mobile',
+	});
+	// The emulator answers a press only after its gesture ends, and a prevented contextmenu holds that answer back.
+	for (const type of ['mousePressed', 'mouseReleased'] as const) {
+		void cdp.send('Input.dispatchMouseEvent', { type, ...at }).catch(() => {});
+		await page.waitForTimeout(type === 'mousePressed' ? 1000 : 100);
+	}
+	await cdp.send('Emulation.setEmitTouchEventsForMouse', { enabled: false });
+	await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+	await cdp.detach();
+}
+
 async function act(page: Page, step: LadderStep) {
 	const action = step.do;
 	if (!action) return;
@@ -267,6 +296,7 @@ async function act(page: Page, step: LadderStep) {
 			await backdrop!.dispatchEvent(type, { button: 0, isPrimary: true, pointerType: 'touch' });
 	}
 	else if ('drag' in action) await drag(page, action.drag.on, action.drag.direction);
+	else if ('longPress' in action) await longPress(page, action.longPress);
 	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });
 	else if ('swipe' in action && action.swipe !== 'up') {
 		const { from, to, until } = action.swipe;

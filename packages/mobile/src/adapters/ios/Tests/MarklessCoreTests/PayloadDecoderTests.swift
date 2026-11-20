@@ -185,6 +185,22 @@ private let pad = """
 	#expect(throws: RuntimeError.self) { try runtime.dispatch(NativeAction(event: .pointerup, host: "h2", pointerId: 7)) }
 }
 
+private let held = """
+	{"version":"markless.native-view/0","component":"P","cells":[{"id":"state:log","name":"log","initial":""}],
+	"nodes":[{"kind":"element","id":"h0","element":"ul","parent":null},{"kind":"element","id":"h1","element":"li","parent":"h0"},
+	{"kind":"element","id":"h2","element":"span","parent":"h1"}],
+	"events":[{"host":"h0","event":"contextmenu","handler":"handler:list"},{"host":"h1","event":"contextmenu","handler":"handler:row"}],
+	"handlers":[{"id":"handler:list","ops":[{"op":"assign","cell":"state:log","value":{"binary":"+","left":{"cell":"state:log"},"right":{"template":[" list:",{"event":"target"},"/",{"event":"currentTarget"},"/",{"event":"timeStamp"}]}}}]},
+	{"id":"handler:row","ops":[{"op":"assign","cell":"state:log","value":{"binary":"+","left":{"cell":"state:log"},"right":{"template":[" row:",{"event":"clientX"},",",{"event":"clientY"}]}}}]}]}
+	"""
+
+@Test func runsALongPressOnTheElementPressedThenEachItIsInside() throws {
+	let runtime = NativeRuntime(payload: try decode(held))
+	_ = try runtime.dispatch(NativeAction(event: .contextmenu, host: "h2", x: 12.5, y: 30, time: 600))
+	#expect(try runtime.value(of: "state:log") == .string(" row:12.5,30 list:h2/h0/600"))
+	#expect(throws: RuntimeError.self) { try runtime.dispatch(NativeAction(event: .contextmenu, host: "h9")) }
+}
+
 @Test func decodesEveryPointerEventAndField() throws {
 	for name in ["pointerdown", "pointermove", "pointerup", "pointercancel", "pointerover", "pointerout", "pointerenter", "pointerleave"] {
 		#expect(try decode(pad.replacingOccurrences(of: "\"event\":\"pointerdown\"", with: "\"event\":\"\(name)\"")).events[0].event.rawValue == name)
@@ -213,4 +229,14 @@ func rejectsTouchShapesItDoesNotKnow(find: String, replace: String, reason: Stri
 	#expect(mutated != pad)
 	let message = try #require(rejection(mutated))
 	#expect(message.contains(reason), "\(message)")
+}
+
+@Test func decodesTheCurrentColourSeenThroughAnOpacity() throws {
+	let template = #"{"version":"markless.native-view/0","component":"A","cells":[],"nodes":[{"kind":"element","id":"h0","element":"svg","parent":null,"drawing":{"viewBox":null,"shapes":[{"path":[],"fill":PAINT,"fillRule":"nonzero","stroke":"currentColor","width":1,"cap":"butt","join":"miter","miterLimit":4}]}}],"events":[],"handlers":[]}"#
+	let svg = { (paint: String) in template.replacingOccurrences(of: "PAINT", with: paint) }
+	let shape = try decode(svg(#"{"current":true,"alpha":64}"#)).nodes[0].drawing?.shapes[0]
+	#expect(shape?.fill == .current(alpha: 64))
+	#expect(shape?.stroke == .currentColor)
+	#expect(rejection(svg(#"{"current":true,"alpha":64.5}"#))?.contains("an integer 0-255") == true)
+	#expect(rejection(svg(#"{"current":false,"alpha":64}"#))?.contains("unknown paint") == true)
 }

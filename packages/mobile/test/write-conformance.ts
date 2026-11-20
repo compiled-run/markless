@@ -7,6 +7,7 @@ import {
 	APP_CONFORMANCE_CASES,
 	CONFORMANCE_CASES,
 	CONFORMANCE_SCRIPT_HOST,
+	readCaseAsset,
 	readCaseModule,
 } from './conformance-cases.ts';
 import { scrollVectors } from '../src/scroll.ts';
@@ -20,6 +21,7 @@ for (const entry of CONFORMANCE_CASES) {
 		...(entry.device ? { device: entry.device } : {}),
 		source,
 		readModule: entry.modules ? readWorkspaceModule : readCaseModule,
+		readAsset: readCaseAsset,
 	});
 	if (!payload)
 		throw new Error(`${entry.fixture}: ${diagnostics.map((d) => d.message).join('; ')}`);

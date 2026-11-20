@@ -1,0 +1,50 @@
+appId: ${APP_ID}
+name: r117-svg-sprite-rows
+---
+- launchApp:
+      clearState: true
+- assertVisible: Plants
+- assertVisible: Sunny sun
+- assertVisible: Leafy leaf
+- assertVisible: Rainy drop
+- assertVisible:
+      text: Leafy
+      below: Sunny
+- assertVisible:
+      text: Rainy
+      below: Leafy
+- tapOn: Reverse
+- assertVisible:
+      text: Leafy
+      below: Rainy
+- assertVisible:
+      text: Sunny
+      below: Leafy
+- assertVisible: Rainy
+- assertVisible: Leafy
+- assertVisible: Sunny
+- assertVisible:
+      text: Leafy
+      below: Rainy
+- assertVisible:
+      text: Sunny
+      below: Leafy
+- tapOn: Remove leafy
+- assertNotVisible: Leafy
+- assertVisible:
+      text: Sunny
+      below: Rainy
+- assertVisible: Rainy
+- assertVisible: Sunny
+- assertVisible: Sunny sun
+- assertNotVisible: Leafy
+- assertVisible:
+      text: Sunny
+      below: Rainy
+- tapOn: Sunny grows a leaf
+- assertNotVisible: Sunny sun
+- assertVisible: Sunny leaf
+- assertNotVisible: Sunny sun
+- assertVisible:
+      text: Sunny
+      below: Rainy

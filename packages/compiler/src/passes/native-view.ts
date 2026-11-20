@@ -25,6 +25,7 @@ import {
 	NATIVE_DOCUMENT_BODY,
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
+	NATIVE_SCRIPT_CONTEXTMENU_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
 	NATIVE_SCRIPT_HOST_GLOBALS,
@@ -33,6 +34,7 @@ import {
 	NATIVE_VIEW_VERSION,
 	type NativeFieldKind,
 	type NativeForm,
+	type NativeContextMenuField,
 	type NativePointerEventName,
 	PLATFORM_PIECES_NAMESPACE,
 	PLATFORM_PIECES_PACKAGE,
@@ -72,6 +74,7 @@ import type {
 	SourceSpan,
 } from '../artifacts.ts';
 import { compileDrawing, type DrawingElement } from './native-drawing.ts';
+import { readSvgFile } from './native-svg-file.ts';
 import { nativeScriptOf, type NativeScriptModuleInput } from './native-script.ts';
 import { scriptFactsOf, type ScriptFacts } from './semantic-graph/script-facts.ts';
 import { sharedDefinitionId } from './semantic-graph/collect-shared.ts';
@@ -86,6 +89,21 @@ export type NativeViewArtifact = {
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 	/** Modules the build resolved but was not given an analysis of; the caller analyzes them and builds again. */
 	readonly missingModules?: ReadonlyArray<string>;
+	/**
+	 * Values the build needs that only app code computes (a `<use>` href naming a sprite symbol), with the script that
+	 * computes them; the caller evaluates each with no cells and builds again with `builtValues`.
+	 */
+	readonly buildValues?: {
+		readonly script?: NativeViewPayload['script'];
+		readonly values: ReadonlyArray<{ readonly key: string; readonly value: NativeExpr }>;
+	};
+	/** Shapes and groups drawn inside an <svg> that carry a `class`: a drawing reads no CSS, so a styled page refuses them. */
+	readonly classedShapes?: ReadonlyArray<{
+		readonly element: string;
+		/** Its own class tokens (not its component's scope class), or null when its class follows a value. */
+		readonly classes: ReadonlyArray<string> | null;
+		readonly span?: SourceSpan;
+	}>;
 	/** Where each element node of the payload is written, by node id, for build errors that name an element. */
 	readonly elementSources: ReadonlyMap<
 		string,
@@ -192,12 +210,15 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	pointerout: 'pointerout',
 	pointerenter: 'pointerenter',
 	pointerleave: 'pointerleave',
+	contextmenu: 'contextmenu',
 };
 
 const CAPTURE_METHODS: ReadonlySet<string> = new Set([
 	'setPointerCapture',
 	'releasePointerCapture',
 ]);
+
+type CarriedEvent = 'dismiss' | 'pointer' | 'contextmenu';
 
 const POINTER_EVENTS: ReadonlySet<string> = new Set<NativePointerEventName>([
 	'pointerdown',
@@ -210,12 +231,9 @@ const POINTER_EVENTS: ReadonlySet<string> = new Set<NativePointerEventName>([
 	'pointerleave',
 ]);
 
-/** The fields a dismiss or pointer event carries, by how a handler reads them off its event parameter. */
+/** The fields a dismiss, pointer or contextmenu event carries, by how a handler reads them off its event parameter. */
 const EVENT_FIELDS: Readonly<
-	Record<
-		'dismiss' | 'pointer',
-		Readonly<Record<string, Extract<NativeExpr, { event: string }>['event']>>
-	>
+	Record<CarriedEvent, Readonly<Record<string, Extract<NativeExpr, { event: string }>['event']>>>
 > = {
 	dismiss: { 'detail.reason': 'reason', 'detail.pressTarget': 'pressTarget' },
 	pointer: {
@@ -231,6 +249,13 @@ const EVENT_FIELDS: Readonly<
 		isPrimary: 'isPrimary',
 		timeStamp: 'timeStamp',
 	},
+	contextmenu: {
+		target: 'target',
+		currentTarget: 'currentTarget',
+		clientX: 'clientX',
+		clientY: 'clientY',
+		timeStamp: 'timeStamp',
+	} satisfies Record<NativeContextMenuField, NativeContextMenuField>,
 };
 
 /** `event.detail.reason` as `detail.reason` when `expression` is a member path of the read `event`. */
@@ -325,6 +350,7 @@ const NOT_ON_PHONES = new Set(['beforematch']);
 const KEYBOARD_ONLY = new Set(['keydown', 'keyup', 'focus', 'blur', 'focusin', 'focusout']);
 const TEXT_ENTRY = new Set(['input', 'textarea']);
 export const NATIVE_KEYBOARD_ONLY_CODE = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
+export const NATIVE_ANDROID_ONLY_CODE = 'MARKLESS_NATIVE_ANDROID_ONLY';
 
 type Item =
 	| {
@@ -486,7 +512,7 @@ type Scope = {
 	/** The element a tap landed on (`event.target`) and the one whose handler runs (`event.currentTarget`). */
 	readonly pressed?: { readonly target: string; readonly currentTarget: string };
 	/** A dismiss or pointer handler's event parameter, whose fields in `EVENT_FIELDS` it may read. */
-	readonly carried?: { readonly name: string; readonly kind: 'dismiss' | 'pointer' };
+	readonly carried?: { readonly name: string; readonly kind: CarriedEvent };
 	/** In a text field's keydown or paste handler: `event.key` or the pasted text is the event's, and `preventDefault()` an op. */
 	readonly typing?: 'keydown' | 'paste';
 	/** In a click handler: `event.detail` is the number of presses in a row. */
@@ -907,7 +933,13 @@ export type NativeViewOptions = {
 	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
 	/** A module's source as the build read it, by filename: where a native build finds a value's own JavaScript. */
 	readonly readSource?: (filename: string) => string | undefined;
+	/** What the caller computed for each of a previous build's `buildValues`, by key. */
+	readonly builtValues?: ReadonlyMap<string, NativeBuiltValue>;
+	/** The text of the file the app serves at a site-root path (`/icons.svg`), as the browser fetches it; the caller owns file access. */
+	readonly readAsset?: (path: string) => string | undefined;
 };
+
+export type NativeBuiltValue = { readonly value: unknown } | { readonly error: string };
 
 /** One module's facts, indexed for lowering its templates. */
 type ModuleFacts = ReturnType<typeof moduleFactsOf>;
@@ -1078,6 +1110,109 @@ function cellsOf(expr: NativeExpr, into = new Set<string>()): Set<string> {
 	return into;
 }
 
+/** What an <svg>'s own attributes give its drawing: its geometry and the paint its shapes inherit. */
+const DRAWN_SVG_ATTRIBUTES = new Set([
+	'viewBox',
+	'width',
+	'height',
+	'preserveAspectRatio',
+	'fill',
+	'stroke',
+	'stroke-width',
+	'fill-opacity',
+	'stroke-opacity',
+	'opacity',
+	'fill-rule',
+	'stroke-linecap',
+	'stroke-linejoin',
+	'stroke-miterlimit',
+	'color',
+]);
+
+/** Expression kinds whose value is only known while the app runs. */
+const RUNTIME_READS = [
+	'cell',
+	'route',
+	'event',
+	'checked',
+	'formData',
+	'focused',
+	'captures',
+	'contains',
+	'focusOrigin',
+] as const;
+
+/** What makes a value differ while the app runs: a list row's item, or state and the rest of `RUNTIME_READS`. */
+function variesWhileRunning(expr: NativeExpr): 'row' | 'state' | undefined {
+	if ('item' in expr) return 'row';
+	if (RUNTIME_READS.some((kind) => kind in expr)) return 'state';
+	if ('script' in expr) {
+		for (const binding of Object.values(expr.bindings)) {
+			if (!('value' in binding)) return 'state';
+			const found = variesWhileRunning(binding.value);
+			if (found) return found;
+		}
+		return undefined;
+	}
+	const visit = (value: unknown): 'row' | 'state' | undefined => {
+		if (Array.isArray(value)) {
+			for (const part of value) {
+				const found = visit(part);
+				if (found) return found;
+			}
+			return undefined;
+		}
+		if (value === null || typeof value !== 'object') return undefined;
+		return 'spread' in value
+			? visit(Object.values(value))
+			: variesWhileRunning(value as NativeExpr);
+	};
+	for (const child of Object.values(expr)) {
+		const found = visit(child);
+		if (found) return found;
+	}
+	return undefined;
+}
+
+/** Whether a value reads a list row's item, and whether it reads state or anything else in `RUNTIME_READS`. */
+function runtimeReadsOf(expr: NativeExpr): ReadonlySet<'row' | 'state'> {
+	const reads = new Set<'row' | 'state'>();
+	const visit = (value: unknown): void => {
+		if (Array.isArray(value)) return value.forEach(visit);
+		if (!value || typeof value !== 'object') return;
+		if ('item' in value) reads.add('row');
+		if (RUNTIME_READS.some((kind) => kind in value)) reads.add('state');
+		if ('script' in value) {
+			for (const binding of Object.values((value as Extract<NativeExpr, { script: string }>).bindings))
+				if ('value' in binding) visit(binding.value);
+				else reads.add('state');
+			return;
+		}
+		Object.values(value).forEach(visit);
+	};
+	visit(expr);
+	return reads;
+}
+
+/** A JSON value as the expression that makes it. */
+function valueExpr(value: unknown): NativeExpr {
+	if (Array.isArray(value)) return { array: value.map((item) => ({ spread: false, value: valueExpr(item) })) };
+	if (value && typeof value === 'object')
+		return { object: Object.entries(value).map(([key, item]) => [key, valueExpr(item)] as const) };
+	return { literal: value === undefined ? null : (value as NativeScalar) };
+}
+
+/** `expr` with the item of list `list`'s row read as `item`. */
+function withItem(expr: NativeExpr, list: string, item: unknown): NativeExpr {
+	const swap = (value: unknown): unknown => {
+		if (Array.isArray(value)) return value.map(swap);
+		if (!value || typeof value !== 'object') return value;
+		if ('item' in value && (value as { item: string }).item === list) return valueExpr(item);
+		return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, swap(inner)]));
+	};
+	return swap(expr) as NativeExpr;
+}
+
 const BUILTIN_CALLS: Readonly<Record<string, (...args: never[]) => unknown>> = {
 	String,
 	Number,
@@ -1096,8 +1231,10 @@ const BUILTIN_CALLS: Readonly<Record<string, (...args: never[]) => unknown>> = {
 function foldConstant(
 	expr: NativeExpr,
 	initial: (cell: string) => NativeValue | undefined,
+	/** A property an object lacks reads as `undefined`, as on the web, instead of leaving the value unknown. */
+	missingIsUndefined = false,
 ): { readonly value: unknown } | undefined {
-	const fold = (inner: NativeExpr) => foldConstant(inner, initial);
+	const fold = (inner: NativeExpr) => foldConstant(inner, initial, missingIsUndefined);
 	if ('literal' in expr) return { value: expr.literal };
 	const element = elementOf(expr);
 	if (element !== undefined) {
@@ -1190,9 +1327,9 @@ function foldConstant(
 		if (holder && typeof holder === 'object' && tokenElement.has(holder)) return undefined;
 		if (expr.property === 'length' && (typeof holder === 'string' || Array.isArray(holder)))
 			return { value: holder.length };
-		return holder && typeof holder === 'object' && Object.hasOwn(holder, expr.property)
-			? { value: (holder as Record<string, unknown>)[expr.property] }
-			: undefined;
+		if (holder && typeof holder === 'object' && Object.hasOwn(holder, expr.property))
+			return { value: (holder as Record<string, unknown>)[expr.property] };
+		return missingIsUndefined && holder && typeof holder === 'object' ? { value: undefined } : undefined;
 	}
 	if ('call' in expr) {
 		const args = expr.arguments.map(fold);
@@ -1239,6 +1376,20 @@ export function createNativeViewPayload(
 			docsUrl: `https://markless.dev/errors/${NATIVE_KEYBOARD_ONLY_CODE}`,
 		});
 	};
+	const androidOnly = (what: string, span?: SourceSpan) => {
+		diagnostics.push({
+			code: NATIVE_ANDROID_ONLY_CODE,
+			severity: 'warning',
+			phase: 'serialization',
+			title: 'A long-press handler runs only on Android',
+			message: `${what} runs only on Android, which raises it for a long press as Chrome does; Safari on iOS raises none, so the iOS app never runs it`,
+			why: 'Chrome on Android raises `contextmenu` when a person long-presses an element; Safari on iOS raises it for no touch.',
+			...(span ? { primarySpan: span } : {}),
+			passId: 'native-view',
+			suggestions: [],
+			docsUrl: `https://markless.dev/errors/${NATIVE_ANDROID_ONLY_CODE}`,
+		});
+	};
 	const elementSources = new Map<
 		string,
 		{ readonly element: string; readonly span?: SourceSpan }
@@ -1253,8 +1404,20 @@ export function createNativeViewPayload(
 		features: [...features],
 		diagnostics,
 		...(missingModules.size > 0 ? { missingModules: [...missingModules] } : {}),
+		...(classedShapes.length > 0 ? { classedShapes } : {}),
+		...(buildValues.length > 0
+			? {
+					buildValues: {
+						...(payload?.script ? { script: payload.script } : {}),
+						values: buildValues,
+					},
+				}
+			: {}),
 		elementSources,
 	});
+	const buildValues: { readonly key: string; readonly value: NativeExpr }[] = [];
+	const classedShapes: NonNullable<NativeViewArtifact['classedShapes']>[number][] = [];
+	const sprites = new Map<string, ReturnType<typeof readSvgFile> | undefined>();
 
 	const root = graph.markup.root;
 	if (!root) return done(refuse('the module has no root component'));
@@ -4350,6 +4513,265 @@ export function createNativeViewPayload(
 		live: read.computedGraphNodeId !== undefined,
 		...(read.sourceSpan ? { span: read.sourceSpan } : {}),
 	});
+	const PENDING_HREF =
+		'is computed by app code when the app is built, and this build has no script engine to compute it';
+	/** A value fixed when the app is built: folded here, or computed by the caller's script engine (`buildValues`). */
+	const builtValue = (
+		value: NativeExpr,
+		key: string,
+	): { readonly value: unknown } | { readonly error: string } | 'pending' => {
+		const built = options.builtValues?.get(key);
+		if (built) return built;
+		const folded = foldConstant(value, () => undefined, true);
+		if (folded) return folded;
+		buildValues.push({ key, value });
+		return 'pending';
+	};
+	const hrefText = (value: unknown) => (value === null || value === undefined ? '' : String(value));
+	/**
+	 * A row's href as data the host evaluates per row: parts that read the row stay data, and every other part of a `+` or a
+	 * template is fixed when the app is built. Null (with a refusal, or a request in `buildValues`) when it cannot be.
+	 */
+	const rowHref = (
+		expression: SemanticExpression,
+		scope: Scope,
+		key: string,
+		refused: (message: string) => null,
+		path: ReadonlyArray<number> = [],
+	): NativeExpr | null => {
+		const data = attempt(() => exprOf(expression, 'the `href` of <use>', scope));
+		const reads = !data.failed && data.value ? runtimeReadsOf(data.value) : undefined;
+		if (reads && !reads.has('state')) return data.value;
+		data.rollBack();
+		if (expression.kind === 'binary' && expression.operator === '+') {
+			const left = rowHref(expression.left, scope, `${key}.0`, refused, [...path, 0]);
+			const right = rowHref(expression.right, scope, `${key}.1`, refused, [...path, 1]);
+			return left && right ? { binary: '+', left, right } : null;
+		}
+		if (expression.kind === 'template') {
+			let expressions = 0;
+			const parts = expression.parts.map((part) => {
+				if (typeof part === 'string') return part;
+				const step = expressions++;
+				return rowHref(part, scope, `${key}.${step}`, refused, [...path, step]);
+			});
+			return parts.includes(null) ? null : { template: parts as (string | NativeExpr)[] };
+		}
+		const lowered = attempt(() =>
+			renderValue(
+				expression,
+				() =>
+					path.length === 0
+						? readScript(scope.module, scope.span)
+						: scope.span && scriptFacts(scope.module)?.operand(scope.span, path),
+				'the `href` of <use>',
+				scope,
+			),
+		);
+		const varies =
+			lowered.failed || !lowered.value ? 'state' : variesWhileRunning(lowered.value);
+		if (varies) {
+			lowered.rollBack();
+			return refused(
+				varies === 'row'
+					? '`href` on <use> reads its @for row through code a phone would run for every row; write the row part as plain data (`marks + row.icon`)'
+					: '`href` on <use> follows state; a native drawing is compiled when the app is built',
+			);
+		}
+		const built = builtValue(lowered.value!, key);
+		if (built === 'pending') return null;
+		lowered.rollBack();
+		if ('error' in built)
+			return refused(`\`href\` on <use> could not be computed when the app was built: ${built.error}`);
+		return { literal: hrefText(built.value) };
+	};
+	/** Each href the rows of a list can give a `<use>`, when the build can know them; null when refused or pending. */
+	const rowHrefs = (
+		value: NativeExpr,
+		key: string,
+		refused: (message: string) => null,
+	): { readonly first: ReadonlyArray<string>; readonly fixed: boolean } | null => {
+		const lists = new Set<string>();
+		const collect = (part: unknown): void => {
+			if (Array.isArray(part)) part.forEach(collect);
+			else if (part && typeof part === 'object') {
+				if ('item' in part) lists.add((part as { item: string }).item);
+				Object.values(part).forEach(collect);
+			}
+		};
+		collect(value);
+		const [list] = lists;
+		const repeat = nodes.find((node) => node.kind === 'repeat' && node.id === list);
+		if (lists.size !== 1 || repeat?.kind !== 'repeat')
+			return refused('`href` on <use> reads the rows of more than one @for');
+		const fixed = !variesWhileRunning(repeat.list);
+		const unknown = () =>
+			refused(
+				'`href` on <use> follows its @for row, and the items that list can hold are not known when the app is built, so the symbols its rows name are not either',
+			);
+		let items: unknown;
+		if (fixed) {
+			const built = builtValue(repeat.list, `${key}/list`);
+			if (built === 'pending') return null;
+			if ('error' in built)
+				return refused(`the @for list could not be computed when the app was built: ${built.error}`);
+			items = built.value;
+		} else {
+			const folded = foldConstant(repeat.list, initialOf);
+			if (!folded) return unknown();
+			items = folded.value;
+		}
+		if (!Array.isArray(items)) return unknown();
+		const first: string[] = [];
+		for (const item of items) {
+			const href = foldConstant(withItem(value, list!, item), () => undefined);
+			if (!href) return unknown();
+			first.push(hrefText(href.value));
+		}
+		return { first, fixed };
+	};
+	/** A bound `<use>` href as the app is built: one string, or per row an expression and each href it can take. */
+	const builtHref = (
+		element: DrawingElement,
+		name: string,
+		scope: Scope,
+	):
+		| string
+		| { readonly row: NativeExpr; readonly hrefs: ReadonlyArray<string>; readonly fixed: boolean }
+		| null => {
+		const span = scope.module.hostSpans.get(element.id);
+		const refused = (message: string) => refuseAs('svg', message, span);
+		const key = `${scope.prefix}${element.id}`;
+		const built = options.builtValues?.get(key);
+		if (built && 'error' in built)
+			return refused(`\`${name}\` on <use> could not be computed when the app was built: ${built.error}`);
+		if (built) return hrefText(built.value);
+		const follows = `\`${name}\` on <use> follows state; a native drawing is compiled when the app is built`;
+		const read = (scope.module.readsByHost.get(element.id) ?? []).find(
+			(candidate) =>
+				candidate.target.kind === 'attribute' && candidate.target.name === name,
+		);
+		if (!read) return refused(follows);
+		const where = readScope(read, scope);
+		const lowered = attempt(() =>
+			renderValue(
+				read.expression,
+				() => readScript(where.module, read.sourceSpan),
+				`the \`${name}\` of <use>`,
+				where,
+			),
+		);
+		const varies =
+			lowered.failed || !lowered.value ? 'state' : variesWhileRunning(lowered.value);
+		if (varies === 'row' && read.expression) {
+			lowered.rollBack();
+			const pending = buildValues.length;
+			const row = rowHref(read.expression, where, key, refused);
+			const hrefs = row && rowHrefs(row, key, refused);
+			if (buildValues.length > pending) return refused(`\`${name}\` on <use> ${PENDING_HREF}`);
+			return row && hrefs ? { row, hrefs: hrefs.first, fixed: hrefs.fixed } : null;
+		}
+		if (varies) {
+			lowered.rollBack();
+			return refused(follows);
+		}
+		const value = builtValue(lowered.value!, key);
+		if (value === 'pending') return refused(`\`${name}\` on <use> ${PENDING_HREF}`);
+		lowered.rollBack();
+		if ('error' in value)
+			return refused(`\`${name}\` on <use> could not be computed when the app was built: ${value.error}`);
+		return hrefText(value.value);
+	};
+	type ResolvedUse = { readonly element: DrawingElement; readonly sprite?: ReadonlyArray<DrawingElement> };
+	/** A `<use>` whose href is `href`; an href naming a file the app serves brings that file's elements. */
+	const resolveUse = (element: DrawingElement, href: string, span: SourceSpan | undefined): ResolvedUse | null => {
+		const { 'xlink:href': _xlink, ...attributes } = element.attributes;
+		const resolved = (target: string): DrawingElement => ({
+			...element,
+			attributes: { ...attributes, href: target },
+			bound: element.bound.filter((bound) => bound !== 'href' && bound !== 'xlink:href'),
+		});
+		if (href === '' || href.startsWith('#')) return { element: resolved(href) };
+		const refused = (message: string) => refuseAs('svg', `<use href="${href}"${message}`, span);
+		const hash = href.indexOf('#');
+		const file = hash < 0 ? href : href.slice(0, hash);
+		const id = hash < 0 ? '' : href.slice(hash + 1);
+		if (id === '') return refused('>, which names a file but no symbol in it');
+		if (!file.startsWith('/') || file.startsWith('//'))
+			return refused(
+				`>: a sprite is read from the app's files when it is built, so its path starts at the site root${file.includes(':') ? '' : `, as \`/${file}\``}`,
+			);
+		const sprite = spriteAt(file);
+		if (typeof sprite === 'string') return refused(sprite);
+		if (!sprite.elements.some((other) => other.attributes.id === id))
+			return refused(`>, which names nothing in ${file.split('?')[0]}`);
+		return {
+			element: resolved(`#${id}`),
+			sprite: sprite.elements.map((other) => ({ ...other, id: element.id })),
+		};
+	};
+	/** The sprite file at a site-root href's path, read once; a string is why it cannot be read (after `<use href="…"`). */
+	const spriteAt = (file: string): { readonly elements: ReadonlyArray<DrawingElement> } | string => {
+		const path = file.split('?')[0]!;
+		if (!options.readAsset) return `>: this build was not given the app's files to read ${path} from`;
+		if (!sprites.has(path)) {
+			const text = options.readAsset(path);
+			sprites.set(path, text === undefined ? undefined : readSvgFile(text));
+		}
+		const sprite = sprites.get(path);
+		if (!sprite) return `>: the app serves no file at ${path}`;
+		if ('error' in sprite) return `>: ${path} is not an SVG file the build can read: ${sprite.error}`;
+		return sprite;
+	};
+	/**
+	 * A `<use>` of an inline svg with its href as the app is built. One that names its symbol per list row (`perRow`) has
+	 * each href its rows can give: those of a fixed list's items, or for a list that changes every element id in the sprites
+	 * its first rows name, so a row draws what the web would. Null when it is refused.
+	 */
+	const useOf = (
+		element: DrawingElement,
+		scope: Scope,
+	):
+		| (ResolvedUse & {
+				readonly perRow?: {
+					readonly value: NativeExpr;
+					readonly choices: ReadonlyArray<ResolvedUse & { readonly href: string }>;
+				};
+		  })
+		| null => {
+		const span = scope.module.hostSpans.get(element.id);
+		const name = element.bound.find((bound) => bound === 'href' || bound === 'xlink:href');
+		const written = name ? builtHref(element, name, scope) : undefined;
+		if (written === null) return null;
+		if (typeof written === 'object') {
+			const choices: (ResolvedUse & { readonly href: string })[] = [];
+			const hrefs = new Set<string>();
+			for (const href of written.hrefs) {
+				const use = resolveUse(element, href.trim(), span);
+				if (!use) return null;
+				hrefs.add(href);
+				if (written.fixed || !use.sprite) continue;
+				const file = href.trim().slice(0, href.trim().indexOf('#'));
+				for (const other of use.sprite)
+					if (other.attributes.id !== undefined) hrefs.add(`${file}#${other.attributes.id}`);
+			}
+			for (const href of hrefs) {
+				const use = resolveUse(element, href.trim(), span);
+				if (use) choices.push({ ...use, href });
+			}
+			return {
+				element: { ...element, attributes: {}, bound: [] },
+				perRow: { value: written.row, choices },
+			};
+		}
+		const href = (
+			written ??
+			element.attributes.href ??
+			element.attributes['xlink:href'] ??
+			''
+		).trim();
+		return resolveUse(element, href, span);
+	};
 	const textPartOf = (graphNodeId: string, scope: Scope): NativeTextPart | null => {
 		const cell = scope.cells.byBinding.get(graphNodeId);
 		if (cell) return { cell };
@@ -4382,6 +4804,276 @@ export function createNativeViewPayload(
 		readonly host: string;
 	}[] = [];
 	const loweredEvents = new Set<string>();
+	/** Each item of an @for the build unrolled inside an <svg>: the list id its rows' expressions read, and the item. */
+	type UnrolledRow = { readonly list: string; readonly value: unknown };
+	const withRows = (expr: NativeExpr, rows: ReadonlyArray<UnrolledRow>) =>
+		rows.reduce((value, row) => withItem(value, row.list, row.value), expr);
+	/** A drawn element's bound attributes as the app is built; one that follows state or a list row stays bound. */
+	const builtAttributes = (
+		host: string,
+		tag: string,
+		written: Readonly<Record<string, string>>,
+		bound: ReadonlyArray<string>,
+		scope: Scope,
+		rows: ReadonlyArray<UnrolledRow>,
+		key: string,
+	): { readonly attributes: Record<string, string>; readonly bound: string[]; readonly refused: boolean } => {
+		const attributes = { ...written };
+		const left: string[] = [];
+		let refused = false;
+		const span = scope.module.hostSpans.get(host);
+		for (const name of bound) {
+			const read = (scope.module.readsByHost.get(host) ?? []).find(
+				(candidate) => candidate.target.kind === 'attribute' && candidate.target.name === name,
+			);
+			if (
+				!read ||
+				name === 'class' ||
+				name === 'style' ||
+				name.startsWith('aria-') ||
+				name.startsWith('data-')
+			) {
+				left.push(name);
+				continue;
+			}
+			const where = readScope(read, scope);
+			const lowered = attempt(() =>
+				renderValue(
+					read.expression,
+					() => readScript(where.module, read.sourceSpan),
+					`the \`${name}\` of <${tag}>`,
+					where,
+				),
+			);
+			const value = !lowered.failed && lowered.value ? withRows(lowered.value, rows) : undefined;
+			if (!value || variesWhileRunning(value)) {
+				lowered.rollBack();
+				left.push(name);
+				continue;
+			}
+			const built = builtValue(value, `${scope.prefix}${host}/${name}#${key}`);
+			if (built === 'pending') {
+				refused = true;
+				refuseAs('svg', `\`${name}\` on <${tag}> ${PENDING_HREF}`, span);
+				continue;
+			}
+			lowered.rollBack();
+			if ('error' in built) {
+				refused = true;
+				refuseAs('svg', `\`${name}\` on <${tag}> could not be computed when the app was built: ${built.error}`, span);
+				continue;
+			}
+			if (built.value === null || built.value === undefined || built.value === false) continue;
+			attributes[name] = built.value === true ? '' : String(built.value);
+		}
+		return { attributes, bound: left, refused };
+	};
+	/**
+	 * An <svg>'s content as drawing elements in paint order. An @for whose list and an @if whose test are fixed when the app
+	 * is built are unrolled, as the web renders them; one that follows state is refused by name.
+	 */
+	const svgContent = (chunk: SemanticMarkupChunk, svgPath: ReadonlyArray<number>, scope: Scope, svgSpan: SourceSpan | undefined) => {
+		const drawn: DrawingElement[] = [];
+		const texts: { path: ReadonlyArray<number>; text: string }[] = [];
+		const sprites = new Map<string, ReadonlyArray<DrawingElement>>();
+		const spans = new Map<string, SourceSpan | undefined>();
+		let perRow: (NonNullable<NonNullable<ReturnType<typeof useOf>>['perRow']> & { readonly at: number }) | undefined;
+		const follows = (what: string) =>
+			refuseAs('svg', `${what} inside an <svg> whose ${what === 'an @for' ? 'list' : 'test'} follows state; a native drawing is compiled when the app is built`, svgSpan);
+		const skip = (skipped: SemanticMarkupChunk) => {
+			if (scope.module === rootModule) lowered.add(skipped.id);
+			for (const host of skipped.hosts)
+				for (const event of scope.module.eventsByHost.get(host.hostNodeId) ?? [])
+					if (scope.module === rootModule) loweredEvents.add(event.id);
+		};
+		const walk = (
+			at: SemanticMarkupChunk,
+			under: ReadonlyArray<number>,
+			out: ReadonlyArray<number>,
+			start: number,
+			scope: Scope,
+			rows: ReadonlyArray<UnrolledRow>,
+			key: string,
+		): number => {
+			if (scope.module === rootModule) lowered.add(at.id);
+			const child = (path: ReadonlyArray<number>) =>
+				path.length === under.length + 1 && under.every((value, index) => path[index] === value);
+			type Entry =
+				| { readonly kind: 'host'; readonly id: string; readonly path: ReadonlyArray<number> }
+				| { readonly kind: 'text'; readonly text: string; readonly path: ReadonlyArray<number> }
+				| { readonly kind: 'slot'; readonly slot: SemanticMarkupChunk['slots'][number]; readonly path: ReadonlyArray<number> };
+			const entries: Entry[] = [
+				...at.hosts.map((host): Entry => ({ kind: 'host', id: host.hostNodeId, path: host.coordinate.path })),
+				...(at.texts ?? []).map((text): Entry => ({ kind: 'text', text: text.text, path: text.coordinate.path })),
+				...at.slots
+					.filter((slot) => slot.kind !== 'attribute' && slot.kind !== 'spread-attributes')
+					.map((slot): Entry => ({ kind: 'slot', slot, path: slot.coordinate.path })),
+			]
+				.filter((entry) => child(entry.path))
+				.sort((a, b) => a.path.at(-1)! - b.path.at(-1)!);
+			let n = start;
+			for (const entry of entries) {
+				if (entry.kind === 'text') {
+					texts.push({ path: [...out, n++], text: entry.text });
+					continue;
+				}
+				if (entry.kind === 'host') {
+					const tag = scope.module.tagOf.get(entry.id) ?? '*';
+					const path = [...out, n++];
+					const id = rows.length > 0 ? `${entry.id}@${key}` : entry.id;
+					spans.set(id, scope.module.hostSpans.get(entry.id));
+					const resolved = builtAttributes(
+						entry.id,
+						tag,
+						Object.fromEntries(
+							(at.attributes ?? [])
+								.filter((attribute) => comparePaths(attribute.coordinate.path, entry.path) === 0)
+								.map((attribute) => [attribute.name, attribute.value]),
+						),
+						at.slots.flatMap((slot) =>
+							slot.kind === 'attribute' && comparePaths(slot.coordinate.path, entry.path) === 0
+								? [slot.name]
+								: [],
+						),
+						scope,
+						rows,
+						key,
+					);
+					const element: DrawingElement = {
+						id: entry.id,
+						tag,
+						path,
+						attributes: resolved.attributes,
+						bound: resolved.bound,
+					};
+					const own = element.bound.includes('class')
+						? null
+						: (element.attributes.class ?? '')
+								.split(/\s+/)
+								.filter(
+									(token) =>
+										token !== '' &&
+										token !== scope.module.graph.markup.scopeClasses?.[at.componentName],
+								);
+					if (own === null || own.length > 0)
+						classedShapes.push({ element: tag, classes: own, ...(spans.get(id) ? { span: spans.get(id)! } : {}) });
+					const use = resolved.refused ? null : tag === 'use' ? useOf(element, scope) : { element };
+					if (use?.perRow && perRow)
+						refuseAs(
+							'svg',
+							'a second <use> in this <svg> whose `href` follows its @for row; one per <svg> picks its symbol per row',
+							spans.get(id) ?? svgSpan,
+						);
+					else if (use?.perRow) perRow = { ...use.perRow, at: drawn.length };
+					else if (use) drawn.push({ ...use.element, id });
+					if (use?.sprite) sprites.set(id, use.sprite.map((other) => ({ ...other, id })));
+					for (const event of scope.module.eventsByHost.get(entry.id) ?? []) {
+						if (scope.module === rootModule) loweredEvents.add(event.id);
+						refuseAs(
+							'svg',
+							`the ${event.eventName} handler on <${tag}> inside an <svg>: its shapes are drawn, not views`,
+							event.handlerSpan,
+						);
+					}
+					walk(at, entry.path, path, 0, scope, rows, key);
+					continue;
+				}
+				const slot = entry.slot;
+				if (slot.kind === 'repeat') {
+					const repeat = scope.module.repeatsById.get(slot.repeatId);
+					const rowChunk = scope.module.chunks.get(slot.rowTemplateId);
+					if (!repeat?.collectionExpression || !rowChunk) {
+						refuseAs('svg', 'an @for inside an <svg> over something the build cannot read', svgSpan);
+						continue;
+					}
+					const list = attempt(() =>
+						renderValue(
+							repeat.collectionExpression,
+							() => listScript(scope.module, repeat.rowHostNodeId),
+							'the @for list',
+							scope,
+						),
+					);
+					const value = !list.failed && list.value ? withRows(list.value, rows) : undefined;
+					if (!value || variesWhileRunning(value)) {
+						list.rollBack();
+						follows('an @for');
+						continue;
+					}
+					const built = builtValue(value, `${scope.prefix}${slot.repeatId}#${key}`);
+					if (built === 'pending') {
+						refuseAs('svg', `an @for inside an <svg> ${PENDING_HREF}`, svgSpan);
+						continue;
+					}
+					list.rollBack();
+					if ('error' in built || !Array.isArray(built.value)) {
+						refuseAs('svg', `the list of an @for inside an <svg> could not be computed when the app was built${'error' in built ? `: ${built.error}` : ''}`, svgSpan);
+						continue;
+					}
+					const listId = `${scope.prefix}${slot.repeatId}#${key}`;
+					const inRow: Scope = { ...scope, items: new Map([...scope.items, [repeat.itemName, listId]]) };
+					built.value.forEach((item: unknown, index: number) => {
+						n = walk(rowChunk, [], out, n, inRow, [...rows, { list: listId, value: item }], `${key}.${index}`);
+					});
+					if (built.value.length === 0 && slot.emptyTemplateId) {
+						const empty = scope.module.chunks.get(slot.emptyTemplateId);
+						if (empty) n = walk(empty, [], out, n, scope, rows, key);
+					} else if (slot.emptyTemplateId) {
+						const empty = scope.module.chunks.get(slot.emptyTemplateId);
+						if (empty) skip(empty);
+					}
+					if (built.value.length === 0) skip(rowChunk);
+					continue;
+				}
+				if (slot.kind === 'branch') {
+					const site = scope.module.branchSites.get(slot.branchSiteId);
+					const arms = slot.armTemplateIds;
+					const plain = site?.kind === 'if' && site.armIndexSource === undefined;
+					const tests = plain ? [site.testExpression] : site?.armTestExpressions;
+					let chosen: number | null = null;
+					let refused = !tests;
+					for (const [index, test] of (tests ?? []).entries()) {
+						if (test === null) {
+							chosen = index;
+							break;
+						}
+						const lowered = attempt(() => testOf(test, 'the @if test', scope));
+						const value = !lowered.failed && lowered.value ? withRows(lowered.value, rows) : undefined;
+						lowered.rollBack();
+						const folded = value && !variesWhileRunning(value) ? foldConstant(value, () => undefined, true) : undefined;
+						if (!folded) {
+							refused = true;
+							break;
+						}
+						if (folded.value) {
+							chosen = index;
+							break;
+						}
+					}
+					if (refused) {
+						follows('an @if');
+						continue;
+					}
+					if (chosen === null && plain && arms.length > 1) chosen = 1;
+					arms.forEach((armId, index) => {
+						const arm = scope.module.chunks.get(armId);
+						if (!arm) return;
+						if (index === chosen) n = walk(arm, [], out, n, scope, rows, key);
+						else skip(arm);
+					});
+					continue;
+				}
+				refuseAs(
+					'svg',
+					`${slot.kind === 'text' ? 'a value' : slot.kind === 'child-component' ? 'a component' : slot.kind === 'async' ? 'an @try' : `a ${slot.kind}`} inside an <svg>, which is drawn once when the app is built`,
+					svgSpan,
+				);
+			}
+			return n;
+		};
+		walk(chunk, svgPath, [], 0, scope, [], '');
+		return { drawn, texts, sprites, spans, perRow };
+	};
 	const lowerChunk = (
 		chunk: SemanticMarkupChunk,
 		baseParent: string | null,
@@ -4747,45 +5439,60 @@ export function createNativeViewPayload(
 					? defaultStyleOf(element, attributes, bindings)
 					: undefined;
 				let drawing: NativeDrawing | undefined;
+				let drawings: Record<string, NativeDrawing> | undefined;
 				if (element === 'svg') {
 					consumed.push(item.path);
-					const inside = items.filter((other) => isPrefix(item.path, other.path));
-					const relative = (path: ReadonlyArray<number>) => path.slice(item.path.length);
-					const drawn: DrawingElement[] = [];
-					const texts: { path: ReadonlyArray<number>; text: string }[] = [];
-					for (const other of inside) {
-						if (other.kind === 'host') {
-							const tag = scope.module.tagOf.get(other.id) ?? '*';
-							drawn.push({
-								id: other.id,
-								tag,
-								path: relative(other.path),
-								attributes: attributesAt(other.path),
-								bound: boundAt(other.path),
-							});
-							for (const event of scope.module.eventsByHost.get(other.id) ?? []) {
-								if (scope.module === rootModule) loweredEvents.add(event.id);
-								refuseAs(
-									'svg',
-									`the ${event.eventName} handler on <${tag}> inside an <svg>: its shapes are drawn, not views`,
-									event.handlerSpan,
-								);
-							}
-						} else if (other.kind === 'part' && 'text' in other.part)
-							texts.push({ path: relative(other.path), text: other.part.text });
-						else
-							refuseAs(
-								'svg',
-								`${other.kind === 'part' ? 'a value' : other.kind === 'child' ? 'a component' : `an @${other.kind === 'repeat' ? 'for' : other.kind === 'boundary' ? 'try' : 'if'}`} inside an <svg>, which is drawn once when the app is built`,
-								span,
-							);
+					const content = svgContent(chunk, item.path, scope, span);
+					const { drawn, texts, perRow } = content;
+					const usedSprites = content.sprites;
+					const own = builtAttributes(
+						item.id,
+						'svg',
+						{},
+						bindings.flatMap((binding) =>
+							'attribute' in binding && DRAWN_SVG_ATTRIBUTES.has(binding.attribute)
+								? [binding.attribute]
+								: [],
+						),
+						scope,
+						[],
+						'',
+					);
+					const drawnAttributes = { ...attributes, ...own.attributes };
+					for (const name of Object.keys(own.attributes)) {
+						const at = bindings.findIndex(
+							(binding) => 'attribute' in binding && binding.attribute === name,
+						);
+						if (at >= 0) bindings.splice(at, 1);
 					}
-					const result = compileDrawing(attributes, drawn, texts, item.id);
-					for (const refusal of result.refusals)
+					const result = compileDrawing(drawnAttributes, drawn, texts, item.id, usedSprites);
+					const refusals = new Map(
+						result.refusals.map((refusal) => [`${refusal.element} ${refusal.message}`, refusal]),
+					);
+					if (perRow) {
+						const choices: Record<string, NativeDrawing> = {};
+						for (const choice of perRow.choices) {
+							const compiled = compileDrawing(
+								drawnAttributes,
+								drawn.toSpliced(perRow.at, 0, choice.element),
+								texts,
+								item.id,
+								choice.sprite
+									? new Map([...usedSprites, [choice.element.id, choice.sprite]])
+									: usedSprites,
+							);
+							for (const refusal of compiled.refusals)
+								refusals.set(`${refusal.element} ${refusal.message}`, refusal);
+							choices[choice.href] = compiled.drawing;
+						}
+						drawings = choices;
+						bindings.push({ attribute: 'href', value: perRow.value });
+					}
+					for (const refusal of refusals.values())
 						refuseAs(
 							'svg',
 							refusal.message,
-							scope.module.hostSpans.get(refusal.element) ?? span,
+							content.spans.get(refusal.element) ?? scope.module.hostSpans.get(refusal.element) ?? span,
 						);
 					drawing = result.drawing;
 					if (result.title !== undefined && !('aria-label' in attributes))
@@ -4802,6 +5509,7 @@ export function createNativeViewPayload(
 					...(defaultStyle ? { defaultStyle } : {}),
 					...(drawing ? { drawing } : {}),
 					...(live ? { live } : {}),
+					...(drawings ? { drawings } : {}),
 					...place,
 				});
 				for (const event of scope.module.eventsByHost.get(item.id) ?? []) {
@@ -4849,6 +5557,11 @@ export function createNativeViewPayload(
 							);
 						continue;
 					}
+					if (semantic === 'contextmenu')
+						androidOnly(
+							`the ${event.eventName} handler on <${element}> ${id}`,
+							event.handlerSpan,
+						);
 					if (semantic === 'submit' && element !== 'form') {
 						refuse(
 							`a submit handler on <${element}>; a native build runs one only on a <form>`,
@@ -5895,10 +6608,15 @@ export function createNativeViewPayload(
 		let readsMissing = false;
 		const semantic = SEMANTIC_EVENTS[event.eventName];
 		const touch = POINTER_EVENTS.has(semantic ?? '');
+		const press = semantic === 'contextmenu';
 		for (const read of fact.event ?? []) {
 			if (touch && NATIVE_SCRIPT_POINTER_FIELDS.includes(read.path[0] ?? '')) continue;
-			// A touch's script event carries no element, so `event.target` there is refused, not read as the generic member.
-			if (touch && read.path[0] && read.path[0] in EVENT_FIELDS.pointer) {
+			if (press && NATIVE_SCRIPT_CONTEXTMENU_FIELDS.includes(read.path[0] ?? '')) continue;
+			// A touch's or long press's script event carries no element, so `event.target` there is refused, not read as the generic member.
+			if (
+				(touch && read.path[0] && read.path[0] in EVENT_FIELDS.pointer) ||
+				(press && (read.path[0] === 'target' || read.path[0] === 'currentTarget'))
+			) {
 				readsMissing = true;
 				refuseScript(
 					`${what} reads \`event.${read.path.join('.')}\`, an element, which JavaScript on a phone cannot hold yet`,
@@ -5915,7 +6633,14 @@ export function createNativeViewPayload(
 			);
 			if (known) continue;
 			readsMissing = true;
-			const doing = semantic === 'input' ? 'a text edit' : touch ? 'a touch' : 'a tap';
+			const doing =
+				semantic === 'input'
+					? 'a text edit'
+					: touch
+						? 'a touch'
+						: press
+							? 'a long press'
+							: 'a tap';
 			refuseScript(
 				`${what} reads \`event.${read.path.join('.')}\`, which ${doing} on a phone does not have`,
 				read.span,
@@ -5970,7 +6695,12 @@ export function createNativeViewPayload(
 		const submitting =
 			event.eventName === 'submit' && pressed ? { submitting: pressed.currentTarget } : {};
 		const semantic = SEMANTIC_EVENTS[event.eventName];
-		const carried = semantic === 'dismiss' || POINTER_EVENTS.has(semantic ?? '');
+		const carried: CarriedEvent | undefined =
+			semantic === 'dismiss' || semantic === 'contextmenu'
+				? semantic
+				: POINTER_EVENTS.has(semantic ?? '')
+					? 'pointer'
+					: undefined;
 		const typing = semantic === 'keydown' || semantic === 'paste' ? { typing: semantic } : {};
 		const clicking =
 			semantic === 'activate' && event.eventName === 'click'
@@ -5980,13 +6710,7 @@ export function createNativeViewPayload(
 			parameter === undefined
 				? { ...running, ...submitting, ...typing }
 				: carried
-					? {
-							...running,
-							carried: {
-								name: parameter,
-								kind: semantic === 'dismiss' ? 'dismiss' : 'pointer',
-							},
-						}
+					? { ...running, carried: { name: parameter, kind: carried } }
 					: event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))
 						? { ...running, event: parameter }
 						: {
@@ -6879,6 +7603,15 @@ export function createNativeViewPayload(
 				(statement.arguments ?? []).length === 0
 			)
 				return [{ op: 'preventDefault' }];
+			// A host shows no menu of its own for a long press, so there is nothing for it to prevent.
+			if (
+				scope.carried?.kind === 'contextmenu' &&
+				statement.name === scope.carried.name &&
+				statement.path?.length === 1 &&
+				statement.path[0] === 'preventDefault' &&
+				(statement.arguments ?? []).length === 0
+			)
+				return [];
 			if (
 				scope.pressed &&
 				statement.name === scope.opaque &&

@@ -94,11 +94,16 @@ final class PreformattedScroll: UIScrollView {}
 
 /// An inline `<svg>`: draws the shapes compiled when the app was built, fitted into its box as the web fits the viewBox.
 final class DrawingView: UIView {
-	let drawing: NativeDrawing
+	private(set) var drawing: NativeDrawing
+	private let base: NativeDrawing
+	private let choices: [String: NativeDrawing]
+	private var picked: String?
 	var currentColor: UIColor = .black { didSet { setNeedsDisplay() } }
 
-	init(_ drawing: NativeDrawing) {
+	init(_ drawing: NativeDrawing, choices: [String: NativeDrawing] = [:]) {
 		self.drawing = drawing
+		self.base = drawing
+		self.choices = choices
 		super.init(frame: .zero)
 		isOpaque = false
 		backgroundColor = .clear
@@ -107,6 +112,14 @@ final class DrawingView: UIView {
 
 	@available(*, unavailable)
 	required init?(coder: NSCoder) { fatalError("DrawingView is made in code") }
+
+	/// The drawing for a row's `<use>` href: its own symbol, or the base drawing when the sprite has none by that name.
+	func pick(_ href: String?) {
+		guard !choices.isEmpty, href != picked else { return }
+		picked = href
+		drawing = href.flatMap { choices[$0] } ?? base
+		setNeedsDisplay()
+	}
 
 	override func draw(_ rect: CGRect) {
 		guard let context = UIGraphicsGetCurrentContext() else { return }
@@ -154,6 +167,7 @@ final class DrawingView: UIView {
 	private func color(_ paint: NativeShape.Paint) -> UIColor {
 		switch paint {
 		case .currentColor: currentColor
+		case let .current(alpha): currentColor.withAlphaComponent(currentColor.cgColor.alpha * alpha / 255)
 		case let .color(c): UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: c.alpha / 255)
 		}
 	}
@@ -804,7 +818,7 @@ final class ViewTree {
 				if unimplementedElements.contains(element) { throw HostError("<\(element)> \(id) has no iOS view yet") }
 				let view: UIView
 				if let drawing = node.drawing {
-					let drawn = DrawingView(drawing)
+					let drawn = DrawingView(drawing, choices: node.drawings ?? [:])
 					drawn.isUserInteractionEnabled = context.button == nil
 					if layout == nil {
 						leaves.insert(ObjectIdentifier(drawn))
@@ -1105,6 +1119,9 @@ final class ViewTree {
 			case (.idle, _), (.visible, _), (.dismiss, _), (_, _) where event.event.isPointer:
 				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host.
 				continue
+			case (.contextmenu, _):
+				// Safari on iOS raises no contextmenu for a long press, so neither does this host.
+				continue
 			default:
 				throw HostError("\(event.event.rawValue) on <\(element)> \(id) has no iOS control event yet")
 			}
@@ -1149,6 +1166,7 @@ final class ViewTree {
 			button.isEnabled = current["disabled"] == nil
 			refreshLabel(of: button)
 		} else if let drawing = view as? DrawingView {
+			drawing.pick(current["href"])
 			// A named svg is an image to VoiceOver; an unnamed one, or one inside a control, is decoration.
 			drawing.accessibilityLabel = current["aria-label"]
 			drawing.isAccessibilityElement = current["aria-label"] != nil && contexts[id]?.button == nil

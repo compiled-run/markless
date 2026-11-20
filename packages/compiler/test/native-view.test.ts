@@ -2771,6 +2771,32 @@ describe('inline svg', () => {
 		]);
 	});
 
+	it('keeps a see-through currentColor paint as the current colour with its alpha, wherever the opacity is written', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Ink() @{
+	<main>
+	<svg viewBox="0 0 10 10" fill="currentColor" opacity="0.5">
+		<defs><symbol id="mark"><path d="M0 0h1" stroke="currentColor" stroke-opacity="0.5" fill="none" /></symbol></defs>
+		<rect width="1" height="1" />
+		<g opacity=".5"><rect width="1" height="1" fill-opacity="0.2" /></g>
+		<use href="#mark" />
+		<rect width="1" height="1" opacity="2" />
+	</svg>
+	<svg viewBox="0 0 1 1"><circle r="1" fill="currentColor" /><circle r="1" fill="currentColor" fill-opacity="0.9999" /></svg>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const [ink, plain] = payload!.nodes.flatMap((node) =>
+			node.kind === 'element' && node.drawing ? [node.drawing.shapes] : [],
+		);
+		expect(ink!.map((shape) => [shape.fill, shape.stroke])).toEqual([
+			[{ current: true, alpha: 128 }, null],
+			[{ current: true, alpha: 13 }, null],
+			[null, { current: true, alpha: 64 }],
+			[{ current: true, alpha: 128 }, null],
+		]);
+		expect(plain!.map((shape) => shape.fill)).toEqual(['currentColor', 'currentColor']);
+	});
+
 	it('keeps a size in ems as ems and turns absolute units into CSS pixels', async () => {
 		const sizes = async (width: string, height: string) => {
 			const { payload } = await nativeView(`export function Icon() @{
@@ -2798,6 +2824,343 @@ describe('inline svg', () => {
 		if (svg.kind !== 'element') throw new Error('not an element');
 		expect(svg.drawing!.shapes).toHaveLength(1);
 		expect(svg.drawing!.shapes[0]!.transform).toEqual([5, 0, 0, 5, 10, 0]);
+	});
+
+	const sprite = `<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg>
+<svg xmlns="http://www.w3.org/2000/svg" fill="red">
+	<!-- each mark is a symbol a page names -->
+	<symbol id="sun" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="#f4a261" /></symbol>
+	<symbol id="bar"><g transform="translate(1 0)"><rect width="2" height="1" /></g></symbol>
+	<symbol id="ring" viewBox="0 0 4 4"><use href="#sun" width="4" height="4" /></symbol>
+</svg>`;
+	const shapesOf = (payload: NonNullable<Awaited<ReturnType<typeof nativeView>>['payload']>) =>
+		payload.nodes.flatMap((node) =>
+			node.kind === 'element' && node.drawing ? [node.drawing.shapes] : [],
+		);
+
+	it('draws a <use> of a <symbol> in a sprite file the app serves, read when the app is built', async () => {
+		const reads: string[] = [];
+		const { payload, diagnostics } = await nativeView(
+			`export function Marks() @{
+	<main>
+		<svg viewBox="0 0 20 20"><use href="/art/marks.svg#sun" /></svg>
+		<svg viewBox="0 0 4 4"><use xlink:href="/art/marks.svg?v=2#bar" x="1" /></svg>
+		<svg viewBox="0 0 8 8"><use href="/art/marks.svg#ring" width="8" height="8" /></svg>
+	</main>
+}`,
+			{
+				readAsset: (url) => {
+					reads.push(url);
+					return url === '/art/marks.svg' ? sprite : undefined;
+				},
+			},
+		);
+		expect(diagnostics).toEqual([]);
+		expect(reads).toEqual(['/art/marks.svg']);
+		const [sun, bar, ring] = shapesOf(payload!);
+		expect(sun).toHaveLength(1);
+		expect(sun![0]).toMatchObject({
+			fill: { r: 244, g: 162, b: 97, alpha: 255 },
+			transform: [2, 0, 0, 2, 0, 0],
+		});
+		expect(bar).toEqual([
+			expect.objectContaining({
+				path: [0, 0, 0, 1, 2, 0, 1, 2, 1, 1, 0, 1, 4],
+				fill: { r: 0, g: 0, b: 0, alpha: 255 },
+				transform: [1, 0, 0, 1, 2, 0],
+			}),
+		]);
+		expect(ring![0]!.transform).toEqual([0.8, 0, 0, 0.8, 0, 0]);
+	});
+
+	it('asks the build for a <use> href that app code computes, then draws the symbol it names', async () => {
+		const source = `function asset(path: string): string {
+	return '/' + path.replace(/^\\/+/, '');
+}
+const INK = 'ink.svg';
+export function Nav() @{
+	const marks = asset(INK) + '#';
+	<svg viewBox="0 0 30 30"><use href={marks + 'sun'} x="5" /></svg>
+}`;
+		const first = await nativeView(source);
+		expect(first.payload).toBeNull();
+		expect(first.diagnostics.map((d) => d.message)).toEqual([
+			'`href` on <use> is computed by app code when the app is built, and this build has no script engine to compute it',
+		]);
+		expect(first.buildValues?.values).toEqual([
+			{ key: expect.any(String), value: expect.objectContaining({ script: expect.any(String) }) },
+		]);
+		expect(first.buildValues?.script?.source).toContain('function asset(path)');
+		const [{ key }] = first.buildValues!.values as [{ key: string }];
+		const { payload, diagnostics } = await nativeView(source, {
+			builtValues: new Map([[key, { value: '/ink.svg#sun' }]]),
+			readAsset: (url) => (url === '/ink.svg' ? sprite : undefined),
+		});
+		expect(diagnostics).toEqual([]);
+		expect(payload!.script).toBeUndefined();
+		expect(shapesOf(payload!)[0]![0]!.transform).toEqual([3, 0, 0, 3, 5, 0]);
+		const failed = await nativeView(source, {
+			builtValues: new Map([[key, { error: 'ReferenceError: window is not defined' }]]),
+		});
+		expect(failed.diagnostics.map((d) => d.message)).toEqual([
+			'`href` on <use> could not be computed when the app was built: ReferenceError: window is not defined',
+		]);
+	});
+
+	it('refuses a <use> href it cannot read when the app is built, by name', async () => {
+		const text = `import { state } from '@markless/core';
+const ROWS = [{ id: 1, icon: 'sun' }, { id: 2, icon: 'moon' }];
+export function Marks() @{
+	let pick = state('sun');
+	<main>
+		<svg viewBox="0 0 10 10"><use href={'/art/marks.svg#' + pick} /></svg>
+		@for (const row of ROWS; key row.id) {
+			<svg viewBox="0 0 10 10"><use href={'/art/marks.svg#' + row.icon} /></svg>
+		}
+		<svg viewBox="0 0 10 10"><use href="/art/marks.svg#moon" /></svg>
+		<svg viewBox="0 0 10 10"><use href="/art/gone.svg#sun" /></svg>
+		<svg viewBox="0 0 10 10"><use href="marks.svg#sun" /></svg>
+		<svg viewBox="0 0 10 10"><use href="/art/broken.svg#sun" /></svg>
+		<svg viewBox="0 0 10 10"><use href="/art/marks.svg" /></svg>
+	</main>
+}`;
+		const { payload, diagnostics } = await nativeView(text, {
+			readAsset: (url) =>
+				url === '/art/marks.svg'
+					? sprite
+					: url === '/art/broken.svg'
+						? '<svg><symbol id="sun"></svg>'
+						: undefined,
+		});
+		expect(payload).toBeNull();
+		expect(diagnostics.every((d) => d.code === 'MARKLESS_NATIVE_SVG')).toBe(true);
+		expect(
+			diagnostics.map((d) => [d.message, text.slice(0, d.primarySpan!.start).split('\n').length]),
+		).toEqual([
+			['`href` on <use> follows state; a native drawing is compiled when the app is built', 6],
+			['<use href="/art/marks.svg#moon">, which names nothing in /art/marks.svg', 8],
+			['<use href="/art/marks.svg#moon">, which names nothing in /art/marks.svg', 10],
+			['<use href="/art/gone.svg#sun">: the app serves no file at /art/gone.svg', 11],
+			[
+				'<use href="marks.svg#sun">: a sprite is read from the app\'s files when it is built, so its path starts at the site root, as `/marks.svg`',
+				12,
+			],
+			[
+				'<use href="/art/broken.svg#sun">: /art/broken.svg is not an SVG file the build can read: <symbol> is closed by </svg>',
+				13,
+			],
+			['<use href="/art/marks.svg">, which names a file but no symbol in it', 14],
+		]);
+	});
+
+	const rowSvg = (payload: NonNullable<Awaited<ReturnType<typeof nativeView>>['payload']>) => {
+		const svg = payload.nodes.find((node) => node.kind === 'element' && node.element === 'svg');
+		if (svg?.kind !== 'element') throw new Error('no svg');
+		return svg;
+	};
+
+	it('gives an svg in a @for row each symbol its fixed list can name, and the row picks by its href', async () => {
+		const { payload, diagnostics } = await nativeView(
+			`const MARKS = [
+	{ key: 'a', mark: 'ring' },
+	{ key: 'b', mark: 'sun' },
+	{ key: 'c', mark: 'ring' },
+];
+export function Legend() @{
+	<ul>
+		@for (const entry of MARKS; key entry.key) {
+			<li><svg viewBox="0 0 20 20" aria-hidden="true"><rect width="1" height="1" /><use href={\`/art/marks.svg#\${entry.mark}\`} /></svg></li>
+		}
+	</ul>
+}`,
+			{ readAsset: (url) => (url === '/art/marks.svg' ? sprite : undefined) },
+		);
+		expect(diagnostics).toEqual([]);
+		const svg = rowSvg(payload!);
+		expect(svg.row).toBe('repeat:0');
+		expect(svg.bindings).toEqual([
+			{
+				attribute: 'href',
+				value: {
+					template: ['/art/marks.svg#', { member: { item: 'repeat:0' }, property: 'mark' }, ''],
+				},
+			},
+		]);
+		expect(svg.drawing!.shapes).toHaveLength(1);
+		expect(Object.keys(svg.drawings!)).toEqual(['/art/marks.svg#ring', '/art/marks.svg#sun']);
+		expect(svg.drawings!['/art/marks.svg#sun']!.shapes).toEqual([
+			svg.drawing!.shapes[0],
+			expect.objectContaining({ transform: [2, 0, 0, 2, 0, 0] }),
+		]);
+		expect(svg.drawings!['/art/marks.svg#ring']!.shapes[1]!.transform).toEqual([
+			2, 0, 0, 2, 0, 0,
+		]);
+	});
+
+	it('gives an svg in the rows of a state list every symbol of the sprites its first rows name', async () => {
+		const { payload, diagnostics } = await nativeView(
+			`import { state } from '@markless/core';
+export function Shelf() @{
+	let items = state([{ id: 7, glyph: 'bar' }, { id: 8, glyph: 'sun' }]);
+	<div>
+		<button onClick={() => (items = [...items].reverse())}>Flip</button>
+		@for (const item of items; key item.id) {
+			<p><svg viewBox="0 0 4 4"><use href={'/art/marks.svg#' + item.glyph} /></svg></p>
+		}
+	</div>
+}`,
+			{ readAsset: (url) => (url === '/art/marks.svg' ? sprite : undefined) },
+		);
+		expect(diagnostics).toEqual([]);
+		const svg = rowSvg(payload!);
+		expect(svg.drawing!.shapes).toEqual([]);
+		expect(Object.keys(svg.drawings!).sort()).toEqual([
+			'/art/marks.svg#bar',
+			'/art/marks.svg#ring',
+			'/art/marks.svg#sun',
+		]);
+	});
+
+	it('refuses by name a row href whose symbols are not known when the app is built', async () => {
+		const text = `import { computed, state } from '@markless/core';
+const ROWS = [{ id: 1, icon: 'sun' }];
+export function Marks() @{
+	let filter = state('');
+	const shown = computed(() => ROWS.filter((row) => row.icon.startsWith(filter)));
+	<main>
+		@for (const row of shown; key row.id) {
+			<svg viewBox="0 0 10 10"><use href={'/art/marks.svg#' + row.icon} /></svg>
+		}
+		@for (const row of ROWS; key row.id) {
+			<svg viewBox="0 0 10 10"><use href={'/art/marks.svg#' + row.icon} /><use href={'/art/marks.svg#' + row.icon} x="5" /></svg>
+		}
+	</main>
+}`;
+		const { payload, diagnostics } = await nativeView(text, {
+			readAsset: (url) => (url === '/art/marks.svg' ? sprite : undefined),
+		});
+		expect(payload).toBeNull();
+		expect(
+			diagnostics.map((d) => [d.message, text.slice(0, d.primarySpan!.start).split('\n').length]),
+		).toEqual([
+			[
+				"`href` on <use> follows its @for row, and the items that list can hold are not known when the app is built, so the symbols its rows name are not either",
+				8,
+			],
+			[
+				'a second <use> in this <svg> whose `href` follows its @for row; one per <svg> picks its symbol per row',
+				11,
+			],
+		]);
+	});
+
+	const drawingsOf = (payload: NonNullable<Awaited<ReturnType<typeof nativeView>>['payload']>) =>
+		payload.nodes.flatMap((node) => (node.kind === 'element' && node.drawing ? [node.drawing] : []));
+
+	it('draws an @for of shapes over a fixed list, its rows in order, with attributes from each item', async () => {
+		const { payload, diagnostics } = await nativeView(`const DOTS = [
+	{ x: 2, color: '#e63946' },
+	{ x: 6, color: '#2a9d8f' },
+];
+export function Dots() @{
+	<svg viewBox="0 0 10 10">
+		<rect width="1" height="1" />
+		@for (const dot of DOTS; key dot.x) {
+			<circle cx={dot.x} cy="5" r="1" fill={dot.color} />
+		}
+		<rect x="9" width="1" height="1" />
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const [drawing] = drawingsOf(payload!);
+		expect(drawing!.shapes.map((shape) => [shape.path.slice(0, 3), shape.fill])).toEqual([
+			[[0, 0, 0], { r: 0, g: 0, b: 0, alpha: 255 }],
+			[[0, 3, 5], { r: 230, g: 57, b: 70, alpha: 255 }],
+			[[0, 7, 5], { r: 42, g: 157, b: 143, alpha: 255 }],
+			[[0, 9, 0], { r: 0, g: 0, b: 0, alpha: 255 }],
+		]);
+	});
+
+	it('unrolls nested @for and @if/@else on build-time data, per call site, with <use> of ids it draws', async () => {
+		const { payload, diagnostics } = await nativeView(`const ART = {
+	small: { size: 10, layers: [{ name: 1, kind: 'mark', id: 'a', d: 'M0 0h4' }, { name: 2, kind: 'copies', uses: ['a'] }] },
+	big: {
+		size: 20,
+		layers: [
+			{ name: 1, kind: 'mark', id: 'p', d: 'M0 0v4' },
+			{ name: 2, kind: 'mark', d: 'M1 1h1' },
+			{ name: 3, kind: 'copies', uses: ['p', 'p2'] },
+			{ name: 4, kind: 'mark', id: 'p2', d: 'M2 2h2' },
+		],
+	},
+};
+function Art({ which }: { readonly which: 'small' | 'big' }) @{
+	const drawing = which === 'big' ? ART.big : ART.small;
+	<svg viewBox={'0 0 ' + drawing.size + ' ' + drawing.size}>
+		@for (const layer of drawing.layers; key layer.name) {
+			@if (layer.kind === 'copies') {
+				<g transform="translate(5 0)">
+					@for (const ref of layer.uses!; key ref) {
+						<use href={'#' + ref} />
+					}
+				</g>
+			} @else {
+				<path id={layer.id} d={layer.d} stroke="red" fill="none" />
+			}
+		}
+	</svg>
+}
+export function Page() @{
+	<main>
+		<Art which="small" />
+		<Art which="big" />
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const [small, big] = drawingsOf(payload!);
+		expect(small!.viewBox).toEqual([0, 0, 10, 10]);
+		expect(small!.shapes.map((shape) => [shape.path, shape.transform ?? null])).toEqual([
+			[[0, 0, 0, 1, 4, 0], null],
+			[[0, 0, 0, 1, 4, 0], [1, 0, 0, 1, 5, 0]],
+		]);
+		expect(big!.viewBox).toEqual([0, 0, 20, 20]);
+		expect(big!.shapes.map((shape) => [shape.path.slice(0, 3), shape.transform?.[4] ?? 0])).toEqual([
+			[[0, 0, 0], 0],
+			[[0, 1, 1], 0],
+			[[0, 0, 0], 5],
+			[[0, 2, 2], 5],
+			[[0, 2, 2], 0],
+		]);
+	});
+
+	it('refuses an @for or @if inside an <svg> that follows state, by name', async () => {
+		const text = `import { state } from '@markless/core';
+export function Live() @{
+	let dots = state([{ x: 1 }]);
+	let on = state(true);
+	<main>
+		<svg viewBox="0 0 10 10">
+			@for (const dot of dots; key dot.x) {
+				<circle cx={dot.x} cy="5" r="1" />
+			}
+		</svg>
+		<svg viewBox="0 0 10 10">
+			@if (on) {
+				<rect width="1" height="1" />
+			}
+		</svg>
+		<button onClick={() => (on = !on)}>Flip</button>
+	</main>
+}`;
+		const { payload, diagnostics } = await nativeView(text);
+		expect(payload).toBeNull();
+		expect(
+			diagnostics.map((d) => [d.message, text.slice(0, d.primarySpan!.start).split('\n').length]),
+		).toEqual([
+			['an @for inside an <svg> whose list follows state; a native drawing is compiled when the app is built', 6],
+			['an @if inside an <svg> whose test follows state; a native drawing is compiled when the app is built', 11],
+		]);
 	});
 
 	it('turns arcs and quadratics into cubics that end where the web ends them', async () => {
@@ -3307,5 +3670,126 @@ export function Pressure() @{
 		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
 			'the pointermove handler reads `event.pressure`, which a touch on a phone does not have',
 		]);
+	});
+});
+
+describe('context menu events', () => {
+	const androidOnly = (where: string) => [
+		'MARKLESS_NATIVE_ANDROID_ONLY',
+		`the contextmenu handler on ${where} runs only on Android, which raises it for a long press as Chrome does; Safari on iOS raises none, so the iOS app never runs it`,
+	];
+
+	it('lowers a contextmenu handler to the long press Android raises, its point, and a preventDefault with nothing to prevent', async () => {
+		const { payload, diagnostics } = await nativeView(
+			`import { state } from '@markless/core';
+export function Inbox() @{
+	let picked = state('none');
+	<main>
+		<ul>
+			<li onContextmenu={(event) => {
+				event.preventDefault();
+				picked = 'Milk at ' + event.clientX + ',' + event.clientY;
+			}}>Milk</li>
+		</ul>
+		<p>{picked}</p>
+	</main>
+}`,
+			dataOnly,
+		);
+		expect(diagnostics.map((d) => [d.code, d.message])).toEqual([androidOnly('<li> h2')]);
+		expect(diagnostics[0]!.severity).toBe('warning');
+		expect(payload!.events).toEqual([
+			{ host: 'h2', event: 'contextmenu', handler: 'handler:event:0' },
+		]);
+		expect(payload!.handlers[0]!.ops).toEqual([
+			{
+				op: 'assign',
+				cell: 'state:picked',
+				value: {
+					binary: '+',
+					left: {
+						binary: '+',
+						left: {
+							binary: '+',
+							left: { literal: 'Milk at ' },
+							right: { event: 'clientX' },
+						},
+						right: { literal: ',' },
+					},
+					right: { event: 'clientY' },
+				},
+			},
+		]);
+	});
+
+	it('lowers another shape: a section whose handler names its event differently, never prevents, and one that runs as JavaScript', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Board() @{
+	let note = state('');
+	let log = state('');
+	<section>
+		<article onContextmenu={(press) => (note = press.target === press.currentTarget ? 'own' : 'inner')}>
+			<span>Card</span>
+		</article>
+		<div onContextmenu={(e) => {
+			e.preventDefault();
+			for (const part of [e.clientY, e.timeStamp]) log = log + part;
+		}}>{log}</div>
+		<em>{note}</em>
+	</section>
+}`);
+		expect(diagnostics.map((d) => [d.code, d.message])).toEqual([
+			androidOnly('<article> h1'),
+			androidOnly('<div> h3'),
+		]);
+		expect(payload!.events.map((event) => [event.host, event.event])).toEqual([
+			['h1', 'contextmenu'],
+			['h3', 'contextmenu'],
+		]);
+		expect(payload!.handlers[0]!.ops).toEqual([
+			{
+				op: 'assign',
+				cell: 'state:note',
+				value: {
+					if: {
+						binary: '===',
+						left: { event: 'target' },
+						right: { event: 'currentTarget' },
+					},
+					whenTrue: { literal: 'own' },
+					whenFalse: { literal: 'inner' },
+				},
+			},
+		]);
+		expect(payload!.handlers[1]!.ops.map((op) => op.op)).toEqual(['script']);
+	});
+
+	it('refuses by name a field a long press does not report yet', async () => {
+		const source = `import { state } from '@markless/core';
+export function Pressure() @{
+	let p = state(0);
+	<div onContextmenu={(event) => (p = event.pointerId)}>{p}</div>
+}`;
+		const data = await nativeView(source, dataOnly);
+		expect(data.payload).toBeNull();
+		expect(data.diagnostics.map((d) => d.message)).toContain(
+			'the contextmenu handler reads `event.pointerId`, which a phone does not report yet',
+		);
+		const script = await nativeView(source);
+		expect(script.payload).toBeNull();
+		expect(script.diagnostics.map((d) => d.message)).toContain(
+			'the contextmenu handler reads `event.pointerId`, which a long press on a phone does not have',
+		);
+		const element = await nativeView(`import { state } from '@markless/core';
+export function Pressed() @{
+	let log = state('');
+	<div onContextmenu={(e) => {
+		for (const part of [e.target]) log = log + String(part);
+	}}>{log}</div>
+}`);
+		expect(element.payload).toBeNull();
+		expect(element.diagnostics.map((d) => d.message)).toContain(
+			'the contextmenu handler reads `event.target`, an element, which JavaScript on a phone cannot hold yet',
+		);
 	});
 });

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg">
+	<symbol id="sun" viewBox="0 0 24 24">
+		<circle cx="12" cy="12" r="5" fill="#e9c46a" />
+		<path fill="none" stroke="#e76f51" stroke-width="2" stroke-linecap="round" d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" />
+	</symbol>
+	<symbol id="leaf">
+		<path fill="#2a9d8f" d="M4 20C4 9 11 4 20 4c0 9-5 16-16 16z" />
+		<path fill="none" stroke="#264653" stroke-width="1.5" d="M4 20L14 10" />
+	</symbol>
+</svg>

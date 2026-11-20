@@ -10,7 +10,7 @@ import {
 } from '../src/index.ts';
 import { compileRungApp, readWorkspaceModule } from '../src/harness/rung.ts';
 import { nodeScriptHost } from '../src/node-engine.ts';
-import { CONFORMANCE_CASES, readCaseModule } from './conformance-cases.ts';
+import { CONFORMANCE_CASES, readCaseAsset, readCaseModule } from './conformance-cases.ts';
 
 // Both meanings of a handler: as data, and as its own JavaScript in the engine. Every committed vector is built twice,
 // once as the compiler chooses and once with every handler a script can run forced into the engine; what each shows and
@@ -25,6 +25,7 @@ const build = async (
 		...(entry.page ? { page: entry.page } : {}),
 		...(entry.device ? { device: entry.device } : {}),
 		readModule: entry.modules ? readWorkspaceModule : readCaseModule,
+		readAsset: readCaseAsset,
 		...(scriptHandlers ? { scriptHandlers } : {}),
 		source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
 	});

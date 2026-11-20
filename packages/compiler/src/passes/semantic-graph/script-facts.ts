@@ -626,6 +626,23 @@ export function scriptFactsOf(source: string, filename: string) {
 			const node = nodeOver(semantic, span);
 			return node && scriptFunctionOf(node, semantic, filename, true);
 		},
+		/**
+		 * A part of the value written at `span`, as its own script: each step of `path` takes the left (0) or right (1) side of
+		 * a `+`, or a template's n-th `${}`.
+		 */
+		operand: (span: SourceSpan, path: ReadonlyArray<number>): SemanticScriptFunction | undefined => {
+			let node = nodeOver(semantic, span);
+			for (const step of path) {
+				while (node?.type === 'ParenthesizedExpression') node = node.expression as AnyNode;
+				node =
+					node?.type === 'BinaryExpression' && node.operator === '+'
+						? ((step === 0 ? node.left : node.right) as AnyNode)
+						: node?.type === 'TemplateLiteral'
+							? (node.expressions as AnyNode[])[step]
+							: undefined;
+			}
+			return node && scriptFunctionOf(node, semantic, filename, true);
+		},
 		/** The list a `@for` iterates, found from where its row element is written. */
 		forList: (rowSpan: SourceSpan): SemanticScriptFunction | undefined => {
 			const at = semantic.nodeAt(rowSpan.start);

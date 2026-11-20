@@ -114,7 +114,7 @@ sealed interface Node {
 	val row: String?
 
 	/** [obj]: the device object a `camera` element shows. */
-	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null, val defaultStyle: DefaultStyle? = null, val drawing: Drawing? = null, val live: Live? = null) : Node
+	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null, val defaultStyle: DefaultStyle? = null, val drawing: Drawing? = null, val live: Live? = null, val drawings: Map<String, Drawing>? = null) : Node
 	/** [parent] is null for text at the top of the page. */
 	data class Text(override val id: String, override val parent: String?, val parts: List<TextPart>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 	/** An `@if` with [test] (arm 0 while truthy, arm 1 otherwise), or a chain with [tests]: the first truthy arm, else the `null` arm. */
@@ -161,6 +161,8 @@ data class Rgba(val r: Int, val g: Int, val b: Int, val alpha: Int) {
 sealed interface ShapePaint {
 	data class Color(val color: Rgba) : ShapePaint
 	data object Current : ShapePaint
+	/** The current colour seen through the shape's opacities: its alpha times [alpha] / 255. */
+	data class CurrentSeen(val alpha: Int) : ShapePaint
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
@@ -176,6 +178,8 @@ enum class EventName(val wire: String, val pointer: Boolean = false, val touch: 
 	PointerDown("pointerdown", true, true), PointerMove("pointermove", true, true), PointerUp("pointerup", true, true), PointerCancel("pointercancel", true, true),
 	PointerOver("pointerover", true), PointerOut("pointerout", true), PointerEnter("pointerenter", true), PointerLeave("pointerleave", true),
 	Choose("choose"),
+	/** A long press, as Chrome on Android raises `contextmenu`: carries a [TouchPoint] for its place, and reaches each element it is inside. */
+	ContextMenu("contextmenu"),
 }
 
 sealed interface Op {
@@ -614,13 +618,19 @@ data class Payload(
 			is Json.Str -> if (v.value == "currentColor") ShapePaint.Current else throw MarklessDecodeError("$what must be a colour, \"currentColor\" or null")
 			else -> {
 				val o = v.obj(what)
-				o.only(setOf("r", "g", "b", "alpha"), what)
 				fun channel(name: String): Int {
 					val n = o.field(name, what).num("$what.$name")
 					if (n < 0 || n > 255 || n != Math.floor(n)) throw MarklessDecodeError("$what.$name is $n; a channel is an integer 0-255")
 					return n.toInt()
 				}
-				ShapePaint.Color(Rgba(channel("r"), channel("g"), channel("b"), channel("alpha")))
+				if ("current" in o) {
+					o.only(setOf("current", "alpha"), what)
+					if (o.field("current", what) != Json.Bool(true)) throw MarklessDecodeError("$what.current must be true")
+					ShapePaint.CurrentSeen(channel("alpha"))
+				} else {
+					o.only(setOf("r", "g", "b", "alpha"), what)
+					ShapePaint.Color(Rgba(channel("r"), channel("g"), channel("b"), channel("alpha")))
+				}
 			}
 		}
 
@@ -661,7 +671,7 @@ data class Payload(
 			val id = o.field("id", what).str("$what.id")
 			return when (val kind = o.field("kind", what).str("$what.kind")) {
 				"element" -> {
-					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object", "defaultStyle", "drawing", "live"), what)
+					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object", "defaultStyle", "drawing", "live", "drawings"), what)
 					val parent = o.field("parent", what)
 					val attributes = o["attributes"]?.obj("$what.attributes")?.mapValues { (k, v) -> v.str("$what.attributes.$k") } ?: emptyMap()
 					val bindings = o["bindings"]?.arr("$what.bindings")?.mapIndexed { n, b ->
@@ -675,7 +685,7 @@ data class Payload(
 							Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), value)
 						}
 					} ?: emptyList()
-					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"), o["defaultStyle"]?.let { defaultStyle(it, "$what.defaultStyle") }, o["drawing"]?.let { drawing(it, "$what.drawing") }, o["live"]?.let { live(it, "$what.live") })
+					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"), o["defaultStyle"]?.let { defaultStyle(it, "$what.defaultStyle") }, o["drawing"]?.let { drawing(it, "$what.drawing") }, o["live"]?.let { live(it, "$what.live") }, o["drawings"]?.let { drawings -> drawings.obj("$what.drawings").entries.associate { (key, value) -> key to drawing(value, "$what.drawings.$key") } })
 				}
 				"text" -> {
 					o.only(setOf("kind", "id", "parent", "parts", "arm", "row"), what)

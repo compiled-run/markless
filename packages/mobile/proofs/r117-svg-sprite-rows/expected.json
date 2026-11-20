@@ -1,0 +1,27 @@
+{
+	"rung": "R117",
+	"name": "Each row of a keyed @for draws the sprite symbol its own item names, through reorder, removal and change",
+	"steps": [
+		{
+			"visible": ["Plants", "Sunny sun", "Leafy leaf", "Rainy drop"],
+			"order": ["Sunny", "Leafy", "Rainy"]
+		},
+		{
+			"do": { "tap": "Reverse" },
+			"visible": ["Rainy", "Leafy", "Sunny"],
+			"order": ["Rainy", "Leafy", "Sunny"]
+		},
+		{
+			"do": { "tap": "Remove leafy" },
+			"visible": ["Rainy", "Sunny", "Sunny sun"],
+			"absent": ["Leafy"],
+			"order": ["Rainy", "Sunny"]
+		},
+		{
+			"do": { "tap": "Sunny grows a leaf" },
+			"visible": ["Sunny leaf"],
+			"absent": ["Sunny sun"],
+			"order": ["Rainy", "Sunny"]
+		}
+	]
+}

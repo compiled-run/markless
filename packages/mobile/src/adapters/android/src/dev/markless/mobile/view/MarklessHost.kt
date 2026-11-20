@@ -429,8 +429,8 @@ class MarklessHost(
 		for ((id, inst) in built) if (inst.node is Node.Element) views[id]?.let { put(it, id) }
 	}
 
-	/** Reports a touch in window coordinates to the runtime as pointer events; call it before the views see the touch. */
-	fun touch(event: android.view.MotionEvent) = overlays.touch(event)
+	/** Reports a touch in window coordinates to the runtime as pointer events; call it before the views see the touch. True when a long press took the gesture. */
+	fun touch(event: android.view.MotionEvent): Boolean = overlays.touch(event)
 
 	private var lastPress: Triple<String, Long, Int>? = null
 
@@ -743,7 +743,7 @@ class MarklessHost(
 		val unseen = type == "hidden" || (type in TICKABLE && node.attributes["aria-hidden"] == "true")
 		if (unseen) inert.add(inst.id)
 		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (drawing != null) "drawing" else if (unstyled?.rule == true) "rule" else if (unseen) "unseen" else if (type in TICKABLE) type else node.element) {
-			"drawing" -> DrawingView(context, drawing!!, baseTextSize * (flow?.blockText(node.parent)?.size ?: 1.0)).also { named(it, inst.id, image = true) }
+			"drawing" -> DrawingView(context, drawing!!, baseTextSize * (flow?.blockText(node.parent)?.size ?: 1.0), node.drawings ?: emptyMap()).also { named(it, inst.id, image = true) }
 			"rule" -> RuleView(context).also { named(it, inst.id) }
 			"unseen" -> View(context)
 			// The runtime owns checkedness: the widget never toggles itself, a press dispatches and the journal sets it.
@@ -838,7 +838,7 @@ class MarklessHost(
 			EventName.Keydown -> (view as? MarklessField ?: throw MarklessHostError("keydown event on \"${node.id}\", which is not a text field")).onKey = { key -> prevents(runtime.dispatch(inst.id, EventName.Keydown, key)) }
 			EventName.Paste -> (view as? MarklessField ?: throw MarklessHostError("paste event on \"${node.id}\", which is not a text field")).onPaste = { text -> prevents(runtime.dispatch(inst.id, EventName.Paste, text)) }
 			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
-			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.Choose -> {}
+			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.Choose, EventName.ContextMenu -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->
 				val now = android.os.SystemClock.uptimeMillis()
@@ -990,6 +990,7 @@ class MarklessHost(
 				if (view is DrawingView && current["aria-hidden"] != "true") view.importantForAccessibility = if (value != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO
 			}
 			"alt" -> if (view is SizedImage) view.contentDescription = value
+			"href" -> if (view is DrawingView) view.pick(value)
 			"src" -> when (view) {
 				is SizedImage -> view.show(value)
 				is AudioButton -> view.source(value)

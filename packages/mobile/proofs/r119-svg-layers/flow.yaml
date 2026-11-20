@@ -1,0 +1,9 @@
+appId: ${APP_ID}
+name: r119-svg-layers
+---
+- launchApp:
+      clearState: true
+- assertVisible: Layers
+- assertVisible: Hill at noon
+- assertVisible: Hill at dusk
+- assertVisible: Two scenes drawn from one list of layers

@@ -18,7 +18,12 @@ import {
 	type NativeRuntime,
 	type NativeScreen,
 } from '../src/index.ts';
-import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harness/rung.ts';
+import {
+	compileRungApp,
+	readAppConfig,
+	readWorkspaceModule,
+	rungAssetReader,
+} from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
 import { nativeMaxLength } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
@@ -933,6 +938,28 @@ function walk(
 			for (let n = 1; n <= moves; n++) out.push(...touch('pointermove', n));
 			out.push(...touch(action.drag.scrolls ? 'pointercancel' : 'pointerup', moves));
 			apply(out, index);
+		} else if (action && 'longPress' in action) {
+			const host = elementReading(action.longPress);
+			if (!host)
+				throw new Error(`step ${index}: nothing reads "${action.longPress}" to press`);
+			// A held finger goes down and up; between them Android's host raises contextmenu, as Chrome does, and iOS's none.
+			const at = { pointerId: 1, x: 100, y: 300 };
+			apply(
+				[
+					...runtime.dispatch({ event: 'pointerdown', host, ...at, time: 0 }),
+					...(target === 'android'
+						? runtime.dispatch({
+								event: 'contextmenu',
+								host,
+								x: at.x,
+								y: at.y,
+								time: 500,
+							})
+						: []),
+					...runtime.dispatch({ event: 'pointerup', host, ...at, time: 600 }),
+				],
+				index,
+			);
 		} else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
@@ -1162,6 +1189,7 @@ test.each(
 			source: readFileSync(filename, 'utf8'),
 			...(page ? { page } : {}),
 			readModule: readWorkspaceModule,
+			readAsset: rungAssetReader(join(proofsDir, folder)),
 			...readAppConfig(join(proofsDir, folder)),
 			target,
 		});

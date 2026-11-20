@@ -111,19 +111,35 @@ export function compileDrawing(
 	elements: ReadonlyArray<DrawingElement>,
 	texts: ReadonlyArray<{ readonly path: ReadonlyArray<number>; readonly text: string }>,
 	svgId: string,
+	/** By `<use>` id: the elements of the sprite file its href names, where its `#id` is looked up instead of this svg. */
+	sprites: ReadonlyMap<string, ReadonlyArray<DrawingElement>> = new Map(),
 ): DrawingResult {
 	const refusals: DrawingRefusal[] = [];
 	const refuse = (element: string, message: string) => refusals.push({ message, element });
 	const isPrefix = (prefix: ReadonlyArray<number>, path: ReadonlyArray<number>) =>
 		prefix.length < path.length && prefix.every((value, index) => path[index] === value);
-	const childrenOf = (parent: ReadonlyArray<number>) =>
-		elements.filter(
+	type Document = {
+		readonly elements: ReadonlyArray<DrawingElement>;
+		readonly byId: ReadonlyMap<string, DrawingElement>;
+	};
+	const documentOf = (all: ReadonlyArray<DrawingElement>): Document => ({
+		elements: all,
+		byId: new Map(
+			all.flatMap((element) =>
+				element.attributes.id === undefined ? [] : [[element.attributes.id, element] as const],
+			),
+		),
+	});
+	const page = documentOf(elements);
+	const spriteDocuments = new Map(
+		[...sprites].map(([use, file]) => [use, documentOf(file)] as const),
+	);
+	const childrenIn = (document: Document, parent: ReadonlyArray<number>) =>
+		document.elements.filter(
 			(element) =>
 				element.path.length === parent.length + 1 && isPrefix(parent, element.path),
 		);
-	const byId = new Map<string, DrawingElement>();
-	for (const element of elements)
-		if (element.attributes.id !== undefined) byId.set(element.attributes.id, element);
+	const childrenOf = (parent: ReadonlyArray<number>) => childrenIn(page, parent);
 
 	let title: string | undefined;
 	const titleElement = childrenOf([]).find((element) => element.tag === 'title');
@@ -252,20 +268,13 @@ export function compileDrawing(
 
 	const shapes: NativeShape[] = [];
 	const emit = (element: DrawingElement, outline: number[], style: Inherited, matrix: Matrix) => {
-		const alpha = (given: Paint, opacity: number): Paint => {
+		const alpha = (given: Paint, opacity: number): NativeShape['fill'] => {
 			const paint = given === 'currentColor' && style.color ? style.color : given;
-			if (paint === null || paint === 'currentColor' || opacity === 1) return paint;
-			return { ...paint, alpha: Math.round(paint.alpha * opacity) };
+			if (paint === null || opacity === 1) return paint;
+			const seen = Math.round((paint === 'currentColor' ? 255 : paint.alpha) * opacity);
+			if (paint !== 'currentColor') return { ...paint, alpha: seen };
+			return seen === 255 ? paint : { current: true, alpha: seen };
 		};
-		const open = (paint: Paint) => paint === 'currentColor' && !style.color;
-		if (
-			(open(style.fill) && style.fillOpacity * style.opacity !== 1) ||
-			(open(style.stroke) && style.strokeOpacity * style.opacity !== 1)
-		)
-			refuse(
-				element.id,
-				`a see-through \`currentColor\` paint on <${element.tag}>: its colour comes from the page's styles`,
-			);
 		if (outline.length === 0) return;
 		shapes.push({
 			path: outline,
@@ -355,11 +364,18 @@ export function compileDrawing(
 		return parsed;
 	};
 
+	const viewBox = svg.viewBox === undefined ? null : parseViewBox(svg.viewBox);
+	// A <use> with no size fills the svg's viewport, as `width`/`height` of `auto` give 100%.
+	const viewport = {
+		width: viewBox?.[2] ?? (svg.width === undefined ? null : parseLength(svg.width)) ?? 100,
+		height: viewBox?.[3] ?? (svg.height === undefined ? null : parseLength(svg.height)) ?? 100,
+	};
 	const visit = (
 		element: DrawingElement,
 		from: Inherited,
 		matrix: Matrix,
-		using: ReadonlySet<string>,
+		using: ReadonlySet<DrawingElement>,
+		document: Document,
 	): void => {
 		if (NEVER_DRAWN.has(element.tag)) return;
 		if (!(element.tag in GEOMETRY)) {
@@ -378,17 +394,19 @@ export function compileDrawing(
 		}
 		if (element.tag === 'use') {
 			const href = (element.attributes.href ?? element.attributes['xlink:href'] ?? '').trim();
-			const target = href.startsWith('#') ? byId.get(href.slice(1)) : undefined;
+			const within =
+				document === page ? (spriteDocuments.get(element.id) ?? page) : document;
+			const target = href.startsWith('#') ? within.byId.get(href.slice(1)) : undefined;
 			if (!target) {
 				refuse(element.id, `<use href="${href}">, which names nothing inside this <svg>`);
 				return;
 			}
-			if (using.has(target.id)) {
+			if (using.has(target)) {
 				refuse(element.id, `<use href="${href}">, which uses itself`);
 				return;
 			}
 			const placed = multiply(own, [1, 0, 0, 1, number(element, 'x'), number(element, 'y')]);
-			const inner = new Set([...using, target.id]);
+			const inner = new Set([...using, target]);
 			if (target.tag === 'symbol') {
 				const box =
 					target.attributes.viewBox === undefined
@@ -398,26 +416,32 @@ export function compileDrawing(
 				const height = element.attributes.height ?? target.attributes.height;
 				let symbolMatrix = placed;
 				if (box) {
-					const w = width === undefined ? 100 : (parseLength(width) ?? 100);
-					const h = height === undefined ? 100 : (parseLength(height) ?? 100);
+					const w =
+						width === undefined
+							? viewport.width
+							: (parseLength(width) ?? viewport.width);
+					const h =
+						height === undefined
+							? viewport.height
+							: (parseLength(height) ?? viewport.height);
 					symbolMatrix = multiply(placed, fitViewBox(box, w, h));
 				}
 				const symbolStyle = inherit(target, style);
-				for (const child of childrenOf(target.path))
-					visit(child, symbolStyle, symbolMatrix, inner);
+				for (const child of childrenIn(within, target.path))
+					visit(child, symbolStyle, symbolMatrix, inner, within);
 				return;
 			}
-			visit({ ...target, tag: target.tag }, style, placed, inner);
+			visit(target, style, placed, inner, within);
 			return;
 		}
-		for (const child of childrenOf(element.path)) visit(child, style, own, using);
+		for (const child of childrenIn(document, element.path))
+			visit(child, style, own, using, document);
 	};
 
 	const root: DrawingElement = { id: svgId, tag: 'svg', path: [], attributes: svg, bound: [] };
 	const rootStyle = inherit(root, INITIAL);
-	for (const child of childrenOf([])) visit(child, rootStyle, IDENTITY, new Set());
+	for (const child of childrenOf([])) visit(child, rootStyle, IDENTITY, new Set(), page);
 
-	const viewBox = svg.viewBox === undefined ? null : parseViewBox(svg.viewBox);
 	if (svg.viewBox !== undefined && viewBox === null)
 		refuse(svgId, `\`viewBox="${svg.viewBox}"\` on <svg>`);
 	const size = (name: 'width' | 'height') => {

@@ -1,0 +1,192 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "SeeThrough",
+		"cells": [
+			{
+				"id": "state:dark",
+				"name": "dark",
+				"initial": false
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "state:dark"
+							},
+							"whenTrue": {
+								"literal": "Ink"
+							},
+							"whenFalse": {
+								"literal": "Paper"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"viewBox": "0 0 4 4",
+					"width": "40",
+					"height": "40",
+					"fill": "currentColor",
+					"opacity": ".25",
+					"aria-label": "Mark"
+				},
+				"drawing": {
+					"viewBox": [
+						0,
+						0,
+						4,
+						4
+					],
+					"width": 40,
+					"height": 40,
+					"shapes": [
+						{
+							"path": [
+								0,
+								0,
+								0,
+								1,
+								4,
+								0,
+								1,
+								4,
+								4,
+								1,
+								0,
+								4,
+								4
+							],
+							"fill": {
+								"current": true,
+								"alpha": 64
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"path": [
+								0,
+								3,
+								2,
+								3,
+								3,
+								2.5522847498307932,
+								2.5522847498307932,
+								3,
+								2,
+								3,
+								3,
+								1.4477152501692065,
+								3,
+								1,
+								2.5522847498307932,
+								1,
+								2,
+								3,
+								1,
+								1.4477152501692065,
+								1.4477152501692065,
+								1,
+								2,
+								1,
+								3,
+								2.5522847498307932,
+								1,
+								3,
+								1.4477152501692065,
+								3,
+								2,
+								4
+							],
+							"fill": null,
+							"fillRule": "nonzero",
+							"stroke": {
+								"current": true,
+								"alpha": 16
+							},
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						}
+					]
+				}
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:dark",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:dark"
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Paper"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "Ink"
+				}
+			]
+		}
+	]
+}

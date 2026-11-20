@@ -159,6 +159,8 @@ public struct NativeNode: Equatable, Sendable {
 	public var drawing: NativeDrawing? = nil
 	/// A live region: a change to the text inside is announced.
 	public var live: NativeLive? = nil
+	/// On an `<svg>` in a list row whose `<use>` names its symbol per row: the drawing for each href its `href` binding gives.
+	public var drawings: [String: NativeDrawing]? = nil
 
 	public var isElement: Bool { if case .element = kind { true } else { false } }
 	public var isText: Bool { if case .text = kind { true } else { false } }
@@ -195,6 +197,8 @@ public struct NativeShape: Equatable, Sendable {
 	public enum Paint: Equatable, Sendable {
 		case color(RGBA)
 		case currentColor
+		/// The current colour seen through the shape's opacities: its alpha times `alpha` / 255.
+		case current(alpha: Double)
 	}
 	/// Verb-coded: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close.
 	public let path: [Double]
@@ -248,6 +252,8 @@ public enum NativeEventName: String, Sendable {
 	case pointerdown, pointermove, pointerup, pointercancel
 	/// Raised by the runtime around a touch; a host never sends them.
 	case pointerover, pointerout, pointerenter, pointerleave
+	/// A long press, as Chrome on Android raises `contextmenu`; Safari on iOS raises none, so this host never sends it.
+	case contextmenu
 
 	/// The pointer events a page's handlers may listen for.
 	public var isPointer: Bool {
@@ -551,7 +557,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let place = ["arm", "row"]
 			switch kind {
 			case "element":
-				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live"] + place)
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live", "drawings"] + place)
 				var attributes: [String: String] = [:]
 				if field.has("attributes") {
 					let reader = try field["attributes"]
@@ -573,7 +579,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 					object: field.has("object") ? try field["object"].string() : nil,
 					defaultStyle: field.has("defaultStyle") ? try decodeDefaultStyle(try field["defaultStyle"]) : nil,
 					drawing: field.has("drawing") ? try decodeDrawing(try field["drawing"]) : nil,
-					live: field.has("live") ? try decodeLive(try field["live"]) : nil)
+					live: field.has("live") ? try decodeLive(try field["live"]) : nil,
+					drawings: field.has("drawings") ? try {
+						let reader = try field["drawings"]
+						var drawings: [String: NativeDrawing] = [:]
+						for key in try reader.keys() { drawings[key] = try decodeDrawing(try reader.field(key)) }
+						return drawings
+					}() : nil)
 			case "text":
 				let field = try node.object(required: ["kind", "id", "parent", "parts"], optional: place)
 				let parts = try decodeParts(try field["parts"])
@@ -834,6 +846,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 			if reader.isString {
 				guard try reader.string() == "currentColor" else { throw reader.fail("unknown paint") }
 				return .currentColor
+			}
+			if try reader.keys().contains("current") {
+				let current = try reader.object(["current", "alpha"])
+				guard try current["current"].bool() else { throw reader.fail("unknown paint") }
+				let alpha = try current["alpha"].number()
+				guard alpha >= 0, alpha <= 255, alpha == alpha.rounded() else { throw reader.fail("alpha is \(alpha); it is an integer 0-255") }
+				return .current(alpha: alpha)
 			}
 			let color = try reader.object(["r", "g", "b", "alpha"])
 			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))

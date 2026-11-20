@@ -4,7 +4,8 @@ import { nodeScriptHost } from '../src/node-engine.ts';
 
 /** The engine the vectors are written with; `crypto` draws from all-zero seed bytes, which a host's test passes too. */
 export const CONFORMANCE_SCRIPT_HOST = () => nodeScriptHost('00'.repeat(32));
-import { readWorkspaceModule } from '../src/harness/rung.ts';
+import { join } from 'node:path';
+import { readWorkspaceModule, rungAssetReader } from '../src/harness/rung.ts';
 
 /** Resolves what a case imports (`@markless/ui`) from packages/mobile, where the case's `src/<name>.tsrx` stands. */
 export const readCaseModule = (specifier: string, importer: string) =>
@@ -12,6 +13,9 @@ export const readCaseModule = (specifier: string, importer: string) =>
 		specifier,
 		importer.startsWith('src/') ? `packages/mobile/${importer}` : importer,
 	);
+
+/** A file a case's app serves (`/marks.svg`), from test/fixtures/public. */
+export const readCaseAsset = rungAssetReader(join(import.meta.dirname, 'fixtures'));
 
 /** Each committed vector file: its component (a path inside packages/mobile) and the actions it records. */
 export const CONFORMANCE_CASES: ReadonlyArray<{
@@ -601,6 +605,21 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'see-through',
+		fixture: 'test/fixtures/SeeThrough.tsrx',
+		actions: [{ event: 'activate', host: 'h1' }],
+	},
+	{
+		name: 'sprite-rows',
+		fixture: 'test/fixtures/SpriteRows.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'rows',
 		fixture: 'test/fixtures/Rows.tsrx',
 		actions: [
@@ -1023,6 +1042,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'pointerup', host: 'h2', pointerId: 1, x: 52.5, y: 118, time: 1032 },
 			{ event: 'pointerdown', host: 'h2', pointerId: 2, x: 30, y: 100, time: 2000 },
 			{ event: 'pointercancel', host: 'h2', pointerId: 2, x: 30, y: 90, time: 2016 },
+		],
+	},
+	{
+		// Long presses as Chrome on Android raises `contextmenu`: on a row's inner element, it reaches the row then the list;
+		// on the list itself; on an element whose handler runs as JavaScript.
+		name: 'contextmenu',
+		fixture: 'test/fixtures/ContextMenu.tsrx',
+		actions: [
+			{ event: 'contextmenu', host: 'h4@Apple', x: 40, y: 120, time: 900 },
+			{ event: 'contextmenu', host: 'h2', x: 10, y: 5, time: 1500 },
+			{ event: 'contextmenu', host: 'h5', x: 52.5, y: 300, time: 2000 },
+			{ event: 'contextmenu', host: 'h4@Pear', x: 41, y: 160, time: 2600 },
 		],
 	},
 ];

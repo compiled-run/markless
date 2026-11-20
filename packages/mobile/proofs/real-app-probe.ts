@@ -27,6 +27,7 @@ type AppCompiler = (input: {
 		specifier: string,
 		importer: string,
 	) => { readonly file: string; readonly cssText: string } | undefined;
+	readonly readAsset?: (path: string) => string | undefined;
 }) => Promise<{ readonly diagnostics: ReadonlyArray<PageDiagnostic> }>;
 
 const { values } = parseArgs({
@@ -80,6 +81,17 @@ function stylesheetReader(specifier: string, importer: string) {
 	return existsSync(file) && file.endsWith('.css')
 		? { file, cssText: readFileSync(file, 'utf8') }
 		: undefined;
+}
+
+/** A file the app serves from its `public/` folder, at a site-root path, as Vite serves it. */
+function assetReader(appRoot: string) {
+	const publicDir = join(appRoot, 'public');
+	return (path: string) => {
+		const file = resolve(publicDir, `.${path}`);
+		return file.startsWith(`${publicDir}/`) && existsSync(file) && statSync(file).isFile()
+			? readFileSync(file, 'utf8')
+			: undefined;
+	};
 }
 
 /** The app's top-level components when it has no pages: modules no other module of the app imports (analyzer facts). */
@@ -163,6 +175,7 @@ function summarize(
 
 async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 	const read = readerFor();
+	const readAsset = assetReader(appRoot);
 	const all = files(appRoot);
 	const pageIds = all
 		.map((file) => relative(appRoot, file))
@@ -196,6 +209,7 @@ async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 					filename: file,
 					source: readFileSync(file, 'utf8'),
 					readModule: read,
+					readAsset,
 				});
 				results.push(summarize(app, page, null, appRoot, build.diagnostics));
 			} catch (error) {
@@ -234,6 +248,7 @@ async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 				...(document ? { document } : {}),
 				readModule: read,
 				readStylesheet: stylesheetReader,
+				readAsset,
 			});
 			for (const route of tsrx)
 				results.push(
@@ -259,12 +274,14 @@ async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 						...(document ? { document } : {}),
 						readModule: read,
 						readStylesheet: stylesheetReader,
+						readAsset,
 					})
 				: await compile.compileNativeComponent({
 						filename: page.filename,
 						source: page.source,
 						page: route.file,
 						readModule: read,
+						readAsset,
 					});
 			results.push(summarize(app, route.file, route.pattern, appRoot, build.diagnostics));
 		} catch (error) {
