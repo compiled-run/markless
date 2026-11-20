@@ -24,7 +24,7 @@ permissions:
 
 jobs:
     agent-files:
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && contains(format(' {0} ', vars.MERGE_QUEUE_RUNNER_JOBS), ' agent-files ') && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 10
         steps:
             - uses: actions/checkout@v4
@@ -38,7 +38,7 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   node-version: 24
-                  cache: pnpm
+                  cache: ${{ runner.environment != 'self-hosted' && 'pnpm' || '' }}
 
             - name: Verify committed agent files match .ruler/ sources
               run: |
@@ -65,7 +65,7 @@ jobs:
     # `vp check --no-fmt` adds the lint stage (fmt is excluded: the tree has
     # pre-existing formatting drift that is scheduled separately).
     typecheck:
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && contains(format(' {0} ', vars.MERGE_QUEUE_RUNNER_JOBS), ' typecheck ') && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 10
         env:
             NPM_CONFIG_AUDIT: 'false'
@@ -87,7 +87,7 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   node-version: 24
-                  cache: pnpm
+                  cache: ${{ runner.environment != 'self-hosted' && 'pnpm' || '' }}
 
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
@@ -1552,7 +1552,7 @@ jobs:
     unit-budget:
         needs: [unit, changes]
         if: needs.unit.result == 'success' && needs.unit.outputs.run == 'true'
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 5
         steps:
             - uses: actions/checkout@v4
@@ -1586,7 +1586,7 @@ jobs:
     save-lane-markers:
         needs: [unit, unit-budget, browser]
         if: always()
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 5
         steps:
             - name: Mark the unit lane complete
@@ -1636,7 +1636,7 @@ jobs:
                 build-warnings,
             ]
         if: always()
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 20
         env:
             RUN_RECEIPTS: ${{ needs.lanes.outputs.run_receipts }}
@@ -1683,7 +1683,7 @@ jobs:
               if: env.RUN_RECEIPTS == 'true'
               with:
                   node-version: 24
-                  cache: pnpm
+                  cache: ${{ runner.environment != 'self-hosted' && 'pnpm' || '' }}
 
             - name: Install Markless dependencies
               if: env.RUN_RECEIPTS == 'true'
@@ -1958,7 +1958,7 @@ jobs:
                   path: build-warnings-completed.txt
 
     changes:
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && contains(format(' {0} ', vars.MERGE_QUEUE_RUNNER_JOBS), ' changes ') && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 10
         permissions:
             contents: read
@@ -2209,7 +2209,7 @@ jobs:
     benchmark-guard:
         needs: [changes, benchmark]
         if: needs.changes.outputs.bench == 'true'
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 10
         env:
             MARKLESS_JSFB_BASELINE_RESULTS: ${{ github.workspace }}/.jsfb-merged/markless-jsfb/results-markless-base
