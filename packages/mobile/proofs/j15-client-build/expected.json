@@ -1,0 +1,23 @@
+{
+	"rung": "J15",
+	"name": "import.meta.env in an app module reads as the web's client build, and its server-only branch never runs",
+	"steps": [
+		{
+			"visible": ["Client build", "Build: not asked", "Greeting: none"]
+		},
+		{
+			"do": {
+				"tap": "Ask the build"
+			},
+			"visible": ["Build: client, production, dev false, prod true", "Greeting: none"],
+			"absent": ["Build: not asked"]
+		},
+		{
+			"do": {
+				"tap": "Load greeting"
+			},
+			"visible": ["Greeting: hello from the client", "Build: client, production, dev false, prod true"],
+			"absent": ["Greeting: none"]
+		}
+	]
+}
