@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: j17-async-submit-script
+name: j41-async-submit-script
 ---
 - launchApp:
     clearState: true

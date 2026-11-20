@@ -646,7 +646,7 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	},
 	{
 		name: 'script-submit',
-		fixture: 'proofs/j18-submit-script/App.tsrx',
+		fixture: 'proofs/j42-submit-script/App.tsrx',
 		modules: true,
 		actions: [
 			{ event: 'activate', host: 'component-edge:0/h3' },
@@ -659,7 +659,7 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	},
 	{
 		name: 'script-submit-async',
-		fixture: 'proofs/j17-async-submit-script/App.tsrx',
+		fixture: 'proofs/j41-async-submit-script/App.tsrx',
 		modules: true,
 		actions: [
 			{ event: 'input', host: 'h3', value: 'Pump house' },
@@ -703,7 +703,7 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	},
 	{
 		name: 'script-structured-clone',
-		fixture: 'proofs/j19-structured-clone/App.tsrx',
+		fixture: 'proofs/j43-structured-clone/App.tsrx',
 		modules: true,
 		actions: [
 			{ event: 'activate', host: 'h2' },

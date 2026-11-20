@@ -1,5 +1,5 @@
 {
-	"rung": "J18",
+	"rung": "J42",
 	"name": "A submit handler runs as JavaScript: it reads its form through FormData and calls the function its parent passed",
 	"steps": [
 		{ "visible": ["Notes", "Save note", "Nothing saved"] },

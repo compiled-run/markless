@@ -1,5 +1,5 @@
 {
-	"rung": "J17",
+	"rung": "J41",
 	"name": "An async submit handler that runs as JavaScript keeps its form busy and its button unavailable until its promise settles",
 	"steps": [
 		{ "visible": ["Check-in", "Save", "Nothing saved"] },

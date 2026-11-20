@@ -1,5 +1,5 @@
 {
-	"rung": "J19",
+	"rung": "J43",
 	"name": "structuredClone copies data as the web's does, and refuses a function with a DataCloneError",
 	"steps": [
 		{ "visible": ["Clone", "Check", "Not checked"] },

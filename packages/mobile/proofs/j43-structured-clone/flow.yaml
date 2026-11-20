@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: j19-structured-clone
+name: j43-structured-clone
 ---
 - launchApp:
     clearState: true

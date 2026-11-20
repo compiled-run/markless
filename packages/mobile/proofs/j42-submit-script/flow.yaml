@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: j18-submit-script
+name: j42-submit-script
 ---
 - launchApp:
     clearState: true
