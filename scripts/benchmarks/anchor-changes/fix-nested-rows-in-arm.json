@@ -79,6 +79,38 @@
 			"delta": 4,
 			"reason": "nested lists inside an @if arm stay beside their enclosing list (server) and are wired with it (client), fixing inner rows never built in arms",
 			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-arm-lists"
+			],
+			"delta": 413,
+			"reason": "a list nested in another list's rows inside an @if arm is wired with its enclosing list, so its inner rows build and update",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/ssr"
+			],
+			"delta": 726,
+			"reason": "the server keeps a list nested in another list's rows beside its enclosing list when an @if arm moves its lists",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 129,
+			"reason": "resume-arm-lists wires nested lists with their enclosing list inside @if arms",
+			"date": "2026-11-20"
 		}
 	]
 }
