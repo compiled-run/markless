@@ -1240,6 +1240,9 @@ function emitDynamicHost(
 			cardinality: 'zero-or-one',
 			nullishTag: 'omit',
 			tag: expressionResidue(tagExpression, context, repeat, builder.componentName),
+			...(NATIVE_FACTS && context.nativeFacts
+				? { nativeTag: nativeCollectors(context.nativeFacts).expression(tagExpression as never) }
+				: {}),
 			staticAttributes,
 			attributeSlots,
 			childChunkId,

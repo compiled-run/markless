@@ -2004,6 +2004,8 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly cardinality: 'zero-or-one';
 				readonly nullishTag: 'omit';
 				readonly tag: SemanticMarkupResidue;
+				/** Native builds only: the tag as a tree a native build folds for each use. */
+				readonly nativeTag?: SemanticExpression;
 				readonly staticAttributes: Readonly<Record<string, string>>;
 				readonly attributeSlots: ReadonlyArray<
 					| {

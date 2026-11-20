@@ -322,6 +322,44 @@ export function Settings() @{
 		expect(payload?.events.map((event) => [event.host, event.event])).toEqual([['h1', 'activate']]);
 	});
 
+	it('builds a dynamic element (`<{tag}>`) as the element its tag names for each use, with its attributes, events and children', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function Box({ asChild, children, ...rest }) @{
+	let pressed = state(0);
+	const tag = asChild === true ? 'div' : 'p';
+	<{tag} {...rest} class="box" onClick={() => (pressed = pressed + 1)}>{children} {pressed}</{tag}>
+}
+export function Page() @{
+	<main>
+		<Box aria-label="Note">Note</Box>
+		<Box asChild={true}>Panel</Box>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const elements = payload?.nodes.filter((node) => node.kind === 'element' && node.parent === 'h1');
+		expect(elements?.map((node) => node.kind === 'element' && [node.id, node.element, node.attributes])).toEqual([
+			['component-edge:0/h0', 'p', { 'aria-label': 'Note', class: 'box' }],
+			['component-edge:1/h0', 'div', { class: 'box' }],
+		]);
+		expect(payload?.events.map((event) => [event.host, event.event])).toEqual([
+			['component-edge:0/h0', 'activate'],
+			['component-edge:1/h0', 'activate'],
+		]);
+	});
+
+	it('refuses a dynamic element whose tag follows state by name', async () => {
+		const { payload, diagnostics } = await nativeView(`import { computed, state } from '@markless/core';
+export function Page() @{
+	let big = state(false);
+	const tag = computed(() => (big ? 'h1' : 'p'));
+	<main><{tag}>Title</{tag}><button onClick={() => (big = !big)}>Grow</button></main>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'a dynamic element (`<{tag}>`) whose tag is not one element name when the app is built; each use must name one',
+		]);
+	});
+
 	it('leaves out drop-target handlers with a warning, as a phone raises them only for a drag from another app', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Upload() @{

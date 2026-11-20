@@ -354,6 +354,11 @@ type Item =
 	  }
 	| { readonly kind: 'children'; readonly path: ReadonlyArray<number> }
 	| {
+			readonly kind: 'dynamic';
+			readonly slot: Extract<SemanticMarkupChunk['slots'][number], { kind: 'dynamic-host' }>;
+			readonly path: ReadonlyArray<number>;
+	  }
+	| {
 			readonly kind: 'boundary';
 			readonly id: string;
 			readonly arms: {
@@ -438,6 +443,8 @@ type ObjectRef =
 type Scope = {
 	/** The analysis of the module whose template is being lowered. */
 	readonly module: ModuleFacts;
+	/** The tag each dynamic element (`<{tag}>`) takes in this instance, by host id. */
+	readonly tags?: ReadonlyMap<string, string>;
 	readonly component: string;
 	/** This instance's cells by state name and by the analyzer's binding id. */
 	readonly cells: {
@@ -3785,8 +3792,12 @@ export function createNativeViewPayload(
 				});
 				continue;
 			}
+			if (slot.kind === 'dynamic-host') {
+				items.push({ kind: 'dynamic', slot, path: slot.coordinate.path });
+				continue;
+			}
 			if (slot.kind !== 'text') {
-				refuse(`a ${slot.kind} binding`);
+				refuse(`a ${(slot as { readonly kind: string }).kind} binding`);
 				continue;
 			}
 			if (slot.raw) {
@@ -3913,9 +3924,83 @@ export function createNativeViewPayload(
 		for (const item of items) {
 			if (consumed.some((path) => isPrefix(path, item.path))) continue;
 			const parent = parentOf(item.path);
+			if (item.kind === 'dynamic') {
+				close();
+				const { slot } = item;
+				const span = scope.module.hostSpans.get(slot.hostNodeId);
+				const tagExpr = slot.nativeTag && exprOf(slot.nativeTag, 'the tag of a dynamic element', scope);
+				// A tag that reads state could change while the app runs; a phone builds one element for each use.
+				const tag =
+					tagExpr && cellsOf(tagExpr).size === 0 ? foldConstant(tagExpr, initialOf)?.value : undefined;
+				const children = scope.module.chunks.get(slot.childChunkId);
+				if (typeof tag !== 'string' || tag === '' || !children) {
+					refuse(
+						'a dynamic element (`<{tag}>`) whose tag is not one element name when the app is built; each use must name one',
+						span,
+					);
+					continue;
+				}
+				// The element the web renders for this use, laid out as a written one: its attributes at the anchor's path,
+				// its children under it.
+				const under = (coordinate: { readonly kind: string; readonly path: ReadonlyArray<number> }) => ({
+					...coordinate,
+					path: [...item.path, ...coordinate.path],
+				});
+				const at = { kind: 'child-index' as const, path: item.path };
+				const written: SemanticMarkupChunk = {
+					...children,
+					hosts: [
+						{ hostNodeId: slot.hostNodeId, tagName: tag, coordinate: at, ...(span ? { sourceSpan: span } : {}) },
+						...children.hosts.map((host) => ({ ...host, coordinate: under(host.coordinate) as typeof host.coordinate })),
+					],
+					attributes: [
+						...Object.entries(slot.staticAttributes).map(([name, value]) => ({ coordinate: at, name, value })),
+						...(children.attributes ?? []).map((attribute) => ({
+							...attribute,
+							coordinate: under(attribute.coordinate) as typeof attribute.coordinate,
+						})),
+					],
+					...(children.texts
+						? {
+								texts: children.texts.map((text) => ({
+									...text,
+									coordinate: under(text.coordinate) as typeof text.coordinate,
+								})),
+							}
+						: {}),
+					slots: [
+						...slot.attributeSlots.map((attribute): SemanticMarkupChunk['slots'][number] =>
+							attribute.kind === 'spread'
+								? {
+										kind: 'spread-attributes',
+										coordinate: at,
+										residue: attribute.residue,
+										excludeNames: attribute.excludeNames ?? [],
+										staticIndex: slot.staticIndex,
+									}
+								: {
+										kind: 'attribute',
+										name: attribute.name,
+										coordinate: at,
+										residue: attribute.residue,
+										staticIndex: slot.staticIndex,
+									},
+						),
+						...children.slots.map(
+							(child) =>
+								({ ...child, coordinate: under(child.coordinate) }) as SemanticMarkupChunk['slots'][number],
+						),
+					],
+				};
+				lowerChunk(written, parent, place, {
+					...scope,
+					tags: new Map([...(scope.tags ?? []), [slot.hostNodeId, tag]]),
+				});
+				continue;
+			}
 			if (item.kind === 'host') {
 				close();
-				const element = scope.module.tagOf.get(item.id);
+				const element = scope.tags?.get(item.id) ?? scope.module.tagOf.get(item.id);
 				const span = scope.module.hostSpans.get(item.id);
 				if (!element || element === '*') refuse(`host ${item.id} has no static tag`, span);
 				else if (!Object.hasOwn(NATIVE_ELEMENTS, element) && element !== 'title') {

@@ -376,6 +376,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// One polymorphic component built as a <p> and as a <div>, each with its own click and state.
+		name: 'dynamic-tag',
+		fixture: 'proofs/r152-dynamic-tag/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+		],
+	},
+	{
 		name: 'forms',
 		fixture: 'test/fixtures/Forms.tsrx',
 		actions: [
