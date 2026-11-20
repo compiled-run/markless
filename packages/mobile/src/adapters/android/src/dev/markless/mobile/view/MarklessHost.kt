@@ -930,7 +930,8 @@ class MarklessHost(
 			isFocusable = false
 			named(this, inst.id, heading = parent.isAccessibilityHeading)
 		}
-		if (view !is Button || block != BlockText(false, false, false, 1.0, false)) {
+		if (block.centered) view.gravity = Gravity.CENTER_HORIZONTAL
+		if (view !is Button || block.copy(centered = false) != BlockText(false, false, false, 1.0, false)) {
 			view.typeface = Typeface.create(if (block.monospace) Typeface.MONOSPACE else Typeface.DEFAULT, when {
 				block.bold && block.italic -> Typeface.BOLD_ITALIC
 				block.bold -> Typeface.BOLD
@@ -1116,6 +1117,7 @@ class MarklessHost(
 					if (s.indent > 0) setPaddingRelative((s.indent * dpr).roundToInt(), 0, 0, 0)
 					if (s.disclosure) disclosure = false
 				}
+				if (flow?.blockText(node.id)?.centered == true) centred = true
 			}
 		}
 		layoutOf(inst.node)?.let { l -> l.export.assignments[l.assignment].byId[inst.id] }?.let { styled -> scrollContainer(inst.id, view, styled) }
