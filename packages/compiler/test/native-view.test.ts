@@ -2937,6 +2937,32 @@ export function Note() @{
 		]);
 	});
 
+	it('draws an <svg> holding an @if as one drawing per arm, shown as the arms of that @if', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Icon() @{
+	let open = state(false);
+	<button onClick={() => (open = !open)}>
+		<svg viewBox="0 0 10 10"><rect width="10" height="10" />@if (open) { <path d="M0 0h10" /> } @else { <g><path d="M0 5h10" /><path d="M0 9h10" /></g> }</svg>
+	</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		const nodes = payload!.nodes as { kind: string; id: string; arm?: object; drawing?: { shapes: unknown[] }; test?: object }[];
+		const branch = nodes.find((node) => node.kind === 'branch')!;
+		expect(branch.test).toEqual({ cell: 'state:open' });
+		expect(nodes.filter((node) => node.drawing).map((node) => [node.arm, node.drawing!.shapes.length])).toEqual([
+			[{ branch: branch.id, index: 0 }, 2],
+			[{ branch: branch.id, index: 1 }, 3],
+		]);
+		const refused = await nativeView(`import { state } from '@markless/core';
+export function Icon() @{
+	let n = state(1);
+	<svg viewBox="0 0 10 10">@if (n > 0) { <circle cx="5" cy="5" r={n} /> }</svg>
+}`);
+		expect(refused.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'an @if arm inside an <svg> that holds a value, a component, a block or an attribute that follows state, which a native drawing does not draw per arm yet',
+		]);
+	});
+
 	it('refuses what a drawing cannot hold by name, at the shape that holds it', async () => {
 		const text = `import { state } from '@markless/core';
 export function Chart() @{

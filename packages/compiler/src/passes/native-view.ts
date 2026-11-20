@@ -4384,6 +4384,32 @@ export function createNativeViewPayload(
 		readonly host: string;
 	}[] = [];
 	const loweredEvents = new Set<string>();
+	/** An @if's (or @switch's) test, or one per arm; null, with a refusal, when the compiler did not record them. */
+	const branchTestsOf = (
+		item: Extract<Item, { kind: 'branch' }>,
+		site: NonNullable<ReturnType<ModuleFacts['branchSites']['get']>>,
+		scope: Scope,
+	): { test: NativeExpr } | { tests: (NativeExpr | null)[] } | null => {
+		const plain = site.kind === 'if' && site.armIndexSource === undefined;
+		const testScope: Scope = { ...scope, live: site.testComputedGraphNodeId !== undefined };
+		const test = plain ? testOf(site.testExpression, 'the @if test', testScope) : undefined;
+		const recorded = site.armTestExpressions?.map((expression) =>
+			expression === null ? null : testOf(expression, `the @${site.kind} test`, testScope),
+		);
+		// A chain with no @else still has an empty last arm; showing it when nothing matches shows nothing.
+		const tests =
+			plain || !recorded
+				? undefined
+				: recorded.length === item.arms.length - 1 && !recorded.includes(null)
+					? [...recorded, null]
+					: recorded;
+		if (plain ? !test : !tests || tests.length !== item.arms.length) {
+			if (!plain && !tests) refuse(`a @${site.kind} whose arm tests the compiler did not record`);
+			if (tests && tests.length !== item.arms.length) refuse(`a @${site.kind} with an empty arm`);
+			return null;
+		}
+		return test ? { test } : { tests: tests! as (NativeExpr | null)[] };
+	};
 	const lowerChunk = (
 		chunk: SemanticMarkupChunk,
 		baseParent: string | null,
@@ -4777,7 +4803,11 @@ export function createNativeViewPayload(
 					const relative = (path: ReadonlyArray<number>) => path.slice(item.path.length);
 					const drawn: DrawingElement[] = [];
 					const texts: { path: ReadonlyArray<number>; text: string }[] = [];
+					const branches = inside.filter(
+						(other): other is Extract<Item, { kind: 'branch' }> => other.kind === 'branch',
+					);
 					for (const other of inside) {
+						if (other.kind === 'branch' && branches.length === 1) continue;
 						if (other.kind === 'host') {
 							const tag = scope.module.tagOf.get(other.id) ?? '*';
 							drawn.push({
@@ -4804,13 +4834,77 @@ export function createNativeViewPayload(
 								span,
 							);
 					}
-					const result = compileDrawing(attributes, drawn, texts, item.id);
-					for (const refusal of result.refusals)
-						refuseAs(
-							'svg',
-							refusal.message,
-							scope.module.hostSpans.get(refusal.element) ?? span,
+					const drawingOf = (
+						elements: DrawingElement[],
+						runs: { path: ReadonlyArray<number>; text: string }[],
+					) => {
+						const result = compileDrawing(
+							attributes,
+							[...elements].sort((a, b) => comparePaths(a.path, b.path)),
+							runs,
+							item.id,
 						);
+						for (const refusal of result.refusals)
+							refuseAs('svg', refusal.message, scope.module.hostSpans.get(refusal.element) ?? span);
+						return result;
+					};
+					if (branches.length === 1) {
+						// An icon that switches on state: one drawing per arm, shown as the arms of an @if.
+						const branch = branches[0]!;
+						const site = scope.module.branchSites.get(branch.id);
+						const resolved = site ? branchTestsOf(branch, site, scope) : refuse(`the branch ${branch.id}`);
+						if ((scope.module.eventsByHost.get(item.id) ?? []).length > 0 || (scope.module.handleBindingsByHost.get(item.id) ?? []).length > 0 || bindings.length > 0)
+							refuseAs('svg', 'an <svg> holding an @if that also has handlers, a handle or attributes that follow state, which a native build does not draw per arm yet', span);
+						else if (resolved) {
+							const at = (path: ReadonlyArray<number>) =>
+								relative([...branch.path.slice(0, -1), branch.path.at(-1)! + path[0]!, ...path.slice(1)]);
+							const variants = branch.arms.map((armId) => {
+								const arm = scope.module.chunks.get(armId);
+								if (!arm) return refuse(`arm ${armId} has no markup`);
+								if (scope.module === rootModule) lowered.add(arm.id);
+								if (arm.slots.length > 0)
+									return refuseAs('svg', 'an @if arm inside an <svg> that holds a value, a component, a block or an attribute that follows state, which a native drawing does not draw per arm yet', span);
+								for (const host of arm.hosts)
+									for (const event of scope.module.eventsByHost.get(host.hostNodeId) ?? []) {
+										if (scope.module === rootModule) loweredEvents.add(event.id);
+										refuseAs('svg', `the ${event.eventName} handler on <${scope.module.tagOf.get(host.hostNodeId) ?? '*'}> inside an <svg>: its shapes are drawn, not views`, event.handlerSpan);
+									}
+								const armDrawn: DrawingElement[] = arm.hosts.map((host) => ({
+									id: host.hostNodeId,
+									tag: scope.module.tagOf.get(host.hostNodeId) ?? '*',
+									path: at(host.coordinate.path),
+									attributes: Object.fromEntries(
+										(arm.attributes ?? [])
+											.filter((attribute) => comparePaths(attribute.coordinate.path, host.coordinate.path) === 0)
+											.map((attribute) => [attribute.name, attribute.value]),
+									) as Record<string, string>,
+									bound: [],
+								}));
+								const armTexts = (arm.texts ?? []).map((text) => ({ path: at(text.coordinate.path), text: text.text }));
+								return drawingOf([...drawn, ...armDrawn], [...texts, ...armTexts]);
+							});
+							if (variants.every((variant) => variant !== null)) {
+								const branchId = scope.prefix + branch.id;
+								nodes.push({ kind: 'branch', id: branchId, parent, ...resolved, arms: variants.length, ...place });
+								variants.forEach((variant, index) => {
+									const own: Record<string, string> = { ...attributes };
+									if (variant!.title !== undefined && !('aria-label' in attributes)) own['aria-label'] = variant!.title;
+									nodes.push({
+										kind: 'element',
+										id: `${id}~${index}`,
+										element: 'svg',
+										parent,
+										...(Object.keys(own).length > 0 ? { attributes: own } : {}),
+										drawing: variant!.drawing,
+										arm: { branch: branchId, index },
+									});
+									elementSources.set(`${id}~${index}`, { element: 'svg', ...(item.span ? { span: item.span } : {}) });
+								});
+							}
+						}
+						continue;
+					}
+					const result = drawingOf(drawn, texts);
 					drawing = result.drawing;
 					if (result.title !== undefined && !('aria-label' in attributes))
 						attributes['aria-label'] = result.title;
@@ -5498,42 +5592,10 @@ export function createNativeViewPayload(
 					refuse(`the branch ${item.id}`);
 					continue;
 				}
-				const plain = site.kind === 'if' && site.armIndexSource === undefined;
-				const testScope: Scope = {
-					...scope,
-					live: site.testComputedGraphNodeId !== undefined,
-				};
-				const test = plain
-					? testOf(site.testExpression, 'the @if test', testScope)
-					: undefined;
-				const recorded = site.armTestExpressions?.map((expression) =>
-					expression === null
-						? null
-						: testOf(expression, `the @${site.kind} test`, testScope),
-				);
-				// A chain with no @else still has an empty last arm; showing it when nothing matches shows nothing.
-				const tests =
-					plain || !recorded
-						? undefined
-						: recorded.length === item.arms.length - 1 && !recorded.includes(null)
-							? [...recorded, null]
-							: recorded;
-				if (plain ? !test : !tests || tests.length !== item.arms.length) {
-					if (!plain && !tests)
-						refuse(`a @${site.kind} whose arm tests the compiler did not record`);
-					if (tests && tests.length !== item.arms.length)
-						refuse(`a @${site.kind} with an empty arm`);
-					continue;
-				}
+				const resolved = branchTestsOf(item, site, scope);
+				if (!resolved) continue;
 				const branchId = scope.prefix + item.id;
-				nodes.push({
-					kind: 'branch',
-					id: branchId,
-					parent,
-					...(test ? { test } : { tests: tests! as (NativeExpr | null)[] }),
-					arms: item.arms.length,
-					...place,
-				});
+				nodes.push({ kind: 'branch', id: branchId, parent, ...resolved, arms: item.arms.length, ...place });
 				item.arms.forEach((armId, index) => {
 					const armChunk = scope.module.chunks.get(armId);
 					if (armChunk)

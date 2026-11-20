@@ -1,0 +1,9 @@
+{
+	"rung": 151,
+	"name": "An @if inside an <svg>: an icon that switches on state, drawn as one drawing per arm",
+	"steps": [
+		{ "visible": ["Theme: light", "Switch theme"] },
+		{ "do": { "tap": "Switch theme" }, "visible": ["Theme: dark"], "absent": ["Theme: light"] },
+		{ "do": { "tap": "Switch theme" }, "visible": ["Theme: light"], "absent": ["Theme: dark"] }
+	]
+}

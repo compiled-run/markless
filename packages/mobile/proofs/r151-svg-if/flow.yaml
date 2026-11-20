@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+name: r151-svg-if
+---
+- launchApp:
+      clearState: true
+- assertVisible: 'Theme: light'
+- assertVisible: Switch theme
+- tapOn: Switch theme
+- assertNotVisible: 'Theme: light'
+- assertVisible: 'Theme: dark'
+- assertNotVisible: 'Theme: light'
+- tapOn: Switch theme
+- assertVisible: 'Theme: light'
+- assertNotVisible: 'Theme: dark'
+- assertVisible: 'Theme: light'
+- assertNotVisible: 'Theme: dark'

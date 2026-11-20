@@ -946,6 +946,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
+		name: 'svg-if',
+		fixture: 'proofs/r151-svg-if/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
 		name: 'svg-text',
 		fixture: 'proofs/r150-svg-text/App.tsrx',
 		modules: true,
