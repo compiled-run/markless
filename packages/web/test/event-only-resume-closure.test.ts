@@ -155,7 +155,9 @@ const resumeOnDemandEntries = [
 // item in place before the reader arrives still repaints it: 37,220 -> 37,236 raw, one condition in resume-keyed-repeats.ts.
 // 2026-11-17: a first click on a keyed row climbs from the target to its row instead of walking every row at each
 // ancestor (1,000 rows, cell no handler owns: 1,000 rows walked -> 1): 37,236 -> 37,431 raw, in resume-keyed-repeats.ts.
-const sourceByteLimit = 37431;
+// 2026-11-20: rows an arm painted are adopted under the collection they were drawn from, so a value landing while the arm
+// wires reconciles over them: 37,429 -> 37,510 raw, one lookup in resume-keyed-repeats.ts (the reads are in resume-async-wiring.ts).
+const sourceByteLimit = 37510;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

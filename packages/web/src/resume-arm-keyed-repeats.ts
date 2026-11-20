@@ -21,7 +21,6 @@ export async function wireArmKeyedRepeats(
 	moved?: (read: SlotRead) => boolean,
 	// The arm's own records: a computed a component in the arm declares is not in the page's.
 	armComputed?: NonNullable<ResumeRuntimeInput['state']>['computed'],
-	paintedCollections?: ReadonlyMap<string, unknown>,
 ): Promise<void> {
 	const { primeKeyedRepeatCollections, wireKeyedRepeats } =
 		await import('./resume-keyed-repeats-lazy.ts');
@@ -49,7 +48,6 @@ export async function wireArmKeyedRepeats(
 				renderData: runtime.renderData,
 				pageRepeats: runtime.view.keyedRepeats,
 				moved,
-				paintedCollections,
 			},
 			rowComponentHost,
 		);
