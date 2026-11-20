@@ -49,6 +49,8 @@ export type ArmCommitUpdate = {
 	readonly after?: boolean;
 	/** Whether a row slot's read moved since this arm's markup was rendered. */
 	readonly moved?: (read: SlotRead) => boolean;
+	/** Each keyed repeat's collection, by repeat id, as this arm's markup drew its rows. */
+	readonly paintedCollections?: ReadonlyMap<string, unknown>;
 };
 
 export type ArmRegistrationDeps = Parameters<typeof createArmCommitter>[0];
@@ -129,6 +131,7 @@ export function createArmCommitter(
 			records: ReadonlyArray<ResumeKeyedRepeatRecord>,
 			moved?: (read: SlotRead) => boolean,
 			computed?: ArmCommitUpdate['computed'],
+			paintedCollections?: ArmCommitUpdate['paintedCollections'],
 		) => Promise<void>;
 		readonly asyncBoundaryWiring?: () => Promise<AsyncBoundaryWiring> | undefined;
 		readonly documentHost?: CommitDocument;
@@ -190,7 +193,7 @@ export async function registerArmRecordSet(
 	deps: ArmRegistrationDeps,
 	installEventType: (eventType: string) => void,
 	boundary: ResumeArmRange,
-	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells' | 'moved'> & {
+	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells' | 'moved' | 'paintedCollections'> & {
 		// A minted row has no anchors around it, so it hands over the comments its @try records count in.
 		readonly comments?: ReadonlyArray<ResumeDomComment>;
 	},
@@ -216,7 +219,7 @@ export async function registerArmRecordSet(
 		await deps.registerComputedRefreshes(update.computed!);
 	}
 	if (deferred.repeats.length)
-		await deps.registerKeyedRepeats?.(deferred.repeats, update.moved, update.computed);
+		await deps.registerKeyedRepeats?.(deferred.repeats, update.moved, update.computed, update.paintedCollections);
 	for (const step of deferred.steps) await step();
 	return materialized;
 }

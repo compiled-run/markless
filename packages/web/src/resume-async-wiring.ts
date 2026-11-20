@@ -9,6 +9,7 @@ import type {
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
 	ResumeDomElement,
+	ResumeKeyedRepeatRecord,
 	ShownAsyncArm,
 	ResumeSymbolContext,
 	ResumePreparedCore,
@@ -481,6 +482,8 @@ async function prepareBoundarySettle(
 		ownRecords = true,
 	): Promise<RuntimeGraphCommit> => {
 		const rows = update.armRecords.keyedRepeats;
+		// Read before any await: a value landing while the arm loads is applied over these rows, not taken for them.
+		const paintedCollections = rows?.length ? paintedPageCollections(input.graph, rows, update) : undefined;
 		const moved = rows?.length
 			? (await import('./resume-keyed-repeats-lazy.ts')).movedSincePaint(input.graph, rows)
 			: undefined;
@@ -492,6 +495,7 @@ async function prepareBoundarySettle(
 		const land = await prepareArm(input, (after ?? boundary) as ResumeAsyncBoundaryRecord, {
 			...update,
 			...(moved && { moved }),
+			...(paintedCollections && { paintedCollections }),
 			arm,
 			...(after && { after: true }),
 		});
@@ -565,6 +569,25 @@ async function prepareBoundarySettle(
 	shownArms.set(boundary, arm === ASYNC_BOUNDARY_ARM.try ? SHOWN_TRY_PLAIN : shownFor(snapshot));
 	input.settleTracker?.markSettled(boundary.id);
 	return boundaryRangeJournal(boundary.id, fragment);
+}
+
+// Values the arm brings in (its cells, its computeds, a row's own list) are not in the graph until it registers.
+function paintedPageCollections(
+	graph: SettleInput['graph'],
+	rows: ReadonlyArray<ResumeKeyedRepeatRecord>,
+	update: Pick<ArmCommitUpdate, 'cells' | 'computed'>,
+): ReadonlyMap<string, unknown> {
+	const armOwned = new Set([
+		...(update.cells ?? []).map((cell) => cell.graphNodeId),
+		...(update.computed ?? []).map((record) => record.graphNodeId),
+	]);
+	return new Map(
+		rows.flatMap((repeat) =>
+			repeat.collectionGraphNodeId && !repeat.enclosingRow && !armOwned.has(repeat.collectionGraphNodeId)
+				? [[repeat.id, graph.read(repeat.collectionGraphNodeId, repeat.collectionPath)] as const]
+				: [],
+		),
+	);
 }
 
 // Recorded once the commit is prepared, so another read of this boundary in the same pass refreshes in place; a landing that fails puts the record back.

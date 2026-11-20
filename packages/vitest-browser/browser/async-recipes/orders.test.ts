@@ -80,3 +80,29 @@ test('CSR: a poll that lands while the last one is still out replaces it, and th
 	await vi.advanceTimersByTimeAsync(1_000);
 	expect(orders()).toEqual(['Saucer']);
 });
+
+test('CSR: a poll answered while the first rows are still wiring up shows its answer, not the rows painted before it', async () => {
+	resetCalls();
+	fakeClock();
+	await render(Orders);
+	// Answers the next poll from inside the task that paints the first rows, before their keyed list has wired.
+	const observer = new MutationObserver(() => {
+		if (orders().length === 0) return;
+		observer.disconnect();
+		vi.advanceTimersByTime(5_000);
+		let turns = 50;
+		const answerOnceAsked = (): void => {
+			if (requested('orders') === 2) return answer('orders', { value: [{ id: 3, item: 'Saucer' }] });
+			if (--turns > 0) queueMicrotask(answerOnceAsked);
+		};
+		answerOnceAsked();
+	});
+	observer.observe(document.body, { childList: true, subtree: true });
+	try {
+		answer('orders');
+		await until(orders, ['Saucer']);
+	} finally {
+		observer.disconnect();
+	}
+	expect(requested('orders')).toBe(2);
+});

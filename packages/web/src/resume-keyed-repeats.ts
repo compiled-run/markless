@@ -172,6 +172,8 @@ export function wireKeyedRepeats(
 		readonly root?: ResumeDomElement;
 		readonly pageRepeats?: ReadonlyArray<ResumeKeyedRepeatRecord>;
 		readonly moved?: (read: SlotRead) => boolean;
+		/** The collections an arm's rows were drawn from; a value that landed while the arm registered differs and is applied over them. */
+		readonly paintedCollections?: ReadonlyMap<string, unknown>;
 	},
 	rowComponentHost?: RowComponentHost,
 	onRow?: ResumeRepeatRowHook,
@@ -205,7 +207,9 @@ export function wireKeyedRepeats(
 	for (const repeat of input.view.keyedRepeats ?? []) {
 		const parent = input.elementsByHostId.get(repeat.parentHostNodeId);
 		if (!parent) continue;
-		const items = readKeyedRepeatCollection(input.graph, repeat),
+		const items = input.paintedCollections?.has(repeat.id)
+				? collectionItems(input.paintedCollections.get(repeat.id))
+				: readKeyedRepeatCollection(input.graph, repeat),
 			rowRootsByKey = new Map<unknown, ResumeRowRoot>(),
 			served = new Map<unknown, [unknown, number]>(),
 			slots: RowSlots = {
@@ -627,7 +631,9 @@ export function readKeyedRepeatCollection(
 	repeat: ResumeKeyedRepeatRecord,
 ): ReadonlyArray<unknown> {
 	if (!repeat.collectionGraphNodeId) return [];
-	const value = graph.read(repeat.collectionGraphNodeId, repeat.collectionPath);
+	return collectionItems(graph.read(repeat.collectionGraphNodeId, repeat.collectionPath));
+}
+function collectionItems(value: unknown): ReadonlyArray<unknown> {
 	return Array.isArray(value) ? value : Array.from((value ?? []) as Iterable<unknown>);
 }
 function repeatItemKey(item: unknown, repeat: ResumeKeyedRepeatRecord, index: number): unknown {
