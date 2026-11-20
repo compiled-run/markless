@@ -382,6 +382,38 @@ export type NativeShape = {
 	readonly miterLimit: number;
 	/** The affine map from the shape's units to the drawing's (`[a, b, c, d, e, f]`), from `transform` on it and its groups. */
 	readonly transform?: readonly [number, number, number, number, number, number];
+	/** A `<text>` element: its `path` is empty, and the host lays out and fills these runs instead. */
+	readonly text?: NativeDrawingText;
+};
+
+/**
+ * An SVG `<text>`, drawn as the browser draws it: its runs (its own text and each `<tspan>`'s, in document order, with
+ * white space already collapsed or kept by `xml:space`) are laid out one after another from the pen. A run's `x` or `y`
+ * moves the pen there and starts a new chunk; `dx` and `dy` shift it. Each chunk is placed by `anchor` (start, middle or
+ * end at the pen's place) and every glyph sits on `baseline` relative to the pen's `y`.
+ */
+export type NativeDrawingText = {
+	readonly anchor: 'start' | 'middle' | 'end';
+	/** `auto` and `alphabetic` put the alphabetic baseline at `y`; the others move the em box as the browser does. */
+	readonly baseline: 'alphabetic' | 'middle' | 'central' | 'hanging' | 'text-top' | 'text-bottom' | 'ideographic';
+	readonly runs: ReadonlyArray<NativeDrawingTextRun>;
+};
+
+export type NativeDrawingTextRun = {
+	readonly text: string;
+	readonly x?: number;
+	readonly y?: number;
+	readonly dx?: number;
+	readonly dy?: number;
+	/** The font size in user units. */
+	readonly size: number;
+	/** 100 to 900; 400 is normal, 700 bold. */
+	readonly weight: number;
+	/** The generic family the run's `font-family` names or falls back to; the page's text font when absent. */
+	readonly family?: 'serif' | 'sans-serif' | 'monospace';
+	/** Extra advance after each glyph, in user units. */
+	readonly letterSpacing: number;
+	readonly fill: NativeColor | 'currentColor' | null;
 };
 
 /** An inline `<svg>`, compiled when the app is built: the host draws `shapes` in the element's box. */
@@ -394,6 +426,8 @@ export type NativeDrawing = {
 	/** `width` and `height` are in ems of the svg's font size (`width="1em"`), not CSS pixels. */
 	readonly em?: true;
 	readonly shapes: ReadonlyArray<NativeShape>;
+	/** The text its `<text>` elements show, which a screen reader reads when the svg has no name, as the browser exposes it. */
+	readonly label?: string;
 };
 
 export type NativeNode = NativePlace &

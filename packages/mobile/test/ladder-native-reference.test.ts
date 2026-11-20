@@ -185,7 +185,8 @@ function mirror(
 		payload.nodes.flatMap((node) => {
 			if (node.kind !== 'element') return [];
 			const bound = attributes.get(`${node.id}\0aria-label`);
-			const label = bound !== undefined ? bound : (node.attributes?.['aria-label'] ?? null);
+			const label =
+				bound !== undefined ? bound : (node.attributes?.['aria-label'] ?? node.drawing?.label ?? null);
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
 	// The element a text names: a labelled element, or the element holding that text (a row instance keeps its key).
@@ -598,6 +599,8 @@ function walk(
 		const label =
 			attribute('aria-label') ??
 			(node.element === 'img' ? (node.attributes?.alt ?? null) : null) ??
+			// An svg's text reads as the svg's, as the browser exposes it.
+			node.drawing?.label ??
 			(labelledBy === null
 				? null
 				: labelledBy

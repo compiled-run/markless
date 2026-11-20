@@ -1,0 +1,20 @@
+{
+	"rung": 184,
+	"name": "SVG <text> and <tspan> draw in a native drawing, placed by x, y, text-anchor and dominant-baseline, and read as the svg's text",
+	"steps": [
+		{
+			"visible": ["Sales chart", "Next quarter", "Sales up 12%"],
+			"absent": ["Q4 forecast"]
+		},
+		{
+			"do": { "tap": "Next quarter" },
+			"visible": ["Q4 forecast"],
+			"absent": ["Sales up 12%"]
+		},
+		{
+			"do": { "tap": "Next quarter" },
+			"visible": ["Sales up 12%"],
+			"absent": ["Q4 forecast"]
+		}
+	]
+}

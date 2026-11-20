@@ -1,4 +1,10 @@
-import type { NativeColor, NativeDrawing, NativeShape } from '@markless/serializer';
+import type {
+	NativeColor,
+	NativeDrawing,
+	NativeDrawingText,
+	NativeDrawingTextRun,
+	NativeShape,
+} from '@markless/serializer';
 
 // An inline <svg> as data a native host draws: SVG 2's attribute grammars (path data, points, transforms, viewBox, paint)
 // read once when the app is built, so no phone parses SVG.
@@ -40,6 +46,14 @@ type Inherited = {
 	readonly miterLimit: number;
 	/** What `currentColor` is, when an ancestor's `color` attribute says; else the svg's text colour. */
 	readonly color: NativeColor | null;
+	readonly fontSize: number;
+	readonly fontWeight: number;
+	readonly fontFamily: NativeDrawingTextRun['family'];
+	readonly anchor: NativeDrawingText['anchor'];
+	readonly baseline: NativeDrawingText['baseline'];
+	/** In user units, or in ems of the font size. */
+	readonly letterSpacing: { readonly value: number; readonly em: boolean };
+	readonly preserve: boolean;
 };
 const INITIAL: Inherited = {
 	fill: { r: 0, g: 0, b: 0, alpha: 255 },
@@ -53,6 +67,14 @@ const INITIAL: Inherited = {
 	join: 'miter',
 	miterLimit: 4,
 	color: null,
+	// The page's default text: 16px, its own font.
+	fontSize: 16,
+	fontWeight: 400,
+	fontFamily: undefined,
+	anchor: 'start',
+	baseline: 'alphabetic',
+	letterSpacing: { value: 0, em: false },
+	preserve: false,
 };
 
 const SHAPES = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
@@ -89,6 +111,9 @@ const GEOMETRY: Readonly<Record<string, ReadonlyArray<string>>> = {
 	polygon: ['points'],
 	use: ['href', 'xlink:href', 'x', 'y', 'width', 'height'],
 	symbol: ['viewBox', 'width', 'height', 'x', 'y'],
+	// `width`, `height` and `orientation` mean nothing on text; the browser ignores them, as charting libraries leave them.
+	text: ['x', 'y', 'dx', 'dy', 'width', 'height', 'orientation', 'xml:space'],
+	tspan: ['x', 'y', 'dx', 'dy', 'xml:space'],
 };
 const PRESENTATION = new Set([
 	'fill',
@@ -104,7 +129,27 @@ const PRESENTATION = new Set([
 	'transform',
 	'stroke-dasharray',
 	'color',
+	'font-size',
+	'font-weight',
+	'font-family',
+	'text-anchor',
+	'dominant-baseline',
+	'letter-spacing',
 ]);
+
+const GENERIC_FAMILIES = new Set(['serif', 'sans-serif', 'monospace']);
+const BASELINES: Readonly<Record<string, NativeDrawingText['baseline']>> = {
+	auto: 'alphabetic',
+	alphabetic: 'alphabetic',
+	middle: 'middle',
+	central: 'central',
+	hanging: 'hanging',
+	'text-before-edge': 'text-top',
+	'text-top': 'text-top',
+	'text-after-edge': 'text-bottom',
+	'text-bottom': 'text-bottom',
+	ideographic: 'ideographic',
+};
 
 export function compileDrawing(
 	svg: Readonly<Record<string, string>>,
@@ -193,7 +238,7 @@ export function compileDrawing(
 				refuse(element.id, `\`stroke-width="${width}"\` on <${element.tag}>`);
 			else next.width = value;
 		}
-		const keyword = <K extends 'fillRule' | 'cap' | 'join'>(
+		const keyword = <K extends 'fillRule' | 'cap' | 'join' | 'anchor'>(
 			name: string,
 			key: K,
 			allowed: ReadonlyArray<Inherited[K]>,
@@ -213,6 +258,51 @@ export function compileDrawing(
 				refuse(element.id, `\`stroke-miterlimit="${limit}"\` on <${element.tag}>`);
 			else next.miterLimit = value;
 		}
+		const fontSize = attribute('font-size')?.trim();
+		if (fontSize !== undefined) {
+			const css = parseCssLength(fontSize);
+			if (css === null || css.value < 0 || fontSize.endsWith('%'))
+				refuse(element.id, `\`font-size="${fontSize}"\` on <${element.tag}>`);
+			else next.fontSize = css.unit === 'em' ? css.value * from.fontSize : css.value;
+		}
+		const fontWeight = attribute('font-weight')?.trim();
+		if (fontWeight !== undefined) {
+			const weight =
+				fontWeight === 'normal'
+					? 400
+					: fontWeight === 'bold'
+						? 700
+						: fontWeight === 'bolder'
+							? Math.min(900, Math.max(400, from.fontWeight + 300))
+							: fontWeight === 'lighter'
+								? Math.max(100, Math.min(400, from.fontWeight - 300))
+								: Number(fontWeight);
+			if (!Number.isInteger(weight) || weight < 1 || weight > 1000)
+				refuse(element.id, `\`font-weight="${fontWeight}"\` on <${element.tag}>`);
+			else next.fontWeight = weight;
+		}
+		const family = attribute('font-family');
+		if (family !== undefined)
+			// The first generic family the list names; a named face falls back to the page's font, as on a phone without it.
+			next.fontFamily = family
+				.split(',')
+				.map((name) => name.trim().replace(/^["']|["']$/g, '').toLowerCase())
+				.find((name) => GENERIC_FAMILIES.has(name)) as NativeDrawingTextRun['family'];
+		keyword('text-anchor', 'anchor', ['start', 'middle', 'end']);
+		const baseline = attribute('dominant-baseline')?.trim();
+		if (baseline !== undefined && baseline !== 'inherit') {
+			const mapped = BASELINES[baseline];
+			if (mapped) next.baseline = mapped;
+			else refuse(element.id, `\`dominant-baseline="${baseline}"\` on <${element.tag}>`);
+		}
+		const spacing = attribute('letter-spacing')?.trim();
+		if (spacing !== undefined) {
+			const css = spacing === 'normal' ? { value: 0, unit: 'px' as const } : parseCssLength(spacing);
+			if (css === null) refuse(element.id, `\`letter-spacing="${spacing}"\` on <${element.tag}>`);
+			else next.letterSpacing = { value: css.value, em: css.unit === 'em' };
+		}
+		const space = attribute('xml:space')?.trim();
+		if (space !== undefined) next.preserve = space === 'preserve';
 		const dashes = attribute('stroke-dasharray')?.trim();
 		if (dashes !== undefined && dashes !== 'none')
 			refuse(
@@ -344,6 +434,101 @@ export function compileDrawing(
 		}
 	};
 
+	const spoken: string[] = [];
+	const emitText = (element: DrawingElement, style: Inherited, matrix: Matrix) => {
+		const paintOf = (at: Inherited): NativeDrawingTextRun['fill'] => {
+			const given = at.fill === 'currentColor' && at.color ? at.color : at.fill;
+			const opacity = at.fillOpacity * at.opacity;
+			if (given === 'currentColor' && opacity !== 1)
+				refuse(element.id, "a see-through `currentColor` fill on <text>: its colour comes from the page's styles");
+			if (given === null || given === 'currentColor' || opacity === 1) return given;
+			return { ...given, alpha: Math.round(given.alpha * opacity) };
+		};
+		const runs: { -readonly [K in keyof NativeDrawingTextRun]: NativeDrawingTextRun[K] }[] = [];
+		let pending: { x?: number; y?: number; dx?: number; dy?: number } = {};
+		const position = (node: DrawingElement) => {
+			for (const name of ['x', 'y', 'dx', 'dy'] as const) {
+				const raw = node.attributes[name];
+				if (raw === undefined) continue;
+				const value = parseLength(raw);
+				if (value === null)
+					refuse(node.id, `\`${name}="${raw}"\` on <${node.tag}>: one length per text is drawn, not a list`);
+				else pending[name] = name === 'dx' || name === 'dy' ? (pending[name] ?? 0) + value : value;
+			}
+		};
+		const collect = (node: DrawingElement, at: Inherited) => {
+			if (at.stroke !== null && at.width > 0)
+				refuse(node.id, `a stroke on <${node.tag}>: text is filled, not outlined, natively yet`);
+			position(node);
+			const items: ({ readonly index: number } & (
+				| { readonly element: DrawingElement }
+				| { readonly text: string }
+			))[] = [
+				...childrenOf(node.path).map((child) => ({ index: child.path.at(-1)!, element: child })),
+				...texts
+					.filter((text) => text.path.length === node.path.length + 1 && isPrefix(node.path, text.path))
+					.map((text) => ({ index: text.path.at(-1)!, text: text.text })),
+			].sort((a, b) => a.index - b.index);
+			for (const item of items) {
+				if ('text' in item) {
+					runs.push({
+						text: item.text,
+						...pending,
+						size: at.fontSize,
+						weight: at.fontWeight,
+						...(at.fontFamily ? { family: at.fontFamily } : {}),
+						letterSpacing: at.letterSpacing.em ? at.letterSpacing.value * at.fontSize : at.letterSpacing.value,
+						fill: paintOf(at),
+					});
+					pending = {};
+					continue;
+				}
+				if (item.element.tag !== 'tspan') {
+					if (!NEVER_DRAWN.has(item.element.tag))
+						refuse(item.element.id, `the SVG <${item.element.tag}> element inside <text>, which a native drawing does not draw yet`);
+					continue;
+				}
+				checkAttributes(item.element);
+				if (item.element.attributes.transform !== undefined)
+					refuse(item.element.id, '`transform` on <tspan>, which SVG does not apply');
+				collect(item.element, inherit(item.element, at));
+			}
+		};
+		collect(element, style);
+		// White space as the browser collapses it in SVG text (kept with `xml:space="preserve"`): line breaks and tabs are
+		// spaces, a run of spaces is one, and the text's first and last spaces go.
+		let previousSpace = true;
+		for (const run of runs) {
+			let out = '';
+			for (const char of run.text) {
+				const space = char === ' ' || char === '\n' || char === '\t' || char === '\r';
+				if (space && !style.preserve && previousSpace) continue;
+				out += space ? ' ' : char;
+				previousSpace = space;
+			}
+			run.text = out;
+		}
+		if (!style.preserve) {
+			const last = runs.findLast((run) => run.text !== '');
+			if (last?.text.endsWith(' ')) last.text = last.text.slice(0, -1);
+		}
+		const shown = runs.filter((run) => run.text !== '' || run.x !== undefined || run.y !== undefined);
+		if (shown.every((run) => run.text === '')) return;
+		spoken.push(shown.map((run) => run.text).join('').trim());
+		shapes.push({
+			path: [],
+			fill: paintOf(style),
+			fillRule: 'nonzero',
+			stroke: null,
+			width: 0,
+			cap: 'butt',
+			join: 'miter',
+			miterLimit: 4,
+			...(matrix.every((value, index) => value === IDENTITY[index]) ? {} : { transform: matrix }),
+			text: { anchor: style.anchor, baseline: style.baseline, runs: shown },
+		});
+	};
+
 	const transformOf = (element: DrawingElement): Matrix => {
 		const raw = element.attributes.transform;
 		if (raw === undefined) return IDENTITY;
@@ -376,6 +561,11 @@ export function compileDrawing(
 			emit(element, outlineOf(element), style, own);
 			return;
 		}
+		if (element.tag === 'text') {
+			emitText(element, style, own);
+			return;
+		}
+		if (element.tag === 'tspan') return;
 		if (element.tag === 'use') {
 			const href = (element.attributes.href ?? element.attributes['xlink:href'] ?? '').trim();
 			const target = href.startsWith('#') ? byId.get(href.slice(1)) : undefined;
@@ -445,6 +635,7 @@ export function compileDrawing(
 			...(height !== undefined ? { height: height.value } : {}),
 			...(em ? { em: true as const } : {}),
 			shapes,
+			...(spoken.length > 0 ? { label: spoken.join(' ') } : {}),
 		},
 		...(title ? { title } : {}),
 		refusals,

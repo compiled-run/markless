@@ -205,6 +205,30 @@ public struct NativeShape: Equatable, Sendable {
 	public let miterLimit: Double
 	/// `[a, b, c, d, e, f]`.
 	public let transform: [Double]?
+	/// A `<text>`: the path is empty, and these runs are laid out and filled instead.
+	public var text: NativeDrawingText?
+}
+
+/// An SVG `<text>`: runs laid out from the pen, each chunk placed by `anchor`, glyphs on `baseline` relative to the pen.
+public struct NativeDrawingText: Equatable, Sendable {
+	public struct Run: Equatable, Sendable {
+		public let text: String
+		public let x: Double?
+		public let y: Double?
+		public let dx: Double?
+		public let dy: Double?
+		public let size: Double
+		public let weight: Double
+		/// serif, sans-serif or monospace; the page's text font when nil.
+		public let family: String?
+		public let letterSpacing: Double
+		public let fill: NativeShape.Paint?
+	}
+	/// start, middle or end.
+	public let anchor: String
+	/// alphabetic, middle, central, hanging, text-top, text-bottom or ideographic.
+	public let baseline: String
+	public let runs: [Run]
 }
 
 /// An inline `<svg>` compiled when the app was built.
@@ -216,6 +240,8 @@ public struct NativeDrawing: Equatable, Sendable {
 	public let shapes: [NativeShape]
 	/// `width` and `height` are in ems of the font size of the text the svg sits in, not CSS px.
 	public var em = false
+	/// What its `<text>` elements say, read when the svg has no name.
+	public var label: String?
 }
 
 public enum NativeEventName: String, Sendable {
@@ -913,7 +939,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 	}
 
 	private static func decodeDrawing(_ reader: Reader) throws -> NativeDrawing {
-		let field = try reader.object(required: ["viewBox", "shapes"], optional: ["width", "height", "em"])
+		let field = try reader.object(required: ["viewBox", "shapes"], optional: ["width", "height", "em", "label"])
 		let viewBox = try field["viewBox"].isNull ? nil : try field["viewBox"].array().map { try $0.number() }
 		if let viewBox, viewBox.count != 4 { throw PayloadError(path: "\(reader.path).viewBox", reason: "expected four numbers") }
 		func paint(_ reader: Reader) throws -> NativeShape.Paint? {
@@ -926,20 +952,43 @@ public struct NativeViewPayload: Equatable, Sendable {
 			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))
 		}
 		let shapes = try field["shapes"].array().map { shape -> NativeShape in
-			let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform"])
+			let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text"])
 			let transform = s.has("transform") ? try s["transform"].array().map { try $0.number() } : nil
 			if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
 			let rule = try s["fillRule"].string()
 			guard rule == "nonzero" || rule == "evenodd" else { throw shape.fail("unknown fillRule \(rule)") }
-			return NativeShape(
+			var decoded = NativeShape(
 				path: try s["path"].array().map { try $0.number() }, fill: try paint(try s["fill"]), evenOdd: rule == "evenodd",
 				stroke: try paint(try s["stroke"]), width: try s["width"].number(), cap: try s["cap"].string(), join: try s["join"].string(),
 				miterLimit: try s["miterLimit"].number(), transform: transform)
+			if s.has("text") {
+				let t = try s["text"].object(["anchor", "baseline", "runs"])
+				let anchor = try t["anchor"].string()
+				guard ["start", "middle", "end"].contains(anchor) else { throw shape.fail("unknown anchor \(anchor)") }
+				let baseline = try t["baseline"].string()
+				guard ["alphabetic", "middle", "central", "hanging", "text-top", "text-bottom", "ideographic"].contains(baseline) else {
+					throw shape.fail("unknown baseline \(baseline)")
+				}
+				let runs = try t["runs"].array().map { run -> NativeDrawingText.Run in
+					let r = try run.object(required: ["text", "size", "weight", "letterSpacing", "fill"], optional: ["x", "y", "dx", "dy", "family"])
+					func optional(_ name: String) throws -> Double? { r.has(name) ? try r[name].number() : nil }
+					let family = r.has("family") ? try r["family"].string() : nil
+					if let family, !["serif", "sans-serif", "monospace"].contains(family) { throw run.fail("unknown family \(family)") }
+					return NativeDrawingText.Run(
+						text: try r["text"].string(), x: try optional("x"), y: try optional("y"), dx: try optional("dx"), dy: try optional("dy"),
+						size: try r["size"].number(), weight: try r["weight"].number(), family: family,
+						letterSpacing: try r["letterSpacing"].number(), fill: try paint(try r["fill"]))
+				}
+				decoded.text = NativeDrawingText(anchor: anchor, baseline: baseline, runs: runs)
+			}
+			return decoded
 		}
-		return NativeDrawing(
+		var drawing = NativeDrawing(
 			viewBox: viewBox, width: field.has("width") ? try field["width"].number() : nil,
 			height: field.has("height") ? try field["height"].number() : nil, shapes: shapes,
 			em: field.has("em") ? try field["em"].bool() : false)
+		drawing.label = field.has("label") ? try field["label"].string() : nil
+		return drawing
 	}
 
 	private static func decodeScript(_ reader: Reader) throws -> NativeScript {

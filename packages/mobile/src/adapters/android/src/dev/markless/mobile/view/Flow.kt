@@ -21,9 +21,11 @@ import android.text.style.UnderlineSpan
 import android.view.View
 import dev.markless.mobile.core.DefaultStyle
 import dev.markless.mobile.core.Drawing
+import dev.markless.mobile.core.DrawingText
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.ShapePaint
+import dev.markless.mobile.core.TextRun
 
 /** The text style a block gives the text inside it: its own default style and its ancestors', combined. */
 data class BlockText(val bold: Boolean, val italic: Boolean, val monospace: Boolean, val size: Double, val preformatted: Boolean)
@@ -175,6 +177,9 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 	}
 	private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
+	/** What the drawing's `<text>` says, read when the svg has no name. */
+	val label: String? get() = drawing.label
+
 	/** The width over the height the web gives it without a size: the viewBox's, else 300 by 150. */
 	private val ratio: Double = drawing.viewBox?.let { it[3] / it[2] } ?: 0.5
 
@@ -197,6 +202,11 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 			shape.transform?.let { (a, b, c, d, e, f) ->
 				canvas.concat(Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
 			}
+			shape.text?.let { text ->
+				draw(canvas, text)
+				canvas.restore()
+				continue
+			}
 			shape.fill?.let { fill ->
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.FILL
@@ -216,6 +226,59 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 			canvas.restore()
 		}
 		canvas.restore()
+	}
+
+	/** Lays out an SVG `<text>`'s runs from the pen, each chunk placed by its anchor, as the browser lays them out. */
+	private fun draw(canvas: Canvas, text: DrawingText) {
+		class Piece(val run: TextRun, val paint: Paint, val width: Float, val dy: Float)
+		class Chunk(val x: Float, val y: Float) { val pieces = ArrayList<Piece>() }
+		val chunks = ArrayList<Chunk>()
+		var penX = 0f
+		var penY = 0f
+		for (run in text.runs) {
+			val dx = (run.dx ?: 0.0).toFloat()
+			val dy = (run.dy ?: 0.0).toFloat()
+			if (run.x != null || run.y != null || chunks.isEmpty()) {
+				penX = run.x?.toFloat() ?: penX
+				penY = run.y?.toFloat() ?: penY
+				chunks.add(Chunk(penX + dx, penY + dy))
+			}
+			penX += dx
+			penY += dy
+			val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+				textSize = run.size.toFloat()
+				val family = when (run.family) { "serif" -> Typeface.SERIF; "monospace" -> Typeface.MONOSPACE; else -> Typeface.DEFAULT }
+				typeface = if (android.os.Build.VERSION.SDK_INT >= 28) Typeface.create(family, run.weight.toInt().coerceIn(1, 1000), false)
+				else Typeface.create(family, if (run.weight >= 600) Typeface.BOLD else Typeface.NORMAL)
+				// Android spaces letters in ems of the text size.
+				letterSpacing = if (run.size > 0) (run.letterSpacing / run.size).toFloat() else 0f
+				color = run.fill?.let(::colorOf) ?: Color.TRANSPARENT
+			}
+			val chunk = chunks.last()
+			val w = p.measureText(run.text)
+			chunk.pieces.add(Piece(run, p, w, penY - chunk.y))
+			penX += w
+		}
+		for (chunk in chunks) {
+			val total = chunk.pieces.sumOf { it.width.toDouble() }.toFloat()
+			var x = chunk.x - when (text.anchor) { "middle" -> total / 2; "end" -> total; else -> 0f }
+			for (piece in chunk.pieces) {
+				val m = piece.paint.fontMetrics
+				val bounds = android.graphics.Rect()
+				piece.paint.getTextBounds("x", 0, 1, bounds)
+				// Where the alphabetic baseline sits below the pen's y for each dominant-baseline, from the font's metrics.
+				val shift = when (text.baseline) {
+					"middle" -> bounds.height() / 2f
+					"central" -> -(m.ascent + m.descent) / 2f
+					"hanging" -> -m.ascent * 0.8f
+					"text-top" -> -m.ascent
+					"text-bottom", "ideographic" -> -m.descent
+					else -> 0f
+				}
+				canvas.drawText(piece.run.text, x, chunk.y + piece.dy + shift, piece.paint)
+				x += piece.width
+			}
+		}
 	}
 
 	private fun colorOf(paint: ShapePaint): Int = when (paint) {

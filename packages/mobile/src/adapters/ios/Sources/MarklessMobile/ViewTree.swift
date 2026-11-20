@@ -133,6 +133,11 @@ final class DrawingView: UIView {
 			}
 			context.saveGState()
 			if let t = shape.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
+			if let text = shape.text {
+				draw(text)
+				context.restoreGState()
+				continue
+			}
 			if let fill = shape.fill {
 				context.addPath(path)
 				context.setFillColor(color(fill).cgColor)
@@ -148,6 +153,72 @@ final class DrawingView: UIView {
 				context.strokePath()
 			}
 			context.restoreGState()
+		}
+	}
+
+	/// Lays out an SVG `<text>`'s runs from the pen, each chunk placed by its anchor, as the browser lays them out.
+	private func draw(_ text: NativeDrawingText) {
+		typealias Piece = (string: NSAttributedString, width: CGFloat, font: UIFont, dy: CGFloat)
+		var chunks: [(x: CGFloat, y: CGFloat, pieces: [Piece])] = []
+		var pen = CGPoint.zero
+		for run in text.runs {
+			if run.x != nil || run.y != nil || chunks.isEmpty {
+				pen = CGPoint(x: run.x.map { CGFloat($0) } ?? pen.x, y: run.y.map { CGFloat($0) } ?? pen.y)
+				chunks.append((pen.x + CGFloat(run.dx ?? 0), pen.y + CGFloat(run.dy ?? 0), []))
+				pen.x += CGFloat(run.dx ?? 0)
+				pen.y += CGFloat(run.dy ?? 0)
+			} else {
+				pen.x += CGFloat(run.dx ?? 0)
+				pen.y += CGFloat(run.dy ?? 0)
+			}
+			let font = Self.font(run)
+			var attributes: [NSAttributedString.Key: Any] = [.font: font, .kern: run.letterSpacing]
+			attributes[.foregroundColor] = run.fill.map(color) ?? UIColor.clear
+			let string = NSAttributedString(string: run.text, attributes: attributes)
+			let width = string.size().width
+			chunks[chunks.count - 1].pieces.append((string, width, font, pen.y - chunks[chunks.count - 1].y))
+			pen.x += width
+		}
+		for chunk in chunks {
+			let total = chunk.pieces.reduce(0) { $0 + $1.width }
+			var x = chunk.x - (text.anchor == "middle" ? total / 2 : text.anchor == "end" ? total : 0)
+			for piece in chunk.pieces {
+				let f = piece.font
+				// Where the alphabetic baseline sits below the pen's y for each dominant-baseline, from the font's metrics.
+				let shift: CGFloat = switch text.baseline {
+				case "middle": f.xHeight / 2
+				case "central": (f.ascender + f.descender) / 2
+				case "hanging": f.ascender * 0.8
+				case "text-top": f.ascender
+				case "text-bottom", "ideographic": f.descender
+				default: 0
+				}
+				// UIKit draws a string from the top of its line, the font's ascender above the baseline.
+				piece.string.draw(at: CGPoint(x: x, y: chunk.y + piece.dy + shift - f.ascender))
+				x += piece.width
+			}
+		}
+	}
+
+	private static func font(_ run: NativeDrawingText.Run) -> UIFont {
+		let size = CGFloat(run.size)
+		let weight: UIFont.Weight = switch run.weight {
+		case ..<150: .ultraLight
+		case ..<250: .thin
+		case ..<350: .light
+		case ..<450: .regular
+		case ..<550: .medium
+		case ..<650: .semibold
+		case ..<750: .bold
+		case ..<850: .heavy
+		default: .black
+		}
+		switch run.family {
+		case "monospace": return UIFont.monospacedSystemFont(ofSize: size, weight: weight)
+		case "serif":
+			let base = UIFont.systemFont(ofSize: size, weight: weight)
+			return base.fontDescriptor.withDesign(.serif).map { UIFont(descriptor: $0, size: size) } ?? base
+		default: return UIFont.systemFont(ofSize: size, weight: weight)
 		}
 	}
 
@@ -1061,10 +1132,12 @@ final class ViewTree {
 			button.isEnabled = current["disabled"] == nil
 			refreshLabel(of: button)
 		} else if let drawing = view as? DrawingView {
-			// A named svg is an image to VoiceOver; an unnamed one, or one inside a control, is decoration.
-			drawing.accessibilityLabel = current["aria-label"]
-			drawing.isAccessibilityElement = current["aria-label"] != nil && contexts[id]?.button == nil
-			drawing.accessibilityTraits = .image
+			// A named svg is an image to VoiceOver, and one with text reads its text, as the browser exposes them; an unnamed one
+			// without text, or one inside a control, is decoration.
+			let label = current["aria-label"] ?? drawing.drawing.label
+			drawing.accessibilityLabel = label
+			drawing.isAccessibilityElement = label != nil && contexts[id]?.button == nil
+			drawing.accessibilityTraits = current["aria-label"] != nil ? .image : .staticText
 		} else if let image = view as? UIImageView {
 			image.accessibilityLabel = current["aria-label"] ?? current["alt"]
 			image.image = current["src"].flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }

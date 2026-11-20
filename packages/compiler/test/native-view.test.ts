@@ -2253,7 +2253,7 @@ export function Chart() @{
 	<svg viewBox="0 0 10 10">
 		<path d="M0 0h10" stroke-dasharray="2 2" />
 		<rect width={w} height="2" fill="url(#g)" />
-		<text x="0" y="5">label</text>
+		<text x="0 4" y="5">label</text>
 	</svg>
 }`;
 		const { payload, diagnostics } = await nativeView(text);
@@ -2274,8 +2274,32 @@ export function Chart() @{
 				'`fill="url(#g)"` on <rect>, a paint a native drawing does not have (gradients and patterns are not drawn yet)',
 				6,
 			],
-			['the SVG <text> element, which a native drawing does not draw yet', 7],
+			['`x="0 4"` on <text>: one length per text is drawn, not a list', 7],
 		]);
+	});
+
+	it("draws SVG <text> and <tspan> as runs, white space collapsed, and reads their text as the svg's", async () => {
+		const { payload, diagnostics } = await nativeView(`export function Chart() @{
+	<svg viewBox="0 0 100 40">
+		<g font-size="10" fill="#333">
+			<text x="50" y="20" text-anchor="middle" dominant-baseline="central">
+				Up   <tspan font-weight="bold" dx="2">12%</tspan>
+			</text>
+		</g>
+	</svg>
+}`);
+		expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const svg = payload!.nodes.find((node) => node.kind === 'element' && node.drawing);
+		const drawing = svg?.kind === 'element' ? svg.drawing : undefined;
+		expect(drawing?.label).toBe('Up 12%');
+		expect(drawing?.shapes[0]?.text).toEqual({
+			anchor: 'middle',
+			baseline: 'central',
+			runs: [
+				{ text: 'Up ', x: 50, y: 20, size: 10, weight: 400, letterSpacing: 0, fill: { r: 51, g: 51, b: 51, alpha: 255 } },
+				{ text: '12%', dx: 2, size: 10, weight: 700, letterSpacing: 0, fill: { r: 51, g: 51, b: 51, alpha: 255 } },
+			],
+		});
 	});
 
 	it('renders a text, an attribute and a @for list that call app code through the script, and keeps a plain page free of it', async () => {

@@ -159,10 +159,16 @@ sealed interface ShapePaint {
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
-data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?)
+data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val text: DrawingText? = null)
+
+/** An SVG `<text>`: runs laid out from the pen, each chunk placed by [anchor], glyphs on [baseline] relative to the pen. */
+data class DrawingText(val anchor: String, val baseline: String, val runs: List<TextRun>)
+
+/** A run of an SVG `<text>`; [family] is serif, sans-serif or monospace, or null for the page's text font. */
+data class TextRun(val text: String, val x: Double?, val y: Double?, val dx: Double?, val dy: Double?, val size: Double, val weight: Double, val family: String?, val letterSpacing: Double, val fill: ShapePaint?)
 
 /** An inline `<svg>` compiled to shapes. */
-data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
+data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false, val label: String? = null)
 
 /** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Dismiss] is a sheet's platform close or an overlay's Escape or outside press. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
 /** [pointer]: an event a touch raises; [touch]: one of those a host reports, from which the runtime raises the rest. */
@@ -688,14 +694,14 @@ data class Payload(
 
 		private fun drawing(v: Json, what: String): Drawing {
 			val o = v.obj(what)
-			o.only(setOf("viewBox", "width", "height", "shapes", "em"), what)
+			o.only(setOf("viewBox", "width", "height", "shapes", "em", "label"), what)
 			val em = o["em"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.em must be true when present"); true } ?: false
 			val viewBox = o.field("viewBox", what).let { if (it == Json.Null) null else it.arr("$what.viewBox").map { n -> n.num("$what.viewBox[]") } }
 			if (viewBox != null && viewBox.size != 4) throw MarklessDecodeError("$what.viewBox must hold four numbers")
 			val shapes = o.field("shapes", what).arr("$what.shapes").mapIndexed { n, sv ->
 				val w = "$what.shapes[$n]"
 				val so = sv.obj(w)
-				so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform"), w)
+				so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text"), w)
 				val path = so.field("path", w).arr("$w.path").map { it.num("$w.path[]") }
 				val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
 				if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
@@ -704,9 +710,28 @@ data class Payload(
 					paint(so.field("stroke", w), "$w.stroke"), so.field("width", w).num("$w.width"),
 					oneOf(so, "cap", setOf("butt", "round", "square"), w), oneOf(so, "join", setOf("miter", "round", "bevel"), w),
 					so.field("miterLimit", w).num("$w.miterLimit"), transform,
+					so["text"]?.let { tv ->
+						val t = tv.obj("$w.text")
+						t.only(setOf("anchor", "baseline", "runs"), "$w.text")
+						DrawingText(
+							oneOf(t, "anchor", setOf("start", "middle", "end"), "$w.text"),
+							oneOf(t, "baseline", setOf("alphabetic", "middle", "central", "hanging", "text-top", "text-bottom", "ideographic"), "$w.text"),
+							t.field("runs", "$w.text").arr("$w.text.runs").mapIndexed { r, rv ->
+								val rw = "$w.text.runs[$r]"
+								val ro = rv.obj(rw)
+								ro.only(setOf("text", "x", "y", "dx", "dy", "size", "weight", "family", "letterSpacing", "fill"), rw)
+								TextRun(
+									ro.field("text", rw).str("$rw.text"), ro["x"]?.num("$rw.x"), ro["y"]?.num("$rw.y"), ro["dx"]?.num("$rw.dx"), ro["dy"]?.num("$rw.dy"),
+									ro.field("size", rw).num("$rw.size"), ro.field("weight", rw).num("$rw.weight"),
+									ro["family"]?.let { oneOf(ro, "family", setOf("serif", "sans-serif", "monospace"), rw) },
+									ro.field("letterSpacing", rw).num("$rw.letterSpacing"), paint(ro.field("fill", rw), "$rw.fill"),
+								)
+							},
+						)
+					},
 				)
 			}
-			return Drawing(viewBox, o["width"]?.num("$what.width"), o["height"]?.num("$what.height"), shapes, em)
+			return Drawing(viewBox, o["width"]?.num("$what.width"), o["height"]?.num("$what.height"), shapes, em, o["label"]?.str("$what.label"))
 		}
 
 		private fun node(v: Json, what: String): Node {
