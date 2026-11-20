@@ -191,6 +191,8 @@ export type NativeElements = {
 	readonly isElement: (id: string) => boolean;
 	/** Whether a node is shown now. */
 	readonly shown: (id: string) => boolean;
+	/** The first shown element whose `id` attribute is `id` now, as `document.getElementById` finds it. */
+	readonly byId: (id: string) => string | null;
 	readonly contains: (within: string, node: string) => boolean;
 	/** Whether `node` has captured the touch `pointer`. */
 	readonly captures: (node: string, pointer: number) => boolean;
@@ -327,6 +329,10 @@ export function evaluateNativeExpr(
 		return typeof value === 'string' && dom().isElement(value);
 	}
 	if ('shown' in expr) return dom().shown(expr.shown);
+	if ('byId' in expr) {
+		const id = evaluate(expr.byId);
+		return id === null ? null : dom().byId(String(id));
+	}
 	if ('captures' in expr) {
 		const node = evaluate(expr.captures);
 		const pointer = evaluate(expr.pointer);
@@ -1009,6 +1015,19 @@ export function createNativeRuntime(
 		shown: (id) => {
 			const node = nodesById.get(id);
 			return node !== undefined && shown(node);
+		},
+		byId: (wanted) => {
+			for (const node of payload.nodes) {
+				if (node.kind !== 'element') continue;
+				const binding = node.bindings?.find((one) => 'attribute' in one && one.attribute === 'id');
+				for (const { id, scope } of instances(node)) {
+					const value = binding
+						? marklessAttributeValue('id', evaluate(binding.value, undefined, scope))
+						: (node.attributes?.['id'] ?? null);
+					if (value === wanted) return id;
+				}
+			}
+			return null;
 		},
 		contains: (within, node) => {
 			if (within === NATIVE_DOCUMENT_BODY) return true;

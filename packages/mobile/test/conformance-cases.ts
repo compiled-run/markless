@@ -460,6 +460,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'by-id',
+		fixture: 'test/fixtures/ById.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h3@c' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+		],
+	},
+	{
 		name: 'arm-handles',
 		fixture: 'test/fixtures/ArmHandles.tsrx',
 		actions: [

@@ -76,6 +76,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case isElement(NativeExpr)
 	/// Whether a node is shown now: every @if arm around it holds.
 	case shown(String)
+	/// `document.getElementById(value)`: the first shown element whose `id` attribute is the value now, else null.
+	case byId(NativeExpr)
 	/// The page's route params, an object of strings.
 	case routeParams
 	/// `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order.
@@ -91,7 +93,7 @@ public indirect enum NativeExpr: Equatable, Sendable {
 		switch self {
 		case let .cell(cell): return [cell]
 		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked, .field, .shown: return []
-		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
+		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner), let .byId(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .captures(node, pointer): return node.cells + pointer.cells
 		case let .array(items): return items.flatMap(\.value.cells)
@@ -1137,6 +1139,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["focusOrigin"]: return .focusOrigin(try decodeExpr(try field("focusOrigin")))
 		case ["isElement"]: return .isElement(try decodeExpr(try field("isElement")))
 		case ["shown"]: return .shown(try field("shown").string())
+		case ["byId"]: return .byId(try decodeExpr(try field("byId")))
 		case ["literal"]: return .literal(try field("literal").scalar())
 		case ["unary", "value"]: return .unary(try oneOf("unary", ["!", "-", "+", "typeof"]), try decodeExpr(try field("value")))
 		case ["binary", "left", "right"]:

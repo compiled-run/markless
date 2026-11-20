@@ -3923,6 +3923,16 @@ export function createNativeViewPayload(
 			}
 			case 'method': {
 				if (
+					expression.method === 'getElementById' &&
+					expression.object.kind === 'read' &&
+					expression.object.name === 'document' &&
+					!isBound('document', scope) &&
+					expression.arguments.length === 1
+				) {
+					const id = exprOf(expression.arguments[0], what, scope);
+					return id && { byId: id };
+				}
+				if (
 					expression.method === 'has' &&
 					expression.object.kind === 'read' &&
 					expression.arguments.length === 1

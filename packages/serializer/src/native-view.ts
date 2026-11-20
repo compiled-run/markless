@@ -139,6 +139,8 @@ export type NativeExpr =
 	| { readonly isElement: NativeExpr }
 	/** Whether a node is shown now: every @if arm around it holds (an element a handle holds only while its arm shows). */
 	| { readonly shown: string }
+	/** `document.getElementById(value)`: the first shown element whose `id` attribute is the value now, else null. */
+	| { readonly byId: NativeExpr }
 	/** A computed whose body runs in the script engine: function `script` of the payload's script, called with `bindings`. */
 	| { readonly script: string; readonly bindings: NativeScriptBindings };
 

@@ -308,6 +308,10 @@ class Runtime(
 			is Expr.FocusOrigin -> (eval(e.overlay) as? JsValue.Str)?.let { o -> origins[o.value]?.let(JsValue::Str) } ?: JsValue.Null
 			is Expr.IsElement -> JsValue.Bool((eval(e.value) as? JsValue.Str)?.let { isElement(it.value) } ?: false)
 			is Expr.Shown -> JsValue.Bool(byId[e.node]?.let { isShown(it) } ?: false)
+			is Expr.ById -> when (val wanted = eval(e.value)) {
+				JsValue.Null -> JsValue.Null
+				else -> elementById(Js.toStr(wanted))?.let { JsValue.Str(it) } ?: JsValue.Null
+			}
 			is Expr.Captures -> {
 				val node = eval(e.node)
 				val pointer = eval(e.pointer)
@@ -796,6 +800,15 @@ class Runtime(
 
 	/** Every `<select>`, in payload order. */
 	private val selects = payload.nodes.filterIsInstance<Node.Element>().filter { it.element == "select" }
+
+	/** The first shown element whose `id` attribute is [wanted] now, as `document.getElementById` finds it. */
+	private fun elementById(wanted: String): String? {
+		for (node in payload.nodes) {
+			if (node !is Node.Element) continue
+			for (instance in instances(node)) if (attributeIn(node, "id", instance.scope) == wanted) return instance.id
+		}
+		return null
+	}
 
 	/** An attribute of one instance as the web has it now: a binding's value in its row, else the attribute as built. */
 	private fun attributeIn(node: Node.Element, name: String, scope: Scope): String? {

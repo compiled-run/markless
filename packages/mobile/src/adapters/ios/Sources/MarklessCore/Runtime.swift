@@ -538,6 +538,10 @@ public final class NativeRuntime {
 		case let .shown(id):
 			guard let node = nodesById[id] else { return .bool(false) }
 			return .bool(try !instances(of: node).isEmpty)
+		case let .byId(inner):
+			let wanted = try evaluate(inner)
+			if case .null = wanted { return .null }
+			return try elementById(textOf(wanted)).map(NativeValue.string) ?? .null
 		case let .contains(within, node):
 			let outer = try evaluate(within)
 			let inner = try evaluate(node)
@@ -1003,6 +1007,14 @@ public final class NativeRuntime {
 		let id: String
 		let node: NativeNode
 		let scope: NativeScope
+	}
+
+	/// The first shown element whose `id` attribute is `wanted` now, as `document.getElementById` finds it.
+	private func elementById(_ wanted: String) throws -> String? {
+		for node in payload.nodes where node.isElement {
+			for instance in try instances(of: node) where try attribute(of: node, "id", in: instance.scope) == wanted { return instance.id }
+		}
+		return nil
 	}
 
 	/// An attribute of one instance as the web has it now: a binding's value in its row, else the attribute as built.
