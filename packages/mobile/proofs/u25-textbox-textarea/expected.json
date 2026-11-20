@@ -1,0 +1,16 @@
+{
+	"rung": 125,
+	"name": "@markless/ui textbox with its textarea: a <textarea> is a multi-line text field on both phones",
+	"steps": [
+		{
+			"visible": ["Feedback", "Tell us what you think", "Sent: nothing yet"],
+			"fields": { "Your message": "Great app" }
+		},
+		{
+			"do": { "type": { "field": "Your message", "text": "Fast and clear" } },
+			"visible": ["Sent: Fast and clear"],
+			"absent": ["Sent: nothing yet"],
+			"fields": { "Your message": "Fast and clear" }
+		}
+	]
+}
