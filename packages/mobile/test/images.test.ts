@@ -63,6 +63,12 @@ test("an SVG file's natural size is the web's: its width and height, else from i
 	}
 });
 
+test('an SVG file without the SVG namespace, or not well-formed, is no image, as in Chrome', () => {
+	// Measured in Chrome: both have natural size 0 by 0 and show the alt text.
+	expect(svg('<svg width="40" height="20"/>')).toBeNull();
+	expect(svg(`<svg ${NS} width="40" height="20">`)).toBeNull();
+});
+
 test('an SVG file is drawn from shapes compiled when the app is built, scaled to the box as the browser scales it', () => {
 	const image = svg(`<?xml version="1.0" encoding="UTF-8"?>
 <!-- a comment -->

@@ -135,7 +135,7 @@ export function svgImage(bytes: Uint8Array): SvgImage | null {
 	let root: XmlElement | null = null;
 	try {
 		const parsed = new DOMParser({ onError: (level) => { if (level !== 'warning') throw new Error('not well-formed'); } })
-			.parseFromString(new TextDecoder().decode(bytes), 'image/svg+xml');
+			.parseFromString(new TextDecoder().decode(bytes), 'application/xml');
 		root = parsed.documentElement;
 	} catch {
 		return null;
