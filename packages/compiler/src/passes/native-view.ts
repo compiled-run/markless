@@ -2245,6 +2245,7 @@ export function createNativeViewPayload(
 		{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }
 	>();
 	const scriptServices = new Set<NativeScriptService>();
+	let scriptReadsUrl = false;
 	const refuseScript = (message: string, span?: SourceSpan): null => {
 		diagnostics.push(nativeRefusal('javascript', message, span));
 		return null;
@@ -2266,7 +2267,8 @@ export function createNativeViewPayload(
 				? NATIVE_SCRIPT_HOST_GLOBALS[name]
 				: undefined;
 			if (service) {
-				if (service !== 'engine') scriptServices.add(service);
+				if (service === 'url') scriptReadsUrl = true;
+				else if (service !== 'engine') scriptServices.add(service);
 				continue;
 			}
 			ok = false;
@@ -2807,7 +2809,7 @@ export function createNativeViewPayload(
 					.map((fn) => ({ id: fn.id, code: fn.fact.code })),
 			};
 		});
-		return nativeScriptOf(inputs, [...scriptServices].sort());
+		return nativeScriptOf(inputs, [...scriptServices].sort(), { url: scriptReadsUrl });
 	}
 
 	const inlining = new Set<string>();

@@ -1,5 +1,6 @@
 import type { NativeScript, NativeScriptService } from '@markless/serializer';
 import { NATIVE_SCRIPT_POINTER_FIELDS } from '@markless/serializer/native-view';
+import { NATIVE_SCRIPT_URL } from './native-script-url.ts';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
@@ -444,6 +445,7 @@ function contentId(text: string): string {
 export function nativeScriptOf(
 	modules: ReadonlyArray<NativeScriptModuleInput>,
 	services: ReadonlyArray<NativeScriptService>,
+	adds: { readonly url: boolean } = { url: false },
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -466,6 +468,6 @@ export function nativeScriptOf(
 		ENTRIES,
 	].join('\n');
 	const id = contentId(body);
-	const source = `(function (g, id) {\n${HOST_SERVICES}\ng.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
+	const source = `(function (g, id) {\n${HOST_SERVICES}\n${adds.url ? `${NATIVE_SCRIPT_URL}\n` : ''}g.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
 	return { id, source, services };
 }

@@ -946,6 +946,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
+		name: 'script-url',
+		fixture: 'proofs/j16-url/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
 		// The real modal family: trigger, a press inside the dialog, a press on its backdrop, an alert that refuses one, Escape.
 		name: 'overlay',
 		fixture: 'proofs/u20-modal/App.tsrx',

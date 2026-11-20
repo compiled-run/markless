@@ -1039,18 +1039,21 @@ export const NATIVE_SCRIPT_LANGUAGE_GLOBALS: ReadonlyArray<string> = [
 	'globalThis',
 ];
 
-/** Globals a host provides to scripts, by the service that backs each. */
-export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptService | 'engine'>> =
-	{
-		setTimeout: 'timers',
-		clearTimeout: 'timers',
-		setInterval: 'timers',
-		clearInterval: 'timers',
-		queueMicrotask: 'engine',
-		console: 'console',
-		fetch: 'fetch',
-		crypto: 'crypto',
-	};
+/** Globals a host provides to scripts, by the service behind each; for `url` the build adds the URL Standard's code. */
+export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<
+	Record<string, NativeScriptService | 'engine' | 'url'>
+> = {
+	setTimeout: 'timers',
+	clearTimeout: 'timers',
+	setInterval: 'timers',
+	clearInterval: 'timers',
+	queueMicrotask: 'engine',
+	URL: 'url',
+	URLSearchParams: 'url',
+	console: 'console',
+	fetch: 'fetch',
+	crypto: 'crypto',
+};
 
 /**
  * What a script handler's event has on a phone, as member paths: a deeper read below `target.value` is a string's. Any
