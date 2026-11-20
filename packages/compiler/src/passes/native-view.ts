@@ -3714,7 +3714,8 @@ export function createNativeViewPayload(
 	/** Where each element node is written, for refusals found after lowering. */
 	const nodeSpans = new Map<string, SourceSpan | undefined>();
 	/** Each list's row key as an expression of its row item: how a row's instance ids are spelt (`<node>@<key>`). */
-	const rowKeys = new Map<string, NativeExpr>();
+	/** A row's key as its instance ids spell it: an inner row's is its outer row's, `@`, then its own. */
+	const rowKeys = new Map<string, ReadonlyArray<string | NativeExpr>>();
 	const textRuns = new Map<string, number>();
 	const lowered = new Set<string>();
 
@@ -4460,10 +4461,6 @@ export function createNativeViewPayload(
 				close();
 				const repeat = scope.module.repeatsById.get(item.id);
 				const rowChunk = scope.module.chunks.get(item.row);
-				if (place.row) {
-					refuse('@for inside another @for');
-					continue;
-				}
 				if (repeat?.indexKey) {
 					refuse('a @for keyed by its index; a native list keys each row by its item');
 					continue;
@@ -4499,13 +4496,13 @@ export function createNativeViewPayload(
 					key: repeat.keyPath,
 					...place,
 				});
-				rowKeys.set(
-					repeatId,
+				rowKeys.set(repeatId, [
+					...(place.row ? [...rowKeys.get(place.row)!, '@'] : []),
 					repeat.keyPath.reduce<NativeExpr>(
 						(object, property) => ({ member: object, property }),
 						{ item: repeatId },
 					),
-				);
+				]);
 				lowerChunk(
 					rowChunk,
 					parent,
@@ -6368,7 +6365,7 @@ export function createNativeViewPayload(
 				continue;
 			}
 			parts.push(`${position > 0 ? ' ' : ''}${id}${row ? '@' : ''}`);
-			if (row) parts.push(rowKeys.get(row)!);
+			if (row) parts.push(...rowKeys.get(row)!);
 		}
 		const value: NativeExpr = parts.every((part) => typeof part === 'string')
 			? { literal: parts.join('') }

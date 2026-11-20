@@ -1122,7 +1122,7 @@ export function Find() @{
 		]);
 	});
 
-	it('places a @for inside an @if arm, with its @empty, in that arm, and still refuses one inside another @for', async () => {
+	it('places a @for inside an @if arm, with its @empty, in that arm, and one inside another @for', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Shelf() @{
 	let showing = state(true);
@@ -1154,9 +1154,7 @@ export function Shelves() @{
 		}
 	</section>
 }`);
-		expect(nested.diagnostics.map((diagnostic) => diagnostic.message)).toContain(
-			'@for inside another @for',
-		);
+		expect(nested.diagnostics).toEqual([]);
 	});
 
 	it('lowers @empty to a branch shown while the list has no rows', async () => {
@@ -2019,6 +2017,70 @@ export function Page() @{
 		expect(diagnostics.map((d) => d.message)).toContain(
 			"the click handler calls `navigate` from @markless/router inside JavaScript that runs on the phone, which needs the app's routes; build the app, not one component",
 		);
+	});
+});
+
+describe('@for inside another @for', () => {
+	it('lowers an inner list in each outer row, its list read from the outer item and its rows reading both', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let groups = state([{ name: 'a', items: ['x', 'y'] }]);
+	<main>
+		@for (const group of groups; key group.name) {
+			<section>
+				@for (const item of group.items; key item) {
+					<p>{group.name}{item}</p>
+				}
+			</section>
+		}
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const [outer, inner] = payload!.nodes.filter((node) => node.kind === 'repeat');
+		expect(inner).toMatchObject({
+			row: outer!.id,
+			list: { member: { item: outer!.id }, property: 'items' },
+			key: [],
+		});
+		expect(payload!.nodes.find((node) => node.kind === 'text' && node.row === inner!.id)).toMatchObject({
+			parts: [{ expr: { member: { item: outer!.id }, property: 'name' } }, { expr: { item: inner!.id } }],
+		});
+	});
+
+	it("names an inner row's own copy of an element by both rows' keys", async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+function Entry({ title }) @{
+	const heading = element();
+	<section aria-labelledby={heading}>
+		<h2 el={heading}>{title}</h2>
+	</section>
+}
+export function Page() @{
+	let groups = state([{ name: 'a', items: ['x'] }]);
+	<main>
+		@for (const group of groups; key group.name) {
+			<div>
+				@for (const item of group.items; key item) { <Entry title={item} /> }
+			</div>
+		}
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const [outer, inner] = payload!.nodes.filter((node) => node.kind === 'repeat');
+		const section = payload!.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'section',
+		);
+		expect(section?.kind === 'element' && section.bindings?.[0]).toMatchObject({
+			attribute: 'aria-labelledby',
+			value: {
+				template: [
+					expect.stringMatching(/@$/),
+					{ member: { item: outer!.id }, property: 'name' },
+					'@',
+					{ item: inner!.id },
+				],
+			},
+		});
 	});
 });
 

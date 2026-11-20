@@ -665,9 +665,9 @@ public final class NativeRuntime {
 	}
 
 	/// A list's rows now: each item with its key, `String()` of the item at the key path.
-	public func rows(of repeatId: String) throws -> [(key: String, item: NativeValue)] {
+	public func rows(of repeatId: String, in scope: NativeScope = .empty) throws -> [(key: String, item: NativeValue)] {
 		guard let node = nodesById[repeatId], case let .repeat(list, keyPath) = node.kind else { throw RuntimeError(reason: "unknown list \(repeatId)") }
-		guard case let .array(array) = try evaluate(list) else { throw RuntimeError(reason: "\(repeatId) lists a value that is not an array") }
+		guard case let .array(array) = try evaluate(list, in: scope) else { throw RuntimeError(reason: "\(repeatId) lists a value that is not an array") }
 		return try array.items.map { item in
 			var key = item
 			for step in keyPath {
@@ -680,12 +680,20 @@ public final class NativeRuntime {
 		}
 	}
 
-	/// Every shown copy of a node.
+	/// Every shown copy of a node; a row of a list inside another list's row is keyed by both (`<id>@<outer>@<key>`).
 	public func instances(of node: NativeNode) throws -> [NativeInstance] {
 		guard let row = node.row else { return try isShown(node.arm) ? [NativeInstance(id: node.id, scope: .empty)] : [] }
-		guard let list = nodesById[row], try isShown(list.arm) else { return [] }
-		return try rows(of: row).map { NativeInstance(id: "\(node.id)@\($0.key)", scope: NativeScope(items: [row: $0.item], keys: [row: $0.key])) }
-			.filter { try isShown(node.arm, in: $0.scope) }
+		guard let list = nodesById[row] else { return [] }
+		return try instances(of: list).flatMap { copy in
+			let outer = list.row.flatMap { copy.scope.keys[$0] }
+			return try rows(of: row, in: copy.scope).map { entry -> NativeInstance in
+				let suffix = outer.map { "\($0)@\(entry.key)" } ?? entry.key
+				var scope = copy.scope
+				scope.items[row] = entry.item
+				scope.keys[row] = suffix
+				return NativeInstance(id: "\(node.id)@\(suffix)", scope: scope)
+			}
+		}.filter { try isShown(node.arm, in: $0.scope) }
 	}
 
 	public func text(of parts: [NativeTextPart], in scope: NativeScope = .empty) throws -> String {
@@ -989,9 +997,9 @@ public final class NativeRuntime {
 
 	/// Every shown list's row keys, in order.
 	public func rows() throws -> [(node: String, keys: [String])] {
-		try payload.nodes.compactMap { node in
-			guard case .repeat = node.kind, try isShown(node.arm) else { return nil }
-			return (node.id, try rows(of: node.id).map(\.key))
+		try payload.nodes.flatMap { node -> [(node: String, keys: [String])] in
+			guard case .repeat = node.kind else { return [] }
+			return try instances(of: node).map { ($0.id, try rows(of: node.id, in: $0.scope).map(\.key)) }
 		}
 	}
 
@@ -1427,8 +1435,12 @@ public final class NativeRuntime {
 		let entries = try payload.nodes.flatMap { node -> [NativeJournalEntry] in
 			switch node.kind {
 			case .repeat:
-				guard let before = beforeRows[node.id], let after = afterRows[node.id], before != after else { return [] }
-				return [.rows(node: node.id, keys: after)]
+				// Each shown copy of the list: an inner list has one per row of its outer list (`<id>@<key>`).
+				return try rows().compactMap { copy in
+					guard copy.node == node.id || copy.node.hasPrefix("\(node.id)@"),
+						let before = beforeRows[copy.node], let after = afterRows[copy.node], before != after else { return nil }
+					return .rows(node: copy.node, keys: after)
+				}
 			case .branch:
 				return try instances(of: node).compactMap { instance in
 					guard let before = beforeArms[instance.id], let after = afterArms[instance.id], before != after else { return nil }

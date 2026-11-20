@@ -1,0 +1,38 @@
+appId: ${APP_ID}
+name: 20-nested-for
+---
+- launchApp:
+    clearState: true
+- assertVisible: Groups
+- assertVisible: Drop Fruit Apple
+- assertVisible: Drop Fruit Pear
+- assertVisible: Drop Veg Kale
+- assertVisible: Add to Fruit
+- assertVisible: Add to Veg
+- assertNotVisible: Drop Veg Fig
+- assertNotVisible: Drop Fruit Fig
+- tapOn: Add to Veg
+- assertVisible: Drop Veg Fig
+- assertVisible: Drop Veg Fig
+- assertVisible: Drop Veg Kale
+- assertVisible: Drop Fruit Pear
+- assertNotVisible: Drop Fruit Fig
+- tapOn: Drop Fruit Pear
+- assertNotVisible: Drop Fruit Pear
+- assertVisible: Drop Fruit Apple
+- assertVisible: Drop Veg Fig
+- assertNotVisible: Drop Fruit Pear
+- assertNotVisible: Drop Fruit Fig
+- tapOn: Add to Fruit
+- assertVisible: Drop Fruit Fig
+- assertVisible: Drop Fruit Fig
+- assertVisible: Drop Fruit Apple
+- assertVisible: Drop Veg Fig
+- assertNotVisible: Drop Fruit Pear
+- tapOn: Drop Veg Fig
+- assertNotVisible: Drop Veg Fig
+- assertNotVisible: Drop Fruit Fig
+- assertVisible: Drop Veg Kale
+- assertVisible: Drop Fruit Apple
+- assertNotVisible: Drop Veg Fig
+- assertNotVisible: Drop Fruit Fig

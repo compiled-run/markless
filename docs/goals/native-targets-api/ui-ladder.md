@@ -205,7 +205,7 @@ the row's item and state, in the reference runtime and both hosts. An id referen
 branch on the list's length, with no payload change. A `@for` lists any expression the pass lowers (`collect-repeat`
 records the collection as a tree), so rows over a `shared()` field or a computed lower; a `@for` keyed by its index was
 lowered as if keyed by its item and is now refused by name. Vector `rows.json` pins row state, row handlers, a row
-re-added fresh and `@empty` for both hosts. Not built: a `@for` inside a row or an `@if` arm, an `@if` in a row, rows
+re-added fresh and `@empty` for both hosts. A `@for` inside another `@for`'s rows keys its rows by both rows (`<id>@<outer key>@<key>`; vector `nested-for.json`, rung 20). Not built: a `@for` inside an `@if` arm, an `@if` in a row, rows
 under Dragon (the style input has no rows, and row state is left out of Dragon's per-state assignments).
 Receipt: the fourteen core rungs and u1 to u6, `proof passed on iOS and Android`, 20 of 20 on each
 (`receipts/2026-11-17-ui-rows-{ios,android}-20-rungs.json`; simulator `markless-ui-rows`, AVD `markless_ui_rows`, the

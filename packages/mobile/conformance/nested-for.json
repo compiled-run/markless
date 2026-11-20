@@ -1,0 +1,471 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:groups",
+				"name": "groups",
+				"initial": [
+					{
+						"name": "Fruit",
+						"items": ["Apple", "Pear"]
+					},
+					{
+						"name": "Veg",
+						"items": ["Kale"]
+					}
+				]
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Groups"
+					}
+				]
+			},
+			{
+				"kind": "repeat",
+				"id": "repeat:0",
+				"parent": "h0",
+				"list": {
+					"cell": "state:groups"
+				},
+				"key": ["name"]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "section",
+				"parent": "h0",
+				"row": "repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "h2",
+				"parent": "h2",
+				"defaultStyle": {
+					"bold": true,
+					"size": 1.5
+				},
+				"row": "repeat:0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"member": {
+								"item": "repeat:0"
+							},
+							"property": "name"
+						}
+					}
+				],
+				"row": "repeat:0"
+			},
+			{
+				"kind": "repeat",
+				"id": "repeat:1",
+				"parent": "h2",
+				"list": {
+					"member": {
+						"item": "repeat:0"
+					},
+					"property": "items"
+				},
+				"key": [],
+				"row": "repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h2",
+				"row": "repeat:1"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Drop ",
+								{
+									"member": {
+										"item": "repeat:0"
+									},
+									"property": "name"
+								},
+								" ",
+								{
+									"item": "repeat:1"
+								},
+								""
+							]
+						}
+					}
+				],
+				"row": "repeat:1"
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h2",
+				"row": "repeat:0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Add to ",
+								{
+									"member": {
+										"item": "repeat:0"
+									},
+									"property": "name"
+								},
+								""
+							]
+						}
+					}
+				],
+				"row": "repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Add group"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h6",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:groups",
+						"value": {
+							"method": "map",
+							"target": {
+								"cell": "state:groups"
+							},
+							"arguments": [
+								{
+									"lambda": ["other"],
+									"body": {
+										"object": [
+											[
+												"name",
+												{
+													"member": {
+														"local": "other"
+													},
+													"property": "name"
+												}
+											],
+											[
+												"items",
+												{
+													"method": "filter",
+													"target": {
+														"member": {
+															"local": "other"
+														},
+														"property": "items"
+													},
+													"arguments": [
+														{
+															"lambda": ["kept"],
+															"body": {
+																"binary": "!==",
+																"left": {
+																	"local": "kept"
+																},
+																"right": {
+																	"item": "repeat:1"
+																}
+															}
+														}
+													]
+												}
+											]
+										]
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:groups",
+						"value": {
+							"method": "map",
+							"target": {
+								"cell": "state:groups"
+							},
+							"arguments": [
+								{
+									"lambda": ["other"],
+									"body": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"member": {
+													"local": "other"
+												},
+												"property": "name"
+											},
+											"right": {
+												"member": {
+													"item": "repeat:0"
+												},
+												"property": "name"
+											}
+										},
+										"whenTrue": {
+											"object": [
+												[
+													"name",
+													{
+														"member": {
+															"local": "other"
+														},
+														"property": "name"
+													}
+												],
+												[
+													"items",
+													{
+														"array": [
+															{
+																"spread": true,
+																"value": {
+																	"member": {
+																		"local": "other"
+																	},
+																	"property": "items"
+																}
+															},
+															{
+																"spread": false,
+																"value": {
+																	"literal": "Fig"
+																}
+															}
+														]
+													}
+												]
+											]
+										},
+										"whenFalse": {
+											"local": "other"
+										}
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:groups",
+						"value": {
+							"array": [
+								{
+									"spread": true,
+									"value": {
+										"cell": "state:groups"
+									}
+								},
+								{
+									"spread": false,
+									"value": {
+										"object": [
+											[
+												"name",
+												{
+													"literal": "Nuts"
+												}
+											],
+											[
+												"items",
+												{
+													"array": [
+														{
+															"spread": false,
+															"value": {
+																"literal": "Pecan"
+															}
+														}
+													]
+												}
+											]
+										]
+									}
+								}
+							]
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		["h1:text0", "Groups"],
+		["h3:text0@Fruit", "Fruit"],
+		["h3:text0@Veg", "Veg"],
+		["h4:text0@Fruit@Apple", "Drop Fruit Apple"],
+		["h4:text0@Fruit@Pear", "Drop Fruit Pear"],
+		["h4:text0@Veg@Kale", "Drop Veg Kale"],
+		["h5:text0@Fruit", "Add to Fruit"],
+		["h5:text0@Veg", "Add to Veg"],
+		["h6:text0", "Add group"]
+	],
+	"initialRows": [
+		["repeat:0", ["Fruit", "Veg"]],
+		["repeat:1@Fruit", ["Apple", "Pear"]],
+		["repeat:1@Veg", ["Kale"]]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5@Veg"
+			},
+			"journal": [
+				{
+					"op": "rows",
+					"node": "repeat:1@Veg",
+					"keys": ["Kale", "Fig"]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "rows",
+					"node": "repeat:0",
+					"keys": ["Fruit", "Veg", "Nuts"]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5@Nuts"
+			},
+			"journal": [
+				{
+					"op": "rows",
+					"node": "repeat:1@Nuts",
+					"keys": ["Pecan", "Fig"]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4@Fruit@Pear"
+			},
+			"journal": [
+				{
+					"op": "rows",
+					"node": "repeat:1@Fruit",
+					"keys": ["Apple"]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4@Veg@Fig"
+			},
+			"journal": [
+				{
+					"op": "rows",
+					"node": "repeat:1@Veg",
+					"keys": ["Kale"]
+				},
+				{
+					"op": "rows",
+					"node": "repeat:1@Nuts",
+					"keys": ["Pecan"]
+				}
+			]
+		}
+	]
+}

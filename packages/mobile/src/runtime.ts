@@ -797,8 +797,8 @@ export function createNativeRuntime(
 			return shown(owner) ? [object.id] : [];
 		});
 	/** A row's key as hosts and journal entries spell it: `String()` of the item's key path. */
-	const rowsOf = (repeat: Extract<NativeNode, { kind: 'repeat' }>) => {
-		const list = evaluate(repeat.list);
+	const rowsOf = (repeat: Extract<NativeNode, { kind: 'repeat' }>, scope: NativeScope = base) => {
+		const list = evaluate(repeat.list, undefined, scope);
 		if (!Array.isArray(list))
 			throw new Error(`${repeat.id} lists a value that is not an array`);
 		return list.map((item) => {
@@ -816,22 +816,31 @@ export function createNativeRuntime(
 			return { key: String(key), item };
 		});
 	};
-	/** Every instance of a node now shown: one outside lists, one per row inside one (`<id>@<key>`). */
+	/**
+	 * Every instance of a node now shown: one outside lists, one per row inside one (`<id>@<key>`); a row of a list inside
+	 * another list's row is keyed by both rows (`<id>@<outer key>@<inner key>`).
+	 */
 	const instances = (
 		node: NativeNode,
 	): { readonly id: string; readonly scope: NativeScope }[] => {
 		if (!node.row) return shownIn(node, base) ? [{ id: node.id, scope: base }] : [];
 		const repeat = repeats.get(node.row);
-		if (!repeat || !shownIn(repeat, base)) return [];
-		return rowsOf(repeat)
-			.map(({ key, item }) => ({
-				id: `${node.id}@${key}`,
-				scope: {
-					...base,
-					items: new Map([[repeat.id, item]]),
-					keys: new Map([[repeat.id, key]]),
-				},
-			}))
+		if (!repeat) return [];
+		return instances(repeat)
+			.flatMap(({ scope }) => {
+				const outer = repeat.row ? scope.keys?.get(repeat.row) : undefined;
+				return rowsOf(repeat, scope).map(({ key, item }) => {
+					const suffix = outer === undefined ? key : `${outer}@${key}`;
+					return {
+						id: `${node.id}@${suffix}`,
+						scope: {
+							...scope,
+							items: new Map([...scope.items, [repeat.id, item]]),
+							keys: new Map([...(scope.keys ?? []), [repeat.id, suffix]]),
+						},
+					};
+				});
+			})
 			.filter((instance) => shownIn(node, instance.scope));
 	};
 	const render = (parts: ReadonlyArray<NativeTextPart>, scope: NativeScope): string =>
@@ -1165,7 +1174,9 @@ export function createNativeRuntime(
 	const rows = () =>
 		payload.nodes.flatMap((node) =>
 			node.kind === 'repeat' && shown(node)
-				? [[node.id, rowsOf(node).map((row) => row.key)] as const]
+				? instances(node).map(
+						({ id, scope }) => [id, rowsOf(node, scope).map((row) => row.key)] as const,
+					)
 				: [],
 		);
 	const sheets = () =>
@@ -1808,13 +1819,15 @@ export function createNativeRuntime(
 			);
 			// A node shown before and after journals its change; a new arm or row is built from current values instead.
 			const nodes = payload.nodes.flatMap((node): NativeJournalEntry[] => {
-				if (node.kind === 'repeat') {
-					const before = beforeRows.get(node.id);
-					const after = afterRows.get(node.id);
-					return before && after && before.join('\0') !== after.join('\0')
-						? [{ op: 'rows', node: node.id, keys: after }]
-						: [];
-				}
+				if (node.kind === 'repeat')
+					// Each shown copy of the list: an inner list has one per row of its outer list (`<id>@<key>`).
+					return [...afterRows].flatMap(([id, after]): NativeJournalEntry[] => {
+						if (id !== node.id && !id.startsWith(`${node.id}@`)) return [];
+						const before = beforeRows.get(id);
+						return before && before.join('\0') !== after.join('\0')
+							? [{ op: 'rows', node: id, keys: after }]
+							: [];
+					});
 				if (node.kind === 'sheet') {
 					const open = afterSheets.get(node.id)!;
 					return beforeSheets.get(node.id) !== open

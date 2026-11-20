@@ -749,6 +749,19 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
+		// A list in each row of another: inner rows keyed within their outer row, a new outer row with its inner rows.
+		name: 'nested-for',
+		fixture: 'proofs/20-nested-for/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5@Veg' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h5@Nuts' },
+			{ event: 'activate', host: 'h4@Fruit@Pear' },
+			{ event: 'activate', host: 'h4@Veg@Fig' },
+		],
+	},
+	{
 		name: 'script-render-list',
 		fixture: 'proofs/j9-render-list/App.tsrx',
 		modules: true,

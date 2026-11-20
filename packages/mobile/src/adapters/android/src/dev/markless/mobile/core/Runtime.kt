@@ -519,8 +519,8 @@ class Runtime(
 	/** Whether any instance of [node] shows. */
 	fun isShown(node: Node): Boolean = instances(node).isNotEmpty()
 
-	fun rowsOf(repeat: Node.Repeat): List<Row> {
-		val list = evaluate(repeat.list) as? JsValue.Arr ?: throw MarklessRuntimeError("${repeat.id} lists a value that is not an array")
+	fun rowsOf(repeat: Node.Repeat, scope: Scope = Scope.EMPTY): List<Row> {
+		val list = evaluate(repeat.list, scope) as? JsValue.Arr ?: throw MarklessRuntimeError("${repeat.id} lists a value that is not an array")
 		return list.items.map { item ->
 			var key = item
 			for (step in repeat.key) key = (key as? JsValue.Obj)?.fields?.get(step) ?: throw MarklessRuntimeError("${repeat.id}: a row has no key at ${repeat.key.joinToString(".")}")
@@ -528,12 +528,20 @@ class Runtime(
 		}
 	}
 
-	/** Every shown instance of [node]: one outside lists, one per row inside one. */
+	/**
+	 * Every shown instance of [node]: one outside lists, one per row inside one; a row of a list inside another list's row
+	 * is keyed by both (`<id>@<outer>@<key>`), and its [Instance.rowKey] is that whole suffix.
+	 */
 	fun instances(node: Node): List<Instance> {
 		val r = node.row ?: return if (shownIn(node, Scope.EMPTY)) listOf(Instance(node.id, node, Scope.EMPTY)) else emptyList()
 		val repeat = byId[r] as? Node.Repeat ?: return emptyList()
-		if (!shownIn(repeat, Scope.EMPTY)) return emptyList()
-		return rowsOf(repeat).map { Instance("${node.id}@${it.key}", node, Scope(items = mapOf(repeat.id to it.item), keys = mapOf(repeat.id to it.key)), it.key) }.filter { shownIn(node, it.scope) }
+		return instances(repeat).flatMap { copy ->
+			val outer = repeat.row?.let { copy.scope.keys[it] }
+			rowsOf(repeat, copy.scope).map {
+				val suffix = if (outer == null) it.key else "$outer@${it.key}"
+				Instance("${node.id}@$suffix", node, copy.scope.copy(items = copy.scope.items + (repeat.id to it.item), keys = copy.scope.keys + (repeat.id to suffix)), suffix)
+			}
+		}.filter { shownIn(node, it.scope) }
 	}
 
 	fun text(t: Node.Text, scope: Scope): String = text(t.parts, scope)
@@ -787,7 +795,7 @@ class Runtime(
 	fun arms(): List<Pair<String, Int?>> = payload.nodes.filterIsInstance<Node.Branch>().flatMap { b -> instances(b).map { it.id to armOf(b, it.scope) } }
 
 	/** Every shown list's row keys, in order. */
-	fun rows(): List<Pair<String, List<String>>> = payload.nodes.filterIsInstance<Node.Repeat>().filter { isShown(it) }.map { r -> r.id to rowsOf(r).map { it.key } }
+	fun rows(): List<Pair<String, List<String>>> = payload.nodes.filterIsInstance<Node.Repeat>().flatMap { r -> instances(r).map { it.id to rowsOf(r, it.scope).map { row -> row.key } } }
 
 	/** Every system sheet and whether its `open` is truthy. */
 	fun sheets(): List<Pair<String, Boolean>> = payload.nodes.filterIsInstance<Node.Sheet>().map { it.id to Js.truthy(evaluate(it.open)) }
@@ -1223,9 +1231,11 @@ class Runtime(
 		val journal = ArrayList<JournalEntry>()
 		for (c in payload.cells) if (c.styled && !Js.strictEquals(cellsBefore.getValue(c.id), values.getValue(c.id))) journal.add(JournalEntry.State(c.id, values.getValue(c.id)))
 		for (node in payload.nodes) when (node) {
-			is Node.Repeat -> {
-				val b = beforeRows[node.id]; val a = afterRows[node.id]
-				if (b != null && a != null && b != a) journal.add(JournalEntry.Rows(node.id, a))
+			// Each shown copy of the list: an inner list has one per row of its outer list (`<id>@<key>`).
+			is Node.Repeat -> for ((id, a) in afterRows) {
+				if (id != node.id && !id.startsWith("${node.id}@")) continue
+				val b = beforeRows[id]
+				if (b != null && b != a) journal.add(JournalEntry.Rows(id, a))
 			}
 			is Node.Sheet -> afterSheets.getValue(node.id).let { if (beforeSheets[node.id] != it) journal.add(JournalEntry.Sheet(node.id, it)) }
 			is Node.Branch -> for (inst in instances(node)) if (inst.id in beforeArms && inst.id in afterArms && beforeArms[inst.id] != afterArms[inst.id]) journal.add(JournalEntry.Arm(inst.id, afterArms[inst.id]))
