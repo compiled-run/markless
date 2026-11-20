@@ -124,11 +124,11 @@ export function assetReader(specifier: string, importer: string) {
 /** The app's packaged images: each file under `markless-images/`, and the manifest of src to file and natural size. */
 function imageAssets(images: ReadonlyArray<NativeImage>): Array<[string, Uint8Array]> {
 	if (images.length === 0) return [];
-	const manifest: Record<string, { file: string; width: number; height: number }> = {};
+	const manifest: Record<string, { file: string; width: number; height: number; orientation?: number }> = {};
 	const files: Array<[string, Uint8Array]> = [];
 	for (const image of images) {
 		const file = `${PROOF_IMAGES_FOLDER}/${createHash('sha256').update(image.bytes).digest('hex')}.${image.format}`;
-		manifest[image.src] = { file, width: image.width, height: image.height };
+		manifest[image.src] = { file, width: image.width, height: image.height, ...(image.orientation && { orientation: image.orientation }) };
 		if (!files.some(([path]) => path === file)) files.push([file, image.bytes]);
 	}
 	return [[PROOF_IMAGES_PATH, new TextEncoder().encode(`${JSON.stringify(manifest)}\n`)], ...files];

@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.SurfaceTexture
@@ -35,8 +36,27 @@ open class SizedFrame(context: Context, private val widthDp: Int, private val he
 	}
 }
 
-/** An image the app packaged for an `<img src>`: its file under the APK's assets and its natural size in CSS px. */
-class PackagedImage(val file: String, val width: Double, val height: Double)
+/**
+ * An image the app packaged for an `<img src>`: its file under the APK's assets, its natural size in CSS px, and a JPEG's
+ * EXIF orientation (1 to 8), which the browser applies and BitmapFactory does not.
+ */
+class PackagedImage(val file: String, val width: Double, val height: Double, val orientation: Int = 1)
+
+/** [bitmap] turned and mirrored as EXIF [orientation] says, as the browser draws it (`image-orientation: from-image`). */
+fun oriented(bitmap: Bitmap, orientation: Int): Bitmap {
+	val matrix = android.graphics.Matrix()
+	when (orientation) {
+		2 -> matrix.setScale(-1f, 1f)
+		3 -> matrix.setRotate(180f)
+		4 -> matrix.setScale(1f, -1f)
+		5 -> { matrix.setRotate(90f); matrix.postScale(-1f, 1f) }
+		6 -> matrix.setRotate(90f)
+		7 -> { matrix.setRotate(-90f); matrix.postScale(-1f, 1f) }
+		8 -> matrix.setRotate(-90f)
+		else -> return bitmap
+	}
+	return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+}
 
 /** The app's packaged images, from `markless/images.json` in the APK's assets; none when the app has no images. */
 fun packagedImages(context: Context): Map<String, PackagedImage> {
@@ -44,7 +64,7 @@ fun packagedImages(context: Context): Map<String, PackagedImage> {
 	val json = org.json.JSONObject(text)
 	return json.keys().asSequence().associateWith { src ->
 		val entry = json.getJSONObject(src)
-		PackagedImage(entry.getString("file"), entry.getDouble("width"), entry.getDouble("height"))
+		PackagedImage(entry.getString("file"), entry.getDouble("width"), entry.getDouble("height"), entry.optInt("orientation", 1))
 	}
 }
 
@@ -61,6 +81,8 @@ class SizedImage(context: Context, private val packaged: Map<String, PackagedIma
 	private var width: Double? = null
 	private var height: Double? = null
 	private var natural: PackagedImage? = null
+	// setImageBitmap(null) still sets a drawable, so whether a picture is drawn is kept here.
+	private var drawn = false
 
 	init {
 		addView(image, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -71,15 +93,16 @@ class SizedImage(context: Context, private val packaged: Map<String, PackagedIma
 		src = value
 		natural = value?.let { packaged[it] }
 		// A photo the device took is a `file:` URL; any other src is a file the app packaged when it was built.
-		val bitmap = natural?.let { p -> context.assets.open(p.file).use(BitmapFactory::decodeStream) }
+		val bitmap = natural?.let { p -> context.assets.open(p.file).use(BitmapFactory::decodeStream)?.let { oriented(it, p.orientation) } }
 			?: value?.takeIf { it.startsWith("file:") }?.let { android.net.Uri.parse(it).path }?.let(BitmapFactory::decodeFile)
-		image.setImageBitmap(bitmap)
-		refresh(bitmap != null)
+		if (bitmap != null) image.setImageBitmap(bitmap) else image.setImageDrawable(null)
+		drawn = bitmap != null
+		refresh()
 	}
 
 	fun alt(value: String?) {
 		alt = value
-		refresh(image.drawable != null)
+		refresh()
 	}
 
 	fun length(name: String, value: String?) {
@@ -88,7 +111,7 @@ class SizedImage(context: Context, private val packaged: Map<String, PackagedIma
 		requestLayout()
 	}
 
-	private fun refresh(drawn: Boolean) {
+	private fun refresh() {
 		altText.text = if (drawn) null else alt
 		altText.visibility = if (drawn || alt.isNullOrEmpty()) View.GONE else View.VISIBLE
 		requestLayout()
@@ -99,7 +122,7 @@ class SizedImage(context: Context, private val packaged: Map<String, PackagedIma
 		val density = resources.displayMetrics.density
 		var w = width
 		var h = height
-		val n = natural?.takeIf { image.drawable != null && it.width > 0 && it.height > 0 }
+		val n = natural?.takeIf { drawn && it.width > 0 && it.height > 0 }
 		if (n != null) {
 			if (w == null && h != null) w = h * n.width / n.height
 			if (h == null && w != null) h = w * n.height / n.width

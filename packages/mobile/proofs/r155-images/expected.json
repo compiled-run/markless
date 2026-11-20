@@ -1,9 +1,9 @@
 {
 	"rung": 155,
-	"name": "images the app packages are drawn at the web's size, named by their alt text, and a missing image shows its alt text",
+	"name": "images the app packages are drawn at the web's size, named by their alt text, and a missing image shows its alt text; a JPEG's EXIF orientation turns it as the web draws it",
 	"steps": [
 		{
-			"visible": ["Images", "Green badge", "Orange photo", "No such picture", "Show square"],
+			"visible": ["Images", "Green badge", "Orange photo", "Turned photo", "No such picture", "Show square"],
 			"absent": ["Blue square"]
 		},
 		{ "do": { "tap": "Show square" }, "visible": ["Blue square", "Hide square"], "absent": ["Show square"] }
