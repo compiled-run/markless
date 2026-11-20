@@ -495,9 +495,10 @@ class Runtime(
 
 	fun rowsOf(repeat: Node.Repeat): List<Row> {
 		val list = evaluate(repeat.list) as? JsValue.Arr ?: throw MarklessRuntimeError("${repeat.id} lists a value that is not an array")
+		val keyPath = repeat.key ?: return list.items.mapIndexed { index, item -> Row(index.toString(), item) }
 		return list.items.map { item ->
 			var key = item
-			for (step in repeat.key) key = (key as? JsValue.Obj)?.fields?.get(step) ?: throw MarklessRuntimeError("${repeat.id}: a row has no key at ${repeat.key.joinToString(".")}")
+			for (step in keyPath) key = (key as? JsValue.Obj)?.fields?.get(step) ?: throw MarklessRuntimeError("${repeat.id}: a row has no key at ${keyPath.joinToString(".")}")
 			Row(Js.toStr(key), item)
 		}
 	}

@@ -4396,10 +4396,6 @@ export function createNativeViewPayload(
 					refuse('@for inside another @for');
 					continue;
 				}
-				if (repeat?.indexKey) {
-					refuse('a @for keyed by its index; a native list keys each row by its item');
-					continue;
-				}
 				const list = repeat?.collectionExpression
 					? renderValue(
 							repeat.collectionExpression,
@@ -4428,16 +4424,18 @@ export function createNativeViewPayload(
 					id: repeatId,
 					parent,
 					list,
-					key: repeat.keyPath,
+					key: repeat.indexKey ? [] : repeat.keyPath,
+					...(repeat.indexKey ? { byIndex: true as const } : {}),
 					...place,
 				});
-				rowKeys.set(
-					repeatId,
-					repeat.keyPath.reduce<NativeExpr>(
-						(object, property) => ({ member: object, property }),
-						{ item: repeatId },
-					),
-				);
+				if (!repeat.indexKey)
+					rowKeys.set(
+						repeatId,
+						repeat.keyPath.reduce<NativeExpr>(
+							(object, property) => ({ member: object, property }),
+							{ item: repeatId },
+						),
+					);
 				lowerChunk(
 					rowChunk,
 					parent,
@@ -6299,8 +6297,15 @@ export function createNativeViewPayload(
 				);
 				continue;
 			}
+			const rowKey = row && rowKeys.get(row);
+			if (row && !rowKey) {
+				refuse(
+					`the \`${reference.attribute}\` attribute of ${node.id} names an element in a row of a @for keyed by its index`,
+				);
+				continue;
+			}
 			parts.push(`${position > 0 ? ' ' : ''}${id}${row ? '@' : ''}`);
-			if (row) parts.push(rowKeys.get(row)!);
+			if (rowKey) parts.push(rowKey);
 		}
 		const value: NativeExpr = parts.every((part) => typeof part === 'string')
 			? { literal: parts.join('') }

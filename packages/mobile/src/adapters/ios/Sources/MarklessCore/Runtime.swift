@@ -653,6 +653,7 @@ public final class NativeRuntime {
 	public func rows(of repeatId: String) throws -> [(key: String, item: NativeValue)] {
 		guard let node = nodesById[repeatId], case let .repeat(list, keyPath) = node.kind else { throw RuntimeError(reason: "unknown list \(repeatId)") }
 		guard case let .array(array) = try evaluate(list) else { throw RuntimeError(reason: "\(repeatId) lists a value that is not an array") }
+		guard let keyPath else { return array.items.enumerated().map { (String($0.offset), $0.element) } }
 		return try array.items.map { item in
 			var key = item
 			for step in keyPath {
