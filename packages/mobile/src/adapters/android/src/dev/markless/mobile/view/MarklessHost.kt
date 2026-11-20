@@ -134,6 +134,8 @@ class MarklessHost(
 	/** The page's own box when its top holds more than one node (text at the top of the page). */
 	private val pageBox: MarklessBox?
 	private val baseTextSize = TextView(context).textSize
+	/** The views drawn with Chrome's form control look ([DefaultStyle.control]), redrawn when the appearance changes. */
+	private val controls = java.util.WeakHashMap<View, String>()
 	private val expanded = HashMap<View, Boolean?>()
 	private val sheets = LinkedHashMap<String, SystemSheet>()
 	/** Each view's current attributes, for the relations and roles the accessibility delegate reports. */
@@ -514,6 +516,28 @@ class MarklessHost(
 		scheduleLoadEvents()
 	}
 
+	/** Chrome's look for a form control without CSS, light or dark: fill, a 1 px border, 2 px corners, its padding and width. */
+	private fun controlLook(view: View, control: String, configuration: Configuration) {
+		val dark = isDark(configuration)
+		val (fill, line) = when {
+			control == "button" && dark -> 0xFF6B6B6B to 0xFF6B6B6B
+			control == "button" -> 0xFFEFEFEF to 0xFF767676
+			dark -> 0xFF3B3B3B to 0xFF858585
+			else -> 0xFFFFFFFF to 0xFF767676
+		}
+		view.background = GradientDrawable().apply {
+			setColor(fill.toInt())
+			setStroke(maxOf(1, dpr.roundToInt()), line.toInt())
+			cornerRadius = (2 * dpr).toFloat()
+		}
+		// The border box is 2 px; the text sits 6 px (a field 2 px) in from the sides and 1 px from the top and bottom.
+		val side = ((if (control == "button") 8 else 4) * dpr).roundToInt()
+		val top = (3 * dpr).roundToInt()
+		view.setPadding(side, top, side, top)
+		(view as? TextView)?.setTextColor(canvasText(configuration))
+		if (control == "field" && view is EditText) (153 * dpr).roundToInt().let { view.minWidth = it; view.maxWidth = it }
+	}
+
 	/** The colour behind the page: the current assignment's canvas (else the web canvas's white), or unstyled the web's Canvas. */
 	val canvasColor: Int get() = page?.let { it.export.assignments[it.assignment].canvas?.argb ?: Color.WHITE } ?: canvas(context.resources.configuration)
 
@@ -525,6 +549,7 @@ class MarklessHost(
 		if (style == null) {
 			for (view in textViews.values) if (view !is Button) view.setTextColor(canvasText(configuration))
 			onCanvas?.invoke(canvas(configuration))
+			for ((view, control) in controls) controlLook(view, control, configuration)
 		}
 		var changed = false
 		for (l in allLayouts()) {
@@ -814,6 +839,11 @@ class MarklessHost(
 			}
 		}
 		if (unstyled?.inline == true) inlineLevel.add(view)
+		unstyled?.control?.let { control ->
+			controls[view] = control
+			controlLook(view, control, context.resources.configuration)
+			if (view is EditText) view.setTextSize(TypedValue.COMPLEX_UNIT_PX, (baseTextSize * unstyled.size * flow!!.blockText(node.parent).size).toFloat())
+		}
 		layoutOf(inst.node)?.let { l -> l.export.assignments[l.assignment].byId[inst.id] }?.let { styled -> scrollContainer(inst.id, view, styled) }
 		views[inst.id] = view
 		if (!unseen && type !in TICKABLE) for (b in node.bindings) if (b.property && b.name == "value") (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setAppText(runtime.property(b, inst.scope))

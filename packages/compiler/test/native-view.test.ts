@@ -57,7 +57,7 @@ export function Counter() @{
 					element: 'button',
 					parent: 'h0',
 					attributes: { class: 'tap' },
-					defaultStyle: { inline: true },
+					defaultStyle: { inline: true, size: 13.3333 / 16, control: 'button' },
 				},
 				{
 					kind: 'text',
@@ -125,7 +125,7 @@ export function Tally() @{
 				id: 'h3',
 				element: 'button',
 				parent: 'h0',
-				defaultStyle: { inline: true },
+				defaultStyle: { inline: true, size: 13.3333 / 16, control: 'button' },
 			},
 			{ kind: 'text', id: 'h3:text0', parent: 'h3', parts: [{ text: 'Move' }] },
 		]);
@@ -582,7 +582,7 @@ export function Toggle() @{
 				id: 'h1',
 				element: 'button',
 				parent: 'h0',
-				defaultStyle: { inline: true },
+				defaultStyle: { inline: true, size: 13.3333 / 16, control: 'button' },
 				bindings: [{ attribute: 'aria-expanded', value: { cell: 'state:open' } }],
 			},
 			{
@@ -1972,6 +1972,25 @@ ${markup}
 }`;
 	const lineOf = (text: string, offset: number) => text.slice(0, offset).split('\n').length;
 
+	it("draws a text field and a button as Chrome's controls, and leaves a checkbox to the phone", async () => {
+		const { payload, diagnostics } = await nativeView(
+			source(`		<input aria-label="Name" />
+		<input type="checkbox" aria-label="Urgent" />`),
+		);
+		expect(diagnostics).toEqual([]);
+		expect(
+			payload!.nodes.flatMap((node) =>
+				node.kind === 'element' && node.element !== 'main'
+					? [[node.element, node.defaultStyle]]
+					: [],
+			),
+		).toEqual([
+			['input', { inline: true, size: 13.3333 / 16, control: 'field' }],
+			['input', { inline: true }],
+			['button', { inline: true, size: 13.3333 / 16, control: 'button' }],
+		]);
+	});
+
 	it('gives phrase elements a flow inside their paragraph and blocks their default look', async () => {
 		const { payload, diagnostics } = await nativeView(
 			source(`		<p>Run <code>{n}</code><br /><kbd>K</kbd></p>
@@ -1990,7 +2009,7 @@ ${markup}
 			['kbd', { flow: 'inline', monospace: true, size: 0.8125 }],
 			['pre', { monospace: true, size: 0.8125, preformatted: true, margin: 1 }],
 			['abbr', { flow: 'inline', line: 'underline' }],
-			['button', { inline: true }],
+			['button', { inline: true, size: 13.3333 / 16, control: 'button' }],
 		]);
 	});
 

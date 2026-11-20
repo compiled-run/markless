@@ -55,7 +55,9 @@
 					"required": ""
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
 				}
 			},
 			{
@@ -76,7 +78,9 @@
 					}
 				],
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
 				}
 			},
 			{
@@ -88,7 +92,9 @@
 					"aria-label": "Unnamed"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
 				}
 			},
 			{
@@ -104,7 +110,9 @@
 					"disabled": ""
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
 				}
 			},
 			{
@@ -174,7 +182,9 @@
 				"element": "button",
 				"parent": "h1",
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
 				}
 			},
 			{
@@ -197,7 +207,9 @@
 					"formnovalidate": ""
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
 				}
 			},
 			{
@@ -219,7 +231,9 @@
 					"type": "button"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
 				}
 			},
 			{
@@ -286,7 +300,9 @@
 					"name": "q"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
 				}
 			},
 			{
@@ -305,7 +321,9 @@
 					"name": "a"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
 				}
 			},
 			{
@@ -318,7 +336,9 @@
 					"name": "b"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
 				}
 			},
 			{
@@ -337,7 +357,9 @@
 					"name": "who"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
 				}
 			},
 			{
@@ -346,7 +368,9 @@
 				"element": "button",
 				"parent": "h19",
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
 				}
 			},
 			{
@@ -393,7 +417,9 @@
 					"aria-disabled": "false"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
 				}
 			},
 			{

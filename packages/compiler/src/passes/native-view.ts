@@ -162,7 +162,11 @@ function defaultStyleOf(
 		'title' in attributes ||
 		bindings.some((binding) => 'attribute' in binding && binding.attribute === 'title');
 	const style: NativeDefaultStyle =
-		element === 'abbr' && titled ? { ...base, line: 'underline' } : base;
+		element === 'abbr' && titled
+			? { ...base, line: 'underline' }
+			: element === 'input' && !TEXT_TYPES.has(attributes['type'] ?? 'text')
+				? { inline: true }
+				: base;
 	return Object.keys(style).length > 0 ? style : undefined;
 }
 

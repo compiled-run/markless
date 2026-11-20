@@ -119,7 +119,9 @@
 				"element": "button",
 				"parent": "component-edge:1/h2",
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
 				},
 				"arm": {
 					"branch": "component-edge:1/boundary:0",

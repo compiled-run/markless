@@ -121,8 +121,8 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		var widest = 0
 		val kids = shown()
 		for (child in kids) {
-			// Text fields span the stack's width, as platform fields do; everything else takes its content width.
-			child.measure(MeasureSpec.makeMeasureSpec(width, if (child is EditText) MeasureSpec.EXACTLY else MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
+			// A text field outside a line spans the stack's width, as platform fields do; everything else takes its content width.
+			child.measure(MeasureSpec.makeMeasureSpec(width, if (child is EditText && child !in inlineLevel) MeasureSpec.EXACTLY else MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
 			widest = maxOf(widest, child.measuredWidth)
 		}
 		// Margins between siblings meet at the larger; the first and last child's leave through the box when it collapses.

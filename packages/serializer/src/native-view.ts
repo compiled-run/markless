@@ -210,6 +210,13 @@ export type NativeDefaultStyle = {
 	 * boxes, and the line wraps at the parent's width, as the web places them, instead of stacking below the one before.
 	 */
 	readonly inline?: true;
+	/**
+	 * Chrome's look for a form control without CSS. `button`: a #efefef fill (#6b6b6b dark) inside a 1px #767676 border
+	 * (the fill's colour when dark), 2px corners, its text 6px in from the sides and 1px from the top and bottom, inside a 2px
+	 * border box. `field`: a white fill (#3b3b3b dark) inside a 1px #767676 border (#858585 dark), 2px corners, 153px wide,
+	 * its text 2px in and 1px down, inside a 2px border box.
+	 */
+	readonly control?: 'button' | 'field';
 	/** `<hr>`: a thin horizontal line across the box. */
 	readonly rule?: true;
 	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
@@ -220,6 +227,8 @@ export type NativeDefaultStyle = {
 
 const MONOSPACE: NativeDefaultStyle = { monospace: true, size: 0.8125 };
 const SMALLER = 1 / 1.2;
+/** A form control's text: Chrome's 13.333px against the 16px body text. */
+const CONTROL_TEXT = 13.3333 / 16;
 
 /**
  * The HTML elements every native host builds, with their look under Chrome's default stylesheet where it is more than a box
@@ -293,8 +302,8 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	bdo: { flow: 'inline' },
 	wbr: { flow: 'inline' },
 	br: { flow: 'break' },
-	button: { inline: true },
-	input: { inline: true },
+	button: { inline: true, size: CONTROL_TEXT, control: 'button' },
+	input: { inline: true, size: CONTROL_TEXT, control: 'field' },
 	a: { inline: true },
 	img: { inline: true },
 	audio: { inline: true },

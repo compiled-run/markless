@@ -139,7 +139,9 @@
 				"element": "button",
 				"parent": "h2",
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
 				},
 				"arm": {
 					"branch": "boundary:0",
@@ -166,7 +168,9 @@
 				"element": "button",
 				"parent": "h2",
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
 				},
 				"arm": {
 					"branch": "boundary:0",

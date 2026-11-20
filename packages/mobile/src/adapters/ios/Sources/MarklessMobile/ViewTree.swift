@@ -218,6 +218,8 @@ final class ViewTree {
 	private var indents: [ObjectIdentifier: CGFloat] = [:]
 	/// Blocks' default margins above and below, in points, before they collapse.
 	private var margins: [ObjectIdentifier: CGFloat] = [:]
+	/// Space between a box's edges and its children in the stacking layout (a control's padding), by box.
+	private var paddings: [ObjectIdentifier: UIEdgeInsets] = [:]
 	/// Inline-level boxes (`<a>`, `<button>`, `<input>`, `<img>`) of the stacking layout: they share lines with text.
 	private var inlineViews = Set<ObjectIdentifier>()
 	/// Whether a paragraph's text starts or ends with whitespace, by its label: a space beside an inline box on its line.
@@ -881,7 +883,7 @@ final class ViewTree {
 						guard let self, let field else { return }
 						self.bringIntoView(field, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
 					}, for: .editingDidBegin)
-					if layout == nil {
+					if layout == nil, node.defaultStyle?.control == nil {
 						field.borderStyle = .roundedRect
 						field.widthAnchor.constraint(equalToConstant: 240).isActive = true
 					}
@@ -1178,7 +1180,9 @@ final class ViewTree {
 		}
 		var constraints: [NSLayoutConstraint] = []
 		var above = container.topAnchor
-		let indent = indents[ObjectIdentifier(container)] ?? 0
+		let pad = paddings[ObjectIdentifier(container)] ?? .zero
+		let indent = (indents[ObjectIdentifier(container)] ?? 0) + pad.left
+		var inset = pad.top
 		var top = container
 		while let parent = top.superview { top = parent }
 		let collapses = self.collapses(container)
@@ -1195,12 +1199,13 @@ final class ViewTree {
 			let end = runEnd(kids, from: index)
 			if end > index + 1 || inlineViews.contains(ObjectIdentifier(kids[index])) {
 				// A line box has no margins of its own: the margin waiting above it is the whole gap.
-				let lines = lineUp(Array(kids[index..<end]), in: container, below: above, gap: leading ? 0 : pending, indent: indent)
+				let lines = lineUp(Array(kids[index..<end]), in: container, below: above, gap: (leading ? 0 : pending) + inset, indent: indent)
 				constraints += lines.constraints
 				if !lines.empty {
 					above = lines.bottom
 					leading = false
 					pending = 0
+					inset = 0
 				}
 				index = end
 				continue
@@ -1218,12 +1223,13 @@ final class ViewTree {
 				pending = marginBelow(child)
 			}
 			constraints += [
-				child.topAnchor.constraint(equalTo: above, constant: gap),
+				child.topAnchor.constraint(equalTo: above, constant: gap + inset),
 				child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
 				wide
-					? child.trailingAnchor.constraint(equalTo: container.trailingAnchor)
-					: child.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
+					? child.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -pad.right)
+					: child.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -pad.right),
 			]
+			inset = 0
 			if wide {
 				// As wide as the page allows: a box with no width of its own (a rule, a code block) takes the line.
 				let page = child.widthAnchor.constraint(equalTo: top.widthAnchor)
@@ -1232,7 +1238,7 @@ final class ViewTree {
 			}
 			above = child.bottomAnchor
 		}
-		constraints.append(container.bottomAnchor.constraint(equalTo: above, constant: collapses ? 0 : max(pending, body)))
+		constraints.append(container.bottomAnchor.constraint(equalTo: above, constant: (collapses ? 0 : max(pending, body)) + pad.bottom + inset))
 		NSLayoutConstraint.activate(constraints)
 		stackConstraints[ObjectIdentifier(container)] = constraints
 		if let kind = listMarkers[ObjectIdentifier(container)] {
@@ -1243,6 +1249,34 @@ final class ViewTree {
 				marker.text = kind == "decimal" ? "\(number)." : "\u{2022}"
 			}
 		}
+	}
+
+	/// Chrome's look for a form control without CSS, light or dark: fill, a 1 pt border, 2 pt corners, its padding and width.
+	private func controlLook(_ view: UIView, _ control: String, scale: CGFloat) {
+		let button = control == "button"
+		func gray(_ value: CGFloat) -> UIColor { UIColor(white: value / 255, alpha: 1) }
+		let fill = UIColor { $0.userInterfaceStyle == .dark ? gray(button ? 107 : 59) : gray(button ? 239 : 255) }
+		let line = UIColor { $0.userInterfaceStyle == .dark ? gray(button ? 107 : 133) : gray(118) }
+		view.backgroundColor = fill
+		view.layer.borderWidth = 1
+		view.layer.cornerRadius = 2
+		view.layer.borderColor = line.resolvedColor(with: view.traitCollection).cgColor
+		view.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (changed: UIView, _: UITraitCollection) in
+			changed.layer.borderColor = line.resolvedColor(with: changed.traitCollection).cgColor
+		}
+		// The border box is 2 pt; the text sits 6 pt (a field's 2 pt) in from the sides and 1 pt from the top and bottom.
+		let side: CGFloat = button ? 8 : 4
+		paddings[ObjectIdentifier(view)] = UIEdgeInsets(top: 3, left: side, bottom: 3, right: side)
+		guard let field = view as? UITextField else { return }
+		field.borderStyle = .none
+		field.font = UIFont.systemFont(ofSize: TextLook.baseSize * scale)
+		for side in [\UITextField.leftView, \UITextField.rightView] {
+			field[keyPath: side] = UIView(frame: CGRect(x: 0, y: 0, width: 4, height: 1))
+		}
+		field.leftViewMode = .always
+		field.rightViewMode = .always
+		field.widthAnchor.constraint(equalToConstant: 153).isActive = true
+		field.heightAnchor.constraint(equalToConstant: ceil(field.font!.lineHeight) + 6).isActive = true
 	}
 
 	/// Where the run of line-sharing children that starts at `start` ends: inline-level boxes and the paragraphs beside them.
@@ -1332,7 +1366,7 @@ final class ViewTree {
 				// The width it was measured at holds, down to the text a button or link holds: nothing in a line wraps early.
 				var held: UIView? = item
 				while let box = held {
-					let keep = box.widthAnchor.constraint(greaterThanOrEqualToConstant: entry.width)
+					let keep = box.widthAnchor.constraint(greaterThanOrEqualToConstant: box === item ? entry.width : min(fittingWidth(box), entry.width))
 					keep.priority = .init(999)
 					constraints.append(keep)
 					let inside = box is UILabel ? [] : stacked(box)
@@ -1379,7 +1413,8 @@ final class ViewTree {
 		if let label = view as? UILabel { return ceil(label.attributedText?.size().width ?? 0) }
 		// An unstyled button or link is its text and nothing around it.
 		let inside = stacked(view)
-		if inside.count == 1, !(view is UITextField) { return fittingWidth(inside[0]) }
+		let pad = paddings[ObjectIdentifier(view)] ?? .zero
+		if inside.count == 1, !(view is UITextField) { return fittingWidth(inside[0]) + pad.left + pad.right }
 		return ceil(view.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).width)
 	}
 
@@ -1490,6 +1525,7 @@ final class ViewTree {
 		if let indent = style.indent { indents[id] = CGFloat(indent) }
 		if let margin = style.margin { margins[id] = CGFloat(margin) * TextLook.baseSize * scale }
 		if style.inline { inlineViews.insert(id) }
+		if let control = style.control { controlLook(view, control, scale: scale) }
 		if style.rule {
 			// Chrome's hr: a 1 px inset line with 0.5em above and below.
 			leaves.insert(id)

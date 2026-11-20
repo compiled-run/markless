@@ -62,7 +62,9 @@ reference. Notes and the before and after probe: `element-vocabulary.md`.
   (`inline`: its text flows on in its parent's text; `break`: `<br>`), `bold`, `italic`, `monospace`, `size` (a multiple
   of the parent's), `line`, `shift`, `highlight`, `quotes`, `preformatted`, `indent` (CSS px), `margin` (above
   and below, in ems of the element's own size; none on a list inside another), `inline` (an inline-level box: `a`,
-  `button`, `input`, `img`, `label`, `select`, `audio`, `svg`), `rule`, `marker` (on
+  `button`, `input`, `img`, `label`, `select`, `audio`, `svg`), `control` (`button` or `field`: Chrome's look for a
+  button or text field without CSS, its fill, 1px border, 2px corners, padding and a field's 153px width, light and dark),
+  `rule`, `marker` (on
   `ul`/`ol`), `table` (`table`, `row`, `cell`). Hosts apply it only without a style export; with one, Dragon decides.
 - **Paragraphs:** among one parent's children in one place, each run of text nodes and flowing elements is one text
   view (`nativeParagraphs`, `nativeShownTexts` in `packages/mobile/src/paragraphs.ts`). Its text collapses whitespace as

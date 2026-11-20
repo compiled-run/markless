@@ -345,7 +345,9 @@
 							"element": "button",
 							"parent": "component-edge:0/h5",
 							"defaultStyle": {
-								"inline": true
+								"inline": true,
+								"size": 0.83333125,
+								"control": "button"
 							}
 						},
 						{
