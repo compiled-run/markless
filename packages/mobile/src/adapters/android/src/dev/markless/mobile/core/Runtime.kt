@@ -1288,7 +1288,12 @@ class Runtime(
 				val key = inst.id to binding.name
 				if (binding.property) {
 					if (key in beforeProperties && key in afterProperties && beforeProperties[key] != afterProperties[key]) journal.add(JournalEntry.Property(inst.id, binding.name, afterProperties.getValue(key)))
-				} else if (key in beforeAttributes && key in afterAttributes && beforeAttributes[key] != afterAttributes[key]) journal.add(JournalEntry.Attribute(inst.id, binding.name, afterAttributes[key]))
+				} else if (key in beforeAttributes && key in afterAttributes && beforeAttributes[key] != afterAttributes[key]) {
+					journal.add(JournalEntry.Attribute(inst.id, binding.name, afterAttributes[key]))
+					// A textarea nobody edited and no `value` property sets shows its `value` attribute, as the web's default value.
+					if (binding.name == "value" && node.element == "textarea" && inst.id !in edited && node.bindings.none { it.property && it.name == "value" })
+						journal.add(JournalEntry.Property(inst.id, "value", afterAttributes[key] ?: ""))
+				}
 				}
 			}
 		}

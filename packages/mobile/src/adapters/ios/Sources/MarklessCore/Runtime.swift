@@ -1503,14 +1503,18 @@ public final class NativeRuntime {
 					guard let before = beforeTexts[instance.id], let after = afterTexts[instance.id], before != after else { return nil }
 					return .text(node: instance.id, value: after)
 				}
-			case let .element(_, _, bindings):
+			case let .element(element, _, bindings):
 				let opened: [NativeJournalEntry] = dialogs[node.id].flatMap { open in open != dialogsBefore[node.id] ? [.dialog(node: node.id, open: open)] : nil } ?? []
+				// A textarea nobody edited and no `value` property sets shows its `value` attribute, as the web's default value.
+				let followsDefault = element == "textarea" && !bindings.contains { $0.isProperty && $0.name == "value" }
 				return try opened + instances(of: node).flatMap { instance in
-					bindings.compactMap { binding -> NativeJournalEntry? in
+					bindings.flatMap { binding -> [NativeJournalEntry] in
 						let key = "\(instance.id)\u{0}\(binding.name)"
 						let (before, after) = binding.isProperty ? (beforeProperties, afterProperties) : (beforeAttributes, afterAttributes)
-						guard let old = before[key], let new = after[key], old != new else { return nil }
-						return binding.isProperty ? .property(node: instance.id, name: binding.name, value: new ?? "") : .attribute(node: instance.id, name: binding.name, value: new)
+						guard let old = before[key], let new = after[key], old != new else { return [] }
+						if binding.isProperty { return [.property(node: instance.id, name: binding.name, value: new ?? "")] }
+						let shown: [NativeJournalEntry] = followsDefault && binding.name == "value" && edited[instance.id] == nil ? [.property(node: instance.id, name: "value", value: new ?? "")] : []
+						return [.attribute(node: instance.id, name: binding.name, value: new)] + shown
 					}
 				}
 			}

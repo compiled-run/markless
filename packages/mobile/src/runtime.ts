@@ -940,6 +940,15 @@ export function createNativeRuntime(
 	};
 	const propertyBinding = (id: string, name: string) =>
 		elementOf(id).bindings?.find((one) => 'property' in one && one.property === name);
+	/** Whether a `<textarea>` shows its default value now: nobody edited it and no `value` property sets it. */
+	const followsDefault = (id: string): boolean => {
+		const node = elementOf(id.split('@')[0]!);
+		return (
+			node.element === 'textarea' &&
+			!edited.has(id) &&
+			propertyBinding(node.id, 'value') === undefined
+		);
+	};
 	const textOf = (id: string): string => {
 		const binding = propertyBinding(id, 'value');
 		const text = edited.has(id)
@@ -1919,6 +1928,17 @@ export function createNativeRuntime(
 											name,
 											value: afterAttributes.get(key)!,
 										},
+										// A field nobody edited shows its `value` attribute, as the web's default value.
+										...(name === 'value' && followsDefault(id)
+											? [
+													{
+														op: 'property' as const,
+														node: id,
+														name: 'value' as const,
+														value: afterAttributes.get(key) ?? '',
+													},
+												]
+											: []),
 									]
 								: [
 										{

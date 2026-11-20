@@ -49,6 +49,11 @@ const typedInto = (text: string, maxlength: string | null) => {
 // The native column before any device: each rung's payload, run by the reference runtime, must show what the
 // web build shows; a rung the compiler cannot lower yet must be refused by name, never emitted half right.
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
+/** Whether a field's `value` property is bound; any other `value` write is a textarea's default value. */
+const bindsValue = (nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][number]>, id: string) => {
+	const node = nodeOf.get(id.split('@')[0]!);
+	return node?.kind === 'element' && (node.bindings ?? []).some((binding) => 'property' in binding && binding.property === 'value');
+};
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
 const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
 
@@ -209,8 +214,10 @@ function mirror(
 		else if (entry.op === 'title') title = entry.value;
 		else if (entry.op === 'attribute')
 			attributes.set(`${entry.node}\0${entry.name}`, entry.value);
-		else if (entry.op === 'property') properties.set(entry.node, entry.value);
-		else if (entry.op === 'navigate') {
+		else if (entry.op === 'property') {
+			// A textarea's default value reaches its text, which this column does not compare.
+			if (bindsValue(nodeOf, entry.node)) properties.set(entry.node, entry.value);
+		} else if (entry.op === 'navigate') {
 			// One page per rung: a navigation opens this page again with the link's params.
 			expect(entry.route, `step ${index}: the link's route`).toBe(payload.route?.pattern);
 			mount(createNativeRuntime(payload, store, entry.params));
@@ -626,11 +633,16 @@ function walk(
 		return node ? parentOf(node) : undefined;
 	};
 	// A field's text: what its `value` binding or attribute gave it, then what was typed or the journal wrote.
+	const builtAttributes = new Map(attributes);
+	const shownDefaults = new Map<string, string>();
 	const staticValue = (id: string) => {
 		const node = nodeOf.get(id);
-		return node?.kind === 'element' && node.element === 'input' && !properties.has(id)
-			? (node.attributes?.['value'] ?? '')
-			: undefined;
+		if (node?.kind !== 'element' || properties.has(id)) return undefined;
+		if (node.element === 'input') return node.attributes?.['value'] ?? '';
+		// A textarea shows its `value` attribute as the host built it, then the default values the journal writes.
+		if (node.element === 'textarea')
+			return shownDefaults.get(id) ?? builtAttributes.get(`${id}\0value`) ?? node.attributes?.['value'] ?? '';
+		return undefined;
 	};
 	const typed = new Map<string, string>();
 	const checks = new Map(runtime.checks());
@@ -741,7 +753,8 @@ function walk(
 			else if (entry.op === 'property' && entry.name === 'selected')
 				selected.set(entry.node, entry.value);
 			else if (entry.op === 'property') {
-				properties.set(entry.node, entry.value);
+				if (bindsValue(nodeOf, entry.node)) properties.set(entry.node, entry.value);
+				else shownDefaults.set(entry.node, entry.value);
 				typed.delete(entry.node);
 			}
 			else if (entry.op === 'navigate') {

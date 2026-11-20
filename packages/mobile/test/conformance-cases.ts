@@ -396,6 +396,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A textarea shows its text and follows it until it is edited; its form sends what it holds.
+		name: 'textarea-default',
+		fixture: 'proofs/r160-textarea-submit/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'input', host: 'h2', value: 'Mine\nand more' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+		],
+	},
+	{
 		name: 'forms',
 		fixture: 'test/fixtures/Forms.tsrx',
 		actions: [

@@ -649,7 +649,7 @@ export function Page() @{
 		}
 	});
 
-	it('builds a <textarea> as a text field, and refuses its change handler and its place in a form by name', async () => {
+	it('builds a <textarea> as a text field, and refuses its change handler by name', async () => {
 		const shown = await nativeView(`import { state } from '@markless/core';
 export function Page() @{
 	let note = state('');
@@ -668,18 +668,54 @@ export function Page() @{
 		expect(changed.diagnostics.map((d) => d.message)).toContain(
 			'the change handler on the <textarea> h1: a text field raises it when it loses focus, which a native build has no lowering for yet',
 		);
+	});
+
+	it("takes a <textarea>'s text as its default value, and submits it with its form", async () => {
 		const sent = await nativeView(`import { state } from '@markless/core';
 export function Page() @{
-	let note = state('');
+	let note = state('draft');
 	<form onSubmit={(event) => { event.preventDefault(); note = 'sent'; }}>
-		<textarea aria-label="Notes" name="notes" />
+		<textarea aria-label="Notes" name="notes">{note}</textarea>
+		<textarea aria-label="Sign" name="sign" value="Ada" />
+		<textarea aria-label="Fixed" name="fixed">as written</textarea>
 		<button>Send</button>
-		<p>{note}</p>
 	</form>
 }`);
-		expect(sent.payload).toBeNull();
-		expect(sent.diagnostics.map((d) => d.message)).toContain(
-			'the <textarea> h1 in the <form> h0, whose text a native build does not submit yet',
+		expect(sent.diagnostics).toEqual([]);
+		expect(sent.payload?.nodes.filter((node) => node.kind === 'element' && node.element === 'textarea')).toEqual([
+			{
+				kind: 'element',
+				id: 'h1',
+				element: 'textarea',
+				parent: 'h0',
+				attributes: { 'aria-label': 'Notes', name: 'notes' },
+				bindings: [
+					{
+						attribute: 'value',
+						value: { template: [{ logical: '??', left: { cell: 'state:note' }, right: { literal: '' } }] },
+					},
+				],
+			},
+			{ kind: 'element', id: 'h2', element: 'textarea', parent: 'h0', attributes: { 'aria-label': 'Sign', name: 'sign', value: 'Ada' } },
+			{ kind: 'element', id: 'h3', element: 'textarea', parent: 'h0', attributes: { 'aria-label': 'Fixed', name: 'fixed', value: 'as written' } },
+		]);
+		expect(sent.payload?.nodes.some((node) => node.kind === 'text' && ['h1', 'h2', 'h3'].includes(node.parent ?? ''))).toBe(false);
+		expect(sent.payload?.forms?.[0]?.fields).toEqual([
+			{ node: 'h1', kind: 'text' },
+			{ node: 'h2', kind: 'text' },
+			{ node: 'h3', kind: 'text' },
+		]);
+		expect(sent.payload?.events).toEqual(
+			expect.arrayContaining(['h1', 'h2', 'h3'].map((host) => expect.objectContaining({ host, event: 'input' }))),
+		);
+		const wrapped = await nativeView(`export function Page() @{
+	<form onSubmit={(event) => event.preventDefault()}>
+		<textarea aria-label="Notes" name="notes" wrap="hard" cols="20" />
+		<button>Send</button>
+	</form>
+}`);
+		expect(wrapped.diagnostics.map((d) => d.message)).toContain(
+			'the <textarea> h1 in the <form> h0 has `wrap`, whose hard wrapping the web adds to the text it sends and no native host adds yet',
 		);
 	});
 

@@ -7105,6 +7105,7 @@ export function createNativeViewPayload(
 		}
 	}
 	tapRun = false;
+	textareaDefaults();
 	wireTicks();
 	checkSelects();
 	let lengthLimited = false;
@@ -7240,6 +7241,42 @@ export function createNativeViewPayload(
 		return node?.kind === 'element' && node.element === 'input' && node.attributes?.['type'] === 'range';
 	}
 
+	/**
+	 * A `<textarea>`'s text is its default value, as the web parses it: the field shows it, and follows it, until a person
+	 * edits it. It becomes the field's `value` attribute, which the runtimes read as an `<input>`'s.
+	 */
+	function textareaDefaults() {
+		for (const area of nodes) {
+			if (area.kind !== 'element' || area.element !== 'textarea') continue;
+			const inside = nodes.filter((node) => node.parent === area.id);
+			if (inside.length === 0) continue;
+			const [text, ...more] = inside;
+			if (text?.kind !== 'text' || more.length > 0) {
+				refuse(`the <textarea> ${area.id} holds more than one run of text, which the web reads as its text`);
+				continue;
+			}
+			nodes.splice(nodes.indexOf(text), 1);
+			const at = nodes.indexOf(area);
+			if (text.parts.every((part) => 'text' in part)) {
+				const value = text.parts.map((part) => ('text' in part ? part.text : '')).join('');
+				nodes[at] = { ...area, attributes: { ...area.attributes, value } };
+				continue;
+			}
+			const value: NativeExpr = {
+				template: text.parts.map((part) =>
+					'text' in part
+						? part.text
+						: {
+								logical: '??' as const,
+								left: 'cell' in part ? { cell: part.cell } : part.expr,
+								right: { literal: '' },
+							},
+				),
+			};
+			nodes[at] = { ...area, bindings: [...(area.bindings ?? []), { attribute: 'value', value }] };
+		}
+	}
+
 	function wireTicks() {
 		for (const node of nodes) {
 			if (
@@ -7352,6 +7389,7 @@ export function createNativeViewPayload(
 			const submitters: string[] = [];
 			const textFields: string[] = [];
 			const ranges: string[] = [];
+			const areas: string[] = [];
 			/** Fields and submit buttons in an @if arm inside the form: they take part only while it shows them. */
 			const armed = new Set<string>();
 			for (const node of nodes) {
@@ -7362,11 +7400,7 @@ export function createNativeViewPayload(
 					refuse(`${field}, a form inside a form`);
 					continue;
 				}
-				if (node.element === 'textarea') {
-					refuse(`${field}, whose text a native build does not submit yet`);
-					continue;
-				}
-				if (node.element !== 'input' && node.element !== 'button' && node.element !== 'select')
+				if (node.element !== 'input' && node.element !== 'textarea' && node.element !== 'button' && node.element !== 'select')
 					continue;
 				if (node.element === 'button' && node.attributes?.['type'] === 'button') continue;
 				if (node.row !== form.row) {
@@ -7382,7 +7416,7 @@ export function createNativeViewPayload(
 					);
 					continue;
 				}
-				const type = node.attributes?.['type'];
+				const type = node.element === 'textarea' ? undefined : node.attributes?.['type'];
 				if (node.element === 'select') {
 					for (const name of [...UNCHECKED_CONSTRAINTS, 'maxlength', 'required'])
 						if (attribute(node, name))
@@ -7426,6 +7460,21 @@ export function createNativeViewPayload(
 						`${field} binds the \`name\` of a radio button, which a native build reads only as written`,
 					);
 				fields.push({ node: node.id, kind });
+				if (node.element === 'textarea') {
+					const wrap = attribute(node, 'wrap');
+					if (wrap === 'bound' || (wrap && node.attributes?.['wrap']?.toLowerCase() === 'hard'))
+						refuse(
+							`${field} has \`wrap\`, whose hard wrapping the web adds to the text it sends and no native host adds yet`,
+						);
+					if (attribute(node, 'dirname'))
+						refuse(
+							`${field} has \`dirname\`, which sends the text's direction with the form, and no native host sends it yet`,
+						);
+					// Its return key adds a line, so it blocks no implicit submission.
+					areas.push(node.id);
+					if (attribute(node, 'maxlength')) lengthLimited = true;
+					continue;
+				}
 				// A range is no text field: it blocks no implicit submission and has no return key.
 				if (range) ranges.push(node.id);
 				if (kind === 'text' && !range) {
@@ -7480,7 +7529,7 @@ export function createNativeViewPayload(
 						? [{ op: 'submit', form: form.id, submitter: null }]
 						: [];
 			// The runtime keeps each range's value from its moves, as each text field's text from its edits.
-			for (const field of ranges) ensureHandler(field, 'input', 'edit');
+			for (const field of [...ranges, ...areas]) ensureHandler(field, 'input', 'edit');
 			for (const field of textFields) {
 				// The runtime keeps each field's text from its edits, so every text field reports them.
 				ensureHandler(field, 'input', 'edit');

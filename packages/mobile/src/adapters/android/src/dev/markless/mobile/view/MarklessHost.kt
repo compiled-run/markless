@@ -835,7 +835,7 @@ class MarklessHost(
 		views[inst.id] = view
 		if (!unseen && type !in TICKABLE) for (b in node.bindings) if (b.property && b.name == "value") (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setAppText(runtime.property(b, inst.scope))
 		// A field's `value` attribute is its text until something sets it, as on the web.
-		if (view is EditText && node.bindings.none { it.property && it.name == "value" }) node.attributes["value"]?.let { view.setAppText(it) }
+		if (view is EditText && node.bindings.none { it.property && it.name == "value" }) (node.bindings.firstOrNull { !it.property && it.name == "value" }?.let { runtime.attribute(it, inst.scope) } ?: node.attributes["value"])?.let { view.setAppText(it) }
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate, detail = pressCount(inst.id))) }
 			EventName.Dismiss -> if (OVERLAY_ATTRIBUTE !in node.attributes) throw MarklessHostError("dismiss event on \"${node.id}\", which is neither a sheet nor an overlay")

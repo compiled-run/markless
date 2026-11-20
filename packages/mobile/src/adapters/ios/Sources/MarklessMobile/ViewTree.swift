@@ -1000,7 +1000,7 @@ final class ViewTree {
 					let text = try bound.map { binding in
 						let value = try runtime.evaluate(binding.value, in: context.scope)
 						return value == .null ? "" : value.text
-					} ?? staticAttributes["value"]
+					} ?? current["value"]
 					if let area = view as? TextArea { area.text = text ?? "" } else { (view as? UITextField)?.text = text }
 				}
 				var childIndex = 0
