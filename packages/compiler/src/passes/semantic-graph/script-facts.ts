@@ -51,10 +51,89 @@ const stateName = (name: string): AnyNode =>
 		optional: false,
 	}) as unknown as AnyNode;
 
-/** A copy of `node` with each node `replace` answers swapped for its answer. */
+// What a web client build (Vite's, for production) gives `import.meta.env`: a phone runs the client's side of the app.
+const CLIENT_ENV: Readonly<Record<string, string | boolean>> = {
+	BASE_URL: '/',
+	MODE: 'production',
+	DEV: false,
+	PROD: true,
+	SSR: false,
+};
+
+const literal = (value: unknown): AnyNode =>
+	(value === undefined
+		? identifier('undefined')
+		: { type: 'Literal', value, raw: JSON.stringify(value) }) as unknown as AnyNode;
+
+const isImportMetaEnv = (node: AnyNode): boolean => {
+	const object = node.object as AnyNode | undefined;
+	return (
+		node.type === 'MemberExpression' &&
+		node.computed !== true &&
+		(node.property as AnyNode).name === 'env' &&
+		object?.type === 'MetaProperty' &&
+		(object.meta as AnyNode).name === 'import' &&
+		(object.property as AnyNode).name === 'meta'
+	);
+};
+
+/** The value a client build gives `import.meta.env.KEY` or its negation; undefined when `node` is neither. */
+function clientEnvRead(node: AnyNode): { readonly value: unknown } | undefined {
+	if (node.type === 'UnaryExpression' && node.operator === '!') {
+		const inner = clientEnvRead(node.argument as AnyNode);
+		return inner && { value: !inner.value };
+	}
+	if (node.type !== 'MemberExpression' || node.computed === true) return undefined;
+	if (!isImportMetaEnv(node.object as AnyNode)) return undefined;
+	const key = String((node.property as AnyNode).name);
+	return { value: Object.hasOwn(CLIENT_ENV, key) ? CLIENT_ENV[key] : undefined };
+}
+
+/**
+ * `node` as a client build has it: `import.meta.env` and its keys become the client's values, and a branch on one
+ * keeps only the side the client takes, as the web's bundle drops the other (often a server-only `import()`).
+ */
+function clientBuildOf(node: AnyNode): AnyNode | undefined {
+	const read = clientEnvRead(node);
+	if (read) return literal(read.value);
+	if (isImportMetaEnv(node))
+		return {
+			type: 'ObjectExpression',
+			properties: Object.entries(CLIENT_ENV).map(([key, value]) => ({
+				type: 'Property',
+				kind: 'init',
+				key: identifier(key),
+				value: literal(value),
+				computed: false,
+				method: false,
+				shorthand: false,
+			})),
+		} as unknown as AnyNode;
+	if (node.type === 'IfStatement' || node.type === 'ConditionalExpression') {
+		const test = clientEnvRead(node.test as AnyNode);
+		if (!test) return undefined;
+		if (test.value) return node.consequent as AnyNode;
+		return (
+			(node.alternate as AnyNode | null) ??
+			({ type: 'BlockStatement', body: [] } as unknown as AnyNode)
+		);
+	}
+	if (node.type === 'LogicalExpression' && (node.operator === '&&' || node.operator === '||')) {
+		const left = clientEnvRead(node.left as AnyNode);
+		if (!left) return undefined;
+		return Boolean(left.value) === (node.operator === '&&')
+			? (node.right as AnyNode)
+			: literal(left.value);
+	}
+	return undefined;
+}
+
+/** A copy of `node` with each node `replace` answers swapped for its answer, as a client build has it. */
 function cloneWith(node: AnyNode, replace: (node: AnyNode) => AnyNode | undefined): AnyNode {
 	const swapped = replace(node);
 	if (swapped) return swapped;
+	const client = clientBuildOf(node);
+	if (client) return cloneWith(client, replace);
 	const copy: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(node)) {
 		if (Array.isArray(value))
@@ -221,7 +300,7 @@ function globalOf(
 	};
 }
 
-/** Constructs type erasure cannot keep (`enum`, `namespace`), and markup, which no script runs. */
+/** Constructs type erasure cannot keep (`enum`, `namespace`), and markup and `import.meta`, which no script runs. */
 function unsupportedIn(
 	node: AnyNode,
 	filename: string,
@@ -229,6 +308,10 @@ function unsupportedIn(
 ): void {
 	if (String(node.type).startsWith('JSX')) {
 		into.push({ construct: 'markup', span: spanOf(node as never, filename) });
+		return;
+	}
+	if (node.type === 'MetaProperty') {
+		into.push({ construct: '`import.meta`', span: spanOf(node as never, filename) });
 		return;
 	}
 	if (node.type === 'TSEnumDeclaration' || node.type === 'TSModuleDeclaration')
@@ -362,11 +445,9 @@ export function scriptFunctionOf(
 		eventReads.push({ path, span: spanOf(at as never, filename) });
 	}
 	const print = (node: AnyNode): string => {
-		unsupportedIn(node, filename, unsupported);
-		return generate(
-			cloneWith(node, (candidate) => replaced.get(candidate)) as never,
-			PRINT,
-		).code.trim();
+		const client = cloneWith(node, (candidate) => replaced.get(candidate));
+		unsupportedIn(client, filename, unsupported);
+		return generate(client as never, PRINT).code.trim();
 	};
 	const declarations = [...inlined]
 		.sort((a, b) => (a.start as number) - (b.start as number))
@@ -384,7 +465,9 @@ export function scriptFunctionOf(
 	return {
 		code: [
 			...declarations,
-			asValue ? `return function () {\nreturn (${print(root)});\n};` : `return (${print(root)});`,
+			asValue
+				? `return function () {\nreturn (${print(root)});\n};`
+				: `return (${print(root)});`,
 		].join('\n'),
 		names: [...names.values()],
 		module: [...moduleNames],
@@ -458,12 +541,10 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 			else if (binding.scope.id === rootScope.id && !declares.includes(binding.name))
 				uses.add(binding.name);
 		}
-		unsupportedIn(node, filename, unsupported);
+		const client = cloneWith(node, (candidate) => replaced.get(candidate));
+		unsupportedIn(client, filename, unsupported);
 		statements.push({
-			code: generate(
-				cloneWith(node, (candidate) => replaced.get(candidate)) as never,
-				PRINT,
-			).code.trim(),
+			code: generate(client as never, PRINT).code.trim(),
 			declares,
 			uses: [...uses],
 			imports: [...used.values()],
@@ -589,12 +670,20 @@ export const scriptValueOf = (node: AnyNode, semantic: ModuleSemantics, filename
 	scriptFunctionOf(node, semantic, filename, true);
 
 /** The outermost node written exactly over `span`. */
-function nodeOver(semantic: ModuleSemantics, span: { readonly start: number; readonly end: number }): AnyNode | undefined {
+function nodeOver(
+	semantic: ModuleSemantics,
+	span: { readonly start: number; readonly end: number },
+): AnyNode | undefined {
 	const at = semantic.nodeAt(span.start);
 	let found: AnyNode | undefined;
 	if (!at) return undefined;
 	for (const node of semantic.ancestors(at) as Iterable<AnyNode>) {
-		if (node.start === span.start && node.end === span.end && node.type !== 'JSXExpressionContainer') found = node;
+		if (
+			node.start === span.start &&
+			node.end === span.end &&
+			node.type !== 'JSXExpressionContainer'
+		)
+			found = node;
 		if ((node.start as number) < span.start || (node.end as number) > span.end) break;
 	}
 	return found;
@@ -623,15 +712,23 @@ export function scriptFactsOf(source: string, filename: string) {
 			const at = semantic.nodeAt(rowSpan.start);
 			if (!at) return undefined;
 			for (const node of semantic.ancestors(at) as Iterable<AnyNode>)
-				if (node.type === 'JSXForExpression') return scriptFunctionOf(node.right as AnyNode, semantic, filename, true);
+				if (node.type === 'JSXForExpression')
+					return scriptFunctionOf(node.right as AnyNode, semantic, filename, true);
 			return undefined;
 		},
 		/** The function of `computed(...)` bound to `name` in `component` (module level when there is none). */
-		computed: (component: string | undefined, name: string): SemanticScriptFunction | undefined => {
+		computed: (
+			component: string | undefined,
+			name: string,
+		): SemanticScriptFunction | undefined => {
 			for (const binding of semantic.bindings) {
 				if (binding.name !== name) continue;
 				const declaring = declaringNode(semantic, binding);
-				if (declaring?.type !== 'VariableDeclarator' || !isFrameworkCall(semantic, declaring.init as AnyNode)) continue;
+				if (
+					declaring?.type !== 'VariableDeclarator' ||
+					!isFrameworkCall(semantic, declaring.init as AnyNode)
+				)
+					continue;
 				let owner: string | undefined;
 				for (const node of semantic.ancestors(declaring as never) as Iterable<AnyNode>)
 					if (isComponent(node)) {

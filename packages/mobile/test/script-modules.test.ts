@@ -17,6 +17,17 @@ export function retitle(text: string) {
 `,
 	'app/words.json': '{ "greeting": "hello", "count": 2 }',
 	'app/legacy.js': `exports.twice = function (value) { return value * 2; };\n`,
+	'app/where.ts': `export function where(): string {
+	if (import.meta.env.SSR) {
+		void import('./server.ts');
+		return 'server';
+	}
+	return import.meta.env.MODE + ' ' + import.meta.env.BASE_URL;
+}
+export function located(): string {
+	return import.meta.url;
+}
+`,
 };
 const readModule = (specifier: string) => {
 	const filename = `app/${specifier.replace('./', '')}`;
@@ -43,7 +54,14 @@ describe('modules a JavaScript handler imports', () => {
 		);
 		expect(diagnostics).toEqual([]);
 		expect(payload!.script!.source).not.toContain('retitle');
-		const runtime = createNativeRuntime(payload!, new Map(), {}, undefined, undefined, nodeScriptHost());
+		const runtime = createNativeRuntime(
+			payload!,
+			new Map(),
+			{},
+			undefined,
+			undefined,
+			nodeScriptHost(),
+		);
 		expect(runtime.dispatch({ event: 'activate', host: payload!.events[0]!.host })).toEqual([
 			{ op: 'text', node: 'h0:text0', value: 'HELLO!2' },
 		]);
@@ -72,6 +90,37 @@ describe('modules a JavaScript handler imports', () => {
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
 			"app/legacy.js is a CommonJS module, which a phone's script does not load; use its ES module build",
+		]);
+	});
+
+	it('reads import.meta.env as the web client build has it, and leaves out the server-only branch', async () => {
+		const { payload, diagnostics } = await build(
+			"text = where() + (import.meta.env.DEV ? ' dev' : ' prod') + (!import.meta.env.PROD || '!') + import.meta.env.VITE_UNSET;",
+			"import { where } from './where.ts';",
+		);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.script!.source).not.toContain('import(');
+		const runtime = createNativeRuntime(
+			payload!,
+			new Map(),
+			{},
+			undefined,
+			undefined,
+			nodeScriptHost(),
+		);
+		expect(runtime.dispatch({ event: 'activate', host: payload!.events[0]!.host })).toEqual([
+			{ op: 'text', node: 'h0:text0', value: 'production / prod!undefined' },
+		]);
+	});
+
+	it('refuses import.meta beyond its env by name, at its own line', async () => {
+		const { payload, diagnostics } = await build(
+			'text = located();',
+			"import { located } from './where.ts';",
+		);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => [d.message, d.primarySpan?.filename])).toEqual([
+			["app/where.ts uses `import.meta`, which a phone's script cannot run", 'app/where.ts'],
 		]);
 	});
 });
