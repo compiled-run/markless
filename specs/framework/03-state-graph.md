@@ -609,6 +609,11 @@ graph. Destructuring in the parameter list is auto-aliased as above.
 page. Key and fallback are string literals. It may be declared at module scope
 or in a component body; both follow the same contract.
 
+- **One key is one value on the page.** Every `storage()` with the same key,
+  in any module, reads and writes one graph node: a write in a page shows in a
+  layout component from another module that reads the key, and in everything
+  derived from it.
+
 - **Cookie is the default backing.** A server render that has a request reads
   the value from the request's `Cookie` header and renders with it, so text,
   attributes and everything derived from the value (for example a tabs root's

@@ -1,0 +1,30 @@
+{
+	"rung": 18,
+	"name": "A @for keyed by its index: rows that repeat a line, a row added, changed and dropped by position",
+	"steps": [
+		{
+			"visible": ["Lines", "Same line", "Last line"],
+			"absent": ["Added line", "First changed"]
+		},
+		{
+			"do": {
+				"tap": "Add a line"
+			},
+			"visible": ["Same line", "Last line", "Added line"],
+			"absent": ["First changed"]
+		},
+		{
+			"do": {
+				"tap": "Change the first"
+			},
+			"visible": ["First changed", "Same line", "Last line", "Added line"]
+		},
+		{
+			"do": {
+				"tap": "Drop the last"
+			},
+			"visible": ["First changed", "Same line", "Last line"],
+			"absent": ["Added line"]
+		}
+	]
+}

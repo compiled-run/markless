@@ -239,3 +239,81 @@ export function Page() @{
 	expect(selection('')).toMatch(/, \[\]$/);
 	expect(selection('Page')).toMatch(/, \[\]$/);
 });
+
+// Text beside an element in the children shares the child's element with it, so the
+// parent writes the text node next to that projected element.
+function updatesOf(result: Awaited<ReturnType<typeof compile>>, graphNodeId: string) {
+	const tags = new Map(result.semanticGraph.hostNodes.map((host) => [host.id, host.tagName]));
+	return result.protocolView.domUpdates
+		.filter((update) => update.graphNodeId === graphNodeId)
+		.map((update) => ({ tag: tags.get(update.hostNodeId), target: update.target }));
+}
+
+test('live text before an element in the children writes the text node before it', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+export function Box({ children }) @{
+	<p data-box>{children}</p>
+}
+export default function Boxed() @{
+	let site = state('North');
+	<main>
+		<Box>
+			{site}
+			<span>▾</span>
+		</Box>
+		<button onClick={() => (site = 'South')}>South</button>
+	</main>
+}`);
+	expect(updatesOf(result, 'state:site')).toEqual([
+		{ tag: 'span', target: { kind: 'text', sibling: 'previous' } },
+	]);
+});
+
+test('alternate shapes: text after an element, and texts on both sides of one', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+export function Frame({ children }) @{
+	<div>{children}</div>
+}
+export function Shapes() @{
+	let size = state(1);
+	let label = state('small');
+	<article>
+		<Frame><b>Size</b>{size} px</Frame>
+		<Frame>{label}: <i>/</i>{size}</Frame>
+		<button onClick={() => { size = size + 1; label = 'large'; }}>Grow</button>
+	</article>
+}`);
+	expect(updatesOf(result, 'state:size')).toEqual([
+		{ tag: 'b', target: { kind: 'text', suffix: ' px', sibling: 'next' } },
+		{ tag: 'i', target: { kind: 'text', sibling: 'next' } },
+	]);
+	expect(updatesOf(result, 'state:label')).toEqual([
+		{ tag: 'i', target: { kind: 'text', suffix: ': ', sibling: 'previous' } },
+	]);
+});
+
+test('several values in one text run beside an element update as one joined text', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+export function Chip({ children }) @{
+	<em>{children}</em>
+}
+export function Joined() @{
+	let first = state('a');
+	let last = state('b');
+	<section>
+		<Chip>{first} and {last}<u>!</u></Chip>
+		<button onClick={() => { first = 'c'; }}>Swap</button>
+	</section>
+}`);
+	const tags = new Map(result.semanticGraph.hostNodes.map((host) => [host.id, host.tagName]));
+	const updates = result.protocolView.domUpdates.filter(
+		(update) => tags.get(update.hostNodeId) === 'u',
+	);
+	expect(updates.map((update) => update.target)).toEqual([{ kind: 'text', sibling: 'previous' }]);
+	const binding = result.semanticGraph.graphBindings.find(
+		(candidate) => candidate.id === updates[0]!.graphNodeId,
+	);
+	expect(new Function('first', 'last', `return (${binding?.functionSource})();`)('c', 'b')).toBe(
+		'c and b',
+	);
+});

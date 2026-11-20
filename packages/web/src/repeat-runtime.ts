@@ -85,8 +85,12 @@ export function readKeyedRepeatCollection(
 	return Array.from((value ?? []) as Iterable<unknown>);
 }
 
-export function repeatItemKey(item: unknown, repeat: RuntimeKeyedRepeatRecord): unknown {
-	return readPath(item, repeat.keyPath);
+export function repeatItemKey(
+	item: unknown,
+	repeat: RuntimeKeyedRepeatRecord,
+	index: number,
+): unknown {
+	return repeat.indexKey ? index : readPath(item, repeat.keyPath);
 }
 
 function assertUniqueRepeatKeys(
@@ -94,8 +98,8 @@ function assertUniqueRepeatKeys(
 	items: ReadonlyArray<unknown>,
 ): void {
 	const seen = new Map<unknown, true>();
-	for (const item of items) {
-		const key = repeatItemKey(item, repeat);
+	for (const [index, item] of items.entries()) {
+		const key = repeatItemKey(item, repeat, index);
 		if (seen.has(key)) throw duplicateRepeatKeyError(repeat, key);
 		seen.set(key, true);
 	}

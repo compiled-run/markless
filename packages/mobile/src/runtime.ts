@@ -37,11 +37,18 @@ import {
 
 /** A host-side action: what a person does to a retained view. */
 export type NativeAction =
-	| { readonly event: 'activate'; readonly host: string }
+	/** A press; `detail` is how many presses in a row on it (a double tap's second is 2), 1 when left out. */
+	| { readonly event: 'activate'; readonly host: string; readonly detail?: number }
 	/** A person chose the option `host` (an instance id inside a list row) in its `<select>`'s list. */
 	| { readonly event: 'choose'; readonly host: string }
+	/** A text field took the keyboard (`focus`) or gave it up (`blur`). */
+	| { readonly event: 'focus' | 'blur'; readonly host: string }
 	/** The field's whole text after an edit. */
 	| { readonly event: 'input'; readonly host: string; readonly value: string }
+	/** A key of the on-screen keyboard in a text field, before it edits the text; `key` as the phone's browser names it. */
+	| { readonly event: 'keydown'; readonly host: string; readonly key: string }
+	/** A paste into a text field from its edit menu, before the text goes in. */
+	| { readonly event: 'paste'; readonly host: string; readonly text: string }
 	/** A live device value changed (connectivity, permission): the host writes the device cell. */
 	| { readonly event: 'device'; readonly cell: string; readonly value: Value }
 	/** A device call the host started has answered: a task cell takes `{ state: 'value', value }` or the error. */
@@ -150,6 +157,12 @@ const RAISE_DEPTH = 32;
 /** What the event running a handler carries, by the field a `{ event }` expression names. */
 export type NativeEventFields = {
 	readonly value?: string;
+	/** A text field's `keydown`: the key as the phone's browser names it. */
+	readonly key?: string;
+	/** A `paste`: the pasted plain text. */
+	readonly text?: string;
+	/** A press: how many presses in a row on the element. */
+	readonly detail?: number;
 	readonly reason?: string;
 	readonly pressTarget?: string | null;
 	readonly target?: string;
@@ -193,6 +206,8 @@ export type NativeScope = {
 	readonly formData?: (form: string) => Value;
 	/** A checkbox's or radio button's checkedness now, for `{ checked }`. */
 	readonly checked?: (node: string) => boolean;
+	/** A text field's text now, for `{ field }`. */
+	readonly fieldText?: (node: string) => string;
 	/** The device's clock, in milliseconds since 1970 (UTC). */
 	readonly now?: () => number;
 };
@@ -368,6 +383,7 @@ export function evaluateNativeExpr(
 								]),
 								...(scope.formData ? { formData: scope.formData } : {}),
 								...(scope.checked ? { checked: scope.checked } : {}),
+								...(scope.fieldText ? { fieldText: scope.fieldText } : {}),
 							},
 							compute,
 							elements,
@@ -393,6 +409,10 @@ export function evaluateNativeExpr(
 	}
 	if ('cell' in expr) return read(expr.cell, scope);
 	if ('literal' in expr) return expr.literal;
+	if ('field' in expr) {
+		if (!scope.fieldText) throw new Error(`the text of ${expr.field} read outside a runtime`);
+		return scope.fieldText(expr.field);
+	}
 	if ('checked' in expr) {
 		if (!scope.checked)
 			throw new Error(`the checkedness of ${expr.checked} read outside a runtime`);
@@ -564,6 +584,7 @@ export function createNativeRuntime(
 		params,
 		formData: (form) => entriesOf(form),
 		checked: (node) => checkedOf(node),
+		fieldText: (node) => textOf(node),
 		now,
 	};
 	const values = new Map<string, Value>(
@@ -1031,7 +1052,8 @@ export function createNativeRuntime(
 		const list = evaluate(repeat.list);
 		if (!Array.isArray(list))
 			throw new Error(`${repeat.id} lists a value that is not an array`);
-		return list.map((item) => {
+		return list.map((item, index) => {
+			if (repeat.byIndex) return { key: String(index), item };
 			let key: Value = item;
 			for (const step of repeat.key) {
 				if (
@@ -1063,6 +1085,40 @@ export function createNativeRuntime(
 				},
 			}))
 			.filter((instance) => shownIn(node, instance.scope));
+	};
+	/** For each row's state that has `rebuiltBy`, by slot (`<cell>@<key>`): those values now, as JSON. */
+	const rowSignatures = () => {
+		const signatures = new Map<string, string>();
+		for (const cell of payload.cells) {
+			if (!cell.row || !cell.rebuiltBy) continue;
+			const repeat = repeats.get(cell.row);
+			if (!repeat || !shown(repeat)) continue;
+			for (const { key, item } of rowsOf(repeat)) {
+				const scope = { ...base, items: new Map([[repeat.id, item]]), keys: new Map([[repeat.id, key]]) };
+				signatures.set(`${cell.id}@${key}`, JSON.stringify(cell.rebuiltBy.map((expr) => evaluate(expr, undefined, scope))));
+			}
+		}
+		return signatures;
+	};
+	/** As on the web, a part a row passes a changed value to is built again: that row's state starts over. */
+	const resetChangedRows = (before: Map<string, string>) => {
+		for (const [slot, now] of rowSignatures()) {
+			const was = before.get(slot);
+			if (was !== undefined && was !== now) values.delete(slot);
+		}
+	};
+	/** A row's state with a `first` takes it once, from the row's item, when the row is built. */
+	const seedRows = () => {
+		for (const cell of payload.cells) {
+			if (!cell.row || !cell.first) continue;
+			const repeat = repeats.get(cell.row);
+			if (!repeat || !shown(repeat)) continue;
+			for (const { key, item } of rowsOf(repeat)) {
+				const slot = `${cell.id}@${key}`;
+				if (values.has(slot)) continue;
+				values.set(slot, evaluate(cell.first, undefined, { ...base, items: new Map([[repeat.id, item]]), keys: new Map([[repeat.id, key]]) }));
+			}
+		}
 	};
 	const render = (parts: ReadonlyArray<NativeTextPart>, scope: NativeScope): string =>
 		parts
@@ -1479,12 +1535,17 @@ export function createNativeRuntime(
 				? instances(node).flatMap(({ id }) => (fired.has(`${event}\0${id}`) ? [] : [id]))
 				: [];
 		});
+	const shownInstance = (id: string) => {
+		const node = nodesById.get(id.split('@')[0]!);
+		return !!node && instances(node).some((shownNow) => shownNow.id === id);
+	};
+	// A field an arm hid is a new element when it shows again: it starts from its markup, as the web builds it.
 	const forgetHidden = () => {
-		for (const key of fired) {
-			const id = key.slice(key.indexOf('\0') + 1);
-			const node = nodesById.get(id.split('@')[0]!);
-			if (!node || !instances(node).some((shownNow) => shownNow.id === id)) fired.delete(key);
-		}
+		for (const key of fired) if (!shownInstance(key.slice(key.indexOf('\0') + 1))) fired.delete(key);
+		for (const id of edited.keys()) if (!shownInstance(id)) edited.delete(id);
+		for (const node of ticked)
+			if (!shown(node))
+				checkedness.set(node.id, checkedBinding(node.id) ?? node.attributes?.['checked'] !== undefined);
 		// A component an arm hid renders anew when it shows again, so its state starts over (a seed runs again then).
 		for (const cell of payload.cells) {
 			if (!cell.arm) continue;
@@ -1494,6 +1555,7 @@ export function createNativeRuntime(
 			} else if (cell.seed && reseed.delete(cell.id)) values.set(cell.id, evaluate(cell.seed));
 		}
 	};
+	seedRows();
 
 	return {
 		texts,
@@ -1863,18 +1925,26 @@ export function createNativeRuntime(
 				.find((shown) => shown.id === action.host);
 			if (!instance) throw new Error(`${action.host} is not shown`);
 			const scope = instance.scope;
-			const eventValue = action.event === 'input' ? action.value : undefined;
+			const edit = action.event === 'input' ? action.value : undefined;
+			const eventValue: string | NativeEventFields | undefined =
+				action.event === 'keydown'
+					? { key: action.key }
+					: action.event === 'paste'
+						? { text: action.text }
+						: action.event === 'activate'
+							? { detail: action.detail ?? 1 }
+							: edit;
 			// A press focuses the control it presses, as the browser does.
 			if (action.event === 'activate') focused = action.host;
 			// A number field's handlers read its value, which is empty while its text is no number.
 			const numeric = action.event === 'input' && elementOf(host).attributes?.['type'] === 'number';
 			const fields =
 				action.event === 'activate'
-					? clickFields(true)
-					: numeric && eventValue !== undefined
+					? { ...clickFields(true), detail: action.detail ?? 1 }
+					: numeric && typeof eventValue === 'string'
 						? nativeNumberValue(eventValue)
 						: eventValue;
-			return change(action.host, eventValue, () =>
+			return change(action.host, edit, () =>
 				run(handlers.get(event.handler) ?? [], fields, scope),
 			);
 		},
@@ -1992,6 +2062,10 @@ export function createNativeRuntime(
 					command: op.command,
 					...(op.preventScroll ? { preventScroll: true as const } : {}),
 				});
+				continue;
+			}
+			if (op.op === 'preventDefault') {
+				calls.push({ op: 'preventDefault' });
 				continue;
 			}
 			if (op.op === 'dialog') {
@@ -2130,6 +2204,7 @@ export function createNativeRuntime(
 		apply: () => NativeJournalEntry[],
 	): ReadonlyArray<NativeJournalEntry> {
 		{
+			seedRows();
 			const cellsBefore = new Map(values);
 			const beforeTexts = new Map(texts());
 			const beforeAttributes = keyed(attributes());
@@ -2153,6 +2228,7 @@ export function createNativeRuntime(
 			const ownedBefore = new Set(liveObjects());
 			const focusBefore = focused;
 			const stackBefore = stack;
+			const itemsBefore = rowSignatures();
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
 			// As the browser queues a dialog's close event, it runs after the handler that closed it.
@@ -2210,6 +2286,8 @@ export function createNativeRuntime(
 				if (list !== undefined && !kept.has(`${list}\0${slot.slice(at + 1)}`))
 					values.delete(slot);
 			}
+			resetChangedRows(itemsBefore);
+			seedRows();
 			forgetHidden();
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());
