@@ -1126,9 +1126,15 @@ final class ViewTree {
 			button.accessibilityLabel = label
 			return
 		}
+		// As the web names a button from its content: its text, and the label of an image or svg inside it.
 		func texts(_ view: UIView) -> [String] {
 			view.subviews.flatMap { child -> [String] in
 				if let label = child as? UILabel { return [label.text ?? ""] }
+				if child is DrawingView || child is UIImageView {
+					let own = child.accessibilityIdentifier.flatMap { attributes[$0] }
+					if own?["aria-hidden"] == "true" { return [] }
+					return [own?["aria-label"] ?? (child is UIImageView ? own?["alt"] : nil) ?? ""]
+				}
 				return texts(child)
 			}
 		}
