@@ -43,8 +43,8 @@ test('wake construction overrides storage fallbacks from the protocol slot', asy
 test('immediate warm mount reconciles a dependent from fallback to the seeded value', async () => {
 	// Reproduces the warm/write-remount browser failure at the graph level: the
 	// SSR text binding (a dependent subscriber) is created reading the fallback,
-	// and the slot-seeded value must reconcile it to 'dark' when the storage
-	// plane mounts — without an extra driver read.
+	// and the slot-seeded value must reconcile it to 'dark' on the cell's first
+	// read after the plane mounts — without an extra driver read.
 	(globalThis as typeof globalThis & Record<symbol, unknown>)[storageSlotSymbol] = {
 		'src/App.tsrx#theme-mode': 'dark',
 	};
@@ -69,6 +69,7 @@ test('immediate warm mount reconciles a dependent from fallback to the seeded va
 	});
 
 	createStoragePlane({ graph, state: state as never });
+	graph.read('storage:src/App.tsrx#theme-mode');
 	await graph.flush();
 
 	expect(rendered).toEqual(['dark']); // reconciled from fallback, exactly once
@@ -125,6 +126,7 @@ test('a write updates the protocol slot, so a page woken later on the same docum
 	const state = storageState();
 	const first = await createRuntimeGraphFromStatePayload(state as never);
 	const plane = createStoragePlane({ graph: first, state: state as never });
+	first.read('storage:src/App.tsrx#theme-mode');
 	first.write({ graphNodeId: 'storage:src/App.tsrx#theme-mode', value: 'dark' });
 	await first.flush();
 	plane.dispose();

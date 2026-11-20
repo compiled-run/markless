@@ -9290,6 +9290,27 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_REPEAT_EMPTY_ARM_SLOT_MISSING',
+		title: 'An @empty branch cannot find where a live value goes',
+		area: 'internal',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: [
+			'MARKLESS_REPEAT_EMPTY_ARM_SLOT_MISSING: cannot find where its @empty arm markup shows a live value.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/fns/empty-arm-slots.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/empty-arm-slots.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_REPEAT_EMPTY_ARM_UNMATCHED',
 		title: 'A list cannot find its @empty branch',
 		area: 'internal',

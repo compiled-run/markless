@@ -110,7 +110,8 @@ sealed interface Node {
 	/** An `@if` with [test] (arm 0 while truthy, arm 1 otherwise), or a chain with [tests]: the first truthy arm, else the `null` arm. */
 	data class Branch(override val id: String, override val parent: String?, val test: Expr?, val arms: Int, override val arm: ArmPlace? = null, override val row: String? = null, val tests: List<Expr?>? = null) : Node
 	/** A keyed list: one row per item of [list], keyed by `String()` of the item at the [key] path. */
-	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
+	/** [key] null: each row's key is its position (`byIndex`). */
+	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>?, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 	/** The platform's own sheet: its content is the nodes whose parent is this id, built at mount and kept; shown while [open] is truthy. */
 	data class Sheet(override val id: String, override val parent: String, val open: Expr, val snapPoints: List<Double>, val dismissible: Boolean, val modal: Boolean) : Node {
 		override val arm: ArmPlace? get() = null
@@ -657,10 +658,12 @@ data class Payload(
 					Node.Branch(id, if (parent == Json.Null) null else parent.str("$what.parent"), test, arms, armPlace(o, what), rowPlace(o, what), tests)
 				}
 				"repeat" -> {
-					o.only(setOf("kind", "id", "parent", "list", "key", "arm", "row"), what)
+					o.only(setOf("kind", "id", "parent", "list", "key", "byIndex", "arm", "row"), what)
 					val parent = o.field("parent", what)
 					val key = o.field("key", what).arr("$what.key").map { it.str("$what.key[]") }
-					Node.Repeat(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("list", what), "$what.list"), key, armPlace(o, what), rowPlace(o, what))
+					val byIndex = o["byIndex"]?.let { (it as? Json.Bool)?.value ?: throw MarklessDecodeError("$what.byIndex must be a boolean") } ?: false
+					if (byIndex && key.isNotEmpty()) throw MarklessDecodeError("$what is keyed by its index and has a key path")
+					Node.Repeat(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("list", what), "$what.list"), if (byIndex) null else key, armPlace(o, what), rowPlace(o, what))
 				}
 				"sheet" -> {
 					o.only(setOf("kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"), what)

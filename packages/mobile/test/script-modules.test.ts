@@ -17,6 +17,11 @@ export function retitle(text: string) {
 `,
 	'app/words.json': '{ "greeting": "hello", "count": 2 }',
 	'app/legacy.js': `exports.twice = function (value) { return value * 2; };\n`,
+	'app/entries.ts': `export function addEntry(saved: string, site: string): { saved: string; id: string } {
+	const id = Date.now().toString(36);
+	return { saved: JSON.stringify([{ site, id }, ...JSON.parse(saved)]), id };
+}
+`,
 };
 const readModule = (specifier: string) => {
 	const filename = `app/${specifier.replace('./', '')}`;
@@ -62,6 +67,59 @@ describe('modules a JavaScript handler imports', () => {
 				'app/helpers.ts',
 			],
 		]);
+	});
+
+	it('runs the app helper a submit handler calls, through a callback of a child form, as the browser runs it', async () => {
+		const { payload, diagnostics } = await compileNativeComponent({
+			filename: 'app/App.tsrx',
+			source: `import { state } from '@markless/core';
+import { addEntry } from './entries.ts';
+function EntryForm({ onSave }: { readonly onSave: (site: string) => void }) @{
+	<form
+		onSubmit={(event) => {
+			event.preventDefault();
+			onSave(String(new FormData(event.currentTarget).get('site')));
+		}}
+	>
+		<input name="site" value="North yard" />
+		<button>Add</button>
+	</form>
+}
+export default function App() @{
+	let saved = state('[]');
+	let last = state('');
+	<main>
+		<EntryForm
+			onSave={(site) => {
+				const added = addEntry(saved, site);
+				saved = added.saved;
+				last = added.id;
+			}}
+		/>
+		<p>{last}</p>
+		<p>{saved}</p>
+	</main>
+}
+`,
+			readModule,
+		});
+		expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const runtime = createNativeRuntime(
+			payload!,
+			new Map(),
+			{},
+			undefined,
+			undefined,
+			nodeScriptHost(),
+		);
+		const button = payload!.events.find((event) => event.event === 'activate')!.host;
+		const before = Date.now();
+		const journal = runtime.dispatch({ event: 'activate', host: button });
+		const texts = journal.flatMap((entry) => (entry.op === 'text' ? [entry.value] : []));
+		expect(texts).toHaveLength(2);
+		const [id, saved] = texts as [string, string];
+		expect(JSON.parse(saved)).toEqual([{ site: 'North yard', id }]);
+		expect(parseInt(id, 36)).toBeGreaterThanOrEqual(before);
 	});
 
 	it('refuses a CommonJS module by name', async () => {

@@ -727,6 +727,63 @@ test('a whole-page branch render takes the branch the page id names, not its loc
 	expect(rendered.html).toBe('<p>child arm</p>');
 });
 
+// The widgets a branch render rooted travel back with it, for the flip to file before its records register.
+test('a branch render hands back the shared definitions it rendered', async () => {
+	const definition = (id: string, scope: 'subtree' | 'page') => ({
+		id,
+		name: 'panelState',
+		scope,
+		version: 0,
+		graphNodeIds: [`${id}/state:panel`],
+		returnProperties: [],
+	});
+	const artifact: SsrRenderArtifact = {
+		async renderSsr() {
+			return {
+				html: '<main><aside>panel</aside></main>',
+				state: {
+					version: 1,
+					cells: [],
+					computed: [],
+					sharedDefinitions: [
+						definition('c2:shared:lib/panel.tsrx#panelState', 'subtree'),
+						definition('shared:lib/theme.tsrx#themeState', 'page'),
+					],
+				},
+				structure: {
+					anchors: [
+						{ kind: 'branch', id: 'branch-site:4', html: '<aside>panel</aside>', elementStart: 1, elementEnd: 2 },
+					],
+				},
+				view: {
+					version: 1,
+					locators: [],
+					events: [],
+					domUpdates: [],
+					behaviors: [],
+					elementHandles: [],
+					keyedRepeats: [],
+					branches: [
+						{
+							id: 'branch-site:4',
+							startAnchor: { strategy: 'dom-order-comment', index: 0 },
+							endAnchor: { strategy: 'dom-order-comment', index: 1 },
+						},
+					],
+					asyncBoundaries: [],
+				},
+			};
+		},
+	};
+
+	const rendered = await renderPrerenderBranch(artifact, 'branch-site:4', { read: () => undefined } as never);
+
+	expect(rendered.sharedDefinitions).toEqual([
+		definition('c2:shared:lib/panel.tsrx#panelState', 'subtree'),
+		definition('shared:lib/theme.tsrx#themeState', 'page'),
+	]);
+});
+
 test('registers newly discovered settled computeds while rendering their local value', async () => {
 	const order: string[] = [];
 	const values = new Map<string, unknown>([

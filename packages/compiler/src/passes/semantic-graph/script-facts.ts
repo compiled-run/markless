@@ -680,6 +680,40 @@ export function scriptFactsOf(source: string, filename: string) {
 			}
 			return undefined;
 		},
+		/**
+		 * A call to `name`, a function this module declares or imports from app code, with the arguments the caller passes as
+		 * the array `__s.args`; none for a component, framework state or a framework import.
+		 */
+		moduleCall: (name: string): SemanticScriptFunction | undefined => {
+			const binding = semantic.bindings.find(
+				(candidate) => candidate.name === name && candidate.scope.id === semantic.rootScope.id,
+			);
+			if (!binding) return undefined;
+			const imports = importSlots(semantic);
+			const imported = imports.record(binding);
+			const declaring = imported
+				? (binding.declarations[0] as AnyNode | undefined)
+				: !importOf(semantic, binding) && declaringNode(semantic, binding);
+			if (
+				!declaring ||
+				isComponent(declaring) ||
+				(declaring.type === 'VariableDeclarator' &&
+					isFrameworkCall(semantic, declaring.init as AnyNode))
+			)
+				return undefined;
+			const callee = imported ? generate(imports.reach(binding) as never, PRINT).code.trim() : name;
+			const span = spanOf(declaring as never, filename);
+			return {
+				code: `return function () {\nreturn ${callee}.apply(undefined, __s.args);\n};`,
+				names: [{ name: 'args', written: false, span }],
+				module: imported ? [] : [name],
+				imports: imported ? [{ slot: imported.index, name: imported.name }] : [],
+				globals: [],
+				framework: [],
+				span,
+				unsupported: [],
+			};
+		},
 		module: (): SemanticScriptModule => (module ??= scriptModuleOf(semantic, filename)),
 	};
 }
