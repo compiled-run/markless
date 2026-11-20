@@ -19,7 +19,7 @@ import {
 	type RouteManifest,
 } from '@markless/router';
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
-import { NATIVE_APP_VERSION } from '@markless/serializer/native-view';
+import { isNativeStyleStateAttribute, NATIVE_APP_VERSION } from '@markless/serializer/native-view';
 import { nativeStyleInputs, type NativeStyleInput } from './style-input.ts';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
@@ -250,16 +250,40 @@ function unstyledOnly(
 	styled: boolean,
 ): CompilerDiagnostic[] {
 	if (!styled) return [];
-	return payload.nodes.flatMap((node) =>
-		node.kind === 'element' && node.element === 'select'
-			? [
-					nativeUnsupported(
-						`the <select> ${node.id} on a styled page, which Dragon does not lay out yet`,
-						sources.get(node.id)?.span,
-					),
-				]
-			: [],
-	);
+	const rowCells = new Set(payload.cells.flatMap((cell) => (cell.row ? [cell.id] : [])));
+	// A row's item or its own state: what a list row reads, which differs from row to row.
+	const readsRow = (tree: unknown): boolean =>
+		Array.isArray(tree)
+			? tree.some(readsRow)
+			: tree !== null &&
+				typeof tree === 'object' &&
+				('item' in tree ||
+					('cell' in tree && rowCells.has((tree as { cell: string }).cell)) ||
+					Object.values(tree).some(readsRow));
+	return payload.nodes.flatMap((node) => {
+		if (node.kind !== 'element') return [];
+		const span = sources.get(node.id)?.span;
+		if (node.element === 'select')
+			return [
+				nativeUnsupported(
+					`the <select> ${node.id} on a styled page, which Dragon does not lay out yet`,
+					span,
+				),
+			];
+		if (!node.row) return [];
+		return (node.bindings ?? []).flatMap((binding) =>
+			'attribute' in binding &&
+			(binding.attribute === 'class' || isNativeStyleStateAttribute(binding.attribute)) &&
+			readsRow(binding.value)
+				? [
+						nativeUnsupported(
+							`the \`${binding.attribute}\` of <${node.element}> ${node.id} follows its @for row on a styled page; Dragon styles each node once, not per row, yet`,
+							span,
+						),
+					]
+				: [],
+		);
+	});
 }
 
 export type NativeAppBuild = {
