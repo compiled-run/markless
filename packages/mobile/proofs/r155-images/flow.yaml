@@ -7,6 +7,8 @@ name: r155-images
 - assertVisible: Green badge
 - assertVisible: Orange photo
 - assertVisible: Turned photo
+- assertVisible: Red and blue flag
+- assertVisible: Green strip
 - assertVisible: No such picture
 - assertVisible: Show square
 - assertNotVisible: Blue square

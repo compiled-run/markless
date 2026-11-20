@@ -1062,12 +1062,14 @@ final class ViewTree {
 			let src = current["src"]
 			// A photo the device took is a `file:` URL; any other src is a file the app packaged when it was built.
 			let packaged = src.flatMap { images[$0] }
-			let image = packaged.flatMap { UIImage(data: $0.data) }
+			let image = packaged?.data.flatMap { UIImage(data: $0) }
 				?? src.flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }
+			let natural = packaged.flatMap { p in p.width.flatMap { w in p.height.map { CGSize(width: w, height: $0) } } }
 			let length = { (name: String) in current[name].flatMap { Double($0.trimmingCharacters(in: .whitespaces)) } }
 			box.show(
-				image, natural: packaged.map { CGSize(width: $0.width, height: $0.height) } ?? image?.size, width: length("width"), height: length("height"),
+				image, drawing: packaged?.drawing, natural: natural ?? image?.size, width: length("width"), height: length("height"),
 				alt: current["alt"], sized: layout == nil)
+			if box.fillsWidth { fullWidth.insert(ObjectIdentifier(box)) } else { fullWidth.remove(ObjectIdentifier(box)) }
 			box.accessibilityLabel = current["aria-label"] ?? current["alt"]
 			// `alt=""` marks a decorative image, which a screen reader skips, as the web leaves it out of the tree.
 			box.isAccessibilityElement = current["aria-label"] != nil || current["alt"].map { !$0.isEmpty } ?? true

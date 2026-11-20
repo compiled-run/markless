@@ -10,6 +10,7 @@ import {
 	createNativeViewPayload,
 	DEVICE_TARGET_FACTS,
 	NATIVE_FACT_COLLECTORS,
+	nativeRefusal,
 	nativeUnsupported,
 	type NativeViewArtifact,
 } from '@markless/compiler/native';
@@ -20,7 +21,7 @@ import {
 } from '@markless/router';
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
 import { isNativeStyleStateAttribute, NATIVE_APP_VERSION } from '@markless/serializer/native-view';
-import { imageHeader, type NativeImage } from './images.ts';
+import { imageHeader, svgImage, type NativeImage } from './images.ts';
 import { nativeStyleInputs, type NativeStyleInput } from './style-input.ts';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
@@ -201,10 +202,20 @@ export async function compileNativeComponent(input: {
 		return graph;
 	};
 	const images = new Map<string, NativeImage>();
-	const imageAt = (src: string, read: NativeFile | undefined): boolean => {
-		const header = read && imageHeader(read.bytes);
+	const imageRefusals: CompilerDiagnostic[] = [];
+	// What the browser takes the file for comes from its type, which the server gives by its extension.
+	const imageAt = (src: string, read: NativeFile | undefined, span?: CompilerDiagnostic['primarySpan']): boolean => {
+		if (!read) return false;
+		if (read.file.toLowerCase().endsWith('.svg')) {
+			const svg = svgImage(read.bytes);
+			for (const refusal of svg?.refusals ?? [])
+				imageRefusals.push(nativeRefusal('svg', `${read.file}, the image ${src}: ${refusal}`, span));
+			if (svg) images.set(src, { src, file: read.file, bytes: read.bytes, ...svg.image });
+			return svg !== null;
+		}
+		const header = imageHeader(read.bytes);
 		if (header) images.set(src, { src, file: read.file, bytes: read.bytes, ...header });
-		return header !== null && header !== undefined;
+		return header !== null;
 	};
 	const assetImport = (specifier: string, importer: string): string | undefined => {
 		const read = input.readAsset?.(specifier, importer);
@@ -275,17 +286,18 @@ export async function compileNativeComponent(input: {
 	for (const node of native.payload?.nodes ?? []) {
 		const src = node.kind === 'element' && node.element === 'img' ? node.attributes?.src : undefined;
 		if (src && src.startsWith('/') && !src.startsWith('//') && !images.has(src))
-			imageAt(src, input.readServedFile?.(src));
+			imageAt(src, input.readServedFile?.(src), native.elementSources.get(node.id)?.span);
 	}
 	return {
-		payload: errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,
+		payload:
+			errors.length > 0 || usage.length > 0 || unstyled.length > 0 || imageRefusals.length > 0 ? null : native.payload,
 		images: [...images.values()],
 		styles,
 		stylesheets: sheets,
 		features: native.features,
 		manifest: deviceEntries,
 		elementSources: native.elementSources,
-		diagnostics: [...errors, ...native.diagnostics, ...usage, ...unstyled],
+		diagnostics: [...errors, ...native.diagnostics, ...usage, ...unstyled, ...imageRefusals],
 	};
 }
 

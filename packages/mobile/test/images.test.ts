@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { imageHeader } from '../src/images.ts';
+import { imageHeader, svgImage } from '../src/images.ts';
 
 const proofs = join(import.meta.dirname, '..', 'proofs');
 
@@ -42,4 +42,46 @@ test("a JPEG's EXIF orientation is applied to its natural size, as the browser's
 	expect(imageHeader(orientedJpeg(9, false, 200, 120))).toEqual({ format: 'jpeg', width: 200, height: 120 });
 	// A photo stored 200 by 120 with orientation 6 (turned a quarter clockwise), as a camera writes it.
 	expect(imageHeader(readFileSync(join(proofs, 'lib/turned.jpg')))).toEqual({ format: 'jpeg', width: 120, height: 200, orientation: 6 });
+});
+
+const svg = (markup: string) => svgImage(new TextEncoder().encode(markup));
+const NS = 'xmlns="http://www.w3.org/2000/svg"';
+
+test("an SVG file's natural size is the web's: its width and height, else from its viewBox's ratio, else 300 by 150", () => {
+	// Measured in Chrome: an <img> of each, with its natural size.
+	expect(svg(`<svg ${NS} width="40" height="20" viewBox="0 0 4 2"><rect width="4" height="2"/></svg>`)?.image).toMatchObject({ format: 'svg', width: 40, height: 20 });
+	expect(svg(`<svg ${NS} width="40" viewBox="0 0 4 2"><rect width="4" height="2"/></svg>`)?.image).toMatchObject({ width: 40, height: 20 });
+	expect(svg(`<svg ${NS} height="10" viewBox="0 0 4 2"><rect width="4" height="2"/></svg>`)?.image).toMatchObject({ width: 20, height: 10 });
+	expect(svg(`<svg ${NS} width="2em" height="1em" viewBox="0 0 4 2"><rect width="4" height="2"/></svg>`)?.image).toMatchObject({ width: 32, height: 16 });
+	expect(svg(`<svg ${NS}><rect width="4" height="2"/></svg>`)?.image).toMatchObject({ width: 300, height: 150 });
+	// Only a ratio: the image takes the width it is given (an <img> fills its line), its height from the ratio.
+	for (const markup of [`<svg ${NS} viewBox="0 0 23 14"><rect width="23" height="14"/></svg>`, `<svg ${NS} width="100%" height="50%" viewBox="0 0 23 14"><rect width="23" height="14"/></svg>`]) {
+		const image = svg(markup)?.image;
+		expect(image?.width).toBeUndefined();
+		expect(image?.height).toBeUndefined();
+		expect(image?.drawing.viewBox).toEqual([0, 0, 23, 14]);
+	}
+});
+
+test('an SVG file is drawn from shapes compiled when the app is built, scaled to the box as the browser scales it', () => {
+	const image = svg(`<?xml version="1.0" encoding="UTF-8"?>
+<!-- a comment -->
+<svg ${NS} xmlns:xlink="http://www.w3.org/1999/xlink" width="40" height="20">
+	<title>Flag</title>
+	<g fill="#ff0000"><rect width="20" height="20"/></g>
+</svg>`);
+	expect(image?.refusals).toEqual([]);
+	// Without a viewBox, the browser scales the picture from its natural size: the viewBox is that size.
+	expect(image?.image.drawing.viewBox).toEqual([0, 0, 40, 20]);
+	expect(image?.image.drawing.shapes).toHaveLength(1);
+	expect(image?.image.drawing.shapes[0]?.fill).toEqual({ r: 255, g: 0, b: 0, alpha: 255 });
+	expect(image?.image.drawing.width).toBeUndefined();
+});
+
+test('an SVG file a native drawing cannot draw is refused, naming why; bytes that are not SVG are no image', () => {
+	const image = svg(`<svg ${NS} viewBox="0 0 4 2"><defs><linearGradient id="g"/></defs><rect width="4" height="2" fill="url(#g)"/></svg>`);
+	expect(image?.refusals.join('\n')).toContain('gradients');
+	expect(svg('<svg><rect></svg>')).toBeNull();
+	expect(svg('<html xmlns="http://www.w3.org/1999/xhtml"/>')).toBeNull();
+	expect(svg('not markup')).toBeNull();
 });

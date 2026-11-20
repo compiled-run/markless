@@ -1092,6 +1092,9 @@ importers:
       '@markless/web':
         specifier: workspace:*
         version: link:../web
+      '@xmldom/xmldom':
+        specifier: 0.9.12
+        version: 0.9.12
       yaml:
         specifier: 2.9.1
         version: 2.9.1

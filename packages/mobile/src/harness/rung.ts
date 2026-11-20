@@ -23,7 +23,7 @@ import {
 import type { DeviceAppConfig, DeviceManifest } from '../permissions.ts';
 import { pageScrollDiagnostics } from '../page-scroll.ts';
 import { dragonDir, dragonStyleExport } from '../style-export.ts';
-import type { NativeImage } from '../images.ts';
+import type { NativeImage, NativeImageManifest } from '../images.ts';
 import { nativeStyleInput } from '../style-input.ts';
 import { readProofExpected } from './expected.ts';
 import {
@@ -124,11 +124,17 @@ export function assetReader(specifier: string, importer: string) {
 /** The app's packaged images: each file under `markless-images/`, and the manifest of src to file and natural size. */
 function imageAssets(images: ReadonlyArray<NativeImage>): Array<[string, Uint8Array]> {
 	if (images.length === 0) return [];
-	const manifest: Record<string, { file: string; width: number; height: number; orientation?: number }> = {};
+	const manifest: Record<string, NativeImageManifest[string]> = {};
 	const files: Array<[string, Uint8Array]> = [];
 	for (const image of images) {
+		const size = image.width !== undefined && image.height !== undefined ? { width: image.width, height: image.height } : {};
+		// An SVG file travels as its compiled drawing; the phone never reads SVG.
+		if (image.drawing) {
+			manifest[image.src] = { ...size, drawing: image.drawing };
+			continue;
+		}
 		const file = `${PROOF_IMAGES_FOLDER}/${createHash('sha256').update(image.bytes).digest('hex')}.${image.format}`;
-		manifest[image.src] = { file, width: image.width, height: image.height, ...(image.orientation && { orientation: image.orientation }) };
+		manifest[image.src] = { file, ...size, ...(image.orientation && { orientation: image.orientation }) };
 		if (!files.some(([path]) => path === file)) files.push([file, image.bytes]);
 	}
 	return [[PROOF_IMAGES_PATH, new TextEncoder().encode(`${JSON.stringify(manifest)}\n`)], ...files];
