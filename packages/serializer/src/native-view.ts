@@ -356,6 +356,19 @@ export type NativeColor = {
 	readonly alpha: number;
 };
 
+/**
+ * A gradient paint, as the browser paints an SVG `<linearGradient>` or `<radialGradient>` with `spreadMethod="pad"`.
+ * `points` are in the gradient's own space: linear `x1 y1 x2 y2`; radial `cx cy r fx fy fr` (the focal circle `fx fy fr`
+ * is where offset 0 starts). `transform` maps that space to the shape's units: the shape's bounding box for
+ * `objectBoundingBox`, then `gradientTransform`. Stops are in order, offsets 0 to 1, with every opacity folded into alpha.
+ */
+export type NativeGradient = {
+	readonly gradient: 'linear' | 'radial';
+	readonly points: ReadonlyArray<number>;
+	readonly stops: ReadonlyArray<{ readonly offset: number; readonly color: NativeColor }>;
+	readonly transform: readonly [number, number, number, number, number, number];
+};
+
 /** One shape of a drawing; numbers are in the drawing's user units. */
 export type NativeShape = {
 	/**
@@ -364,9 +377,9 @@ export type NativeShape = {
 	 */
 	readonly path: ReadonlyArray<number>;
 	/** `currentColor` is the svg's text colour: its style export's, else the page's default black. */
-	readonly fill: NativeColor | 'currentColor' | null;
+	readonly fill: NativeColor | 'currentColor' | NativeGradient | null;
 	readonly fillRule: 'nonzero' | 'evenodd';
-	readonly stroke: NativeColor | 'currentColor' | null;
+	readonly stroke: NativeColor | 'currentColor' | NativeGradient | null;
 	readonly width: number;
 	readonly cap: 'butt' | 'round' | 'square';
 	readonly join: 'miter' | 'round' | 'bevel';

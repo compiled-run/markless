@@ -199,6 +199,16 @@ public struct NativeShape: Equatable, Sendable {
 	public enum Paint: Equatable, Sendable {
 		case color(RGBA)
 		case currentColor
+		case gradient(Gradient)
+	}
+	/// A pad gradient: `points` linear x1 y1 x2 y2, radial cx cy r fx fy fr, in gradient space; `transform` maps it to the
+	/// shape's units.
+	public struct Gradient: Equatable, Sendable {
+		public let radial: Bool
+		public let points: [Double]
+		public let offsets: [Double]
+		public let colors: [RGBA]
+		public let transform: [Double]
 	}
 	/// Verb-coded: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close.
 	public let path: [Double]
@@ -840,6 +850,25 @@ public struct NativeViewPayload: Equatable, Sendable {
 			if reader.isString {
 				guard try reader.string() == "currentColor" else { throw reader.fail("unknown paint") }
 				return .currentColor
+			}
+			if try reader.object(required: [], optional: ["gradient", "points", "stops", "transform", "r", "g", "b", "alpha"]).has("gradient") {
+				let g = try reader.object(["gradient", "points", "stops", "transform"])
+				let kind = try g["gradient"].string()
+				guard kind == "linear" || kind == "radial" else { throw reader.fail("unknown gradient \(kind)") }
+				let points = try g["points"].array().map { try $0.number() }
+				guard points.count == (kind == "radial" ? 6 : 4) else { throw reader.fail("a \(kind) gradient has \(kind == "radial" ? 6 : 4) points") }
+				let transform = try g["transform"].array().map { try $0.number() }
+				guard transform.count == 6 else { throw reader.fail("a transform has six numbers") }
+				var offsets: [Double] = []
+				var colors: [RGBA] = []
+				for stop in try g["stops"].array() {
+					let s = try stop.object(["offset", "color"])
+					offsets.append(try s["offset"].number())
+					guard case let .color(rgba)? = try paint(try s["color"]) else { throw stop.fail("a stop's colour is a colour") }
+					colors.append(rgba)
+				}
+				guard !colors.isEmpty else { throw reader.fail("a gradient has stops") }
+				return .gradient(NativeShape.Gradient(radial: kind == "radial", points: points, offsets: offsets, colors: colors, transform: transform))
 			}
 			let color = try reader.object(["r", "g", "b", "alpha"])
 			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))

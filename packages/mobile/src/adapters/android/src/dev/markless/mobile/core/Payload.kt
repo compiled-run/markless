@@ -165,6 +165,8 @@ data class Rgba(val r: Int, val g: Int, val b: Int, val alpha: Int) {
 sealed interface ShapePaint {
 	data class Color(val color: Rgba) : ShapePaint
 	data object Current : ShapePaint
+	/** A pad gradient: [points] linear x1 y1 x2 y2, radial cx cy r fx fy fr, in gradient space; [transform] maps it to the shape's units. */
+	data class Gradient(val radial: Boolean, val points: List<Double>, val offsets: List<Double>, val colors: List<Rgba>, val transform: List<Double>) : ShapePaint
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
@@ -618,7 +620,22 @@ data class Payload(
 		private fun paint(v: Json, what: String): ShapePaint? = when (v) {
 			Json.Null -> null
 			is Json.Str -> if (v.value == "currentColor") ShapePaint.Current else throw MarklessDecodeError("$what must be a colour, \"currentColor\" or null")
-			else -> {
+			is Json.Obj -> if ("gradient" in v.fields) {
+				val o = v.obj(what)
+				o.only(setOf("gradient", "points", "stops", "transform"), what)
+				val radial = when (o.field("gradient", what).str("$what.gradient")) { "linear" -> false; "radial" -> true; else -> throw MarklessDecodeError("$what.gradient must be linear or radial") }
+				val points = o.field("points", what).arr("$what.points").map { it.num("$what.points") }
+				if (points.size != if (radial) 6 else 4) throw MarklessDecodeError("$what.points has ${points.size} numbers")
+				val transform = o.field("transform", what).arr("$what.transform").map { it.num("$what.transform") }
+				if (transform.size != 6) throw MarklessDecodeError("$what.transform has six numbers")
+				val stops = o.field("stops", what).arr("$what.stops").map { s ->
+					val stop = s.obj("$what.stops")
+					stop.only(setOf("offset", "color"), "$what.stops")
+					stop.field("offset", "$what.stops").num("$what.stops.offset") to (paint(stop.field("color", "$what.stops"), "$what.stops.color") as? ShapePaint.Color ?: throw MarklessDecodeError("$what.stops.color must be a colour")).color
+				}
+				if (stops.isEmpty()) throw MarklessDecodeError("$what.stops is empty")
+				ShapePaint.Gradient(radial, points, stops.map { it.first }, stops.map { it.second }, transform)
+			} else {
 				val o = v.obj(what)
 				o.only(setOf("r", "g", "b", "alpha"), what)
 				fun channel(name: String): Int {
@@ -628,6 +645,7 @@ data class Payload(
 				}
 				ShapePaint.Color(Rgba(channel("r"), channel("g"), channel("b"), channel("alpha")))
 			}
+			else -> throw MarklessDecodeError("$what must be a colour, a gradient, \"currentColor\" or null")
 		}
 
 		private fun live(v: Json, what: String): Live {

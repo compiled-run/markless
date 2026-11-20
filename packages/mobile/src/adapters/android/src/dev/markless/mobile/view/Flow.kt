@@ -2,6 +2,9 @@ package dev.markless.mobile.view
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
@@ -200,13 +203,13 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 			shape.fill?.let { fill ->
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.FILL
-				paint.color = colorOf(fill)
+				use(paint, fill)
 				canvas.drawPath(paths[index], paint)
 			}
 			shape.stroke?.let { stroke ->
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.STROKE
-				paint.color = colorOf(stroke)
+				use(paint, stroke)
 				paint.strokeWidth = shape.width.toFloat()
 				paint.strokeCap = when (shape.cap) { "round" -> Paint.Cap.ROUND; "square" -> Paint.Cap.SQUARE; else -> Paint.Cap.BUTT }
 				paint.strokeJoin = when (shape.join) { "round" -> Paint.Join.ROUND; "bevel" -> Paint.Join.BEVEL; else -> Paint.Join.MITER }
@@ -218,9 +221,28 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 		canvas.restore()
 	}
 
+	/** Sets [paint] to draw [given]: a colour, or a gradient as a shader whose local matrix maps its space to the shape's. */
+	private fun use(paint: Paint, given: ShapePaint) {
+		if (given !is ShapePaint.Gradient) {
+			paint.color = colorOf(given)
+			return
+		}
+		val p = given.points.map { it.toFloat() }
+		val colors = given.colors.map { it.argb }.toIntArray()
+		val offsets = given.offsets.map { it.toFloat() }.toFloatArray()
+		// One stop paints its colour everywhere, as the web does; a shader needs two.
+		val (c, o) = if (colors.size == 1) intArrayOf(colors[0], colors[0]) to floatArrayOf(0f, 1f) else colors to offsets
+		paint.shader = (if (given.radial) RadialGradient(p[3], p[4], p[5], p[0], p[1], p[2], c.map { Color.pack(it) }.toLongArray(), o, Shader.TileMode.CLAMP)
+			else LinearGradient(p[0], p[1], p[2], p[3], c, o, Shader.TileMode.CLAMP)).apply {
+			val (a, b, cc, d, e, f) = given.transform
+			setLocalMatrix(Matrix().apply { setValues(floatArrayOf(a.toFloat(), cc.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
+		}
+	}
+
 	private fun colorOf(paint: ShapePaint): Int = when (paint) {
 		is ShapePaint.Color -> paint.color.argb
 		ShapePaint.Current -> currentColor
+		is ShapePaint.Gradient -> throw MarklessHostError("a gradient is not one colour")
 	}
 }
 

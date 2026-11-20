@@ -2817,11 +2817,48 @@ describe('inline svg', () => {
 		).toEqual([20, 10]);
 	});
 
+	it('paints gradients in the shape\'s box, falls back as the browser does, and reads hsl() colours', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Logo() @{
+	<svg viewBox="0 0 20 10">
+		<linearGradient id="a" gradientTransform="rotate(90)"><stop offset="0.2" stop-color="hsl(120 100% 25%)" /><stop offset="0.1" stop-color="red" stop-opacity="0.5" /></linearGradient>
+		<radialGradient id="flat" r="0"><stop stop-color="blue" /></radialGradient>
+		<rect x="2" y="4" width="10" height="4" fill="url(#a)" opacity="0.5" />
+		<rect width="4" height="4" fill="url(#missing) hsl(0, 100%, 50%)" />
+		<rect width="4" height="4" fill="url(#flat)" />
+		<path d="M0 0h10" fill="url(#a)" />
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const shapes = (payload!.nodes.find((node) => 'drawing' in node && node.drawing) as { drawing: { shapes: { fill: unknown }[] } }).drawing.shapes;
+		expect(shapes.map((shape) => shape.fill)).toEqual([
+			{
+				gradient: 'linear',
+				points: [0, 0, 1, 0],
+				// Offsets never go back; each opacity is folded into alpha.
+				stops: [
+					{ offset: 0.2, color: { r: 0, g: 128, b: 0, alpha: 128 } },
+					{ offset: 0.2, color: { r: 255, g: 0, b: 0, alpha: 64 } },
+				],
+				transform: [6.123233995736766e-16, 4, -10, 2.4492935982947064e-16, 2, 4],
+			},
+			{ r: 255, g: 0, b: 0, alpha: 255 },
+			{ r: 0, g: 0, b: 255, alpha: 255 },
+			// A box of no height has no gradient space: nothing is painted.
+			null,
+		]);
+		const refused = await nativeView(`export function Logo() @{
+	<svg viewBox="0 0 10 10"><linearGradient id="r" spreadMethod="reflect"><stop stop-color="red" /></linearGradient><rect width="2" height="2" fill="url(#r)" /></svg>
+}`);
+		expect(refused.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'`spreadMethod="reflect"` on <linearGradient>; a native drawing draws pad only yet',
+		]);
+	});
+
 	it('refuses what a drawing cannot hold by name, at the shape that holds it', async () => {
 		const text = `import { state } from '@markless/core';
 export function Chart() @{
 	let w = state(4);
-	<svg viewBox="0 0 10 10">
+	<svg viewBox="0 0 10 10"><defs><pattern id="g" /></defs>
 		<path d="M0 0h10" stroke-dasharray="2 2" />
 		<rect width={w} height="2" fill="url(#g)" />
 		<text x="0" y="5">label</text>
@@ -2842,7 +2879,7 @@ export function Chart() @{
 				6,
 			],
 			[
-				'`fill="url(#g)"` on <rect>, a paint a native drawing does not have (gradients and patterns are not drawn yet)',
+				'`fill="url(#g)"` on <rect>, a paint a native drawing does not have (patterns are not drawn yet)',
 				6,
 			],
 			['the SVG <text> element, which a native drawing does not draw yet', 7],

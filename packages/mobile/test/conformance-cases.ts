@@ -946,6 +946,12 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
+		name: 'svg-paints',
+		fixture: 'proofs/r148-svg-paints/App.tsrx',
+		modules: true,
+		actions: [],
+	},
+	{
 		name: 'center',
 		fixture: 'proofs/r147-center/App.tsrx',
 		modules: true,

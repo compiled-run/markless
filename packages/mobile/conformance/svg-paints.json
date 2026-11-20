@@ -1,0 +1,156 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Paints"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"width": "240",
+					"height": "120",
+					"viewBox": "0 0 120 60",
+					"aria-label": "Sunrise"
+				},
+				"drawing": {
+					"viewBox": [0, 0, 120, 60],
+					"width": 240,
+					"height": 120,
+					"shapes": [
+						{
+							"path": [0, 0, 0, 1, 120, 0, 1, 120, 60, 1, 0, 60, 4],
+							"fill": {
+								"gradient": "linear",
+								"points": [0, 0, 0, 1],
+								"stops": [
+									{
+										"offset": 0,
+										"color": {
+											"r": 30,
+											"g": 58,
+											"b": 138,
+											"alpha": 255
+										}
+									},
+									{
+										"offset": 1,
+										"color": {
+											"r": 255,
+											"g": 153,
+											"b": 51,
+											"alpha": 255
+										}
+									}
+								],
+								"transform": [120, 0, 0, 60, 0, 0]
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"path": [
+								0, 76, 40, 3, 76, 48.83655599729269, 68.83655599729269, 56, 60, 56,
+								3, 51.16344400270731, 56, 44, 48.83655599729269, 44, 40, 3, 44,
+								31.163444002707305, 51.16344400270731, 24, 60, 24, 3,
+								68.83655599729269, 24, 76, 31.163444002707305, 76, 40, 4
+							],
+							"fill": {
+								"gradient": "radial",
+								"points": [0.5, 0.5, 0.5, 0.4, 0.4, 0],
+								"stops": [
+									{
+										"offset": 0,
+										"color": {
+											"r": 255,
+											"g": 247,
+											"b": 174,
+											"alpha": 255
+										}
+									},
+									{
+										"offset": 1,
+										"color": {
+											"r": 245,
+											"g": 158,
+											"b": 11,
+											"alpha": 204
+										}
+									}
+								],
+								"transform": [32, 0, 0, 32, 44, 24]
+							},
+							"fillRule": "nonzero",
+							"stroke": {
+								"r": 255,
+								"g": 255,
+								"b": 255,
+								"alpha": 255
+							},
+							"width": 2,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						}
+					]
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h13",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h13:text0",
+				"parent": "h13",
+				"parts": [
+					{
+						"text": "Sunrise drawn"
+					}
+				]
+			}
+		],
+		"events": [],
+		"handlers": []
+	},
+	"initial": [
+		["h1:text0", "Paints"],
+		["h13:text0", "Sunrise drawn"]
+	],
+	"steps": []
+}

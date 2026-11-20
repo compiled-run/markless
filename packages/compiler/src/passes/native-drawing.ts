@@ -1,4 +1,4 @@
-import type { NativeColor, NativeDrawing, NativeShape } from '@markless/serializer';
+import type { NativeColor, NativeDrawing, NativeGradient, NativeShape } from '@markless/serializer';
 
 // An inline <svg> as data a native host draws: SVG 2's attribute grammars (path data, points, transforms, viewBox, paint)
 // read once when the app is built, so no phone parses SVG.
@@ -25,7 +25,8 @@ export type DrawingResult = {
 type Matrix = readonly [number, number, number, number, number, number];
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 
-type Paint = NativeColor | 'currentColor' | null;
+/** A paint as inherited: a gradient stays the element it names until a shape's box resolves it. */
+type Paint = NativeColor | 'currentColor' | null | { readonly gradient: DrawingElement };
 /** The inherited presentation properties (SVG 2 §13 and §6.6), with `opacity` folded into each paint's alpha. */
 type Inherited = {
 	readonly fill: Paint;
@@ -57,7 +58,16 @@ const INITIAL: Inherited = {
 
 const SHAPES = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 /** Elements that draw nothing themselves and whose content is never drawn in place. */
-const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata']);
+const NEVER_DRAWN = new Set([
+	'defs',
+	'symbol',
+	'title',
+	'desc',
+	'metadata',
+	'linearGradient',
+	'radialGradient',
+	'stop',
+]);
 /** Attributes that change nothing a native drawing shows. */
 const NO_DRAWING_EFFECT = new Set([
 	'class',
@@ -154,6 +164,24 @@ export function compileDrawing(
 		const paint = (name: 'fill' | 'stroke') => {
 			const raw = attribute(name);
 			if (raw === undefined) return;
+			const reference = /^url\(\s*(['"]?)#([^'")\s]+)\1\s*\)\s*(.*)$/.exec(raw.trim());
+			if (reference) {
+				const target = byId.get(reference[2]!);
+				if (target?.tag === 'linearGradient' || target?.tag === 'radialGradient') {
+					next[name] = { gradient: target };
+					return;
+				}
+				// A reference to nothing paints the fallback colour after it, or nothing at all, as the browser does.
+				const fallback = reference[3]!.trim();
+				const parsed = fallback === '' ? null : parsePaint(fallback);
+				if (parsed === undefined || (target && fallback === ''))
+					refuse(
+						element.id,
+						`\`${name}="${raw}"\` on <${element.tag}>, a paint a native drawing does not have (patterns are not drawn yet)`,
+					);
+				else next[name] = parsed;
+				return;
+			}
 			const parsed = parsePaint(raw);
 			if (parsed === undefined)
 				refuse(
@@ -250,9 +278,89 @@ export function compileDrawing(
 		}
 	};
 
+	/** A gradient element as a paint for one shape (`outline` gives its bounding box); null where the browser paints none. */
+	const gradientOf = (
+		element: DrawingElement,
+		outline: ReadonlyArray<number>,
+		opacity: number,
+		style: Inherited,
+	): NativeGradient | NativeColor | null => {
+		const attributes = element.attributes;
+		for (const name of ['href', 'xlink:href'])
+			if (attributes[name] !== undefined)
+				refuse(element.id, `\`${name}\` on <${element.tag}>, a gradient built on another, which a native drawing does not draw yet`);
+		const spread = attributes.spreadMethod?.trim() ?? 'pad';
+		if (spread !== 'pad')
+			refuse(element.id, `\`spreadMethod="${spread}"\` on <${element.tag}>; a native drawing draws pad only yet`);
+		const units = attributes.gradientUnits?.trim() ?? 'objectBoundingBox';
+		const box = units === 'objectBoundingBox';
+		if (!box && units !== 'userSpaceOnUse')
+			refuse(element.id, `\`gradientUnits="${units}"\` on <${element.tag}>`);
+		const coordinate = (name: string, fallback: number): number => {
+			const raw = attributes[name]?.trim();
+			if (raw === undefined) return fallback;
+			if (raw.endsWith('%') && box) return Number(raw.slice(0, -1)) / 100;
+			const value = Number(raw);
+			if (raw === '' || !Number.isFinite(value)) {
+				refuse(element.id, `\`${name}="${raw}"\` on <${element.tag}>, which is not a number${box ? ' or a percentage' : ' in user units'}`);
+				return fallback;
+			}
+			return value;
+		};
+		const points =
+			element.tag === 'linearGradient'
+				? [coordinate('x1', 0), coordinate('y1', 0), coordinate('x2', box ? 1 : 0), coordinate('y2', 0)]
+				: (() => {
+						const cx = coordinate('cx', box ? 0.5 : 0);
+						const cy = coordinate('cy', box ? 0.5 : 0);
+						return [cx, cy, coordinate('r', box ? 0.5 : 0), coordinate('fx', cx), coordinate('fy', cy), coordinate('fr', 0)];
+					})();
+		if (!box && ['x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'fx', 'fy', 'fr'].some((name) => attributes[name]?.trim().endsWith('%')))
+			refuse(element.id, `a percentage on <${element.tag} gradientUnits="userSpaceOnUse">, which a native drawing does not resolve yet`);
+		const stops: { offset: number; color: NativeColor }[] = [];
+		for (const stop of elements.filter((child) => child.tag === 'stop' && child.path.length === element.path.length + 1 && isPrefix(element.path, child.path))) {
+			const raw = stop.attributes.offset?.trim() ?? '0';
+			const parsed = raw.endsWith('%') ? Number(raw.slice(0, -1)) / 100 : Number(raw);
+			const offset = Math.min(1, Math.max(0, Number.isFinite(parsed) ? parsed : 0, stops.at(-1)?.offset ?? 0));
+			if ((stop.attributes.style ?? '').trim() !== '')
+				refuse(stop.id, `\`style\` on <stop>, whose stop-color a native drawing does not read from styles yet`);
+			const written = stop.attributes['stop-color']?.trim() ?? 'black';
+			const color = written === 'currentColor' || written === 'currentcolor' ? style.color : parseColor(written);
+			if (!color) {
+				refuse(stop.id, `\`stop-color="${written}"\` on <stop>${written.startsWith('current') ? ', whose colour comes from the page\'s styles' : ''}`);
+				continue;
+			}
+			const stopOpacity = parseOpacity(stop.attributes['stop-opacity'] ?? '1') ?? 1;
+			stops.push({ offset, color: { ...color, alpha: Math.round(color.alpha * stopOpacity * opacity) } });
+		}
+		if (stops.length === 0) return null;
+		// A gradient of no length (or no radius) paints its last stop's colour, as SVG 2 says.
+		const degenerate =
+			element.tag === 'linearGradient'
+				? points[0] === points[2] && points[1] === points[3]
+				: points[2]! <= 0;
+		if (degenerate) return stops.at(-1)!.color;
+		let transform: Matrix = IDENTITY;
+		if (box) {
+			const bounds = outlineBounds(outline);
+			// A box of no width or height has no gradient space: the browser paints nothing.
+			if (!bounds || bounds[2] === 0 || bounds[3] === 0) return null;
+			transform = [bounds[2], 0, 0, bounds[3], bounds[0], bounds[1]];
+		}
+		const own = attributes.gradientTransform;
+		if (own !== undefined) {
+			const parsed = parseTransform(own);
+			if (parsed === null) refuse(element.id, `\`gradientTransform="${own}"\` on <${element.tag}>`);
+			else transform = multiply(transform, parsed);
+		}
+		return { gradient: element.tag === 'linearGradient' ? 'linear' : 'radial', points, stops, transform };
+	};
+
 	const shapes: NativeShape[] = [];
 	const emit = (element: DrawingElement, outline: number[], style: Inherited, matrix: Matrix) => {
-		const alpha = (given: Paint, opacity: number): Paint => {
+		const alpha = (given: Paint, opacity: number): NativeShape['fill'] => {
+			if (given !== null && typeof given === 'object' && 'gradient' in given)
+				return gradientOf(given.gradient, outline, opacity, style);
 			const paint = given === 'currentColor' && style.color ? style.color : given;
 			if (paint === null || paint === 'currentColor' || opacity === 1) return paint;
 			return { ...paint, alpha: Math.round(paint.alpha * opacity) };
@@ -452,6 +560,57 @@ export function compileDrawing(
 }
 
 // Geometry.
+
+/** The bounding box `[x, y, width, height]` of a verb-coded outline, curves by their extremes; null when it is empty. */
+export function outlineBounds(outline: ReadonlyArray<number>): [number, number, number, number] | null {
+	let minX = Infinity;
+	let minY = Infinity;
+	let maxX = -Infinity;
+	let maxY = -Infinity;
+	const add = (x: number, y: number) => {
+		minX = Math.min(minX, x);
+		maxX = Math.max(maxX, x);
+		minY = Math.min(minY, y);
+		maxY = Math.max(maxY, y);
+	};
+	// The t in (0, 1) where one coordinate of a cubic from p0 through p1, p2 to p3 turns.
+	const turns = (p0: number, p1: number, p2: number, p3: number): number[] => {
+		const a = -p0 + 3 * p1 - 3 * p2 + p3;
+		const b = 2 * (p0 - 2 * p1 + p2);
+		const c = p1 - p0;
+		if (Math.abs(a) < 1e-12) return Math.abs(b) < 1e-12 ? [] : [-c / b];
+		const d = b * b - 4 * a * c;
+		if (d < 0) return [];
+		const root = Math.sqrt(d);
+		return [(-b + root) / (2 * a), (-b - root) / (2 * a)];
+	};
+	let x = 0;
+	let y = 0;
+	for (let index = 0; index < outline.length; ) {
+		const verb = outline[index]!;
+		if (verb === 0 || verb === 1) {
+			x = outline[index + 1]!;
+			y = outline[index + 2]!;
+			add(x, y);
+			index += 3;
+		} else if (verb === 3) {
+			const [x1, y1, x2, y2, x3, y3] = outline.slice(index + 1, index + 7) as [number, number, number, number, number, number];
+			add(x3, y3);
+			for (const t of [...turns(x, x1, x2, x3), ...turns(y, y1, y2, y3)]) {
+				if (!(t > 0 && t < 1)) continue;
+				const u = 1 - t;
+				add(
+					u * u * u * x + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3,
+					u * u * u * y + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3,
+				);
+			}
+			x = x3;
+			y = y3;
+			index += 7;
+		} else index += 1;
+	}
+	return Number.isFinite(minX) ? [minX, minY, maxX - minX, maxY - minY] : null;
+}
 
 function multiply(m: Matrix, n: Matrix): Matrix {
 	return [
@@ -996,6 +1155,28 @@ export function parseColor(raw: string): NativeColor | null {
 					: Number(alphaPart);
 		if (r == null || g == null || b == null || !Number.isFinite(alpha)) return null;
 		return { r, g, b, alpha: Math.round(Math.min(Math.max(alpha, 0), 1) * 255) };
+	}
+	const hsl = /^hsla?\(([^)]*)\)$/.exec(text);
+	if (hsl) {
+		const parts = hsl[1]!.split(/\s*[,/]\s*|\s+/).filter((part) => part !== '');
+		if (parts.length !== 3 && parts.length !== 4) return null;
+		const angle = /^(-?[\d.]+(?:e-?\d+)?)(deg|rad|grad|turn)?$/.exec(parts[0]!);
+		const percent = (part: string) => (part.endsWith('%') ? Number(part.slice(0, -1)) / 100 : NaN);
+		const turns = { deg: 1 / 360, rad: 1 / (2 * Math.PI), grad: 1 / 400, turn: 1 } as const;
+		const hue = angle ? Number(angle[1]) * turns[(angle[2] ?? 'deg') as keyof typeof turns] : NaN;
+		const saturation = Math.min(Math.max(percent(parts[1]!), 0), 1);
+		const lightness = Math.min(Math.max(percent(parts[2]!), 0), 1);
+		const alphaPart = parts[3];
+		const alpha = alphaPart === undefined ? 1 : alphaPart.endsWith('%') ? Number(alphaPart.slice(0, -1)) / 100 : Number(alphaPart);
+		if (![hue, saturation, lightness, alpha].every(Number.isFinite)) return null;
+		// CSS Color 4's hsl-to-rgb.
+		const h = ((hue % 1) + 1) % 1;
+		const channel = (n: number) => {
+			const k = (n + h * 12) % 12;
+			const a = saturation * Math.min(lightness, 1 - lightness);
+			return Math.round((lightness - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))) * 255);
+		};
+		return { r: channel(0), g: channel(8), b: channel(4), alpha: Math.round(Math.min(Math.max(alpha, 0), 1) * 255) };
 	}
 	const named = NAMED_COLORS[text];
 	if (named === undefined) return null;
