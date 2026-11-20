@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loadProjectGraph, type ProjectGraph } from '../../analyzer/test-support/project-graph.ts';
 import { allRungFolders } from '../proofs/ladder.ts';
 import { affectedRungs } from '../src/runner/affected.ts';
@@ -200,6 +200,14 @@ describe('the rungs a change affects, from the project graph', () => {
 });
 
 describe("the runner's checkout", () => {
+	// Inside the commit hook git exports GIT_DIR and GIT_INDEX_FILE, which would point these git calls at the real repository.
+	const hookEnv = Object.entries(process.env).filter(([key]) => key.startsWith('GIT_'));
+	beforeAll(() => {
+		for (const [key] of hookEnv) delete process.env[key];
+	});
+	afterAll(() => {
+		for (const [key, value] of hookEnv) process.env[key] = value;
+	});
 	const behind: CheckoutFacts = {
 		head: 'a'.repeat(40),
 		upstream: 'b'.repeat(40),
