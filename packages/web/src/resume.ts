@@ -51,6 +51,7 @@ export function createResumeRuntime(
 		elementsByHostId,
 		input.view.elementHandles,
 		input.view.keyedRepeats,
+		input.graph,
 	);
 	const prepared = { elementsByHostId, elementHandles, asyncBoundariesById };
 	let state: FacadeState | undefined;

@@ -1,3 +1,4 @@
+import type { RuntimeGraph } from '@markless/runtime';
 import type {
 	ElementHandleRegistry,
 	ResumeDomComment,
@@ -10,7 +11,7 @@ import {
 	mismatchedElementLocatorError,
 	missingElementLocatorError,
 } from './inline/resume-errors.ts';
-import { marklessElementAt, pageNodes } from './resume-anchor-census.ts';
+import { elementsOf, marklessElementAt, pageNodes } from './resume-anchor-census.ts';
 import { censusElements, spliceCensus } from './resume-census.ts';
 import { qualifiedElementHandleId } from './resume-handle-qualifier.ts';
 import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../serializer/src/protocol-locator-paths.ts';
@@ -83,6 +84,7 @@ export function materializeElementHandles(
 	// repeat's live children hold at READ time, so a reorder or a removal needs
 	// no bookkeeping to stay true. See rowMembers().
 	keyedRepeats: ResumeViewRecord['keyedRepeats'] = [],
+	graph?: Pick<RuntimeGraph, 'read'>,
 ): ElementHandleRegistry {
 	type Held = {
 		readonly handleId: string;
@@ -163,15 +165,14 @@ export function materializeElementHandles(
 		const element = elementsByHostId.get(handle.hostNodeId);
 		if (element) register(handle.hostNodeId, handle, element);
 	}
-	// Row members are walked, never filed: a repeat's rows ARE its parent's
+	// Row members are walked, never filed: a repeat's rows are its span of its parent's
 	// element children, so insert, remove and reorder need no bookkeeping.
 	function rowMembers(id: string): ResumeDomElement[] {
 		const members: ResumeDomElement[] = [];
 		for (const handle of rowHandles) {
 			if (handle.handleId !== id && handle.name !== id) continue;
 			const parent = elementsByHostId.get(handle.repeat.parentHostNodeId);
-			for (const rowRoot of parent?.childNodes ?? []) {
-				if (rowRoot.nodeType !== 1) continue;
+			for (const rowRoot of parent ? repeatRows(parent, handle.repeat, graph) : []) {
 				const member = marklessElementAt(rowRoot, handle.hostPath);
 				if (member) members.push(member);
 			}
@@ -203,6 +204,27 @@ export function materializeElementHandles(
 		register,
 		deleteHost,
 	};
+}
+
+// A repeat's rows may share their parent with elements before and after them.
+function repeatRows(
+	parent: ResumeDomElement,
+	{
+		collectionGraphNodeId: id,
+		collectionPath,
+		rowStartOffset = 0,
+		rowEndOffset: end,
+	}: NonNullable<ResumeViewRecord['keyedRepeats']>[number],
+	graph?: Pick<RuntimeGraph, 'read'>,
+): ResumeDomElement[] {
+	const children = elementsOf(pageNodes(parent));
+	const items =
+		id && graph
+			? (graph.read(id, collectionPath) as { length?: number; size?: number } | undefined)
+			: false;
+	const count = items === false ? children.length : (items?.length ?? items?.size ?? 0);
+	const from = end === undefined ? rowStartOffset : Math.max(0, children.length - end - count);
+	return children.slice(from, from + count);
 }
 
 // Document order asked of the document, not of the pinned census: rows the

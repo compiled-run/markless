@@ -1,0 +1,84 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume"
+			],
+			"delta": 13,
+			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-locators"
+			],
+			"delta": 402,
+			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 18,
+			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume"
+			],
+			"delta": 13,
+			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-locators"
+			],
+			"delta": 402,
+			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 8,
+			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
+			"date": "2026-11-20"
+		}
+	]
+}
