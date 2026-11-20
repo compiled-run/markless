@@ -1768,6 +1768,23 @@ export function App() @{
 			'the click handler uses `FormData`: an HTML form, which a phone does not have',
 		);
 	});
+	it('binds a typed callback parameter by its name, as data', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function Pick({ onPick }: { readonly onPick: (value: string) => void }) @{
+	<button onClick={() => onPick('tea')}>Pick</button>
+}
+export function App() @{
+	let chosen = state('');
+	<main>
+		<Pick onPick={(value: string) => (chosen = value)} />
+		<p>{chosen}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{ op: 'assign', cell: 'state:chosen', value: { literal: 'tea' } },
+		]);
+	});
 });
 
 describe('the element vocabulary', () => {

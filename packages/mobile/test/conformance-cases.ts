@@ -547,6 +547,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'typed-callbacks',
+		fixture: 'proofs/r118-typed-callbacks/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h1' },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+		],
+	},
+	{
 		name: 'script-async',
 		fixture: 'proofs/j3-await-catch/App.tsrx',
 		modules: true,

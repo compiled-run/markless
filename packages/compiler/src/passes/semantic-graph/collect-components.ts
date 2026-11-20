@@ -375,6 +375,13 @@ function componentPropBindings(
 				source: inlined?.source ?? expressionSource(callback, state.source),
 				kind: 'callback',
 				...(NATIVE_FACTS ? nativeStatementsOf(factoryCall ? undefined : callback, state) : {}),
+				...(NATIVE_FACTS && !factory
+					? {
+							nativeParameters: parameterNodes.map(
+								(parameter) => getIdentifierName(parameter) ?? '',
+							),
+						}
+					: {}),
 				...(inlined?.definitionSpans.length
 					? { definitionSpans: inlined.definitionSpans }
 					: {}),

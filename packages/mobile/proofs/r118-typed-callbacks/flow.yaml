@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+name: r118-typed-callbacks
+---
+- launchApp:
+    clearState: true
+- assertVisible: Typed callbacks
+- assertVisible: Drink none, cups 0
+- assertVisible: Wi-Fi is off
+- tapOn: Tea
+- assertNotVisible: Drink none, cups 0
+- assertVisible: Drink tea, cups 3
+- assertNotVisible: Drink none, cups 0
+- tapOn: Coffee
+- assertNotVisible: Drink tea, cups 3
+- assertVisible: Drink coffee, cups 9
+- assertVisible: Wi-Fi is off
+- assertNotVisible: Drink tea, cups 3
+- tapOn: Wi-Fi
+- assertNotVisible: Wi-Fi is off
+- assertVisible: Wi-Fi is on
+- assertNotVisible: Wi-Fi is off

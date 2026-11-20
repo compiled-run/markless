@@ -416,7 +416,7 @@ const forwardedEvent = ({ prop, edge }: Forwarded, host: string): SemanticEvent 
 	...(prop.catchResets ? { handlerCatchResets: prop.catchResets } : {}),
 	...(prop.catchBoundaryId ? { handlerCatchBoundaryId: prop.catchBoundaryId } : {}),
 	...(prop.returnsPromise ? { handlerReturnsPromise: true as const } : {}),
-	handlerParameters: prop.parameters ?? [],
+	handlerParameters: prop.nativeParameters ?? prop.parameters ?? [],
 	...(prop.nativeStatements ? { handlerStatements: prop.nativeStatements } : {}),
 	hasSyncPolicyCandidate: prop.hasSyncPolicyCandidate ?? false,
 	...(prop.syncPolicy ? { syncPolicy: prop.syncPolicy } : {}),
@@ -4398,7 +4398,7 @@ export function createNativeViewPayload(
 								props.set(carried.prop.name, {
 									kind: 'callback',
 									statements: carried.prop.nativeStatements,
-									parameters: carried.prop.parameters ?? [],
+									parameters: carried.prop.nativeParameters ?? carried.prop.parameters ?? [],
 									scope: carried.scope,
 									...(carried.prop.sourceSpan ? { span: carried.prop.sourceSpan } : {}),
 								});
@@ -4408,7 +4408,7 @@ export function createNativeViewPayload(
 						value = {
 							kind: 'callback',
 							statements: prop.nativeStatements,
-							parameters: prop.parameters ?? [],
+							parameters: prop.nativeParameters ?? prop.parameters ?? [],
 							scope,
 							...(prop.sourceSpan ? { span: prop.sourceSpan } : {}),
 						};
@@ -4913,7 +4913,7 @@ export function createNativeViewPayload(
 				);
 				return;
 			}
-			const [parameter] = onChange.parameters ?? [];
+			const [parameter] = onChange.nativeParameters ?? onChange.parameters ?? [];
 			const handler = `handler:${id}`;
 			events.push({ host: id, event: 'dismiss', handler });
 			continuations = { base: handler, next: 0 };
