@@ -490,6 +490,10 @@ jobs:
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium webkit
 
+            - name: Warm the runner's WebKit before the first test opens a page
+              if: steps.lane.outputs.run == 'true'
+              run: node scripts/ci/warm-webkit.mjs
+
             - name: Run unit and integration tests
               if: steps.lane.outputs.run == 'true'
               env:
