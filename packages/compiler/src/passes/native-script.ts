@@ -68,6 +68,33 @@ if (!host) {
 		if (typeof signal.onabort === 'function') signal.onabort(event);
 		signal.listeners.slice().forEach(function (fn) { fn.call(signal, event); });
 	};
+	// iOS's JavaScriptCore joins an English medium date and its time with " at "; Chrome, and Android's engine, with ", ".
+	if (g.Intl && g.Intl.DateTimeFormat && !host.dateTimeFormat) {
+		var NativeDateTimeFormat = (host.dateTimeFormat = g.Intl.DateTimeFormat);
+		var DateTimeFormat = function (locales, options) {
+			var inner = new NativeDateTimeFormat(locales, options);
+			var resolved = inner.resolvedOptions();
+			if (resolved.dateStyle !== 'medium' || !resolved.timeStyle || !/^en(-|$)/.test(resolved.locale)) return inner;
+			var dateOnly = {}, timeOnly = {};
+			for (var key in options) {
+				if (key !== 'timeStyle') dateOnly[key] = options[key];
+				if (key !== 'dateStyle') timeOnly[key] = options[key];
+			}
+			var date = new NativeDateTimeFormat(locales, dateOnly), time = new NativeDateTimeFormat(locales, timeOnly);
+			Object.defineProperty(inner, 'format', { value: function (when) { return date.format(when) + ', ' + time.format(when); } });
+			Object.defineProperty(inner, 'formatToParts', {
+				value: function (when) { return date.formatToParts(when).concat([{ type: 'literal', value: ', ' }], time.formatToParts(when)); },
+			});
+			return inner;
+		};
+		DateTimeFormat.prototype = NativeDateTimeFormat.prototype;
+		DateTimeFormat.supportedLocalesOf = NativeDateTimeFormat.supportedLocalesOf;
+		g.Intl.DateTimeFormat = DateTimeFormat;
+		var toLocaleString = Date.prototype.toLocaleString;
+		Date.prototype.toLocaleString = function (locales, options) {
+			return options && options.dateStyle ? DateTimeFormat(locales, options).format(this) : toLocaleString.call(this, locales, options);
+		};
+	}
 	if (typeof g.queueMicrotask !== 'function') g.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
 	var Headers = function (pairs) {
 		this.get = function (name) {

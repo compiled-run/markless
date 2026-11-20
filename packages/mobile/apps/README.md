@@ -43,15 +43,15 @@ and `:focus-visible`, `<img>` sources from state). So the phone runs below use t
 compared with the web's rendering of that unstyled markup in Chromium at 402 by 778, light. Each was walked through the
 shared runner on the iOS simulator and the Android emulator; every step passed on both.
 
-| Screen                               | Runs on both phones | Differences from the web                                                                                                              |
-| ------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| checkin `/` (empty, then a list row) | yes                 | none seen                                                                                                                             |
-| checkin `/checkins/[id]`             | yes                 | iOS writes the date "Nov 19, 2026 at 3:30 AM"; the web and Android write "Nov 19, 2026, 3:30 AM" (the engine's `Intl`)                |
-| checkin `/permissions`               | yes                 | the text says what each phone allows, by design of the app                                                                            |
-| notes `/` (empty, then two notes)    | yes                 | none seen                                                                                                                             |
-| notes `/tags`                        | yes                 | none seen                                                                                                                             |
-| notes `/tags/[tag]`                  | yes                 | none seen                                                                                                                             |
-| shop, 5 screens                      | not run             | they load their data from the app's API routes; a phone reaches them through app.json `origin`, which needs the shop's server running |
+| Screen                               | Runs on both phones | Differences from the web                                                                                                                             |
+| ------------------------------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| checkin `/` (empty, then a list row) | yes                 | none seen                                                                                                                                            |
+| checkin `/checkins/[id]`             | yes                 | none seen; iOS's engine wrote "Nov 19, 2026 at 3:30 AM" until the phone's script joined an English medium date and time with a comma, as Chrome does |
+| checkin `/permissions`               | yes                 | the text says what each phone allows, by design of the app                                                                                           |
+| notes `/` (empty, then two notes)    | yes                 | none seen                                                                                                                                            |
+| notes `/tags`                        | yes                 | none seen                                                                                                                                            |
+| notes `/tags/[tag]`                  | yes                 | none seen                                                                                                                                            |
+| shop, 5 screens                      | not run             | they load their data from the app's API routes; a phone reaches them through app.json `origin`, which needs the shop's server running                |
 
 "None seen" means the same text, links, controls, line breaks and spacing; buttons can wrap a word sooner or later than
 Chromium's because the phones' system fonts are not Arial.
