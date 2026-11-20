@@ -14,6 +14,7 @@ import android.text.style.ForegroundColorSpan
 import android.view.ContextThemeWrapper
 import android.view.MenuItem
 import android.view.MotionEvent
+import android.view.inputmethod.InputMethodManager
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
@@ -36,6 +37,27 @@ import kotlin.math.roundToInt
 abstract class MarklessActivity : Activity() {
 	lateinit var host: MarklessHost
 		private set
+
+	/** A touch that starts outside the focused text field takes its focus and keyboard away, as a tap elsewhere does on the web. */
+	// Pointer events reach the runtime before the views, so a press is reported before the click it ends in.
+	override fun dispatchTouchEvent(e: MotionEvent): Boolean {
+		if (::host.isInitialized) host.touch(e)
+		if (e.actionMasked == MotionEvent.ACTION_DOWN && ::host.isInitialized) host.focusedField()?.let { field ->
+			val at = IntArray(2).also { field.getLocationOnScreen(it) }
+			val inside = e.rawX >= at[0] && e.rawX < at[0] + field.width && e.rawY >= at[1] && e.rawY < at[1] + field.height
+			if (!inside) {
+				// The window takes the focus itself: offered to its views first, it would land on the first focusable one, maybe this field.
+				(window.decorView as ViewGroup).apply {
+					isFocusableInTouchMode = true
+					descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
+					requestFocus()
+					descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+				}
+				(getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(field.windowToken, 0)
+			}
+		}
+		return super.dispatchTouchEvent(e)
+	}
 
 	abstract fun payloadBytes(): ByteArray
 
@@ -254,12 +276,6 @@ abstract class MarklessActivity : Activity() {
 	}
 
 	fun contentRoot(): View = host.root
-
-	// Pointer events reach the runtime before the views, so a press is reported before the click it ends in.
-	override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-		if (::host.isInitialized) host.touch(event)
-		return super.dispatchTouchEvent(event)
-	}
 
 	companion object {
 		/** The system's own theme, light or dark with the device. */
