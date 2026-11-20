@@ -53,6 +53,10 @@ import type {
 	ResumeRenderDataThunk,
 	ResumeRowRoot,
 } from '../resume-types.ts';
+import { joinRepeatKeyParts } from '../repeat-key-parts.ts';
+
+// False when no @for of the app joins its key from fields, so each joined-key branch folds away.
+declare const __MARKLESS_JOINED_KEYS__: boolean;
 
 /**
  * The row a resumed client builds when the row IS a component.
@@ -420,6 +424,10 @@ function loadInstanceScope(): Awaitable<InstanceScopeModule> {
 }
 
 function rowKeyOf(item: unknown, repeat: ResumeKeyedRepeatRecord): unknown {
+	if ((typeof __MARKLESS_JOINED_KEYS__ === 'undefined' || __MARKLESS_JOINED_KEYS__) && repeat.keyParts)
+		return joinRepeatKeyParts(item, repeat.keyParts, (value, path) =>
+			rowKeyOf(value, { keyPath: path } as ResumeKeyedRepeatRecord),
+		);
 	let cursor = item as Record<string, unknown> | null | undefined;
 	for (const key of repeat.keyPath) {
 		if (cursor == null) return undefined;

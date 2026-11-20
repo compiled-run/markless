@@ -4919,15 +4919,24 @@ export function createNativeViewPayload(
 					list,
 					key: repeat.indexKey ? [] : repeat.keyPath,
 					...(repeat.indexKey ? { byIndex: true as const } : {}),
+					...(repeat.keyParts ? { keyParts: repeat.keyParts } : {}),
 					...place,
 				});
+				const itemAt = (path: ReadonlyArray<string>) =>
+					path.reduce<NativeExpr>(
+						(object, property) => ({ member: object, property }),
+						{ item: repeatId },
+					);
 				if (!repeat.indexKey)
 					rowKeys.set(
 						repeatId,
-						repeat.keyPath.reduce<NativeExpr>(
-							(object, property) => ({ member: object, property }),
-							{ item: repeatId },
-						),
+						repeat.keyParts
+							? {
+									template: repeat.keyParts.map((part) =>
+										typeof part === 'string' ? part : itemAt(part),
+									),
+								}
+							: itemAt(repeat.keyPath),
 					);
 				lowerChunk(
 					rowChunk,

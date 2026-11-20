@@ -318,6 +318,9 @@ export function createRuntimeDemandMap(
 	return {
 		passId: 'runtime-demand-map',
 		version: 1,
+		...((input.keyedRepeats ?? []).some((repeat) => repeat.keyParts)
+			? { joinedRepeatKeys: true as const }
+			: {}),
 		recordKinds: recordKindPhases({ scalarEvents, scalarRows }),
 		symbols,
 		payloadRecords,

@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 336,
+	total: 337,
 	guided: 55,
 	groups: [
 		{
@@ -1539,6 +1539,14 @@ export const errorIndex: ErrorIndex = {
 			icon: 'gear',
 			blurb: 'Markless checking itself. If you see one, it is a Markless bug: please open an issue.',
 			codes: [
+				{
+					code: 'MARKLESS_JOINED_KEYS_REBUILD_UNAVAILABLE',
+					title: '',
+					chip: 'error',
+					kind: 'build error',
+					guided: false,
+					words: ' markless_joined_keys_rebuild_unavailable a markless build tooling error from @markless/bundler.',
+				},
 				{
 					code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
 					title: 'A @catch reset has no graph to re-run values in',
