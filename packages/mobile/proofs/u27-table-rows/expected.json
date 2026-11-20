@@ -1,0 +1,20 @@
+{
+	"rung": 127,
+	"name": "@markless/ui table with rows from a @for: each row's item seeds its part's state when the row is built, and a tap picks the row it landed on",
+	"steps": [
+		{
+			"visible": ["Folder", "notes.txt", "photo.png", "Chosen none"],
+			"absent": ["Chosen notes", "Chosen photo"]
+		},
+		{
+			"do": { "tap": "photo.png" },
+			"visible": ["Chosen photo"],
+			"absent": ["Chosen none", "Chosen notes"]
+		},
+		{
+			"do": { "tap": "notes.txt" },
+			"visible": ["Chosen notes"],
+			"absent": ["Chosen none", "Chosen photo"]
+		}
+	]
+}
