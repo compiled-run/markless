@@ -4824,8 +4824,8 @@ export function createNativeViewPayload(
 		scope: Scope,
 	) {
 		const what = `<${PLATFORM_PIECES_NAMESPACE}.sheet>`;
-		if (place.arm || place.row) {
-			refuse(`a ${what} inside an @if arm or a @for row`, edge.sourceSpan);
+		if (place.row) {
+			refuse(`a ${what} inside a @for row`, edge.sourceSpan);
 			return;
 		}
 		const props = new Map(edge.props.map((prop) => [prop.name, prop]));
@@ -4884,11 +4884,11 @@ export function createNativeViewPayload(
 			points.length >= 1 &&
 			points.length <= 2 &&
 			points.every((point) => typeof point === 'number' && point > 0 && point <= 1) &&
-			Math.max(...(points as number[])) === 1 &&
+			(points.length === 1 || Math.max(...(points as number[])) === 1) &&
 			new Set(points).size === points.length;
 		if (points !== NOT_FIXED && !portableHeights)
 			refuse(
-				`\`snapPoints\` of ${what}: one or two fractions of the screen's height, the largest 1 (Android's sheet has one height between collapsed and full)`,
+				`\`snapPoints\` of ${what}: one fraction of the screen's height, or two with the larger 1 (Android's sheet has one height between collapsed and full)`,
 				props.get('snapPoints')?.sourceSpan,
 			);
 		const snapPoints = portableHeights ? [...(points as number[])].sort((a, b) => a - b) : null;
@@ -4915,8 +4915,8 @@ export function createNativeViewPayload(
 			refuse(`children passed to ${what} that have no markup`, edge.sourceSpan);
 		const id = `sheet:${scope.prefix}${edge.id}`;
 		if (open && snapPoints && dismissible !== null && modal !== null)
-			nodes.push({ kind: 'sheet', id, parent, open, snapPoints, dismissible, modal });
-		if (projected) lowerChunk(projected, id, {}, scope);
+			nodes.push({ kind: 'sheet', id, parent, open, snapPoints, dismissible, modal, ...place });
+		if (projected) lowerChunk(projected, id, place, scope);
 		if (onChange?.kind === 'callback' && dismissible === true) {
 			if (!onChange.nativeStatements) {
 				refuse(

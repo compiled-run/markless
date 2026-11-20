@@ -98,8 +98,9 @@ private let sheet = """
 @Test(arguments: [
 	("\"snapPoints\":[0.5,1]", "\"snapPoints\":[1,0.5]", "a sheet rests at"),
 	("\"snapPoints\":[0.5,1]", "\"snapPoints\":[0.25,0.5,1]", "a sheet rests at"),
-	("\"snapPoints\":[0.5,1]", "\"snapPoints\":[0.5]", "a sheet rests at"),
-	("\"modal\":true}", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}}", "unknown field \"arm\""),
+	("\"snapPoints\":[0.5,1]", "\"snapPoints\":[0]", "a sheet rests at"),
+	("\"snapPoints\":[0.5,1]", "\"snapPoints\":[0.3,0.8]", "a sheet rests at"),
+	("\"modal\":true}", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}}", "which is not an earlier branch"),
 	("\"host\":\"sheet:0\"", "\"host\":\"h0\"", "which is not a sheet"),
 	("\"event\":\"activate\"", "\"event\":\"dismiss\"", "which is not a sheet"),
 	("\"host\":\"h0\"", "\"host\":\"sheet:0\"", "which is not an element"),

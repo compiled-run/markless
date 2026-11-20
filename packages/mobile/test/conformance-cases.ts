@@ -271,6 +271,21 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A sheet in an @if arm: no `sheet` entry when its arm leaves or comes; the host closes it with the arm and builds
+		// it as its state says.
+		name: 'sheet-in-arm',
+		fixture: 'proofs/y5-sheet-in-arm/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'dismiss', host: 'sheet:component-edge:0' },
+		],
+	},
+	{
 		name: 'guards',
 		fixture: 'test/fixtures/Guards.tsrx',
 		actions: [

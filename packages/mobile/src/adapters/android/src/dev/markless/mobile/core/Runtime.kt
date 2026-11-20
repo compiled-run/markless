@@ -764,8 +764,8 @@ class Runtime(
 	/** Every shown list's row keys, in order. */
 	fun rows(): List<Pair<String, List<String>>> = payload.nodes.filterIsInstance<Node.Repeat>().filter { isShown(it) }.map { r -> r.id to rowsOf(r).map { it.key } }
 
-	/** Every system sheet and whether its `open` is truthy. */
-	fun sheets(): List<Pair<String, Boolean>> = payload.nodes.filterIsInstance<Node.Sheet>().map { it.id to Js.truthy(evaluate(it.open)) }
+	/** Every system sheet shown (its arm, if any, showing) and whether its `open` is truthy. */
+	fun sheets(): List<Pair<String, Boolean>> = payload.nodes.filterIsInstance<Node.Sheet>().filter { isShown(it) }.map { it.id to Js.truthy(evaluate(it.open)) }
 
 	/** Each `<dialog>`'s top-layer state; every dialog mounts closed. */
 	private val dialogs = LinkedHashMap<String, Boolean>().apply {
@@ -1196,7 +1196,11 @@ class Runtime(
 				val b = beforeRows[node.id]; val a = afterRows[node.id]
 				if (b != null && a != null && b != a) journal.add(JournalEntry.Rows(node.id, a))
 			}
-			is Node.Sheet -> afterSheets.getValue(node.id).let { if (beforeSheets[node.id] != it) journal.add(JournalEntry.Sheet(node.id, it)) }
+			is Node.Sheet -> {
+				val before = beforeSheets[node.id]
+				val after = afterSheets[node.id]
+				if (before != null && after != null && before != after) journal.add(JournalEntry.Sheet(node.id, after))
+			}
 			is Node.Branch -> for (inst in instances(node)) if (inst.id in beforeArms && inst.id in afterArms && beforeArms[inst.id] != afterArms[inst.id]) journal.add(JournalEntry.Arm(inst.id, afterArms[inst.id]))
 			is Node.Text -> for (inst in instances(node)) {
 				val b = beforeTexts[inst.id]; val a = afterTexts[inst.id]

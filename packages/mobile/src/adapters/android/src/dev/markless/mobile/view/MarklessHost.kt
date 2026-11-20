@@ -130,6 +130,8 @@ class MarklessHost(
 	private val baseTextSize = TextView(context).textSize
 	private val expanded = HashMap<View, Boolean?>()
 	private val sheets = LinkedHashMap<String, SystemSheet>()
+	/** The sheets shown at the last journal: one whose arm leaves closes, one whose arm comes while open opens. */
+	private var shownSheets: Set<String> = emptySet()
 	/** Each view's current attributes, for the relations and roles the accessibility delegate reports. */
 	private val attrs = HashMap<String, HashMap<String, String>>()
 	/** Each scroll container's scroll views (outermost first) and the content box its children sit in. */
@@ -243,7 +245,7 @@ class MarklessHost(
 		buildShown()
 		refreshMarkers()
 		root = pageBox ?: views.getValue(single!!.id)
-		for ((id, open) in runtime.sheets()) if (open) root.post { sheets.getValue(id).open() }
+		syncSheets()
 		for (cell in payload.cells) cell.device?.let { name -> needDevice().watch(name, cell.obj) { if (!released) apply(runtime.device(cell.id, it)) } }
 		for (call in runtime.tasks()) runCall(call)
 		// The activity reads the title after building the host, so a start that retitles needs no title bar yet.
@@ -495,6 +497,7 @@ class MarklessHost(
 			}
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
+		syncSheets()
 		refreshRelations()
 		refreshSelects()
 		onJournal?.invoke(journal)
@@ -520,6 +523,13 @@ class MarklessHost(
 		if (!changed) return
 		repaint()
 		Log.i(TAG, "band (${if (isDark(configuration)) "dark" else "light"}), style assignments ${allLayouts().map { it.assignment }}")
+	}
+
+	private fun syncSheets() {
+		val now = runtime.sheets().toMap()
+		for (id in shownSheets - now.keys) sheets.getValue(id).close()
+		for ((id, open) in now) if (open && id !in shownSheets) root.post { if (!released && id in shownSheets) sheets.getValue(id).open() }
+		shownSheets = now.keys
 	}
 
 	/** A sheet came to rest at [snapPoint]: its content takes that height's layout. */

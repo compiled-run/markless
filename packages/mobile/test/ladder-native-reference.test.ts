@@ -502,7 +502,7 @@ function walk(
 	// A closed <dialog> shows nothing (the UA's dialog:not([open]) rule); the journal opens and closes it.
 	const openDialogs = new Map(runtime.dialogs());
 	const chosen = new Map(runtime.arms());
-	// What the platform's sheets show: changed only by `sheet` entries and by the platform closing one.
+	// What the platform's sheets show: changed by `sheet` entries, by the arm a sheet is in, and by the platform closing one.
 	const sheetOpen = new Map(runtime.sheets());
 	const inClosedSheet = (id: string): boolean => {
 		const parent = nodeOf.get(id)?.parent;
@@ -790,6 +790,10 @@ function walk(
 				for (const [node, checked] of runtime.checks())
 					if (inArm(node, entry.node)) checks.set(node, checked);
 				for (const id of typed.keys()) if (inArm(id, entry.node)) typed.delete(id);
+				// A sheet leaves with its arm, closed; one that comes is built open or closed as its state says.
+				for (const node of sheetOpen.keys()) if (inArm(node, entry.node)) sheetOpen.delete(node);
+				for (const [node, open] of runtime.sheets())
+					if (inArm(node, entry.node)) sheetOpen.set(node, open);
 			} else if (entry.op === 'sheet') sheetOpen.set(entry.node, entry.open);
 			const scripted = services.answer(entry);
 			if (scripted) answered.push(() => runtime.dispatch(scripted));
