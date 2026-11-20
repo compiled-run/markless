@@ -2260,6 +2260,65 @@ export function createNativeViewPayload(
 		return value;
 	}
 
+	/** Whether a call to an app function the data path cannot evaluate runs in the script instead: in a submit or change handler. */
+	let handlerCallsScript = false;
+	/** The script functions that call an app function for a handler: each such value runs once where it is written. */
+	const calledFacts = new WeakSet<SemanticScriptFunction>();
+	const callsScript = (tree: unknown): boolean => {
+		if (!tree || typeof tree !== 'object') return false;
+		const id = (tree as { script?: unknown }).script;
+		if (typeof id === 'string')
+			for (const entry of scriptFunctions.values())
+				if (entry.id === id && calledFacts.has(entry.fact)) return true;
+		return Object.values(tree).some(callsScript);
+	};
+
+	/** Whether a value is a form's entries, or an object or array literal holding them. */
+	const holdsEntries = (value: NativeExpr): boolean =>
+		'formData' in value ||
+		entryLists.has(JSON.stringify(value)) ||
+		('object' in value && value.object.some(([, field]) => holdsEntries(field))) ||
+		('array' in value && value.array.some((item) => holdsEntries(item.value)));
+
+	/** A call to an app function as a call into the script, its arguments evaluated as data and passed as JSON. */
+	function scriptCall(
+		module: ModuleFacts,
+		name: string,
+		args: ReadonlyArray<NativeExpr>,
+		what: string,
+		span: SourceSpan | undefined,
+	): NativeExpr | null {
+		return keepingFunctions(() => {
+			const fact = scriptFacts(module)?.moduleCall(name);
+			if (!fact)
+				return refuseScript(
+					`${what} calls \`${name}\`, which is not an app function whose source the build read, so it cannot run as JavaScript`,
+					span,
+				);
+			for (const arg of args) {
+				if (mentionsElement(arg))
+					return refuseScript(
+						`${what} passes an element to \`${name}\`, which JavaScript on a phone cannot hold yet`,
+						span,
+					);
+				if (holdsEntries(arg))
+					return refuseScript(
+						`${what} passes a form's FormData to \`${name}\`, which JavaScript on a phone cannot hold yet`,
+						span,
+					);
+			}
+			const fn = scriptFunctionId(fact, module, `the function \`${name}\``);
+			if (fn === null) return null;
+			calledFacts.add(fact);
+			return {
+				script: fn,
+				bindings: {
+					args: { value: { array: args.map((value) => ({ spread: false, value })) } },
+				},
+			};
+		});
+	}
+
 	/** A computed whose body is not data, as a call into the script; null with a refusal when no script runs it either. */
 	function scriptComputed(
 		computed: SemanticGraphArtifact['graphBindings'][number],
@@ -2529,8 +2588,6 @@ export function createNativeViewPayload(
 	};
 	/** Set while handlers are lowered, after the whole tree: only then does every handle know the elements it is bound to. */
 	let lateLowering = false;
-	/** Set while an `@if` test that is one bare name is lowered: there, children the caller passed are only present. */
-	let childrenAsTest = false;
 	/** The @for row whose element a tap run is lowered for, while it is. */
 	let pressedRow: string | undefined;
 	/** Set while a tap's handler is lowered for where the tap landed. */
@@ -3057,6 +3114,35 @@ export function createNativeViewPayload(
 			inlining.delete(key);
 		}
 	}
+	/** The text a caller's children are when they are text alone (`<Caption>30 rows</Caption>`), which the web passes as a string. */
+	const projectedText = (chunk: SemanticMarkupChunk): string | undefined => {
+		const [only, ...more] = chunk.texts ?? [];
+		return chunk.hosts.length === 0 &&
+			chunk.slots.length === 0 &&
+			only &&
+			more.length === 0 &&
+			only.coordinate.path.length === 1
+			? only.text
+			: undefined;
+	};
+
+	/** `expression` where only its truth is read: children a caller passed are true there, as on the web. */
+	function testOf(
+		expression: SemanticExpression | undefined,
+		what: string,
+		scope: Scope,
+	): NativeExpr | null {
+		if (
+			expression?.kind === 'read' &&
+			!scope.locals.has(expression.name) &&
+			!scope.args.has(expression.name) &&
+			!scope.items.has(expression.name) &&
+			propOf(expression.name, scope)?.kind === 'children'
+		)
+			return { literal: true };
+		return exprOf(expression, what, scope);
+	}
+
 	function exprOf(
 		expression: SemanticExpression | undefined,
 		what: string,
@@ -3116,17 +3202,8 @@ export function createNativeViewPayload(
 				if (repeat) return { item: repeat };
 				const prop = propOf(expression.name, scope);
 				if (prop?.kind === 'value') return prop.expr;
-				if (prop?.kind === 'children') {
-					// The web passes children that are one run of plain text as that string; other markup is no value.
-					const chunk = prop.chunk;
-					if (
-						chunk.hosts.length === 0 &&
-						chunk.slots.length === 0 &&
-						chunk.texts?.length === 1
-					)
-						return { literal: chunk.texts[0]!.text };
-					if (childrenAsTest) return { literal: true };
-				}
+				const text = prop?.kind === 'children' ? projectedText(prop.chunk) : undefined;
+				if (text !== undefined) return { literal: text };
 				if (prop)
 					return refuse(`${what} reads the callback \`${expression.name}\` as a value`);
 				if (isPropName(expression.name, scope)) {
@@ -3210,7 +3287,10 @@ export function createNativeViewPayload(
 					return refuse(
 						`${what} uses \`typeof\` other than compared with 'string', 'number' or 'boolean'; a native value does not tell undefined from null`,
 					);
-				const value = exprOf(expression.value, what, scope);
+				const value =
+					expression.operator === '!'
+						? testOf(expression.value, what, scope)
+						: exprOf(expression.value, what, scope);
 				return value && { unary: expression.operator, value };
 			}
 			case 'binary':
@@ -3226,7 +3306,10 @@ export function createNativeViewPayload(
 						}
 					);
 				}
-				const left = exprOf(expression.left, what, scope);
+				const left =
+					expression.kind === 'logical' && expression.operator === '&&'
+						? testOf(expression.left, what, scope)
+						: exprOf(expression.left, what, scope);
 				// As in JavaScript, a left side known when the app is built either decides `&&`, `||` or `??` (the right side never
 				// runs) or hands the whole value to the right side.
 				if (left && expression.kind === 'logical') {
@@ -3270,7 +3353,7 @@ export function createNativeViewPayload(
 					: { logical: expression.operator, left, right };
 			}
 			case 'conditional': {
-				const test = exprOf(expression.test, what, scope);
+				const test = testOf(expression.test, what, scope);
 				// A test known when the app is built picks its branch; the other never runs, as in JavaScript.
 				const decided = test ? buildTime(test) : undefined;
 				if (decided)
@@ -3556,31 +3639,50 @@ export function createNativeViewPayload(
 				)
 					return refuse(`${what} calls \`${name}\`, a value the build cannot call`);
 				const found = functionAt(scope.module, name);
-				if (!found)
-					return refuse(
-						`${what} uses a call to \`${name}\`, which needs a script engine`,
-					);
-				const key = `${found.module.graph.filename}#${found.fn.name}`;
-				if (inlining.has(key)) return refuse(`${what} calls \`${name}\` inside itself`);
+				const unknown = () =>
+					refuse(`${what} uses a call to \`${name}\`, which needs a script engine`);
+				if (!found && !handlerCallsScript) return unknown();
+				const key = found && `${found.module.graph.filename}#${found.fn.name}`;
+				if (key && inlining.has(key)) return refuse(`${what} calls \`${name}\` inside itself`);
 				const args = all(expression.arguments);
 				if (!args) return null;
-				const { parameters, statements } = found.fn.native;
-				const inner = parameters.reduce<Scope>(
-					(bound, parameter, index) =>
-						bindName(bound, parameter, args[index] ?? { literal: null }),
-					helperScope(found.module, scope),
-				);
-				inlining.add(key);
-				try {
-					return evaluateFunction(
-						statements,
-						`the function \`${found.fn.name}\``,
-						inner,
-						new Set(parameters),
+				const evaluate = (): NativeExpr | null => {
+					if (!found || !key) return unknown();
+					const { parameters, statements } = found.fn.native;
+					const inner = parameters.reduce<Scope>(
+						(bound, parameter, index) =>
+							bindName(bound, parameter, args[index] ?? { literal: null }),
+						helperScope(found.module, scope),
 					);
-				} finally {
-					inlining.delete(key);
-				}
+					inlining.add(key);
+					try {
+						return evaluateFunction(
+							statements,
+							`the function \`${found.fn.name}\``,
+							inner,
+							new Set(parameters),
+						);
+					} finally {
+						inlining.delete(key);
+					}
+				};
+				if (!handlerCallsScript) return evaluate();
+				// The outermost call runs whole in the script, so a value its body uses twice is computed once.
+				const asData = <T>(run: () => T): T => {
+					handlerCallsScript = false;
+					try {
+						return run();
+					} finally {
+						handlerCallsScript = true;
+					}
+				};
+				const data = asData(() => attempt(evaluate));
+				if (!data.failed) return data.value;
+				data.rollBack();
+				const called = attempt(() => scriptCall(scope.module, name, args, what, scope.span));
+				if (called.value && !called.failed) return called.value;
+				called.rollBack();
+				return asData(evaluate);
 			}
 			case 'instanceof': {
 				const value = exprOf(expression.value, what, scope);
@@ -4787,10 +4889,6 @@ export function createNativeViewPayload(
 					refuse('@for inside another @for');
 					continue;
 				}
-				if (repeat?.indexKey) {
-					refuse('a @for keyed by its index; a native list keys each row by its item');
-					continue;
-				}
 				const list = repeat?.collectionExpression
 					? renderValue(
 							repeat.collectionExpression,
@@ -4819,16 +4917,18 @@ export function createNativeViewPayload(
 					id: repeatId,
 					parent,
 					list,
-					key: repeat.keyPath,
+					key: repeat.indexKey ? [] : repeat.keyPath,
+					...(repeat.indexKey ? { byIndex: true as const } : {}),
 					...place,
 				});
-				rowKeys.set(
-					repeatId,
-					repeat.keyPath.reduce<NativeExpr>(
-						(object, property) => ({ member: object, property }),
-						{ item: repeatId },
-					),
-				);
+				if (!repeat.indexKey)
+					rowKeys.set(
+						repeatId,
+						repeat.keyPath.reduce<NativeExpr>(
+							(object, property) => ({ member: object, property }),
+							{ item: repeatId },
+						),
+					);
 				lowerChunk(
 					rowChunk,
 					parent,
@@ -5028,15 +5128,13 @@ export function createNativeViewPayload(
 					...scope,
 					live: site.testComputedGraphNodeId !== undefined,
 				};
-				childrenAsTest = site.testExpression?.kind === 'read';
 				const test = plain
-					? exprOf(site.testExpression, 'the @if test', testScope)
+					? testOf(site.testExpression, 'the @if test', testScope)
 					: undefined;
-				childrenAsTest = false;
 				const recorded = site.armTestExpressions?.map((expression) =>
 					expression === null
 						? null
-						: exprOf(expression, `the @${site.kind} test`, testScope),
+						: testOf(expression, `the @${site.kind} test`, testScope),
 				);
 				// A chain with no @else still has an empty last arm; showing it when nothing matches shows nothing.
 				const tests =
@@ -5224,13 +5322,16 @@ export function createNativeViewPayload(
 		handler: string,
 		pressed?: NonNullable<Scope['pressed']>,
 	): NativeOp[] {
-		if (
-			scriptMode === 'never' ||
-			!event.handlerSpan ||
-			DATA_ONLY_EVENTS.has(event.eventName) ||
-			!scriptFacts(scope.module)
-		)
+		if (scriptMode === 'never' || !event.handlerSpan || !scriptFacts(scope.module))
 			return dataHandlerOps(event, scope, handler, pressed);
+		if (DATA_ONLY_EVENTS.has(event.eventName)) {
+			handlerCallsScript = true;
+			try {
+				return dataHandlerOps(event, scope, handler, pressed);
+			} finally {
+				handlerCallsScript = false;
+			}
+		}
 		if (scriptMode === 'all') {
 			// The engine has no fields and no press count, and sees an unset cell as null: such a handler stays data.
 			const data = attempt(() => dataHandlerOps(event, scope, handler, pressed));
@@ -5528,7 +5629,9 @@ export function createNativeViewPayload(
 			count: snapshots.count,
 		};
 		const first = run(bindings.map(([, value]) => value));
-		const kept = bindings.map(([, value]) => mayChangeBeforeRead(first.ops, readsOf(value)));
+		const kept = bindings.map(
+			([, value]) => callsScript(value) || mayChangeBeforeRead(first.ops, readsOf(value)),
+		);
 		if (!kept.includes(true)) return first;
 		diagnostics.length = marks.diagnostics;
 		dialogOps.length = marks.dialogOps;
@@ -6718,8 +6821,15 @@ export function createNativeViewPayload(
 				);
 				continue;
 			}
+			const rowKey = row && rowKeys.get(row);
+			if (row && !rowKey) {
+				refuse(
+					`the \`${reference.attribute}\` attribute of ${node.id} names an element in a row of a @for keyed by its index`,
+				);
+				continue;
+			}
 			parts.push(`${position > 0 ? ' ' : ''}${id}${row ? '@' : ''}`);
-			if (row) parts.push(rowKeys.get(row)!);
+			if (rowKey) parts.push(rowKey);
 		}
 		const value: NativeExpr = parts.every((part) => typeof part === 'string')
 			? { literal: parts.join('') }
@@ -7042,6 +7152,8 @@ export function createNativeViewPayload(
 			const fields: NativeForm['fields'][number][] = [];
 			const submitters: string[] = [];
 			const textFields: string[] = [];
+			/** Fields and submit buttons in an @if arm inside the form: they take part only while it shows them. */
+			const armed = new Set<string>();
 			for (const node of nodes) {
 				if (node.kind !== 'element' || node.id === form.id || !isWithin(node.id, form.id))
 					continue;
@@ -7056,12 +7168,14 @@ export function createNativeViewPayload(
 				}
 				if (node.element !== 'input' && node.element !== 'button' && node.element !== 'select')
 					continue;
-				if (node.row || JSON.stringify(node.arm) !== JSON.stringify(form.arm)) {
+				if (node.element === 'button' && node.attributes?.['type'] === 'button') continue;
+				if (node.row !== form.row) {
 					refuse(
-						`${field} sits in an @if arm or @for row of its form, which a native build does not submit yet`,
+						`${field} sits in a @for row of its form, which a native build does not submit yet`,
 					);
 					continue;
 				}
+				if (JSON.stringify(node.arm) !== JSON.stringify(form.arm)) armed.add(node.id);
 				if (attribute(node, 'type') === 'bound') {
 					refuse(
 						`${field} binds its \`type\`, which a native build reads only as written`,
@@ -7137,6 +7251,15 @@ export function createNativeViewPayload(
 					form: form.id,
 					submitter,
 				});
+			const steady = textFields.filter((id) => !armed.has(id));
+			if (textFields.length > 0 && submitters[0] !== undefined && armed.has(submitters[0]))
+				refuse(
+					`the first submit button of ${where} sits in an @if arm, so which button the return key presses follows what shows; a native build presses one it knows when it builds`,
+				);
+			else if (submitters.length === 0 && steady.length < 2 && textFields.length > 1)
+				refuse(
+					`${where} has text fields in an @if arm and no submit button, so whether the return key submits it follows how many show; a native build decides that when it builds`,
+				);
 			// The return key clicks the first submit button unless it is disabled; with none, it submits only a form with one text field.
 			const implicit: NativeOp[] =
 				submitters.length > 0

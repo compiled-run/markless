@@ -34,7 +34,7 @@
 				"id": "component-edge:0/branch-site:0",
 				"parent": "component-edge:0/h1",
 				"test": {
-					"literal": "Plain words"
+					"literal": true
 				},
 				"arms": 2
 			},
@@ -303,20 +303,56 @@
 		]
 	},
 	"initial": [
-		["component-edge:0/h1:text0", "Plain words"],
-		["component-edge:0/h2:text0", "Spoken: Plain words"],
-		["h5:text0", "Bold"],
-		["component-edge:1/h3:text0", " words"],
-		["component-edge:2/h3:text0", "no frame"],
-		["component-edge:3/h1:text0", "empty"],
-		["component-edge:3/h2:text0", "Spoken: no text"],
-		["h6:text0", "Pressed 0"]
+		[
+			"component-edge:0/h1:text0",
+			"Plain words"
+		],
+		[
+			"component-edge:0/h2:text0",
+			"Spoken: Plain words"
+		],
+		[
+			"h5:text0",
+			"Bold"
+		],
+		[
+			"component-edge:1/h3:text0",
+			" words"
+		],
+		[
+			"component-edge:2/h3:text0",
+			"no frame"
+		],
+		[
+			"component-edge:3/h1:text0",
+			"empty"
+		],
+		[
+			"component-edge:3/h2:text0",
+			"Spoken: no text"
+		],
+		[
+			"h6:text0",
+			"Pressed 0"
+		]
 	],
 	"initialArms": [
-		["component-edge:0/branch-site:0", 0],
-		["component-edge:1/branch-site:1", 0],
-		["component-edge:2/branch-site:1", 1],
-		["component-edge:3/branch-site:0", 1]
+		[
+			"component-edge:0/branch-site:0",
+			0
+		],
+		[
+			"component-edge:1/branch-site:1",
+			0
+		],
+		[
+			"component-edge:2/branch-site:1",
+			1
+		],
+		[
+			"component-edge:3/branch-site:0",
+			1
+		]
 	],
 	"steps": [
 		{

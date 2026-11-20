@@ -115,10 +115,22 @@
 		]
 	},
 	"initial": [
-		["h2:text0", "Saved: First line"],
-		["h3:text0", "Clear"]
+		[
+			"h2:text0",
+			"Saved: First line"
+		],
+		[
+			"h3:text0",
+			"Clear"
+		]
 	],
-	"initialProperties": [["h1", "value", "First line"]],
+	"initialProperties": [
+		[
+			"h1",
+			"value",
+			"First line"
+		]
+	],
 	"steps": [
 		{
 			"action": {

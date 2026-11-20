@@ -99,8 +99,14 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Press"],
-		["h2:text0", "none"]
+		[
+			"h1:text0",
+			"Press"
+		],
+		[
+			"h2:text0",
+			"none"
+		]
 	],
 	"steps": [
 		{

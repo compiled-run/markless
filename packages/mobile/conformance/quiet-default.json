@@ -152,9 +152,18 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Next"],
-		["h2:text0", "Lock"],
-		["h3:text0", "Page 1"]
+		[
+			"h1:text0",
+			"Next"
+		],
+		[
+			"h2:text0",
+			"Lock"
+		],
+		[
+			"h3:text0",
+			"Page 1"
+		]
 	],
 	"steps": [
 		{

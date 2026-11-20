@@ -421,6 +421,8 @@ export type NativeNode = NativePlace &
 				readonly parent: string | null;
 				readonly list: NativeExpr;
 				readonly key: ReadonlyArray<string>;
+				/** `key i` on the index: a row's key is its position (`"0"`, `"1"`), and `key` is empty. */
+				readonly byIndex?: true;
 		  }
 		| {
 				/**

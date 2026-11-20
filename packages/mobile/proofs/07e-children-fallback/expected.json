@@ -1,0 +1,33 @@
+{
+	"rung": 7.9375,
+	"name": "A component that shows its children when it is given some and a fallback when it is not",
+	"steps": [
+		{
+			"visible": [
+				"Days",
+				"Monday",
+				"Taps 0",
+				"Tap",
+				"Monday has a note",
+				"Tuesday",
+				"Nothing written on Tuesday",
+				"Tuesday is blank",
+				"Wednesday",
+				"Rain all day",
+				"Wednesday has a note"
+			],
+			"absent": [
+				"Nothing written on Monday",
+				"Monday is blank",
+				"Tuesday has a note",
+				"Nothing written on Wednesday",
+				"Wednesday is blank"
+			]
+		},
+		{
+			"do": { "tap": "Tap" },
+			"visible": ["Taps 1", "Nothing written on Tuesday"],
+			"absent": ["Taps 0"]
+		}
+	]
+}
