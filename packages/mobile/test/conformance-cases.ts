@@ -1228,6 +1228,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'focus', host: 'h3' },
 		],
 	},
+	{
+		// A readonly text field: submitted, but left out of the checks a submit runs, so its `required` stops nothing.
+		name: 'readonly-field',
+		fixture: 'proofs/j48-readonly-field/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h3', value: 'SAVE10' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */

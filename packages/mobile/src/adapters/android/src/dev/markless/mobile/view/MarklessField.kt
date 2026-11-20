@@ -19,6 +19,15 @@ class MarklessField(context: Context) : EditText(context) {
 	var onKey: ((String) -> Boolean)? = null
 	var onPaste: ((String) -> Boolean)? = null
 	private var enterAt = 0L
+	private val editingKeys = keyListener
+
+	/** `readonly`: the field takes focus and selection but no typing, and brings up no keyboard, as Chrome's does. */
+	var readOnly = false
+		set(value) {
+			field = value
+			keyListener = if (value) null else editingKeys
+			showSoftInputOnFocus = !value
+		}
 
 	override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
 		val connection = super.onCreateInputConnection(outAttrs) ?: return null

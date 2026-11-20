@@ -313,7 +313,6 @@ const UNCHECKED_CONSTRAINTS = [
 	'max',
 	'step',
 	'multiple',
-	'readonly',
 	'form',
 ];
 /** A submit button's own overrides of where and how its form is sent. */

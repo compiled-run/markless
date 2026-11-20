@@ -1359,6 +1359,8 @@ export function createNativeRuntime(
 	const invalidity = (node: string, kind: NativeFieldKind): string | undefined => {
 		if (kind === 'hidden' || !shown(elementOf(node))) return undefined;
 		if (attributeNow(node, 'disabled') !== null) return undefined;
+		// A readonly text field is barred from constraint validation.
+		if (kind === 'text' && attributeNow(node, 'readonly') !== null) return undefined;
 		// A radio button is missing its value when any button of its group is required and none is checked.
 		const required =
 			kind === 'radio'

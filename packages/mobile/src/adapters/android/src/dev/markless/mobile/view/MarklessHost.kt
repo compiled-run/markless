@@ -1168,6 +1168,7 @@ class MarklessHost(
 			}
 			"controls" -> if (view is AudioButton) view.visibility = if (value == null) View.GONE else View.VISIBLE
 			"disabled" -> view.isEnabled = value == null
+			"readonly" -> if (view is MarklessField) view.readOnly = value != null
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
 			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else if (view is DrawingView) (if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO) else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO

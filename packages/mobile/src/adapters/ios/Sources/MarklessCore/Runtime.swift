@@ -1122,6 +1122,8 @@ public final class NativeRuntime {
 	private func invalidity(_ field: NativeForm.Field) throws -> String? {
 		guard field.kind != .hidden, field.kind != .select, try isShownField(field.node) else { return nil }
 		guard try attributeNow(field.node, "disabled") == nil else { return nil }
+		// A readonly text field is barred from constraint validation.
+		if field.kind == .text, try attributeNow(field.node, "readonly") != nil { return nil }
 		// A radio button is missing its value when any button of its group is required and none is checked.
 		let required = field.kind == .radio
 			? try group(of: field.node).contains { try attributeNow($0.id, "required") != nil }

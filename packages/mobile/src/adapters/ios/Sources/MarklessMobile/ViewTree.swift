@@ -1294,7 +1294,8 @@ final class ViewTree {
 			view.accessibilityLabel = current["aria-label"]
 		}
 		if let field = view as? UITextField { field.isEnabled = current["disabled"] == nil }
-		if let area = view as? TextArea { area.isEditable = current["disabled"] == nil }
+		if let field = view as? TextField { field.readOnly = current["readonly"] != nil }
+		if let area = view as? TextArea { area.isEditable = current["disabled"] == nil && current["readonly"] == nil }
 		// aria-disabled only reads as dimmed: a press still reaches the button, as on the web.
 		let disabled = (view is UIButton || view is UITextField || view is TextArea) && current["disabled"] != nil
 		if disabled || current["aria-disabled"] == "true" {
@@ -2216,9 +2217,13 @@ final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
 
 	/// The field is its own delegate, so `maxlength` is asked here.
 	var lengthLimit: LengthLimit?
+	/// `readonly`: the field takes focus and selection but no typing, and brings up no keyboard, as Safari's does.
+	var readOnly = false {
+		didSet { inputView = readOnly ? UIView() : nil }
+	}
 
 	func textField(_ field: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
-		lengthLimit?.textField(field, shouldChangeCharactersIn: range, replacementString: string) ?? true
+		!readOnly && (lengthLimit?.textField(field, shouldChangeCharactersIn: range, replacementString: string) ?? true)
 	}
 
 	override func deleteBackward() {

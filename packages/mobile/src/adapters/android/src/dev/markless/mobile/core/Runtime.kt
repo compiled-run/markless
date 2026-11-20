@@ -932,6 +932,8 @@ class Runtime(
 	private fun invalidity(field: Field): String? {
 		val (node, kind) = field
 		if (kind == FieldKind.Hidden || kind == FieldKind.Select || !isShown(elementOf(node)) || attributeNow(node, "disabled") != null) return null
+		// A readonly text field is barred from constraint validation.
+		if (kind == FieldKind.Text && attributeNow(node, "readonly") != null) return null
 		// A radio button is missing its value when any button of its group is required and none is checked.
 		val required = if (kind == FieldKind.Radio) groupOf(node).any { attributeNow(it.id, "required") != null } else attributeNow(node, "required") != null
 		val absent = required && when (kind) {
