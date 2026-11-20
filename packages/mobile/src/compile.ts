@@ -10,6 +10,7 @@ import {
 	createNativeViewPayload,
 	DEVICE_TARGET_FACTS,
 	NATIVE_FACT_COLLECTORS,
+	nativeUnsupported,
 	type NativeViewArtifact,
 } from '@markless/compiler/native';
 import {
@@ -222,20 +223,43 @@ export async function compileNativeComponent(input: {
 		native.features,
 		input.device,
 	);
+	const styles = [...importedStyles, ...compiled.publicRenderPlan.styleScopes].filter(
+		(style, index, all) => all.findIndex((other) => other.scopeId === style.scopeId) === index,
+	);
+	const sheets = stylesheets.filter(
+		(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
+	);
+	const unstyled = native.payload
+		? unstyledOnly(native.payload, native.elementSources, sheets.length > 0 || styles.some((style) => style.cssText.length > 0))
+		: [];
 	return {
-		payload: errors.length > 0 || usage.length > 0 ? null : native.payload,
-		styles: [...importedStyles, ...compiled.publicRenderPlan.styleScopes].filter(
-			(style, index, all) =>
-				all.findIndex((other) => other.scopeId === style.scopeId) === index,
-		),
-		stylesheets: stylesheets.filter(
-			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
-		),
+		payload: errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,
+		styles,
+		stylesheets: sheets,
 		features: native.features,
 		manifest: deviceEntries,
 		elementSources: native.elementSources,
-		diagnostics: [...errors, ...native.diagnostics, ...usage],
+		diagnostics: [...errors, ...native.diagnostics, ...usage, ...unstyled],
 	};
+}
+
+/** Elements a native host draws only on a page Dragon does not lay out: Dragon has no box for a pop-up list yet. */
+function unstyledOnly(
+	payload: NativeViewPayload,
+	sources: NativeViewArtifact['elementSources'],
+	styled: boolean,
+): CompilerDiagnostic[] {
+	if (!styled) return [];
+	return payload.nodes.flatMap((node) =>
+		node.kind === 'element' && node.element === 'select'
+			? [
+					nativeUnsupported(
+						`the <select> ${node.id} on a styled page, which Dragon does not lay out yet`,
+						sources.get(node.id)?.span,
+					),
+				]
+			: [],
+	);
 }
 
 export type NativeAppBuild = {
@@ -310,15 +334,21 @@ export async function compileNativeApp(input: {
 			...build.diagnostics.map((diagnostic) => ({ ...diagnostic, page: page.page })),
 		);
 		if (!build.payload) continue;
+		const sheets = [...documentSheets, ...build.stylesheets].filter(
+			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
+		);
+		const styled = sheets.length > 0 || build.styles.some((style) => style.cssText.length > 0);
+		const unstyled = unstyledOnly(build.payload, build.elementSources, styled);
+		if (unstyled.length > 0) {
+			diagnostics.push(...unstyled.map((diagnostic) => ({ ...diagnostic, page: page.page })));
+			continue;
+		}
 		routes.push({
 			pattern: route.pattern,
 			params: route.params.map((param) => param.name),
 			page: build.payload,
 		});
-		const sheets = [...documentSheets, ...build.stylesheets].filter(
-			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
-		);
-		if (sheets.length > 0 || build.styles.some((style) => style.cssText.length > 0)) {
+		if (styled) {
 			const inputs = nativeStyleInputs(build.payload, build.styles, sheets);
 			styleInputs.push({
 				pattern: route.pattern,

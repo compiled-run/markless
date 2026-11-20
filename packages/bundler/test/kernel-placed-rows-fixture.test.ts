@@ -4,9 +4,10 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { chromium, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterEach, describe, expect, test } from 'vitest';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 // Lists placed in a child's keyed rows, the TanStack playground's shape, answered in the browser of a
 // production build. Which renderer filled them is read from V8 coverage mapped through the build's own
@@ -213,7 +214,7 @@ async function exerciseRows(page: Page, list: string, reloads: number) {
 describe('a list added in component rows, answered in the browser of a production build', () => {
 	test('the kernel fills them without the evaluator running, and their rows stay live', async () => {
 		const url = await buildAndServe('lists');
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage();
 			const errors: string[] = [];
@@ -230,7 +231,7 @@ describe('a list added in component rows, answered in the browser of a productio
 
 	test('component rows the kernel refuses fill through the evaluator, and their rows stay live', async () => {
 		const url = await buildAndServe('evaluated');
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage();
 			const errors: string[] = [];
@@ -246,7 +247,7 @@ describe('a list added in component rows, answered in the browser of a productio
 
 	test('rows whose expression reads the owner state follow its writes through the evaluator', async () => {
 		const url = await buildAndServe('evaluated');
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage();
 			await addedListFill(page, url, false);
@@ -258,7 +259,7 @@ describe('a list added in component rows, answered in the browser of a productio
 
 	test('a row holding two list components as direct siblings fills both, and their rows stay live', async () => {
 		const url = await buildAndServe('siblings');
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage();
 			const errors: string[] = [];
@@ -273,7 +274,7 @@ describe('a list added in component rows, answered in the browser of a productio
 	}, 180_000);
 	test('evaluator-drawn rows over the owner state follow it when reordered, and when one is removed under a held save', async () => {
 		const url = await buildAndServe('edits');
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage();
 			const errors: string[] = [];
@@ -321,7 +322,7 @@ describe('a list added in component rows, answered in the browser of a productio
 
 	test('evaluator-drawn rows inside an @if follow the owner state when it hides and shows them', async () => {
 		const url = await buildAndServe('hidden');
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage();
 			const errors: string[] = [];
@@ -347,7 +348,7 @@ describe('a list added in component rows, answered in the browser of a productio
 
 	test('rows of a component from another file follow the owner state through the evaluator', async () => {
 		const url = await buildAndServe('edits');
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage();
 			const errors: string[] = [];
@@ -362,7 +363,7 @@ describe('a list added in component rows, answered in the browser of a productio
 
 	test('a list component imported from a module whose own root renders it keeps its row callbacks', async () => {
 		const url = await buildAndServe('edits');
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage();
 			const errors: string[] = [];

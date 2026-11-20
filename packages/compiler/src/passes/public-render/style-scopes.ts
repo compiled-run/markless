@@ -1,8 +1,9 @@
 import { parse as parseCss } from 'yuku-css';
-import { asNodes, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { rawElementText } from '../../ast/raw-text.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
+import { hyphenateStyleName } from '../semantic-graph/style-object.ts';
 import { componentMarkupRoot } from './component-markup-root.ts';
 import { unsupportedRenderConstructDiagnostic } from './diagnostics.ts';
 
@@ -17,6 +18,8 @@ type StyleScopeCollection = {
 	readonly styleScopes: ReadonlyArray<PublicRenderStyleScope>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
+
+type CompiledStyles = StyleScopeCollection & { readonly keyframes: ReadonlySet<string> };
 
 export function collectStyleScopes(
 	root: AnyNode,
@@ -46,6 +49,10 @@ export function collectModuleStyleScopes(
 		const compiled = compileStyleNodes(own, filename, moduleId);
 		styleScopes.push(...compiled.styleScopes);
 		diagnostics.push(...compiled.diagnostics);
+		if (compiled.keyframes.size > 0)
+			diagnostics.push(
+				...keyframeNameUseDiagnostics(component.node, compiled.keyframes, filename),
+			);
 	}
 	const strayDiagnostics = findStyleNodes(ast)
 		.filter((styleNode) => !covered.has(styleNode))
@@ -122,11 +129,12 @@ function compileStyleNodes(
 	styleNodes: ReadonlyArray<AnyNode>,
 	filename: string,
 	moduleId: string,
-): StyleScopeCollection {
+): CompiledStyles {
 	const scopeId = styleScopeId(moduleId, styleNodes);
-	if (scopeId === null) return { styleScopes: [], diagnostics: [] };
+	if (scopeId === null) return { styleScopes: [], diagnostics: [], keyframes: new Set() };
 	const diagnostics: CompilerDiagnostic[] = [];
 	const cssParts: string[] = [];
+	const keyframes = new Set<string>();
 
 	for (const styleNode of styleNodes) {
 		const scoped = scopedStyleElement(styleNode, scopeId);
@@ -144,18 +152,22 @@ function compileStyleNodes(
 			);
 			continue;
 		}
-		cssParts.push(scoped.trim());
+		cssParts.push(scoped.cssText.trim());
+		for (const name of scoped.keyframes) keyframes.add(name);
 	}
 
 	return {
 		styleScopes: cssParts.length > 0 ? [{ scopeId, cssText: cssParts.join('\n') }] : [],
 		diagnostics,
+		keyframes,
 	};
 }
 
-const scopedByStyleNode = new WeakMap<AnyNode, Map<string, string | null>>();
+type ScopedSheet = { readonly cssText: string; readonly keyframes: ReadonlySet<string> };
 
-function scopedStyleElement(styleNode: AnyNode, scopeId: string): string | null {
+const scopedByStyleNode = new WeakMap<AnyNode, Map<string, ScopedSheet | null>>();
+
+function scopedStyleElement(styleNode: AnyNode, scopeId: string): ScopedSheet | null {
 	let byScope = scopedByStyleNode.get(styleNode);
 	if (!byScope) scopedByStyleNode.set(styleNode, (byScope = new Map()));
 	if (byScope.has(scopeId)) return byScope.get(scopeId)!;
@@ -165,20 +177,31 @@ function scopedStyleElement(styleNode: AnyNode, scopeId: string): string | null 
 }
 
 // Until @tsrx/yuku returns each `<style>` with its parsed sheet, the sheet is parsed here, once per block.
-function scopeStyleElement(styleNode: AnyNode, scopeId: string): string | null {
+function scopeStyleElement(styleNode: AnyNode, scopeId: string): ScopedSheet | null {
 	const css = rawElementText(styleNode);
 	if (css === null) return null;
 	const { ast, diagnostics } = parseCss(css, { parseValue: false, parseAtrulePrelude: false });
 	if (diagnostics.length > 0) return null;
 	const offsets: number[] = [];
 	if (!collectScopeInserts(css, ast.children, offsets)) return null;
-	return spliceScopeClass(css, offsets, `.${scopeId}`);
+	const scopeClass = `.${scopeId}`;
+	const edits: CssEdit[] = offsets.map((at) => ({ start: at, end: at, text: scopeClass }));
+	const keyframes = new Set<string>();
+	edits.push(...keyframeNameEdits(css, ast.children, scopeId, keyframes));
+	return { cssText: spliceEdits(css, edits), keyframes };
 }
 
 type CssNode = { readonly type: string; readonly start: number; readonly end: number };
 type CssParent = CssNode & { readonly children?: readonly CssNode[] | null };
 type CssRule = CssNode & { readonly prelude: CssParent; readonly block: CssParent | null };
-type CssAtrule = CssNode & { readonly name: string; readonly block: CssParent | null };
+type CssAtrule = CssNode & {
+	readonly name: string;
+	readonly prelude: CssNode | null;
+	readonly block: CssParent | null;
+};
+type CssDeclaration = CssNode & { readonly property: string; readonly value: CssNode };
+type CssName = CssNode & { readonly name?: string; readonly value?: string };
+type CssEdit = { readonly start: number; readonly end: number; readonly text: string };
 
 // Every rule's selectors gain the class, nested rules and those under conditional at-rules included.
 // A block the end of the sheet closes would swallow the next module's rules once sheets are joined, so it fails closed.
@@ -203,7 +226,7 @@ function collectScopeInserts(
 			const atrule = node as CssAtrule;
 			if (atrule.block && !closed(css, atrule.block)) return false;
 			// Keyframe selectors ("from", "50%") name timeline stops, not elements.
-			if (/keyframes$/i.test(atrule.name)) continue;
+			if (unprefixed(atrule.name) === 'keyframes') continue;
 			if (!collectScopeInserts(css, atrule.block?.children, offsets)) return false;
 		}
 	}
@@ -230,14 +253,319 @@ function selectorScopeInsert(selector: CssParent): number | null {
 	return parts[parts.length - 1]!.end;
 }
 
-function spliceScopeClass(source: string, offsets: readonly number[], scopeClass: string): string {
-	if (offsets.length === 0) return source;
-	const ascending = [...offsets].sort((left, right) => left - right);
+// Keyframe names are document-global, so local ones take the scope hash (TSRX spec 4.5); `-global-` and `:global { }` opt out.
+function keyframeNameEdits(
+	css: string,
+	nodes: readonly CssNode[] | null | undefined,
+	scopeId: string,
+	local: Set<string>,
+): CssEdit[] {
+	const edits: CssEdit[] = [];
+	const declare = (list: readonly CssNode[] | null | undefined, global: boolean): void => {
+		for (const node of list ?? []) {
+			if (node.type === 'Rule') {
+				const rule = node as CssRule;
+				declare(rule.block?.children, global || isGlobalBlockRule(rule));
+			} else if (node.type === 'Atrule') {
+				const atrule = node as CssAtrule;
+				if (unprefixed(atrule.name) !== 'keyframes') {
+					declare(atrule.block?.children, global);
+					continue;
+				}
+				const name = keyframesPreludeName(css, atrule.prelude);
+				if (!name || global) continue;
+				const text = css.slice(name.start, name.end);
+				const quoted = name.type === 'String';
+				if ((quoted ? text.slice(1) : text).startsWith(GLOBAL_KEYFRAMES_PREFIX)) {
+					const start = name.start + (quoted ? 1 : 0);
+					edits.push({ start, end: start + GLOBAL_KEYFRAMES_PREFIX.length, text: '' });
+					continue;
+				}
+				local.add(cssNameOf(name));
+				edits.push(scopedNameEdit(name, scopeId));
+			}
+		}
+	};
+	declare(nodes, false);
+	if (local.size === 0) return edits;
+	const declarations: CssDeclaration[] = [];
+	const collect = (list: readonly CssNode[] | null | undefined): void => {
+		for (const node of list ?? []) {
+			if (node.type === 'Rule') collect((node as CssRule).block?.children);
+			else if (node.type === 'Atrule') {
+				const atrule = node as CssAtrule;
+				if (unprefixed(atrule.name) !== 'keyframes') collect(atrule.block?.children);
+			} else if (node.type === 'Declaration') declarations.push(node as CssDeclaration);
+		}
+	};
+	collect(nodes);
+	// A custom property an animation value reads through var() carries names too (`--slide: slide-a`).
+	const carriers = new Set<string>();
+	const readDeclaration = (declaration: CssDeclaration, property: string): void => {
+		const value = declaration.value;
+		const found = readAnimationValue(property, css.slice(value.start, value.end), value.start);
+		for (const name of found.names) {
+			if (local.has(cssNameOf(name))) edits.push(scopedNameEdit(name, scopeId));
+		}
+		for (const carrier of found.carriers) carriers.add(carrier);
+	};
+	for (const declaration of declarations) readDeclaration(declaration, declaration.property);
+	const readAsCarrier = new Set<CssDeclaration>();
+	for (let grew = true; grew;) {
+		grew = false;
+		for (const declaration of declarations) {
+			if (!carriers.has(declaration.property) || readAsCarrier.has(declaration)) continue;
+			readAsCarrier.add(declaration);
+			readDeclaration(declaration, 'animation');
+			grew = true;
+		}
+	}
+	return edits;
+}
+
+const GLOBAL_KEYFRAMES_PREFIX = '-global-';
+
+// Style attributes and script are not renamed with the block, so naming a scoped keyframe there silently misses.
+function keyframeNameUseDiagnostics(
+	component: AnyNode,
+	keyframes: ReadonlySet<string>,
+	filename: string,
+): CompilerDiagnostic[] {
+	const diagnostics: CompilerDiagnostic[] = [];
+	const report = (node: AnyNode, label: string, message: string, suggestion: string): void => {
+		diagnostics.push(
+			unsupportedRenderConstructDiagnostic({
+				label,
+				message,
+				node,
+				filename,
+				severity: 'warning',
+				suggestion,
+			}),
+		);
+	};
+	const globalHint = `declare the keyframes as \`@keyframes ${GLOBAL_KEYFRAMES_PREFIX}name\` to keep the name global`;
+	const reportStyle = (node: AnyNode, message: string): void =>
+		report(
+			node,
+			'An animation in a style attribute',
+			message,
+			`Set the animation from a rule in the component's <style> block, or ${globalHint}.`,
+		);
+	const reportScript = (node: AnyNode, name: string): void =>
+		report(
+			node,
+			'A script reading an animation name',
+			`\`${name}\` is a keyframe name scoped to this component's <style> block; at run time the animation is named \`${name}\` plus the scope hash, so this exact name never matches.`,
+			`Tell the animations apart without the name (event.target, or the element the listener sits on), or ${globalHint}.`,
+		);
+	const scopedNamesIn = (property: string, value: string): string[] =>
+		animationNamesOf(property, value, 0)
+			.map(cssNameOf)
+			.filter((name) => keyframes.has(name));
+	const checkCssText = (node: AnyNode, cssText: string): void => {
+		const { ast } = parseCss(cssText, { context: 'declarationList' });
+		for (const declaration of ((ast as CssParent).children ?? []) as CssDeclaration[]) {
+			if (declaration.type !== 'Declaration') continue;
+			const value = cssText.slice(declaration.value.start, declaration.value.end);
+			for (const name of scopedNamesIn(declaration.property, value))
+				reportStyle(node, scopedInlineMessage(name));
+		}
+	};
+	const checkStyleAttribute = (attribute: AnyNode): void => {
+		const value = attribute.value as AnyNode | null | undefined;
+		const expression =
+			value?.type === 'JSXExpressionContainer' ? (value.expression as AnyNode) : value;
+		const text = staticString(expression);
+		if (text !== null) {
+			checkCssText(attribute, text);
+			return;
+		}
+		if (expression?.type !== 'ObjectExpression') return;
+		for (const property of asNodes(expression.properties)) {
+			const key = property.type === 'Property' ? styleObjectKey(property) : null;
+			if (key === null) continue;
+			const cssName = hyphenateStyleName(key);
+			if (unprefixed(cssName) !== 'animation' && unprefixed(cssName) !== 'animation-name')
+				continue;
+			const literal = staticString(property.value as AnyNode);
+			if (literal === null) {
+				reportStyle(
+					property,
+					`The component declares scoped keyframes (${[...keyframes].join(', ')}), and this \`${key}\` value is only known at run time, so the compiler cannot point it at their scoped names.`,
+				);
+				continue;
+			}
+			for (const name of scopedNamesIn(cssName, literal))
+				reportStyle(property, scopedInlineMessage(name));
+		}
+	};
+	const visit = (node: AnyNode): void => {
+		if (node.type === 'JSXStyleElement') return;
+		if (node.type === 'JSXAttribute' && getIdentifierName(node.name as AnyNode) === 'style')
+			checkStyleAttribute(node);
+		if (node.type === 'BinaryExpression' && EQUALITY_OPERATORS.has(node.operator as string)) {
+			const left = node.left as AnyNode;
+			const right = node.right as AnyNode;
+			const literal = readsAnimationName(left)
+				? staticString(right)
+				: readsAnimationName(right)
+					? staticString(left)
+					: null;
+			if (literal !== null && keyframes.has(literal)) reportScript(node, literal);
+		}
+		if (node.type === 'AssignmentExpression' && readsAnimationName(node.left as AnyNode)) {
+			const literal = staticString(node.right as AnyNode);
+			for (const name of literal === null ? [] : scopedNamesIn('animation-name', literal))
+				reportScript(node, name);
+		}
+		for (const value of Object.values(node)) {
+			for (const item of Array.isArray(value) ? value : [value]) {
+				if (item && typeof item === 'object' && typeof (item as AnyNode).type === 'string')
+					visit(item as AnyNode);
+			}
+		}
+	};
+	visit(component);
+	return diagnostics;
+}
+
+const EQUALITY_OPERATORS = new Set(['===', '!==', '==', '!=']);
+
+function readsAnimationName(node: AnyNode): boolean {
+	if (node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression') return false;
+	const property = node.property as AnyNode;
+	return node.computed
+		? staticString(property) === 'animationName'
+		: property.type === 'Identifier' && property.name === 'animationName';
+}
+
+function scopedInlineMessage(name: string): string {
+	return `\`${name}\` is a keyframe name scoped to this component's <style> block, so a style attribute that names it finds no keyframes.`;
+}
+
+function staticString(node: AnyNode | null | undefined): string | null {
+	if (node?.type === 'Literal' && typeof node.value === 'string') return node.value;
+	if (node?.type !== 'TemplateLiteral' || asNodes(node.expressions).length > 0) return null;
+	const cooked = (asNodes(node.quasis)[0]?.value as { cooked?: string } | undefined)?.cooked;
+	return typeof cooked === 'string' ? cooked : null;
+}
+
+function styleObjectKey(property: AnyNode): string | null {
+	if (property.computed) return null;
+	const key = property.key as AnyNode | undefined;
+	if (key?.type === 'Identifier') return key.name as string;
+	return staticString(key);
+}
+
+function isGlobalBlockRule(rule: CssRule): boolean {
+	const selectors = rule.prelude.type === 'SelectorList' ? (rule.prelude.children ?? []) : [];
+	const parts = (selectors.length === 1 ? (selectors[0] as CssParent).children : null) ?? [];
+	const only = parts.length === 1 ? (parts[0] as CssParent & CssName) : null;
+	return only?.type === 'PseudoClassSelector' && only.name === 'global' && !only.children;
+}
+
+function keyframesPreludeName(css: string, prelude: CssNode | null): CssName | null {
+	if (!prelude) return null;
+	const { ast } = parseCss(css.slice(prelude.start, prelude.end), {
+		context: 'atrulePrelude',
+		atrule: 'keyframes',
+	});
+	const parts = (ast as CssParent).children ?? [];
+	const only = parts.length === 1 ? parts[0]! : null;
+	if (only?.type !== 'Identifier' && only?.type !== 'String') return null;
+	return shifted(only as CssName, prelude.start);
+}
+
+// Shorthand values that another `animation-*` longhand claims first (CSS Animations 1, `animation`).
+const ANIMATION_KEYWORD_GROUPS = new Map<string, string>([
+	...['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'step-start', 'step-end'].map(
+		(word) => [word, 'timing'] as const,
+	),
+	['infinite', 'iteration'],
+	...['normal', 'reverse', 'alternate', 'alternate-reverse'].map(
+		(word) => [word, 'direction'] as const,
+	),
+	...['none', 'forwards', 'backwards', 'both'].map((word) => [word, 'fill'] as const),
+	...['running', 'paused'].map((word) => [word, 'play-state'] as const),
+]);
+
+function animationNamesOf(propertyName: string, value: string, offset: number): CssName[] {
+	return readAnimationValue(propertyName, value, offset).names;
+}
+
+// The names an `animation`/`animation-name` value gives, and the custom properties it reads through var().
+function readAnimationValue(
+	propertyName: string,
+	value: string,
+	offset: number,
+): { readonly names: CssName[]; readonly carriers: string[] } {
+	const names: CssName[] = [];
+	const carriers: string[] = [];
+	const property = unprefixed(propertyName);
+	if (property !== 'animation' && property !== 'animation-name') return { names, carriers };
+	const { ast } = parseCss(value, { context: 'value' });
+	let claimed = new Set<string>();
+	for (const part of ((ast as CssParent).children ?? []) as (CssName & CssParent)[]) {
+		if (part.type === 'Operator' && part.value === ',') {
+			claimed = new Set();
+			continue;
+		}
+		if (part.type === 'Function' && part.name?.toLowerCase() === 'var') {
+			const [custom, , fallback] = (part.children ?? []) as (CssName & CssNode)[];
+			if (custom?.type === 'Identifier' && custom.name) carriers.push(custom.name);
+			if (fallback?.type === 'Raw') {
+				const inner = readAnimationValue(
+					property,
+					value.slice(fallback.start, fallback.end),
+					offset + fallback.start,
+				);
+				names.push(...inner.names);
+				carriers.push(...inner.carriers);
+			}
+			continue;
+		}
+		if (part.type === 'Identifier' && property === 'animation') {
+			const group = ANIMATION_KEYWORD_GROUPS.get(part.name!.toLowerCase());
+			if (group && !claimed.has(group)) {
+				claimed.add(group);
+				continue;
+			}
+		}
+		if (part.type === 'Identifier' || part.type === 'String') names.push(shifted(part, offset));
+	}
+	return { names, carriers };
+}
+
+function cssNameOf(name: CssName): string {
+	return (name.type === 'String' ? name.value : name.name) ?? '';
+}
+
+function scopedNameEdit(name: CssName, scopeId: string): CssEdit {
+	const at = name.type === 'String' ? name.end - 1 : name.end;
+	return { start: at, end: at, text: `-${scopeId}` };
+}
+
+function shifted(node: CssName, by: number): CssName {
+	return { ...node, start: node.start + by, end: node.end + by };
+}
+
+// `-webkit-keyframes` is `keyframes`, `-moz-animation-name` is `animation-name`; custom properties stay as written.
+function unprefixed(name: string): string {
+	const lower = name.toLowerCase();
+	if (!lower.startsWith('-') || lower.startsWith('--')) return lower;
+	const vendorEnd = lower.indexOf('-', 1);
+	return vendorEnd === -1 ? lower : lower.slice(vendorEnd + 1);
+}
+
+function spliceEdits(source: string, edits: readonly CssEdit[]): string {
+	if (edits.length === 0) return source;
+	const ascending = [...edits].sort((left, right) => left.start - right.start);
 	let output = '';
 	let from = 0;
-	for (const at of ascending) {
-		output += source.slice(from, at) + scopeClass;
-		from = at;
+	for (const edit of ascending) {
+		output += source.slice(from, edit.start) + edit.text;
+		from = edit.end;
 	}
 	return output + source.slice(from);
 }

@@ -1,10 +1,10 @@
 import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { chromium } from '@playwright/test';
 import { expect, test } from 'vitest';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { buildFixture } from '../support/fixture-build.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 const TEXT_COUNT = 40;
@@ -61,7 +61,7 @@ test('a lookup table of import() loaders keeps each target in its own chunk, fet
 			expect(textsIn(await readFile(join(clientDir, file), 'utf8')), file).toBeLessThanOrEqual(1);
 
 		const server = await startBuiltServer(join(root, '.output/server/index.mjs'), { cwd: root });
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage();
 			await page.addInitScript(() => {

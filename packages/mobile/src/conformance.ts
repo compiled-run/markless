@@ -27,6 +27,8 @@ export type NativeConformance = {
 	readonly initialRows?: ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
 	/** Present when the payload has checkboxes or radio buttons: `[node, checked]`. */
 	readonly initialChecks?: ReadonlyArray<readonly [node: string, checked: boolean]>;
+	/** Present when the payload has selects: `[option, selected]` for each shown option, in tree order. */
+	readonly initialSelections?: ReadonlyArray<readonly [node: string, selected: boolean]>;
 	/** Present when the payload has branches: `[branch, arm]`, arm null when none is shown. */
 	readonly initialArms?: ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Present when the payload has system sheets: `[sheet, open]`. */
@@ -57,6 +59,7 @@ export function nativeConformance(
 	const initialSheets = runtime.sheets();
 	const tasks = runtime.tasks();
 	const initialChecks = runtime.checks();
+	const initialSelections = runtime.selections();
 	return {
 		version: NATIVE_CONFORMANCE_VERSION,
 		payload,
@@ -71,6 +74,7 @@ export function nativeConformance(
 		...(initialSheets.length > 0 ? { initialSheets } : {}),
 		...(tasks.length > 0 ? { tasks } : {}),
 		...(initialChecks.length > 0 ? { initialChecks } : {}),
+		...(initialSelections.length > 0 ? { initialSelections } : {}),
 		steps: actions.map((action) => ({ action, journal: runtime.dispatch(action) })),
 	};
 }
