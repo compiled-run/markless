@@ -11,6 +11,7 @@ import {
 	DEVICE_TARGET_FACTS,
 	NATIVE_FACT_COLLECTORS,
 	nativeUnsupported,
+	selectorAttributes,
 	type NativeViewArtifact,
 } from '@markless/compiler/native';
 import {
@@ -19,8 +20,8 @@ import {
 	type RouteManifest,
 } from '@markless/router';
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
-import { isNativeStyleStateAttribute, NATIVE_APP_VERSION } from '@markless/serializer/native-view';
-import { nativeStyleInputs, type NativeStyleInput } from './style-input.ts';
+import { NATIVE_APP_VERSION } from '@markless/serializer/native-view';
+import { nativeStyleInputs, nativeStyleRowAttribute, type NativeStyleInput } from './style-input.ts';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
 
@@ -230,7 +231,7 @@ export async function compileNativeComponent(input: {
 		(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 	);
 	const unstyled = native.payload
-		? unstyledOnly(native.payload, native.elementSources, sheets.length > 0 || styles.some((style) => style.cssText.length > 0))
+		? unstyledOnly(native.payload, native.elementSources, [...sheets, ...styles].map((style) => style.cssText))
 		: [];
 	return {
 		payload: errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,
@@ -247,9 +248,10 @@ export async function compileNativeComponent(input: {
 function unstyledOnly(
 	payload: NativeViewPayload,
 	sources: NativeViewArtifact['elementSources'],
-	styled: boolean,
+	css: ReadonlyArray<string>,
 ): CompilerDiagnostic[] {
-	if (!styled) return [];
+	if (!css.some((text) => text.length > 0)) return [];
+	const tested = new Set(css.flatMap((text) => [...selectorAttributes(text)]));
 	const rowCells = new Set(payload.cells.flatMap((cell) => (cell.row ? [cell.id] : [])));
 	// A row's item or its own state: what a list row reads, which differs from row to row.
 	const readsRow = (tree: unknown): boolean =>
@@ -274,7 +276,7 @@ function unstyledOnly(
 		if (!node.row) return [];
 		return (node.bindings ?? []).flatMap((binding) =>
 			'attribute' in binding &&
-			(binding.attribute === 'class' || isNativeStyleStateAttribute(binding.attribute)) &&
+			nativeStyleRowAttribute(binding.attribute, tested) &&
 			readsRow(binding.value)
 				? [
 						nativeUnsupported(
@@ -363,7 +365,11 @@ export async function compileNativeApp(input: {
 			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 		);
 		const styled = sheets.length > 0 || build.styles.some((style) => style.cssText.length > 0);
-		const unstyled = unstyledOnly(build.payload, build.elementSources, styled);
+		const unstyled = unstyledOnly(
+			build.payload,
+			build.elementSources,
+			[...sheets, ...build.styles].map((style) => style.cssText),
+		);
 		if (unstyled.length > 0) {
 			diagnostics.push(...unstyled.map((diagnostic) => ({ ...diagnostic, page: page.page })));
 			continue;

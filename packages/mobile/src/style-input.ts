@@ -1,4 +1,5 @@
 import type { NativeArmPlace, NativeViewPayload } from '@markless/serializer';
+import { selectorAttributes } from '@markless/compiler/native';
 import { isNativeStyleStateAttribute } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeBuild, NativeStylesheet } from './compile.ts';
@@ -62,6 +63,15 @@ export type NativeStyleInput = {
 };
 
 type PayloadNode = NativeViewPayload['nodes'][number];
+
+/**
+ * Whether a bound attribute can give a node a different style: `class`, `hidden` (its UA rule), or another state attribute
+ * a selector of the page's CSS (`tested`) reads. Dragon styles a list row's node once, so only these must not differ by row.
+ */
+export const nativeStyleRowAttribute = (attribute: string, tested: ReadonlySet<string>): boolean =>
+	attribute === 'class' ||
+	attribute === 'hidden' ||
+	(isNativeStyleStateAttribute(attribute) && tested.has(attribute));
 
 /** The cells an expression reads. */
 const cellsOf = (expr: unknown, into: Set<string>): Set<string> => {
@@ -175,6 +185,9 @@ export function nativeStyleInput(
 	const initial = new Map(
 		createNativeRuntime(payload, new Map(), params, undefined, undefined, host).texts(),
 	);
+	const tested = new Set(
+		[...stylesheets, ...styles].flatMap((style) => [...selectorAttributes(style.cssText)]),
+	);
 	const evaluateAt = host
 		? evaluateWithScript(payload, host)
 		: evaluateWithScript(payload, {
@@ -261,6 +274,7 @@ export function nativeStyleInput(
 			for (const binding of node.bindings ?? []) {
 				if (!('attribute' in binding) || !isNativeStyleStateAttribute(binding.attribute))
 					continue;
+				if (node.row && !nativeStyleRowAttribute(binding.attribute, tested)) continue;
 				const byState = combinations.map((when) => ({
 					when,
 					value:

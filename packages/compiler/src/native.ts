@@ -2,6 +2,7 @@
 // compiler (the docs' compile worker imports the main entry) never loads native code.
 export { NATIVE_FACT_COLLECTORS } from './passes/semantic-graph/expression-tree.ts';
 export { DEVICE_TARGET_FACTS } from './passes/semantic-graph/device-target.ts';
+export { selectorAttributes } from './passes/native-selector-attributes.ts';
 export {
 	createNativeViewPayload,
 	nativeRefusal,
