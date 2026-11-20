@@ -1,0 +1,42 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u31-field-text",
+			"failure": null,
+			"installSeconds": 3.3447204999999958,
+			"flowSeconds": 31.106744457999994
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.29937408300000246,
+			"flowSeconds": 27.049006583000008
+		},
+		{
+			"name": "u23-textbox",
+			"failure": null,
+			"installSeconds": 0.3544609580000106,
+			"flowSeconds": 25.345298749999987
+		},
+		{
+			"name": "u29-field-focus",
+			"failure": null,
+			"installSeconds": 0.28149425000001793,
+			"flowSeconds": 31.707137499999984
+		},
+		{
+			"name": "u30-text-keys",
+			"failure": null,
+			"installSeconds": 0.3460975000000035,
+			"flowSeconds": 44.001743625
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 0.34788687500002563,
+			"flowSeconds": 37.87122129199997
+		}
+	]
+}
