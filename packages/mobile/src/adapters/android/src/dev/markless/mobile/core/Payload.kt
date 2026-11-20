@@ -262,7 +262,8 @@ fun nativeMaxLength(attribute: String?): Int? {
 }
 
 /** A form's submittable fields and submit buttons, each in tree order. */
-data class Form(val node: String, val fields: List<Field>, val submitters: List<String>, val noValidate: Boolean = false, val authoredAriaDisabled: Boolean = false)
+/** [opens]: a GET form on another site, whose submit opens this URL with its query replaced by the form's entries. */
+data class Form(val node: String, val fields: List<Field>, val submitters: List<String>, val noValidate: Boolean = false, val authoredAriaDisabled: Boolean = false, val opens: String? = null)
 
 data class Payload(
 	val component: String,
@@ -704,7 +705,7 @@ data class Payload(
 
 		private fun form(v: Json, what: String): Form {
 			val o = v.obj(what)
-			o.only(setOf("node", "fields", "submitters", "noValidate", "authoredAriaDisabled"), what)
+			o.only(setOf("node", "fields", "submitters", "noValidate", "authoredAriaDisabled", "opens"), what)
 			val fields = o.field("fields", what).arr("$what.fields").mapIndexed { n, f ->
 				val fo = f.obj("$what.fields[$n]")
 				fo.only(setOf("node", "kind"), "$what.fields[$n]")
@@ -712,7 +713,7 @@ data class Payload(
 				Field(fo.field("node", what).str("$what.fields[$n].node"), FieldKind.entries.first { it.wire == kind })
 			}
 			val submitters = o.field("submitters", what).arr("$what.submitters").map { it.str("$what.submitters[]") }
-			return Form(o.field("node", what).str("$what.node"), fields, submitters, flag(o, "noValidate", what), flag(o, "authoredAriaDisabled", what))
+			return Form(o.field("node", what).str("$what.node"), fields, submitters, flag(o, "noValidate", what), flag(o, "authoredAriaDisabled", what), o["opens"]?.str("$what.opens"))
 		}
 
 		private fun handler(v: Json, what: String, cells: Set<String>): Handler {

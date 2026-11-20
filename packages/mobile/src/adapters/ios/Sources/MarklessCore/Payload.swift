@@ -356,6 +356,8 @@ public struct NativeForm: Equatable, Sendable {
 	public let noValidate: Bool
 	/// An author wrote `aria-disabled` on one of its submit buttons, so a running submission marks none of them.
 	public let authoredAriaDisabled: Bool
+	/// A GET form on another site: submitting opens this URL, its query replaced by the form's entries, in the browser.
+	public var opens: String? = nil
 }
 
 /// A navigate op's param: a string fixed at build time, or an expression evaluated in the activated element's scope.
@@ -699,7 +701,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 				}
 		}
 		let forms: [NativeForm] = fields.has("forms") ? try fields["forms"].array().map { form in
-			let field = try form.object(required: ["node", "fields", "submitters"], optional: ["noValidate", "authoredAriaDisabled"])
+			let field = try form.object(required: ["node", "fields", "submitters"], optional: ["noValidate", "authoredAriaDisabled", "opens"])
 			let flag = { (key: String) throws -> Bool in
 				guard field.has(key) else { return false }
 				guard try field[key].bool() else { throw PayloadError(path: try field[key].path, reason: "\(key) is only ever true") }
@@ -716,7 +718,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 					return NativeForm.Field(node: try f["node"].string(), kind: fieldKind)
 				},
 				submitters: try field["submitters"].array().map { try $0.string() },
-				noValidate: try flag("noValidate"), authoredAriaDisabled: try flag("authoredAriaDisabled"))
+				noValidate: try flag("noValidate"), authoredAriaDisabled: try flag("authoredAriaDisabled"),
+				opens: field.has("opens") ? try field["opens"].string() : nil)
 		} : []
 		let valueMissing: [(locale: String, messages: NativeValueMissing)] = fields.has("valueMissing") ? try {
 			let reader = try fields["valueMissing"]

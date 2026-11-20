@@ -762,6 +762,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A GET form on another site: typed text, a hidden field, the action's query and fragment, then the submit.
+		name: 'form-opens',
+		fixture: 'proofs/21-form-opens/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'input', host: 'h4', value: 'phone apps & more ✓' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'enter', host: 'h4' },
+		],
+	},
+	{
 		name: 'script-render-list',
 		fixture: 'proofs/j9-render-list/App.tsrx',
 		modules: true,

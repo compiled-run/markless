@@ -756,6 +756,11 @@ export type NativeForm = {
 	readonly noValidate?: true;
 	/** An author wrote `aria-disabled` on one of its submit buttons, so a running submission marks none of them. */
 	readonly authoredAriaDisabled?: true;
+	/**
+	 * A GET form with no submit handler whose action is on another site: submitting calls `browser.open` with this URL,
+	 * its query replaced by the form's entries (`application/x-www-form-urlencoded`), as the web leaves for that page.
+	 */
+	readonly opens?: string;
 };
 
 /** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */

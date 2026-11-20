@@ -1334,6 +1334,11 @@ public final class NativeRuntime {
 			calls.append(.invalid(node: invalid.node, message: invalid.message))
 			return []
 		}
+		if let opens = form.opens {
+			let url = nativeFormUrl(opens, try entries(of: formId).map { ($0[0], $0[1]) })
+			calls.append(.call(call: "browser.open", object: nil, arguments: [.string(url)], result: nil, resume: nil))
+			return []
+		}
 		let sent = try entries(of: formId)
 		let runs = running[formId] ?? []
 		if runs.contains(where: { $0.sent == sent && $0.submitter == submitter }) { return [] }
@@ -1564,6 +1569,24 @@ extension Optional where Wrapped == NativeScriptHost {
 }
 
 /// The prefix of a timer the script set, as its `timer` entries name it (`script:3`); other timers are `after` ops.
+/// The URL a GET form leaves for: its action with the query replaced by the entries, each encoded as
+/// `application/x-www-form-urlencoded` (UTF-8, a space as `+`, all but `*-._` and ASCII letters and digits escaped).
+public func nativeFormUrl(_ action: String, _ entries: [(String, String)]) -> String {
+	let encode = { (text: String) -> String in
+		text.utf8.map { byte -> String in
+			switch byte {
+			case 0x20: return "+"
+			case 0x30...0x39, 0x41...0x5A, 0x61...0x7A, 0x2A, 0x2D, 0x2E, 0x5F: return String(UnicodeScalar(byte))
+			default: return String(format: "%%%02X", byte)
+			}
+		}.joined()
+	}
+	let fragment = action.firstIndex(of: "#").map { String(action[$0...]) } ?? ""
+	let base = action.firstIndex(of: "#").map { String(action[..<$0]) } ?? action
+	let path = base.firstIndex(of: "?").map { String(base[..<$0]) } ?? base
+	return path + "?" + entries.map { "\(encode($0.0))=\(encode($0.1))" }.joined(separator: "&") + fragment
+}
+
 public let scriptTimer = "script:"
 /// The continuation a device call from a script names: its answer goes back to the script.
 public let scriptCall = "script:"

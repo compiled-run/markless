@@ -87,6 +87,33 @@ export type NativeAction =
 	| { readonly event: 'response'; readonly id: number; readonly response: NativeFetchResponse };
 
 /** The prefix of a timer the script set, as its `timer` entries name it (`script:3`); other timers are `after` ops. */
+/**
+ * The URL a GET form leaves for: its action with the query replaced by the entries, each name and value encoded as
+ * `application/x-www-form-urlencoded` (UTF-8, a space as `+`, all but `*-._` and ASCII letters and digits escaped).
+ */
+export function nativeFormUrl(action: string, entries: ReadonlyArray<readonly [string, string]>): string {
+	const encode = (text: string) =>
+		[...new TextEncoder().encode(text)]
+			.map((byte) =>
+				byte === 0x20
+					? '+'
+					: (byte >= 0x30 && byte <= 0x39) ||
+						  (byte >= 0x41 && byte <= 0x5a) ||
+						  (byte >= 0x61 && byte <= 0x7a) ||
+						  byte === 0x2a ||
+						  byte === 0x2d ||
+						  byte === 0x2e ||
+						  byte === 0x5f
+						? String.fromCharCode(byte)
+						: `%${byte.toString(16).toUpperCase().padStart(2, '0')}`,
+			)
+			.join('');
+	const hash = action.indexOf('#');
+	const base = hash < 0 ? action : action.slice(0, hash);
+	const query = base.indexOf('?');
+	return `${query < 0 ? base : base.slice(0, query)}?${entries.map(([name, value]) => `${encode(name)}=${encode(value)}`).join('&')}${hash < 0 ? '' : action.slice(hash)}`;
+}
+
 export const SCRIPT_TIMER = 'script:';
 /** The continuation a device call from a script names: its answer goes back to the script. */
 export const SCRIPT_CALL = 'script:';
@@ -1724,6 +1751,14 @@ export function createNativeRuntime(
 		const invalid = firstInvalid(op.form, op.submitter);
 		if (invalid) {
 			calls.push({ op: 'invalid', node: invalid.node, message: invalid.message });
+			return [];
+		}
+		if (form.opens !== undefined) {
+			calls.push({
+				op: 'call',
+				call: 'browser.open',
+				arguments: [nativeFormUrl(form.opens, entriesOf(op.form) as [string, string][])],
+			});
 			return [];
 		}
 		const sent = JSON.stringify(entriesOf(op.form));

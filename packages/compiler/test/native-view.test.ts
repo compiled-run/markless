@@ -2020,6 +2020,42 @@ export function Page() @{
 	});
 });
 
+describe('a GET form on another site', () => {
+	const form = (attributes: string, button = '<button>Go</button>') =>
+		nativeView(`export function Page() @{
+	<form ${attributes}>
+		<input name="q" aria-label="Query" />
+		${button}
+	</form>
+}`);
+
+	it('opens its action in the browser when it has no submit handler, a scheme-relative action as https', async () => {
+		const external = await form('action="https://example.com/search?x=1#top" method="GET"');
+		expect(external.diagnostics).toEqual([]);
+		expect(external.payload!.forms).toEqual([
+			expect.objectContaining({ opens: 'https://example.com/search?x=1#top' }),
+		]);
+		const relative = await form('action="//hn.algolia.com/"');
+		expect(relative.payload!.forms).toEqual([
+			expect.objectContaining({ opens: 'https://hn.algolia.com/' }),
+		]);
+	});
+
+	it("refuses a POST, an action on the app's own server, and a named submit button by name", async () => {
+		const messages = async (attributes: string, button?: string) =>
+			(await form(attributes, button)).diagnostics.map((d) => d.message);
+		expect(await messages('action="https://example.com/login" method="post"')).toEqual([
+			expect.stringContaining('has no onSubmit handler'),
+		]);
+		expect(await messages('action="/search"')).toEqual([
+			expect.stringContaining('has no onSubmit handler'),
+		]);
+		expect(
+			await messages('action="https://example.com/"', '<button name="go" value="1">Go</button>'),
+		).toEqual([expect.stringContaining('has a `name`, which the web adds to the query')]);
+	});
+});
+
 describe('@for inside another @for', () => {
 	it('lowers an inner list in each outer row, its list read from the outer item and its rows reading both', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';

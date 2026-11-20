@@ -48,6 +48,8 @@ class ProofDevice(private val platform: NativeDevice, private val label: TextVie
 	override fun call(name: String, obj: String?, arguments: List<JsValue>, settle: ((DeviceOutcome) -> Unit)?) {
 		calls.add(name)
 		label.text = "calls: " + calls.joinToString(", ")
+		// The browser would cover the app the flow reads: the call is listed and goes no further.
+		if (name == "browser.open") return settle?.invoke(DeviceOutcome.Value(JsValue.Null)) ?: Unit
 		platform.call(name, obj, arguments, settle)
 	}
 

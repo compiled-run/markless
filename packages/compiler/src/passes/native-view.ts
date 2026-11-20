@@ -6636,6 +6636,17 @@ export function createNativeViewPayload(
 					  )
 					? 'bound'
 					: undefined;
+		/** A GET form's action on another site, as the URL the web leaves for; undefined for this app's own or a bound one. */
+		const externalAction = (form: Extract<NativeNode, { kind: 'element' }>): string | undefined => {
+			if (attribute(form, 'action') !== 'static' || attribute(form, 'method') === 'bound') return undefined;
+			const method = form.attributes?.['method']?.trim().toLowerCase();
+			if (method !== undefined && method !== 'get') return undefined;
+			const action = form.attributes!['action']!.trim();
+			// A scheme-relative action takes the page's scheme, which a site served over HTTPS gives it.
+			if (!URL.canParse(action.startsWith('//') ? `https:${action}` : action)) return undefined;
+			const url = new URL(action.startsWith('//') ? `https:${action}` : action);
+			return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : undefined;
+		};
 		const handlerOf = (host: string, event: NativeViewPayload['events'][number]['event']) => {
 			const entry = events.find(
 				(candidate) => candidate.host === host && candidate.event === event,
@@ -6744,18 +6755,29 @@ export function createNativeViewPayload(
 					if (attribute(node, 'maxlength')) lengthLimited = true;
 				}
 			}
-			if (!submit) {
+			const opens = submit ? undefined : externalAction(form);
+			if (!submit && !opens) {
 				if (submitters.length > 0 || textFields.length === 1)
 					refuse(
 						`${where} has no onSubmit handler: the web sends it to its action and loads the answer (or sends a POST to an API route in place), and a phone app has no server or page to load`,
 					);
 				continue;
 			}
-			if (!prevents(submit.ops))
-				refuse(
-					`the submit handler on ${where} does not call \`event.preventDefault()\` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for`,
-				);
-			submit.ops = withoutPrevent(submit.ops);
+			if (opens) {
+				features.add(DEVICE_CALLS['browser.open'].feature);
+				for (const submitter of submitters)
+					if (attribute(byId.get(submitter) as Extract<NativeNode, { kind: 'element' }>, 'name'))
+						refuse(
+							`the submit button ${submitter} of ${where} has a \`name\`, which the web adds to the query a native build opens; leave it out`,
+						);
+			}
+			if (submit) {
+				if (!prevents(submit.ops))
+					refuse(
+						`the submit handler on ${where} does not call \`event.preventDefault()\` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for`,
+					);
+				submit.ops = withoutPrevent(submit.ops);
+			}
 			for (const submitter of submitters)
 				ensureHandler(submitter, 'activate', 'submit').ops.push({
 					op: 'submit',
@@ -6790,6 +6812,7 @@ export function createNativeViewPayload(
 				node: form.id,
 				fields,
 				submitters,
+				...(opens ? { opens } : {}),
 				...(form.attributes?.['novalidate'] !== undefined
 					? { noValidate: true as const }
 					: {}),

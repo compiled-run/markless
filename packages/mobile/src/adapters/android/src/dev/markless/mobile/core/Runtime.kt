@@ -1281,6 +1281,11 @@ class Runtime(
 			calls.add(JournalEntry.Invalid(node, message))
 			return emptyList()
 		}
+		form.opens?.let { opens ->
+			val entries = (entriesOf(op.form) as JsValue.Arr).items.map { (it as JsValue.Arr).items.let { pair -> Js.toStr(pair[0]) to Js.toStr(pair[1]) } }
+			calls.add(JournalEntry.Call("browser.open", listOf(JsValue.Str(nativeFormUrl(opens, entries))), null))
+			return emptyList()
+		}
 		val sent = jsonValue(entriesOf(op.form))
 		val runs = running[op.form].orEmpty()
 		// The same entries from the same button as a submission still running: the web drops it before any handler hears it.
