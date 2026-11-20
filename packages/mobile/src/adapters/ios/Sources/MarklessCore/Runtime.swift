@@ -638,7 +638,8 @@ public final class NativeRuntime {
 			var names: [String] = []
 			for name in found.attributes.keys.sorted() + found.bindings.filter({ !$0.isProperty }).map(\.name) where !names.contains(name) { names.append(name) }
 			var attributes: [(String, JSONValue)] = []
-			for name in names { if let value = try attributeNow(nodeOf(id), name) { attributes.append((name, .string(value))) } }
+			let at = try instances(of: found.node).first { $0.id == id }?.scope ?? .empty
+			for name in names { if let value = try attribute(of: found.node, name, in: at) { attributes.append((name, .string(value))) } }
 			var ancestors: [JSONValue] = []
 			var up = found.node.parent
 			while let parent = up {
@@ -1362,12 +1363,13 @@ public final class NativeRuntime {
 			if down == nil { self.touches[pointerId] = state }
 			let x = action.x ?? 0, y = action.y ?? 0
 			if action.event != .pointermove { self.tapPoint = action.event == .pointerup ? (x, y) : nil }
-			/// The elements from `id` out to the root, innermost first.
+			/// The elements from `id` out to the root, innermost first; those in its row keep its row's key.
 			let chain = { (id: String) -> [String] in
+				let key = id.firstIndex(of: "@").map { String(id[$0...]) } ?? ""
 				var out: [String] = []
 				var at: String? = self.nodeOf(id)
 				while let current = at {
-					out.append(current == self.nodeOf(id) ? id : current)
+					out.append(current == self.nodeOf(id) ? id : !key.isEmpty && self.nodesById[current]?.row != nil ? current + key : current)
 					at = self.nodesById[current]?.parent
 				}
 				return out

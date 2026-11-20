@@ -460,6 +460,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'row-element-facts',
+		fixture: 'test/fixtures/RowElementFacts.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h2@b' },
+			{ event: 'pointerup', host: 'h2@b' },
+			{ event: 'pointerdown', host: 'h2@a' },
+			{ event: 'pointerup', host: 'h2@a' },
+		],
+	},
+	{
 		name: 'by-id',
 		fixture: 'test/fixtures/ById.tsrx',
 		actions: [

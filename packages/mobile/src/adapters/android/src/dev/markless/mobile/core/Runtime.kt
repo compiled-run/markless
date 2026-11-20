@@ -485,7 +485,8 @@ class Runtime(
 			val key = if ('@' in id) id.substring(id.indexOf('@')) else ""
 			val node = elementOf(id.substringBefore('@'))
 			val names = LinkedHashSet<String>(node.attributes.keys.sorted()).apply { addAll(node.bindings.filter { !it.property }.map { it.name }) }
-			val attributes = names.mapNotNull { name -> attributeNow(node.id, name)?.let { "${jsonString(name)}:${jsonString(it)}" } }
+			val at = instances(node).firstOrNull { it.id == id }?.scope ?: Scope.EMPTY
+			val attributes = names.mapNotNull { name -> attributeIn(node, name, at)?.let { "${jsonString(name)}:${jsonString(it)}" } }
 			val ancestors = ArrayList<String>()
 			var up = node.parent
 			while (up != null) {
@@ -1157,13 +1158,14 @@ class Runtime(
 
 	private fun touching(pointer: JsValue): Touching? = (pointer as? JsValue.Num)?.let { touches[it.value + 0.0] }
 
-	/** The elements from [id] out to the root, innermost first; a row's copy keeps its own id. */
+	/** The elements from [id] out to the root, innermost first; those in its row keep its row's key. */
 	private fun chain(id: String): List<String> {
 		val base = id.substringBefore('@')
+		val key = if ('@' in id) id.substring(id.indexOf('@')) else ""
 		val out = ArrayList<String>()
 		var at: String? = base
 		while (!at.isNullOrEmpty()) {
-			out.add(if (at == base) id else at)
+			out.add(if (at == base) id else if (key.isNotEmpty() && byId[at]?.row != null) at + key else at)
 			at = byId[at]?.parent
 		}
 		return out

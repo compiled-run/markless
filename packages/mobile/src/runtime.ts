@@ -736,16 +736,16 @@ export function createNativeRuntime(
 			const key = at < 0 ? '' : id.slice(at);
 			const node = nodesById.get(nodeOf(id));
 			const attributes: Record<string, string> = {};
-			if (node?.kind === 'element')
-				for (const name of new Set([
-					...Object.keys(node.attributes ?? {}),
-					...(node.bindings ?? []).flatMap((binding) =>
-						'attribute' in binding ? [binding.attribute] : [],
-					),
-				])) {
-					const value = attributeNow(id, name);
-					if (value !== null) attributes[name] = value;
+			if (node?.kind === 'element') {
+				const scope = instances(node).find((instance) => instance.id === id)?.scope ?? base;
+				for (const name of Object.keys(node.attributes ?? {})) attributes[name] = node.attributes![name]!;
+				for (const binding of node.bindings ?? []) {
+					if (!('attribute' in binding)) continue;
+					const value = marklessAttributeValue(binding.attribute, evaluate(binding.value, undefined, scope));
+					if (value === null) delete attributes[binding.attribute];
+					else attributes[binding.attribute] = value;
 				}
+			}
 			const ancestors: string[] = [];
 			for (let up = node?.parent; up; up = nodesById.get(up)?.parent)
 				ancestors.push(key && nodesById.get(up)?.row ? `${up}${key}` : up);
@@ -1767,15 +1767,16 @@ export function createNativeRuntime(
 					if (!down) touches.set(pointerId, state);
 					const at = { x: touch.x ?? 0, y: touch.y ?? 0 };
 					if (touch.event !== 'pointermove') tapPoint = touch.event === 'pointerup' ? at : null;
-					/** The elements from `id` out to the root, innermost first. */
+					/** The elements from `id` out to the root, innermost first; those in its row keep its row's key. */
 					const chain = (id: string): string[] => {
+						const key = id.includes('@') ? id.slice(id.indexOf('@')) : '';
 						const out: string[] = [];
 						for (
 							let node: string | null | undefined = nodeOf(id);
 							node;
 							node = nodesById.get(node)?.parent
 						)
-							out.push(node === nodeOf(id) ? id : node);
+							out.push(node === nodeOf(id) ? id : key && nodesById.get(node)?.row ? `${node}${key}` : node);
 						return out;
 					};
 					const fieldsOf = (

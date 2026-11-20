@@ -991,8 +991,7 @@ function walk(
 			const returns = payload.events.some(
 				(event) => event.host === host && event.event === 'enter',
 			);
-			// A row's copy (`<node>@<key>`) is not in the tree by that id: it activates as itself.
-			const activates = !!pressed || host.includes('@');
+			const activates = !!pressed;
 			if ('tap' in action && !activates && touched.length === 0)
 				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
 			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.
