@@ -242,6 +242,15 @@ public struct NativeDrawing: Equatable, Sendable {
 	public var em = false
 	/// What its `<text>` elements say, read when the svg has no name.
 	public var label: String?
+	/// `preserveAspectRatio`; nil is `xMidYMid meet`.
+	public var aspect: Aspect?
+
+	public enum Aspect: Equatable, Sendable {
+		/// The viewBox stretched to the box.
+		case none
+		/// One scale that fits (or, sliced, fills) the box; each axis's `min`, `mid` or `max` aligned.
+		case align(x: String, y: String, slice: Bool)
+	}
 }
 
 public enum NativeEventName: String, Sendable {
@@ -939,7 +948,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 	}
 
 	private static func decodeDrawing(_ reader: Reader) throws -> NativeDrawing {
-		let field = try reader.object(required: ["viewBox", "shapes"], optional: ["width", "height", "em", "label"])
+		let field = try reader.object(required: ["viewBox", "shapes"], optional: ["width", "height", "em", "label", "aspect"])
 		let viewBox = try field["viewBox"].isNull ? nil : try field["viewBox"].array().map { try $0.number() }
 		if let viewBox, viewBox.count != 4 { throw PayloadError(path: "\(reader.path).viewBox", reason: "expected four numbers") }
 		func paint(_ reader: Reader) throws -> NativeShape.Paint? {
@@ -988,6 +997,18 @@ public struct NativeViewPayload: Equatable, Sendable {
 			height: field.has("height") ? try field["height"].number() : nil, shapes: shapes,
 			em: field.has("em") ? try field["em"].bool() : false)
 		drawing.label = field.has("label") ? try field["label"].string() : nil
+		if field.has("aspect") {
+			let aspect = try field["aspect"]
+			if aspect.isString {
+				guard try aspect.string() == "none" else { throw aspect.fail("unknown aspect") }
+				drawing.aspect = NativeDrawing.Aspect.none
+			} else {
+				let a = try aspect.object(required: ["x", "y"], optional: ["slice"])
+				let x = try a["x"].string(), y = try a["y"].string()
+				guard ["min", "mid", "max"].contains(x), ["min", "mid", "max"].contains(y) else { throw aspect.fail("unknown alignment") }
+				drawing.aspect = .align(x: x, y: y, slice: a.has("slice") ? try a["slice"].bool() : false)
+			}
+		}
 		return drawing
 	}
 

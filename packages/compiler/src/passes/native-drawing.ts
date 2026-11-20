@@ -622,24 +622,35 @@ export function compileDrawing(
 	const em = width?.unit === 'em' || height?.unit === 'em';
 	if (em && width?.unit !== height?.unit)
 		refuse(svgId, 'a width and a height on <svg> where only one is in `em`');
-	const aspect = svg.preserveAspectRatio?.trim();
-	if (aspect !== undefined && aspect !== 'xMidYMid' && aspect !== 'xMidYMid meet')
-		refuse(
-			svgId,
-			`\`preserveAspectRatio="${aspect}"\` on <svg>: drawings are centred and fitted (xMidYMid meet)`,
-		);
+	const rawAspect = svg.preserveAspectRatio?.trim();
+	const aspect = rawAspect === undefined ? undefined : parseAspect(rawAspect);
+	if (aspect === null) refuse(svgId, `\`preserveAspectRatio="${rawAspect}"\` on <svg>`);
 	return {
 		drawing: {
 			viewBox,
 			...(width !== undefined ? { width: width.value } : {}),
 			...(height !== undefined ? { height: height.value } : {}),
 			...(em ? { em: true as const } : {}),
+			...(aspect && aspect !== 'default' ? { aspect } : {}),
 			shapes,
 			...(spoken.length > 0 ? { label: spoken.join(' ') } : {}),
 		},
 		...(title ? { title } : {}),
 		refusals,
 	};
+}
+
+/** SVG 2 §8.5's `preserveAspectRatio`; `default` for `xMidYMid meet`, null when it is not one. */
+function parseAspect(raw: string): NativeDrawing['aspect'] | 'default' | null {
+	const [align, mode, ...rest] = raw.split(/\s+/);
+	if (rest.length > 0 || (mode !== undefined && mode !== 'meet' && mode !== 'slice')) return null;
+	if (align === 'none') return 'none';
+	const axes: Readonly<Record<string, 'min' | 'mid' | 'max'>> = { Min: 'min', Mid: 'mid', Max: 'max' };
+	const x = axes[align?.slice(1, 4) ?? ''];
+	const y = axes[align?.slice(5, 8) ?? ''];
+	if (align?.length !== 8 || align[0] !== 'x' || align[4] !== 'Y' || !x || !y) return null;
+	if (x === 'mid' && y === 'mid' && mode !== 'slice') return 'default';
+	return { x, y, ...(mode === 'slice' ? { slice: true as const } : {}) };
 }
 
 // Geometry.

@@ -168,7 +168,13 @@ data class DrawingText(val anchor: String, val baseline: String, val runs: List<
 data class TextRun(val text: String, val x: Double?, val y: Double?, val dx: Double?, val dy: Double?, val size: Double, val weight: Double, val family: String?, val letterSpacing: Double, val fill: ShapePaint?)
 
 /** An inline `<svg>` compiled to shapes. */
-data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false, val label: String? = null)
+data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false, val label: String? = null, val aspect: Aspect? = null)
+
+/** An svg's `preserveAspectRatio`; null on [Drawing] is `xMidYMid meet`. [x] and [y] are min, mid or max. */
+sealed interface Aspect {
+	data object None : Aspect
+	data class Align(val x: String, val y: String, val slice: Boolean) : Aspect
+}
 
 /** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Dismiss] is a sheet's platform close or an overlay's Escape or outside press. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
 /** [pointer]: an event a touch raises; [touch]: one of those a host reports, from which the runtime raises the rest. */
@@ -694,7 +700,7 @@ data class Payload(
 
 		private fun drawing(v: Json, what: String): Drawing {
 			val o = v.obj(what)
-			o.only(setOf("viewBox", "width", "height", "shapes", "em", "label"), what)
+			o.only(setOf("viewBox", "width", "height", "shapes", "em", "label", "aspect"), what)
 			val em = o["em"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.em must be true when present"); true } ?: false
 			val viewBox = o.field("viewBox", what).let { if (it == Json.Null) null else it.arr("$what.viewBox").map { n -> n.num("$what.viewBox[]") } }
 			if (viewBox != null && viewBox.size != 4) throw MarklessDecodeError("$what.viewBox must hold four numbers")
@@ -731,7 +737,16 @@ data class Payload(
 					},
 				)
 			}
-			return Drawing(viewBox, o["width"]?.num("$what.width"), o["height"]?.num("$what.height"), shapes, em, o["label"]?.str("$what.label"))
+			val aspect = o["aspect"]?.let { av ->
+				if (av is Json.Str) { if (av.value != "none") throw MarklessDecodeError("$what.aspect must be none or an alignment"); Aspect.None }
+				else {
+					val ao = av.obj("$what.aspect")
+					ao.only(setOf("x", "y", "slice"), "$what.aspect")
+					val axes = setOf("min", "mid", "max")
+					Aspect.Align(oneOf(ao, "x", axes, "$what.aspect"), oneOf(ao, "y", axes, "$what.aspect"), ao["slice"]?.let { it == Json.Bool(true) } ?: false)
+				}
+			}
+			return Drawing(viewBox, o["width"]?.num("$what.width"), o["height"]?.num("$what.height"), shapes, em, o["label"]?.str("$what.label"), aspect)
 		}
 
 		private fun node(v: Json, what: String): Node {

@@ -418,8 +418,20 @@ export type NativeDrawingTextRun = {
 
 /** An inline `<svg>`, compiled when the app is built: the host draws `shapes` in the element's box. */
 export type NativeDrawing = {
-	/** min-x, min-y, width and height; drawn centred and scaled to fit the box (`xMidYMid meet`), as the web does. */
+	/** min-x, min-y, width and height; placed in the box by `aspect`, as the web does. */
 	readonly viewBox: readonly [number, number, number, number] | null;
+	/**
+	 * The svg's `preserveAspectRatio`, absent for the default `xMidYMid meet` (one scale that fits, centred): `none`
+	 * stretches the viewBox to the box; otherwise one scale that fits (`meet`) or fills (`slice`, clipped to the box), the
+	 * viewBox aligned at the min, middle or max of each axis.
+	 */
+	readonly aspect?:
+		| 'none'
+		| {
+				readonly x: 'min' | 'mid' | 'max';
+				readonly y: 'min' | 'mid' | 'max';
+				readonly slice?: true;
+		  };
 	/** The `width` and `height` attributes in CSS pixels; without a size the box is the web's: full width, the viewBox's ratio. */
 	readonly width?: number;
 	readonly height?: number;

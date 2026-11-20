@@ -19,6 +19,7 @@ import android.text.style.SuperscriptSpan
 import android.text.style.TypefaceSpan
 import android.text.style.UnderlineSpan
 import android.view.View
+import dev.markless.mobile.core.Aspect
 import dev.markless.mobile.core.DefaultStyle
 import dev.markless.mobile.core.Drawing
 import dev.markless.mobile.core.DrawingText
@@ -193,9 +194,22 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 	override fun onDraw(canvas: Canvas) {
 		canvas.save()
 		drawing.viewBox?.let { (x, y, w, h) ->
-			val scale = minOf(width / w, height / h)
-			canvas.translate((-x * scale + (width - w * scale) / 2).toFloat(), (-y * scale + (height - h * scale) / 2).toFloat())
-			canvas.scale(scale.toFloat(), scale.toFloat())
+			// SVG 2 §8.5: the viewBox placed in the box by preserveAspectRatio, xMidYMid meet when it has none.
+			when (val aspect = drawing.aspect) {
+				Aspect.None -> {
+					canvas.scale((width / w).toFloat(), (height / h).toFloat())
+					canvas.translate(-x.toFloat(), -y.toFloat())
+				}
+				else -> {
+					val align = aspect as? Aspect.Align
+					val slice = align?.slice == true
+					val scale = if (slice) maxOf(width / w, height / h) else minOf(width / w, height / h)
+					fun place(at: String?, room: Double) = when (at) { "min" -> 0.0; "max" -> room; else -> room / 2 }
+					if (slice) canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
+					canvas.translate((-x * scale + place(align?.x, width - w * scale)).toFloat(), (-y * scale + place(align?.y, height - h * scale)).toFloat())
+					canvas.scale(scale.toFloat(), scale.toFloat())
+				}
+			}
 		} ?: canvas.scale(density, density)
 		for ((index, shape) in drawing.shapes.withIndex()) {
 			canvas.save()

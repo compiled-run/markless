@@ -111,10 +111,22 @@ final class DrawingView: UIView {
 	override func draw(_ rect: CGRect) {
 		guard let context = UIGraphicsGetCurrentContext() else { return }
 		if let box = drawing.viewBox?.map({ CGFloat($0) }), box[2] > 0, box[3] > 0 {
-			// SVG 2 xMidYMid meet: one scale that fits both axes, the rest centred.
-			let scale = min(bounds.width / box[2], bounds.height / box[3])
-			context.translateBy(x: -box[0] * scale + (bounds.width - box[2] * scale) / 2, y: -box[1] * scale + (bounds.height - box[3] * scale) / 2)
-			context.scaleBy(x: scale, y: scale)
+			// SVG 2 §8.5: the viewBox placed in the box by preserveAspectRatio, xMidYMid meet when it has none.
+			switch drawing.aspect {
+			case .none?:
+				context.scaleBy(x: bounds.width / box[2], y: bounds.height / box[3])
+				context.translateBy(x: -box[0], y: -box[1])
+			default:
+				var (x, y, slice) = ("mid", "mid", false)
+				if case let .align(ax, ay, sliced)? = drawing.aspect { (x, y, slice) = (ax, ay, sliced) }
+				let fit = [bounds.width / box[2], bounds.height / box[3]]
+				let scale = slice ? fit.max()! : fit.min()!
+				let place = { (align: String, room: CGFloat) -> CGFloat in align == "min" ? 0 : align == "max" ? room : room / 2 }
+				if slice { context.clip(to: bounds) }
+				context.translateBy(
+					x: -box[0] * scale + place(x, bounds.width - box[2] * scale), y: -box[1] * scale + place(y, bounds.height - box[3] * scale))
+				context.scaleBy(x: scale, y: scale)
+			}
 		}
 		for shape in drawing.shapes {
 			let path = CGMutablePath()

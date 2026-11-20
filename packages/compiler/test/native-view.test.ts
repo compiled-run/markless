@@ -2278,6 +2278,20 @@ export function Chart() @{
 		]);
 	});
 
+	it('places the viewBox by preserveAspectRatio, and refuses a value that is not one', async () => {
+		const aspectOf = async (value: string) => {
+			const { payload, diagnostics } = await nativeView(`export function Banner() @{
+	<svg viewBox="0 0 10 10" preserveAspectRatio="${value}"><rect width="10" height="10" /></svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return { aspect: svg?.kind === 'element' ? svg.drawing?.aspect : undefined, messages: diagnostics.map((d) => d.message) };
+		};
+		expect((await aspectOf('none')).aspect).toBe('none');
+		expect((await aspectOf('xMidYMid meet')).aspect).toBeUndefined();
+		expect((await aspectOf('xMaxYMin slice')).aspect).toEqual({ x: 'max', y: 'min', slice: true });
+		expect((await aspectOf('xMidYMid stretch')).messages).toContain('`preserveAspectRatio="xMidYMid stretch"` on <svg>');
+	});
+
 	it("draws SVG <text> and <tspan> as runs, white space collapsed, and reads their text as the svg's", async () => {
 		const { payload, diagnostics } = await nativeView(`export function Chart() @{
 	<svg viewBox="0 0 100 40">
