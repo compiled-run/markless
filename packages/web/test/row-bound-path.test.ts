@@ -139,6 +139,18 @@ test('a row key that names no item, or a path the rows do not describe, answers 
 	expect(marklessRowLocal(nestedRows, groupGraph('r:b:r:x:c1:'), route)).toBeUndefined();
 });
 
+test('a row keyed by a string joined from its fields names the item whose fields join to that key', () => {
+	const joined = {
+		rowIndex: 1,
+		keyPath: [],
+		keyParts: ['#', ['id']],
+		itemPath: ['items'],
+	};
+	const route = { rowPiece: 0, rows: [outerStep, joined] };
+	expect(marklessRowLocal(nestedRows, groupGraph('r:a:r:%23y%20w:c0:'), route)).toBe(GROUPS[0]!.items[1]);
+	expect(marklessRowLocal(nestedRows, groupGraph('r:a:r:y%20w:c0:'), route)).toBeUndefined();
+});
+
 test('an index-keyed row names its item by position', () => {
 	const graph = groupGraph('r:1:r:0:c0:');
 	const byIndex = { rowIndex: 0, keyPath: [], indexKey: true as const, graphNodeId: 'computed:groups' };

@@ -397,7 +397,7 @@ class Runtime(
 			}
 			is Expr.Call -> Js.call(e.name, e.arguments.map(::eval), now)
 			is Expr.Script -> {
-				val entry = "{\"kind\":\"compute\",\"fn\":${jsonString(e.fn)},\"frame\":${frameOf(e.bindings, scope)}${entryCells()}}"
+				val entry = "{\"kind\":\"compute\",\"fn\":${jsonString(e.fn)},\"frame\":${frameOf(e.bindings, scope)},\"elements\":${elementFacts(e.bindings, scope)}${entryCells()}}"
 				val started = System.nanoTime()
 				val result = Json.parse(scriptCall("enter", entry)).obj("compute")
 				val value = nonFiniteJoin(result.field("json", "compute"), result["nonFinite"])
@@ -452,6 +452,9 @@ class Runtime(
 		data class Slot(val slot: String) : Bound
 		data class Fields(val fields: Map<String, String>) : Bound
 		data class Value(val value: JsValue) : Bound
+		data class Elements(val value: JsValue) : Bound
+		data class Object(val members: Map<String, Bound>) : Bound
+		data class Shared(val members: Map<String, Bound>) : Bound
 	}
 
 	private fun bind(bindings: Map<String, ScriptBinding>, scope: Scope): Map<String, Bound> = bindings.mapValuesTo(LinkedHashMap()) { (_, b) ->
@@ -459,6 +462,9 @@ class Runtime(
 			is ScriptBinding.Cell -> Bound.Slot(slot(b.cell, scope))
 			is ScriptBinding.Fields -> Bound.Fields(b.fields.mapValuesTo(LinkedHashMap()) { slot(it.value, scope) })
 			is ScriptBinding.Value -> Bound.Value(evaluate(b.value, scope))
+			is ScriptBinding.Elements -> Bound.Elements(evaluate(b.value, scope))
+			is ScriptBinding.Object -> Bound.Object(bind(b.members, scope))
+			is ScriptBinding.Shared -> Bound.Shared(bind(b.members, scope))
 		}
 	}
 
@@ -467,6 +473,9 @@ class Runtime(
 			is Bound.Slot -> "{\"slot\":${jsonString(b.slot)}}"
 			is Bound.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}}"
 			is Bound.Value -> "{\"value\":${jsonValue(b.value)}}"
+			is Bound.Elements -> "{\"elements\":${jsonValue(b.value)}}"
+			is Bound.Object -> "{\"object\":${frameJson(b.members)}}"
+			is Bound.Shared -> "{\"shared\":${frameJson(b.members)}}"
 		}
 	}
 
@@ -481,7 +490,44 @@ class Runtime(
 			is Bound.Slot -> jsonValue(nullish(values[b.slot]) ?: nullish(values[b.slot.substringBefore('@')]) ?: JsValue.Null)
 			is Bound.Fields -> b.fields.values.joinToString(",", "[", "]") { jsonValue(values[it] ?: values[it.substringBefore('@')] ?: JsValue.Null) }
 			is Bound.Value -> jsonValue(b.value)
+			is Bound.Elements -> jsonValue(b.value)
+			is Bound.Object -> readFrame(b.members)
+			is Bound.Shared -> readFrame(b.members)
 		}
+	}
+
+	/** What the host tells a script about the elements its frame passes as proxies: each one's attributes now and the elements it is inside, nearest first. */
+	private fun elementFacts(bindings: Map<String, ScriptBinding>, scope: Scope): String {
+		val facts = LinkedHashMap<String, String>()
+		fun add(value: JsValue) {
+			if (value !is JsValue.Str) return
+			val id = value.value
+			if (id in facts || id == NATIVE_DOCUMENT_BODY || !isElement(id)) return
+			val key = if ('@' in id) id.substring(id.indexOf('@')) else ""
+			val node = elementOf(id.substringBefore('@'))
+			val names = LinkedHashSet<String>(node.attributes.keys.sorted()).apply { addAll(node.bindings.filter { !it.property }.map { it.name }) }
+			val attributes = names.mapNotNull { name -> attributeNow(node.id, name)?.let { "${jsonString(name)}:${jsonString(it)}" } }
+			val ancestors = ArrayList<String>()
+			var up = node.parent
+			while (up != null) {
+				ancestors.add(jsonString(if (key.isNotEmpty() && byId[up]?.row != null) up + key else up))
+				up = byId[up]?.parent
+			}
+			facts[id] = "{\"attributes\":${attributes.joinToString(",", "{", "}")},\"ancestors\":${ancestors.joinToString(",", "[", "]")}}"
+		}
+		fun visit(named: Map<String, ScriptBinding>) {
+			for (b in named.values) when (b) {
+				is ScriptBinding.Elements -> when (val v = evaluate(b.value, scope)) {
+					is JsValue.Arr -> v.items.forEach(::add)
+					else -> add(v)
+				}
+				is ScriptBinding.Object -> visit(b.members)
+				is ScriptBinding.Shared -> visit(b.members)
+				else -> {}
+			}
+		}
+		visit(bindings)
+		return facts.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value}" }
 	}
 
 	/** Every current value by slot, and the seed `crypto` draws from when the script uses it. */
@@ -532,6 +578,19 @@ class Runtime(
 					q.field("body", "request").let { if (it == Json.Null) null else it.str("request.body") },
 				)
 				JournalEntry.Fetch(id(o.field("id", "leave().requests[]")), request)
+			} +
+			(if (result.containsKey("commands")) list("commands") else emptyList()).mapNotNull { c ->
+				val parts = c.arr("leave().commands[]")
+				val node = parts[0].str("leave().commands[][0]")
+				val command = parts[1].str("leave().commands[][1]")
+				// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
+				if (command == "showModal" || command == "close") {
+					if (node !in dialogs) throw MarklessRuntimeError("$command() on $node, which is not a dialog")
+					dialogs[node] = command == "showModal"
+					return@mapNotNull null
+				}
+				if (command == "focus") focused = node
+				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
 			}
 	}
 
@@ -597,10 +656,15 @@ class Runtime(
 	fun rowsOf(repeat: Node.Repeat): List<Row> {
 		val list = evaluate(repeat.list) as? JsValue.Arr ?: throw MarklessRuntimeError("${repeat.id} lists a value that is not an array")
 		val keyPath = repeat.key ?: return list.items.mapIndexed { index, item -> Row(index.toString(), item) }
-		return list.items.map { item ->
+		fun valueAt(item: JsValue, path: List<String>): JsValue {
 			var key = item
-			for (step in keyPath) key = (key as? JsValue.Obj)?.fields?.get(step) ?: throw MarklessRuntimeError("${repeat.id}: a row has no key at ${keyPath.joinToString(".")}")
-			Row(Js.toStr(key), item)
+			for (step in path) key = (key as? JsValue.Obj)?.fields?.get(step) ?: throw MarklessRuntimeError("${repeat.id}: a row has no key at ${path.joinToString(".")}")
+			return key
+		}
+		return list.items.map { item ->
+			@Suppress("UNCHECKED_CAST")
+			val key = repeat.keyParts?.joinToString("") { if (it is String) it else Js.toStr(valueAt(item, it as List<String>)) } ?: Js.toStr(valueAt(item, keyPath))
+			Row(key, item)
 		}
 	}
 
@@ -1223,7 +1287,7 @@ class Runtime(
 				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
 				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$touch}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
-				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"event\":$event$catch"))
+				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope)},\"event\":$event$catch"))
 			}
 			is Op.Reset -> {
 				op.catch?.let { values[it] = JsValue.Null }

@@ -149,6 +149,13 @@ export function createMarklessRolldownPlugin(input: {
 			yield manifest.runtimeDemandMap;
 	}
 
+	// Some compiled module of this build keys a @for by fields joined into a string.
+	function joinedRepeatKeys() {
+		for (const manifest of state.moduleMetadata.symbolClaimManifests())
+			if (manifest.runtimeDemandMap?.joinedRepeatKeys) return true;
+		return false;
+	}
+
 	// Every compiled module of this build mounts through the direct-DOM renderer.
 	function directCsrOnly() {
 		let compiled = false;
@@ -214,6 +221,7 @@ export function createMarklessRolldownPlugin(input: {
 			runtimeDemandMaps,
 			runtimeDemandSources,
 			directCsrOnly,
+			joinedRepeatKeys,
 			unreachableChildren,
 			recordLiteralComponentInstances: (
 				source: string,
@@ -288,10 +296,25 @@ export function createMarklessRolldownPlugin(input: {
 				this.warn?.(
 					`experimental.attachDebugInfo: '${asked}' is ignored in production builds: its region comments name modules by id, and Markless's generated module ids carry this checkout's source paths.`,
 				);
+			const defined: InputOptions = {
+				...input,
+				transform: {
+					...input.transform,
+					define: {
+						...input.transform?.define,
+						// Dev and the server serve one runtime for every page they may meet, so they always join keys.
+						__MARKLESS_JOINED_KEYS__: String(
+							internalOptions.dev === true ||
+								getEnvironment(this) !== 'client' ||
+								internalOptions.joinedRepeatKeys === true,
+						),
+					},
+				},
+			};
 			const withoutRegions: InputOptions =
 				internalOptions.dev === true
-					? input
-					: { ...input, experimental: { ...input.experimental, attachDebugInfo: 'none' } };
+					? defined
+					: { ...defined, experimental: { ...defined.experimental, attachDebugInfo: 'none' } };
 			if (currentEnvironment !== 'client') {
 				return withoutRegions;
 			}

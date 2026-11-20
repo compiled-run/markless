@@ -1550,7 +1550,7 @@ jobs:
     # scripts/ci/unit-budget.json. A job of its own so it reports when another lane
     # fails, and the unit marker waits for it so a re-run after a red budget measures again.
     unit-budget:
-        needs: unit
+        needs: [unit, changes]
         if: needs.unit.result == 'success' && needs.unit.outputs.run == 'true'
         runs-on: ubuntu-26.04
         timeout-minutes: 5
@@ -1558,6 +1558,8 @@ jobs:
             - uses: actions/checkout@v4
               with:
                   persist-credentials: false
+                  # The changed-file set below diffs against the base the changes job chose.
+                  fetch-depth: 0
 
             - name: Download the unit budget measurements
               uses: actions/download-artifact@v4
@@ -1565,8 +1567,21 @@ jobs:
                   pattern: unit-budget-*
                   path: ${{ runner.temp }}/unit-budget
 
+            # The slot-line check fails only for test files this change adds or modifies; with no base, it only reports.
+            - name: List the files this change adds or modifies
+              env:
+                  BASE: ${{ needs.changes.outputs.base }}
+              run: |
+                  if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+                    git diff --name-only --diff-filter=AMR "$BASE" HEAD > "$RUNNER_TEMP/changed-files.txt"
+                    echo "$(wc -l < "$RUNNER_TEMP/changed-files.txt") files changed against $BASE"
+                  fi
+
             - name: Check the unit shards against their CPU and memory budget
-              run: node scripts/ci/unit-budget.mjs check --measurements "$RUNNER_TEMP/unit-budget"
+              run: |
+                  changed=()
+                  if [ -f "$RUNNER_TEMP/changed-files.txt" ]; then changed=(--changed "$RUNNER_TEMP/changed-files.txt"); fi
+                  node scripts/ci/unit-budget.mjs check --measurements "$RUNNER_TEMP/unit-budget" "${changed[@]}"
 
     save-lane-markers:
         needs: [unit, unit-budget, browser]

@@ -252,6 +252,7 @@ export const TITLES: Readonly<Record<string, string>> = {
 	MARKLESS_INLINE_RESUMER_PAGE_TOKEN_FOLDED: 'The inline loader lost its page token',
 	MARKLESS_INLINE_RESUMER_PAGE_TOKEN_MISSING: 'The inline loader has no page token',
 	MARKLESS_INLINE_RESUMER_TRANSFORM_FAILED: 'The inline loader could not be built',
+	MARKLESS_JOINED_KEYS_REBUILD_UNAVAILABLE: 'A list keyed by joined fields needs Vite’s app builder',
 	MARKLESS_LEAN_PAYLOAD_MISSING: 'The page’s state data is missing',
 	MARKLESS_LINKED_RENDER_DATA_PAYLOAD_ACCESS: 'Linked data read the page’s state scripts',
 	MARKLESS_MDX_RENDER_DATA_CHILD_MISSING: 'An MDX component is missing its data',
