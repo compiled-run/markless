@@ -5,10 +5,21 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
+				"web/resume-paint-snapshot"
+			],
+			"set": 1266,
+			"reason": "new module: the row slot-read helpers moved out of resume-keyed-repeats plus the PaintSnapshot type, loaded with resume-async-wiring so the snapshot is taken before the first await: 1266 B rendered (#1010)",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
 				"web/resume-async-wiring"
 			],
-			"delta": 368,
-			"reason": "resume-async-wiring +290 B rendered (16061 -> 16351): an arm commit reads each page-held list collection before its first await so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010)",
+			"delta": 337,
+			"reason": "an arm commit takes its paint-time snapshot (list collections and row slot reads) before its first await, so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010): 16061 -> 16398 B rendered",
 			"date": "2026-11-20"
 		},
 		{
@@ -18,8 +29,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-keyed-repeats"
 			],
-			"delta": 40,
-			"reason": "resume-async-wiring +290 B rendered (16061 -> 16351): an arm commit reads each page-held list collection before its first await so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010)",
+			"delta": -868,
+			"reason": "the row slot-read helpers moved to resume-paint-snapshot; the wiring adopts painted rows under the snapshot collections (#1010): 22387 -> 21519 B rendered",
 			"date": "2026-11-20"
 		},
 		{
@@ -30,8 +41,19 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": -1,
-			"reason": "resume-async-wiring +290 B rendered (16061 -> 16351): an arm commit reads each page-held list collection before its first await so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010)",
+			"delta": -8,
+			"reason": "emitted runtime gzip measured on this tree after the paint snapshot change (#1010)",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-paint-snapshot"
+			],
+			"set": 1266,
+			"reason": "new module: the row slot-read helpers moved out of resume-keyed-repeats plus the PaintSnapshot type, loaded with resume-async-wiring so the snapshot is taken before the first await: 1266 B rendered (#1010)",
 			"date": "2026-11-20"
 		},
 		{
@@ -41,8 +63,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-async-wiring"
 			],
-			"delta": 368,
-			"reason": "resume-async-wiring +290 B rendered (16061 -> 16351): an arm commit reads each page-held list collection before its first await so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010)",
+			"delta": 337,
+			"reason": "an arm commit takes its paint-time snapshot (list collections and row slot reads) before its first await, so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010): 16061 -> 16398 B rendered",
 			"date": "2026-11-20"
 		},
 		{
@@ -52,8 +74,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-keyed-repeats"
 			],
-			"delta": 40,
-			"reason": "resume-async-wiring +290 B rendered (16061 -> 16351): an arm commit reads each page-held list collection before its first await so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010)",
+			"delta": -868,
+			"reason": "the row slot-read helpers moved to resume-paint-snapshot; the wiring adopts painted rows under the snapshot collections (#1010): 22387 -> 21519 B rendered",
 			"date": "2026-11-20"
 		},
 		{
@@ -64,20 +86,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": -3,
-			"reason": "resume-async-wiring +290 B rendered (16061 -> 16351): an arm commit reads each page-held list collection before its first await so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010)",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": -4,
-			"reason": "resume-async-wiring +290 B rendered (16061 -> 16351): an arm commit reads each page-held list collection before its first await so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010)",
+			"delta": -2,
+			"reason": "emitted runtime gzip measured on this tree after the paint snapshot change (#1010)",
 			"date": "2026-11-20"
 		},
 		{
@@ -86,8 +96,18 @@
 				"runtimeModules",
 				"web/resume-async-wiring"
 			],
-			"delta": 368,
-			"reason": "an arm commit reads each page-held list collection before its first await so a value landing while the arm wires reconciles over the painted rows (16058 -> 16351 B, +293; orders poll flake, #1010)",
+			"delta": 340,
+			"reason": "G10: an arm commit takes its paint-time snapshot (list collections and row slot reads) before its first await, so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010): 16058 -> 16398 B rendered",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-paint-snapshot"
+			],
+			"set": 1266,
+			"reason": "G10: new module holding the row slot-read helpers moved from resume-keyed-repeats and the PaintSnapshot type, loaded with resume-async-wiring (#1010): 1266 B rendered",
 			"date": "2026-11-20"
 		}
 	]

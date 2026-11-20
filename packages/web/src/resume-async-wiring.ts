@@ -3,12 +3,14 @@ import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
 import { boundaryArmRecordSet, composedArmRecordQualifier } from './resume-arm-records.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import { asyncPlanes } from './reconcile-plane-slot.ts';
+import { movedSincePaint, type PaintSnapshot } from './resume-paint-snapshot.ts';
 import { setBoundaryBusy } from './resume-refresh-busy.ts';
 import { reaskOnReturn, registerWriteRefresh } from './resume-return-reask.ts';
 import type {
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
 	ResumeDomElement,
+	ResumeKeyedRepeatRecord,
 	ShownAsyncArm,
 	ResumeSymbolContext,
 	ResumePreparedCore,
@@ -481,15 +483,7 @@ async function prepareBoundarySettle(
 		ownRecords = true,
 	): Promise<RuntimeGraphCommit> => {
 		const rows = update.armRecords.keyedRepeats;
-		// Before any await, so a value landing meanwhile reconciles over these rows; the arm's own cells are not in the graph yet.
-		const painted = new Map();
-		for (const { id, collectionGraphNodeId: node, collectionPath, enclosingRow } of rows ?? []) {
-			const items = node && !enclosingRow && !update.cells?.some((cell) => cell.graphNodeId === node) && input.graph.read(node, collectionPath);
-			if (Array.isArray(items)) painted.set(id, items);
-		}
-		const moved = rows?.length
-			? Object.assign((await import('./resume-keyed-repeats-lazy.ts')).movedSincePaint(input.graph, rows), { painted })
-			: undefined;
+		const painted = rows?.length ? paintSnapshot(input.graph, rows, update) : undefined;
 		// A failed refresh over shown @try content keeps it and draws the @catch in a range opened after it.
 		const after =
 			arm === ASYNC_BOUNDARY_ARM.catch && showsTry(boundary)
@@ -497,7 +491,7 @@ async function prepareBoundarySettle(
 				: undefined;
 		const land = await prepareArm(input, (after ?? boundary) as ResumeAsyncBoundaryRecord, {
 			...update,
-			...(moved && { moved }),
+			...(painted && { painted }),
 			arm,
 			...(after && { after: true }),
 		});
@@ -571,6 +565,21 @@ async function prepareBoundarySettle(
 	shownArms.set(boundary, arm === ASYNC_BOUNDARY_ARM.try ? SHOWN_TRY_PLAIN : shownFor(snapshot));
 	input.settleTracker?.markSettled(boundary.id);
 	return boundaryRangeJournal(boundary.id, fragment);
+}
+
+// Read before the commit's first await, so a write landing while the arm loads is applied over these rows; the arm's own values are absent or stale until it registers.
+function paintSnapshot(
+	graph: SettleInput['graph'],
+	rows: ReadonlyArray<ResumeKeyedRepeatRecord>,
+	update: Pick<ArmCommitUpdate, 'cells' | 'computed'>,
+): PaintSnapshot {
+	const owned = new Set([...(update.cells ?? []), ...(update.computed ?? [])].map((each) => each.graphNodeId));
+	const collections = new Map<string, ReadonlyArray<unknown>>();
+	for (const { id, collectionGraphNodeId: node, collectionPath, enclosingRow } of rows) {
+		const items = node && !enclosingRow && !owned.has(node) && graph.read(node, collectionPath);
+		if (Array.isArray(items)) collections.set(id, items);
+	}
+	return { moved: movedSincePaint(graph, rows), collections };
 }
 
 // Recorded once the commit is prepared, so another read of this boundary in the same pass refreshes in place; a landing that fails puts the record back.
