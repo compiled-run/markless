@@ -1518,13 +1518,8 @@ export function createNativeViewPayload(
 				refuse(`top-level state \`${binding.name}\` in an imported module`);
 				continue;
 			}
-			if (!moduleLevel && prefix !== '' && binding.storage) {
-				refuse(
-					`storage \`${binding.name}\` declared inside the child component ${component}`,
-				);
-				continue;
-			}
-			const id = moduleLevel ? binding.id : `${prefix}${binding.id}`;
+			// Every storage() with one key is one value, as on the web: its cell is named after the key, not the instance.
+			const id = moduleLevel || binding.storage ? binding.id : `${prefix}${binding.id}`;
 			let value: unknown = nativeInitialOf(binding.initialValue);
 			noteUndefined(id, binding.initialValue);
 			let known = binding.initialValueKnown === true;
@@ -1575,6 +1570,16 @@ export function createNativeViewPayload(
 					kind: 'fields',
 					cells: splitCells(id, binding.name, value, row),
 				});
+				continue;
+			}
+			const kept = binding.storage ? initialOf(id) : undefined;
+			if (kept !== undefined && JSON.stringify(kept) !== JSON.stringify(value)) {
+				refuse(
+					`storage \`${binding.name}\` of ${component} starts at ${JSON.stringify(value)}, but another storage() with key "${binding.storage!.key}" starts at ${JSON.stringify(kept)}`,
+					binding.sourceSpan,
+				);
+				byName.set(binding.name, id);
+				byBinding.set(binding.id, id);
 				continue;
 			}
 			byName.set(binding.name, id);

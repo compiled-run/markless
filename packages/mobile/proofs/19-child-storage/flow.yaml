@@ -1,0 +1,39 @@
+appId: ${APP_ID}
+name: 19-child-storage
+---
+- launchApp:
+    clearState: true
+- assertVisible: Shared taps
+- assertVisible: Total 0
+- assertVisible: Left 0
+- assertNotVisible: Total 1
+- tapOn: Left 0
+- assertVisible: Total 1
+- assertNotVisible: Total 0
+- assertNotVisible: Left 0
+- assertVisible: Total 1
+- assertVisible: Left 1
+- assertNotVisible: Total 0
+- assertNotVisible: Left 0
+- tapOn: Left 1
+- assertNotVisible: Total 1
+- assertNotVisible: Left 1
+- assertVisible: Total 2
+- assertVisible: Left 2
+- assertNotVisible: Total 1
+- assertNotVisible: Left 1
+- stopApp
+- launchApp
+- assertVisible: Total 2
+- assertVisible: Left 2
+- assertNotVisible: Total 0
+- assertNotVisible: Left 0
+- tapOn: Reset
+- assertVisible: Total 0
+- assertVisible: Left 0
+- assertNotVisible: Total 2
+- assertNotVisible: Left 2
+- assertVisible: Total 0
+- assertVisible: Left 0
+- assertNotVisible: Total 2
+- assertNotVisible: Left 2

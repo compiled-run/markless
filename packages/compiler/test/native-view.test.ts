@@ -2022,6 +2022,49 @@ export function Page() @{
 	});
 });
 
+describe('storage() in child components', () => {
+	it('keeps one cell per key for a page and every copy of a child component, as the web keeps one value', async () => {
+		const { payload, diagnostics } = await nativeView(`import { storage } from '@markless/core';
+function Counter({ label }: { label: string }) @{
+	let taps = storage('taps', '0');
+	<button onClick={() => (taps = taps + '1')}>{label}{taps}</button>
+}
+export function Page() @{
+	let total = storage('taps', '0');
+	<main>
+		<p>{total}</p>
+		<Counter label="Left" />
+		<Counter label="Right" />
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const stored = payload!.cells.filter((cell) => cell.storage);
+		expect(stored).toHaveLength(1);
+		expect(stored[0]).toMatchObject({ initial: '0', storage: { key: 'taps' } });
+		expect(
+			payload!.handlers.map((handler) => handler.ops[0]?.op === 'assign' && handler.ops[0].cell),
+		).toEqual([stored[0]!.id, stored[0]!.id]);
+	});
+
+	it('refuses two first values for one key by name', async () => {
+		const { diagnostics } = await nativeView(`import { storage } from '@markless/core';
+function Badge() @{
+	let theme = storage('theme', 'dark');
+	<span>{theme}</span>
+}
+export function Page() @{
+	let theme = storage('theme', 'light');
+	<main>
+		<p>{theme}</p>
+		<Badge />
+	</main>
+}`);
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'storage `theme` of Badge starts at "dark", but another storage() with key "theme" starts at "light"',
+		]);
+	});
+});
+
 describe('@markless/device in JavaScript', () => {
 	it("calls the device through the host from a handler's JavaScript", async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
