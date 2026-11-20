@@ -81,7 +81,9 @@
 								"href": "/words"
 							},
 							"defaultStyle": {
-								"inline": true
+								"inline": true,
+								"line": "underline",
+								"link": true
 							}
 						},
 						{

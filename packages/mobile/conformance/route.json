@@ -55,7 +55,9 @@
 					"href": "/[fruit]"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"line": "underline",
+					"link": true
 				}
 			},
 			{
@@ -77,7 +79,9 @@
 					"href": "/[fruit]"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"line": "underline",
+					"link": true
 				}
 			},
 			{

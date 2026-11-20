@@ -164,7 +164,12 @@ function defaultStyleOf(
 	const style: NativeDefaultStyle =
 		element === 'abbr' && titled
 			? { ...base, line: 'underline' }
-			: element === 'input' && !TEXT_TYPES.has(attributes['type'] ?? 'text')
+			: (element === 'input' && !TEXT_TYPES.has(attributes['type'] ?? 'text')) ||
+				  (element === 'a' &&
+						!('href' in attributes) &&
+						!bindings.some(
+							(binding) => 'attribute' in binding && binding.attribute === 'href',
+						))
 				? { inline: true }
 				: base;
 	return Object.keys(style).length > 0 ? style : undefined;

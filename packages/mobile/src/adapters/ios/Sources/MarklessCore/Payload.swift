@@ -182,6 +182,8 @@ public struct NativeDefaultStyle: Equatable, Sendable {
 	public var margin: Double?
 	/// An inline-level box: it sits on its parent's line beside text and other such boxes, wrapping at the parent's width.
 	public var inline = false
+	/// An `<a>` with an `href`: its text is LinkText.
+	public var link = false
 	/// Chrome's look for a form control without CSS: `button` or `field`.
 	public var control: String?
 	public var rule = false
@@ -759,7 +761,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	private static func decodeDefaultStyle(_ reader: Reader) throws -> NativeDefaultStyle {
 		let field = try reader.object(required: [], optional: [
-			"flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "margin",
+			"flow", "bold", "italic", "monospace", "size", "line", "shift", "link", "highlight", "quotes", "preformatted", "indent", "margin",
 			"inline", "control", "rule", "marker", "table",
 		])
 		func oneOf(_ key: String, _ allowed: [String]) throws -> String? {
@@ -783,6 +785,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.indent = field.has("indent") ? try field["indent"].number() : nil
 		style.margin = field.has("margin") ? try field["margin"].number() : nil
 		style.inline = try flag("inline")
+		style.link = try flag("link")
 		style.control = try oneOf("control", ["button", "field"])
 		style.rule = try flag("rule")
 		style.marker = try oneOf("marker", ["disc", "decimal"])

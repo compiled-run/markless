@@ -30,6 +30,7 @@ struct TextLook: Equatable {
 	var shift: String?
 	var highlight = false
 	var preformatted = false
+	var link = false
 
 	func applying(_ style: NativeDefaultStyle?) -> TextLook {
 		guard let style else { return self }
@@ -42,7 +43,13 @@ struct TextLook: Equatable {
 		next.shift = style.shift ?? shift
 		next.highlight = highlight || style.highlight
 		next.preformatted = preformatted || style.preformatted
+		next.link = link || style.link
 		return next
+	}
+
+	/// Chrome's LinkText: #0000ee, or #9e9eff when dark.
+	static let linkText = UIColor {
+		$0.userInterfaceStyle == .dark ? UIColor(red: 158 / 255, green: 158 / 255, blue: 1, alpha: 1) : UIColor(red: 0, green: 0, blue: 238 / 255, alpha: 1)
 	}
 
 	/// The label font size the stacking layout starts from (UILabel's own).
@@ -61,6 +68,7 @@ struct TextLook: Equatable {
 		if line == "line-through" { attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
 		if shift == "super" { attributes[.baselineOffset] = TextLook.baseSize * 0.33 }
 		if shift == "sub" { attributes[.baselineOffset] = -TextLook.baseSize * 0.2 }
+		if link { attributes[.foregroundColor] = TextLook.linkText }
 		if highlight {
 			attributes[.backgroundColor] = UIColor.yellow
 			attributes[.foregroundColor] = UIColor.black

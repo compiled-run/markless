@@ -32,6 +32,8 @@ const texts = (payload: { nodes: ReadonlyArray<unknown> } | null) =>
 		return text.kind === 'text' ? [[text.id, text.parts] as const] : [];
 	});
 
+const LINK = { inline: true, line: 'underline', link: true };
+
 describe('values that are not component state', () => {
 	it('reads module constants, their fields, destructured names and items of a list over them', async () => {
 		const { payload, diagnostics } = await nativeView(`const TITLE = 'Plans';
@@ -277,7 +279,7 @@ export function App() @{
 			payload?.nodes.flatMap((node) =>
 				node.kind === 'element' && node.element === 'a' ? [node.defaultStyle] : [],
 			),
-		).toEqual([{ inline: true }, { inline: true }]);
+		).toEqual([LINK, LINK]);
 	});
 
 	it('binds a link attribute that follows state, and opens the route an href built from a prop or a value names', async () => {

@@ -139,6 +139,8 @@ data class DefaultStyle(
 	val margin: Double = 0.0,
 	/** An inline-level box: it sits on its parent's line beside text and other such boxes, wrapping at the parent's width. */
 	val inline: Boolean = false,
+	/** An `<a>` with an `href`: its text is LinkText. */
+	val link: Boolean = false,
 	/** Chrome's look for a form control without CSS: `button` or `field`. */
 	val control: String? = null,
 	val rule: Boolean = false,
@@ -570,7 +572,7 @@ data class Payload(
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
 			val o = v.obj(what)
-			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "margin", "inline", "control", "rule", "marker", "table"), what)
+			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "link", "highlight", "quotes", "preformatted", "indent", "margin", "inline", "control", "rule", "marker", "table"), what)
 			fun flag(name: String): Boolean = o[name]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.$name must be true when present"); true } ?: false
 			fun word(name: String, allowed: Set<String>): String? = o[name]?.let { oneOf(o, name, allowed, what) }
 			return DefaultStyle(
@@ -583,6 +585,7 @@ data class Payload(
 				indent = o["indent"]?.num("$what.indent") ?: 0.0,
 				margin = o["margin"]?.num("$what.margin") ?: 0.0,
 				inline = flag("inline"),
+				link = flag("link"),
 				control = word("control", setOf("button", "field")),
 				rule = flag("rule"),
 				marker = word("marker", setOf("disc", "decimal")),

@@ -51,7 +51,9 @@
 								"href": "/orders"
 							},
 							"defaultStyle": {
-								"inline": true
+								"inline": true,
+								"line": "underline",
+								"link": true
 							}
 						},
 						{
@@ -183,7 +185,9 @@
 								"href": "/orders/[id]"
 							},
 							"defaultStyle": {
-								"inline": true
+								"inline": true,
+								"line": "underline",
+								"link": true
 							},
 							"row": "repeat:0"
 						},

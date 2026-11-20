@@ -81,7 +81,9 @@
 								"href": "/script"
 							},
 							"defaultStyle": {
-								"inline": true
+								"inline": true,
+								"line": "underline",
+								"link": true
 							}
 						},
 						{

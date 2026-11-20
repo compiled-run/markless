@@ -64,6 +64,9 @@ class MarklessHostError(message: String) : RuntimeException(message)
 /** The web's default text colour, CanvasText: black, or white in the dark appearance. */
 internal fun canvasText(configuration: Configuration): Int = if (isDark(configuration)) Color.WHITE else Color.BLACK
 
+/** Chrome's LinkText: #0000ee, or #9e9eff when dark. */
+internal fun linkText(configuration: Configuration): Int = if (isDark(configuration)) 0xFF9E9EFF.toInt() else 0xFF0000EE.toInt()
+
 /** The web's Canvas colour, as Chrome paints a page that allows dark mode: white, or #121212 when dark. */
 internal fun canvas(configuration: Configuration): Int = if (isDark(configuration)) 0xFF121212.toInt() else Color.WHITE
 
@@ -547,7 +550,10 @@ class MarklessHost(
 	/** The device's appearance changed: move to the @media band it selects, as a cell's `state` entry moves to its assignment. */
 	fun configurationChanged(configuration: Configuration) {
 		if (style == null) {
-			for (view in textViews.values) if (view !is Button) view.setTextColor(canvasText(configuration))
+			for ((id, view) in textViews) if (view !is Button) {
+				val parent = flow?.node(id.substringBefore('@'))?.parent
+				view.setTextColor(if (flow?.blockText(parent)?.link == true) linkText(configuration) else canvasText(configuration))
+			}
 			onCanvas?.invoke(canvas(configuration))
 			for ((view, control) in controls) controlLook(view, control, configuration)
 		}
@@ -684,7 +690,8 @@ class MarklessHost(
 			isClickable = false
 			isFocusable = false
 			named(this, inst.id, heading = parent.isAccessibilityHeading)
-			if (style == null) setTextColor(canvasText(context.resources.configuration))
+			if (style == null) setTextColor(if (block.link) linkText(context.resources.configuration) else canvasText(context.resources.configuration))
+			if (style == null && block.underline) paintFlags = paintFlags or Paint.UNDERLINE_TEXT_FLAG
 		}
 		if (view !is Button || block != BlockText(false, false, false, 1.0, false)) {
 			view.typeface = Typeface.create(if (block.monospace) Typeface.MONOSPACE else Typeface.DEFAULT, when {

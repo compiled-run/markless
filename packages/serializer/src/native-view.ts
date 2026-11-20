@@ -192,6 +192,8 @@ export type NativeDefaultStyle = {
 	readonly size?: number;
 	readonly line?: 'underline' | 'line-through';
 	readonly shift?: 'sub' | 'super';
+	/** An `<a>` with an `href`: its text is LinkText, #0000ee (#9e9eff dark), as Chrome paints an unvisited link. */
+	readonly link?: true;
 	/** `<mark>`: black text on yellow. */
 	readonly highlight?: true;
 	/** `<q>`: the text inside curly quotes. */
@@ -304,7 +306,7 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	br: { flow: 'break' },
 	button: { inline: true, size: CONTROL_TEXT, control: 'button' },
 	input: { inline: true, size: CONTROL_TEXT, control: 'field' },
-	a: { inline: true },
+	a: { inline: true, line: 'underline', link: true },
 	img: { inline: true },
 	audio: { inline: true },
 	label: { inline: true },

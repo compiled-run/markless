@@ -60,7 +60,7 @@ reference. Notes and the before and after probe: `element-vocabulary.md`.
 
 - **`defaultStyle`** on an element node: its look under Chrome's default stylesheet (`NativeDefaultStyle`): `flow`
   (`inline`: its text flows on in its parent's text; `break`: `<br>`), `bold`, `italic`, `monospace`, `size` (a multiple
-  of the parent's), `line`, `shift`, `highlight`, `quotes`, `preformatted`, `indent` (CSS px), `margin` (above
+  of the parent's), `line`, `shift`, `link` (an `<a>` with an `href`: LinkText, #0000ee or #9e9eff dark), `highlight`, `quotes`, `preformatted`, `indent` (CSS px), `margin` (above
   and below, in ems of the element's own size; none on a list inside another), `inline` (an inline-level box: `a`,
   `button`, `input`, `img`, `label`, `select`, `audio`, `svg`), `control` (`button` or `field`: Chrome's look for a
   button or text field without CSS, its fill, 1px border, 2px corners, padding and a field's 153px width, light and dark),
