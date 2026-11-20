@@ -390,6 +390,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'fieldset',
+		fixture: 'proofs/f12-fieldset/App.tsrx',
+		actions: [
+			{ event: 'input', host: 'h5', value: 'Ann' },
+			{ event: 'input', host: 'h8', value: 'Oslo' },
+			{ event: 'activate', host: 'h9' },
+		],
+	},
+	{
 		name: 'ticks',
 		fixture: 'test/fixtures/Ticks.tsrx',
 		preferredLanguages: ['fr-CA', 'en'],

@@ -1696,6 +1696,24 @@ export function Page() @{
 		});
 	});
 
+	it('draws a <fieldset> and its <legend>; refuses a disabled fieldset by name', async () => {
+		const shown = await nativeView(`export function Group() @{
+	<fieldset><legend>Who</legend><p>Ann</p></fieldset>
+}`);
+		expect(shown.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		expect(shown.payload!.nodes.filter((node) => node.kind === 'element').map((node) => node.element)).toEqual([
+			'fieldset',
+			'legend',
+			'p',
+		]);
+		const disabled = await nativeView(`export function Group() @{
+	<fieldset disabled><legend>Who</legend></fieldset>
+}`);
+		expect(disabled.diagnostics.map((d) => d.message)).toContain(
+			'a <fieldset disabled>, which disables every control inside it on the web; a native build does not pass that to its controls yet',
+		);
+	});
+
 	it('lowers a password field as a text field of its form: its text is sent, and required and maxlength are checked', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Login() @{

@@ -3982,6 +3982,11 @@ export function createNativeViewPayload(
 				const element = scope.module.tagOf.get(item.id);
 				const span = scope.module.hostSpans.get(item.id);
 				if (!element || element === '*') refuse(`host ${item.id} has no static tag`, span);
+				else if (element === 'fieldset' && (attributesAt(item.path).disabled !== undefined || boundAt(item.path).includes('disabled')))
+					refuse(
+						'a <fieldset disabled>, which disables every control inside it on the web; a native build does not pass that to its controls yet',
+						span,
+					);
 				else if (!Object.hasOwn(NATIVE_ELEMENTS, element) && element !== 'title') {
 					const written = attributesAt(item.path);
 					const bound = boundAt(item.path);

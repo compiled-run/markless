@@ -236,6 +236,9 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	aside: {},
 	hgroup: {},
 	search: {},
+	/** A group of a form's controls, its `<legend>` the group's caption (Chrome's border is the page's to style). */
+	fieldset: {},
+	legend: {},
 	p: {},
 	h1: { bold: true, size: 2 },
 	h2: { bold: true, size: 1.5 },
