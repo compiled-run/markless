@@ -1214,10 +1214,7 @@ function composedBoundaryArmRecords(
 		})),
 		keyedRepeats: set.keyedRepeats?.map((repeat) => ({
 			...repeat,
-			id: prefix + repeat.id,
-			...(repeat.enclosingRow && {
-				enclosingRow: { ...repeat.enclosingRow, prefix: prefix + (repeat.enclosingRow.prefix ?? '') },
-			}),
+			...marklessPrefixedRepeatId(repeat, prefix),
 			parentHostNodeId: prefix + repeat.parentHostNodeId,
 			...(repeat.ownerHostNodeId ? { ownerHostNodeId: prefix + repeat.ownerHostNodeId } : {}),
 			...(repeat.collectionGraphNodeId &&
@@ -1466,4 +1463,13 @@ export function installMarklessComposedArmRecords(): void {
 			marklessGraphWidgetRegistry(graph as RuntimeGraph | undefined),
 		),
 	);
+}
+
+/** A record's id under a composition prefix, with its enclosing list's id prefixed alike: one never moves without the other. */
+export function marklessPrefixedRepeatId<R extends { readonly id: string; readonly enclosingRow?: { readonly prefix?: string } }>(
+	repeat: R,
+	prefix: string,
+): Pick<R, 'id' | 'enclosingRow'> {
+	const at = repeat.enclosingRow;
+	return { id: prefix + repeat.id, ...(at && { enclosingRow: { ...at, prefix: prefix + (at.prefix ?? '') } }) } as Pick<R, 'id' | 'enclosingRow'>;
 }

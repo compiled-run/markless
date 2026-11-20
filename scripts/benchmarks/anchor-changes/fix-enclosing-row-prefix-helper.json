@@ -1,0 +1,106 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/instance-scope"
+			],
+			"delta": 210,
+			"reason": "one helper prefixes a list id and its enclosing list id together at every composition site, so no site can prefix one without the other",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": 424,
+			"reason": "one helper prefixes a list id and its enclosing list id together at every composition site, so no site can prefix one without the other",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-arm-lists"
+			],
+			"delta": 99,
+			"reason": "one helper prefixes a list id and its enclosing list id together at every composition site, so no site can prefix one without the other",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 61,
+			"reason": "one helper prefixes a list id and its enclosing list id together at every composition site, so no site can prefix one without the other",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/instance-scope"
+			],
+			"delta": 210,
+			"reason": "one helper prefixes a list id and its enclosing list id together at every composition site, so no site can prefix one without the other",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": 424,
+			"reason": "one helper prefixes a list id and its enclosing list id together at every composition site, so no site can prefix one without the other",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-arm-lists"
+			],
+			"delta": 99,
+			"reason": "one helper prefixes a list id and its enclosing list id together at every composition site, so no site can prefix one without the other",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 51,
+			"reason": "one helper prefixes a list id and its enclosing list id together at every composition site, so no site can prefix one without the other",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 45,
+			"reason": "one helper prefixes a list id and its enclosing list id together at every composition site, so no site can prefix one without the other",
+			"date": "2026-11-20"
+		}
+	]
+}
