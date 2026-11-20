@@ -2278,6 +2278,27 @@ export function Chart() @{
 		]);
 	});
 
+	it('draws a <marker> at the vertices it marks: on the end, turned along the path, its ref point on the vertex', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Flow() @{
+	<svg viewBox="0 0 100 100">
+		<defs><marker id="m" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z" /></marker></defs>
+		<line x1="10" y1="10" x2="10" y2="60" stroke="black" marker-end="url(#m)" />
+	</svg>
+}`);
+		expect(diagnostics.filter((d) => d.severity === 'error').map((d) => d.message)).toEqual([]);
+		const svg = payload!.nodes.find((node) => node.kind === 'element' && node.drawing);
+		const shapes = svg?.kind === 'element' ? svg.drawing!.shapes : [];
+		expect(shapes).toHaveLength(2);
+		// The line points down, so the arrow's tip (10, 5) lands on (10, 60) and its base sits above it.
+		const [a, b, c, d, e, f] = shapes[1]!.transform!;
+		const at = (x: number, y: number) => [a * x + c * y + e, b * x + d * y + f].map((n) => Math.round(n * 1000) / 1000 + 0);
+		const tip = at(shapes[1]!.path[4]!, shapes[1]!.path[5]!);
+		const corner = at(shapes[1]!.path[1]!, shapes[1]!.path[2]!);
+		expect(tip).toEqual([10, 60]);
+		expect(corner).toEqual([15, 50]);
+		expect(shapes[1]!.clip).toHaveLength(1);
+	});
+
 	it('clips a group by the <clipPath> its clip-path names, mapped into the drawing; refuses one in bounding-box units', async () => {
 		const shapesOf = async (clipPath: string) => {
 			const { payload, diagnostics } = await nativeView(`export function Moon() @{

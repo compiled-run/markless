@@ -353,6 +353,11 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h2' }],
 	},
 	{
+		name: 'svg-markers',
+		fixture: 'proofs/u77-svg-markers/App.tsrx',
+		actions: [{ event: 'activate', host: 'h2' }],
+	},
+	{
 		name: 'types',
 		fixture: 'test/fixtures/Types.tsrx',
 		actions: [

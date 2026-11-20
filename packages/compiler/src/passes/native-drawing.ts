@@ -56,6 +56,12 @@ type Inherited = {
 	readonly preserve: boolean;
 	/** The clip outlines of it and its groups, in the drawing's units. */
 	readonly clips: ReadonlyArray<ReadonlyArray<number>>;
+	/** The <marker> each of a path's vertices gets: its first, its middle ones, its last. */
+	readonly markers: {
+		readonly start?: DrawingElement;
+		readonly mid?: DrawingElement;
+		readonly end?: DrawingElement;
+	};
 };
 const INITIAL: Inherited = {
 	fill: { r: 0, g: 0, b: 0, alpha: 255 },
@@ -78,11 +84,14 @@ const INITIAL: Inherited = {
 	letterSpacing: { value: 0, em: false },
 	preserve: false,
 	clips: [],
+	markers: {},
 };
 
 const SHAPES = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 /** Elements that draw nothing themselves and whose content is never drawn in place. */
-const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata', 'clipPath']);
+const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata', 'clipPath', 'marker']);
+/** Shapes that get markers at their vertices. */
+const MARKABLE = new Set(['path', 'line', 'polyline', 'polygon']);
 /** Attributes that change nothing a native drawing shows. */
 const NO_DRAWING_EFFECT = new Set([
 	'class',
@@ -104,10 +113,11 @@ const NO_DRAWING_EFFECT = new Set([
 ]);
 const GEOMETRY: Readonly<Record<string, ReadonlyArray<string>>> = {
 	svg: ['viewBox', 'width', 'height', 'x', 'y'],
-	g: [],
+	// Position and size mean nothing on a group or a circle's box; the browser ignores them.
+	g: ['x', 'y', 'dx', 'dy', 'width', 'height', 'alignment-baseline'],
 	path: ['d'],
 	rect: ['x', 'y', 'width', 'height', 'rx', 'ry'],
-	circle: ['cx', 'cy', 'r'],
+	circle: ['cx', 'cy', 'r', 'width', 'height'],
 	ellipse: ['cx', 'cy', 'rx', 'ry'],
 	line: ['x1', 'y1', 'x2', 'y2'],
 	polyline: ['points'],
@@ -115,8 +125,9 @@ const GEOMETRY: Readonly<Record<string, ReadonlyArray<string>>> = {
 	use: ['href', 'xlink:href', 'x', 'y', 'width', 'height'],
 	symbol: ['viewBox', 'width', 'height', 'x', 'y'],
 	// `width`, `height` and `orientation` mean nothing on text; the browser ignores them, as charting libraries leave them.
-	text: ['x', 'y', 'dx', 'dy', 'width', 'height', 'orientation', 'xml:space'],
-	tspan: ['x', 'y', 'dx', 'dy', 'xml:space'],
+	text: ['x', 'y', 'dx', 'dy', 'width', 'height', 'orientation', 'xml:space', 'alignment-baseline'],
+	tspan: ['x', 'y', 'dx', 'dy', 'xml:space', 'alignment-baseline'],
+	marker: ['viewBox', 'refX', 'refY', 'markerWidth', 'markerHeight', 'markerUnits', 'orient', 'preserveAspectRatio'],
 };
 const PRESENTATION = new Set([
 	'fill',
@@ -139,6 +150,9 @@ const PRESENTATION = new Set([
 	'dominant-baseline',
 	'letter-spacing',
 	'clip-path',
+	'marker-start',
+	'marker-mid',
+	'marker-end',
 ]);
 
 const GENERIC_FAMILIES = new Set(['serif', 'sans-serif', 'monospace']);
@@ -305,6 +319,27 @@ export function compileDrawing(
 			if (css === null) refuse(element.id, `\`letter-spacing="${spacing}"\` on <${element.tag}>`);
 			else next.letterSpacing = { value: css.value, em: css.unit === 'em' };
 		}
+		// alignment-baseline places a text element's own glyphs, as dominant-baseline does for what it holds.
+		const alignment = element.tag === 'text' || element.tag === 'tspan' ? attribute('alignment-baseline')?.trim() : undefined;
+		if (alignment !== undefined && alignment !== 'baseline' && alignment !== 'auto') {
+			const mapped = BASELINES[alignment];
+			if (mapped) next.baseline = mapped;
+			else refuse(element.id, `\`alignment-baseline="${alignment}"\` on <${element.tag}>`);
+		}
+		const markers = { ...from.markers } as { -readonly [K in keyof Inherited['markers']]: Inherited['markers'][K] };
+		for (const at of ['start', 'mid', 'end'] as const) {
+			const raw = attribute(`marker-${at}`)?.trim();
+			if (raw === undefined) continue;
+			if (raw === 'none') {
+				delete markers[at];
+				continue;
+			}
+			const id = raw.startsWith('url(#') && raw.endsWith(')') ? raw.slice(5, -1).trim() : undefined;
+			const target = id === undefined ? undefined : byId.get(id);
+			if (target?.tag === 'marker') markers[at] = target;
+			else refuse(element.id, `\`marker-${at}="${raw}"\` on <${element.tag}>, which names no <marker> inside this <svg>`);
+		}
+		next.markers = markers;
 		const space = attribute('xml:space')?.trim();
 		if (space !== undefined) next.preserve = space === 'preserve';
 		const dashes = attribute('stroke-dasharray')?.trim();
@@ -576,6 +611,66 @@ export function compileDrawing(
 		return { ...style, clips: [...style.clips, outline] };
 	};
 
+	/**
+	 * SVG 2 §11.6: each <marker> drawn at the vertices it marks, rotated by its `orient`, scaled by the stroke width
+	 * (`markerUnits="strokeWidth"`) and its viewBox, its `refX`/`refY` on the vertex, clipped to its box; its content takes
+	 * its styles from where the marker is written, not from the shape.
+	 */
+	const placeMarkers = (outline: ReadonlyArray<number>, style: Inherited, own: Matrix, using: ReadonlySet<string>) => {
+		const vertices = verticesOf(outline);
+		if (vertices.length === 0) return;
+		const place = (marker: DrawingElement, vertex: Vertex, first: boolean) => {
+			if (using.has(marker.id)) return;
+			checkAttributes(marker);
+			const units = marker.attributes.markerUnits?.trim() ?? 'strokeWidth';
+			if (units !== 'strokeWidth' && units !== 'userSpaceOnUse') {
+				refuse(marker.id, `\`markerUnits="${units}"\` on <marker>`);
+				return;
+			}
+			const orient = marker.attributes.orient?.trim() ?? '0';
+			let angle: number;
+			if (orient === 'auto' || orient === 'auto-start-reverse') {
+				angle = vertex.angle + (orient === 'auto-start-reverse' && first ? Math.PI : 0);
+			} else {
+				const degrees = parseAngle(orient);
+				if (degrees === null) {
+					refuse(marker.id, `\`orient="${orient}"\` on <marker>`);
+					return;
+				}
+				angle = (degrees * Math.PI) / 180;
+			}
+			const width = number(marker, 'markerWidth', 3);
+			const height = number(marker, 'markerHeight', 3);
+			const box = marker.attributes.viewBox === undefined ? null : parseViewBox(marker.attributes.viewBox);
+			const aspect = marker.attributes.preserveAspectRatio?.trim();
+			if (aspect !== undefined && parseAspect(aspect) !== 'default')
+				refuse(marker.id, `\`preserveAspectRatio="${aspect}"\` on <marker>: a marker's viewBox is centred and fitted`);
+			const fit = box ? fitViewBox(box, width, height) : IDENTITY;
+			const refX = number(marker, 'refX');
+			const refY = number(marker, 'refY');
+			const scale = units === 'strokeWidth' ? style.width : 1;
+			const cos = Math.cos(angle);
+			const sin = Math.sin(angle);
+			// The marker's box (its viewport) on the vertex: the ref point, through the viewBox, lands on the vertex.
+			const viewport = multiply(
+				multiply(own, [cos * scale, sin * scale, -sin * scale, cos * scale, vertex.x, vertex.y]),
+				[1, 0, 0, 1, -(fit[0] * refX + fit[4]), -(fit[3] * refY + fit[5])],
+			);
+			const content = multiply(viewport, fit);
+			const markerStyle: Inherited = {
+				...inherit(marker, rootStyle),
+				clips: [...style.clips, mapOutline([0, 0, 0, 1, width, 0, 1, width, height, 1, 0, height, 4], viewport)],
+			};
+			const inner = new Set([...using, marker.id]);
+			for (const child of childrenOf(marker.path)) visit(child, markerStyle, content, inner);
+		};
+		const { start, mid, end } = style.markers;
+		vertices.forEach((vertex, index) => {
+			const marker = index === 0 ? start : index === vertices.length - 1 ? end : mid;
+			if (marker) place(marker, vertex, index === 0);
+		});
+	};
+
 	const visit = (
 		element: DrawingElement,
 		from: Inherited,
@@ -594,7 +689,9 @@ export function compileDrawing(
 		const own = multiply(matrix, transformOf(element));
 		const style = clipped(element, inherit(element, from), own);
 		if (SHAPES.has(element.tag)) {
-			emit(element, outlineOf(element), style, own);
+			const outline = outlineOf(element);
+			emit(element, outline, style, own);
+			if (MARKABLE.has(element.tag)) placeMarkers(outline, style, own, using);
 			return;
 		}
 		if (element.tag === 'text') {
@@ -690,6 +787,73 @@ function parseAspect(raw: string): NativeDrawing['aspect'] | 'default' | null {
 }
 
 // Geometry.
+
+type Vertex = { readonly x: number; readonly y: number; readonly angle: number };
+
+/** A path's vertices in order, each with the direction a marker with `orient="auto"` takes there (SVG 2 §11.6.2). */
+function verticesOf(outline: ReadonlyArray<number>): Vertex[] {
+	type Point = { x: number; y: number; into?: [number, number] | undefined; out?: [number, number] | undefined };
+	const points: Point[] = [];
+	let start: Point | undefined;
+	let i = 0;
+	const direction = (from: { x: number; y: number }, ...to: [number, number][]): [number, number] | undefined => {
+		for (const [x, y] of to) if (x !== from.x || y !== from.y) return [x - from.x, y - from.y];
+		return undefined;
+	};
+	while (i < outline.length) {
+		const verb = outline[i++]!;
+		const previous = points.at(-1);
+		if (verb === 0) {
+			start = { x: outline[i]!, y: outline[i + 1]! };
+			points.push(start);
+			i += 2;
+		} else if (verb === 1 && previous) {
+			const next: Point = { x: outline[i]!, y: outline[i + 1]! };
+			previous.out ??= direction(previous, [next.x, next.y]);
+			next.into = direction(previous, [next.x, next.y]);
+			points.push(next);
+			i += 2;
+		} else if (verb === 3 && previous) {
+			const c1: [number, number] = [outline[i]!, outline[i + 1]!];
+			const c2: [number, number] = [outline[i + 2]!, outline[i + 3]!];
+			const next: Point = { x: outline[i + 4]!, y: outline[i + 5]! };
+			previous.out ??= direction(previous, c1, c2, [next.x, next.y]);
+			const back = direction(next, c2, c1, [previous.x, previous.y]);
+			next.into = back ? [-back[0], -back[1]] : undefined;
+			points.push(next);
+			i += 6;
+		} else if (verb === 4 && previous && start) {
+			const closing: Point = { x: start.x, y: start.y, into: direction(previous, [start.x, start.y]) };
+			previous.out ??= closing.into;
+			points.push(closing);
+		} else break;
+	}
+	const angleOf = (v: [number, number]) => Math.atan2(v[1], v[0]);
+	return points.map((point) => {
+		const { into, out } = point;
+		let angle = 0;
+		if (into && out) {
+			const a = angleOf(into);
+			const b = angleOf(out);
+			let delta = b - a;
+			while (delta > Math.PI) delta -= 2 * Math.PI;
+			while (delta < -Math.PI) delta += 2 * Math.PI;
+			angle = a + delta / 2;
+		} else if (into) angle = angleOf(into);
+		else if (out) angle = angleOf(out);
+		return { x: point.x, y: point.y, angle };
+	});
+}
+
+/** An `orient` angle: degrees, or with `deg`, `rad`, `grad` or `turn`. */
+function parseAngle(raw: string): number | null {
+	const match = NUMBER.exec(raw);
+	if (!match) return null;
+	const value = Number(match[0]);
+	const unit = raw.slice(match[0].length);
+	const scale: Readonly<Record<string, number>> = { '': 1, deg: 1, rad: 180 / Math.PI, grad: 0.9, turn: 360 };
+	return scale[unit] === undefined ? null : value * scale[unit]!;
+}
 
 /** A verb-coded outline with every point mapped by `m`; an affine map keeps lines and cubics what they are. */
 function mapOutline(outline: ReadonlyArray<number>, m: Matrix): number[] {
