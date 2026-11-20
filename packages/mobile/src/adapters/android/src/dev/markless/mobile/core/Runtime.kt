@@ -857,7 +857,7 @@ class Runtime(
 				emptyList()
 			}
 		}
-		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
+		if ((event == EventName.Input || event == EventName.Commit) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
 		if (point != null && !event.touch) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
 		if (event == EventName.Dismiss && reason != null) {

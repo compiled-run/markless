@@ -8,6 +8,11 @@
 				"id": "state:volume",
 				"name": "volume",
 				"initial": 5
+			},
+			{
+				"id": "state:saved",
+				"name": "saved",
+				"initial": "nothing"
 			}
 		],
 		"nodes": [
@@ -84,13 +89,32 @@
 			{
 				"kind": "element",
 				"id": "h4",
-				"element": "button",
+				"element": "p",
 				"parent": "h0"
 			},
 			{
 				"kind": "text",
 				"id": "h4:text0",
 				"parent": "h4",
+				"parts": [
+					{
+						"text": "Saved "
+					},
+					{
+						"cell": "state:saved"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
 				"parts": [
 					{
 						"text": "Quiet"
@@ -105,9 +129,14 @@
 				"handler": "handler:event:0"
 			},
 			{
-				"host": "h4",
-				"event": "activate",
+				"host": "h2",
+				"event": "commit",
 				"handler": "handler:event:1"
+			},
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:2"
 			}
 		],
 		"handlers": [
@@ -133,6 +162,18 @@
 				"ops": [
 					{
 						"op": "assign",
+						"cell": "state:saved",
+						"value": {
+							"event": "value"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
 						"cell": "state:volume",
 						"value": {
 							"literal": 3
@@ -145,7 +186,8 @@
 	"initial": [
 		["h1:text0", "Speaker"],
 		["h3:text0", "Volume 5"],
-		["h4:text0", "Quiet"]
+		["h4:text0", "Saved nothing"],
+		["h5:text0", "Quiet"]
 	],
 	"initialAttributes": [["h2", "value", "5"]],
 	"steps": [
@@ -171,8 +213,22 @@
 		},
 		{
 			"action": {
+				"event": "commit",
+				"host": "h2",
+				"value": "10"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Saved 10"
+				}
+			]
+		},
+		{
+			"action": {
 				"event": "activate",
-				"host": "h4"
+				"host": "h5"
 			},
 			"journal": [
 				{

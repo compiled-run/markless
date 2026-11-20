@@ -229,6 +229,8 @@ public enum NativeEventName: String, Sendable {
 	case enter
 	/// A form's, run only by a `submit` op.
 	case submit
+	/// A range input let go after its value moved: the web's `change` on it.
+	case commit
 	/// A `timer` journal entry's time has come.
 	case timer
 	/// The host is idle after the element appeared; once for each shown instance.

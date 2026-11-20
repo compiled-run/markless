@@ -37,6 +37,8 @@ export type NativeAction =
 	| { readonly event: 'choose'; readonly host: string }
 	/** The field's whole text after an edit. */
 	| { readonly event: 'input'; readonly host: string; readonly value: string }
+	/** A range input let go after its value moved (the web's `change`), with the value it holds. */
+	| { readonly event: 'commit'; readonly host: string; readonly value: string }
 	/** A live device value changed (connectivity, permission): the host writes the device cell. */
 	| { readonly event: 'device'; readonly cell: string; readonly value: Value }
 	/** A device call the host started has answered: a task cell takes `{ state: 'value', value }` or the error. */
@@ -1487,7 +1489,7 @@ export function createNativeRuntime(
 				.find((shown) => shown.id === action.host);
 			if (!instance) throw new Error(`${action.host} is not shown`);
 			const scope = instance.scope;
-			const eventValue = action.event === 'input' ? action.value : undefined;
+			const eventValue = action.event === 'input' || action.event === 'commit' ? action.value : undefined;
 			// A press focuses the control it presses, as the browser does.
 			if (action.event === 'activate') focused = action.host;
 			return change(action.host, eventValue, () =>

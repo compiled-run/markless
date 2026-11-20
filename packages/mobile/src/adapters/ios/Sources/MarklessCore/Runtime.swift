@@ -1081,7 +1081,7 @@ public final class NativeRuntime {
 		let scope = instance.scope
 		// A press focuses the control it presses, as the browser does.
 		if action.event == .activate { focused = action.host }
-		eventValue = action.event == .input ? action.value ?? "" : nil
+		eventValue = action.event == .input || action.event == .commit ? action.value ?? "" : nil
 		defer { eventValue = nil }
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
 	}

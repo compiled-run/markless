@@ -322,7 +322,7 @@ export function Settings() @{
 		expect(payload?.events.map((event) => [event.host, event.event])).toEqual([['h1', 'activate']]);
 	});
 
-	it('lowers a range input with its min, max and step, reports its moves in a form, and refuses its change by name', async () => {
+	it('lowers a range input with its min, max and step, reports its moves in a form, and runs its change when it is let go', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Mixer() @{
 	let sent = state('');
@@ -346,12 +346,16 @@ export function Mixer() @{
 			'enter',
 			'input',
 		]);
-		const changed = await nativeView(`export function Mixer() @{
-	<input type="range" aria-label="Level" onChange={() => {}} />
+		const changed = await nativeView(`import { state } from '@markless/core';
+export function Mixer() @{
+	let level = state('5');
+	<main>
+		<input type="range" aria-label="Level" onChange={(event) => (level = event.currentTarget.value)} />
+		<p>{level}</p>
+	</main>
 }`);
-		expect(changed.diagnostics.map((d) => d.message)).toEqual([
-			'the change handler on the <input type="range"> h0 runs when the slider is let go, which phones do not report yet',
-		]);
+		expect(changed.diagnostics).toEqual([]);
+		expect(changed.payload?.events.map((event) => [event.host, event.event])).toEqual([['h1', 'commit']]);
 	});
 
 	it('builds a dynamic element (`<{tag}>`) as the element its tag names for each use, with its attributes, events and children', async () => {

@@ -461,6 +461,8 @@ export type NativeEventName =
 	| 'submit'
 	| 'idle'
 	| 'visible'
+	/** A range input let go after its value moved: the web's `change` on it. */
+	| 'commit'
 	| NativePointerEventName;
 
 /**

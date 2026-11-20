@@ -5199,7 +5199,9 @@ export function createNativeViewPayload(
 								kind: semantic === 'dismiss' ? 'dismiss' : 'pointer',
 							},
 						}
-					: event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))
+					: (event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))) ||
+						  // A range's change carries its value as its input does.
+						  (event.eventName === 'change' && pressed !== undefined && isRange(pressed.currentTarget))
 						? { ...running, event: parameter }
 						: {
 								...running,
@@ -6709,19 +6711,29 @@ export function createNativeViewPayload(
 		}
 	}
 
+	/** Whether the element `id` is an `<input type="range">`. */
+	function isRange(id: string): boolean {
+		const node = nodes.find((candidate) => candidate.id === id);
+		return node?.kind === 'element' && node.element === 'input' && node.attributes?.['type'] === 'range';
+	}
+
 	function wireTicks() {
 		for (const node of nodes) {
 			if (node.kind !== 'element' || node.element !== 'input') continue;
 			const own = pendingHandlers.filter((pending) => pending.host === node.id);
 			if (!isTicked(node.id)) {
-				for (const pending of own)
-					if (pending.event.eventName === 'change')
+				for (const pending of own) {
+					if (pending.event.eventName !== 'change') continue;
+					// A range's change runs when it is let go after its value moved.
+					const at = events.findIndex((entry) => entry.handler === pending.handler.id);
+					if (node.attributes?.['type'] === 'range' && at >= 0)
+						events[at] = { ...events[at]!, event: 'commit' };
+					else
 						refuse(
-							node.attributes?.['type'] === 'range'
-								? `the change handler on the <input type="range"> ${node.id} runs when the slider is let go, which phones do not report yet`
-								: `the change handler on the <input> ${node.id}: a text field raises it when it loses focus, which a native build has no lowering for yet`,
+							`the change handler on the <input> ${node.id}: a text field raises it when it loses focus, which a native build has no lowering for yet`,
 							pending.event.handlerSpan,
 						);
+				}
 				continue;
 			}
 			if (node.row) continue;

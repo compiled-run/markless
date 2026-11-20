@@ -390,7 +390,8 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		fixture: 'proofs/r153-range/App.tsrx',
 		actions: [
 			{ event: 'input', host: 'h2', value: '10' },
-			{ event: 'activate', host: 'h4' },
+			{ event: 'commit', host: 'h2', value: '10' },
+			{ event: 'activate', host: 'h5' },
 			{ event: 'input', host: 'h2', value: '7' },
 		],
 	},

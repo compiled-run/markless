@@ -1014,6 +1014,8 @@ final class ViewTree {
 				view.addGestureRecognizer(ActivateGesture { onAction(NativeAction(event: .activate, host: id)) })
 			case let (.input, slider as RangeSlider):
 				slider.onInput = { value in onAction(NativeAction(event: .input, host: id, value: value)) }
+			case let (.commit, slider as RangeSlider):
+				slider.onCommit = { value in onAction(NativeAction(event: .commit, host: id, value: value)) }
 			case let (.input, field as UITextField):
 				field.addAction(
 					UIAction { [weak field] _ in onAction(NativeAction(event: .input, host: id, value: field?.text ?? "")) },
@@ -1533,6 +1535,9 @@ final class TopLayerView: UIView {
 /// event does while the thumb crosses a step; VoiceOver adjusts it a step at a time.
 final class RangeSlider: UIControl {
 	var onInput: ((String) -> Void)?
+	/// Called when a drag or tap ends with the value moved since it began, as the web's `change`.
+	var onCommit: ((String) -> Void)?
+	private var startValue = ""
 	private var attributes: [String: String] = [:]
 	private var reported = ""
 	private var low = 0.0
@@ -1602,6 +1607,13 @@ final class RangeSlider: UIControl {
 
 	@objc private func dragged(_ gesture: UIGestureRecognizer) {
 		guard isEnabled else { return }
+		if gesture.state == .began || (gesture is UITapGestureRecognizer && gesture.state == .ended) { startValue = reported }
+		defer {
+			if gesture.state == .ended || gesture.state == .cancelled, reported != startValue {
+				startValue = reported
+				onCommit?(reported)
+			}
+		}
 		let inset = Self.thumbSize / 2
 		let width = Swift.max(1, bounds.width - 2 * inset)
 		let fraction = Swift.min(1, Swift.max(0, (gesture.location(in: self).x - inset) / width))
@@ -1629,8 +1641,15 @@ final class RangeSlider: UIControl {
 		set {}
 	}
 
-	override func accessibilityIncrement() { land(on: valueOf(String(value + stepSize))) }
-	override func accessibilityDecrement() { land(on: valueOf(String(value - stepSize))) }
+	/// A VoiceOver step is a move that ends at once, as a keyboard step on the web raises input and then change.
+	private func step(by delta: Double) {
+		let before = reported
+		land(on: valueOf(String(value + delta)))
+		if reported != before { onCommit?(reported) }
+	}
+
+	override func accessibilityIncrement() { step(by: stepSize) }
+	override func accessibilityDecrement() { step(by: -stepSize) }
 
 	/// The value as a number, for the host's tests.
 	var number: Double { value }

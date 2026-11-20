@@ -928,6 +928,9 @@ function walk(
 				attributeNow(slider, 'step'),
 			);
 			apply(runtime.dispatch({ event: 'input', host: slider, value }), index);
+			// Let go, the slider raises change when its value moved, as the web's End key does.
+			if (payload.events.some((event) => event.host === slider && event.event === 'commit'))
+				apply(runtime.dispatch({ event: 'commit', host: slider, value }), index);
 		} else if (action && 'drag' in action) {
 			const host = elementReading(action.drag.on);
 			if (!host) throw new Error(`step ${index}: nothing reads "${action.drag.on}" to drag`);

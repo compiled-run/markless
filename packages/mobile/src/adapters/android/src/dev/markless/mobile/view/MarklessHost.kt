@@ -823,6 +823,7 @@ class MarklessHost(
 					else -> { apply(runtime.dispatch(inst.id, EventName.Enter)); true }
 				}
 			}
+			EventName.Commit -> (view as? RangeBar ?: throw MarklessHostError("commit event on \"${node.id}\", which is not a range")).onCommit = { value -> apply(runtime.dispatch(inst.id, EventName.Commit, value)) }
 			EventName.Input -> if (view is RangeBar) view.onInput = { value -> apply(runtime.dispatch(inst.id, EventName.Input, value)) } else (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -1260,6 +1261,9 @@ private fun EditText.setAppText(text: String) {
  */
 class RangeBar(context: Context) : android.widget.SeekBar(context) {
 	var onInput: ((String) -> Unit)? = null
+	/** Called when a drag ends with the value moved since it began, as the web's `change`. */
+	var onCommit: ((String) -> Unit)? = null
+	private var startValue = ""
 	private var attributes: Map<String, String> = emptyMap()
 	private var low = 0.0
 	private var unit = 1.0
@@ -1277,8 +1281,14 @@ class RangeBar(context: Context) : android.widget.SeekBar(context) {
 				reported = landed
 				onInput?.invoke(landed)
 			}
-			override fun onStartTrackingTouch(bar: android.widget.SeekBar) {}
-			override fun onStopTrackingTouch(bar: android.widget.SeekBar) {}
+			override fun onStartTrackingTouch(bar: android.widget.SeekBar) {
+				startValue = reported
+			}
+			override fun onStopTrackingTouch(bar: android.widget.SeekBar) {
+				if (reported == startValue) return
+				startValue = reported
+				onCommit?.invoke(reported)
+			}
 		})
 	}
 
