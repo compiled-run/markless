@@ -1,0 +1,5 @@
+{
+	"rung": 160,
+	"name": "a style binding the build knows (a literal, a template of constants, a module constant) is the element's style attribute, laid out on a styled page as the web lays it out",
+	"steps": [{ "visible": ["Fixed styles", "Red and bold", "Spaced and blue", "Read by screen readers only"] }]
+}

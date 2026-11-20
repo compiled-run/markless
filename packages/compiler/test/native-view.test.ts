@@ -262,6 +262,31 @@ export function Logger() @{
 		]);
 	});
 
+	it('writes a style binding the build knows as the style attribute, and refuses one that follows state by name', async () => {
+		const fixed = await nativeView(`const HIDDEN = 'position: absolute; width: 1px';
+const GAP = 12;
+export function Card() @{
+	<main>
+		<p style={HIDDEN}>Constant</p>
+		<p style={\`margin-top: \${GAP}px\`}>Template</p>
+		<p style={null}>None</p>
+	</main>
+}`);
+		expect(fixed.diagnostics).toEqual([]);
+		const styles = fixed.payload?.nodes.flatMap((node) => (node.kind === 'element' && node.element === 'p' ? [node.attributes?.style ?? null] : []));
+		expect(styles).toEqual(['position: absolute; width: 1px', 'margin-top: 12px', null]);
+		expect(fixed.payload?.nodes.some((node) => node.kind === 'element' && node.bindings?.some((b) => 'attribute' in b && b.attribute === 'style'))).toBe(false);
+		const follows = await nativeView(`import { state } from '@markless/core';
+export function Card() @{
+	let wide = state(false);
+	<p style={wide ? 'width: 100%' : 'width: 50%'} onClick={() => (wide = !wide)}>Follows</p>
+}`);
+		expect(follows.payload).toBeNull();
+		expect(follows.diagnostics.map((d) => d.message)).toContain(
+			"a style binding whose value follows state while the app runs, which waits on Dragon's typed style slots",
+		);
+	});
+
 	it('refuses constructs with no native lowering yet', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Field() @{

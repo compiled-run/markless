@@ -360,6 +360,32 @@ type Item =
 			readonly path: ReadonlyArray<number>;
 	  };
 
+/**
+ * The text a style binding writes when the build knows it (a literal, a constant, or a template of them): the element's
+ * style attribute, as the web writes it; null when it writes none; undefined when it follows state.
+ */
+function fixedStyle(expr: NativeExpr): string | null | undefined {
+	if ('literal' in expr)
+		return expr.literal === null || expr.literal === false
+			? null
+			: typeof expr.literal === 'string' || typeof expr.literal === 'number'
+				? String(expr.literal)
+				: undefined;
+	if ('template' in expr) {
+		let text = '';
+		for (const part of expr.template) {
+			if (typeof part === 'string') text += part;
+			else {
+				const given = fixedStyle(part);
+				if (given === undefined) return undefined;
+				text += given ?? '';
+			}
+		}
+		return text;
+	}
+	return undefined;
+}
+
 // A non-finite number is a value too: the payload carries it beside its JSON (nativeNonFiniteSplit).
 const isNativeValue = (value: unknown): value is NativeValue =>
 	value === null ||
@@ -3789,6 +3815,16 @@ export function createNativeViewPayload(
 					},
 				];
 			}
+			// Inline style the build knows is the element's style attribute, which Dragon cascades; see `fixedStyle`.
+			if (target.kind === 'style') {
+				const value = renderValue(
+					read.expression,
+					() => readScript(scope.module, read.sourceSpan),
+					'the style',
+					scope,
+				);
+				return value ? [{ attribute: 'style', value }] : [];
+			}
 			refuse(`a ${target.kind} binding${'name' in target ? ` (\`${target.name}\`)` : ''}`);
 			return [];
 		});
@@ -4146,7 +4182,16 @@ export function createNativeViewPayload(
 							),
 					),
 					...own,
-				];
+				].filter((binding) => {
+					if (!('attribute' in binding) || binding.attribute !== 'style') return true;
+					const fixed = fixedStyle(binding.value);
+					if (fixed === undefined)
+						refuse(
+							'a style binding whose value follows state while the app runs, which waits on Dragon\'s typed style slots',
+						);
+					else if (fixed !== null) attributes.style = fixed;
+					return false;
+				});
 				for (const attribute of handleAttrs) {
 					if (attribute.name === 'id') continue;
 					handleReferences.push({

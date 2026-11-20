@@ -1,0 +1,9 @@
+appId: ${APP_ID}
+name: r160-fixed-style
+---
+- launchApp:
+      clearState: true
+- assertVisible: Fixed styles
+- assertVisible: Red and bold
+- assertVisible: Spaced and blue
+- assertVisible: Read by screen readers only
