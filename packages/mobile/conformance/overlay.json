@@ -218,7 +218,10 @@
 							"literal": "component-edge:3/h3"
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -393,6 +396,9 @@
 				"parent": "component-edge:3/h3",
 				"attributes": {
 					"type": "button"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -479,7 +485,10 @@
 							"literal": "component-edge:10/h3"
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -629,6 +638,9 @@
 				"parent": "component-edge:10/h3",
 				"attributes": {
 					"type": "button"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{

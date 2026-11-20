@@ -80,7 +80,10 @@
 				"kind": "element",
 				"id": "component-edge:0/h2",
 				"element": "button",
-				"parent": "component-edge:0/h0"
+				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -134,7 +137,10 @@
 				"kind": "element",
 				"id": "component-edge:1/h2",
 				"element": "button",
-				"parent": "component-edge:1/h0"
+				"parent": "component-edge:1/h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",

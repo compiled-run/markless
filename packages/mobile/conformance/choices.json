@@ -26,7 +26,10 @@
 				"kind": "element",
 				"id": "h1",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -42,7 +45,10 @@
 				"kind": "element",
 				"id": "h2",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",

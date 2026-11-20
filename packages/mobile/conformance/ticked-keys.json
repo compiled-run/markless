@@ -31,6 +31,9 @@
 					"type": "radio",
 					"aria-label": "Small",
 					"name": "size"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -42,6 +45,9 @@
 					"type": "radio",
 					"aria-label": "Large",
 					"name": "size"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -52,6 +58,9 @@
 				"attributes": {
 					"type": "checkbox",
 					"aria-label": "News"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{

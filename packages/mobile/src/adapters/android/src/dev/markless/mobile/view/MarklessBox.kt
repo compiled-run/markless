@@ -10,6 +10,12 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.TextView
 
+/**
+ * Views of inline-level boxes (`<a>`, `<button>`, `<input>`, `<img>`) laid out without a style export: in their parent's
+ * stack they share lines with each other and with the paragraphs beside them, as the web's inline formatting context does.
+ */
+internal val inlineLevel: MutableSet<View> = java.util.Collections.newSetFromMap(java.util.WeakHashMap())
+
 /** The element view: children stack vertically until a style export assigns frames, then each child sits at its frame. */
 open class MarklessBox(context: Context) : FrameLayout(context) {
 	internal val frames = HashMap<View, Rect>()
@@ -27,8 +33,9 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 	internal var marginBottom = 0
 	/** The page's body: its margin in px on every side, which its children's margins collapse into (`body { margin: 8px }`). */
 	internal var body = 0
-	/** Each shown child's top, worked out while measuring. */
+	/** Each shown child's top and start offset, worked out while measuring. */
 	private var tops = IntArray(0)
+	private var lefts = IntArray(0)
 
 	/** Whether a first and last child's margins pass through this box, as they do through a block with no border or padding. */
 	private val collapses get() = frames.isEmpty() && table == null && body == 0 && fixedSize == null && paddingTop == 0 && paddingBottom == 0
@@ -120,16 +127,28 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		}
 		// Margins between siblings meet at the larger; the first and last child's leave through the box when it collapses.
 		tops = IntArray(kids.size)
+		lefts = IntArray(kids.size)
 		var y = paddingTop
 		var pending = body
 		var leading = collapses
-		for ((i, child) in kids.withIndex()) {
-			if (child.through()) { pending = maxOf(pending, child.marginAbove(), child.marginBelow()); tops[i] = y; continue }
+		var i = 0
+		while (i < kids.size) {
+			val run = runAt(kids, i)
+			if (run > i + 1 || kids[i] in inlineLevel) {
+				// A line box: no margins of its own, so the margin waiting above it is the whole gap.
+				val lines = lineUp(kids, i, run, width, if (leading) y else y + pending)
+				if (lines.height > 0) { y = lines.bottom; leading = false; pending = 0; widest = maxOf(widest, lines.widest) }
+				i = run
+				continue
+			}
+			val child = kids[i]
+			if (child.through()) { pending = maxOf(pending, child.marginAbove(), child.marginBelow()); tops[i] = y; i++; continue }
 			if (!leading) y += maxOf(pending, child.marginAbove())
 			leading = false
 			tops[i] = y
 			y += child.measuredHeight
 			pending = child.marginBelow()
+			i++
 		}
 		if (!collapses) y += maxOf(pending, body)
 		val height = y + paddingBottom
@@ -159,8 +178,82 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		}
 		for ((i, child) in shown().withIndex()) {
 			val y = tops.getOrElse(i) { paddingTop }
-			child.layout(paddingLeft, y, paddingLeft + child.measuredWidth, y + child.measuredHeight)
+			val x = paddingLeft + lefts.getOrElse(i) { 0 }
+			child.layout(x, y, x + child.measuredWidth, y + child.measuredHeight)
 		}
+	}
+
+	/** Where the run of line-sharing children that starts at [start] ends: inline-level boxes and the paragraphs beside them. */
+	private fun runAt(kids: List<View>, start: Int): Int {
+		var end = start
+		while (end < kids.size && (kids[end] in inlineLevel || kids[end] is FlowText)) end++
+		return if ((start until end).any { kids[it] in inlineLevel }) end else start + 1
+	}
+
+	private class Lines(val bottom: Int, val height: Int, val widest: Int)
+
+	/**
+	 * Places kids [from] until [to] in lines [width] wide from [top], as the web's inline formatting context places inline
+	 * boxes: side by side, a space between two only where the text there has whitespace, a new line when the next one does
+	 * not fit, and each line's items on one baseline.
+	 */
+	private fun lineUp(kids: List<View>, from: Int, to: Int, width: Int, top: Int): Lines {
+		val line = ArrayList<Int>()
+		var lineTop = top
+		var x = 0
+		var widest = 0
+		var spaced = false
+		val space = (from until to).map { kids[it] }.firstNotNullOfOrNull { (it as? TextView)?.paint?.measureText(" ") }?.toInt() ?: markerPaint.measureText(" ").toInt()
+		fun close() {
+			if (line.isEmpty()) return
+			val base = line.maxOf { baselineOf(kids[it]) }
+			val below = line.maxOf { kids[it].measuredHeight - baselineOf(kids[it]) }
+			for (k in line) tops[k] = lineTop + base - baselineOf(kids[k])
+			widest = maxOf(widest, x)
+			lineTop += base + below
+			line.clear()
+			x = 0
+		}
+		for (k in from until to) {
+			val child = kids[k]
+			val text = child as? FlowText
+			if (child.measuredHeight == 0 && child.measuredWidth == 0) {
+				// Whitespace alone between two boxes is a space; an empty paragraph is nothing.
+				if (text?.spaceBefore == true) spaced = true
+				tops[k] = lineTop
+				continue
+			}
+			val gap = if (x > 0 && (spaced || text?.spaceBefore == true)) space else 0
+			if (x > 0 && x + gap + child.measuredWidth > width) close()
+			lefts[k] = if (x > 0) x + gap else 0
+			x = lefts[k] + child.measuredWidth
+			line.add(k)
+			spaced = text?.spaceAfter == true
+		}
+		close()
+		return Lines(lineTop, lineTop - top, widest)
+	}
+
+	/** Where [view]'s first line of text sits from its top once measured; a box with no text sits on its bottom edge, as an image does. */
+	private fun baselineOf(view: View): Int = when (view) {
+		is TextView -> view.baseline.takeIf { it >= 0 } ?: view.measuredHeight
+		is MarklessBox -> view.firstBaseline() ?: view.measuredHeight
+		else -> view.measuredHeight
+	}
+
+	/** This box's first line's baseline from its top, after measuring. */
+	private fun firstBaseline(): Int? {
+		val kids = shown()
+		for ((i, child) in kids.withIndex()) {
+			if (child.measuredHeight == 0) continue
+			val inner = when (child) {
+				is TextView -> child.baseline.takeIf { it >= 0 }
+				is MarklessBox -> child.firstBaseline()
+				else -> null
+			} ?: return null
+			return tops.getOrElse(i) { paddingTop } + inner
+		}
+		return null
 	}
 
 	override fun dispatchDraw(canvas: Canvas) {

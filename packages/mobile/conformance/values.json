@@ -226,7 +226,10 @@
 				"kind": "element",
 				"id": "h5",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",

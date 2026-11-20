@@ -205,6 +205,11 @@ export type NativeDefaultStyle = {
 	 * web: two siblings' meet at the larger, and a box's first and last child's margins become the box's own.
 	 */
 	readonly margin?: number;
+	/**
+	 * An inline-level box (`<a>`, `<button>`, `<input>`, `<img>`): it sits on its parent's line beside text and other such
+	 * boxes, and the line wraps at the parent's width, as the web places them, instead of stacking below the one before.
+	 */
+	readonly inline?: true;
 	/** `<hr>`: a thin horizontal line across the box. */
 	readonly rule?: true;
 	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
@@ -288,17 +293,17 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	bdo: { flow: 'inline' },
 	wbr: { flow: 'inline' },
 	br: { flow: 'break' },
-	button: {},
-	input: {},
-	a: {},
-	img: {},
-	audio: {},
-	label: {},
+	button: { inline: true },
+	input: { inline: true },
+	a: { inline: true },
+	img: { inline: true },
+	audio: { inline: true },
+	label: { inline: true },
 	dialog: {},
 	form: {},
-	select: {},
+	select: { inline: true },
 	option: {},
-	svg: {},
+	svg: { inline: true },
 };
 
 /**

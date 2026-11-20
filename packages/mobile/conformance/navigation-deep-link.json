@@ -49,6 +49,9 @@
 							"parent": "h0",
 							"attributes": {
 								"href": "/orders"
+							},
+							"defaultStyle": {
+								"inline": true
 							}
 						},
 						{
@@ -178,6 +181,9 @@
 							"parent": "h4",
 							"attributes": {
 								"href": "/orders/[id]"
+							},
+							"defaultStyle": {
+								"inline": true
 							},
 							"row": "repeat:0"
 						},

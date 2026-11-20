@@ -75,7 +75,10 @@
 				"kind": "element",
 				"id": "h9",
 				"element": "button",
-				"parent": "h8"
+				"parent": "h8",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -151,6 +154,9 @@
 				"id": "component-edge:0/h2",
 				"element": "button",
 				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "branch-site:1",
 					"index": 0
@@ -288,6 +294,9 @@
 						}
 					}
 				],
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "component-edge:0/branch-site:0",
 					"index": 0

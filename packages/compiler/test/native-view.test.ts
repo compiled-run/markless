@@ -57,6 +57,7 @@ export function Counter() @{
 					element: 'button',
 					parent: 'h0',
 					attributes: { class: 'tap' },
+					defaultStyle: { inline: true },
 				},
 				{
 					kind: 'text',
@@ -119,7 +120,13 @@ export function Tally() @{
 				parent: 'h1',
 				parts: [{ text: ' after ' }, { cell: 'state:right' }],
 			},
-			{ kind: 'element', id: 'h3', element: 'button', parent: 'h0' },
+			{
+				kind: 'element',
+				id: 'h3',
+				element: 'button',
+				parent: 'h0',
+				defaultStyle: { inline: true },
+			},
 			{ kind: 'text', id: 'h3:text0', parent: 'h3', parts: [{ text: 'Move' }] },
 		]);
 		expect(payload?.handlers).toEqual([
@@ -575,6 +582,7 @@ export function Toggle() @{
 				id: 'h1',
 				element: 'button',
 				parent: 'h0',
+				defaultStyle: { inline: true },
 				bindings: [{ attribute: 'aria-expanded', value: { cell: 'state:open' } }],
 			},
 			{
@@ -1982,7 +1990,7 @@ ${markup}
 			['kbd', { flow: 'inline', monospace: true, size: 0.8125 }],
 			['pre', { monospace: true, size: 0.8125, preformatted: true, margin: 1 }],
 			['abbr', { flow: 'inline', line: 'underline' }],
-			['button', undefined],
+			['button', { inline: true }],
 		]);
 	});
 
@@ -2285,7 +2293,14 @@ export function Page() @{
 }`);
 		expect(diagnostics).toEqual([]);
 		expect(payload!.nodes.find((node) => node.kind === 'text')).toMatchObject({
-			parts: [{ expr: { script: expect.any(String), bindings: { cart: { cell: 'state:cart' } } } }],
+			parts: [
+				{
+					expr: {
+						script: expect.any(String),
+						bindings: { cart: { cell: 'state:cart' } },
+					},
+				},
+			],
 		});
 		expect(payload!.script!.source).toContain('function total(text)');
 	});

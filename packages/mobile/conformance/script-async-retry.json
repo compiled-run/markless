@@ -107,7 +107,10 @@
 				"kind": "element",
 				"id": "h4",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -270,6 +273,9 @@
 				"id": "h8",
 				"element": "button",
 				"parent": "h6",
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "boundary:0",
 					"index": 2
@@ -294,6 +300,9 @@
 				"id": "h9",
 				"element": "button",
 				"parent": "h6",
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "boundary:0",
 					"index": 2
@@ -399,6 +408,9 @@
 				"id": "boundary:0:caught/h8",
 				"element": "button",
 				"parent": "boundary:0:caught/h6",
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "boundary:0:caught",
 					"index": 0
@@ -423,6 +435,9 @@
 				"id": "boundary:0:caught/h9",
 				"element": "button",
 				"parent": "boundary:0:caught/h6",
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "boundary:0:caught",
 					"index": 0

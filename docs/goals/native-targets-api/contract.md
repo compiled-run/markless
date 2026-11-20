@@ -61,7 +61,8 @@ reference. Notes and the before and after probe: `element-vocabulary.md`.
 - **`defaultStyle`** on an element node: its look under Chrome's default stylesheet (`NativeDefaultStyle`): `flow`
   (`inline`: its text flows on in its parent's text; `break`: `<br>`), `bold`, `italic`, `monospace`, `size` (a multiple
   of the parent's), `line`, `shift`, `highlight`, `quotes`, `preformatted`, `indent` (CSS px), `margin` (above
-  and below, in ems of the element's own size; none on a list inside another), `rule`, `marker` (on
+  and below, in ems of the element's own size; none on a list inside another), `inline` (an inline-level box: `a`,
+  `button`, `input`, `img`, `label`, `select`, `audio`, `svg`), `rule`, `marker` (on
   `ul`/`ol`), `table` (`table`, `row`, `cell`). Hosts apply it only without a style export; with one, Dragon decides.
 - **Paragraphs:** among one parent's children in one place, each run of text nodes and flowing elements is one text
   view (`nativeParagraphs`, `nativeShownTexts` in `packages/mobile/src/paragraphs.ts`). Its text collapses whitespace as
@@ -589,7 +590,9 @@ Rungs 1 and 3 run without Dragon: hosts stack children vertically (start-aligned
 is a temporary layout so the state rungs do not wait on styling; rung 2 replaces it with Dragon frames. It keeps the web's
 defaults where they decide what a person sees: the body's 8 px margin, each block's `margin` collapsing as CSS margins do
 (siblings meet at the larger, and a box's first and last child's pass through it), CanvasText for text, an empty paragraph
-with no height, and an `<img>` without a picture showing its `alt` text, or nothing when that is empty.
+with no height, an `<img>` without a picture showing its `alt` text, or nothing when that is empty, and `inline` boxes
+sharing lines with each other and the paragraphs beside them: side by side on one baseline, a space between two only where
+the text there has whitespace, wrapping at the page's width less each enclosing box's indent.
 
 ### Styles through Dragon (rung 2), as far as known
 

@@ -145,7 +145,10 @@
 							"literal": "component-edge:2/h2"
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -258,6 +261,9 @@
 				"parent": "component-edge:2/h2",
 				"attributes": {
 					"type": "button"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{

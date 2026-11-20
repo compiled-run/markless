@@ -74,7 +74,10 @@
 				"kind": "element",
 				"id": "h3",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -136,13 +139,19 @@
 							"cell": "state:city"
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "element",
 				"id": "h6",
 				"element": "button",
-				"parent": "sheet:component-edge:0"
+				"parent": "sheet:component-edge:0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -178,7 +187,10 @@
 				"kind": "element",
 				"id": "h9",
 				"element": "button",
-				"parent": "h8"
+				"parent": "h8",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -200,7 +212,10 @@
 				"kind": "element",
 				"id": "h11",
 				"element": "button",
-				"parent": "h10"
+				"parent": "h10",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -222,7 +237,10 @@
 				"kind": "element",
 				"id": "h13",
 				"element": "button",
-				"parent": "h12"
+				"parent": "h12",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",

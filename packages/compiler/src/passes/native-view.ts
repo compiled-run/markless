@@ -4329,6 +4329,7 @@ export function createNativeViewPayload(
 					if (fixedHref === undefined)
 						bindings.push({ attribute: 'href', value: hrefValue });
 					else attributes['href'] = fixedHref;
+					const defaultStyle = defaultStyleOf('a', attributes, bindings);
 					nodes.push({
 						kind: 'element',
 						id,
@@ -4336,6 +4337,7 @@ export function createNativeViewPayload(
 						parent,
 						attributes,
 						...(bindings.length > 0 ? { bindings } : {}),
+						...(defaultStyle ? { defaultStyle } : {}),
 						...place,
 					});
 					if (projection) lowerChunk(projection, id, place, scope);

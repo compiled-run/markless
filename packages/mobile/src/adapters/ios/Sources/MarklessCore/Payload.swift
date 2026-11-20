@@ -180,6 +180,8 @@ public struct NativeDefaultStyle: Equatable, Sendable {
 	public var indent: Double?
 	/// Space above and below, in ems of the element's own font size; adjoining margins collapse.
 	public var margin: Double?
+	/// An inline-level box: it sits on its parent's line beside text and other such boxes, wrapping at the parent's width.
+	public var inline = false
 	public var rule = false
 	/// `disc` or `decimal`, on a list.
 	public var marker: String?
@@ -756,7 +758,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 	private static func decodeDefaultStyle(_ reader: Reader) throws -> NativeDefaultStyle {
 		let field = try reader.object(required: [], optional: [
 			"flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "margin",
-			"rule", "marker", "table",
+			"inline", "rule", "marker", "table",
 		])
 		func oneOf(_ key: String, _ allowed: [String]) throws -> String? {
 			guard field.has(key) else { return nil }
@@ -778,6 +780,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.preformatted = try flag("preformatted")
 		style.indent = field.has("indent") ? try field["indent"].number() : nil
 		style.margin = field.has("margin") ? try field["margin"].number() : nil
+		style.inline = try flag("inline")
 		style.rule = try flag("rule")
 		style.marker = try oneOf("marker", ["disc", "decimal"])
 		style.table = try oneOf("table", ["table", "row", "cell"])

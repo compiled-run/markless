@@ -120,7 +120,10 @@
 				"kind": "element",
 				"id": "component-edge:1/h1",
 				"element": "button",
-				"parent": "component-edge:1/h0"
+				"parent": "component-edge:1/h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -197,7 +200,10 @@
 				"kind": "element",
 				"id": "component-edge:1/h4",
 				"element": "button",
-				"parent": "component-edge:1/h0"
+				"parent": "component-edge:1/h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -213,7 +219,10 @@
 				"kind": "element",
 				"id": "component-edge:1/h5",
 				"element": "button",
-				"parent": "component-edge:1/h0"
+				"parent": "component-edge:1/h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -278,6 +287,9 @@
 						}
 					}
 				],
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "component-edge:1/branch-site:1",
 					"index": 0

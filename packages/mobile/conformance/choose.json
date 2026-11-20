@@ -44,6 +44,9 @@
 				"attributes": {
 					"name": "size",
 					"aria-label": "Size"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -122,6 +125,9 @@
 				"attributes": {
 					"name": "fruit",
 					"aria-label": "Fruit"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -188,6 +194,9 @@
 					"name": "off",
 					"aria-label": "Off",
 					"disabled": ""
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -214,6 +223,9 @@
 				"attributes": {
 					"name": "snack",
 					"aria-label": "Snack"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -249,7 +261,10 @@
 				"kind": "element",
 				"id": "h12",
 				"element": "button",
-				"parent": "h1"
+				"parent": "h1",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -265,7 +280,10 @@
 				"kind": "element",
 				"id": "h13",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -281,7 +299,10 @@
 				"kind": "element",
 				"id": "h14",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -297,7 +318,10 @@
 				"kind": "element",
 				"id": "h15",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -313,7 +337,10 @@
 				"kind": "element",
 				"id": "h16",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",

@@ -85,7 +85,10 @@
 							"cell": "state:liked"
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -115,7 +118,10 @@
 							}
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",

@@ -47,7 +47,10 @@
 				"kind": "element",
 				"id": "h4",
 				"element": "button",
-				"parent": "h3"
+				"parent": "h3",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -116,6 +119,9 @@
 						}
 					}
 				],
+				"defaultStyle": {
+					"inline": true
+				},
 				"row": "repeat:0"
 			},
 			{
@@ -177,6 +183,9 @@
 				"id": "h7",
 				"element": "button",
 				"parent": "h6",
+				"defaultStyle": {
+					"inline": true
+				},
 				"row": "repeat:0"
 			},
 			{

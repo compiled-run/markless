@@ -88,7 +88,10 @@
 				"kind": "element",
 				"id": "h6",
 				"element": "button",
-				"parent": "h3"
+				"parent": "h3",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -104,7 +107,10 @@
 				"kind": "element",
 				"id": "h7",
 				"element": "button",
-				"parent": "h3"
+				"parent": "h3",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",

@@ -138,6 +138,9 @@
 				"id": "h5",
 				"element": "button",
 				"parent": "h2",
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "boundary:0",
 					"index": 0
@@ -162,6 +165,9 @@
 				"id": "h6",
 				"element": "button",
 				"parent": "h2",
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "boundary:0",
 					"index": 0

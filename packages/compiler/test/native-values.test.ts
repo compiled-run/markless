@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { SemanticGraphArtifact } from '../src/index.ts';
-import { createNativeViewPayload, NATIVE_FACT_COLLECTORS, type NativeViewOptions } from '../src/native.ts';
+import {
+	createNativeViewPayload,
+	NATIVE_FACT_COLLECTORS,
+	type NativeViewOptions,
+} from '../src/native.ts';
 import { buildSemanticGraph } from '../src/passes/semantic-graph/index.ts';
 
 const analyze = (filename: string, source: string) =>
@@ -15,7 +19,8 @@ const nativeView = async (source: string, options: NativeViewOptions = {}) =>
 /** The build with other modules: `files` by name, resolved from `./name`. */
 const withModules = async (source: string, files: Record<string, string>) => {
 	const graphs = new Map<string, SemanticGraphArtifact>();
-	for (const [name, text] of Object.entries(files)) graphs.set(`src/${name}`, await analyze(`src/${name}`, text));
+	for (const [name, text] of Object.entries(files))
+		graphs.set(`src/${name}`, await analyze(`src/${name}`, text));
 	return createNativeViewPayload(await analyze('src/App.tsrx', source), {
 		modules: { graphs, resolve: (specifier) => `src/${specifier.replace('./', '')}` },
 	});
@@ -53,8 +58,24 @@ export function App() @{
 		expect(list).toMatchObject({
 			list: {
 				array: [
-					{ spread: false, value: { object: [['id', { literal: 'a' }], ['name', { literal: 'Basic' }]] } },
-					{ spread: false, value: { object: [['id', { literal: 'b' }], ['name', { literal: 'Pro' }]] } },
+					{
+						spread: false,
+						value: {
+							object: [
+								['id', { literal: 'a' }],
+								['name', { literal: 'Basic' }],
+							],
+						},
+					},
+					{
+						spread: false,
+						value: {
+							object: [
+								['id', { literal: 'b' }],
+								['name', { literal: 'Pro' }],
+							],
+						},
+					},
 				],
 			},
 		});
@@ -121,19 +142,26 @@ export function App() @{
 			['h1:text0', [{ expr: { literal: 2 } }]],
 			['h2:text0', [{ expr: { template: ['Now ', doubled, ''] } }]],
 		]);
-		expect(payload?.handlers[0]?.ops).toEqual([{ op: 'assign', cell: 'state:count', value: doubled }]);
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{ op: 'assign', cell: 'state:count', value: doubled },
+		]);
 	});
 
 	it('names a value it cannot read, with where it is written when values are data only', async () => {
-		const { diagnostics } = await nativeView(`import { state } from '@markless/core';
+		const { diagnostics } = await nativeView(
+			`import { state } from '@markless/core';
 const PATTERN = /x/;
 export function App() @{
 	let text = state('a');
 	<main><p>{PATTERN}</p></main>
-}`, { scriptHandlers: 'never' });
+}`,
+			{ scriptHandlers: 'never' },
+		);
 		expect(diagnostics).toHaveLength(1);
 		expect(diagnostics[0]).toMatchObject({
-			message: expect.stringContaining('a text expression through `PATTERN` uses a regular expression'),
+			message: expect.stringContaining(
+				'a text expression through `PATTERN` uses a regular expression',
+			),
 			primarySpan: { filename: 'src/App.tsrx' },
 		});
 	});
@@ -151,7 +179,12 @@ export function App() @{
 	</main>
 }`);
 		expect(diagnostics).toEqual([]);
-		expect(payload?.cells).toContainEqual({ id: 'clock:open', name: 'Date.now()', initial: 0, clock: true });
+		expect(payload?.cells).toContainEqual({
+			id: 'clock:open',
+			name: 'Date.now()',
+			initial: 0,
+			clock: true,
+		});
 		expect(texts(payload)[0]).toEqual([
 			'h1:text0',
 			[{ expr: { call: 'Date.toISOString', arguments: [{ cell: 'clock:open' }] } }],
@@ -160,7 +193,10 @@ export function App() @{
 			{
 				op: 'assign',
 				cell: 'state:pressedAt',
-				value: { call: 'Date.toISOString', arguments: [{ call: 'Date.now', arguments: [] }] },
+				value: {
+					call: 'Date.toISOString',
+					arguments: [{ call: 'Date.now', arguments: [] }],
+				},
 			},
 		]);
 	});
@@ -173,7 +209,9 @@ export function App() @{
 }`);
 		expect(diagnostics).toEqual([]);
 		expect(payload?.cells).toEqual([{ id: 'state:now', name: 'now', initial: 0, clock: true }]);
-		expect(payload?.handlers[0]?.ops).toEqual([{ op: 'assign', cell: 'state:now', value: { call: 'Date.now', arguments: [] } }]);
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{ op: 'assign', cell: 'state:now', value: { call: 'Date.now', arguments: [] } },
+		]);
 	});
 
 	it('refuses by name what formats a date in a time zone, and a date made from a value', async () => {
@@ -181,7 +219,9 @@ export function App() @{
 	<main><p>{new Date().toTimeString()}</p><p>{new Date(0).getTime()}</p><p>{new Date()}</p></main>
 }`);
 		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
-			expect.stringContaining('calls `.toTimeString()` on a date, which depends on a time zone'),
+			expect.stringContaining(
+				'calls `.toTimeString()` on a date, which depends on a time zone',
+			),
 			expect.stringContaining('makes a date from a value (`new Date(…)`)'),
 			expect.stringContaining('a date used as a value'),
 		]);
@@ -213,8 +253,10 @@ describe('links', () => {
 	const resolvePath = (path: string) => {
 		const segments = path.split('/').filter(Boolean);
 		if (segments.length === 0) return { pattern: '/', params: {} };
-		if (segments.length === 1 && segments[0] === 'about') return { pattern: '/about', params: {} };
-		if (segments.length === 2 && segments[0] === 'users') return { pattern: '/users/[id]', params: { id: segments[1]! } };
+		if (segments.length === 1 && segments[0] === 'about')
+			return { pattern: '/about', params: {} };
+		if (segments.length === 2 && segments[0] === 'users')
+			return { pattern: '/users/[id]', params: { id: segments[1]! } };
 		return undefined;
 	};
 
@@ -231,6 +273,11 @@ export function App() @{
 			[{ op: 'navigate', route: '/about', params: {} }],
 			[{ op: 'navigate', route: '/users/[id]', params: { id: '7' } }],
 		]);
+		expect(
+			payload?.nodes.flatMap((node) =>
+				node.kind === 'element' && node.element === 'a' ? [node.defaultStyle] : [],
+			),
+		).toEqual([{ inline: true }, { inline: true }]);
 	});
 
 	it('binds a link attribute that follows state, and opens the route an href built from a prop or a value names', async () => {
@@ -252,20 +299,42 @@ export function App() @{
 			{ routes, resolvePath },
 		);
 		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([]);
-		const anchors = payload?.nodes.filter((node) => node.kind === 'element' && node.element === 'a');
+		const anchors = payload?.nodes.filter(
+			(node) => node.kind === 'element' && node.element === 'a',
+		);
 		const current = { cell: 'state:on' };
 		expect(anchors?.[0]).toMatchObject({
 			attributes: { href: '/about', 'data-tab': 'x' },
 			bindings: [
-				{ attribute: 'class', value: { if: current, whenTrue: { literal: 'tab on' }, whenFalse: { literal: 'tab' } } },
-				{ attribute: 'aria-current', value: { if: current, whenTrue: { literal: 'page' }, whenFalse: { literal: null } } },
+				{
+					attribute: 'class',
+					value: {
+						if: current,
+						whenTrue: { literal: 'tab on' },
+						whenFalse: { literal: 'tab' },
+					},
+				},
+				{
+					attribute: 'aria-current',
+					value: {
+						if: current,
+						whenTrue: { literal: 'page' },
+						whenFalse: { literal: null },
+					},
+				},
 			],
 		});
 		const userPath = { template: ['/users/', { cell: 'state:user' }, ''] };
 		expect(anchors?.[1]).toMatchObject({ bindings: [{ attribute: 'href', value: userPath }] });
 		expect(payload?.handlers.map((handler) => handler.ops)).toEqual([
 			[{ op: 'navigate', route: '/about', params: {} }],
-			[{ op: 'navigate', route: '/users/[id]', params: { id: { template: [{ cell: 'state:user' }] } } }],
+			[
+				{
+					op: 'navigate',
+					route: '/users/[id]',
+					params: { id: { template: [{ cell: 'state:user' }] } },
+				},
+			],
 			expect.anything(),
 		]);
 	});
@@ -293,8 +362,11 @@ export function App() @{
 }`,
 			{ routes, resolvePath },
 		);
-		expect(diagnostics.map((diagnostic) => [diagnostic.message, diagnostic.primarySpan !== undefined])).toContainEqual(
-			['a link to /nowhere/, which is not a route of this app', true],
-		);
+		expect(
+			diagnostics.map((diagnostic) => [
+				diagnostic.message,
+				diagnostic.primarySpan !== undefined,
+			]),
+		).toContainEqual(['a link to /nowhere/, which is not a route of this app', true]);
 	});
 });

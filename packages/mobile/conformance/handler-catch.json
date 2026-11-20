@@ -118,6 +118,9 @@
 				"id": "component-edge:1/h3",
 				"element": "button",
 				"parent": "component-edge:1/h2",
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "component-edge:1/boundary:0",
 					"index": 0

@@ -147,6 +147,9 @@
 				"id": "component-edge:0/h4",
 				"element": "button",
 				"parent": "component-edge:0/h2",
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "component-edge:0/branch-site:0",
 					"index": 0

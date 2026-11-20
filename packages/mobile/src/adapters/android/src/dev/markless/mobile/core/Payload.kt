@@ -137,6 +137,8 @@ data class DefaultStyle(
 	val indent: Double = 0.0,
 	/** Space above and below, in ems of the element's own font size; adjoining margins collapse. */
 	val margin: Double = 0.0,
+	/** An inline-level box: it sits on its parent's line beside text and other such boxes, wrapping at the parent's width. */
+	val inline: Boolean = false,
 	val rule: Boolean = false,
 	/** "disc" or "decimal", on a list. */
 	val marker: String? = null,
@@ -566,7 +568,7 @@ data class Payload(
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
 			val o = v.obj(what)
-			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "margin", "rule", "marker", "table"), what)
+			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "margin", "inline", "rule", "marker", "table"), what)
 			fun flag(name: String): Boolean = o[name]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.$name must be true when present"); true } ?: false
 			fun word(name: String, allowed: Set<String>): String? = o[name]?.let { oneOf(o, name, allowed, what) }
 			return DefaultStyle(
@@ -578,6 +580,7 @@ data class Payload(
 				highlight = flag("highlight"), quotes = flag("quotes"), preformatted = flag("preformatted"),
 				indent = o["indent"]?.num("$what.indent") ?: 0.0,
 				margin = o["margin"]?.num("$what.margin") ?: 0.0,
+				inline = flag("inline"),
 				rule = flag("rule"),
 				marker = word("marker", setOf("disc", "decimal")),
 				table = word("table", setOf("table", "row", "cell")),

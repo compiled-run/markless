@@ -218,6 +218,14 @@ final class ViewTree {
 	private var indents: [ObjectIdentifier: CGFloat] = [:]
 	/// Blocks' default margins above and below, in points, before they collapse.
 	private var margins: [ObjectIdentifier: CGFloat] = [:]
+	/// Inline-level boxes (`<a>`, `<button>`, `<input>`, `<img>`) of the stacking layout: they share lines with text.
+	private var inlineViews = Set<ObjectIdentifier>()
+	/// Whether a paragraph's text starts or ends with whitespace, by its label: a space beside an inline box on its line.
+	private var textEdges: [ObjectIdentifier: (before: Bool, after: Bool)] = [:]
+	/// The containers whose children share lines, with the width their lines were broken at and the guides of those lines.
+	private var lineBoxes: [ObjectIdentifier: (container: UIView, guides: [UILayoutGuide], items: [UIView], widths: [CGFloat])] = [:]
+	/// The width the page's content gets (the safe area less the body's margins), from the last layout; 0 before the first.
+	private var pageWidth: CGFloat = 0
 	/// Lists and the marker kind their items show; each item's marker label.
 	private var listMarkers: [ObjectIdentifier: String] = [:]
 	private var itemMarkers: [ObjectIdentifier: UILabel] = [:]
@@ -629,6 +637,11 @@ final class ViewTree {
 	}
 
 	/// The text an element shows, in view order: what `aria-labelledby` and `aria-describedby` read from it.
+	/// Whether a template has text inside it, at any depth, whatever that text reads now; its labels are filled after it is built.
+	private func holdsText(_ template: String) -> Bool {
+		(slots[template] ?? []).contains { nodes[$0]?.isText == true || holdsText($0) }
+	}
+
 	private func text(within view: UIView) -> String {
 		if let label = view as? UILabel { return label.text ?? "" }
 		return view.subviews.map { text(within: $0) }.filter { !$0.isEmpty }.joined(separator: " ")
@@ -930,9 +943,15 @@ final class ViewTree {
 				_ = try build(template, in: scrollViews[id] ?? view, at: &childIndex, inner)
 				applyAttributes(id, view)
 				// The stacking layout sizes a control by its text; one with none (a switch's thumb) gets the 44 pt touch target.
-				if layout == nil, view is UIButton, text(within: view).isEmpty {
+				if layout == nil, view is UIButton, !holdsText(template) {
 					view.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
 					view.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+				} else if layout == nil, view is UIButton {
+					// Its text sizes it, as an unstyled control on the web: the button's own empty-title size must not stretch the label.
+					for axis in [NSLayoutConstraint.Axis.horizontal, .vertical] {
+						view.setContentCompressionResistancePriority(.init(200), for: axis)
+						view.setContentHuggingPriority(.init(200), for: axis)
+					}
 				}
 			case let .text(parts):
 				let label = UILabel()
@@ -1034,11 +1053,16 @@ final class ViewTree {
 		}
 		labels.removeValue(forKey: id)?.removeFromSuperview()
 		scrollViews.removeValue(forKey: id)
-		paragraphs.removeValue(forKey: id)?.view.removeFromSuperview()
+		if let paragraph = paragraphs.removeValue(forKey: id) {
+			textEdges.removeValue(forKey: ObjectIdentifier(paragraph.label))
+			paragraph.view.removeFromSuperview()
+		}
 		paragraphTexts.removeValue(forKey: id)
 		flowing.remove(id)
 		if let view = elements.removeValue(forKey: id) {
 			stackConstraints.removeValue(forKey: ObjectIdentifier(view))
+			lineBoxes.removeValue(forKey: ObjectIdentifier(view))
+			inlineViews.remove(ObjectIdentifier(view))
 			view.removeFromSuperview()
 		}
 		contexts.removeValue(forKey: id)
@@ -1140,8 +1164,9 @@ final class ViewTree {
 
 	private func stackTree(_ view: UIView) {
 		guard !(view is UILabel || view is UITextField || view is AudioButton), !leaves.contains(ObjectIdentifier(view)) else { return }
-		stack(view)
+		// Children first: a line box measures its items, which needs their own layout in place.
 		for child in view.subviews where !anchors.contains(ObjectIdentifier(child)) { stackTree(child) }
+		stack(view)
 	}
 
 	/// The temporary layout for rungs without Dragon: children top to bottom, start-aligned, their margins collapsing as on the web.
@@ -1161,7 +1186,27 @@ final class ViewTree {
 		// The margin waiting above the next child; while `leading`, the first children's margins leave through the container.
 		var pending = body
 		var leading = collapses
-		for child in stacked(container) {
+		let kids = stacked(container)
+		if let old = lineBoxes.removeValue(forKey: ObjectIdentifier(container)) {
+			for guide in old.guides { container.removeLayoutGuide(guide) }
+		}
+		var index = 0
+		while index < kids.count {
+			let end = runEnd(kids, from: index)
+			if end > index + 1 || inlineViews.contains(ObjectIdentifier(kids[index])) {
+				// A line box has no margins of its own: the margin waiting above it is the whole gap.
+				let lines = lineUp(Array(kids[index..<end]), in: container, below: above, gap: leading ? 0 : pending, indent: indent)
+				constraints += lines.constraints
+				if !lines.empty {
+					above = lines.bottom
+					leading = false
+					pending = 0
+				}
+				index = end
+				continue
+			}
+			let child = kids[index]
+			index += 1
 			child.translatesAutoresizingMaskIntoConstraints = false
 			let wide = fullWidth.contains(ObjectIdentifier(child))
 			var gap: CGFloat = 0
@@ -1198,6 +1243,144 @@ final class ViewTree {
 				marker.text = kind == "decimal" ? "\(number)." : "\u{2022}"
 			}
 		}
+	}
+
+	/// Where the run of line-sharing children that starts at `start` ends: inline-level boxes and the paragraphs beside them.
+	private func runEnd(_ kids: [UIView], from start: Int) -> Int {
+		var end = start
+		while end < kids.count, sharesLines(kids[end]) { end += 1 }
+		return kids[start..<end].contains { inlineViews.contains(ObjectIdentifier($0)) } ? end : start + 1
+	}
+
+	private func sharesLines(_ view: UIView) -> Bool {
+		let id = ObjectIdentifier(view)
+		return (inlineViews.contains(id) || view is UILabel) && !fullWidth.contains(id)
+	}
+
+	/// The label whose first baseline is `view`'s: itself, or the first text it shows; nil for a box with no text (an image).
+	private func baselineLabel(_ view: UIView) -> UIView? {
+		if let label = view as? UILabel { return (label.attributedText?.length ?? 0) > 0 ? label : nil }
+		if view is UITextField { return view }
+		for child in stacked(view) {
+			if let found = baselineLabel(child) { return found }
+		}
+		return nil
+	}
+
+	/**
+	 * Places `items` in lines as the web's inline formatting context places inline boxes: side by side, a space between two
+	 * only where the text there has whitespace, a new line when the next one does not fit the container's width, and each
+	 * line's items on one baseline. The lines are broken at the container's current width; `relineIfResized` breaks them again.
+	 */
+	private func lineUp(
+		_ items: [UIView], in container: UIView, below above: NSLayoutYAxisAnchor, gap: CGFloat, indent: CGFloat
+	) -> (constraints: [NSLayoutConstraint], bottom: NSLayoutYAxisAnchor, empty: Bool) {
+		// A block is as wide as its containing block on the web: the page less each enclosing box's start inset.
+		var width = pageWidth
+		var at: UIView? = container
+		while let box = at, box !== root {
+			width -= indents[ObjectIdentifier(box)] ?? 0
+			at = box.superview
+		}
+		let room = pageWidth > 0 ? max(width, 1) : .greatestFiniteMagnitude
+		var lines: [[(view: UIView, gap: CGFloat, width: CGFloat)]] = [[]]
+		var measured: [(UIView, CGFloat)] = []
+		var x: CGFloat = 0
+		var spaced = false
+		for item in items {
+			item.translatesAutoresizingMaskIntoConstraints = false
+			let edges = textEdges[ObjectIdentifier(item)] ?? (false, false)
+			if let label = item as? UILabel, (label.attributedText?.length ?? 0) == 0 {
+				// Whitespace alone between two boxes is a space; an empty paragraph is nothing.
+				if edges.before { spaced = true }
+				continue
+			}
+			let font = (baselineLabel(item) as? UILabel)?.font ?? UIFont.systemFont(ofSize: TextLook.baseSize)
+			let space = x > 0 && (spaced || edges.before) ? (" " as NSString).size(withAttributes: [.font: font]).width : 0
+			let size = min(fittingWidth(item), room)
+			measured.append((item, fittingWidth(item)))
+			if x > 0, x + space + size > room {
+				lines.append([])
+				x = 0
+			}
+			lines[lines.count - 1].append((item, x > 0 ? space : 0, size))
+			x += (x > 0 ? space : 0) + size
+			spaced = edges.after
+		}
+		var constraints: [NSLayoutConstraint] = []
+		var guides: [UILayoutGuide] = []
+		var top = above
+		for line in lines where !line.isEmpty {
+			let guide = UILayoutGuide()
+			container.addLayoutGuide(guide)
+			guides.append(guide)
+			let hug = guide.heightAnchor.constraint(equalToConstant: 0)
+			hug.priority = .defaultLow
+			constraints += [
+				guide.topAnchor.constraint(equalTo: top, constant: guides.count == 1 ? gap : 0),
+				guide.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+				guide.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+				hug,
+			]
+			var leadingEdge = container.leadingAnchor
+			var spacing = indent
+			let anchorLabel = line.lazy.compactMap { self.baselineLabel($0.view) }.first
+			for (index, entry) in line.enumerated() {
+				let item = entry.view
+				let pinTop = item.topAnchor.constraint(equalTo: guide.topAnchor)
+				pinTop.priority = .defaultLow
+				// The width it was measured at holds, down to the text a button or link holds: nothing in a line wraps early.
+				var held: UIView? = item
+				while let box = held {
+					let keep = box.widthAnchor.constraint(greaterThanOrEqualToConstant: entry.width)
+					keep.priority = .init(999)
+					constraints.append(keep)
+					let inside = box is UILabel ? [] : stacked(box)
+					held = inside.count == 1 ? inside[0] : nil
+				}
+				constraints += [
+					item.leadingAnchor.constraint(equalTo: leadingEdge, constant: index == 0 ? spacing : entry.gap),
+					item.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
+					item.topAnchor.constraint(greaterThanOrEqualTo: guide.topAnchor),
+					guide.bottomAnchor.constraint(greaterThanOrEqualTo: item.bottomAnchor),
+					pinTop,
+				]
+				if let anchorLabel {
+					// One baseline per line; a box with no text sits on it with its bottom edge, as an image does.
+					let own = baselineLabel(item)
+					constraints.append(
+						own.map { $0.firstBaselineAnchor.constraint(equalTo: anchorLabel.firstBaselineAnchor) }
+							?? item.bottomAnchor.constraint(equalTo: anchorLabel.firstBaselineAnchor))
+				}
+				leadingEdge = item.trailingAnchor
+				spacing = 0
+			}
+			top = guide.bottomAnchor
+		}
+		lineBoxes[ObjectIdentifier(container)] = (container, guides, measured.map(\.0), measured.map(\.1))
+		return (constraints, top, guides.isEmpty)
+	}
+
+	/// After a layout pass with the page `width` wide (its safe area): breaks every line box again when that width changed.
+	func relineIfResized(_ width: CGFloat) -> Bool {
+		let content = width - 2 * ViewTree.bodyMargin
+		let resized = abs(content - pageWidth) > 0.5
+		pageWidth = content
+		// A box whose items measure differently now (a title set, an image loaded) breaks its lines again too.
+		let moved = lineBoxes.values.filter { box in
+			resized || zip(box.items, box.widths).contains { abs(fittingWidth($0.0) - $0.1) > 0.5 }
+		}
+		for box in moved { restack(box.container) }
+		return !moved.isEmpty
+	}
+
+	/// How wide `view` is on one line, as the web sizes an inline box to its content: text unwrapped, anything else at its fit.
+	private func fittingWidth(_ view: UIView) -> CGFloat {
+		if let label = view as? UILabel { return ceil(label.attributedText?.size().width ?? 0) }
+		// An unstyled button or link is its text and nothing around it.
+		let inside = stacked(view)
+		if inside.count == 1, !(view is UITextField) { return fittingWidth(inside[0]) }
+		return ceil(view.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).width)
 	}
 
 	/// Stacks `container` again, and each stacked container above it that its first or last child's margins reach.
@@ -1306,6 +1489,7 @@ final class ViewTree {
 		let id = ObjectIdentifier(view)
 		if let indent = style.indent { indents[id] = CGFloat(indent) }
 		if let margin = style.margin { margins[id] = CGFloat(margin) * TextLook.baseSize * scale }
+		if style.inline { inlineViews.insert(id) }
 		if style.rule {
 			// Chrome's hr: a 1 px inset line with 0.5em above and below.
 			leaves.insert(id)
@@ -1455,6 +1639,7 @@ final class ViewTree {
 		let preformatted = paragraph.look.preformatted
 		var pending: TextLook?
 		var atLineStart = true
+		var leadingSpace = false
 		for piece in pieces {
 			switch piece {
 			case .lineBreak:
@@ -1471,6 +1656,7 @@ final class ViewTree {
 						if pending == nil { pending = look }
 						continue
 					}
+					if pending != nil, out.length == 0, run.isEmpty { leadingSpace = true }
 					if let space = pending, !atLineStart { emit(" ", space) }
 					pending = nil
 					atLineStart = false
@@ -1481,7 +1667,11 @@ final class ViewTree {
 		flush()
 		let wasEmpty = (paragraph.label.attributedText?.length ?? 0) == 0
 		paragraph.label.attributedText = out
-		if layout == nil, wasEmpty != (out.length == 0), let container = paragraph.label.superview, stackConstraints[ObjectIdentifier(container)] != nil {
+		// Whitespace at either end is the space the web shows there when an inline box sits beside the text.
+		let edges = (before: leadingSpace || (out.length == 0 && pending != nil), after: pending != nil)
+		let oldEdges = textEdges.updateValue(edges, forKey: ObjectIdentifier(paragraph.label))
+		let edgesMoved = oldEdges.map { $0.before != edges.before || $0.after != edges.after } ?? false
+		if layout == nil, wasEmpty != (out.length == 0) || edgesMoved, let container = paragraph.label.superview, stackConstraints[ObjectIdentifier(container)] != nil {
 			restack(container)
 		}
 		// UIKit's own label for a UILabel reads its line breaks as spaces; the text a person reads keeps them.

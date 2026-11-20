@@ -89,13 +89,15 @@ class TextFlow(payload: Payload) {
 	 * The paragraph that starts at [lead], for the row instance [suffix] (`@key` or ""): its texts from [text], whitespace
 	 * collapsed as CSS `white-space: normal` unless [preformatted], each flowing element's look as spans.
 	 */
-	fun render(lead: String, suffix: String, preformatted: Boolean, text: (String) -> String?): CharSequence {
+	fun render(lead: String, suffix: String, preformatted: Boolean, edges: ((before: Boolean, after: Boolean) -> Unit)? = null, text: (String) -> String?): CharSequence {
 		val out = SpannableStringBuilder()
 		var pending = false
 		var spaceAt = -1
+		var before = false
 		fun chars(s: String) {
 			for (c in s) {
 				if (!preformatted && (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\u000c')) { pending = true; continue }
+				if (pending && out.isEmpty()) before = true
 				if (pending && out.isNotEmpty() && out[out.length - 1] != '\n') { spaceAt = out.length; out.append(' ') }
 				pending = false
 				out.append(c)
@@ -118,6 +120,8 @@ class TextFlow(payload: Payload) {
 			}
 		}
 		for (id in paragraphs.getValue(lead)) emit(byId.getValue(id))
+		// Whitespace at either end collapses into the space the web shows there when an inline box sits beside the text.
+		edges?.invoke(before || (pending && out.isEmpty()), pending)
 		return out
 	}
 
@@ -133,6 +137,10 @@ class TextFlow(payload: Payload) {
 
 /** A paragraph's text view: with no text it takes no space, as an empty paragraph has no height on the web, unless a style export sizes it. */
 class FlowText(context: Context) : android.widget.TextView(context) {
+	/** Whether the paragraph's text starts or ends with whitespace, which is a space beside an inline box on its line. */
+	var spaceBefore = false
+	var spaceAfter = false
+
 	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
 		if (text.isEmpty() && MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.EXACTLY) setMeasuredDimension(0, 0)
 		else super.onMeasure(widthMeasureSpec, heightMeasureSpec)

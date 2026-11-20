@@ -48,7 +48,10 @@
 							"cell": "component-edge:0/shared:src/typed-target.tsrx#fieldState/state:field.value"
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "element",

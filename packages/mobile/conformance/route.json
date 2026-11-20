@@ -53,6 +53,9 @@
 				"parent": "h0",
 				"attributes": {
 					"href": "/[fruit]"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -72,6 +75,9 @@
 				"parent": "h0",
 				"attributes": {
 					"href": "/[fruit]"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{

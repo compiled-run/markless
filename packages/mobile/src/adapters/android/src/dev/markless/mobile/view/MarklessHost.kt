@@ -417,7 +417,13 @@ class MarklessHost(
 		val at = lead.indexOf('@')
 		val base = if (at < 0) lead else lead.substring(0, at)
 		val node = f.node(base)!!
-		view.text = f.render(base, if (at < 0) "" else lead.substring(at), f.blockText(node.parent).preformatted) { heldTexts[it] }
+		view.text = f.render(base, if (at < 0) "" else lead.substring(at), f.blockText(node.parent).preformatted, { before, after ->
+			if (view is FlowText && (view.spaceBefore != before || view.spaceAfter != after)) {
+				view.spaceBefore = before
+				view.spaceAfter = after
+				view.requestLayout()
+			}
+		}) { heldTexts[it] }
 	}
 
 	/** Whether the sheet's dialog is on screen. */
@@ -801,6 +807,7 @@ class MarklessHost(
 				}
 			}
 		}
+		if (unstyled?.inline == true) inlineLevel.add(view)
 		layoutOf(inst.node)?.let { l -> l.export.assignments[l.assignment].byId[inst.id] }?.let { styled -> scrollContainer(inst.id, view, styled) }
 		views[inst.id] = view
 		if (!unseen && type !in TICKABLE) for (b in node.bindings) if (b.property && b.name == "value") (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setAppText(runtime.property(b, inst.scope))

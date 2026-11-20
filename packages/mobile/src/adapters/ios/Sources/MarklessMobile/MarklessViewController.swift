@@ -265,6 +265,8 @@ public final class MarklessViewController: UIViewController {
 
 	public override func viewDidLayoutSubviews() {
 		super.viewDidLayoutSubviews()
+		// Lines of an unstyled page break at the width they get; a new width breaks them again before the frame shows.
+		if tree?.relineIfResized(view.safeAreaLayoutGuide.layoutFrame.width) == true { view.layoutIfNeeded() }
 		if view.window != nil { FirstFrame.laidOut() }
 		raiseVisible()
 	}

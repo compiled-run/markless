@@ -41,6 +41,9 @@
 				"attributes": {
 					"aria-label": "Note",
 					"name": "note"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -58,7 +61,10 @@
 							}
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -74,7 +80,10 @@
 				"kind": "element",
 				"id": "h4",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",

@@ -126,7 +126,10 @@
 				"kind": "element",
 				"id": "component-edge:0/h4",
 				"element": "button",
-				"parent": "component-edge:0/h0"
+				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -142,7 +145,10 @@
 				"kind": "element",
 				"id": "component-edge:0/h5",
 				"element": "button",
-				"parent": "component-edge:0/h0"
+				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -185,7 +191,10 @@
 				"kind": "element",
 				"id": "h8",
 				"element": "button",
-				"parent": "h6"
+				"parent": "h6",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",

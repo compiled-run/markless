@@ -53,6 +53,9 @@
 					"name": "first",
 					"value": "Ada",
 					"required": ""
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -71,7 +74,10 @@
 							"cell": "state:draft"
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "element",
@@ -80,6 +86,9 @@
 				"parent": "h1",
 				"attributes": {
 					"aria-label": "Unnamed"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -93,6 +102,9 @@
 					"value": "X",
 					"required": "",
 					"disabled": ""
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -104,6 +116,9 @@
 					"type": "hidden",
 					"name": "kind",
 					"value": "person"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -133,7 +148,10 @@
 							"cell": "state:agreed"
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "element",
@@ -145,13 +163,19 @@
 					"aria-hidden": "true",
 					"name": "off",
 					"value": "yes"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
 				"kind": "element",
 				"id": "h9",
 				"element": "button",
-				"parent": "h1"
+				"parent": "h1",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -171,6 +195,9 @@
 				"attributes": {
 					"type": "submit",
 					"formnovalidate": ""
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -190,6 +217,9 @@
 				"parent": "h1",
 				"attributes": {
 					"type": "button"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -254,6 +284,9 @@
 				"attributes": {
 					"aria-label": "Search",
 					"name": "q"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -270,6 +303,9 @@
 				"attributes": {
 					"aria-label": "A",
 					"name": "a"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -280,6 +316,9 @@
 				"attributes": {
 					"aria-label": "B",
 					"name": "b"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
@@ -296,13 +335,19 @@
 				"attributes": {
 					"aria-label": "Who",
 					"name": "who"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{
 				"kind": "element",
 				"id": "h21",
 				"element": "button",
-				"parent": "h19"
+				"parent": "h19",
+				"defaultStyle": {
+					"inline": true
+				}
 			},
 			{
 				"kind": "text",
@@ -346,6 +391,9 @@
 				"parent": "h23",
 				"attributes": {
 					"aria-disabled": "false"
+				},
+				"defaultStyle": {
+					"inline": true
 				}
 			},
 			{

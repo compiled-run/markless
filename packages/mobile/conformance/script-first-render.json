@@ -52,7 +52,10 @@
 							"kind": "element",
 							"id": "h3",
 							"element": "button",
-							"parent": "h0"
+							"parent": "h0",
+							"defaultStyle": {
+								"inline": true
+							}
 						},
 						{
 							"kind": "text",
@@ -74,6 +77,9 @@
 							"parent": "h0",
 							"attributes": {
 								"href": "/words"
+							},
+							"defaultStyle": {
+								"inline": true
 							}
 						},
 						{
