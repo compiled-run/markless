@@ -249,7 +249,7 @@ networks, `'fast'` ones, or `'none'`:
   room for it.
 - `budget` (default 2 MiB, `FRAGMENT_GUESS_BUDGET_BYTES`): wire bytes viewport
   and idle fetches may spend per page shown, counted from each response's
-  declared length, else from Resource Timing. Once spent, they stop until the
+  declared length, else from Resource Timing or the bytes read. Once spent, they stop until the
   next page is shown; intent still fetches. A migrated site sets it from what
   its original spent before a click.
 - Guessing reads only two things from navigation: a navigation started, and a
@@ -282,8 +282,9 @@ intent wants it) for 30 s, and up to 8 Mi characters of text in all, the
 oldest to arrive dropped first (`FRAGMENT_HELD_CHARS`).
 
 Guessing (the viewport and idle triggers) has one state per tab: paused while
-a navigation is on its way, then armed, scheduled and watching for the page
-shown. A swap, or a navigation cancelled by a click on the page shown or by
+a navigation is on its way, then for each page shown: shown, armed at the
+main thread's first idle moment after it (nothing is guessed, and no guess
+code runs, in the page's load), and watching once the idle scan ran. A swap, or a navigation cancelled by a click on the page shown or by
 Back or Forward to it, arms it again for the page that is shown.
 
 ### Kept parts

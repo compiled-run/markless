@@ -228,6 +228,11 @@ async function open(setup: Setup) {
 		mostOpen: () => mostOpen,
 		// Runs the idle callbacks the page queued; the idle tier's fetches start inside them.
 		idle: () => page.evaluate(() => (window as unknown as { __idle: () => number }).__idle()),
+		// The page's first idle moment: guessing arms in the idle callback queued once the page is measured.
+		armed: () =>
+			expect
+				.poll(() => page.evaluate(() => (window as unknown as { __idle: () => number }).__idle()))
+				.toBeGreaterThan(0),
 		// Resolves the page's own-download measurement: whether its link is fast.
 		measured: (fast: boolean) =>
 			page.evaluate(
@@ -295,7 +300,7 @@ describe('idle tier', () => {
 		const slow = await open({});
 		await slow.measured(false);
 		await afterFrames(slow.page);
-		expect(await slow.idle()).toBe(0);
+		await slow.armed();
 		expect(await slow.fetches()).toEqual([]);
 		await slow.page.close();
 		const all = await open({ prefetch: { idle: 'all' } });
@@ -333,6 +338,7 @@ describe('viewport tier', () => {
 		await off.page.close();
 		const s = await open({ prefetch: { viewport: 'all', idle: 'none' } });
 		await s.measured(false);
+		await s.armed();
 		await expect.poll(async () => sorted(await s.paths())).toEqual(inView);
 		await s.page.mouse.wheel(0, 800);
 		await expect.poll(s.paths).toContain('/p/33');
@@ -344,6 +350,7 @@ describe('viewport tier', () => {
 	test("'fast' fetches nothing on a link measured slow", async () => {
 		const s = await open({ prefetch: { viewport: 'fast', idle: 'none' } });
 		await s.measured(false);
+		await s.armed();
 		await s.viewportSettled();
 		expect(await s.fetches()).toEqual([]);
 		await s.page.close();
@@ -358,6 +365,7 @@ describe('viewport tier', () => {
 		await s.page.mouse.move(500, 12 * 40 + 60);
 		await s.page.mouse.move(501, 12 * 40 + 60);
 		await s.measured(true);
+		await s.armed();
 		await expect.poll(async () => (await s.fetches()).length, { timeout: 10_000 }).toBe(IN_VIEW);
 		expect(s.mostOpen()).toBe(3);
 		expect((await s.paths()).slice(0, 3).toSorted()).toEqual(['/p/11', '/p/12', '/p/13']);
@@ -370,6 +378,7 @@ describe('viewport tier', () => {
 			attributes: { 3: `${PREFETCH_ATTRIBUTE}="intent"`, 4: `${PREFETCH_ATTRIBUTE}="none"` },
 		});
 		await s.measured(true);
+		await s.armed();
 		await expect.poll(async () => (await s.fetches()).length).toBe(IN_VIEW - 2);
 		await expect.poll(s.allArrived).toBe(true);
 		await afterFrames(s.page);
@@ -384,6 +393,7 @@ describe('viewport tier', () => {
 			},
 		});
 		await opted.measured(true);
+		await opted.armed();
 		await expect.poll(opted.paths).toEqual(['/p/5']);
 		await opted.page.close();
 	});
@@ -391,6 +401,7 @@ describe('viewport tier', () => {
 	test('links the page adds after an interaction join the tier', async () => {
 		const s = await open({ prefetch: { viewport: 'all', idle: 'none' } });
 		await s.measured(true);
+		await s.armed();
 		await expect.poll(async () => (await s.fetches()).length).toBe(IN_VIEW);
 		await s.page.evaluate((attribute) => {
 			const button = document.createElement('button');
@@ -417,6 +428,7 @@ describe('intent', () => {
 	test('a mouse resting on a link fetches it on a slow link by default', async () => {
 		const s = await open({ connection: { effectiveType: '3g' } });
 		await s.measured(false);
+		await s.armed();
 		await s.page.hover('a[href="/p/2"]');
 		await expect
 			.poll(s.fetches)
@@ -427,12 +439,14 @@ describe('intent', () => {
 	test("'fast' intent waits for a fast link; 'none' never fetches on hover or focus", async () => {
 		const fastOnly = await open({ prefetch: { intent: 'fast', idle: 'none' } });
 		await fastOnly.measured(false);
+		await fastOnly.armed();
 		await fastOnly.page.hover('a[href="/p/2"]');
 		await fastOnly.afterDwell();
 		expect(await fastOnly.fetches()).toEqual([]);
 		await fastOnly.page.close();
 		const none = await open({ prefetch: { intent: 'none', idle: 'none' } });
 		await none.measured(true);
+		await none.armed();
 		await none.page.hover('a[href="/p/2"]');
 		await none.page.focus('a[href="/p/3"]');
 		await none.afterDwell();
@@ -446,6 +460,7 @@ describe('intent', () => {
 			holdMs: Infinity,
 		});
 		await s.measured(true);
+		await s.armed();
 		await expect.poll(async () => (await s.fetches()).length).toBe(1);
 		const [guess] = await s.paths();
 		await s.page.hover('a[href="/p/7"]');
@@ -464,6 +479,7 @@ describe('never early', () => {
 			connection: { effectiveType: '4g', saveData: true },
 		});
 		await s.measured(true);
+		await s.armed();
 		await s.viewportSettled();
 		await s.idle();
 		await s.page.hover('a[href="/p/2"]');
@@ -483,6 +499,7 @@ describe('never early', () => {
 	test('a hidden tab fetches nothing until it is shown', async () => {
 		const s = await open({ prefetch: { viewport: 'all', idle: 'none' }, hidden: true });
 		await s.measured(true);
+		await s.armed();
 		await s.viewportSettled();
 		expect(await s.fetches()).toEqual([]);
 		await s.page.evaluate(() => {
@@ -502,6 +519,7 @@ describe('a click', () => {
 			navigation: 'hang',
 		});
 		await s.measured(true);
+		await s.armed();
 		await expect.poll(async () => (await s.fetches()).length).toBe(4);
 		const [kept, ...others] = await s.paths();
 		await s.page.click(`a[href="${kept}"]`);
@@ -522,11 +540,13 @@ describe('a click', () => {
 			),
 		});
 		await s.measured(true);
+		await s.armed();
 		await expect.poll(async () => (await s.fetches()).length).toBe(4);
 		const [kept, ...others] = await s.paths();
 		await s.page.click(`a[href="${kept}"]`);
 		await expect.poll(() => s.aborted.length).toBe(3);
 		await s.page.click('a[href="/"]');
+		await s.armed();
 		await expect.poll(async () => (await s.paths()).slice(4).toSorted()).toEqual(others.toSorted());
 		await s.page.close();
 	});
@@ -541,6 +561,7 @@ describe('guess budget', () => {
 			answer: () => ({ body, headers: { 'content-length': String(size) } }),
 		});
 		await s.measured(true);
+		await s.armed();
 		await expect.poll(async () => (await s.fetches()).length).toBe(3);
 		await expect.poll(s.allArrived).toBe(true);
 		await s.idle();
@@ -551,6 +572,7 @@ describe('guess budget', () => {
 		await s.page.hover(`a[href="${hovered}"]`);
 		await expect.poll(s.paths).toContain(hovered);
 		await s.page.click(`a[href="${hovered}"]`);
+		await s.armed();
 		await expect.poll(async () => (await s.fetches()).length).toBe(7);
 		await expect.poll(s.allArrived).toBe(true);
 		await s.idle();
@@ -572,6 +594,7 @@ describe('memory', () => {
 			}),
 		});
 		await s.measured(true);
+		await s.armed();
 		await expect.poll(async () => (await s.fetches()).length).toBe(IN_VIEW);
 		await expect.poll(s.allArrived).toBe(true);
 		expect(await s.held()).toEqual((await s.paths()).slice(-3));
@@ -596,6 +619,20 @@ describe('memory', () => {
 });
 
 describe('guessing state', () => {
+	test("nothing is guessed, and no guess code runs, before the page's first idle moment", async () => {
+		const s = await open({ prefetch: { viewport: 'all', idle: 'all' } });
+		await s.measured(true);
+		await afterFrames(s.page);
+		expect(await s.page.evaluate(() => (window as unknown as { __watched: number }).__watched)).toBe(0);
+		expect(await s.fetches()).toEqual([]);
+		// Intent is not a guess: a hover still fetches before idle.
+		await s.page.hover('a[href="/p/2"]');
+		await expect.poll(s.paths).toEqual(['/p/2']);
+		await s.armed();
+		await expect.poll(async () => (await s.fetches()).length).toBeGreaterThan(1);
+		await s.page.close();
+	});
+
 	test('a click in the same task as a cancel leaves guessing paused, without an error', async () => {
 		const s = await open({
 			prefetch: { viewport: 'all', idle: 'all' },
@@ -603,6 +640,7 @@ describe('guessing state', () => {
 			navigation: 'hang',
 		});
 		await s.measured(true);
+		await s.armed();
 		await s.page.locator('a[href="/p/2"]').click();
 		await s.page.evaluate(() => {
 			document.querySelector<HTMLAnchorElement>('a[href="/"]')!.click();
@@ -624,6 +662,7 @@ describe('byte budget', () => {
 			answer: () => ({ body: gzipSync(big), headers: { 'content-encoding': 'gzip' } }),
 		});
 		await compressed.measured(true);
+		await compressed.armed();
 		await expect.poll(async () => (await compressed.fetches()).length).toBe(IN_VIEW);
 		expect(
 			await compressed.page.evaluate(
@@ -638,6 +677,7 @@ describe('byte budget', () => {
 			answer: () => ({ body: big }),
 		});
 		await raw.measured(true);
+		await raw.armed();
 		await expect.poll(async () => (await raw.fetches()).length).toBe(IN_VIEW);
 		await expect.poll(raw.held).toEqual([]);
 		await raw.page.close();

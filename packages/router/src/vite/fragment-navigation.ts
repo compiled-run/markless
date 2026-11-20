@@ -708,13 +708,11 @@ export function runFragmentNavigation(
 		};
 		const closed = () => {
 			if (entry.phase < ARRIVED) move(entry, ARRIVED);
-			if (page < 0 || counted) return void queueMicrotask(pumpIdle);
-			// Resource Timing records the transfer once the response has ended, a task later.
-			w.setTimeout(() => {
+			if (page >= 0 && !counted) {
 				const timing = target && w.performance.getEntriesByName(target.href).at(-1);
 				spend((timing as PerformanceResourceTiming | undefined)?.transferSize || bytes);
-				pumpIdle();
-			});
+			}
+			queueMicrotask(pumpIdle);
 		};
 		const entry: FragmentPrefetch = {
 			at: started?.at ?? w.performance.now(),
@@ -809,11 +807,11 @@ export function runFragmentNavigation(
 			current.abort();
 		}, config.prefetchTtlMs);
 	};
-	// What the page shown may still fetch ahead, one state moved only by `speculate`: PAUSED while a
-	// navigation is on its way, then for each page shown ARMED, SCHEDULED (idle scan pending) and WATCHING.
+	// What the page shown may still fetch ahead, one state moved only by `speculate`: PAUSED while a navigation
+	// is on its way, then for each page shown SHOWN, ARMED at its first idle moment, and WATCHING once the idle scan ran.
 	const PAUSED = 0,
-		ARMED = 1,
-		SCHEDULED = 2,
+		SHOWN = 1,
+		ARMED = 2,
 		WATCHING = 3;
 	// spent: wire bytes the page shown has guessed so far, against config.guessBudget.
 	let speculation = { phase: PAUSED, page: 0, spent: 0 };
@@ -827,7 +825,7 @@ export function runFragmentNavigation(
 		!state.prefetches.has(pageKey(url)) && !fetched.has(pageKey(url));
 	// Idle and viewport guesses share the app's concurrency and wait for a free slot rather than cancel one another.
 	const pumpIdle = () => {
-		if (speculation.phase === PAUSED) return;
+		if (speculation.phase < ARMED) return;
 		for (;;) {
 			if (speculation.spent >= config.guessBudget) return;
 			let open = 0;
@@ -868,9 +866,9 @@ export function runFragmentNavigation(
 	// Links the page adds later (an opened menu, a longer list) join the viewport tier once the page is idle again.
 	const more = () =>
 		viewport &&
-		speculation.phase !== PAUSED &&
+		speculation.phase >= ARMED &&
 		(w.requestIdleCallback ?? w.setTimeout)(
-			() => speculation.phase !== PAUSED && viewport?.watch(true),
+			() => speculation.phase >= ARMED && viewport?.watch(true),
 		);
 	for (const type of ['click', 'keyup']) d.addEventListener(type, more, { passive: true });
 	// A click or Back/Forward pauses guessing and cancels every fetch still arriving but its own page's, so none competes with it.
@@ -886,25 +884,26 @@ export function runFragmentNavigation(
 	};
 	// A page is shown: after a swap, or when a navigation was cancelled and the page it left stays.
 	const rescan = () => {
-		speculate(ARMED, speculation.page + 1);
+		speculate(SHOWN, speculation.page + 1);
 		const page = speculation.page;
 		const current = () => speculation.page === page;
 		void (host.__marklessFragmentIdle ?? Promise.resolve(false)).then((measured) => {
 			fast = measured;
 			// A click since this page was shown has paused guessing; its own swap or cancel arms it again.
-			if (!current() || speculation.phase !== ARMED) return;
-			if (
-				loadViewport &&
-				(viewportLevel || d.querySelector(`a[href][${config.prefetchAttribute}="viewport"]`))
-			)
-				startViewport().then(
-					(started) => current() && speculation.phase !== PAUSED && started.watch(),
-					() => {},
-				);
-			if (!idleLevel || !onNetwork(idleLevel)) return;
-			speculate(SCHEDULED);
-			const run = () => {
-				if (!current() || speculation.phase !== SCHEDULED) return;
+			if (!current() || speculation.phase !== SHOWN) return;
+			// Guessing waits for the main thread's first idle moment after the page is shown: nothing runs in its load.
+			const arm = () => {
+				if (!current() || speculation.phase !== SHOWN) return;
+				speculate(ARMED);
+				if (
+					loadViewport &&
+					(viewportLevel || d.querySelector(`a[href][${config.prefetchAttribute}="viewport"]`))
+				)
+					startViewport().then(
+						(started) => current() && speculation.phase >= ARMED && started.watch(),
+						() => {},
+					);
+				if (!idleLevel || !onNetwork(idleLevel)) return;
 				speculate(WATCHING);
 				const visible = new Map<string, URL>();
 				for (const anchor of d.querySelectorAll('a[href]')) {
@@ -924,8 +923,8 @@ export function runFragmentNavigation(
 					if (idleQueue.length < config.idleFragments && unfetched(url)) idleQueue.push(url);
 				pumpIdle();
 			};
-			if (w.requestIdleCallback) w.requestIdleCallback(run, { timeout: 3000 });
-			else w.setTimeout(run, 500);
+			if (w.requestIdleCallback) w.requestIdleCallback(arm, { timeout: 3000 });
+			else w.setTimeout(arm, 500);
 		});
 	};
 	// A navigation that ends without a swap leaves the page it started from shown, so guessing resumes for it.
