@@ -295,6 +295,8 @@ const TICKED_TYPES = new Set(['checkbox', 'radio']);
 
 /** `<input>` types a host draws as a single-line text field (a password masked); each blocks the return key's submit when a form has two. */
 const TEXT_TYPES = new Set(['text', 'search', 'tel', 'password']);
+/** The form controls a disabled `<fieldset>` disables. */
+const CONTROL_ELEMENTS = new Set(['input', 'button', 'select', 'textarea']);
 /** Field attributes the web checks before a submit (or that limit typing) and no host checks yet. */
 const UNCHECKED_CONSTRAINTS = [
 	'pattern',
@@ -3980,11 +3982,6 @@ export function createNativeViewPayload(
 				const element = scope.module.tagOf.get(item.id);
 				const span = scope.module.hostSpans.get(item.id);
 				if (!element || element === '*') refuse(`host ${item.id} has no static tag`, span);
-				else if (element === 'fieldset' && (attributesAt(item.path).disabled !== undefined || boundAt(item.path).includes('disabled')))
-					refuse(
-						'a <fieldset disabled>, which disables every control inside it on the web; a native build does not pass that to its controls yet',
-						span,
-					);
 				else if (!nativeElementStyle(element) && element !== 'title') {
 					const written = attributesAt(item.path);
 					const bound = boundAt(item.path);
@@ -6606,6 +6603,7 @@ export function createNativeViewPayload(
 		}
 	}
 	wireTicks();
+	wireFieldsets();
 	wireLinks();
 	checkSelects();
 	let lengthLimited = false;
@@ -6701,6 +6699,40 @@ export function createNativeViewPayload(
 	 * by name: a list box (`multiple`, `size`), a select whose choice a binding sets, handlers on either element, and
 	 * anything but text inside an option or options inside a select.
 	 */
+	/**
+	 * A disabled `<fieldset>` disables every form control inside it but those in its first `<legend>`, as the web does: each
+	 * such control's `disabled` follows its own value or the fieldset's, which the hosts and the form data already read.
+	 */
+	function wireFieldsets() {
+		const disabledOf = (node: Extract<NativeNode, { kind: 'element' }>): NativeExpr | undefined => {
+			if (node.attributes?.['disabled'] !== undefined) return { literal: true };
+			const bound = node.bindings?.find((binding) => 'attribute' in binding && binding.attribute === 'disabled');
+			return bound?.value;
+		};
+		for (const fieldset of nodes) {
+			if (fieldset.kind !== 'element' || fieldset.element !== 'fieldset') continue;
+			const off = disabledOf(fieldset);
+			if (!off) continue;
+			const legend = nodes.find(
+				(node) => node.kind === 'element' && node.element === 'legend' && node.parent === fieldset.id,
+			);
+			for (const [index, node] of nodes.entries()) {
+				if (node.kind !== 'element' || !CONTROL_ELEMENTS.has(node.element) || node.id === fieldset.id) continue;
+				if (!isWithin(node.id, fieldset.id) || (legend && isWithin(node.id, legend.id))) continue;
+				if (node.attributes?.['disabled'] !== undefined) continue;
+				const own = disabledOf(node);
+				const value: NativeExpr = own ? { logical: '||', left: own, right: off } : off;
+				const bindings = (node.bindings ?? []).filter(
+					(binding) => !('attribute' in binding && binding.attribute === 'disabled'),
+				);
+				nodes[index] =
+					'literal' in value && value.literal === true
+						? { ...node, attributes: { ...node.attributes, disabled: '' } }
+						: { ...node, bindings: [...bindings, { attribute: 'disabled', value }] };
+			}
+		}
+	}
+
 	/**
 	 * A plain `<a href>` to one of the app's pages navigates in place, as a <Link> does on the web: a fixed path the
 	 * router matches opens that route. An anchor with a press of its own, or one to another site, is left as it is.

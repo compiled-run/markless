@@ -404,6 +404,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h6' }],
 	},
 	{
+		name: 'fieldset-disabled',
+		fixture: 'proofs/f13-fieldset-disabled/App.tsrx',
+		actions: [
+			{ event: 'input', host: 'h5', value: 'Red' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h6' },
+		],
+	},
+	{
 		name: 'ticks',
 		fixture: 'test/fixtures/Ticks.tsrx',
 		preferredLanguages: ['fr-CA', 'en'],

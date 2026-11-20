@@ -1697,7 +1697,7 @@ export function Page() @{
 		});
 	});
 
-	it('draws a <fieldset> and its <legend>; refuses a disabled fieldset by name', async () => {
+	it('draws a <fieldset> and its <legend>; a disabled one disables the controls inside it but those in its legend', async () => {
 		const shown = await nativeView(`export function Group() @{
 	<fieldset><legend>Who</legend><p>Ann</p></fieldset>
 }`);
@@ -1708,11 +1708,11 @@ export function Page() @{
 			'p',
 		]);
 		const disabled = await nativeView(`export function Group() @{
-	<fieldset disabled><legend>Who</legend></fieldset>
+	<fieldset disabled><legend><input name="kept" /></legend><input name="off" /></fieldset>
 }`);
-		expect(disabled.diagnostics.map((d) => d.message)).toContain(
-			'a <fieldset disabled>, which disables every control inside it on the web; a native build does not pass that to its controls yet',
-		);
+		expect(disabled.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const inputs = disabled.payload!.nodes.filter((node) => node.kind === 'element' && node.element === 'input');
+		expect(inputs.map((node) => node.kind === 'element' && node.attributes?.['disabled'])).toEqual([undefined, '']);
 	});
 
 	it('draws a custom element the app never defines as an inline container, as the browser renders an unknown element; not a reserved name', async () => {
