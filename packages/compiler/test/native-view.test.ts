@@ -1469,6 +1469,166 @@ export function Signup() @{
 		expect(JSON.stringify(submit)).not.toContain('prevent');
 	});
 
+	describe('a submit handler calling an app function that is not data', () => {
+		const payloadOf = async (files: Record<string, string>, entry: string) => {
+			const graphs = new Map<string, Awaited<ReturnType<typeof buildSemanticGraph>>>();
+			for (const [filename, source] of Object.entries(files))
+				graphs.set(
+					filename,
+					await buildSemanticGraph({
+						filename,
+						source,
+						nativeFacts: NATIVE_FACT_COLLECTORS,
+					}),
+				);
+			return createNativeViewPayload(graphs.get(entry)!, {
+				modules: {
+					graphs,
+					resolve: (specifier) => `src/${specifier.replace('./', '')}`,
+				},
+				readSource: (file) => files[file],
+			});
+		};
+		const scriptCalls = (tree: unknown): unknown[] =>
+			!tree || typeof tree !== 'object'
+				? []
+				: 'script' in tree
+					? [tree]
+					: Object.values(tree).flatMap(scriptCalls);
+
+		it('runs an imported helper (a method on a number, JSON) as JavaScript once, from the data handler', async () => {
+			const { payload, diagnostics } = await payloadOf(
+				{
+					'src/entries.ts': `export function addEntry(text: string, entry: { readonly site: string }): { saved: string; id: string } {
+	const id = Date.now().toString(36);
+	return { saved: JSON.stringify([{ ...entry, id }, ...JSON.parse(text)]), id };
+}`,
+					'src/App.tsrx': `import { state } from '@markless/core';
+import { addEntry } from './entries.ts';
+export function Entries() @{
+	let saved = state('[]');
+	let last = state('');
+	<form
+		onSubmit={(event) => {
+			event.preventDefault();
+			const data = new FormData(event.currentTarget);
+			const added = addEntry(saved, { site: String(data.get('site')) });
+			saved = added.saved;
+			last = added.id;
+		}}
+	>
+		<input name="site" />
+		<button>Add</button>
+		<p>{last}</p>
+	</form>
+}`,
+				},
+				'src/App.tsrx',
+			);
+			expect(diagnostics).toEqual([]);
+			const submit = payload!.handlers.find(
+				(handler) =>
+					handler.id ===
+					payload!.events.find((event) => event.event === 'submit')?.handler,
+			)!.ops;
+			expect(submit.map((op) => op.op)).toEqual(['assign', 'assign', 'assign']);
+			expect(scriptCalls(submit)).toEqual([
+				{
+					script: 'fn:0',
+					bindings: {
+						args: {
+							value: {
+								array: [
+									{ spread: false, value: { cell: 'state:saved' } },
+									{
+										spread: false,
+										value: expect.objectContaining({
+											object: expect.anything(),
+										}),
+									},
+								],
+							},
+						},
+					},
+				},
+			]);
+			expect(payload!.script!.source).toContain('toString(36)');
+		});
+
+		it('runs a same-file helper called straight into state, with other names and a method on a number', async () => {
+			const { payload, diagnostics } = await payloadOf(
+				{
+					'src/Tally.tsrx': `import { state } from '@markless/core';
+function encodeCount(previous: string, count: number): string {
+	return JSON.stringify({ previous, hex: count.toString(16) });
+}
+export function Tally() @{
+	let record = state('');
+	<form
+		onSubmit={(submitEvent) => {
+			submitEvent.preventDefault();
+			record = encodeCount(record, Number(new FormData(submitEvent.currentTarget).get('count')));
+		}}
+	>
+		<button>Encode</button>
+		<input name="count" />
+		<p>{record}</p>
+	</form>
+}`,
+				},
+				'src/Tally.tsrx',
+			);
+			expect(diagnostics).toEqual([]);
+			const submit = payload!.handlers.find(
+				(handler) =>
+					handler.id ===
+					payload!.events.find((event) => event.event === 'submit')?.handler,
+			)!.ops;
+			expect(submit).toEqual([
+				{
+					op: 'assign',
+					cell: 'state:record',
+					value: expect.objectContaining({ script: 'fn:0' }),
+				},
+			]);
+			expect(payload!.script!.source).toContain('toString(16)');
+		});
+
+		it('keeps a helper value read twice, so the script runs once as the web calls it once', async () => {
+			const { payload, diagnostics } = await payloadOf(
+				{
+					'src/stamp.ts': `export const makeStamp = () => ({ code: Date.now().toString(36), label: JSON.stringify('x') });`,
+					'src/Stamps.tsrx': `import { state } from '@markless/core';
+import { makeStamp } from './stamp.ts';
+export function Stamps() @{
+	let first = state('');
+	let second = state('');
+	<form
+		onSubmit={(event) => {
+			event.preventDefault();
+			const made = makeStamp();
+			first = made.code;
+			second = made.code + made.label;
+		}}
+	>
+		<button>Stamp</button>
+		<p>{first} {second}</p>
+	</form>
+}`,
+				},
+				'src/Stamps.tsrx',
+			);
+			expect(diagnostics).toEqual([]);
+			const submit = payload!.handlers.find(
+				(handler) =>
+					handler.id ===
+					payload!.events.find((event) => event.event === 'submit')?.handler,
+			)!.ops;
+			expect(scriptCalls(submit)).toHaveLength(1);
+			expect(submit[0]).toMatchObject({ op: 'assign', value: { script: 'fn:0' } });
+		});
+	});
+
 	it('submits a form with no submit button from the return key only when it has one text field', async () => {
 		const { payload } = await nativeView(`import { state } from '@markless/core';
 export function Search() @{
