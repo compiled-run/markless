@@ -329,3 +329,28 @@ test('two children carrying one app-scoped shared() cell compose to one record o
 	);
 	expect(composed.cells.map((cell) => cell.graphNodeId)).toEqual([graphNodeId]);
 });
+
+test('a page and a child declaring one storage() key compose to one cell of it', () => {
+	const storage = [{ graphNodeId: 'storage:basket', key: 'basket' }];
+	const cell = { graphNodeId: 'storage:basket', name: 'lines', valueKind: 'scalar', value: '2' };
+	const composed = marklessComposeState(
+		{ version: STORAGE_PROTOCOL_VERSION, cells: [cell], computed: [], storage },
+		[
+			{
+				output: {
+					state: {
+						version: STORAGE_PROTOCOL_VERSION,
+						cells: [{ ...cell, name: 'total' }],
+						computed: [],
+						storage,
+					},
+				},
+				hostPrefix: 'c0:',
+				symbolPrefix: 'c0:',
+				graphProps: [],
+			},
+		],
+	);
+	expect(composed.cells.map((entry) => entry.graphNodeId)).toEqual(['storage:basket']);
+	expect(composed.storage).toEqual(storage);
+});

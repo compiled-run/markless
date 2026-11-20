@@ -280,6 +280,7 @@ export const TITLES: Readonly<Record<string, string>> = {
 	MARKLESS_RENDER_DATA_UNPUBLISHED: 'Build data was read before it was ready',
 	MARKLESS_REPEAT_EMPTY_ARM_EMPTY: 'An @empty branch rendered nothing',
 	MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING: 'An @empty branch has nothing to render with',
+	MARKLESS_REPEAT_EMPTY_ARM_SLOT_MISSING: 'An @empty branch cannot find where a live value goes',
 	MARKLESS_REPEAT_EMPTY_ARM_UNMATCHED: 'A list cannot find its @empty branch',
 	MARKLESS_REPEAT_ROW_COMPONENT_ANCHOR_MISSING: 'A list row lost its place',
 	MARKLESS_REPEAT_ROW_COMPONENT_EMPTY: 'A list row built nothing',

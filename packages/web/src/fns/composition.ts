@@ -569,10 +569,6 @@ function marklessComposedState<T extends ComposeStateDraft>(
 			),
 		),
 	]);
-	const cells = marklessMergedSharedCells(
-		[...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])],
-		sharedDefinitions,
-	);
 	const sharedSeeds = [
 		...(state.sharedSeeds ?? []),
 		...children.flatMap((child) =>
@@ -589,6 +585,11 @@ function marklessComposedState<T extends ComposeStateDraft>(
 				.map((record) => [record.graphNodeId, record]),
 		).values(),
 	];
+	const cells = marklessMergedSharedCells(
+		[...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])],
+		sharedDefinitions,
+		storage,
+	);
 	return {
 		...state,
 		...(storage.length ? { storage, version: protocolStateVersion(storage) } : {}),
@@ -645,16 +646,23 @@ function marklessDropCarriedWidgetCells(children: ReadonlyArray<ComposeChild>): 
 }
 
 // Several children may carry one shared() instance's cells; the composed state keeps one per node id.
+// A shared() instance or a storage() key is one cell on the page, however many modules declare it.
 function marklessMergedSharedCells(
 	cells: ReadonlyArray<ComposeStateNode>,
 	sharedDefinitions: ReadonlyArray<ComposeSharedDefinition>,
+	storage: ReadonlyArray<{ readonly graphNodeId: string }>,
 ): ReadonlyArray<ComposeStateNode> {
 	const definitionIds = new Set(sharedDefinitions.map((definition) => definition.id));
-	if (definitionIds.size === 0) return cells;
+	const storageIds = new Set(storage.map((record) => record.graphNodeId));
+	if (definitionIds.size === 0 && storageIds.size === 0) return cells;
 	const taken = new Set<string>();
 	return cells.filter((cell) => {
 		const graphNodeId = cell.graphNodeId;
-		if (!definitionIds.has(graphNodeId.slice(0, graphNodeId.lastIndexOf('/')))) return true;
+		if (
+			!storageIds.has(graphNodeId) &&
+			!definitionIds.has(graphNodeId.slice(0, graphNodeId.lastIndexOf('/')))
+		)
+			return true;
 		if (taken.has(graphNodeId)) return false;
 		taken.add(graphNodeId);
 		return true;
