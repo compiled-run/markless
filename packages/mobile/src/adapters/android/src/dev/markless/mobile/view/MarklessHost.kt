@@ -644,7 +644,7 @@ class MarklessHost(
 			val marker = (inst.node as? Node.Element)?.defaultStyle?.marker ?: continue
 			val box = views[inst.id] as? MarklessBox ?: continue
 			val items = (0 until box.childCount).map { box.getChildAt(it) }.filter { v -> built[views.entries.firstOrNull { it.value === v }?.key]?.node.let { it is Node.Element && it.element == "li" } }
-			box.markers = items.withIndex().associate { (i, v) -> v to if (marker == "decimal") "${i + 1}." else "•" }
+			box.markers = items.withIndex().associate { (i, v) -> v to listMarker(marker, i + 1) }
 		}
 	}
 
@@ -1373,3 +1373,11 @@ private fun EditText.setAppText(text: String) {
 /** A textarea's `cols` or `rows` as HTML reads it: the digits after any leading whitespace, if they make a number above zero, else [fallback]. */
 internal fun textareaExtent(value: String?, fallback: Int): Int =
 	(value ?: "").trimStart(' ', '\t', '\n', '\r', '\u000C').takeWhile { it in '0'..'9' }.toIntOrNull()?.takeIf { it > 0 } ?: fallback
+
+/** The marker before a list's [number]th item, as Chrome writes it: `1.`, or a disc, circle or square. */
+internal fun listMarker(kind: String?, number: Int): String = when (kind) {
+	"decimal" -> "$number."
+	"circle" -> "\u25E6"
+	"square" -> "\u25AA"
+	else -> "\u2022"
+}

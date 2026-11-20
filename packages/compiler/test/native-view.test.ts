@@ -2447,6 +2447,25 @@ ${markup}
 		]);
 	});
 
+	it('marks a bulleted list inside a list with circles, and one two lists in with squares, as Chrome does', async () => {
+		const { payload, diagnostics } = await nativeView(
+			source(`		<ul>
+			<li>One<ul><li>Two<ol><li>Three<ul><li>Four</li></ul></li></ol></li></ul></li>
+		</ul>`),
+		);
+		expect(diagnostics).toEqual([]);
+		expect(
+			payload!.nodes.flatMap((node) =>
+				node.kind === 'element' && node.defaultStyle?.marker ? [[node.element, node.defaultStyle.marker]] : [],
+			),
+		).toEqual([
+			['ul', 'disc'],
+			['ul', 'circle'],
+			['ol', 'decimal'],
+			['ul', 'square'],
+		]);
+	});
+
 	it('gives a table its structure and centres a header cell, as Chrome draws one', async () => {
 		const { payload, diagnostics } = await nativeView(
 			source(`		<table>
@@ -2513,7 +2532,7 @@ ${markup}
 			['br', { flow: 'break' }],
 			['kbd', { flow: 'inline', monospace: true, size: 0.8125 }],
 			['pre', { monospace: true, size: 0.8125, preformatted: true, margin: 1 }],
-			['abbr', { flow: 'inline', line: 'underline' }],
+			['abbr', { flow: 'inline', line: 'dotted-underline' }],
 			['button', { inline: true, size: 13.3333 / 16, control: 'button' }],
 		]);
 	});

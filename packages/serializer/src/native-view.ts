@@ -206,7 +206,8 @@ export type NativeDefaultStyle = {
 	readonly monospace?: true;
 	/** Font size as a multiple of the parent's (`<h1>` 2, `<small>` 0.833, `<code>` 0.8125). */
 	readonly size?: number;
-	readonly line?: 'underline' | 'line-through';
+	/** A line through or under the text; `dotted-underline` is `<abbr title>`'s `underline dotted`. */
+	readonly line?: 'underline' | 'dotted-underline' | 'line-through';
 	readonly shift?: 'sub' | 'super';
 	/** An `<a>` with an `href`: its text is LinkText, #0000ee (#9e9eff dark), as Chrome paints an unvisited link. */
 	readonly link?: true;
@@ -242,8 +243,11 @@ export type NativeDefaultStyle = {
 	readonly control?: 'button' | 'field' | 'select' | 'tick' | 'area';
 	/** `<hr>`: Chrome's 2px inset line across the box (#9a9a9a over #eeeeee). */
 	readonly rule?: true;
-	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
-	readonly marker?: 'disc' | 'decimal';
+	/**
+	 * On `<ul>` and `<ol>`: the marker each item shows before its content. A bulleted list inside another list shows
+	 * `circle` (◦), and one inside two or more shows `square` (▪), as Chrome's stylesheet has it.
+	 */
+	readonly marker?: 'disc' | 'circle' | 'square' | 'decimal';
 	/**
 	 * Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`, as Chrome draws a table
 	 * without CSS: 2px apart and 2px in from the table's edges (`border-spacing: 2px`), each cell's content 1px inside it and

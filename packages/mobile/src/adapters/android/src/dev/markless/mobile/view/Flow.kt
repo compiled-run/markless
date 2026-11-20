@@ -133,7 +133,7 @@ class TextFlow(payload: Payload) {
 		if (s.bold && s.italic) add(StyleSpan(Typeface.BOLD_ITALIC)) else if (s.bold) add(StyleSpan(Typeface.BOLD)) else if (s.italic) add(StyleSpan(Typeface.ITALIC))
 		if (s.monospace) add(TypefaceSpan("monospace"))
 		if (s.size != 1.0) add(RelativeSizeSpan(s.size.toFloat()))
-		when (s.line) { "underline" -> add(UnderlineSpan()); "line-through" -> add(StrikethroughSpan()) }
+		when (s.line) { "underline" -> add(UnderlineSpan()); "dotted-underline" -> add(DottedUnderline()); "line-through" -> add(StrikethroughSpan()) }
 		when (s.shift) { "sub" -> add(SubscriptSpan()); "super" -> add(SuperscriptSpan()) }
 		if (s.highlight) { add(BackgroundColorSpan(Color.YELLOW)); add(ForegroundColorSpan(Color.BLACK)) }
 	}
@@ -155,7 +155,39 @@ class FlowText(context: Context) : android.widget.TextView(context) {
 		super.onTextChanged(text, start, lengthBefore, lengthAfter)
 		if ((lengthBefore == 0) != (this.text.isEmpty())) requestLayout()
 	}
+
+	private val dots = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+
+	/** Draws each [DottedUnderline] range's dots under every line it covers, as Chrome draws `underline dotted`. */
+	override fun onDraw(canvas: Canvas) {
+		super.onDraw(canvas)
+		val spanned = text as? android.text.Spanned ?: return
+		val layout = layout ?: return
+		val marks = spanned.getSpans(0, spanned.length, DottedUnderline::class.java)
+		if (marks.isEmpty()) return
+		val thickness = maxOf(1f, textSize / 16f)
+		dots.color = currentTextColor
+		dots.strokeWidth = thickness
+		dots.pathEffect = android.graphics.DashPathEffect(floatArrayOf(thickness, thickness), 0f)
+		canvas.save()
+		canvas.translate(totalPaddingLeft.toFloat(), totalPaddingTop.toFloat())
+		for (mark in marks) {
+			val start = spanned.getSpanStart(mark)
+			val end = spanned.getSpanEnd(mark)
+			for (line in layout.getLineForOffset(start)..layout.getLineForOffset(end)) {
+				val from = maxOf(start, layout.getLineStart(line))
+				val to = minOf(end, layout.getLineEnd(line))
+				if (from >= to) continue
+				val y = layout.getLineBaseline(line) + thickness * 2
+				canvas.drawLine(layout.getPrimaryHorizontal(from), y, layout.getPrimaryHorizontal(to).takeIf { to < layout.getLineEnd(line) || line == layout.lineCount - 1 } ?: layout.getLineRight(line), y, dots)
+			}
+		}
+		canvas.restore()
+	}
 }
+
+/** Marks text that `onDraw` underlines with dots (`<abbr title>`); it changes nothing about the text itself. */
+class DottedUnderline
 
 /** `<hr>`: a thin gray line across the available width, with space above and below. */
 /** `<hr>` as Chrome draws it: a 2 px inset box, a #9a9a9a line over a #eeeeee one, across its container. */

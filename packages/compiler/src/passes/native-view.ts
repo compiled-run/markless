@@ -163,7 +163,7 @@ function defaultStyleOf(
 		bindings.some((binding) => 'attribute' in binding && binding.attribute === 'title');
 	const style: NativeDefaultStyle =
 		element === 'abbr' && titled
-			? { ...base, line: 'underline' }
+			? { ...base, line: 'dotted-underline' }
 			: element === 'input' &&
 				  (attributes['type'] === 'checkbox' || attributes['type'] === 'radio')
 				? { inline: true, control: 'tick' }
@@ -7083,6 +7083,17 @@ export function createNativeViewPayload(
 		const { margin: _margin, ...rest } = node.defaultStyle;
 		const { defaultStyle: _style, ...plain } = node;
 		nodes[index] = Object.keys(rest).length > 0 ? { ...plain, defaultStyle: rest } : plain;
+	}
+	// Chrome's marker for a bulleted list inside another list: a circle one level in, a square two or more levels in.
+	const MARKED_LISTS: ReadonlySet<string> = new Set(['menu', 'ol', 'ul']);
+	for (let index = 0; index < nodes.length; index++) {
+		const node = nodes[index]!;
+		if (node.kind !== 'element' || node.defaultStyle?.marker !== 'disc') continue;
+		let depth = 0;
+		for (let above = node.parent ? byId.get(node.parent) : undefined; above; above = above.parent ? byId.get(above.parent) : undefined)
+			if (above.kind === 'element' && MARKED_LISTS.has(above.element)) depth++;
+		if (depth > 0)
+			nodes[index] = { ...node, defaultStyle: { ...node.defaultStyle, marker: depth === 1 ? 'circle' : 'square' } };
 	}
 	rootObjects.own(0);
 	// A backstop for markup nothing lowered: a refused @for or arm already says why its markup was not.

@@ -598,7 +598,7 @@ data class Payload(
 				flow = word("flow", setOf("inline", "break")),
 				bold = flag("bold"), italic = flag("italic"), monospace = flag("monospace"),
 				size = o["size"]?.num("$what.size") ?: 1.0,
-				line = word("line", setOf("underline", "line-through")),
+				line = word("line", setOf("underline", "dotted-underline", "line-through")),
 				shift = word("shift", setOf("sub", "super")),
 				highlight = flag("highlight"), quotes = flag("quotes"), preformatted = flag("preformatted"),
 				indent = o["indent"]?.num("$what.indent") ?: 0.0,
@@ -607,7 +607,7 @@ data class Payload(
 				link = flag("link"),
 				control = word("control", setOf("button", "field", "select", "tick", "area")),
 				rule = flag("rule"),
-				marker = word("marker", setOf("disc", "decimal")),
+				marker = word("marker", setOf("disc", "circle", "square", "decimal")),
 				table = word("table", setOf("table", "row", "cell")),
 				center = flag("center"),
 			)

@@ -802,7 +802,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.italic = try flag("italic")
 		style.monospace = try flag("monospace")
 		style.size = field.has("size") ? try field["size"].number() : nil
-		style.line = try oneOf("line", ["underline", "line-through"])
+		style.line = try oneOf("line", ["underline", "dotted-underline", "line-through"])
 		style.shift = try oneOf("shift", ["sub", "super"])
 		style.highlight = try flag("highlight")
 		style.quotes = try flag("quotes")
@@ -813,7 +813,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.link = try flag("link")
 		style.control = try oneOf("control", ["button", "field", "select", "tick", "area"])
 		style.rule = try flag("rule")
-		style.marker = try oneOf("marker", ["disc", "decimal"])
+		style.marker = try oneOf("marker", ["disc", "circle", "square", "decimal"])
 		style.table = try oneOf("table", ["table", "row", "cell"])
 		style.center = try flag("center")
 		return style

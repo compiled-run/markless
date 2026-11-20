@@ -65,6 +65,7 @@ struct TextLook: Equatable {
 		}
 		var attributes: [NSAttributedString.Key: Any] = [.font: font]
 		if line == "underline" { attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue }
+		if line == "dotted-underline" { attributes[.underlineStyle] = NSUnderlineStyle([.single, .patternDot]).rawValue }
 		if line == "line-through" { attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
 		if shift == "super" { attributes[.baselineOffset] = TextLook.baseSize * 0.33 }
 		if shift == "sub" { attributes[.baselineOffset] = -TextLook.baseSize * 0.2 }
@@ -1379,7 +1380,7 @@ final class ViewTree {
 			for child in stacked(container) {
 				guard let marker = itemMarkers[ObjectIdentifier(child)] else { continue }
 				number += 1
-				marker.text = kind == "decimal" ? "\(number)." : "\u{2022}"
+				marker.text = listMarker(kind, number)
 			}
 		}
 	}
@@ -2300,6 +2301,16 @@ final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
 	override func paste(_ sender: Any?) {
 		if pasteLeavesOut() { return }
 		super.paste(sender)
+	}
+}
+
+/// The marker before a list's `number`th item, as Chrome writes it: `1.`, or a disc, circle or square.
+func listMarker(_ kind: String, _ number: Int) -> String {
+	switch kind {
+	case "decimal": return "\(number)."
+	case "circle": return "\u{25E6}"
+	case "square": return "\u{25AA}"
+	default: return "\u{2022}"
 	}
 }
 
