@@ -7,19 +7,19 @@
 				"@fixtures/vite-csr",
 				"web/fns/instance-scope"
 			],
-			"delta": 405,
-			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together, so no composition site can prefix one without the others",
+			"delta": 344,
+			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together (the +344 includes #944's own +139, which was under budget and never recorded)",
 			"date": "2026-11-20"
 		},
 		{
 			"surface": "fixture-runtime",
 			"path": [
 				"modules",
-				"@fixtures/vite-csr",
-				"web/fns/ssr"
+				"@fixtures/vite-plus",
+				"web/fns/instance-scope"
 			],
-			"delta": -332,
-			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together, so no composition site can prefix one without the others",
+			"delta": 344,
+			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together (the +344 includes #944's own +139, which was under budget and never recorded)",
 			"date": "2026-11-20"
 		},
 		{
@@ -30,30 +30,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 87,
-			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together, so no composition site can prefix one without the others",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/fns/instance-scope"
-			],
-			"delta": 405,
-			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together, so no composition site can prefix one without the others",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/fns/ssr"
-			],
-			"delta": -332,
-			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together, so no composition site can prefix one without the others",
+			"delta": 42,
+			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together (the +344 includes #944's own +139, which was under budget and never recorded)",
 			"date": "2026-11-20"
 		},
 		{
@@ -64,8 +42,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 85,
-			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together, so no composition site can prefix one without the others",
+			"delta": 75,
+			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together (the +344 includes #944's own +139, which was under budget and never recorded)",
 			"date": "2026-11-20"
 		},
 		{
@@ -76,8 +54,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 82,
-			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together, so no composition site can prefix one without the others",
+			"delta": 14,
+			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together (the +344 includes #944's own +139, which was under budget and never recorded)",
 			"date": "2026-11-20"
 		}
 	]
