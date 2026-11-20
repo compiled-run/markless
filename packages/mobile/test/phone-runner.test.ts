@@ -273,6 +273,9 @@ describe("the runner's checkout", () => {
 
 	it('reads a checkout behind origin/main from git, after fetching it', async () => {
 		const scratch = mkdtempSync(join(tmpdir(), 'runner-refresh-'));
+		// A pre-commit hook exports GIT_DIR and GIT_INDEX_FILE, which would aim git, here and in checkoutFacts, at the real repository.
+		const hookGit = Object.entries(process.env).filter(([key]) => key.startsWith('GIT_'));
+		for (const [key] of hookGit) delete process.env[key];
 		const git = (cwd: string, ...args: string[]) =>
 			execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
 				cwd,
@@ -299,6 +302,7 @@ describe("the runner's checkout", () => {
 			writeFileSync(join(runner, 'note.txt'), 'local work');
 			expect(planRefresh(await checkoutFacts(runner)).kind).toBe('kept');
 		} finally {
+			Object.assign(process.env, Object.fromEntries(hookGit));
 			rmSync(scratch, { recursive: true, force: true });
 		}
 	});
