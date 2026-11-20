@@ -1,0 +1,17 @@
+{
+	"rung": "J19",
+	"name": "structuredClone copies data as the web's does, and refuses a function with a DataCloneError",
+	"steps": [
+		{ "visible": ["Clone", "Check", "Not checked"] },
+		{
+			"do": { "tap": "Check" },
+			"visible": ["Ada: draft+checked, original draft, date copied"],
+			"absent": ["Not checked"]
+		},
+		{
+			"do": { "tap": "Clone a function" },
+			"visible": ["Refused: DataCloneError"],
+			"absent": ["Ada: draft+checked, original draft, date copied"]
+		}
+	]
+}

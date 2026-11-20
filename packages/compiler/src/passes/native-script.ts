@@ -171,6 +171,69 @@ if (!host) {
 	};
 	g.window = g.self = g;
 	host.Response = Response;
+	// The HTML structured clone, as Chromium runs it, for an engine that has none.
+	if (typeof g.structuredClone !== 'function') {
+		var cloneFailed = function (what) {
+			var message = "Failed to execute 'structuredClone' on 'Window': " + what + ' could not be cloned.';
+			if (typeof g.DOMException === 'function') return new g.DOMException(message, 'DataCloneError');
+			var error = new Error(message);
+			error.name = 'DataCloneError';
+			return error;
+		};
+		var ERRORS = ['Error', 'EvalError', 'RangeError', 'ReferenceError', 'SyntaxError', 'TypeError', 'URIError'];
+		var tag = function (value) { return Object.prototype.toString.call(value).slice(8, -1); };
+		g.structuredClone = function structuredClone(value) {
+			if (arguments.length === 0)
+				throw new TypeError("Failed to execute 'structuredClone' on 'Window': 1 argument required, but only 0 present.");
+			var memory = new Map();
+			var copy = function (input) {
+				var type = typeof input;
+				if (type === 'symbol' || type === 'function') throw cloneFailed(String(input));
+				if (input === null || type !== 'object') return input;
+				if (memory.has(input)) return memory.get(input);
+				// The host's own objects stand for the web's platform objects, which do not clone.
+				if (input instanceof host.Form) throw cloneFailed('HTMLFormElement object');
+				if (typeof g.FormData === 'function' && input instanceof g.FormData) throw cloneFailed('FormData object');
+				var kind = tag(input), output;
+				if (kind === 'Boolean') output = Object(Boolean.prototype.valueOf.call(input));
+				else if (kind === 'Number') output = Object(Number.prototype.valueOf.call(input));
+				else if (kind === 'String') output = Object(String.prototype.valueOf.call(input));
+				else if (kind === 'BigInt') output = Object(BigInt.prototype.valueOf.call(input));
+				else if (kind === 'Date') output = new Date(input.getTime());
+				else if (kind === 'RegExp') output = new RegExp(input.source, input.flags);
+				else if (kind === 'ArrayBuffer') output = input.slice(0);
+				else if (ArrayBuffer.isView(input)) {
+					var buffer = copy(input.buffer);
+					output = kind === 'DataView'
+						? new DataView(buffer, input.byteOffset, input.byteLength)
+						: new input.constructor(buffer, input.byteOffset, input.length);
+				} else if (kind === 'Map') {
+					output = new Map();
+					memory.set(input, output);
+					input.forEach(function (entry, key) { output.set(copy(key), copy(entry)); });
+					return output;
+				} else if (kind === 'Set') {
+					output = new Set();
+					memory.set(input, output);
+					input.forEach(function (entry) { output.add(copy(entry)); });
+					return output;
+				} else if (kind === 'Error') {
+					var name = ERRORS.indexOf(input.name) >= 0 ? input.name : 'Error';
+					var own = Object.getOwnPropertyDescriptor(input, 'message');
+					output = own && 'value' in own ? new g[name](String(own.value)) : new g[name]();
+					if (typeof input.stack === 'string') output.stack = input.stack;
+				} else if (kind === 'Array' || kind === 'Object' || kind === 'Arguments') {
+					output = kind === 'Array' ? new Array(input.length) : {};
+					memory.set(input, output);
+					Object.keys(input).forEach(function (key) { output[key] = copy(input[key]); });
+					return output;
+				} else throw cloneFailed(kind + ' object');
+				memory.set(input, output);
+				return output;
+			};
+			return copy(value);
+		};
+	}
 	// The form a submit handler's event names: only FormData reads it, as its entries when the form was sent.
 	host.Form = function (entries) { Object.defineProperty(this, 'entries', { value: entries }); };
 	if (typeof g.FormData !== 'function') {

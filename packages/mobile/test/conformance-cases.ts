@@ -567,6 +567,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'script-structured-clone',
+		fixture: 'proofs/j19-structured-clone/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'script-async',
 		fixture: 'proofs/j3-await-catch/App.tsrx',
 		modules: true,

@@ -982,6 +982,7 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		setInterval: 'timers',
 		clearInterval: 'timers',
 		queueMicrotask: 'engine',
+		structuredClone: 'engine',
 		console: 'console',
 		fetch: 'fetch',
 		crypto: 'crypto',
