@@ -12,7 +12,11 @@ export default function App() @{
 		<Counter label="Kept" />
 		<button onClick={() => (open = !open)}>{open ? 'Hide' : 'Show'}</button>
 		@if (open) {
-			<Counter label="Inside" />
+			let marks = state(0);
+			<>
+				<Counter label="Inside" />
+				<button onClick={() => marks++}>Marks {marks}</button>
+			</>
 		}
 	</main>
 }

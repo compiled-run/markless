@@ -10,6 +10,15 @@
 				"initial": true
 			},
 			{
+				"id": "state:marks",
+				"name": "marks",
+				"initial": 0,
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
 				"id": "component-edge:0/state:n",
 				"name": "n",
 				"initial": 0
@@ -141,6 +150,33 @@
 					"branch": "branch-site:0",
 					"index": 0
 				}
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h1",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Marks "
+					},
+					{
+						"cell": "state:marks"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
 			}
 		],
 		"events": [
@@ -158,6 +194,11 @@
 				"host": "component-edge:1/h0",
 				"event": "activate",
 				"handler": "handler:component-edge:1/event:0"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:2"
 			}
 		],
 		"handlers": [
@@ -217,6 +258,27 @@
 						}
 					}
 				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:marks",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "state:marks"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
 			}
 		]
 	},
@@ -236,6 +298,10 @@
 		[
 			"component-edge:1/h0:text0",
 			"Inside 0"
+		],
+		[
+			"h4:text0",
+			"Marks 0"
 		]
 	],
 	"initialArms": [
@@ -287,6 +353,19 @@
 		{
 			"action": {
 				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Marks 1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
 				"host": "h3"
 			},
 			"journal": [
@@ -330,6 +409,19 @@
 					"op": "text",
 					"node": "component-edge:1/h0:text0",
 					"value": "Inside 1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Marks 1"
 				}
 			]
 		}

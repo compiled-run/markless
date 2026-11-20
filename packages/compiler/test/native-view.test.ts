@@ -1678,12 +1678,19 @@ export function Page() @{
 	<main>
 		<Counter />
 		<button onClick={() => (open = !open)}>Toggle</button>
-		@if (open) { <Counter /> }
+		@if (open) {
+			let marks = state({ count: 0 });
+			<>
+				<Counter />
+				<b>{marks.count}</b>
+			</>
+		}
 	</main>
 }`);
 		expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
 		expect(Object.fromEntries(payload!.cells.map((cell) => [cell.id, cell.arm ?? null]))).toEqual({
 			'state:open': null,
+			'state:marks.count': { branch: 'branch-site:0', index: 0 },
 			'component-edge:0/state:n': null,
 			'component-edge:1/state:n': { branch: 'branch-site:0', index: 0 },
 		});

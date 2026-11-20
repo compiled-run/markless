@@ -1325,9 +1325,13 @@ export function createNativeViewPayload(
 	/** Component instances an @if arm shows, by their cell prefix: their state starts over each time the arm shows them. */
 	const armedPrefixes = new Map<string, NativeArmPlace>();
 	/** The innermost arm a cell's component sits in, for plain state only (not kept, device, async, clock or seeded values). */
+	/** state() written inside an @if arm, by its cell id (its fields are `<id>.<field>`): back to its first value each time the arm opens. */
+	const armedCells = new Map<string, NativeArmPlace>();
 	const armOfCell = (cell: NativeViewPayload['cells'][number]): NativeArmPlace | undefined => {
 		if (cell.row || cell.storage || cell.device || cell.object || cell.task || cell.async || cell.clock || cell.seed)
 			return undefined;
+		const own = armedCells.get(cell.id) ?? armedCells.get(cell.id.slice(0, Math.max(0, cell.id.lastIndexOf('.'))));
+		if (own) return own;
 		let found: { prefix: string; arm: NativeArmPlace } | undefined;
 		for (const [prefix, arm] of armedPrefixes)
 			if (cell.id.startsWith(prefix) && (!found || prefix.length > found.prefix.length)) found = { prefix, arm };
@@ -1556,6 +1560,8 @@ export function createNativeViewPayload(
 				continue;
 			}
 			const id = moduleLevel ? binding.id : `${prefix}${binding.id}`;
+			if (binding.armScope && !row)
+				armedCells.set(id, { branch: `${prefix}${binding.armScope.branchSiteId}`, index: binding.armScope.arm });
 			let value: unknown = nativeInitialOf(binding.initialValue);
 			noteUndefined(id, binding.initialValue);
 			let known = binding.initialValueKnown === true;
