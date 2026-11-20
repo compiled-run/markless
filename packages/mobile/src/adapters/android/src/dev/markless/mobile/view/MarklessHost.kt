@@ -588,6 +588,7 @@ class MarklessHost(
 			}
 			onCanvas?.invoke(canvas(configuration))
 			for ((view, control) in controls) controlLook(view, control, configuration)
+			for (view in views.values) if (view is SizedImage) view.recolor(configuration)
 		}
 		var changed = false
 		for (l in allLayouts()) {

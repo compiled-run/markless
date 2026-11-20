@@ -63,6 +63,9 @@ class SizedImage(context: Context) : FrameLayout(context) {
 		update()
 	}
 
+	/** The alt text in the web's CanvasText for [configuration]'s light or dark appearance. */
+	fun recolor(configuration: android.content.res.Configuration) = altText.setTextColor(canvasText(configuration))
+
 	/** While it shows its alt text, the text's baseline, so it sits on its line as the web's broken image does; else none. */
 	override fun getBaseline(): Int = if (altText.visibility == View.VISIBLE) altText.top + altText.baseline else -1
 
