@@ -7994,6 +7994,43 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_NATIVE_MOUSE_ONLY',
+		title: 'A mouse-only handler is left out of the native build',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error-or-warning',
+		description:
+			'A mouse-only handler is left out of the native build: a Markless build error.',
+		printed: [
+			'MARKLESS_NATIVE_MOUSE_ONLY: <what> runs only from a mouse or trackpad on a phone; native hosts have none yet, so it is left out',
+			'A touch on iOS and Android scrolls and swipes without raising wheel events.',
+			'https://markless.dev/errors/MARKLESS_NATIVE_MOUSE_ONLY',
+		],
+		structured: true,
+		why: 'A touch on iOS and Android scrolls and swipes without raising wheel events.',
+		allow: [
+			{
+				id: 'l0',
+				runs: [
+					{
+						id: 'r0',
+						text: '// markless-allow MARKLESS_NATIVE_MOUSE_ONLY: the reason you accept it',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
+					},
+				],
+			},
+		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/native-view.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_NATIVE_SCRIPT',
 		title: 'A <script> cannot run in a native app',
 		area: 'internal',

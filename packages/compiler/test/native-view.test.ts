@@ -303,6 +303,27 @@ export function Choice() @{
 		expect(payload).toBeNull();
 	});
 
+	it('leaves out a wheel handler with a warning, as a touch on a phone scrolls without wheel events', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Slides() @{
+	let slide = state(0);
+	<main>
+		<div onWheel={() => (slide = slide + 1)}>Slide {slide}</div>
+		<button onClick={() => (slide = slide + 1)}>Next</button>
+	</main>
+}`);
+		expect(diagnostics.map((d) => [d.severity, d.code, d.message])).toEqual([
+			[
+				'warning',
+				'MARKLESS_NATIVE_MOUSE_ONLY',
+				'the wheel handler on <div> h1 runs only from a mouse or trackpad on a phone; native hosts have none yet, so it is left out',
+			],
+		]);
+		expect(payload?.events.map((event) => [event.host, event.event])).toEqual([
+			['h2', 'activate'],
+		]);
+	});
+
 	it('gives a state field whose first value is undefined a null cell, as a native expression spells undefined', async () => {
 		const { payload, diagnostics } =
 			await nativeView(`import { shared, state } from '@markless/core';

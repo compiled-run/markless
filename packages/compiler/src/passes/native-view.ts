@@ -316,6 +316,9 @@ const NOT_ON_PHONES = new Set(['beforematch']);
 const KEYBOARD_ONLY = new Set(['keydown', 'keyup', 'focus', 'blur', 'focusin', 'focusout']);
 const TEXT_ENTRY = new Set(['input', 'textarea']);
 export const NATIVE_KEYBOARD_ONLY_CODE = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
+/** Events a phone raises only from a connected mouse or trackpad: a touch scrolls and swipes without a wheel event. */
+const MOUSE_ONLY = new Set(['wheel']);
+export const NATIVE_MOUSE_ONLY_CODE = 'MARKLESS_NATIVE_MOUSE_ONLY';
 
 type Item =
 	| {
@@ -1126,6 +1129,20 @@ export function createNativeViewPayload(
 			passId: 'native-view',
 			suggestions: [],
 			docsUrl: `https://markless.dev/errors/${NATIVE_KEYBOARD_ONLY_CODE}`,
+		});
+	};
+	const mouseOnly = (what: string, span?: SourceSpan) => {
+		diagnostics.push({
+			code: NATIVE_MOUSE_ONLY_CODE,
+			severity: 'warning',
+			phase: 'serialization',
+			title: 'A mouse-only handler is left out of the native build',
+			message: `${what} runs only from a mouse or trackpad on a phone; native hosts have none yet, so it is left out`,
+			why: 'A touch on iOS and Android scrolls and swipes without raising wheel events.',
+			...(span ? { primarySpan: span } : {}),
+			passId: 'native-view',
+			suggestions: [],
+			docsUrl: `https://markless.dev/errors/${NATIVE_MOUSE_ONLY_CODE}`,
 		});
 	};
 	const elementSources = new Map<
@@ -4080,6 +4097,10 @@ export function createNativeViewPayload(
 							`the ${event.eventName} handler on <${element}> ${id}`,
 							event.handlerSpan,
 						);
+						continue;
+					}
+					if (MOUSE_ONLY.has(event.eventName)) {
+						mouseOnly(`the ${event.eventName} handler on <${element}> ${id}`, event.handlerSpan);
 						continue;
 					}
 					const semantic = SEMANTIC_EVENTS[event.eventName];

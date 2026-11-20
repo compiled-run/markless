@@ -1836,6 +1836,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a list row reads a widget no one owns markless_repeat_row_component_widget_unresolved a markless runtime error from @markless/web.',
 				},
 				{
+					code: 'MARKLESS_NATIVE_MOUSE_ONLY',
+					title: 'A mouse-only handler is left out of the native build',
+					chip: 'error',
+					kind: 'compile error or warning',
+					guided: false,
+					words: 'a mouse-only handler is left out of the native build markless_native_mouse_only a mouse-only handler is left out of the native build: a markless build error.',
+				},
+				{
 					code: 'MARKLESS_DEVICE_WEB_ABSENT',
 					title: 'A native element does not exist on the web',
 					chip: 'error',

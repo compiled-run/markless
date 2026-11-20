@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { NATIVE_REFUSALS } from '@markless/compiler/native';
+import {
+	NATIVE_KEYBOARD_ONLY_CODE,
+	NATIVE_MOUSE_ONLY_CODE,
+	NATIVE_REFUSALS,
+} from '@markless/compiler/native';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '@markless/router';
 import type {
 	NativeAppPayload,
@@ -44,7 +48,6 @@ const typedInto = (text: string, maxlength: string | null) => {
 // The native column before any device: each rung's payload, run by the reference runtime, must show what the
 // web build shows; a rung the compiler cannot lower yet must be refused by name, never emitted half right.
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
-const NATIVE_KEYBOARD_ONLY = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
 const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
 
@@ -1126,7 +1129,12 @@ test.each(
 				build.diagnostics.map((diagnostic) =>
 					diagnostic.severity === 'error' && refusalCodes.has(diagnostic.code)
 						? ['error', diagnostic.code]
-						: ['warning', NATIVE_KEYBOARD_ONLY],
+						: [
+								'warning',
+								diagnostic.code === NATIVE_MOUSE_ONLY_CODE
+									? NATIVE_MOUSE_ONLY_CODE
+									: NATIVE_KEYBOARD_ONLY_CODE,
+							],
 				),
 			);
 			return;
