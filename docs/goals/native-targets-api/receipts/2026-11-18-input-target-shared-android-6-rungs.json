@@ -1,0 +1,48 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u23-textbox",
+			"failure": null,
+			"installSeconds": 1.8286963340000002,
+			"flowSeconds": 17.300556583
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 1.808954625000013,
+			"flowSeconds": 18.71334625
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 1.8390992499999994,
+			"flowSeconds": 29.493713208000003
+		},
+		{
+			"name": "f2-return-key",
+			"failure": {
+				"step": 2,
+				"action": "submit",
+				"role": "flow",
+				"command": "assertConditionCommand",
+				"message": "Assertion is false: \"No search yet\" is not visible"
+			},
+			"installSeconds": 1.6341220839999733,
+			"flowSeconds": 35.703152791
+		},
+		{
+			"name": "f4-required",
+			"failure": null,
+			"installSeconds": 1.587336083000002,
+			"flowSeconds": 27.748925457999984
+		},
+		{
+			"name": "f6-disabled",
+			"failure": null,
+			"installSeconds": 1.6128358339999687,
+			"flowSeconds": 20.978837832999996
+		}
+	]
+}

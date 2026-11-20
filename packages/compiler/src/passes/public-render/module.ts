@@ -16,6 +16,7 @@ import { collectSeedChildrenDiagnostics } from './seed-children-diagnostics.ts';
 import { hasExecutableBodyStatements, sharedInstanceLocalNames } from './render-body.ts';
 import { sameModuleSsrComponentNames, ssrComponentFunctionName } from './same-module.ts';
 import { componentPropNames, isFragmentNode } from './shared.ts';
+import { TYPE_STRIP_PARAMETER_PROPERTY_CODE } from '../semantic-graph/parameter-properties.ts';
 
 export { firstComponentRoot, planPublicRender, selectPublicRenderRoot } from './plan.ts';
 export { emitPublicSsrRenderModule } from './ssr-module.ts';
@@ -28,7 +29,9 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 	if (
 		input.publicRenderPlan.diagnostics.some((diagnostic) => diagnostic.severity === 'error') ||
 		input.semanticGraph.diagnostics.some(
-			(item) => item.code === 'MARKLESS_EVENT_SPREAD_UNSUPPORTED',
+			(item) =>
+				item.code === 'MARKLESS_EVENT_SPREAD_UNSUPPORTED' ||
+				item.code === TYPE_STRIP_PARAMETER_PROPERTY_CODE,
 		)
 	) {
 		return {

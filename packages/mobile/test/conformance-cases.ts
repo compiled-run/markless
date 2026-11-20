@@ -334,6 +334,27 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'choose',
+		fixture: 'test/fixtures/Choose.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h12' },
+			{ event: 'choose', host: 'h3@Large' },
+			{ event: 'activate', host: 'h12' },
+			{ event: 'choose', host: 'h7' },
+			{ event: 'choose', host: 'h5' },
+			{ event: 'choose', host: 'h9' },
+			{ event: 'activate', host: 'h14' },
+			{ event: 'activate', host: 'h12' },
+			{ event: 'activate', host: 'h13' },
+			{ event: 'activate', host: 'h12' },
+			{ event: 'choose', host: 'h11@Kiwi' },
+			{ event: 'activate', host: 'h15' },
+			{ event: 'activate', host: 'h12' },
+			{ event: 'activate', host: 'h16' },
+			{ event: 'activate', host: 'h12' },
+		],
+	},
+	{
 		name: 'form-return',
 		fixture: 'test/fixtures/FormReturn.tsrx',
 		actions: [
@@ -377,6 +398,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h8' },
 			{ event: 'activate', host: 'component-edge:0/h5' },
 			{ event: 'activate', host: 'h8' },
+		],
+	},
+	{
+		name: 'typed-target',
+		fixture: 'test/fixtures/TypedTarget.tsrx',
+		actions: [
+			{ event: 'input', host: 'component-edge:0/h1', value: 'ada' },
+			{ event: 'input', host: 'component-edge:0/h1', value: 'ada' },
+			{ event: 'input', host: 'component-edge:0/h1', value: 'bo' },
 		],
 	},
 	{

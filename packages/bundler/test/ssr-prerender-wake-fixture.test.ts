@@ -4,13 +4,13 @@ import type { AddressInfo } from 'node:net';
 import { readdir, readFile, rm } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { chromium } from '@playwright/test';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { renderToString, type SsrRenderable } from '@markless/web';
 import { MARKLESS_BUNDLE_GRAPH } from '../src/build/chunking.ts';
 import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
 import { parseBundleGraph, planModulePreloadUrls } from '../src/build/preload-plan.ts';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -207,7 +207,7 @@ async function wakeInBrowser(clientHtml: string, served: string) {
 	});
 	await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
 	const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-	const browser = await chromium.launch();
+	const browser = await launchBrowser();
 	try {
 		const page = await browser.newPage();
 		const errors: string[] = [];

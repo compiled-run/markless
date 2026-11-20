@@ -71,6 +71,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case property(node: String, name: String, value: String)
 	/// A checkbox's or radio button's checkedness changed (journalled as the `checked` property).
 	case checked(node: String, value: Bool)
+	/// An option's selectedness changed (journalled as the `selected` property); a row's new option arrives unselected.
+	case selected(node: String, value: Bool)
 	/// A list's new row order: rows whose key left go, new rows are built from current values, the rest move.
 	case rows(node: String, keys: [String])
 	/// Shows arm `index` of a branch (nil: none), built from current values; the old arm's views go.
@@ -114,6 +116,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("property")), ("node", .string(node)), ("name", .string(name)), ("value", .string(value))])
 		case let .checked(node, value):
 			return .object([("op", .string("property")), ("node", .string(node)), ("name", .string("checked")), ("value", .bool(value))])
+		case let .selected(node, value):
+			return .object([("op", .string("property")), ("node", .string(node)), ("name", .string("selected")), ("value", .bool(value))])
 		case let .rows(node, keys):
 			return .object([("op", .string("rows")), ("node", .string(node)), ("keys", .array(keys.map(JSONValue.string)))])
 		case let .arm(node, index):
@@ -239,6 +243,14 @@ public final class NativeRuntime {
 	private let ticked: [NativeNode]
 	/// Each one's checkedness: its `checked` binding sets it, as does a person's tick.
 	private var checkedness: [String: Bool] = [:]
+	/// Every `<select>`, in payload order.
+	private let selects: [NativeNode]
+	/// Each shown option's selectedness, kept as the web keeps it (HTML's selectedness setting algorithm).
+	private var selectedness: [String: Bool] = [:]
+	/// What each option's `selected` binding last wrote: a binding sets the selectedness only when its value changes.
+	private var selectedBound: [String: Bool?] = [:]
+	/// The option a person chose in the action being dispatched.
+	private var chosenNow: String?
 	private let missing: NativeValueMissing?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
@@ -292,6 +304,10 @@ public final class NativeRuntime {
 			guard node.row == nil, case let .element("input", attributes, _) = node.kind else { return false }
 			return attributes["type"] == "checkbox" || attributes["type"] == "radio"
 		}
+		selects = payload.nodes.filter { node in
+			if case .element("select", _, _) = node.kind { return true }
+			return false
+		}
 		let locale = nativeLocale(preferredLanguages, payload.valueMissing.map(\.locale))
 		missing = payload.valueMissing.first { $0.locale == locale }?.messages
 		dialogs = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
@@ -306,6 +322,7 @@ public final class NativeRuntime {
 			guard node.row == nil, case let .element(_, attributes, bindings) = node.kind else { return false }
 			return attributes[OverlayProtocol.attribute] != nil && bindings.contains { !$0.isProperty && $0.name == "hidden" }
 		}
+		try? settleSelects()
 		// Shown at mount: the document's focus is the body.
 		if let shown = try? shownOverlays() {
 			stack = shown
@@ -736,6 +753,118 @@ public final class NativeRuntime {
 		try ticked.compactMap { node in try isShown(node.arm) ? (node.id, try isChecked(node.id)) : nil }
 	}
 
+	private struct OptionInstance {
+		let id: String
+		let node: NativeNode
+		let scope: NativeScope
+	}
+
+	/// An attribute of one instance as the web has it now: a binding's value in its row, else the attribute as built.
+	private func attribute(of node: NativeNode, _ name: String, in scope: NativeScope) throws -> String? {
+		guard case let .element(_, attributes, bindings) = node.kind else { return nil }
+		if let binding = bindings.first(where: { !$0.isProperty && $0.name == name }) {
+			return marklessAttributeValue(name, try evaluate(binding.value, in: scope))
+		}
+		return attributes[name]
+	}
+
+	/// A select's shown options in tree order: a list's rows where the list stands, each row's options in order.
+	private func options(of select: String) throws -> [OptionInstance] {
+		let children = payload.nodes.filter { node in
+			guard node.parent == select, case .element("option", _, _) = node.kind else { return false }
+			return true
+		}
+		var listed = Set<String>()
+		var found: [OptionInstance] = []
+		for node in children {
+			guard let row = node.row else {
+				found += try instances(of: node).map { OptionInstance(id: $0.id, node: node, scope: $0.scope) }
+				continue
+			}
+			guard !listed.contains(row) else { continue }
+			listed.insert(row)
+			guard let list = nodesById[row], try isShown(list.arm) else { continue }
+			let siblings = children.filter { $0.row == row }
+			var shown: [String: OptionInstance] = [:]
+			for child in siblings {
+				for instance in try instances(of: child) { shown[instance.id] = OptionInstance(id: instance.id, node: child, scope: instance.scope) }
+			}
+			for entry in try rows(of: row) {
+				for child in siblings { if let option = shown["\(child.id)@\(entry.key)"] { found.append(option) } }
+			}
+		}
+		return found
+	}
+
+	/// An option's text: its text with ASCII whitespace stripped and collapsed, as `option.text` gives it.
+	private func text(of option: OptionInstance) throws -> String {
+		let raw = try payload.nodes.compactMap { node -> String? in
+			guard node.parent == option.node.id, case let .text(parts) = node.kind else { return nil }
+			return try text(of: parts, in: option.scope)
+		}.joined()
+		return raw.split(whereSeparator: { "\t\n\u{0C}\r ".contains($0) }).joined(separator: " ")
+	}
+
+	private func value(of option: OptionInstance) throws -> String {
+		try attribute(of: option.node, "value", in: option.scope) ?? text(of: option)
+	}
+
+	private func selectedBinding(_ option: OptionInstance) throws -> Bool? {
+		guard case let .element(_, _, bindings) = option.node.kind,
+			let binding = bindings.first(where: { $0.isProperty && $0.name == "selected" })
+		else { return nil }
+		return try evaluate(binding.value, in: option.scope).isTruthy
+	}
+
+	/// Brings each select's options up to date: rows that came or left, `selected` bindings that changed, then the rule.
+	private func settleSelects(_ chosen: String? = nil) throws {
+		for select in selects {
+			let options = try options(of: select.id)
+			let ids = Set(options.map(\.id))
+			for id in Array(selectedBound.keys) where nodesById[nodeOf(id)]?.parent == select.id && !ids.contains(id) {
+				selectedBound.removeValue(forKey: id)
+				selectedness.removeValue(forKey: id)
+			}
+			let choose = { (id: String) in for option in options { self.selectedness[option.id] = option.id == id } }
+			for option in options {
+				if selectedBound.index(forKey: option.id) == nil {
+					let first = try selectedBinding(option)
+					selectedBound[option.id] = .some(first)
+					let selected = try first ?? (attribute(of: option.node, "selected", in: option.scope) != nil)
+					selectedness[option.id] = selected
+					if selected { choose(option.id) }
+					continue
+				}
+				if let bound = try selectedBinding(option), bound != selectedBound[option.id] ?? nil {
+					selectedBound[option.id] = .some(bound)
+					selectedness[option.id] = bound
+					if bound { choose(option.id) }
+				}
+			}
+			if let chosen, ids.contains(chosen) { choose(chosen) }
+			if !options.contains(where: { selectedness[$0.id] == true }),
+				let first = try options.first(where: { try attribute(of: $0.node, "disabled", in: $0.scope) == nil })
+			{
+				selectedness[first.id] = true
+			}
+		}
+	}
+
+	/// Each shown option of each `<select>`, in tree order, and whether it is selected.
+	public func selections() throws -> [(node: String, selected: Bool)] {
+		try selects.flatMap { select in try options(of: select.id).map { ($0.id, selectedness[$0.id] ?? false) } }
+	}
+
+	/// What a select's list shows: each shown option in tree order, with its label (its `label` attribute when not empty,
+	/// else its text), whether a person cannot choose it, and whether it is the chosen one.
+	public func choices(of select: String) throws -> [(option: String, label: String, disabled: Bool, selected: Bool)] {
+		try options(of: select).map { option in
+			let label = try attribute(of: option.node, "label", in: option.scope).flatMap { $0.isEmpty ? nil : $0 } ?? text(of: option)
+			let disabled = try attribute(of: option.node, "disabled", in: option.scope) != nil
+			return (option.id, label, disabled, selectedness[option.id] ?? false)
+		}
+	}
+
 	private func formOf(_ id: String) -> String? {
 		payload.forms.first { form in form.fields.contains { $0.node == id } }?.node
 	}
@@ -764,6 +893,9 @@ public final class NativeRuntime {
 			case .checkbox, .radio: return try isChecked(field.node) ? [name, try attributeNow(field.node, "value") ?? "on"] : nil
 			case .hidden: return [name, try attributeNow(field.node, "value") ?? ""]
 			case .text: return [name, try textOf(field: field.node)]
+			case .select:
+				guard let chosen = try options(of: field.node).first(where: { selectedness[$0.id] == true }) else { return nil }
+				return [name, try value(of: chosen)]
 			}
 		}
 	}
@@ -773,7 +905,7 @@ public final class NativeRuntime {
 		if form.noValidate { return nil }
 		if let submitter, try attributeNow(submitter, "formnovalidate") != nil { return nil }
 		return try form.fields.first { field in
-			guard field.kind != .hidden, try isShownField(field.node) else { return false }
+			guard field.kind != .hidden, field.kind != .select, try isShownField(field.node) else { return false }
 			guard try attributeNow(field.node, "disabled") == nil else { return false }
 			// A radio button is missing its value when any button of its group is required and none is checked.
 			let required = field.kind == .radio
@@ -834,6 +966,17 @@ public final class NativeRuntime {
 
 	/// Runs the handler bound to the action and returns the journal the host applies.
 	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
+		if action.event == .choose {
+			guard let option = nodesById[nodeOf(action.host)], case .element("option", _, _) = option.kind, let select = option.parent,
+				let instance = try options(of: select).first(where: { $0.id == action.host })
+			else { throw RuntimeError(reason: "\(action.host) is not a shown option of a select") }
+			return try change(host: nil) {
+				if try self.attributeNow(select, "disabled") == nil, try self.attribute(of: option, "disabled", in: instance.scope) == nil {
+					self.chosenNow = action.host
+				}
+				return []
+			}
+		}
 		if action.event == .timer, let timer = action.timer, timer.hasPrefix(scriptTimer) {
 			guard let id = Int(timer.dropFirst(scriptTimer.count)) else { throw RuntimeError(reason: "no timer \(timer) is set") }
 			return try change(host: nil) { try self.enter([("kind", .string("timer")), ("timer", .number(Double(id)))]) }
@@ -1136,6 +1279,7 @@ public final class NativeRuntime {
 			case .text, .hidden: missing.text
 			case .checkbox: missing.checkbox
 			case .radio: missing.radio
+			case .select: throw RuntimeError(reason: "a <select> is never required in a native build")
 			}
 			calls.append(.invalid(node: invalid.node, message: message))
 			return []
@@ -1195,6 +1339,7 @@ public final class NativeRuntime {
 		let beforeAttributes = keyed(try boundAttributes())
 		let beforeMarks = keyed(marks())
 		let checkedBefore = checkedness
+		let selectedBefore = selectedness
 		let bindingsBefore = Dictionary(uniqueKeysWithValues: try ticked.map { ($0.id, try checkedBinding($0.id)) })
 		var beforeProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
 		if let eventValue, let host {
@@ -1275,6 +1420,12 @@ public final class NativeRuntime {
 			guard try isShown(node.arm), let now = checkedness[node.id], checkedBefore[node.id] != now else { return nil }
 			return .checked(node: node.id, value: now)
 		}
+		try settleSelects(chosenNow)
+		chosenNow = nil
+		// An option a new row builds starts unselected on the host, so only a selected one is sent.
+		let chosen = try selections().compactMap { entry -> NativeJournalEntry? in
+			(selectedBefore[entry.node] ?? false) == entry.selected ? nil : .selected(node: entry.node, value: entry.selected)
+		}
 		let afterMarks = marks()
 		let marked = afterMarks.compactMap { mark -> NativeJournalEntry? in
 			guard beforeMarks["\(mark.node)\u{0}\(mark.name)"] != mark.value else { return nil }
@@ -1289,7 +1440,7 @@ public final class NativeRuntime {
 		let afterTitle = try title()
 		let titled: [NativeJournalEntry] = afterTitle != beforeTitle ? afterTitle.map { [.title(value: $0)] } ?? [] : []
 		var journal: [NativeJournalEntry] = styles
-		for part in [entries, checks, marked, titled, releases, overlays, calls] { journal += part }
+		for part in [entries, checks, chosen, marked, titled, releases, overlays, calls] { journal += part }
 		return journal
 	}
 }

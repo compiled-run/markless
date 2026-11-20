@@ -153,3 +153,16 @@ test('the inline resumer reads a row cell out of a templated cell list', () => {
 	expect(shared.read!(served, `${rows[11]}state:open`, [])).toBe(true);
 	expect(shared.read!(served, `${rows[9]}prop:props`, ['kids', '0', 'label'])).toBe('kid');
 });
+
+test('the inline resumer decodes a "__proto__" field as an own field, not as the prototype', () => {
+	const shared = bootSharedGraphPolicy();
+	const hostile = JSON.parse('{"profile":{"__proto__":{"admin":true},"name":"ada"}}');
+	const page = container(undefined, [
+		{ graphNodeId: 'user', name: 'user', valueKind: 'object', value: hostile },
+	]);
+	const profile = shared.read!(page, 'user', ['profile']) as Record<string, unknown>;
+	expect(Object.getPrototypeOf(profile)).toBe(Object.prototype);
+	expect(profile.admin).toBeUndefined();
+	expect(Object.keys(profile)).toEqual(['__proto__', 'name']);
+	expect(({} as Record<string, unknown>).admin).toBeUndefined();
+});

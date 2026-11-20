@@ -163,9 +163,9 @@
 		}
 	},
 	"anchors": {
-		"calibrationS": 1.38,
-		"cpuS": 3481.7,
-		"peakRssMb": 4018,
+		"calibrationS": 1.228,
+		"cpuS": 2730.7,
+		"peakRssMb": 4147,
 		"models": {
 			"factors": {
 				"AMD EPYC 7763 64-Core Processor": 1.048,
@@ -198,38 +198,28 @@
 		"suite": "51355badafb6",
 		"shards": {
 			"1/3": {
-				"cpuS": 1145.3,
-				"peakRssMb": 4018,
-				"suite": 1175.4,
-				"typical": 1155.9
+				"cpuS": 867,
+				"peakRssMb": 3913,
+				"suite": 1032.7,
+				"typical": 856.9
 			},
 			"2/3": {
-				"cpuS": 1101.9,
-				"peakRssMb": 4009,
-				"suite": 945.7,
-				"typical": 1110.6
+				"cpuS": 875.1,
+				"peakRssMb": 4147,
+				"suite": 866.1,
+				"typical": 886.2
 			},
 			"3/3": {
-				"cpuS": 1234.5,
-				"peakRssMb": 3906,
-				"suite": 1014.5,
-				"typical": 1239.8
+				"cpuS": 988.6,
+				"peakRssMb": 3554,
+				"suite": 909.1,
+				"typical": 965.4
 			}
 		},
 		"runs": [
-			"/tmp/bcal/dirs/44295174978",
-			"/tmp/bcal/dirs/44298306419",
-			"/tmp/bcal/dirs/44301189837",
-			"/tmp/bcal/dirs/44303989807",
-			"/tmp/bcal/dirs/44309385892",
-			"/tmp/bcal/dirs/44311509283",
-			"/tmp/bcal/dirs/44314402874",
-			"/tmp/bcal/dirs/44317429892",
-			"/tmp/bcal/dirs/44320203319",
-			"/tmp/bcal/dirs/44326017704",
-			"/tmp/bcal/dirs/44330207839"
+			"/tmp/cc-scratch/ubdirs/44546975882"
 		],
-		"sha": "d2791e424ceabc69fd030fcbf8a7c93dee1b3f0b"
+		"sha": "aaf76970e442bc59f9666d62b523528410660c25"
 	},
 	"history": [
 		{
@@ -1335,6 +1325,22 @@
 				"/tmp/bcal/dirs/44330207839"
 			],
 			"reason": "the suite reference changed (new), which invalidates the anchors: re-accepted from the same 11 landed runs as the 2026-11-18 anchors (44295174978 to 44330207839), read from their job logs, which adds each shard's median suite and typical-speed readings; cpuS and peakRssMb are unchanged"
+		},
+		{
+			"date": "2026-11-19",
+			"change": "anchors",
+			"from": {
+				"cpuS": 3481.7,
+				"peakRssMb": 4018
+			},
+			"to": {
+				"cpuS": 2730.7,
+				"peakRssMb": 4147
+			},
+			"runs": [
+				"/tmp/cc-scratch/ubdirs/44546975882"
+			],
+			"reason": "Node's compile cache (PR #896): within one unit run, test workers, fixture-build children and build workers reuse what earlier processes compiled, so total CPU at the anchors' speed fell by 11.7% to 12.8% across five attempts of run 44546975882 (3,036 / 3,041 / 3,056 / 3,057 / 3,076 against 3,481.7). The same main without the cache (#877, run 44548573716) stayed inside the margin. Anchored on attempts 3 to 5, whose artifacts were saved before each re-run replaced them; the unit job does not restore a cache from main yet."
 		}
 	],
 	"models": {

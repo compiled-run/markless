@@ -116,7 +116,8 @@ export type NativeExpr =
 	/**
 	 * `new FormData(form)`: the form's entry list as the web builds it, `[name, value]` pairs in tree order. A field is left
 	 * out when it is disabled or has no name, a checkbox when it is not checked; a checkbox's value is its `value` attribute
-	 * or "on", a text field's its text now, a hidden input's its `value` attribute.
+	 * or "on", a text field's its text now, a hidden input's its `value` attribute, a `<select>`'s its selected option's
+	 * value (left out when no option is selected).
 	 */
 	| { readonly formData: string }
 	/** A checkbox's or radio button's checkedness now: what its `checked` binding last set, or a person's tick since. */
@@ -290,6 +291,8 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	label: {},
 	dialog: {},
 	form: {},
+	select: {},
+	option: {},
 	svg: {},
 };
 
@@ -426,8 +429,11 @@ export type NativeNode = NativePlace &
 		  }
 	);
 
-/** A field's state a binding sets as a DOM property: a text field's text, a checkbox's checkedness and its mixed look. */
-export type NativeProperty = 'value' | 'checked' | 'indeterminate';
+/**
+ * A field's state a binding sets as a DOM property: a text field's text, a checkbox's checkedness and its mixed look, an
+ * option's selectedness.
+ */
+export type NativeProperty = 'value' | 'checked' | 'indeterminate' | 'selected';
 
 /**
  * Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click).
@@ -723,8 +729,8 @@ export type NativeForm = {
 	readonly authoredAriaDisabled?: true;
 };
 
-/** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, or a hidden input. */
-export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden';
+/** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */
+export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden' | 'select';
 
 export { NATIVE_VALUE_MISSING_BY_LOCALE } from './native-validation-messages.ts';
 
@@ -796,6 +802,16 @@ export type NativeJournalEntry =
 			readonly op: 'property';
 			readonly node: string;
 			readonly name: 'checked';
+			readonly value: boolean;
+	  }
+	/**
+	 * An option's selectedness changed: by a person's choice, by its `selected` binding, or because its `<select>` chose
+	 * another. An option a list row adds arrives unselected; an entry follows when it is selected.
+	 */
+	| {
+			readonly op: 'property';
+			readonly node: string;
+			readonly name: 'selected';
 			readonly value: boolean;
 	  }
 	/** A styled cell's new value: the host moves to Dragon's next style assignment (`next[a][s][v]`) and applies it. */

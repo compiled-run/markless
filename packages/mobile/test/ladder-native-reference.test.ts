@@ -471,6 +471,8 @@ function walk(
 		for (const [node, open] of runtime.sheets()) sheetOpen.set(node, open);
 		checks.clear();
 		for (const [node, checked] of runtime.checks()) checks.set(node, checked);
+		selected.clear();
+		for (const [node, value] of runtime.selections()) selected.set(node, value);
 	};
 	const nodeOf = new Map(payload.nodes.map((node) => [node.id, node]));
 	// A closed <dialog> shows nothing (the UA's dialog:not([open]) rule); the journal opens and closes it.
@@ -524,6 +526,8 @@ function walk(
 		if (!node) return false;
 		if (node.kind === 'element') {
 			if (openDialogs.get(id) === false) return true;
+			// An option shows only in its select's list, which is closed between steps.
+			if (node.element === 'option') return true;
 			const bound = attributes.get(`${id}\0hidden`);
 			if ((bound !== undefined ? bound : (node.attributes?.['hidden'] ?? null)) !== null)
 				return true;
@@ -600,6 +604,15 @@ function walk(
 	};
 	const typed = new Map<string, string>();
 	const checks = new Map(runtime.checks());
+	// Each option's selectedness as the journal reported it; an option a new row adds starts unselected.
+	const selected = new Map(runtime.selections());
+	// A closed select shows its chosen option's label; its options show only in its list.
+	const chosenLabels = () =>
+		payload.nodes.flatMap((node) =>
+			node.kind === 'element' && node.element === 'select' && shownNode(node.id) && !hiddenWithin(node.id)
+				? runtime.choices(node.id).flatMap((choice) => (selected.get(choice.option) ? [choice.label] : []))
+				: [],
+		);
 	const attributeNow = (id: string, name: string) => {
 		const bound = attributes.get(`${id}\0${name}`);
 		if (bound !== undefined) return bound;
@@ -695,6 +708,8 @@ function walk(
 				attributes.set(`${entry.node}\0${entry.name}`, entry.value);
 			else if (entry.op === 'property' && entry.name === 'checked')
 				checks.set(entry.node, entry.value);
+			else if (entry.op === 'property' && entry.name === 'selected')
+				selected.set(entry.node, entry.value);
 			else if (entry.op === 'property') {
 				properties.set(entry.node, entry.value);
 				typed.delete(entry.node);
@@ -858,6 +873,16 @@ function walk(
 						],
 				index,
 			);
+		} else if (action && 'choose' in action) {
+			const select = elementReading(action.choose.field);
+			if (!select || nodeOf.get(select)?.kind !== 'element')
+				throw new Error(`step ${index}: no select reads "${action.choose.field}"`);
+			if (attributeNow(select, 'disabled') != null)
+				throw new Error(`step ${index}: "${action.choose.field}" is disabled`);
+			const choice = runtime.choices(select).find((one) => one.label === action.choose.option);
+			if (!choice || choice.disabled)
+				throw new Error(`step ${index}: "${action.choose.field}" has no option "${action.choose.option}" to pick`);
+			apply(runtime.dispatch({ event: 'choose', host: choice.option }), index);
 		} else if (action && 'drag' in action) {
 			const host = elementReading(action.drag.on);
 			if (!host) throw new Error(`step ${index}: nothing reads "${action.drag.on}" to drag`);
@@ -987,9 +1012,12 @@ function walk(
 			...labels()
 				.filter(([id]) => !hiddenWithin(id))
 				.map(([, label]) => label),
+			...chosenLabels(),
 		];
 		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
+		for (const [node, value] of runtime.selections())
+			expect(selected.get(node) ?? false, `step ${index}: the journal left ${node}'s selectedness stale`).toBe(value);
 		expect(shown, `step ${index}: scrolled out of sight, still held`).toEqual(
 			expect.arrayContaining([...(step.offScreen ?? [])]),
 		);
