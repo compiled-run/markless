@@ -148,14 +148,9 @@ jobs:
             - name: Run the website tests
               run: pnpm --dir website exec vp test run --project website
 
-    # Content-hash gate in front of every lane. Each lane's inputs are hashed
-    # into a cache key and probed read-only; a lane whose key already has a
-    # green marker saved against it is skipped instead of re-run. `.github/**`
-    # and `scripts/ci/**` are deliberately outside the base key, so CI-only
-    # edits do not invalidate every lane; the unit lane hashes this workflow
-    # anyway, because one of its tests reads it. Nothing installs in this job,
-    # so the globs below see a clean checkout with no node_modules or dist to
-    # hash.
+    # Every lane's key, for the jobs after the lanes: the gate's receipts and the markers a queue-tested push carries
+    # onto main. Keys depend only on the tree, so they match what each lane computed for itself in
+    # .github/actions/lane-hash; whether a lane ran is that lane's own `run` output, never decided here.
     lanes:
         runs-on: ubuntu-26.04
         permissions:
@@ -164,258 +159,121 @@ jobs:
             actions: read
         timeout-minutes: 10
         outputs:
-            # The browsers are a function of the Playwright version, the system packages of that and the runner image:
-            # a lockfile change elsewhere keeps both caches, so no job downloads them from the CDN or the apt mirror.
-            queue_run: ${{ steps.queue.outputs.run }}
-            playwright_version: ${{ steps.playwright.outputs.version }}
-            image_os: ${{ steps.playwright.outputs.image }}
-            key_unit: ${{ steps.unit.outputs.cache-primary-key }}
-            run_unit: ${{ steps.queue.outputs.tested != 'true' && (steps.unit.outputs.cache-hit != 'true') }}
-            key_browser: ${{ steps.browser.outputs.cache-primary-key }}
-            run_browser: ${{ steps.queue.outputs.tested != 'true' && (steps.browser.outputs.cache-hit != 'true') }}
-            key_completion_matrix: ${{ steps.completion_matrix.outputs.cache-primary-key }}
-            run_completion_matrix: ${{ steps.queue.outputs.tested != 'true' && (steps.completion_matrix.outputs.cache-hit != 'true') }}
-            key_boxes_bundler: ${{ steps.boxes_bundler.outputs.cache-primary-key }}
-            run_boxes_bundler: ${{ steps.queue.outputs.tested != 'true' && (steps.boxes_bundler.outputs.cache-hit != 'true') }}
-            key_boxes_router: ${{ steps.boxes_router.outputs.cache-primary-key }}
-            run_boxes_router: ${{ steps.queue.outputs.tested != 'true' && (steps.boxes_router.outputs.cache-hit != 'true') }}
-            key_boxes_music_player: ${{ steps.boxes_music_player.outputs.cache-primary-key }}
-            run_boxes_music_player: ${{ steps.queue.outputs.tested != 'true' && (steps.boxes_music_player.outputs.cache-hit != 'true') }}
-            key_boxes_music_player_ssr: ${{ steps.boxes_music_player_ssr.outputs.cache-primary-key }}
-            run_boxes_music_player_ssr: ${{ steps.queue.outputs.tested != 'true' && (steps.boxes_music_player_ssr.outputs.cache-hit != 'true') }}
+            queue_run: ${{ steps.unit.outputs.queue_run }}
+            playwright_version: ${{ steps.unit.outputs.playwright_version }}
+            image_os: ${{ steps.unit.outputs.image_os }}
+            key_unit: ${{ steps.unit.outputs.key }}
+            key_browser: ${{ steps.browser.outputs.key }}
+            key_completion_matrix: ${{ steps.completion_matrix.outputs.key }}
+            key_boxes_bundler: ${{ steps.boxes_bundler.outputs.key }}
+            key_boxes_router: ${{ steps.boxes_router.outputs.key }}
+            key_boxes_music_player: ${{ steps.boxes_music_player.outputs.key }}
+            key_boxes_music_player_ssr: ${{ steps.boxes_music_player_ssr.outputs.key }}
+            key_website_boxes: ${{ steps.website_boxes.outputs.key }}
+            key_perf_guards: ${{ steps.perf_guards.outputs.key }}
+            key_demo_boxes: ${{ steps.demo_boxes.outputs.key }}
+            key_build_scale: ${{ steps.build_scale.outputs.key }}
+            key_build_warnings: ${{ steps.build_warnings.outputs.key }}
             key_receipts: ${{ steps.receipts.outputs.cache-primary-key }}
-            run_receipts: ${{ steps.queue.outputs.tested != 'true' && (steps.receipts.outputs.cache-hit != 'true') }}
-            key_website_boxes: ${{ steps.website_boxes.outputs.cache-primary-key }}
-            run_website_boxes: ${{ steps.queue.outputs.tested != 'true' && (steps.website_boxes.outputs.cache-hit != 'true') }}
-            key_perf_guards: ${{ steps.perf_guards.outputs.cache-primary-key }}
-            run_perf_guards: ${{ steps.queue.outputs.tested != 'true' && (steps.perf_guards.outputs.cache-hit != 'true') }}
-            key_demo_boxes: ${{ steps.demo_boxes.outputs.cache-primary-key }}
-            run_demo_boxes: ${{ steps.queue.outputs.tested != 'true' && (steps.demo_boxes.outputs.cache-hit != 'true') }}
-            key_build_scale: ${{ steps.build_scale.outputs.cache-primary-key }}
-            run_build_scale: ${{ steps.queue.outputs.tested != 'true' && (steps.build_scale.outputs.cache-hit != 'true') }}
-            key_build_warnings: ${{ steps.build_warnings.outputs.cache-primary-key }}
-            run_build_warnings: ${{ steps.queue.outputs.tested != 'true' && (steps.build_warnings.outputs.cache-hit != 'true') }}
-            run_playwright: ${{ steps.queue.outputs.tested != 'true' && (steps.unit.outputs.cache-hit != 'true' || steps.browser.outputs.cache-hit != 'true' ||
-                steps.boxes_bundler.outputs.cache-hit != 'true' ||
-                steps.website_boxes.outputs.cache-hit != 'true' ||
-                steps.perf_guards.outputs.cache-hit != 'true' ||
-                steps.demo_boxes.outputs.cache-hit != 'true') }}
+            run_receipts: ${{ steps.unit.outputs.queue_run == '' && steps.receipts.outputs.cache-hit != 'true' }}
 
         steps:
             - uses: actions/checkout@v4
               with:
                   persist-credentials: false
 
-            # The merge queue lands the exact commit it tested, so a green merge_group run for this sha already
-            # ran every lane; the push run keeps only the cheap always-on jobs that report the required checks.
-            - name: Find the merge queue's run of this commit
-              id: queue
-              if: github.event_name == 'push'
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: |
-                  run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${GITHUB_SHA}&event=merge_group&status=success&per_page=1" \
-                    --jq '.workflow_runs[0].id // empty' || true)
-                  if [ -n "$run" ]; then
-                    echo "tested=true" >> "$GITHUB_OUTPUT"
-                    echo "run=$run" >> "$GITHUB_OUTPUT"
-                    echo "already tested by run $run"
-                  else
-                    echo "no green merge-queue run for ${GITHUB_SHA}; running every lane"
-                  fi
-
-            - name: Name the Playwright caches
-              id: playwright
-              run: |
-                  version=$(grep -oE '^  playwright-core@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2 | sort -u | paste -sd+ -)
-                  if [ -z "$version" ]; then echo 'pnpm-lock.yaml names no playwright-core version'; exit 1; fi
-                  echo "version=$version" >> "$GITHUB_OUTPUT"
-                  echo "image=${ImageOS:-${{ runner.os }}}" >> "$GITHUB_OUTPUT"
-
-            # Shared inputs every lane depends on. Its evaluated key is written
-            # to a file so the per-lane keys below layer on top of it.
-            # The per-package manifests are in here because they decide package
-            # resolution and the exports every lane imports through: the
-            # lockfile pins versions, but it does not see a changed `exports`
-            # map in `packages/core/package.json`.
-            - name: Probe the shared input hash
-              id: base
-              uses: actions/cache/restore@v4
-              with:
-                  lookup-only: true
-                  path: ci-base-key.txt
-                  key:
-                      markless-base-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml',
-                      'package.json', 'tsconfig.json', 'vite.config.ts',
-                      'packages/*/package.json', 'packages/*/*/package.json',
-                      'packages/*/tsconfig*.json', 'packages/*/src/**/*', 'scripts/**/*',
-                      '!scripts/ci/**') }}
-
-            - name: Record the shared input hash
-              run: echo '${{ steps.base.outputs.cache-primary-key }}' > ci-base-key.txt
-
-            # The node project is `packages/*/test/**/*.test.ts` plus
-            # `scripts/**/*.test.ts`, and those files read more than their own
-            # directory: the bundler, router and vitest-browser suites build
-            # `packages/*/fixtures`, `packages/cli/test/create.test.ts`
-            # scaffolds from `packages/cli/templates`, several bundler and web
-            # suites measure `demos/**` sources, and
-            # `scripts/benchmarks/ci-workflow.test.ts` asserts on this workflow
-            # file. Every one of those is an input: leave it out of the key and
-            # editing it skips the lane that would have caught the break, which
-            # the gate then reads as a content-hash hit.
-            - name: Probe the unit lane
+            - name: Name the unit lane key
               id: unit
-              uses: actions/cache/restore@v4
+              uses: ./.github/actions/lane-hash
               with:
-                  lookup-only: true
-                  path: unit-completed.txt
-                  key:
-                      unit-${{ hashFiles('ci-base-key.txt', 'packages/*/test/**/*',
-                      'packages/*/test-support/**/*', 'packages/*/fixtures/**/*',
-                      'packages/cli/templates/**/*', 'demos/**/*',
-                      '.github/workflows/ci.yml', 'scripts/ci/**/*', '!**/node_modules/**',
-                      '!**/dist/**', '!**/.witness/**') }}
+                  lane: unit
+                  probe: 'false'
 
-            - name: Probe the browser lane
+            - name: Name the browser lane key
               id: browser
-              uses: actions/cache/restore@v4
+              uses: ./.github/actions/lane-hash
               with:
-                  lookup-only: true
-                  path: browser-completed.txt
-                  key:
-                      browser-${{ hashFiles('ci-base-key.txt', 'packages/vitest-browser/**/*',
-                      'packages/headless/**/*', 'packages/*/fixtures/**/*',
-                      'packages/*/test-support/**/*', '!**/node_modules/**', '!**/dist/**') }}
+                  lane: browser
+                  probe: 'false'
 
-            - name: Probe the completion-matrix lane
+            - name: Name the completion-matrix lane key
               id: completion_matrix
-              uses: actions/cache/restore@v4
+              uses: ./.github/actions/lane-hash
               with:
-                  lookup-only: true
-                  path: completion-matrix-completed.txt
-                  key:
-                      completion-matrix-${{ hashFiles('ci-base-key.txt', 'packages/typescript-plugin/**/*',
-                      '!**/node_modules/**', '!**/dist/**') }}
+                  lane: completion-matrix
+                  probe: 'false'
 
-            - name: Probe the bundler box lane
+            - name: Name the boxes-bundler lane key
               id: boxes_bundler
-              uses: actions/cache/restore@v4
+              uses: ./.github/actions/lane-hash
               with:
-                  lookup-only: true
-                  path: |
-                      boxes-bundler-completed.txt
-                      packages/bundler/.witness/receipts
-                  key:
-                      boxes-bundler-${{ hashFiles('ci-base-key.txt', 'packages/bundler/**/*',
-                      '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
+                  lane: boxes-bundler
+                  probe: 'false'
 
-            - name: Probe the router box lane
+            - name: Name the boxes-router lane key
               id: boxes_router
-              uses: actions/cache/restore@v4
+              uses: ./.github/actions/lane-hash
               with:
-                  lookup-only: true
-                  path: |
-                      boxes-router-completed.txt
-                      packages/router/.witness/receipts
-                  key:
-                      boxes-router-${{ hashFiles('ci-base-key.txt', 'packages/router/**/*',
-                      '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
+                  lane: boxes-router
+                  probe: 'false'
 
-            - name: Probe the music-player box lane
+            - name: Name the boxes-music-player lane key
               id: boxes_music_player
-              uses: actions/cache/restore@v4
+              uses: ./.github/actions/lane-hash
               with:
-                  lookup-only: true
-                  path: |
-                      boxes-music-player-completed.txt
-                      demos/music-player/.witness/receipts
-                  key:
-                      boxes-music-player-${{ hashFiles('ci-base-key.txt', 'demos/music-player/**/*',
-                      '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
+                  lane: boxes-music-player
+                  probe: 'false'
 
-            - name: Probe the music-player-ssr box lane
+            - name: Name the boxes-music-player-ssr lane key
               id: boxes_music_player_ssr
-              uses: actions/cache/restore@v4
+              uses: ./.github/actions/lane-hash
               with:
-                  lookup-only: true
-                  path: |
-                      boxes-music-player-ssr-completed.txt
-                      demos/music-player-ssr/.witness/receipts
-                  key:
-                      boxes-music-player-ssr-${{ hashFiles('ci-base-key.txt', 'demos/music-player-ssr/**/*',
-                      '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
+                  lane: boxes-music-player-ssr
+                  probe: 'false'
 
-            - name: Probe the website box lane
+            - name: Name the website-boxes lane key
               id: website_boxes
-              uses: actions/cache/restore@v4
+              uses: ./.github/actions/lane-hash
               with:
-                  lookup-only: true
-                  path: website-boxes-completed.txt
-                  key:
-                      website-boxes-${{ hashFiles('ci-base-key.txt', 'website/**/*',
-                      'packages/headless/components/api/**/*', '!**/node_modules/**', '!**/dist/**',
-                      '!**/.witness/**', '!**/.output/**') }}
+                  lane: website-boxes
+                  probe: 'false'
 
-            # The perf guards build the interaction benchmark app and the docs
-            # site, the bundler and router fixtures behind G12 to G14, and read
-            # Playwright through demos/news; the guard code and anchors are in
-            # scripts/, which the base key already hashes.
-            - name: Probe the perf-guards lane
+            - name: Name the perf-guards lane key
               id: perf_guards
-              uses: actions/cache/restore@v4
+              uses: ./.github/actions/lane-hash
               with:
-                  lookup-only: true
-                  path: perf-guards-completed.txt
-                  key:
-                      perf-guards-${{ hashFiles('ci-base-key.txt', 'website/**/*', 'demos/**/*',
-                      'packages/headless/**/*', 'packages/*/fixtures/**/*',
-                      'packages/*/test/fixtures/**/*', 'packages/bundler/test/perf-guards/**/*',
-                      '!**/node_modules/**', '!**/dist/**', '!**/.witness/**', '!**/.output/**') }}
+                  lane: perf-guards
+                  probe: 'false'
 
-            - name: Probe the demo box lane
+            - name: Name the demo-boxes lane key
               id: demo_boxes
-              uses: actions/cache/restore@v4
+              uses: ./.github/actions/lane-hash
               with:
-                  lookup-only: true
-                  path: demo-boxes-completed.txt
-                  key:
-                      demo-boxes-${{ hashFiles('ci-base-key.txt', 'demos/live-feed/**/*',
-                      'demos/same-module-branch/**/*',
-                      'demos/executed-at-load/**/*',
-                      '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
+                  lane: demo-boxes
+                  probe: 'false'
 
-            # The generated app is written by scripts/benchmarks/build-scale and built
-            # through packages/*/src, which the shared hash already covers.
-            - name: Probe the build-scale lane
+            - name: Name the build-scale lane key
               id: build_scale
-              uses: actions/cache/restore@v4
+              uses: ./.github/actions/lane-hash
               with:
-                  lookup-only: true
-                  path: build-scale-completed.txt
-                  key: build-scale-${{ hashFiles('ci-base-key.txt') }}
+                  lane: build-scale
+                  probe: 'false'
 
-            # The guard script lives in scripts/ci/, which the base key leaves out.
-            - name: Probe the build-warnings lane
+            - name: Name the build-warnings lane key
               id: build_warnings
-              uses: actions/cache/restore@v4
+              uses: ./.github/actions/lane-hash
               with:
-                  lookup-only: true
-                  path: build-warnings-completed.txt
-                  key:
-                      build-warnings-${{ hashFiles('ci-base-key.txt', 'website/**/*', 'demos/**/*',
-                      'packages/headless/**/*', 'scripts/ci/build-warnings.mjs',
-                      'scripts/ci/browser-output-scan.mjs', '!**/node_modules/**',
-                      '!**/dist/**', '!**/.witness/**', '!**/.output/**') }}
+                  lane: build-warnings
+                  probe: 'false'
 
-            # The receipt set is the union of what the box lanes wrote, so every
-            # box key feeds this one: a box lane that re-runs re-runs receipts.
+            # The receipt set is the union of what the box lanes wrote, so every box key feeds this one: a box lane
+            # that re-runs re-runs receipts.
             - name: Record the box lane keys
               run: |
-                  echo '${{ steps.boxes_bundler.outputs.cache-primary-key }}' > boxes-bundler-key.txt
-                  echo '${{ steps.boxes_router.outputs.cache-primary-key }}' > boxes-router-key.txt
-                  echo '${{ steps.boxes_music_player.outputs.cache-primary-key }}' > boxes-music-player-key.txt
-                  echo '${{ steps.boxes_music_player_ssr.outputs.cache-primary-key }}' > boxes-music-player-ssr-key.txt
+                  echo '${{ steps.boxes_bundler.outputs.key }}' > boxes-bundler-key.txt
+                  echo '${{ steps.boxes_router.outputs.key }}' > boxes-router-key.txt
+                  echo '${{ steps.boxes_music_player.outputs.key }}' > boxes-music-player-key.txt
+                  echo '${{ steps.boxes_music_player_ssr.outputs.key }}' > boxes-music-player-ssr-key.txt
 
             - name: Probe the receipts lane
               id: receipts
@@ -430,31 +288,16 @@ jobs:
                       'packages/web/**/*', '!**/node_modules/**', '!**/dist/**', '!**/.witness/**')
                       }}
 
-            - name: Report the lane decisions
-              run: |
-                  echo "unit=${{ steps.unit.outputs.cache-hit != 'true' }}"
-                  echo "browser=${{ steps.browser.outputs.cache-hit != 'true' }}"
-                  echo "completion-matrix=${{ steps.completion_matrix.outputs.cache-hit != 'true' }}"
-                  echo "boxes-bundler=${{ steps.boxes_bundler.outputs.cache-hit != 'true' }}"
-                  echo "boxes-router=${{ steps.boxes_router.outputs.cache-hit != 'true' }}"
-                  echo "boxes-music-player=${{ steps.boxes_music_player.outputs.cache-hit != 'true' }}"
-                  echo "boxes-music-player-ssr=${{ steps.boxes_music_player_ssr.outputs.cache-hit != 'true' }}"
-                  echo "receipts=${{ steps.receipts.outputs.cache-hit != 'true' }}"
-                  echo "website-boxes=${{ steps.website_boxes.outputs.cache-hit != 'true' }}"
-                  echo "perf-guards=${{ steps.perf_guards.outputs.cache-hit != 'true' }}"
-                  echo "demo-boxes=${{ steps.demo_boxes.outputs.cache-hit != 'true' }}"
-                  echo "build-scale=${{ steps.build_scale.outputs.cache-hit != 'true' }}"
-                  echo "build-warnings=${{ steps.build_warnings.outputs.cache-hit != 'true' }}"
-
     # Fills the browser and system-package caches the unit, browser and box lanes restore. Keyed by the
     # lockfile, so the pinned Playwright version is part of the key, and by the runner image, because WebKit
     # is a per-distro build (the ubuntu24 one needs ICU 74, which ubuntu26 lacks); WebKit rides along for the
     # node tests that drive both engines; the browsers sit beside the checkout, so a lint of the tree never sees them.
     # No lane needs this job: waiting on it cost a merge group a second runner queue (12 minutes on
     # 2026-10-27), and only a Playwright bump misses the cache, when each lane installs its own copy.
+    # Only main fills it: a cache saved by a pull request or merge-queue run is readable by that ref alone.
     prepare-playwright:
         needs: lanes
-        if: needs.lanes.outputs.run_playwright == 'true'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         runs-on: ubuntu-26.04
         timeout-minutes: 15
         env:
@@ -567,9 +410,14 @@ jobs:
     # Node vitest project, split by test file across three runners (~200 files).
     # Its fixture tests launch Chromium and WebKit, so it restores the prepared browser cache.
     unit:
-        needs: [typecheck, lanes]
-        if: needs.lanes.outputs.run_unit == 'true'
         runs-on: ubuntu-26.04
+        outputs:
+            run: ${{ steps.lane.outputs.run }}
+            key: ${{ steps.lane.outputs.key }}
+        permissions:
+            contents: read
+            # The lane probe reads the merge queue's CI run for this commit.
+            actions: read
         timeout-minutes: 20
         strategy:
             fail-fast: false
@@ -589,54 +437,68 @@ jobs:
               with:
                   persist-credentials: false
 
+            # Before any install, so the content hash sees a clean checkout.
+            - name: Decide whether this lane's inputs already went green
+              id: lane
+              uses: ./.github/actions/lane-hash
+              with:
+                  lane: unit
+
             - uses: pnpm/action-setup@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   version: 10.33.2
 
             - uses: actions/setup-node@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   node-version: 24
                   cache: pnpm
 
             - name: Install Markless dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm install --frozen-lockfile
 
             - name: Restore the Playwright browser cache
+              if: steps.lane.outputs.run == 'true'
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-chromium-webkit-${{ steps.lane.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
+              if: steps.lane.outputs.run == 'true'
               id: apt-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-apt-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-${{ steps.lane.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-
+                      playwright-apt-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-matched-key != ''
+              if: steps.lane.outputs.run == 'true' && (steps.apt-cache.outputs.cache-matched-key != '')
               run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium webkit
 
             - name: Install Playwright browsers for the node fixture tests
-              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              if: steps.lane.outputs.run == 'true' && (steps.playwright-cache.outputs.cache-hit != 'true')
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium webkit
 
             - name: Run unit and integration tests
+              if: steps.lane.outputs.run == 'true'
               env:
                   MARKLESS_UNIT_BUDGET_OUT: ${{ runner.temp }}/unit-budget/measurement.json
                   MARKLESS_UNIT_BUDGET_SHARD: ${{ matrix.shard }}
               run: node scripts/ci/unit-budget.mjs measure -- pnpm exec vp test --project node --shard=${{ matrix.shard }}
 
             - name: Upload the unit budget measurement
-              if: ${{ !cancelled() }}
+              if: steps.lane.outputs.run == 'true' && !cancelled()
               uses: actions/upload-artifact@v4
               with:
                   name: unit-budget-shard${{ strategy.job-index }}-attempt${{ github.run_attempt }}
@@ -647,9 +509,14 @@ jobs:
     # @markless/ui runs 670 s of files serially, 125 s of it in one conformance file; on one shard it
     # made that shard a 15-minute run while the other took under 3.
     browser:
-        needs: [typecheck, lanes]
-        if: needs.lanes.outputs.run_browser == 'true'
         runs-on: ubuntu-26.04
+        outputs:
+            run: ${{ steps.lane.outputs.run }}
+            key: ${{ steps.lane.outputs.key }}
+        permissions:
+            contents: read
+            # The lane probe reads the merge queue's CI run for this commit.
+            actions: read
         timeout-minutes: 25
         strategy:
             fail-fast: false
@@ -669,64 +536,84 @@ jobs:
               with:
                   persist-credentials: false
 
+            # Before any install, so the content hash sees a clean checkout.
+            - name: Decide whether this lane's inputs already went green
+              id: lane
+              uses: ./.github/actions/lane-hash
+              with:
+                  lane: browser
+
             - uses: pnpm/action-setup@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   version: 10.33.2
 
             - uses: actions/setup-node@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   node-version: 24
                   cache: pnpm
 
             - name: Install Markless dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm install --frozen-lockfile
 
             # The system libraries are per-runner, so install-deps always runs; the browser only downloads if the cache missed.
             - name: Restore the Playwright browser cache
+              if: steps.lane.outputs.run == 'true'
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-chromium-webkit-${{ steps.lane.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
+              if: steps.lane.outputs.run == 'true'
               id: apt-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-apt-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-${{ steps.lane.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-
+                      playwright-apt-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-matched-key != ''
+              if: steps.lane.outputs.run == 'true' && (steps.apt-cache.outputs.cache-matched-key != '')
               run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
 
             - name: Install Playwright browsers for the vitest browser project
-              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              if: steps.lane.outputs.run == 'true' && (steps.playwright-cache.outputs.cache-hit != 'true')
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
 
             - name: Run browser tests
+              if: steps.lane.outputs.run == 'true'
               run: pnpm exec vp test --project browser --shard=${{ matrix.shard }}
 
             - name: Run the @markless/ui browser project
+              if: steps.lane.outputs.run == 'true'
               run: pnpm exec vp test --project ui --shard=${{ matrix.shard }}
 
             # The checked-in @markless/ui API manifest matches the family sources; the lane key hashes packages/headless/**.
             - name: Check the @markless/ui API manifest
-              if: matrix.shard == '1/3'
+              if: steps.lane.outputs.run == 'true' && (matrix.shard == '1/3')
               run: pnpm --dir packages/headless/components api:check
 
     # Packaged editor completion matrix: builds the CJS plugin bundles, so it
     # owns a runner instead of serializing behind the test suites.
     completion-matrix:
-        needs: [typecheck, lanes]
-        if: needs.lanes.outputs.run_completion_matrix == 'true'
         runs-on: ubuntu-26.04
+        outputs:
+            run: ${{ steps.lane.outputs.run }}
+            key: ${{ steps.lane.outputs.key }}
+        permissions:
+            contents: read
+            # The lane probe reads the merge queue's CI run for this commit.
+            actions: read
         timeout-minutes: 20
         env:
             NPM_CONFIG_AUDIT: 'false'
@@ -741,30 +628,43 @@ jobs:
               with:
                   persist-credentials: false
 
+            # Before any install, so the content hash sees a clean checkout.
+            - name: Decide whether this lane's inputs already went green
+              id: lane
+              uses: ./.github/actions/lane-hash
+              with:
+                  lane: completion-matrix
+
             - uses: pnpm/action-setup@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   version: 10.33.2
 
             - uses: actions/setup-node@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   node-version: 24
                   cache: pnpm
 
             - name: Install Markless dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm install --frozen-lockfile
 
             - name: Run packaged editor completion matrix
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir packages/typescript-plugin test:completion-matrix
 
             # Green marker under this lane's content hash: an identical tree
             # skips the lane next time. A failed run never reaches this step.
             - name: Mark the completion-matrix lane complete
+              if: steps.lane.outputs.run == 'true'
               run: echo ok > completion-matrix-completed.txt
 
             - name: Save the completion-matrix lane marker
+              if: steps.lane.outputs.run == 'true'
               uses: actions/cache/save@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_completion_matrix }}
+                  key: ${{ steps.lane.outputs.key }}
                   path: completion-matrix-completed.txt
 
     # Bundler pipeline boxes. Boxes drive a real browser through @async/witness,
@@ -772,9 +672,14 @@ jobs:
     # writes are the only copy of that evidence, so they leave as an artifact for
     # the `receipts` job to validate.
     boxes-bundler:
-        needs: [typecheck, lanes]
-        if: needs.lanes.outputs.run_boxes_bundler == 'true'
         runs-on: ubuntu-26.04
+        outputs:
+            run: ${{ steps.lane.outputs.run }}
+            key: ${{ steps.lane.outputs.key }}
+        permissions:
+            contents: read
+            # The lane probe reads the merge queue's CI run for this commit.
+            actions: read
         timeout-minutes: 25
         env:
             PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
@@ -790,54 +695,69 @@ jobs:
               with:
                   persist-credentials: false
 
+            # Before any install, so the content hash sees a clean checkout.
+            - name: Decide whether this lane's inputs already went green
+              id: lane
+              uses: ./.github/actions/lane-hash
+              with:
+                  lane: boxes-bundler
+
             - uses: pnpm/action-setup@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   version: 10.33.2
 
             - uses: actions/setup-node@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   node-version: 24
                   cache: pnpm
 
             - name: Install Markless dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm install --frozen-lockfile
 
             - name: Restore the Playwright browser cache
+              if: steps.lane.outputs.run == 'true'
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-chromium-webkit-${{ steps.lane.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
+              if: steps.lane.outputs.run == 'true'
               id: apt-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-apt-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-${{ steps.lane.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-
+                      playwright-apt-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-matched-key != ''
+              if: steps.lane.outputs.run == 'true' && (steps.apt-cache.outputs.cache-matched-key != '')
               run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
 
             - name: Install Playwright browsers for the pipeline boxes
-              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              if: steps.lane.outputs.run == 'true' && (steps.playwright-cache.outputs.cache-hit != 'true')
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
 
             - name: Warm the runner's Chrome before the first timed launch
+              if: steps.lane.outputs.run == 'true'
               run: node scripts/ci/warm-chrome.mjs
 
             - name: Run bundler pipeline boxes
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir packages/bundler test:boxes
 
             - name: Upload bundler analyzer receipts
-              if: always()
+              if: steps.lane.outputs.run == 'true' && always()
               uses: actions/upload-artifact@v4
               with:
                   name: receipts-bundler
@@ -847,7 +767,7 @@ jobs:
 
             # A failed box's receipt (its recorded page events, requests and HMR payloads) is the only evidence of what it saw.
             - name: Upload the box receipts of a failed run
-              if: failure()
+              if: steps.lane.outputs.run == 'true' && failure()
               uses: actions/upload-artifact@v4
               with:
                   name: box-receipts-bundler
@@ -859,21 +779,28 @@ jobs:
             # lane's key, so a later run that skips the lane can still restore
             # the receipt set this lane is the only producer of.
             - name: Mark the bundler box lane complete
+              if: steps.lane.outputs.run == 'true'
               run: echo ok > boxes-bundler-completed.txt
 
             - name: Save the bundler box lane marker and receipts
+              if: steps.lane.outputs.run == 'true'
               uses: actions/cache/save@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_boxes_bundler }}
+                  key: ${{ steps.lane.outputs.key }}
                   path: |
                       boxes-bundler-completed.txt
                       packages/bundler/.witness/receipts
 
     # Router pipeline boxes.
     boxes-router:
-        needs: [typecheck, lanes]
-        if: needs.lanes.outputs.run_boxes_router == 'true'
         runs-on: ubuntu-26.04
+        outputs:
+            run: ${{ steps.lane.outputs.run }}
+            key: ${{ steps.lane.outputs.key }}
+        permissions:
+            contents: read
+            # The lane probe reads the merge queue's CI run for this commit.
+            actions: read
         timeout-minutes: 25
         env:
             NPM_CONFIG_AUDIT: 'false'
@@ -888,27 +815,39 @@ jobs:
               with:
                   persist-credentials: false
 
+            # Before any install, so the content hash sees a clean checkout.
+            - name: Decide whether this lane's inputs already went green
+              id: lane
+              uses: ./.github/actions/lane-hash
+              with:
+                  lane: boxes-router
+
             - uses: pnpm/action-setup@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   version: 10.33.2
 
             - uses: actions/setup-node@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   node-version: 24
                   cache: pnpm
 
             - name: Install Markless dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm install --frozen-lockfile
 
             # Witness drives the runner image's Google Chrome, so this lane restores no Playwright browser.
             - name: Warm the runner's Chrome before the first timed launch
+              if: steps.lane.outputs.run == 'true'
               run: node scripts/ci/warm-chrome.mjs
 
             - name: Run router pipeline boxes
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir packages/router test:boxes
 
             - name: Upload router analyzer receipts
-              if: always()
+              if: steps.lane.outputs.run == 'true' && always()
               uses: actions/upload-artifact@v4
               with:
                   name: receipts-router
@@ -918,7 +857,7 @@ jobs:
 
             # A failed box's receipt (its recorded page events, requests and HMR payloads) is the only evidence of what it saw.
             - name: Upload the box receipts of a failed run
-              if: failure()
+              if: steps.lane.outputs.run == 'true' && failure()
               uses: actions/upload-artifact@v4
               with:
                   name: box-receipts-router
@@ -927,21 +866,28 @@ jobs:
                   retention-days: 14
 
             - name: Mark the router box lane complete
+              if: steps.lane.outputs.run == 'true'
               run: echo ok > boxes-router-completed.txt
 
             - name: Save the router box lane marker and receipts
+              if: steps.lane.outputs.run == 'true'
               uses: actions/cache/save@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_boxes_router }}
+                  key: ${{ steps.lane.outputs.key }}
                   path: |
                       boxes-router-completed.txt
                       packages/router/.witness/receipts
 
     # music-player demo: analyzer gate tests then boxes, same order as before.
     boxes-music-player:
-        needs: [typecheck, lanes]
-        if: needs.lanes.outputs.run_boxes_music_player == 'true'
         runs-on: ubuntu-26.04
+        outputs:
+            run: ${{ steps.lane.outputs.run }}
+            key: ${{ steps.lane.outputs.key }}
+        permissions:
+            contents: read
+            # The lane probe reads the merge queue's CI run for this commit.
+            actions: read
         timeout-minutes: 25
         env:
             NPM_CONFIG_AUDIT: 'false'
@@ -956,30 +902,43 @@ jobs:
               with:
                   persist-credentials: false
 
+            # Before any install, so the content hash sees a clean checkout.
+            - name: Decide whether this lane's inputs already went green
+              id: lane
+              uses: ./.github/actions/lane-hash
+              with:
+                  lane: boxes-music-player
+
             - uses: pnpm/action-setup@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   version: 10.33.2
 
             - uses: actions/setup-node@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   node-version: 24
                   cache: pnpm
 
             - name: Install Markless dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm install --frozen-lockfile
 
             - name: Run music-player demo analyzer gate tests
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir demos/music-player test:analyzer
 
             # Witness drives the runner image's Google Chrome, so this lane restores no Playwright browser.
             - name: Warm the runner's Chrome before the first timed launch
+              if: steps.lane.outputs.run == 'true'
               run: node scripts/ci/warm-chrome.mjs
 
             - name: Run music-player demo boxes
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir demos/music-player test:boxes
 
             - name: Upload music-player analyzer receipts
-              if: always()
+              if: steps.lane.outputs.run == 'true' && always()
               uses: actions/upload-artifact@v4
               with:
                   name: receipts-music-player
@@ -989,7 +948,7 @@ jobs:
 
             # A failed box's receipt (its recorded page events, requests and HMR payloads) is the only evidence of what it saw.
             - name: Upload the box receipts of a failed run
-              if: failure()
+              if: steps.lane.outputs.run == 'true' && failure()
               uses: actions/upload-artifact@v4
               with:
                   name: box-receipts-music-player
@@ -998,21 +957,28 @@ jobs:
                   retention-days: 14
 
             - name: Mark the music-player box lane complete
+              if: steps.lane.outputs.run == 'true'
               run: echo ok > boxes-music-player-completed.txt
 
             - name: Save the music-player box lane marker and receipts
+              if: steps.lane.outputs.run == 'true'
               uses: actions/cache/save@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_boxes_music_player }}
+                  key: ${{ steps.lane.outputs.key }}
                   path: |
                       boxes-music-player-completed.txt
                       demos/music-player/.witness/receipts
 
     # music-player-ssr demo: analyzer gate tests then boxes.
     boxes-music-player-ssr:
-        needs: [typecheck, lanes]
-        if: needs.lanes.outputs.run_boxes_music_player_ssr == 'true'
         runs-on: ubuntu-26.04
+        outputs:
+            run: ${{ steps.lane.outputs.run }}
+            key: ${{ steps.lane.outputs.key }}
+        permissions:
+            contents: read
+            # The lane probe reads the merge queue's CI run for this commit.
+            actions: read
         timeout-minutes: 25
         env:
             NPM_CONFIG_AUDIT: 'false'
@@ -1027,30 +993,43 @@ jobs:
               with:
                   persist-credentials: false
 
+            # Before any install, so the content hash sees a clean checkout.
+            - name: Decide whether this lane's inputs already went green
+              id: lane
+              uses: ./.github/actions/lane-hash
+              with:
+                  lane: boxes-music-player-ssr
+
             - uses: pnpm/action-setup@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   version: 10.33.2
 
             - uses: actions/setup-node@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   node-version: 24
                   cache: pnpm
 
             - name: Install Markless dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm install --frozen-lockfile
 
             - name: Run music-player-ssr demo analyzer gate tests
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir demos/music-player-ssr test:analyzer
 
             # Witness drives the runner image's Google Chrome, so this lane restores no Playwright browser.
             - name: Warm the runner's Chrome before the first timed launch
+              if: steps.lane.outputs.run == 'true'
               run: node scripts/ci/warm-chrome.mjs
 
             - name: Run music-player-ssr demo boxes
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir demos/music-player-ssr test:boxes
 
             - name: Upload music-player-ssr analyzer receipts
-              if: always()
+              if: steps.lane.outputs.run == 'true' && always()
               uses: actions/upload-artifact@v4
               with:
                   name: receipts-music-player-ssr
@@ -1060,7 +1039,7 @@ jobs:
 
             # A failed box's receipt (its recorded page events, requests and HMR payloads) is the only evidence of what it saw.
             - name: Upload the box receipts of a failed run
-              if: failure()
+              if: steps.lane.outputs.run == 'true' && failure()
               uses: actions/upload-artifact@v4
               with:
                   name: box-receipts-music-player-ssr
@@ -1069,12 +1048,14 @@ jobs:
                   retention-days: 14
 
             - name: Mark the music-player-ssr box lane complete
+              if: steps.lane.outputs.run == 'true'
               run: echo ok > boxes-music-player-ssr-completed.txt
 
             - name: Save the music-player-ssr box lane marker and receipts
+              if: steps.lane.outputs.run == 'true'
               uses: actions/cache/save@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_boxes_music_player_ssr }}
+                  key: ${{ steps.lane.outputs.key }}
                   path: |
                       boxes-music-player-ssr-completed.txt
                       demos/music-player-ssr/.witness/receipts
@@ -1083,9 +1064,14 @@ jobs:
     # and components, so copy and markup edits that strand them fail here. About
     # 30 seconds of boxes. Not part of the receipt set: they write no analyzer receipts.
     website-boxes:
-        needs: [typecheck, lanes]
-        if: needs.lanes.outputs.run_website_boxes == 'true'
         runs-on: ubuntu-26.04
+        outputs:
+            run: ${{ steps.lane.outputs.run }}
+            key: ${{ steps.lane.outputs.key }}
+        permissions:
+            contents: read
+            # The lane probe reads the merge queue's CI run for this commit.
+            actions: read
         timeout-minutes: 20
         env:
             PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
@@ -1101,63 +1087,81 @@ jobs:
               with:
                   persist-credentials: false
 
+            # Before any install, so the content hash sees a clean checkout.
+            - name: Decide whether this lane's inputs already went green
+              id: lane
+              uses: ./.github/actions/lane-hash
+              with:
+                  lane: website-boxes
+
             - uses: pnpm/action-setup@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   version: 10.33.2
 
             - uses: actions/setup-node@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   node-version: 24
                   cache: pnpm
 
             - name: Install Markless dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm install --frozen-lockfile
 
             - name: Restore the Playwright browser cache
+              if: steps.lane.outputs.run == 'true'
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-chromium-webkit-${{ steps.lane.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
+              if: steps.lane.outputs.run == 'true'
               id: apt-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-apt-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-${{ steps.lane.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-
+                      playwright-apt-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-matched-key != ''
+              if: steps.lane.outputs.run == 'true' && (steps.apt-cache.outputs.cache-matched-key != '')
               run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
 
             - name: Install Playwright browsers for the website boxes
-              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              if: steps.lane.outputs.run == 'true' && (steps.playwright-cache.outputs.cache-hit != 'true')
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
 
             # The website tooling tests ride this lane: its key hashes website/ and the UI API manifest they read.
             - name: Run website tooling tests
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir website exec vp test run --config vitest.tooling.config.ts
 
             - name: Warm the runner's Chrome before the first timed launch
+              if: steps.lane.outputs.run == 'true'
               run: node scripts/ci/warm-chrome.mjs
 
             - name: Run website boxes
+              if: steps.lane.outputs.run == 'true'
               run: node scripts/ci/memory-watch.mjs -- pnpm --dir website test:boxes
 
             - name: Mark the website box lane complete
+              if: steps.lane.outputs.run == 'true'
               run: echo ok > website-boxes-completed.txt
 
             - name: Save the website box lane marker
+              if: steps.lane.outputs.run == 'true'
               uses: actions/cache/save@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_website_boxes }}
+                  key: ${{ steps.lane.outputs.key }}
                   path: website-boxes-completed.txt
 
     # The deterministic performance guards (scripts/benchmarks/perf-guards):
@@ -1166,9 +1170,10 @@ jobs:
     # runner gives the same answer. The full set runs on every PR in parallel
     # with the box lanes; docs/ci-process.md has the measured cost.
     perf-guards:
-        needs: [typecheck, lanes]
-        if: needs.lanes.outputs.run_perf_guards == 'true'
         runs-on: ubuntu-26.04
+        outputs:
+            run: ${{ steps.lane.outputs.run }}
+            key: ${{ steps.lane.outputs.key }}
         # Slowest of 165 jobs took 14.3 min; the G16 baseline adds up to 10 min of waiting and ~1 min of downloads: 25.3, so 40 leaves 14.7.
         timeout-minutes: 40
         permissions:
@@ -1191,47 +1196,61 @@ jobs:
                   # The baseline walks up to 300 first parents for the commit each page's growth is counted from.
                   fetch-depth: 301
 
+            # Before any install, so the content hash sees a clean checkout.
+            - name: Decide whether this lane's inputs already went green
+              id: lane
+              uses: ./.github/actions/lane-hash
+              with:
+                  lane: perf-guards
+
             - uses: pnpm/action-setup@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   version: 10.33.2
 
             - uses: actions/setup-node@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   node-version: 24
                   cache: pnpm
 
             - name: Install Markless dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm install --frozen-lockfile
 
             - name: Restore the Playwright browser cache
+              if: steps.lane.outputs.run == 'true'
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-chromium-webkit-${{ steps.lane.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
+              if: steps.lane.outputs.run == 'true'
               id: apt-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-apt-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-${{ steps.lane.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-
+                      playwright-apt-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-matched-key != ''
+              if: steps.lane.outputs.run == 'true' && (steps.apt-cache.outputs.cache-matched-key != '')
               run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
 
             - name: Install Playwright browsers for the perf guards
-              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              if: steps.lane.outputs.run == 'true' && (steps.playwright-cache.outputs.cache-hit != 'true')
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
 
             - name: Run the performance guards
+              if: steps.lane.outputs.run == 'true'
               env:
                   GH_TOKEN: ${{ github.token }}
                   MARKLESS_PERF_GUARD_BASELINE: ci
@@ -1239,7 +1258,7 @@ jobs:
 
             # A Linux anchor is accepted from this file: pnpm perf:guard:accept <guard> <subject> --from last-measurement.json
             - name: Upload the perf-guards measurement
-              if: always()
+              if: steps.lane.outputs.run == 'true' && always()
               uses: actions/upload-artifact@v4
               with:
                   name: perf-guards-measurement
@@ -1249,21 +1268,28 @@ jobs:
                   retention-days: 14
 
             - name: Mark the perf-guards lane complete
+              if: steps.lane.outputs.run == 'true'
               run: echo ok > perf-guards-completed.txt
 
             - name: Save the perf-guards lane marker
+              if: steps.lane.outputs.run == 'true'
               uses: actions/cache/save@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_perf_guards }}
+                  key: ${{ steps.lane.outputs.key }}
                   path: perf-guards-completed.txt
 
     # Witness boxes of two demos no other lane builds, and the compiler-only
     # half of demos/executed-at-load. The box receipts are not part of the
     # analyzer receipt set, so this lane is not a `boxes-*` lane.
     demo-boxes:
-        needs: [typecheck, lanes]
-        if: needs.lanes.outputs.run_demo_boxes == 'true'
         runs-on: ubuntu-26.04
+        outputs:
+            run: ${{ steps.lane.outputs.run }}
+            key: ${{ steps.lane.outputs.key }}
+        permissions:
+            contents: read
+            # The lane probe reads the merge queue's CI run for this commit.
+            actions: read
         timeout-minutes: 20
         env:
             PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
@@ -1279,66 +1305,85 @@ jobs:
               with:
                   persist-credentials: false
 
+            # Before any install, so the content hash sees a clean checkout.
+            - name: Decide whether this lane's inputs already went green
+              id: lane
+              uses: ./.github/actions/lane-hash
+              with:
+                  lane: demo-boxes
+
             - uses: pnpm/action-setup@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   version: 10.33.2
 
             - uses: actions/setup-node@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   node-version: 24
                   cache: pnpm
 
             - name: Install Markless dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm install --frozen-lockfile
 
             - name: Restore the Playwright browser cache
+              if: steps.lane.outputs.run == 'true'
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-chromium-webkit-${{ steps.lane.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
+              if: steps.lane.outputs.run == 'true'
               id: apt-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-apt-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-${{ steps.lane.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-
+                      playwright-apt-${{ runner.os }}-${{ steps.lane.outputs.image_os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-matched-key != ''
+              if: steps.lane.outputs.run == 'true' && (steps.apt-cache.outputs.cache-matched-key != '')
               run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
 
             - name: Install Playwright browsers for the demo boxes
-              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              if: steps.lane.outputs.run == 'true' && (steps.playwright-cache.outputs.cache-hit != 'true')
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
 
             - name: Warm the runner's Chrome before the first timed launch
+              if: steps.lane.outputs.run == 'true'
               run: node scripts/ci/warm-chrome.mjs
 
             - name: Run live-feed demo boxes
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir demos/live-feed test:boxes
 
             - name: Run same-module-branch demo boxes
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir demos/same-module-branch test:boxes
 
             # Its `gate` half holds wall-clock caps and stays manual.
             - name: Run the executed-at-load fixture tests
+              if: steps.lane.outputs.run == 'true'
               run: pnpm --dir demos/executed-at-load test
 
             - name: Mark the demo box lane complete
+              if: steps.lane.outputs.run == 'true'
               run: echo ok > demo-boxes-completed.txt
 
             - name: Save the demo box lane marker
+              if: steps.lane.outputs.run == 'true'
               uses: actions/cache/save@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_demo_boxes }}
+                  key: ${{ steps.lane.outputs.key }}
                   path: demo-boxes-completed.txt
 
     # Reassembles the receipt tree the split box lanes wrote on four different
@@ -1505,8 +1550,8 @@ jobs:
     # scripts/ci/unit-budget.json. A job of its own so it reports when another lane
     # fails, and the unit marker waits for it so a re-run after a red budget measures again.
     unit-budget:
-        needs: [lanes, unit]
-        if: needs.unit.result == 'success'
+        needs: unit
+        if: needs.unit.result == 'success' && needs.unit.outputs.run == 'true'
         runs-on: ubuntu-26.04
         timeout-minutes: 5
         steps:
@@ -1524,31 +1569,31 @@ jobs:
               run: node scripts/ci/unit-budget.mjs check --measurements "$RUNNER_TEMP/unit-budget"
 
     save-lane-markers:
-        needs: [lanes, unit, unit-budget, browser]
+        needs: [unit, unit-budget, browser]
         if: always()
         runs-on: ubuntu-26.04
         timeout-minutes: 5
         steps:
             - name: Mark the unit lane complete
-              if: needs.lanes.outputs.run_unit == 'true' && needs.unit.result == 'success' && needs.unit-budget.result == 'success'
+              if: needs.unit.outputs.run == 'true' && needs.unit.result == 'success' && needs.unit-budget.result == 'success'
               run: echo ok > unit-completed.txt
 
             - name: Save the unit lane marker
-              if: needs.lanes.outputs.run_unit == 'true' && needs.unit.result == 'success' && needs.unit-budget.result == 'success'
+              if: needs.unit.outputs.run == 'true' && needs.unit.result == 'success' && needs.unit-budget.result == 'success'
               uses: actions/cache/save@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_unit }}
+                  key: ${{ needs.unit.outputs.key }}
                   path: unit-completed.txt
 
             - name: Mark the browser lane complete
-              if: needs.lanes.outputs.run_browser == 'true' && needs.browser.result == 'success'
+              if: needs.browser.outputs.run == 'true' && needs.browser.result == 'success'
               run: echo ok > browser-completed.txt
 
             - name: Save the browser lane marker
-              if: needs.lanes.outputs.run_browser == 'true' && needs.browser.result == 'success'
+              if: needs.browser.outputs.run == 'true' && needs.browser.result == 'success'
               uses: actions/cache/save@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_browser }}
+                  key: ${{ needs.browser.outputs.key }}
                   path: browser-completed.txt
 
     # The required status check. It holds the name branch protection already
@@ -1587,11 +1632,9 @@ jobs:
             PUPPETEER_SKIP_DOWNLOAD: '1'
             CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
         steps:
-            # `skipped` means the lane's content hash already had a green marker.
-            # It cannot mean "an upstream job failed": typecheck and lanes are the
-            # only jobs that can skip a lane, and both are in `needs`, so their
-            # failure lands here as `failure`. `unit-budget` skips only with `unit`,
-            # whose own failure lands here.
+            # A lane whose content hash already had a green marker succeeds without
+            # doing the work, so no lane is ever `skipped`. Only `unit-budget`
+            # skips: when `unit` hit its hash, or failed, which lands here itself.
             - name: Fail unless every test lane succeeded or hit its content hash
               id: gate
               run: |
@@ -1637,68 +1680,68 @@ jobs:
             # nothing this run, so its receipts come back out of the cache entry
             # its last green run saved under the same key.
             - name: Download bundler analyzer receipts
-              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_bundler == 'true'
+              if: env.RUN_RECEIPTS == 'true' && needs.boxes-bundler.outputs.run == 'true'
               uses: actions/download-artifact@v4
               with:
                   name: receipts-bundler
                   path: packages/bundler/.witness/receipts
 
             - name: Restore cached bundler analyzer receipts
-              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_bundler != 'true'
+              if: env.RUN_RECEIPTS == 'true' && needs.boxes-bundler.outputs.run != 'true'
               uses: actions/cache/restore@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_boxes_bundler }}
+                  key: ${{ needs.boxes-bundler.outputs.key }}
                   fail-on-cache-miss: true
                   path: |
                       boxes-bundler-completed.txt
                       packages/bundler/.witness/receipts
 
             - name: Download router analyzer receipts
-              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_router == 'true'
+              if: env.RUN_RECEIPTS == 'true' && needs.boxes-router.outputs.run == 'true'
               uses: actions/download-artifact@v4
               with:
                   name: receipts-router
                   path: packages/router/.witness/receipts
 
             - name: Restore cached router analyzer receipts
-              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_router != 'true'
+              if: env.RUN_RECEIPTS == 'true' && needs.boxes-router.outputs.run != 'true'
               uses: actions/cache/restore@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_boxes_router }}
+                  key: ${{ needs.boxes-router.outputs.key }}
                   fail-on-cache-miss: true
                   path: |
                       boxes-router-completed.txt
                       packages/router/.witness/receipts
 
             - name: Download music-player analyzer receipts
-              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_music_player == 'true'
+              if: env.RUN_RECEIPTS == 'true' && needs.boxes-music-player.outputs.run == 'true'
               uses: actions/download-artifact@v4
               with:
                   name: receipts-music-player
                   path: demos/music-player/.witness/receipts
 
             - name: Restore cached music-player analyzer receipts
-              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_music_player != 'true'
+              if: env.RUN_RECEIPTS == 'true' && needs.boxes-music-player.outputs.run != 'true'
               uses: actions/cache/restore@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_boxes_music_player }}
+                  key: ${{ needs.boxes-music-player.outputs.key }}
                   fail-on-cache-miss: true
                   path: |
                       boxes-music-player-completed.txt
                       demos/music-player/.witness/receipts
 
             - name: Download music-player-ssr analyzer receipts
-              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_music_player_ssr == 'true'
+              if: env.RUN_RECEIPTS == 'true' && needs.boxes-music-player-ssr.outputs.run == 'true'
               uses: actions/download-artifact@v4
               with:
                   name: receipts-music-player-ssr
                   path: demos/music-player-ssr/.witness/receipts
 
             - name: Restore cached music-player-ssr analyzer receipts
-              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_music_player_ssr != 'true'
+              if: env.RUN_RECEIPTS == 'true' && needs.boxes-music-player-ssr.outputs.run != 'true'
               uses: actions/cache/restore@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_boxes_music_player_ssr }}
+                  key: ${{ needs.boxes-music-player-ssr.outputs.key }}
                   fail-on-cache-miss: true
                   path: |
                       boxes-music-player-ssr-completed.txt
@@ -1708,10 +1751,10 @@ jobs:
               if: env.RUN_RECEIPTS == 'true'
               run: |
                   : > "$RUNNER_TEMP/lane-restored-receipts"
-                  [ '${{ needs.lanes.outputs.run_boxes_bundler }}' = true ] || echo packages/bundler/ >> "$RUNNER_TEMP/lane-restored-receipts"
-                  [ '${{ needs.lanes.outputs.run_boxes_router }}' = true ] || echo packages/router/ >> "$RUNNER_TEMP/lane-restored-receipts"
-                  [ '${{ needs.lanes.outputs.run_boxes_music_player }}' = true ] || echo demos/music-player/ >> "$RUNNER_TEMP/lane-restored-receipts"
-                  [ '${{ needs.lanes.outputs.run_boxes_music_player_ssr }}' = true ] || echo demos/music-player-ssr/ >> "$RUNNER_TEMP/lane-restored-receipts"
+                  [ '${{ needs.boxes-bundler.outputs.run }}' = true ] || echo packages/bundler/ >> "$RUNNER_TEMP/lane-restored-receipts"
+                  [ '${{ needs.boxes-router.outputs.run }}' = true ] || echo packages/router/ >> "$RUNNER_TEMP/lane-restored-receipts"
+                  [ '${{ needs.boxes-music-player.outputs.run }}' = true ] || echo demos/music-player/ >> "$RUNNER_TEMP/lane-restored-receipts"
+                  [ '${{ needs.boxes-music-player-ssr.outputs.run }}' = true ] || echo demos/music-player-ssr/ >> "$RUNNER_TEMP/lane-restored-receipts"
                   cat "$RUNNER_TEMP/lane-restored-receipts"
 
             - name: Generate analyzer unit-contract receipts
@@ -1793,74 +1836,110 @@ jobs:
     # A generated app built at 100 and 300 pages: build memory, the largest chunk and the largest
     # build artifact against scripts/benchmarks/build-scale/budgets.json, and the built server answers.
     build-scale:
-        needs: [typecheck, lanes]
-        if: needs.lanes.outputs.run_build_scale == 'true'
         runs-on: ubuntu-26.04
+        outputs:
+            run: ${{ steps.lane.outputs.run }}
+            key: ${{ steps.lane.outputs.key }}
+        permissions:
+            contents: read
+            # The lane probe reads the merge queue's CI run for this commit.
+            actions: read
         timeout-minutes: 20
         steps:
             - uses: actions/checkout@v4
               with:
                   persist-credentials: false
 
+            # Before any install, so the content hash sees a clean checkout.
+            - name: Decide whether this lane's inputs already went green
+              id: lane
+              uses: ./.github/actions/lane-hash
+              with:
+                  lane: build-scale
+
             - uses: pnpm/action-setup@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   version: 10.33.2
 
             - uses: actions/setup-node@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   node-version: 24
                   cache: pnpm
 
             - name: Install Markless dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm install --frozen-lockfile
 
             - name: Build the generated app at two sizes against its budgets
+              if: steps.lane.outputs.run == 'true'
               run: pnpm build-scale:guard
 
             - name: Mark the build-scale lane complete
+              if: steps.lane.outputs.run == 'true'
               run: echo ok > build-scale-completed.txt
 
             - name: Save the build-scale lane marker
+              if: steps.lane.outputs.run == 'true'
               uses: actions/cache/save@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_build_scale }}
+                  key: ${{ steps.lane.outputs.key }}
                   path: build-scale-completed.txt
 
     # The docs site and the demo apps build without a single warning on stderr
     # (scripts/ci/build-warnings.mjs) and ship no Node-only code to the browser
     # (scripts/ci/browser-output-scan.mjs); the starters are held to the same in the unit lane.
     build-warnings:
-        needs: [typecheck, lanes]
-        if: needs.lanes.outputs.run_build_warnings == 'true'
         runs-on: ubuntu-26.04
+        outputs:
+            run: ${{ steps.lane.outputs.run }}
+            key: ${{ steps.lane.outputs.key }}
+        permissions:
+            contents: read
+            # The lane probe reads the merge queue's CI run for this commit.
+            actions: read
         timeout-minutes: 20
         steps:
             - uses: actions/checkout@v4
               with:
                   persist-credentials: false
 
+            # Before any install, so the content hash sees a clean checkout.
+            - name: Decide whether this lane's inputs already went green
+              id: lane
+              uses: ./.github/actions/lane-hash
+              with:
+                  lane: build-warnings
+
             - uses: pnpm/action-setup@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   version: 10.33.2
 
             - uses: actions/setup-node@v4
+              if: steps.lane.outputs.run == 'true'
               with:
                   node-version: 24
                   cache: pnpm
 
             - name: Install Markless dependencies
+              if: steps.lane.outputs.run == 'true'
               run: pnpm install --frozen-lockfile
 
             - name: Build the docs site and demos and fail on any warning or Node-only browser code
+              if: steps.lane.outputs.run == 'true'
               run: pnpm build-warnings:guard
 
             - name: Mark the build-warnings lane complete
+              if: steps.lane.outputs.run == 'true'
               run: echo ok > build-warnings-completed.txt
 
             - name: Save the build-warnings lane marker
+              if: steps.lane.outputs.run == 'true'
               uses: actions/cache/save@v4
               with:
-                  key: ${{ needs.lanes.outputs.key_build_warnings }}
+                  key: ${{ steps.lane.outputs.key }}
                   path: build-warnings-completed.txt
 
     changes:

@@ -614,7 +614,13 @@ export type NativeOp =
 			readonly type: string;
 			readonly bindings: NativeScriptBindings;
 			readonly catch?: string;
-	  };
+	  }
+	/**
+	 * `reset` of `@catch (error, reset)`: clears the boundary's handler error (`catch`) and runs again each of its async
+	 * values (`cells`, read where the handler runs) that holds an error, with the same key; until one answers the boundary
+	 * keeps showing what it shows.
+	 */
+	| { readonly op: 'reset'; readonly cells: ReadonlyArray<string>; readonly catch?: string };
 
 /** Element commands a host runs. */
 export type NativeCommand = 'focus' | 'scrollIntoView';
@@ -643,6 +649,18 @@ export type NativeViewPayload = {
 		readonly task?: {
 			readonly call: NativeDeviceCall;
 			readonly arguments: ReadonlyArray<NativeExpr>;
+		};
+		/**
+		 * An async value the payload's script computes (`computed(async ...)` that is not one device call). The host's
+		 * runtime starts it when the screen starts and again whenever a cell its bindings read changes, and the script
+		 * settles the cell: `{ state: 'pending' }` until the first answer, then `{ state: 'value', value, error }` (`error` is
+		 * a failed refresh's error over the value it kept, else null) or `{ state: 'error', error: { name, message } }`.
+		 */
+		readonly async?: {
+			readonly script: string;
+			readonly bindings: NativeScriptBindings;
+			/** The `@try` branches that read it: it runs while one of them is shown, and is aborted when none is. */
+			readonly boundaries: ReadonlyArray<string>;
 		};
 		/**
 		 * State of a component a list row renders (`repeat` node id): one value per row, `initial` when the row is built and
@@ -688,6 +706,8 @@ export type NativeViewPayload = {
 	 * wording); the host picks the device's language. Present with `forms`.
 	 */
 	readonly valueMissing?: Readonly<Record<string, NativeValueMissing>>;
+	/** What the web says when a text field a person edited is longer than its `maxlength`, by language; present when a form's text field has one. */
+	readonly tooLong?: Readonly<Record<string, NativeTooLong>>;
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	readonly script?: NativeScript;
 };
@@ -710,6 +730,29 @@ export type NativeValueMissing = {
 	readonly radio: string;
 };
 
+/** Chromium's message for a text field longer than its `maxlength`: `{max}` and `{length}` in `text` are written in `digits` (ASCII when absent). */
+export type NativeTooLong = { readonly text: string; readonly digits?: string };
+
+/** `message` with `{max}` and `{length}` filled in as Chromium writes them: no grouping, in the language's digits. */
+export function nativeTooLongMessage(message: NativeTooLong, max: number, length: number): string {
+	const digits = message.digits ?? '0123456789';
+	const write = (value: number) =>
+		String(value).replace(/[0-9]/g, (digit) => digits[Number(digit)]!);
+	return message.text.replace('{max}', write(max)).replace('{length}', write(length));
+}
+
+/**
+ * A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers: leading ASCII whitespace, an
+ * optional sign, then digits up to the first non-digit. Undefined (no limit) when there are no digits or it is negative.
+ */
+export function nativeMaxLength(attribute: string | null | undefined): number | undefined {
+	const match = attribute == null ? null : /^[\t\n\f\r ]*([+-]?)([0-9]+)/.exec(attribute);
+	if (!match) return undefined;
+	const value = Number(match[2]);
+	if (match[1] === '-' && value !== 0) return undefined;
+	return value;
+}
+
 /** A form's submittable fields and submit buttons, each in tree order. */
 export type NativeForm = {
 	readonly node: string;
@@ -724,7 +767,10 @@ export type NativeForm = {
 /** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */
 export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden' | 'select';
 
-export { NATIVE_VALUE_MISSING_BY_LOCALE } from './native-validation-messages.ts';
+export {
+	NATIVE_TOO_LONG_BY_LOCALE,
+	NATIVE_VALUE_MISSING_BY_LOCALE,
+} from './native-validation-messages.ts';
 
 /**
  * The language a browser on a device with these preferred languages shows its own text in, among `available`: the first
@@ -845,7 +891,9 @@ export type NativeJournalEntry =
 	/** The script cleared a timer it set (`timer` names it, `script:<n>`): the host drops it. */
 	| { readonly op: 'clearTimer'; readonly timer: string }
 	/** The script called `fetch`: the host sends the request and answers with a `response` action naming `id`. */
-	| { readonly op: 'fetch'; readonly id: number; readonly request: NativeFetchRequest };
+	| { readonly op: 'fetch'; readonly id: number; readonly request: NativeFetchRequest }
+	/** The signal of the request `id` aborted (its async value was superseded or left the screen): cancel it, send no response. */
+	| { readonly op: 'abort'; readonly id: number };
 
 /** A request as the script made it; `url` is absolute (a relative one rejects in the script, as with no page to resolve it). */
 export type NativeFetchRequest = {

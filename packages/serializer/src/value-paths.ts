@@ -1,4 +1,5 @@
 import { isPlainObject } from './value.ts';
+import { setDataField } from './value-own-field.ts';
 
 /**
  * The value with only what `paths` reach kept, so the page ships the fields
@@ -37,11 +38,6 @@ export function valueAlongPaths(
 	const kept: Record<string, unknown> = {};
 	for (const [key, rest] of rests)
 		if (Object.hasOwn(value, key))
-			Object.defineProperty(kept, key, {
-				value: valueAlongPaths((value as Record<string, unknown>)[key], rest),
-				enumerable: true,
-				writable: true,
-				configurable: true,
-			});
+			setDataField(kept, key, valueAlongPaths((value as Record<string, unknown>)[key], rest));
 	return kept;
 }

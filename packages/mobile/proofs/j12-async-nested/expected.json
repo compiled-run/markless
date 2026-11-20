@@ -1,0 +1,76 @@
+{
+	"rung": "J12",
+	"name": "@try inside an @if arm and inside another @try: each waits, fails and refreshes on its own; shown again, it keeps its answer",
+	"server": "echo",
+	"steps": [
+		{
+			"visible": ["Nested", "Hide", "Asked: apple", "Loading word"],
+			"absent": ["Show", "Word: apple"],
+			"onWeb": {
+				"why": "The web's server render waits for both values before it sends the page; a phone renders on the device, so it shows @pending first.",
+				"visible": ["Nested", "Hide", "Word: apple", "Detail: pear"],
+				"absent": ["Loading word", "Loading detail"]
+			}
+		},
+		{
+			"do": {
+				"wait": 5500
+			},
+			"visible": ["Word: apple", "Loading detail"],
+			"absent": ["Loading word", "Detail: pear"],
+			"onWeb": {
+				"why": "Both values came with the page.",
+				"visible": ["Word: apple", "Detail: pear"]
+			}
+		},
+		{
+			"do": {
+				"wait": 5500
+			},
+			"visible": ["Word: apple", "Detail: pear"],
+			"absent": ["Loading detail", "Detail asked: missing"]
+		},
+		{
+			"do": {
+				"tap": "Break detail"
+			},
+			"visible": ["Detail: pear", "Detail asked: missing"],
+			"absent": ["Detail failed: No entry for missing", "Detail asked: pear"]
+		},
+		{
+			"do": {
+				"wait": 5500
+			},
+			"visible": ["Word: apple", "Detail: pear", "Detail failed: No entry for missing"],
+			"absent": ["Word failed: No entry for missing"]
+		},
+		{
+			"do": {
+				"tap": "Hide"
+			},
+			"visible": ["Show"],
+			"absent": ["Word: apple", "Detail: pear"]
+		},
+		{
+			"do": {
+				"tap": "Show"
+			},
+			"visible": ["Hide", "Word: apple", "Detail failed: No entry for missing"],
+			"absent": ["Show", "Loading word", "Loading detail", "Detail: pear", "Asked: banana"]
+		},
+		{
+			"do": {
+				"tap": "Banana"
+			},
+			"visible": ["Asked: banana", "Word: apple", "Detail failed: No entry for missing"],
+			"absent": ["Asked: apple", "Loading word"]
+		},
+		{
+			"do": {
+				"wait": 5500
+			},
+			"visible": ["Word: banana", "Detail failed: No entry for missing"],
+			"absent": ["Word: apple", "Loading detail"]
+		}
+	]
+}

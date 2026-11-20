@@ -17,6 +17,7 @@ public final class MarklessScripting {
 	/// Called after each engine creation with the app's count of them.
 	public var engineStarted: ((Int) -> Void)?
 	private var answers: [Int: (NativeFetchResponse) -> Void] = [:]
+	private var sending: [Int: Task<Void, Never>] = [:]
 	private var nextAnswer = 0
 	private var warming: Set<String> = []
 	private let session = URLSession(configuration: .ephemeral)
@@ -55,15 +56,25 @@ public final class MarklessScripting {
 	}
 
 	/// Sends the request and answers on the main queue: the response with its body as text, or `{ error }` on any failure.
-	func fetch(_ request: NativeFetchRequest, answer: @escaping (NativeFetchResponse) -> Void) {
+	/// Returns the token `cancel(_:)` takes.
+	@discardableResult
+	func fetch(_ request: NativeFetchRequest, answer: @escaping (NativeFetchResponse) -> Void) -> Int {
 		let token = nextAnswer
 		nextAnswer += 1
 		answers[token] = answer
 		let session = self.session
-		Task { @MainActor in
+		sending[token] = Task { @MainActor in
 			let response = await Self.send(request, session)
+			MarklessScripting.shared.sending[token] = nil
 			MarklessScripting.shared.answers.removeValue(forKey: token)?(response)
 		}
+		return token
+	}
+
+	/// Stops a request `fetch` sent; its answer is never called.
+	func cancel(_ token: Int) {
+		answers[token] = nil
+		sending.removeValue(forKey: token)?.cancel()
 	}
 
 	private nonisolated static func send(_ request: NativeFetchRequest, _ session: URLSession) async -> NativeFetchResponse {

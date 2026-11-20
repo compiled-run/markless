@@ -13266,6 +13266,1121 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_STATE_CLASS_INSTANCE',
+		title: 'state() holds a class instance',
+		area: 'state',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'state() starts with a class instance, which cannot cross from the server to the browser.',
+		printed: [
+			'MARKLESS_STATE_CLASS_INSTANCE: state "<name>" holds <held>. Class instances in state are not supported yet: the server render cannot write one into the page, and a method that changes `this` records no change, so the page would not update.',
+			'state() crosses from the server to the browser as data. A class instance is data plus methods, and the methods do not cross: the browser would get a plain object, and a write made inside a method is invisible to Markless.',
+			'Keep the fields as plain data in state and turn each method into a function beside it that takes the data: `function update(<name>, ...) { ... }`, called as `update(<name>, ...)`. Markless tracks what that function changes.',
+			'https://markless.dev/errors/MARKLESS_STATE_CLASS_INSTANCE',
+		],
+		structured: true,
+		why: 'state() crosses from the server to the browser as data. A class instance is data plus methods, and the methods do not cross: the browser would get a plain object, and a write made inside a method is invisible to Markless.',
+		suggestion:
+			'Keep the fields as plain data in state and turn each method into a function beside it that takes the data: `function update(<name>, ...) { ... }`, called as `update(<name>, ...)`. Markless tracks what that function changes.',
+		guide: {
+			summary:
+				'state() starts with a class instance, which cannot cross from the server to the browser.',
+			what: [
+				{
+					id: 's0',
+					text: 'State reaches the browser as data. A class instance is data plus methods, and the methods do not come along, so the server render could not write it into the page and a method that changes ',
+				},
+				{
+					id: 's1',
+					text: 'this',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' would leave the page stale. Markless refuses ',
+				},
+				{
+					id: 's3',
+					text: 'new X()',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' in a state() initializer, alone or as array elements, unless X is a built-in it can send, such as ',
+				},
+				{
+					id: 's5',
+					text: 'Date',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ', ',
+				},
+				{
+					id: 's7',
+					text: 'Map',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: ' or ',
+				},
+				{
+					id: 's9',
+					text: 'Set',
+					code: true,
+				},
+				{
+					id: 's10',
+					text: '. What the build does not catch yet: an instance returned from a function or a static factory (',
+				},
+				{
+					id: 's11',
+					text: 'state(makeCart())',
+					code: true,
+				},
+				{
+					id: 's12',
+					text: ', ',
+				},
+				{
+					id: 's13',
+					text: 'Cart.create()',
+					code: true,
+				},
+				{
+					id: 's14',
+					text: '), one nested in an array of arrays, inside an object in an array, behind a condition (',
+				},
+				{
+					id: 's15',
+					text: 'ok ? new Cart() : null',
+					code: true,
+				},
+				{
+					id: 's16',
+					text: '), as a Map value, under a computed key, made with ',
+				},
+				{
+					id: 's17',
+					text: 'Object.create',
+					code: true,
+				},
+				{
+					id: 's18',
+					text: ', or assigned or pushed later in a handler (',
+				},
+				{
+					id: 's19',
+					text: 'cart = new Cart()',
+					code: true,
+				},
+				{
+					id: 's20',
+					text: ', ',
+				},
+				{
+					id: 's21',
+					text: 'carts.push(new Cart())',
+					code: true,
+				},
+				{
+					id: 's22',
+					text: '). Those still build, then fail at server render or leave the page stale.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Keep the fields as plain data in state and move each method into a function beside it that takes the data. Markless tracks what that function changes. Or keep plain data in state and build the instance inside the handler that needs it.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'add',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r3',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'cart',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r5',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r6',
+							text: ' { ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: 'bags',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r8',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r9',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: 'number',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r11',
+							text: ' }, ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'n',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r13',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r14',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r15',
+							text: 'number',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r16',
+							text: ') {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\tcart.bags ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: '+=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r2',
+							text: ' n;',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Shop',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r5',
+							text: '() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'let',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r2',
+							text: ' cart ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r6',
+							text: '({ bags: ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: '0',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r8',
+							text: ' });',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l6',
+					runs: [],
+				},
+				{
+					id: 'l7',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'onClick',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r5',
+							text: '{() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r7',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'add',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r9',
+							text: '(cart, ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: '1',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r11',
+							text: ')}>{cart.bags}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r13',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l8',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+			],
+			before: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'import',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' { state } ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'from',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: "'@markless/core'",
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
+						},
+						{
+							id: 'r5',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: 'class',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'Cart',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r3',
+							text: ' {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'bags',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: '0',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r6',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'add',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r2',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'n',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r4',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r5',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'number',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r7',
+							text: ') {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'this',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r2',
+							text: '.bags ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '+=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r4',
+							text: ' n;',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l6',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l7',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l8',
+					runs: [],
+				},
+				{
+					id: 'l9',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Shop',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r5',
+							text: '() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+				{
+					id: 'l10',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'let',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r2',
+							text: ' cart ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r6',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: 'new',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r8',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r9',
+							text: 'Cart',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r10',
+							text: '());',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l11',
+					runs: [],
+				},
+				{
+					id: 'l12',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'onClick',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r5',
+							text: '{() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r7',
+							text: ' cart.',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'add',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r9',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: '1',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r11',
+							text: ')}>{cart.bags}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r13',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l13',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+			],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/capture-analysis.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/capture-analysis.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_STATE_CLASS_METHOD_CALL',
+		title: 'Code calls a method on a class instance in state',
+		area: 'state',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'Code calls a method on a class instance held in state.',
+		printed: [
+			'MARKLESS_STATE_CLASS_METHOD_CALL: `<callSource>` calls a method of the `<constructorName>` instance state "<stateName>" holds. Class instances in state are not supported yet, so Markless cannot see what the method changes and the page would not update.',
+			"state() crosses from the server to the browser as data, and a class instance's methods do not cross with it. A change a method makes through `this` is not a change Markless can record.",
+			'Keep the fields as plain data in "<stateName>" and turn the method into a function that takes the data, called as `update(<stateName>, ...)`; or build the <constructorName> inside this handler and write the fields you need back to state.',
+			'https://markless.dev/errors/MARKLESS_STATE_CLASS_METHOD_CALL',
+		],
+		structured: true,
+		why: "state() crosses from the server to the browser as data, and a class instance's methods do not cross with it. A change a method makes through `this` is not a change Markless can record.",
+		suggestion:
+			'Keep the fields as plain data in "<stateName>" and turn the method into a function that takes the data, called as `update(<stateName>, ...)`; or build the <constructorName> inside this handler and write the fields you need back to state.',
+		guide: {
+			summary: 'Code calls a method on a class instance held in state.',
+			what: [
+				{
+					id: 's0',
+					text: 'Markless cannot see what a method changes through ',
+				},
+				{
+					id: 's1',
+					text: 'this',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', so the page would not update, and a method named like a Map or Set method (',
+				},
+				{
+					id: 's3',
+					text: 'add',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', ',
+				},
+				{
+					id: 's5',
+					text: 'set',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ') is not treated as one. This comes with the refusal of the instance itself. What the build does not catch yet: an instance returned from a function or a static factory (',
+				},
+				{
+					id: 's7',
+					text: 'state(makeCart())',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: ', ',
+				},
+				{
+					id: 's9',
+					text: 'Cart.create()',
+					code: true,
+				},
+				{
+					id: 's10',
+					text: '), one nested in an array of arrays, inside an object in an array, behind a condition (',
+				},
+				{
+					id: 's11',
+					text: 'ok ? new Cart() : null',
+					code: true,
+				},
+				{
+					id: 's12',
+					text: '), as a Map value, under a computed key, made with ',
+				},
+				{
+					id: 's13',
+					text: 'Object.create',
+					code: true,
+				},
+				{
+					id: 's14',
+					text: ', or assigned or pushed later in a handler (',
+				},
+				{
+					id: 's15',
+					text: 'cart = new Cart()',
+					code: true,
+				},
+				{
+					id: 's16',
+					text: ', ',
+				},
+				{
+					id: 's17',
+					text: 'carts.push(new Cart())',
+					code: true,
+				},
+				{
+					id: 's18',
+					text: '). Those still build, then fail at server render or leave the page stale.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Turn the method into a function that takes the plain data, called as ',
+				},
+				{
+					id: 's1',
+					text: 'add(cart, 1)',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', or build the instance inside the handler and write the fields you need back to state.',
+				},
+			],
+			example: [],
+			before: [],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_STATE_CLASS_METHOD_UNBOUND',
+		title: 'A handler is a method read off state',
+		area: 'state',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'An event handler is a method read off a class instance in state.',
+		printed: [
+			'MARKLESS_STATE_CLASS_METHOD_UNBOUND: `<attributeName>={<referenceSource>}` hands the event a method read off state "<stateName>". A value in state is data, so the handler would have nothing to call, and a method passed without its object runs with no `this`.',
+			'state() crosses from the server to the browser as data; methods do not cross with it. A handler must be a function the compiler can see, so it can run in the browser after resume.',
+			'Write `<attributeName>={() => <referenceSource>()}`, so the call is visible where the event runs.',
+			'https://markless.dev/errors/MARKLESS_STATE_CLASS_METHOD_UNBOUND',
+		],
+		structured: true,
+		why: 'state() crosses from the server to the browser as data; methods do not cross with it. A handler must be a function the compiler can see, so it can run in the browser after resume.',
+		suggestion:
+			'Write `<attributeName>={() => <referenceSource>()}`, so the call is visible where the event runs.',
+		guide: {
+			summary: 'An event handler is a method read off a class instance in state.',
+			what: [
+				{
+					id: 's0',
+					text: 'onClick={cart.add}',
+					code: true,
+				},
+				{
+					id: 's1',
+					text: ' hands the event a method of an instance that state holds. The method does not reach the browser, and even in plain JavaScript a method passed without its object runs with no ',
+				},
+				{
+					id: 's2',
+					text: 'this',
+					code: true,
+				},
+				{
+					id: 's3',
+					text: '. Only element event attributes are checked: ',
+				},
+				{
+					id: 's4',
+					text: 'items.forEach(cart.add)',
+					code: true,
+				},
+				{
+					id: 's5',
+					text: ' and a component prop such as ',
+				},
+				{
+					id: 's6',
+					text: 'onPick={cart.add}',
+					code: true,
+				},
+				{
+					id: 's7',
+					text: ' are not. What the build does not catch yet: an instance returned from a function or a static factory (',
+				},
+				{
+					id: 's8',
+					text: 'state(makeCart())',
+					code: true,
+				},
+				{
+					id: 's9',
+					text: ', ',
+				},
+				{
+					id: 's10',
+					text: 'Cart.create()',
+					code: true,
+				},
+				{
+					id: 's11',
+					text: '), one nested in an array of arrays, inside an object in an array, behind a condition (',
+				},
+				{
+					id: 's12',
+					text: 'ok ? new Cart() : null',
+					code: true,
+				},
+				{
+					id: 's13',
+					text: '), as a Map value, under a computed key, made with ',
+				},
+				{
+					id: 's14',
+					text: 'Object.create',
+					code: true,
+				},
+				{
+					id: 's15',
+					text: ', or assigned or pushed later in a handler (',
+				},
+				{
+					id: 's16',
+					text: 'cart = new Cart()',
+					code: true,
+				},
+				{
+					id: 's17',
+					text: ', ',
+				},
+				{
+					id: 's18',
+					text: 'carts.push(new Cart())',
+					code: true,
+				},
+				{
+					id: 's19',
+					text: '). Those still build, then fail at server render or leave the page stale.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Call the method inside an arrow function, ',
+				},
+				{
+					id: 's1',
+					text: 'onClick={() => cart.add()}',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', and keep the data plain as the page for MARKLESS_STATE_CLASS_INSTANCE describes.',
+				},
+			],
+			example: [],
+			before: [],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_STATE_CONST_REASSIGNMENT',
 		title: 'Code reassigns state declared with const',
 		area: 'state',
@@ -15938,6 +17053,213 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/bundler/src/transform.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/transform.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_TYPE_STRIP_PARAMETER_PROPERTY',
+		title: 'A constructor declares a field in its parameters',
+		area: 'build',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'A class constructor declares a field in its parameter list (`constructor(public sku: string)`).',
+		printed: [
+			'MARKLESS_TYPE_STRIP_PARAMETER_PROPERTY: The constructor of <className> declares the field "<parameterName>" in its parameter list (`<source>`). Markless turns .tsrx code into JavaScript only by removing types, and this form cannot be produced that way: its JavaScript equivalent is a field in the class body plus an assignment in the constructor, which removing types does not write.',
+			'A TypeScript parameter property both declares a field and assigns it. With only the types removed it would be an ordinary parameter and the field would be gone, so the type remover refuses it.',
+			'Declare the field in the class body and assign it in the constructor: `<parameterName>: Type;` and `constructor(<parameterName>: Type) { this.<parameterName> = <parameterName>; }`.',
+			'https://markless.dev/errors/MARKLESS_TYPE_STRIP_PARAMETER_PROPERTY',
+		],
+		structured: true,
+		why: 'A TypeScript parameter property both declares a field and assigns it. With only the types removed it would be an ordinary parameter and the field would be gone, so the type remover refuses it.',
+		suggestion:
+			'Declare the field in the class body and assign it in the constructor: `<parameterName>: Type;` and `constructor(<parameterName>: Type) { this.<parameterName> = <parameterName>; }`.',
+		guide: {
+			summary:
+				'A class constructor declares a field in its parameter list (`constructor(public sku: string)`).',
+			what: [
+				{
+					id: 's0',
+					text: 'Markless turns .tsrx code into JavaScript only by removing types. A TypeScript parameter property declares a field and assigns it; with only the types removed it would be an ordinary parameter and the field would be gone.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Declare the field in the class body and assign it in the constructor.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'class',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'Item',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r3',
+							text: ' {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'sku',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r2',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'string',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r5',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'constructor',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r2',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'sku',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r4',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r5',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'string',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r7',
+							text: ') {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'this',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r2',
+							text: '.sku ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r4',
+							text: ' sku;',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+			before: [],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/compiler/src/passes/semantic-graph/parameter-properties.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/parameter-properties.ts',
 			},
 		],
 		moreSources: 0,

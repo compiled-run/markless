@@ -52,6 +52,13 @@ type Loaded = {
 	readonly sources: readonly string[];
 };
 
+type ImageEvent = {
+	readonly image: string;
+	readonly type: string;
+	readonly currentSrc: string;
+	readonly naturalWidth: number;
+};
+
 const loaded = async (page: Page): Promise<Loaded> => {
 	await page.waitForFunction(() =>
 		[...document.querySelectorAll<HTMLMediaElement>('[data-media]')].every(
@@ -130,36 +137,60 @@ for (const [name, browserType] of [
 			const page = await browser.newPage();
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(String(error)));
+			const requests = new Map<string, string>();
 			// An image or media request that fails is named, so a missing image says why.
 			page.on('requestfailed', (request) => {
-				if (['image', 'media'].includes(request.resourceType()))
-					errors.push(`${request.url()} failed: ${request.failure()?.errorText}`);
+				if (!['image', 'media'].includes(request.resourceType())) return;
+				const failure = `failed: ${request.failure()?.errorText}`;
+				requests.set(request.url(), failure);
+				errors.push(`${request.url()} ${failure}`);
 			});
 			page.on('response', (response) => {
-				if (['image', 'media'].includes(response.request().resourceType()) && response.status() >= 400)
-					errors.push(`${response.url()} answered ${response.status()}`);
+				if (!['image', 'media'].includes(response.request().resourceType())) return;
+				requests.set(response.url(), `answered ${response.status()}`);
+				if (response.status() >= 400) errors.push(`${response.url()} answered ${response.status()}`);
 			});
 			await page.addInitScript(() => {
 				const broken = new WeakSet<Element>();
-				Object.assign(window, { __brokenImages: broken });
-				document.addEventListener('error', (event) => broken.add(event.target as Element), true);
+				const imageEvents: ImageEvent[] = [];
+				Object.assign(window, { __brokenImages: broken, __imageEvents: imageEvents });
+				const record = (event: Event) => {
+					const target = event.target as Element;
+					if (event.type === 'error') broken.add(target);
+					if (target instanceof HTMLImageElement)
+						imageEvents.push({
+							image: target.dataset.image ?? target.src,
+							type: event.type,
+							currentSrc: target.currentSrc,
+							naturalWidth: target.naturalWidth,
+						});
+				};
+				document.addEventListener('error', record, true);
+				document.addEventListener('load', record, true);
 			});
 			await page.goto(origin + path, { waitUntil: 'load' });
-			return { page, errors };
+			// Every image's load and error events, with what the network answered for the source it showed, for the failure message.
+			const imageTrace = async () =>
+				(await page.evaluate(() => (window as unknown as { __imageEvents: ImageEvent[] }).__imageEvents))
+					.map(
+						(event) =>
+							`${event.image} ${event.type} currentSrc=${event.currentSrc} naturalWidth=${event.naturalWidth} request=${requests.get(event.currentSrc) ?? 'no response seen'}`,
+					)
+					.join('\n');
+			return { page, errors, imageTrace };
 		};
 
 		test('a full load of the page plays its media and shows its images', async () => {
-			const { page, errors } = await open('/media');
+			const { page, errors, imageTrace } = await open('/media');
 			const result = await loaded(page);
-			expect(result).toEqual(expected);
+			expect({ ...result, errors }, await imageTrace()).toEqual({ ...expected, errors: [] });
 			for (const media of Object.values(result.media))
 				expect(media.readyState).toBeGreaterThan(0);
-			expect(errors).toEqual([]);
 			await page.close();
 		});
 
 		test('the same page arriving in place plays its media and shows its images', async () => {
-			const { page, errors } = await open('/');
+			const { page, errors, imageTrace } = await open('/');
 			const documents: string[] = [];
 			page.on('request', (request) => {
 				if (request.resourceType() === 'document')
@@ -168,8 +199,7 @@ for (const [name, browserType] of [
 			await page.locator('[data-go="media"]').click();
 			await page.waitForFunction(() => document.querySelector('[data-page="media"]'));
 			const result = await loaded(page);
-			expect(errors).toEqual([]);
-			expect(result).toEqual(expected);
+			expect({ ...result, errors }, await imageTrace()).toEqual({ ...expected, errors: [] });
 			for (const media of Object.values(result.media))
 				expect(media.readyState).toBeGreaterThan(0);
 			expect(documents.filter((path) => path !== '/frame.html')).toEqual([]);
@@ -177,15 +207,14 @@ for (const [name, browserType] of [
 		});
 
 		test('a page arriving in place over one of the same shape plays and shows its own sources', async () => {
-			const { page, errors } = await open('/media');
+			const { page, errors, imageTrace } = await open('/media');
 			await loaded(page);
 			await page.locator('[data-go="clip"]').click();
 			await page.waitForFunction(() => document.querySelector('[data-page="clip"]'));
 			const result = await loaded(page);
-			expect(result).toEqual(expected);
+			expect({ ...result, errors }, await imageTrace()).toEqual({ ...expected, errors: [] });
 			expect(result.sources.filter((search) => !search.includes('clip'))).toEqual([]);
 			expect(result.sources).toHaveLength(8);
-			expect(errors).toEqual([]);
 			await page.close();
 		});
 	});
