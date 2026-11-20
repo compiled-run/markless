@@ -230,3 +230,13 @@ func rejectsTouchShapesItDoesNotKnow(find: String, replace: String, reason: Stri
 	let message = try #require(rejection(mutated))
 	#expect(message.contains(reason), "\(message)")
 }
+
+@Test func decodesTheCurrentColourSeenThroughAnOpacity() throws {
+	let template = #"{"version":"markless.native-view/0","component":"A","cells":[],"nodes":[{"kind":"element","id":"h0","element":"svg","parent":null,"drawing":{"viewBox":null,"shapes":[{"path":[],"fill":PAINT,"fillRule":"nonzero","stroke":"currentColor","width":1,"cap":"butt","join":"miter","miterLimit":4}]}}],"events":[],"handlers":[]}"#
+	let svg = { (paint: String) in template.replacingOccurrences(of: "PAINT", with: paint) }
+	let shape = try decode(svg(#"{"current":true,"alpha":64}"#)).nodes[0].drawing?.shapes[0]
+	#expect(shape?.fill == .current(alpha: 64))
+	#expect(shape?.stroke == .currentColor)
+	#expect(rejection(svg(#"{"current":true,"alpha":64.5}"#))?.contains("an integer 0-255") == true)
+	#expect(rejection(svg(#"{"current":false,"alpha":64}"#))?.contains("unknown paint") == true)
+}

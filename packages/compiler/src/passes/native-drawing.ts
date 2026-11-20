@@ -268,20 +268,13 @@ export function compileDrawing(
 
 	const shapes: NativeShape[] = [];
 	const emit = (element: DrawingElement, outline: number[], style: Inherited, matrix: Matrix) => {
-		const alpha = (given: Paint, opacity: number): Paint => {
+		const alpha = (given: Paint, opacity: number): NativeShape['fill'] => {
 			const paint = given === 'currentColor' && style.color ? style.color : given;
-			if (paint === null || paint === 'currentColor' || opacity === 1) return paint;
-			return { ...paint, alpha: Math.round(paint.alpha * opacity) };
+			if (paint === null || opacity === 1) return paint;
+			const seen = Math.round((paint === 'currentColor' ? 255 : paint.alpha) * opacity);
+			if (paint !== 'currentColor') return { ...paint, alpha: seen };
+			return seen === 255 ? paint : { current: true, alpha: seen };
 		};
-		const open = (paint: Paint) => paint === 'currentColor' && !style.color;
-		if (
-			(open(style.fill) && style.fillOpacity * style.opacity !== 1) ||
-			(open(style.stroke) && style.strokeOpacity * style.opacity !== 1)
-		)
-			refuse(
-				element.id,
-				`a see-through \`currentColor\` paint on <${element.tag}>: its colour comes from the page's styles`,
-			);
 		if (outline.length === 0) return;
 		shapes.push({
 			path: outline,

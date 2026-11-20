@@ -1,0 +1,9 @@
+appId: ${APP_ID}
+name: r118-svg-see-through
+---
+- launchApp:
+      clearState: true
+- assertVisible: See-through ink
+- assertVisible: Quarter ink square
+- assertVisible: Faded ring
+- assertVisible: Ink seen through its opacity

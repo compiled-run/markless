@@ -233,6 +233,7 @@ class DrawingView(context: Context, private val base: Drawing, emPx: Double, pri
 	private fun colorOf(paint: ShapePaint): Int = when (paint) {
 		is ShapePaint.Color -> paint.color.argb
 		ShapePaint.Current -> currentColor
+		is ShapePaint.CurrentSeen -> (currentColor and 0x00FFFFFF) or (Math.round(Color.alpha(currentColor) * paint.alpha / 255.0).toInt() shl 24)
 	}
 }
 

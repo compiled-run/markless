@@ -349,6 +349,16 @@ export type NativeColor = {
 	readonly alpha: number;
 };
 
+/**
+ * What a shape paints with. `currentColor` is the svg's text colour as it is now; `{ current, alpha }` is that colour seen
+ * through the shape's opacities, its alpha multiplied by `alpha` / 255.
+ */
+export type NativePaint =
+	| NativeColor
+	| 'currentColor'
+	| { readonly current: true; readonly alpha: number }
+	| null;
+
 /** One shape of a drawing; numbers are in the drawing's user units. */
 export type NativeShape = {
 	/**
@@ -357,9 +367,9 @@ export type NativeShape = {
 	 */
 	readonly path: ReadonlyArray<number>;
 	/** `currentColor` is the svg's text colour: its style export's, else the page's default black. */
-	readonly fill: NativeColor | 'currentColor' | null;
+	readonly fill: NativePaint;
 	readonly fillRule: 'nonzero' | 'evenodd';
-	readonly stroke: NativeColor | 'currentColor' | null;
+	readonly stroke: NativePaint;
 	readonly width: number;
 	readonly cap: 'butt' | 'round' | 'square';
 	readonly join: 'miter' | 'round' | 'bevel';

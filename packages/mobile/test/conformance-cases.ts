@@ -605,6 +605,11 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'see-through',
+		fixture: 'test/fixtures/SeeThrough.tsrx',
+		actions: [{ event: 'activate', host: 'h1' }],
+	},
+	{
 		name: 'sprite-rows',
 		fixture: 'test/fixtures/SpriteRows.tsrx',
 		actions: [

@@ -161,6 +161,8 @@ data class Rgba(val r: Int, val g: Int, val b: Int, val alpha: Int) {
 sealed interface ShapePaint {
 	data class Color(val color: Rgba) : ShapePaint
 	data object Current : ShapePaint
+	/** The current colour seen through the shape's opacities: its alpha times [alpha] / 255. */
+	data class CurrentSeen(val alpha: Int) : ShapePaint
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
@@ -616,13 +618,19 @@ data class Payload(
 			is Json.Str -> if (v.value == "currentColor") ShapePaint.Current else throw MarklessDecodeError("$what must be a colour, \"currentColor\" or null")
 			else -> {
 				val o = v.obj(what)
-				o.only(setOf("r", "g", "b", "alpha"), what)
 				fun channel(name: String): Int {
 					val n = o.field(name, what).num("$what.$name")
 					if (n < 0 || n > 255 || n != Math.floor(n)) throw MarklessDecodeError("$what.$name is $n; a channel is an integer 0-255")
 					return n.toInt()
 				}
-				ShapePaint.Color(Rgba(channel("r"), channel("g"), channel("b"), channel("alpha")))
+				if ("current" in o) {
+					o.only(setOf("current", "alpha"), what)
+					if (o.field("current", what) != Json.Bool(true)) throw MarklessDecodeError("$what.current must be true")
+					ShapePaint.CurrentSeen(channel("alpha"))
+				} else {
+					o.only(setOf("r", "g", "b", "alpha"), what)
+					ShapePaint.Color(Rgba(channel("r"), channel("g"), channel("b"), channel("alpha")))
+				}
 			}
 		}
 

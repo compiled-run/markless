@@ -2771,6 +2771,32 @@ describe('inline svg', () => {
 		]);
 	});
 
+	it('keeps a see-through currentColor paint as the current colour with its alpha, wherever the opacity is written', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Ink() @{
+	<main>
+	<svg viewBox="0 0 10 10" fill="currentColor" opacity="0.5">
+		<defs><symbol id="mark"><path d="M0 0h1" stroke="currentColor" stroke-opacity="0.5" fill="none" /></symbol></defs>
+		<rect width="1" height="1" />
+		<g opacity=".5"><rect width="1" height="1" fill-opacity="0.2" /></g>
+		<use href="#mark" />
+		<rect width="1" height="1" opacity="2" />
+	</svg>
+	<svg viewBox="0 0 1 1"><circle r="1" fill="currentColor" /><circle r="1" fill="currentColor" fill-opacity="0.9999" /></svg>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const [ink, plain] = payload!.nodes.flatMap((node) =>
+			node.kind === 'element' && node.drawing ? [node.drawing.shapes] : [],
+		);
+		expect(ink!.map((shape) => [shape.fill, shape.stroke])).toEqual([
+			[{ current: true, alpha: 128 }, null],
+			[{ current: true, alpha: 13 }, null],
+			[null, { current: true, alpha: 64 }],
+			[{ current: true, alpha: 128 }, null],
+		]);
+		expect(plain!.map((shape) => shape.fill)).toEqual(['currentColor', 'currentColor']);
+	});
+
 	it('keeps a size in ems as ems and turns absolute units into CSS pixels', async () => {
 		const sizes = async (width: string, height: string) => {
 			const { payload } = await nativeView(`export function Icon() @{

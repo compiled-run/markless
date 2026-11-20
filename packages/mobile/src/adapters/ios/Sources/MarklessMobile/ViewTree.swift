@@ -167,6 +167,7 @@ final class DrawingView: UIView {
 	private func color(_ paint: NativeShape.Paint) -> UIColor {
 		switch paint {
 		case .currentColor: currentColor
+		case let .current(alpha): currentColor.withAlphaComponent(currentColor.cgColor.alpha * alpha / 255)
 		case let .color(c): UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: c.alpha / 255)
 		}
 	}

@@ -197,6 +197,8 @@ public struct NativeShape: Equatable, Sendable {
 	public enum Paint: Equatable, Sendable {
 		case color(RGBA)
 		case currentColor
+		/// The current colour seen through the shape's opacities: its alpha times `alpha` / 255.
+		case current(alpha: Double)
 	}
 	/// Verb-coded: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close.
 	public let path: [Double]
@@ -844,6 +846,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 			if reader.isString {
 				guard try reader.string() == "currentColor" else { throw reader.fail("unknown paint") }
 				return .currentColor
+			}
+			if try reader.keys().contains("current") {
+				let current = try reader.object(["current", "alpha"])
+				guard try current["current"].bool() else { throw reader.fail("unknown paint") }
+				let alpha = try current["alpha"].number()
+				guard alpha >= 0, alpha <= 255, alpha == alpha.rounded() else { throw reader.fail("alpha is \(alpha); it is an integer 0-255") }
+				return .current(alpha: alpha)
 			}
 			let color = try reader.object(["r", "g", "b", "alpha"])
 			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))

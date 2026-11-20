@@ -1,0 +1,14 @@
+{
+	"rung": "R118",
+	"name": "A currentColor paint seen through its opacities: on the shape, its group and the svg, fill and stroke",
+	"steps": [
+		{
+			"visible": [
+				"See-through ink",
+				"Quarter ink square",
+				"Faded ring",
+				"Ink seen through its opacity"
+			]
+		}
+	]
+}
