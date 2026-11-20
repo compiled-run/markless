@@ -272,6 +272,9 @@ describe("the runner's checkout", () => {
 	});
 
 	it('reads a checkout behind origin/main from git, after fetching it', async () => {
+		// Inside a git hook GIT_DIR and GIT_INDEX_FILE name the repository being committed; every git here must use its own.
+		const inherited = Object.entries(process.env).filter(([name]) => name.startsWith('GIT_'));
+		for (const [name] of inherited) delete process.env[name];
 		const scratch = mkdtempSync(join(tmpdir(), 'runner-refresh-'));
 		const git = (cwd: string, ...args: string[]) =>
 			execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
@@ -300,6 +303,7 @@ describe("the runner's checkout", () => {
 			expect(planRefresh(await checkoutFacts(runner)).kind).toBe('kept');
 		} finally {
 			rmSync(scratch, { recursive: true, force: true });
+			for (const [name, value] of inherited) process.env[name] = value;
 		}
 	});
 });
