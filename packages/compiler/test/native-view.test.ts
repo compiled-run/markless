@@ -1809,6 +1809,27 @@ export function Page() @{
 	});
 });
 
+describe('linked stylesheets', () => {
+	const source = `export function Page() @{
+	<main>
+		<link rel="stylesheet" href="/static/site.css" />
+		<p>Hi</p>
+	</main>
+}`;
+
+	it('reads a <link rel="stylesheet"> the build can read, as the browser loads it, and refuses one it cannot', async () => {
+		const asked: string[] = [];
+		const read = await nativeView(source, { linkStylesheet: (href) => (asked.push(href), true) });
+		expect(read.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(asked).toEqual(['/static/site.css']);
+		expect(read.payload!.nodes.some((node) => node.kind === 'element' && node.element === 'link')).toBe(false);
+		const unread = await nativeView(source, { linkStylesheet: () => false });
+		expect(unread.diagnostics.map((diagnostic) => diagnostic.message)).toContain(
+			'<link rel="stylesheet" href="/static/site.css"> loads styles while the page runs',
+		);
+	});
+});
+
 describe('class bindings', () => {
 	it('keeps the style scope class around a class that follows state, as the web writes it', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';

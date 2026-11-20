@@ -6,6 +6,7 @@ import {
 	readFileSync,
 	realpathSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from 'node:fs';
 import { createRequire, findPackageJSON } from 'node:module';
@@ -87,6 +88,18 @@ export function readRelativeStylesheet(specifier: string, importer: string) {
 		: undefined;
 }
 
+/** A stylesheet an app serves at a path (`/static/news.css`): the file in its public folder, as Vite serves it. */
+export function servedReader(appRoot: string) {
+	const publicDir = resolve(appRoot, 'public');
+	return (href: string) => {
+		if (!href.startsWith('/') || href.startsWith('//')) return undefined;
+		const file = resolve(publicDir, `.${href.split(/[?#]/)[0]}`);
+		return file.startsWith(`${publicDir}/`) && existsSync(file) && statSync(file).isFile()
+			? { file: relative(repoRoot, file), cssText: readFileSync(file, 'utf8') }
+			: undefined;
+	};
+}
+
 /** The app's document, when the rung has its own (`document.tsrx`, whose stylesheet imports reach every page). */
 const APP_DOCUMENT = 'document.tsrx';
 
@@ -113,6 +126,7 @@ export function compileRungApp(
 			: {}),
 		readModule: readRelativeModule,
 		readStylesheet: readRelativeStylesheet,
+		readServedStylesheet: servedReader(dir),
 	});
 }
 
@@ -308,6 +322,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				// A rung that is a page compiles as its page file, so the router derives its route.
 				...(expected.route === undefined ? {} : { page: `pages/${expected.route}.tsrx` }),
 				readModule: readWorkspaceModule,
+				readServedStylesheet: servedReader(dir),
 				...(appConfig.device ? { device: appConfig.device } : {}),
 				target: platform,
 			});
@@ -325,7 +340,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				PROOF_PAYLOAD_PATH,
 				new TextEncoder().encode(payloads[platform]),
 			]);
-			if (build.styles.some((style) => style.cssText.length > 0)) {
+			if (build.styles.some((style) => style.cssText.length > 0) || build.stylesheets.length > 0) {
 				// Dragon lays out one input for both phones, so both must build the same views.
 				if (
 					payloads.ios !== undefined &&
@@ -337,7 +352,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 					);
 				writeFileSync(
 					join(dir, STYLE_INPUT),
-					`${JSON.stringify(nativeStyleInput(build.payload, build.styles), null, '\t')}\n`,
+					`${JSON.stringify(nativeStyleInput(build.payload, build.styles, build.stylesheets), null, '\t')}\n`,
 				);
 				if (platform === 'android') {
 					const styled = styleAssets(
