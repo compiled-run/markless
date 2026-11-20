@@ -3367,7 +3367,7 @@ test('renderToString emits the immediate storage seed as the leading fragment an
 	const html = await renderToString({
 		storageSeeds: [
 			{
-				slotKey: 'src/Settings.tsrx#theme-mode',
+				slotKey: 'theme-mode',
 				driverKey: 'theme-mode',
 				fallback: 'light',
 			},
@@ -3378,7 +3378,7 @@ test('renderToString emits the immediate storage seed as the leading fragment an
 				cells: [],
 				storage: [
 					{
-						graphNodeId: 'storage:src/Settings.tsrx#theme-mode',
+						graphNodeId: 'storage:theme-mode',
 						key: 'theme-mode',
 					},
 				],
@@ -3390,7 +3390,7 @@ test('renderToString emits the immediate storage seed as the leading fragment an
 	expect(html).toMatch(/^<script>/);
 	const seed = html.slice(0, html.indexOf('</script>'));
 	expect(seed).toContain('Symbol.for("tsrx.storage/1")');
-	expect(seed).toContain('src/Settings.tsrx#theme-mode');
+	expect(seed).toContain('["theme-mode","theme-mode",');
 	expect(seed).toContain('localStorage.getItem');
 	expect(seed).toContain('document.documentElement.setAttribute(a,v)');
 	expect(seed).toContain('"data-theme-mode"');
@@ -3405,7 +3405,7 @@ test('renderToString applies the executable nonce to the storage seed', async ()
 		{
 			storageSeeds: [
 				{
-					slotKey: 'src/Settings.tsrx#theme-mode',
+					slotKey: 'theme-mode',
 					driverKey: 'theme-mode',
 					fallback: 'light',
 				},
@@ -3433,7 +3433,7 @@ export function Settings() @{
 	});
 
 	expect(transformed.code).toContain('storageSeeds:');
-	expect(transformed.code).toContain('"slotKey": "src/Settings.tsrx#theme-mode"');
+	expect(transformed.code).toContain('"slotKey": "theme-mode"');
 	expect(transformed.code).toContain('"driverKey": "theme-mode"');
 	expect(transformed.code).toContain('"fallback": "light"');
 	expect(transformed.code).not.toContain('localStorage.getItem');

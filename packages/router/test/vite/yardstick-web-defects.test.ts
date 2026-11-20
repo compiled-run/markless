@@ -310,7 +310,7 @@ test.fails('a page the router prefetched shows a list derived from a storage() v
 	}
 });
 
-test.fails('a storage() value written in a page shows in a component from another module that reads the same key (#867)', async () => {
+test('a storage() value written in a page shows in a component from another module that reads the same key (#867)', async () => {
 	await visit('/shared', async (page) => {
 		await page.getByRole('button', { name: 'Add' }).click();
 		await expect.poll(() => page.locator('[data-badge]').textContent()).toBe('1');
