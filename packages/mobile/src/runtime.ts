@@ -1,5 +1,6 @@
 import type {
 	NativeBuiltin,
+	NativeEventName,
 	NativeExpr,
 	NativeFieldKind,
 	NativeFetchResponse,
@@ -111,7 +112,10 @@ const TOUCHES: ReadonlySet<string> = new Set<NativeTouch>([
 	'pointerup',
 	'pointercancel',
 ]);
+/** How many dialog close events one change runs, so close handlers that reopen and close their dialog end. */
+const CLOSE_DEPTH = 16;
 const RAISED: ReadonlySet<string> = new Set([
+	'close',
 	'pointerover',
 	'pointerout',
 	'pointerenter',
@@ -592,6 +596,12 @@ export function createNativeRuntime(
 			node.kind === 'element' && node.element === 'dialog' ? [[node.id, false]] : [],
 		),
 	);
+	/** Dialogs that closed during the current change, in order; each fires its `close` once the change's handler ends. */
+	const closing: string[] = [];
+	const setDialog = (node: string, open: boolean) => {
+		if (dialogs.get(node) === true && !open) closing.push(node);
+		dialogs.set(node, open);
+	};
 	const branches = new Map(
 		payload.nodes.flatMap((node) => (node.kind === 'branch' ? [[node.id, node] as const] : [])),
 	);
@@ -783,7 +793,7 @@ export function createNativeRuntime(
 				// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
 				if (command === 'showModal' || command === 'close') {
 					if (!dialogs.has(node)) throw new Error(`${command}() on ${node}, which is not a dialog`);
-					dialogs.set(node, command === 'showModal');
+					setDialog(node, command === 'showModal');
 					return [];
 				}
 				if (command === 'focus') focused = node;
@@ -1442,7 +1452,7 @@ export function createNativeRuntime(
 		stack.push(overlay);
 		origins.set(overlay, NATIVE_DOCUMENT_BODY);
 	}
-	const handlerOf = (host: string, name: NativeAction['event'] | NativePointerEventName) =>
+	const handlerOf = (host: string, name: NativeAction['event'] | NativeEventName) =>
 		payload.events.find((candidate) => candidate.host === host && candidate.event === name);
 	/** The scope a shown instance's handlers run in (its row's), or undefined when it is not shown. */
 	const scopeOf = (id: string): NativeScope | undefined =>
@@ -1597,7 +1607,7 @@ export function createNativeRuntime(
 					(candidate) => candidate.host === host && candidate.event === 'cancel',
 				);
 				return change(host, undefined, () => {
-					dialogs.set(host, false);
+					setDialog(host, false);
 					return cancel ? run(handlers.get(cancel.handler) ?? [], undefined, base) : [];
 				});
 			}
@@ -1918,7 +1928,7 @@ export function createNativeRuntime(
 			}
 			if (op.op === 'dialog') {
 				if (!dialogs.has(op.node)) throw new Error(`${op.node} is not a dialog`);
-				dialogs.set(op.node, op.method === 'showModal');
+				setDialog(op.node, op.method === 'showModal');
 				continue;
 			}
 			if (op.op === 'if') {
@@ -2077,6 +2087,16 @@ export function createNativeRuntime(
 			const stackBefore = stack;
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
+			// As the browser queues a dialog's close event, it runs after the handler that closed it.
+			for (let fired = 0; closing.length > 0 && fired < CLOSE_DEPTH; fired++) {
+				const node = closing.shift()!;
+				const close = handlerOf(node, 'close');
+				if (!close) continue;
+				const out = run(handlers.get(close.handler) ?? [], undefined, scopeOf(node) ?? base);
+				if (out[0]?.op === 'navigate') return out;
+				calls.push(...out);
+			}
+			closing.length = 0;
 			calls.push(...syncAsync());
 			// An overlay becoming shown supersedes every shown hint it is not inside, before it joins the stack.
 			const shownFirst = shownOverlays();

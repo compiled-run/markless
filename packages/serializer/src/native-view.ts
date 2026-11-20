@@ -479,13 +479,15 @@ export type NativeProperty = 'value' | 'checked' | 'indeterminate' | 'selected';
  * `enter` is the keyboard's return key in a single-line text field. `submit` is a form's, raised only by a `submit` op.
  * `idle` and `visible` mean what the web runtime gives them, once for each shown instance of their element (shown again
  * after it left, it is a new one): `idle` at the first moment the host is idle after the screen's first frame (or after
- * the element appears), `visible` the first time any of the element is on the screen.
+ * the element appears), `visible` the first time any of the element is on the screen. `close` is a `<dialog>`'s, raised
+ * after the handler (or the host's back gesture) that closed it, as the browser queues it.
  */
 export type NativeEventName =
 	| 'activate'
 	| 'input'
 	| 'dismiss'
 	| 'cancel'
+	| 'close'
 	| 'enter'
 	| 'submit'
 	| 'idle'

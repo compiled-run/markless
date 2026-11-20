@@ -270,6 +270,8 @@ public final class NativeRuntime {
 	private let numberMessages: NativeNumberMessages?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
+	/// Dialogs that closed during the current change, in order; each fires its `close` once the change's handler ends.
+	private var closing: [String] = []
 	/// Where a page with a script gets its engine; asked only when a script op runs or a script computed is read.
 	private let scriptHost: NativeScriptHost?
 
@@ -657,7 +659,7 @@ public final class NativeRuntime {
 			// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
 			if name == "showModal" || name == "close" {
 				guard dialogs[node] != nil else { throw RuntimeError(reason: "\(name)() on \(node), which is not a dialog") }
-				dialogs[node] = name == "showModal"
+				setDialog(node, name == "showModal")
 				return nil
 			}
 			if name == "focus" { focused = node }
@@ -675,6 +677,12 @@ public final class NativeRuntime {
 
 	/// How deep events raised from JavaScript may nest.
 	private let raiseDepth = 32
+	/// How many dialog close events one change runs, so close handlers that reopen and close their dialog end.
+	private let closeDepth = 16
+	private func setDialog(_ node: String, _ open: Bool) {
+		if dialogs[node] == true, !open { closing.append(node) }
+		dialogs[node] = open
+	}
 	private var raising = 0
 
 	/// An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press on
@@ -1179,6 +1187,7 @@ public final class NativeRuntime {
 
 	/// Runs the handler bound to the action and returns the journal the host applies.
 	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
+		if action.event == .close { throw RuntimeError(reason: "close is raised by the runtime, not dispatched") }
 		if action.event == .choose {
 			guard let option = nodesById[nodeOf(action.host)], case .element("option", _, _) = option.kind, let select = option.parent,
 				let instance = try options(of: select).first(where: { $0.id == action.host })
@@ -1213,7 +1222,7 @@ public final class NativeRuntime {
 			guard dialogs[action.host] == true else { throw RuntimeError(reason: "\(action.host) is not an open dialog") }
 			let cancel = payload.events.first(where: { $0.host == action.host && $0.event == .cancel })
 			return try change(host: action.host) {
-				self.dialogs[action.host] = false
+				self.setDialog(action.host, false)
 				return try cancel.map { try self.run(self.handlers[$0.handler] ?? [], in: .empty) } ?? []
 			}
 		}
@@ -1468,7 +1477,7 @@ public final class NativeRuntime {
 				calls.append(contentsOf: taken)
 			case let .dialog(node, open):
 				guard dialogs[node] != nil else { throw RuntimeError(reason: "\(node) is not a dialog") }
-				dialogs[node] = open
+				setDialog(node, open)
 			case let .command(target, command, preventScroll):
 				let value = try evaluate(target, in: scope)
 				if value == .null || value == .string(nativeDocumentBody) { continue }
@@ -1593,6 +1602,18 @@ public final class NativeRuntime {
 		let stackBefore = stack
 		var calls = try apply()
 		if case .navigate? = calls.first { return calls }
+		// As the browser queues a dialog's close event, it runs after the handler that closed it.
+		var fired = 0
+		while !closing.isEmpty, fired < closeDepth {
+			fired += 1
+			let node = closing.removeFirst()
+			guard let close = payload.events.first(where: { $0.host == node && $0.event == .close }) else { continue }
+			let scope = try nodesById[node].flatMap { try instances(of: $0).first { $0.id == node }?.scope } ?? .empty
+			let taken = try run(handlers[close.handler] ?? [], in: scope)
+			if case .navigate? = taken.first { return taken }
+			calls.append(contentsOf: taken)
+		}
+		closing.removeAll()
 		calls += try syncAsync()
 		// An overlay becoming shown supersedes every shown hint it is not inside, before it joins the stack.
 		let shownFirst = try shownOverlays()

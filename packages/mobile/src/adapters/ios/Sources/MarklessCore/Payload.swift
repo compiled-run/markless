@@ -225,6 +225,8 @@ public enum NativeEventName: String, Sendable {
 	case dismiss
 	/// The host's back gesture or Escape on an open `<dialog>`: it closes, as the browser's cancel does.
 	case cancel
+	/// A `<dialog>` closed; raised by the runtime after the handler or back gesture that closed it, never sent by a host.
+	case close
 	/// The keyboard's return key in a single-line text field.
 	case enter
 	/// A form's, run only by a `submit` op.

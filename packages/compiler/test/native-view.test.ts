@@ -1715,6 +1715,27 @@ export function Page() @{
 		expect(inputs.map((node) => node.kind === 'element' && node.attributes?.['disabled'])).toEqual([undefined, '']);
 	});
 
+	it("lowers a <dialog>'s close handler, which the runtime raises after the dialog closes; refuses one on another element", async () => {
+		const shown = await nativeView(`import { element, state } from '@markless/core';
+export function Rename() @{
+	const dialog = element<HTMLDialogElement>();
+	let closes = state(0);
+	<main>
+		<dialog el={dialog} onClose={() => closes++}><button onClick={() => dialog?.close()}>Done</button></dialog>
+		<p>{closes}</p>
+	</main>
+}`);
+		expect(shown.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const dialog = shown.payload!.nodes.find((node) => node.kind === 'element' && node.element === 'dialog')!;
+		expect(shown.payload!.events.filter((event) => event.host === dialog.id).map((event) => event.event)).toEqual(['close']);
+		const other = await nativeView(`import { state } from '@markless/core';
+export function Panel() @{
+	let closes = state(0);
+	<div onClose={() => closes++}>{closes}</div>
+}`);
+		expect(other.diagnostics.map((d) => d.message)).toContain('a close handler on <div>; the web raises close only on a <dialog>');
+	});
+
 	it('draws a custom element the app never defines as an inline container, as the browser renders an unknown element; not a reserved name', async () => {
 		const custom = await nativeView(`export function Shell() @{
 	<app-root><router-outlet></router-outlet><p>Feed</p></app-root>

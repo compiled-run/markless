@@ -808,7 +808,7 @@ class MarklessHost(
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
 			EventName.Dismiss -> if (OVERLAY_ATTRIBUTE !in node.attributes) throw MarklessHostError("dismiss event on \"${node.id}\", which is neither a sheet nor an overlay")
-			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
+			EventName.Cancel, EventName.Close, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
 			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.Choose -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->

@@ -1014,8 +1014,8 @@ final class ViewTree {
 					for: .editingChanged)
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
-			case (.idle, _), (.visible, _), (.dismiss, _), (_, _) where event.event.isPointer:
-				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host.
+			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (_, _) where event.event.isPointer:
+				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host, close by the runtime.
 				continue
 			default:
 				throw HostError("\(event.event.rawValue) on <\(element)> \(id) has no iOS control event yet")

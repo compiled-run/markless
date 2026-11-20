@@ -1,0 +1,28 @@
+{
+	"rung": 182,
+	"name": "A <dialog>'s close event runs after the handler that closed it, once for each close, as the browser queues it",
+	"steps": [
+		{
+			"visible": ["Rename", "Rename file", "Closed 0 times", "Nothing yet"],
+			"absent": ["New name?", "Save"]
+		},
+		{
+			"do": { "tap": "Rename file" },
+			"visible": ["New name?", "Save", "Never mind"]
+		},
+		{
+			"do": { "tap": "Save" },
+			"visible": ["Closed 1 times", "Saved, then closed"],
+			"absent": ["New name?", "Nothing yet"]
+		},
+		{
+			"do": { "tap": "Rename file" },
+			"visible": ["New name?", "Never mind"]
+		},
+		{
+			"do": { "tap": "Never mind" },
+			"visible": ["Closed 2 times", "Saved, then closed, then closed"],
+			"absent": ["New name?", "Closed 1 times"]
+		}
+	]
+}

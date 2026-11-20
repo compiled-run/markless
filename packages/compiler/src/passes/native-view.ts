@@ -179,6 +179,7 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	[PROTOCOL_IDLE_EVENT_NAME]: 'idle',
 	[PROTOCOL_VISIBLE_EVENT_NAME]: 'visible',
 	[DISMISS_EVENT]: 'dismiss',
+	close: 'close',
 	pointerdown: 'pointerdown',
 	pointermove: 'pointermove',
 	pointerup: 'pointerup',
@@ -4188,6 +4189,13 @@ export function createNativeViewPayload(
 					if (!semantic) {
 						refuse(
 							`the ${event.eventName} event has no native meaning yet`,
+							event.handlerSpan,
+						);
+						continue;
+					}
+					if (semantic === 'close' && element !== 'dialog') {
+						refuse(
+							`a close handler on <${element}>; the web raises close only on a <dialog>`,
 							event.handlerSpan,
 						);
 						continue;

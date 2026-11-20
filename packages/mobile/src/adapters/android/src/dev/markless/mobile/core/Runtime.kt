@@ -8,6 +8,9 @@ const val OVERLAY_HINT_ATTRIBUTE = "overlay-hint"
 
 /** How deep events raised from JavaScript may nest. */
 const val RAISE_DEPTH = 32
+
+/** How many dialog close events one change runs, so close handlers that reopen and close their dialog end. */
+const val CLOSE_DEPTH = 16
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
@@ -506,7 +509,7 @@ class Runtime(
 				// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
 				if (command == "showModal" || command == "close") {
 					if (node !in dialogs) throw MarklessRuntimeError("$command() on $node, which is not a dialog")
-					dialogs[node] = command == "showModal"
+					setDialog(node, command == "showModal")
 					return@mapNotNull null
 				}
 				if (command == "focus") focused = node
@@ -917,6 +920,14 @@ class Runtime(
 
 	fun isDialogOpen(id: String): Boolean = dialogs[id] == true
 
+	/** Dialogs that closed during the current change, in order; each fires its `close` once the change's handler ends. */
+	private val closing = ArrayDeque<String>()
+
+	private fun setDialog(node: String, open: Boolean) {
+		if (dialogs[node] == true && !open) closing.addLast(node)
+		dialogs[node] = open
+	}
+
 	private var focused: String? = null
 	/** The overlay stack, topmost last, and the focus each overlay was shown from. */
 	private var stack: List<String> = emptyList()
@@ -1001,12 +1012,12 @@ class Runtime(
 			}
 		}
 		if (event.touch) return touch(host, event, point ?: TouchPoint())
-		if (event.pointer) throw MarklessRuntimeError("${event.wire} is raised by the runtime, not dispatched")
+		if (event.pointer || event == EventName.Close) throw MarklessRuntimeError("${event.wire} is raised by the runtime, not dispatched")
 		if (event == EventName.Cancel) {
 			if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
 			val cancel = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
 			return change(host, null) {
-				dialogs[host] = false
+				setDialog(host, false)
 				cancel?.let { run(it.ops, Scope.EMPTY) } ?: emptyList()
 			}
 		}
@@ -1260,7 +1271,7 @@ class Runtime(
 			}
 			is Op.Dialog -> {
 				if (op.node !in dialogs) throw MarklessRuntimeError("\"${op.node}\" is not a dialog")
-				dialogs[op.node] = op.open
+				setDialog(op.node, op.open)
 			}
 			is Op.Capture -> {
 				val node = evaluate(op.node, scope)
@@ -1349,6 +1360,18 @@ class Runtime(
 		val stackBefore = stack
 		val calls = apply().toMutableList()
 		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
+		// As the browser queues a dialog's close event, it runs after the handler that closed it.
+		var fired = 0
+		while (closing.isNotEmpty() && fired < CLOSE_DEPTH) {
+			fired++
+			val node = closing.removeFirst()
+			val handler = handlerFor(node, EventName.Close)?.let { handlers[it] } ?: continue
+			val scope = byId[node]?.let { at -> instances(at).firstOrNull { it.id == node }?.scope } ?: Scope.EMPTY
+			val taken = run(handler.ops, scope)
+			if (taken.firstOrNull() is JournalEntry.Navigate) return taken
+			calls.addAll(taken)
+		}
+		closing.clear()
 		calls.addAll(syncAsync())
 		// An overlay becoming shown supersedes every shown hint it is not inside, before it joins the stack.
 		val shownFirst = shownOverlays()

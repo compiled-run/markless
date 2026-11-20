@@ -297,6 +297,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'dialog-close',
+		fixture: 'proofs/u72-dialog-close/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'cancel', host: 'h5' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h8' },
+		],
+	},
+	{
 		name: 'types',
 		fixture: 'test/fixtures/Types.tsrx',
 		actions: [
