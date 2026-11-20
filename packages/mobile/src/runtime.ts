@@ -590,6 +590,7 @@ export function createNativeRuntime(
 		...(script?.services.includes('crypto') && scriptHost?.seed
 			? { seed: scriptHost.seed() }
 			: {}),
+		...(script?.services.includes('navigate') ? { params } : {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
 	const enter = (entry: Record<string, unknown>): NativeJournalEntry[] => {
@@ -603,6 +604,11 @@ export function createNativeRuntime(
 				readonly request: Extract<NativeJournalEntry, { op: 'fetch' }>['request'];
 			}>;
 			readonly logs: ReadonlyArray<readonly [string, string]>;
+			readonly navigate?: {
+				readonly route: string;
+				readonly params: Readonly<Record<string, string>>;
+				readonly replace: boolean;
+			};
 		};
 		for (const [slot, value] of result.writes) {
 			const at = slot.indexOf('@');
@@ -628,6 +634,16 @@ export function createNativeRuntime(
 				id,
 				request,
 			})),
+			...(result.navigate
+				? [
+						{
+							op: 'navigate',
+							route: result.navigate.route,
+							params: result.navigate.params,
+							...(result.navigate.replace ? { replace: true as const } : {}),
+						} satisfies NativeJournalEntry,
+					]
+				: []),
 		];
 	};
 	const compute: Compute = (fn, bindings, scope) =>

@@ -349,11 +349,13 @@ class Runtime(
 		}
 	}
 
-	/** Every current value by slot, and the seed `crypto` draws from when the script uses it. */
+	/** Every current value by slot, the seed `crypto` draws from when the script uses it, and the route params for `navigate`. */
 	private fun entryCells(): String = buildString {
 		append(",\"cells\":")
 		append(values.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" })
 		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
+		if (payload.script?.services?.contains("navigate") == true)
+			append(",\"params\":" + params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" })
 	}
 
 	/** One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries, in that order. */
@@ -393,7 +395,16 @@ class Runtime(
 					q.field("body", "request").let { if (it == Json.Null) null else it.str("request.body") },
 				)
 				JournalEntry.Fetch(id(o.field("id", "leave().requests[]")), request)
-			}
+			} +
+			listOfNotNull(result["navigate"]?.let { n ->
+				val o = n.obj("leave().navigate")
+				o.only(setOf("route", "params", "replace"), "leave().navigate")
+				JournalEntry.Navigate(
+					o.field("route", "leave().navigate").str("leave().navigate.route"),
+					o.field("params", "leave().navigate").obj("leave().navigate.params").mapValues { it.value.str("a route param") },
+					(o.field("replace", "leave().navigate") as? Json.Bool)?.value ?: throw MarklessDecodeError("leave().navigate.replace must be a boolean"),
+				)
+			})
 	}
 
 

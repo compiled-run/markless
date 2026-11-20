@@ -1,0 +1,47 @@
+appId: ${APP_ID}
+name: j11-script-navigate
+---
+- launchApp:
+      clearState: true
+- assertVisible: Order desk
+- assertVisible: Nothing yet
+- assertVisible: Open next order
+- assertVisible: Stay here
+- assertVisible: Home
+- tapOn: Stay here
+- assertNotVisible: Nothing yet
+- assertVisible: Order desk
+- assertVisible: Stayed on this page
+- assertNotVisible: Nothing yet
+- assertVisible: Home
+- tapOn: Open next order
+- assertNotVisible: Order desk
+- assertVisible: Order 42
+- assertVisible: Details for order 42
+- assertVisible: Next one instead
+- assertNotVisible: Order desk
+- assertVisible: Order 42
+- tapOn: Next one instead
+- assertNotVisible: Details for order 42
+- assertVisible: Order 43
+- assertVisible: Details for order 43
+- assertNotVisible: Details for order 42
+- assertVisible: Order 43
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertNotVisible: Details for order 43
+- assertVisible: Home
+- assertVisible: Order desk
+- assertVisible: Open next order
+- assertNotVisible: Details for order 43
+- assertNotVisible: Details for order 42
+- assertVisible: Home

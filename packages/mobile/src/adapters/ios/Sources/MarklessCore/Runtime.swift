@@ -500,13 +500,16 @@ public final class NativeRuntime {
 		})
 	}
 
-	/// Every current value by slot (the page's cells in payload order, then row slots), and a seed when `crypto` is used.
+	/// Every current value by slot (the page's cells in payload order, then row slots), a seed when `crypto` is used, and
+	/// the route params when `navigate` is.
 	private func entryCells() -> [(String, JSONValue)] {
 		let ids = Set(payload.cells.map(\.id))
 		let cells = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0.json) } }
 			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!.json) }
 		let crypto = payload.script?.services.contains(.crypto) == true
+		let navigate = payload.script?.services.contains(.navigate) == true
 		return [("cells", .object(cells))] + (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
+			+ (navigate ? [("params", .object(params.map { ($0.name, .string($0.value)) }))] : [])
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
@@ -515,7 +518,8 @@ public final class NativeRuntime {
 			_ = try callScript("enter", .object(entry + entryCells()))
 			return try callScript("leave")
 		}
-		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(["writes", "timers", "clears", "requests", "logs"])
+		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
+			.object(required: ["writes", "timers", "clears", "requests", "logs"], optional: ["navigate"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
@@ -544,7 +548,10 @@ public final class NativeRuntime {
 				url: try asked["url"].string(), method: try asked["method"].string(), headers: try decodeHeaders(asked["headers"]),
 				body: try asked["body"].optionalString()))
 		}
-		return clears + timers + requests
+		guard result.has("navigate") else { return clears + timers + requests }
+		let opened = try result["navigate"].object(["route", "params", "replace"])
+		let params = try opened["params"].keys().map { NativeRouteParam(name: $0, value: try opened["params"].field($0).string()) }
+		return clears + timers + requests + [.navigate(route: try opened["route"].string(), params: params, replace: try opened["replace"].bool())]
 	}
 
 	/// The host's answer to a `fetch` entry.

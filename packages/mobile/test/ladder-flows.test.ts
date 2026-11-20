@@ -143,6 +143,7 @@ test('the navigation ladder has one app folder per rung, in rung order', () => {
 	expect(navRungFolders().map((folder) => readRung(folder).rung)).toEqual([
 		'J6',
 		'J10',
+		'J11',
 		'N1',
 		'N2',
 		'N3',
