@@ -88,6 +88,8 @@ export type NativeAction =
 
 /** The prefix of a timer the script set, as its `timer` entries name it (`script:3`); other timers are `after` ops. */
 export const SCRIPT_TIMER = 'script:';
+/** The continuation a device call from a script names: its answer goes back to the script. */
+export const SCRIPT_CALL = 'script:';
 
 /** Each screen's async values run under their own name in an engine the app's screens share. */
 let screens = 0;
@@ -456,7 +458,9 @@ export function evaluateWithScript(
 							? { slot: binding.cell }
 							: 'fields' in binding
 								? { fields: binding.fields }
-								: { value: evaluate(binding.value, values) },
+								: 'device' in binding
+									? { device: binding.device, object: binding.object }
+									: { value: evaluate(binding.value, values) },
 					]),
 				);
 				const entry = {
@@ -596,7 +600,9 @@ export function createNativeRuntime(
 									]),
 								),
 							}
-						: { value: evaluate(binding.value, eventValue, scope) },
+						: 'device' in binding
+							? { device: binding.device, object: binding.object }
+							: { value: evaluate(binding.value, eventValue, scope) },
 			]),
 		);
 	const entryCells = () => ({
@@ -619,6 +625,12 @@ export function createNativeRuntime(
 				readonly request: Extract<NativeJournalEntry, { op: 'fetch' }>['request'];
 			}>;
 			readonly logs: ReadonlyArray<readonly [string, string]>;
+			readonly calls?: ReadonlyArray<{
+				readonly id?: number;
+				readonly call: Extract<NativeJournalEntry, { op: 'call' }>['call'];
+				readonly object?: string;
+				readonly arguments: ReadonlyArray<Value>;
+			}>;
 			readonly navigate?: {
 				readonly route: string;
 				readonly params: Readonly<Record<string, string>>;
@@ -650,6 +662,15 @@ export function createNativeRuntime(
 				id,
 				request,
 			})),
+			...(result.calls ?? []).map(
+				({ id, call, object, arguments: given }): NativeJournalEntry => ({
+					op: 'call',
+					call,
+					...(object !== undefined ? { object } : {}),
+					arguments: given,
+					...(id !== undefined ? { resume: `${SCRIPT_CALL}${id}` } : {}),
+				}),
+			),
 			...(result.navigate
 				? [
 						{
@@ -709,7 +730,9 @@ export function createNativeRuntime(
 				? read(binding.cell, scope)
 				: 'fields' in binding
 					? Object.values(binding.fields).map((cell) => read(cell, scope))
-					: evaluate(binding.value, undefined, scope),
+					: 'device' in binding
+						? binding.object
+						: evaluate(binding.value, undefined, scope),
 		);
 	const compute: Compute = (fn, bindings, scope) =>
 		JSON.parse(
@@ -1270,6 +1293,19 @@ export function createNativeRuntime(
 			if (action.event === 'response')
 				return change(undefined, undefined, () =>
 					enter({ kind: 'response', request: action.id, response: action.response }),
+				);
+			if (
+				(action.event === 'resume' || action.event === 'reject') &&
+				action.continuation.startsWith(SCRIPT_CALL)
+			)
+				return change(undefined, undefined, () =>
+					enter({
+						kind: 'answer',
+						call: Number(action.continuation.slice(SCRIPT_CALL.length)),
+						...(action.event === 'resume'
+							? { value: action.value }
+							: { error: action.error }),
+					}),
 				);
 			if (action.event === 'resume') {
 				const continuation = continuations.get(action.continuation);

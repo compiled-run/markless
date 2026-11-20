@@ -1,6 +1,7 @@
 import { BindingFlags, generate } from '@tsrx/yuku';
 import type { AnyNode } from '../../ast/nodes.ts';
 import type {
+	SemanticScriptDeviceCall,
 	SemanticScriptExport,
 	SemanticScriptFunction,
 	SemanticScriptGlobal,
@@ -8,6 +9,7 @@ import type {
 	SemanticScriptStatement,
 	SourceSpan,
 } from '../../artifacts.ts';
+import { DEVICE_CALLS, DEVICE_MODULE } from '@markless/serializer/native-device';
 import { moduleSemantics, type ModuleSemantics } from './shared-ast.ts';
 
 // Script facts read yuku's scope analysis only: what each name resolves to decides how the emitted JavaScript reaches it.
@@ -126,6 +128,42 @@ function hostFunctionOf(entry: {
 	)
 		return undefined;
 	return member(member(identifier('globalThis'), '__marklessHost'), entry.name);
+}
+
+/**
+ * `location.current()`: a call on a `@markless/device` export that the device makes, as `[call, the export's stand-in]`.
+ * Any other use of the export (a value such as `location.access`, a device object's maker) is left to the caller.
+ */
+function deviceCallOf(
+	semantic: ModuleSemantics,
+	node: AnyNode,
+	entry: { readonly kind: string; readonly specifier: string; readonly name?: string | null },
+): readonly [call: string, standIn: AnyNode] | undefined {
+	if (entry.kind !== 'named' || entry.specifier !== DEVICE_MODULE || !entry.name) return undefined;
+	const method = methodCalledOn(semantic, node);
+	if (method === undefined) return undefined;
+	const call = `${entry.name}.${method}`;
+	if (!Object.hasOwn(DEVICE_CALLS, call) || 'object' in DEVICE_CALLS[call as keyof typeof DEVICE_CALLS])
+		return undefined;
+	return [
+		call,
+		member(member(member(identifier('globalThis'), '__marklessHost'), 'devices'), entry.name),
+	];
+}
+
+/** `name.method(...)`: the method a reference is the object of a call to, when it is one. */
+function methodCalledOn(semantic: ModuleSemantics, node: AnyNode): string | undefined {
+	const read = semantic.parentOf(node as never) as AnyNode | null;
+	const called = read && (semantic.parentOf(read as never) as AnyNode | null);
+	if (
+		read?.type !== 'MemberExpression' ||
+		read.object !== node ||
+		read.computed ||
+		called?.type !== 'CallExpression' ||
+		called.callee !== read
+	)
+		return undefined;
+	return String((read.property as AnyNode).name);
 }
 
 /** The import record a binding comes from, when it is a value import. */
@@ -281,9 +319,13 @@ export function scriptFunctionOf(
 	const parts: AnyNode[] = [root];
 	const inlined = new Set<AnyNode>();
 	const viaState = new Map<number, Binding>();
-	const names = new Map<string, { name: string; written: boolean; span: SourceSpan }>();
+	const names = new Map<
+		string,
+		{ name: string; written: boolean; span: SourceSpan; calledOnly?: string[] }
+	>();
 	const framework: { name: string; source: string; span: SourceSpan }[] = [];
 	const navigates: SourceSpan[] = [];
+	const devices: SemanticScriptDeviceCall[] = [];
 	const globals: SemanticScriptGlobal[] = [];
 	const replaced = new Map<AnyNode, AnyNode>();
 	const unsupported: { construct: string; span: SourceSpan }[] = [];
@@ -307,6 +349,12 @@ export function scriptFunctionOf(
 			if (service) {
 				replaced.set(node, service);
 				navigates.push(spanOf(node as never, filename));
+				continue;
+			}
+			const device = entry && deviceCallOf(semantic, node, entry);
+			if (device) {
+				replaced.set(node, device[1]);
+				devices.push({ call: device[0], span: spanOf(node as never, filename) });
 				continue;
 			}
 			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
@@ -359,10 +407,16 @@ export function scriptFunctionOf(
 			viaState.set(binding.id, binding);
 			replaced.set(node, stateName(binding.name));
 			const known = names.get(binding.name);
+			const method = methodCalledOn(semantic, node);
+			const calledOnly =
+				(known === undefined || known.calledOnly !== undefined) && method !== undefined
+					? [...new Set([...(known?.calledOnly ?? []), method])]
+					: undefined;
 			names.set(binding.name, {
 				name: binding.name,
 				written: (known?.written ?? false) || reference.isWrite,
 				span: known?.span ?? spanOf(node as never, filename),
+				...(calledOnly ? { calledOnly } : {}),
 			});
 		}
 	}
@@ -420,6 +474,7 @@ export function scriptFunctionOf(
 		globals,
 		framework,
 		navigates,
+		devices,
 		span: spanOf(root as never, filename),
 		unsupported,
 	};
@@ -459,6 +514,7 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 		const dropped: { name: string; span: SourceSpan }[] = [];
 		const framework: { name: string; source: string; span: SourceSpan }[] = [];
 		const navigates: SourceSpan[] = [];
+		const devices: SemanticScriptDeviceCall[] = [];
 		const unsupported: { construct: string; span: SourceSpan }[] = [];
 		for (const reference of semantic.references) {
 			const at = reference.node as unknown as AnyNode;
@@ -473,6 +529,12 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 			if (service) {
 				replaced.set(at, service);
 				navigates.push(spanOf(at as never, filename));
+				continue;
+			}
+			const device = entry && deviceCallOf(semantic, at, entry);
+			if (device) {
+				replaced.set(at, device[1]);
+				devices.push({ call: device[0], span: spanOf(at as never, filename) });
 				continue;
 			}
 			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
@@ -507,6 +569,7 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 			dropped,
 			framework,
 			navigates,
+			devices,
 			unsupported,
 		});
 	};

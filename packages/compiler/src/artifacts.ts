@@ -137,7 +137,13 @@ export type SemanticScriptFunction = {
 	 */
 	readonly code: string;
 	/** The component's names it reads as `__s.<name>`, and whether it assigns them. */
-	readonly names: ReadonlyArray<{ readonly name: string; readonly written: boolean; readonly span: SourceSpan }>;
+	readonly names: ReadonlyArray<{
+		readonly name: string;
+		readonly written: boolean;
+		readonly span: SourceSpan;
+		/** The methods called on it (`cam.takePhoto()`), when every use is such a call; absent once any use is not. */
+		readonly calledOnly?: ReadonlyArray<string>;
+	}>;
 	/** Module-level names it reads as written, which its module's statements declare. */
 	readonly module: ReadonlyArray<string>;
 	/** What it reads from imports: `__i[slot]`, then `name` (null: the whole module). */
@@ -149,6 +155,8 @@ export type SemanticScriptFunction = {
 	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
 	/** Each place it reaches `navigate` from `@markless/router`, which the host's route table stands in for. */
 	readonly navigates: ReadonlyArray<SourceSpan>;
+	/** Each `@markless/device` call it makes (`location.current()`), which the host makes for it. */
+	readonly devices: ReadonlyArray<SemanticScriptDeviceCall>;
 	readonly span: SourceSpan;
 	/** Constructs the engine cannot run as written (an `enum`), from type erasure. */
 	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
@@ -171,8 +179,12 @@ export type SemanticScriptStatement = {
 	readonly dropped: ReadonlyArray<{ readonly name: string; readonly span: SourceSpan }>;
 	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
 	readonly navigates: ReadonlyArray<SourceSpan>;
+	readonly devices: ReadonlyArray<SemanticScriptDeviceCall>;
 	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
 };
+
+/** A `@markless/device` call a script makes, by the name a build records (`location.current`). */
+export type SemanticScriptDeviceCall = { readonly call: string; readonly span: SourceSpan };
 
 /** An export of a script module: a local name, a name of another module (`from` null: the whole module), or `export *`. */
 export type SemanticScriptExport =

@@ -1996,6 +1996,13 @@ export function createNativeViewPayload(
 		return false;
 	}
 
+	/** A script's `@markless/device` calls: the host makes each, and the app declares what each needs. */
+	function checkDevices(devices: SemanticScriptFunction['devices']): void {
+		if (devices.length === 0) return;
+		scriptServices.add('device');
+		for (const { call } of devices) features.add(DEVICE_CALLS[call as NativeDeviceCall].feature);
+	}
+
 	/** Whether every global a script reads is one a phone's engine has; refuses each other one by name, file and line. */
 	function checkGlobals(globals: ReadonlyArray<SemanticScriptGlobal>, what: string): boolean {
 		let ok = true;
@@ -2041,6 +2048,7 @@ export function createNativeViewPayload(
 		if (known) return known.id;
 		let ok = checkGlobals(fact.globals, what);
 		if (!checkNavigates(fact.navigates, what)) ok = false;
+		checkDevices(fact.devices);
 		for (const use of fact.framework) {
 			ok = false;
 			refuseScript(
@@ -2069,16 +2077,31 @@ export function createNativeViewPayload(
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
 		let ok = true;
-		for (const { name, written, span } of fact.names) {
+		for (const { name, written, span, calledOnly } of fact.names) {
 			const object = scope.objects.get(name);
 			if (object?.kind === 'fields') {
 				bindings[name] = { fields: Object.fromEntries(object.cells) };
 				continue;
 			}
-			if (object?.kind === 'instance' || scope.deviceObjects.has(name)) {
+			const device = object ? undefined : scope.deviceObjects.get(name);
+			if (
+				device &&
+				!written &&
+				calledOnly?.every((method) => {
+					const call = `${device.device}.${method}`;
+					return isDeviceCall(call) && 'object' in DEVICE_CALLS[call];
+				})
+			) {
+				scriptServices.add('device');
+				bindings[name] = { device: device.device, object: device.id };
+				continue;
+			}
+			if (object?.kind === 'instance' || device) {
 				ok = false;
 				refuseScript(
-					`${what} uses \`${name}\` (${object ? 'a shared() object' : 'a device object'}), which JavaScript on a phone cannot reach yet`,
+					device
+						? `${what} uses \`${name}\` (a device object) other than to call its methods, which JavaScript on a phone cannot do yet`
+						: `${what} uses \`${name}\` (a shared() object), which JavaScript on a phone cannot reach yet`,
 					span,
 				);
 				continue;
@@ -2279,6 +2302,7 @@ export function createNativeViewPayload(
 				);
 			checkGlobals(statement.globals, at);
 			checkNavigates(statement.navigates, at);
+			checkDevices(statement.devices);
 			for (const name of statement.uses) local(entry, name);
 			for (const use of statement.imports) imported(entry, use.slot, use.name);
 		};

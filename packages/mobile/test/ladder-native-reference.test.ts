@@ -423,6 +423,8 @@ function walk(
 	let cameraPermission: 'unknown' | 'granted' | 'denied' = 'unknown';
 	let microphonePermission: 'unknown' | 'granted' | 'denied' = 'unknown';
 	let waiting: string[] = [];
+	// `location.current()` calls from handlers, waiting on the location prompt, by continuation.
+	let waitingCalls: string[] = [];
 	// Recorders: those recording and their seconds, and those whose start waits on the microphone prompt.
 	const recording = new Map<string, number>();
 	let waitingForMicrophone: string[] = [];
@@ -454,6 +456,18 @@ function walk(
 			: runtime.dispatch({
 					event: 'settle',
 					cell,
+					error: { name: 'NotAllowedError', message: 'Location was refused' },
+				});
+	const answerCall = (continuation: string) =>
+		permission === 'granted'
+			? runtime.dispatch({
+					event: 'resume',
+					continuation,
+					value: { ...position!, accuracy: 5 },
+				})
+			: runtime.dispatch({
+					event: 'reject',
+					continuation,
 					error: { name: 'NotAllowedError', message: 'Location was refused' },
 				});
 	const services = scriptServices();
@@ -696,6 +710,11 @@ function walk(
 						);
 				}
 				if (entry.call === 'sharesheet.open') sheet = entry.resume;
+				if (entry.call === 'location.current' && entry.resume) {
+					const continuation = entry.resume;
+					if (permission === 'unknown') waitingCalls.push(continuation);
+					else answered.push(() => answerCall(continuation));
+				}
 				if (
 					entry.call === 'camera.facing' &&
 					!facings.includes(String(entry.arguments[0]))
@@ -836,13 +855,15 @@ function walk(
 						apply(runtime.dispatch({ event: 'device', cell: cell.id, value }), index);
 		} else if (action && 'answer' in action) {
 			const given = action.answer === 'allow' ? 'granted' : 'denied';
-			if (payload.cells.some((cell) => cell.device?.startsWith('recorder.')))
+			if (waitingCalls.length > 0) permission = given;
+			else if (payload.cells.some((cell) => cell.device?.startsWith('recorder.')))
 				microphonePermission = given;
 			else if (payload.cells.some((cell) => cell.device?.startsWith('camera.')))
 				cameraPermission = given;
 			else permission = given;
 			refreshAccess(index);
 			for (const cell of waiting.splice(0)) apply(answer(cell), index);
+			for (const continuation of waitingCalls.splice(0)) apply(answerCall(continuation), index);
 			for (const object of waitingForMicrophone.splice(0))
 				if (given === 'granted') recording.set(object, 0);
 				else apply(setObject(object, 'recorder.active', false), index);

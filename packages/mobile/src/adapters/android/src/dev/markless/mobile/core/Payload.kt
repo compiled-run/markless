@@ -81,6 +81,8 @@ sealed interface ScriptBinding {
 	data class Cell(val cell: String) : ScriptBinding
 	data class Fields(val fields: Map<String, String>) : ScriptBinding
 	data class Value(val value: Expr) : ScriptBinding
+	/** A device object the component made: the script calls its methods through `call` entries. */
+	data class Device(val device: String, val obj: String) : ScriptBinding
 }
 
 /** The JavaScript a payload's script ops and script computeds run, kept in the engine under [id]; [services] are the host services it uses. */
@@ -432,10 +434,11 @@ data class Payload(
 				is ScriptBinding.Cell -> listOf(b.cell)
 				is ScriptBinding.Fields -> b.fields.values.toList()
 				is ScriptBinding.Value -> cellsOf(b.value)
+				is ScriptBinding.Device -> emptyList()
 			}
 		}
 
-		private val SERVICES = setOf("timers", "fetch", "console", "crypto", "navigate")
+		private val SERVICES = setOf("timers", "fetch", "console", "crypto", "navigate", "device")
 
 		private fun scriptBindings(v: Json, what: String): Map<String, ScriptBinding> = v.obj(what).entries.associateTo(LinkedHashMap()) { (name, b) ->
 			val bo = b.obj("$what.$name")
@@ -446,6 +449,10 @@ data class Payload(
 					ScriptBinding.Fields(bo.field("fields", what).obj("$what.$name.fields").entries.associateTo(LinkedHashMap()) { (f, c) -> f to c.str("$what.$name.fields.$f") })
 				}
 				bo.containsKey("value") -> { bo.only(setOf("value"), "$what.$name"); ScriptBinding.Value(expr(bo.field("value", what), "$what.$name.value")) }
+				bo.containsKey("device") -> {
+					bo.only(setOf("device", "object"), "$what.$name")
+					ScriptBinding.Device(bo.field("device", what).str("$what.$name.device"), bo.field("object", what).str("$what.$name.object"))
+				}
 				else -> throw MarklessDecodeError("$what.$name is an unknown script binding (fields ${bo.keys})")
 			}
 		}

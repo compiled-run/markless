@@ -2022,6 +2022,53 @@ export function Page() @{
 	});
 });
 
+describe('@markless/device in JavaScript', () => {
+	it("calls the device through the host from a handler's JavaScript", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+import { haptics, location } from '@markless/device';
+export function Page() @{
+	let text = state('');
+	<button
+		onClick={async () => {
+			try {
+				text = (await location.current()).latitude.toFixed(2);
+				haptics.tap();
+			} catch (error) {
+				text = (error as Error).name;
+			}
+		}}
+	>
+		{text}
+	</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.script!.services).toContain('device');
+		expect(payload!.script!.source).toContain(
+			'globalThis["__marklessHost"]["devices"]["location"].current()',
+		);
+		expect(payload!.script!.source).toContain(
+			'globalThis["__marklessHost"]["devices"]["haptics"].tap()',
+		);
+	});
+
+	it('refuses a device value read in JavaScript by name', async () => {
+		const { diagnostics } = await nativeView(`import { state } from '@markless/core';
+import { location } from '@markless/device';
+function label(access: string): string {
+	let out = '';
+	for (const letter of access) out += letter.toUpperCase();
+	return out;
+}
+export function Page() @{
+	let text = state('');
+	<button onClick={() => { text = label(location.access); }}>{text}</button>
+}`);
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the click handler calls `location` from @markless/device inside JavaScript that runs on the phone, which it cannot reach there yet',
+		]);
+	});
+});
+
 describe('overlays', () => {
 	it('lowers an overlay sheet: its mark, dismiss and pointer events, element values, focus and a module set its helpers keep', async () => {
 		const { payload, diagnostics } =

@@ -1,4 +1,5 @@
 import type { NativeScript, NativeScriptService } from '@markless/serializer';
+import { DEVICE_CALLS } from '@markless/serializer/native-device';
 import { NATIVE_SCRIPT_POINTER_FIELDS } from '@markless/serializer/native-view';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
@@ -252,6 +253,48 @@ if (!host) {
 		host.out.navigate = { route: match.route, params: match.params, replace: !!(options && options.replace) };
 		return Promise.resolve();
 	};
+	// A device call is a call entry the host makes; one that gives a value waits for the host's answer to its id.
+	var deviceCalls = ${JSON.stringify(DEVICE_CALLS)};
+	var answers = {};
+	var nextCall = 1;
+	host.device = function (call, object, args) {
+		var out = output();
+		var given = [];
+		for (var index = 0; index < args.length; index++) given.push(args[index] === undefined ? null : JSON.parse(JSON.stringify(args[index])));
+		var entry = { call: call, arguments: given };
+		if (object) entry.object = object;
+		if (!deviceCalls[call].async) {
+			out.calls.push(entry);
+			return undefined;
+		}
+		entry.id = nextCall++;
+		out.calls.push(entry);
+		return new Promise(function (resolve, reject) { answers[entry.id] = { resolve: resolve, reject: reject }; });
+	};
+	host.answer = function (id, answer) {
+		var waiting = answers[id];
+		delete answers[id];
+		if (!waiting) return;
+		if (!('error' in answer)) return waiting.resolve(answer.value);
+		var error = new Error(answer.error.message);
+		error.name = answer.error.name;
+		waiting.reject(error);
+	};
+	var callsOn = function (device, object) {
+		var made = {};
+		Object.keys(deviceCalls).forEach(function (call) {
+			var dot = call.indexOf('.');
+			if (call.slice(0, dot) !== device || !deviceCalls[call].object !== !object) return;
+			made[call.slice(dot + 1)] = function () { return host.device(call, object, Array.prototype.slice.call(arguments)); };
+		});
+		return made;
+	};
+	host.devices = {};
+	Object.keys(deviceCalls).forEach(function (call) {
+		var device = call.slice(0, call.indexOf('.'));
+		if (!deviceCalls[call].object) host.devices[device] = callsOn(device, null);
+	});
+	host.deviceObject = callsOn;
 	g.window = g.self = g;
 	host.Response = Response;
 }`;
@@ -299,7 +342,8 @@ var frameOf = function (bindings) {
 			var object = {};
 			Object.keys(binding.fields).forEach(function (field) { cellProperty(object, field, binding.fields[field]); });
 			Object.defineProperty(names, name, { enumerable: true, value: object });
-		} else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
+		} else if ('device' in binding) Object.defineProperty(names, name, { enumerable: true, value: host.deviceObject(binding.device, binding.object) });
+		else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
 	});
 	return names;
 };
@@ -314,7 +358,7 @@ var begin = function (entry) {
 	cells = entry.cells;
 	before = {};
 	for (var slot in cells) before[slot] = JSON.stringify(cells[slot]);
-	host.out = { timers: [], clears: [], requests: [], aborts: [], logs: [], navigate: null };
+	host.out = { timers: [], clears: [], requests: [], aborts: [], calls: [], logs: [], navigate: null };
 	host.place = navigation && entry.kind !== 'compute' ? { routes: navigation.routes, path: pathOf(navigation.here, entry.params || {}) } : null;
 	host.seed = entry.seed || null;
 	host.counter = 0;
@@ -440,6 +484,8 @@ g.__markless[id] = {
 				if (runs[at].done && kept && kept.state === 'value' && kept.error) cells[slot] = { state: 'error', error: kept.error };
 				if (!runs[at].done || entry.leave) delete runs[at];
 			}
+		} else if (entry.kind === 'answer') {
+			host.answer(entry.call, entry);
 		} else if (entry.kind === 'response') {
 			var request = host.requests[entry.request];
 			delete host.requests[entry.request];
@@ -459,6 +505,7 @@ g.__markless[id] = {
 		var out = host.out;
 		host.out = null;
 		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs };
+		if (out.calls.length > 0) left.calls = out.calls;
 		if (out.navigate) left.navigate = out.navigate;
 		return JSON.stringify(left);
 	},

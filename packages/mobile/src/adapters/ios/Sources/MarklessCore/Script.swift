@@ -2,7 +2,7 @@ import Foundation
 
 /// A host service a payload's script uses; a host provides only those it names.
 public enum NativeScriptService: String, Sendable {
-	case timers, fetch, console, crypto, navigate
+	case timers, fetch, console, crypto, navigate, device
 }
 
 /// The JavaScript a payload's `script` ops and script computeds run, in the platform's engine, started on first use.
@@ -22,6 +22,8 @@ public struct NativeScriptBinding: Equatable, Sendable {
 		case fields([NativeScriptField])
 		/// A value it only reads.
 		case value(NativeExpr)
+		/// A device object the component made: the script calls its methods through `call` entries.
+		case device(device: String, object: String)
 	}
 	public let name: String
 	public let kind: Kind
@@ -31,6 +33,7 @@ public struct NativeScriptBinding: Equatable, Sendable {
 		case let .cell(cell): return [cell]
 		case let .fields(fields): return fields.map(\.cell)
 		case let .value(expr): return expr.cells
+		case .device: return []
 		}
 	}
 }

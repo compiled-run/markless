@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { NativeOp, NativeViewPayload } from '@markless/serializer';
+import type { NativeJournalEntry, NativeOp, NativeViewPayload } from '@markless/serializer';
 import {
 	compileNativeComponent,
 	createNativeAppRuntime,
@@ -57,10 +57,28 @@ const look = (
 		arms: runtime.arms(),
 		rows: runtime.rows(),
 	});
-	const start = runtime.start();
+	// Data names a call's continuation after its handler and JavaScript by number: an answer goes to the oldest call
+	// still waiting, and the journal spells each continuation by the order its call was made.
+	const waiting: string[] = [];
+	const order = new Map<string, number>();
+	const answering = (journal: ReadonlyArray<NativeJournalEntry>) =>
+		journal.map((entry) => {
+			if (entry.op !== 'call' || entry.resume === undefined) return entry;
+			waiting.push(entry.resume);
+			order.set(entry.resume, order.size);
+			return { ...entry, resume: `call ${order.get(entry.resume)}` };
+		});
+	const answer = (action: NativeAction): NativeAction =>
+		action.event === 'resume' || action.event === 'reject'
+			? { ...action, continuation: waiting.shift() ?? action.continuation }
+			: action;
+	const start = answering(runtime.start());
 	return {
 		initial: { start, ...screen() },
-		steps: actions.map((action) => ({ journal: runtime.dispatch(action), ...screen() })),
+		steps: actions.map((action) => ({
+			journal: answering(runtime.dispatch(answer(action))),
+			...screen(),
+		})),
 	};
 };
 

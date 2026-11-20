@@ -514,6 +514,7 @@ public final class NativeRuntime {
 			case let .fields(fields):
 				return (binding.name, .object([("fields", .object(try fields.map { ($0.name, .string(try slot(of: $0.cell, in: scope))) }))]))
 			case let .value(expr): return (binding.name, .object([("value", try evaluate(expr, in: scope).json)]))
+			case let .device(device, object): return (binding.name, .object([("device", .string(device)), ("object", .string(object))]))
 			}
 		})
 	}
@@ -537,7 +538,7 @@ public final class NativeRuntime {
 			return try callScript("leave")
 		}
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
-			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs"], optional: ["navigate"])
+			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs"], optional: ["calls", "navigate"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
@@ -567,10 +568,17 @@ public final class NativeRuntime {
 				url: try asked["url"].string(), method: try asked["method"].string(), headers: try decodeHeaders(asked["headers"]),
 				body: try asked["body"].optionalString()))
 		}
-		guard result.has("navigate") else { return aborts + clears + timers + requests }
+		let calls = try (result.has("calls") ? result["calls"].array() : []).map { asked -> NativeJournalEntry in
+			let fields = try asked.object(required: ["call", "arguments"], optional: ["id", "object"])
+			return .call(
+				call: try fields["call"].string(), object: fields.has("object") ? try fields["object"].string() : nil,
+				arguments: try fields["arguments"].array().map { NativeValue(json: $0.value) }, result: nil,
+				resume: fields.has("id") ? "\(scriptCall)\(try wholeNumber(fields["id"]))" : nil)
+		}
+		guard result.has("navigate") else { return aborts + clears + timers + requests + calls }
 		let opened = try result["navigate"].object(["route", "params", "replace"])
 		let params = try opened["params"].keys().map { NativeRouteParam(name: $0, value: try opened["params"].field($0).string()) }
-		return aborts + clears + timers + requests + [.navigate(route: try opened["route"].string(), params: params, replace: try opened["replace"].bool())]
+		return aborts + clears + timers + requests + calls + [.navigate(route: try opened["route"].string(), params: params, replace: try opened["replace"].bool())]
 	}
 
 	/// Tells the engine which async values are shown and what they read, when that moved; it starts and aborts runs.
@@ -1194,6 +1202,9 @@ public final class NativeRuntime {
 
 	/// A device call a handler awaited answered: its continuation runs with the answer as its local.
 	public func resume(_ continuation: String, value: NativeValue) throws -> [NativeJournalEntry] {
+		if let call = scriptCallId(continuation) {
+			return try change(host: nil) { try self.enter([("kind", .string("answer")), ("call", .number(Double(call))), ("value", value.json)]) }
+		}
 		guard let then = continuations[continuation] else { throw RuntimeError(reason: "no continuation \(continuation)") }
 		var scope = NativeScope.empty
 		scope.locals[then.as] = value
@@ -1202,6 +1213,10 @@ public final class NativeRuntime {
 
 	/// That call failed: the rest of the handler does not run, and the nearest `@catch` cell takes `{ name, message }`.
 	public func reject(_ continuation: String, name: String, message: String) throws -> [NativeJournalEntry] {
+		if let call = scriptCallId(continuation) {
+			let error = JSONValue.object([("name", .string(name)), ("message", .string(message))])
+			return try change(host: nil) { try self.enter([("kind", .string("answer")), ("call", .number(Double(call))), ("error", error)]) }
+		}
 		guard let then = continuations[continuation] else { throw RuntimeError(reason: "no continuation \(continuation)") }
 		guard let cell = then.catch else { return [] }
 		return try change(host: nil) {
@@ -1538,3 +1553,9 @@ extension Optional where Wrapped == NativeScriptHost {
 
 /// The prefix of a timer the script set, as its `timer` entries name it (`script:3`); other timers are `after` ops.
 public let scriptTimer = "script:"
+/// The continuation a device call from a script names: its answer goes back to the script.
+public let scriptCall = "script:"
+
+private func scriptCallId(_ continuation: String) -> Int? {
+	continuation.hasPrefix(scriptCall) ? Int(continuation.dropFirst(scriptCall.count)) : nil
+}

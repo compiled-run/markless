@@ -188,6 +188,36 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// Device calls from a handler's JavaScript: an awaited location then a tap, a camera object's photo, a refusal caught.
+		name: 'script-device',
+		fixture: 'proofs/j18-script-device/App.tsrx',
+		modules: true,
+		device: {
+			usage: { camera: 'Takes the photo you ask for.', location: 'Finds where you are.' },
+		},
+		actions: [
+			{ event: 'device', cell: 'object:component-edge:1/cam:ready', value: true },
+			{ event: 'activate', host: 'component-edge:1/h4' },
+			{
+				event: 'resume',
+				continuation: 'script:1',
+				value: { latitude: 51.5, longitude: -0.125, accuracy: 5 },
+			},
+			{ event: 'activate', host: 'component-edge:1/h5' },
+			{
+				event: 'resume',
+				continuation: 'script:2',
+				value: { url: 'file:///photo.png', width: 640, height: 480 },
+			},
+			{ event: 'activate', host: 'component-edge:1/h4' },
+			{
+				event: 'reject',
+				continuation: 'script:3',
+				error: { name: 'NotAllowedError', message: 'Location was refused' },
+			},
+		],
+	},
+	{
 		name: 'handler-catch',
 		fixture: 'proofs/d4b-photo-refused/App.tsrx',
 		device: { usage: { camera: 'Takes the photo you ask for.' } },

@@ -146,16 +146,19 @@ export const NATIVE_DOCUMENT_BODY = '#body';
 export type NativeScriptBinding =
 	| { readonly cell: string }
 	| { readonly fields: Readonly<Record<string, string>> }
-	| { readonly value: NativeExpr };
+	| { readonly value: NativeExpr }
+	/** A device object the component made (`cam`): the script calls its methods through the host. */
+	| { readonly device: NativeDeviceObject; readonly object: string };
 
 export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
 
 /**
  * Host services a payload's script uses, so a host provides only those: timers (`setTimeout` and the rest, through
  * `timer` entries), `fetch` (through `fetch` entries), `console`, `crypto.randomUUID` (from a `seed` the host passes),
- * and `navigate` from @markless/router (through a `navigate` entry; the host passes the page's route `params`).
+ * `navigate` from @markless/router (through a `navigate` entry; the host passes the page's route `params`), and
+ * `@markless/device` calls (through `call` entries, answered with `resume` or `reject` actions).
  */
-export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto' | 'navigate';
+export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto' | 'navigate' | 'device';
 
 /** The JavaScript a payload's `script` ops and script computeds run, in the platform's engine, started on first use. */
 export type NativeScript = {

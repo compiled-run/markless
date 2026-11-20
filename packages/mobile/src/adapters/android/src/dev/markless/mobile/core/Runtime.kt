@@ -354,6 +354,7 @@ class Runtime(
 		data class Slot(val slot: String) : Bound
 		data class Fields(val fields: Map<String, String>) : Bound
 		data class Value(val value: JsValue) : Bound
+		data class Device(val device: String, val obj: String) : Bound
 	}
 
 	private fun bind(bindings: Map<String, ScriptBinding>, scope: Scope): Map<String, Bound> = bindings.mapValuesTo(LinkedHashMap()) { (_, b) ->
@@ -361,6 +362,7 @@ class Runtime(
 			is ScriptBinding.Cell -> Bound.Slot(slot(b.cell, scope))
 			is ScriptBinding.Fields -> Bound.Fields(b.fields.mapValuesTo(LinkedHashMap()) { slot(it.value, scope) })
 			is ScriptBinding.Value -> Bound.Value(evaluate(b.value, scope))
+			is ScriptBinding.Device -> Bound.Device(b.device, b.obj)
 		}
 	}
 
@@ -369,6 +371,7 @@ class Runtime(
 			is Bound.Slot -> "{\"slot\":${jsonString(b.slot)}}"
 			is Bound.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}}"
 			is Bound.Value -> "{\"value\":${jsonValue(b.value)}}"
+			is Bound.Device -> "{\"device\":${jsonString(b.device)},\"object\":${jsonString(b.obj)}}"
 		}
 	}
 
@@ -383,6 +386,7 @@ class Runtime(
 			is Bound.Slot -> jsonValue(nullish(values[b.slot]) ?: nullish(values[b.slot.substringBefore('@')]) ?: JsValue.Null)
 			is Bound.Fields -> b.fields.values.joinToString(",", "[", "]") { jsonValue(values[it] ?: values[it.substringBefore('@')] ?: JsValue.Null) }
 			is Bound.Value -> jsonValue(b.value)
+			is Bound.Device -> jsonString(b.obj)
 		}
 	}
 
@@ -433,6 +437,17 @@ class Runtime(
 					q.field("body", "request").let { if (it == Json.Null) null else it.str("request.body") },
 				)
 				JournalEntry.Fetch(id(o.field("id", "leave().requests[]")), request)
+			} +
+			(result["calls"]?.arr("leave().calls") ?: emptyList()).map { c ->
+				val o = c.obj("leave().calls[]")
+				o.only(setOf("id", "call", "object", "arguments"), "leave().calls[]")
+				JournalEntry.Call(
+					o.field("call", "leave().calls[]").str("leave().calls[].call"),
+					o.field("arguments", "leave().calls[]").arr("leave().calls[].arguments").map { JsValue.fromJson(it) },
+					null,
+					o["object"]?.str("leave().calls[].object"),
+					o["id"]?.let { "$SCRIPT_CALL${id(it)}" },
+				)
 			} +
 			listOfNotNull(result["navigate"]?.let { n ->
 				val o = n.obj("leave().navigate")
@@ -1043,12 +1058,19 @@ class Runtime(
 
 	/** A device call a handler awaited answered: its continuation runs with the answer as its local. */
 	fun resume(continuation: String, value: JsValue): List<JournalEntry> {
+		scriptCallId(continuation)?.let { id ->
+			return change(null, null) { enter("\"kind\":\"answer\",\"call\":$id,\"value\":${jsonValue(value)}") }
+		}
 		val then = continuations[continuation] ?: throw MarklessRuntimeError("no continuation \"$continuation\"")
 		return change(null, null) { run(then.ops, Scope(locals = mapOf(then.local to value))) }
 	}
 
 	/** That call failed: the handler ends, and the nearest `@catch` around it (if any) takes `{ name, message }`. */
 	fun reject(continuation: String, name: String, message: String): List<JournalEntry> {
+		scriptCallId(continuation)?.let { id ->
+			val error = "{\"name\":${jsonString(name)},\"message\":${jsonString(message)}}"
+			return change(null, null) { enter("\"kind\":\"answer\",\"call\":$id,\"error\":$error") }
+		}
 		val then = continuations[continuation] ?: throw MarklessRuntimeError("no continuation \"$continuation\"")
 		val cell = then.catch ?: return emptyList()
 		return change(null, null) {
