@@ -39,7 +39,7 @@ jobs:
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
             - run: node scripts/ci/g16-diagnose.mjs
               env:
-                  G16_RUNS: '20'
+                  G16_RUNS: '12'
             - if: always()
               uses: actions/upload-artifact@v4
               with:

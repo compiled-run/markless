@@ -39,6 +39,33 @@ try {
 		for (let run = 0; run < RUNS; run++) {
 			const visit = await openPage(browser, { coverage: true });
 			try {
+				if (process.env.G16_CPU_THROTTLE) {
+					const cdp = await visit.page.context().newCDPSession(visit.page);
+					await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.G16_CPU_THROTTLE) });
+				}
+				await visit.page.context().addInitScript(() => {
+					const log = (globalThis.__g16 = { events: [], links: [], atLoad: null });
+					const t = () => Math.round(performance.now() * 10) / 10;
+					for (const type of ['pointermove', 'pointerover', 'pointerdown', 'mousemove', 'mouseover', 'touchstart', 'focusin', 'scroll', 'popstate'])
+						addEventListener(type, (e) => log.events.push([type, t(), e.isTrusted, e.target?.nodeName ?? String(e.target), e.clientX ?? null, e.clientY ?? null, e.pointerType ?? null]), { capture: true, passive: true });
+					new MutationObserver((records) => {
+						for (const r of records)
+							for (const n of r.addedNodes)
+								if (n.nodeName === 'LINK' && n.rel === 'modulepreload') {
+									const entry = { href: n.href.replace(location.origin, ''), added: t(), loaded: null };
+									log.links.push(entry);
+									n.addEventListener('load', () => (entry.loaded = t()), { once: true });
+								}
+					}).observe(document, { childList: true, subtree: true });
+					addEventListener('load', () => {
+						log.atLoad = {
+							t: t(),
+							pending: [...document.head.querySelectorAll('link[rel="modulepreload"]')]
+								.filter((l) => !performance.getEntriesByName(l.href, 'resource').length)
+								.map((l) => l.href.replace(location.origin, '')),
+						};
+					}, { once: true });
+				});
 				const t0 = Date.now();
 				await visit.goto(new URL(route, target.url).href);
 				const tGoto = Date.now() - t0;
@@ -46,6 +73,7 @@ try {
 				const tIdle = Date.now() - t0;
 				const scripts = await visit.coverage.take();
 				const timeline = await visit.page.evaluate(() => ({
+					g16: globalThis.__g16,
 					now: performance.now(),
 					nav: performance.getEntriesByType('navigation').map((e) => ({
 						dcl: e.domContentLoadedEventEnd,
@@ -98,7 +126,7 @@ try {
 		console.log(`\n=== ${route}: totals ${totals.join(' ')}`);
 		for (const r of runs)
 			console.log(
-				`  total ${r.total} goto ${r.tGoto}ms idle ${r.tIdle}ms load ${Math.round(r.timeline.nav?.load ?? -1)} now ${Math.round(r.timeline.now)}`,
+				`  total ${r.total} goto ${r.tGoto}ms idle ${r.tIdle}ms load ${Math.round(r.timeline.nav?.load ?? -1)} now ${Math.round(r.timeline.now)}\n    events ${JSON.stringify(r.timeline.g16?.events)}\n    atLoad ${JSON.stringify(r.timeline.g16?.atLoad)}\n    links ${JSON.stringify(r.timeline.g16?.links)}`,
 			);
 		for (const v of variable)
 			console.log(`  VAR in ${v.in}/${RUNS} chars ${v.chars.join(',')} ${v.key}\n    ${JSON.stringify(v.snippet)}`);
