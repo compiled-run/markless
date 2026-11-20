@@ -184,8 +184,14 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 	 * band must follow exactly one of [cells] (the payload's styled cells); with [everyCell], every styled cell must have a state
 	 * (a page's export), else only the cells its nodes read do (a sheet's).
 	 */
-	fun start(cells: List<String>, value: (String) -> JsValue, dark: Boolean, everyCell: Boolean = true): Int {
-		val wanted = states.mapIndexed { s, st -> if (s == bandState) JsValue.Num(band(dark).toDouble()) else value(cellOf(st, cells)) }
+	fun start(cells: List<String>, value: (String) -> JsValue, dark: Boolean, everyCell: Boolean = true, branches: List<String> = emptyList(), arm: (String) -> JsValue? = { null }): Int {
+		// A branch's state is the arm it shows; one no arm around it shows keeps a value no box reads: its first.
+		val wanted = states.mapIndexed { s, st ->
+			when {
+				s == bandState -> JsValue.Num(band(dark).toDouble())
+				else -> cellOf(st, cells + branches).let { c -> if (c in branches) arm(c) ?: st.domain[0] else value(c) }
+			}
+		}
 		if (everyCell) for (c in cells) stateFor(c)
 		fun matches(a: Int) = states.withIndex().all { (s, st) -> assignments[a].values[st.key]?.let { Js.strictEquals(it, wanted[s]) } == true }
 		if (matches(initial)) return initial
@@ -194,7 +200,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 
 	private fun cellOf(state: StyleState, cells: List<String>): String {
 		val named = cells.filter { state.key == it || state.key.endsWith("#$it") }
-		if (named.size != 1) throw MarklessDecodeError("style state \"${state.key}\" follows ${named.size} styled cells of the payload")
+		if (named.size != 1) throw MarklessDecodeError("style state \"${state.key}\" follows ${named.size} styled cells or branches of the payload")
 		return named[0]
 	}
 

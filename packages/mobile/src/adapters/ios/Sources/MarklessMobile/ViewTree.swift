@@ -590,6 +590,7 @@ final class ViewTree {
 				let built = try index.map { try build("\(templates[node] ?? node)#\($0)", in: container, at: &position, context) } ?? []
 				branches[node] = (branch.anchor, index, built)
 				settle(container, built: built, context)
+				try followArms()
 			case let .rows(node, keys):
 				guard let list = lists[node], let context = contexts[node] else { throw HostError("journal names list \(node), which is not shown") }
 				let container = list.anchor.superview ?? root
@@ -734,6 +735,33 @@ final class ViewTree {
 		layer.faces = systemFaces
 		layer.setNeedsDisplay()
 		label.textColor = .clear
+	}
+
+	/// Moves each styled branch's style state to the arm it shows now, inner ones included, and lays the page out again.
+	private func followArms() throws {
+		var moved = false
+		if let layout {
+			for cell in layout.stateCells {
+				guard let value = try runtime.styleArm(of: cell) else { continue }
+				let reached = try layout.next(from: assignment, cell: cell, value: value)
+				moved = moved || reached != assignment
+				assignment = reached
+			}
+		}
+		for (sheet, styles) in sheetStyles {
+			var next = styles
+			for (index, height) in styles.heights.enumerated() {
+				for cell in height.layout.stateCells {
+					guard let value = try runtime.styleArm(of: cell) else { continue }
+					next.assignments[index] = try height.layout.next(from: next.assignments[index], cell: cell, value: value)
+				}
+			}
+			moved = moved || next.assignments != styles.assignments
+			sheetStyles[sheet] = next
+		}
+		guard moved else { return }
+		try repaint { _ in true }
+		try sizePage()
 	}
 
 	private func style(of id: String) -> ResolvedStyle? {

@@ -1,6 +1,10 @@
 import type { NativeArmPlace, NativeViewPayload } from '@markless/serializer';
 import { fontFaceSources } from '@markless/compiler/native';
-import { isNativeStyleStateAttribute, nativeExprCells } from '@markless/serializer/native-view';
+import {
+	isNativeStyleStateAttribute,
+	NATIVE_NO_ARM,
+	nativeExprCells,
+} from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeBuild, NativeStylesheet } from './compile.ts';
 import { createNativeRuntime, evaluateWithScript, formatNativeValue } from './runtime.ts';
@@ -44,6 +48,7 @@ export type NativeStyleInput = {
 				/** A markup ancestor of a sheet's content: there for its selectors and inheritance, with no box of its own. */
 				readonly boxless?: true;
 				readonly arm?: NativeArmPlace;
+				readonly row?: string;
 		  }
 		| {
 				readonly kind: 'text';
@@ -56,6 +61,7 @@ export type NativeStyleInput = {
 					readonly value: string;
 				}>;
 				readonly arm?: NativeArmPlace;
+				readonly row?: string;
 		  }
 	>;
 	/** The stylesheets the page imports (unscoped, in import order), then every shown component's scoped CSS. */
@@ -73,6 +79,23 @@ export type NativeStyleInput = {
 	 * stylesheet's file. Written to disk with `file` relative to the input file (`nativeStyleInputAt`).
 	 */
 	readonly fonts?: ReadonlyArray<{ readonly url: string; readonly file: string }>;
+	/**
+	 * Each `@if` or `@try` whose arms hold styled nodes, as a state Dragon compiles: the arm it shows (`"0"`, `"1"`, …, or
+	 * NATIVE_NO_ARM when it shows none), the arm at mount, and the arm it sits in. A node's `arm` names its innermost one.
+	 */
+	readonly branches?: ReadonlyArray<{
+		readonly id: string;
+		readonly domain: ReadonlyArray<string>;
+		readonly initial: string;
+		readonly arm?: NativeArmPlace;
+	}>;
+};
+
+/** The arms a branch can show, as its style state's values: one per arm, and NATIVE_NO_ARM when it can show none. */
+export const branchDomain = (branch: Extract<PayloadNode, { kind: 'branch' }>): string[] => {
+	const arms = Array.from({ length: branch.arms }, (_, index) => String(index));
+	const none = branch.test ? branch.arms < 2 : !(branch.tests ?? []).includes(null);
+	return none ? [...arms, NATIVE_NO_ARM] : arms;
 };
 
 const URL_ROOT = 'https://markless.invalid/';
@@ -228,9 +251,9 @@ export function nativeStyleInput(
 	// What a script computes at the first render is laid out too: Dragon measures the text it gives. A route param reads as ''.
 	const host = payload.script ? nodeScriptHost() : undefined;
 	const params = Object.fromEntries((payload.route?.params ?? []).map((name) => [name, '']));
-	const initial = new Map(
-		createNativeRuntime(payload, new Map(), params, undefined, undefined, host).texts(),
-	);
+	const mounted = createNativeRuntime(payload, new Map(), params, undefined, undefined, host);
+	const initial = new Map(mounted.texts());
+	const shownArms = new Map(mounted.arms());
 	const evaluateAt = host
 		? evaluateWithScript(payload, host)
 		: evaluateWithScript(payload, {
@@ -258,6 +281,20 @@ export function nativeStyleInput(
 		[{}],
 	);
 	const initialCells = new Map(payload.cells.map((cell) => [cell.id, cell.initial]));
+	// A branch an outer arm hides keeps a value no box reads, since each arm inside it also needs that outer arm: its first.
+	const branches = nodes.flatMap((node) => {
+		if (node.kind !== 'branch' || node.row) return [];
+		const domain = branchDomain(node);
+		const shown = shownArms.get(node.id);
+		return [
+			{
+				id: node.id,
+				domain,
+				initial: shown === undefined ? domain[0]! : shown === null ? NATIVE_NO_ARM : String(shown),
+				...(node.arm ? { arm: node.arm } : {}),
+			},
+		];
+	});
 	// A node in an arm not shown at mount still gets laid out: its literals and its cells' first values (an expression reads as '').
 	const unshownText = (
 		parts: Extract<NativeViewPayload['nodes'][number], { kind: 'text' }>['parts'],
@@ -275,7 +312,8 @@ export function nativeStyleInput(
 		version: NATIVE_STYLE_INPUT_VERSION,
 		component: payload.component,
 		nodes: nodes.flatMap((node): NativeStyleInput['nodes'][number][] => {
-			const place = node.arm ? { arm: node.arm } : {};
+			// A row's nodes name their list: Dragon refuses them by name until rows are laid out on the phone.
+			const place = { ...(node.arm ? { arm: node.arm } : {}), ...(node.row ? { row: node.row } : {}) };
 			if (node.kind === 'branch' || node.kind === 'repeat') return [];
 			if (node.kind === 'sheet')
 				throw new Error(
@@ -381,5 +419,6 @@ export function nativeStyleInput(
 		css: [...stylesheets, ...styles].map((style) => style.cssText).join('\n'),
 		states,
 		...(fonts.length > 0 ? { fonts } : {}),
+		...(branches.length > 0 ? { branches } : {}),
 	};
 }

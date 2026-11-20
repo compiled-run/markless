@@ -185,12 +185,14 @@ class MarklessHost(
 	private val dpr = context.resources.displayMetrics.density.toDouble()
 	private var enterPressedAt = Long.MIN_VALUE / 2
 	private val styledCells = payload.cells.filter { it.styled }.map { it.id }
+	/** Each @if or @try outside list rows: its style state is the arm it shows. */
+	private val styledBranches = payload.nodes.filter { it is Node.Branch && it.row == null }.map { it.id }
 
 	/** One laid-out document (the page, or a sheet's content at one resting height) and the assignment it shows. */
 	private inner class Layout(export: StyleExport, everyCell: Boolean) {
 		var export = export
 			private set
-		var assignment = export.start(styledCells, runtime::value, isDark(context.resources.configuration), everyCell)
+		var assignment = export.start(styledCells, runtime::value, isDark(context.resources.configuration), everyCell, styledBranches, runtime::styleArm)
 		var absolutes: List<Map<String, Pair<Double, Double>>> = export.assignments.map { a -> absoluteOrigins(a.nodes) }
 			private set
 
@@ -528,6 +530,7 @@ class MarklessHost(
 						val key = entry.node.substringAfter('@')
 						rebuild { it.rowKey == key && inArm(it.node, branch) }
 					}
+					followArms()
 				}
 				is JournalEntry.Invalid -> invalid(entry.node, entry.message)
 				is JournalEntry.Timer -> scheduleTimer(entry.node, entry.ms)
@@ -657,6 +660,20 @@ class MarklessHost(
 		s.current = at
 		repaint()
 		Log.i(TAG, "sheet $id at $snapPoint, style assignment ${layout.assignment}")
+	}
+
+	/** Moves each styled branch's style state to the arm it shows now, inner ones included, and lays the page out again. */
+	private fun followArms() {
+		if (page == null) return
+		var moved = false
+		for (b in styledBranches) {
+			val value = runtime.styleArm(b) ?: continue
+			for (l in allLayouts()) {
+				val before = l.assignment
+				if (l.advance(b, value)) moved = moved || l.assignment != before
+			}
+		}
+		if (moved) repaint()
 	}
 
 	private fun repaint() {

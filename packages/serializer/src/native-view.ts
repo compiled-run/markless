@@ -184,6 +184,8 @@ export type NativeTextPart =
 
 /** Where a node sits when it belongs to one arm of an `@if`: shown only while that arm is chosen. */
 export type NativeArmPlace = { readonly branch: string; readonly index: number };
+/** A branch's style state when it shows no arm (an `@if` with no `@else` whose test fails); otherwise its arm's index. */
+export const NATIVE_NO_ARM = 'none';
 
 /** Where a node sits: in an `@if` arm, or in a list row (`row` names the `repeat` node). */
 export type NativePlace = { readonly arm?: NativeArmPlace; readonly row?: string };

@@ -109,7 +109,7 @@ extension StyleExport {
 	/// `value` reads a cell's value at mount, so the starting assignment matches stored values too; `dark` picks the band.
 	public func resolve(
 		for payload: NativeViewPayload, initialTexts: [(node: String, text: String)], value: (String) throws -> NativeValue,
-		dark: Bool = false
+		arm: (String) throws -> NativeValue? = { _ in nil }, dark: Bool = false
 	) throws -> StyleLayout {
 		let roots = sheetRoots(of: payload)
 		for node in payload.nodes where roots[node.id] == node.id && !sheets.contains(where: { $0.node == node.id }) {
@@ -117,20 +117,20 @@ extension StyleExport {
 		}
 		return try layout(
 			for: payload, nodes: payload.nodes.filter { roots[$0.id] == nil }, root: nil, everyStyledCell: true,
-			initialTexts: initialTexts, value: value, dark: dark)
+			initialTexts: initialTexts, value: value, arm: arm, dark: dark)
 	}
 
 	/// The layout of each resting height of the sheet `node`, in its `heights` order.
 	public func resolveSheet(
 		_ node: String, for payload: NativeViewPayload, initialTexts: [(node: String, text: String)],
-		value: (String) throws -> NativeValue, dark: Bool = false
+		value: (String) throws -> NativeValue, arm: (String) throws -> NativeValue? = { _ in nil }, dark: Bool = false
 	) throws -> [(snapPoint: Double, layout: StyleLayout)] {
 		guard let sheet = sheets.first(where: { $0.node == node }) else { throw styleError("\(node): the style export has no styles for this system sheet") }
 		let roots = sheetRoots(of: payload)
 		let content = payload.nodes.filter { roots[$0.id] == node && $0.id != node }
 		return try sheet.heights.map { height in
 			(height.snapPoint, try height.style.layout(
-				for: payload, nodes: content, root: node, everyStyledCell: false, initialTexts: initialTexts, value: value, dark: dark))
+				for: payload, nodes: content, root: node, everyStyledCell: false, initialTexts: initialTexts, value: value, arm: arm, dark: dark))
 		}
 	}
 
@@ -145,19 +145,27 @@ extension StyleExport {
 
 	private func layout(
 		for payload: NativeViewPayload, nodes: [NativeNode], root: String?, everyStyledCell: Bool,
-		initialTexts: [(node: String, text: String)], value: (String) throws -> NativeValue, dark: Bool
+		initialTexts: [(node: String, text: String)], value: (String) throws -> NativeValue,
+		arm: (String) throws -> NativeValue?, dark: Bool
 	) throws -> StyleLayout {
 		let styledCells = payload.cells.filter(\.styled).map(\.id)
+		// An @if or @try outside list rows: its style state is the arm it shows.
+		let branches = Set(payload.nodes.compactMap { node -> String? in
+			guard case .branch = node.kind, node.row == nil else { return nil }
+			return node.id
+		})
 		let stateCells = try states.map { state in
 			if state.key == StyleBands.state { return state.key }
-			let named = styledCells.filter(state.names)
-			guard named.count == 1 else { throw styleError("style state \(state.key) names \(named.count) styled cells of the payload") }
+			let named = (styledCells + branches.sorted()).filter(state.names)
+			guard named.count == 1 else { throw styleError("style state \(state.key) names \(named.count) styled cells or branches of the payload") }
 			return named[0]
 		}
 		if everyStyledCell, let unstyled = styledCells.first(where: { !stateCells.contains($0) }) {
 			throw styleError("the payload's styled cell \(unstyled) has no state in the style export")
 		}
-		let current = try stateCells.map { cell in
+		let current = try stateCells.enumerated().map { index, cell in
+			// A branch no arm around it shows keeps a value no box reads: its first.
+			if branches.contains(cell) { return try arm(cell) ?? states[index].domain[0] }
 			guard cell == StyleBands.state else { return try value(cell) }
 			guard let bands else { throw styleError("\(cell) is a state, but there are no bands") }
 			return NativeValue.number(Double(try bands.band(dark: dark, widthPx: viewport.width * dpr, heightPx: viewport.height * dpr, scale: dpr)))
@@ -201,7 +209,7 @@ extension StyleExport {
 		let texts = initialTexts.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.node, $0.text) }) }
 		var styles: [String: ResolvedStyle] = [:]
 		for node in payloadNodes {
-			if case .branch = node.kind { throw styleError("\(node.id): @if is not styled on iOS yet, the style export lays out one state") }
+			if case .branch = node.kind { continue }
 			if case .repeat = node.kind { throw styleError("\(node.id): @for is not styled on iOS yet, the style export lays out one state") }
 			if case .sheet = node.kind { throw styleError("\(node.id): a system sheet inside another sheet's content is not styled on iOS") }
 			guard let styled = byId[node.id] else { throw styleError("no style export node for \(node.id)") }
