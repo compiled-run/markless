@@ -957,6 +957,8 @@ export function createNativeRuntime(
 		eventValue?: string | NativeEventFields,
 		scope?: NativeScope,
 	): Value => evaluateNativeExpr(expr, read, eventValue, scope ?? base, compute, elements);
+	// A first value the build could not know is taken when the screen opens, in cell order, as the body runs once on the web.
+	for (const cell of payload.cells) if (cell.seed) values.set(cell.id, evaluate(cell.seed));
 	const armOf = (
 		branch: Extract<NativeNode, { kind: 'branch' }>,
 		scope: NativeScope = base,

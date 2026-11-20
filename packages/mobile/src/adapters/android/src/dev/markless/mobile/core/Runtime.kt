@@ -1027,6 +1027,12 @@ class Runtime(
 	/** Each touch that is down: the element it is captured to (null after a release), the one under it, and whether it was first. */
 	private val touches = LinkedHashMap<Double, Touching>()
 
+	// Last, once every field a script entry reads is set: a first value the build could not know is taken when the screen
+	// opens, in cell order, as the body runs once on the web.
+	init {
+		for (c in payload.cells) c.seed?.let { values[c.id] = evaluate(it) }
+	}
+
 	private fun touching(pointer: JsValue): Touching? = (pointer as? JsValue.Num)?.let { touches[it.value + 0.0] }
 
 	/** The elements from [id] out to the root, innermost first; a row's copy keeps its own id. */

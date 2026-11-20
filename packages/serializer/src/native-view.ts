@@ -672,6 +672,11 @@ export type NativeViewPayload = {
 		 * build, as a page's render reads the clock when it is served; `initial` is never shown.
 		 */
 		readonly clock?: true;
+		/**
+		 * A first value the build cannot know (`state(Number(id))`): the host evaluates it when the screen opens, before the
+		 * first build and in cell order, as the web runs a component's body once when it first renders; `initial` is never shown.
+		 */
+		readonly seed?: NativeExpr;
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;

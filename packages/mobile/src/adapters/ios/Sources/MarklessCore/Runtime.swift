@@ -279,6 +279,8 @@ public final class NativeRuntime {
 	private var asyncSent: String?
 	/// Async values a `reset` asked to run again, by slot, in order: sent with the next `tasks` entry.
 	private var retry: [String] = []
+	/// Why a first value taken when the screen opened failed; every later read fails with it, as the web's render does.
+	private var seedFailure: Error?
 
 	/// `params`: the route params the page opened with; `now`: the clock (a conformance run fixes it).
 	/// `preferredLanguages`: the device's, most preferred first; the web's messages are shown in the first one the payload has.
@@ -328,6 +330,12 @@ public final class NativeRuntime {
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
 			return nil
 		})
+		// A first value the build could not know is taken when the screen opens, in cell order, as the body runs once on the web.
+		do {
+			for cell in payload.cells { if let seed = cell.seed { values[cell.id] = try evaluate(seed) } }
+		} catch {
+			seedFailure = error
+		}
 		for node in ticked {
 			guard case let .element(_, attributes, _) = node.kind else { continue }
 			checkedness[node.id] = (try? checkedBinding(node.id)) ?? (attributes["checked"] != nil)
@@ -399,6 +407,7 @@ public final class NativeRuntime {
 
 	/// A row's state reads its first value until the row writes it.
 	private func read(_ cell: String, in scope: NativeScope = .empty) throws -> NativeValue {
+		if let seedFailure { throw seedFailure }
 		guard let value = values[cell] else { throw RuntimeError(reason: "unknown cell \(cell)") }
 		return values[try slot(of: cell, in: scope)] ?? value
 	}
@@ -407,6 +416,7 @@ public final class NativeRuntime {
 	public func value(of cell: String) throws -> NativeValue { try read(cell) }
 
 	public func evaluate(_ expr: NativeExpr, in scope: NativeScope = .empty) throws -> NativeValue {
+		if let seedFailure { throw seedFailure }
 		let evaluate = { (inner: NativeExpr) throws -> NativeValue in try self.evaluate(inner, in: scope) }
 		switch expr {
 		case let .cell(cell): return try read(cell, in: scope)

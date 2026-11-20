@@ -572,6 +572,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// First values the build cannot know, taken when the screen opens: from JavaScript, from another seeded cell, and from a
+		// prop that follows state, which the child keeps after the prop moves, as its body ran once.
+		name: 'state-seeds',
+		fixture: 'proofs/u66-state-seeds/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
 		name: 'script-loop',
 		fixture: 'proofs/j1-loop-local/App.tsrx',
 		modules: true,

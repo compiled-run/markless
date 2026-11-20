@@ -2,6 +2,7 @@ import type {
 	NativeCommand,
 	NativeDefaultStyle,
 	NativeDrawing,
+	NativeArmPlace,
 	NativePlace,
 	NativeBuiltin,
 	NativeExpr,
@@ -1471,6 +1472,8 @@ export function createNativeViewPayload(
 		includeModuleState: boolean,
 		/** The list whose rows this instance renders in: its state is per row. */
 		row?: string,
+		/** The @if arm this instance renders in, which renders it again each time it shows. */
+		arm?: NativeArmPlace,
 	): Scope => {
 		const byName = new Map<string, string>();
 		const byBinding = new Map<string, string>();
@@ -1551,15 +1554,41 @@ export function createNativeViewPayload(
 				continue;
 			}
 			if (!known && initializer) {
-				const lowered = exprOf(initializer, `the first value of \`${binding.name}\``, {
-					...scope,
-					...(binding.sourceSpan ? { span: binding.sourceSpan } : {}),
-				});
-				const folded = lowered && foldConstant(lowered, initialOf);
-				if (folded && lowered && cellsOf(lowered).size === 0) {
+				const lowered = attempt(() =>
+					exprOf(initializer, `the first value of \`${binding.name}\``, {
+						...scope,
+						...(binding.sourceSpan ? { span: binding.sourceSpan } : {}),
+					}),
+				);
+				const folded = !lowered.failed && lowered.value && foldConstant(lowered.value, initialOf);
+				if (folded && lowered.value && cellsOf(lowered.value).size === 0) {
 					value = folded.value;
 					known = true;
+				} else lowered.rollBack();
+			}
+			if (!known && !binding.storage && (row || arm)) {
+				refuse(
+					`state \`${binding.name}\` of ${component}, which an @if arm or @for row shows, takes a first value the build cannot know each time it shows; a native build takes one only when the screen opens`,
+					binding.sourceSpan,
+				);
+				continue;
+			}
+			if (!known && !binding.storage) {
+				const seed = attempt(() =>
+					renderValue(
+						initializer,
+						() => scriptFacts(module)?.stateSeed(binding.componentName, binding.name),
+						`the first value of \`${binding.name}\``,
+						{ ...scope, ...(binding.sourceSpan ? { span: binding.sourceSpan } : {}) },
+					),
+				);
+				if (seed.value && !seed.failed) {
+					byName.set(binding.name, id);
+					byBinding.set(binding.id, id);
+					addCell({ id, name: binding.name, initial: null, seed: seed.value });
+					continue;
 				}
+				seed.rollBack();
 			}
 			if (!known || !isNativeValue(value)) {
 				refuse(
@@ -4427,6 +4456,7 @@ export function createNativeViewPayload(
 					scope.shared,
 					target.module === rootModule,
 					place.row,
+					place.arm,
 				);
 				lowerChunk(template, parent, place, {
 					...childScope,

@@ -442,6 +442,8 @@ public struct NativeCell: Equatable, Sendable {
 	public var row: String? = nil
 	/// The clock when the screen opened: written at mount, before the first build.
 	public var clock = false
+	/// A first value the build could not know, evaluated when the screen opens, in cell order.
+	public var seed: NativeExpr? = nil
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -496,7 +498,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "async", "object", "row", "clock"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "async", "object", "row", "clock", "seed"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
 			}
@@ -521,7 +523,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 						boundaries: try async["boundaries"].array().map { try $0.string() })
 				}() : nil,
 				row: field.has("row") ? try field["row"].string() : nil,
-				clock: field.has("clock"))
+				clock: field.has("clock"),
+				seed: field.has("seed") ? try decodeExpr(try field["seed"]) : nil)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()

@@ -1482,6 +1482,38 @@ export function Search() @{
 		);
 	});
 
+	it("takes a state's first value the build cannot know when the screen opens, as data or as JavaScript; not in an @if arm", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+const WORDS = ['pear', 'fig'];
+function titled(word: string) { return word.charAt(0).toUpperCase() + word.slice(1); }
+export function Seeds() @{
+	let names = state(WORDS.map((word) => titled(word)));
+	let first = state(names[0]);
+	<p>{first} {names.join(', ')}</p>
+}`);
+		expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const seeds = Object.fromEntries(payload!.cells.map((cell) => [cell.name, cell.seed]));
+		expect(seeds['names']).toMatchObject({ script: expect.any(String) });
+		expect(seeds['first']).toEqual({ member: { cell: 'state:names' }, property: '0' });
+		const armed = await nativeView(`import { state } from '@markless/core';
+function Shown({ start }: { readonly start: number }) @{
+	let count = state(start * 2);
+	<b>{count}</b>
+}
+export function Armed() @{
+	let total = state(1);
+	let open = state(false);
+	<main>
+		<button onClick={() => (open = !open)}>Open</button>
+		@if (open) { <Shown start={total} /> }
+	</main>
+}`);
+		expect(armed.diagnostics.map((d) => d.message)).toEqual([
+			'state `count` of Shown, which an @if arm or @for row shows, takes a first value the build cannot know each time it shows; a native build takes one only when the screen opens',
+			'a text expression reads `count`, which is not state of this component',
+		]);
+	});
+
 	it('lowers a password field as a text field of its form: its text is sent, and required and maxlength are checked', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Login() @{
