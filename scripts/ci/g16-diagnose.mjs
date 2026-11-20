@@ -34,15 +34,18 @@ const sourceOf = (url) => {
 
 const report = {};
 try {
+	for (const variant of (process.env.G16_VARIANTS ?? 'plain').split(','))
 	for (const route of SITES.bench.routes) {
 		const runs = [];
 		for (let run = 0; run < RUNS; run++) {
 			const visit = await openPage(browser, { coverage: true });
 			try {
-				if (process.env.G16_CPU_THROTTLE) {
+				const cpu = /cpu(\d+)/.exec(variant)?.[1];
+				if (cpu) {
 					const cdp = await visit.page.context().newCDPSession(visit.page);
-					await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.G16_CPU_THROTTLE) });
+					await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(cpu) });
 				}
+				if (variant.includes('park')) await visit.page.mouse.move(-1, -1);
 				await visit.page.context().addInitScript(() => {
 					const log = (globalThis.__g16 = { events: [], links: [], atLoad: null });
 					const t = () => Math.round(performance.now() * 10) / 10;
@@ -122,8 +125,8 @@ try {
 			const code = sourceOf(`${target.url}${file}`);
 			v.snippet = code ? code.slice(Number(start), Math.min(Number(end), Number(start) + 400)) : null;
 		}
-		report[route] = { totals, variable, runs };
-		console.log(`\n=== ${route}: totals ${totals.join(' ')}`);
+		report[`${variant} ${route}`] = { totals, variable, runs };
+		console.log(`\n=== ${variant} ${route}: totals ${totals.join(' ')}`);
 		for (const r of runs)
 			console.log(
 				`  total ${r.total} goto ${r.tGoto}ms idle ${r.tIdle}ms load ${Math.round(r.timeline.nav?.load ?? -1)} now ${Math.round(r.timeline.now)}\n    events ${JSON.stringify(r.timeline.g16?.events)}\n    atLoad ${JSON.stringify(r.timeline.g16?.atLoad)}\n    links ${JSON.stringify(r.timeline.g16?.links)}`,
