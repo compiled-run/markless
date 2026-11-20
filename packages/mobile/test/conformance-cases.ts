@@ -1025,6 +1025,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'pointercancel', host: 'h2', pointerId: 2, x: 30, y: 90, time: 2016 },
 		],
 	},
+	{
+		// Long presses as Chrome on Android raises `contextmenu`: on a row's inner element, it reaches the row then the list;
+		// on the list itself; on an element whose handler runs as JavaScript.
+		name: 'contextmenu',
+		fixture: 'test/fixtures/ContextMenu.tsrx',
+		actions: [
+			{ event: 'contextmenu', host: 'h4@Apple', x: 40, y: 120, time: 900 },
+			{ event: 'contextmenu', host: 'h2', x: 10, y: 5, time: 1500 },
+			{ event: 'contextmenu', host: 'h5', x: 52.5, y: 300, time: 2000 },
+			{ event: 'contextmenu', host: 'h4@Pear', x: 41, y: 160, time: 2600 },
+		],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */

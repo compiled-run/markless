@@ -25,6 +25,7 @@ import {
 	NATIVE_DOCUMENT_BODY,
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
+	NATIVE_SCRIPT_CONTEXTMENU_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
 	NATIVE_SCRIPT_HOST_GLOBALS,
@@ -33,6 +34,7 @@ import {
 	NATIVE_VIEW_VERSION,
 	type NativeFieldKind,
 	type NativeForm,
+	type NativeContextMenuField,
 	type NativePointerEventName,
 	PLATFORM_PIECES_NAMESPACE,
 	PLATFORM_PIECES_PACKAGE,
@@ -192,12 +194,15 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	pointerout: 'pointerout',
 	pointerenter: 'pointerenter',
 	pointerleave: 'pointerleave',
+	contextmenu: 'contextmenu',
 };
 
 const CAPTURE_METHODS: ReadonlySet<string> = new Set([
 	'setPointerCapture',
 	'releasePointerCapture',
 ]);
+
+type CarriedEvent = 'dismiss' | 'pointer' | 'contextmenu';
 
 const POINTER_EVENTS: ReadonlySet<string> = new Set<NativePointerEventName>([
 	'pointerdown',
@@ -210,12 +215,9 @@ const POINTER_EVENTS: ReadonlySet<string> = new Set<NativePointerEventName>([
 	'pointerleave',
 ]);
 
-/** The fields a dismiss or pointer event carries, by how a handler reads them off its event parameter. */
+/** The fields a dismiss, pointer or contextmenu event carries, by how a handler reads them off its event parameter. */
 const EVENT_FIELDS: Readonly<
-	Record<
-		'dismiss' | 'pointer',
-		Readonly<Record<string, Extract<NativeExpr, { event: string }>['event']>>
-	>
+	Record<CarriedEvent, Readonly<Record<string, Extract<NativeExpr, { event: string }>['event']>>>
 > = {
 	dismiss: { 'detail.reason': 'reason', 'detail.pressTarget': 'pressTarget' },
 	pointer: {
@@ -231,6 +233,13 @@ const EVENT_FIELDS: Readonly<
 		isPrimary: 'isPrimary',
 		timeStamp: 'timeStamp',
 	},
+	contextmenu: {
+		target: 'target',
+		currentTarget: 'currentTarget',
+		clientX: 'clientX',
+		clientY: 'clientY',
+		timeStamp: 'timeStamp',
+	} satisfies Record<NativeContextMenuField, NativeContextMenuField>,
 };
 
 /** `event.detail.reason` as `detail.reason` when `expression` is a member path of the read `event`. */
@@ -325,6 +334,7 @@ const NOT_ON_PHONES = new Set(['beforematch']);
 const KEYBOARD_ONLY = new Set(['keydown', 'keyup', 'focus', 'blur', 'focusin', 'focusout']);
 const TEXT_ENTRY = new Set(['input', 'textarea']);
 export const NATIVE_KEYBOARD_ONLY_CODE = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
+export const NATIVE_ANDROID_ONLY_CODE = 'MARKLESS_NATIVE_ANDROID_ONLY';
 
 type Item =
 	| {
@@ -486,7 +496,7 @@ type Scope = {
 	/** The element a tap landed on (`event.target`) and the one whose handler runs (`event.currentTarget`). */
 	readonly pressed?: { readonly target: string; readonly currentTarget: string };
 	/** A dismiss or pointer handler's event parameter, whose fields in `EVENT_FIELDS` it may read. */
-	readonly carried?: { readonly name: string; readonly kind: 'dismiss' | 'pointer' };
+	readonly carried?: { readonly name: string; readonly kind: CarriedEvent };
 	/** In a text field's keydown or paste handler: `event.key` or the pasted text is the event's, and `preventDefault()` an op. */
 	readonly typing?: 'keydown' | 'paste';
 	/** In a click handler: `event.detail` is the number of presses in a row. */
@@ -1237,6 +1247,20 @@ export function createNativeViewPayload(
 			passId: 'native-view',
 			suggestions: [],
 			docsUrl: `https://markless.dev/errors/${NATIVE_KEYBOARD_ONLY_CODE}`,
+		});
+	};
+	const androidOnly = (what: string, span?: SourceSpan) => {
+		diagnostics.push({
+			code: NATIVE_ANDROID_ONLY_CODE,
+			severity: 'warning',
+			phase: 'serialization',
+			title: 'A long-press handler runs only on Android',
+			message: `${what} runs only on Android, which raises it for a long press as Chrome does; Safari on iOS raises none, so the iOS app never runs it`,
+			why: 'Chrome on Android raises `contextmenu` when a person long-presses an element; Safari on iOS raises it for no touch.',
+			...(span ? { primarySpan: span } : {}),
+			passId: 'native-view',
+			suggestions: [],
+			docsUrl: `https://markless.dev/errors/${NATIVE_ANDROID_ONLY_CODE}`,
 		});
 	};
 	const elementSources = new Map<
@@ -4849,6 +4873,11 @@ export function createNativeViewPayload(
 							);
 						continue;
 					}
+					if (semantic === 'contextmenu')
+						androidOnly(
+							`the ${event.eventName} handler on <${element}> ${id}`,
+							event.handlerSpan,
+						);
 					if (semantic === 'submit' && element !== 'form') {
 						refuse(
 							`a submit handler on <${element}>; a native build runs one only on a <form>`,
@@ -5895,10 +5924,15 @@ export function createNativeViewPayload(
 		let readsMissing = false;
 		const semantic = SEMANTIC_EVENTS[event.eventName];
 		const touch = POINTER_EVENTS.has(semantic ?? '');
+		const press = semantic === 'contextmenu';
 		for (const read of fact.event ?? []) {
 			if (touch && NATIVE_SCRIPT_POINTER_FIELDS.includes(read.path[0] ?? '')) continue;
-			// A touch's script event carries no element, so `event.target` there is refused, not read as the generic member.
-			if (touch && read.path[0] && read.path[0] in EVENT_FIELDS.pointer) {
+			if (press && NATIVE_SCRIPT_CONTEXTMENU_FIELDS.includes(read.path[0] ?? '')) continue;
+			// A touch's or long press's script event carries no element, so `event.target` there is refused, not read as the generic member.
+			if (
+				(touch && read.path[0] && read.path[0] in EVENT_FIELDS.pointer) ||
+				(press && (read.path[0] === 'target' || read.path[0] === 'currentTarget'))
+			) {
 				readsMissing = true;
 				refuseScript(
 					`${what} reads \`event.${read.path.join('.')}\`, an element, which JavaScript on a phone cannot hold yet`,
@@ -5915,7 +5949,14 @@ export function createNativeViewPayload(
 			);
 			if (known) continue;
 			readsMissing = true;
-			const doing = semantic === 'input' ? 'a text edit' : touch ? 'a touch' : 'a tap';
+			const doing =
+				semantic === 'input'
+					? 'a text edit'
+					: touch
+						? 'a touch'
+						: press
+							? 'a long press'
+							: 'a tap';
 			refuseScript(
 				`${what} reads \`event.${read.path.join('.')}\`, which ${doing} on a phone does not have`,
 				read.span,
@@ -5970,7 +6011,12 @@ export function createNativeViewPayload(
 		const submitting =
 			event.eventName === 'submit' && pressed ? { submitting: pressed.currentTarget } : {};
 		const semantic = SEMANTIC_EVENTS[event.eventName];
-		const carried = semantic === 'dismiss' || POINTER_EVENTS.has(semantic ?? '');
+		const carried: CarriedEvent | undefined =
+			semantic === 'dismiss' || semantic === 'contextmenu'
+				? semantic
+				: POINTER_EVENTS.has(semantic ?? '')
+					? 'pointer'
+					: undefined;
 		const typing = semantic === 'keydown' || semantic === 'paste' ? { typing: semantic } : {};
 		const clicking =
 			semantic === 'activate' && event.eventName === 'click'
@@ -5980,13 +6026,7 @@ export function createNativeViewPayload(
 			parameter === undefined
 				? { ...running, ...submitting, ...typing }
 				: carried
-					? {
-							...running,
-							carried: {
-								name: parameter,
-								kind: semantic === 'dismiss' ? 'dismiss' : 'pointer',
-							},
-						}
+					? { ...running, carried: { name: parameter, kind: carried } }
 					: event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))
 						? { ...running, event: parameter }
 						: {
@@ -6879,6 +6919,15 @@ export function createNativeViewPayload(
 				(statement.arguments ?? []).length === 0
 			)
 				return [{ op: 'preventDefault' }];
+			// A host shows no menu of its own for a long press, so there is nothing for it to prevent.
+			if (
+				scope.carried?.kind === 'contextmenu' &&
+				statement.name === scope.carried.name &&
+				statement.path?.length === 1 &&
+				statement.path[0] === 'preventDefault' &&
+				(statement.arguments ?? []).length === 0
+			)
+				return [];
 			if (
 				scope.pressed &&
 				statement.name === scope.opaque &&

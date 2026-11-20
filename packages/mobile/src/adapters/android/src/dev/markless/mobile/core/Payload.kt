@@ -176,6 +176,8 @@ enum class EventName(val wire: String, val pointer: Boolean = false, val touch: 
 	PointerDown("pointerdown", true, true), PointerMove("pointermove", true, true), PointerUp("pointerup", true, true), PointerCancel("pointercancel", true, true),
 	PointerOver("pointerover", true), PointerOut("pointerout", true), PointerEnter("pointerenter", true), PointerLeave("pointerleave", true),
 	Choose("choose"),
+	/** A long press, as Chrome on Android raises `contextmenu`: carries a [TouchPoint] for its place, and reaches each element it is inside. */
+	ContextMenu("contextmenu"),
 }
 
 sealed interface Op {

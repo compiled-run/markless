@@ -472,7 +472,10 @@ export type NativeProperty = 'value' | 'checked' | 'indeterminate' | 'selected';
  * `enter` is the keyboard's return key in a single-line text field. `submit` is a form's, raised only by a `submit` op.
  * `idle` and `visible` mean what the web runtime gives them, once for each shown instance of their element (shown again
  * after it left, it is a new one): `idle` at the first moment the host is idle after the screen's first frame (or after
- * the element appears), `visible` the first time any of the element is on the screen.
+ * the element appears), `visible` the first time any of the element is on the screen. `contextmenu` is a long press as
+ * Chrome on Android raises it: on the element pressed, then each element it is inside, innermost first, with the press's
+ * place (`NativeContextMenuField`); the tap that press would end in does not follow. Safari on iOS raises none for a long
+ * press, so the iOS host never sends it.
  */
 /**
  * `focus` and `blur` are a text field's: it took the keyboard, or gave it up. `keydown` and `paste` are a text field's too:
@@ -491,6 +494,7 @@ export type NativeEventName =
 	| 'submit'
 	| 'idle'
 	| 'visible'
+	| 'contextmenu'
 	| NativePointerEventName;
 
 /**
@@ -528,6 +532,14 @@ export type NativePointerField =
 	| 'pointerId'
 	| 'pointerType'
 	| 'isPrimary'
+	| 'timeStamp';
+
+/** What a `contextmenu` handler reads off its event: the elements pressed and handling it, and the press's place and time as a pointer's. */
+export type NativeContextMenuField =
+	| 'target'
+	| 'currentTarget'
+	| 'clientX'
+	| 'clientY'
 	| 'timeStamp';
 
 /** Why the overlay behaviour reported a dismissal; the vocabulary of `OverlayGestureReason` in `@markless/web`. */
@@ -1079,6 +1091,13 @@ export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [
 	'pointerId',
 	'pointerType',
 	'isPrimary',
+	'timeStamp',
+];
+
+/** What a long press adds to a script `contextmenu` handler's event. */
+export const NATIVE_SCRIPT_CONTEXTMENU_FIELDS: ReadonlyArray<string> = [
+	'clientX',
+	'clientY',
 	'timeStamp',
 ];
 
