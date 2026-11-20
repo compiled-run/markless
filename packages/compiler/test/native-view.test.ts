@@ -1575,6 +1575,22 @@ export function Size() @{
 		expect(ok!.numberMessages?.['fa']?.decimal).toBe('٫');
 	});
 
+	it("keeps an app-scoped shared() (the default scope) in the app's session, one copy for every screen", async () => {
+		const { payload, diagnostics } = await nativeView(`import { shared, state } from '@markless/core';
+export const player = shared(() => {
+	const box = state({ playing: false });
+	return { ...box, toggle() { box.playing = !box.playing; } };
+});
+export function Player() @{
+	const p = player();
+	<button onClick={() => p.toggle()}>{p.playing ? 'Playing' : 'Paused'}</button>
+}`);
+		expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const kept = payload!.cells.filter((cell) => cell.storage?.session);
+		expect(kept.map((cell) => cell.name)).toEqual(['box.playing']);
+		expect(kept[0]!.storage!.key).toBe(kept[0]!.id);
+	});
+
 	it('lowers a password field as a text field of its form: its text is sent, and required and maxlength are checked', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Login() @{

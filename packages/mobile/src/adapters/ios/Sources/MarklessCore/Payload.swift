@@ -532,6 +532,8 @@ public struct NativeCell: Equatable, Sendable {
 	public var row: String? = nil
 	/// The clock when the screen opened: written at mount, before the first build.
 	public var clock = false
+	/// An app-scoped shared field: its key is in the app's session store (kept for the launch, across screens), not the device's.
+	public var session = false
 	/// A first value the build could not know, evaluated when the screen opens, in cell order.
 	public var seed: NativeExpr? = nil
 }
@@ -603,7 +605,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 			return NativeCell(
 				id: try field["id"].string(), name: try field["name"].string(), initial: initial,
-				storageKey: field.has("storage") ? try field["storage"].object(["key"])["key"].string() : nil, styled: styled,
+				storageKey: field.has("storage") ? try field["storage"].object(required: ["key"], optional: ["session"])["key"].string() : nil, styled: styled,
 				device: field.has("device") ? try field["device"].string() : nil,
 				object: field.has("object") ? try field["object"].string() : nil,
 				task: field.has("task") ? try {
@@ -617,6 +619,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 				}() : nil,
 				row: field.has("row") ? try field["row"].string() : nil,
 				clock: field.has("clock"),
+				session: try field.has("storage") && field["storage"].object(required: ["key"], optional: ["session"]).has("session"),
 				seed: field.has("seed") ? try decodeExpr(try field["seed"]) : nil)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in

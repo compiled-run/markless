@@ -635,7 +635,8 @@ export type NativeViewPayload = {
 		readonly id: string;
 		readonly name: string;
 		readonly initial: NativeValue;
-		readonly storage?: { readonly key: string };
+		/** `session`: an app-scoped shared field, kept for the app's launch across its screens and never across launches. */
+		readonly storage?: { readonly key: string; readonly session?: true };
 		/** A class or `ui-*` attribute binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
 		readonly styled?: true;
 		/** A live device value (`network.online`): the host fills it at mount and sends a `device` action when it changes. */

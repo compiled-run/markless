@@ -1320,6 +1320,9 @@ export function createNativeViewPayload(
 			for (const [field, value] of Object.entries(first))
 				if (holdsUndefined(value)) undefinedFirst.add(`${id}.${field}`);
 	};
+	/** App-scoped shared() instances, one per definition for the whole payload; their cells are kept across screens. */
+	const appInstances = new Map<string, SharedInstance>();
+	const APP_SHARED_PREFIX = 'app:';
 	const addCell = (cell: NativeViewPayload['cells'][number]) => {
 		if (cellIndex.has(cell.id)) return;
 		cellIndex.set(cell.id, cells.length);
@@ -1508,8 +1511,17 @@ export function createNativeViewPayload(
 				);
 				continue;
 			}
+			if ((definition.scope ?? 'app') === 'app') {
+				// One copy for the whole app, as the web keeps one per document: the same cells on every screen.
+				const instance =
+					appInstances.get(definition.id) ??
+					createInstance(definition, module, APP_SHARED_PREFIX, undefined);
+				appInstances.set(definition.id, instance);
+				objects.set(use.localName, { kind: 'instance', instance });
+				continue;
+			}
 			if (definition.scope !== 'subtree') {
-				refuse(`${definition.name}: shared() with scope \`${definition.scope ?? 'app'}\``);
+				refuse(`${definition.name}: shared() with scope \`${definition.scope}\``);
 				continue;
 			}
 			const instance =
@@ -6615,11 +6627,14 @@ export function createNativeViewPayload(
 		...(options.route
 			? { route: { pattern: options.route.pattern, params: options.route.params } }
 			: {}),
-		cells: cells.map((cell) =>
-			styledCells.has(cell.id) && !rowCells.has(cell.id)
-				? { ...cell, styled: true as const }
-				: cell,
-		),
+		cells: cells.map((cell) => {
+			const kept = cell.id.startsWith(APP_SHARED_PREFIX)
+				? { ...cell, storage: { key: cell.id, session: true as const } }
+				: cell;
+			return styledCells.has(cell.id) && !rowCells.has(cell.id)
+				? { ...kept, styled: true as const }
+				: kept;
+		}),
 		nodes,
 		events,
 		handlers,

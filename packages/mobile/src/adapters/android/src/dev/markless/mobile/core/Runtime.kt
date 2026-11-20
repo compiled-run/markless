@@ -199,9 +199,12 @@ class Runtime(
 	private val now: () -> Double = { System.currentTimeMillis().toDouble() },
 	/** Where a page with a script gets the app's engine; never asked for a page without one. */
 	private val scriptHost: ScriptHost? = null,
+	/** App-scoped shared fields' values by key, kept for the app's launch: one store for every screen the app opens. */
+	private val session: Store = MemoryStore(),
 ) {
+	private val sessionCells = payload.cells.filter { it.session }.mapTo(HashSet()) { it.id }
 	private val opened = now()
-	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, if (c.clock) JsValue.Num(opened) else c.storageKey?.let(store::get) ?: c.initial) }
+	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, if (c.clock) JsValue.Num(opened) else c.storageKey?.let(if (c.session) session::get else store::get) ?: c.initial) }
 	/** `idle` and `visible` handlers that ran, by `<event>\u0000<instance>`; an instance that leaves the screen is forgotten. */
 	private val fired = HashSet<String>()
 	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
@@ -462,7 +465,7 @@ class Runtime(
 			if (payload.cells.none { it.id == cell }) throw MarklessRuntimeError("the script wrote unknown cell $cell")
 			val v = JsValue.fromJson(pair[1])
 			values[slot] = v
-			storageKeys[cell]?.let { store.set(it, v) }
+			storageKeys[cell]?.let { (if (cell in sessionCells) session else store).set(it, v) }
 		}
 		for (l in list("logs")) {
 			val pair = l.arr("leave().logs[]")
@@ -590,6 +593,12 @@ class Runtime(
 	}
 
 	/** Starts the async values the script computes, once the screen is built; the host applies its journal as an action's. */
+	/** The screen shows again (Back): app-scoped shared fields take the values the app holds now; the journal of what moved. */
+	fun resume(): List<JournalEntry> = if (sessionCells.isEmpty()) emptyList() else change(null, null) {
+		for (cell in sessionCells) storageKeys[cell]?.let(session::get)?.let { values[cell] = it }
+		emptyList()
+	}
+
 	fun start(): List<JournalEntry> = if (asyncCells.isEmpty()) emptyList() else change(null, null) { emptyList() }
 
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
@@ -1273,7 +1282,7 @@ class Runtime(
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)
 				values[slot(op.cell, scope)] = v
-				storageKeys[op.cell]?.let { store.set(it, v) }
+				storageKeys[op.cell]?.let { (if (op.cell in sessionCells) session else store).set(it, v) }
 			}
 		}
 		return calls

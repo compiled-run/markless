@@ -236,6 +236,8 @@ export type NativeRuntime = {
 	readonly logs: () => ReadonlyArray<readonly [level: string, text: string]>;
 	/** Starts the async values the script computes, once the screen is built; the host applies its journal as an action's. */
 	readonly start: () => ReadonlyArray<NativeJournalEntry>;
+	/** The screen shows again (Back): app-scoped shared fields take the values the app holds now; the journal of what moved. */
+	readonly resume: () => ReadonlyArray<NativeJournalEntry>;
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
 	readonly leave: () => ReadonlyArray<NativeJournalEntry>;
 };
@@ -541,7 +543,10 @@ export function createNativeRuntime(
 	now: () => number = Date.now,
 	/** Where a page with JavaScript handlers gets its engine; started on first use, never for a page without a script. */
 	scriptHost?: NativeScriptHost,
+	/** App-scoped shared fields by key, kept for the app's launch: one map for every screen the app opens. */
+	session: Map<string, Value> = new Map(),
 ): NativeRuntime {
+	const keeperOf = (storage: { readonly session?: true }) => (storage.session ? session : store);
 	const base: NativeScope = {
 		...EMPTY_SCOPE,
 		params,
@@ -554,10 +559,13 @@ export function createNativeRuntime(
 			cell.id,
 			cell.clock
 				? now()
-				: cell.storage && store.has(cell.storage.key)
-					? store.get(cell.storage.key)!
+				: cell.storage && keeperOf(cell.storage).has(cell.storage.key)
+					? keeperOf(cell.storage).get(cell.storage.key)!
 					: cell.initial,
 		]),
+	);
+	const sessionCells = new Set(
+		payload.cells.flatMap((cell) => (cell.storage?.session ? [cell.id] : [])),
 	);
 	const storageKeys = new Map(
 		payload.cells.flatMap((cell) =>
@@ -738,7 +746,7 @@ export function createNativeRuntime(
 			if (!values.has(cell)) throw new Error(`the script wrote unknown cell ${cell}`);
 			values.set(slot, value);
 			const key = storageKeys.get(cell);
-			if (key !== undefined) store.set(key, value);
+			if (key !== undefined) (sessionCells.has(cell) ? session : store).set(key, value);
 		}
 		logs.push(...result.logs);
 		const raised: NativeJournalEntry[] = [];
@@ -1481,6 +1489,16 @@ export function createNativeRuntime(
 		engineStarts: () => engineStarts,
 		logs: () => logs,
 		start: () => (asyncCells.length === 0 ? [] : change(undefined, undefined, () => [])),
+		resume: () =>
+			sessionCells.size === 0
+				? []
+				: change(undefined, undefined, () => {
+						for (const cell of sessionCells) {
+							const key = storageKeys.get(cell)!;
+							if (session.has(key)) values.set(cell, session.get(key)!);
+						}
+						return [];
+					}),
 		leave: () =>
 			asyncSent === null
 				? []
@@ -1952,7 +1970,7 @@ export function createNativeRuntime(
 			const value = evaluate(op.value, eventValue, scope);
 			values.set(slotOf(op.cell, scope), value);
 			const key = storageKeys.get(op.cell);
-			if (key !== undefined) store.set(key, value);
+			if (key !== undefined) (sessionCells.has(op.cell) ? session : store).set(key, value);
 		}
 		return calls;
 	}

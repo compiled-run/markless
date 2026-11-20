@@ -38,6 +38,7 @@ import android.widget.EditText
 import android.widget.HorizontalScrollView
 import android.widget.ScrollView
 import android.widget.TextView
+import dev.markless.mobile.core.MemoryStore
 import dev.markless.mobile.core.ScrollAlignment
 import dev.markless.mobile.core.ScrollBox
 import dev.markless.mobile.core.ScrollRange
@@ -110,7 +111,7 @@ class MarklessHost(
 		preferredLanguages: List<String> = LocaleList.getDefault().let { list -> (0 until list.size()).map { list[it].toLanguageTag() } },
 	) : this(context, Payload.decode(payloadBytes), styleExportBytes?.let { StyleExport.decode(it) }, fonts, store, params, device, preferredLanguages)
 
-	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
+	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine, AppSession.store).apply {
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
 		onScriptEntry = AppScriptEngine::entryRan
 	}
@@ -1251,4 +1252,9 @@ private fun EditText.setAppText(text: String) {
 	val limit = filters.filterIsInstance<LengthLimit>().singleOrNull()
 	limit?.appWriting = true
 	try { setText(text) } finally { limit?.appWriting = false }
+}
+
+/** App-scoped shared fields for this launch: one store every screen reads and writes, as the web keeps one copy per document. */
+internal object AppSession {
+	val store = MemoryStore()
 }

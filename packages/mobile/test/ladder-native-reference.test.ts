@@ -356,13 +356,11 @@ function walkApp(
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
 		if (action && 'back' in action) {
-			expect(
-				appRuntime
-					.dispatch({ event: 'back' })
-					.filter((entry) => entry.op !== 'abort' && entry.op !== 'clearTimer'),
-				`step ${index}: Back journals only what it cancels`,
-			).toEqual([]);
+			// Back journals what the leaving screen cancels, then what the screen it shows takes from the app's shared copies.
+			const journal = appRuntime.dispatch({ event: 'back' });
 			stack.pop();
+			for (const entry of journal)
+				if (entry.op !== 'abort' && entry.op !== 'clearTimer') stack.at(-1)!.apply(entry, index);
 		} else if (looksOnly(action) || (action && ('swipe' in action || 'scrollTo' in action))) {
 			// Neither the appearance nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
 		} else if (action) {

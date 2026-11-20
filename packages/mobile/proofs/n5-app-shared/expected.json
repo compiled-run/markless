@@ -1,0 +1,41 @@
+{
+	"rung": "N5",
+	"name": "An app-scoped shared() is one copy for the whole app: a second screen reads and writes the copy the first wrote, and Back shows the copy as it is now",
+	"steps": [
+		{
+			"visible": ["Player", "Paused: Harbour Lights", "Play or pause", "Now playing"],
+			"absent": ["Playing: Harbour Lights", "Track"],
+			"title": "Home"
+		},
+		{
+			"do": {
+				"tap": "Play or pause"
+			},
+			"visible": ["Playing: Harbour Lights"],
+			"absent": ["Paused: Harbour Lights"]
+		},
+		{
+			"do": {
+				"tap": "Now playing"
+			},
+			"visible": ["Track", "Playing: Harbour Lights", "Toggle here"],
+			"absent": ["Player", "Paused: Harbour Lights"],
+			"title": "Now playing"
+		},
+		{
+			"do": {
+				"tap": "Toggle here"
+			},
+			"visible": ["Paused: Harbour Lights", "Track"],
+			"absent": ["Playing: Harbour Lights"]
+		},
+		{
+			"do": {
+				"back": "gesture"
+			},
+			"visible": ["Player", "Paused: Harbour Lights"],
+			"absent": ["Track", "Playing: Harbour Lights"],
+			"title": "Home"
+		}
+	]
+}
