@@ -384,6 +384,10 @@ export type NativeShape = {
 	readonly cap: 'butt' | 'round' | 'square';
 	readonly join: 'miter' | 'round' | 'bevel';
 	readonly miterLimit: number;
+	/** `stroke-dasharray`: dash and gap lengths in turn, an even count; absent for a solid stroke. */
+	readonly dash?: ReadonlyArray<number>;
+	/** `stroke-dashoffset`: how far into the dash pattern the stroke starts; absent when 0. */
+	readonly dashOffset?: number;
 	/** The affine map from the shape's units to the drawing's (`[a, b, c, d, e, f]`), from `transform` on it and its groups. */
 	readonly transform?: readonly [number, number, number, number, number, number];
 };

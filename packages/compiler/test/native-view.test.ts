@@ -2854,12 +2854,32 @@ describe('inline svg', () => {
 		]);
 	});
 
+	it('dashes strokes as the browser does: odd lists repeat, groups pass them down, zeros and invalid values draw solid', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Lines() @{
+	<svg viewBox="0 0 10 10" stroke="red">
+		<g stroke-dasharray="1 2 3" stroke-dashoffset="1"><path d="M0 0h10" /><path d="M0 2h10" stroke-dasharray="none" /></g>
+		<path d="M0 4h10" stroke-dasharray="0 0" />
+		<path d="M0 6h10" stroke-dasharray="2 -1" />
+		<path d="M0 8h10" stroke-dasharray="2" fill="none" stroke="none" />
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const shapes = (payload!.nodes.find((node) => 'drawing' in node && node.drawing) as { drawing: { shapes: { dash?: number[]; dashOffset?: number }[] } }).drawing.shapes;
+		expect(shapes.map((shape) => [shape.dash, shape.dashOffset])).toEqual([
+			[[1, 2, 3, 1, 2, 3], 1],
+			[undefined, undefined],
+			[undefined, undefined],
+			[undefined, undefined],
+			[undefined, undefined],
+		]);
+	});
+
 	it('refuses what a drawing cannot hold by name, at the shape that holds it', async () => {
 		const text = `import { state } from '@markless/core';
 export function Chart() @{
 	let w = state(4);
 	<svg viewBox="0 0 10 10"><defs><pattern id="g" /></defs>
-		<path d="M0 0h10" stroke-dasharray="2 2" />
+		<path d="M0 0h10" stroke-dasharray="2%" />
 		<rect width={w} height="2" fill="url(#g)" />
 		<text x="0" y="5">label</text>
 	</svg>
@@ -2873,7 +2893,7 @@ export function Chart() @{
 				text.slice(0, d.primarySpan!.start).split('\n').length,
 			]),
 		).toEqual([
-			['`stroke-dasharray` on <path>: dashed strokes are not drawn natively yet', 5],
+			['`stroke-dasharray="2%"` on <path>, which is not a list of lengths in user units', 5],
 			[
 				'`width` on <rect> follows state; a native drawing is compiled when the app is built',
 				6,

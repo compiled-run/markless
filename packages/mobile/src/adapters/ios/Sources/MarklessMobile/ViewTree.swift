@@ -154,6 +154,7 @@ final class DrawingView: UIView {
 				context.setLineCap(shape.cap == "round" ? .round : shape.cap == "square" ? .square : .butt)
 				context.setLineJoin(shape.join == "round" ? .round : shape.join == "bevel" ? .bevel : .miter)
 				context.setMiterLimit(shape.miterLimit)
+				if let dash = shape.dash { context.setLineDash(phase: shape.dashOffset, lengths: dash.map { CGFloat($0) }) }
 				if case let .gradient(gradient) = stroke {
 					context.saveGState()
 					context.replacePathWithStrokedPath()

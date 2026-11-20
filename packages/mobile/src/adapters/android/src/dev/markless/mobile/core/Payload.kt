@@ -170,7 +170,7 @@ sealed interface ShapePaint {
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
-data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?)
+data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val dash: List<Double>? = null, val dashOffset: Double = 0.0)
 
 /** An inline `<svg>` compiled to shapes. */
 data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
@@ -666,7 +666,9 @@ data class Payload(
 			val shapes = o.field("shapes", what).arr("$what.shapes").mapIndexed { n, sv ->
 				val w = "$what.shapes[$n]"
 				val so = sv.obj(w)
-				so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform"), w)
+				so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "dash", "dashOffset"), w)
+				val dash = so["dash"]?.arr("$w.dash")?.map { it.num("$w.dash[]") }
+				if (dash != null && (dash.isEmpty() || dash.size % 2 != 0 || dash.any { it < 0 })) throw MarklessDecodeError("$w.dash must hold an even count of lengths")
 				val path = so.field("path", w).arr("$w.path").map { it.num("$w.path[]") }
 				val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
 				if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
@@ -674,7 +676,7 @@ data class Payload(
 					path, paint(so.field("fill", w), "$w.fill"), oneOf(so, "fillRule", setOf("nonzero", "evenodd"), w) == "evenodd",
 					paint(so.field("stroke", w), "$w.stroke"), so.field("width", w).num("$w.width"),
 					oneOf(so, "cap", setOf("butt", "round", "square"), w), oneOf(so, "join", setOf("miter", "round", "bevel"), w),
-					so.field("miterLimit", w).num("$w.miterLimit"), transform,
+					so.field("miterLimit", w).num("$w.miterLimit"), transform, dash, so["dashOffset"]?.num("$w.dashOffset") ?: 0.0,
 				)
 			}
 			return Drawing(viewBox, o["width"]?.num("$what.width"), o["height"]?.num("$what.height"), shapes, em)

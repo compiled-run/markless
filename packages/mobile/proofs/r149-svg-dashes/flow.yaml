@@ -1,0 +1,7 @@
+appId: ${APP_ID}
+name: r149-svg-dashes
+---
+- launchApp:
+      clearState: true
+- assertVisible: Dashes
+- assertVisible: Dashes drawn

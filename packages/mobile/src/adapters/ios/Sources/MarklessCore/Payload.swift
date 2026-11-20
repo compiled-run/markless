@@ -221,6 +221,9 @@ public struct NativeShape: Equatable, Sendable {
 	public let miterLimit: Double
 	/// `[a, b, c, d, e, f]`.
 	public let transform: [Double]?
+	/// Dash and gap lengths in turn, an even count; nil for a solid stroke.
+	public var dash: [Double]? = nil
+	public var dashOffset: Double = 0
 }
 
 /// An inline `<svg>` compiled when the app was built.
@@ -874,7 +877,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))
 		}
 		let shapes = try field["shapes"].array().map { shape -> NativeShape in
-			let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform"])
+			let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "dash", "dashOffset"])
+			let dash = s.has("dash") ? try s["dash"].array().map { try $0.number() } : nil
+			if let dash, dash.isEmpty || dash.count % 2 != 0 || dash.contains(where: { $0 < 0 }) { throw shape.fail("a dash list holds an even count of lengths") }
 			let transform = s.has("transform") ? try s["transform"].array().map { try $0.number() } : nil
 			if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
 			let rule = try s["fillRule"].string()
@@ -882,7 +887,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 			return NativeShape(
 				path: try s["path"].array().map { try $0.number() }, fill: try paint(try s["fill"]), evenOdd: rule == "evenodd",
 				stroke: try paint(try s["stroke"]), width: try s["width"].number(), cap: try s["cap"].string(), join: try s["join"].string(),
-				miterLimit: try s["miterLimit"].number(), transform: transform)
+				miterLimit: try s["miterLimit"].number(), transform: transform, dash: dash,
+				dashOffset: s.has("dashOffset") ? try s["dashOffset"].number() : 0)
 		}
 		return NativeDrawing(
 			viewBox: viewBox, width: field.has("width") ? try field["width"].number() : nil,
