@@ -536,6 +536,8 @@ public struct NativeCell: Equatable, Sendable {
 	public var session = false
 	/// A first value the build could not know, evaluated when the screen opens, in cell order.
 	public var seed: NativeExpr? = nil
+	/// State of a component an `@if` arm shows: back to `initial` while the arm is hidden, as the web renders the arm anew.
+	public var arm: NativeArmPlace? = nil
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -593,7 +595,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "async", "object", "row", "clock", "seed"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "async", "object", "row", "clock", "seed", "arm"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
 			}
@@ -620,7 +622,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 				row: field.has("row") ? try field["row"].string() : nil,
 				clock: field.has("clock"),
 				session: try field.has("storage") && field["storage"].object(required: ["key"], optional: ["session"]).has("session"),
-				seed: field.has("seed") ? try decodeExpr(try field["seed"]) : nil)
+				seed: field.has("seed") ? try decodeExpr(try field["seed"]) : nil,
+				arm: try decodeArm(field))
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()

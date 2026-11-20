@@ -1,0 +1,337 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:open",
+				"name": "open",
+				"initial": true
+			},
+			{
+				"id": "component-edge:0/state:n",
+				"name": "n",
+				"initial": 0
+			},
+			{
+				"id": "component-edge:1/state:n",
+				"name": "n",
+				"initial": 0,
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "h1",
+				"parent": "h1",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Counters"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "button",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h0:text0",
+				"parent": "component-edge:0/h0",
+				"parts": [
+					{
+						"expr": {
+							"literal": "Kept"
+						}
+					},
+					{
+						"text": " "
+					},
+					{
+						"cell": "component-edge:0/state:n"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "state:open"
+							},
+							"whenTrue": {
+								"literal": "Hide"
+							},
+							"whenFalse": {
+								"literal": "Show"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:0",
+				"parent": "h1",
+				"test": {
+					"cell": "state:open"
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h0",
+				"element": "button",
+				"parent": "h1",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h0:text0",
+				"parent": "component-edge:1/h0",
+				"parts": [
+					{
+						"expr": {
+							"literal": "Inside"
+						}
+					},
+					{
+						"text": " "
+					},
+					{
+						"cell": "component-edge:1/state:n"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:0/h0",
+				"event": "activate",
+				"handler": "handler:component-edge:0/event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "component-edge:1/h0",
+				"event": "activate",
+				"handler": "handler:component-edge:1/event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:0/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:0/state:n",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "component-edge:0/state:n"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:open",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:open"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:1/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:1/state:n",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "component-edge:1/state:n"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h2:text0",
+			"Counters"
+		],
+		[
+			"component-edge:0/h0:text0",
+			"Kept 0"
+		],
+		[
+			"h3:text0",
+			"Hide"
+		],
+		[
+			"component-edge:1/h0:text0",
+			"Inside 0"
+		]
+	],
+	"initialArms": [
+		[
+			"branch-site:0",
+			0
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h0"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0",
+					"value": "Kept 1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h0"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h0:text0",
+					"value": "Inside 1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h0"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h0:text0",
+					"value": "Inside 2"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Show"
+				},
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 1
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Hide"
+				},
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 0
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h0"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h0:text0",
+					"value": "Inside 1"
+				}
+			]
+		}
+	]
+}

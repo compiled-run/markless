@@ -1667,6 +1667,28 @@ export function Pick() @{
 		]);
 	});
 
+	it("marks the state of a component an @if arm shows with that arm, so it starts over each time the arm shows it", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function Counter() @{
+	let n = state(0);
+	<button onClick={() => n++}>{n}</button>
+}
+export function Page() @{
+	let open = state(true);
+	<main>
+		<Counter />
+		<button onClick={() => (open = !open)}>Toggle</button>
+		@if (open) { <Counter /> }
+	</main>
+}`);
+		expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		expect(Object.fromEntries(payload!.cells.map((cell) => [cell.id, cell.arm ?? null]))).toEqual({
+			'state:open': null,
+			'component-edge:0/state:n': null,
+			'component-edge:1/state:n': { branch: 'branch-site:0', index: 0 },
+		});
+	});
+
 	it('lowers a password field as a text field of its form: its text is sent, and required and maxlength are checked', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Login() @{

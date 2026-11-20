@@ -983,10 +983,12 @@ export function createNativeRuntime(
 		return fallback >= 0 ? fallback : null;
 	};
 	/** Whether a node shows where `scope` is: in a list row, the arms around it are that row's. */
-	const shownIn = (node: NativeNode, scope: NativeScope): boolean => {
-		if (!node.arm) return true;
-		const branch = branches.get(node.arm.branch);
-		return !!branch && shownIn(branch, scope) && armOf(branch, scope) === node.arm.index;
+	const shownIn = (node: NativeNode, scope: NativeScope): boolean => armShown(node.arm, scope);
+	/** Whether an arm place shows: its branch shows and has that arm chosen; no place always shows. */
+	const armShown = (arm: NativeNode['arm'], scope: NativeScope = base): boolean => {
+		if (!arm) return true;
+		const branch = branches.get(arm.branch);
+		return !!branch && shownIn(branch, scope) && armOf(branch, scope) === arm.index;
 	};
 	/** Whether any instance of a node shows. */
 	const shown = (node: NativeNode): boolean => instances(node).length > 0;
@@ -1457,6 +1459,8 @@ export function createNativeRuntime(
 			const node = nodesById.get(id.split('@')[0]!);
 			if (!node || !instances(node).some((shownNow) => shownNow.id === id)) fired.delete(key);
 		}
+		// A component an arm hid renders anew when it shows again, so its state starts over.
+		for (const cell of payload.cells) if (cell.arm && !armShown(cell.arm)) values.set(cell.id, cell.initial);
 	};
 
 	return {

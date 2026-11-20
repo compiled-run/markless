@@ -1375,6 +1375,10 @@ public final class NativeRuntime {
 			let shown = try nodesById[template].map { node in try instances(of: node).contains { $0.id == id } } ?? false
 			if !shown { fired.remove(key) }
 		}
+		// A component an arm hid renders anew when it shows again, so its state starts over.
+		for cell in payload.cells where cell.arm != nil {
+			if !(try isShown(cell.arm)) { values[cell.id] = cell.initial }
+		}
 	}
 
 	/// A device call a handler awaited answered: its continuation runs with the answer as its local.

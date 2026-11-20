@@ -624,6 +624,19 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
+		// A component an @if arm shows starts over each time the arm shows it; one outside keeps its state.
+		name: 'arm-state',
+		fixture: 'proofs/u69-arm-state/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+		],
+	},
+	{
 		name: 'script-loop',
 		fixture: 'proofs/j1-loop-local/App.tsrx',
 		modules: true,

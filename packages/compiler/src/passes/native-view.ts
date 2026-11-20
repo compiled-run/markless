@@ -1322,6 +1322,17 @@ export function createNativeViewPayload(
 	};
 	/** App-scoped shared() instances, one per definition for the whole payload; their cells are kept across screens. */
 	const appInstances = new Map<string, SharedInstance>();
+	/** Component instances an @if arm shows, by their cell prefix: their state starts over each time the arm shows them. */
+	const armedPrefixes = new Map<string, NativeArmPlace>();
+	/** The innermost arm a cell's component sits in, for plain state only (not kept, device, async, clock or seeded values). */
+	const armOfCell = (cell: NativeViewPayload['cells'][number]): NativeArmPlace | undefined => {
+		if (cell.row || cell.storage || cell.device || cell.object || cell.task || cell.async || cell.clock || cell.seed)
+			return undefined;
+		let found: { prefix: string; arm: NativeArmPlace } | undefined;
+		for (const [prefix, arm] of armedPrefixes)
+			if (cell.id.startsWith(prefix) && (!found || prefix.length > found.prefix.length)) found = { prefix, arm };
+		return found?.arm;
+	};
 	const APP_SHARED_PREFIX = 'app:';
 	const addCell = (cell: NativeViewPayload['cells'][number]) => {
 		if (cellIndex.has(cell.id)) return;
@@ -4467,6 +4478,7 @@ export function createNativeViewPayload(
 						);
 				}
 				const childPrefix = `${scope.prefix}${edge.id}/`;
+				if (place.arm && !place.row) armedPrefixes.set(childPrefix, place.arm);
 				const childObjects = instanceObjects(target.module, target.component, childPrefix);
 				const first = nodes.length;
 				const childScope = enterComponent(
@@ -6650,9 +6662,12 @@ export function createNativeViewPayload(
 			? { route: { pattern: options.route.pattern, params: options.route.params } }
 			: {}),
 		cells: cells.map((cell) => {
+			const arm = armOfCell(cell);
 			const kept = cell.id.startsWith(APP_SHARED_PREFIX)
 				? { ...cell, storage: { key: cell.id, session: true as const } }
-				: cell;
+				: arm
+					? { ...cell, arm }
+					: cell;
 			return styledCells.has(cell.id) && !rowCells.has(cell.id)
 				? { ...kept, styled: true as const }
 				: kept;

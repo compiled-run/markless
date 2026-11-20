@@ -678,6 +678,11 @@ export type NativeViewPayload = {
 		 * first build and in cell order, as the web runs a component's body once when it first renders; `initial` is never shown.
 		 */
 		readonly seed?: NativeExpr;
+		/**
+		 * State of a component an `@if` arm shows (its innermost arm): back to `initial` while the arm is hidden, so it starts
+		 * over each time the arm shows it, as the web renders the arm anew.
+		 */
+		readonly arm?: NativeArmPlace;
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;

@@ -1,0 +1,45 @@
+{
+	"rung": 179,
+	"name": "A component an @if arm shows starts over each time the arm shows it, as the web renders the arm anew; one outside keeps its state",
+	"steps": [
+		{
+			"visible": ["Counters", "Kept 0", "Hide", "Inside 0"],
+			"absent": ["Kept 1", "Inside 2"]
+		},
+		{
+			"do": {
+				"tap": "Kept 0"
+			},
+			"visible": ["Kept 1", "Inside 0"],
+			"absent": ["Kept 0"]
+		},
+		{
+			"do": {
+				"tap": "Inside 0"
+			},
+			"visible": ["Inside 1", "Kept 1"],
+			"absent": ["Inside 0"]
+		},
+		{
+			"do": {
+				"tap": "Inside 1"
+			},
+			"visible": ["Inside 2", "Kept 1"],
+			"absent": ["Inside 1"]
+		},
+		{
+			"do": {
+				"tap": "Hide"
+			},
+			"visible": ["Show", "Kept 1"],
+			"absent": ["Inside 2", "Hide"]
+		},
+		{
+			"do": {
+				"tap": "Show"
+			},
+			"visible": ["Inside 0", "Kept 1", "Hide"],
+			"absent": ["Inside 2", "Show"]
+		}
+	]
+}

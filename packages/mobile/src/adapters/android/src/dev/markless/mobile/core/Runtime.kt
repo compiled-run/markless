@@ -617,8 +617,11 @@ class Runtime(
 	}
 
 	/** Whether [node] shows where [scope] is: in a list row, the arms around it are that row's. */
-	fun shownIn(node: Node, scope: Scope): Boolean {
-		val a = node.arm ?: return true
+	fun shownIn(node: Node, scope: Scope): Boolean = armShown(node.arm, scope)
+
+	/** Whether an arm place shows: its branch shows and has that arm chosen; no place always shows. */
+	private fun armShown(a: ArmPlace?, scope: Scope = Scope.EMPTY): Boolean {
+		if (a == null) return true
 		val b = byId[a.branch] as? Node.Branch ?: return false
 		return shownIn(b, scope) && armOf(b, scope) == a.index
 	}
@@ -1193,6 +1196,8 @@ class Runtime(
 			val node = byId[id.substringBefore('@')]
 			node == null || instances(node).none { it.id == id }
 		}
+		// A component an arm hid renders anew when it shows again, so its state starts over.
+		for (c in payload.cells) if (c.arm != null && !armShown(c.arm)) values[c.id] = c.initial
 	}
 
 	/** A device call a handler awaited answered: its continuation runs with the answer as its local. */
