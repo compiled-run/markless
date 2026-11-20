@@ -136,7 +136,8 @@ public struct NativeNode: Equatable, Sendable {
 		/// An `@if` chain or `@switch`: the first arm whose test is truthy, else the arm with no test, else none.
 		case branch(tests: [NativeExpr?])
 		/// A keyed `@for`: one row per item of `list`, keyed by `String()` of the item at `key`.
-		case `repeat`(list: NativeExpr, key: [String])
+		/// `key` nil: each row's key is its position (`byIndex`).
+		case `repeat`(list: NativeExpr, key: [String]?)
 		/// The platform's own sheet: its content (the nodes whose parent it is) is built at mount and kept while closed.
 		case sheet(open: NativeExpr, snapPoints: [Double], dismissible: Bool, modal: Bool)
 	}
@@ -570,11 +571,14 @@ public struct NativeViewPayload: Equatable, Sendable {
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
 					row: try decodeRow(field), kind: .branch(tests: tests))
 			case "repeat":
-				let field = try node.object(required: ["kind", "id", "parent", "list", "key"], optional: place)
+				let field = try node.object(required: ["kind", "id", "parent", "list", "key"], optional: place + ["byIndex"])
+				let key = try field["key"].array().map { try $0.string() }
+				let byIndex = field.has("byIndex") ? try field["byIndex"].bool() : false
+				if byIndex && !key.isEmpty { throw try field["key"].fail("a list keyed by its index has no key path") }
 				return NativeNode(
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
 					row: try decodeRow(field),
-					kind: .repeat(list: try decodeExpr(try field["list"]), key: try field["key"].array().map { try $0.string() }))
+					kind: .repeat(list: try decodeExpr(try field["list"]), key: byIndex ? nil : key))
 			case "sheet":
 				let field = try node.object(["kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"])
 				let snapPoints = try field["snapPoints"].array().map { try $0.number() }

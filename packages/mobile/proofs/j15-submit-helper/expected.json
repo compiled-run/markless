@@ -1,0 +1,25 @@
+{
+	"rung": "J15",
+	"name": "A form's submit handler calls a function from another module of the app that uses a number's toString and JSON",
+	"steps": [
+		{
+			"visible": ["Site log", "Add", "Last: none", "Log: empty"],
+			"fields": { "Site": "North yard" }
+		},
+		{
+			"do": { "tap": "Add" },
+			"visible": ["Last: z", "Log: z North yard"],
+			"absent": ["Last: none"]
+		},
+		{
+			"do": { "type": { "field": "Site", "text": "Pump house" } },
+			"visible": ["Last: z"],
+			"fields": { "Site": "Pump house" }
+		},
+		{
+			"do": { "tap": "Add" },
+			"visible": ["Last: 10", "Log: z North yard, 10 Pump house"],
+			"absent": ["Last: z"]
+		}
+	]
+}
