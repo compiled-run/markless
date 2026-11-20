@@ -106,3 +106,35 @@ export default function Tag({ params }: PageProps<{ tag: string }>) @{
 	);
 	expect(texts).toEqual(['', 'Tagged ']);
 });
+
+test("a styled page refuses a row's class or aria-* that follows its row, by name, where Dragon could not lay it out", async () => {
+	const build = await compileNativeApp({
+		pages: [
+			{
+				page: 'pages/index.tsrx',
+				filename: 'packages/mobile/test/fixtures/pages/index.tsrx',
+				source: `import { state } from '@markless/core';
+
+export default function List() @{
+	let names = state(['ada', 'grace']);
+	let busy = state(false);
+	<main>
+		<style>
+			li { padding: 4px; }
+		</style>
+		<ul>
+			@for (const name of names; key name) {
+				<li aria-label={\`Remove \${name}\`} aria-busy={busy ? 'true' : 'false'}>{name}</li>
+			}
+		</ul>
+	</main>
+}`,
+			},
+		],
+	});
+	expect(build.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+		expect.stringMatching(
+			/^the `aria-label` of <li> \S+ follows its @for row on a styled page; Dragon styles each node once, not per row, yet$/,
+		),
+	]);
+});
