@@ -128,6 +128,11 @@ export type NativeExpr =
 	| { readonly checked: string }
 	/** A text field's text now (`field.value`): what a person typed since, else its `value` binding, else its `value` attribute. */
 	| { readonly field: string }
+	/**
+	 * A scroll container's scroll position now (`box.scrollTop`, `box.scrollLeft`), in CSS px from where its content starts:
+	 * what the host reported with its last `scroll` event, 0 before it first scrolls. A box that does not scroll stays at 0.
+	 */
+	| { readonly scroll: string; readonly axis: 'top' | 'left' }
 	/** The element that has focus (`document.activeElement`), or the document body when none has. */
 	| { readonly focused: true }
 	/** Whether the element `node` is `within` or inside it (`within.contains(node)`); false when either is not an element. */
@@ -536,6 +541,7 @@ export type NativeEventName =
 	| 'submit'
 	| 'idle'
 	| 'visible'
+	| 'scroll'
 	| NativePointerEventName;
 
 /**
@@ -1129,6 +1135,9 @@ export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [
 	'isPrimary',
 	'timeStamp',
 ];
+
+/** What a `scroll` adds to a script handler's event: the scroll container's position, which its `target` reads. */
+export const NATIVE_SCRIPT_SCROLL_FIELDS: ReadonlyArray<string> = ['scrollTop', 'scrollLeft'];
 
 /** Names for the global object itself: `window.setTimeout` reads a provided global, `window.document` does not. */
 export const NATIVE_SCRIPT_GLOBAL_OBJECTS: ReadonlyArray<string> = ['window', 'self', 'globalThis'];

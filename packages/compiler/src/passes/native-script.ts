@@ -1,5 +1,5 @@
 import type { NativeScript, NativeScriptService } from '@markless/serializer';
-import { NATIVE_SCRIPT_POINTER_FIELDS } from '@markless/serializer/native-view';
+import { NATIVE_SCRIPT_POINTER_FIELDS, NATIVE_SCRIPT_SCROLL_FIELDS } from '@markless/serializer/native-view';
 import { NATIVE_SCRIPT_URL } from './native-script-url.ts';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
@@ -237,7 +237,7 @@ var frameOf = function (bindings) {
 	return names;
 };
 // An element is a proxy that offers only what the host answers: the attributes it has now, whether it holds another
-// element, and the commands a handler's data can run. No tree walking, no selectors, no layout.
+// element, its scroll position, and the commands a handler's data can run. No tree walking, no selectors, no layout.
 var elementFacts = {};
 var proxies = {};
 var elementOf = function (id) {
@@ -261,6 +261,8 @@ var elementOf = function (id) {
 		scrollIntoView: function () { command('scrollIntoView', false); },
 		showModal: function () { command('showModal', false); },
 		close: function () { command('close', false); },
+		get scrollTop() { return facts().scroll ? facts().scroll.top : 0; },
+		get scrollLeft() { return facts().scroll ? facts().scroll.left : 0; },
 		getBoundingClientRect: function () {
 			throw new Error('getBoundingClientRect() asks the host to measure while JavaScript waits, which a phone does not answer');
 		},
@@ -303,6 +305,7 @@ var eventOf = function (given) {
 		stopPropagation: function () {},
 	};
 	${JSON.stringify(NATIVE_SCRIPT_POINTER_FIELDS)}.forEach(function (field) { if (field in given) event[field] = given[field]; });
+	${JSON.stringify(NATIVE_SCRIPT_SCROLL_FIELDS)}.forEach(function (field) { if (field in given) target[field] = given[field]; });
 	return event;
 };
 var errorOf = function (error) {

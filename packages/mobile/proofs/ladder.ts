@@ -23,13 +23,16 @@ export type LadderAction =
 	| { readonly swipe: 'up' }
 	/**
 	 * A drag across the screen from one point to another, each `[x, y]` in percent of the screen; with `until`, repeated
-	 * (up to 80 times) until that text or accessible name is on screen.
+	 * (up to 80 times) until that text or accessible name is on screen. `scrolls` names a text inside the scroll container
+	 * the drag scrolls and where the container ends up: the phones and the browser find that out for themselves, the
+	 * reference ladder, which lays nothing out, is told, and raises the container's `scroll` event there.
 	 */
 	| {
 			readonly swipe: {
 				readonly from: readonly [number, number];
 				readonly to: readonly [number, number];
 				readonly until?: string;
+				readonly scrolls?: { readonly box: string; readonly top: number; readonly left: number };
 			};
 	  }
 	/** The keyboard's return key in the text field with this accessible name. */

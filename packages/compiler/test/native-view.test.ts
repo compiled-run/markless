@@ -3111,6 +3111,30 @@ export function Page() @{
 		]);
 	});
 
+	it('runs a scroll handler on its box and reads the box\'s scroll position, which the box then reports even without a handler', async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+export function Page() @{
+	let top = state(0);
+	let left = state(0);
+	const box = element<HTMLDivElement>();
+	const other = element<HTMLDivElement>();
+	<main>
+		<div el={box} onScroll={() => { top = box.scrollTop; }}><p>Tall</p></div>
+		<div el={other}><p>Wide</p></div>
+		<button onClick={() => { left = other.scrollLeft; }}>{top} {left}</button>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.events.filter((event) => event.event === 'scroll').map((event) => event.host)).toEqual(['h1', 'h3']);
+		const ops = (host: string, name: string) => {
+			const event = payload!.events.find((one) => one.host === host && one.event === name)!;
+			return payload!.handlers.find((handler) => handler.id === event.handler)!.ops;
+		};
+		expect(ops('h1', 'scroll')).toEqual([{ op: 'assign', cell: expect.any(String), value: { scroll: 'h1', axis: 'top' } }]);
+		expect(ops('h3', 'scroll')).toEqual([]);
+		expect(ops('h5', 'activate')).toEqual([{ op: 'assign', cell: expect.any(String), value: { scroll: 'h3', axis: 'left' } }]);
+	});
+
 	it('draws <center> with its default look: its blocks in the middle of the line, its text centred', async () => {
 		const { payload, diagnostics } = await nativeView(`export function Page() @{
 	<center><h1>Poll</h1><p>Once</p></center>

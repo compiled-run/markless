@@ -1,0 +1,140 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "ScrollTarget",
+		"cells": [
+			{
+				"id": "state:top",
+				"name": "top",
+				"initial": 0
+			},
+			{
+				"id": "state:left",
+				"name": "left",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "div",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Tall"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"cell": "state:top"
+					},
+					{
+						"text": " down, "
+					},
+					{
+						"cell": "state:left"
+					},
+					{
+						"text": " across"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "scroll",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:top",
+						"value": {
+							"scroll": "h1",
+							"axis": "top"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:left",
+						"value": {
+							"scroll": "h1",
+							"axis": "left"
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		["h2:text0", "Tall"],
+		["h3:text0", "0 down, 0 across"]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "scroll",
+				"host": "h1",
+				"top": 12.5,
+				"left": 0
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "12.5 down, 0 across"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "scroll",
+				"host": "h1",
+				"top": 300,
+				"left": 40
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "300 down, 40 across"
+				}
+			]
+		}
+	]
+}

@@ -990,6 +990,26 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A scroll container's scroll events carry where it is; its handler reads scrollTop, 0 before the first one.
+		name: 'scroll',
+		fixture: 'proofs/r152-scroll/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'scroll', host: 'h4', top: 40, left: 0 },
+			{ event: 'scroll', host: 'h4', top: 1020, left: 0 },
+			{ event: 'scroll', host: 'h4', top: 0, left: 0 },
+		],
+	},
+	{
+		// A scroll handler reads its own box's position through `event.target` and `event.currentTarget`.
+		name: 'scroll-target',
+		fixture: 'test/fixtures/ScrollTarget.tsrx',
+		actions: [
+			{ event: 'scroll', host: 'h1', top: 12.5, left: 0 },
+			{ event: 'scroll', host: 'h1', top: 300, left: 40 },
+		],
+	},
+	{
 		name: 'script-url',
 		fixture: 'proofs/j16-url/App.tsrx',
 		modules: true,

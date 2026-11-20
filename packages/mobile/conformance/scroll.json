@@ -1,0 +1,864 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:scrolled",
+				"name": "scrolled",
+				"initial": false
+			},
+			{
+				"id": "state:top",
+				"name": "top",
+				"initial": 0
+			},
+			{
+				"id": "state:still",
+				"name": "still",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null,
+				"attributes": {
+					"class": "page mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"attributes": {
+					"class": "title mk-1le3fuf"
+				},
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Scroll events"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0",
+				"attributes": {
+					"class": "line mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "state:scrolled"
+							},
+							"whenTrue": {
+								"literal": "Box scrolled"
+							},
+							"whenFalse": {
+								"literal": "Box not scrolled"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0",
+				"attributes": {
+					"class": "line mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"binary": ">",
+								"left": {
+									"cell": "state:top"
+								},
+								"right": {
+									"literal": 100
+								}
+							},
+							"whenTrue": {
+								"literal": "Past the first rows"
+							},
+							"whenFalse": {
+								"literal": "At the first rows"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"class": "box mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Box row 1"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Box row 2"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Box row 3"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"text": "Box row 4"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"text": "Box row 5"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h10",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h10:text0",
+				"parent": "h10",
+				"parts": [
+					{
+						"text": "Box row 6"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h11",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h11:text0",
+				"parent": "h11",
+				"parts": [
+					{
+						"text": "Box row 7"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h12",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h12:text0",
+				"parent": "h12",
+				"parts": [
+					{
+						"text": "Box row 8"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h13",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h13:text0",
+				"parent": "h13",
+				"parts": [
+					{
+						"text": "Box row 9"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h14",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h14:text0",
+				"parent": "h14",
+				"parts": [
+					{
+						"text": "Box row 10"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h15",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h15:text0",
+				"parent": "h15",
+				"parts": [
+					{
+						"text": "Box row 11"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h16",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h16:text0",
+				"parent": "h16",
+				"parts": [
+					{
+						"text": "Box row 12"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h17",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h17:text0",
+				"parent": "h17",
+				"parts": [
+					{
+						"text": "Box row 13"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h18",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h18:text0",
+				"parent": "h18",
+				"parts": [
+					{
+						"text": "Box row 14"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h19",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h19:text0",
+				"parent": "h19",
+				"parts": [
+					{
+						"text": "Box row 15"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h20",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h20:text0",
+				"parent": "h20",
+				"parts": [
+					{
+						"text": "Box row 16"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h21",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h21:text0",
+				"parent": "h21",
+				"parts": [
+					{
+						"text": "Box row 17"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h22",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h22:text0",
+				"parent": "h22",
+				"parts": [
+					{
+						"text": "Box row 18"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h23",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h23:text0",
+				"parent": "h23",
+				"parts": [
+					{
+						"text": "Box row 19"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h24",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h24:text0",
+				"parent": "h24",
+				"parts": [
+					{
+						"text": "Box row 20"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h25",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h25:text0",
+				"parent": "h25",
+				"parts": [
+					{
+						"text": "Box row 21"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h26",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h26:text0",
+				"parent": "h26",
+				"parts": [
+					{
+						"text": "Box row 22"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h27",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h27:text0",
+				"parent": "h27",
+				"parts": [
+					{
+						"text": "Box row 23"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h28",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h28:text0",
+				"parent": "h28",
+				"parts": [
+					{
+						"text": "Box row 24"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h29",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h29:text0",
+				"parent": "h29",
+				"parts": [
+					{
+						"text": "Box row 25"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h30",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h30:text0",
+				"parent": "h30",
+				"parts": [
+					{
+						"text": "Box row 26"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h31",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h31:text0",
+				"parent": "h31",
+				"parts": [
+					{
+						"text": "Box row 27"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h32",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h32:text0",
+				"parent": "h32",
+				"parts": [
+					{
+						"text": "Box row 28"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h33",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h33:text0",
+				"parent": "h33",
+				"parts": [
+					{
+						"text": "Box row 29"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h34",
+				"element": "p",
+				"parent": "h4",
+				"attributes": {
+					"class": "item mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h34:text0",
+				"parent": "h34",
+				"parts": [
+					{
+						"text": "Box row 30"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h35",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"class": "line mk-1le3fuf"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h35:text0",
+				"parent": "h35",
+				"parts": [
+					{
+						"text": "Still box scrolled "
+					},
+					{
+						"cell": "state:still"
+					},
+					{
+						"text": " times"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h4",
+				"event": "scroll",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h35",
+				"event": "scroll",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:scrolled",
+						"value": {
+							"literal": true
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:top",
+						"value": {
+							"scroll": "h4",
+							"axis": "top"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:still",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "state:still"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		["h1:text0", "Scroll events"],
+		["h2:text0", "Box not scrolled"],
+		["h3:text0", "At the first rows"],
+		["h5:text0", "Box row 1"],
+		["h6:text0", "Box row 2"],
+		["h7:text0", "Box row 3"],
+		["h8:text0", "Box row 4"],
+		["h9:text0", "Box row 5"],
+		["h10:text0", "Box row 6"],
+		["h11:text0", "Box row 7"],
+		["h12:text0", "Box row 8"],
+		["h13:text0", "Box row 9"],
+		["h14:text0", "Box row 10"],
+		["h15:text0", "Box row 11"],
+		["h16:text0", "Box row 12"],
+		["h17:text0", "Box row 13"],
+		["h18:text0", "Box row 14"],
+		["h19:text0", "Box row 15"],
+		["h20:text0", "Box row 16"],
+		["h21:text0", "Box row 17"],
+		["h22:text0", "Box row 18"],
+		["h23:text0", "Box row 19"],
+		["h24:text0", "Box row 20"],
+		["h25:text0", "Box row 21"],
+		["h26:text0", "Box row 22"],
+		["h27:text0", "Box row 23"],
+		["h28:text0", "Box row 24"],
+		["h29:text0", "Box row 25"],
+		["h30:text0", "Box row 26"],
+		["h31:text0", "Box row 27"],
+		["h32:text0", "Box row 28"],
+		["h33:text0", "Box row 29"],
+		["h34:text0", "Box row 30"],
+		["h35:text0", "Still box scrolled 0 times"]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "scroll",
+				"host": "h4",
+				"top": 40,
+				"left": 0
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Box scrolled"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "scroll",
+				"host": "h4",
+				"top": 1020,
+				"left": 0
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Past the first rows"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "scroll",
+				"host": "h4",
+				"top": 0,
+				"left": 0
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "At the first rows"
+				}
+			]
+		}
+	]
+}

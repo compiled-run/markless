@@ -243,6 +243,12 @@ function mirror(
 				if (inArm(node, entry.node)) attributes.set(`${node}\0${name}`, value);
 		}
 	};
+	// The scroll container around the element a text names: its nearest element with a scroll handler, itself included.
+	const scrollerOf = (text: string) => {
+		for (let at = elementReading(text); at; at = nodeOf.get(baseOf(at))?.parent ?? undefined)
+			if (payload.events.some((event) => event.host === baseOf(at!) && event.event === 'scroll')) return at;
+		return undefined;
+	};
 	return {
 		get runtime() {
 			return runtime;
@@ -250,6 +256,7 @@ function mirror(
 		mount,
 		apply,
 		elementReading,
+		scrollerOf,
 		disabled: (host: string) => attributes.get(`${host}\0disabled`) != null,
 		/** Types into the emptied field and returns what it holds. */
 		typed: (host: string, text: string) => {
@@ -363,6 +370,13 @@ function walkApp(
 				`step ${index}: Back journals only what it cancels`,
 			).toEqual([]);
 			stack.pop();
+		} else if (action && 'swipe' in action && typeof action.swipe === 'object' && action.swipe.scrolls) {
+			// The reference lays nothing out, so the step says where the swipe leaves the box it scrolls.
+			const { box, top, left } = action.swipe.scrolls;
+			const shown = stack.at(-1)!;
+			const host = shown.scrollerOf(box);
+			if (!host) throw new Error(`step ${index}: no scroll handler around "${box}"`);
+			for (const entry of appRuntime.dispatch({ event: 'scroll', host, top, left })) shown.apply(entry, index);
 		} else if (looksOnly(action) || (action && ('swipe' in action || 'scrollTo' in action))) {
 			// Neither the appearance nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
 		} else if (action) {
@@ -891,7 +905,15 @@ function walk(
 				throw new Error(`step ${index}: no audio control reads "${action.tap}"`);
 			playing = action.tap === 'Play';
 		} else if (action && 'swipe' in action && action.swipe === 'up') openSheet(index);
-		else if (action && 'swipe' in action) {
+		else if (action && 'swipe' in action && action.swipe.scrolls) {
+			// The reference lays nothing out, so the step says where the swipe leaves the box it scrolls.
+			const { box, top, left } = action.swipe.scrolls;
+			let host = elementReading(box);
+			while (host && !payload.events.some((event) => event.host === host && event.event === 'scroll'))
+				host = nodeOf.get(host.split('@')[0]!)?.parent ?? undefined;
+			if (!host) throw new Error(`step ${index}: no scroll handler around "${box}"`);
+			apply(runtime.dispatch({ event: 'scroll', host, top, left }), index);
+		} else if (action && 'swipe' in action) {
 			// Scrolling changes what is on screen, not what the page holds; the devices and the web judge the screen.
 		}
 		else if (action && 'scrollTo' in action) {

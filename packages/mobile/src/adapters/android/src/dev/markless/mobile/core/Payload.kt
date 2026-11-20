@@ -74,6 +74,8 @@ sealed interface Expr {
 	data class Checked(val node: String) : Expr
 	/** A text field's text now: what a person typed since, else its `value` binding, else its `value` attribute. */
 	data class Field(val node: String) : Expr
+	/** A box's scroll position now ([top] true for `scrollTop`), as its last `scroll` event reported it; 0 before that. */
+	data class Scroll(val node: String, val top: Boolean) : Expr
 	/** A computed whose body runs in the script engine: function [fn] of the payload's script, called with [bindings]. */
 	data class Script(val fn: String, val bindings: Map<String, ScriptBinding>) : Expr
 }
@@ -184,7 +186,7 @@ data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: D
 /** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Dismiss] is a sheet's platform close or an overlay's Escape or outside press. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
 /** [pointer]: an event a touch raises; [touch]: one of those a host reports, from which the runtime raises the rest. */
 enum class EventName(val wire: String, val pointer: Boolean = false, val touch: Boolean = false) {
-	Activate("activate"), Input("input"), Focus("focus"), Blur("blur"), Keydown("keydown"), Paste("paste"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"),
+	Activate("activate"), Input("input"), Focus("focus"), Blur("blur"), Keydown("keydown"), Paste("paste"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"), Scroll("scroll"),
 	PointerDown("pointerdown", true, true), PointerMove("pointermove", true, true), PointerUp("pointerup", true, true), PointerCancel("pointercancel", true, true),
 	PointerOver("pointerover", true), PointerOut("pointerout", true), PointerEnter("pointerenter", true), PointerLeave("pointerleave", true),
 	Choose("choose"),
@@ -410,7 +412,7 @@ data class Payload(
 			is Expr.Method -> hasScript(e.target) || e.arguments.any(::hasScript)
 			is Expr.Lambda -> hasScript(e.body)
 			is Expr.Call -> e.arguments.any(::hasScript)
-			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> false
+			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field, is Expr.Scroll -> false
 			is Expr.Contains -> hasScript(e.within) || hasScript(e.node)
 			is Expr.Captures -> hasScript(e.node) || hasScript(e.pointer)
 			is Expr.FocusOrigin -> hasScript(e.overlay)
@@ -447,7 +449,7 @@ data class Payload(
 			is Expr.Lambda -> cellsOf(e.body)
 			is Expr.Local, is Expr.Item, Expr.RouteParams -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
-			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> emptyList()
+			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field, is Expr.Scroll -> emptyList()
 			is Expr.Contains -> cellsOf(e.within) + cellsOf(e.node)
 			is Expr.Captures -> cellsOf(e.node) + cellsOf(e.pointer)
 			is Expr.FocusOrigin -> cellsOf(e.overlay)
@@ -559,6 +561,12 @@ data class Payload(
 				o.containsKey("isElement") -> { o.only(setOf("isElement"), what); Expr.IsElement(sub("isElement")) }
 				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
 				o.containsKey("field") -> { o.only(setOf("field"), what); Expr.Field(o.field("field", what).str("$what.field")) }
+				o.containsKey("scroll") -> {
+					o.only(setOf("scroll", "axis"), what)
+					val axis = o.field("axis", what).str("$what.axis")
+					if (axis != "top" && axis != "left") throw MarklessDecodeError("$what.axis: unknown scroll axis \"$axis\"")
+					Expr.Scroll(o.field("scroll", what).str("$what.scroll"), axis == "top")
+				}
 				o.containsKey("formData") -> { o.only(setOf("formData"), what); Expr.FormData(o.field("formData", what).str("$what.formData")) }
 				o.containsKey("script") -> { o.only(setOf("script", "bindings"), what); Expr.Script(o.field("script", what).str("$what.script"), scriptBindings(o.field("bindings", what), "$what.bindings")) }
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")

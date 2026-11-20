@@ -263,7 +263,7 @@ export function scriptFunctionOf(
 	const parts: AnyNode[] = [root];
 	const inlined = new Set<AnyNode>();
 	const viaState = new Map<number, Binding>();
-	const names = new Map<string, { name: string; written: boolean; span: SourceSpan }>();
+	const names = new Map<string, { name: string; written: boolean; span: SourceSpan; members?: string[] }>();
 	const framework: { name: string; source: string; span: SourceSpan }[] = [];
 	const globals: SemanticScriptGlobal[] = [];
 	const replaced = new Map<AnyNode, AnyNode>();
@@ -334,10 +334,22 @@ export function scriptFunctionOf(
 			viaState.set(binding.id, binding);
 			replaced.set(node, stateName(binding.name));
 			const known = names.get(binding.name);
+			const parent = semantic.parentOf(node as never) as AnyNode | null;
+			const property = parent?.property as AnyNode | undefined;
+			const member =
+				parent?.type === 'MemberExpression' &&
+				parent.object === node &&
+				!parent.computed &&
+				typeof property?.name === 'string'
+					? property.name
+					: null;
+			const members = [...(known?.members ?? [])];
+			if (member !== null && !members.includes(member)) members.push(member);
 			names.set(binding.name, {
 				name: binding.name,
 				written: (known?.written ?? false) || reference.isWrite,
 				span: known?.span ?? spanOf(node as never, filename),
+				...(members.length > 0 ? { members } : {}),
 			});
 		}
 	}

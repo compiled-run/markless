@@ -140,8 +140,16 @@ export type SemanticScriptFunction = {
 	 * (`n` indexes the module's `scriptModule.imports`); module-level names are left as written.
 	 */
 	readonly code: string;
-	/** The component's names it reads as `__s.<name>`, and whether it assigns them. */
-	readonly names: ReadonlyArray<{ readonly name: string; readonly written: boolean; readonly span: SourceSpan }>;
+	/**
+	 * The component's names it reads as `__s.<name>`, whether it assigns them, and the properties it reads directly off
+	 * each (`box.scrollTop`: `scrollTop`), in first-read order.
+	 */
+	readonly names: ReadonlyArray<{
+		readonly name: string;
+		readonly written: boolean;
+		readonly span: SourceSpan;
+		readonly members?: ReadonlyArray<string>;
+	}>;
 	/** Module-level names it reads as written, which its module's statements declare. */
 	readonly module: ReadonlyArray<string>;
 	/** What it reads from imports: `__i[slot]`, then `name` (null: the whole module). */

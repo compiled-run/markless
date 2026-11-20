@@ -136,7 +136,7 @@ data class FetchRequest(val url: String, val method: String, val headers: List<P
 
 /** `JSON.stringify` of a value: non-finite numbers are `null`. */
 /** What a touch adds to a script pointer handler's event, in the order the reference writes them. */
-private val TOUCH_FIELDS = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp")
+private val TOUCH_FIELDS = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp", "scrollTop", "scrollLeft")
 
 fun jsonValue(v: JsValue): String = when (v) {
 	JsValue.Null -> "null"
@@ -183,6 +183,9 @@ data class Scope(val items: Map<String, JsValue> = emptyMap(), val locals: Map<S
 
 /** A touch as a host reports it: [pointerId] numbers it (from 1, as a phone browser does), [x] and [y] are its place in points or dp from the screen's top left, [time] the milliseconds since the screen appeared. */
 data class TouchPoint(val pointerId: Double = 1.0, val x: Double = 0.0, val y: Double = 0.0, val time: Double = 0.0)
+
+/** A box's scroll position a `scroll` event reports: where it is now, in dp from where its content starts. */
+data class ScrollPosition(val top: Double, val left: Double)
 
 /** One shown copy of a node: the node itself outside lists, one per row inside one (`<id>@<key>`). */
 data class Instance(val id: String, val node: Node, val scope: Scope, val rowKey: String? = null)
@@ -318,6 +321,7 @@ class Runtime(
 			is Expr.FormData -> entriesOf(e.form)
 			is Expr.Checked -> JsValue.Bool(checkedOf(e.node))
 			is Expr.Field -> JsValue.Str(textOf(e.node))
+			is Expr.Scroll -> JsValue.Num(scrolled[e.node]?.let { if (e.top) it.top else it.left } ?: 0.0)
 			is Expr.CellRef -> read(e.cell, scope)
 			Expr.Focused -> JsValue.Str(focused ?: NATIVE_DOCUMENT_BODY)
 			is Expr.FocusOrigin -> (eval(e.overlay) as? JsValue.Str)?.let { o -> origins[o.value]?.let(JsValue::Str) } ?: JsValue.Null
@@ -508,7 +512,8 @@ class Runtime(
 				ancestors.add(jsonString(if (key.isNotEmpty() && byId[up]?.row != null) up + key else up))
 				up = byId[up]?.parent
 			}
-			facts[id] = "{\"attributes\":${attributes.joinToString(",", "{", "}")},\"ancestors\":${ancestors.joinToString(",", "[", "]")}}"
+			val scroll = scrolled[id]?.let { ",\"scroll\":{\"top\":${JsString.number(it.top)},\"left\":${JsString.number(it.left)}}" } ?: ""
+			facts[id] = "{\"attributes\":${attributes.joinToString(",", "{", "}")},\"ancestors\":${ancestors.joinToString(",", "[", "]")}$scroll}"
 		}
 		fun visit(named: Map<String, ScriptBinding>) {
 			for (b in named.values) when (b) {
@@ -712,6 +717,8 @@ class Runtime(
 	private val forms = payload.forms.associateBy { it.node }
 	/** A field's text a person typed since its `value` binding last wrote it. */
 	private val edited = HashMap<String, String>()
+	/** Each box's scroll position as its last `scroll` event reported it. */
+	private val scrolled = HashMap<String, ScrollPosition>()
 
 	private class Submission(val sent: String, val submitter: String?, val marks: Boolean) {
 		var pending = 0
@@ -995,7 +1002,7 @@ class Runtime(
 	 * ([EventName.touch], at [point]) raises the browser's pointer events, after a `dismiss` of the topmost overlay when a
 	 * `pointerdown` lands outside it.
 	 */
-	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, detail: Int? = null, point: TouchPoint? = null): List<JournalEntry> {
+	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, detail: Int? = null, point: TouchPoint? = null, scroll: ScrollPosition? = null): List<JournalEntry> {
 		if (event == EventName.Choose) {
 			val option = byId[host.substringBefore('@')] as? Node.Element
 			val select = option?.parent
@@ -1010,6 +1017,8 @@ class Runtime(
 		if ((event in VALUED) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
 		if (point != null && !event.touch) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
+		if ((event == EventName.Scroll) != (scroll != null)) throw MarklessRuntimeError("a ${event.wire} event ${if (scroll == null) "needs" else "carries no"} a scroll position")
+		if (scroll != null) scrolled[host] = scroll
 		if (event == EventName.Dismiss && reason != null) {
 			if (stack.lastOrNull() != host) throw MarklessRuntimeError("\"$host\" is not the topmost overlay")
 			val dismiss = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
@@ -1044,6 +1053,7 @@ class Runtime(
 			EventName.Keydown -> mapOf("key" to JsValue.Str(value!!))
 			EventName.Paste -> mapOf("text" to JsValue.Str(value!!))
 			EventName.Activate -> mapOf("detail" to JsValue.Num((detail ?: 1).toDouble()))
+			EventName.Scroll -> scroll?.let { mapOf("scrollTop" to JsValue.Num(it.top), "scrollLeft" to JsValue.Num(it.left)) }
 			else -> null
 		}
 		return change(host, if (event == EventName.Input) value else null) {

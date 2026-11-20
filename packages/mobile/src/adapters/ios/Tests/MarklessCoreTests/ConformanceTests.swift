@@ -182,7 +182,7 @@ func reproducesConformanceVector(file: URL) throws {
 			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
 			let event = NativeEventName(rawValue: eventName),
 			actionFields.allSatisfy({
-				(event == .timer ? ["event", "timer"] : ["event", "host", "value", "reason", "key", "text", "detail"] + (event.isTouch ? ["pointerId", "x", "y", "time"] : [])).contains($0.0)
+				(event == .timer ? ["event", "timer"] : ["event", "host", "value", "reason", "key", "text", "detail"] + (event.isTouch ? ["pointerId", "x", "y", "time"] : []) + (event == .scroll ? ["top", "left"] : [])).contains($0.0)
 			}),
 			let expected = stepFields.first(where: { $0.0 == "journal" })?.1
 		else { Issue.record("malformed step \(step.jsonText)"); return }
@@ -195,7 +195,7 @@ func reproducesConformanceVector(file: URL) throws {
 			let detail: Int? = if case let .number(count)? = actionFields.first(where: { $0.0 == "detail" })?.1 { Int(count) } else { nil }
 			action = NativeAction(
 				event: event, host: try #require(string("host")), value: string(event == .keydown ? "key" : event == .paste ? "text" : "value"), reason: string("reason"),
-				detail: detail, pointerId: number("pointerId"), x: number("x"), y: number("y"), time: number("time"))
+				detail: detail, pointerId: number("pointerId"), x: number("x"), y: number("y"), time: number("time"), top: number("top"), left: number("left"))
 		}
 		let journal = JSONValue.array(try runtime.dispatch(action).map(\.json))
 		#expect(Array(journal.jsonText.utf8) == Array(expected.jsonText.utf8), "\(file.lastPathComponent) \(eventName) on \(action.timer ?? action.host)")

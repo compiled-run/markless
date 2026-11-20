@@ -17,6 +17,8 @@ public enum NativeEventField: String, Sendable {
 	case value, reason, pressTarget, key, text, detail
 	/// A pointer event's, as a phone's browser reports a touch.
 	case target, currentTarget, relatedTarget, button, buttons, clientX, clientY, pointerId, pointerType, isPrimary, timeStamp
+	/// A `scroll`'s scroll container position, which a script handler's `event.target` reads.
+	case scrollTop, scrollLeft
 }
 
 public enum NativeBuiltin: String, Sendable {
@@ -77,11 +79,13 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case script(fn: String, bindings: [NativeScriptBinding])
 	/// A text field's text now: what a person typed since, else its `value` binding, else its `value` attribute.
 	case field(String)
+	/// A box's scroll position now (`top` true for `scrollTop`), as its last `scroll` event reported it; 0 before that.
+	case scroll(String, top: Bool)
 
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked, .field: return []
+		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked, .field, .scroll: return []
 		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .captures(node, pointer): return node.cells + pointer.cells
@@ -281,6 +285,8 @@ public enum NativeEventName: String, Sendable {
 	case idle
 	/// Some of the element is on the screen; once for each shown instance.
 	case visible
+	/// A scroll container's scroll position changed, at most once a frame; the action carries where it is now.
+	case scroll
 	/// A person chose an option (its instance id is the action's host) in its `<select>`'s list; never a payload event.
 	case choose
 	/// A touch going down, moving, lifting, or taken by the platform for a scroll: the runtime raises the browser's pointer
@@ -1065,6 +1071,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["checked"]: return .checked(try field("checked").string())
 		case ["bindings", "script"]: return .script(fn: try field("script").string(), bindings: try decodeBindings(try field("bindings")))
 		case ["field"]: return .field(try field("field").string())
+		case ["axis", "scroll"]:
+			let axis = try field("axis").string()
+			guard axis == "top" || axis == "left" else { throw PayloadError(path: reader.path + ".axis", reason: "unknown scroll axis \"\(axis)\"") }
+			return .scroll(try field("scroll").string(), top: axis == "top")
 		case ["arguments", "call"]:
 			let name = try field("call").string()
 			guard let builtin = NativeBuiltin(rawValue: name) else { throw PayloadError(path: reader.path + ".call", reason: "unknown call \"\(name)\"") }

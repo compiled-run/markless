@@ -300,6 +300,8 @@ final class ViewTree {
 	private var topLayer: (layer: TopLayerView, home: UIView, index: Int)?
 	/// The scroll view each scroll container hosts its children in.
 	private var scrollViews: [String: ContainerScrollView] = [:]
+	/// The `scroll` handlers' sources, by the scroll container's id.
+	private var scrollReporters: [String: ScrollReporter] = [:]
 	/// What a stopped submit says, shown until the person's next action.
 	private var message: UILabel?
 	private var touches: TouchWatcher?
@@ -1174,6 +1176,10 @@ final class ViewTree {
 				area.onPaste = { text in ask(NativeAction(event: .paste, host: id, value: text)) }
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
+			case (.scroll, _):
+				// Only a scroll container scrolls; any other box's handler never runs, as on the web.
+				guard let scroll = scrollViews[id] else { continue }
+				scrollReporters[id] = ScrollReporter(scroll) { top, left in onAction(NativeAction(event: .scroll, host: id, top: top, left: left)) }
 			case (.idle, _), (.visible, _), (.dismiss, _), (_, _) where event.event.isPointer:
 				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host.
 				continue
@@ -1198,6 +1204,7 @@ final class ViewTree {
 		}
 		labels.removeValue(forKey: id)?.removeFromSuperview()
 		scrollViews.removeValue(forKey: id)
+		scrollReporters.removeValue(forKey: id)
 		paragraphs.removeValue(forKey: id)?.view.removeFromSuperview()
 		paragraphTexts.removeValue(forKey: id)
 		flowing.remove(id)
@@ -1854,6 +1861,39 @@ private final class ActivateGesture: UITapGestureRecognizer {
 
 /// How many quick taps in one place a button's current press is: its `event.detail`.
 final class TapCount { var value = 1 }
+
+/// Reports a scroll container's position after it moved, at most once per main run loop turn (a frame while it scrolls), as
+/// the web fires `scroll` once per frame after the position changed.
+@MainActor
+final class ScrollReporter {
+	private var observation: NSKeyValueObservation?
+	private var pending = false
+	private var last: CGPoint
+	private let report: @MainActor (Double, Double) -> Void
+
+	init(_ scroll: UIScrollView, report: @escaping @MainActor (Double, Double) -> Void) {
+		last = scroll.contentOffset
+		self.report = report
+		observation = scroll.observe(\.contentOffset) { [weak self] scroll, _ in
+			MainActor.assumeIsolated { self?.moved(scroll) }
+		}
+	}
+
+	private func moved(_ scroll: UIScrollView) {
+		guard !pending else { return }
+		pending = true
+		DispatchQueue.main.async { [weak self, weak scroll] in
+			MainActor.assumeIsolated {
+				guard let self, let scroll else { return }
+				self.pending = false
+				let now = scroll.contentOffset
+				guard now != self.last else { return }
+				self.last = now
+				self.report(Double(now.y), Double(now.x))
+			}
+		}
+	}
+}
 
 /// A scroll container's scroll view over its padding box. A drag that starts toward an edge it is already at goes to the
 /// scroll view around it, as the web chains a scroll to the page once a box is at its end.

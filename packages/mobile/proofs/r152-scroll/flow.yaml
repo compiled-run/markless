@@ -1,0 +1,36 @@
+appId: ${APP_ID}
+name: r152-scroll
+---
+- launchApp:
+      clearState: true
+- assertVisible: Scroll events
+- assertVisible: Box not scrolled
+- assertVisible: At the first rows
+- assertVisible: Box row 1
+- assertVisible: Still box scrolled 0 times
+- assertNotVisible: Box row 30
+- repeat:
+      times: 80
+      while:
+          notVisible: Box row 30
+      commands:
+          - swipe:
+                start: 50%, 48%
+                end: 50%, 28%
+- assertVisible: Box row 30
+- assertVisible: Box row 30
+- assertVisible: Box scrolled
+- assertVisible: Past the first rows
+- assertVisible: Still box scrolled 0 times
+- repeat:
+      times: 80
+      while:
+          notVisible: Box row 1
+      commands:
+          - swipe:
+                start: 50%, 28%
+                end: 50%, 48%
+- assertVisible: Box row 1
+- assertVisible: Box scrolled
+- assertVisible: At the first rows
+- assertVisible: Still box scrolled 0 times

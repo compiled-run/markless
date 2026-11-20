@@ -26,6 +26,7 @@ import {
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
+	NATIVE_SCRIPT_SCROLL_FIELDS,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
 	NATIVE_SCRIPT_HOST_GLOBALS,
 	NATIVE_SCRIPT_LANGUAGE_GLOBALS,
@@ -192,6 +193,8 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	pointerout: 'pointerout',
 	pointerenter: 'pointerenter',
 	pointerleave: 'pointerleave',
+	// A scroll container's, after its scroll position changed, at most once per frame; a box that does not scroll never fires it.
+	scroll: 'scroll',
 };
 
 const CAPTURE_METHODS: ReadonlySet<string> = new Set([
@@ -2387,7 +2390,7 @@ export function createNativeViewPayload(
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
 		let ok = true;
-		for (const { name, written, span } of fact.names) {
+		for (const { name, written, span, members } of fact.names) {
 			const object = scope.objects.get(name);
 			if (object?.kind === 'fields') {
 				bindings[name] = { fields: Object.fromEntries(object.cells) };
@@ -2447,6 +2450,10 @@ export function createNativeViewPayload(
 			}
 			// An element handle (or a list of them) reaches the script as proxies the host answers.
 			if (mentionsElement(read.value)) {
+				// A box whose scroll position the script reads reports it, as one a data handler reads does.
+				const box = elementOf(read.value);
+				if (box !== undefined && !nodeById().get(box)?.row && members?.some((member) => member === 'scrollTop' || member === 'scrollLeft'))
+					scrollReads.add(box);
 				bindings[name] = { elements: read.value };
 				continue;
 			}
@@ -2869,6 +2876,8 @@ export function createNativeViewPayload(
 	let typedField: string | undefined;
 	/** Text fields whose text a handler reads (`field.value`). */
 	const readFields = new Set<string>();
+	/** The boxes whose scroll position a handler reads (`box.scrollTop`). */
+	const scrollReads = new Set<string>();
 	const nodeById = () => new Map(nodes.map((node) => [node.id, node]));
 
 	/** A handle read as a value in a handler: its element (null when unbound), or its elements in order when plural. */
@@ -3828,6 +3837,17 @@ export function createNativeViewPayload(
 						readFields.add(element);
 						return { field: element };
 					}
+				}
+				if (
+					element !== undefined &&
+					(expression.property === 'scrollTop' || expression.property === 'scrollLeft')
+				) {
+					if (nodeById().get(element)?.row)
+						return refuse(
+							`${what} reads the scroll position of a box in a @for row, which a native build cannot name yet`,
+						);
+					scrollReads.add(element);
+					return { scroll: element, axis: expression.property === 'scrollTop' ? 'top' : 'left' };
 				}
 				if (element !== undefined && isTicked(element)) {
 					if (expression.property === 'checked') return { checked: element };
@@ -5998,6 +6018,14 @@ export function createNativeViewPayload(
 				);
 				continue;
 			}
+			// A scroll handler's target is its scroll container, whose position the event carries.
+			if (
+				semantic === 'scroll' &&
+				read.path.length === 2 &&
+				(read.path[0] === 'target' || read.path[0] === 'currentTarget') &&
+				NATIVE_SCRIPT_SCROLL_FIELDS.includes(read.path[1]!)
+			)
+				continue;
 			const known = NATIVE_SCRIPT_EVENT_MEMBERS.some(
 				(members) =>
 					members.every(
@@ -7561,6 +7589,13 @@ export function createNativeViewPayload(
 	wireDetails();
 	let lengthLimited = false;
 	const forms = wireForms();
+	// The runtime keeps a box's scroll position from its scroll events, so a box whose position a handler reads reports each one.
+	for (const box of scrollReads)
+		if (!events.some((event) => event.host === box && event.event === 'scroll')) {
+			const handler = { id: `handler:${box}/scroll`, ops: [] as NativeOp[] };
+			events.push({ host: box, event: 'scroll', handler: handler.id });
+			handlers.push(handler);
+		}
 	// The runtime keeps a field's text from its edits, so a field whose text a handler reads reports each edit.
 	for (const field of readFields)
 		if (!events.some((event) => event.host === field && event.event === 'input')) {
