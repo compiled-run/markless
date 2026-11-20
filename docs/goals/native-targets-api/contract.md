@@ -62,8 +62,8 @@ reference. Notes and the before and after probe: `element-vocabulary.md`.
   (`inline`: its text flows on in its parent's text; `break`: `<br>`), `bold`, `italic`, `monospace`, `size` (a multiple
   of the parent's), `line`, `shift`, `link` (an `<a>` with an `href`: LinkText, #0000ee or #9e9eff dark), `highlight`, `quotes`, `preformatted`, `indent` (CSS px), `margin` (above
   and below, in ems of the element's own size; none on a list inside another), `inline` (an inline-level box: `a`,
-  `button`, `input`, `img`, `label`, `select`, `audio`, `svg`), `control` (`button` or `field`: Chrome's look for a
-  button or text field without CSS, its fill, 1px border, 2px corners, padding and a field's 153px width, light and dark),
+  `button`, `input`, `img`, `label`, `select`, `audio`, `svg`), `control` (`button`, `field`, `select` or `tick`: Chrome's look for a
+  button, text field, select, checkbox or radio button without CSS, its fill, 1px border, 2px corners, padding, a field's 153px width, a select's chevron, a 13px tick in Chrome's accent when checked, light and dark),
   `rule`, `marker` (on
   `ul`/`ol`), `table` (`table`, `row`, `cell`). Hosts apply it only without a style export; with one, Dragon decides.
 - **Paragraphs:** among one parent's children in one place, each run of text nodes and flowing elements is one text

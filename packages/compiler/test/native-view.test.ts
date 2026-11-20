@@ -1972,7 +1972,7 @@ ${markup}
 }`;
 	const lineOf = (text: string, offset: number) => text.slice(0, offset).split('\n').length;
 
-	it("draws a text field and a button as Chrome's controls, and leaves a checkbox to the phone", async () => {
+	it("draws a text field, a checkbox and a button as Chrome's controls", async () => {
 		const { payload, diagnostics } = await nativeView(
 			source(`		<input aria-label="Name" />
 		<input type="checkbox" aria-label="Urgent" />`),
@@ -1986,7 +1986,7 @@ ${markup}
 			),
 		).toEqual([
 			['input', { inline: true, size: 13.3333 / 16, control: 'field' }],
-			['input', { inline: true }],
+			['input', { inline: true, control: 'tick' }],
 			['button', { inline: true, size: 13.3333 / 16, control: 'button' }],
 		]);
 	});

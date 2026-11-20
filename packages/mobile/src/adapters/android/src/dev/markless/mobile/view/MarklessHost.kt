@@ -521,6 +521,7 @@ class MarklessHost(
 
 	/** Chrome's look for a form control without CSS, light or dark: fill, a 1 px border, 2 px corners, its padding and width. */
 	private fun controlLook(view: View, control: String, configuration: Configuration) {
+		if (control == "tick") { view.invalidate(); return }
 		val dark = isDark(configuration)
 		val (fill, line) = when {
 			control == "button" && dark -> 0xFF6B6B6B to 0xFF6B6B6B
@@ -535,8 +536,9 @@ class MarklessHost(
 		}
 		// The border box is 2 px; the text sits 6 px (a field 2 px) in from the sides and 1 px from the top and bottom.
 		val side = ((if (control == "button") 8 else 4) * dpr).roundToInt()
-		val top = (3 * dpr).roundToInt()
+		val top = ((if (control == "select") 2 else 3) * dpr).roundToInt()
 		view.setPadding(side, top, side, top)
+		if (view is SelectBox) view.chromeLook(canvasText(configuration), dpr.toFloat())
 		(view as? TextView)?.setTextColor(canvasText(configuration))
 		if (control == "field" && view is EditText) (153 * dpr).roundToInt().let { view.minWidth = it; view.maxWidth = it }
 	}
@@ -782,8 +784,9 @@ class MarklessHost(
 			}
 			"unseen" -> View(context)
 			// The runtime owns checkedness: the widget never toggles itself, a press dispatches and the journal sets it.
-			"checkbox", "radio" -> (if (type == "radio") object : RadioButton(context) { override fun toggle() {} } else object : CheckBox(context) { override fun toggle() {} }).apply {
-				if (style == null) { minWidth = (48 * dpr).roundToInt(); minHeight = (48 * dpr).roundToInt() }
+			"checkbox", "radio" -> (if (unstyled?.control == "tick") (if (type == "radio") ChromeRadio(context) else ChromeCheckBox(context))
+				else if (type == "radio") object : RadioButton(context) { override fun toggle() {} } else object : CheckBox(context) { override fun toggle() {} }).apply {
+				if (style == null && unstyled?.control != "tick") { minWidth = (48 * dpr).roundToInt(); minHeight = (48 * dpr).roundToInt() }
 				if (node.row == null) isChecked = runtime.checkedOf(node.id)
 				named(this, inst.id)
 			}
@@ -813,7 +816,7 @@ class MarklessHost(
 				named(this, inst.id)
 			}
 			"select" -> SelectBox(context).apply {
-				if (style == null) { minimumWidth = (120 * dpr).roundToInt(); minimumHeight = (48 * dpr).roundToInt() }
+				if (style == null && unstyled?.control == null) { minimumWidth = (120 * dpr).roundToInt(); minimumHeight = (48 * dpr).roundToInt() }
 				named(this, inst.id, control = true)
 				setOnClickListener {
 					if (attrs[inst.id]?.containsKey("disabled") == true) return@setOnClickListener
@@ -852,7 +855,9 @@ class MarklessHost(
 		unstyled?.control?.let { control ->
 			controls[view] = control
 			controlLook(view, control, context.resources.configuration)
-			if (view is EditText) view.setTextSize(TypedValue.COMPLEX_UNIT_PX, (baseTextSize * unstyled.size * flow!!.blockText(node.parent).size).toFloat())
+			val controlText = (baseTextSize * unstyled.size * flow!!.blockText(node.parent).size).toFloat()
+			if (view is EditText) view.setTextSize(TypedValue.COMPLEX_UNIT_PX, controlText)
+			if (view is SelectBox) view.textSize(controlText)
 		}
 		layoutOf(inst.node)?.let { l -> l.export.assignments[l.assignment].byId[inst.id] }?.let { styled -> scrollContainer(inst.id, view, styled) }
 		views[inst.id] = view

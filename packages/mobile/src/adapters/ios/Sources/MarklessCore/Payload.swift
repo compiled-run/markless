@@ -786,7 +786,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.margin = field.has("margin") ? try field["margin"].number() : nil
 		style.inline = try flag("inline")
 		style.link = try flag("link")
-		style.control = try oneOf("control", ["button", "field"])
+		style.control = try oneOf("control", ["button", "field", "select", "tick"])
 		style.rule = try flag("rule")
 		style.marker = try oneOf("marker", ["disc", "decimal"])
 		style.table = try oneOf("table", ["table", "row", "cell"])

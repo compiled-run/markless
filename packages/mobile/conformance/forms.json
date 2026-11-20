@@ -158,7 +158,8 @@
 					}
 				],
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{
@@ -173,7 +174,8 @@
 					"value": "yes"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{

@@ -47,7 +47,8 @@
 					}
 				],
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{
@@ -63,7 +64,8 @@
 					"required": ""
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{
@@ -78,7 +80,8 @@
 					"value": "L"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{
@@ -134,7 +137,8 @@
 					"name": "size"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{
@@ -149,7 +153,8 @@
 					"checked": ""
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{

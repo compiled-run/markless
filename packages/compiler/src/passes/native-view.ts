@@ -164,14 +164,17 @@ function defaultStyleOf(
 	const style: NativeDefaultStyle =
 		element === 'abbr' && titled
 			? { ...base, line: 'underline' }
-			: (element === 'input' && !TEXT_TYPES.has(attributes['type'] ?? 'text')) ||
-				  (element === 'a' &&
-						!('href' in attributes) &&
-						!bindings.some(
-							(binding) => 'attribute' in binding && binding.attribute === 'href',
-						))
-				? { inline: true }
-				: base;
+			: element === 'input' &&
+				  (attributes['type'] === 'checkbox' || attributes['type'] === 'radio')
+				? { inline: true, control: 'tick' }
+				: (element === 'input' && !TEXT_TYPES.has(attributes['type'] ?? 'text')) ||
+					  (element === 'a' &&
+							!('href' in attributes) &&
+							!bindings.some(
+								(binding) => 'attribute' in binding && binding.attribute === 'href',
+							))
+					? { inline: true }
+					: base;
 	return Object.keys(style).length > 0 ? style : undefined;
 }
 
@@ -3394,7 +3397,8 @@ export function createNativeViewPayload(
 					refuse(`${what} uses a call to \`${name}\`, which needs a script engine`);
 				if (!found && !handlerCallsScript) return unknown();
 				const key = found && `${found.module.graph.filename}#${found.fn.name}`;
-				if (key && inlining.has(key)) return refuse(`${what} calls \`${name}\` inside itself`);
+				if (key && inlining.has(key))
+					return refuse(`${what} calls \`${name}\` inside itself`);
 				const args = all(expression.arguments);
 				if (!args) return null;
 				const evaluate = (): NativeExpr | null => {
@@ -3430,7 +3434,9 @@ export function createNativeViewPayload(
 				const data = asData(() => attempt(evaluate));
 				if (!data.failed) return data.value;
 				data.rollBack();
-				const called = attempt(() => scriptCall(scope.module, name, args, what, scope.span));
+				const called = attempt(() =>
+					scriptCall(scope.module, name, args, what, scope.span),
+				);
 				if (called.value && !called.failed) return called.value;
 				called.rollBack();
 				return asData(evaluate);

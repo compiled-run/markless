@@ -586,7 +586,7 @@ data class Payload(
 				margin = o["margin"]?.num("$what.margin") ?: 0.0,
 				inline = flag("inline"),
 				link = flag("link"),
-				control = word("control", setOf("button", "field")),
+				control = word("control", setOf("button", "field", "select", "tick")),
 				rule = flag("rule"),
 				marker = word("marker", setOf("disc", "decimal")),
 				table = word("table", setOf("table", "row", "cell")),

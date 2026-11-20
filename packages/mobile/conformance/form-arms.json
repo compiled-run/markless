@@ -94,7 +94,8 @@
 					"name": "wrap"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"control": "tick"
 				},
 				"arm": {
 					"branch": "branch-site:0",

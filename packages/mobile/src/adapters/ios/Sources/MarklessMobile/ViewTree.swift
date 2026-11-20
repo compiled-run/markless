@@ -228,6 +228,8 @@ final class ViewTree {
 	private var margins: [ObjectIdentifier: CGFloat] = [:]
 	/// Space between a box's edges and its children in the stacking layout (a control's padding), by box.
 	private var paddings: [ObjectIdentifier: UIEdgeInsets] = [:]
+	/// Checkboxes and radio buttons drawn as Chrome draws them unstyled (`control: tick`).
+	private var chromeTicks = Set<ObjectIdentifier>()
 	/// Inline-level boxes (`<a>`, `<button>`, `<input>`, `<img>`) of the stacking layout: they share lines with text.
 	private var inlineViews = Set<ObjectIdentifier>()
 	/// Whether a paragraph's text starts or ends with whitespace, by its label: a space beside an inline box on its line.
@@ -852,7 +854,7 @@ final class ViewTree {
 							}
 						} catch { fatalError("Markless iOS host: \(error)") }
 					}
-					if layout == nil {
+					if layout == nil, node.defaultStyle?.control == nil {
 						select.layer.borderWidth = 1
 						select.layer.borderColor = UIColor.separator.cgColor
 						select.layer.cornerRadius = 6
@@ -1144,8 +1146,12 @@ final class ViewTree {
 
 	private func drawTick(_ id: String, _ view: UIView) {
 		guard let tick = ticks[id], let button = view as? UIButton else { return }
-		let symbol = tick.radio ? (tick.checked ? "largecircle.fill.circle" : "circle") : (tick.checked ? "checkmark.square.fill" : "square")
-		button.setImage(UIImage(systemName: symbol), for: .normal)
+		if chromeTicks.contains(ObjectIdentifier(button)) {
+			ChromeTick.apply(to: button, radio: tick.radio, checked: tick.checked)
+		} else {
+			let symbol = tick.radio ? (tick.checked ? "largecircle.fill.circle" : "circle") : (tick.checked ? "checkmark.square.fill" : "square")
+			button.setImage(UIImage(systemName: symbol), for: .normal)
+		}
 		button.accessibilityValue = tick.checked ? "1" : "0"
 	}
 
@@ -1181,7 +1187,7 @@ final class ViewTree {
 	private func stackTree(_ view: UIView) {
 		guard !(view is UILabel || view is UITextField || view is AudioButton), !leaves.contains(ObjectIdentifier(view)) else { return }
 		// Children first: a line box measures its items, which needs their own layout in place.
-		for child in view.subviews where !anchors.contains(ObjectIdentifier(child)) { stackTree(child) }
+		for child in view.subviews where !anchors.contains(ObjectIdentifier(child)) && !decorations.contains(ObjectIdentifier(child)) { stackTree(child) }
 		stack(view)
 	}
 
@@ -1267,6 +1273,10 @@ final class ViewTree {
 
 	/// Chrome's look for a form control without CSS, light or dark: fill, a 1 pt border, 2 pt corners, its padding and width.
 	private func controlLook(_ view: UIView, _ control: String, scale: CGFloat) {
+		if control == "tick" {
+			chromeTicks.insert(ObjectIdentifier(view))
+			return
+		}
 		let button = control == "button"
 		func gray(_ value: CGFloat) -> UIColor { UIColor(white: value / 255, alpha: 1) }
 		let fill = UIColor { $0.userInterfaceStyle == .dark ? gray(button ? 107 : 59) : gray(button ? 239 : 255) }
@@ -1280,7 +1290,8 @@ final class ViewTree {
 		}
 		// The border box is 2 pt; the text sits 6 pt (a field's 2 pt) in from the sides and 1 pt from the top and bottom.
 		let side: CGFloat = button ? 8 : 4
-		paddings[ObjectIdentifier(view)] = UIEdgeInsets(top: 3, left: side, bottom: 3, right: side)
+		paddings[ObjectIdentifier(view)] = UIEdgeInsets(top: control == "select" ? 2 : 3, left: side, bottom: control == "select" ? 2 : 3, right: control == "select" ? side + 13 : side)
+		if let select = view as? SelectButton { select.chromeLook(fontSize: TextLook.baseSize * scale, decorations: &decorations) }
 		guard let field = view as? UITextField else { return }
 		field.borderStyle = .none
 		field.font = UIFont.systemFont(ofSize: TextLook.baseSize * scale)
@@ -1808,6 +1819,102 @@ final class SelectButton: UIButton {
 	func show(_ label: String) {
 		display.text = label
 		accessibilityValue = label
+	}
+
+	/// Chrome's unstyled select inside the field-like box: its text at the control size and a chevron at its end.
+	func chromeLook(fontSize: CGFloat, decorations: inout Set<ObjectIdentifier>) {
+		display.font = UIFont.systemFont(ofSize: fontSize)
+		let chevron = UIImageView(image: ChromeTick.chevron())
+		chevron.tintColor = .label
+		chevron.translatesAutoresizingMaskIntoConstraints = false
+		addSubview(chevron)
+		decorations.insert(ObjectIdentifier(chevron))
+		NSLayoutConstraint.activate([
+			chevron.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5),
+			chevron.centerYAnchor.constraint(equalTo: centerYAnchor),
+		])
+	}
+}
+
+/// Checkboxes and radio buttons as Chrome draws them without CSS: 13 pt, with Chrome's margins inside the button, unchecked in
+/// a field's colours and checked in its accent (#0075ff, #99c8ff dark), drawn for light and dark.
+@MainActor
+enum ChromeTick {
+	static func apply(to button: UIButton, radio: Bool, checked: Bool) {
+		let margins = radio ? UIEdgeInsets(top: 3, left: 5, bottom: 0, right: 3) : UIEdgeInsets(top: 3, left: 4, bottom: 3, right: 3)
+		if button.constraints.first(where: { $0.identifier == "chrome-tick" }) == nil {
+			let width = button.widthAnchor.constraint(equalToConstant: 13 + margins.left + margins.right)
+			let height = button.heightAnchor.constraint(equalToConstant: 13 + margins.top + margins.bottom)
+			width.identifier = "chrome-tick"
+			NSLayoutConstraint.activate([width, height])
+		}
+		let asset = UIImageAsset()
+		for style in [UIUserInterfaceStyle.light, .dark] {
+			let traits = UITraitCollection(userInterfaceStyle: style)
+			asset.register(image(radio: radio, checked: checked, margins: margins, dark: style == .dark), with: traits)
+		}
+		button.setImage(asset.image(with: button.traitCollection), for: .normal)
+		button.contentHorizontalAlignment = .fill
+		button.contentVerticalAlignment = .fill
+	}
+
+	private static func image(radio: Bool, checked: Bool, margins: UIEdgeInsets, dark: Bool) -> UIImage {
+		func gray(_ value: CGFloat) -> UIColor { UIColor(white: value / 255, alpha: 1) }
+		let fill = dark ? gray(59) : .white
+		let line = dark ? gray(133) : gray(118)
+		let accent = dark ? UIColor(red: 153 / 255, green: 200 / 255, blue: 1, alpha: 1) : UIColor(red: 0, green: 117 / 255, blue: 1, alpha: 1)
+		let size = CGSize(width: 13 + margins.left + margins.right, height: 13 + margins.top + margins.bottom)
+		return UIGraphicsImageRenderer(size: size).image { _ in
+			let box = CGRect(x: margins.left, y: margins.top, width: 13, height: 13)
+			if radio {
+				(checked ? accent : fill).setFill()
+				UIBezierPath(ovalIn: box).fill()
+				if checked {
+					fill.setFill()
+					UIBezierPath(ovalIn: box.insetBy(dx: 1.5, dy: 1.5)).fill()
+					accent.setFill()
+					UIBezierPath(ovalIn: box.insetBy(dx: 3, dy: 3)).fill()
+				} else {
+					line.setStroke()
+					let ring = UIBezierPath(ovalIn: box.insetBy(dx: 0.5, dy: 0.5))
+					ring.lineWidth = 1
+					ring.stroke()
+				}
+				return
+			}
+			(checked ? accent : fill).setFill()
+			UIBezierPath(roundedRect: box, cornerRadius: 2).fill()
+			if !checked {
+				line.setStroke()
+				let edge = UIBezierPath(roundedRect: box.insetBy(dx: 0.5, dy: 0.5), cornerRadius: 2)
+				edge.lineWidth = 1
+				edge.stroke()
+				return
+			}
+			fill.setStroke()
+			let tick = UIBezierPath()
+			tick.move(to: CGPoint(x: box.minX + 3.5, y: box.minY + 6.8))
+			tick.addLine(to: CGPoint(x: box.minX + 5.6, y: box.minY + 9))
+			tick.addLine(to: CGPoint(x: box.minX + 9.8, y: box.minY + 4.2))
+			tick.lineWidth = 1.6
+			tick.lineCapStyle = .round
+			tick.lineJoinStyle = .round
+			tick.stroke()
+		}
+	}
+
+	/// The chevron at the end of a closed select: a 7 by 4 pt open V, drawn as a template in the text's colour.
+	static func chevron() -> UIImage {
+		UIGraphicsImageRenderer(size: CGSize(width: 9, height: 6)).image { _ in
+			UIColor.black.setStroke()
+			let path = UIBezierPath()
+			path.move(to: CGPoint(x: 1, y: 1))
+			path.addLine(to: CGPoint(x: 4.5, y: 5))
+			path.addLine(to: CGPoint(x: 8, y: 1))
+			path.lineWidth = 1.5
+			path.lineCapStyle = .round
+			path.stroke()
+		}.withRenderingMode(.alwaysTemplate)
 	}
 }
 

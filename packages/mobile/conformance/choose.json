@@ -46,7 +46,9 @@
 					"aria-label": "Size"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "select"
 				}
 			},
 			{
@@ -127,7 +129,9 @@
 					"aria-label": "Fruit"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "select"
 				}
 			},
 			{
@@ -196,7 +200,9 @@
 					"disabled": ""
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "select"
 				}
 			},
 			{
@@ -225,7 +231,9 @@
 					"aria-label": "Snack"
 				},
 				"defaultStyle": {
-					"inline": true
+					"inline": true,
+					"size": 0.83333125,
+					"control": "select"
 				}
 			},
 			{

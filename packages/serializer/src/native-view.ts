@@ -216,9 +216,11 @@ export type NativeDefaultStyle = {
 	 * Chrome's look for a form control without CSS. `button`: a #efefef fill (#6b6b6b dark) inside a 1px #767676 border
 	 * (the fill's colour when dark), 2px corners, its text 6px in from the sides and 1px from the top and bottom, inside a 2px
 	 * border box. `field`: a white fill (#3b3b3b dark) inside a 1px #767676 border (#858585 dark), 2px corners, 153px wide,
-	 * its text 2px in and 1px down, inside a 2px border box.
+	 * its text 2px in and 1px down, inside a 2px border box. `select`: a field's fill and border round its chosen option's
+	 * text and a chevron. `tick`: a checkbox's 13px box or a radio button's circle, unchecked in a field's colours, checked in
+	 * Chrome's accent (#0075ff, #99c8ff dark), with a checkbox's margins 3px 3px 3px 4px and a radio's 3px 3px 0 5px.
 	 */
-	readonly control?: 'button' | 'field';
+	readonly control?: 'button' | 'field' | 'select' | 'tick';
 	/** `<hr>`: Chrome's 2px inset line across the box (#9a9a9a over #eeeeee). */
 	readonly rule?: true;
 	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
@@ -312,7 +314,7 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	label: { inline: true },
 	dialog: {},
 	form: {},
-	select: { inline: true },
+	select: { inline: true, size: CONTROL_TEXT, control: 'select' },
 	option: {},
 	svg: { inline: true },
 };
