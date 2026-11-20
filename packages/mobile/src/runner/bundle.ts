@@ -40,6 +40,8 @@ export type BundledRung = {
 	readonly name: string;
 	readonly flow: InstrumentedFlow;
 	readonly manifest: DeviceManifest;
+	/** The rung fetches from the test's echo server, which the runner serves for as long as it runs. */
+	readonly server?: 'echo';
 	/** Set when the rung did not build: it fails at `build` on every platform without reaching a phone. */
 	readonly buildError?: string;
 };
@@ -74,14 +76,11 @@ export async function writeBundle(input: {
 		let bundled: BundledRung;
 		try {
 			const rung = await loadRung(dir);
-			if (rung.expected.server === 'echo')
-				throw new Error(
-					'the rung fetches from the echo server, which the phone runner does not start; run it with `node src/harness/cli.ts`',
-				);
 			bundled = {
 				name,
 				flow: instrumentFlow(rung.flow, rung.expected, rung.flowPath),
 				manifest: rung.manifest,
+				...(rung.expected.server ? { server: rung.expected.server } : {}),
 			};
 			for (const platform of PROOF_PLATFORMS)
 				writeAssets(join(out, 'assets', platform), rung.assets[platform]);

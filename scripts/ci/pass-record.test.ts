@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -35,6 +35,20 @@ describe('working tree key', () => {
 		const onDisk = workingTree(root);
 		expect(git('diff', '--cached', '--name-only')).toBe('');
 		expect(onDisk).not.toBe(indexTree(root));
+		git('add', '-A');
+		expect(indexTree(root)).toBe(onDisk);
+	});
+
+	// git re-hashes a file whose mtime is not older than the index's own; a copy of the index with a newer mtime would not.
+	it('re-hashes a same-size edit that git treats as racy in the real index', () => {
+		git('config', 'core.trustctime', 'false');
+		const past = new Date(Date.now() - 100_000);
+		utimesSync(join(root, 'a.ts'), past, past);
+		git('update-index', '--refresh');
+		utimesSync(join(root, '.git', 'index'), past, past);
+		writeFileSync(join(root, 'a.ts'), 'export const a = 2;\n');
+		utimesSync(join(root, 'a.ts'), past, past);
+		const onDisk = workingTree(root);
 		git('add', '-A');
 		expect(indexTree(root)).toBe(onDisk);
 	});

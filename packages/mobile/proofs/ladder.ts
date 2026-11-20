@@ -34,6 +34,8 @@ export type LadderAction =
 	  }
 	/** The keyboard's return key in the text field with this accessible name. */
 	| { readonly submit: string }
+	/** Opens the `<select>` with this accessible name and picks the option with this label from its list. */
+	| { readonly choose: { readonly field: string; readonly option: string } }
 	/** Scroll until this text is on screen. */
 	| { readonly scrollTo: string }
 	| {
@@ -174,8 +176,12 @@ export const MICROPHONE_STATE_ID = 'markless-microphone';
 /** The test-build label where a phone shell shows how many times the app started its script engine: `engine starts: <n>`. */
 export const ENGINE_STARTS_ID = 'markless-engine-starts';
 export const engineStartsText = (starts: number): string => `engine starts: ${starts}`;
-/** The port of the test's echo server, which a rung with `server: 'echo'` fetches from (`echo-server.ts`). */
-export const ECHO_SERVER_PORT = 47608;
+/**
+ * The port of the test's echo server, which a rung with `server: 'echo'` fetches from (`echo-server.ts`). Fixed, since
+ * the rung's App.tsrx names it, and below every OS's ephemeral range (Linux 32768-60999, macOS and Windows 49152-65535),
+ * where any outgoing connection on the machine can already hold it.
+ */
+export const ECHO_SERVER_PORT = 28761;
 export const callsText = (calls: readonly string[]): string =>
 	`calls: ${calls.length === 0 ? 'none' : calls.join(', ')}`;
 
@@ -230,7 +236,11 @@ const isApp = (folder: string): boolean => existsSync(join(proofsDir, folder, 'p
 /** The navigation ladder: each folder an app (`pages/`) of several routes; an `r<n>` or `j<n>` rung with `pages/` too. */
 export const navRungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && (/^n\d+-/.test(entry.name) || (/^[jr]\d+-/.test(entry.name) && isApp(entry.name))))
+		.filter(
+			(entry) =>
+				entry.isDirectory() &&
+				(/^n\d+-/.test(entry.name) || (/^[jr]\d+-/.test(entry.name) && isApp(entry.name))),
+		)
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
@@ -390,6 +400,11 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];
 	if ('submit' in action) return [{ tapOn: selector(action.submit) }, { pressKey: 'Enter' }];
+	if ('choose' in action)
+		return [
+			{ tapOn: selector(action.choose.field) },
+			{ tapOn: { text: selector(action.choose.option) } },
+		];
 	if ('relaunch' in action)
 		return [
 			'stopApp',
@@ -427,7 +442,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			? [pullDown()]
 			: [onPlatform('Android', [backGesture]), onPlatform('iOS', [pullDown()])];
 	// The screenshot after the step records the height it came to rest at.
-	if ('swipe' in action && action.swipe === 'up') return [pullUp, { waitForAnimationToEnd: { timeout: 5000 } }];
+	if ('swipe' in action && action.swipe === 'up')
+		return [pullUp, { waitForAnimationToEnd: { timeout: 5000 } }];
 	if ('scrollTo' in action)
 		return [
 			{
@@ -514,27 +530,27 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 	const visitsSettings = rung.steps.some((step) => step.do && 'settings' in step.do);
 	return rung.steps.map((step, index) => {
 		const commands = [
-		...(index === 0 && visitsSettings
-			? [
-					{
-						runFlow: {
-							when: { platform: 'iOS' },
-							commands: [{ stopApp: 'com.apple.Preferences' }],
+			...(index === 0 && visitsSettings
+				? [
+						{
+							runFlow: {
+								when: { platform: 'iOS' },
+								commands: [{ stopApp: 'com.apple.Preferences' }],
+							},
 						},
-					},
-				]
-			: []),
-		...(index === 0 && rung.location ? [{ setLocation: rung.location }] : []),
-		...(index === 0 ? [...launch, ...appearance] : []),
-		...(step.do ? actionCommands(step.do, step) : []),
-		...(index > 0
-			? assertions({
-					...changeWitness(rung.steps[index - 1]!, step),
-					...(step.prompt && { prompt: step.prompt }),
-					...(step.system && { system: step.system }),
-				})
-			: []),
-		...assertions(step),
+					]
+				: []),
+			...(index === 0 && rung.location ? [{ setLocation: rung.location }] : []),
+			...(index === 0 ? [...launch, ...appearance] : []),
+			...(step.do ? actionCommands(step.do, step) : []),
+			...(index > 0
+				? assertions({
+						...changeWitness(rung.steps[index - 1]!, step),
+						...(step.prompt && { prompt: step.prompt }),
+						...(step.system && { system: step.system }),
+					})
+				: []),
+			...assertions(step),
 		];
 		return step.do && 'escape' in step.do
 			? [{ runFlow: { when: { platform: 'Android' }, commands } }]

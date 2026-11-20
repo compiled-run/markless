@@ -2,9 +2,10 @@ import { execFile } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { chromium, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterAll, describe, expect, test } from 'vitest';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 const exec = promisify(execFile);
 const fixtures = resolve(import.meta.dirname, '../fixtures');
@@ -106,7 +107,7 @@ async function buildAndClick(variant: Variant, packed: boolean) {
 	});
 	await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
 	const { port } = server.address() as { port: number };
-	const browser = await chromium.launch();
+	const browser = await launchBrowser();
 	try {
 		const page = await browser.newPage();
 		const errors: string[] = [];

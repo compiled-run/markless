@@ -3,12 +3,12 @@ import { createServer } from 'node:http';
 import { readdir, readFile, rm } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { chromium } from '@playwright/test';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { resumeModuleClosure, servedResumeModuleUrl } from './helpers/served-resume-module.ts';
 import { listenOnFreePort } from './helpers/listen.ts';
 import { dispatchesSettled, trackDispatches } from './helpers/dispatch-settled.ts';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -68,7 +68,7 @@ test.each([false, true])(
 			}
 		});
 		port = await listenOnFreePort(server);
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage();
 			const scripts: string[] = [];

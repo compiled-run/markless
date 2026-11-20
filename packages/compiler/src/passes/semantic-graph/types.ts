@@ -189,6 +189,8 @@ export type WalkState = {
 	readonly hostParents: Map<string, string>;
 	/** Template values already refused at their use site; the walk must not treat them as markup again. */
 	readonly handledTemplateValues: WeakSet<object>;
+	/** Analyzer symbol id of each state() declaration whose initializer holds a class instance, to its graph binding id. */
+	readonly stateClassBindings: Map<number, string>;
 	currentComponentName: string | null;
 	currentComponentId: string | null;
 	/** The <style> scope class of the component being walked; every class this component writes carries it. */
@@ -379,6 +381,7 @@ export function createWalkState(input: {
 		relayCancelRefusals: [],
 		hostParents: new Map(),
 		handledTemplateValues: new WeakSet<object>(),
+		stateClassBindings: new Map(),
 		currentComponentName: null,
 		currentComponentId: null,
 		currentStyleScopeClass: null,

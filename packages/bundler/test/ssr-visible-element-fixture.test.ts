@@ -3,10 +3,10 @@ import { createServer } from 'node:http';
 import { readFile, rm } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { chromium } from '@playwright/test';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { listenOnFreePort } from './helpers/listen.ts';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -43,7 +43,7 @@ test.each([false, true])(
 			}
 		});
 		const port = await listenOnFreePort(server);
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
 			const errors: string[] = [];
