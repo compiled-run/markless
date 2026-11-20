@@ -88,6 +88,8 @@ async function opened(path: string) {
 
 test('an MDX island arm opened by an idle and a visible trigger, before any event', async () => {
 	const { page, errors } = await opened('/idle');
+	// The visible trigger fires once its host is in view, whatever the runner's viewport.
+	await page.locator('[data-visible]').scrollIntoViewIfNeeded();
 	const shown = () =>
 		page.evaluate(() =>
 			[...document.querySelectorAll('.idle .badge, .seen .badge')]

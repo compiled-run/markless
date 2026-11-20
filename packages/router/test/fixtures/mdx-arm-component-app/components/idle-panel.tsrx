@@ -12,7 +12,8 @@ export default function IdlePanel() @{
 				<Badge />
 			</div>
 		}
-		<div onVisible={() => (seen = true)}>
+		<div data-visible onVisible={() => (seen = true)}>
+			<span>watched</span>
 			@if (seen) {
 				<div class="seen">
 					<Badge />
