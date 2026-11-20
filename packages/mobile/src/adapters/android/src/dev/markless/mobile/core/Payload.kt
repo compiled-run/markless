@@ -156,6 +156,8 @@ data class DefaultStyle(
 	val marker: String? = null,
 	/** "table", "row" or "cell". */
 	val table: String? = null,
+	/** Its content centred across its box (`<th>`). */
+	val center: Boolean = false,
 )
 
 /** An RGBA colour, each channel 0-255. */
@@ -589,7 +591,7 @@ data class Payload(
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
 			val o = v.obj(what)
-			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "link", "highlight", "quotes", "preformatted", "indent", "margin", "inline", "control", "rule", "marker", "table"), what)
+			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "link", "highlight", "quotes", "preformatted", "indent", "margin", "inline", "control", "rule", "marker", "table", "center"), what)
 			fun flag(name: String): Boolean = o[name]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.$name must be true when present"); true } ?: false
 			fun word(name: String, allowed: Set<String>): String? = o[name]?.let { oneOf(o, name, allowed, what) }
 			return DefaultStyle(
@@ -607,6 +609,7 @@ data class Payload(
 				rule = flag("rule"),
 				marker = word("marker", setOf("disc", "decimal")),
 				table = word("table", setOf("table", "row", "cell")),
+				center = flag("center"),
 			)
 		}
 

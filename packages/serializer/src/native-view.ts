@@ -244,8 +244,14 @@ export type NativeDefaultStyle = {
 	readonly rule?: true;
 	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
 	readonly marker?: 'disc' | 'decimal';
-	/** Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`. */
+	/**
+	 * Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`, as Chrome draws a table
+	 * without CSS: 2px apart and 2px in from the table's edges (`border-spacing: 2px`), each cell's content 1px inside it and
+	 * centred on the row's height (`vertical-align: middle`).
+	 */
 	readonly table?: 'table' | 'row' | 'cell';
+	/** Its content centred across its box (`<th>`'s `text-align: center`). */
+	readonly center?: true;
 };
 
 const MONOSPACE: NativeDefaultStyle = { monospace: true, size: 0.8125 };
@@ -295,7 +301,7 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	tfoot: {},
 	tr: { table: 'row' },
 	td: { table: 'cell' },
-	th: { table: 'cell', bold: true },
+	th: { table: 'cell', bold: true, center: true },
 	span: { flow: 'inline' },
 	b: { flow: 'inline', bold: true },
 	strong: { flow: 'inline', bold: true },

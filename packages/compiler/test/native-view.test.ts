@@ -2447,6 +2447,29 @@ ${markup}
 		]);
 	});
 
+	it('gives a table its structure and centres a header cell, as Chrome draws one', async () => {
+		const { payload, diagnostics } = await nativeView(
+			source(`		<table>
+			<tr><th>Item</th></tr>
+			<tr><td>Apples</td></tr>
+		</table>`),
+		);
+		expect(diagnostics).toEqual([]);
+		expect(
+			payload!.nodes.flatMap((node) =>
+				node.kind === 'element' && node.element !== 'main' && node.element !== 'button'
+					? [[node.element, node.defaultStyle]]
+					: [],
+			),
+		).toEqual([
+			['table', { table: 'table' }],
+			['tr', { table: 'row' }],
+			['th', { table: 'cell', bold: true, center: true }],
+			['tr', { table: 'row' }],
+			['td', { table: 'cell' }],
+		]);
+	});
+
 	it("makes a textarea's text its starting value, as the HTML parser does, instead of a child", async () => {
 		const { payload, diagnostics } = await nativeView(
 			source(`		<textarea aria-label="Notes">{'\\nTen across'}</textarea>`),

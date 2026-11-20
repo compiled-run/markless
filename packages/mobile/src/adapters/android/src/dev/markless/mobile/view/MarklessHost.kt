@@ -890,6 +890,10 @@ class MarklessHost(
 				named(this, inst.id, heading = node.element in HEADINGS, control = events[node.id].orEmpty().any { it.event == EventName.Activate }, link = node.element == "a")
 				unstyled?.let { s ->
 					table = s.table?.takeIf { it != "cell" }
+					// Chrome's table: a cell's content 1 px inside it; rows 2 px apart and from the table's edges, their margins meeting.
+					if (s.table == "cell") (1 * dpr).roundToInt().let { setPadding(it, it, it, it) }
+					if (s.table == "row") (2 * dpr).roundToInt().let { marginTop = it; marginBottom = it }
+					center = s.center
 					if (s.indent > 0) setPaddingRelative((s.indent * dpr).roundToInt(), 0, 0, 0)
 					if (s.margin > 0) (s.margin * baseTextSize * flow!!.blockText(node.id).size).roundToInt().let { marginTop = it; marginBottom = it }
 				}

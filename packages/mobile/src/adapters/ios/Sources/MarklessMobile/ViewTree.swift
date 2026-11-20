@@ -249,6 +249,8 @@ final class ViewTree {
 	private var tables = Set<ObjectIdentifier>()
 	private var tableRows = Set<ObjectIdentifier>()
 	private var tableCells = Set<ObjectIdentifier>()
+	/// Boxes whose content is centred across them (`<th>`).
+	private var centered = Set<ObjectIdentifier>()
 	private var columnConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 	private var tableViews: [ObjectIdentifier: UIView] = [:]
 	/// Views a container holds that the stacking layout does not place (a list marker, a rule's line).
@@ -1347,13 +1349,19 @@ final class ViewTree {
 				leading = false
 				pending = marginBelow(child)
 			}
+			let center = centered.contains(ObjectIdentifier(container))
+			if center, let label = child as? UILabel { label.textAlignment = .center }
 			constraints += [
 				child.topAnchor.constraint(equalTo: above, constant: gap + inset),
-				child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
+				// Centred across a `<th>`, else at the start.
+				center
+					? child.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: indent)
+					: child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
 				wide
 					? child.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -pad.right)
 					: child.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -pad.right),
 			]
+			if center { constraints.append(child.centerXAnchor.constraint(equalTo: container.centerXAnchor, constant: (indent - pad.right) / 2)) }
 			inset = 0
 			if wide {
 				// As wide as the page allows: a box with no width of its own (a rule, a code block) takes the line.
@@ -1623,15 +1631,18 @@ final class ViewTree {
 		var constraints: [NSLayoutConstraint] = []
 		var leading = row.leadingAnchor
 		let cells = stacked(row)
-		for (index, cell) in cells.enumerated() {
+		// Cells 2 pt apart and in from the row's ends (`border-spacing: 2px`), each centred on the row's height
+		// (`vertical-align: middle`); the row is as tall as its tallest cell.
+		for cell in cells {
 			cell.translatesAutoresizingMaskIntoConstraints = false
-			let fit = row.bottomAnchor.constraint(equalTo: cell.bottomAnchor)
+			let fit = row.heightAnchor.constraint(equalTo: cell.heightAnchor)
 			fit.priority = .defaultLow
 			let narrow = cell.widthAnchor.constraint(equalToConstant: 0)
 			narrow.priority = .defaultLow
 			constraints += [
-				cell.topAnchor.constraint(equalTo: row.topAnchor),
-				cell.leadingAnchor.constraint(equalTo: leading, constant: index == 0 ? 0 : 12),
+				cell.topAnchor.constraint(greaterThanOrEqualTo: row.topAnchor),
+				cell.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+				cell.leadingAnchor.constraint(equalTo: leading, constant: 2),
 				row.bottomAnchor.constraint(greaterThanOrEqualTo: cell.bottomAnchor),
 				fit,
 				narrow,
@@ -1639,7 +1650,7 @@ final class ViewTree {
 			leading = cell.trailingAnchor
 		}
 		if cells.isEmpty { constraints.append(row.topAnchor.constraint(equalTo: row.bottomAnchor)) }
-		else { constraints.append(leading.constraint(lessThanOrEqualTo: row.trailingAnchor)) }
+		else { constraints.append(leading.constraint(lessThanOrEqualTo: row.trailingAnchor, constant: -2)) }
 		NSLayoutConstraint.activate(constraints)
 		stackConstraints[ObjectIdentifier(row)] = constraints
 	}
@@ -1699,10 +1710,17 @@ final class ViewTree {
 		case "table":
 			tables.insert(id)
 			tableViews[id] = view
-		case "row": tableRows.insert(id)
-		case "cell": tableCells.insert(id)
+		case "row":
+			// Chrome's `border-spacing: 2px`: rows 2 pt apart and from the table's edges, their margins meeting between them.
+			tableRows.insert(id)
+			margins[id] = 2
+		case "cell":
+			// A cell's content sits 1 pt inside it.
+			tableCells.insert(id)
+			paddings[id] = UIEdgeInsets(top: 1, left: 1, bottom: 1, right: 1)
 		default: break
 		}
+		if style.center { centered.insert(id) }
 	}
 
 	/// A list item's marker, beside it in its list's inset; it is neither read nor part of the item's text.

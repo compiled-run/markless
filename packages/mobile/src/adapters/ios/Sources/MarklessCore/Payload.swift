@@ -197,6 +197,8 @@ public struct NativeDefaultStyle: Equatable, Sendable {
 	public var marker: String?
 	/// `table`, `row` or `cell`.
 	public var table: String?
+	/// Its content centred across its box (`<th>`).
+	public var center = false
 	public init() {}
 }
 
@@ -785,7 +787,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 	private static func decodeDefaultStyle(_ reader: Reader) throws -> NativeDefaultStyle {
 		let field = try reader.object(required: [], optional: [
 			"flow", "bold", "italic", "monospace", "size", "line", "shift", "link", "highlight", "quotes", "preformatted", "indent", "margin",
-			"inline", "control", "rule", "marker", "table",
+			"inline", "control", "rule", "marker", "table", "center",
 		])
 		func oneOf(_ key: String, _ allowed: [String]) throws -> String? {
 			guard field.has(key) else { return nil }
@@ -813,6 +815,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.rule = try flag("rule")
 		style.marker = try oneOf("marker", ["disc", "decimal"])
 		style.table = try oneOf("table", ["table", "row", "cell"])
+		style.center = try flag("center")
 		return style
 	}
 

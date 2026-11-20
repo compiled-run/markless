@@ -28,6 +28,10 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 	/** A row's column widths, set by its table while measuring. */
 	private var columns: IntArray? = null
 	private val gap = (8 * context.resources.displayMetrics.density).toInt()
+	/** Chrome's `border-spacing: 2px`: between a row's cells and in from its ends. */
+	private val spacing = Math.round(2 * context.resources.displayMetrics.density)
+	/** Its content centred across its width (`<th>`). */
+	internal var center = false
 
 	/** Without a style export: the element's default margins above and below, in px, before they collapse. */
 	internal var marginTop = 0
@@ -88,12 +92,12 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		if (table == "row") {
 			val cells = (0 until childCount).map { getChildAt(it) }.filter { it.visibility != View.GONE }
 			val cols = columns
-			var x = 0
+			var x = spacing
 			var tallest = 0
 			for ((i, cell) in cells.withIndex()) {
 				val w = cols?.getOrNull(i)
 				cell.measure(if (w != null) MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY) else MeasureSpec.makeMeasureSpec(width, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
-				x += cell.measuredWidth + if (i > 0) gap else 0
+				x += cell.measuredWidth + spacing
 				tallest = maxOf(tallest, cell.measuredHeight)
 			}
 			setMeasuredDimension(x + paddingLeft + paddingRight, resolveSize(tallest + paddingTop + paddingBottom, heightMeasureSpec))
@@ -168,18 +172,21 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 			return
 		}
 		if (table == "row") {
-			var x = paddingLeft
+			// Each cell centred on the row's height (`vertical-align: middle`).
+			var x = paddingLeft + spacing
+			val inner = height - paddingTop - paddingBottom
 			for (i in 0 until childCount) {
 				val child = getChildAt(i)
 				if (child.visibility == View.GONE) continue
-				child.layout(x, paddingTop, x + child.measuredWidth, paddingTop + child.measuredHeight)
-				x += child.measuredWidth + gap
+				val y = paddingTop + (inner - child.measuredHeight) / 2
+				child.layout(x, y, x + child.measuredWidth, y + child.measuredHeight)
+				x += child.measuredWidth + spacing
 			}
 			return
 		}
 		for ((i, child) in shown().withIndex()) {
 			val y = tops.getOrElse(i) { paddingTop }
-			val x = paddingLeft + lefts.getOrElse(i) { 0 }
+			val x = if (center) paddingLeft + maxOf(0, (width - paddingLeft - paddingRight - child.measuredWidth) / 2) else paddingLeft + lefts.getOrElse(i) { 0 }
 			child.layout(x, y, x + child.measuredWidth, y + child.measuredHeight)
 		}
 	}
