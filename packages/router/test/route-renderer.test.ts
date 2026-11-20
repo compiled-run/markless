@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { routeMountTarget, ROUTE_SCRIPT_TYPE } from '../src/route-dom.ts';
+import { routePageProps } from '../src/route-state.ts';
 
 describe('route update renderer', () => {
 	it('replaces the served route at its existing position inside the document shell', () => {
@@ -35,5 +36,21 @@ describe('route update renderer', () => {
 		expect(source).toContain('MARKLESS_ROUTER_RENDER_DATA_MISSING');
 		expect(source).not.toMatch(/(?:\.|\?\.)renderCsr(?:\?\.)?\s*\(/);
 		expect(source).not.toMatch(/\.innerHTML\s*=/);
+	});
+});
+
+describe('navigated page props', () => {
+	it('gives the page its url as a URL, query included', () => {
+		const { url } = routePageProps({
+			file: 'pages/list.tsrx',
+			params: {},
+			status: 200,
+			url: 'http://markless-router.test/list?tab=done&sort=a&sort=b',
+		});
+
+		expect(url).toBeInstanceOf(URL);
+		expect(url.pathname).toBe('/list');
+		expect(url.searchParams.get('tab')).toBe('done');
+		expect(url.searchParams.getAll('sort')).toEqual(['a', 'b']);
 	});
 });

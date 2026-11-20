@@ -343,9 +343,9 @@ export default function Page() @{
 	).not.toContain('MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE');
 });
 
-test.fails('a page that reads url.searchParams in an attribute renders (#865)', async () => {
+test('a page that reads url.searchParams in an attribute renders (#865)', async () => {
 	await visit('/notice?saved=1', async (page) => {
-		await expect(page.getByRole('status')).toBeVisible();
+		await page.getByRole('status').waitFor({ state: 'visible' });
 	});
 });
 
