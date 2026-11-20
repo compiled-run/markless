@@ -6,6 +6,7 @@ import {
 	walkNode,
 	type AnyNode,
 } from '../../ast/nodes.ts';
+import { SERIALIZABLE_BUILT_IN_CONSTRUCTORS } from '@markless/serializer';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import { parseModule } from '../../js-ast.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
@@ -58,6 +59,7 @@ import { ownedModuleAst, type ModuleSemantics } from './shared-ast.ts';
 import type { WalkState } from './types.ts';
 import { collectSharedInstance, resolveSharedCall } from './collect-shared.ts';
 import { collectStorageBinding } from './collect-storage.ts';
+import { rememberStateClassBinding, stateClassInstances } from './state-class-instance.ts';
 import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 export function collectVariableDeclaration(node: AnyNode, state: WalkState): void {
@@ -163,7 +165,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 			});
 		}
 
-		if (isClassInstanceValue(init)) {
+		if (isClassInstanceValue(init, state.semantic)) {
 			state.graph.localBindings.push({
 				name,
 				kind: 'class-instance',
@@ -267,6 +269,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 					}),
 				);
 			}
+			const classInstances = stateClassInstances(initial, state);
 			const binding: SemanticGraphBinding & {
 				readonly initialValueKnown?: boolean;
 				readonly initializerSource?: string;
@@ -291,8 +294,10 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 								initializerSource: expressionSource(initial, state.source),
 							}
 						: {}),
+				...(classInstances.length > 0 ? { classInstances } : {}),
 			};
 			state.graph.graphBindings.push(binding);
+			rememberStateClassBinding(id, binding, state);
 		}
 
 		// The render lowering already treats an in-body storage() declaration as a state initializer.
@@ -1353,7 +1358,7 @@ function unsupportedLocalBindingKind(
 	const binding = aliasedLocalBinding(node, state);
 	if (binding) return binding.kind;
 	if (isFunctionValue(node)) return 'function';
-	if (isClassInstanceValue(node)) return 'class-instance';
+	if (isClassInstanceValue(node, state.semantic)) return 'class-instance';
 	if (isDomNodeValue(node)) return 'dom-node';
 	if (isNonSerializableConstantValue(node, state)) return 'non-serializable-constant';
 
@@ -1416,11 +1421,25 @@ function isFunctionValue(node: AnyNode): boolean {
 	return node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression';
 }
 
-export function isClassInstanceValue(node: AnyNode): boolean {
+/**
+ * True for `new X()` when X is not a built-in the serializer encodes. With the
+ * module's semantics, a name that resolves to any declaration or import (a local
+ * `class Map`) is not the global built-in; without them only the name is read.
+ */
+export function isClassInstanceValue(node: AnyNode, semantic?: () => ModuleSemantics): boolean {
 	const constructorName = getNewConstructorName(node);
-	if (constructorName) return !isSerializableBuiltInConstructorName(constructorName);
+	if (constructorName) {
+		if (!isSerializableBuiltInConstructorName(constructorName)) return true;
+		return semantic !== undefined && !constructsGlobal(node, semantic);
+	}
 
 	return node.type === 'NewExpression';
+}
+
+function constructsGlobal(node: AnyNode, semantic: () => ModuleSemantics): boolean {
+	const callee = node.callee as AnyNode | undefined;
+	if (node.type !== 'NewExpression' || callee?.type !== 'Identifier') return true;
+	return typeof callee.start !== 'number' || resolvedSymbolAt(semantic(), callee.start) === null;
 }
 
 function getNewConstructorName(node: AnyNode): string | null {
@@ -1437,25 +1456,7 @@ function getNewConstructorName(node: AnyNode): string | null {
 }
 
 function isSerializableBuiltInConstructorName(name: string | null): boolean {
-	return (
-		name === 'Date' ||
-		name === 'RegExp' ||
-		name === 'Map' ||
-		name === 'Set' ||
-		name === 'URL' ||
-		name === 'ArrayBuffer' ||
-		name === 'Int8Array' ||
-		name === 'Uint8Array' ||
-		name === 'Uint8ClampedArray' ||
-		name === 'Int16Array' ||
-		name === 'Uint16Array' ||
-		name === 'Int32Array' ||
-		name === 'Uint32Array' ||
-		name === 'Float32Array' ||
-		name === 'Float64Array' ||
-		name === 'BigInt64Array' ||
-		name === 'BigUint64Array'
-	);
+	return name !== null && SERIALIZABLE_BUILT_IN_CONSTRUCTORS.includes(name);
 }
 
 function isDomNodeValue(node: AnyNode): boolean {
@@ -1519,7 +1520,8 @@ function containsNonSerializableConstantValue(
 		return containsNonSerializableConstantValue(node.argument as AnyNode | undefined, state);
 	}
 	if (aliasedLocalBinding(node, state)) return true;
-	if (isFunctionValue(node) || isClassInstanceValue(node) || isDomNodeValue(node)) return true;
+	if (isFunctionValue(node) || isClassInstanceValue(node, state.semantic) || isDomNodeValue(node))
+		return true;
 
 	return isNonSerializableConstantValue(node, state);
 }

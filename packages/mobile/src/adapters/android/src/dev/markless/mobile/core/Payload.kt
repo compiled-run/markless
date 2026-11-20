@@ -55,8 +55,10 @@ sealed interface Expr {
 	/** The current row's item of a list. */
 	data class Item(val repeat: String) : Expr
 	data class Call(val name: String, val arguments: List<Expr>) : Expr
-	/** A field of the event running the handler: `value`, `reason`, `pressTarget`, `target` or `button`. */
+	/** A field of the event running the handler: an input's `value`, a dismissal's `reason` and `pressTarget`, or a pointer field. */
 	data class Event(val field: String) : Expr
+	/** Whether the element [node] has captured the touch [pointer] (`hasPointerCapture`). */
+	data class Captures(val node: Expr, val pointer: Expr) : Expr
 	/** The focused element's id, or [NATIVE_DOCUMENT_BODY] when none has focus. */
 	data object Focused : Expr
 	/** Whether the element [node] is [within] or inside it. */
@@ -91,7 +93,7 @@ sealed interface TextPart {
 
 data class ArmPlace(val branch: String, val index: Int)
 
-/** An attribute that follows state, or (when [property]) an input's `value`, `checked` or `indeterminate` property. */
+/** An attribute that follows state, or (when [property]) an input's `value`, `checked` or `indeterminate`, or an option's `selected`. */
 data class Binding(val name: String, val value: Expr, val property: Boolean = false)
 
 sealed interface Node {
@@ -108,7 +110,8 @@ sealed interface Node {
 	/** An `@if` with [test] (arm 0 while truthy, arm 1 otherwise), or a chain with [tests]: the first truthy arm, else the `null` arm. */
 	data class Branch(override val id: String, override val parent: String?, val test: Expr?, val arms: Int, override val arm: ArmPlace? = null, override val row: String? = null, val tests: List<Expr?>? = null) : Node
 	/** A keyed list: one row per item of [list], keyed by `String()` of the item at the [key] path. */
-	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
+	/** [key] null: each row's key is its position (`byIndex`). */
+	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>?, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 	/** The platform's own sheet: its content is the nodes whose parent is this id, built at mount and kept; shown while [open] is truthy. */
 	data class Sheet(override val id: String, override val parent: String, val open: Expr, val snapPoints: List<Double>, val dismissible: Boolean, val modal: Boolean) : Node {
 		override val arm: ArmPlace? get() = null
@@ -157,7 +160,13 @@ data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boo
 data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
 
 /** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Dismiss] is a sheet's platform close or an overlay's Escape or outside press. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
-enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"), PointerDown("pointerdown"), PointerUp("pointerup") }
+/** [pointer]: an event a touch raises; [touch]: one of those a host reports, from which the runtime raises the rest. */
+enum class EventName(val wire: String, val pointer: Boolean = false, val touch: Boolean = false) {
+	Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"),
+	PointerDown("pointerdown", true, true), PointerMove("pointermove", true, true), PointerUp("pointerup", true, true), PointerCancel("pointercancel", true, true),
+	PointerOver("pointerover", true), PointerOut("pointerout", true), PointerEnter("pointerenter", true), PointerLeave("pointerleave", true),
+	Choose("choose"),
+}
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
@@ -181,6 +190,10 @@ sealed interface Op {
 	data class Tick(val node: String) : Op
 	/** Runs function [fn] of the payload's script with [bindings]; a throw or rejection writes `{ name, message }` to [catch] when there is one. */
 	data class Script(val fn: String, val type: String, val bindings: Map<String, ScriptBinding>, val catch: String? = null) : Op
+	/** `reset` of `@catch (error, reset)`: clears [catch] and runs again each of [cells] that holds an error. */
+	data class Reset(val cells: List<String>, val catch: String? = null) : Op
+	/** `setPointerCapture(pointer)` on the element [node] evaluates to, or with [release] `releasePointerCapture(pointer)`. */
+	data class Capture(val node: Expr, val pointer: Expr, val release: Boolean) : Op
 }
 
 /** A device call a task cell starts at mount. */
@@ -205,7 +218,10 @@ data class Route(val pattern: String, val params: List<String>) {
 
 /** [device]: a live device value the host fills at mount and on change. [task]: an async device call started at mount. [row]: state of a component a list row renders, one value per row of that `repeat`, [initial] when the row is built. */
 /** [clock]: the clock when the screen opened, written at mount before the first build. */
-data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null, val clock: Boolean = false)
+/** [async]: an async value function [AsyncValue.fn] of the payload's script computes while one of its [AsyncValue.boundaries] branches is shown; the script settles the cell. */
+data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null, val clock: Boolean = false, val async: AsyncValue? = null)
+
+data class AsyncValue(val fn: String, val bindings: Map<String, ScriptBinding>, val boundaries: List<String>)
 data class Event(val host: String, val event: EventName, val handler: String)
 data class Handler(val id: String, val ops: List<Op>)
 
@@ -215,12 +231,34 @@ data class Continuation(val id: String, val local: String, val ops: List<Op>, va
 /** A device object a component makes (`const cam = camera()`); it lives while its [owner] node is shown. */
 data class DeviceObject(val id: String, val device: String, val owner: String)
 
-enum class FieldKind(val wire: String) { Text("text"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden") }
+enum class FieldKind(val wire: String) { Text("text"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden"), Select("select") }
 
 data class Field(val node: String, val kind: FieldKind)
 
 /** What the web says when a required field of each kind has no value, in one language. */
 data class ValueMissing(val text: String, val checkbox: String, val radio: String)
+
+/** Chromium's message for a text field longer than its `maxlength`, with `{max}` and `{length}` written in [digits]. */
+data class TooLong(val text: String, val digits: String = "0123456789") {
+	/** The message for these numbers, as Chromium writes them: no grouping, in the language's digits. */
+	fun message(max: Int, length: Int): String {
+		fun write(value: Int) = value.toString().map { digits[it - '0'] }.joinToString("")
+		return text.replace("{max}", write(max)).replace("{length}", write(length))
+	}
+}
+
+/** A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers; null (no limit) when it has none. */
+fun nativeMaxLength(attribute: String?): Int? {
+	if (attribute == null) return null
+	var at = 0
+	while (at < attribute.length && attribute[at] in " \t\n\r\u000C") at++
+	val negative = attribute.getOrNull(at) == '-'
+	if (negative || attribute.getOrNull(at) == '+') at++
+	val start = at
+	while (at < attribute.length && attribute[at] in '0'..'9') at++
+	val value = attribute.substring(start, at).toIntOrNull() ?: return null
+	return if (negative && value != 0) null else value
+}
 
 /** A form's submittable fields and submit buttons, each in tree order. */
 data class Form(val node: String, val fields: List<Field>, val submitters: List<String>, val noValidate: Boolean = false, val authoredAriaDisabled: Boolean = false)
@@ -238,6 +276,8 @@ data class Payload(
 	val forms: List<Form> = emptyList(),
 	/** [ValueMissing] by the locale the browser shows its own text in. */
 	val valueMissing: Map<String, ValueMissing> = emptyMap(),
+	/** [TooLong] by the locale the browser shows its own text in. */
+	val tooLong: Map<String, TooLong> = emptyMap(),
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	val script: ScriptSource? = null,
 ) {
@@ -246,7 +286,7 @@ data class Payload(
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "script"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "script"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -273,6 +313,7 @@ data class Payload(
 				for (e in readsOf(node)) for (c in cellsOf(e)) if (c !in cellIds) throw MarklessDecodeError("node \"${node.id}\" reads unknown cell \"$c\"")
 			}
 			for (c in cells) c.row?.let { r -> if (seen[r] !is Node.Repeat) throw MarklessDecodeError("cell \"${c.id}\" is state of rows of \"$r\", which is not a list") }
+			for (c in cells) c.async?.let { a -> for (r in cellsOf(a.bindings)) if (r !in cellIds) throw MarklessDecodeError("cell \"${c.id}\" reads unknown cell \"$r\"") }
 			val handlers = root.field("handlers", "payload").arr("payload.handlers").mapIndexed { n, h -> handler(h, "handlers[$n]", cellIds) }
 			val handlerIds = HashSet<String>()
 			for (h in handlers) if (!handlerIds.add(h.id)) throw MarklessDecodeError("duplicate handler \"${h.id}\"")
@@ -301,6 +342,13 @@ data class Payload(
 				fun text(k: String) = mo.field(k, "payload.valueMissing.$locale").str("payload.valueMissing.$locale.$k")
 				locale to ValueMissing(text("text"), text("checkbox"), text("radio"))
 			} ?: emptyMap()
+			val tooLong = root["tooLong"]?.obj("payload.tooLong")?.entries?.associateTo(LinkedHashMap()) { (locale, m) ->
+				val mo = m.obj("payload.tooLong.$locale")
+				mo.only(setOf("text", "digits"), "payload.tooLong.$locale")
+				val digits = mo["digits"]?.str("payload.tooLong.$locale.digits") ?: "0123456789"
+				if (digits.length != 10) throw MarklessDecodeError("payload.tooLong.$locale.digits is not ten digits")
+				locale to TooLong(mo.field("text", "payload.tooLong.$locale").str("payload.tooLong.$locale.text"), digits)
+			} ?: emptyMap()
 			val script = root["script"]?.obj("payload.script")?.let { o ->
 				o.only(setOf("id", "source", "services"), "payload.script")
 				val services = o.field("services", "payload.script").arr("payload.script.services").map { it.str("payload.script.services[]") }
@@ -308,10 +356,10 @@ data class Payload(
 				ScriptSource(o.field("id", "payload.script").str("payload.script.id"), o.field("source", "payload.script").str("payload.script.source"), services)
 			}
 			if (script == null) {
-				val runsScript = handlers.any { h -> scriptOps(h.ops) } || nodes.any { n -> readsOf(n).any(::hasScript) } || title.orEmpty().any { it is TextPart.Value && hasScript(it.expr) }
+				val runsScript = cells.any { it.async != null } || handlers.any { h -> scriptOps(h.ops) } || nodes.any { n -> readsOf(n).any(::hasScript) } || title.orEmpty().any { it is TextPart.Value && hasScript(it.expr) }
 				if (runsScript) throw MarklessDecodeError("a script op or computed in a payload with no script")
 			}
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, script)
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, script)
 		}
 
 		private fun readsOf(node: Node): List<Expr> = when (node) {
@@ -338,6 +386,7 @@ data class Payload(
 			is Expr.Call -> e.arguments.any(::hasScript)
 			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked -> false
 			is Expr.Contains -> hasScript(e.within) || hasScript(e.node)
+			is Expr.Captures -> hasScript(e.node) || hasScript(e.pointer)
 			is Expr.FocusOrigin -> hasScript(e.overlay)
 			is Expr.IsElement -> hasScript(e.value)
 		}
@@ -350,7 +399,8 @@ data class Payload(
 				is Op.Assign -> hasScript(op.value)
 				is Op.Navigate -> op.params.values.any(::hasScript)
 				is Op.After -> hasScript(op.ms) || op.capture.any { hasScript(it.second) } || scriptOps(op.ops)
-				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick -> false
+				is Op.Capture -> hasScript(op.node) || hasScript(op.pointer)
+				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick, is Op.Reset -> false
 			}
 		}
 
@@ -372,6 +422,7 @@ data class Payload(
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
 			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked -> emptyList()
 			is Expr.Contains -> cellsOf(e.within) + cellsOf(e.node)
+			is Expr.Captures -> cellsOf(e.node) + cellsOf(e.pointer)
 			is Expr.FocusOrigin -> cellsOf(e.overlay)
 			is Expr.IsElement -> cellsOf(e.value)
 			is Expr.Script -> cellsOf(e.bindings)
@@ -404,7 +455,7 @@ data class Payload(
 		private val BINARY = setOf("+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=")
 		private val LOGICAL = setOf("&&", "||", "??")
 		private val METHODS = setOf("filter", "map", "findIndex", "some", "every", "includes", "indexOf", "join", "concat", "slice", "reverse", "toReversed", "toUpperCase", "toLowerCase", "trim")
-		private val EVENT_FIELDS = setOf("value", "reason", "pressTarget", "target", "button")
+		private val EVENT_FIELDS = setOf("value", "reason", "pressTarget", "target", "currentTarget", "relatedTarget", "button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp")
 		private val BUILTINS = setOf("String", "Number", "Boolean", "Math.abs", "Math.floor", "Math.max", "Math.min", "Math.round", "Date.now", "Date.toISOString")
 
 		private fun oneOf(o: Map<String, Json>, key: String, allowed: Set<String>, what: String): String {
@@ -465,6 +516,7 @@ data class Payload(
 					Expr.Focused
 				}
 				o.containsKey("contains") -> { o.only(setOf("contains", "node"), what); Expr.Contains(sub("contains"), sub("node")) }
+				o.containsKey("captures") -> { o.only(setOf("captures", "pointer"), what); Expr.Captures(sub("captures"), sub("pointer")) }
 				o.containsKey("focusOrigin") -> { o.only(setOf("focusOrigin"), what); Expr.FocusOrigin(sub("focusOrigin")) }
 				o.containsKey("isElement") -> { o.only(setOf("isElement"), what); Expr.IsElement(sub("isElement")) }
 				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
@@ -495,7 +547,7 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled", "domain", "device", "task", "object", "row", "clock"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled", "domain", "device", "task", "object", "row", "clock", "async"), what)
 			// The style export carries each state's domain; the payload's copy is Dragon's input, checked here and not kept.
 			o["domain"]?.arr("$what.domain")?.forEach { it.str("$what.domain[]") }
 			val clock = o["clock"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.clock must be true when present"); true } ?: false
@@ -505,7 +557,11 @@ data class Payload(
 				t.only(setOf("call", "arguments"), "$what.task")
 				Task(t.field("call", what).str("$what.task.call"), t.field("arguments", what).arr("$what.task.arguments").mapIndexed { n, a -> expr(a, "$what.task.arguments[$n]") })
 			}
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock)
+			val async = o["async"]?.obj("$what.async")?.let { a ->
+				a.only(setOf("script", "bindings", "boundaries"), "$what.async")
+				AsyncValue(a.field("script", what).str("$what.async.script"), scriptBindings(a.field("bindings", what), "$what.async.bindings"), a.field("boundaries", what).arr("$what.async.boundaries").map { it.str("$what.async.boundaries[]") })
+			}
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, async)
 		}
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
@@ -578,7 +634,7 @@ data class Payload(
 						val value = expr(bo.field("value", what), "$what.bindings[$n].value")
 						if (bo.containsKey("property")) {
 							bo.only(setOf("property", "value"), "$what.bindings[$n]")
-							Binding(oneOf(bo, "property", setOf("value", "checked", "indeterminate"), "$what.bindings[$n]"), value, property = true)
+							Binding(oneOf(bo, "property", setOf("value", "checked", "indeterminate", "selected"), "$what.bindings[$n]"), value, property = true)
 						} else {
 							bo.only(setOf("attribute", "value"), "$what.bindings[$n]")
 							Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), value)
@@ -604,10 +660,12 @@ data class Payload(
 					Node.Branch(id, if (parent == Json.Null) null else parent.str("$what.parent"), test, arms, armPlace(o, what), rowPlace(o, what), tests)
 				}
 				"repeat" -> {
-					o.only(setOf("kind", "id", "parent", "list", "key", "arm", "row"), what)
+					o.only(setOf("kind", "id", "parent", "list", "key", "byIndex", "arm", "row"), what)
 					val parent = o.field("parent", what)
 					val key = o.field("key", what).arr("$what.key").map { it.str("$what.key[]") }
-					Node.Repeat(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("list", what), "$what.list"), key, armPlace(o, what), rowPlace(o, what))
+					val byIndex = o["byIndex"]?.let { (it as? Json.Bool)?.value ?: throw MarklessDecodeError("$what.byIndex must be a boolean") } ?: false
+					if (byIndex && key.isNotEmpty()) throw MarklessDecodeError("$what is keyed by its index and has a key path")
+					Node.Repeat(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("list", what), "$what.list"), if (byIndex) null else key, armPlace(o, what), rowPlace(o, what))
 				}
 				"sheet" -> {
 					o.only(setOf("kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"), what)
@@ -704,6 +762,14 @@ data class Payload(
 				for (c in cellsOf(node)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
 				return Op.Command(node, command, preventScroll)
 			}
+			if (name == "capture") {
+				o.only(setOf("op", "node", "pointer", "release"), what)
+				val raw = o.field("node", what)
+				val node = if (raw is Json.Str) Expr.Literal(JsValue.Str(raw.value)) else expr(raw, "$what.node")
+				val pointer = expr(o.field("pointer", what), "$what.pointer")
+				for (c in cellsOf(node) + cellsOf(pointer)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				return Op.Capture(node, pointer, flag(o, "release", what))
+			}
 			if (name == "if") {
 				o.only(setOf("op", "test", "whenTrue", "whenFalse"), what)
 				val test = expr(o.field("test", what), "$what.test")
@@ -740,6 +806,14 @@ data class Payload(
 				val catch = o["catch"]?.str("$what.catch")
 				if (catch != null && catch !in cells) throw MarklessDecodeError("$what catches into unknown cell \"$catch\"")
 				return Op.Script(o.field("fn", what).str("$what.fn"), o.field("type", what).str("$what.type"), bindings, catch)
+			}
+			if (name == "reset") {
+				o.only(setOf("op", "cells", "catch"), what)
+				val reset = o.field("cells", what).arr("$what.cells").mapIndexed { n, c -> c.str("$what.cells[$n]") }
+				for (c in reset) if (c !in cells) throw MarklessDecodeError("$what resets unknown cell \"$c\"")
+				val catch = o["catch"]?.str("$what.catch")
+				if (catch != null && catch !in cells) throw MarklessDecodeError("$what clears unknown cell \"$catch\"")
+				return Op.Reset(reset, catch)
 			}
 			if (name != "assign") throw MarklessDecodeError("$what has unknown op \"$name\"")
 			o.only(setOf("op", "cell", "value"), what)

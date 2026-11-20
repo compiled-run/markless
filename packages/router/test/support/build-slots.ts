@@ -67,22 +67,28 @@ async function acquireSlot(held = ''): Promise<string> {
 					const slot = join(slotsDir, String(index));
 					try {
 						await mkdir(slot);
-						await writeFile(join(slot, 'pid'), String(process.pid));
-						await writeFile(join(slot, 'file'), testFile());
-						if (held) await writeFile(join(slot, 'held'), held);
-						const waited = Date.now() - asked;
-						// A long wait is what turns a short build into a hook timeout; the CI log then says who held the slots.
-						if (waited > 30_000)
-							console.error(
-								`[build-slot] ${testFile()} waited ${Math.round(waited / 1000)} s for a build slot, held meanwhile by ${[...holders].join(', ') || 'unknown'}`,
-							);
-						return slot;
 					} catch {
 						holders.add(await readFile(join(slot, 'file'), 'utf8').catch(() => 'unknown'));
 						// A worker killed mid-build leaves its slot behind.
 						const holder = Number(await readFile(join(slot, 'pid'), 'utf8').catch(() => ''));
 						if (holder && !alive(holder)) await rm(slot, { recursive: true, force: true });
+						continue;
 					}
+					try {
+						await writeFile(join(slot, 'pid'), String(process.pid));
+						await writeFile(join(slot, 'file'), testFile());
+						if (held) await writeFile(join(slot, 'held'), held);
+					} catch (error) {
+						await rm(slot, { recursive: true, force: true });
+						throw error;
+					}
+					const waited = Date.now() - asked;
+					// A long wait is what turns a short build into a hook timeout; the CI log then says who held the slots.
+					if (waited > 30_000)
+						console.error(
+							`[build-slot] ${testFile()} waited ${Math.round(waited / 1000)} s for a build slot, held meanwhile by ${[...holders].join(', ') || 'unknown'}`,
+						);
+					return slot;
 				}
 			await new Promise((settle) => setTimeout(settle, 50));
 		}

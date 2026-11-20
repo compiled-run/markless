@@ -27,7 +27,7 @@ import {
 	getFrameworkApiForCall,
 } from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
-import { componentsWithIdleRecords, componentsWithLiveShared, componentsWithOverlays } from './idle-records.ts';
+import { componentsWithIdleRecords, componentsWithLiveShared, componentsWithOverlays, componentsWithWidgets } from './idle-records.ts';
 import { collectComponentPropSpends, collectElementRosterCounts } from './roster-count.ts';
 import { collectElementRosterPositions } from './roster-position.ts';
 import { spreadHostsField } from './spread-hosts.ts';
@@ -92,6 +92,7 @@ import { collectSemanticMarkup, componentStyleScopeClass } from './collect-marku
 import { moduleIdOf } from '../../module-id.ts';
 import { inlineNestedTemplateLocals } from './render-local-inline.ts';
 import { collectDirectEvalDiagnostics } from './direct-eval.ts';
+import { parameterPropertyDiagnostics } from './parameter-properties.ts';
 import { mintAsyncBoundaryGates } from '../public-render/boundary-runner.ts';
 import { componentsWithRejectingHandlers, keepRejectingChildCatches } from './rejecting-handlers.ts';
 import {
@@ -122,6 +123,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 			source: input.source,
 			filename: input.filename,
 		}),
+		...parameterPropertyDiagnostics(ast, input.source, input.filename),
 	);
 	const apiSources = frameworkApiSources(input.additionalFrameworkApiSources);
 	graph.moduleImports.push(...collectModuleImports(statements, apiSources));
@@ -328,6 +330,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	const idleComponents = componentsWithIdleRecords(graph, input.importedModuleInterfaces);
 	const overlayComponents = componentsWithOverlays(graph, input.importedModuleInterfaces);
 	const liveSharedComponents = componentsWithLiveShared(graph, input.importedModuleInterfaces);
+	const widgetComponents = componentsWithWidgets(graph, input.importedModuleInterfaces);
 	const relayedProps = moduleRelayedProps({
 		componentNames: graph.components.map((component) => component.name),
 		events: graph.events,
@@ -410,6 +413,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 						...(idleComponents.has(component.name) ? { idleRecords: true as const } : {}),
 						...(overlayComponents.has(component.name) ? { overlayRecords: true as const } : {}),
 						...(liveSharedComponents.has(component.name) ? { liveShared: true as const } : {}),
+						...(widgetComponents.has(component.name) ? { widgets: true as const } : {}),
 						...(containerRepeats.has(component.name)
 							? { containerRepeat: true as const }
 							: {}),

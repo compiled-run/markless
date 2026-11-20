@@ -1,0 +1,64 @@
+appId: ${APP_ID}
+name: r143-select
+---
+- launchApp:
+      clearState: true
+- assertVisible: Nothing sent
+- assertVisible: Home
+- assertVisible: Small
+- assertNotVisible: Work
+- assertNotVisible: Ideas
+- assertNotVisible: Large
+- assertNotVisible: Medium
+- tapOn: Send
+- assertNotVisible: Nothing sent
+- assertVisible: Sent Home at s
+- assertVisible: Home
+- assertVisible: Small
+- assertNotVisible: Nothing sent
+- assertNotVisible: Work
+- assertNotVisible: Ideas
+- assertNotVisible: Large
+- tapOn: Tag
+- tapOn:
+      text: Work
+- assertVisible: Work
+- assertNotVisible: Home
+- assertVisible: Work
+- assertVisible: Small
+- assertVisible: Sent Home at s
+- assertNotVisible: Home
+- assertNotVisible: Ideas
+- assertNotVisible: Large
+- tapOn: Size
+- tapOn:
+      text: Large
+- assertVisible: Large
+- assertNotVisible: Small
+- assertVisible: Large
+- assertVisible: Work
+- assertVisible: Sent Home at s
+- assertNotVisible: Small
+- assertNotVisible: Medium
+- assertNotVisible: Home
+- tapOn: Send
+- assertNotVisible: Sent Home at s
+- assertVisible: Sent Work at l
+- assertVisible: Work
+- assertVisible: Large
+- assertNotVisible: Sent Home at s
+- assertNotVisible: Home
+- assertNotVisible: Small
+- tapOn: Use the last tag
+- assertNotVisible: Work
+- assertVisible: Ideas
+- assertVisible: Large
+- assertVisible: Sent Work at l
+- assertNotVisible: Work
+- assertNotVisible: Home
+- tapOn: Send
+- assertNotVisible: Sent Work at l
+- assertVisible: Sent Ideas at l
+- assertVisible: Ideas
+- assertNotVisible: Sent Work at l
+- assertNotVisible: Work

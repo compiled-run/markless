@@ -14,6 +14,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import {
 	callWritesAssumedDiagnostic,
+	stateClassMethodCallDiagnostic,
 	stateWriteInComputedDiagnostic,
 	stateWriteInTemplateDiagnostic,
 	templateAsValueDiagnostic,
@@ -21,6 +22,7 @@ import {
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { callsSharedInstanceMethod, resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import { getFrameworkApiForCall } from './imports.ts';
+import { stateClassInstanceAt } from './state-class-instance.ts';
 import type {
 	FunctionParameterWrites,
 	ParameterWrite,
@@ -334,6 +336,8 @@ function startsPrimitive(binding: SemanticGraphBinding, path: ReadonlyArray<stri
 export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 	const callee = unwrapChainExpression(node.callee as AnyNode | undefined);
 	if (callee?.type !== 'MemberExpression') return;
+	// A receiver the bindings show is a class instance is not a collection, whatever its method is named.
+	if (refuseStateClassMethodCall(node, callee, state)) return;
 
 	const method = getStaticMemberPropertyName(callee);
 	if (!method || !isMutatingCollectionMethod(method)) return;
@@ -373,6 +377,33 @@ export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 			node.optional === true || callee.optional === true || isChainExpression(node.callee),
 	});
 }
+
+function refuseStateClassMethodCall(node: AnyNode, callee: AnyNode, state: WalkState): boolean {
+	if (callee.computed === true) return false;
+	const held = stateClassInstanceAt(
+		unwrapChainExpression(callee.object as AnyNode | undefined),
+		state,
+	);
+	if (!held) return false;
+	const span = sourceSpan(node, state.filename);
+	let reported = reportedClassMethodCalls.get(state);
+	if (!reported) reportedClassMethodCalls.set(state, (reported = new WeakSet()));
+	if (!reported.has(node)) {
+		reported.add(node);
+		state.graph.diagnostics.push(
+			stateClassMethodCallDiagnostic({
+				stateName: held.binding.name,
+				callSource: expressionSource(node, state.source),
+				constructorName: held.instance.constructorName,
+				...(span ? { sourceSpan: span } : {}),
+			}),
+		);
+	}
+	return true;
+}
+
+// The walk can reach one call twice (a write's value is walked again for nested writes).
+const reportedClassMethodCalls = new WeakMap<WalkState, WeakSet<AnyNode>>();
 
 const templateValueTypes = new Set([
 	'Element',
@@ -554,7 +585,8 @@ function collectReadsIn(
 		if (
 			callee?.type === 'MemberExpression' &&
 			hasOptionalLink(callee) &&
-			namesABinding(callee)
+			namesABinding(callee) &&
+			!readsElementHandle(callee.object as AnyNode | undefined, state)
 		) {
 			addStateRead(callee, state, region);
 			if (callee.computed === true) {
@@ -602,10 +634,7 @@ function collectReadsIn(
 		}
 
 		addStateRead(node, state, region);
-
-		if (node.computed === true) {
-			collectReadsIn(node.property as AnyNode | undefined, state, region);
-		}
+		collectChainKeyReads(node, state, region);
 		return;
 	}
 
@@ -857,11 +886,39 @@ function keysIntoOneStateCell(node: AnyNode, state: WalkState): boolean {
 		graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
 		semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
 	);
+	if (!resolved) return false;
+	// A handle is one value however it is reached: `els[i]` reads the handle and the key.
+	if (resolved.binding.kind === 'element') return resolved.path.length === 0;
 	return (
-		!!resolved &&
 		(resolved.binding.kind === 'state' || resolved.binding.kind === 'computed') &&
 		resolved.binding.sharedDefinitionId === undefined
 	);
+}
+
+// A DOM method off a handle is no graph callable, so its read stops at the handle like any optional link.
+function readsElementHandle(node: AnyNode | undefined, state: WalkState): boolean {
+	const receiver = unwrapValueWrappers(node);
+	if (!receiver || !namesABinding(receiver)) return false;
+	const source = expressionSource(receiver, state.source);
+	if (!source) return false;
+	return (
+		resolveGraphPath(
+			source,
+			graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+			semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+		)?.binding.kind === 'element'
+	);
+}
+
+// A key anywhere along the chain is evaluated, not only the outermost one: `places[view.i].y` reads `view.i`.
+function collectChainKeyReads(node: AnyNode, state: WalkState, region: ReadRegion | null): void {
+	for (
+		let current: AnyNode | undefined = node;
+		current?.type === 'MemberExpression';
+		current = unwrapValueWrappers(current.object as AnyNode | undefined)
+	)
+		if (current.computed === true)
+			collectReadsIn(current.property as AnyNode | undefined, state, region);
 }
 
 function isChainExpression(node: unknown): boolean {

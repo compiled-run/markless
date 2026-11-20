@@ -1,0 +1,19 @@
+{
+	"rung": "T1",
+	"name": "Touch: a drag raises pointerover, pointerdown, pointermove, pointerup and pointerleave in a phone browser's order, with the touch's place, captured to the pressed element; a drag along a box that scrolls ends in pointercancel",
+	"steps": [
+		{
+			"visible": ["Drag me", "Idle", "Pointer none", "Captured no", "Still", "Over 0 left 0", "Not scrolled"]
+		},
+		{
+			"do": { "drag": { "on": "Drag me", "direction": "right" } },
+			"visible": ["Dropped right", "Pointer touch", "Captured yes", "Moved", "Over 2 left 1", "Not scrolled"],
+			"absent": ["Idle", "Dragging", "Still"]
+		},
+		{
+			"do": { "drag": { "on": "Scroll me", "direction": "up", "scrolls": true } },
+			"visible": ["Taken by the scroll", "Dropped right"],
+			"absent": ["Touching", "Lifted", "Not scrolled"]
+		}
+	]
+}

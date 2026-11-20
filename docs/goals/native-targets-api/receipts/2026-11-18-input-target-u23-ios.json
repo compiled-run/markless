@@ -1,0 +1,12 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u23-textbox",
+			"failure": null,
+			"installSeconds": 5.878211542000001,
+			"flowSeconds": 29.437364375
+		}
+	]
+}

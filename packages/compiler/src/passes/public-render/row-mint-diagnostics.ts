@@ -286,6 +286,7 @@ function unpaintedRowValues(
 	const values = [];
 	for (const slot of chunk.slots) {
 		if (slot.kind !== 'text' && slot.kind !== 'attribute') continue;
+		if (slot.kind === 'attribute' && slot.selectedOption) continue;
 		const value =
 			mintableSlotValue(slot) ?? expressionSlotValue(slot, graph, component, rowNames);
 		if (!value || 'itemPath' in value) continue;
@@ -548,6 +549,7 @@ function rowMintRefusal(input: {
 	if (unseen?.kind === 'child-component')
 		return { kind: 'component', componentName: unseen.childComponentName };
 	for (const slot of chunk.slots) {
+		if (slot.kind === 'attribute' && slot.selectedOption) continue;
 		if (slot.kind === 'text' || slot.kind === 'attribute') {
 			if (stepsAfterNestedRows(chunk, slot.coordinate.path, slot.kind === 'text') === null)
 				return { kind: 'between-lists' };

@@ -1,6 +1,5 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
-import { SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE } from '../src/passes/symbol-modules.ts';
 
 /**
  * A member chain THROUGH an `element()` handle keeps its tail.
@@ -11,8 +10,8 @@ import { SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE } from '../src/passes/sym
  * that whole recorded source, so the emitted module read
  * `measure(context.getElementHandle("element:box"))` — the element itself,
  * where the author asked for a number, and nothing anywhere said so. The tail is
- * rebuilt onto the handle call now, and any tail this band cannot spell as plain
- * dots fails the compile rather than shipping a wrong value.
+ * rebuilt onto the handle call now from the authored member nodes, so `[0]` and
+ * `?.` survive as written.
  */
 
 async function compile(source: string) {
@@ -101,12 +100,9 @@ export function Page() @{
 	]);
 });
 
-test('an indexed read off a plural handle fails the compile instead of reading undefined', async () => {
-	// `rows[0].id` reaches the emitter with `["0", "id"]` as its path, and `?.0.id`
-	// is not JavaScript. Falling through to the graph read would emit
-	// `graph.read("element:rows", ["0", "id"])`, which answers `undefined` at the
-	// first click with nothing to say so, so the authored name is left standing
-	// and the unresolved-reference guard fails the build naming it.
+test('an indexed read off a plural handle keeps its authored index', async () => {
+	// `rows[0].id` reaches the emitter with `["0", "id"]` as its path; the tail is
+	// rebuilt from the authored member nodes, so the index stays an index.
 	const result = await compile(`
 import { element } from '@markless/core';
 import { measure } from './measure.ts';
@@ -121,15 +117,13 @@ export function Page() @{
 }
 `);
 
-	const codes = result.symbolModules.diagnostics.map((diagnostic) => diagnostic.code);
-	expect(codes).toContain(SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE);
-	expect(
-		result.symbolModules.diagnostics.every((diagnostic) => diagnostic.severity === 'error'),
-	).toBe(true);
-	expect(eventSymbolSources(result)).toEqual([expect.not.stringContaining('getElementHandle')]);
+	expect(result.symbolModules.diagnostics).toEqual([]);
+	expect(eventSymbolSources(result)).toEqual([
+		expect.stringContaining('measure(context.getElementHandle("element:rows")?.[0].id)'),
+	]);
 });
 
-test('an optional indexed read off a plural handle fails the compile too', async () => {
+test('an optional indexed read off a plural handle keeps both links', async () => {
 	const result = await compile(`
 import { element } from '@markless/core';
 import { measure } from './measure.ts';
@@ -144,8 +138,10 @@ export function Page() @{
 }
 `);
 
-	const codes = result.symbolModules.diagnostics.map((diagnostic) => diagnostic.code);
-	expect(codes).toContain(SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE);
+	expect(result.symbolModules.diagnostics).toEqual([]);
+	expect(eventSymbolSources(result)).toEqual([
+		expect.stringContaining('measure((context.getElementHandle("element:rows")?.[0])?.id)'),
+	]);
 });
 
 test('a chain on the right-hand side of a state write keeps its tail', async () => {

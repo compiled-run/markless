@@ -7,8 +7,8 @@ import UIKit.UIGestureRecognizerSubclass
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"canvas", "details", "embed", "iframe", "object", "option",
-	"picture", "select", "summary", "textarea", "video",
+	"canvas", "details", "embed", "iframe", "object",
+	"picture", "summary", "textarea", "video",
 ]
 
 /// Where an instance is built: its row (`@key`, empty outside lists), the names its expressions see, and what encloses it.
@@ -203,6 +203,8 @@ final class ViewTree {
 	let dismissGestures: [UIGestureRecognizer] = [UITapGestureRecognizer()]
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 	private var forwards: [LabelForward] = []
+	/// Each text field's typing limit, kept here because a field holds its delegate weakly.
+	private var limits: [LengthLimit] = []
 	private var dialogIds = Set<String>()
 	/// The stacking layout's paragraphs, by each text node and phrase element instance in them.
 	private var paragraphs: [String: Paragraph] = [:]
@@ -236,7 +238,7 @@ final class ViewTree {
 	private var touches: TouchWatcher?
 	/// Each drawn checkbox (false) or radio button (true) and whether it is checked.
 	private var ticks: [String: (radio: Bool, checked: Bool)] = [:]
-	private var overlays: OverlayHost!
+	private(set) var overlays: OverlayHost!
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:],
@@ -258,10 +260,10 @@ final class ViewTree {
 		for node in payload.nodes {
 			let parent = node.parent ?? ""
 			let key: String
-			if let row = node.row, (nodes[row]?.parent ?? "") == parent {
-				key = row
-			} else if let arm = node.arm, (nodes[arm.branch]?.parent ?? "") == parent {
+			if let arm = node.arm, let branch = nodes[arm.branch], branch.row == node.row, (branch.parent ?? "") == parent {
 				key = "\(arm.branch)#\(arm.index)"
+			} else if let row = node.row, (nodes[row]?.parent ?? "") == parent {
+				key = row
 			} else {
 				key = parent
 			}
@@ -295,10 +297,11 @@ final class ViewTree {
 			try sizePage()
 		}
 		refreshRelations()
+		refreshSelects()
 		overlays = OverlayHost(
 			runtime: runtime, root: root, onAction: onAction,
 			nodeOf: { [unowned self] view in
-				view.accessibilityIdentifier.flatMap { id in self.elements[id] === view ? self.templates[id] : nil }
+				view.accessibilityIdentifier.flatMap { id in self.elements[id] === view ? id : nil }
 			},
 			viewOf: { [unowned self] id in self.elements[id] },
 			restack: { [unowned self] container in if self.layout == nil { self.stack(container) } })
@@ -322,6 +325,7 @@ final class ViewTree {
 	}
 
 	func pageAppeared(_ host: UIViewController) {
+		overlays.appeared()
 		for sheet in sheets.values { sheet.hostAppeared(host) }
 	}
 
@@ -375,6 +379,7 @@ final class ViewTree {
 		dismissMessage()
 		if let touches { touches.view?.removeGestureRecognizer(touches) }
 		touches = nil
+		overlays.unmount()
 		closeSheets()
 		page.removeFromSuperview()
 	}
@@ -476,6 +481,9 @@ final class ViewTree {
 				label.text = value
 				drawLines(label)
 				if let button = contexts[node]?.button { refreshLabel(of: button) }
+			case .selected:
+				// Each select's shown choice is read again once the whole journal is applied.
+				continue
 			case let .checked(node, checked):
 				if elements[node] is AbsentField { continue }
 				guard let tick = ticks[node], let view = elements[node] else { throw HostError("journal names checkbox \(node), which is not shown") }
@@ -498,7 +506,7 @@ final class ViewTree {
 				if open { sheet.open(from: presenter) } else { sheet.close() }
 			case .navigate, .title:
 				throw HostError("navigate and title entries reach the screen's controller, not its views")
-			case .call, .release, .fetch:
+			case .call, .release, .fetch, .abort:
 				throw HostError("a \(entry.json.jsonText) entry reaches the page's device or script services, not its views")
 			case let .dialog(node, open):
 				try present(node, open: open)
@@ -575,8 +583,8 @@ final class ViewTree {
 				position = (container.subviews.firstIndex(of: list.anchor) ?? 0) + 1
 				var placed = Set<ObjectIdentifier>()
 				for key in keys {
-					for id in built[key] ?? [] {
-						guard let view = paragraphs[id]?.view ?? elements[id] ?? labels[id], placed.insert(ObjectIdentifier(view)).inserted else { continue }
+					for id in (built[key] ?? []).flatMap(withArms) {
+						guard let view = branches[id]?.anchor ?? paragraphs[id]?.view ?? elements[id] ?? labels[id], placed.insert(ObjectIdentifier(view)).inserted else { continue }
 						container.insertSubview(view, at: position)
 						position += 1
 					}
@@ -586,6 +594,7 @@ final class ViewTree {
 			}
 		}
 		refreshRelations()
+		refreshSelects()
 		if layout == nil { alignTables() }
 		overlays.flush()
 	}
@@ -742,8 +751,13 @@ final class ViewTree {
 		if let button = context.button { refreshLabel(of: button) }
 		if layout == nil {
 			stack(container)
-			for id in built { if let view = elements[id] { stackTree(view) } }
+			for id in built.flatMap(withArms) { if let view = elements[id] { stackTree(view) } }
 		}
+	}
+
+	/// A branch instance followed by what its shown arm placed, recursively; any other id alone.
+	private func withArms(_ id: String) -> [String] {
+		[id] + (branches[id]?.built.flatMap(withArms) ?? [])
 	}
 
 	private func buildRow(_ list: String, key: String, item: NativeValue, in container: UIView, at index: inout Int, _ context: Context) throws -> [String] {
@@ -854,6 +868,33 @@ final class ViewTree {
 						image.heightAnchor.constraint(equalToConstant: 90).isActive = true
 					}
 					view = image
+				} else if element == "select" {
+					if context.button != nil { throw HostError("<select> \(id) is inside a button") }
+					let runtime = runtime
+					let onAction = onAction
+					let select = SelectButton { [weak self] in
+						guard let self else { return [] }
+						do {
+							return try runtime.choices(of: template).map { choice in
+								UIAction(title: choice.label, attributes: choice.disabled ? .disabled : [], state: choice.selected ? .on : .off) { _ in
+									self.dismissMessage()
+									onAction(NativeAction(event: .choose, host: choice.option))
+								}
+							}
+						} catch { fatalError("Markless iOS host: \(error)") }
+					}
+					if layout == nil {
+						select.layer.borderWidth = 1
+						select.layer.borderColor = UIColor.separator.cgColor
+						select.layer.cornerRadius = 6
+						select.widthAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
+						select.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+					}
+					view = select
+				} else if element == "option" {
+					// The select's list shows its options; their views only keep their text current.
+					view = UIView()
+					view.isHidden = true
 				} else if element == "input", staticAttributes["type"] == "hidden"
 					|| (["checkbox", "radio"].contains(staticAttributes["type"]) && staticAttributes["aria-hidden"] == "true")
 				{
@@ -869,6 +910,9 @@ final class ViewTree {
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = UITextField()
+					let limit = LengthLimit { [weak self] in nativeMaxLength(self?.attributes[id]?["maxlength"]) }
+					limits.append(limit)
+					field.delegate = limit
 					field.addAction(UIAction { [weak self, weak field] _ in
 						self?.dismissMessage()
 						field?.resignFirstResponder()
@@ -892,7 +936,7 @@ final class ViewTree {
 					view.isUserInteractionEnabled = context.button == nil
 				}
 				var inner = context
-				inner.button = (view as? UIButton) ?? context.button
+				inner.button = view is SelectButton ? nil : (view as? UIButton) ?? context.button
 				inner.heading = context.heading || headings.contains(element)
 				inner.look = context.look.applying(node.defaultStyle)
 				if layout == nil, let style = node.defaultStyle { applyBlockStyle(style, to: view) }
@@ -961,9 +1005,8 @@ final class ViewTree {
 				if let style = style(of: id) { try place(id, label, style) }
 				if let button = context.button { refreshLabel(of: button) }
 			case .branch:
-				if !context.suffix.isEmpty { throw HostError("@if inside a list row (\(id)) has no iOS host support yet") }
 				let marker = anchor(in: container, at: &index)
-				let arm = try runtime.arm(of: template)
+				let arm = try runtime.arm(of: template, in: context.scope)
 				let armViews = try arm.map { try build("\(template)#\($0)", in: container, at: &index, context) } ?? []
 				branches[id] = (marker, arm, armViews)
 			case .repeat:
@@ -1021,7 +1064,7 @@ final class ViewTree {
 					for: .editingChanged)
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
-			case (.idle, _), (.visible, _), (.dismiss, _), (.pointerdown, _), (.pointerup, _):
+			case (.idle, _), (.visible, _), (.dismiss, _), (_, _) where event.event.isPointer:
 				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host.
 				continue
 			default:
@@ -1103,7 +1146,8 @@ final class ViewTree {
 		view.accessibilityElementsHidden = current["aria-hidden"] == "true"
 		// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
 		if layout == nil, !dialogIds.contains(id) {
-			let hidden = current["hidden"] != nil
+			// An option shows only in its select's list.
+			let hidden = current["hidden"] != nil || view.superview is SelectButton
 			if view.isHidden != hidden {
 				view.isHidden = hidden
 				if let parent = view.superview, !(parent is UIButton || parent is OverlayCard) { stack(parent) }
@@ -1118,8 +1162,22 @@ final class ViewTree {
 		button.accessibilityValue = tick.checked ? "1" : "0"
 	}
 
-	/// A button reads as its `aria-label`, or else its text in view order.
+	/// Each select shows its chosen option's label, as the web's closed `<select>` does.
+	private func refreshSelects() {
+		for (id, view) in elements {
+			guard let select = view as? SelectButton, let template = templates[id] else { continue }
+			do {
+				select.show(try runtime.choices(of: template).first { $0.selected }?.label ?? "")
+			} catch { fatalError("Markless iOS host: \(error)") }
+		}
+	}
+
+	/// A button reads as its `aria-label`, or else its text in view order; a select reads as its `aria-label` and its choice.
 	private func refreshLabel(of button: UIButton) {
+		if button is SelectButton {
+			button.accessibilityLabel = button.accessibilityIdentifier.flatMap { attributes[$0]?["aria-label"] }
+			return
+		}
 		if let id = button.accessibilityIdentifier, let label = attributes[id]?["aria-label"] {
 			button.accessibilityLabel = label
 			return
@@ -1476,11 +1534,62 @@ final class AudioButton: UIButton, AVAudioPlayerDelegate {
 }
 
 /// The top layer's view: VoiceOver's escape gesture (two-finger scrub) on it closes the dialog.
+/// A closed `<select>`: its chosen option's label; a press opens the list of its options as a menu, as Safari shows one.
+final class SelectButton: UIButton {
+	private let display = UILabel()
+
+	init(choices: @escaping () -> [UIAction]) {
+		super.init(frame: .zero)
+		isAccessibilityElement = true
+		accessibilityTraits = .button
+		display.numberOfLines = 1
+		display.isAccessibilityElement = false
+		display.isUserInteractionEnabled = false
+		addSubview(display)
+		showsMenuAsPrimaryAction = true
+		menu = UIMenu(children: [UIDeferredMenuElement.uncached { completion in completion(choices()) }])
+	}
+
+	@available(*, unavailable)
+	required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+	func show(_ label: String) {
+		display.text = label
+		accessibilityValue = label
+	}
+}
+
 final class TopLayerView: UIView {
 	var onEscape: (() -> Void)?
 	override func accessibilityPerformEscape() -> Bool {
 		onEscape?()
 		return onEscape != nil
+	}
+}
+
+/// Stops typing at a field's `maxlength` as the web does: an insertion is cut to fit, never through a surrogate pair, while
+/// text the app sets is kept whole. Text an input method is still composing is left to it.
+@MainActor
+final class LengthLimit: NSObject, UITextFieldDelegate {
+	private let limit: () -> Int?
+
+	init(limit: @escaping () -> Int?) { self.limit = limit }
+
+	func textField(_ field: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+		guard field.markedTextRange == nil, let max = limit() else { return true }
+		let current = (field.text ?? "") as NSString
+		let inserted = string as NSString
+		let room = Swift.max(0, max - (current.length - range.length))
+		if inserted.length <= room { return true }
+		var cut = room
+		if cut > 0, UTF16.isLeadSurrogate(inserted.character(at: cut - 1)) { cut -= 1 }
+		if cut == 0, range.length == 0 { return false }
+		field.text = current.replacingCharacters(in: range, with: inserted.substring(to: cut))
+		if let caret = field.position(from: field.beginningOfDocument, offset: range.location + cut) {
+			field.selectedTextRange = field.textRange(from: caret, to: caret)
+		}
+		field.sendActions(for: .editingChanged)
+		return false
 	}
 }
 

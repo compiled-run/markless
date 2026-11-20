@@ -119,6 +119,37 @@ and the first script entry's duration.
 **Android linking.** The engine (`src/adapters/android/engine/`, built by `build-hermes.sh`) is packed into an APK only
 when one of its payloads has a script; the host finds `dev.markless.mobile.engine.HermesEngine` by class name.
 
+## 0d. Async values the script computes (2026-11-19, `cw/async-try-native`)
+
+`computed(async ...)` whose body is not one device call (a `fetch`-backed loader, an awaited app function) runs as a
+script function, with the web's meaning (`specs/framework/03-state-graph.md` "Async derivation",
+`specs/framework/12-arm-rendering.md` D8). Vectors: `conformance/script-async-value.json`; rung J11.
+
+**Payload.** The cell has `async: { script: fn, bindings }` and starts as `{ state: 'pending' }`. The script writes
+`{ state: 'value', value, error: null }`, `{ state: 'value', value, error }` (a refresh failed: the value it had stays) or
+`{ state: 'error', error }` (the first answer failed). The `@try` branch reads `state` as for a device task; a branch
+`<boundary>:caught` after it shows the `@catch` content while `state` is `value` and `error` is not null.
+
+**Starting and refreshing.** `start()` (after `tasks()` at mount; its journal is applied as an action's) and every change
+send the engine `{ kind: 'tasks', screen, tasks: [{ slot, fn, frame }] }` when the shown async values, or a value their
+bindings read, moved. The engine keys each run by the values its frame reads: a new key aborts the run in flight (its
+signal fires) and starts another while the cell keeps what it shows; an answer for an aborted run is dropped. A value runs only while a `@try` that reads it is shown (`async.boundaries`, the branch ids): a `@try` in an `@if` arm
+or inside another `@try` starts when its arm shows, and hiding it aborts a run in flight. Shown again, a finished value is
+kept without a new run, and one whose last refresh failed shows `@catch` alone, as the web does when it mounts the block
+again (rung J12, `conformance/script-async-nested.json`).
+A `@try` inside a `@for` row is one branch per row: its node carries `row`, nodes in its arms carry `row` and `arm`, its
+arm is chosen in that row's scope, `arms()` lists `<branch>@<key>`, and an `arm` entry naming `<branch>@<key>` rebuilds
+that row's arm alone. An async value of a component a row renders has `row` too (slot `<cell>@<key>`), so each row waits,
+answers and fails on its own, and a row that leaves aborts its run (rung 11, J13, `conformance/script-async-row*.json`).
+`@catch (error, reset)`: a handler in the `@catch` that calls `reset` (or is `reset`) has the op `{ op: 'reset', cells,
+catch? }`. It clears the handler error cell and marks each listed async value that holds an error (`state: 'error'`, or a
+value with `error`) to run again; the next `tasks` entry carries `retry: [slot]`, and the engine starts those runs with
+the same key. The `@catch` stays until an answer comes, as on the web (rung J14, `conformance/script-async-retry.json`).
+`reset` handed to a child component, or of a `@try` waiting on a device call, is refused by name. `leave()`
+(the screen is popped or replaced) sends `{ kind: 'tasks', screen, tasks: [], leave: true }`. `leave` of an entry also
+returns `aborts: [id]`: a request whose signal fired, journalled first as `{ op: 'abort', id }`; the host cancels it and
+never answers it.
+
 ## 1. What I found before building (the owner's picture is weeks old)
 
 - **`docs/goals/native-targets-api/` was not in the repo.** The research board lives only on the planner's machine (copy read
@@ -352,9 +383,20 @@ export function Counter() @{
   the `command` op, whose `node` is a fixed id or an expression evaluated when it runs (null or the body does nothing);
   the journal's `command` entry names the resolved element. A press focuses the control it presses, as Chromium does on a
   click.
-- **Pointer events:** `pointerdown`/`pointerup` with `{ event: 'target' | 'button' }` (the element the touch is on; 0).
-  Hosts report every touch's down and up on the innermost element under it; the runtime runs the handlers on it and each
-  element it is inside, innermost first.
+- **Pointer events:** hosts report each touch as `pointerdown`, `pointermove`, `pointerup` or `pointercancel` on the
+  innermost element under it, with `pointerId` (touches numbered from 1 per screen), `x`/`y` (points or dp from the
+  screen's top left) and `time` (ms since the screen appeared); `pointercancel` when a native scroll view starts
+  scrolling with the touch. The runtime raises what a phone's browser raises for a touch, in its order (recorded from
+  Safari on iOS and Chrome on Android, `packages/mobile/conformance/recorded/`): `pointerover`, `pointerenter` from the
+  outermost element in, `pointerdown`; the touched element captures the pointer; before each later event, a change of
+  capturing element raises `pointerout`/`pointerleave` on the old one and `pointerover`/`pointerenter` on the new one;
+  `pointermove`, then `pointerup` or `pointercancel` to the capturing element; then `pointerout` and `pointerleave` from the
+  innermost element out. Hover lasts only while the finger is down. `setPointerCapture`/`releasePointerCapture` are the
+  `capture` op, `hasPointerCapture` the `{ captures, pointer }` expression. A handler reads `target`, `currentTarget`,
+  `relatedTarget`, `button`, `buttons`, `clientX`, `clientY`, `pointerId`, `pointerType` ("touch"), `isPrimary` and
+  `timeStamp` as `{ event: <field> }`; any other field is refused by name. `button` is Safari's (-1 but on down and up,
+  where it is 0); Chrome reports 0 for over, enter, out and leave too. No compatibility mouse events are raised: a tap
+  still ends in `activate` (the web's click), and a drag or a cancelled touch in none. Vector `touch.json`; rung T1.
 - **Plain functions and module sets:** a module function is evaluated for its value where an expression calls it
   (`apply`), and run as ops where a handler statement calls it for its effects (`invoke`, through its `effects` body);
   one with effects whose value a `const` reads runs as ops and leaves its value in a cell. A module-level empty
@@ -650,7 +692,7 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 8 | Text input and two-way state | passing | passing | **passing** | **passing** | vectors `input.json` |
 | 9 | Storage | passing | passing | **passing** | **passing** | relaunch keeps the value |
 | 10 | State from the URL and one route change | passing | passing | **passing** | **passing** | harness verdict passed on both (opens at `/apple`, the link rebuilds the page at `/pear`); vectors `route.json` |
-| 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not started | not started | stopped by design: owner decision (a declared fetch or a script engine) |
+| 11 | Async value with `@try`/`@pending`/`@catch` | passing | passing | see the PR | see the PR | owner decision 2026-11-19: the script engine computes it (section 0d); vectors `script-async-row.json` |
 
 **Final device receipt (2026-11-17 07:15, tree `760b38b1f`):** one harness run of all fourteen passing rungs (1, 2, 3, 4,
 5, 5b, 6, 7, 7b, 7c, 7d, 8, 9, 10), Android then iOS, then `proof verdict`: **"proof passed on iOS and Android"**, 14 of 14 on

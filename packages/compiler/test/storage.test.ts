@@ -22,7 +22,7 @@ test('semantic graph records module storage as writable state metadata', async (
 
 	expect(graph.graphBindings).toEqual([
 		expect.objectContaining({
-			id: 'storage:src/settings.tsrx#theme-mode',
+			id: 'storage:theme-mode',
 			name: 'theme',
 			kind: 'state',
 			declarationKind: 'let',
@@ -46,6 +46,33 @@ test('semantic graph records module storage as writable state metadata', async (
 	]);
 });
 
+test('one storage key is one graph node whichever module declares it', async () => {
+	const declare = (filename: string, source: string) =>
+		buildSemanticGraph({ filename, source }).then((graph) => graph.graphBindings[0]?.id);
+	const layout = await declare(
+		'lib/Frame.tsrx',
+		`import { storage } from '@markless/core';
+export default function Frame() @{
+	let total = storage('basket', '0');
+	<aside>{total}</aside>
+}
+`,
+	);
+	const page = await declare(
+		'pages/checkout.tsrx',
+		`import { storage } from '@markless/core';
+export let lines = storage('basket', '0');
+`,
+	);
+	const derived = await Promise.all([
+		declare('a.tsrx', `import { storage } from '@markless/core';\nexport let tone = storage('dim');\n`),
+		declare('b/c.tsrx', `import { storage } from '@markless/core';\nexport let tone = storage('dim');\n`),
+	]);
+	expect(layout).toBe(page);
+	expect(derived[0]).toBe(derived[1]);
+	expect(layout).not.toBe(derived[0]);
+});
+
 test('semantic graph records const module storage as read-only state metadata', async () => {
 	const source = `
 import { storage } from '@markless/core';
@@ -64,7 +91,7 @@ export function App() @{
 
 	expect(graph.graphBindings).toEqual([
 		expect.objectContaining({
-			id: 'storage:src/const-settings.tsrx#theme-mode',
+			id: 'storage:theme-mode',
 			name: 'theme',
 			kind: 'state',
 			declarationKind: 'const',
@@ -143,7 +170,7 @@ test('storage derives markless:<identifier> when the key is omitted', async () =
 
 	expect(graph.graphBindings).toEqual([
 		expect.objectContaining({
-			id: 'storage:src/settings.tsrx#markless:theme',
+			id: 'storage:markless:theme',
 			name: 'theme',
 			kind: 'state',
 			writable: true,
@@ -162,7 +189,7 @@ test('storage keeps an explicit key verbatim, including non-kebab characters', a
 
 	expect(graph.graphBindings).toEqual([
 		expect.objectContaining({
-			id: 'storage:src/settings.tsrx#Theme_mode',
+			id: 'storage:Theme_mode',
 			storage: { key: 'Theme_mode' },
 			initialValue: 'light',
 		}),
@@ -185,7 +212,7 @@ test('derived storage bakes a stable literal key and lowers the executable call'
 	}
 	expect(result.publicRenderModule.ssrModuleSource).toContain("let theme = 'light';");
 	expect(result.payloadArena.state.storage).toEqual([
-		{ graphNodeId: 'storage:src/settings.tsrx#markless:theme', key: 'markless:theme' },
+		{ graphNodeId: 'storage:markless:theme', key: 'markless:theme' },
 	]);
 });
 
@@ -227,7 +254,7 @@ test('public render lowering removes executable storage calls', async () => {
 	expect(result.protocolView.domUpdates).toEqual([
 		expect.objectContaining({
 			source: 'theme',
-			graphNodeId: 'storage:src/settings.tsrx#theme-mode',
+			graphNodeId: 'storage:theme-mode',
 			path: [],
 		}),
 	]);
@@ -239,7 +266,7 @@ test('public render lowering removes executable storage calls', async () => {
 	expect(result.publicRenderModule.ssrModuleSource).toContain("let theme = 'light';");
 	expect(result.payloadArena.state.storage).toEqual([
 		{
-			graphNodeId: 'storage:src/settings.tsrx#theme-mode',
+			graphNodeId: 'storage:theme-mode',
 			key: 'theme-mode',
 		},
 	]);
@@ -247,7 +274,7 @@ test('public render lowering removes executable storage calls', async () => {
 		version: 2,
 		storage: [
 			{
-				graphNodeId: 'storage:src/settings.tsrx#theme-mode',
+				graphNodeId: 'storage:theme-mode',
 				key: 'theme-mode',
 			},
 		],
@@ -272,7 +299,7 @@ test('storage declared inside a component body is the same persisted cell', asyn
 	expect(graph.diagnostics).toEqual([]);
 	expect(graph.graphBindings).toEqual([
 		expect.objectContaining({
-			id: 'storage:src/settings.tsrx#theme-mode',
+			id: 'storage:theme-mode',
 			name: 'theme',
 			kind: 'state',
 			declarationKind: 'let',
@@ -297,15 +324,15 @@ test('storage declared inside a component body is the same persisted cell', asyn
 	expect(result.protocolView.domUpdates).toEqual([
 		expect.objectContaining({
 			source: 'theme',
-			graphNodeId: 'storage:src/settings.tsrx#theme-mode',
+			graphNodeId: 'storage:theme-mode',
 			path: [],
 		}),
 	]);
 	expect(result.payloadArena.state.storage).toEqual([
-		{ graphNodeId: 'storage:src/settings.tsrx#theme-mode', key: 'theme-mode' },
+		{ graphNodeId: 'storage:theme-mode', key: 'theme-mode' },
 	]);
 	expect(result.protocolState).toMatchObject({
-		storage: [{ graphNodeId: 'storage:src/settings.tsrx#theme-mode', key: 'theme-mode' }],
+		storage: [{ graphNodeId: 'storage:theme-mode', key: 'theme-mode' }],
 	});
 });
 
@@ -335,15 +362,15 @@ test('sibling components keep their own in-body storage under one local name', a
 	expect(
 		result.semanticGraph.graphBindings.map((binding) => [binding.id, binding.componentName]),
 	).toEqual([
-		['storage:src/pair.tsrx#key-a', 'First'],
-		['storage:src/pair.tsrx#key-b', 'Second'],
+		['storage:key-a', 'First'],
+		['storage:key-b', 'Second'],
 	]);
 	expect(result.protocolView.domUpdates.map((update) => update.graphNodeId)).toEqual(
-		expect.arrayContaining(['storage:src/pair.tsrx#key-a', 'storage:src/pair.tsrx#key-b']),
+		expect.arrayContaining(['storage:key-a', 'storage:key-b']),
 	);
 	expect(result.payloadArena.state.storage).toEqual([
-		{ graphNodeId: 'storage:src/pair.tsrx#key-a', key: 'key-a' },
-		{ graphNodeId: 'storage:src/pair.tsrx#key-b', key: 'key-b' },
+		{ graphNodeId: 'storage:key-a', key: 'key-a' },
+		{ graphNodeId: 'storage:key-b', key: 'key-b' },
 	]);
 });
 
@@ -425,7 +452,7 @@ test('render body lowering treats storage metadata as a state initializer', () =
 			semanticGraph: {
 				graphBindings: [
 					{
-						id: 'storage:src/App.tsrx#theme-mode',
+						id: 'storage:theme-mode',
 						name: 'theme',
 						kind: 'state',
 						writable: true,
@@ -443,7 +470,7 @@ test('render body lowering treats storage metadata as a state initializer', () =
 	);
 
 	expect(lines).toEqual([
-		`\tlet theme = stateValue(values, payload, "storage:src/App.tsrx#theme-mode", (marklessSsrRenderContext?.${STORAGE_RENDER_CONTEXT_READER}?.("theme-mode") ?? "light"));`,
+		`\tlet theme = stateValue(values, payload, "storage:theme-mode", (marklessSsrRenderContext?.${STORAGE_RENDER_CONTEXT_READER}?.("theme-mode") ?? "light"));`,
 		'\treturn root;',
 	]);
 });

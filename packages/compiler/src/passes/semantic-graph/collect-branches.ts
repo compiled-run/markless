@@ -305,7 +305,7 @@ function armIndexTest(
 		readSources.push(...sources);
 	}
 	const minted = mintTemplateExpressionComputed(
-		`() => ${indexSource}`,
+		indexSource,
 		readSources,
 		state,
 		undefined,

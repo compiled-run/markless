@@ -1,11 +1,12 @@
 import { execFile } from 'node:child_process';
 import { mkdir, readFile, rm, symlink } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { chromium, type Browser, type Page } from '@playwright/test';
+import { type Browser, type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
 import { PACK_REGISTRATION, PACK_REGISTRY } from '../src/build/lazy-module-facades.ts';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 // Code the page preloaded is used in the input's own task: no request, and no task hop for an import().
 
@@ -117,7 +118,7 @@ describe('routed first uses', () => {
 			const server = await startBuiltServer(resolve(app, '.output/server/index.mjs'), {
 				env: { ...process.env, HOST: '127.0.0.1' },
 			});
-			const browser = await chromium.launch();
+			const browser = await launchBrowser();
 			try {
 				const { origin } = server;
 

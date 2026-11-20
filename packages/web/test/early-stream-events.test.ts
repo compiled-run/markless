@@ -1,8 +1,8 @@
 import { createServer } from 'node:http';
-import { chromium } from '@playwright/test';
 import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 import { expect, test } from 'vitest';
 import { renderToString } from '../src/render-to-string.ts';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 test('trusted clicks during HTML delivery reach the resumer once, in order', async () => {
 	const html = await renderToString(
@@ -48,7 +48,7 @@ test('trusted clicks during HTML delivery reach the resumer once, in order', asy
 		}
 	});
 	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-	const browser = await chromium.launch({ headless: true });
+	const browser = await launchBrowser();
 	try {
 		const page = await browser.newPage();
 		await page.goto(`http://127.0.0.1:${(server.address() as { port: number }).port}/`, {

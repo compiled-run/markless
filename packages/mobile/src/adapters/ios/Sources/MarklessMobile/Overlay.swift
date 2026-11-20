@@ -5,22 +5,32 @@ import UIKit.UIGestureRecognizerSubclass
 
 /// The overlay stack on screen: a modal overlay's view is lifted into its own top layer above the page (the stacking
 /// layout's card: centred, white, 16 pt padding), a non-modal one stays where its `hidden` binding shows it. Touches are
-/// reported as `pointerdown`/`pointerup` and VoiceOver's escape gesture as a `dismiss` of the topmost overlay.
+/// reported as `pointerdown`, `pointermove`, `pointerup` and `pointercancel`, and VoiceOver's escape gesture as a `dismiss` of
+/// the topmost overlay.
 @MainActor
 final class OverlayHost {
 	private let runtime: NativeRuntime
 	private let root: UIView
 	private let onAction: (NativeAction) -> Void
-	/// The element (template) id a view stands for, or nil when it is no element.
+	/// The element instance id a view stands for, or nil when it is no element.
 	private let nodeOf: (UIView) -> String?
 	private let viewOf: (String) -> UIView?
 	/// Lays a container's children out again after one leaves or returns (the stacking layout only).
 	private let restack: (UIView) -> Void
 	private let reportsTouches: Bool
+	/// Whether a move can run a handler: without one the runtime hears only a touch's down, up and cancel.
+	private let reportsMoves: Bool
 	/// Where a touch reports when it lands on no element: the page's first root element, the body's stand-in.
 	private let pageElement: String?
 	private var lifted: [(node: String, layer: OverlayLayerView, home: UIView, index: Int, frame: CGRect?)] = []
 	private var observer: PointerObserver?
+	/// Each touch reported down and not yet up or cancelled: its pointer id, the scroll views it is in, its last place.
+	private var active: [ObjectIdentifier: (pointerId: Int, scrolls: [ObjectIdentifier], point: CGPoint)] = [:]
+	private var nextPointer = 1
+	/// The system uptime touch times count from: when the page was mounted, then when its screen first appeared.
+	private var origin: (time: TimeInterval, appeared: Bool) = (ProcessInfo.processInfo.systemUptime, false)
+	/// The scroll views whose pan is watched, by identity.
+	private var pans: [ObjectIdentifier: (scroll: UIScrollView, watch: PanWatch)] = [:]
 	/// The screen the page is mounted in, where a modal overlay's top layer goes.
 	private weak var screen: UIView?
 	private var announce: (screen: Bool, focus: UIView?) = (false, nil)
@@ -39,7 +49,10 @@ final class OverlayHost {
 		reportsTouches = payload.nodes.contains { node in
 			if case let .element(_, attributes, _) = node.kind { return attributes[OverlayProtocol.attribute] != nil }
 			return false
-		} || payload.events.contains { $0.event == .pointerdown || $0.event == .pointerup }
+		} || payload.events.contains { $0.event.isPointer }
+		reportsMoves = payload.events.contains { event in
+			[.pointermove, .pointerover, .pointerout, .pointerenter, .pointerleave].contains(event.event)
+		}
 		pageElement = payload.nodes.first { $0.parent == nil && $0.isElement }?.id
 	}
 
@@ -48,6 +61,7 @@ final class OverlayHost {
 	/// Watches the screen's touches and opens the overlays the runtime already shows.
 	func mount(in screen: UIView) throws {
 		self.screen = screen
+		origin = (ProcessInfo.processInfo.systemUptime, false)
 		if reportsTouches {
 			let observer = PointerObserver { [weak self] event, touch in self?.report(event, touch) }
 			screen.addGestureRecognizer(observer)
@@ -146,21 +160,94 @@ final class OverlayHost {
 		return true
 	}
 
+	var timeOrigin: TimeInterval { origin.time }
+
+	/// The page's screen appeared: touch times count from the first time it did.
+	func appeared() {
+		guard !origin.appeared else { return }
+		origin = (ProcessInfo.processInfo.systemUptime, true)
+	}
+
+	/// The page is taken off its screen: it stops hearing the screen's touches and its scroll views' pans.
+	func unmount() {
+		if let observer { observer.view?.removeGestureRecognizer(observer) }
+		observer = nil
+		for pan in pans.values { pan.scroll.panGestureRecognizer.removeTarget(pan.watch, action: #selector(PanWatch.changed(_:))) }
+		pans = [:]
+		active = [:]
+	}
+
 	private func report(_ event: NativeEventName, _ touch: UITouch) {
-		// A page navigated away from stops hearing the screen's touches.
-		guard root.superview != nil else {
-			if let observer { observer.view?.removeGestureRecognizer(observer) }
-			return
+		guard let screen else { return }
+		let point = touch.location(in: screen)
+		let under = event == .pointerdown ? touch.view : screen.hitTest(point, with: nil)
+		self.touch(event, ObjectIdentifier(touch), under: under, at: point, time: touch.timestamp)
+	}
+
+	/// One touch's report: `view` is the deepest view under it now, `point` its place in the screen, `time` its system uptime.
+	func touch(_ event: NativeEventName, _ key: ObjectIdentifier, under view: UIView?, at point: CGPoint, time: TimeInterval) {
+		let pointerId: Int
+		switch event {
+		case .pointerdown:
+			guard active[key] == nil else { return }
+			pointerId = nextPointer
+			nextPointer += 1
+			var scrolls: [ObjectIdentifier] = []
+			var at = view
+			while let current = at {
+				if let scroll = current as? UIScrollView {
+					scrolls.append(ObjectIdentifier(scroll))
+					watch(scroll)
+				}
+				at = current.superview
+			}
+			active[key] = (pointerId, scrolls, point)
+		case .pointermove:
+			guard var moving = active[key] else { return }
+			moving.point = point
+			active[key] = moving
+			guard reportsMoves else { return }
+			pointerId = moving.pointerId
+		default:
+			guard let ended = active.removeValue(forKey: key) else { return }
+			pointerId = ended.pointerId
 		}
-		var at = touch.view
+		var at = view
 		var host: String?
-		while let view = at, host == nil {
-			host = nodeOf(view) ?? (view as? OverlayLayerView)?.node
-			at = view.superview
+		while let current = at, host == nil {
+			host = nodeOf(current) ?? (current as? OverlayLayerView)?.node
+			at = current.superview
 		}
 		guard let host = host ?? pageElement else { return }
-		onAction(NativeAction(event: event, host: host))
+		onAction(NativeAction(
+			event: event, host: host, pointerId: Double(pointerId), x: Double(point.x), y: Double(point.y), time: (time - origin.time) * 1000))
 	}
+
+	private func watch(_ scroll: UIScrollView) {
+		let id = ObjectIdentifier(scroll)
+		guard pans[id] == nil else { return }
+		let target = PanWatch { [weak self] pan in
+			if pan.state == .began { self?.scrollBegan(id) }
+		}
+		scroll.panGestureRecognizer.addTarget(target, action: #selector(PanWatch.changed(_:)))
+		pans[id] = (scroll, target)
+	}
+
+	/// A scroll view began scrolling: each touch in it is the platform's now, as Safari reports with `pointercancel`.
+	func scrollBegan(_ scroll: ObjectIdentifier) {
+		let now = ProcessInfo.processInfo.systemUptime
+		for (key, touch) in active.sorted(by: { $0.value.pointerId < $1.value.pointerId }) where touch.scrolls.contains(scroll) {
+			self.touch(.pointercancel, key, under: screen?.hitTest(touch.point, with: nil), at: touch.point, time: now)
+		}
+	}
+}
+
+/// The target of a scroll view's pan: its own recognizer is not cancelled by the pan, so the host watches the pan begin.
+@MainActor
+final class PanWatch: NSObject {
+	private let onChange: (UIPanGestureRecognizer) -> Void
+	init(_ onChange: @escaping (UIPanGestureRecognizer) -> Void) { self.onChange = onChange }
+	@objc func changed(_ pan: UIPanGestureRecognizer) { onChange(pan) }
 }
 
 /// Hears every touch on the screen and never recognizes, so the controls under it work as before; it sees each touch before
@@ -180,12 +267,23 @@ final class PointerObserver: UIGestureRecognizer {
 		for touch in touches { report(.pointerdown, touch) }
 	}
 
-	override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
-		for touch in touches { report(.pointerup, touch) }
-		if event.allTouches?.allSatisfy({ $0.phase == .ended || $0.phase == .cancelled }) ?? true { state = .failed }
+	override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+		for touch in touches { report(.pointermove, touch) }
 	}
 
-	override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) { state = .failed }
+	override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+		for touch in touches { report(.pointerup, touch) }
+		finishIfDone(event)
+	}
+
+	override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+		for touch in touches { report(.pointercancel, touch) }
+		finishIfDone(event)
+	}
+
+	private func finishIfDone(_ event: UIEvent) {
+		if event.allTouches?.allSatisfy({ $0.phase == .ended || $0.phase == .cancelled }) ?? true { state = .failed }
+	}
 
 	override func canPrevent(_ preventedGestureRecognizer: UIGestureRecognizer) -> Bool { false }
 	override func canBePrevented(by preventingGestureRecognizer: UIGestureRecognizer) -> Bool { false }

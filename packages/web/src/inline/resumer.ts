@@ -27,6 +27,7 @@ import type {
 	ProtocolServedRecords,
 } from '../../../serializer/src/protocol-record-templates.ts';
 import { PROTOCOL_RECORD_KEYS } from '../../../serializer/src/protocol-record-keys.ts';
+import { setDataField } from '../../../serializer/src/value-own-field.ts';
 
 const listKeys = (type: keyof typeof PROTOCOL_RECORD_KEYS, list: string) =>
 	(PROTOCOL_RECORD_KEYS[type] as Readonly<Record<string, string | undefined>>)[list] ?? '';
@@ -76,6 +77,7 @@ declare const __MARKLESS_INLINE_PATHS_ATTRIBUTE__: typeof PROTOCOL_LOCATOR_PATHS
 declare const __MARKLESS_INLINE_HOST_ATTRIBUTE__: typeof PROTOCOL_EVENT_HOST_ATTRIBUTE;
 declare const __MARKLESS_INLINE_EXPAND__: typeof expandRecordTemplates;
 declare const __MARKLESS_INLINE_KEYS__: typeof inlineListKeys;
+declare const __MARKLESS_INLINE_SET_FIELD__: typeof setDataField;
 type InlineServed = {
 	readonly instancePaths?: ProtocolInstancePaths;
 	readonly inRows?: Readonly<Record<string, ProtocolServedRecords>>;
@@ -267,6 +269,7 @@ const __MARKLESS_INLINE_PATHS_ATTRIBUTE__=${JSON.stringify(PROTOCOL_LOCATOR_PATH
 const __MARKLESS_INLINE_HOST_ATTRIBUTE__=${JSON.stringify(PROTOCOL_EVENT_HOST_ATTRIBUTE)};
 const __MARKLESS_INLINE_EXPAND__=${expands ? expandRecordTemplates.toString() : 'undefined'};
 const __MARKLESS_INLINE_KEYS__=${expands ? JSON.stringify(inlineListKeys) : 'undefined'};
+const __MARKLESS_INLINE_SET_FIELD__=${options.graphSyncPolicy && options.sharedGraphPolicy ? setDataField.toString() : 'undefined'};
 const __MARKLESS_INLINE_POLICY_TYPE__=${JSON.stringify(PROTOCOL_SYNC_POLICY_TABLE_TYPE)};
 const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__=${debugBootstrap};
 const __MARKLESS_INLINE_DEBUG_REGISTER__=${debugRegistration};
@@ -1069,7 +1072,7 @@ function runInlineResumer(
 				if (record.type === 'object') {
 					const value: Record<string, unknown> = {};
 					for (const [key, field] of record.fields ?? []) {
-						value[key] = shared.decode!(field, records);
+						__MARKLESS_INLINE_SET_FIELD__(value, key, shared.decode!(field, records));
 					}
 					return value;
 				}

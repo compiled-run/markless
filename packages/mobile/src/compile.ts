@@ -10,6 +10,7 @@ import {
 	createNativeViewPayload,
 	DEVICE_TARGET_FACTS,
 	NATIVE_FACT_COLLECTORS,
+	nativeUnsupported,
 	type NativeViewArtifact,
 } from '@markless/compiler/native';
 import {
@@ -18,7 +19,7 @@ import {
 	type RouteManifest,
 } from '@markless/router';
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
-import { NATIVE_APP_VERSION } from '@markless/serializer/native-view';
+import { isNativeStyleStateAttribute, NATIVE_APP_VERSION } from '@markless/serializer/native-view';
 import { nativeStyleInputs, type NativeStyleInput } from './style-input.ts';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
@@ -222,20 +223,67 @@ export async function compileNativeComponent(input: {
 		native.features,
 		input.device,
 	);
+	const styles = [...importedStyles, ...compiled.publicRenderPlan.styleScopes].filter(
+		(style, index, all) => all.findIndex((other) => other.scopeId === style.scopeId) === index,
+	);
+	const sheets = stylesheets.filter(
+		(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
+	);
+	const unstyled = native.payload
+		? unstyledOnly(native.payload, native.elementSources, sheets.length > 0 || styles.some((style) => style.cssText.length > 0))
+		: [];
 	return {
-		payload: errors.length > 0 || usage.length > 0 ? null : native.payload,
-		styles: [...importedStyles, ...compiled.publicRenderPlan.styleScopes].filter(
-			(style, index, all) =>
-				all.findIndex((other) => other.scopeId === style.scopeId) === index,
-		),
-		stylesheets: stylesheets.filter(
-			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
-		),
+		payload: errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,
+		styles,
+		stylesheets: sheets,
 		features: native.features,
 		manifest: deviceEntries,
 		elementSources: native.elementSources,
-		diagnostics: [...errors, ...native.diagnostics, ...usage],
+		diagnostics: [...errors, ...native.diagnostics, ...usage, ...unstyled],
 	};
+}
+
+/** Elements a native host draws only on a page Dragon does not lay out: Dragon has no box for a pop-up list yet. */
+function unstyledOnly(
+	payload: NativeViewPayload,
+	sources: NativeViewArtifact['elementSources'],
+	styled: boolean,
+): CompilerDiagnostic[] {
+	if (!styled) return [];
+	const rowCells = new Set(payload.cells.flatMap((cell) => (cell.row ? [cell.id] : [])));
+	// A row's item or its own state: what a list row reads, which differs from row to row.
+	const readsRow = (tree: unknown): boolean =>
+		Array.isArray(tree)
+			? tree.some(readsRow)
+			: tree !== null &&
+				typeof tree === 'object' &&
+				('item' in tree ||
+					('cell' in tree && rowCells.has((tree as { cell: string }).cell)) ||
+					Object.values(tree).some(readsRow));
+	return payload.nodes.flatMap((node) => {
+		if (node.kind !== 'element') return [];
+		const span = sources.get(node.id)?.span;
+		if (node.element === 'select')
+			return [
+				nativeUnsupported(
+					`the <select> ${node.id} on a styled page, which Dragon does not lay out yet`,
+					span,
+				),
+			];
+		if (!node.row) return [];
+		return (node.bindings ?? []).flatMap((binding) =>
+			'attribute' in binding &&
+			(binding.attribute === 'class' || isNativeStyleStateAttribute(binding.attribute)) &&
+			readsRow(binding.value)
+				? [
+						nativeUnsupported(
+							`the \`${binding.attribute}\` of <${node.element}> ${node.id} follows its @for row on a styled page; Dragon styles each node once, not per row, yet`,
+							span,
+						),
+					]
+				: [],
+		);
+	});
 }
 
 export type NativeAppBuild = {
@@ -310,15 +358,21 @@ export async function compileNativeApp(input: {
 			...build.diagnostics.map((diagnostic) => ({ ...diagnostic, page: page.page })),
 		);
 		if (!build.payload) continue;
+		const sheets = [...documentSheets, ...build.stylesheets].filter(
+			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
+		);
+		const styled = sheets.length > 0 || build.styles.some((style) => style.cssText.length > 0);
+		const unstyled = unstyledOnly(build.payload, build.elementSources, styled);
+		if (unstyled.length > 0) {
+			diagnostics.push(...unstyled.map((diagnostic) => ({ ...diagnostic, page: page.page })));
+			continue;
+		}
 		routes.push({
 			pattern: route.pattern,
 			params: route.params.map((param) => param.name),
 			page: build.payload,
 		});
-		const sheets = [...documentSheets, ...build.stylesheets].filter(
-			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
-		);
-		if (sheets.length > 0 || build.styles.some((style) => style.cssText.length > 0)) {
+		if (styled) {
 			const inputs = nativeStyleInputs(build.payload, build.styles, sheets);
 			styleInputs.push({
 				pattern: route.pattern,

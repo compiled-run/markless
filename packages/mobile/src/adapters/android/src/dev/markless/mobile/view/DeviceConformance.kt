@@ -8,9 +8,11 @@ import dev.markless.mobile.core.JournalEntry
 import dev.markless.mobile.core.JsString
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
+import dev.markless.mobile.core.TouchPoint
 import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.field
 import dev.markless.mobile.core.jsonString
+import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
 
@@ -31,9 +33,9 @@ object DeviceConformance {
 			if (host.viewIds() != wanted) failures.add("$where: views exist for ${(host.viewIds() - wanted).sorted()} and are missing for ${(wanted - host.viewIds()).sorted()}")
 			for ((repeat, keys) in host.runtime.rows()) {
 				val r = host.runtime.node(repeat)
-				val top = host.payload.nodes.first { it.row == repeat && it.parent == r.parent }
+				val tops = host.payload.nodes.filter { it.row == repeat && it.parent == r.parent && (it is Node.Element || it is Node.Text) }
 				val parent = host.view(r.parent ?: continue) as android.view.ViewGroup
-				val at = keys.map { k -> parent.indexOfChild(host.view("${top.id}@$k")) }
+				val at = keys.map { k -> tops.firstOrNull { host.hasView("${it.id}@$k") }?.let { parent.indexOfChild(host.view("${it.id}@$k")) } ?: -1 }
 				if (at != at.sorted() || at.any { it < 0 }) failures.add("$where: rows of $repeat sit at child indexes $at for keys $keys")
 			}
 		}
@@ -71,7 +73,11 @@ object DeviceConformance {
 				"cancel" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Cancel))
 				"dismiss" -> action["reason"]?.let { host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Dismiss, reason = it.str("reason"))) }
 					?: host.closedByPlatform(action.field("host", "action").str("host"))
-				"pointerdown", "pointerup" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.entries.first { it.wire == event }))
+				"pointerdown", "pointermove", "pointerup", "pointercancel" -> {
+					fun n(name: String, default: Double) = action[name]?.num("action.$name") ?: default
+					val point = TouchPoint(n("pointerId", 1.0), n("x", 0.0), n("y", 0.0), n("time", 0.0))
+					host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.entries.first { it.wire == event }, point = point))
+				}
 				"input" -> (target as? EditText ?: throw MarklessHostError("steps[$n] types into a view that is not an input")).setText(action.field("value", "action").str("value"))
 				"dismiss" -> host.closedByPlatform(action.field("host", "action").str("host"))
 				"enter" -> (target as? EditText ?: throw MarklessHostError("steps[$n] presses return in a view that is not an input")).onEditorAction(EditorInfo.IME_ACTION_GO)

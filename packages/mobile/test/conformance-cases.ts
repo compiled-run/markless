@@ -8,7 +8,10 @@ import { readWorkspaceModule } from '../src/harness/rung.ts';
 
 /** Resolves what a case imports (`@markless/ui`) from packages/mobile, where the case's `src/<name>.tsrx` stands. */
 export const readCaseModule = (specifier: string, importer: string) =>
-	readWorkspaceModule(specifier, importer.startsWith('src/') ? `packages/mobile/${importer}` : importer);
+	readWorkspaceModule(
+		specifier,
+		importer.startsWith('src/') ? `packages/mobile/${importer}` : importer,
+	);
 
 /** Each committed vector file: its component (a path inside packages/mobile) and the actions it records. */
 export const CONFORMANCE_CASES: ReadonlyArray<{
@@ -307,6 +310,31 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'max-length',
+		fixture: 'test/fixtures/MaxLength.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'abcde' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'xy' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h2', value: 'Barth' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'max-length-persian',
+		fixture: 'test/fixtures/MaxLength.tsrx',
+		preferredLanguages: ['fa-IR'],
+		actions: [
+			{ event: 'input', host: 'h3', value: 'abcde' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'forms',
 		fixture: 'test/fixtures/Forms.tsrx',
 		actions: [
@@ -331,6 +359,27 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'choose',
+		fixture: 'test/fixtures/Choose.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h12' },
+			{ event: 'choose', host: 'h3@Large' },
+			{ event: 'activate', host: 'h12' },
+			{ event: 'choose', host: 'h7' },
+			{ event: 'choose', host: 'h5' },
+			{ event: 'choose', host: 'h9' },
+			{ event: 'activate', host: 'h14' },
+			{ event: 'activate', host: 'h12' },
+			{ event: 'activate', host: 'h13' },
+			{ event: 'activate', host: 'h12' },
+			{ event: 'choose', host: 'h11@Kiwi' },
+			{ event: 'activate', host: 'h15' },
+			{ event: 'activate', host: 'h12' },
+			{ event: 'activate', host: 'h16' },
+			{ event: 'activate', host: 'h12' },
+		],
+	},
+	{
 		name: 'form-return',
 		fixture: 'test/fixtures/FormReturn.tsrx',
 		actions: [
@@ -338,6 +387,22 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'enter', host: 'h2' },
 			{ event: 'activate', host: 'h4' },
 			{ event: 'enter', host: 'h2' },
+		],
+	},
+	{
+		name: 'form-arms',
+		fixture: 'test/fixtures/FormArms.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'input', host: 'h1', value: 'ann' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'input', host: 'h3', value: 'red' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h5' },
 		],
 	},
 	{
@@ -374,6 +439,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h8' },
 			{ event: 'activate', host: 'component-edge:0/h5' },
 			{ event: 'activate', host: 'h8' },
+		],
+	},
+	{
+		name: 'typed-target',
+		fixture: 'test/fixtures/TypedTarget.tsrx',
+		actions: [
+			{ event: 'input', host: 'component-edge:0/h1', value: 'ada' },
+			{ event: 'input', host: 'component-edge:0/h1', value: 'ada' },
+			{ event: 'input', host: 'component-edge:0/h1', value: 'bo' },
 		],
 	},
 	{
@@ -488,6 +562,164 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// Pending, the value, a refresh that holds it, a change while pending, a stale answer dropped, a failed refresh beside
+		// the value, a refresh that clears it; the vector's `leave` aborts the request still in flight.
+		name: 'script-async-value',
+		fixture: 'proofs/j11-async-fetch/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'timer', timer: 'script:1' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=apple - ',
+				},
+			},
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:3' },
+			{ event: 'activate', host: 'h5' },
+			{
+				event: 'response',
+				id: 2,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=cherry - ',
+				},
+			},
+			{ event: 'timer', timer: 'script:4' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'timer', timer: 'script:5' },
+			{
+				event: 'response',
+				id: 3,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=banana - ',
+				},
+			},
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:6' },
+		],
+	},
+	{
+		// A @try in an @if arm and one inside it: the inner starts once the outer shows; its failed refresh stays its own;
+		// hidden and shown again, a finished value is kept (the failed one as @catch alone) and a run in flight starts over.
+		name: 'script-async-nested',
+		fixture: 'proofs/j12-async-nested/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'timer', timer: 'script:1' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=apple - ',
+				},
+			},
+			{ event: 'timer', timer: 'script:2' },
+			{
+				event: 'response',
+				id: 2,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=pear - ',
+				},
+			},
+			{ event: 'activate', host: 'h5' },
+			{ event: 'timer', timer: 'script:3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:5' },
+		],
+	},
+	{
+		// A @try per list row: each row waits, answers or fails on its own (the riddle's first answer fails: @catch alone).
+		name: 'script-async-row',
+		fixture: 'proofs/11-async/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'timer', timer: 'script:2' },
+		],
+	},
+	{
+		// Rows that start together and settle apart; a new row starts its own; a row that leaves aborts its lookup.
+		name: 'script-async-rows',
+		fixture: 'proofs/j13-async-rows/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'timer', timer: 'script:2' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=apple - ',
+				},
+			},
+			{ event: 'activate', host: 'h6' },
+			{ event: 'timer', timer: 'script:3' },
+			{ event: 'activate', host: 'h7' },
+			{
+				event: 'response',
+				id: 2,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=cherry - ',
+				},
+			},
+		],
+	},
+	{
+		// `reset` (an arrow that calls it, and `onClick={reset}`) runs the failed value again with the same key while @catch
+		// stays; a key change while that run waits starts over; a later answer shows the value.
+		name: 'script-async-retry',
+		fixture: 'proofs/j14-async-retry/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'activate', host: 'h8' },
+			{ event: 'timer', timer: 'script:2' },
+			{ event: 'activate', host: 'h9' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:4' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=apple - ',
+				},
+			},
+		],
+	},
+	{
 		name: 'script-computed',
 		fixture: 'proofs/j5-engine-computed/App.tsrx',
 		modules: true,
@@ -501,6 +733,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		fixture: 'proofs/j8-render-values/App.tsrx',
 		modules: true,
 		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		// Rows keyed by position: two rows show the same line, then rows are added, changed and dropped at the end.
+		name: 'for-index-key',
+		fixture: 'proofs/18-for-index-key/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+		],
 	},
 	{
 		name: 'script-render-list',
@@ -548,6 +792,44 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'dismiss', host: 'component-edge:2/h2', reason: 'escape' },
 			{ event: 'activate', host: 'component-edge:1/h1' },
 			{ event: 'activate', host: 'component-edge:5/h5' },
+		],
+	},
+	{
+		// Touches as a phone's browser delivers them (recorded from Safari on iOS and Chrome on Android, see
+		// conformance/recorded/): a tap on a child of the pad, a drag the pad captures from that child, a press that releases
+		// its capture and moves across elements, a drag a scroll takes, and a second finger.
+		name: 'touch',
+		fixture: 'test/fixtures/Touch.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h3', pointerId: 1, x: 40, y: 120, time: 1000 },
+			{ event: 'pointerup', host: 'h3', pointerId: 1, x: 40, y: 120, time: 1080 },
+			{ event: 'pointerdown', host: 'h3', pointerId: 2, x: 40, y: 120, time: 2000 },
+			{ event: 'pointermove', host: 'h3', pointerId: 2, x: 52, y: 118, time: 2016 },
+			{ event: 'pointermove', host: 'h4', pointerId: 2, x: 64.5, y: 190, time: 2032 },
+			{ event: 'pointerup', host: 'h4', pointerId: 2, x: 64.5, y: 190, time: 2048 },
+			{ event: 'pointerdown', host: 'h5', pointerId: 3, x: 40, y: 300, time: 3000 },
+			{ event: 'pointermove', host: 'h4', pointerId: 3, x: 40, y: 200, time: 3016 },
+			{ event: 'pointermove', host: 'h4', pointerId: 3, x: 40, y: 190, time: 3032 },
+			{ event: 'pointerup', host: 'h4', pointerId: 3, x: 40, y: 190, time: 3048 },
+			{ event: 'pointerdown', host: 'h4', pointerId: 4, x: 40, y: 190, time: 4000 },
+			{ event: 'pointermove', host: 'h4', pointerId: 4, x: 40, y: 180, time: 4016 },
+			{ event: 'pointercancel', host: 'h4', pointerId: 4, x: 40, y: 170, time: 4032 },
+			{ event: 'pointerdown', host: 'h2', pointerId: 5, x: 30, y: 110, time: 5000 },
+			{ event: 'pointerdown', host: 'h4', pointerId: 6, x: 30, y: 190, time: 5010 },
+			{ event: 'pointerup', host: 'h4', pointerId: 6, x: 30, y: 190, time: 5100 },
+			{ event: 'pointerup', host: 'h2', pointerId: 5, x: 30, y: 110, time: 5110 },
+		],
+	},
+	{
+		// The same touch fields, read by pointer handlers that run as JavaScript.
+		name: 'touch-script',
+		fixture: 'test/fixtures/TouchScript.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h2', pointerId: 1, x: 40, y: 120, time: 1000 },
+			{ event: 'pointermove', host: 'h2', pointerId: 1, x: 52.5, y: 118, time: 1016 },
+			{ event: 'pointerup', host: 'h2', pointerId: 1, x: 52.5, y: 118, time: 1032 },
+			{ event: 'pointerdown', host: 'h2', pointerId: 2, x: 30, y: 100, time: 2000 },
+			{ event: 'pointercancel', host: 'h2', pointerId: 2, x: 30, y: 90, time: 2016 },
 		],
 	},
 ];
@@ -604,7 +886,11 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		name: 'navigation-deep-link',
 		app: 'proofs/n4-deep-link',
 		open: '/orders/42',
-		actions: [{ event: 'back' }, { event: 'back' }, { event: 'activate', host: 'component-edge:0' }],
+		actions: [
+			{ event: 'back' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'component-edge:0' },
+		],
 	},
 	{
 		name: 'script-first-render',

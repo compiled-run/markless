@@ -3,6 +3,7 @@ import type {
 	ProtocolViewPayloadWithArmRecords,
 	SemanticComponentEdge,
 } from '../../artifacts.ts';
+import { emptyArmShowsValues } from '../runtime-demand-map.ts';
 
 export type RowSlotReaderComponentsInput = {
 	readonly componentEdges: ReadonlyArray<SemanticComponentEdge>;
@@ -15,7 +16,8 @@ type RowMintFlag =
 	| 'rowComponentMint'
 	| 'rowTemplateMint'
 	| 'nestedRepeats'
-	| 'rowBranchMint';
+	| 'rowBranchMint'
+	| 'emptyArmSlots';
 
 /** Components whose tree rebuilds rows through a render-data reader, transitively through imports. */
 export function rowSlotReaderComponents(input: RowSlotReaderComponentsInput): ReadonlySet<string> {
@@ -47,7 +49,7 @@ export function rowComponentMintComponents(
 export function rowTemplateMintComponents(
 	input: RowSlotReaderComponentsInput,
 	componentNames: ReadonlyArray<string>,
-	flag: 'rowTemplateMint' | 'nestedRepeats' | 'rowBranchMint' = 'rowTemplateMint',
+	flag: 'rowTemplateMint' | 'nestedRepeats' | 'rowBranchMint' | 'emptyArmSlots' = 'rowTemplateMint',
 ): ReadonlySet<string> {
 	// A plain row record names no component, so every component of its module may own it.
 	const owns = (input.protocolView.keyedRepeats ?? []).some((repeat) =>
@@ -55,7 +57,9 @@ export function rowTemplateMintComponents(
 			? repeat.enclosingRow !== undefined
 			: flag === 'rowBranchMint'
 				? repeat.rowTemplate?.branchSlots !== undefined
-				: (repeat.rowTemplate ?? repeat.emptyArm) !== undefined,
+				: flag === 'emptyArmSlots'
+					? emptyArmShowsValues(repeat)
+					: (repeat.rowTemplate ?? repeat.emptyArm) !== undefined,
 	);
 	return withComposingComponents(new Set(owns ? componentNames : []), input, flag);
 }
@@ -99,12 +103,14 @@ export function withRowSlotReaders(
 	const templating = rowTemplateMintComponents(input, componentNames);
 	const nesting = rowTemplateMintComponents(input, componentNames, 'nestedRepeats');
 	const flipping = rowTemplateMintComponents(input, componentNames, 'rowBranchMint');
+	const emptyArms = rowTemplateMintComponents(input, componentNames, 'emptyArmSlots');
 	if (
 		reading.size === 0 &&
 		minting.size === 0 &&
 		templating.size === 0 &&
 		nesting.size === 0 &&
-		flipping.size === 0
+		flipping.size === 0 &&
+		emptyArms.size === 0
 	)
 		return moduleGraphInterface;
 	return {
@@ -122,6 +128,7 @@ export function withRowSlotReaders(
 					: {}),
 				...(nesting.has(component.componentName) ? { nestedRepeats: true as const } : {}),
 				...(flipping.has(component.componentName) ? { rowBranchMint: true as const } : {}),
+				...(emptyArms.has(component.componentName) ? { emptyArmSlots: true as const } : {}),
 			})),
 		},
 	};
@@ -169,5 +176,14 @@ export function importedRowBranchMints(
 ): boolean {
 	return Object.values(importedModuleInterfaces ?? {}).some((moduleInterface) =>
 		moduleInterface.render.components.some((component) => component.rowBranchMint === true),
+	);
+}
+
+/** Whether any component a module imports holds an `@empty` arm showing a live value, in its tree. */
+export function importedEmptyArmSlots(
+	importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>> | undefined,
+): boolean {
+	return Object.values(importedModuleInterfaces ?? {}).some((moduleInterface) =>
+		moduleInterface.render.components.some((component) => component.emptyArmSlots === true),
 	);
 }

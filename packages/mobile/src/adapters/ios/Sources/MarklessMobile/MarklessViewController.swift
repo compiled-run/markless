@@ -32,6 +32,8 @@ public final class MarklessViewController: UIViewController {
 	private var raisingVisible = false
 	/// Scroll views around a due `visible` element: each scroll looks again.
 	private var scrollWatches: [ObjectIdentifier: NSKeyValueObservation] = [:]
+	/// This screen's in-flight script requests: the request id the script gave, to the token that cancels it.
+	private var requests: [Int: Int] = [:]
 	/// In an app: opens the page a `navigate` entry names, pushed or in this screen's place.
 	var navigator: ((_ route: String, _ params: [NativeRouteParam], _ replace: Bool) throws -> Void)?
 
@@ -143,6 +145,21 @@ public final class MarklessViewController: UIViewController {
 		tree?.presenter = self
 		navigationItem.title = try runtime.title()
 		try runCalls(try runtime.tasks())
+		apply { try self.runtime.start() }
+	}
+
+	/// The screen is gone: the requests of its async values are cancelled and their responses never arrive.
+	private func leave() {
+		do {
+			try runCalls(try runtime.leave())
+		} catch {
+			fatalError("Markless iOS host: \(error)")
+		}
+	}
+
+	public override func didMove(toParent parent: UIViewController?) {
+		super.didMove(toParent: parent)
+		if parent == nil { leave() }
 	}
 
 	/// Hands `release` and `call` entries to the device (a call with a result settles its task cell when the device answers),
@@ -150,10 +167,13 @@ public final class MarklessViewController: UIViewController {
 	private func runCalls(_ journal: [NativeJournalEntry]) throws {
 		for entry in journal {
 			if case let .release(object) = entry { device.release(object) }
+			if case let .abort(id) = entry, let token = requests.removeValue(forKey: id) { MarklessScripting.shared.cancel(token) }
 			if case let .fetch(id, request) = entry {
 				let runtime = self.runtime
-				MarklessScripting.shared.fetch(request) { [weak self] response in
-					guard let self, self.runtime === runtime else { return }
+				requests[id] = MarklessScripting.shared.fetch(request) { [weak self] response in
+					guard let self else { return }
+					self.requests[id] = nil
+					guard self.runtime === runtime else { return }
 					self.apply { try runtime.response(id, response) }
 				}
 			}
@@ -308,6 +328,7 @@ public final class MarklessViewController: UIViewController {
 		do {
 			let journal = try runtime.dispatch(action)
 			if case let .navigate(route, params, replace)? = journal.last {
+				if replace || navigator == nil { leave() }
 				if let navigator { try navigator(route, params, replace) } else { try navigate(route, params) }
 				return
 			}
@@ -355,7 +376,7 @@ extension NativeJournalEntry {
 	/// Every entry but the ones the page's device runs and the title, which the screen's navigation bar shows.
 	var isForViews: Bool {
 		switch self {
-		case .call, .release, .title, .fetch: false
+		case .call, .release, .title, .fetch, .abort: false
 		default: true
 		}
 	}

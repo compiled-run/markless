@@ -159,6 +159,28 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(views.labels["h6:text0@pear"] === pear)
 }
 
+@MainActor @Test func aRowsArmIsBuiltFromItsRowAndRebuiltAlone() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("script-async-rows"), store: MemoryStore())
+	let views = try tree(controller)
+	let list = try #require(views.elements["h8"])
+	let rows = { list.subviews.filter { !$0.isHidden }.compactMap(\.accessibilityIdentifier) }
+	#expect(rows() == ["component-edge:0/h2@apple", "component-edge:0/h2@missing"])
+	#expect(views.labels["component-edge:0/h2:text0@missing"]?.text == "Looking up missing")
+	controller.perform(NativeAction(event: .activate, host: "h6"))
+	#expect(rows() == ["component-edge:0/h2@apple", "component-edge:0/h2@missing", "component-edge:0/h2@cherry"])
+	let apple = try #require(views.elements["component-edge:0/h2@apple"])
+	try views.apply([.arm(node: "component-edge:0/boundary:0@missing", index: nil)])
+	#expect(rows() == ["component-edge:0/h2@apple", "component-edge:0/h2@cherry"])
+	try views.apply([.arm(node: "component-edge:0/boundary:0@missing", index: 1)])
+	#expect(rows() == ["component-edge:0/h2@apple", "component-edge:0/h2@missing", "component-edge:0/h2@cherry"])
+	#expect(views.elements["component-edge:0/h2@apple"] === apple)
+	try views.apply([.rows(node: "repeat:0", keys: ["cherry", "missing", "apple"])])
+	#expect(rows() == ["component-edge:0/h2@cherry", "component-edge:0/h2@missing", "component-edge:0/h2@apple"])
+	controller.perform(NativeAction(event: .activate, host: "h7"))
+	#expect(rows() == ["component-edge:0/h2@apple"])
+	#expect(views.labels["component-edge:0/h2:text0@missing"] == nil)
+}
+
 @MainActor @Test func aPageOpensAtItsRouteAndNavigatesFromScratch() throws {
 	let controller = try MarklessViewController(payload: vectorPayload("route"), store: MemoryStore(), route: "/apple")
 	let before = try tree(controller)
@@ -239,6 +261,34 @@ private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) 
 	#expect(again.accessibilityPerformEscape())
 	#expect(overlay.superview === home)
 	#expect(again.superview == nil)
+}
+
+@MainActor @Test func touchesAreNumberedPerScreenAndAScrollTakingOneCancelsIt() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("touch"), store: MemoryStore())
+	let views = try tree(controller)
+	#expect(controller.view.gestureRecognizers?.contains { $0 is PointerObserver && !$0.cancelsTouchesInView } == true)
+	let host = try #require(views.overlays)
+	let log = { views.labels["h1:text0"]?.text ?? "" }
+	let knob = try #require(views.elements["h3"])
+	let other = try #require(views.elements["h4"])
+	let now = ProcessInfo.processInfo.systemUptime
+	let (first, second, third) = (NSObject(), NSObject(), NSObject())
+	host.touch(.pointerdown, ObjectIdentifier(first), under: knob, at: CGPoint(x: 40, y: 120), time: now)
+	#expect(log().contains(" down:pad/touch/1/0/1/40,120/true/"))
+	host.touch(.pointermove, ObjectIdentifier(first), under: other, at: CGPoint(x: 64.5, y: 190), time: now)
+	host.touch(.pointerup, ObjectIdentifier(first), under: other, at: CGPoint(x: 64.5, y: 190), time: now)
+	#expect(log().hasSuffix(" move:pad/-1/1/64.5 up:pad/0/0 out:pad/none leave:pad leave:main"))
+	host.touch(.pointerdown, ObjectIdentifier(second), under: other, at: CGPoint(x: 40, y: 190), time: now)
+	#expect(log().hasSuffix(" over:other enter:main enter:other"))
+	host.scrollBegan(ObjectIdentifier(UIScrollView()))
+	#expect(log().hasSuffix(" over:other enter:main enter:other"))
+	host.scrollBegan(ObjectIdentifier(views.page))
+	#expect(log().hasSuffix(" cancel:other out:other leave:other leave:main"))
+	host.touch(.pointermove, ObjectIdentifier(second), under: other, at: CGPoint(x: 40, y: 150), time: now)
+	host.touch(.pointerup, ObjectIdentifier(second), under: other, at: CGPoint(x: 40, y: 150), time: now)
+	#expect(log().hasSuffix(" cancel:other out:other leave:other leave:main"))
+	host.touch(.pointerdown, ObjectIdentifier(third), under: knob, at: CGPoint(x: 1, y: 2), time: now)
+	#expect(log().hasSuffix(" down:pad/touch/3/0/1/1,2/true/\(formatJavaScriptNumber((now - host.timeOrigin) * 1000))"))
 }
 
 @MainActor @Test func journalNamingAnUnknownNodeIsAnError() throws {

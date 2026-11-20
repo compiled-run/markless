@@ -34,6 +34,8 @@ export type LadderAction =
 	  }
 	/** The keyboard's return key in the text field with this accessible name. */
 	| { readonly submit: string }
+	/** Opens the `<select>` with this accessible name and picks the option with this label from its list. */
+	| { readonly choose: { readonly field: string; readonly option: string } }
 	/** Scroll until this text is on screen. */
 	| { readonly scrollTo: string }
 	| {
@@ -62,7 +64,13 @@ export type LadderAction =
 	/** Escape on the web, the back gesture on Android; iOS has none a flow can perform, so the step runs on Android only. */
 	| { readonly escape: true }
 	/** A press that starts and ends on the topmost overlay element itself, beside what it holds (a modal's backdrop). */
-	| { readonly pressBackdrop: true };
+	| { readonly pressBackdrop: true }
+	/**
+	 * A finger pressed on the element showing `on`, dragged toward `direction` and lifted. `scrolls` says the drag runs along
+	 * a box that scrolls that way, so the platform takes the touch for the scroll (the web's `pointercancel`); the phones and
+	 * the browser find that out for themselves, the reference ladder, which lays nothing out, is told.
+	 */
+	| { readonly drag: { readonly on: string; readonly direction: 'right' | 'up'; readonly scrolls?: true } };
 
 /** Where a phone flow presses the backdrop: above a centred surface, below the status bar. */
 export const BACKDROP_POINT = '50%,8%';
@@ -168,8 +176,12 @@ export const MICROPHONE_STATE_ID = 'markless-microphone';
 /** The test-build label where a phone shell shows how many times the app started its script engine: `engine starts: <n>`. */
 export const ENGINE_STARTS_ID = 'markless-engine-starts';
 export const engineStartsText = (starts: number): string => `engine starts: ${starts}`;
-/** The port of the test's echo server, which a rung with `server: 'echo'` fetches from (`echo-server.ts`). */
-export const ECHO_SERVER_PORT = 47608;
+/**
+ * The port of the test's echo server, which a rung with `server: 'echo'` fetches from (`echo-server.ts`). Fixed, since
+ * the rung's App.tsrx names it, and below every OS's ephemeral range (Linux 32768-60999, macOS and Windows 49152-65535),
+ * where any outgoing connection on the machine can already hold it.
+ */
+export const ECHO_SERVER_PORT = 28761;
 export const callsText = (calls: readonly string[]): string =>
 	`calls: ${calls.length === 0 ? 'none' : calls.join(', ')}`;
 
@@ -212,7 +224,7 @@ export const rungFolders = (): string[] =>
 		.filter(
 			(entry) =>
 				entry.isDirectory() &&
-				/^((\d\d|[dp]\d)[a-z]?|[fjruy]\d+)-/.test(entry.name),
+				/^((\d\d|[dp]\d)[a-z]?|[fjrtuy]\d+)-/.test(entry.name),
 		)
 		.filter((entry) => !isApp(entry.name))
 		.map((entry) => entry.name)
@@ -224,7 +236,11 @@ const isApp = (folder: string): boolean => existsSync(join(proofsDir, folder, 'p
 /** The navigation ladder: each folder an app (`pages/`) of several routes; an `r<n>` or `j<n>` rung with `pages/` too. */
 export const navRungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && (/^n\d+-/.test(entry.name) || (/^[jr]\d+-/.test(entry.name) && isApp(entry.name))))
+		.filter(
+			(entry) =>
+				entry.isDirectory() &&
+				(/^n\d+-/.test(entry.name) || (/^[jr]\d+-/.test(entry.name) && isApp(entry.name))),
+		)
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
@@ -384,6 +400,11 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];
 	if ('submit' in action) return [{ tapOn: selector(action.submit) }, { pressKey: 'Enter' }];
+	if ('choose' in action)
+		return [
+			{ tapOn: selector(action.choose.field) },
+			{ tapOn: { text: selector(action.choose.option) } },
+		];
 	if ('relaunch' in action)
 		return [
 			'stopApp',
@@ -459,6 +480,16 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			},
 		];
 	}
+	if ('drag' in action)
+		return [
+			{
+				swipe: {
+					from: { text: selector(action.drag.on) },
+					direction: action.drag.direction === 'right' ? 'RIGHT' : 'UP',
+					duration: 800,
+				},
+			},
+		];
 	if ('escape' in action) return ['back'];
 	if ('pressBackdrop' in action) return [{ tapOn: { point: BACKDROP_POINT } }];
 	return [
@@ -499,27 +530,27 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 	const visitsSettings = rung.steps.some((step) => step.do && 'settings' in step.do);
 	return rung.steps.map((step, index) => {
 		const commands = [
-		...(index === 0 && visitsSettings
-			? [
-					{
-						runFlow: {
-							when: { platform: 'iOS' },
-							commands: [{ stopApp: 'com.apple.Preferences' }],
+			...(index === 0 && visitsSettings
+				? [
+						{
+							runFlow: {
+								when: { platform: 'iOS' },
+								commands: [{ stopApp: 'com.apple.Preferences' }],
+							},
 						},
-					},
-				]
-			: []),
-		...(index === 0 && rung.location ? [{ setLocation: rung.location }] : []),
-		...(index === 0 ? [...launch, ...appearance] : []),
-		...(step.do ? actionCommands(step.do, step) : []),
-		...(index > 0
-			? assertions({
-					...changeWitness(rung.steps[index - 1]!, step),
-					...(step.prompt && { prompt: step.prompt }),
-					...(step.system && { system: step.system }),
-				})
-			: []),
-		...assertions(step),
+					]
+				: []),
+			...(index === 0 && rung.location ? [{ setLocation: rung.location }] : []),
+			...(index === 0 ? [...launch, ...appearance] : []),
+			...(step.do ? actionCommands(step.do, step) : []),
+			...(index > 0
+				? assertions({
+						...changeWitness(rung.steps[index - 1]!, step),
+						...(step.prompt && { prompt: step.prompt }),
+						...(step.system && { system: step.system }),
+					})
+				: []),
+			...assertions(step),
 		];
 		return step.do && 'escape' in step.do
 			? [{ runFlow: { when: { platform: 'Android' }, commands } }]

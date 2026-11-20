@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import { compileRungApp } from '../src/harness/rung.ts';
 import { SHEET_AREAS } from '../src/sheet-areas.ts';
 import { nativeStyleInputs } from '../src/style-input.ts';
-import { compileNativeComponent } from '../src/compile.ts';
+import { compileNativeApp, compileNativeComponent } from '../src/compile.ts';
 
 const proof = (folder: string) => join(import.meta.dirname, '..', 'proofs', folder);
 
@@ -78,4 +78,63 @@ test("a sheet's markup ancestors come along without boxes, for selectors and inh
 	expect(boxless).toEqual(chain);
 	expect(boxless.length).toBeGreaterThan(1);
 	expect(build.styleInputs[0]!.input.nodes.some((node) => 'boxless' in node)).toBe(false);
+});
+
+test("a styled page whose text reads a route param lays that text out as '', as Dragon cannot know it at build time", async () => {
+	const build = await compileNativeApp({
+		pages: [
+			{
+				page: 'pages/[tag].tsrx',
+				filename: 'packages/mobile/test/fixtures/pages/[tag].tsrx',
+				source: `import type { PageProps } from '@markless/router';
+
+export default function Tag({ params }: PageProps<{ tag: string }>) @{
+	<main>
+		<style>
+			h1 { font-size: 20px; }
+		</style>
+		<h1>{params.tag}</h1>
+		<p>{\`Tagged \${params.tag}\`}</p>
+	</main>
+}`,
+			},
+		],
+	});
+	expect(build.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	const texts = build.styleInputs[0]!.input.nodes.flatMap((node) =>
+		node.kind === 'text' ? [node.text] : [],
+	);
+	expect(texts).toEqual(['', 'Tagged ']);
+});
+
+test("a styled page refuses a row's class or aria-* that follows its row, by name, where Dragon could not lay it out", async () => {
+	const build = await compileNativeApp({
+		pages: [
+			{
+				page: 'pages/index.tsrx',
+				filename: 'packages/mobile/test/fixtures/pages/index.tsrx',
+				source: `import { state } from '@markless/core';
+
+export default function List() @{
+	let names = state(['ada', 'grace']);
+	let busy = state(false);
+	<main>
+		<style>
+			li { padding: 4px; }
+		</style>
+		<ul>
+			@for (const name of names; key name) {
+				<li aria-label={\`Remove \${name}\`} aria-busy={busy ? 'true' : 'false'}>{name}</li>
+			}
+		</ul>
+	</main>
+}`,
+			},
+		],
+	});
+	expect(build.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+		expect.stringMatching(
+			/^the `aria-label` of <li> \S+ follows its @for row on a styled page; Dragon styles each node once, not per row, yet$/,
+		),
+	]);
 });

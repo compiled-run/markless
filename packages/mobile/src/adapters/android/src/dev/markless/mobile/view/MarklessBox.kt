@@ -11,7 +11,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 
 /** The element view: children stack vertically until a style export assigns frames, then each child sits at its frame. */
-class MarklessBox(context: Context) : FrameLayout(context) {
+open class MarklessBox(context: Context) : FrameLayout(context) {
 	internal val frames = HashMap<View, Rect>()
 	/** Each child's place in paint order: 0 in flow, below 0 under it, above 0 a positioned box in its stacking context's order. */
 	private val orderKeys = HashMap<View, Int>()

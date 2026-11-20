@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 331,
-	guided: 51,
+	total: 336,
+	guided: 55,
 	groups: [
 		{
 			area: 'state',
@@ -44,6 +44,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a handler changes a plain variable the page shows markless_state_stale_local_write an event handler writes a plain variable that the markup reads, so the page never changes.',
 				},
 				{
+					code: 'MARKLESS_STATE_CLASS_METHOD_UNBOUND',
+					title: 'A handler is a method read off state',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'a handler is a method read off state markless_state_class_method_unbound an event handler is a method read off a class instance in state.',
+				},
+				{
 					code: 'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT',
 					title: 'A shared() has no scope',
 					chip: 'warning',
@@ -58,6 +66,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: true,
 					words: 'a shared() scope was renamed markless_shared_scope_renamed a shared() uses a scope name that markless renamed.',
+				},
+				{
+					code: 'MARKLESS_STATE_CLASS_METHOD_CALL',
+					title: 'Code calls a method on a class instance in state',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'code calls a method on a class instance in state markless_state_class_method_call code calls a method on a class instance held in state.',
 				},
 				{
 					code: 'MARKLESS_STATE_CONST_REASSIGNMENT',
@@ -98,6 +114,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: true,
 					words: 'state holds a value the server cannot send markless_serialize_unsupported_value state holds a value that markless cannot send from the server to the browser.',
+				},
+				{
+					code: 'MARKLESS_STATE_CLASS_INSTANCE',
+					title: 'state() holds a class instance',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'state() holds a class instance markless_state_class_instance state() starts with a class instance, which cannot cross from the server to the browser.',
 				},
 				{
 					code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
@@ -1332,6 +1356,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a .tsrx file has errors, so the build stopped markless_compile_blocked a .tsrx file has errors, so the build stopped.',
 				},
 				{
+					code: 'MARKLESS_TYPE_STRIP_PARAMETER_PROPERTY',
+					title: 'A constructor declares a field in its parameters',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'a constructor declares a field in its parameters markless_type_strip_parameter_property a class constructor declares a field in its parameter list (`constructor(public sku: string)`).',
+				},
+				{
 					code: 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE',
 					title: 'markless-allow cannot silence an error',
 					chip: 'warning',
@@ -2082,6 +2114,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a write through a loop variable found no list markless_write_through_not_a_list a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_REPEAT_EMPTY_ARM_SLOT_MISSING',
+					title: 'An @empty branch cannot find where a live value goes',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'an @empty branch cannot find where a live value goes markless_repeat_empty_arm_slot_missing a markless runtime error from @markless/web.',
 				},
 				{
 					code: 'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',

@@ -108,13 +108,16 @@ export type NativeExpr =
 	/**
 	 * What the event that runs the handler carries: an `input` handler's field text after the edit
 	 * (`event.currentTarget.value`); a `dismiss` handler's `event.detail.reason` and `event.detail.pressTarget` (an element,
-	 * or null for Escape); a pointer handler's `event.target` (an element) and `event.button` (0, a touch).
+	 * or null for Escape); a pointer handler's fields, as a phone's browser reports a touch (`NativePointerField`).
 	 */
-	| { readonly event: 'value' | 'reason' | 'pressTarget' | 'target' | 'button' }
+	| { readonly event: 'value' | 'reason' | 'pressTarget' | NativePointerField }
+	/** Whether the element `node` has captured the pointer `pointer` (`node.hasPointerCapture(pointer)`). */
+	| { readonly captures: NativeExpr; readonly pointer: NativeExpr }
 	/**
 	 * `new FormData(form)`: the form's entry list as the web builds it, `[name, value]` pairs in tree order. A field is left
 	 * out when it is disabled or has no name, a checkbox when it is not checked; a checkbox's value is its `value` attribute
-	 * or "on", a text field's its text now, a hidden input's its `value` attribute.
+	 * or "on", a text field's its text now, a hidden input's its `value` attribute, a `<select>`'s its selected option's
+	 * value (left out when no option is selected).
 	 */
 	| { readonly formData: string }
 	/** A checkbox's or radio button's checkedness now: what its `checked` binding last set, or a person's tick since. */
@@ -301,6 +304,8 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	label: {},
 	dialog: {},
 	form: {},
+	select: {},
+	option: {},
 	svg: {},
 };
 
@@ -417,6 +422,8 @@ export type NativeNode = NativePlace &
 				readonly parent: string | null;
 				readonly list: NativeExpr;
 				readonly key: ReadonlyArray<string>;
+				/** `key i` on the index: a row's key is its position (`"0"`, `"1"`), and `key` is empty. */
+				readonly byIndex?: true;
 		  }
 		| {
 				/**
@@ -437,8 +444,11 @@ export type NativeNode = NativePlace &
 		  }
 	);
 
-/** A field's state a binding sets as a DOM property: a text field's text, a checkbox's checkedness and its mixed look. */
-export type NativeProperty = 'value' | 'checked' | 'indeterminate';
+/**
+ * A field's state a binding sets as a DOM property: a text field's text, a checkbox's checkedness and its mixed look, an
+ * option's selectedness.
+ */
+export type NativeProperty = 'value' | 'checked' | 'indeterminate' | 'selected';
 
 /**
  * Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click).
@@ -459,8 +469,44 @@ export type NativeEventName =
 	| 'submit'
 	| 'idle'
 	| 'visible'
+	| NativePointerEventName;
+
+/**
+ * The pointer events a touch raises, in a phone browser's order (Safari on iOS, Chrome on Android): `pointerover`, then
+ * `pointerenter` on each element from the outermost to the one touched, `pointerdown`; `pointermove` while it moves;
+ * `pointerup`, or `pointercancel` when the platform takes the touch for a scroll; then `pointerout` and `pointerleave` on
+ * each element from the innermost out. The touched element captures the pointer until it lifts, so `pointermove` and
+ * `pointerup` reach it wherever the finger goes, unless a handler captures it elsewhere or releases it. Hover lasts only
+ * while the finger is down.
+ */
+export type NativePointerEventName =
 	| 'pointerdown'
-	| 'pointerup';
+	| 'pointermove'
+	| 'pointerup'
+	| 'pointercancel'
+	| 'pointerover'
+	| 'pointerout'
+	| 'pointerenter'
+	| 'pointerleave';
+
+/**
+ * What a pointer handler reads off its event. `target`, `currentTarget` and `relatedTarget` are elements (`relatedTarget`
+ * is null, as a touch has no element it came from); `clientX` and `clientY` are the touch's place in points (iOS) or dp
+ * (Android) from the screen's top left, which a browser's CSS pixels match; `pointerType` is "touch"; `timeStamp` is in
+ * milliseconds since the screen appeared.
+ */
+export type NativePointerField =
+	| 'target'
+	| 'currentTarget'
+	| 'relatedTarget'
+	| 'button'
+	| 'buttons'
+	| 'clientX'
+	| 'clientY'
+	| 'pointerId'
+	| 'pointerType'
+	| 'isPrimary'
+	| 'timeStamp';
 
 /** Why the overlay behaviour reported a dismissal; the vocabulary of `OverlayGestureReason` in `@markless/web`. */
 export type NativeDismissReason = 'escape' | 'outside-press';
@@ -503,6 +549,17 @@ export type NativeOp =
 	 * page, with the page behind inert, or takes it out again.
 	 */
 	| { readonly op: 'dialog'; readonly node: string; readonly method: 'showModal' | 'close' }
+	/**
+	 * `node.setPointerCapture(pointer)`, or with `release` `node.releasePointerCapture(pointer)`: the runtime sends that touch's
+	 * later pointer events to `node` wherever the finger goes, or again to the element under it. A pointer that is not down,
+	 * or (to release) not captured by `node`, changes nothing.
+	 */
+	| {
+			readonly op: 'capture';
+			readonly node: string | NativeExpr;
+			readonly pointer: NativeExpr;
+			readonly release?: true;
+	  }
 	/**
 	 * `element.focus()` or `element.scrollIntoView()`, after the handler's writes have reached the views. Focus moves as on
 	 * the web (a text field takes the keyboard; anything else the screen reader's cursor) and scrolls the element into view
@@ -562,7 +619,13 @@ export type NativeOp =
 			readonly type: string;
 			readonly bindings: NativeScriptBindings;
 			readonly catch?: string;
-	  };
+	  }
+	/**
+	 * `reset` of `@catch (error, reset)`: clears the boundary's handler error (`catch`) and runs again each of its async
+	 * values (`cells`, read where the handler runs) that holds an error, with the same key; until one answers the boundary
+	 * keeps showing what it shows.
+	 */
+	| { readonly op: 'reset'; readonly cells: ReadonlyArray<string>; readonly catch?: string };
 
 /** Element commands a host runs. */
 export type NativeCommand = 'focus' | 'scrollIntoView';
@@ -593,6 +656,18 @@ export type NativeViewPayload = {
 		readonly task?: {
 			readonly call: NativeDeviceCall;
 			readonly arguments: ReadonlyArray<NativeExpr>;
+		};
+		/**
+		 * An async value the payload's script computes (`computed(async ...)` that is not one device call). The host's
+		 * runtime starts it when the screen starts and again whenever a cell its bindings read changes, and the script
+		 * settles the cell: `{ state: 'pending' }` until the first answer, then `{ state: 'value', value, error }` (`error` is
+		 * a failed refresh's error over the value it kept, else null) or `{ state: 'error', error: { name, message } }`.
+		 */
+		readonly async?: {
+			readonly script: string;
+			readonly bindings: NativeScriptBindings;
+			/** The `@try` branches that read it: it runs while one of them is shown, and is aborted when none is. */
+			readonly boundaries: ReadonlyArray<string>;
 		};
 		/**
 		 * State of a component a list row renders (`repeat` node id): one value per row, `initial` when the row is built and
@@ -638,6 +713,8 @@ export type NativeViewPayload = {
 	 * wording); the host picks the device's language. Present with `forms`.
 	 */
 	readonly valueMissing?: Readonly<Record<string, NativeValueMissing>>;
+	/** What the web says when a text field a person edited is longer than its `maxlength`, by language; present when a form's text field has one. */
+	readonly tooLong?: Readonly<Record<string, NativeTooLong>>;
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	readonly script?: NativeScript;
 };
@@ -660,6 +737,29 @@ export type NativeValueMissing = {
 	readonly radio: string;
 };
 
+/** Chromium's message for a text field longer than its `maxlength`: `{max}` and `{length}` in `text` are written in `digits` (ASCII when absent). */
+export type NativeTooLong = { readonly text: string; readonly digits?: string };
+
+/** `message` with `{max}` and `{length}` filled in as Chromium writes them: no grouping, in the language's digits. */
+export function nativeTooLongMessage(message: NativeTooLong, max: number, length: number): string {
+	const digits = message.digits ?? '0123456789';
+	const write = (value: number) =>
+		String(value).replace(/[0-9]/g, (digit) => digits[Number(digit)]!);
+	return message.text.replace('{max}', write(max)).replace('{length}', write(length));
+}
+
+/**
+ * A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers: leading ASCII whitespace, an
+ * optional sign, then digits up to the first non-digit. Undefined (no limit) when there are no digits or it is negative.
+ */
+export function nativeMaxLength(attribute: string | null | undefined): number | undefined {
+	const match = attribute == null ? null : /^[\t\n\f\r ]*([+-]?)([0-9]+)/.exec(attribute);
+	if (!match) return undefined;
+	const value = Number(match[2]);
+	if (match[1] === '-' && value !== 0) return undefined;
+	return value;
+}
+
 /** A form's submittable fields and submit buttons, each in tree order. */
 export type NativeForm = {
 	readonly node: string;
@@ -671,10 +771,13 @@ export type NativeForm = {
 	readonly authoredAriaDisabled?: true;
 };
 
-/** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, or a hidden input. */
-export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden';
+/** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */
+export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden' | 'select';
 
-export { NATIVE_VALUE_MISSING_BY_LOCALE } from './native-validation-messages.ts';
+export {
+	NATIVE_TOO_LONG_BY_LOCALE,
+	NATIVE_VALUE_MISSING_BY_LOCALE,
+} from './native-validation-messages.ts';
 
 /**
  * The language a browser on a device with these preferred languages shows its own text in, among `available`: the first
@@ -746,6 +849,16 @@ export type NativeJournalEntry =
 			readonly name: 'checked';
 			readonly value: boolean;
 	  }
+	/**
+	 * An option's selectedness changed: by a person's choice, by its `selected` binding, or because its `<select>` chose
+	 * another. An option a list row adds arrives unselected; an entry follows when it is selected.
+	 */
+	| {
+			readonly op: 'property';
+			readonly node: string;
+			readonly name: 'selected';
+			readonly value: boolean;
+	  }
 	/** A styled cell's new value: the host moves to Dragon's next style assignment (`next[a][s][v]`) and applies it. */
 	| { readonly op: 'state'; readonly cell: string; readonly value: NativeValue }
 	/**
@@ -785,7 +898,9 @@ export type NativeJournalEntry =
 	/** The script cleared a timer it set (`timer` names it, `script:<n>`): the host drops it. */
 	| { readonly op: 'clearTimer'; readonly timer: string }
 	/** The script called `fetch`: the host sends the request and answers with a `response` action naming `id`. */
-	| { readonly op: 'fetch'; readonly id: number; readonly request: NativeFetchRequest };
+	| { readonly op: 'fetch'; readonly id: number; readonly request: NativeFetchRequest }
+	/** The signal of the request `id` aborted (its async value was superseded or left the screen): cancel it, send no response. */
+	| { readonly op: 'abort'; readonly id: number };
 
 /** A request as the script made it; `url` is absolute (a relative one rejects in the script, as with no page to resolve it). */
 export type NativeFetchRequest = {
@@ -904,6 +1019,18 @@ export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> =
 	['currentTarget'],
 	['currentTarget', 'value'],
 	['currentTarget', 'checked'],
+];
+
+/** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */
+export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [
+	'button',
+	'buttons',
+	'clientX',
+	'clientY',
+	'pointerId',
+	'pointerType',
+	'isPrimary',
+	'timeStamp',
 ];
 
 /** Names for the global object itself: `window.setTimeout` reads a provided global, `window.document` does not. */

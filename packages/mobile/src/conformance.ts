@@ -27,12 +27,18 @@ export type NativeConformance = {
 	readonly initialRows?: ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
 	/** Present when the payload has checkboxes or radio buttons: `[node, checked]`. */
 	readonly initialChecks?: ReadonlyArray<readonly [node: string, checked: boolean]>;
+	/** Present when the payload has selects: `[option, selected]` for each shown option, in tree order. */
+	readonly initialSelections?: ReadonlyArray<readonly [node: string, selected: boolean]>;
 	/** Present when the payload has branches: `[branch, arm]`, arm null when none is shown. */
 	readonly initialArms?: ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Present when the payload has system sheets: `[sheet, open]`. */
 	readonly initialSheets?: ReadonlyArray<readonly [node: string, open: boolean]>;
 	/** Present when the payload has task cells: the calls a host starts at mount, in cell order. */
 	readonly tasks?: ReadonlyArray<Extract<NativeJournalEntry, { op: 'call' }>>;
+	/** Present when the payload has async values the script computes: the journal of starting them, after the tasks. */
+	readonly start?: ReadonlyArray<NativeJournalEntry>;
+	/** Present when leaving the screen after the last step cancels requests: that journal. */
+	readonly leave?: ReadonlyArray<NativeJournalEntry>;
 	readonly steps: ReadonlyArray<{
 		readonly action: NativeAction;
 		readonly journal: ReadonlyArray<NativeJournalEntry>;
@@ -57,6 +63,10 @@ export function nativeConformance(
 	const initialSheets = runtime.sheets();
 	const tasks = runtime.tasks();
 	const initialChecks = runtime.checks();
+	const initialSelections = runtime.selections();
+	const start = runtime.start();
+	const steps = actions.map((action) => ({ action, journal: runtime.dispatch(action) }));
+	const leave = payload.cells.some((cell) => cell.async) ? runtime.leave() : [];
 	return {
 		version: NATIVE_CONFORMANCE_VERSION,
 		payload,
@@ -71,7 +81,10 @@ export function nativeConformance(
 		...(initialSheets.length > 0 ? { initialSheets } : {}),
 		...(tasks.length > 0 ? { tasks } : {}),
 		...(initialChecks.length > 0 ? { initialChecks } : {}),
-		steps: actions.map((action) => ({ action, journal: runtime.dispatch(action) })),
+		...(initialSelections.length > 0 ? { initialSelections } : {}),
+		...(start.length > 0 ? { start } : {}),
+		steps,
+		...(leave.length > 0 ? { leave } : {}),
 	};
 }
 
@@ -86,6 +99,8 @@ export type NativeAppConformance = {
 	readonly version: typeof NATIVE_APP_CONFORMANCE_VERSION;
 	readonly app: NativeAppPayload;
 	readonly open: string;
+	/** Present when a screen it opens with has async values the script computes: the journal of starting them. */
+	readonly started?: ReadonlyArray<NativeJournalEntry>;
 	readonly initial: NativeAppConformanceScreen;
 	readonly steps: ReadonlyArray<
 		{
@@ -121,6 +136,7 @@ export function nativeAppConformance(
 		version: NATIVE_APP_CONFORMANCE_VERSION,
 		app,
 		open,
+		...(runtime.started.length > 0 ? { started: runtime.started } : {}),
 		initial: look(),
 		steps: actions.map((action) => ({ action, journal: runtime.dispatch(action), ...look() })),
 	};

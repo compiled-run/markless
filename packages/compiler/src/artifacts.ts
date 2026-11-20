@@ -490,6 +490,18 @@ export type SemanticGraphBinding = {
 	readonly armScope?: SemanticBranchArm;
 	// The arms around `armScope`'s site, outermost first: opening any of them rebuilds this arm, so it restarts the cell too.
 	readonly enclosingArms?: ReadonlyArray<SemanticBranchArm>;
+	// state() only: each `new X()` the initializer spells where X resolves to anything but a built-in the serializer encodes.
+	readonly classInstances?: ReadonlyArray<SemanticStateClassInstance>;
+};
+
+export type SemanticStateClassInstance = {
+	/** The member path the instance sits at; empty for the whole value. */
+	readonly path: ReadonlyArray<string>;
+	/** Set when the instance is an element of the array literal at `path`. */
+	readonly element?: true;
+	readonly constructorName: string;
+	readonly source: string;
+	readonly sourceSpan?: SourceSpan;
 };
 
 export type ModuleGraphInterfaceHelperReturn = {
@@ -631,6 +643,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly overlayRecords?: true;
 			/** This component or one it renders resolves a shared() instance that outlives the page. */
 			readonly liveShared?: true;
+			/** This component or one it renders resolves a subtree-scoped shared() instance: a widget. */
+			readonly widgets?: true;
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
 			/**
@@ -677,6 +691,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly nestedRepeats?: true;
 			/** Present when this component's tree holds a keyed repeat whose rows flip an @if of their own. */
 			readonly rowBranchMint?: true;
+			/** Present when this component's tree holds a keyed repeat whose `@empty` arm shows a live value. */
+			readonly emptyArmSlots?: true;
 			/**
 			 * Present when this component's tree holds an action compiled as a
 			 * closure plan, so a composing page routes plan lookups toward it.
@@ -1183,6 +1199,9 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_CHILD_REPEAT_WITHOUT_ELEMENT'
 		| 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
 		| 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE'
+		| 'MARKLESS_STATE_CLASS_METHOD_CALL'
+		| 'MARKLESS_STATE_CLASS_METHOD_UNBOUND'
+		| 'MARKLESS_TYPE_STRIP_PARAMETER_PROPERTY'
 		| 'MARKLESS_STATE_WRITE_IN_TEMPLATE'
 		| 'MARKLESS_STATE_WRITE_IN_COMPUTED'
 		| 'MARKLESS_SHARED_DEFINITION_CYCLE'
@@ -1627,6 +1646,11 @@ export type SemanticTemplateRead = {
 	// The component edge whose children hold this read directly. It is projected
 	// into that child, so this module owns no element for it to write.
 	readonly projectedComponentEdgeId?: string;
+	// A projected read whose text sits beside an element of the same children: it writes the text node next to that element.
+	readonly projectedBeside?: {
+		readonly hostNodeId: string;
+		readonly target: SemanticTemplateBindingTarget;
+	};
 	readonly computedGraphNodeId?: string;
 	// On a joined text inside a flipped arm: the computed each composite interpolation rebuilds from.
 	readonly armHoles?: ReadonlyArray<{
@@ -1915,6 +1939,11 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				// The name and quotes are already in the statics: this value can
 				// never be absent, so the slot renders the value alone.
 				readonly alwaysPresent?: true;
+				// An option's `selected`, true when its select's value names it: written by the
+				// server render only, since the browser writes `select.value` itself.
+				readonly selectedOption?: true;
+				/** That comparison as a tree, for native builds only (`nativeFacts`). */
+				readonly nativeExpression?: SemanticExpression;
 				readonly directClassMatch?: {
 					readonly stateGraphNodeId: string;
 					readonly statePath: ReadonlyArray<string>;
@@ -2751,7 +2780,8 @@ export type CaptureAnalysisDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED'
 		| 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED'
 		| 'MARKLESS_SHARED_FACTORY_CLASS_INSTANCE'
-		| 'MARKLESS_STATE_PROPERTY_CLASS_INSTANCE';
+		| 'MARKLESS_STATE_PROPERTY_CLASS_INSTANCE'
+		| 'MARKLESS_STATE_CLASS_INSTANCE';
 	readonly phase: 'capture-analysis';
 	readonly passId: 'capture-analysis';
 	readonly symbolId?: string;
@@ -2978,6 +3008,8 @@ export type SymbolModulesDiagnostic = CompilerDiagnostic & {
 export type ArmEscalationCandidate = {
 	readonly branchSiteId: string;
 	readonly symbolId: string;
+	/** An arm content can render a widget in, which the flip files before its records register. */
+	readonly rootsWidgets?: true;
 };
 
 /**

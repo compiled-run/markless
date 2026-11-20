@@ -315,7 +315,7 @@ function settleAttributeNames(element: SpanNode): void {
 	}
 }
 
-function lineStarts(source: string): number[] {
+export function lineStarts(source: string): number[] {
 	const starts = [0];
 	for (let index = source.indexOf('\n'); index !== -1; index = source.indexOf('\n', index + 1)) {
 		starts.push(index + 1);
@@ -323,7 +323,7 @@ function lineStarts(source: string): number[] {
 	return starts;
 }
 
-function sourcePosition(lines: readonly number[], length: number, offset: number): MarklessSourcePosition {
+export function sourcePosition(lines: readonly number[], length: number, offset: number): MarklessSourcePosition {
 	const at = Math.min(Math.max(offset, 0), length);
 	let low = 0;
 	let high = lines.length - 1;
