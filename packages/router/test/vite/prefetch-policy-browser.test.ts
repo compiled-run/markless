@@ -10,6 +10,7 @@ import {
 	FRAGMENT_IDLE_FRAGMENT_DECODED_BYTES,
 	FRAGMENT_PATH_PREFIX,
 	FRAGMENT_REGION_END,
+	PREFETCH_MARKS,
 	fragmentPageUrl,
 	runFragmentNavigation,
 	watchViewport,
@@ -94,6 +95,7 @@ function config(setup: Setup): FragmentNavigationConfig {
 		heldChars: setup.heldChars ?? FRAGMENT_HELD_CHARS,
 		prefetchConnections: policy.concurrency,
 		guessBudget: policy.budget,
+		prefetchMarks: PREFETCH_MARKS,
 		prefetchOn: policy.levels,
 		endpointPrefixes: ['/api'],
 		idleFragments: 6,
@@ -256,6 +258,14 @@ async function open(setup: Setup) {
 					}
 				).__marklessFragmentNav.prefetches.keys(),
 			]),
+		marks: (name: string) =>
+			page.evaluate(
+				(name) =>
+					performance
+						.getEntriesByName(name, 'mark')
+						.map((mark) => (mark as PerformanceMark).detail),
+				name,
+			),
 		allArrived: () =>
 			page.evaluate(() =>
 				[
@@ -302,6 +312,9 @@ describe('idle tier', () => {
 		await afterFrames(slow.page);
 		await slow.armed();
 		expect(await slow.fetches()).toEqual([]);
+		expect(await slow.marks(PREFETCH_MARKS[1])).toEqual([
+			{ page: '/', reason: 'network', triggers: ['idle'] },
+		]);
 		await slow.page.close();
 		const all = await open({ prefetch: { idle: 'all' } });
 		await all.measured(false);
@@ -485,6 +498,9 @@ describe('never early', () => {
 		await s.page.hover('a[href="/p/2"]');
 		await s.afterDwell();
 		expect(await s.fetches()).toEqual([]);
+		expect(await s.marks(PREFETCH_MARKS[1])).toEqual([
+			{ page: '/', reason: 'save-data', triggers: ['viewport', 'idle'] },
+		]);
 		await s.page.click('a[href="/p/2"]');
 		await expect
 			.poll(() =>
@@ -567,6 +583,7 @@ describe('guess budget', () => {
 		await s.idle();
 		await afterFrames(s.page);
 		expect(await s.fetches()).toHaveLength(3);
+		expect(await s.marks(PREFETCH_MARKS[0])).toEqual([{ page: '/', bytes: 3 * size }]);
 		const guessed = await s.paths();
 		const hovered = inView.find((path) => !guessed.includes(path))!;
 		await s.page.hover(`a[href="${hovered}"]`);
@@ -578,6 +595,7 @@ describe('guess budget', () => {
 		await s.idle();
 		await afterFrames(s.page);
 		expect(await s.fetches()).toHaveLength(7);
+		expect((await s.marks(PREFETCH_MARKS[0])).map((mark) => mark.page)).toEqual(['/', hovered]);
 		await s.page.close();
 	});
 });

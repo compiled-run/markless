@@ -54,6 +54,10 @@ describe('router prefetch policy', () => {
 		expect(routerVite.PREFETCH_NETWORKS).toBe(PREFETCH_NETWORKS);
 		expect(routerVite.PREFETCH_DEFAULTS).toBe(PREFETCH_DEFAULTS);
 		expect(routerVite.PREFETCH_LINK_CHOICES).toEqual(['intent', 'viewport']);
+		expect(routerVite.PREFETCH_MARKS).toEqual([
+			'markless:prefetch-budget-spent',
+			'markless:prefetch-skipped',
+		]);
 		for (const trigger of PREFETCH_TRIGGERS)
 			expect(PREFETCH_NETWORKS).toContain(PREFETCH_DEFAULTS[trigger]);
 	});

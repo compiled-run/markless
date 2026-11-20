@@ -636,7 +636,14 @@ export function runFragmentNavigation(
 		const spend = (wire: number) => {
 			if (counted) return;
 			counted = true;
-			if (speculation.page === page) speculation.spent += wire;
+			if (speculation.page !== page) return;
+			const before = speculation.spent;
+			speculation.spent += wire;
+			// Tools tell "the budget was spent" apart from "never guessed" by this mark, once per page shown.
+			if (before < config.guessBudget && speculation.spent >= config.guessBudget)
+				w.performance.mark(config.prefetchMarks[0], {
+					detail: { page: state.shown, bytes: speculation.spent },
+				});
 		};
 		const read = async (): Promise<FragmentFetched> => {
 			const prefix = config.requestPrefix;
@@ -895,6 +902,19 @@ export function runFragmentNavigation(
 			const arm = () => {
 				if (!current() || speculation.phase !== SHOWN) return;
 				speculate(ARMED);
+				// Guessing that this page would do but the visitor's settings or link rule out is marked, once, with why.
+				const would = (viewportLevel ? ['viewport'] : []).concat(idleLevel ? ['idle'] : []);
+				const reason = connection?.saveData
+					? 'save-data'
+					: d.visibilityState === 'hidden'
+						? 'hidden'
+						: would.some((trigger) => !onNetwork(trigger === 'idle' ? idleLevel : viewportLevel))
+							? 'network'
+							: '';
+				if (would.length && reason)
+					w.performance.mark(config.prefetchMarks[1], {
+						detail: { page: state.shown, reason, triggers: would },
+					});
 				if (
 					loadViewport &&
 					(viewportLevel || d.querySelector(`a[href][${config.prefetchAttribute}="viewport"]`))
@@ -1218,6 +1238,8 @@ export const FRAGMENT_PREFETCH_TTL_MS = 30_000;
 export const FRAGMENT_PREFETCH_CONNECTIONS = 2;
 // Wire bytes viewport and idle fetches may spend per page shown: about what the Next.js original of the shadcn docs prefetched (1.5 MB).
 export const FRAGMENT_GUESS_BUDGET_BYTES = 2 * 1024 * 1024;
+/** Performance marks a tool can read: the page's guess budget ran out; guessing was ruled out (detail.reason). */
+export const PREFETCH_MARKS = ['markless:prefetch-budget-spent', 'markless:prefetch-skipped'] as const;
 export const FRAGMENT_IDLE_FRAGMENTS = 6;
 // Characters of page text a tab keeps for pages fetched ahead: about 8 MB as one-byte strings, so three of the largest docs pages measured (2.2 MB decoded) and a dozen typical ones (650 kB).
 export const FRAGMENT_HELD_CHARS = 8 * 1024 * 1024;

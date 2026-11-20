@@ -1,6 +1,7 @@
 import { FRAGMENT_GUESS_BUDGET_BYTES, FRAGMENT_PREFETCH_CONNECTIONS } from './fragment-navigation.ts';
 
 export { PREFETCH_LINK_CHOICES, type PrefetchLinkChoice } from '../link-attributes.ts';
+export { PREFETCH_MARKS } from './fragment-navigation.ts';
 
 /** The triggers `router({ prefetch })` takes; a tool that writes router config can detect support by this export. */
 export const PREFETCH_TRIGGERS = ['intent', 'viewport', 'idle'] as const;

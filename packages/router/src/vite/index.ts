@@ -120,6 +120,7 @@ import { LINK_BRIDGE_DIR } from './runtime/link-bridge-module.ts';
 export {
 	PREFETCH_DEFAULTS,
 	PREFETCH_LINK_CHOICES,
+	PREFETCH_MARKS,
 	PREFETCH_NETWORKS,
 	PREFETCH_TRIGGERS,
 	type PrefetchLinkChoice,

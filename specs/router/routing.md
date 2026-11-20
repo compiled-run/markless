@@ -252,6 +252,10 @@ networks, `'fast'` ones, or `'none'`:
   declared length, else from Resource Timing or the bytes read. Once spent, they stop until the
   next page is shown; intent still fetches. A migrated site sets it from what
   its original spent before a click.
+- Tools read two performance marks (`PREFETCH_MARKS`): `markless:prefetch-budget-spent`
+  once per page shown when its budget runs out (`detail: { page, bytes }`), and
+  `markless:prefetch-skipped` once per page shown when guessing it would do is
+  ruled out (`detail: { page, reason: 'save-data' | 'hidden' | 'network', triggers }`).
 - Guessing reads only two things from navigation: a navigation started, and a
   page is shown; the swap module's own navigation phase stays its own (#569).
 - The viewport trigger observes the page's page links when a page is shown,

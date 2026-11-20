@@ -57,6 +57,8 @@ export interface FragmentNavigationConfig {
 	readonly prefetchConnections: number;
 	// Wire bytes viewport and idle fetches may spend per page shown.
 	readonly guessBudget: number;
+	// Performance mark names: [budget spent, guessing skipped].
+	readonly prefetchMarks: readonly [budgetSpent: string, skipped: string];
 	// [intent, viewport, idle]: 0 never, 1 on a fast link, 2 on any (never under Save-Data or in a hidden tab).
 	readonly prefetchOn: readonly [intent: number, viewport: number, idle: number];
 	// Paths the server answers with endpoints, not pages: never fetched before a click or as a fragment.

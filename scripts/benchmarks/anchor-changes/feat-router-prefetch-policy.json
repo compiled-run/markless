@@ -56,8 +56,8 @@
 				"bench /settings",
 				"executedChars"
 			],
-			"delta": 494,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state, one phase per fetch ahead, intent outside the guess limit, a cap on held text and a per-page guess budget; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"delta": 718,
+			"reason": "router prefetch policy run half at idle: +718 chars, as on bench / and the same CI runs; G16 runs on main flip a 224-char function in and out on bench / and /settings (merge-queue runs 44637590549 and 44643186980: 11996 vs 11772, 11738 vs 11962), and the earlier +494 paired this PR's low reading with the base's high one",
 			"date": "2026-11-19"
 		},
 		{
