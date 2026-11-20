@@ -150,6 +150,8 @@ data class DefaultStyle(
 	val marker: String? = null,
 	/** On a summary: a ▸ (collapsed) or ▾ (expanded) before its content, by its aria-expanded. */
 	val disclosure: Boolean = false,
+	/** On a center: its blocks in the middle of the line and its text centred, which what is inside inherits. */
+	val center: Boolean = false,
 	/** "table", "row" or "cell". */
 	val table: String? = null,
 )
@@ -594,7 +596,7 @@ data class Payload(
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
 			val o = v.obj(what)
-			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule", "marker", "disclosure", "table"), what)
+			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule", "marker", "disclosure", "center", "table"), what)
 			fun flag(name: String): Boolean = o[name]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.$name must be true when present"); true } ?: false
 			fun word(name: String, allowed: Set<String>): String? = o[name]?.let { oneOf(o, name, allowed, what) }
 			return DefaultStyle(
@@ -608,6 +610,7 @@ data class Payload(
 				rule = flag("rule"),
 				marker = word("marker", setOf("disc", "decimal")),
 				disclosure = flag("disclosure"),
+				center = flag("center"),
 				table = word("table", setOf("table", "row", "cell")),
 			)
 		}

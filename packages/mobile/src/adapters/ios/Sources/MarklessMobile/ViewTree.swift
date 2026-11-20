@@ -30,6 +30,8 @@ struct TextLook: Equatable {
 	var shift: String?
 	var highlight = false
 	var preformatted = false
+	/// Inside a `<center>`: blocks sit in the middle of the line and text is centred (`text-align: -webkit-center`).
+	var centered = false
 
 	func applying(_ style: NativeDefaultStyle?) -> TextLook {
 		guard let style else { return self }
@@ -42,6 +44,7 @@ struct TextLook: Equatable {
 		next.shift = style.shift ?? shift
 		next.highlight = highlight || style.highlight
 		next.preformatted = preformatted || style.preformatted
+		next.centered = centered || style.center
 		return next
 	}
 
@@ -217,6 +220,8 @@ final class ViewTree {
 	/// Lists and the marker kind their items show; each item's marker label.
 	private var listMarkers: [ObjectIdentifier: String] = [:]
 	private var itemMarkers: [ObjectIdentifier: UILabel] = [:]
+	/// Containers whose children sit in the middle of the line (inside a `<center>`).
+	private var centered: Set<ObjectIdentifier> = []
 	/// Each summary's disclosure triangle, in its start inset.
 	private var disclosures: [ObjectIdentifier: UILabel] = [:]
 	/// Table structure: tables, their rows and the rows' cells.
@@ -956,6 +961,7 @@ final class ViewTree {
 				inner.heading = context.heading || headings.contains(element)
 				inner.look = context.look.applying(node.defaultStyle)
 				if layout == nil, let style = node.defaultStyle { applyBlockStyle(style, to: view) }
+				if layout == nil, inner.look.centered { centered.insert(ObjectIdentifier(view)) }
 				if layout == nil, element == "li", listMarkers[ObjectIdentifier(container)] != nil { addMarker(to: view) }
 				view.accessibilityIdentifier = id
 				elements[id] = view
@@ -1249,6 +1255,7 @@ final class ViewTree {
 		var constraints: [NSLayoutConstraint] = []
 		var above = container.topAnchor
 		let indent = indents[ObjectIdentifier(container)] ?? 0
+		let middle = centered.contains(ObjectIdentifier(container))
 		var top = container
 		while let parent = top.superview { top = parent }
 		for child in stacked(container) {
@@ -1256,11 +1263,14 @@ final class ViewTree {
 			let wide = fullWidth.contains(ObjectIdentifier(child))
 			constraints += [
 				child.topAnchor.constraint(equalTo: above),
-				child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
+				middle && !wide
+					? child.centerXAnchor.constraint(equalTo: container.centerXAnchor, constant: indent / 2)
+					: child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
 				wide
 					? child.trailingAnchor.constraint(equalTo: container.trailingAnchor)
 					: child.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
 			]
+			if middle && !wide { constraints.append(child.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: indent)) }
 			if wide {
 				// As wide as the page allows: a box with no width of its own (a rule, a code block) takes the line.
 				let page = child.widthAnchor.constraint(equalTo: top.widthAnchor)
@@ -1410,6 +1420,7 @@ final class ViewTree {
 		let label = UILabel()
 		label.isUserInteractionEnabled = false
 		label.numberOfLines = 0
+		if context.look.centered { label.textAlignment = .center }
 		label.accessibilityIdentifier = run[0] + context.suffix
 		if context.button != nil {
 			label.isAccessibilityElement = false

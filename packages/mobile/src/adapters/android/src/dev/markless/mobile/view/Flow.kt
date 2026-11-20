@@ -26,7 +26,7 @@ import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.ShapePaint
 
 /** The text style a block gives the text inside it: its own default style and its ancestors', combined. */
-data class BlockText(val bold: Boolean, val italic: Boolean, val monospace: Boolean, val size: Double, val preformatted: Boolean)
+data class BlockText(val bold: Boolean, val italic: Boolean, val monospace: Boolean, val size: Double, val preformatted: Boolean, val centered: Boolean = false)
 
 /**
  * Text flow without a style export, as `nativeParagraphs` (packages/mobile/src/paragraphs.ts) defines it: among one parent's
@@ -73,16 +73,16 @@ class TextFlow(payload: Payload) {
 
 	/** The style text inherits inside [parent]: every non-flowing ancestor's default style, nearest last. */
 	fun blockText(parent: String?): BlockText {
-		var bold = false; var italic = false; var mono = false; var size = 1.0; var pre = false
+		var bold = false; var italic = false; var mono = false; var size = 1.0; var pre = false; var centered = false
 		var at = parent
 		while (at != null) {
 			val n = byId[at] ?: break
 			if (n is Node.Element && !flowing(n)) n.defaultStyle?.let { s ->
-				bold = bold || s.bold; italic = italic || s.italic; mono = mono || s.monospace; size *= s.size; pre = pre || s.preformatted
+				bold = bold || s.bold; italic = italic || s.italic; mono = mono || s.monospace; size *= s.size; pre = pre || s.preformatted; centered = centered || s.center
 			}
 			at = n.parent
 		}
-		return BlockText(bold, italic, mono, size, pre)
+		return BlockText(bold, italic, mono, size, pre, centered)
 	}
 
 	/**
