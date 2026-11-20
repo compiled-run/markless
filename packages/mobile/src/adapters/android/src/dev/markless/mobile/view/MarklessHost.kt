@@ -64,6 +64,9 @@ class MarklessHostError(message: String) : RuntimeException(message)
 /** The web's default text colour, CanvasText: black, or white in the dark appearance. */
 internal fun canvasText(configuration: Configuration): Int = if (isDark(configuration)) Color.WHITE else Color.BLACK
 
+/** The web's Canvas colour, as Chrome paints a page that allows dark mode: white, or #121212 when dark. */
+internal fun canvas(configuration: Configuration): Int = if (isDark(configuration)) 0xFF121212.toInt() else Color.WHITE
+
 internal fun isDark(configuration: Configuration): Boolean =
 	configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
@@ -511,15 +514,18 @@ class MarklessHost(
 		scheduleLoadEvents()
 	}
 
-	/** The colour behind the page in the current assignment (the export's canvas, else the web canvas's white); null unstyled. */
-	val canvasColor: Int? get() = page?.let { it.export.assignments[it.assignment].canvas?.argb ?: Color.WHITE }
+	/** The colour behind the page: the current assignment's canvas (else the web canvas's white), or unstyled the web's Canvas. */
+	val canvasColor: Int get() = page?.let { it.export.assignments[it.assignment].canvas?.argb ?: Color.WHITE } ?: canvas(context.resources.configuration)
 
 	/** Called with [canvasColor] whenever the assignment changes. */
 	var onCanvas: ((Int) -> Unit)? = null
 
 	/** The device's appearance changed: move to the @media band it selects, as a cell's `state` entry moves to its assignment. */
 	fun configurationChanged(configuration: Configuration) {
-		if (style == null) for (view in textViews.values) if (view !is Button) view.setTextColor(canvasText(configuration))
+		if (style == null) {
+			for (view in textViews.values) if (view !is Button) view.setTextColor(canvasText(configuration))
+			onCanvas?.invoke(canvas(configuration))
+		}
 		var changed = false
 		for (l in allLayouts()) {
 			if (l.export.bandState < 0) continue
@@ -551,7 +557,7 @@ class MarklessHost(
 	}
 
 	private fun repaint() {
-		canvasColor?.let { onCanvas?.invoke(it) }
+		onCanvas?.invoke(canvasColor)
 		for (inst in built.values.sortedBy { order.getValue(it.node.id) }) place(inst, views.getValue(inst.id))
 		root.requestLayout()
 		// A sheet's boxes live in its dialog, outside the page's root.
