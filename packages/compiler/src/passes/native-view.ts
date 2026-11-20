@@ -394,6 +394,18 @@ function fixedStyle(expr: NativeExpr): string | null | undefined {
 	return undefined;
 }
 
+/** `Number`'s constants: the finite ones as literals, the non-finite ones by name. */
+const NUMBER_CONSTANTS: Readonly<Record<string, NativeExpr>> = {
+	POSITIVE_INFINITY: { nonFinite: 'Infinity' },
+	NEGATIVE_INFINITY: { nonFinite: '-Infinity' },
+	NaN: { nonFinite: 'NaN' },
+	MAX_SAFE_INTEGER: { literal: Number.MAX_SAFE_INTEGER },
+	MIN_SAFE_INTEGER: { literal: Number.MIN_SAFE_INTEGER },
+	MAX_VALUE: { literal: Number.MAX_VALUE },
+	MIN_VALUE: { literal: Number.MIN_VALUE },
+	EPSILON: { literal: Number.EPSILON },
+};
+
 // A non-finite number is a value too: the payload carries it beside its JSON (nativeNonFiniteSplit).
 const isNativeValue = (value: unknown): value is NativeValue =>
 	value === null ||
@@ -3215,6 +3227,10 @@ export function createNativeViewPayload(
 				if (scope.locals.has(expression.name)) return { local: expression.name };
 				const bound = scope.args.get(expression.name);
 				if (bound) return bound;
+				if (expression.name === 'Infinity')
+					return { nonFinite: 'Infinity' };
+				if (expression.name === 'NaN')
+					return { nonFinite: 'NaN' };
 				if (scope.opaque === expression.name || scope.carried?.name === expression.name)
 					return refuse(`${what} reads its event`);
 				if (scope.deviceObjects.has(expression.name))
@@ -3436,6 +3452,15 @@ export function createNativeViewPayload(
 			}
 			case 'member': {
 				const holder = expression.object;
+				// Number's constants, as JavaScript gives them; the non-finite ones travel as their names.
+				if (
+					holder.kind === 'read' &&
+					holder.name === 'Number' &&
+					!scope.locals.has('Number') &&
+					!scope.args.has('Number') &&
+					Object.hasOwn(NUMBER_CONSTANTS, expression.property)
+				)
+					return NUMBER_CONSTANTS[expression.property]!;
 				if (
 					holder.kind === 'read' &&
 					scope.objects.has(holder.name) &&

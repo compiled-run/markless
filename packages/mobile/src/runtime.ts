@@ -363,6 +363,8 @@ export function evaluateNativeExpr(
 	}
 	if ('cell' in expr) return read(expr.cell, scope);
 	if ('literal' in expr) return expr.literal;
+	if ('nonFinite' in expr)
+		return expr.nonFinite === 'NaN' ? Number.NaN : expr.nonFinite === 'Infinity' ? Infinity : -Infinity;
 	if ('field' in expr) {
 		if (!scope.fieldText) throw new Error(`the text of ${expr.field} read outside a runtime`);
 		return scope.fieldText(expr.field);

@@ -986,6 +986,14 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["focusOrigin"]: return .focusOrigin(try decodeExpr(try field("focusOrigin")))
 		case ["isElement"]: return .isElement(try decodeExpr(try field("isElement")))
 		case ["literal"]: return .literal(try field("literal").scalar())
+		case ["nonFinite"]:
+			// A JSON literal cannot hold these; in memory they are numbers like any other.
+			switch try field("nonFinite").string() {
+			case "Infinity": return .literal(.number(.infinity))
+			case "-Infinity": return .literal(.number(-.infinity))
+			case "NaN": return .literal(.number(.nan))
+			case let name: throw reader.fail("unknown nonFinite \(name)")
+			}
 		case ["unary", "value"]: return .unary(try oneOf("unary", ["!", "-", "+", "typeof"]), try decodeExpr(try field("value")))
 		case ["binary", "left", "right"]:
 			return .binary(

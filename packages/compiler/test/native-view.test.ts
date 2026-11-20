@@ -289,6 +289,23 @@ export function Card() @{
 		);
 	});
 
+	it("lowers Infinity, NaN and Number's constants, the non-finite ones by name", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Bounds() @{
+	let max = state(0);
+	<main>
+		<button onClick={() => (max = Number.POSITIVE_INFINITY)}>Uncap</button>
+		<button onClick={() => (max = -Infinity)}>Floor</button>
+		<button onClick={() => (max = Number.MAX_SAFE_INTEGER)}>Big</button>
+		<p>{String(max)}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const text = JSON.stringify(payload?.handlers);
+		expect(text).toContain('{"nonFinite":"Infinity"}');
+		expect(text).toContain(`{"literal":${Number.MAX_SAFE_INTEGER}}`);
+	});
+
 	it('refuses constructs with no native lowering yet', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Field() @{

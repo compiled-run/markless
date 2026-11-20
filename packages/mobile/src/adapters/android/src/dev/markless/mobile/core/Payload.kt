@@ -529,6 +529,16 @@ data class Payload(
 			fun sub(k: String) = expr(o.field(k, what), "$what.$k")
 			return when {
 				o.containsKey("cell") -> { o.only(setOf("cell"), what); Expr.CellRef(o.field("cell", what).str("$what.cell")) }
+				// A JSON literal cannot hold these; in memory they are numbers like any other.
+				o.containsKey("nonFinite") -> {
+					o.only(setOf("nonFinite"), what)
+					Expr.Literal(JsValue.Num(when (val name = o.field("nonFinite", what).str("$what.nonFinite")) {
+						"Infinity" -> Double.POSITIVE_INFINITY
+						"-Infinity" -> Double.NEGATIVE_INFINITY
+						"NaN" -> Double.NaN
+						else -> throw MarklessDecodeError("$what.nonFinite: unknown \"$name\"")
+					}))
+				}
 				o.containsKey("literal") -> { o.only(setOf("literal"), what); Expr.Literal(o.field("literal", what).let { if (it == Json.Null) JsValue.Null else scalar(it, "$what.literal") }) }
 				o.containsKey("unary") -> { o.only(setOf("unary", "value"), what); Expr.Unary(oneOf(o, "unary", UNARY, what), sub("value")) }
 				o.containsKey("binary") -> { o.only(setOf("binary", "left", "right"), what); Expr.Binary(oneOf(o, "binary", BINARY, what), sub("left"), sub("right")) }

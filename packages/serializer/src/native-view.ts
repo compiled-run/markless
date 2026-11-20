@@ -64,6 +64,8 @@ export type NativeBuiltin =
 export type NativeExpr =
 	| { readonly cell: string }
 	| { readonly literal: NativeScalar | null }
+	/** `Infinity`, `-Infinity` or `NaN` (the globals, `Number.POSITIVE_INFINITY` and the like), which a JSON literal cannot hold. */
+	| { readonly nonFinite: 'Infinity' | '-Infinity' | 'NaN' }
 	/**
 	 * `typeof` gives JavaScript's answer for a JSON value: 'string', 'number', 'boolean', or 'object' for an array, an
 	 * object and null. A native value spells `undefined` as null, so the compiler emits it only compared with 'string',
