@@ -59,6 +59,7 @@ import { createMutableSemanticGraphArtifact } from './passes/semantic-graph/type
 import { moduleIdOf } from './module-id.ts';
 import { lowerStateAccess } from './passes/state-lowering.ts';
 import { emitSymbolModules } from './passes/symbol-modules.ts';
+import { TYPE_STRIP_PARAMETER_PROPERTY_CODE } from './passes/semantic-graph/parameter-properties.ts';
 import {
 	createSymbolResolverModuleManifest,
 	emitSymbolResolverModule,
@@ -506,6 +507,15 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 			return {
 				...pass,
 				run({ inputs }) {
+					// The printer cannot strip a parameter property; the build already fails with that diagnostic.
+					if (
+						(inputs.semanticGraph as SemanticGraphArtifact).diagnostics.some(
+							(diagnostic) => diagnostic.code === TYPE_STRIP_PARAMETER_PROPERTY_CODE,
+						)
+					)
+						return {
+							symbolModules: { passId: 'symbol-modules', modules: [], diagnostics: [] },
+						};
 					return {
 						symbolModules: emitSymbolModules({
 							source: inputs.source as CompileTsrxModuleInput,

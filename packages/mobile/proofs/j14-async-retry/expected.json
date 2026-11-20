@@ -1,0 +1,48 @@
+{
+	"rung": "J14",
+	"name": "@catch (error, reset): reset runs a failed async value again; the @catch stays until an answer comes",
+	"server": "echo",
+	"steps": [
+		{
+			"visible": ["Retry", "Tries: 0", "Looking up"],
+			"absent": ["Failed: No entry for missing"],
+			"onWeb": {
+				"why": "The web's server render waits for the value before it sends the page; a phone shows @pending first.",
+				"visible": ["Retry", "Tries: 0", "Failed: No entry for missing"],
+				"absent": ["Looking up"]
+			}
+		},
+		{
+			"do": {
+				"wait": 5500
+			},
+			"visible": ["Failed: No entry for missing", "Try again"],
+			"absent": ["Looking up", "Tries: 1"],
+			"onWeb": {
+				"why": "The page came with @catch.",
+				"visible": ["Failed: No entry for missing"]
+			}
+		},
+		{
+			"do": {
+				"tap": "Try again"
+			},
+			"visible": ["Tries: 1", "Failed: No entry for missing"],
+			"absent": ["Tries: 0", "Looking up", "Asked: apple"]
+		},
+		{
+			"do": {
+				"tap": "Ask apple"
+			},
+			"visible": ["Asked: apple", "Failed: No entry for missing"],
+			"absent": ["Asked: missing", "Looking up", "Word: apple"]
+		},
+		{
+			"do": {
+				"wait": 5500
+			},
+			"visible": ["Word: apple"],
+			"absent": ["Failed: No entry for missing", "Try again"]
+		}
+	]
+}
