@@ -196,9 +196,17 @@ test('the styles ladder has one app folder per rung, in rung order', () => {
 		'S12',
 		'S13',
 		'S14',
+		'S15',
 	]);
 	for (const folder of styleRungFolders())
 		expect(existsSync(join(proofsDir, folder, 'pages'))).toBe(true);
+});
+
+test.each(allRungFolders())('%s: a rung that turns the phone leaves it upright', (folder) => {
+	const turns = readRung(folder).steps.flatMap((step) =>
+		step.do && 'orientation' in step.do ? [step.do.orientation] : [],
+	);
+	if (turns.length > 0) expect(turns.at(-1)).toBe('portrait');
 });
 
 test.each(allRungFolders())(

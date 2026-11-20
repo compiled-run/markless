@@ -1,0 +1,30 @@
+body {
+	margin: 0;
+	font-family: sans-serif;
+	color: #22223b;
+}
+
+.page {
+	padding: 16px;
+}
+
+.upright {
+	padding: 12px;
+	background: #f2e9e4;
+}
+
+.sideways {
+	display: none;
+}
+
+@media (orientation: landscape) {
+	.upright {
+		display: none;
+	}
+
+	.sideways {
+		display: block;
+		padding: 12px;
+		background: #c9ada7;
+	}
+}

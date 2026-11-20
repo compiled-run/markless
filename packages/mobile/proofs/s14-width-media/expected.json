@@ -1,6 +1,6 @@
 {
 	"rung": "S14",
-	"name": "Width @media: min-width, max-width, the range syntax and orientation change the layout at breakpoints and on rotation",
+	"name": "Width @media: min-width, max-width and the range syntax change the layout at breakpoints and on rotation",
 	"steps": [
 		{
 			"visible": ["Seeds sown on Monday", "Harvest on Saturday"],
