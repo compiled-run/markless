@@ -841,7 +841,13 @@ async function repeatsAcceptedTsrxSource(
 		return false;
 	}
 	const accepted = acceptedSources.get(ctx.file);
-	if (accepted?.source === source && accepted.timestamp !== ctx.timestamp) return true;
+	// An added file changes every glob listing, whatever an earlier change event already read.
+	if (
+		ctx.type !== 'create' &&
+		accepted?.source === source &&
+		accepted.timestamp !== ctx.timestamp
+	)
+		return true;
 	acceptedSources.set(ctx.file, { source, timestamp: ctx.timestamp });
 	return false;
 }
