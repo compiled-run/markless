@@ -1,0 +1,30 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u25-textbox-textarea",
+			"failure": null,
+			"installSeconds": 1.6883552500000005,
+			"flowSeconds": 17.868437416
+		},
+		{
+			"name": "u23-textbox",
+			"failure": null,
+			"installSeconds": 1.6735480410000019,
+			"flowSeconds": 15.750802375
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 1.6761264999999839,
+			"flowSeconds": 18.582787749999987
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 1.6815409579999978,
+			"flowSeconds": 28.784511333
+		}
+	]
+}

@@ -1,0 +1,36 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u28-row-rebuild",
+			"failure": null,
+			"installSeconds": 1.8925171249999986,
+			"flowSeconds": 22.77782120800001
+		},
+		{
+			"name": "u27-table-rows",
+			"failure": null,
+			"installSeconds": 1.711916041000004,
+			"flowSeconds": 15.749320749999999
+		},
+		{
+			"name": "u6-base-rows",
+			"failure": null,
+			"installSeconds": 1.6843585420000018,
+			"flowSeconds": 48.355855708000014
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 1.6526364999999932,
+			"flowSeconds": 16.018280750000006
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 1.6876844999999738,
+			"flowSeconds": 14.150592375000008
+		}
+	]
+}
