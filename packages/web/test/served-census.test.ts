@@ -1,4 +1,4 @@
-import { chromium } from '@playwright/test';
+
 import { expect, test } from 'vitest';
 import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../serializer/src/protocol-locator-paths.ts';
 import {
@@ -8,6 +8,7 @@ import {
 import { marklessRepairCensus } from '../src/fns/served-census-repair.ts';
 import { marklessServedCensus } from '../src/inline/served-census.ts';
 import { servedElementTree, servedLocatorPaths } from '../src/locator-paths.ts';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 const served =
 	'<main><ul><li>a</li><li>b</li></ul><p>c</p><section><span>d</span></section><svg><linearGradient></linearGradient></svg></main>';
@@ -18,7 +19,7 @@ test('the inline census flags a page a script reordered without changing its ele
 		.toString()
 		.replace('__MARKLESS_PAGE_START__', JSON.stringify(PROTOCOL_CONTAINER_START_COMMENT))
 		.replace('__MARKLESS_PAGE_END__', JSON.stringify(PROTOCOL_CONTAINER_END_COMMENT));
-	const browser = await chromium.launch({ headless: true });
+	const browser = await launchBrowser();
 	try {
 		const page = await browser.newPage();
 		await page.setContent('<!doctype html><body></body>');

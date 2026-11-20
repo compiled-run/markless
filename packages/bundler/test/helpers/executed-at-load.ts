@@ -2,8 +2,9 @@ import { readFile, stat } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { extname, resolve } from 'pathe';
-import { chromium, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
 import { startBuiltServer as startNitroServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 export type ServedApp = { readonly url: string; close(): Promise<void> };
 
@@ -56,7 +57,7 @@ export async function executedAtLoad(
 	url: string,
 	options: { readonly settledSelector?: string } = {},
 ): Promise<number> {
-	const browser = await chromium.launch();
+	const browser = await launchBrowser();
 	try {
 		const page = await browser.newPage();
 		// Headless Chromium on Linux sends its resting cursor's pointerover after first layout; that is input.
@@ -102,7 +103,7 @@ export async function executedByFirstClick(
 	selector: string,
 	settled: (page: Page) => Promise<unknown>,
 ): Promise<number> {
-	const browser = await chromium.launch();
+	const browser = await launchBrowser();
 	try {
 		const page = await browser.newPage();
 		const origin = new URL(url).origin;

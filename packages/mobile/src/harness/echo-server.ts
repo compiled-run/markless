@@ -1,5 +1,24 @@
+import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { ECHO_SERVER_PORT } from '../../proofs/ladder.ts';
+
+/** The processes with a TCP socket on a local port, listening or connected, as `lsof` or `ss` names them. */
+function portHolder(port: number): string {
+	const probes: Array<[string, string[]]> = [
+		['lsof', ['-nP', `-iTCP:${port}`]],
+		['ss', ['-Htanp', `sport = :${port}`]],
+	];
+	for (const [command, args] of probes) {
+		try {
+			const found = execFileSync(command, args, {
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'ignore'],
+			}).trim();
+			if (found) return found;
+		} catch {}
+	}
+	return 'a process neither lsof nor ss could name';
+}
 
 /** One request the echo server answered, as the test reads it back. */
 export type EchoRequest = {
@@ -45,7 +64,16 @@ export async function startEchoServer(port = ECHO_SERVER_PORT): Promise<{
 		});
 	});
 	await new Promise<void>((resolve, reject) => {
-		server.once('error', reject);
+		server.once('error', (error: NodeJS.ErrnoException) =>
+			reject(
+				error.code === 'EADDRINUSE'
+					? new Error(
+							`the echo server cannot listen on 127.0.0.1:${port}: it is in use by ${portHolder(port)}`,
+							{ cause: error },
+						)
+					: error,
+			),
+		);
 		server.listen(port, '127.0.0.1', () => resolve());
 	});
 	return {
