@@ -39,50 +39,10 @@
 							"element": "a",
 							"parent": "component-edge:0/h0",
 							"attributes": {
+								"aria-current": "page",
+								"aria-label": "Home tab, open",
 								"href": "/"
 							},
-							"bindings": [
-								{
-									"attribute": "aria-current",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "home"
-											},
-											"right": {
-												"literal": "home"
-											}
-										},
-										"whenTrue": {
-											"literal": "page"
-										},
-										"whenFalse": {
-											"literal": null
-										}
-									}
-								},
-								{
-									"attribute": "aria-label",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "home"
-											},
-											"right": {
-												"literal": "home"
-											}
-										},
-										"whenTrue": {
-											"literal": "Home tab, open"
-										},
-										"whenFalse": {
-											"literal": "Home tab"
-										}
-									}
-								}
-							],
 							"defaultStyle": {
 								"inline": true,
 								"line": "underline",
@@ -105,50 +65,9 @@
 							"element": "a",
 							"parent": "component-edge:0/h0",
 							"attributes": {
+								"aria-label": "About tab",
 								"href": "/about"
 							},
-							"bindings": [
-								{
-									"attribute": "aria-current",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "home"
-											},
-											"right": {
-												"literal": "about"
-											}
-										},
-										"whenTrue": {
-											"literal": "page"
-										},
-										"whenFalse": {
-											"literal": null
-										}
-									}
-								},
-								{
-									"attribute": "aria-label",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "home"
-											},
-											"right": {
-												"literal": "about"
-											}
-										},
-										"whenTrue": {
-											"literal": "About tab, open"
-										},
-										"whenFalse": {
-											"literal": "About tab"
-										}
-									}
-								}
-							],
 							"defaultStyle": {
 								"inline": true,
 								"line": "underline",
@@ -337,50 +256,9 @@
 							"element": "a",
 							"parent": "component-edge:0/h0",
 							"attributes": {
+								"aria-label": "Home tab",
 								"href": "/"
 							},
-							"bindings": [
-								{
-									"attribute": "aria-current",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "about"
-											},
-											"right": {
-												"literal": "home"
-											}
-										},
-										"whenTrue": {
-											"literal": "page"
-										},
-										"whenFalse": {
-											"literal": null
-										}
-									}
-								},
-								{
-									"attribute": "aria-label",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "about"
-											},
-											"right": {
-												"literal": "home"
-											}
-										},
-										"whenTrue": {
-											"literal": "Home tab, open"
-										},
-										"whenFalse": {
-											"literal": "Home tab"
-										}
-									}
-								}
-							],
 							"defaultStyle": {
 								"inline": true,
 								"line": "underline",
@@ -403,50 +281,10 @@
 							"element": "a",
 							"parent": "component-edge:0/h0",
 							"attributes": {
+								"aria-current": "page",
+								"aria-label": "About tab, open",
 								"href": "/about"
 							},
-							"bindings": [
-								{
-									"attribute": "aria-current",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "about"
-											},
-											"right": {
-												"literal": "about"
-											}
-										},
-										"whenTrue": {
-											"literal": "page"
-										},
-										"whenFalse": {
-											"literal": null
-										}
-									}
-								},
-								{
-									"attribute": "aria-label",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "about"
-											},
-											"right": {
-												"literal": "about"
-											}
-										},
-										"whenTrue": {
-											"literal": "About tab, open"
-										},
-										"whenFalse": {
-											"literal": "About tab"
-										}
-									}
-								}
-							],
 							"defaultStyle": {
 								"inline": true,
 								"line": "underline",
@@ -526,13 +364,17 @@
 			},
 			{
 				"pattern": "/items/[id]",
-				"params": ["id"],
+				"params": [
+					"id"
+				],
 				"page": {
 					"version": "markless.native-view/0",
 					"component": "Item",
 					"route": {
 						"pattern": "/items/[id]",
-						"params": ["id"]
+						"params": [
+							"id"
+						]
 					},
 					"cells": [],
 					"nodes": [
@@ -554,50 +396,9 @@
 							"element": "a",
 							"parent": "component-edge:0/h0",
 							"attributes": {
+								"aria-label": "Home tab",
 								"href": "/"
 							},
-							"bindings": [
-								{
-									"attribute": "aria-current",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "item"
-											},
-											"right": {
-												"literal": "home"
-											}
-										},
-										"whenTrue": {
-											"literal": "page"
-										},
-										"whenFalse": {
-											"literal": null
-										}
-									}
-								},
-								{
-									"attribute": "aria-label",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "item"
-											},
-											"right": {
-												"literal": "home"
-											}
-										},
-										"whenTrue": {
-											"literal": "Home tab, open"
-										},
-										"whenFalse": {
-											"literal": "Home tab"
-										}
-									}
-								}
-							],
 							"defaultStyle": {
 								"inline": true,
 								"line": "underline",
@@ -620,50 +421,9 @@
 							"element": "a",
 							"parent": "component-edge:0/h0",
 							"attributes": {
+								"aria-label": "About tab",
 								"href": "/about"
 							},
-							"bindings": [
-								{
-									"attribute": "aria-current",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "item"
-											},
-											"right": {
-												"literal": "about"
-											}
-										},
-										"whenTrue": {
-											"literal": "page"
-										},
-										"whenFalse": {
-											"literal": null
-										}
-									}
-								},
-								{
-									"attribute": "aria-label",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "item"
-											},
-											"right": {
-												"literal": "about"
-											}
-										},
-										"whenTrue": {
-											"literal": "About tab, open"
-										},
-										"whenFalse": {
-											"literal": "About tab"
-										}
-									}
-								}
-							],
 							"defaultStyle": {
 								"inline": true,
 								"line": "underline",
@@ -794,13 +554,27 @@
 	},
 	"open": "/",
 	"initial": {
-		"stack": ["/"],
+		"stack": [
+			"/"
+		],
 		"title": "Home",
 		"texts": [
-			["component-edge:0/component-edge:0:text0", "Home"],
-			["component-edge:0/component-edge:1:text0", "About"],
-			["h2:text0", "Choose pear"],
-			["component-edge:1:text0", "Open apple"]
+			[
+				"component-edge:0/component-edge:0:text0",
+				"Home"
+			],
+			[
+				"component-edge:0/component-edge:1:text0",
+				"About"
+			],
+			[
+				"h2:text0",
+				"Choose pear"
+			],
+			[
+				"component-edge:1:text0",
+				"Open apple"
+			]
 		]
 	},
 	"steps": [
@@ -822,13 +596,27 @@
 					"value": "Open pear"
 				}
 			],
-			"stack": ["/"],
+			"stack": [
+				"/"
+			],
 			"title": "Home",
 			"texts": [
-				["component-edge:0/component-edge:0:text0", "Home"],
-				["component-edge:0/component-edge:1:text0", "About"],
-				["h2:text0", "Choose pear"],
-				["component-edge:1:text0", "Open pear"]
+				[
+					"component-edge:0/component-edge:0:text0",
+					"Home"
+				],
+				[
+					"component-edge:0/component-edge:1:text0",
+					"About"
+				],
+				[
+					"h2:text0",
+					"Choose pear"
+				],
+				[
+					"component-edge:1:text0",
+					"Open pear"
+				]
 			]
 		},
 		{
@@ -845,13 +633,28 @@
 					}
 				}
 			],
-			"stack": ["/", "/items/pear"],
+			"stack": [
+				"/",
+				"/items/pear"
+			],
 			"title": "Item",
 			"texts": [
-				["component-edge:0/component-edge:0:text0", "Home"],
-				["component-edge:0/component-edge:1:text0", "About"],
-				["h2:text0", "Item pear"],
-				["component-edge:1/component-edge:0:text0", "Back home"]
+				[
+					"component-edge:0/component-edge:0:text0",
+					"Home"
+				],
+				[
+					"component-edge:0/component-edge:1:text0",
+					"About"
+				],
+				[
+					"h2:text0",
+					"Item pear"
+				],
+				[
+					"component-edge:1/component-edge:0:text0",
+					"Back home"
+				]
 			]
 		},
 		{
@@ -859,13 +662,27 @@
 				"event": "back"
 			},
 			"journal": [],
-			"stack": ["/"],
+			"stack": [
+				"/"
+			],
 			"title": "Home",
 			"texts": [
-				["component-edge:0/component-edge:0:text0", "Home"],
-				["component-edge:0/component-edge:1:text0", "About"],
-				["h2:text0", "Choose pear"],
-				["component-edge:1:text0", "Open pear"]
+				[
+					"component-edge:0/component-edge:0:text0",
+					"Home"
+				],
+				[
+					"component-edge:0/component-edge:1:text0",
+					"About"
+				],
+				[
+					"h2:text0",
+					"Choose pear"
+				],
+				[
+					"component-edge:1:text0",
+					"Open pear"
+				]
 			]
 		},
 		{
@@ -880,12 +697,24 @@
 					"params": {}
 				}
 			],
-			"stack": ["/", "/about"],
+			"stack": [
+				"/",
+				"/about"
+			],
 			"title": "About",
 			"texts": [
-				["component-edge:0/component-edge:0:text0", "Home"],
-				["component-edge:0/component-edge:1:text0", "About"],
-				["h2:text0", "About these links"]
+				[
+					"component-edge:0/component-edge:0:text0",
+					"Home"
+				],
+				[
+					"component-edge:0/component-edge:1:text0",
+					"About"
+				],
+				[
+					"h2:text0",
+					"About these links"
+				]
 			]
 		}
 	]

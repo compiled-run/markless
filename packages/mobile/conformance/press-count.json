@@ -1,0 +1,170 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "PressCount",
+		"cells": [
+			{
+				"id": "state:note",
+				"name": "note",
+				"initial": "none"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "button",
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Press"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"cell": "state:note"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:note",
+						"value": {
+							"if": {
+								"binary": ">=",
+								"left": {
+									"event": "detail"
+								},
+								"right": {
+									"literal": 2
+								}
+							},
+							"whenTrue": {
+								"template": [
+									"twice (",
+									{
+										"event": "detail"
+									},
+									")"
+								]
+							},
+							"whenFalse": {
+								"template": [
+									"once (",
+									{
+										"event": "detail"
+									},
+									")"
+								]
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Press"
+		],
+		[
+			"h2:text0",
+			"none"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "once (1)"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1",
+				"detail": 1
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1",
+				"detail": 2
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "twice (2)"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1",
+				"detail": 3
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "twice (3)"
+				}
+			]
+		}
+	]
+}

@@ -117,7 +117,9 @@
 				"list": {
 					"cell": "state:rows"
 				},
-				"key": ["id"]
+				"key": [
+					"id"
+				]
 			},
 			{
 				"kind": "element",
@@ -245,14 +247,42 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Idle 0"],
-		["h2:text0", "Seen "],
-		["h3:text0@a", "a"],
-		["h3:text0@b", "b"],
-		["h4:text0", "Toggle"]
+		[
+			"h1:text0",
+			"Idle 0"
+		],
+		[
+			"h2:text0",
+			"Seen "
+		],
+		[
+			"h3:text0@a",
+			"a"
+		],
+		[
+			"h3:text0@b",
+			"b"
+		],
+		[
+			"h4:text0",
+			"Toggle"
+		]
 	],
-	"initialArms": [["branch-site:0", 0]],
-	"initialRows": [["repeat:0", ["a", "b"]]],
+	"initialArms": [
+		[
+			"branch-site:0",
+			0
+		]
+	],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"a",
+				"b"
+			]
+		]
+	],
 	"steps": [
 		{
 			"action": {

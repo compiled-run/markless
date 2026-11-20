@@ -278,12 +278,23 @@
 	},
 	"open": "/",
 	"initial": {
-		"stack": ["/"],
+		"stack": [
+			"/"
+		],
 		"title": "Home",
 		"texts": [
-			["h2:text0", "Data only"],
-			["h3:text0", "Taps 0"],
-			["component-edge:0:text0", "Open script"]
+			[
+				"h2:text0",
+				"Data only"
+			],
+			[
+				"h3:text0",
+				"Taps 0"
+			],
+			[
+				"component-edge:0:text0",
+				"Open script"
+			]
 		]
 	},
 	"steps": [
@@ -299,12 +310,23 @@
 					"value": "Taps 1"
 				}
 			],
-			"stack": ["/"],
+			"stack": [
+				"/"
+			],
 			"title": "Home",
 			"texts": [
-				["h2:text0", "Data only"],
-				["h3:text0", "Taps 1"],
-				["component-edge:0:text0", "Open script"]
+				[
+					"h2:text0",
+					"Data only"
+				],
+				[
+					"h3:text0",
+					"Taps 1"
+				],
+				[
+					"component-edge:0:text0",
+					"Open script"
+				]
 			]
 		},
 		{
@@ -319,12 +341,24 @@
 					"params": {}
 				}
 			],
-			"stack": ["/", "/script"],
+			"stack": [
+				"/",
+				"/script"
+			],
 			"title": "Script",
 			"texts": [
-				["h2:text0", "Script page"],
-				["h3:text0", "Stamp: none"],
-				["h4:text0", "Stamp"]
+				[
+					"h2:text0",
+					"Script page"
+				],
+				[
+					"h3:text0",
+					"Stamp: none"
+				],
+				[
+					"h4:text0",
+					"Stamp"
+				]
 			]
 		},
 		{
@@ -339,12 +373,24 @@
 					"value": "Stamp: 2026-11-18T00:00:00.000Z"
 				}
 			],
-			"stack": ["/", "/script"],
+			"stack": [
+				"/",
+				"/script"
+			],
 			"title": "Script",
 			"texts": [
-				["h2:text0", "Script page"],
-				["h3:text0", "Stamp: 2026-11-18T00:00:00.000Z"],
-				["h4:text0", "Stamp"]
+				[
+					"h2:text0",
+					"Script page"
+				],
+				[
+					"h3:text0",
+					"Stamp: 2026-11-18T00:00:00.000Z"
+				],
+				[
+					"h4:text0",
+					"Stamp"
+				]
 			]
 		}
 	]

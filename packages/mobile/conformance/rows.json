@@ -27,13 +27,29 @@
 				"id": "component-edge:0/shared:src/rows.tsrx#lineState/state:line.open",
 				"name": "line.open",
 				"initial": false,
-				"row": "repeat:0"
+				"row": "repeat:0",
+				"rebuiltBy": [
+					{
+						"member": {
+							"item": "repeat:0"
+						},
+						"property": "label"
+					}
+				]
 			},
 			{
 				"id": "component-edge:0/state:picks",
 				"name": "picks",
 				"initial": 0,
-				"row": "repeat:0"
+				"row": "repeat:0",
+				"rebuiltBy": [
+					{
+						"member": {
+							"item": "repeat:0"
+						},
+						"property": "label"
+					}
+				]
 			}
 		],
 		"nodes": [

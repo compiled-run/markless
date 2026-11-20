@@ -448,23 +448,11 @@
 								}
 							},
 							"right": {
-								"logical": "&&",
-								"left": {
-									"binary": "!==",
-									"left": {
-										"literal": "component-edge:2/h2"
-									},
-									"right": {
-										"literal": null
-									}
+								"contains": {
+									"literal": "component-edge:2/h2"
 								},
-								"right": {
-									"contains": {
-										"literal": "component-edge:2/h2"
-									},
-									"node": {
-										"focused": true
-									}
+								"node": {
+									"focused": true
 								}
 							}
 						},

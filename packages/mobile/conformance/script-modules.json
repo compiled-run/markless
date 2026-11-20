@@ -197,11 +197,26 @@
 		}
 	},
 	"initial": [
-		["h1:text0", "Library"],
-		["h2:text0", "Heading: none"],
-		["h3:text0", "Price: none"],
-		["h4:text0", "Title case"],
-		["h5:text0", "Format price"]
+		[
+			"h1:text0",
+			"Library"
+		],
+		[
+			"h2:text0",
+			"Heading: none"
+		],
+		[
+			"h3:text0",
+			"Price: none"
+		],
+		[
+			"h4:text0",
+			"Title case"
+		],
+		[
+			"h5:text0",
+			"Format price"
+		]
 	],
 	"steps": [
 		{

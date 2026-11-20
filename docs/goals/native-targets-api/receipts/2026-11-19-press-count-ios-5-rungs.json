@@ -1,0 +1,36 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u32-double-tap",
+			"failure": null,
+			"installSeconds": 0.33134916700000033,
+			"flowSeconds": 21.842935
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.28765549999999346,
+			"flowSeconds": 18.503343041
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 0.2752244170000049,
+			"flowSeconds": 19.765559291999992
+		},
+		{
+			"name": "u27-table-rows",
+			"failure": null,
+			"installSeconds": 0.2806479159999872,
+			"flowSeconds": 20.756751332999993
+		},
+		{
+			"name": "u24-pagination-links",
+			"failure": null,
+			"installSeconds": 0.26343825000000654,
+			"flowSeconds": 21.191566542000015
+		}
+	]
+}

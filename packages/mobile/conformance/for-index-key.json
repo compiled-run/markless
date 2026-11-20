@@ -233,15 +233,45 @@
 		}
 	},
 	"initial": [
-		["h1:text0", "Lines"],
-		["h2:text0@0", "Same line"],
-		["h2:text0@1", "Same line"],
-		["h2:text0@2", "Last line"],
-		["h3:text0", "Add a line"],
-		["h4:text0", "Change the first"],
-		["h5:text0", "Drop the last"]
+		[
+			"h1:text0",
+			"Lines"
+		],
+		[
+			"h2:text0@0",
+			"Same line"
+		],
+		[
+			"h2:text0@1",
+			"Same line"
+		],
+		[
+			"h2:text0@2",
+			"Last line"
+		],
+		[
+			"h3:text0",
+			"Add a line"
+		],
+		[
+			"h4:text0",
+			"Change the first"
+		],
+		[
+			"h5:text0",
+			"Drop the last"
+		]
 	],
-	"initialRows": [["repeat:0", ["0", "1", "2"]]],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"0",
+				"1",
+				"2"
+			]
+		]
+	],
 	"steps": [
 		{
 			"action": {
@@ -252,7 +282,12 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["0", "1", "2", "3"]
+					"keys": [
+						"0",
+						"1",
+						"2",
+						"3"
+					]
 				}
 			]
 		},
@@ -278,7 +313,11 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["0", "1", "2"]
+					"keys": [
+						"0",
+						"1",
+						"2"
+					]
 				}
 			]
 		},
@@ -291,7 +330,10 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["0", "1"]
+					"keys": [
+						"0",
+						"1"
+					]
 				}
 			]
 		}

@@ -588,7 +588,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -618,7 +620,9 @@
 														},
 														"arguments": [
 															{
-																"lambda": ["formdata:entry"],
+																"lambda": [
+																	"formdata:entry"
+																],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -661,7 +665,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -691,7 +697,9 @@
 														},
 														"arguments": [
 															{
-																"lambda": ["formdata:entry"],
+																"lambda": [
+																	"formdata:entry"
+																],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -734,7 +742,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -764,7 +774,9 @@
 														},
 														"arguments": [
 															{
-																"lambda": ["formdata:entry"],
+																"lambda": [
+																	"formdata:entry"
+																],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -807,7 +819,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -837,7 +851,9 @@
 														},
 														"arguments": [
 															{
-																"lambda": ["formdata:entry"],
+																"lambda": [
+																	"formdata:entry"
+																],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -880,7 +896,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -910,7 +928,9 @@
 														},
 														"arguments": [
 															{
-																"lambda": ["formdata:entry"],
+																"lambda": [
+																	"formdata:entry"
+																],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -952,7 +972,9 @@
 											},
 											"arguments": [
 												{
-													"lambda": ["formdata:entry"],
+													"lambda": [
+														"formdata:entry"
+													],
 													"body": {
 														"binary": "===",
 														"left": {
@@ -975,7 +997,9 @@
 										},
 										"arguments": [
 											{
-												"lambda": ["formdata:entry"],
+												"lambda": [
+													"formdata:entry"
+												],
 												"body": {
 													"member": {
 														"local": "formdata:entry"
@@ -998,7 +1022,9 @@
 											},
 											"arguments": [
 												{
-													"lambda": ["formdata:entry"],
+													"lambda": [
+														"formdata:entry"
+													],
 													"body": {
 														"binary": "===",
 														"left": {
@@ -1097,7 +1123,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -1127,7 +1155,9 @@
 														},
 														"arguments": [
 															{
-																"lambda": ["formdata:entry"],
+																"lambda": [
+																	"formdata:entry"
+																],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -1205,7 +1235,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -1235,7 +1267,9 @@
 														},
 														"arguments": [
 															{
-																"lambda": ["formdata:entry"],
+																"lambda": [
+																	"formdata:entry"
+																],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -1670,7 +1704,10 @@
 						"kind": "checkbox"
 					}
 				],
-				"submitters": ["h9", "h10"]
+				"submitters": [
+					"h9",
+					"h10"
+				]
 			},
 			{
 				"node": "h14",
@@ -1704,12 +1741,16 @@
 						"kind": "text"
 					}
 				],
-				"submitters": ["h21"]
+				"submitters": [
+					"h21"
+				]
 			},
 			{
 				"node": "h23",
 				"fields": [],
-				"submitters": ["h24"],
+				"submitters": [
+					"h24"
+				],
 				"authoredAriaDisabled": true
 			}
 		],
@@ -1992,30 +2033,102 @@
 		}
 	},
 	"initial": [
-		["h9:text0", "Send"],
-		["h10:text0", "Send anyway"],
-		["h11:text0", "Agree"],
-		["h12:text0", ""],
-		["h13:text0", "0"],
-		["h21:text0", "Save"],
-		["h22:text0", "Idle"],
-		["h24:text0", "Mine"]
+		[
+			"h9:text0",
+			"Send"
+		],
+		[
+			"h10:text0",
+			"Send anyway"
+		],
+		[
+			"h11:text0",
+			"Agree"
+		],
+		[
+			"h12:text0",
+			""
+		],
+		[
+			"h13:text0",
+			"0"
+		],
+		[
+			"h21:text0",
+			"Save"
+		],
+		[
+			"h22:text0",
+			"Idle"
+		],
+		[
+			"h24:text0",
+			"Mine"
+		]
 	],
 	"initialAttributes": [
-		["h7", "tabindex", "-1"],
-		["h1", "aria-busy", null],
-		["h9", "aria-disabled", null],
-		["h10", "aria-disabled", null],
-		["h14", "aria-busy", null],
-		["h16", "aria-busy", null],
-		["h19", "aria-busy", null],
-		["h21", "aria-disabled", null],
-		["h23", "aria-busy", null]
+		[
+			"h7",
+			"tabindex",
+			"-1"
+		],
+		[
+			"h1",
+			"aria-busy",
+			null
+		],
+		[
+			"h9",
+			"aria-disabled",
+			null
+		],
+		[
+			"h10",
+			"aria-disabled",
+			null
+		],
+		[
+			"h14",
+			"aria-busy",
+			null
+		],
+		[
+			"h16",
+			"aria-busy",
+			null
+		],
+		[
+			"h19",
+			"aria-busy",
+			null
+		],
+		[
+			"h21",
+			"aria-disabled",
+			null
+		],
+		[
+			"h23",
+			"aria-busy",
+			null
+		]
 	],
-	"initialProperties": [["h3", "value", "Bo"]],
+	"initialProperties": [
+		[
+			"h3",
+			"value",
+			"Bo"
+		]
+	],
 	"initialChecks": [
-		["h7", false],
-		["h8", false]
+		[
+			"h7",
+			false
+		],
+		[
+			"h8",
+			false
+		]
 	],
 	"steps": [
 		{

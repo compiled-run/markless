@@ -1,0 +1,285 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "FieldText",
+		"cells": [
+			{
+				"id": "state:shown",
+				"name": "shown",
+				"initial": "nothing"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "input",
+				"parent": "h0",
+				"attributes": {
+					"aria-label": "Name",
+					"value": "Ada"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Read"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"cell": "state:shown"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "keydown",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h1",
+				"event": "focus",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h1",
+				"event": "blur",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "h1",
+				"event": "input",
+				"handler": "handler:h1/edit"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"event": "key"
+							},
+							"right": {
+								"literal": "Enter"
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "assign",
+								"cell": "state:shown",
+								"value": {
+									"template": [
+										"entered ",
+										{
+											"field": "h1"
+										},
+										""
+									]
+								}
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:shown",
+						"value": {
+							"literal": "typing"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:shown",
+						"value": {
+							"template": [
+								"left ",
+								{
+									"field": "h1"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:shown",
+						"value": {
+							"template": [
+								"read ",
+								{
+									"field": "h1"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:h1/edit",
+				"ops": []
+			}
+		]
+	},
+	"initial": [
+		[
+			"h2:text0",
+			"Read"
+		],
+		[
+			"h3:text0",
+			"nothing"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "read Ada"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "focus",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "typing"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h1",
+				"key": "B"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h1",
+				"value": "Bea"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h1",
+				"key": "Enter"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "entered Bea"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "blur",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "left Bea"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "read Bea"
+				}
+			]
+		}
+	]
+}

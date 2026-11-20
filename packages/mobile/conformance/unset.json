@@ -297,13 +297,34 @@
 		]
 	},
 	"initial": [
-		["component-edge:0/h1:text0", "nothing"],
-		["component-edge:0/h2:text0", "unset"],
-		["component-edge:0/h3:text0", "Picked 0"],
-		["component-edge:0/h4:text0", "Tea"],
-		["component-edge:0/h5:text0", "Clear"],
-		["h7:text0", "no note"],
-		["h8:text0", "Note"]
+		[
+			"component-edge:0/h1:text0",
+			"nothing"
+		],
+		[
+			"component-edge:0/h2:text0",
+			"unset"
+		],
+		[
+			"component-edge:0/h3:text0",
+			"Picked 0"
+		],
+		[
+			"component-edge:0/h4:text0",
+			"Tea"
+		],
+		[
+			"component-edge:0/h5:text0",
+			"Clear"
+		],
+		[
+			"h7:text0",
+			"no note"
+		],
+		[
+			"h8:text0",
+			"Note"
+		]
 	],
 	"steps": [
 		{

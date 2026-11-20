@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: u26-table
+---
+- launchApp:
+      clearState: true
+- assertVisible: Files
+- assertVisible: README\.md
+- assertVisible: LICENSE
+- assertVisible: secret\.key
+- assertVisible: Picked none
+- assertNotVisible: Picked readme
+- assertNotVisible: Picked license
+- tapOn: LICENSE
+- assertVisible: Picked license
+- assertNotVisible: Picked none
+- assertVisible: Picked license
+- assertNotVisible: Picked none
+- assertNotVisible: Picked readme
+- tapOn: README\.md
+- assertVisible: Picked readme
+- assertNotVisible: Picked license
+- assertVisible: Picked readme
+- assertNotVisible: Picked none
+- assertNotVisible: Picked license
