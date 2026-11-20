@@ -4529,7 +4529,12 @@ export function createNativeViewPayload(
 				return value ? [{ attribute: target.name, value }] : [];
 			}
 			if (target.kind === 'class') {
-				const given = exprOf(read.expression, 'the class', scope);
+				const given = renderValue(
+					read.expression,
+					() => readScript(scope.module, read.sourceSpan),
+					'the class',
+					scope,
+				);
 				if (!given) return [];
 				const value: NativeExpr =
 					target.trueValue !== undefined && target.falseValue !== undefined

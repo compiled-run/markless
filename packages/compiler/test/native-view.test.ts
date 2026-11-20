@@ -3144,6 +3144,22 @@ export function Account() @{
 	expect(payload!.nodes.some((node) => 'arm' in node && node.arm?.index === 2)).toBe(false);
 });
 
+it('runs a class a helper computes as JavaScript, keeping the style scope around it', async () => {
+	const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function cn(...parts: Array<string | false>): string { return parts.filter(Boolean).join(' '); }
+export function Note() @{
+	const shown = state({ loud: false });
+	<main>
+		<style>.note { color: red; }</style>
+		<p class={cn('note', shown.loud && 'loud')}>A</p>
+	</main>
+}`);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	const note = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'p');
+	if (note?.kind !== 'element') throw new Error('no p');
+	expect(note.bindings).toMatchObject([{ attribute: 'class', value: { if: { script: expect.any(String) } } }]);
+});
+
 describe('linked stylesheets', () => {
 	const source = `export function Page() @{
 	<main>
