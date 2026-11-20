@@ -303,6 +303,97 @@
 	},
 	"slotHolders": {
 		"why": "Each listed test keeps more memory outside the build slot than scripts/ci/unit-budget.mjs allows (SLOT_HOLDER_MB), measured by CI's unit budget (peakMb in that run). It holds a build slot for its whole run (scripts/ci/in-worker-build-slot.ts), so no build overlaps it and a shard's peak does not depend on which files happen to run together.",
-		"tests": []
+		"tests": [
+			{
+				"test": "packages/analyzer/test/project-graph.test.ts",
+				"peakMb": 1633,
+				"run": "44705540466",
+				"why": "builds the analyzer project graph of the repo in its worker and spawns app builds"
+			},
+			{
+				"test": "packages/bundler/test/arm-flip-same-task.test.ts",
+				"peakMb": 1406,
+				"run": "44705540466",
+				"why": "builds through execFile, outside the build slot, and drives its own Chromium"
+			},
+			{
+				"test": "packages/bundler/test/build-determinism.test.ts",
+				"peakMb": 1449,
+				"run": "44705540466",
+				"why": "runs `pnpm --dir <demo> build` through execFile, outside the build slot"
+			},
+			{
+				"test": "packages/bundler/test/build-emit-burst.test.ts",
+				"peakMb": 1451,
+				"run": "44705540466",
+				"why": "builds through execFile, outside the build slot"
+			},
+			{
+				"test": "packages/bundler/test/kernel-placed-rows-fixture.test.ts",
+				"peakMb": 1638,
+				"run": "44705540466",
+				"why": "builds through execFile, outside the build slot, serves the app and drives its own Chromium"
+			},
+			{
+				"test": "packages/bundler/test/music-player-csr-budget.test.ts",
+				"peakMb": 1599,
+				"run": "44705540466",
+				"why": "builds the music-player demo under its own demo lock, not the build slot, and serves it"
+			},
+			{
+				"test": "packages/bundler/test/music-player-ssr-budget.test.ts",
+				"peakMb": 1745,
+				"run": "44705540466",
+				"why": "builds the music-player demo under its own demo lock, not the build slot, and serves it"
+			},
+			{
+				"test": "packages/bundler/test/render-order-sweep.test.ts",
+				"peakMb": 2094,
+				"run": "44705540466",
+				"why": "SSR-loads every @markless/ui scenario through a Vite dev server (in its worker on main; in child processes with #981)"
+			},
+			{
+				"test": "packages/bundler/test/ssr-prerender-wake-fixture.test.ts",
+				"peakMb": 1506,
+				"run": "44705540466",
+				"why": "builds through execFile, outside the build slot, serves the app and drives its own Chromium"
+			},
+			{
+				"test": "packages/bundler/test/ssr-row-outer-read-fixture.test.ts",
+				"peakMb": 1500,
+				"run": "44705540466",
+				"why": "builds and serves its fixture and drives its own Chromium"
+			},
+			{
+				"test": "packages/cli/test/starter-build.test.ts",
+				"peakMb": 1543,
+				"run": "44705540466",
+				"why": "creates, builds and serves a starter app through the CLI in child processes, outside the build slot"
+			},
+			{
+				"test": "packages/mobile/test/phone-runner.test.ts",
+				"peakMb": 1682,
+				"run": "44705540466",
+				"why": "builds the analyzer project graph in its worker"
+			},
+			{
+				"test": "packages/router/test/navigation-chunk.test.ts",
+				"peakMb": 1719,
+				"run": "44705540466",
+				"why": "runs `pnpm --filter @markless/fixture-router build` through execFile, outside the build slot"
+			},
+			{
+				"test": "packages/router/test/package-build.test.ts",
+				"peakMb": 1695,
+				"run": "44705540466",
+				"why": "runs `pnpm exec vp pack` on @markless/router through execFile, outside the build slot"
+			},
+			{
+				"test": "packages/vitest-browser/test/ssr-module-cache-rerun.test.ts",
+				"peakMb": 1400,
+				"run": "44705540466",
+				"why": "runs a vitest browser project through execFile, outside the build slot"
+			}
+		]
 	}
 }
