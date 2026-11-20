@@ -1,5 +1,9 @@
 import { marklessRunAtCurrentTarget } from '../event-current-target.ts';
 import type { SsrDataResidue, SsrDataSlot } from '../ssr-data/renderer.ts';
+import type { ProtocolRepeatKeyParts } from '@markless/serializer/protocol';
+
+// False when no @for of the app joins its key from fields, so each joined-key branch folds away.
+declare const __MARKLESS_JOINED_KEYS__: boolean;
 
 // The direct-DOM renderer runs in the browser against real DOM. Chunk
 // coordinates address elements, so the walk below hands back elements.
@@ -53,6 +57,7 @@ type DirectRepeat = {
 	readonly collectionGraphNodeId: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	readonly rowChunkId: string;
 	readonly emptyChunkId?: string;
 	readonly classWrites: ReadonlyArray<DirectClassWrite>;
@@ -396,7 +401,10 @@ function syncDirectRepeat(
 	let canAppend = hadRows && state.keys.length < items.length;
 	for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 		const item = items[itemIndex];
-		const key = readMarklessPublicPath(item, repeat.keyPath);
+		const key =
+			(typeof __MARKLESS_JOINED_KEYS__ === 'undefined' || __MARKLESS_JOINED_KEYS__) && repeat.keyParts
+				? repeat.keyParts.map((p) => (typeof p == 'string' ? p : `${readMarklessPublicPath(item, p)}`)).join('')
+				: readMarklessPublicPath(item, repeat.keyPath);
 		assertUniqueMarklessPublicRepeatKey(
 			seenKeys,
 			repeat.repeatId,

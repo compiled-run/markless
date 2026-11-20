@@ -24,6 +24,10 @@ export type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	/** The target-constant analysis for `@markless/device`; set by the build plugin, left out by the docs pages' compiler. */
 	deviceTargetFacts?: SemanticGraphInput['deviceTargetFacts'];
 	routeModules?: (moduleId: string) => boolean;
+	// Set once a client build compiled a @for keyed by fields joined into a string: the next build ships the key-joining runtime.
+	joinedRepeatKeys?: boolean;
+	// The build driver runs that second client build; a client build without it refuses such a @for instead.
+	joinedKeysRebuild?: boolean;
 	// Set per build: a page no file imports, so only the router renders it and its props never change.
 	unimportedRouteModule?: (moduleId: string) => boolean;
 	emitResumeModules?: boolean;

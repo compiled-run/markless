@@ -4,6 +4,7 @@ import {
 	type NativeDeviceObject,
 	type NativeDeviceValue,
 } from './native-device.ts';
+import type { ProtocolRepeatKeyParts } from './protocol.ts';
 
 // The target-neutral view a native host builds retained views from: no HTML, no DOM positions, no script.
 export const NATIVE_VIEW_VERSION = 'markless.native-view/0';
@@ -151,7 +152,17 @@ export const NATIVE_DOCUMENT_BODY = '#body';
 export type NativeScriptBinding =
 	| { readonly cell: string }
 	| { readonly fields: Readonly<Record<string, string>> }
-	| { readonly value: NativeExpr };
+	| { readonly value: NativeExpr }
+	/**
+	 * An element (its node id) or an array of them, which the function reads through proxies: `getAttribute`,
+	 * `hasAttribute`, `contains`, and the commands `focus` and `scrollIntoView`. The host answers each read from the
+	 * entry's `elements`: the attributes each element has now and the elements it is inside.
+	 */
+	| { readonly elements: NativeExpr }
+	/** A family's shared object, member by member (its methods run only as data, so a script never gets them). */
+	| { readonly object: Readonly<Record<string, NativeScriptBinding>> }
+	/** A `shared()` accessor (`selectState`): a function that returns that object. */
+	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> };
 
 export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
 
@@ -424,6 +435,8 @@ export type NativeNode = NativePlace &
 				readonly key: ReadonlyArray<string>;
 				/** `key i` on the index: a row's key is its position (`"0"`, `"1"`), and `key` is empty. */
 				readonly byIndex?: true;
+				/** A key joined from the item's fields, as the web joins it; `key` is then empty and is not the key. */
+				readonly keyParts?: ProtocolRepeatKeyParts;
 		  }
 		| {
 				/**

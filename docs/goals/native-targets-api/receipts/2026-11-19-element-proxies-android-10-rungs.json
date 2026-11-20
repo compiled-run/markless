@@ -1,0 +1,66 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u34-select",
+			"failure": null,
+			"installSeconds": 1.863003334000001,
+			"flowSeconds": 19.127068625
+		},
+		{
+			"name": "u20-modal",
+			"failure": null,
+			"installSeconds": 1.4301515409999992,
+			"flowSeconds": 34.631564792000006
+		},
+		{
+			"name": "u21-popover",
+			"failure": null,
+			"installSeconds": 1.7151143750000046,
+			"flowSeconds": 40.045298584
+		},
+		{
+			"name": "u3-tabs",
+			"failure": null,
+			"installSeconds": 1.6063905410000006,
+			"flowSeconds": 17.800328083
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 1.6195800000000162,
+			"flowSeconds": 12.096246666999999
+		},
+		{
+			"name": "j1-loop-local",
+			"failure": null,
+			"installSeconds": 2.1079664999999803,
+			"flowSeconds": 16.52852574999997
+		},
+		{
+			"name": "j2-app-and-library",
+			"failure": null,
+			"installSeconds": 1.897169458999997,
+			"flowSeconds": 19.962683709000004
+		},
+		{
+			"name": "j3-await-catch",
+			"failure": null,
+			"installSeconds": 1.8745779999999794,
+			"flowSeconds": 21.996904416000003
+		},
+		{
+			"name": "j4-timers-fetch",
+			"failure": null,
+			"installSeconds": 1.8183417079999926,
+			"flowSeconds": 16.626332208000008
+		},
+		{
+			"name": "j6-engine-on-demand",
+			"failure": null,
+			"installSeconds": 1.8559123329999856,
+			"flowSeconds": 19.570088541999926
+		}
+	]
+}
