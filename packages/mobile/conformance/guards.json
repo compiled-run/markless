@@ -102,7 +102,10 @@
 				"kind": "element",
 				"id": "h4",
 				"element": "p",
-				"parent": "h3"
+				"parent": "h3",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",

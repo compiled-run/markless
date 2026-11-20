@@ -21,7 +21,10 @@
 				"kind": "element",
 				"id": "h1",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -43,7 +46,10 @@
 				"kind": "element",
 				"id": "h3",
 				"element": "p",
-				"parent": "h2"
+				"parent": "h2",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",

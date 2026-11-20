@@ -24,7 +24,8 @@
 				"parent": "h3",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -63,7 +64,10 @@
 				"kind": "element",
 				"id": "component-edge:0/h2",
 				"element": "p",
-				"parent": "component-edge:0/h0"
+				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",

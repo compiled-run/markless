@@ -122,7 +122,10 @@
 				"kind": "element",
 				"id": "h7",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",

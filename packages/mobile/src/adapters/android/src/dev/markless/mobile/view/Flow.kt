@@ -131,6 +131,20 @@ class TextFlow(payload: Payload) {
 	}
 }
 
+/** A paragraph's text view: with no text it takes no space, as an empty paragraph has no height on the web, unless a style export sizes it. */
+class FlowText(context: Context) : android.widget.TextView(context) {
+	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+		if (text.isEmpty() && MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.EXACTLY) setMeasuredDimension(0, 0)
+		else super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+	}
+
+	/** TextView skips a new layout when the text changes inside a fixed box; one that empties or fills changes height here. */
+	override fun onTextChanged(text: CharSequence?, start: Int, lengthBefore: Int, lengthAfter: Int) {
+		super.onTextChanged(text, start, lengthBefore, lengthAfter)
+		if ((lengthBefore == 0) != (this.text.isEmpty())) requestLayout()
+	}
+}
+
 /** `<hr>`: a thin gray line across the available width, with space above and below. */
 class RuleView(context: Context) : View(context) {
 	private val density = context.resources.displayMetrics.density

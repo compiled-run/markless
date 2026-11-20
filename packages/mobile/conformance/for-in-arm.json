@@ -89,7 +89,10 @@
 				"kind": "element",
 				"id": "h4",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -125,7 +128,8 @@
 				"parent": "h0",
 				"defaultStyle": {
 					"indent": 40,
-					"marker": "disc"
+					"marker": "disc",
+					"margin": 1
 				},
 				"arm": {
 					"branch": "branch-site:0",
@@ -221,6 +225,9 @@
 				"id": "h8",
 				"element": "p",
 				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 1

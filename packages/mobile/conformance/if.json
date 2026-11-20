@@ -24,7 +24,8 @@
 				"parent": "h0",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -77,6 +78,9 @@
 				"id": "h3",
 				"element": "p",
 				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 0
@@ -101,6 +105,9 @@
 				"id": "h4",
 				"element": "p",
 				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 1

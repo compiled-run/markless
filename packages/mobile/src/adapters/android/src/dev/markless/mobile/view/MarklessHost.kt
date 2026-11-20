@@ -61,6 +61,9 @@ import kotlin.math.roundToInt
 
 class MarklessHostError(message: String) : RuntimeException(message)
 
+/** The web's default text colour, CanvasText: black, or white in the dark appearance. */
+internal fun canvasText(configuration: Configuration): Int = if (isDark(configuration)) Color.WHITE else Color.BLACK
+
 internal fun isDark(configuration: Configuration): Boolean =
 	configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
@@ -228,7 +231,8 @@ class MarklessHost(
 		val single = (payload.nodes.firstOrNull() as? Node.Element)?.takeIf { it.parent == null && it.arm == null && payload.nodes.count { n -> n.parent == null } == 1 }
 		if (single == null && style != null) throw MarklessHostError("a styled payload must start with its one root element")
 		if (single == null && payload.nodes.isEmpty()) throw MarklessHostError("payload has no nodes")
-		pageBox = if (single == null) MarklessBox(context) else null
+		// Without a style export the page's nodes sit in a body with the browser's 8 px margin; a styled root fills the page itself.
+		pageBox = if (single == null || style == null) MarklessBox(context).apply { body = (8 * dpr).roundToInt(); setPadding(body, 0, body, 0) } else null
 		for (sheet in payload.nodes.filterIsInstance<Node.Sheet>()) {
 			if (sheet.dismissible && runtime.handlerFor(sheet.id, EventName.Dismiss) == null) throw MarklessHostError("\"${sheet.id}\" is dismissible but has no dismiss handler")
 			val content = MarklessBox(context).apply { named(this, sheet.id) }
@@ -527,6 +531,7 @@ class MarklessHost(
 
 	/** The device's appearance changed: move to the @media band it selects, as a cell's `state` entry moves to its assignment. */
 	fun configurationChanged(configuration: Configuration) {
+		if (style == null) for (view in textViews.values) if (view !is Button) view.setTextColor(canvasText(configuration))
 		var changed = false
 		for (l in allLayouts()) {
 			if (l.export.bandState < 0) continue
@@ -656,11 +661,12 @@ class MarklessHost(
 		val view: TextView = if (parent is Button) {
 			if (textViews.values.any { it === parent }) throw MarklessHostError("button \"${inst.node.parent}\" has more than one paragraph; Android holds one per button")
 			parent
-		} else TextView(context).apply {
+		} else FlowText(context).apply {
 			includeFontPadding = false
 			isClickable = false
 			isFocusable = false
 			named(this, inst.id, heading = parent.isAccessibilityHeading)
+			if (style == null) setTextColor(canvasText(context.resources.configuration))
 		}
 		if (view !is Button || block != BlockText(false, false, false, 1.0, false)) {
 			view.typeface = Typeface.create(if (block.monospace) Typeface.MONOSPACE else Typeface.DEFAULT, when {
@@ -822,6 +828,7 @@ class MarklessHost(
 				unstyled?.let { s ->
 					table = s.table?.takeIf { it != "cell" }
 					if (s.indent > 0) setPaddingRelative((s.indent * dpr).roundToInt(), 0, 0, 0)
+					if (s.margin > 0) (s.margin * baseTextSize * flow!!.blockText(node.id).size).roundToInt().let { marginTop = it; marginBottom = it }
 				}
 			}
 		}
@@ -962,11 +969,12 @@ class MarklessHost(
 		val view: TextView = if (parent is Button) {
 			if (textViews.values.any { it === parent }) throw MarklessHostError("button \"${node.parent}\" has more than one text run; Android holds one per button")
 			parent
-		} else TextView(context).apply {
+		} else FlowText(context).apply {
 			includeFontPadding = false
 			isClickable = false
 			isFocusable = false
 			named(this, inst.id, heading = parent.isAccessibilityHeading)
+			if (style == null) setTextColor(canvasText(context.resources.configuration))
 		}
 		view.text = runtime.text(node, inst.scope)
 		textViews[inst.id] = view
@@ -989,7 +997,7 @@ class MarklessHost(
 				view.contentDescription = value
 				if (view is DrawingView && current["aria-hidden"] != "true") view.importantForAccessibility = if (value != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO
 			}
-			"alt" -> if (view is SizedImage) view.contentDescription = value
+			"alt" -> if (view is SizedImage) { view.contentDescription = value; view.alt(value) }
 			"src" -> when (view) {
 				is SizedImage -> view.show(value)
 				is AudioButton -> view.source(value)

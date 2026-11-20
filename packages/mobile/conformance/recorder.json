@@ -51,7 +51,8 @@
 				"parent": "h6",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -120,6 +121,9 @@
 				"id": "component-edge:0/h1",
 				"element": "p",
 				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:1",
 					"index": 0
@@ -181,6 +185,9 @@
 				"id": "component-edge:0/h3",
 				"element": "p",
 				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:1",
 					"index": 0
@@ -208,6 +215,9 @@
 				"id": "component-edge:0/h4",
 				"element": "p",
 				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:1",
 					"index": 0

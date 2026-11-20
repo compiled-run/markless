@@ -47,7 +47,8 @@
 				"parent": "h0",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -64,7 +65,10 @@
 				"kind": "element",
 				"id": "h2",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -83,7 +87,10 @@
 				"kind": "element",
 				"id": "h3",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -152,6 +159,9 @@
 				"id": "h5",
 				"element": "p",
 				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "boundary:0",
 					"index": 0
@@ -187,6 +197,9 @@
 				"id": "h10",
 				"element": "p",
 				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "boundary:0",
 					"index": 1
@@ -221,6 +234,9 @@
 				"id": "h7",
 				"element": "p",
 				"parent": "h6",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "boundary:0",
 					"index": 2
@@ -347,6 +363,9 @@
 				"id": "boundary:0:caught/h7",
 				"element": "p",
 				"parent": "boundary:0:caught/h6",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "boundary:0:caught",
 					"index": 0

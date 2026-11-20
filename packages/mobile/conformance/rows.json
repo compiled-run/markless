@@ -82,7 +82,8 @@
 				"parent": "h3",
 				"defaultStyle": {
 					"indent": 40,
-					"marker": "disc"
+					"marker": "disc",
+					"margin": 1
 				}
 			},
 			{
@@ -259,7 +260,10 @@
 				"kind": "element",
 				"id": "h9",
 				"element": "p",
-				"parent": "h3"
+				"parent": "h3",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",

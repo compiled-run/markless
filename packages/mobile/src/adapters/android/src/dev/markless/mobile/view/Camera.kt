@@ -18,8 +18,10 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Surface
 import android.view.TextureView
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.TextView
 import dev.markless.mobile.core.JsValue
 import java.io.File
 
@@ -33,18 +35,49 @@ open class SizedFrame(context: Context, private val widthDp: Int, private val he
 	}
 }
 
-/** An `img`: an ImageView in a fixed box. */
-class SizedImage(context: Context) : SizedFrame(context, 120, 90) {
+/**
+ * An `img`: its picture in a 120 by 90 box. Without a picture it shows its alt text in the picture's place, as the web
+ * does, and takes no space when that is empty.
+ */
+class SizedImage(context: Context) : FrameLayout(context) {
 	val image = ImageView(context).apply { scaleType = ImageView.ScaleType.FIT_CENTER }
+	private val altText = TextView(context).apply {
+		includeFontPadding = false
+		importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+		setTextColor(canvasText(context.resources.configuration))
+	}
+	private var picture = false
 
 	init {
 		addView(image, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+		addView(altText, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
+		update()
 	}
 
-	/** Shows the picture at a `file:` URL; anything else shows nothing. */
+	/** Shows the picture at a `file:` URL; anything else shows none. */
 	fun show(src: String?) {
 		val path = src?.takeIf { it.startsWith("file:") }?.let { android.net.Uri.parse(it).path }
-		image.setImageBitmap(path?.let(BitmapFactory::decodeFile))
+		val bitmap = path?.let(BitmapFactory::decodeFile)
+		image.setImageBitmap(bitmap)
+		picture = bitmap != null
+		update()
+	}
+
+	fun alt(text: String?) {
+		altText.text = text ?: ""
+		update()
+	}
+
+	private fun update() {
+		image.visibility = if (picture) View.VISIBLE else View.GONE
+		altText.visibility = if (!picture && altText.text.isNotEmpty()) View.VISIBLE else View.GONE
+		requestLayout()
+	}
+
+	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+		if (!picture) return super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+		val density = resources.displayMetrics.density
+		super.onMeasure(MeasureSpec.makeMeasureSpec((120 * density).toInt(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec((90 * density).toInt(), MeasureSpec.EXACTLY))
 	}
 }
 
