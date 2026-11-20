@@ -127,6 +127,7 @@
 		"packages/router/test/vite/document-html-attributes.test.ts",
 		"packages/router/test/vite/document-html-element-build.test.ts",
 		"packages/router/test/vite/document-navigation.test.ts",
+		"packages/router/test/vite/empty-arm-live-text.test.ts",
 		"packages/router/test/vite/first-write-sync.test.ts",
 		"packages/router/test/vite/fixed-route-rows.test.ts",
 		"packages/router/test/vite/foreign-dom-before-wake.test.ts",

@@ -34,6 +34,7 @@ vi.mock('@markless/compiler', async (importOriginal) => {
 		importedRowTemplateMints: actual.importedRowTemplateMints,
 		importedNestedRepeats: actual.importedNestedRepeats,
 		importedRowBranchMints: actual.importedRowBranchMints,
+		importedEmptyArmSlots: actual.importedEmptyArmSlots,
 		importedSymbolRoutes: actual.importedSymbolRoutes,
 		linkedRenderDataBoundarySymbols: actual.linkedRenderDataBoundarySymbols,
 		moduleInterfaceHash: actual.moduleInterfaceHash,

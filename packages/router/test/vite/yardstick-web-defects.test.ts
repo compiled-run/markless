@@ -278,7 +278,7 @@ export default function Page() @{
 	).not.toContain('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
 });
 
-test.fails('@empty with live text shows when a filtered list goes from some rows to none (#868)', async () => {
+test('@empty with live text shows when a filtered list goes from some rows to none (#868)', async () => {
 	await visit('/empty', async (page) => {
 		await page.getByLabel('Search').fill('zzz');
 		await expect.poll(() => page.locator('li').allTextContents()).toEqual(['No match for zzz']);
