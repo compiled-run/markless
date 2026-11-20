@@ -1,0 +1,37 @@
+{
+	"rung": 130,
+	"name": "a text field's keydown handler runs for the on-screen keyboard's return and delete keys, and preventDefault() there leaves out the key's own edit",
+	"steps": [
+		{
+			"visible": ["Labels", "0 tags: none", "Removed 0", "Sent nothing"]
+		},
+		{
+			"do": { "type": { "field": "Tag", "text": "red" } },
+			"visible": ["0 tags: none", "Removed 0"],
+			"fields": { "Tag": "red" }
+		},
+		{
+			"do": { "submit": "Tag" },
+			"visible": ["1 tags: red", "Removed 0"],
+			"absent": ["0 tags: none"],
+			"fields": { "Tag": "" }
+		},
+		{
+			"do": { "erase": "Tag" },
+			"visible": ["1 tags: red", "Removed 1"],
+			"absent": ["Removed 0"],
+			"fields": { "Tag": "" }
+		},
+		{
+			"do": { "type": { "field": "Message", "text": "hello" } },
+			"visible": ["Sent nothing", "Removed 1"],
+			"fields": { "Message": "hello" }
+		},
+		{
+			"do": { "submit": "Message" },
+			"visible": ["Sent hello", "1 tags: red"],
+			"absent": ["Sent nothing"],
+			"fields": { "Message": "" }
+		}
+	]
+}
