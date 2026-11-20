@@ -2012,10 +2012,16 @@ export function createNativeViewPayload(
 	};
 	const readScript = (module: ModuleFacts, span: SourceSpan | undefined) =>
 		span && scriptFacts(module)?.value(span);
-	const listScript = (module: ModuleFacts, rowHost: string | undefined) => {
+	const listScript = (
+		module: ModuleFacts,
+		rowHost: string | undefined,
+		collectionSpan: SourceSpan | undefined,
+	) => {
 		const span =
 			rowHost && module.graph.hostNodes.find((host) => host.id === rowHost)?.sourceSpan;
-		return span ? scriptFacts(module)?.forList(span) : undefined;
+		if (span) return scriptFacts(module)?.forList(span);
+		// Rows that are a component have no row element; the list is found where it is written.
+		return collectionSpan ? scriptFacts(module)?.value(collectionSpan) : undefined;
 	};
 	/** Script functions by where they are written; each payload numbers its own. */
 	const scriptFunctions = new Map<
@@ -4497,7 +4503,7 @@ export function createNativeViewPayload(
 				const list = repeat?.collectionExpression
 					? renderValue(
 							repeat.collectionExpression,
-							() => listScript(scope.module, repeat.rowHostNodeId),
+							() => listScript(scope.module, repeat.rowHostNodeId, repeat.collectionSpan),
 							'the @for list',
 							{
 								...scope,
@@ -4509,6 +4515,21 @@ export function createNativeViewPayload(
 						  (repeat.collectionPath?.length ?? 0) === 0
 						? { cell: scope.cells.byBinding.get(repeat.collectionGraphNodeId)! }
 						: null;
+				// Only a list the build can tell is fixed once the screen opens: the web keeps such component rows as rendered.
+				if (
+					repeat &&
+					!repeat.rowHostNodeId &&
+					list &&
+					'script' in list &&
+					Object.values(list.bindings).some(
+						(binding) => 'cell' in binding || 'fields' in binding || ('value' in binding && cellsOf(binding.value).size > 0),
+					)
+				) {
+					refuse(
+						'a @for whose rows are a component, with a list JavaScript computes from state; a native build takes such a list only when it reads no state',
+					);
+					continue;
+				}
 				if (!repeat || !rowChunk || !list) {
 					if (!repeat?.collectionExpression)
 						refuse(

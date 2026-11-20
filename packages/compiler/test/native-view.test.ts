@@ -1591,6 +1591,32 @@ export function Player() @{
 		expect(kept[0]!.storage!.key).toBe(kept[0]!.id);
 	});
 
+	it('lists the rows of a @for whose rows are a component through JavaScript when data cannot; not when that list reads state', async () => {
+		const source = (list: string) => `import { state } from '@markless/core';
+const NAV = [{ kind: 'section', title: 'Start' }, { kind: 'link', title: 'Blog' }];
+const SECTIONS = NAV.flatMap((entry) => (entry.kind === 'section' ? [entry] : []));
+function Row({ title }: { readonly title: string }) @{
+	<li>{title}</li>
+}
+export function Nav() @{
+	let more = state(1);
+	const rows = (section: (typeof SECTIONS)[number]) => ({ title: section.title.toUpperCase() });
+	<main>
+		<ul>@for (const section of ${list}; key section.title) { <Row title={section.title} /> }</ul>
+		<button onClick={() => more++}>{more}</button>
+	</main>
+}`;
+		const fixed = await nativeView(source('SECTIONS.map(rows)'));
+		expect(fixed.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		expect(fixed.payload!.nodes.find((node) => node.kind === 'repeat')).toMatchObject({
+			list: { script: expect.any(String) },
+		});
+		const following = await nativeView(source('SECTIONS.slice(0, more).map(rows)'));
+		expect(following.diagnostics.map((d) => d.message)).toContain(
+			'a @for whose rows are a component, with a list JavaScript computes from state; a native build takes such a list only when it reads no state',
+		);
+	});
+
 	it('lowers a password field as a text field of its form: its text is sent, and required and maxlength are checked', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Login() @{

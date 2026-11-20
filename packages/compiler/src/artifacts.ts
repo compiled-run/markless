@@ -1029,6 +1029,8 @@ export type SemanticKeyedRepeat = {
 	readonly collectionPath: ReadonlyArray<string>;
 	/** The collection as a tree (native builds only). */
 	readonly collectionExpression?: SemanticExpression;
+	/** Where the collection is written, which finds it when no row element does (native builds only). */
+	readonly collectionSpan?: SourceSpan;
 	readonly keySource: string;
 	// Empty means the item ITSELF is the key (`key row`), which a list of scalars
 	// is; `indexKey` is what says a row has no data identity at all.

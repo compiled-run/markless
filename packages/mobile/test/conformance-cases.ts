@@ -617,6 +617,13 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A @for whose rows are a component gets its list as JavaScript when data cannot run it, once the screen opens.
+		name: 'component-rows',
+		fixture: 'proofs/u68-component-rows/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
 		name: 'script-loop',
 		fixture: 'proofs/j1-loop-local/App.tsrx',
 		modules: true,

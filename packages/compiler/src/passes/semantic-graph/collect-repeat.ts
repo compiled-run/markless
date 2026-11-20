@@ -262,7 +262,10 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 		...(indexName ? { indexName } : {}),
 		collectionSource,
 		...(NATIVE_FACTS && state.nativeFacts
-			? { collectionExpression: nativeCollectors(state.nativeFacts).expression(collectionNode as never) }
+			? {
+					collectionExpression: nativeCollectors(state.nativeFacts).expression(collectionNode as never),
+					...(collectionSpan ? { collectionSpan } : {}),
+				}
 			: {}),
 		...(collection
 			? {
