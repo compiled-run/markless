@@ -390,6 +390,22 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'form-arms',
+		fixture: 'test/fixtures/FormArms.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'input', host: 'h1', value: 'ann' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'input', host: 'h3', value: 'red' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
 		name: 'ticks',
 		fixture: 'test/fixtures/Ticks.tsrx',
 		preferredLanguages: ['fr-CA', 'en'],

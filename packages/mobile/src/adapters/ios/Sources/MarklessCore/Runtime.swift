@@ -1176,12 +1176,18 @@ public final class NativeRuntime {
 		}
 	}
 
+	private func isShownInstance(_ id: String) throws -> Bool {
+		let template = id.firstIndex(of: "@").map { String(id[..<$0]) } ?? id
+		return try nodesById[template].map { node in try instances(of: node).contains { $0.id == id } } ?? false
+	}
+
+	/// A field an arm hid is a new element when it shows again: it starts from its markup, as the web builds it.
 	private func forgetHidden() throws {
-		for key in fired {
-			let id = String(key[key.index(after: key.firstIndex(of: "\u{0}")!)...])
-			let template = id.firstIndex(of: "@").map { String(id[..<$0]) } ?? id
-			let shown = try nodesById[template].map { node in try instances(of: node).contains { $0.id == id } } ?? false
-			if !shown { fired.remove(key) }
+		for key in fired where !(try isShownInstance(String(key[key.index(after: key.firstIndex(of: "\u{0}")!)...]))) { fired.remove(key) }
+		for id in edited.keys where !(try isShownInstance(id)) { edited[id] = nil }
+		for node in ticked where try instances(of: node).isEmpty {
+			guard case let .element(_, attributes, _) = node.kind else { continue }
+			checkedness[node.id] = try checkedBinding(node.id) ?? (attributes["checked"] != nil)
 		}
 	}
 
