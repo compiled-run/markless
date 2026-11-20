@@ -154,17 +154,20 @@ class FlowText(context: Context) : android.widget.TextView(context) {
 }
 
 /** `<hr>`: a thin gray line across the available width, with space above and below. */
-class RuleView(context: Context) : View(context) {
+/** `<hr>` as Chrome draws it: a 2 px inset box, a #9a9a9a line over a #eeeeee one, across its container. */
+class RuleView(context: Context) : MarklessBox(context) {
 	private val density = context.resources.displayMetrics.density
-	private val paint = Paint().apply { color = 0xFF808080.toInt(); strokeWidth = density }
+	private val upper = Paint().apply { color = 0xFF9A9A9A.toInt() }
+	private val lower = Paint().apply { color = 0xFFEEEEEE.toInt() }
 
 	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-		setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), resolveSize((17 * density).toInt(), heightMeasureSpec))
+		setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), resolveSize(maxOf(2, (2 * density).toInt()), heightMeasureSpec))
 	}
 
 	override fun onDraw(canvas: Canvas) {
-		val y = height / 2f
-		canvas.drawLine(0f, y, width.toFloat(), y, paint)
+		val half = height / 2f
+		canvas.drawRect(0f, 0f, width.toFloat(), half, upper)
+		canvas.drawRect(0f, half, width.toFloat(), height.toFloat(), lower)
 	}
 }
 

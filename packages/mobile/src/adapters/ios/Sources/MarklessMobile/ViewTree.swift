@@ -1527,22 +1527,24 @@ final class ViewTree {
 		if style.inline { inlineViews.insert(id) }
 		if let control = style.control { controlLook(view, control, scale: scale) }
 		if style.rule {
-			// Chrome's hr: a 1 px inset line with 0.5em above and below.
+			// Chrome's hr: a 2 pt inset box, a #9a9a9a line over a #eeeeee one; its 0.5em margins collapse like any block's.
 			leaves.insert(id)
 			fullWidth.insert(id)
 			view.isAccessibilityElement = false
-			view.heightAnchor.constraint(equalToConstant: 17).isActive = true
-			let line = UIView()
-			line.backgroundColor = .systemGray3
-			line.translatesAutoresizingMaskIntoConstraints = false
-			view.addSubview(line)
-			decorations.insert(ObjectIdentifier(line))
-			NSLayoutConstraint.activate([
-				line.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-				line.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-				line.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-				line.heightAnchor.constraint(equalToConstant: 1),
-			])
+			view.heightAnchor.constraint(equalToConstant: 2).isActive = true
+			for (shade, top) in [(CGFloat(154), true), (CGFloat(238), false)] {
+				let line = UIView()
+				line.backgroundColor = UIColor(white: shade / 255, alpha: 1)
+				line.translatesAutoresizingMaskIntoConstraints = false
+				view.addSubview(line)
+				decorations.insert(ObjectIdentifier(line))
+				NSLayoutConstraint.activate([
+					line.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+					line.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+					top ? line.topAnchor.constraint(equalTo: view.topAnchor) : line.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+					line.heightAnchor.constraint(equalToConstant: 1),
+				])
+			}
 		}
 		if let marker = style.marker { listMarkers[id] = marker }
 		switch style.table {

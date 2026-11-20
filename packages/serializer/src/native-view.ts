@@ -217,7 +217,7 @@ export type NativeDefaultStyle = {
 	 * its text 2px in and 1px down, inside a 2px border box.
 	 */
 	readonly control?: 'button' | 'field';
-	/** `<hr>`: a thin horizontal line across the box. */
+	/** `<hr>`: Chrome's 2px inset line across the box (#9a9a9a over #eeeeee). */
 	readonly rule?: true;
 	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
 	readonly marker?: 'disc' | 'decimal';
@@ -256,7 +256,7 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	blockquote: { indent: 40, margin: 1 },
 	figure: { indent: 40, margin: 1 },
 	figcaption: {},
-	hr: { rule: true },
+	hr: { rule: true, margin: 0.5 },
 	pre: { ...MONOSPACE, preformatted: true, margin: 1 },
 	ul: { indent: 40, marker: 'disc', margin: 1 },
 	ol: { indent: 40, marker: 'decimal', margin: 1 },

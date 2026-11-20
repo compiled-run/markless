@@ -592,7 +592,7 @@ Rungs 1 and 3 run without Dragon: hosts stack children vertically (start-aligned
 is a temporary layout so the state rungs do not wait on styling; rung 2 replaces it with Dragon frames. It keeps the web's
 defaults where they decide what a person sees: the body's 8 px margin, each block's `margin` collapsing as CSS margins do
 (siblings meet at the larger, and a box's first and last child's pass through it), CanvasText for text, an empty paragraph
-with no height, an `<img>` without a picture showing its `alt` text, or nothing when that is empty, and `inline` boxes
+with no height, an `<img>` without a picture showing its `alt` text, or nothing when that is empty, an `<hr>` drawn as Chrome's 2px inset line with 0.5em margins that collapse like any block's, and `inline` boxes
 sharing lines with each other and the paragraphs beside them: side by side on one baseline, a space between two only where
 the text there has whitespace, wrapping at the page's width less each enclosing box's indent.
 

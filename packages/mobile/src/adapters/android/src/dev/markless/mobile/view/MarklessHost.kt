@@ -769,7 +769,10 @@ class MarklessHost(
 		if (unseen) inert.add(inst.id)
 		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (drawing != null) "drawing" else if (unstyled?.rule == true) "rule" else if (unseen) "unseen" else if (type in TICKABLE) type else node.element) {
 			"drawing" -> DrawingView(context, drawing!!, baseTextSize * (flow?.blockText(node.parent)?.size ?: 1.0)).also { named(it, inst.id, image = true) }
-			"rule" -> RuleView(context).also { named(it, inst.id) }
+			"rule" -> RuleView(context).also { rule ->
+				named(rule, inst.id)
+				unstyled?.let { s -> (s.margin * baseTextSize * flow!!.blockText(node.id).size).roundToInt().let { rule.marginTop = it; rule.marginBottom = it } }
+			}
 			"unseen" -> View(context)
 			// The runtime owns checkedness: the widget never toggles itself, a press dispatches and the journal sets it.
 			"checkbox", "radio" -> (if (type == "radio") object : RadioButton(context) { override fun toggle() {} } else object : CheckBox(context) { override fun toggle() {} }).apply {
