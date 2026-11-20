@@ -1,4 +1,5 @@
 import type { NativeScript, NativeScriptService } from '@markless/serializer';
+import { SVG_GEOMETRY_SOURCE } from './native-svg-geometry.ts';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
@@ -369,6 +370,8 @@ function contentId(text: string): string {
 export function nativeScriptOf(
 	modules: ReadonlyArray<NativeScriptModuleInput>,
 	services: ReadonlyArray<NativeScriptService>,
+	/** A drawing's geometry follows state: the engine carries the svg grammars (`__svgPath`, `__svgViewBox`). */
+	svg = false,
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -388,6 +391,7 @@ export function nativeScriptOf(
 		'var modules = [];',
 		`var owners = ${JSON.stringify(owners)};`,
 		...definitions,
+		...(svg ? [SVG_GEOMETRY_SOURCE] : []),
 		ENTRIES,
 	].join('\n');
 	const id = contentId(body);

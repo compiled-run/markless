@@ -2,6 +2,7 @@ import type {
 	NativeCommand,
 	NativeDefaultStyle,
 	NativeDrawing,
+	NativeShape,
 	NativePlace,
 	NativeBuiltin,
 	NativeExpr,
@@ -68,7 +69,7 @@ import type {
 	SemanticScriptGlobal,
 	SourceSpan,
 } from '../artifacts.ts';
-import { compileDrawing, type DrawingElement } from './native-drawing.ts';
+import { compileDrawing, compileLiveShape, SHAPES, type DrawingElement } from './native-drawing.ts';
 import { nativeScriptOf, type NativeScriptModuleInput } from './native-script.ts';
 import { scriptFactsOf, type ScriptFacts } from './semantic-graph/script-facts.ts';
 import { sharedDefinitionId } from './semantic-graph/collect-shared.ts';
@@ -401,6 +402,8 @@ type Field =
 			readonly expression: SemanticExpression | undefined;
 			/** The factory's `computed(...)` it reads, by name, which can run as a script computed. */
 			readonly computed?: string;
+			/** Where that computed's function is written, for one the factory returns without naming it. */
+			readonly functionSpan?: SourceSpan;
 	  };
 
 /** A name whose members are what a native build reads: a state object split into one cell per field, or a shared instance. */
@@ -1447,6 +1450,7 @@ export function createNativeViewPayload(
 						kind: 'expr',
 						expression: binding.nativeExpression,
 						computed: binding.name,
+						...(binding.nativeFunctionSpan ? { functionSpan: binding.nativeFunctionSpan } : {}),
 					});
 			}
 		}
@@ -1720,7 +1724,7 @@ export function createNativeViewPayload(
 			const binding = instance.module.bindingsById.get(prop.graphNodeId);
 			for (const [name, field] of instance.fields) {
 				if (binding?.kind === 'computed' && field.kind === 'expr' && field.computed === binding.name && prop.path.length === 0)
-					return sharedExpr(instance, name, field.expression, field.computed);
+					return sharedExpr(instance, name, field.expression, field.computed, field.functionSpan);
 				if (binding?.kind === 'state' && field.kind === 'cell' && prop.path.length === 1 && name === prop.path[0])
 					return { cell: field.cell };
 			}
@@ -1949,6 +1953,35 @@ export function createNativeViewPayload(
 	/** Script functions by where they are written; each payload numbers its own. */
 	const scriptFunctions = new Map<string, { readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }>();
 	const scriptServices = new Set<NativeScriptService>();
+	/** A drawing's geometry follows state, so the engine carries the svg grammars. */
+	let svgGeometry = false;
+	/**
+	 * A `d` or `viewBox` that follows state, as the engine turns it into numbers: the outline as Dragon's verb-coded numbers
+	 * (or the viewBox's four), space-separated, so no phone parses SVG.
+	 */
+	const geometryOf = (kind: 'path' | 'viewBox', value: NativeExpr, module: ModuleFacts): NativeExpr => {
+		svgGeometry = true;
+		const key = `${module.graph.filename}\0svg:${kind}`;
+		let id = scriptFunctions.get(key)?.id;
+		if (!id) {
+			id = `fn:${scriptFunctions.size}`;
+			scriptFunctions.set(key, {
+				id,
+				module,
+				fact: {
+					code: `return function () { return ${kind === 'path' ? '__svgPath' : '__svgViewBox'}(__s.v); };`,
+					names: [],
+					module: [],
+					imports: [],
+					globals: [],
+					framework: [],
+					unsupported: [],
+					span: { filename: module.graph.filename, start: 0, end: 0 },
+				},
+			});
+		}
+		return { script: id, bindings: { v: { value } } };
+	};
 	const refuseScript = (message: string, span?: SourceSpan): null => {
 		diagnostics.push(nativeRefusal('javascript', message, span));
 		return null;
@@ -2036,7 +2069,7 @@ export function createNativeViewPayload(
 				if (!value) return null;
 				members[field] = { elements: value };
 			} else if (member.kind === 'expr' && member.expression) {
-				const value = sharedExpr(instance, field, member.expression, member.computed);
+				const value = sharedExpr(instance, field, member.expression, member.computed, member.functionSpan);
 				if (!value) return null;
 				members[field] = mentionsElement(value) ? { elements: value } : { value };
 			}
@@ -2164,12 +2197,14 @@ export function createNativeViewPayload(
 		field: string,
 		expression: SemanticExpression | undefined,
 		computed: string | undefined,
+		functionSpan?: SourceSpan,
 	): NativeExpr | null {
 		const label = `${instance.definition.name}.${field}`;
 		const scope = { ...instance.scope, live: true };
 		const data = attempt(() => exprOf(expression, label, scope));
 		if (!data.failed || scriptMode === 'never' || computed === undefined) return data.value;
-		const fact = scriptFacts(instance.module)?.computed(undefined, computed);
+		const facts = scriptFacts(instance.module);
+		const fact = facts?.computed(undefined, computed) ?? (functionSpan && facts?.computedAt(functionSpan));
 		if (!fact) return data.value;
 		data.rollBack();
 		const script = attempt(() => {
@@ -2352,7 +2387,7 @@ export function createNativeViewPayload(
 					.map((fn) => ({ id: fn.id, code: fn.fact.code })),
 			};
 		});
-		return nativeScriptOf(inputs, [...scriptServices].sort());
+		return nativeScriptOf(inputs, [...scriptServices].sort(), svgGeometry);
 	}
 
 	const inlining = new Set<string>();
@@ -3095,7 +3130,7 @@ export function createNativeViewPayload(
 					const field = object.instance.fields.get(expression.property);
 					if (field?.kind === 'cell') return { cell: field.cell };
 					if (field?.kind === 'expr')
-						return sharedExpr(object.instance, expression.property, field.expression, field.computed);
+						return sharedExpr(object.instance, expression.property, field.expression, field.computed, field.functionSpan);
 					if (field?.kind === 'handle')
 						return handleValue(
 							field.key,
@@ -3882,15 +3917,26 @@ export function createNativeViewPayload(
 			);
 		/** Subtrees lowered whole (an `<svg>`) or never shown (`<template>`): their items are not lowered one by one. */
 		const consumed: ReadonlyArray<number>[] = [];
+		/** Inside a consumed `<svg>`, components and `{children}` whose shapes it draws while the app runs. */
+		const drawnLive: ReadonlyArray<number>[] = [];
 		for (const item of items) {
-			if (consumed.some((path) => isPrefix(path, item.path))) continue;
+			if (
+				consumed.some((path) => isPrefix(path, item.path)) &&
+				!drawnLive.some((path) => path === item.path || isPrefix(path, item.path))
+			)
+				continue;
 			const parent = parentOf(item.path);
 			if (item.kind === 'host') {
 				close();
 				const element = scope.module.tagOf.get(item.id);
 				const span = scope.module.hostSpans.get(item.id);
+				const around = parent === null ? undefined : nodeById().get(parent);
+				const drawnIn =
+					element !== undefined && SHAPES.has(element) && around?.kind === 'element' && around.drawing
+						? around
+						: undefined;
 				if (!element || element === '*') refuse(`host ${item.id} has no static tag`, span);
-				else if (!Object.hasOwn(NATIVE_ELEMENTS, element) && element !== 'title') {
+				else if (!Object.hasOwn(NATIVE_ELEMENTS, element) && element !== 'title' && !drawnIn) {
 					const written = attributesAt(item.path);
 					const bound = boundAt(item.path);
 					// A <select> hidden from sight and from screen readers only carries a value for its form: outside one it does nothing.
@@ -4041,6 +4087,13 @@ export function createNativeViewPayload(
 					const drawn: DrawingElement[] = [];
 					const texts: { path: ReadonlyArray<number>; text: string }[] = [];
 					for (const other of inside) {
+						if (drawnLive.some((path) => isPrefix(path, other.path))) continue;
+						if (other.kind === 'host' && drawnLive.length > 0)
+							refuseAs(
+								'svg',
+								'a shape after a component or `{children}` inside an <svg>, which a native drawing would paint under them',
+								scope.module.hostSpans.get(other.id) ?? span,
+							);
 						if (other.kind === 'host') {
 							const tag = scope.module.tagOf.get(other.id) ?? '*';
 							drawn.push({
@@ -4060,6 +4113,11 @@ export function createNativeViewPayload(
 							}
 						} else if (other.kind === 'part' && 'text' in other.part)
 							texts.push({ path: relative(other.path), text: other.part.text });
+						else if (
+							(other.kind === 'child' || other.kind === 'children') &&
+							other.path.length === item.path.length + 1
+						)
+							drawnLive.push(other.path);
 						else
 							refuseAs(
 								'svg',
@@ -4077,6 +4135,29 @@ export function createNativeViewPayload(
 					drawing = result.drawing;
 					if (result.title !== undefined && !('aria-label' in attributes))
 						attributes['aria-label'] = result.title;
+					const viewBox = bindings.findIndex((binding) => 'attribute' in binding && binding.attribute === 'viewBox');
+					if (viewBox >= 0)
+						bindings[viewBox] = { attribute: 'viewBox', value: geometryOf('viewBox', bindings[viewBox]!.value, scope.module) };
+				}
+				let shape: NativeShape | undefined;
+				if (drawnIn && element) {
+					const bound = bindings.flatMap((binding) => ('attribute' in binding ? [binding.attribute] : []));
+					const result = compileLiveShape(
+						drawnIn.attributes ?? {},
+						{ id: item.id, tag: element, path: [0], attributes, bound },
+						drawnIn.id,
+					);
+					for (const refusal of result.refusals) refuseAs('svg', refusal.message, span);
+					shape = result.shape;
+					for (const event of scope.module.eventsByHost.get(item.id) ?? [])
+						refuseAs(
+							'svg',
+							`the ${event.eventName} handler on <${element}> inside an <svg>: its shapes are drawn, not views`,
+							event.handlerSpan,
+						);
+					const d = bindings.findIndex((binding) => 'attribute' in binding && binding.attribute === 'd');
+					if (d >= 0) bindings[d] = { attribute: 'd', value: geometryOf('path', bindings[d]!.value, scope.module) };
+					delete attributes.d;
 				}
 				const live = liveRegionOf(element ?? '*', attributes, bindings, item.span);
 				nodes.push({
@@ -4088,6 +4169,7 @@ export function createNativeViewPayload(
 					...(bindings.length > 0 ? { bindings } : {}),
 					...(defaultStyle ? { defaultStyle } : {}),
 					...(drawing ? { drawing } : {}),
+					...(shape ? { shape } : {}),
 					...(live ? { live } : {}),
 					...place,
 				});

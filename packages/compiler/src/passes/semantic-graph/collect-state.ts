@@ -2047,7 +2047,14 @@ function objectPropertyKey(node: AnyNode | undefined): string | null {
 	return null;
 }
 
-function nativeComputed(fn: AnyNode | undefined, state: WalkState): Pick<SemanticGraphBinding, 'nativeExpression'> {
-	const nativeExpression = fn && state.nativeFacts && nativeCollectors(state.nativeFacts).computedValue(fn as never);
-	return nativeExpression ? { nativeExpression } : {};
+function nativeComputed(
+	fn: AnyNode | undefined,
+	state: WalkState,
+): Pick<SemanticGraphBinding, 'nativeExpression' | 'nativeFunctionSpan'> {
+	if (!fn || !state.nativeFacts) return {};
+	const nativeExpression = nativeCollectors(state.nativeFacts).computedValue(fn as never);
+	return {
+		...(nativeExpression ? { nativeExpression } : {}),
+		nativeFunctionSpan: sourceSpan(fn, state.filename),
+	};
 }
