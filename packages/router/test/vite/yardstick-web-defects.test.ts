@@ -278,21 +278,21 @@ export default function Page() @{
 	).not.toContain('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
 });
 
-test.fails('@empty with live text shows when a filtered list goes from some rows to none (#868)', async () => {
+test('@empty with live text shows when a filtered list goes from some rows to none (#868)', async () => {
 	await visit('/empty', async (page) => {
 		await page.getByLabel('Search').fill('zzz');
 		await expect.poll(() => page.locator('li').allTextContents()).toEqual(['No match for zzz']);
 	});
 });
 
-test.fails('an @if arm does not run its expressions once its condition turns false (#863)', async () => {
+test('an @if arm does not run its expressions once its condition turns false (#863)', async () => {
 	await visit('/guarded', async (page) => {
 		await page.getByRole('button', { name: 'Delete' }).click();
 		await expect.poll(() => page.locator('main').textContent()).toBe('Deleted');
 	});
 });
 
-test.fails('a page the router prefetched shows a list derived from a storage() value written after the prefetch (#876)', async () => {
+test('a page the router prefetched shows a list derived from a storage() value written after the prefetch (#876)', async () => {
 	const context = await browser.newContext({ baseURL: app.origin });
 	try {
 		const page = await context.newPage();
@@ -372,7 +372,7 @@ export default function Page() @{
 	},
 );
 
-test.fails('<select value> selects its option in the server HTML (#871)', async () => {
+test('<select value> selects its option in the server HTML (#871)', async () => {
 	const context = await browser.newContext({ baseURL: app.origin, javaScriptEnabled: false });
 	try {
 		const page = await context.newPage();

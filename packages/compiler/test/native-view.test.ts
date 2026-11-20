@@ -1359,15 +1359,38 @@ export function Tags() @{
 		]);
 	});
 
-	it('refuses a @for keyed by its index by name, and not again as markup it left out', async () => {
+	it('keys the rows of a @for keyed by its index by position', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Words() @{
-	let words = state(['a', 'b']);
+	let words = state(['a', 'a']);
 	<ul>@for (const word of words; index at; key at) { <li>{word}</li> }</ul>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.nodes.find((node) => node.kind === 'repeat')).toMatchObject({
+			list: { cell: 'state:words' },
+			key: [],
+			byIndex: true,
+		});
+	});
+
+	it("refuses an element's id reference inside a row of a @for keyed by its index", async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { element, state } from '@markless/core';
+function Entry({ title }) @{
+	const heading = element();
+	<section aria-labelledby={heading}>
+		<h2 el={heading}>{title}</h2>
+	</section>
+}
+export function Entries() @{
+	let titles = state(['A', 'A']);
+	<div>
+		@for (const title of titles; index at; key at) { <Entry title={title} /> }
+	</div>
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
-			'a @for keyed by its index; a native list keys each row by its item',
+			expect.stringContaining('names an element in a row of a @for keyed by its index'),
 		]);
 	});
 
@@ -1446,6 +1469,166 @@ export function Signup() @{
 		expect(JSON.stringify(submit)).not.toContain('prevent');
 	});
 
+	describe('a submit handler calling an app function that is not data', () => {
+		const payloadOf = async (files: Record<string, string>, entry: string) => {
+			const graphs = new Map<string, Awaited<ReturnType<typeof buildSemanticGraph>>>();
+			for (const [filename, source] of Object.entries(files))
+				graphs.set(
+					filename,
+					await buildSemanticGraph({
+						filename,
+						source,
+						nativeFacts: NATIVE_FACT_COLLECTORS,
+					}),
+				);
+			return createNativeViewPayload(graphs.get(entry)!, {
+				modules: {
+					graphs,
+					resolve: (specifier) => `src/${specifier.replace('./', '')}`,
+				},
+				readSource: (file) => files[file],
+			});
+		};
+		const scriptCalls = (tree: unknown): unknown[] =>
+			!tree || typeof tree !== 'object'
+				? []
+				: 'script' in tree
+					? [tree]
+					: Object.values(tree).flatMap(scriptCalls);
+
+		it('runs an imported helper (a method on a number, JSON) as JavaScript once, from the data handler', async () => {
+			const { payload, diagnostics } = await payloadOf(
+				{
+					'src/entries.ts': `export function addEntry(text: string, entry: { readonly site: string }): { saved: string; id: string } {
+	const id = Date.now().toString(36);
+	return { saved: JSON.stringify([{ ...entry, id }, ...JSON.parse(text)]), id };
+}`,
+					'src/App.tsrx': `import { state } from '@markless/core';
+import { addEntry } from './entries.ts';
+export function Entries() @{
+	let saved = state('[]');
+	let last = state('');
+	<form
+		onSubmit={(event) => {
+			event.preventDefault();
+			const data = new FormData(event.currentTarget);
+			const added = addEntry(saved, { site: String(data.get('site')) });
+			saved = added.saved;
+			last = added.id;
+		}}
+	>
+		<input name="site" />
+		<button>Add</button>
+		<p>{last}</p>
+	</form>
+}`,
+				},
+				'src/App.tsrx',
+			);
+			expect(diagnostics).toEqual([]);
+			const submit = payload!.handlers.find(
+				(handler) =>
+					handler.id ===
+					payload!.events.find((event) => event.event === 'submit')?.handler,
+			)!.ops;
+			expect(submit.map((op) => op.op)).toEqual(['assign', 'assign', 'assign']);
+			expect(scriptCalls(submit)).toEqual([
+				{
+					script: 'fn:0',
+					bindings: {
+						args: {
+							value: {
+								array: [
+									{ spread: false, value: { cell: 'state:saved' } },
+									{
+										spread: false,
+										value: expect.objectContaining({
+											object: expect.anything(),
+										}),
+									},
+								],
+							},
+						},
+					},
+				},
+			]);
+			expect(payload!.script!.source).toContain('toString(36)');
+		});
+
+		it('runs a same-file helper called straight into state, with other names and a method on a number', async () => {
+			const { payload, diagnostics } = await payloadOf(
+				{
+					'src/Tally.tsrx': `import { state } from '@markless/core';
+function encodeCount(previous: string, count: number): string {
+	return JSON.stringify({ previous, hex: count.toString(16) });
+}
+export function Tally() @{
+	let record = state('');
+	<form
+		onSubmit={(submitEvent) => {
+			submitEvent.preventDefault();
+			record = encodeCount(record, Number(new FormData(submitEvent.currentTarget).get('count')));
+		}}
+	>
+		<button>Encode</button>
+		<input name="count" />
+		<p>{record}</p>
+	</form>
+}`,
+				},
+				'src/Tally.tsrx',
+			);
+			expect(diagnostics).toEqual([]);
+			const submit = payload!.handlers.find(
+				(handler) =>
+					handler.id ===
+					payload!.events.find((event) => event.event === 'submit')?.handler,
+			)!.ops;
+			expect(submit).toEqual([
+				{
+					op: 'assign',
+					cell: 'state:record',
+					value: expect.objectContaining({ script: 'fn:0' }),
+				},
+			]);
+			expect(payload!.script!.source).toContain('toString(16)');
+		});
+
+		it('keeps a helper value read twice, so the script runs once as the web calls it once', async () => {
+			const { payload, diagnostics } = await payloadOf(
+				{
+					'src/stamp.ts': `export const makeStamp = () => ({ code: Date.now().toString(36), label: JSON.stringify('x') });`,
+					'src/Stamps.tsrx': `import { state } from '@markless/core';
+import { makeStamp } from './stamp.ts';
+export function Stamps() @{
+	let first = state('');
+	let second = state('');
+	<form
+		onSubmit={(event) => {
+			event.preventDefault();
+			const made = makeStamp();
+			first = made.code;
+			second = made.code + made.label;
+		}}
+	>
+		<button>Stamp</button>
+		<p>{first} {second}</p>
+	</form>
+}`,
+				},
+				'src/Stamps.tsrx',
+			);
+			expect(diagnostics).toEqual([]);
+			const submit = payload!.handlers.find(
+				(handler) =>
+					handler.id ===
+					payload!.events.find((event) => event.event === 'submit')?.handler,
+			)!.ops;
+			expect(scriptCalls(submit)).toHaveLength(1);
+			expect(submit[0]).toMatchObject({ op: 'assign', value: { script: 'fn:0' } });
+		});
+	});
+
 	it('submits a form with no submit button from the return key only when it has one text field', async () => {
 		const { payload } = await nativeView(`import { state } from '@markless/core';
 export function Search() @{
@@ -1466,6 +1649,78 @@ export function Search() @{
 		expect(payload!.handlers.find((handler) => handler.id === enters[0]!.handler)!.ops).toEqual(
 			[{ op: 'submit', form: 'h1', submitter: null }],
 		);
+	});
+
+	it('lowers fields and submit buttons in an @if arm of their form; a type="button" button is no part of it, in an arm or a row', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Order() @{
+	let gift = state(false);
+	let sent = state('');
+	let tags = state(['a']);
+	<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget).get('note')); }}>
+		<input name="name" />
+		<button>Send</button>
+		@if (gift) {
+			<>
+				<input name="note" />
+				<button>Send gift</button>
+			</>
+		} @else {
+			<button type="button" onClick={() => (gift = true)}>Add a note</button>
+		}
+		@for (const tag of tags; key tag) { <button type="button">{tag}</button> }
+		<p>{sent}</p>
+	</form>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(payload!.forms).toEqual([
+			{
+				node: 'h0',
+				fields: [
+					{ node: 'h1', kind: 'text' },
+					{ node: 'h3', kind: 'text' },
+				],
+				submitters: ['h2', 'h4'],
+			},
+		]);
+		const submits = payload!.handlers.filter((handler) =>
+			handler.ops.some((op) => op.op === 'submit'),
+		);
+		expect(submits.flatMap((handler) => handler.ops)).toContainEqual({
+			op: 'submit',
+			form: 'h0',
+			submitter: 'h4',
+		});
+	});
+
+	it('refuses an @if arm that decides which button the return key presses, or whether it submits', async () => {
+		const { diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Forms() @{
+	let busy = state(false);
+	let more = state(false);
+	let rows = state(['a']);
+	let sent = state('');
+	<main>
+		<form onSubmit={(event) => { event.preventDefault(); sent = 'one'; }}>
+			<input name="q" />
+			@if (busy) { <button disabled>Saving</button> } @else { <button>Save</button> }
+		</form>
+		<form onSubmit={(event) => { event.preventDefault(); sent = 'two'; }}>
+			<input name="a" />
+			@if (more) { <input name="b" /> }
+		</form>
+		<form onSubmit={(event) => { event.preventDefault(); sent = 'three'; }}>
+			@for (const row of rows; key row) { <input name={row} /> }
+			<button>Send</button>
+		</form>
+		<p>{sent}</p>
+	</main>
+}`);
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the first submit button of the <form> h1 sits in an @if arm, so which button the return key presses follows what shows; a native build presses one it knows when it builds',
+			'the <form> h5 has text fields in an @if arm and no submit button, so whether the return key submits it follows how many show; a native build decides that when it builds',
+			'the <input> h9 in the <form> h8 sits in a @for row of its form, which a native build does not submit yet',
+		]);
 	});
 
 	it('names a form the web would send to its action, and fields and calls no native host checks', async () => {

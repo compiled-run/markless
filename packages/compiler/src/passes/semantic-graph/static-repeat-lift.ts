@@ -125,7 +125,7 @@ export function liftStaticCollection(
 				dependencySources([collection], state))
 			: dependencySources([collection, ...inlined.definitions], state);
 	const lifted = mintTemplateExpressionComputed(
-		`() => ${inlined.source}`,
+		inlined.source,
 		readSources,
 		state,
 		undefined,

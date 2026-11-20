@@ -390,6 +390,22 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'form-arms',
+		fixture: 'test/fixtures/FormArms.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'input', host: 'h1', value: 'ann' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'input', host: 'h3', value: 'red' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
 		name: 'ticks',
 		fixture: 'test/fixtures/Ticks.tsrx',
 		preferredLanguages: ['fr-CA', 'en'],
@@ -717,6 +733,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		fixture: 'proofs/j8-render-values/App.tsrx',
 		modules: true,
 		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		// Rows keyed by position: two rows show the same line, then rows are added, changed and dropped at the end.
+		name: 'for-index-key',
+		fixture: 'proofs/18-for-index-key/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+		],
 	},
 	{
 		name: 'script-render-list',

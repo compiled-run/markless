@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 335,
+	total: 336,
 	guided: 55,
 	groups: [
 		{
@@ -2114,6 +2114,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a write through a loop variable found no list markless_write_through_not_a_list a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_REPEAT_EMPTY_ARM_SLOT_MISSING',
+					title: 'An @empty branch cannot find where a live value goes',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'an @empty branch cannot find where a live value goes markless_repeat_empty_arm_slot_missing a markless runtime error from @markless/web.',
 				},
 				{
 					code: 'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',

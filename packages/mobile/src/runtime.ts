@@ -762,7 +762,8 @@ export function createNativeRuntime(
 		const list = evaluate(repeat.list);
 		if (!Array.isArray(list))
 			throw new Error(`${repeat.id} lists a value that is not an array`);
-		return list.map((item) => {
+		return list.map((item, index) => {
+			if (repeat.byIndex) return { key: String(index), item };
 			let key: Value = item;
 			for (const step of repeat.key) {
 				if (
@@ -1183,12 +1184,17 @@ export function createNativeRuntime(
 				? instances(node).flatMap(({ id }) => (fired.has(`${event}\0${id}`) ? [] : [id]))
 				: [];
 		});
+	const shownInstance = (id: string) => {
+		const node = nodesById.get(id.split('@')[0]!);
+		return !!node && instances(node).some((shownNow) => shownNow.id === id);
+	};
+	// A field an arm hid is a new element when it shows again: it starts from its markup, as the web builds it.
 	const forgetHidden = () => {
-		for (const key of fired) {
-			const id = key.slice(key.indexOf('\0') + 1);
-			const node = nodesById.get(id.split('@')[0]!);
-			if (!node || !instances(node).some((shownNow) => shownNow.id === id)) fired.delete(key);
-		}
+		for (const key of fired) if (!shownInstance(key.slice(key.indexOf('\0') + 1))) fired.delete(key);
+		for (const id of edited.keys()) if (!shownInstance(id)) edited.delete(id);
+		for (const node of ticked)
+			if (!shown(node))
+				checkedness.set(node.id, checkedBinding(node.id) ?? node.attributes?.['checked'] !== undefined);
 	};
 
 	return {

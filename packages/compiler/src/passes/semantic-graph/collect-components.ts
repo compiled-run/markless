@@ -635,7 +635,7 @@ function scopedCallSiteClass(
 	const readSources = pureCompositeReadSources(valueNode, state, { methodCalls: true });
 	if (!readSources) return null;
 	const composed = mintTemplateExpressionComputed(
-		`() => ${scopedClassSource(source, styleScopeClass)}`,
+		scopedClassSource(source, styleScopeClass),
 		readSources,
 		state,
 		scope,

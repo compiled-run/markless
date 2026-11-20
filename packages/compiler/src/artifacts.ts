@@ -691,6 +691,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly nestedRepeats?: true;
 			/** Present when this component's tree holds a keyed repeat whose rows flip an @if of their own. */
 			readonly rowBranchMint?: true;
+			/** Present when this component's tree holds a keyed repeat whose `@empty` arm shows a live value. */
+			readonly emptyArmSlots?: true;
 			/**
 			 * Present when this component's tree holds an action compiled as a
 			 * closure plan, so a composing page routes plan lookups toward it.
@@ -1937,6 +1939,11 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				// The name and quotes are already in the statics: this value can
 				// never be absent, so the slot renders the value alone.
 				readonly alwaysPresent?: true;
+				// An option's `selected`, true when its select's value names it: written by the
+				// server render only, since the browser writes `select.value` itself.
+				readonly selectedOption?: true;
+				/** That comparison as a tree, for native builds only (`nativeFacts`). */
+				readonly nativeExpression?: SemanticExpression;
 				readonly directClassMatch?: {
 					readonly stateGraphNodeId: string;
 					readonly statePath: ReadonlyArray<string>;
