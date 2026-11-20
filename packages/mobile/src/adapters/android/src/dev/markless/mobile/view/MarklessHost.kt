@@ -123,7 +123,7 @@ class MarklessHost(
 	private val context: Context,
 	val payload: Payload,
 	/** This page's styles: a page's own export, or its route's styles from an app style file. */
-	val style: StyleExport?,
+	style: StyleExport?,
 	bundledFonts: FontSource = AssetFonts(context),
 	store: Store = PreferencesStore(context),
 	/** The route params the page opens with. */
@@ -146,6 +146,12 @@ class MarklessHost(
 		preferredLanguages: List<String> = LocaleList.getDefault().let { list -> (0 until list.size()).map { list[it].toLanguageTag() } },
 	) : this(context, Payload.decode(payloadBytes), styleExportBytes?.let { StyleExport.decode(it) }, fonts, store, params, device, preferredLanguages)
 
+	/** This page's styles, laid out at the page's own size once [layOutAt] has run with Dragon's plan. */
+	var style: StyleExport? = style
+		private set
+	/** The export as built, which Dragon's plan lays out again at each size. */
+	private val planned = style
+	private var laidOutFor: Pair<Int, Int>? = null
 	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
 	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
@@ -181,12 +187,21 @@ class MarklessHost(
 	private val styledCells = payload.cells.filter { it.styled }.map { it.id }
 
 	/** One laid-out document (the page, or a sheet's content at one resting height) and the assignment it shows. */
-	private inner class Layout(val export: StyleExport, everyCell: Boolean) {
+	private inner class Layout(export: StyleExport, everyCell: Boolean) {
+		var export = export
+			private set
 		var assignment = export.start(styledCells, runtime::value, isDark(context.resources.configuration), everyCell)
-		val absolutes: List<Map<String, Pair<Double, Double>>> = export.assignments.map { a -> absoluteOrigins(a.nodes) }
+		var absolutes: List<Map<String, Pair<Double, Double>>> = export.assignments.map { a -> absoluteOrigins(a.nodes) }
+			private set
 
 		init {
-			if (Math.abs(dpr - export.dpr) > 1e-3) throw MarklessHostError("style export is for pixel ratio ${export.dpr}; this device is $dpr")
+			if ((export.plan == null || planLayout == null) && Math.abs(dpr - export.dpr) > 1e-3) throw MarklessHostError("style export is for pixel ratio ${export.dpr}; this device is $dpr")
+		}
+
+		/** The same document laid out at another size: the same assignments, new geometry. */
+		fun relaid(next: StyleExport) {
+			export = next
+			absolutes = next.assignments.map { a -> absoluteOrigins(a.nodes) }
 		}
 
 		/** Moves to the assignment [cell] = [value] reaches; false when no state of this document follows [cell]. */
@@ -577,17 +592,72 @@ class MarklessHost(
 
 	/** The device's appearance changed: move to the @media band it selects, as a cell's `state` entry moves to its assignment. */
 	fun configurationChanged(configuration: Configuration) {
+		if (!followBand(isDark(configuration))) return
+		repaint()
+		Log.i(TAG, "band (${if (isDark(configuration)) "dark" else "light"}), style assignments ${allLayouts().map { it.assignment }}")
+	}
+
+	/** The page's current style assignment; null unstyled. */
+	val assignment: Int? get() = page?.assignment
+
+	/**
+	 * With Dragon's plan, the page lays out at the size it is shown at, as a browser does: [widthPx] x [heightPx] is the page
+	 * area. Chrome on Android lays a page out at a whole CSS px width, the screen's width in dp rounded up. Returns whether it
+	 * laid out again.
+	 */
+	fun layOutAt(widthPx: Int, heightPx: Int): Boolean {
+		val p = page ?: return false
+		val layout = planLayout ?: return false
+		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0 || laidOutFor == widthPx to heightPx) return false
+		val next = planned.laidOut(Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout)
+		style = next
+		p.relaid(next)
+		laidOutFor = widthPx to heightPx
+		followBand(isDark(context.resources.configuration))
+		repaint()
+		Log.i(TAG, "laid out at ${next.viewportWidth}x${next.viewportHeight} dp, style assignment ${p.assignment}")
+		return true
+	}
+
+	/**
+	 * Every shown element's and text's box in device px from [origin]'s top left, by node id: what a layout check compares with
+	 * a browser's boxes. A text node's box is its frame where its view draws its lines.
+	 */
+	fun shownFrames(origin: View): List<Pair<String, List<Double>>> {
+		val from = IntArray(2).also { origin.getLocationInWindow(it) }
+		return built.keys.sorted().mapNotNull { id ->
+			val inst = built.getValue(id)
+			val view = views[id] ?: return@mapNotNull null
+			if (sheetOf[inst.node.id] != null) return@mapNotNull null
+			var at: View? = view
+			while (at != null) {
+				if (at.visibility != View.VISIBLE) return@mapNotNull null
+				if (at === root) break
+				at = at.parent as? View
+			}
+			if (at == null) return@mapNotNull null
+			val loc = IntArray(2).also { view.getLocationInWindow(it) }
+			val x = (loc[0] - from[0]).toDouble(); val y = (loc[1] - from[1]).toDouble()
+			val lines = (view as? TextView)?.let { lineSources[it] }?.takeIf { inst.node is Node.Text }
+			when {
+				lines != null -> lines.first.frame!!.let { f -> listOf(x + lines.second.first, y + lines.second.second, f.width, f.height) }
+				inst.node is Node.Text && view is Button -> listOf(x + view.paddingLeft, y + view.paddingTop, (view.width - view.paddingLeft - view.paddingRight).toDouble(), (view.height - view.paddingTop - view.paddingBottom).toDouble())
+				else -> listOf(x, y, view.width.toDouble(), view.height.toDouble())
+			}?.let { id to it }
+		}
+	}
+
+	/** Moves every document to the band its appearance and laid-out size select; true when any moved. */
+	private fun followBand(dark: Boolean): Boolean {
 		var changed = false
 		for (l in allLayouts()) {
 			if (l.export.bandState < 0) continue
-			val band = JsValue.Num(l.export.band(isDark(configuration)).toDouble())
+			val band = JsValue.Num(l.export.band(dark).toDouble())
 			if (l.export.assignments[l.assignment].values[BAND_KEY] == band) continue
 			l.advance(BAND_KEY, band)
 			changed = true
 		}
-		if (!changed) return
-		repaint()
-		Log.i(TAG, "band (${if (isDark(configuration)) "dark" else "light"}), style assignments ${allLayouts().map { it.assignment }}")
+		return changed
 	}
 
 	/** A sheet came to rest at [snapPoint]: its content takes that height's layout. */
@@ -1381,6 +1451,20 @@ class MarklessHost(
 
 	companion object {
 		const val TAG = "MarklessHost"
+
+		/** Dragon's translated `runMarklessLayout`, when the app is built with Dragon's engine; without it a page keeps the size it was exported at. */
+		val planLayout: ((String) -> String)? = try {
+			val run = Class.forName("dev.dragon.layout.HarnessKt").getMethod("harness_runMarklessLayout", String::class.java)
+			({ line: String ->
+				try {
+					run.invoke(null, line) as String
+				} catch (e: java.lang.reflect.InvocationTargetException) {
+					throw e.cause ?: e
+				}
+			})
+		} catch (_: ClassNotFoundException) {
+			null
+		}
 		private val HEADINGS = setOf("h1", "h2", "h3", "h4", "h5", "h6")
 		private val TICKABLE = setOf("checkbox", "radio")
 	}

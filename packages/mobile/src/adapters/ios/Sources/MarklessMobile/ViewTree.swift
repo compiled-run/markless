@@ -169,7 +169,7 @@ final class ViewTree {
 	let page = UIScrollView()
 	let keyboard: KeyboardDismisser
 	private let runtime: NativeRuntime
-	private let layout: StyleLayout?
+	private var layout: StyleLayout?
 	private let faces: [String: UIFontDescriptor]
 	/// The system faces the page's and its sheets' styles name.
 	private let systemFaces: [String: SystemFace]
@@ -195,7 +195,7 @@ final class ViewTree {
 	/// The controller that presents the page's system sheets.
 	weak var presenter: UIViewController?
 	private var anchors = Set<ObjectIdentifier>()
-	private var assignment: Int
+	private(set) var assignment: Int
 	private let bodyLayer = CALayer()
 	/// Each styled sheet's layout per resting height, the height it rests at, and each height's current assignment.
 	private var sheetStyles: [String: (heights: [(snapPoint: Double, layout: StyleLayout)], height: Int, assignments: [Int])] = [:]
@@ -336,6 +336,29 @@ final class ViewTree {
 	/// Before the page is rebuilt: its sheets go with it, without a `dismiss` action.
 	func closeSheets() {
 		for sheet in sheets.values { sheet.close(animated: false) }
+	}
+
+	/// Every shown element's and text's box in points from the page's top left, by node id: what a layout check compares with
+	/// a browser's boxes.
+	func shownFrames() -> [(id: String, frame: CGRect)] {
+		(elements.map { ($0.key, $0.value as UIView) } + labels.map { ($0.key, $0.value as UIView) }).compactMap { id, view in
+			var at: UIView? = view
+			while let current = at, current !== root {
+				if current.isHidden { return nil }
+				at = current.superview
+			}
+			guard at === root else { return nil }
+			return (templates[id] ?? id, view.convert(view.bounds, to: root))
+		}.sorted { $0.id < $1.id }
+	}
+
+	/// The page laid out again at another size (a rotation, a resized window): every view takes its new box in the current assignment.
+	func relayout(_ new: StyleLayout) throws {
+		guard layout != nil else { return }
+		layout = new
+		try repaint { _ in true }
+		paintBody()
+		try sizePage()
 	}
 
 	/// The page's scrollable size: Dragon's page range over the viewport it laid out at.

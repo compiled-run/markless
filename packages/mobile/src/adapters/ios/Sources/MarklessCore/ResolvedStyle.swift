@@ -160,7 +160,7 @@ extension StyleExport {
 		let current = try stateCells.map { cell in
 			guard cell == StyleBands.state else { return try value(cell) }
 			guard let bands else { throw styleError("\(cell) is a state, but there are no bands") }
-			return NativeValue.number(Double(try bands.band(dark: dark)))
+			return NativeValue.number(Double(try bands.band(dark: dark, widthPx: viewport.width * dpr, heightPx: viewport.height * dpr, scale: dpr)))
 		}
 		let matches = { (index: Int) in zip(self.states, current).allSatisfy { state, value in self.assignments[index].values[state.key].map { $0.strictlyEquals(value) } ?? false } }
 		guard let start = matches(initial) ? initial : assignments.indices.first(where: matches) else {
