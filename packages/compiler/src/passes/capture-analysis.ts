@@ -208,6 +208,8 @@ function symbolTouchesPageSpaceGraph(
 	const traffic = [
 		...('reads' in symbol ? (symbol.reads ?? []) : []),
 		...('writes' in symbol ? (symbol.writes ?? []) : []),
+		...('dependencies' in symbol ? (symbol.dependencies ?? []) : []),
+		...('testReads' in symbol ? symbol.testReads : []),
 	];
 	return (
 		traffic.some((entry) => pageSpace(entry.graphNodeId)) ||

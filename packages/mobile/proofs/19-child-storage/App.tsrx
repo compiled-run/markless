@@ -11,6 +11,7 @@ export default function App() @{
 		<h1>Shared taps</h1>
 		<p>{`Total ${total}`}</p>
 		<Counter label="Left" />
+		<Counter label="Right" />
 		<button onClick={() => (total = '0')}>Reset</button>
 	</main>
 }
