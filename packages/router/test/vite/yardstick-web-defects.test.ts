@@ -253,7 +253,7 @@ async function visit(path: string, run: (page: Page) => Promise<void>) {
 	}
 }
 
-test.fails('an @if arm can hold a modal (#869)', { timeout: 240_000 }, async () => {
+test('an @if arm can hold a modal (#869)', { timeout: 240_000 }, async () => {
 	expect(
 		(await buildError({
 			'index.tsrx': `import { state } from '@markless/core';
@@ -278,21 +278,21 @@ export default function Page() @{
 	).not.toContain('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
 });
 
-test.fails('@empty with live text shows when a filtered list goes from some rows to none (#868)', async () => {
+test('@empty with live text shows when a filtered list goes from some rows to none (#868)', async () => {
 	await visit('/empty', async (page) => {
 		await page.getByLabel('Search').fill('zzz');
 		await expect.poll(() => page.locator('li').allTextContents()).toEqual(['No match for zzz']);
 	});
 });
 
-test.fails('an @if arm does not run its expressions once its condition turns false (#863)', async () => {
+test('an @if arm does not run its expressions once its condition turns false (#863)', async () => {
 	await visit('/guarded', async (page) => {
 		await page.getByRole('button', { name: 'Delete' }).click();
 		await expect.poll(() => page.locator('main').textContent()).toBe('Deleted');
 	});
 });
 
-test.fails('a page the router prefetched shows a list derived from a storage() value written after the prefetch (#876)', async () => {
+test('a page the router prefetched shows a list derived from a storage() value written after the prefetch (#876)', async () => {
 	const context = await browser.newContext({ baseURL: app.origin });
 	try {
 		const page = await context.newPage();
@@ -310,14 +310,14 @@ test.fails('a page the router prefetched shows a list derived from a storage() v
 	}
 });
 
-test.fails('a storage() value written in a page shows in a component from another module that reads the same key (#867)', async () => {
+test('a storage() value written in a page shows in a component from another module that reads the same key (#867)', async () => {
 	await visit('/shared', async (page) => {
 		await page.getByRole('button', { name: 'Add' }).click();
 		await expect.poll(() => page.locator('[data-badge]').textContent()).toBe('1');
 	});
 });
 
-test.fails("live text beside an element in a component's children follows its state (#864)", async () => {
+test("live text beside an element in a component's children follows its state (#864)", async () => {
 	await visit('/boxed', async (page) => {
 		await page.getByRole('button', { name: 'South' }).click();
 		await expect.poll(() => page.locator('[data-box]').textContent()).toBe('South▾');
@@ -343,9 +343,9 @@ export default function Page() @{
 	).not.toContain('MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE');
 });
 
-test.fails('a page that reads url.searchParams in an attribute renders (#865)', async () => {
+test('a page that reads url.searchParams in an attribute renders (#865)', async () => {
 	await visit('/notice?saved=1', async (page) => {
-		await expect(page.getByRole('status')).toBeVisible();
+		await page.getByRole('status').waitFor({ state: 'visible' });
 	});
 });
 
@@ -372,7 +372,7 @@ export default function Page() @{
 	},
 );
 
-test.fails('<select value> selects its option in the server HTML (#871)', async () => {
+test('<select value> selects its option in the server HTML (#871)', async () => {
 	const context = await browser.newContext({ baseURL: app.origin, javaScriptEnabled: false });
 	try {
 		const page = await context.newPage();

@@ -1,0 +1,36 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u25-textbox-textarea",
+			"failure": {
+				"step": 1,
+				"action": "type",
+				"role": "flow",
+				"command": "assertConditionCommand",
+				"message": "Assertion is false: \"Sent: nothing yet\" is not visible"
+			},
+			"installSeconds": 3.427175833000001,
+			"flowSeconds": 46.267262125
+		},
+		{
+			"name": "u23-textbox",
+			"failure": null,
+			"installSeconds": 0.28503104100000926,
+			"flowSeconds": 25.298776417000003
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.2857426249999844,
+			"flowSeconds": 27.760840834000003
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 0.3309733750000014,
+			"flowSeconds": 38.09004679200001
+		}
+	]
+}

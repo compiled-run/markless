@@ -1,0 +1,30 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u24-pagination-links",
+			"failure": null,
+			"installSeconds": 3.527886584,
+			"flowSeconds": 23.37745575
+		},
+		{
+			"name": "u11-pagination",
+			"failure": null,
+			"installSeconds": 0.27751916700000584,
+			"flowSeconds": 25.422126999999993
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 0.33648554200000946,
+			"flowSeconds": 24.19461391700001
+		},
+		{
+			"name": "u1-base",
+			"failure": null,
+			"installSeconds": 0.269277625000017,
+			"flowSeconds": 19.491691749999998
+		}
+	]
+}

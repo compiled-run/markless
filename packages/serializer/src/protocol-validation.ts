@@ -569,6 +569,7 @@ function assertOptionalEnclosingRow(record: Record<string, unknown>, context: st
 	if (enclosingRow === undefined) return;
 	assertRecordShape(enclosingRow, context);
 	assertStringField(enclosingRow, 'repeatId', context);
+	if (enclosingRow.prefix !== undefined) assertStringField(enclosingRow, 'prefix', context);
 	assertElementAddressField(enclosingRow, 'parentHostPath', context);
 	assertOptionalStringArrayField(enclosingRow, 'itemPath', context);
 	if (enclosingRow.arm !== undefined) {
@@ -743,6 +744,19 @@ function assertOptionalEmptyArm(record: Record<string, unknown>, context: string
 	if (arm === undefined) return;
 	assertRecordShape(arm, context);
 	assertStringField(arm, 'html', context);
+	assertOptionalEmptyArmSlots(arm.textSlots, `${context}.textSlots`);
+	assertOptionalEmptyArmSlots(arm.attributeSlots, `${context}.attributeSlots`, true);
+}
+
+// An `@empty` arm has no item, so each of its slots reads a graph node.
+function assertOptionalEmptyArmSlots(slots: unknown, context: string, named = false): void {
+	assertOptionalRowTemplateSlots(slots, context, named);
+	for (const [index, slot] of ((slots ?? []) as Array<Record<string, unknown>>).entries())
+		if (slot.graphNodeId === undefined)
+			throw invalidPayloadShapeError(
+				contextPayloadType(context),
+				`Invalid ${context}[${index}]: expected graphNodeId with graphPath.`,
+			);
 }
 
 function assertOptionalRowElementHandles(record: Record<string, unknown>, context: string): void {

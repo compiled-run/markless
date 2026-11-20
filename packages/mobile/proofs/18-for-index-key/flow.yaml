@@ -1,0 +1,28 @@
+appId: ${APP_ID}
+name: 18-for-index-key
+---
+- launchApp:
+    clearState: true
+- assertVisible: Lines
+- assertVisible: Same line
+- assertVisible: Last line
+- assertNotVisible: Added line
+- assertNotVisible: First changed
+- tapOn: Add a line
+- assertVisible: Added line
+- assertVisible: Same line
+- assertVisible: Last line
+- assertVisible: Added line
+- assertNotVisible: First changed
+- tapOn: Change the first
+- assertVisible: First changed
+- assertVisible: First changed
+- assertVisible: Same line
+- assertVisible: Last line
+- assertVisible: Added line
+- tapOn: Drop the last
+- assertNotVisible: Added line
+- assertVisible: First changed
+- assertVisible: Same line
+- assertVisible: Last line
+- assertNotVisible: Added line

@@ -1143,6 +1143,25 @@ test('only rows holding an @if of their own install the row-branch loader', () =
 	).toContain(loader);
 });
 
+test('only a repeat whose @empty arm shows a live value installs the empty-arm loader, beside any row @if', () => {
+	const loader = "import('@markless/web/fns/empty-arm-slots')";
+	const building = ['web/repeat-runtime', 'web/resume-keyed-repeats', 'web/fns/row-mint'];
+	const live = repeatDemandMap([...building, 'web/fns/empty-arm-slots']);
+	expect(emitResumeModule({ ...baseInput, runtimeDemandMap: live })).toContain(loader);
+	expect(emitResumeModule({ ...baseInput, runtimeDemandMap: repeatDemandMap(building) })).not.toContain(loader);
+	expect(
+		emitResumeModule({ ...baseInput, runtimeDemandMap: repeatDemandMap(building), linkedEmptyArmSlots: true }),
+	).toContain(loader);
+	const both = emitResumeModule({
+		...baseInput,
+		runtimeDemandMap: repeatDemandMap([...building, 'web/fns/empty-arm-slots', 'web/fns/row-branch-mint']),
+	});
+	const line = both.split('\n').find((text) => text.startsWith('globalThis.__marklessRowBranches'))!;
+	expect(line).toContain(loader);
+	expect(line).toContain("import('@markless/web/fns/row-branch-mint')");
+	expect(line).toContain('Object.assign({}, ...loaded)');
+});
+
 test('only a repeat nested in another repeat\'s rows installs the nested-repeat loader', () => {
 	const loader = "import('@markless/web/fns/nested-repeats')";
 	const nested = repeatDemandMap([

@@ -38,6 +38,13 @@ export type RowMintGraph = Pick<RuntimeGraph, 'read'>;
  * flipped `@if` arm; it is spelled here rather than threaded in because the
  * repeat runtime is reached from two call sites that hand it no renderer.
  */
+// The graph and arm are read by the live-arm render `fns/empty-arm-slots` puts in this one's place; the overload costs no bytes.
+export function renderEmptyArm(
+	parent: ResumeDomElement,
+	repeat: ResumeKeyedRepeatRecord,
+	graph?: RuntimeGraph,
+	arm?: { readonly nodes: ReadonlyArray<ResumeDomNode> },
+): ReadonlyArray<ResumeDomNode>;
 export function renderEmptyArm(
 	parent: ResumeDomElement,
 	repeat: ResumeKeyedRepeatRecord,
