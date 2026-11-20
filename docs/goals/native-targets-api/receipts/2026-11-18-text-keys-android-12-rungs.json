@@ -1,0 +1,78 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u30-text-keys",
+			"failure": null,
+			"installSeconds": 2.739381625000002,
+			"flowSeconds": 40.394859291
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 1.7645550419999927,
+			"flowSeconds": 18.994774875000004
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 1.7811098749999947,
+			"flowSeconds": 29.28437520800001
+		},
+		{
+			"name": "f2-return-key",
+			"failure": null,
+			"installSeconds": 1.7796405000000086,
+			"flowSeconds": 42.65472041700001
+		},
+		{
+			"name": "f4-required",
+			"failure": null,
+			"installSeconds": 1.705693499999994,
+			"flowSeconds": 26.343320125000027
+		},
+		{
+			"name": "f5-async",
+			"failure": null,
+			"installSeconds": 1.5516211250000052,
+			"flowSeconds": 45.52151033399999
+		},
+		{
+			"name": "f6-disabled",
+			"failure": null,
+			"installSeconds": 1.5454268750000046,
+			"flowSeconds": 21.471217000000063
+		},
+		{
+			"name": "16-keyboard",
+			"failure": null,
+			"installSeconds": 1.4654369589999552,
+			"flowSeconds": 24.963568042000055
+		},
+		{
+			"name": "u23-textbox",
+			"failure": null,
+			"installSeconds": 1.3808199160000076,
+			"flowSeconds": 15.839244917000062
+		},
+		{
+			"name": "u25-textbox-textarea",
+			"failure": null,
+			"installSeconds": 1.4311854169999716,
+			"flowSeconds": 16.31180116699997
+		},
+		{
+			"name": "u29-field-focus",
+			"failure": null,
+			"installSeconds": 1.7483701250000159,
+			"flowSeconds": 22.940046750000096
+		},
+		{
+			"name": "y2-sheet-pick",
+			"failure": null,
+			"installSeconds": 1.578095750000095,
+			"flowSeconds": 30.66170308300003
+		}
+	]
+}

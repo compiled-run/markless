@@ -5,7 +5,7 @@ public struct NativeAction: Equatable, Sendable {
 	public let event: NativeEventName
 	/// The element acted on; "" for a `timer`.
 	public let host: String
-	/// For `input`: the field's whole text after the edit.
+	/// For `input`: the field's whole text after the edit; for `keydown`, the key; for `paste`, the pasted text.
 	public let value: String?
 	/// For `timer`: the journalled timer whose time has come.
 	public let timer: String?
@@ -18,14 +18,17 @@ public struct NativeAction: Equatable, Sendable {
 	public let x: Double?
 	public let y: Double?
 	public let time: Double?
+	/// For `activate`: how many presses in a row on the element (a double tap's second is 2); nil reads as 1.
+	public let detail: Int?
 
 	public init(
 		event: NativeEventName, host: String, value: String? = nil, reason: String? = nil, pointerId: Double? = nil, x: Double? = nil,
-		y: Double? = nil, time: Double? = nil
+		y: Double? = nil, time: Double? = nil, detail: Int? = nil
 	) {
 		self.event = event
 		self.host = host
 		self.value = value
+		self.detail = detail
 		timer = nil
 		self.reason = reason
 		self.pointerId = pointerId
@@ -38,6 +41,7 @@ public struct NativeAction: Equatable, Sendable {
 		self.event = event
 		host = ""
 		value = nil
+		detail = nil
 		self.timer = timer
 		reason = nil
 		pointerId = nil
@@ -104,6 +108,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case abort(id: Int)
 	/// An element marked `overlay` joined the overlay stack (`open`) or left it; a modal one goes in the top layer.
 	case overlay(node: String, open: Bool, modal: Bool)
+	/// The `keydown` or `paste` handler called `preventDefault()`: the host leaves out what the key or paste does.
+	case preventDefault
 
 	public var json: JSONValue {
 		switch self {
@@ -149,6 +155,7 @@ public enum NativeJournalEntry: Equatable, Sendable {
 		case let .abort(id): return .object([("op", .string("abort")), ("id", .number(Double(id)))])
 		case let .overlay(node, open, modal):
 			return .object([("op", .string("overlay")), ("node", .string(node)), ("open", .bool(open)), ("modal", .bool(modal))])
+		case .preventDefault: return .object([("op", .string("preventDefault"))])
 		}
 	}
 }
@@ -221,6 +228,8 @@ public final class NativeRuntime {
 	/// Row state's list by cell id: its values are kept as `<cell>@<key>`.
 	private let rowOfCell: [String: String]
 	private var eventValue: String?
+	/// In an `input` dispatch: the field's text as typed, which it already shows; `eventValue` is it sanitized (an email field).
+	private var edit: String?
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
 	/// What a touch adds to a script pointer handler's event, in the order the reference writes them.
@@ -233,6 +242,7 @@ public final class NativeRuntime {
 	/// Each touch that is down, by pointer id.
 	private var touches: [Double: TouchState] = [:]
 	private var overlayNodes: [NativeNode] = []
+	private let firstOfCell: [String: NativeExpr]
 	private let forms: [String: NativeForm]
 	/// A field's text a person typed since its `value` binding last changed it.
 	private var edited: [String: String] = [:]
@@ -256,8 +266,6 @@ public final class NativeRuntime {
 	private let emailMismatch: NativeEmailMismatch?
 	/// The label the web draws on an `<input type="submit">` without a `value`, in the device's language.
 	public let submitLabel: String?
-	/// An input's text as typed, which the field keeps; the handler reads `eventValue`, sanitized as the web sanitizes it.
-	private var edit: String?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
 	/// Where a page with a script gets its engine; asked only when a script op runs or a script computed is read.
@@ -304,6 +312,7 @@ public final class NativeRuntime {
 		for handler in payload.handlers { collect(handler.ops) }
 		self.continuations = continuations
 		rowOfCell = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.row.map { (cell.id, $0) } })
+		firstOfCell = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.first.map { (cell.id, $0) } })
 		nodesById = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
 		forms = Dictionary(payload.forms.map { ($0.node, $0) }, uniquingKeysWith: { first, _ in first })
 		ticked = payload.nodes.filter { node in
@@ -389,10 +398,41 @@ public final class NativeRuntime {
 		return "\(cell)@\(key)"
 	}
 
-	/// A row's state reads its first value until the row writes it.
+	/// A row's state reads its first value until the row writes it; one taken from the row's item is seeded before any change
+	/// (`seedRows`), so until the first change it reads the item as the row was built.
 	private func read(_ cell: String, in scope: NativeScope = .empty) throws -> NativeValue {
 		guard let value = values[cell] else { throw RuntimeError(reason: "unknown cell \(cell)") }
-		return values[try slot(of: cell, in: scope)] ?? value
+		if let seeded = values[try slot(of: cell, in: scope)] { return seeded }
+		if let first = firstOfCell[cell] { return try evaluate(first, in: scope) }
+		return value
+	}
+
+	/// For each row's state that has `rebuiltBy`, by slot (`<cell>@<key>`): those values now, as JSON.
+	private func rowSignatures() throws -> [String: String] {
+		var signatures: [String: String] = [:]
+		for cell in payload.cells {
+			guard let row = cell.row, let rebuiltBy = cell.rebuiltBy, let list = nodesById[row], try isShown(list.arm) else { continue }
+			for (key, item) in try rows(of: row) {
+				let scope = NativeScope(items: [row: item], keys: [row: key])
+				signatures["\(cell.id)@\(key)"] = try rebuiltBy.map { try evaluate($0, in: scope).jsonText }.joined(separator: ",")
+			}
+		}
+		return signatures
+	}
+
+	/// As on the web, a part a row passes a changed value to is built again: that row's state starts over.
+	private func resetChangedRows(_ before: [String: String]) throws {
+		for (slot, now) in try rowSignatures() where before[slot].map({ $0 != now }) ?? false { values.removeValue(forKey: slot) }
+	}
+
+	/// A row's state with a `first` takes it once, from the row's item, when the row is built.
+	private func seedRows() throws {
+		for cell in payload.cells {
+			guard let row = cell.row, let first = cell.first, let list = nodesById[row], try isShown(list.arm) else { continue }
+			for (key, item) in try rows(of: row) where values["\(cell.id)@\(key)"] == nil {
+				values["\(cell.id)@\(key)"] = try evaluate(first, in: NativeScope(items: [row: item], keys: [row: key]))
+			}
+		}
 	}
 
 	/// The current value of a cell.
@@ -433,6 +473,7 @@ public final class NativeRuntime {
 			return try callMethod(method, on: targetValue, args)
 		case .routeParams: return .object(params.map { (key: $0.name, value: .string($0.value)) })
 		case let .checked(node): return .bool(try isChecked(node))
+		case let .field(node): return .string(try textOf(field: node))
 		case let .formData(form): return .array(try entries(of: form).map { .array($0.map(NativeValue.string)) })
 		case .event(.value):
 			guard let eventValue else { throw RuntimeError(reason: "the event's value read where the event has none") }
@@ -1085,7 +1126,13 @@ public final class NativeRuntime {
 		if action.event == .activate { focused = action.host }
 		edit = action.event == .input ? action.value ?? "" : nil
 		eventValue = try edit.map { try sanitized(action.host, $0) }
-		defer { eventValue = nil; edit = nil }
+		switch action.event {
+		case .keydown: eventFields = [.key: .string(action.value ?? "")]
+		case .paste: eventFields = [.text: .string(action.value ?? "")]
+		case .activate: eventFields = [.detail: .number(Double(action.detail ?? 1))]
+		default: break
+		}
+		defer { eventValue = nil; edit = nil; eventFields = nil }
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
 	}
 
@@ -1304,6 +1351,8 @@ public final class NativeRuntime {
 					let touch = touches[id]
 				else { continue }
 				if !release { touch.capture = node } else if touch.capture == node { touch.capture = nil }
+			case .preventDefault:
+				calls.append(.preventDefault)
 			case let .call(call, object, arguments, result, then):
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):
@@ -1384,6 +1433,7 @@ public final class NativeRuntime {
 		let keyed = { (list: [(node: String, name: String, value: String?)]) in
 			Dictionary(list.map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { $1 })
 		}
+		try seedRows()
 		let cellsBefore = values
 		let beforeTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let beforeAttributes = keyed(try boundAttributes())
@@ -1404,6 +1454,7 @@ public final class NativeRuntime {
 		let ownedBefore = Set(try liveObjects())
 		let focusBefore = focused
 		let stackBefore = stack
+		let signaturesBefore = try rowSignatures()
 		var calls = try apply()
 		if case .navigate? = calls.first { return calls }
 		calls += try syncAsync()
@@ -1421,6 +1472,8 @@ public final class NativeRuntime {
 			guard let at = slot.firstIndex(of: "@"), let list = rowOfCell[String(slot[..<at])] else { continue }
 			if !kept.contains("\(list)\u{0}\(slot[slot.index(after: at)...])") { values.removeValue(forKey: slot) }
 		}
+		try resetChangedRows(signaturesBefore)
+		try seedRows()
 		try forgetHidden()
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let afterAttributes = keyed(try boundAttributes())
