@@ -68,6 +68,43 @@ if (!host) {
 		if (typeof signal.onabort === 'function') signal.onabort(event);
 		signal.listeners.slice().forEach(function (fn) { fn.call(signal, event); });
 	};
+	// A submitted form as a script holds it: the name and value of each field it sends, in order, as FormData reads them.
+	var Form = (host.Form = function (entries) { this.entries = entries; });
+	var FormData = function (form, submitter) {
+		// A phone's script holds no element, so the only submitter it can name is none.
+		if (submitter !== undefined && submitter !== null) throw new TypeError("Failed to construct 'FormData': a phone's script has no submitter element to add.");
+		if (form === undefined) { this.pairs = []; return; }
+		if (!(form instanceof Form)) throw new TypeError("Failed to construct 'FormData': parameter 1 is not of type 'HTMLFormElement'.");
+		this.pairs = form.entries.map(function (pair) { return [String(pair[0]), String(pair[1])]; });
+	};
+	FormData.prototype.get = function (name) {
+		for (var index = 0; index < this.pairs.length; index++) if (this.pairs[index][0] === String(name)) return this.pairs[index][1];
+		return null;
+	};
+	FormData.prototype.getAll = function (name) {
+		return this.pairs.filter(function (pair) { return pair[0] === String(name); }).map(function (pair) { return pair[1]; });
+	};
+	FormData.prototype.has = function (name) { return this.get(name) !== null; };
+	FormData.prototype.append = function (name, value) { this.pairs.push([String(name), String(value)]); };
+	FormData.prototype.set = function (name, value) {
+		var at = -1, kept = [];
+		for (var index = 0; index < this.pairs.length; index++) {
+			if (this.pairs[index][0] !== String(name)) kept.push(this.pairs[index]);
+			else if (at < 0) { at = kept.length; kept.push([String(name), String(value)]); }
+		}
+		if (at < 0) kept.push([String(name), String(value)]);
+		this.pairs = kept;
+	};
+	FormData.prototype['delete'] = function (name) { this.pairs = this.pairs.filter(function (pair) { return pair[0] !== String(name); }); };
+	FormData.prototype.forEach = function (fn, self) {
+		var form = this;
+		this.pairs.slice().forEach(function (pair) { fn.call(self, pair[1], pair[0], form); });
+	};
+	FormData.prototype.entries = function () { return this.pairs.map(function (pair) { return [pair[0], pair[1]]; })[Symbol.iterator](); };
+	FormData.prototype.keys = function () { return this.pairs.map(function (pair) { return pair[0]; })[Symbol.iterator](); };
+	FormData.prototype.values = function () { return this.pairs.map(function (pair) { return pair[1]; })[Symbol.iterator](); };
+	FormData.prototype[Symbol.iterator] = FormData.prototype.entries;
+	g.FormData = FormData;
 	if (typeof g.queueMicrotask !== 'function') g.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
 	var Headers = function (pairs) {
 		this.get = function (name) {
@@ -312,7 +349,10 @@ g.__markless[id] = {
 		if (entry.kind === 'dispatch') {
 			var settled = function (error) { fail(entry['catch'], error); };
 			try {
-				var result = fn(entry.fn)(frameOf(entry.frame))(eventOf(entry.event));
+				var event = eventOf(entry.event);
+				// A submit's event is at its form: its target and currentTarget are the form, whose entries FormData reads.
+				if ('#form' in entry.frame) event.target = event.currentTarget = new host.Form(entry.frame['#form'].value);
+				var result = fn(entry.fn)(frameOf(entry.frame))(event);
 				if (result && typeof result.then === 'function') result.then(null, settled);
 			} catch (error) {
 				settled(error);

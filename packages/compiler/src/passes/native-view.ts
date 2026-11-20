@@ -944,8 +944,84 @@ export function nativeUnsupported(message: string, span?: SourceSpan): CompilerD
 }
 
 const LANGUAGE_GLOBALS = new Set(NATIVE_SCRIPT_LANGUAGE_GLOBALS);
-// A submit's default action and a box's checkedness are the host's; a script's event cannot report them back yet.
-const DATA_ONLY_EVENTS = new Set(['submit', 'change']);
+// A box's checkedness is the host's; a script's event cannot report it back yet.
+const DATA_ONLY_EVENTS = new Set(['change']);
+/** The binding a submit's script reads its form's entries from; `#` keeps it apart from every name a handler reads. */
+const FORM_ENTRIES_BINDING = '#form';
+
+/** Whether an expression awaits anywhere in it. */
+const awaits = (tree: unknown): boolean =>
+	!!tree &&
+	typeof tree === 'object' &&
+	((tree as { kind?: unknown }).kind === 'await' ||
+		Object.values(tree).some((child) =>
+			Array.isArray(child) ? child.some(awaits) : awaits(child),
+		));
+
+/**
+ * Whether `statements` call `event.preventDefault()` on every path before anything that awaits or returns, as a submit
+ * handler running as JavaScript must for the web to keep its page: the phone has no action to send the form to.
+ */
+function preventsFirst(
+	statements: ReadonlyArray<SemanticHandlerStatement>,
+	event: string | undefined,
+): boolean {
+	if (event === undefined) return false;
+	for (const statement of statements) {
+		if (
+			statement.kind === 'invoke' &&
+			statement.name === event &&
+			statement.path?.length === 1 &&
+			statement.path[0] === 'preventDefault' &&
+			(statement.arguments ?? []).length === 0
+		)
+			return true;
+		if (statement.kind === 'if') {
+			if (awaits(statement.test)) return false;
+			if (
+				preventsFirst(statement.whenTrue, event) &&
+				preventsFirst(statement.whenFalse, event)
+			)
+				return true;
+			if (leaves(statement.whenTrue) || leaves(statement.whenFalse)) return false;
+			continue;
+		}
+		if (leaves([statement])) return false;
+	}
+	return false;
+}
+
+/**
+ * Whether a handler may give back a promise: the web marks a submitting form busy until it settles, and a phone's engine
+ * does not report when it does, so such a submit handler stays data.
+ */
+const settlesLater = (statements: ReadonlyArray<SemanticHandlerStatement>): boolean =>
+	awaits(statements) || returnsValue(statements);
+
+/** Whether any of `statements`, at any depth, returns a value. */
+const returnsValue = (statements: ReadonlyArray<SemanticHandlerStatement>): boolean =>
+	statements.some((statement) =>
+		statement.kind === 'return'
+			? statement.value !== undefined
+			: statement.kind === 'if'
+				? returnsValue(statement.whenTrue) || returnsValue(statement.whenFalse)
+				: statement.kind === 'try' &&
+					[statement.body, statement.handler ?? [], statement.finalizer].some(returnsValue),
+	);
+
+/** Whether running `statements` may return, await or do what the build does not follow, so a later statement may not run first. */
+const leaves = (statements: ReadonlyArray<SemanticHandlerStatement>): boolean =>
+	statements.some(
+		(statement) =>
+			statement.kind === 'return' ||
+			statement.kind === 'try' ||
+			statement.kind === 'unsupported' ||
+			(statement.kind === 'if'
+				? awaits(statement.test) ||
+					leaves(statement.whenTrue) ||
+					leaves(statement.whenFalse)
+				: awaits(statement)),
+	);
 const RENDER_UNSTEADY = new Set(['Date', 'crypto', 'performance']);
 const GLOBAL_OBJECTS = new Set(NATIVE_SCRIPT_GLOBAL_OBJECTS);
 
@@ -1856,12 +1932,7 @@ export function createNativeViewPayload(
 		const call = methodCallSite(body?.kind === 'await' ? body.value : body);
 		const device = call ? deviceName(call.calleePath, scope) : undefined;
 		const id = `${scope.prefix}task:${computed.id}`;
-		if (
-			!call ||
-			device === undefined ||
-			!isDeviceCall(device) ||
-			!DEVICE_CALLS[device].async
-		) {
+		if (!call || device === undefined || !isDeviceCall(device) || !DEVICE_CALLS[device].async) {
 			if (!cells.some((cell) => cell.id === id)) {
 				const script = scriptAsync(computed, { ...scope, boundary: undefined }, what);
 				if (script === null) return null;
@@ -3159,7 +3230,11 @@ export function createNativeViewPayload(
 									`${what} reads \`.${expression.property}\` of an error; a native build reads its \`message\` and \`name\``,
 								);
 				const element = elementOf(object);
-				if (element !== undefined && element === typedField && expression.property === 'value')
+				if (
+					element !== undefined &&
+					element === typedField &&
+					expression.property === 'value'
+				)
 					return { event: 'value' };
 				if (element !== undefined && isTicked(element)) {
 					if (expression.property === 'checked') return { checked: element };
@@ -4503,7 +4578,10 @@ export function createNativeViewPayload(
 					lowerChunk(
 						chunk,
 						parent,
-						{ ...(place.row ? { row: place.row } : {}), arm: { branch: branchId, index } },
+						{
+							...(place.row ? { row: place.row } : {}),
+							arm: { branch: branchId, index },
+						},
 						{
 							...scope,
 							...(arm === 'try' ? { catches } : {}),
@@ -4559,7 +4637,10 @@ export function createNativeViewPayload(
 					const cell = cells[index]!;
 					cells[index] = {
 						...cell,
-						async: { ...cell.async!, boundaries: [...cell.async!.boundaries, branchId] },
+						async: {
+							...cell.async!,
+							boundaries: [...cell.async!.boundaries, branchId],
+						},
 					};
 				}
 				// A handler that rejects keeps the shown content and opens @catch after it, as the web's spec says (a failed
@@ -4605,7 +4686,10 @@ export function createNativeViewPayload(
 					lowerChunk(
 						scope.module.chunks.get(item.arms.catch)!,
 						parent,
-						{ ...(place.row ? { row: place.row } : {}), arm: { branch: caughtId, index: 0 } },
+						{
+							...(place.row ? { row: place.row } : {}),
+							arm: { branch: caughtId, index: 0 },
+						},
 						{
 							...scope,
 							prefix: `${scope.prefix}${caughtId}/`,
@@ -4835,6 +4919,7 @@ export function createNativeViewPayload(
 			scriptMode === 'never' ||
 			!event.handlerSpan ||
 			DATA_ONLY_EVENTS.has(event.eventName) ||
+			(event.eventName === 'submit' && settlesLater(event.handlerStatements ?? [])) ||
 			!scriptFacts(scope.module)
 		)
 			return dataHandlerOps(event, scope, handler, pressed);
@@ -4843,8 +4928,8 @@ export function createNativeViewPayload(
 			const data = attempt(() => dataHandlerOps(event, scope, handler, pressed));
 			if (!data.failed && readsUndefinedFirst(data.value)) return data.value;
 			data.rollBack();
-			const scripted = attempt(() => scriptOp(event, scope));
-			if (scripted.value && !scripted.failed) return [scripted.value];
+			const scripted = attempt(() => scriptOps(event, scope, pressed));
+			if (scripted.value && !scripted.failed) return scripted.value;
 			scripted.rollBack();
 			return dataHandlerOps(event, scope, handler, pressed);
 		}
@@ -4852,8 +4937,25 @@ export function createNativeViewPayload(
 		if (!data.failed) return data.value;
 		data.rollBack();
 		// When the script cannot run it either, what stops the script names what a phone lacks: those refusals stay.
-		const scripted = scriptOp(event, scope);
-		return scripted ? [scripted] : [];
+		return scriptOps(event, scope, pressed) ?? [];
+	}
+
+	/**
+	 * A handler's one `script` op. A submit's script gets its form's entries for its event's `currentTarget`, and is marked
+	 * as preventing the submit's default when its own statements call `event.preventDefault()` first on every path.
+	 */
+	function scriptOps(
+		event: SemanticEvent,
+		scope: Scope,
+		pressed?: NonNullable<Scope['pressed']>,
+	): NativeOp[] | null {
+		const form = event.eventName === 'submit' ? pressed?.currentTarget : undefined;
+		const statements = event.handlerStatements ?? [];
+		const op = scriptOp(event, scope, form);
+		const prevented = form !== undefined && preventsFirst(statements, event.handlerParameters[0]);
+		// A refused script keeps its mark, so the form's check does not add that it never prevents.
+		if (!op) return prevented ? [PREVENT] : null;
+		return prevented ? [PREVENT, op] : [op];
 	}
 
 	/** Runs `run`, then says whether it refused, and can undo what it added (refusals, cells, dialog ops, features). */
@@ -4906,11 +5008,11 @@ export function createNativeViewPayload(
 		return value;
 	}
 
-	function scriptOp(event: SemanticEvent, scope: Scope): NativeOp | null {
-		return keepingFunctions(() => scriptOpOf(event, scope));
+	function scriptOp(event: SemanticEvent, scope: Scope, form?: string): NativeOp | null {
+		return keepingFunctions(() => scriptOpOf(event, scope, form));
 	}
 
-	function scriptOpOf(event: SemanticEvent, scope: Scope): NativeOp | null {
+	function scriptOpOf(event: SemanticEvent, scope: Scope, form?: string): NativeOp | null {
 		const fact = event.handlerSpan && scriptFacts(scope.module)?.handler(event.handlerSpan);
 		const what = `the ${event.eventName} handler`;
 		if (!fact)
@@ -4958,7 +5060,10 @@ export function createNativeViewPayload(
 			op: 'script',
 			fn,
 			type: event.eventName,
-			bindings,
+			bindings:
+				form === undefined
+					? bindings
+					: { ...bindings, [FORM_ENTRIES_BINDING]: { value: { formData: form } } },
 			...(caught ? { catch: caught } : {}),
 		};
 	}
@@ -4988,7 +5093,11 @@ export function createNativeViewPayload(
 			live: true,
 			...(event.handlerSpan ? { span: event.handlerSpan } : {}),
 			...(event.handlerCatchResets?.length
-				? { resets: new Map(event.handlerCatchResets.map((reset) => [reset.name, reset.boundaryId])) }
+				? {
+						resets: new Map(
+							event.handlerCatchResets.map((reset) => [reset.name, reset.boundaryId]),
+						),
+					}
 				: {}),
 		};
 		const submitting =
@@ -5016,7 +5125,8 @@ export function createNativeViewPayload(
 							};
 		snapshots = { handler, count: 0 };
 		continuations = { base: handler, next: 0 };
-		typedField = 'event' in inner && inner.event !== undefined ? pressed?.currentTarget : undefined;
+		typedField =
+			'event' in inner && inner.event !== undefined ? pressed?.currentTarget : undefined;
 		try {
 			return lowerStatements(event.handlerStatements, inner, what, event.handlerSpan, 0, {
 				next: [],
@@ -5750,18 +5860,35 @@ export function createNativeViewPayload(
 	}
 
 	/** `reset()` of the `@catch` the handler is in: its async values that failed run again, its handler error clears. */
-	function resetOps(boundaryId: string, scope: Scope, what: string, span: SourceSpan | undefined): NativeOp[] {
+	function resetOps(
+		boundaryId: string,
+		scope: Scope,
+		what: string,
+		span: SourceSpan | undefined,
+	): NativeOp[] {
 		const boundary = scope.boundary;
 		if (boundary?.id !== boundaryId || boundary.arm !== 'catch') {
-			refuse(`${what} calls the \`reset\` of a @catch it is not in (handed to a component), which phones cannot do yet`, span);
+			refuse(
+				`${what} calls the \`reset\` of a @catch it is not in (handed to a component), which phones cannot do yet`,
+				span,
+			);
 			return [];
 		}
 		const tasks = [...boundary.tasks];
 		if (tasks.some((task) => !cells[cellIndex.get(task) ?? -1]?.async)) {
-			refuse(`${what} calls \`reset\` of a @try that waits on a device call, which phones cannot run again yet`, span);
+			refuse(
+				`${what} calls \`reset\` of a @try that waits on a device call, which phones cannot run again yet`,
+				span,
+			);
 			return [];
 		}
-		return [{ op: 'reset', cells: tasks, ...(boundary.catches.used() ? { catch: boundary.catches.cell() } : {}) }];
+		return [
+			{
+				op: 'reset',
+				cells: tasks,
+				...(boundary.catches.used() ? { catch: boundary.catches.cell() } : {}),
+			},
+		];
 	}
 
 	function statementOps(
@@ -6486,22 +6613,49 @@ export function createNativeViewPayload(
 						);
 			if (node.element === 'select') {
 				if (node.row)
-					refuse(`${where} sits inside a @for row, which a native build does not draw yet`, span);
+					refuse(
+						`${where} sits inside a @for row, which a native build does not draw yet`,
+						span,
+					);
 				for (const name of ['multiple', 'size'])
-					if (node.attributes?.[name] !== undefined || node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === name))
-						refuse(`${where} has \`${name}\`, a list box a native build does not draw yet`, span);
-				if (node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === 'value'))
-					refuse(`${where} binds \`value\`; a native build chooses an option through its \`selected\``, span);
+					if (
+						node.attributes?.[name] !== undefined ||
+						node.bindings?.some(
+							(binding) => 'attribute' in binding && binding.attribute === name,
+						)
+					)
+						refuse(
+							`${where} has \`${name}\`, a list box a native build does not draw yet`,
+							span,
+						);
+				if (
+					node.bindings?.some(
+						(binding) => 'attribute' in binding && binding.attribute === 'value',
+					)
+				)
+					refuse(
+						`${where} binds \`value\`; a native build chooses an option through its \`selected\``,
+						span,
+					);
 				continue;
 			}
 			const parent = node.parent === null ? undefined : byId.get(node.parent);
 			const inSelect = parent?.kind === 'element' && parent.element === 'select';
 			if (node.element === 'option' && !inSelect)
-				refuse(`${where} is not inside a <select>, which a native build does not show yet`, span);
+				refuse(
+					`${where} is not inside a <select>, which a native build does not show yet`,
+					span,
+				);
 			else if (node.element !== 'option' && inSelect)
-				refuse(`${where} sits inside a <select>, which a native build shows only <option>s of`, span);
+				refuse(
+					`${where} sits inside a <select>, which a native build shows only <option>s of`,
+					span,
+				);
 			else if (parent?.kind === 'element' && parent.element === 'option')
-				refuse(`${where} sits inside an <option>, which a native build shows only text of`, span);
+				refuse(
+					`${where} sits inside an <option>, which a native build shows only text of`,
+					span,
+				);
 		}
 	}
 
@@ -6614,7 +6768,11 @@ export function createNativeViewPayload(
 					refuse(`${field}, a form inside a form`);
 					continue;
 				}
-				if (node.element !== 'input' && node.element !== 'button' && node.element !== 'select')
+				if (
+					node.element !== 'input' &&
+					node.element !== 'button' &&
+					node.element !== 'select'
+				)
 					continue;
 				if (node.row || JSON.stringify(node.arm) !== JSON.stringify(form.arm)) {
 					refuse(
