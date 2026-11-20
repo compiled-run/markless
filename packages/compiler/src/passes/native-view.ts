@@ -1088,6 +1088,7 @@ function foldConstant(
 		const object = fold(expr.member);
 		if (!object) return undefined;
 		const holder = object.value;
+		if (expr.optional && holder == null) return { value: null };
 		if (holder && typeof holder === 'object' && tokenElement.has(holder)) return undefined;
 		if (expr.property === 'length' && (typeof holder === 'string' || Array.isArray(holder)))
 			return { value: holder.length };
@@ -3218,7 +3219,11 @@ export function createNativeViewPayload(
 						};
 				}
 				if (!object) return null;
-				const member: NativeExpr = { member: object, property: expression.property };
+				const member: NativeExpr = {
+					member: object,
+					property: expression.property,
+					...(expression.optional ? { optional: true as const } : {}),
+				};
 				// A field of an object or array known when the app is built is that field's value.
 				const field =
 					'array' in object || 'object' in object ? buildTime(member) : undefined;

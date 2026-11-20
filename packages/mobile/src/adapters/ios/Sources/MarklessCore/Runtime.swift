@@ -475,6 +475,9 @@ public final class NativeRuntime {
 				case let .expr(inner): return try evaluate(inner).text
 				}
 			}.joined())
+		case let .optionalMember(inner, property):
+			if case .null = try evaluate(inner) { return .null }
+			return try evaluate(.member(inner, property))
 		case let .member(inner, property):
 			let value = try evaluate(inner)
 			switch value {

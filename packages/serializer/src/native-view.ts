@@ -86,7 +86,12 @@ export type NativeExpr =
 	 * `length` of a string or array, an array's element at an index (`"0"`, `"1"`: null past its end, as `undefined` on
 	 * the web), or an own property of an object; anything else is a runtime error.
 	 */
-	| { readonly member: NativeExpr; readonly property: string }
+	| {
+			readonly member: NativeExpr;
+			readonly property: string;
+			/** In an optional chain (`a?.b`): a null object gives null, as JavaScript gives undefined. */
+			readonly optional?: true;
+	  }
 	/** An array's element at an index computed while the app runs: null when it is not an integer inside the array. */
 	| { readonly at: NativeExpr; readonly of: NativeExpr }
 	| { readonly array: ReadonlyArray<{ readonly spread: boolean; readonly value: NativeExpr }> }

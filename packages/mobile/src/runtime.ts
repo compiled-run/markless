@@ -405,6 +405,7 @@ export function evaluateNativeExpr(
 			.join('');
 	if ('member' in expr) {
 		const value = evaluate(expr.member);
+		if (expr.optional && value === null) return null;
 		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length')
 			return value.length;
 		const index = Number(expr.property);

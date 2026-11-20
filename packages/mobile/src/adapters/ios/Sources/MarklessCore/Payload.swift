@@ -44,6 +44,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case template([NativeTemplatePart])
 	/// `length` of a string or array, or an own property of an object.
 	case member(NativeExpr, String)
+	/// A member read in an optional chain (`a?.b`): null when the object is null, as JavaScript gives undefined.
+	case optionalMember(NativeExpr, String)
 	/// An array's element at an index computed while the app runs; null when it is not an integer inside the array.
 	case at(NativeExpr, of: NativeExpr)
 	case array([NativeArrayItem])
@@ -80,7 +82,7 @@ public indirect enum NativeExpr: Equatable, Sendable {
 		switch self {
 		case let .cell(cell): return [cell]
 		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked: return []
-		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
+		case let .unary(_, inner), let .member(inner, _), let .optionalMember(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .captures(node, pointer): return node.cells + pointer.cells
 		case let .array(items): return items.flatMap(\.value.cells)
@@ -975,6 +977,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 				return .expr(try decodeExpr(part))
 			})
 		case ["member", "property"]: return .member(try decodeExpr(try field("member")), try field("property").string())
+		case ["member", "optional", "property"]:
+			guard try field("optional").bool() else { throw PayloadError(path: reader.path + ".optional", reason: "optional is only ever true") }
+			return .optionalMember(try decodeExpr(try field("member")), try field("property").string())
 		case ["at", "of"]: return .at(try decodeExpr(try field("at")), of: try decodeExpr(try field("of")))
 		case ["array"]:
 			return .array(try field("array").array().map { item in

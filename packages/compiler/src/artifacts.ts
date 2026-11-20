@@ -1512,7 +1512,13 @@ export type SemanticExpression =
 			readonly alternate: SemanticExpression;
 	  }
 	| { readonly kind: 'template'; readonly parts: ReadonlyArray<string | SemanticExpression> }
-	| { readonly kind: 'member'; readonly object: SemanticExpression; readonly property: string }
+	/** `optional`: the read is in an optional chain at or after a `?.`, so a nullish object gives undefined. */
+	| {
+			readonly kind: 'member';
+			readonly object: SemanticExpression;
+			readonly property: string;
+			readonly optional?: true;
+	  }
 	/** `object[index]` with an index that is not a literal. */
 	| {
 			readonly kind: 'index';

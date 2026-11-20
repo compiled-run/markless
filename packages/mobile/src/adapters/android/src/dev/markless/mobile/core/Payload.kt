@@ -42,7 +42,8 @@ sealed interface Expr {
 	/** Each part is a literal string or an expression read with `String(value)`. */
 	data class Template(val parts: List<Any>) : Expr
 	/** `length` of a string or array, or an own property of an object. */
-	data class Member(val value: Expr, val property: String) : Expr
+	/** [optional]: in an optional chain (`a?.b`), so a null object gives null, as JavaScript gives undefined. */
+	data class Member(val value: Expr, val property: String, val optional: Boolean = false) : Expr
 	/** An array's element at an index computed while the app runs; null when it is not an integer inside the array. */
 	data class At(val index: Expr, val list: Expr) : Expr
 	/** Each item, spread when [spread] (its value must be an array). */
@@ -524,7 +525,11 @@ data class Payload(
 					Expr.Template(o.field("template", what).arr("$what.template").mapIndexed { n, p -> if (p is Json.Str) p.value else expr(p, "$what.template[$n]") })
 				}
 				o.containsKey("at") -> { o.only(setOf("at", "of"), what); Expr.At(sub("at"), sub("of")) }
-				o.containsKey("member") -> { o.only(setOf("member", "property"), what); Expr.Member(sub("member"), o.field("property", what).str("$what.property")) }
+				o.containsKey("member") -> {
+					o.only(setOf("member", "property", "optional"), what)
+					val optional = o["optional"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.optional must be true when present"); true } ?: false
+					Expr.Member(sub("member"), o.field("property", what).str("$what.property"), optional)
+				}
 				o.containsKey("array") -> {
 					o.only(setOf("array"), what)
 					Expr.ArrayLit(o.field("array", what).arr("$what.array").mapIndexed { n, a ->

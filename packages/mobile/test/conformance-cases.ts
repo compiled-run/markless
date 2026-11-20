@@ -367,6 +367,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// `?.` ends the chain at a null object, past the `?.` too (`user?.home.city`), as JavaScript does.
+		name: 'optional-chain',
+		fixture: 'proofs/r151-optional-chain/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
 		name: 'forms',
 		fixture: 'test/fixtures/Forms.tsrx',
 		actions: [

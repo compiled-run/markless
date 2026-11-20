@@ -275,6 +275,7 @@ class Runtime(
 			is Expr.Member -> {
 				val v = eval(e.value)
 				when {
+					e.optional && v == JsValue.Null -> JsValue.Null
 					v is JsValue.Str && e.property == "length" -> JsValue.Num(v.value.length.toDouble())
 					v is JsValue.Arr && e.property == "length" -> JsValue.Num(v.items.size.toDouble())
 					v is JsValue.Arr && Js.element(v, e.property) != null -> Js.element(v, e.property)!!
