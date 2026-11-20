@@ -932,6 +932,11 @@ const isPrefix = (prefix: ReadonlyArray<number>, path: ReadonlyArray<number>): b
 
 /** Builds the native view of a module's root component from its semantic graph, or refuses with diagnostics. */
 export type NativeViewOptions = {
+	/**
+	 * A `<link rel="stylesheet">` with a fixed `href`: true when the build read that file (one the app serves), so it styles
+	 * the page as the browser's load does; else the link is refused.
+	 */
+	readonly linkStylesheet?: (href: string) => boolean;
 	/** The page's route when the module is a page: the router's pattern and its param names. */
 	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
 	/**
@@ -4915,7 +4920,13 @@ export function createNativeViewPayload(
 							);
 					} else if (element === 'link') {
 						const rel = written.rel?.trim().toLowerCase().split(/\s+/) ?? [];
-						if (bound.includes('rel') || rel.includes('stylesheet'))
+						const read =
+							!bound.includes('rel') &&
+							!bound.includes('href') &&
+							rel.includes('stylesheet') &&
+							written.href !== undefined &&
+							options.linkStylesheet?.(written.href) === true;
+						if (!read && (bound.includes('rel') || rel.includes('stylesheet')))
 							refuseAs(
 								'stylesheet',
 								`<link rel="stylesheet"${written.href ? ` href="${written.href}"` : ''}> loads styles while the page runs`,
