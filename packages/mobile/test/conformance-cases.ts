@@ -460,6 +460,14 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'roster-place',
+		fixture: 'proofs/u78-roster-place/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:3/h4' },
+			{ event: 'activate', host: 'component-edge:3/h4' },
+		],
+	},
+	{
 		name: 'custom-elements',
 		fixture: 'proofs/u70-custom-elements/App.tsrx',
 		actions: [{ event: 'activate', host: 'h6' }],

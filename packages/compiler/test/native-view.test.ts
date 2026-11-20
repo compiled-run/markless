@@ -2100,6 +2100,40 @@ export function Search() @{
 		);
 	});
 
+	it("settles a part's place in its family's roster and the roster's size from render order; a part in an @if arm is refused", async () => {
+		const family = (stops: string) => `import { computed, element, shared, state } from '@markless/core';
+const track = shared(() => {
+	const s = state({ current: 0 });
+	const stopEls = element<HTMLLIElement[]>();
+	return { ...s, stopEls };
+}, { scope: 'subtree' });
+function Stop({ name }: { readonly name: string }) @{
+	const t = track();
+	const mine = element<HTMLLIElement>();
+	const at = computed(() => t.stopEls.indexOf(mine as HTMLLIElement));
+	const count = computed(() => t.stopEls.length);
+	<li el={[t.stopEls, mine]}>{\`\${name} \${at + 1} of \${count}\`}</li>
+}
+export function Route() @{
+	const t = track();
+	let more = state(false);
+	<ol>${stops}</ol>
+}`;
+		const { payload, diagnostics } = await nativeView(
+			family('<Stop name="a" /><Stop name="b" /><Stop name="c" />'),
+		);
+		expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const texts = JSON.stringify(payload);
+		for (const literal of [0, 1, 2, 3]) expect(texts).toContain(`{"literal":${literal}}`);
+		const armed = await nativeView(
+			family('<Stop name="a" />@if (more) {<Stop name="b" />}'),
+		);
+		expect(armed.payload).toBeNull();
+		expect(armed.diagnostics.map((d) => d.message).join('\n')).toContain(
+			'a roster with a part inside an @if arm or @for row',
+		);
+	});
+
 	it('builds a component whose body marks a prop used with `void`, which runs nothing; other render-time statements stay refused', async () => {
 		const { payload, diagnostics } = await nativeView(`export function Banner({ path }: { readonly path: string }) @{
 	void path;

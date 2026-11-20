@@ -3364,6 +3364,20 @@ export function createNativeViewPayload(
 					scope.module.computeds.get('')?.get(expression.name);
 				if (computed?.kind === 'computed' && computed.async)
 					return asyncRead(computed, what, scope);
+				// A part's place in its family's roster, or how many parts it has: render order, settled once the tree is built.
+				const roster =
+					computed &&
+					(scope.module.graph.elementRosterPositions?.find((fact) => fact.computedGraphNodeId === computed.id) ??
+						scope.module.graph.elementRosterCounts?.find((fact) => fact.computedGraphNodeId === computed.id));
+				if (roster) {
+					const rosterKey = handleKey(roster.rosterGraphNodeId, scope);
+					const ownKey = 'handleGraphNodeId' in roster ? handleKey(roster.handleGraphNodeId, scope) : undefined;
+					if (rosterKey === undefined || ('handleGraphNodeId' in roster && ownKey === undefined))
+						return refuse(`${what} reads \`${expression.name}\`, a roster whose handle this build cannot place`);
+					const placed: { literal: number } = { literal: 0 };
+					rosterReads.push({ expr: placed, roster: rosterKey, own: ownKey, what });
+					return placed;
+				}
 				if (computed) {
 					if (inlining.has(computed.id))
 						return refuse(
@@ -4120,6 +4134,8 @@ export function createNativeViewPayload(
 		return binding ? `${scope.prefix}${graphNodeId}` : undefined;
 	};
 	const boundHandles = new Map<string, string[]>();
+	/** Roster positions and counts read while the tree was walked, settled from the handles bound once it is built. */
+	const rosterReads: { expr: { literal: number }; roster: string; own: string | undefined; what: string }[] = [];
 	const dialogOps: { op: 'dialog'; node: string; method: 'showModal' | 'close' }[] = [];
 	const handleReferences: {
 		readonly node: string;
@@ -7226,6 +7242,25 @@ export function createNativeViewPayload(
 	}
 	lateLowering = false;
 
+	for (const read of rosterReads) {
+		const byId = nodeById();
+		const members = boundHandles.get(read.roster) ?? [];
+		// A part in an @if arm or a @for row joins and leaves the roster while the app runs, which a fixed number cannot follow.
+		if (members.some((id) => byId.get(id)?.arm || byId.get(id)?.row)) {
+			refuse(`${read.what}: a roster with a part inside an @if arm or @for row, whose place changes while the app runs`);
+			continue;
+		}
+		if (read.own === undefined) {
+			read.expr.literal = members.length;
+			continue;
+		}
+		const own = boundHandles.get(read.own) ?? [];
+		if (own.length !== 1) {
+			refuse(`${read.what}: a roster place whose own handle is not bound to exactly one element`);
+			continue;
+		}
+		read.expr.literal = members.indexOf(own[0]!);
+	}
 	for (const op of dialogOps) {
 		const bound = boundHandles.get(op.node) ?? [];
 		const element = bound.length === 1 ? nodes.find((node) => node.id === bound[0]) : undefined;
