@@ -559,6 +559,7 @@ export function runFragmentNavigation(
 	const drain = (
 		reader: ReadableStreamDefaultReader<Uint8Array>,
 		closed: () => void,
+		read: (bytes: number) => void,
 	): ReadableStreamDefaultReader<Uint8Array> => {
 		const chunks: Uint8Array[] = [];
 		let ended = false;
@@ -571,6 +572,7 @@ export function runFragmentNavigation(
 		void (async () => {
 			for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
 				chunks.push(chunk.value);
+				read(chunk.value.byteLength);
 				wake();
 			}
 		})().then(end, end);
@@ -590,10 +592,18 @@ export function runFragmentNavigation(
 		WANTED = 1,
 		ARRIVED = 2,
 		GONE = 3;
+	// A move the lifecycle does not allow throws in development; in production it is reported and the state recovers.
+	const illegal = (message: string) => {
+		const error = new Error(`Markless router: ${message}.`);
+		if (config.strictMoves) throw error;
+		w.setTimeout(() => {
+			throw error;
+		});
+	};
 	const move = (entry: FragmentPrefetch, next: number) => {
 		if (entry.phase === next) return;
 		if (entry.phase === GONE || (entry.phase === ARRIVED && next !== GONE) || next < entry.phase)
-			throw new Error(`Markless router: no prefetch move from ${entry.phase} to ${next}.`);
+			return illegal(`no prefetch move from ${entry.phase} to ${next}`);
 		entry.phase = next;
 	};
 	// A guess keeps its response as text; the document is parsed when a click or intent wants it.
@@ -628,7 +638,8 @@ export function runFragmentNavigation(
 		const key = pageKey(url);
 		fetched.add(key);
 		const controller = started?.controller ?? new AbortController();
-		// A guess's bytes count against the budget of the page it was guessed from: its declared length, else what Resource Timing saw.
+		// A guess's bytes count against the budget of the page it was guessed from, however it ends:
+		// its declared length, else what Resource Timing saw, else the bytes it read before it stopped.
 		const page = speculative === 'idle' ? speculation.page : -1;
 		let counted = false;
 		let target: URL | undefined;
@@ -642,8 +653,20 @@ export function runFragmentNavigation(
 			// Tools tell "the budget was spent" apart from "never guessed" by this mark, once per page shown.
 			if (before < config.guessBudget && speculation.spent >= config.guessBudget)
 				w.performance.mark(config.prefetchMarks[0], {
-					detail: { page: state.shown, bytes: speculation.spent },
+					detail: { page: location.pathname, bytes: speculation.spent },
 				});
+		};
+		// finished: Resource Timing will record the transfer, a few tasks after the body ends; wait for it briefly.
+		const received = (finished = false, tries = 0): void => {
+			if (page < 0 || counted) return;
+			const timing = target && w.performance.getEntriesByName(target.href).at(-1);
+			const wire = (timing as PerformanceResourceTiming | undefined)?.transferSize;
+			if (!wire && finished && tries < 5)
+				return void w.setTimeout(() => {
+					received(true, tries + 1);
+					pumpIdle();
+				}, 20);
+			spend(wire || bytes);
 		};
 		const read = async (): Promise<FragmentFetched> => {
 			const prefix = config.requestPrefix;
@@ -677,10 +700,13 @@ export function runFragmentNavigation(
 			finalUrl.hash = url.hash;
 			// A guess stops past the budget in wire bytes: a declared length is that, an uncompressed body counts as it reads.
 			const declared = Number(response.headers.get('content-length') ?? 0);
-			if (declared) spend(declared);
-			if (entry.phase === GUESS && declared > config.idleFragmentBytes)
+			// Too big by its own declaration: stopped before its body comes, so it counts only what it received.
+			if (entry.phase === GUESS && declared > config.idleFragmentBytes) {
+				controller.abort();
 				throw new Error('MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET');
-			const counted = declared
+			}
+			if (declared) spend(declared);
+			const limit = declared
 				? Infinity
 				: response.headers.get('content-encoding')
 					? config.idleFragmentDecodedBytes
@@ -693,7 +719,7 @@ export function runFragmentNavigation(
 					const arrived = fragmentOf(
 						finalUrl.href,
 						text,
-						speculative ? drain(reader, closed) : reader,
+						speculative ? drain(reader, closed, (more) => (bytes += more)) : reader,
 					);
 					if (entry.phase === WANTED) void arrived.doc;
 					return hold(entry, arrived, text.length);
@@ -706,7 +732,7 @@ export function runFragmentNavigation(
 					return hold(entry, arrived, text.length);
 				}
 				bytes += chunk.value.byteLength;
-				if (entry.phase === GUESS && bytes > counted) {
+				if (entry.phase === GUESS && bytes > limit) {
 					void reader.cancel();
 					throw new Error('MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET');
 				}
@@ -715,10 +741,7 @@ export function runFragmentNavigation(
 		};
 		const closed = () => {
 			if (entry.phase < ARRIVED) move(entry, ARRIVED);
-			if (page >= 0 && !counted) {
-				const timing = target && w.performance.getEntriesByName(target.href).at(-1);
-				spend((timing as PerformanceResourceTiming | undefined)?.transferSize || bytes);
-			}
+			received(true);
 			queueMicrotask(pumpIdle);
 		};
 		const entry: FragmentPrefetch = {
@@ -734,9 +757,11 @@ export function runFragmentNavigation(
 					() => {},
 				);
 			},
-			abort: () => {
-				// A page dropped before it arrived may be fetched ahead again.
-				if (entry.phase < ARRIVED) fetched.delete(key);
+			// again: a click dropped it before it arrived, so the next page may guess it again; a guess
+			// dropped to make room for intent stays fetched for this page, or it would be downloaded in a loop.
+			abort: (again = false) => {
+				if (again && entry.phase < ARRIVED) fetched.delete(key);
+				received();
 				move(entry, GONE);
 				controller.abort();
 				queueMicrotask(pumpIdle);
@@ -744,13 +769,14 @@ export function runFragmentNavigation(
 		};
 		(entry as { result: Promise<FragmentFetched> }).result = read();
 		entry.result.catch(() => {
+			received();
 			if (entry.phase !== GONE) move(entry, GONE);
 			queueMicrotask(pumpIdle);
 		});
 		return entry;
 	};
 	const inFlight = (entry: FragmentPrefetch) => entry.phase < ARRIVED;
-	// Pages fetched ahead are kept as text up to config.heldChars in all; past it the oldest to arrive go first.
+	// Pages fetched ahead are kept as text up to config.heldChars in all; past it the earliest started go first.
 	const sizes = new WeakMap<FragmentPrefetch, number>();
 	const hold = (entry: FragmentPrefetch, arrived: FragmentFetched, size: number) => {
 		sizes.set(entry, size);
@@ -823,8 +849,10 @@ export function runFragmentNavigation(
 	// spent: wire bytes the page shown has guessed so far, against config.guessBudget.
 	let speculation = { phase: PAUSED, page: 0, spent: 0 };
 	const speculate = (phase: number, page = speculation.page) => {
-		if (page === speculation.page && phase !== PAUSED && phase !== speculation.phase + 1)
-			throw new Error(`Markless router: no speculation move from ${speculation.phase} to ${phase}.`);
+		if (page === speculation.page && phase !== PAUSED && phase !== speculation.phase + 1) {
+			illegal(`no speculation move from ${speculation.phase} to ${phase}`);
+			phase = PAUSED;
+		}
 		speculation = { phase, page, spent: page === speculation.page ? speculation.spent : 0 };
 	};
 	let idleQueue: URL[] = [];
@@ -886,7 +914,7 @@ export function runFragmentNavigation(
 		for (const [other, entry] of state.prefetches)
 			if (other !== key && inFlight(entry)) {
 				state.prefetches.delete(other);
-				entry.abort();
+				entry.abort(true);
 			}
 	};
 	// A page is shown: after a swap, or when a navigation was cancelled and the page it left stays.
@@ -913,7 +941,12 @@ export function runFragmentNavigation(
 							: '';
 				if (would.length && reason)
 					w.performance.mark(config.prefetchMarks[1], {
-						detail: { page: state.shown, reason, triggers: would },
+						detail: { page: location.pathname, reason, triggers: would },
+					});
+				// A budget of 0 is spent before anything starts: the same mark tells a tool so.
+				else if (would.length && !config.guessBudget)
+					w.performance.mark(config.prefetchMarks[0], {
+						detail: { page: location.pathname, bytes: 0 },
 					});
 				if (
 					loadViewport &&
@@ -949,6 +982,15 @@ export function runFragmentNavigation(
 	};
 	// A navigation that ends without a swap leaves the page it started from shown, so guessing resumes for it.
 	const resume = () => speculation.phase === PAUSED && rescan();
+	// A navigation that threw swapped nothing: the page it started from is still shown.
+	const failed = (error: unknown) => {
+		resume();
+		w.setTimeout(() => {
+			throw error;
+		});
+	};
+	// A page left for a document load and brought back from the back/forward cache shows again.
+	w.addEventListener('pageshow', (event) => (event as PageTransitionEvent).persisted && resume());
 	const fresh = (entry: FragmentPrefetch, now: number) =>
 		entry.writes === state.writes &&
 		now - entry.at < config.prefetchTtlMs &&
@@ -1076,14 +1118,16 @@ export function runFragmentNavigation(
 		const manual = anchor.getAttribute(config.scrollAttribute) === 'manual';
 		const stops = state.stops;
 		const swap = (entry: FragmentEntryModule) =>
-			entry.navigate(
-				d,
-				url,
-				replace ? 'replace' : 'push',
-				manual ? 'manual' : 'reset',
-				stops,
-				askedAt,
-			);
+			entry
+				.navigate(
+					d,
+					url,
+					replace ? 'replace' : 'push',
+					manual ? 'manual' : 'reset',
+					stops,
+					askedAt,
+				)
+				.catch(failed);
 		if (loaded) void swap(loaded);
 		else
 			load().then(swap, () => {
@@ -1118,7 +1162,7 @@ export function runFragmentNavigation(
 			event.state as { __marklessFragment?: { x: number; y: number; id?: string } } | null
 		)?.__marklessFragment;
 		load().then(
-			(entry) => entry.navigate(d, url, 'traverse', saved ?? { x: 0, y: 0 }),
+			(entry) => entry.navigate(d, url, 'traverse', saved ?? { x: 0, y: 0 }).catch(failed),
 			() => location.reload(),
 		);
 	};
@@ -1241,7 +1285,8 @@ export const FRAGMENT_GUESS_BUDGET_BYTES = 2 * 1024 * 1024;
 /** Performance marks a tool can read: the page's guess budget ran out; guessing was ruled out (detail.reason). */
 export const PREFETCH_MARKS = ['markless:prefetch-budget-spent', 'markless:prefetch-skipped'] as const;
 export const FRAGMENT_IDLE_FRAGMENTS = 6;
-// Characters of page text a tab keeps for pages fetched ahead: about 8 MB as one-byte strings, so three of the largest docs pages measured (2.2 MB decoded) and a dozen typical ones (650 kB).
+// Characters of page text kept for pages fetched ahead: 8 MB as one-byte strings, 16 MB if a page has text outside Latin-1.
+// Parsed documents (pages intent wanted, the page shown) are not counted.
 export const FRAGMENT_HELD_CHARS = 8 * 1024 * 1024;
 // An idle or viewport fetch of a page past this many bytes on the wire stops there; the page is fetched on intent instead.
 export const FRAGMENT_IDLE_FRAGMENT_BYTES = 256 * 1024;

@@ -57,6 +57,8 @@ export interface FragmentNavigationConfig {
 	readonly prefetchConnections: number;
 	// Wire bytes viewport and idle fetches may spend per page shown.
 	readonly guessBudget: number;
+	// Development and tests: a move a lifecycle does not allow throws; in production it is reported and recovers.
+	readonly strictMoves: boolean;
 	// Performance mark names: [budget spent, guessing skipped].
 	readonly prefetchMarks: readonly [budgetSpent: string, skipped: string];
 	// [intent, viewport, idle]: 0 never, 1 on a fast link, 2 on any (never under Save-Data or in a hidden tab).
@@ -99,7 +101,8 @@ export type FragmentPrefetch = {
 	phase: number;
 	// A guess becomes wanted: no byte budget, and its document is parsed on arrival.
 	readonly want: () => void;
-	readonly abort: () => void;
+	// again: the page may be fetched ahead again by the next page shown.
+	readonly abort: (again?: boolean) => void;
 };
 
 // What the inline bootstrap leaves on the document for the swap module (entries/fragment-entry.ts).
@@ -1175,11 +1178,9 @@ export async function navigate(
 	const [sharedProperty, resumeAttribute] = state.config.sharedInstances;
 	const sharedSwap = [d, d.querySelector(`[${containerAttribute}]`)].some((place) =>
 		Object.values(
-			(
-				place as {
-					[key: string]: { instances?: Record<string, { shape?: string }> };
-				} | null
-			)?.[sharedProperty]?.instances ?? {},
+			(place as { [key: string]: { instances?: Record<string, { shape?: string }> } } | null)?.[
+				sharedProperty
+			]?.instances ?? {},
 		).some((instance) => instance.shape),
 	)
 		? import('@markless/web/shared-swap')

@@ -250,10 +250,18 @@ networks, `'fast'` ones, or `'none'`:
 - `budget` (default 2 MiB, `FRAGMENT_GUESS_BUDGET_BYTES`): wire bytes viewport
   and idle fetches may spend per page shown, counted from each response's
   declared length, else from Resource Timing or the bytes read. Once spent, they stop until the
-  next page is shown; intent still fetches. A migrated site sets it from what
+  next page is shown; intent still fetches. Intent's own fetches never count;
+  a guess that intent or a click adopts keeps what it already counted. Every
+  guess counts what it received however it ends (finished, stopped for size,
+  cancelled, failed), so the budget can be passed by at most the guesses in
+  flight when it runs out: `concurrency` times 256 KiB of an uncompressed page
+  with no declared length, or 4 MiB decoded of a compressed one. A guess
+  cancelled to make room for intent is not guessed again on that page. A
+  migrated site sets it from what
   its original spent before a click.
 - Tools read two performance marks (`PREFETCH_MARKS`): `markless:prefetch-budget-spent`
-  once per page shown when its budget runs out (`detail: { page, bytes }`), and
+  once per page shown when its budget runs out, or when guessing starts with a
+  budget of 0 (`detail: { page, bytes }`, `page` the pathname only), and
   `markless:prefetch-skipped` once per page shown when guessing it would do is
   ruled out (`detail: { page, reason: 'save-data' | 'hidden' | 'network', triggers }`).
 - Guessing reads only two things from navigation: a navigation started, and a

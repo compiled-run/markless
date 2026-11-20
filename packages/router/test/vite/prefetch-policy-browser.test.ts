@@ -51,9 +51,17 @@ type Setup = {
 	readonly attributes?: Record<number, string>;
 	// How long each fragment answer is held, in ms; Infinity never answers.
 	readonly holdMs?: number;
-	readonly answer?: (path: string) => { body: Buffer | string; headers?: Record<string, string> };
+	// chunked: sent in two writes with no declared length.
+	readonly answer?: (path: string) => {
+		body: Buffer | string;
+		headers?: Record<string, string>;
+		chunked?: boolean;
+	};
+	// The query the page lands with.
+	readonly search?: string;
 	// 'hang': a click's navigation never swaps, as when its page is still on its way.
-	readonly navigation?: 'swap' | 'hang';
+	// 'throw': the swap module's navigate rejects.
+	readonly navigation?: 'swap' | 'hang' | 'throw';
 	readonly heldChars?: number;
 };
 
@@ -96,6 +104,7 @@ function config(setup: Setup): FragmentNavigationConfig {
 		prefetchConnections: policy.concurrency,
 		guessBudget: policy.budget,
 		prefetchMarks: PREFETCH_MARKS,
+		strictMoves: true,
 		prefetchOn: policy.levels,
 		endpointPrefixes: ['/api'],
 		idleFragments: 6,
@@ -126,6 +135,7 @@ window.__watched = 0;
 const navigate = async (_d, url) => {
 	window.__navigated.push(url.pathname);
 	if (${JSON.stringify(setup.navigation ?? 'swap')} === 'hang') return new Promise(() => {});
+	if (${JSON.stringify(setup.navigation ?? 'swap')} === 'throw') throw new Error('navigate failed');
 	const state = d.__marklessFragmentNav;
 	state.shown = url.pathname;
 	history.pushState(null, '', url.href);
@@ -207,7 +217,10 @@ async function open(setup: Setup) {
 			body: `<main>${destination.pathname}</main>${FRAGMENT_REGION_END}`,
 		};
 		response.writeHead(200, { 'content-type': 'text/html;charset=utf-8', ...answer.headers });
-		response.end(answer.body);
+		if (!answer.chunked) return void response.end(answer.body);
+		const half = Math.floor(answer.body.length / 2);
+		response.write(answer.body.slice(0, half));
+		response.end(answer.body.slice(half));
 	});
 	await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
 	servers.push({ server, held: [] });
@@ -216,7 +229,7 @@ async function open(setup: Setup) {
 		const destination = fragmentPageUrl(new URL(request.url()));
 		if (destination) aborted.push(destination.pathname);
 	});
-	await page.goto(`${origin}/`);
+	await page.goto(`${origin}/${setup.search ?? ''}`);
 	const fetches = () =>
 		page.evaluate(() => (window as unknown as { __fetches: Fetch[] }).__fetches.slice());
 	const paths = async () => (await fetches()).map((fetch) => fetch.path);
@@ -600,6 +613,108 @@ describe('guess budget', () => {
 	});
 });
 
+describe('guess budget, every exit', () => {
+	test('a guess stopped for size with no declared length counts the bytes it received', async () => {
+		const body = `<main>${'x'.repeat(1024 * 1024)}</main>${FRAGMENT_REGION_END}`;
+		const s = await open({
+			prefetch: { viewport: 'all', idle: 'none', concurrency: 1, budget: 600_000 },
+			answer: () => ({ body, chunked: true }),
+		});
+		await s.measured(true);
+		await s.armed();
+		await expect.poll(async () => (await s.marks(PREFETCH_MARKS[0])).length).toBe(1);
+		const [spent] = await s.marks(PREFETCH_MARKS[0]);
+		expect(spent.bytes).toBeGreaterThanOrEqual(600_000);
+		await afterFrames(s.page);
+		// Each stops a little past 256 KiB: three at most, against all fourteen in view before.
+		expect((await s.fetches()).length).toBeLessThanOrEqual(3);
+		await s.page.close();
+	});
+
+	test('a guess cancelled to make room for intent is not guessed again on that page', async () => {
+		const s = await open({
+			prefetch: { viewport: 'all', idle: 'none', concurrency: 1 },
+			holdMs: 300,
+		});
+		await s.measured(true);
+		await s.armed();
+		await expect.poll(async () => (await s.fetches()).length).toBe(1);
+		const [guess] = await s.paths();
+		const hovered = inView.find((path) => path !== guess)!;
+		await s.page.hover(`a[href="${hovered}"]`);
+		await expect.poll(() => s.aborted).toEqual([guess]);
+		await expect.poll(async () => (await s.fetches()).length, { timeout: 15_000 }).toBe(IN_VIEW);
+		await expect.poll(s.allArrived).toBe(true);
+		await afterFrames(s.page);
+		const paths = await s.paths();
+		expect(paths.filter((path) => path === guess)).toHaveLength(1);
+		expect(new Set(paths).size).toBe(IN_VIEW);
+		await s.page.close();
+	});
+
+	test('a budget of 0 marks the budget spent at once, with the pathname only', async () => {
+		const s = await open({
+			prefetch: { viewport: 'all', idle: 'all', budget: 0 },
+			search: '?email=someone%40example.com',
+		});
+		await s.measured(true);
+		await s.armed();
+		await afterFrames(s.page);
+		expect(await s.marks(PREFETCH_MARKS[0])).toEqual([{ page: '/', bytes: 0 }]);
+		expect(await s.fetches()).toEqual([]);
+		await s.page.close();
+	});
+});
+
+describe('guessing resumes', () => {
+	test('after a navigation that threw', async () => {
+		const s = await open({
+			prefetch: { viewport: 'all', idle: 'none', concurrency: 4 },
+			holdMs: Infinity,
+			navigation: 'throw',
+			attributes: Object.fromEntries(
+				Array.from({ length: LINKS - 4 }, (_, i) => [i + 4, `${PREFETCH_ATTRIBUTE}="intent"`]),
+			),
+		});
+		await s.measured(true);
+		await s.armed();
+		await expect.poll(async () => (await s.fetches()).length).toBe(4);
+		const [kept, ...others] = await s.paths();
+		await s.page.click(`a[href="${kept}"]`);
+		await expect.poll(() => s.aborted.length).toBe(3);
+		await s.armed();
+		await expect
+			.poll(async () => (await s.paths()).slice(4).toSorted())
+			.toEqual(others.toSorted());
+		await s.page.close();
+	});
+
+	test('when the page returns from the back/forward cache', async () => {
+		const s = await open({
+			prefetch: { viewport: 'all', idle: 'none', concurrency: 4 },
+			holdMs: Infinity,
+			navigation: 'hang',
+			attributes: Object.fromEntries(
+				Array.from({ length: LINKS - 4 }, (_, i) => [i + 4, `${PREFETCH_ATTRIBUTE}="intent"`]),
+			),
+		});
+		await s.measured(true);
+		await s.armed();
+		await expect.poll(async () => (await s.fetches()).length).toBe(4);
+		const [kept, ...others] = await s.paths();
+		await s.page.click(`a[href="${kept}"]`);
+		await expect.poll(() => s.aborted.length).toBe(3);
+		await s.page.evaluate(() =>
+			window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })),
+		);
+		await s.armed();
+		await expect
+			.poll(async () => (await s.paths()).slice(4).toSorted())
+			.toEqual(others.toSorted());
+		await s.page.close();
+	});
+});
+
 describe('memory', () => {
 	test('pages fetched ahead are kept as text up to the cap, the oldest dropped first', async () => {
 		// Each answer is 1 MB of text and the cap is 3.5 MB: three pages fit.
@@ -696,8 +811,11 @@ describe('byte budget', () => {
 		});
 		await raw.measured(true);
 		await raw.armed();
-		await expect.poll(async () => (await raw.fetches()).length).toBe(IN_VIEW);
-		await expect.poll(raw.held).toEqual([]);
+		// Each stops a little past 256 KiB and counts what it received, so the 2 MiB budget ends guessing early.
+		await expect.poll(async () => (await raw.marks(PREFETCH_MARKS[0])).length).toBe(1);
+		await expect.poll(raw.allArrived).toBe(true);
+		expect(await raw.held()).toEqual([]);
+		expect((await raw.fetches()).length).toBeLessThan(IN_VIEW);
 		await raw.page.close();
 	});
 });

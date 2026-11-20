@@ -1242,7 +1242,7 @@ function linkBridgeModules(
 		? { path: linkBridgeModulePath(base, contentHash(viewportSource)), source: viewportSource }
 		: undefined;
 	const runSource =
-		fragment && `export default ${boundFragmentRun(fragment, documentLoads, viewport?.path)};`;
+		fragment && `export default ${boundFragmentRun(fragment, documentLoads, viewport?.path, true)};`;
 	const run: LinkBridgeModule | undefined = runSource
 		? { path: linkBridgeModulePath(base, contentHash(runSource)), source: runSource }
 		: undefined;
@@ -1332,17 +1332,19 @@ interface FragmentBridge {
 }
 
 // The run half with the app's config bound in, so the page bridge never carries the config.
+// viewportPath: the built viewport file. Without one this is the development (inline) run half, which throws on a lifecycle move it does not allow.
 function boundFragmentRun(
 	fragment: FragmentBridge,
 	documentLoads: boolean,
 	viewportPath?: string,
+	built = viewportPath !== undefined,
 ): string {
 	const viewport = !prefetches(fragment.prefetch)
 		? ''
 		: viewportPath
 			? `,()=>import(${JSON.stringify(viewportPath)}).then((m)=>m.default)`
 			: `,()=>Promise.resolve(${fragment.viewportSource})`;
-	return `(d,...a)=>(${fragment.runSource})(d,${escapeScriptJson(fragmentConfig(fragment, documentLoads))},...a${viewport})`;
+	return `(d,...a)=>(${fragment.runSource})(d,${escapeScriptJson({ ...fragmentConfig(fragment, documentLoads), strictMoves: !built })},...a${viewport})`;
 }
 
 function fragmentConfig(
@@ -1390,6 +1392,7 @@ function fragmentConfig(
 		prefetchConnections: fragment.prefetch.concurrency,
 		guessBudget: fragment.prefetch.budget,
 		prefetchMarks: PREFETCH_MARKS,
+		strictMoves: false,
 		prefetchOn: fragment.prefetch.levels,
 		endpointPrefixes: [API_PATHNAME_PREFIX],
 		idleFragments: FRAGMENT_IDLE_FRAGMENTS,
