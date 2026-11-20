@@ -817,10 +817,10 @@ class MarklessHost(
 						if (key.action == KeyEvent.ACTION_DOWN) { enterPressedAt = now; apply(runtime.dispatch(inst.id, EventName.Enter)) }
 						true
 					}
-					actionId == EditorInfo.IME_NULL -> false
-					// One press can arrive as the Enter key and then again as the keyboard's action: it submits once.
+					// One press can arrive as the Enter key and then again as the keyboard's action, or as IME_NULL with no key
+					// from some keyboards: it submits once, and focus stays in the field (Android's default would move it on).
 					now - enterPressedAt < 500 -> true
-					else -> { apply(runtime.dispatch(inst.id, EventName.Enter)); true }
+					else -> { enterPressedAt = now; apply(runtime.dispatch(inst.id, EventName.Enter)); true }
 				}
 			}
 			EventName.Commit -> (view as? RangeBar ?: throw MarklessHostError("commit event on \"${node.id}\", which is not a range")).onCommit = { value -> apply(runtime.dispatch(inst.id, EventName.Commit, value)) }
