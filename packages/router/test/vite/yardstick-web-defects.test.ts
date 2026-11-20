@@ -324,7 +324,7 @@ test.fails("live text beside an element in a component's children follows its st
 	});
 });
 
-test.fails('a state() can start from a storage() value (#870)', { timeout: 240_000 }, async () => {
+test('a state() can start from a storage() value (#870)', { timeout: 240_000 }, async () => {
 	expect(
 		(await buildError({
 			'index.tsrx': `import { state, storage } from '@markless/core';

@@ -52,6 +52,22 @@ if (!host) {
 		if (set.length !== out.timers.length) out.timers = set;
 		else out.clears.push(id);
 	};
+	// The signal an async value's run gets, as the web's computed(async ({ signal }) => ...) does; not a global.
+	var Signal = function () { this.aborted = false; this.reason = undefined; this.onabort = null; this.listeners = []; };
+	Signal.prototype.addEventListener = function (type, fn) { if (type === 'abort') this.listeners.push(fn); };
+	Signal.prototype.removeEventListener = function (type, fn) { this.listeners = this.listeners.filter(function (other) { return other !== fn; }); };
+	Signal.prototype.throwIfAborted = function () { if (this.aborted) throw this.reason; };
+	host.signal = function () { return new Signal(); };
+	host.abort = function (signal) {
+		if (signal.aborted) return;
+		var reason = new Error('signal is aborted without reason');
+		reason.name = 'AbortError';
+		signal.aborted = true;
+		signal.reason = reason;
+		var event = { type: 'abort', target: signal };
+		if (typeof signal.onabort === 'function') signal.onabort(event);
+		signal.listeners.slice().forEach(function (fn) { fn.call(signal, event); });
+	};
 	if (typeof g.queueMicrotask !== 'function') g.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
 	var Headers = function (pairs) {
 		this.get = function (name) {
@@ -90,9 +106,21 @@ if (!host) {
 				reject(new TypeError('a phone sends a text body only'));
 				return;
 			}
+			var signal = options.signal;
+			if (signal && signal.aborted) {
+				reject(signal.reason);
+				return;
+			}
 			var id = host.nextRequest++;
 			host.requests[id] = { resolve: resolve, reject: reject, url: url };
 			output().requests.push({ id: id, request: { url: url, method: String(options.method || 'GET').toUpperCase(), headers: headers, body: body } });
+			if (signal && typeof signal.addEventListener === 'function')
+				signal.addEventListener('abort', function () {
+					if (!host.requests[id]) return;
+					delete host.requests[id];
+					output().aborts.push(id);
+					reject(signal.reason);
+				});
 		});
 	};
 	var rotate = function (value, bits) { return (value << bits) | (value >>> (32 - bits)); };
@@ -229,7 +257,7 @@ if (!host) {
 }`;
 
 // One payload's script: its modules, its functions, and the entry points a host calls (`enter`, then `leave`).
-const ENTRIES = String.raw`var cells = {}, before = {}, cache = {}, functions = {};
+const ENTRIES = String.raw`var cells = {}, before = {}, cache = {}, functions = {}, runs = {};
 var load = function (id) {
 	var module = cache[id];
 	if (module) return module;
@@ -286,7 +314,7 @@ var begin = function (entry) {
 	cells = entry.cells;
 	before = {};
 	for (var slot in cells) before[slot] = JSON.stringify(cells[slot]);
-	host.out = { timers: [], clears: [], requests: [], logs: [], navigate: null };
+	host.out = { timers: [], clears: [], requests: [], aborts: [], logs: [], navigate: null };
 	host.place = navigation && entry.kind !== 'compute' ? { routes: navigation.routes, path: pathOf(navigation.here, entry.params || {}) } : null;
 	host.seed = entry.seed || null;
 	host.counter = 0;
@@ -312,6 +340,43 @@ var eventOf = function (given) {
 	};
 	${JSON.stringify(NATIVE_SCRIPT_POINTER_FIELDS)}.forEach(function (field) { if (field in given) event[field] = given[field]; });
 	return event;
+};
+var errorOf = function (error) {
+	return {
+		name: error && error.name !== undefined ? String(error.name) : 'Error',
+		message: error && error.message !== undefined ? String(error.message) : String(error),
+	};
+};
+// What an async value's run depends on: the values its names read now. A run whose key moved is aborted and started again.
+var keyOf = function (frame) {
+	return JSON.stringify(Object.keys(frame).sort().map(function (name) {
+		var binding = frame[name];
+		if ('slot' in binding) return slotValue(binding.slot);
+		if ('fields' in binding) return Object.keys(binding.fields).sort().map(function (field) { return slotValue(binding.fields[field]); });
+		return binding.value;
+	}));
+};
+var startRun = function (at, task, key) {
+	var signal = host.signal();
+	var run = runs[at] = { key: key, signal: signal, done: false };
+	var settle = function (value) {
+		// An answer for a run that was aborted or started again since is dropped, as the web drops a stale one.
+		if (runs[at] !== run) return;
+		run.done = true;
+		cells[task.slot] = value;
+	};
+	var failed = function (error) {
+		var shown = slotValue(task.slot);
+		var caught = errorOf(error);
+		settle(shown && shown.state === 'value' ? { state: 'value', value: shown.value, error: caught } : { state: 'error', error: caught });
+	};
+	try {
+		Promise.resolve(fn(task.fn)(frameOf(task.frame))({ signal: signal })).then(function (value) {
+			settle({ state: 'value', value: plain(value), error: null });
+		}, failed);
+	} catch (error) {
+		failed(error);
+	}
 };
 var json = function (value) { return value === undefined ? null : value; };
 // A value the page shows crosses as JSON; anything else (a RegExp, a class instance) as the text the web would show for it.
@@ -353,6 +418,28 @@ g.__markless[id] = {
 				else delete host.timers[entry.timer];
 				try { timer.fn.apply(null, timer.args); } catch (error) { fail(null, error); }
 			}
+		} else if (entry.kind === 'tasks') {
+			var listed = {}, prefix = entry.screen + '\u0000', again = {};
+			(entry.retry || []).forEach(function (slot) { again[slot] = true; });
+			entry.tasks.forEach(function (task) {
+				var at = prefix + task.slot;
+				listed[at] = true;
+				var key = keyOf(task.frame);
+				var run = runs[at];
+				var current = slotValue(task.slot);
+				// A row or screen that started over shows pending again, so a finished run with the same key runs again too.
+				if (run && run.key === key && !again[task.slot] && (!run.done || !current || current.state !== 'pending')) return;
+				if (run && !run.done) host.abort(run.signal);
+				startRun(at, task, key);
+			});
+			for (var at in runs) {
+				if (at.indexOf(prefix) !== 0 || listed[at]) continue;
+				if (!runs[at].done) host.abort(runs[at].signal);
+				// A @try shown again shows a refresh that failed as @catch alone, as a first answer that failed is.
+				var slot = at.slice(prefix.length), kept = slotValue(slot);
+				if (runs[at].done && kept && kept.state === 'value' && kept.error) cells[slot] = { state: 'error', error: kept.error };
+				if (!runs[at].done || entry.leave) delete runs[at];
+			}
 		} else if (entry.kind === 'response') {
 			var request = host.requests[entry.request];
 			delete host.requests[entry.request];
@@ -371,7 +458,7 @@ g.__markless[id] = {
 		}
 		var out = host.out;
 		host.out = null;
-		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, logs: out.logs };
+		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs };
 		if (out.navigate) left.navigate = out.navigate;
 		return JSON.stringify(left);
 	},

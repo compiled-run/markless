@@ -33,9 +33,9 @@ object DeviceConformance {
 			if (host.viewIds() != wanted) failures.add("$where: views exist for ${(host.viewIds() - wanted).sorted()} and are missing for ${(wanted - host.viewIds()).sorted()}")
 			for ((repeat, keys) in host.runtime.rows()) {
 				val r = host.runtime.node(repeat)
-				val top = host.payload.nodes.first { it.row == repeat && it.parent == r.parent }
+				val tops = host.payload.nodes.filter { it.row == repeat && it.parent == r.parent && (it is Node.Element || it is Node.Text) }
 				val parent = host.view(r.parent ?: continue) as android.view.ViewGroup
-				val at = keys.map { k -> parent.indexOfChild(host.view("${top.id}@$k")) }
+				val at = keys.map { k -> tops.firstOrNull { host.hasView("${it.id}@$k") }?.let { parent.indexOfChild(host.view("${it.id}@$k")) } ?: -1 }
 				if (at != at.sorted() || at.any { it < 0 }) failures.add("$where: rows of $repeat sit at child indexes $at for keys $keys")
 			}
 		}

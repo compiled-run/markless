@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: j11-script-navigate
+name: j16-script-navigate
 ---
 - launchApp:
       clearState: true

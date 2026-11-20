@@ -73,8 +73,13 @@ const PLAYWRIGHT_JOB = 'prepare-playwright';
 
 // The analyzer receipt set is checked inside the gate, after its result step.
 const RECEIPTS_JOB = GATE_JOB;
-const IMAGE_KEY = '${{ needs.lanes.outputs.image_os }}';
-const BROWSER_CACHE_KEY = 'playwright-${{ runner.os }}-' + IMAGE_KEY + '-chromium-webkit-';
+// A lane names the runner image from its own probe; jobs after the lanes read it from `lanes`.
+const IMAGE_KEYS = ['${{ steps.lane.outputs.image_os }}', '${{ needs.lanes.outputs.image_os }}'];
+const BROWSER_CACHE_KEYS = IMAGE_KEYS.map((image) => 'playwright-${{ runner.os }}-' + image + '-chromium-webkit-');
+const BROWSER_CACHE_KEY = BROWSER_CACHE_KEYS[0];
+const LANE_ACTION = './.github/actions/lane-hash';
+const LANE_STEP = 'lane';
+const LANE_GATE = "steps.lane.outputs.run == 'true'";
 
 // Jobs the gate depends on that are wiring rather than a content-hashed lane.
 const GATE_INFRASTRUCTURE = new Set([LANES_JOB]);
@@ -82,8 +87,7 @@ const GATE_INFRASTRUCTURE = new Set([LANES_JOB]);
 // Checks that share their lane's content hash: the lane's marker waits for them, or a re-run skips both.
 const LANE_CHECKS = new Map([['unit-budget', 'unit']]);
 
-// Jobs whose failure skips a lane. The gate reads `skipped` as a content-hash
-// hit, so each of these has to reach the gate under its own name.
+// Jobs the gate reads `skipped` past: the gate must need each by name, so its failure lands there as `failure`.
 const SKIP_CAUSING_JOBS = ['typecheck', LANES_JOB];
 
 // `boxes-music-player` -> `boxes_music_player`: GitHub expressions read `-` as
@@ -219,10 +223,10 @@ if (!jobNames.includes(GATE_JOB)) {
 	// so every job whose failure would skip a lane has to reach the gate under
 	// its own name, where it lands as `failure` instead.
 	if (!/skipped/.test(jobText(GATE_JOB)))
-		fail(`Job \`${GATE_JOB}\` never mentions \`skipped\`, so a lane that hit its content hash would read as a failure.`);
+		fail(`Job \`${GATE_JOB}\` never mentions \`skipped\`, so \`unit-budget\` skipping after a \`unit\` hash hit would read as a failure.`);
 	for (const guard of SKIP_CAUSING_JOBS) {
 		if (jobNames.includes(guard) && !gateNeeds.has(guard))
-			fail(`Job \`${GATE_JOB}\` does not need \`${guard}\`, whose failure skips lanes the gate would then read as content-hash hits.`);
+			fail(`Job \`${GATE_JOB}\` does not need \`${guard}\`, so its failure could pass for a skip.`);
 	}
 }
 
@@ -270,13 +274,12 @@ if (isCiSuite && !jobNames.includes(RECEIPTS_JOB)) {
 		fail(`Job \`${RECEIPTS_JOB}\` never runs \`receipts:check\`.`);
 	if (!/analyzer-contract-receipts/.test(receiptsText))
 		fail(`Job \`${RECEIPTS_JOB}\` never uploads the \`analyzer-contract-receipts\` artifact.`);
-	// A skipped box lane uploads nothing, so its receipts have to come back out
-	// of the cache entry its last green run saved under the very key whose hit
-	// is the reason the lane skipped.
+	// A box lane that hit its content hash uploads nothing, so its receipts come back out of the cache entry saved under that key.
 	for (const boxJob of boxJobs) {
-		const slug = slugOf(boxJob);
-		if (!new RegExp(`needs\\.lanes\\.outputs\\.key_${slug}${wordEnd}`).test(receiptsText))
-			fail(`Job \`${RECEIPTS_JOB}\` never restores \`${boxJob}\` receipts from \`needs.lanes.outputs.key_${slug}\`, so a skipped box lane would leave the receipt set short.`);
+		if (!new RegExp(`needs\\.${boxJob}\\.outputs\\.key${wordEnd}`).test(receiptsText))
+			fail(`Job \`${RECEIPTS_JOB}\` never restores \`${boxJob}\` receipts from \`needs.${boxJob}.outputs.key\`, so a box lane that hit its content hash would leave the receipt set short.`);
+		if (!new RegExp(`needs\\.${boxJob}\\.outputs\\.run${wordEnd}`).test(receiptsText))
+			fail(`Job \`${RECEIPTS_JOB}\` never reads \`needs.${boxJob}.outputs.run\`, so it cannot tell a box lane that ran from one that hit its content hash.`);
 	}
 	// `fail-on-cache-miss` has to be set to true, not merely mentioned: the
 	// key's default is false, and false is exactly the value that would turn a
@@ -292,14 +295,25 @@ if (isCiSuite && !jobNames.includes(RECEIPTS_JOB)) {
 	}
 }
 
-// 7. Content-hash lanes. A lane may only skip because its key already carries a
-// green marker, so each one needs a read-only probe in `lanes`, an `if:` on
-// that probe's verdict, and a marker saved under the same key when it wins.
+// 7. Content-hash lanes. A lane may only skip its work because its key already carries a green marker. Each lane
+// decides that itself with the lane-hash action as its first step after checkout, so it waits for no other job
+// (each `needs:` hop is another wait in the runner queue), and every later step gates on that verdict.
+const laneAction = loadLaneAction();
+const laneHashStep = (lane) =>
+	(laneAction?.runs?.steps ?? []).find((step) => step.id === slugOf(lane) && String(step.if ?? '').includes(`inputs.lane == '${lane}'`));
+const markerPaths = (lane) =>
+	String(laneHashStep(lane)?.env?.MARKER_PATHS ?? '')
+		.split('\n')
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.join(', ');
+function laneKeyPattern(lane) {
+	return new RegExp(`needs\\.lanes\\.outputs\\.key_${slugOf(lane)}${wordEnd}|needs\\.${lane}\\.outputs\\.key${wordEnd}`);
+}
 if (jobNames.includes(GATE_JOB) && !jobNames.includes(LANES_JOB)) {
-	fail(`There is no \`${LANES_JOB}\` job, so nothing decides which lanes a run can skip.`);
+	fail(`There is no \`${LANES_JOB}\` job, so nothing names the lane keys the jobs after the lanes read.`);
 } else if (jobNames.includes(GATE_JOB)) {
 	const laneOutputs = new Set(outputsOf(LANES_JOB));
-	const lanesText = jobText(LANES_JOB);
 	const hashedLanes = needsOf(GATE_JOB).filter(
 		(name) =>
 			jobNames.includes(name) &&
@@ -309,59 +323,83 @@ if (jobNames.includes(GATE_JOB) && !jobNames.includes(LANES_JOB)) {
 			!NON_TEST_JOBS.has(name),
 	);
 	if (hashedLanes.length === 0) fail('The gate depends on no content-hashed lane.');
+	if (laneAction === null) fail(`\`${LANE_ACTION}/action.yml\` is missing or does not parse, so no lane can decide whether it runs.`);
 	for (const lane of hashedLanes) {
 		const slug = slugOf(lane);
-		if (!laneOutputs.has(`run_${slug}`))
-			fail(`Job \`${LANES_JOB}\` has no \`run_${slug}\` output, so lane \`${lane}\` has no content hash to skip on.`);
+		const hashStep = laneHashStep(lane);
+		if (hashStep === undefined) {
+			fail(`\`${LANE_ACTION}\` has no step with id \`${slug}\` for \`inputs.lane == '${lane}'\`, so lane \`${lane}\` has no content hash.`);
+		} else {
+			if (!/hashFiles\('ci-base-key\.txt'/.test(String(hashStep.env?.KEY ?? '')))
+				fail(`\`${LANE_ACTION}\` hashes lane \`${lane}\` without \`ci-base-key.txt\`, so it would skip on a tree whose shared sources changed.`);
+			if (markerPaths(lane) === '') fail(`\`${LANE_ACTION}\` names no MARKER_PATHS for lane \`${lane}\`.`);
+		}
 		if (!laneOutputs.has(`key_${slug}`))
-			fail(`Job \`${LANES_JOB}\` has no \`key_${slug}\` output, so lane \`${lane}\` has no key to save a marker under.`);
-		if (
-			!new RegExp(`steps\\.${slug}\\.outputs\\.cache-hit`).test(lanesText) ||
-			!new RegExp(`steps\\.${slug}\\.outputs\\.cache-primary-key`).test(lanesText)
-		)
-			fail(`Job \`${LANES_JOB}\` has no cache probe with id \`${slug}\` behind the \`${lane}\` outputs.`);
-		if (!new RegExp(`needs\\.lanes\\.outputs\\.run_${slug}${wordEnd}`).test(ifOf(lane)))
-			fail(`Lane \`${lane}\` does not gate on \`needs.lanes.outputs.run_${slug}\`, so its content hash decides nothing.`);
-		const saver = jobNames.find(
-			(name) =>
-				/actions\/cache\/save/.test(jobText(name)) &&
-				new RegExp(`needs\\.lanes\\.outputs\\.key_${slug}${wordEnd}`).test(jobText(name)),
-		);
-		if (saver === undefined)
-			fail(`No job saves a marker under \`needs.lanes.outputs.key_${slug}\`, so lane \`${lane}\` re-runs forever on an unchanged tree.`);
-		// actions/cache versions an entry by its path list, so a probe naming other paths never finds it.
-		const probe = stepsOf(LANES_JOB).find((step) => step.id === slug);
-		const probePaths = pathList(probe);
+			fail(`Job \`${LANES_JOB}\` has no \`key_${slug}\` output, so a queue-tested push cannot carry lane \`${lane}\`'s marker.`);
+		if (needsOf(lane).length > 0)
+			fail(`Lane \`${lane}\` needs ${needsOf(lane).join(', ')}; it decides from its own probe, so waiting on another job only adds a runner-queue wait.`);
+		if (ifOf(lane) !== '') fail(`Lane \`${lane}\` has a job-level \`if:\`; only its probe may skip its work.`);
+		const steps = stepsOf(lane);
+		const probeIndex = steps.findIndex((step) => step.id === LANE_STEP && step.uses === LANE_ACTION);
+		const probe = steps[probeIndex];
+		const installIndex = steps.findIndex((step) => /pnpm install/.test(String(step.run ?? '')));
+		if (probe === undefined) {
+			fail(`Lane \`${lane}\` has no \`${LANE_ACTION}\` step with id \`${LANE_STEP}\`, so its content hash decides nothing.`);
+			continue;
+		}
+		if (withOf(probe).lane !== lane) fail(`Lane \`${lane}\` probes the hash of lane \`${withOf(probe).lane}\`.`);
+		if (withOf(probe).probe !== undefined && String(withOf(probe).probe) !== 'true')
+			fail(`Lane \`${lane}\` runs its probe with \`probe: ${withOf(probe).probe}\`, so it never looks its marker up.`);
+		if (installIndex !== -1 && installIndex < probeIndex)
+			fail(`Lane \`${lane}\` installs before its probe, so the content hash sees node_modules.`);
+		for (const step of steps.slice(probeIndex + 1)) {
+			if (!String(step.if ?? '').startsWith(LANE_GATE))
+				fail(`Step \`${step.name ?? step.uses ?? 'unnamed'}\` in lane \`${lane}\` does not start its \`if:\` with \`${LANE_GATE}\`, so it runs on a tree whose marker is already green.`);
+		}
+		for (const [output, source] of [['run', 'steps.lane.outputs.run'], ['key', 'steps.lane.outputs.key']]) {
+			if (!String(jobs[lane]?.outputs?.[output] ?? '').includes(source))
+				fail(`Lane \`${lane}\` has no \`${output}\` output from \`${source}\`, so the jobs after it cannot tell whether it ran.`);
+		}
+		// actions/cache versions an entry by its path list, so a save naming other paths than the probe is never found.
+		let saved = false;
 		for (const name of jobNames) {
 			for (const step of stepsOf(name)) {
 				if (!usesAction(step, 'actions/cache/save')) continue;
-				if (!new RegExp(`needs\\.lanes\\.outputs\\.key_${slug}${wordEnd}`).test(String(withOf(step).key ?? ''))) continue;
-				if (probe !== undefined && pathList(step) !== probePaths)
-					fail(`\`${step.name ?? 'a cache save'}\` in \`${name}\` saves lane \`${lane}\`'s marker under paths [${pathList(step)}] but its probe in \`${LANES_JOB}\` looks up [${probePaths}], so the probe never finds it and the lane re-runs on every tree.`);
+				const key = String(withOf(step).key ?? '');
+				const own = name === lane && /steps\.lane\.outputs\.key(?![A-Za-z0-9_])/.test(key);
+				if (!own && !laneKeyPattern(lane).test(key)) continue;
+				saved = true;
+				if (hashStep !== undefined && pathList(step) !== markerPaths(lane))
+					fail(`\`${step.name ?? 'a cache save'}\` in \`${name}\` saves lane \`${lane}\`'s marker under paths [${pathList(step)}] but \`${LANE_ACTION}\` looks it up under [${markerPaths(lane)}], so the lane re-runs on every tree.`);
 			}
 		}
+		if (!saved) fail(`No job saves lane \`${lane}\`'s marker, so it re-runs forever on an unchanged tree.`);
 	}
-	// Every probe reads: a restore without `lookup-only` would unpack a marker
-	// into the workspace, and one that ever wrote would mark work green that
-	// never ran.
-	{
-		const restoreSteps = stepsOf(LANES_JOB).filter((step) =>
-			usesAction(step, 'actions/cache/restore'),
-		);
-		if (restoreSteps.length < hashedLanes.length)
-			fail(`Job \`${LANES_JOB}\` has ${restoreSteps.length} cache probe(s) for ${hashedLanes.length} lane(s).`);
-		for (const step of restoreSteps) {
+	if (laneAction !== null) {
+		const actionSteps = laneAction.runs?.steps ?? [];
+		if (actionSteps.some((step) => usesAction(step, 'actions/cache/save') || usesAction(step, 'actions/cache@')))
+			fail(`\`${LANE_ACTION}\` writes a cache; a lane's key may only be marked green by the lane that ran.`);
+		const lookups = actionSteps.filter((step) => usesAction(step, 'actions/cache/restore'));
+		if (lookups.length === 0) fail(`\`${LANE_ACTION}\` never looks a marker up.`);
+		for (const step of lookups) {
 			if (withOf(step)['lookup-only'] !== true)
-				fail(`Probe \`${step.name ?? step.id ?? 'unnamed'}\` in \`${LANES_JOB}\` does not set \`lookup-only: true\`, so it unpacks a marker instead of only reading whether one exists.`);
+				fail(`Probe \`${step.name ?? step.id ?? 'unnamed'}\` in \`${LANE_ACTION}\` does not set \`lookup-only: true\`, so it unpacks a marker instead of only reading whether one exists.`);
 		}
 	}
-	// Every lane key layers on the shared input hash. A lane key that stopped
-	// reading `ci-base-key.txt` would skip on a tree whose sources changed.
-	const layered = (lanesText.match(/hashFiles\('ci-base-key\.txt'/g) ?? []).length;
-	if (layered < hashedLanes.length)
-		fail(`Job \`${LANES_JOB}\` layers ${layered} lane key(s) on \`ci-base-key.txt\` for ${hashedLanes.length} lane(s); a lane key that drops the shared hash skips on changed sources.`);
-	if (/actions\/cache\/save/.test(lanesText) || /actions\/cache@/.test(lanesText))
-		fail(`Job \`${LANES_JOB}\` writes a cache; a lane's key may only be marked green by the lane that ran.`);
+	for (const step of stepsOf(LANES_JOB)) {
+		if (usesAction(step, 'actions/cache/restore') && withOf(step)['lookup-only'] !== true)
+			fail(`Probe \`${step.name ?? step.id ?? 'unnamed'}\` in \`${LANES_JOB}\` does not set \`lookup-only: true\`.`);
+		if (usesAction(step, 'actions/cache/save') || usesAction(step, 'actions/cache@'))
+			fail(`Job \`${LANES_JOB}\` writes a cache; a lane's key may only be marked green by the lane that ran.`);
+	}
+}
+
+function loadLaneAction() {
+	try {
+		return yaml.parse(readFileSync(resolve(repoRoot, LANE_ACTION, 'action.yml'), 'utf8'));
+	} catch {
+		return null;
+	}
 }
 
 // 7b. A lane check gates on its lane's success, and every save of that lane's marker waits for the check.
@@ -375,7 +413,7 @@ if (isCiSuite) {
 			fail(`Job \`${check}\` does not need \`${lane}\`, so it can run before the lane it checks.`);
 		if (!new RegExp(`needs\\.${lane}\\.result\\s*==\\s*'success'`).test(ifOf(check)))
 			fail(`Job \`${check}\` does not gate on \`needs.${lane}.result == 'success'\`, so it could skip while its lane ran.`);
-		const laneKey = new RegExp(`needs\\.lanes\\.outputs\\.key_${slugOf(lane)}${wordEnd}`);
+		const laneKey = laneKeyPattern(lane);
 		const checkPassed = new RegExp(`needs\\.${check}\\.result\\s*==\\s*'success'`);
 		for (const name of jobNames) {
 			// A merge-queue run that concluded green already passed every check, so its markers carry over whole.
@@ -430,7 +468,7 @@ if (isCiSuite && !jobNames.includes(PLAYWRIGHT_JOB)) {
 			if (typeof cachePath === 'string' && cachePath.includes('ms-playwright') && cachePath !== browsersPath)
 				fail(`Step \`${step.name ?? step.id ?? 'unnamed'}\` in \`${name}\` caches \`${cachePath}\`, not the job's \`PLAYWRIGHT_BROWSERS_PATH\` \`${browsersPath}\`.`);
 			const keys = [withOf(step).key, ...String(withOf(step)['restore-keys'] ?? '').split('\n')].map((key) => String(key ?? '').trim()).filter(Boolean);
-			if (typeof cachePath === 'string' && /ms-playwright|playwright-apt/.test(cachePath) && keys.some((key) => !key.includes(IMAGE_KEY)))
+			if (typeof cachePath === 'string' && /ms-playwright|playwright-apt/.test(cachePath) && keys.some((key) => !IMAGE_KEYS.some((image) => key.includes(image))))
 				fail(`Step \`${step.name ?? step.id ?? 'unnamed'}\` in \`${name}\` keys \`${cachePath}\` without the runner image; WebKit and its system packages differ per Ubuntu release.`);
 		}
 	}
@@ -439,7 +477,7 @@ if (isCiSuite && !jobNames.includes(PLAYWRIGHT_JOB)) {
 	if (lanesRunner === 'ubuntu-latest')
 		fail(`Job \`${LANES_JOB}\` runs on \`ubuntu-latest\`, which moves between Ubuntu releases mid-rollout; pin the release.`);
 	for (const name of jobNames) {
-		if (jobText(name).includes(IMAGE_KEY) && jobs[name]?.['runs-on'] !== lanesRunner)
+		if (IMAGE_KEYS.some((image) => jobText(name).includes(image)) && jobs[name]?.['runs-on'] !== lanesRunner)
 			fail(`Job \`${name}\` keys a cache on \`${LANES_JOB}\`'s runner image but runs on \`${jobs[name]?.['runs-on']}\`, not \`${lanesRunner}\`.`);
 	}
 	const launchers = nodeTestsLaunchingBrowsers();
@@ -458,7 +496,7 @@ function restoresBrowserCache(name) {
 	return stepsOf(name).some(
 		(step) =>
 			usesAction(step, 'actions/cache/restore') &&
-			String(withOf(step).key ?? '').startsWith(BROWSER_CACHE_KEY) &&
+			BROWSER_CACHE_KEYS.some((prefix) => String(withOf(step).key ?? '').startsWith(prefix)) &&
 			withOf(step)['lookup-only'] !== true,
 	);
 }

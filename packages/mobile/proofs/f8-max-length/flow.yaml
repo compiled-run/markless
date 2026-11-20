@@ -1,0 +1,57 @@
+appId: ${APP_ID}
+name: f8-max-length
+---
+- launchApp:
+    clearState: true
+- assertVisible: Profile
+- assertVisible: Nothing sent
+- assertVisible: Codes up to 5
+- assertVisible: Alexandra
+- assertVisible: ""
+- tapOn: Send
+- assertNotVisible: Nothing sent
+- assertVisible: Sent Alexandra with \[\]
+- assertVisible: Codes up to 5
+- assertNotVisible: Nothing sent
+- tapOn: Code
+- eraseText
+- inputText: abcdefg
+- hideKeyboard
+- assertVisible: abcde
+- assertVisible: Sent Alexandra with \[\]
+- assertVisible: Codes up to 5
+- assertVisible: abcde
+- tapOn: Shorter codes
+- assertNotVisible: Codes up to 5
+- assertVisible: Codes up to 3
+- assertVisible: Sent Alexandra with \[\]
+- assertNotVisible: Codes up to 5
+- assertVisible: abcde
+- tapOn: Send
+- assertVisible: Please shorten this text to 3 characters or less \(you are
+    currently using 5 characters\)\.
+- assertVisible: Sent Alexandra with \[\]
+- assertVisible: Please shorten this text to 3 characters or less \(you are
+    currently using 5 characters\)\.
+- tapOn: Code
+- eraseText
+- inputText: xy
+- hideKeyboard
+- assertVisible: xy
+- assertVisible: Sent Alexandra with \[\]
+- assertVisible: xy
+- tapOn: Send
+- assertNotVisible: Sent Alexandra with \[\]
+- assertVisible: Sent Alexandra with \[xy\]
+- assertNotVisible: Sent Alexandra with \[\]
+- tapOn: Handle
+- eraseText
+- inputText: Bartholomew
+- hideKeyboard
+- assertVisible: Barth
+- assertVisible: Sent Alexandra with \[xy\]
+- assertVisible: Barth
+- tapOn: Send
+- assertNotVisible: Sent Alexandra with \[xy\]
+- assertVisible: Sent Barth with \[xy\]
+- assertNotVisible: Sent Alexandra with \[xy\]
