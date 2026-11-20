@@ -110,7 +110,7 @@ export type NativeExpr =
 	 * What the event that runs the handler carries: an `input` handler's field text after the edit
 	 * (`event.currentTarget.value`); a `dismiss` handler's `event.detail.reason` and `event.detail.pressTarget` (an element,
 	 * or null for Escape); a pointer handler's fields, as a phone's browser reports a touch (`NativePointerField`); a text
-	 * field's `keydown` handler's `event.key`, as the phone's browser gives it for its on-screen keyboard; a `paste` handler's
+	 * field's `keydown` or `keyup` handler's `event.key`, as the phone's browser gives it for its on-screen keyboard; a `paste` handler's
 	 * pasted plain text (`event.clipboardData.getData('text')`); a click handler's `event.detail`, how many presses in a row on
 	 * the element (a double tap's second press is 2).
 	 */
@@ -474,7 +474,8 @@ export type NativeProperty = 'value' | 'checked' | 'indeterminate' | 'selected';
  */
 /**
  * `focus` and `blur` are a text field's: it took the keyboard, or gave it up. `keydown` and `paste` are a text field's too:
- * a key of the on-screen keyboard, and a paste from its edit menu.
+ * a key of the on-screen keyboard, and a paste from its edit menu. `keyup` follows each `keydown` with the same key, after
+ * what the key did (or did not do, when the keydown was prevented).
  */
 export type NativeEventName =
 	| 'activate'
@@ -482,6 +483,7 @@ export type NativeEventName =
 	| 'focus'
 	| 'blur'
 	| 'keydown'
+	| 'keyup'
 	| 'paste'
 	| 'dismiss'
 	| 'cancel'

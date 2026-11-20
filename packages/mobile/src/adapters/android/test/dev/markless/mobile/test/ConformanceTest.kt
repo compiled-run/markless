@@ -200,7 +200,7 @@ private fun runVector(file: File, vector: Map<String, Json>, runtime: Runtime) {
 			continue
 		}
 		val name = EventName.entries.firstOrNull { it.wire == event } ?: throw IllegalStateException("steps[$n] has unknown event $event")
-		val carried = when (name) { EventName.Keydown -> "key"; EventName.Paste -> "text"; else -> "value" }
+		val carried = when (name) { EventName.Keydown, EventName.Keyup -> "key"; EventName.Paste -> "text"; else -> "value" }
 		val value = action[carried]?.str("action.$carried")
 		val reason = action["reason"]?.str("action.reason")
 		val detail = (action["detail"] as? Json.Num)?.value?.toInt()

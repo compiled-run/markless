@@ -39,6 +39,8 @@ export type NativeAction =
 	| { readonly event: 'input'; readonly host: string; readonly value: string }
 	/** A key of the on-screen keyboard in a text field, before it edits the text; `key` as the phone's browser names it. */
 	| { readonly event: 'keydown'; readonly host: string; readonly key: string }
+	/** The same key after what it did to the text (or did not, when its keydown was prevented). */
+	| { readonly event: 'keyup'; readonly host: string; readonly key: string }
 	/** A paste into a text field from its edit menu, before the text goes in. */
 	| { readonly event: 'paste'; readonly host: string; readonly text: string }
 	/** A live device value changed (connectivity, permission): the host writes the device cell. */
@@ -122,7 +124,7 @@ const RAISED: ReadonlySet<string> = new Set([
 /** What the event running a handler carries, by the field a `{ event }` expression names. */
 export type NativeEventFields = {
 	readonly value?: string;
-	/** A text field's `keydown`: the key as the phone's browser names it. */
+	/** A text field's `keydown` or `keyup`: the key as the phone's browser names it. */
 	readonly key?: string;
 	/** A `paste`: the pasted plain text. */
 	readonly text?: string;
@@ -1705,7 +1707,7 @@ export function createNativeRuntime(
 			const scope = instance.scope;
 			const edit = action.event === 'input' ? action.value : undefined;
 			const eventValue: string | NativeEventFields | undefined =
-				action.event === 'keydown'
+				action.event === 'keydown' || action.event === 'keyup'
 					? { key: action.key }
 					: action.event === 'paste'
 						? { text: action.text }

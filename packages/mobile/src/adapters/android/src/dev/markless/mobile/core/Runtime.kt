@@ -7,8 +7,8 @@ const val OVERLAY_ATTRIBUTE = "overlay"
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
-/** The events that carry a string: an `input` the field's text, a `keydown` its key, a `paste` the pasted text. */
-private val VALUED = setOf(EventName.Input, EventName.Keydown, EventName.Paste)
+/** The events that carry a string: an `input` the field's text, a `keydown` or `keyup` its key, a `paste` the pasted text. */
+private val VALUED = setOf(EventName.Input, EventName.Keydown, EventName.Keyup, EventName.Paste)
 
 sealed interface JournalEntry {
 	val node: String
@@ -1001,7 +1001,7 @@ class Runtime(
 		if (event == EventName.Activate) focused = host
 		val carried = when (event) {
 			EventName.Input -> value?.let { mapOf("value" to JsValue.Str(it)) }
-			EventName.Keydown -> mapOf("key" to JsValue.Str(value!!))
+			EventName.Keydown, EventName.Keyup -> mapOf("key" to JsValue.Str(value!!))
 			EventName.Paste -> mapOf("text" to JsValue.Str(value!!))
 			EventName.Activate -> mapOf("detail" to JsValue.Num((detail ?: 1).toDouble()))
 			else -> null

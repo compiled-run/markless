@@ -582,6 +582,20 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'text-keyup',
+		fixture: 'test/fixtures/TextKeyup.tsrx',
+		actions: [
+			{ event: 'keydown', host: 'h1', key: 'a' },
+			{ event: 'input', host: 'h1', value: 'a' },
+			{ event: 'keyup', host: 'h1', key: 'a' },
+			{ event: 'keydown', host: 'h1', key: 'Backspace' },
+			{ event: 'input', host: 'h1', value: '' },
+			{ event: 'keyup', host: 'h1', key: 'Backspace' },
+			{ event: 'keydown', host: 'h1', key: 'Backspace' },
+			{ event: 'keyup', host: 'h1', key: 'Backspace' },
+		],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [

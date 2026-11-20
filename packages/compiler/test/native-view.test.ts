@@ -266,11 +266,11 @@ export function Logger() @{
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Field() @{
 	let text = state('');
-	<input value={text} onKeyUp={() => (text = '')} />
+	<input value={text} onWheel={() => (text = '')} />
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toContain(
-			'the keyup event has no native meaning yet',
+			'the wheel event has no native meaning yet',
 		);
 	});
 
@@ -318,6 +318,46 @@ export function Tags() @{
 					value: { logical: '??', left: { event: 'text' }, right: { literal: '' } },
 				},
 			],
+		]);
+	});
+
+	it("runs a text field's keyup handler with the key and the field's text after the key, and preventDefault() there does nothing", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Search() @{
+	let last = state('');
+	let after = state('');
+	<main>
+		<input
+			aria-label="Search"
+			onKeyUp={(event) => {
+				event.preventDefault();
+				last = event.key;
+				if (event.key === 'Backspace' && (event.target as HTMLInputElement).value === '') after = 'cleared';
+			}}
+		/>
+		<button onKeyUp={() => (last = 'button')}>Go</button>
+	</main>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'the keyup handler on <button> h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out',
+		]);
+		expect(payload?.events).toEqual([
+			{ host: 'h1', event: 'keyup', handler: 'handler:event:0' },
+			{ host: 'h1', event: 'input', handler: 'handler:h1/edit' },
+		]);
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{ op: 'assign', cell: 'state:last', value: { event: 'key' } },
+			{
+				op: 'if',
+				test: {
+					logical: '&&',
+					left: { binary: '===', left: { event: 'key' }, right: { literal: 'Backspace' } },
+					right: { binary: '===', left: { field: 'h1' }, right: { literal: '' } },
+				},
+				whenTrue: [{ op: 'assign', cell: 'state:after', value: { literal: 'cleared' } }],
+				whenFalse: [],
+			},
 		]);
 	});
 

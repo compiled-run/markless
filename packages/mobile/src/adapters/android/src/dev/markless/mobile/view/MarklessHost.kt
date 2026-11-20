@@ -814,7 +814,7 @@ class MarklessHost(
 					override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
 					override fun afterTextChanged(s: Editable) = dismissMessage()
 				})
-				if (node.element == "input" && events[node.id].orEmpty().any { it.event == EventName.Enter || it.event == EventName.Keydown }) imeOptions = EditorInfo.IME_ACTION_GO
+				if (node.element == "input" && events[node.id].orEmpty().any { it.event == EventName.Enter || it.event == EventName.Keydown || it.event == EventName.Keyup }) imeOptions = EditorInfo.IME_ACTION_GO
 				named(this, inst.id)
 			}
 			else -> MarklessBox(context).apply {
@@ -836,6 +836,7 @@ class MarklessHost(
 			// Raised by the field's focus listener, set where the field is built.
 			EventName.Focus, EventName.Blur -> if (view !is EditText) throw MarklessHostError("${e.event.wire} event on \"${node.id}\", which is not a text field")
 			EventName.Keydown -> (view as? MarklessField ?: throw MarklessHostError("keydown event on \"${node.id}\", which is not a text field")).onKey = { key -> prevents(runtime.dispatch(inst.id, EventName.Keydown, key)) }
+			EventName.Keyup -> (view as? MarklessField ?: throw MarklessHostError("keyup event on \"${node.id}\", which is not a text field")).onKeyUp = { key -> apply(runtime.dispatch(inst.id, EventName.Keyup, key)) }
 			EventName.Paste -> (view as? MarklessField ?: throw MarklessHostError("paste event on \"${node.id}\", which is not a text field")).onPaste = { text -> prevents(runtime.dispatch(inst.id, EventName.Paste, text)) }
 			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
 			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.Choose -> {}

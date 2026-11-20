@@ -1169,7 +1169,7 @@ public final class NativeRuntime {
 		eventValue = action.event == .input ? action.value ?? "" : nil
 		edit = eventValue
 		switch action.event {
-		case .keydown: eventFields = [.key: .string(action.value ?? "")]
+		case .keydown, .keyup: eventFields = [.key: .string(action.value ?? "")]
 		case .paste: eventFields = [.text: .string(action.value ?? "")]
 		case .activate: eventFields = [.detail: .number(Double(action.detail ?? 1))]
 		default: break

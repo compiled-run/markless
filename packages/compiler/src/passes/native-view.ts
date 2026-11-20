@@ -176,6 +176,7 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	focusout: 'blur',
 	// A text field's, as a phone's browser sends them from its on-screen keyboard (anywhere else keydown is keyboard-only).
 	keydown: 'keydown',
+	keyup: 'keyup',
 	paste: 'paste',
 	submit: 'submit',
 	// A checkbox's or radio button's change runs after its tick, joined into its press by `wireTicks`.
@@ -479,7 +480,7 @@ type Scope = {
 	/** A dismiss or pointer handler's event parameter, whose fields in `EVENT_FIELDS` it may read. */
 	readonly carried?: { readonly name: string; readonly kind: 'dismiss' | 'pointer' };
 	/** In a text field's keydown or paste handler: `event.key` or the pasted text is the event's, and `preventDefault()` an op. */
-	readonly typing?: 'keydown' | 'paste';
+	readonly typing?: 'keydown' | 'keyup' | 'paste';
 	/** In a click handler: `event.detail` is the number of presses in a row. */
 	readonly clicking?: true;
 	/** In a form's submit handler: the form, which `event.preventDefault()` keeps from being sent. */
@@ -988,8 +989,8 @@ export function nativeUnsupported(message: string, span?: SourceSpan): CompilerD
 
 const LANGUAGE_GLOBALS = new Set(NATIVE_SCRIPT_LANGUAGE_GLOBALS);
 // A submit's default action and a box's checkedness are the host's; a script's event cannot report them back yet.
-// keydown and paste stay data: the engine journals no cancel of what the key or paste does.
-const DATA_ONLY_EVENTS = new Set(['submit', 'change', 'keydown', 'paste']);
+// keydown and paste stay data: the engine journals no cancel of what the key or paste does; keyup reads its key as keydown does.
+const DATA_ONLY_EVENTS = new Set(['submit', 'change', 'keydown', 'keyup', 'paste']);
 const RENDER_UNSTEADY = new Set(['Date', 'crypto', 'performance']);
 const GLOBAL_OBJECTS = new Set(NATIVE_SCRIPT_GLOBAL_OBJECTS);
 
@@ -3488,10 +3489,10 @@ export function createNativeViewPayload(
 					!scope.args.has(holder.name)
 				) {
 					if (TOUCH_MODIFIERS.has(expression.property)) return { literal: false };
-					if (scope.typing === 'keydown' && expression.property === 'key')
+					if ((scope.typing === 'keydown' || scope.typing === 'keyup') && expression.property === 'key')
 						return { event: 'key' };
 					if (scope.clicking && expression.property === 'detail') return { event: 'detail' };
-					if (scope.typing === 'keydown' && expression.property === 'isComposing')
+					if ((scope.typing === 'keydown' || scope.typing === 'keyup') && expression.property === 'isComposing')
 						return { literal: false };
 					if (
 						scope.pressed &&
@@ -5614,7 +5615,8 @@ export function createNativeViewPayload(
 			event.eventName === 'submit' && pressed ? { submitting: pressed.currentTarget } : {};
 		const semantic = SEMANTIC_EVENTS[event.eventName];
 		const carried = semantic === 'dismiss' || POINTER_EVENTS.has(semantic ?? '');
-		const typing = semantic === 'keydown' || semantic === 'paste' ? { typing: semantic } : {};
+		const typing =
+			semantic === 'keydown' || semantic === 'keyup' || semantic === 'paste' ? { typing: semantic } : {};
 		const clicking = semantic === 'activate' && event.eventName === 'click' ? { clicking: true as const } : {};
 		const inner: Scope =
 			parameter === undefined
@@ -6509,7 +6511,7 @@ export function createNativeViewPayload(
 				statement.path[0] === 'preventDefault' &&
 				(statement.arguments ?? []).length === 0
 			)
-				return [{ op: 'preventDefault' }];
+				return scope.typing === 'keyup' ? [] : [{ op: 'preventDefault' }];
 			if (
 				scope.pressed &&
 				statement.name === scope.opaque &&

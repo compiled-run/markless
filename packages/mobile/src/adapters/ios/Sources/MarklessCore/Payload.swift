@@ -227,8 +227,9 @@ public enum NativeEventName: String, Sendable {
 	case input
 	/// A text field took the keyboard, or gave it up.
 	case focus, blur
-	/// A key of the on-screen keyboard in a text field, and a paste from its edit menu, before either edits the text.
-	case keydown, paste
+	/// A key of the on-screen keyboard in a text field, and a paste from its edit menu, before either edits the text;
+	/// `keyup` is the same key after it.
+	case keydown, keyup, paste
 	/// The platform closed a system sheet; it is already closed when the handler runs.
 	case dismiss
 	/// The host's back gesture or Escape on an open `<dialog>`: it closes, as the browser's cancel does.
