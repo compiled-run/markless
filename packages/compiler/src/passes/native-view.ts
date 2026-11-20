@@ -3964,6 +3964,22 @@ export function createNativeViewPayload(
 						);
 					if (consumed.includes(item.path)) continue;
 				}
+				if (element === 'iframe') {
+					// A phone shows a page another server answers; the app's own pages are not served to it.
+					const src = attributesAt(item.path).src?.trim();
+					const at = src !== undefined && URL.canParse(src) ? new URL(src) : undefined;
+					if (boundAt(item.path).some((name) => name === 'src' || name === 'srcdoc'))
+						refuse('an <iframe> whose `src` follows state', span);
+					else if (attributesAt(item.path).srcdoc !== undefined)
+						refuse('an <iframe> with `srcdoc`, which a native web view does not show yet', span);
+					else if (!at || (at.protocol !== 'https:' && at.protocol !== 'http:'))
+						refuse(
+							`an <iframe> whose \`src\` is ${src === undefined ? 'missing' : `"${src}"`}: a phone shows a fixed http(s) URL on another server, and the app's own pages are not served to it`,
+							span,
+						);
+					else features.add('web');
+					consumed.push(item.path);
+				}
 				const id = scope.prefix + item.id;
 				nodeSpans.set(id, span);
 				const spread = chunk.slots.some(

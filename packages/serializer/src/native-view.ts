@@ -291,6 +291,8 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	input: {},
 	a: {},
 	img: {},
+	/** The platform's web view showing the page its `src` names, a fixed http(s) URL. */
+	iframe: {},
 	audio: {},
 	label: {},
 	dialog: {},

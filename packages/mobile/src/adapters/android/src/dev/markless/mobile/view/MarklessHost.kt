@@ -763,6 +763,12 @@ class MarklessHost(
 				needDevice().view(obj, device).also { named(it, inst.id) }
 			}
 			"img" -> SizedImage(context).also { named(it, inst.id) }
+			"iframe" -> EmbeddedPage(
+				context,
+				node.attributes["src"] ?: throw MarklessHostError("<iframe> ${inst.id} has no src"),
+				node.attributes["width"]?.toIntOrNull() ?: 300,
+				node.attributes["height"]?.toIntOrNull() ?: 150,
+			).also { it.contentDescription = node.attributes["title"]; it.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES }
 			"audio" -> AudioButton(context).apply {
 				visibility = View.GONE
 				named(this, inst.id)

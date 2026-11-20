@@ -3,10 +3,11 @@ import AVFoundation
 import MarklessCore
 import UIKit
 import UIKit.UIGestureRecognizerSubclass
+import WebKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"canvas", "details", "embed", "iframe", "object",
+	"canvas", "details", "embed", "object",
 	"picture", "summary", "textarea", "video",
 ]
 
@@ -806,6 +807,18 @@ final class ViewTree {
 						audio.heightAnchor.constraint(equalToConstant: 44).isActive = true
 					}
 					view = audio
+				} else if element == "iframe" {
+					// The browser's embedded page: the platform's web view at the iframe's size, 300 by 150 by default.
+					guard let link = staticAttributes["src"], let url = URL(string: link) else { throw HostError("<iframe> \(id) has no src") }
+					let page = WKWebView()
+					page.load(URLRequest(url: url))
+					page.isAccessibilityElement = false
+					page.accessibilityLabel = staticAttributes["title"]
+					if layout == nil {
+						page.widthAnchor.constraint(equalToConstant: staticAttributes["width"].flatMap(Double.init) ?? 300).isActive = true
+						page.heightAnchor.constraint(equalToConstant: staticAttributes["height"].flatMap(Double.init) ?? 150).isActive = true
+					}
+					view = page
 				} else if element == "img" {
 					let image = UIImageView()
 					image.contentMode = .scaleAspectFit

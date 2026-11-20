@@ -2020,6 +2020,35 @@ export function Page() @{
 	});
 });
 
+describe('<iframe>', () => {
+	const frame = async (attributes: string) =>
+		nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let page = state('https://example.com/');
+	<main><iframe ${attributes}></iframe></main>
+}`);
+
+	it('keeps an iframe of a fixed http(s) page with its attributes', async () => {
+		const { payload, diagnostics } = await frame('src="https://example.com/" title="Example" width="320"');
+		expect(diagnostics).toEqual([]);
+		expect(payload!.nodes.find((node) => node.kind === 'element' && node.element === 'iframe')).toMatchObject({
+			attributes: { src: 'https://example.com/', title: 'Example', width: '320' },
+		});
+	});
+
+	it("refuses one on the app's own server, one whose src follows state, and srcdoc, by name", async () => {
+		const messages = async (attributes: string) =>
+			(await frame(attributes)).diagnostics.map((d) => d.message);
+		expect(await messages('src="/docs"')).toEqual([
+			expect.stringContaining('an <iframe> whose `src` is "/docs"'),
+		]);
+		expect(await messages('src={page}')).toEqual(['an <iframe> whose `src` follows state']);
+		expect(await messages('srcdoc="<p>hi</p>"')).toEqual([
+			'an <iframe> with `srcdoc`, which a native web view does not show yet',
+		]);
+	});
+});
+
 describe("a <select>'s change handler", () => {
 	it("lowers to the select's input event, reading the chosen value; one that needs JavaScript runs as a script", async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
