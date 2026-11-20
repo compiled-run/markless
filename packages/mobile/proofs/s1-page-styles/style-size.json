@@ -1,9 +1,9 @@
 {
 	"perPage": {
-		"/": 15470,
-		"/care": 11827
+		"/": 15485,
+		"/care": 11842
 	},
-	"perPageTotal": 27297,
+	"perPageTotal": 27327,
 	"app": 23731,
 	"targets": {
 		"ios": {
