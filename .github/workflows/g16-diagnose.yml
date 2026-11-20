@@ -1,0 +1,48 @@
+name: G16 diagnose (temporary)
+
+on:
+    push:
+        branches:
+            - ci/g16-deterministic
+
+permissions:
+    contents: read
+
+jobs:
+    diagnose:
+        runs-on: ubuntu-26.04
+        timeout-minutes: 30
+        env:
+            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile
+            - id: pw
+              run: echo "version=$(grep -oE '^  playwright-core@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2 | sort -u | paste -sd+ -)" >> "$GITHUB_OUTPUT"
+            - uses: actions/cache/restore@v4
+              id: playwright-cache
+              with:
+                  key: playwright-${{ runner.os }}-${{ env.ImageOS }}-chromium-webkit-${{ steps.pw.outputs.version }}
+                  path: ${{ github.workspace }}-ms-playwright
+            - run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
+            - if: steps.playwright-cache.outputs.cache-hit != 'true'
+              run: pnpm --dir packages/vitest-browser exec playwright install chromium
+            - run: node scripts/ci/g16-diagnose.mjs
+              env:
+                  G16_RUNS: '20'
+            - if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: g16-diagnose
+                  path: /tmp/g16-diagnose
+                  retention-days: 3
