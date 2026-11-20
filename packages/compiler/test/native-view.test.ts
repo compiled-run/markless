@@ -2696,6 +2696,57 @@ export function Page() @{
 	});
 });
 
+describe('element proxies', () => {
+	const source = `import { element, shared, state } from '@markless/core';
+const pickerState = shared(
+	() => {
+		const picker = state({ open: false });
+		const optionEls = element<HTMLButtonElement[]>();
+		return { ...picker, optionEls, setOpen(next: boolean) { picker.open = next; } };
+	},
+	{ scope: 'subtree' },
+);
+function focusFirst(options: ReadonlyArray<HTMLElement> | undefined): void {
+	if (!options) return;
+	for (const option of options) {
+		if (option.getAttribute('aria-disabled') !== 'true') { option.focus(); return; }
+	}
+}
+function Trigger() @{
+	const picker = pickerState();
+	<button onClick={() => { picker.setOpen(true); focusFirst(picker.optionEls); }}>Open</button>
+}
+function Option() @{
+	const picker = pickerState();
+	<button el={picker.optionEls}>Option</button>
+}
+export function Picker() @{
+	const picker = pickerState();
+	const list = element<HTMLDivElement[]>();
+	<main ui-open={picker.open}>
+		<Trigger />
+		<Option />
+		<div el={list} />
+		<button onClick={() => { for (const one of list) one.focus(); }}>All</button>
+	</main>
+}`;
+
+	it('passes element handles to a JavaScript handler as proxies, and runs a helper data cannot spell as JavaScript beside the data a shared object needs', async () => {
+		const { payload, diagnostics } = await nativeView(source);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		const [trigger, all] = payload!.handlers;
+		expect(trigger?.ops.map((op) => op.op)).toEqual(['assign', 'script']);
+		expect(trigger?.ops[1]).toMatchObject({
+			op: 'script',
+			type: 'call',
+			bindings: { __a0: { elements: { array: [{ spread: false, value: { literal: 'component-edge:1/h1' } }] } } },
+		});
+		expect(all?.ops).toEqual([
+			{ op: 'script', fn: expect.any(String), type: 'click', bindings: { list: { elements: { array: [{ spread: false, value: { literal: 'h3' } }] } } } },
+		]);
+	});
+});
+
 describe('overlays', () => {
 	it('lowers an overlay sheet: its mark, dismiss and pointer events, element values, focus and a module set its helpers keep', async () => {
 		const { payload, diagnostics } =
