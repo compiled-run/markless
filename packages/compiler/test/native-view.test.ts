@@ -2884,7 +2884,7 @@ export function Nav() @{
 
 	it('refuses a <use> href it cannot read when the app is built, by name', async () => {
 		const text = `import { state } from '@markless/core';
-const ROWS = [{ id: 1, icon: 'sun' }, { id: 2, icon: 'bar' }];
+const ROWS = [{ id: 1, icon: 'sun' }, { id: 2, icon: 'moon' }];
 export function Marks() @{
 	let pick = state('sun');
 	<main>
@@ -2913,10 +2913,7 @@ export function Marks() @{
 			diagnostics.map((d) => [d.message, text.slice(0, d.primarySpan!.start).split('\n').length]),
 		).toEqual([
 			['`href` on <use> follows state; a native drawing is compiled when the app is built', 6],
-			[
-				'`href` on <use> follows its @for row; a native drawing is compiled once for every row, so a row cannot name its own symbol yet',
-				8,
-			],
+			['<use href="/art/marks.svg#moon">, which names nothing in /art/marks.svg', 8],
 			['<use href="/art/marks.svg#moon">, which names nothing in /art/marks.svg', 10],
 			['<use href="/art/gone.svg#sun">: the app serves no file at /art/gone.svg', 11],
 			[
@@ -2928,6 +2925,107 @@ export function Marks() @{
 				13,
 			],
 			['<use href="/art/marks.svg">, which names a file but no symbol in it', 14],
+		]);
+	});
+
+	const rowSvg = (payload: NonNullable<Awaited<ReturnType<typeof nativeView>>['payload']>) => {
+		const svg = payload.nodes.find((node) => node.kind === 'element' && node.element === 'svg');
+		if (svg?.kind !== 'element') throw new Error('no svg');
+		return svg;
+	};
+
+	it('gives an svg in a @for row each symbol its fixed list can name, and the row picks by its href', async () => {
+		const { payload, diagnostics } = await nativeView(
+			`const MARKS = [
+	{ key: 'a', mark: 'ring' },
+	{ key: 'b', mark: 'sun' },
+	{ key: 'c', mark: 'ring' },
+];
+export function Legend() @{
+	<ul>
+		@for (const entry of MARKS; key entry.key) {
+			<li><svg viewBox="0 0 20 20" aria-hidden="true"><rect width="1" height="1" /><use href={\`/art/marks.svg#\${entry.mark}\`} /></svg></li>
+		}
+	</ul>
+}`,
+			{ readAsset: (url) => (url === '/art/marks.svg' ? sprite : undefined) },
+		);
+		expect(diagnostics).toEqual([]);
+		const svg = rowSvg(payload!);
+		expect(svg.row).toBe('repeat:0');
+		expect(svg.bindings).toEqual([
+			{
+				attribute: 'href',
+				value: {
+					template: ['/art/marks.svg#', { member: { item: 'repeat:0' }, property: 'mark' }, ''],
+				},
+			},
+		]);
+		expect(svg.drawing!.shapes).toHaveLength(1);
+		expect(Object.keys(svg.drawings!)).toEqual(['/art/marks.svg#ring', '/art/marks.svg#sun']);
+		expect(svg.drawings!['/art/marks.svg#sun']!.shapes).toEqual([
+			svg.drawing!.shapes[0],
+			expect.objectContaining({ transform: [2, 0, 0, 2, 0, 0] }),
+		]);
+		expect(svg.drawings!['/art/marks.svg#ring']!.shapes[1]!.transform).toEqual([
+			2, 0, 0, 2, 0, 0,
+		]);
+	});
+
+	it('gives an svg in the rows of a state list every symbol of the sprites its first rows name', async () => {
+		const { payload, diagnostics } = await nativeView(
+			`import { state } from '@markless/core';
+export function Shelf() @{
+	let items = state([{ id: 7, glyph: 'bar' }, { id: 8, glyph: 'sun' }]);
+	<div>
+		<button onClick={() => (items = [...items].reverse())}>Flip</button>
+		@for (const item of items; key item.id) {
+			<p><svg viewBox="0 0 4 4"><use href={'/art/marks.svg#' + item.glyph} /></svg></p>
+		}
+	</div>
+}`,
+			{ readAsset: (url) => (url === '/art/marks.svg' ? sprite : undefined) },
+		);
+		expect(diagnostics).toEqual([]);
+		const svg = rowSvg(payload!);
+		expect(svg.drawing!.shapes).toEqual([]);
+		expect(Object.keys(svg.drawings!).sort()).toEqual([
+			'/art/marks.svg#bar',
+			'/art/marks.svg#ring',
+			'/art/marks.svg#sun',
+		]);
+	});
+
+	it('refuses by name a row href whose symbols are not known when the app is built', async () => {
+		const text = `import { computed, state } from '@markless/core';
+const ROWS = [{ id: 1, icon: 'sun' }];
+export function Marks() @{
+	let filter = state('');
+	const shown = computed(() => ROWS.filter((row) => row.icon.startsWith(filter)));
+	<main>
+		@for (const row of shown; key row.id) {
+			<svg viewBox="0 0 10 10"><use href={'/art/marks.svg#' + row.icon} /></svg>
+		}
+		@for (const row of ROWS; key row.id) {
+			<svg viewBox="0 0 10 10"><use href={'/art/marks.svg#' + row.icon} /><use href={'/art/marks.svg#' + row.icon} x="5" /></svg>
+		}
+	</main>
+}`;
+		const { payload, diagnostics } = await nativeView(text, {
+			readAsset: (url) => (url === '/art/marks.svg' ? sprite : undefined),
+		});
+		expect(payload).toBeNull();
+		expect(
+			diagnostics.map((d) => [d.message, text.slice(0, d.primarySpan!.start).split('\n').length]),
+		).toEqual([
+			[
+				"`href` on <use> follows its @for row, and the items that list can hold are not known when the app is built, so the symbols its rows name are not either",
+				8,
+			],
+			[
+				'a second <use> in this <svg> whose `href` follows its @for row; one per <svg> picks its symbol per row',
+				11,
+			],
 		]);
 	});
 

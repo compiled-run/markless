@@ -114,7 +114,7 @@ sealed interface Node {
 	val row: String?
 
 	/** [obj]: the device object a `camera` element shows. */
-	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null, val defaultStyle: DefaultStyle? = null, val drawing: Drawing? = null, val live: Live? = null) : Node
+	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null, val defaultStyle: DefaultStyle? = null, val drawing: Drawing? = null, val live: Live? = null, val drawings: Map<String, Drawing>? = null) : Node
 	/** [parent] is null for text at the top of the page. */
 	data class Text(override val id: String, override val parent: String?, val parts: List<TextPart>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 	/** An `@if` with [test] (arm 0 while truthy, arm 1 otherwise), or a chain with [tests]: the first truthy arm, else the `null` arm. */
@@ -663,7 +663,7 @@ data class Payload(
 			val id = o.field("id", what).str("$what.id")
 			return when (val kind = o.field("kind", what).str("$what.kind")) {
 				"element" -> {
-					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object", "defaultStyle", "drawing", "live"), what)
+					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object", "defaultStyle", "drawing", "live", "drawings"), what)
 					val parent = o.field("parent", what)
 					val attributes = o["attributes"]?.obj("$what.attributes")?.mapValues { (k, v) -> v.str("$what.attributes.$k") } ?: emptyMap()
 					val bindings = o["bindings"]?.arr("$what.bindings")?.mapIndexed { n, b ->
@@ -677,7 +677,7 @@ data class Payload(
 							Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), value)
 						}
 					} ?: emptyList()
-					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"), o["defaultStyle"]?.let { defaultStyle(it, "$what.defaultStyle") }, o["drawing"]?.let { drawing(it, "$what.drawing") }, o["live"]?.let { live(it, "$what.live") })
+					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"), o["defaultStyle"]?.let { defaultStyle(it, "$what.defaultStyle") }, o["drawing"]?.let { drawing(it, "$what.drawing") }, o["live"]?.let { live(it, "$what.live") }, o["drawings"]?.let { drawings -> drawings.obj("$what.drawings").entries.associate { (key, value) -> key to drawing(value, "$what.drawings.$key") } })
 				}
 				"text" -> {
 					o.only(setOf("kind", "id", "parent", "parts", "arm", "row"), what)

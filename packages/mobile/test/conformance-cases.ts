@@ -4,7 +4,8 @@ import { nodeScriptHost } from '../src/node-engine.ts';
 
 /** The engine the vectors are written with; `crypto` draws from all-zero seed bytes, which a host's test passes too. */
 export const CONFORMANCE_SCRIPT_HOST = () => nodeScriptHost('00'.repeat(32));
-import { readWorkspaceModule } from '../src/harness/rung.ts';
+import { join } from 'node:path';
+import { readWorkspaceModule, rungAssetReader } from '../src/harness/rung.ts';
 
 /** Resolves what a case imports (`@markless/ui`) from packages/mobile, where the case's `src/<name>.tsrx` stands. */
 export const readCaseModule = (specifier: string, importer: string) =>
@@ -12,6 +13,9 @@ export const readCaseModule = (specifier: string, importer: string) =>
 		specifier,
 		importer.startsWith('src/') ? `packages/mobile/${importer}` : importer,
 	);
+
+/** A file a case's app serves (`/marks.svg`), from test/fixtures/public. */
+export const readCaseAsset = rungAssetReader(join(import.meta.dirname, 'fixtures'));
 
 /** Each committed vector file: its component (a path inside packages/mobile) and the actions it records. */
 export const CONFORMANCE_CASES: ReadonlyArray<{
@@ -597,6 +601,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [
 			{ event: 'activate', host: 'h3' },
 			{ event: 'input', host: 'h1', value: 'hi' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'sprite-rows',
+		fixture: 'test/fixtures/SpriteRows.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
 			{ event: 'activate', host: 'h4' },
 		],
 	},

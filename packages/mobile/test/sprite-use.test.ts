@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { compileNativeComponent } from '../src/index.ts';
+import { compileNativeComponent, createNativeRuntime } from '../src/index.ts';
+import { nodeScriptHost } from '../src/node-engine.ts';
 
 // A `<use>` naming a symbol in a sprite the app serves, its path computed by app code: the build runs that code, reads the
 // sprite and draws the symbol, as the web's server renders the href and the browser fetches the file.
@@ -69,8 +70,84 @@ export default function App() @{
 		expect(drop![0]!.fill).toEqual(first![0]!.fill);
 	});
 
-	it('refuses by name an href that names a symbol from its @for row, or a sprite the app does not serve', async () => {
-		const { payload, diagnostics } = await build(`const ROWS = [{ id: 1, icon: 'leaf' }, { id: 2, icon: 'drop' }];
+	it('draws in each list row the symbol its own item names, and follows the rows as they move, leave or change', async () => {
+		reads.length = 0;
+		const { payload, diagnostics } = await build(`import { state } from '@markless/core';
+const PLANTS = [
+	{ name: 'fern', mark: 'leaf' },
+	{ name: 'cactus', mark: 'drop' },
+	{ name: 'skip', mark: 'none' },
+].filter((plant) => plant.name !== 'skip');
+export default function App() @{
+	const marks = asset(MARKS) + '#';
+	let shelf = state([{ id: 'x', mark: 'drop' }, { id: 'y', mark: 'leaf' }, { id: 'z', mark: 'drop' }]);
+	<main>
+		<ul>
+			@for (const plant of PLANTS; key plant.name) {
+				<li><svg viewBox="0 0 24 24" aria-label={plant.name}><use href={marks + plant.mark} /></svg></li>
+			}
+		</ul>
+		<button onClick={() => (shelf = [...shelf].reverse())}>Flip</button>
+		<button onClick={() => (shelf = shelf.slice(1))}>Drop first</button>
+		<button onClick={() => (shelf = shelf.map((pot) => (pot.id === 'y' ? { ...pot, mark: 'drop' } : pot)))}>Repot</button>
+		<ol>
+			@for (const pot of shelf; key pot.id) {
+				<li><svg viewBox="0 0 24 24"><use href={marks + pot.mark} /></svg></li>
+			}
+		</ol>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(new Set(reads)).toEqual(new Set(['/static/marks.svg']));
+		const svgs = payload!.nodes.filter(
+			(node): node is Extract<typeof node, { kind: 'element' }> =>
+				node.kind === 'element' && node.element === 'svg',
+		);
+		expect(JSON.stringify(svgs.map((svg) => svg.bindings))).not.toContain('"script"');
+		expect(svgs.map((svg) => Object.keys(svg.drawings!).sort())).toEqual([
+			['/static/marks.svg#drop', '/static/marks.svg#leaf'],
+			['/static/marks.svg#drop', '/static/marks.svg#leaf'],
+		]);
+		const leaf = svgs[0]!.drawings!['/static/marks.svg#leaf']!.shapes[0]!;
+		const drop = svgs[0]!.drawings!['/static/marks.svg#drop']!.shapes[0]!;
+		expect(leaf.fill).toEqual({ r: 42, g: 157, b: 143, alpha: 255 });
+		expect(drop.fill).toEqual({ r: 38, g: 70, b: 83, alpha: 255 });
+
+		const runtime = createNativeRuntime(payload!, new Map(), {}, undefined, undefined, nodeScriptHost());
+		const hrefs = () =>
+			Object.fromEntries(
+				runtime
+					.attributes()
+					.filter(([node, name]) => name === 'href' && node.includes('@'))
+					.map(([node, , value]) => [node, value]),
+			);
+		const [plants, pots] = svgs.map((svg) => svg.id);
+		expect(hrefs()).toEqual({
+			[`${plants}@fern`]: '/static/marks.svg#leaf',
+			[`${plants}@cactus`]: '/static/marks.svg#drop',
+			[`${pots}@x`]: '/static/marks.svg#drop',
+			[`${pots}@y`]: '/static/marks.svg#leaf',
+			[`${pots}@z`]: '/static/marks.svg#drop',
+		});
+		const button = (label: string) =>
+			payload!.events[
+				['Flip', 'Drop first', 'Repot'].indexOf(label)
+			]!.host;
+		const shelfRows = () => runtime.rows().find(([node]) => node !== payload!.nodes.find((n) => n.kind === 'repeat')!.id)![1];
+		expect(runtime.dispatch({ event: 'activate', host: button('Flip') })).toEqual([
+			expect.objectContaining({ op: 'rows', keys: ['z', 'y', 'x'] }),
+		]);
+		expect(shelfRows()).toEqual(['z', 'y', 'x']);
+		expect(runtime.dispatch({ event: 'activate', host: button('Drop first') })).toEqual([
+			expect.objectContaining({ op: 'rows', keys: ['y', 'x'] }),
+		]);
+		expect(runtime.dispatch({ event: 'activate', host: button('Repot') })).toEqual([
+			{ op: 'attribute', node: `${pots}@y`, name: 'href', value: '/static/marks.svg#drop' },
+		]);
+	});
+
+	it('refuses by name a row whose item names no symbol in the sprite, or a sprite the app does not serve', async () => {
+		const { payload, diagnostics } = await build(`const ROWS = [{ id: 1, icon: 'leaf' }, { id: 2, icon: 'stem' }];
 export default function App() @{
 	const marks = asset(MARKS) + '#';
 	<main>
@@ -82,7 +159,7 @@ export default function App() @{
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
-			'`href` on <use> follows its @for row; a native drawing is compiled once for every row, so a row cannot name its own symbol yet',
+			'<use href="/static/marks.svg#stem">, which names nothing in /static/marks.svg',
 			'<use href="/static/gone.svg#leaf">: the app serves no file at /static/gone.svg',
 		]);
 	});

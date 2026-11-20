@@ -397,6 +397,11 @@ export type NativeNode = NativePlace &
 				 * announced, after the screen reader's current speech when polite; `atomic` reads the whole region, else the changed text.
 				 */
 				readonly live?: { readonly politeness: 'polite' | 'assertive'; readonly atomic: boolean };
+				/**
+				 * On an `<svg>` in a list row whose `<use>` names its symbol per row: what it draws for each `<use>` href, by
+				 * that href. The node's `href` binding is the row's href; an href with no entry draws `drawing`.
+				 */
+				readonly drawings?: Readonly<Record<string, NativeDrawing>>;
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
 				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */

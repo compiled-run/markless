@@ -13,6 +13,7 @@ import {
 	APP_CONFORMANCE_CASES,
 	CONFORMANCE_CASES,
 	CONFORMANCE_SCRIPT_HOST,
+	readCaseAsset,
 	readCaseModule,
 } from './conformance-cases.ts';
 import { scrollVectors } from '../src/scroll.ts';
@@ -54,6 +55,7 @@ describe('native conformance vectors', () => {
 				...(entry.device ? { device: entry.device } : {}),
 				source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
 				readModule: entry.modules ? readWorkspaceModule : readCaseModule,
+				readAsset: readCaseAsset,
 			});
 			expect(committed(`${entry.name}.json`), entry.name).toEqual(
 				nativeConformance(payload!, entry.actions, entry.params, entry.preferredLanguages, entry.now, CONFORMANCE_SCRIPT_HOST()),

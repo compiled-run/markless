@@ -1148,6 +1148,45 @@ function variesWhileRunning(expr: NativeExpr): 'row' | 'state' | undefined {
 	return undefined;
 }
 
+/** Whether a value reads a list row's item, and whether it reads state or anything else in `RUNTIME_READS`. */
+function runtimeReadsOf(expr: NativeExpr): ReadonlySet<'row' | 'state'> {
+	const reads = new Set<'row' | 'state'>();
+	const visit = (value: unknown): void => {
+		if (Array.isArray(value)) return value.forEach(visit);
+		if (!value || typeof value !== 'object') return;
+		if ('item' in value) reads.add('row');
+		if (RUNTIME_READS.some((kind) => kind in value)) reads.add('state');
+		if ('script' in value) {
+			for (const binding of Object.values((value as Extract<NativeExpr, { script: string }>).bindings))
+				if ('value' in binding) visit(binding.value);
+				else reads.add('state');
+			return;
+		}
+		Object.values(value).forEach(visit);
+	};
+	visit(expr);
+	return reads;
+}
+
+/** A JSON value as the expression that makes it. */
+function valueExpr(value: unknown): NativeExpr {
+	if (Array.isArray(value)) return { array: value.map((item) => ({ spread: false, value: valueExpr(item) })) };
+	if (value && typeof value === 'object')
+		return { object: Object.entries(value).map(([key, item]) => [key, valueExpr(item)] as const) };
+	return { literal: value === undefined ? null : (value as NativeScalar) };
+}
+
+/** `expr` with the item of list `list`'s row read as `item`. */
+function withItem(expr: NativeExpr, list: string, item: unknown): NativeExpr {
+	const swap = (value: unknown): unknown => {
+		if (Array.isArray(value)) return value.map(swap);
+		if (!value || typeof value !== 'object') return value;
+		if ('item' in value && (value as { item: string }).item === list) return valueExpr(item);
+		return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, swap(inner)]));
+	};
+	return swap(expr) as NativeExpr;
+}
+
 const BUILTIN_CALLS: Readonly<Record<string, (...args: never[]) => unknown>> = {
 	String,
 	Number,
@@ -4444,24 +4483,145 @@ export function createNativeViewPayload(
 		live: read.computedGraphNodeId !== undefined,
 		...(read.sourceSpan ? { span: read.sourceSpan } : {}),
 	});
-	/** A bound `<use>` href as the app is built: folded here, or computed by the caller's script engine (`buildValues`). */
-	const builtHref = (element: DrawingElement, name: string, scope: Scope): string | null => {
+	const PENDING_HREF =
+		'is computed by app code when the app is built, and this build has no script engine to compute it';
+	/** A value fixed when the app is built: folded here, or computed by the caller's script engine (`buildValues`). */
+	const builtValue = (
+		value: NativeExpr,
+		key: string,
+	): { readonly value: unknown } | { readonly error: string } | 'pending' => {
+		const built = options.builtValues?.get(key);
+		if (built) return built;
+		const folded = foldConstant(value, () => undefined);
+		if (folded) return folded;
+		buildValues.push({ key, value });
+		return 'pending';
+	};
+	const hrefText = (value: unknown) => (value === null || value === undefined ? '' : String(value));
+	/**
+	 * A row's href as data the host evaluates per row: parts that read the row stay data, and every other part of a `+` or a
+	 * template is fixed when the app is built. Null (with a refusal, or a request in `buildValues`) when it cannot be.
+	 */
+	const rowHref = (
+		expression: SemanticExpression,
+		scope: Scope,
+		key: string,
+		refused: (message: string) => null,
+		path: ReadonlyArray<number> = [],
+	): NativeExpr | null => {
+		const data = attempt(() => exprOf(expression, 'the `href` of <use>', scope));
+		const reads = !data.failed && data.value ? runtimeReadsOf(data.value) : undefined;
+		if (reads && !reads.has('state')) return data.value;
+		data.rollBack();
+		if (expression.kind === 'binary' && expression.operator === '+') {
+			const left = rowHref(expression.left, scope, `${key}.0`, refused, [...path, 0]);
+			const right = rowHref(expression.right, scope, `${key}.1`, refused, [...path, 1]);
+			return left && right ? { binary: '+', left, right } : null;
+		}
+		if (expression.kind === 'template') {
+			let expressions = 0;
+			const parts = expression.parts.map((part) => {
+				if (typeof part === 'string') return part;
+				const step = expressions++;
+				return rowHref(part, scope, `${key}.${step}`, refused, [...path, step]);
+			});
+			return parts.includes(null) ? null : { template: parts as (string | NativeExpr)[] };
+		}
+		const lowered = attempt(() =>
+			renderValue(
+				expression,
+				() =>
+					path.length === 0
+						? readScript(scope.module, scope.span)
+						: scope.span && scriptFacts(scope.module)?.operand(scope.span, path),
+				'the `href` of <use>',
+				scope,
+			),
+		);
+		const varies =
+			lowered.failed || !lowered.value ? 'state' : variesWhileRunning(lowered.value);
+		if (varies) {
+			lowered.rollBack();
+			return refused(
+				varies === 'row'
+					? '`href` on <use> reads its @for row through code a phone would run for every row; write the row part as plain data (`marks + row.icon`)'
+					: '`href` on <use> follows state; a native drawing is compiled when the app is built',
+			);
+		}
+		const built = builtValue(lowered.value!, key);
+		if (built === 'pending') return null;
+		lowered.rollBack();
+		if ('error' in built)
+			return refused(`\`href\` on <use> could not be computed when the app was built: ${built.error}`);
+		return { literal: hrefText(built.value) };
+	};
+	/** Each href the rows of a list can give a `<use>`, when the build can know them; null when refused or pending. */
+	const rowHrefs = (
+		value: NativeExpr,
+		key: string,
+		refused: (message: string) => null,
+	): { readonly first: ReadonlyArray<string>; readonly fixed: boolean } | null => {
+		const lists = new Set<string>();
+		const collect = (part: unknown): void => {
+			if (Array.isArray(part)) part.forEach(collect);
+			else if (part && typeof part === 'object') {
+				if ('item' in part) lists.add((part as { item: string }).item);
+				Object.values(part).forEach(collect);
+			}
+		};
+		collect(value);
+		const [list] = lists;
+		const repeat = nodes.find((node) => node.kind === 'repeat' && node.id === list);
+		if (lists.size !== 1 || repeat?.kind !== 'repeat')
+			return refused('`href` on <use> reads the rows of more than one @for');
+		const fixed = !variesWhileRunning(repeat.list);
+		const unknown = () =>
+			refused(
+				'`href` on <use> follows its @for row, and the items that list can hold are not known when the app is built, so the symbols its rows name are not either',
+			);
+		let items: unknown;
+		if (fixed) {
+			const built = builtValue(repeat.list, `${key}/list`);
+			if (built === 'pending') return null;
+			if ('error' in built)
+				return refused(`the @for list could not be computed when the app was built: ${built.error}`);
+			items = built.value;
+		} else {
+			const folded = foldConstant(repeat.list, initialOf);
+			if (!folded) return unknown();
+			items = folded.value;
+		}
+		if (!Array.isArray(items)) return unknown();
+		const first: string[] = [];
+		for (const item of items) {
+			const href = foldConstant(withItem(value, list!, item), () => undefined);
+			if (!href) return unknown();
+			first.push(hrefText(href.value));
+		}
+		return { first, fixed };
+	};
+	/** A bound `<use>` href as the app is built: one string, or per row an expression and each href it can take. */
+	const builtHref = (
+		element: DrawingElement,
+		name: string,
+		scope: Scope,
+	):
+		| string
+		| { readonly row: NativeExpr; readonly hrefs: ReadonlyArray<string>; readonly fixed: boolean }
+		| null => {
 		const span = scope.module.hostSpans.get(element.id);
+		const refused = (message: string) => refuseAs('svg', message, span);
 		const key = `${scope.prefix}${element.id}`;
 		const built = options.builtValues?.get(key);
 		if (built && 'error' in built)
-			return refuseAs(
-				'svg',
-				`\`${name}\` on <use> could not be computed when the app was built: ${built.error}`,
-				span,
-			);
-		if (built) return built.value === null || built.value === undefined ? '' : String(built.value);
+			return refused(`\`${name}\` on <use> could not be computed when the app was built: ${built.error}`);
+		if (built) return hrefText(built.value);
 		const follows = `\`${name}\` on <use> follows state; a native drawing is compiled when the app is built`;
 		const read = (scope.module.readsByHost.get(element.id) ?? []).find(
 			(candidate) =>
 				candidate.target.kind === 'attribute' && candidate.target.name === name,
 		);
-		if (!read) return refuseAs('svg', follows, span);
+		if (!read) return refused(follows);
 		const where = readScope(read, scope);
 		const lowered = attempt(() =>
 			renderValue(
@@ -4473,46 +4633,28 @@ export function createNativeViewPayload(
 		);
 		const varies =
 			lowered.failed || !lowered.value ? 'state' : variesWhileRunning(lowered.value);
+		if (varies === 'row' && read.expression) {
+			lowered.rollBack();
+			const pending = buildValues.length;
+			const row = rowHref(read.expression, where, key, refused);
+			const hrefs = row && rowHrefs(row, key, refused);
+			if (buildValues.length > pending) return refused(`\`${name}\` on <use> ${PENDING_HREF}`);
+			return row && hrefs ? { row, hrefs: hrefs.first, fixed: hrefs.fixed } : null;
+		}
 		if (varies) {
 			lowered.rollBack();
-			return refuseAs(
-				'svg',
-				varies === 'row'
-					? `\`${name}\` on <use> follows its @for row; a native drawing is compiled once for every row, so a row cannot name its own symbol yet`
-					: follows,
-				span,
-			);
+			return refused(follows);
 		}
-		const folded = foldConstant(lowered.value!, () => undefined);
-		if (folded) {
-			lowered.rollBack();
-			return folded.value === null || folded.value === undefined ? '' : String(folded.value);
-		}
-		buildValues.push({ key, value: lowered.value! });
-		return refuseAs(
-			'svg',
-			`\`${name}\` on <use> is computed by app code when the app is built, and this build has no script engine to compute it`,
-			span,
-		);
+		const value = builtValue(lowered.value!, key);
+		if (value === 'pending') return refused(`\`${name}\` on <use> ${PENDING_HREF}`);
+		lowered.rollBack();
+		if ('error' in value)
+			return refused(`\`${name}\` on <use> could not be computed when the app was built: ${value.error}`);
+		return hrefText(value.value);
 	};
-	/**
-	 * A `<use>` of an inline svg with its href as the app is built; an href naming a file the app serves (`/icons.svg#sun`)
-	 * brings that file's elements, where its `#id` is looked up. Null when it is refused.
-	 */
-	const useOf = (
-		element: DrawingElement,
-		scope: Scope,
-	): { readonly element: DrawingElement; readonly sprite?: ReadonlyArray<DrawingElement> } | null => {
-		const span = scope.module.hostSpans.get(element.id);
-		const name = element.bound.find((bound) => bound === 'href' || bound === 'xlink:href');
-		const written = name ? builtHref(element, name, scope) : undefined;
-		if (written === null) return null;
-		const href = (
-			written ??
-			element.attributes.href ??
-			element.attributes['xlink:href'] ??
-			''
-		).trim();
+	type ResolvedUse = { readonly element: DrawingElement; readonly sprite?: ReadonlyArray<DrawingElement> };
+	/** A `<use>` whose href is `href`; an href naming a file the app serves brings that file's elements. */
+	const resolveUse = (element: DrawingElement, href: string, span: SourceSpan | undefined): ResolvedUse | null => {
 		const { 'xlink:href': _xlink, ...attributes } = element.attributes;
 		const resolved = (target: string): DrawingElement => ({
 			...element,
@@ -4529,23 +4671,76 @@ export function createNativeViewPayload(
 			return refused(
 				`>: a sprite is read from the app's files when it is built, so its path starts at the site root${file.includes(':') ? '' : `, as \`/${file}\``}`,
 			);
+		const sprite = spriteAt(file);
+		if (typeof sprite === 'string') return refused(sprite);
+		if (!sprite.elements.some((other) => other.attributes.id === id))
+			return refused(`>, which names nothing in ${file.split('?')[0]}`);
+		return {
+			element: resolved(`#${id}`),
+			sprite: sprite.elements.map((other) => ({ ...other, id: element.id })),
+		};
+	};
+	/** The sprite file at a site-root href's path, read once; a string is why it cannot be read (after `<use href="…"`). */
+	const spriteAt = (file: string): { readonly elements: ReadonlyArray<DrawingElement> } | string => {
 		const path = file.split('?')[0]!;
-		if (!options.readAsset)
-			return refused(`>: this build was not given the app's files to read ${path} from`);
+		if (!options.readAsset) return `>: this build was not given the app's files to read ${path} from`;
 		if (!sprites.has(path)) {
 			const text = options.readAsset(path);
 			sprites.set(path, text === undefined ? undefined : readSvgFile(text));
 		}
 		const sprite = sprites.get(path);
-		if (!sprite) return refused(`>: the app serves no file at ${path}`);
-		if ('error' in sprite)
-			return refused(`>: ${path} is not an SVG file the build can read: ${sprite.error}`);
-		if (!sprite.elements.some((other) => other.attributes.id === id))
-			return refused(`>, which names nothing in ${path}`);
-		return {
-			element: resolved(`#${id}`),
-			sprite: sprite.elements.map((other) => ({ ...other, id: element.id })),
-		};
+		if (!sprite) return `>: the app serves no file at ${path}`;
+		if ('error' in sprite) return `>: ${path} is not an SVG file the build can read: ${sprite.error}`;
+		return sprite;
+	};
+	/**
+	 * A `<use>` of an inline svg with its href as the app is built. One that names its symbol per list row (`perRow`) has
+	 * each href its rows can give: those of a fixed list's items, or for a list that changes every element id in the sprites
+	 * its first rows name, so a row draws what the web would. Null when it is refused.
+	 */
+	const useOf = (
+		element: DrawingElement,
+		scope: Scope,
+	):
+		| (ResolvedUse & {
+				readonly perRow?: {
+					readonly value: NativeExpr;
+					readonly choices: ReadonlyArray<ResolvedUse & { readonly href: string }>;
+				};
+		  })
+		| null => {
+		const span = scope.module.hostSpans.get(element.id);
+		const name = element.bound.find((bound) => bound === 'href' || bound === 'xlink:href');
+		const written = name ? builtHref(element, name, scope) : undefined;
+		if (written === null) return null;
+		if (typeof written === 'object') {
+			const choices: (ResolvedUse & { readonly href: string })[] = [];
+			const hrefs = new Set<string>();
+			for (const href of written.hrefs) {
+				const use = resolveUse(element, href.trim(), span);
+				if (!use) return null;
+				hrefs.add(href);
+				if (written.fixed || !use.sprite) continue;
+				const file = href.trim().slice(0, href.trim().indexOf('#'));
+				for (const other of use.sprite)
+					if (other.attributes.id !== undefined) hrefs.add(`${file}#${other.attributes.id}`);
+			}
+			for (const href of hrefs) {
+				const use = resolveUse(element, href.trim(), span);
+				if (use) choices.push({ ...use, href });
+			}
+			return {
+				element: { ...element, attributes: {}, bound: [] },
+				perRow: { value: written.row, choices },
+			};
+		}
+		const href = (
+			written ??
+			element.attributes.href ??
+			element.attributes['xlink:href'] ??
+			''
+		).trim();
+		return resolveUse(element, href, span);
 	};
 	const textPartOf = (graphNodeId: string, scope: Scope): NativeTextPart | null => {
 		const cell = scope.cells.byBinding.get(graphNodeId);
@@ -4944,12 +5139,14 @@ export function createNativeViewPayload(
 					? defaultStyleOf(element, attributes, bindings)
 					: undefined;
 				let drawing: NativeDrawing | undefined;
+				let drawings: Record<string, NativeDrawing> | undefined;
 				if (element === 'svg') {
 					consumed.push(item.path);
 					const inside = items.filter((other) => isPrefix(item.path, other.path));
 					const relative = (path: ReadonlyArray<number>) => path.slice(item.path.length);
 					const drawn: DrawingElement[] = [];
 					const usedSprites = new Map<string, ReadonlyArray<DrawingElement>>();
+					let perRow: (NonNullable<NonNullable<ReturnType<typeof useOf>>['perRow']> & { readonly at: number }) | undefined;
 					const texts: { path: ReadonlyArray<number>; text: string }[] = [];
 					for (const other of inside) {
 						if (other.kind === 'host') {
@@ -4962,7 +5159,14 @@ export function createNativeViewPayload(
 								bound: boundAt(other.path),
 							};
 							const use = tag === 'use' ? useOf(element, scope) : { element };
-							if (use) drawn.push(use.element);
+							if (use?.perRow && perRow)
+								refuseAs(
+									'svg',
+									'a second <use> in this <svg> whose `href` follows its @for row; one per <svg> picks its symbol per row',
+									scope.module.hostSpans.get(other.id) ?? span,
+								);
+							else if (use?.perRow) perRow = { ...use.perRow, at: drawn.length };
+							else if (use) drawn.push(use.element);
 							if (use?.sprite) usedSprites.set(other.id, use.sprite);
 							for (const event of scope.module.eventsByHost.get(other.id) ?? []) {
 								if (scope.module === rootModule) loweredEvents.add(event.id);
@@ -4982,7 +5186,29 @@ export function createNativeViewPayload(
 							);
 					}
 					const result = compileDrawing(attributes, drawn, texts, item.id, usedSprites);
-					for (const refusal of result.refusals)
+					const refusals = new Map(
+						result.refusals.map((refusal) => [`${refusal.element} ${refusal.message}`, refusal]),
+					);
+					if (perRow) {
+						const choices: Record<string, NativeDrawing> = {};
+						for (const choice of perRow.choices) {
+							const compiled = compileDrawing(
+								attributes,
+								drawn.toSpliced(perRow.at, 0, choice.element),
+								texts,
+								item.id,
+								choice.sprite
+									? new Map([...usedSprites, [choice.element.id, choice.sprite]])
+									: usedSprites,
+							);
+							for (const refusal of compiled.refusals)
+								refusals.set(`${refusal.element} ${refusal.message}`, refusal);
+							choices[choice.href] = compiled.drawing;
+						}
+						drawings = choices;
+						bindings.push({ attribute: 'href', value: perRow.value });
+					}
+					for (const refusal of refusals.values())
 						refuseAs(
 							'svg',
 							refusal.message,
@@ -5003,6 +5229,7 @@ export function createNativeViewPayload(
 					...(defaultStyle ? { defaultStyle } : {}),
 					...(drawing ? { drawing } : {}),
 					...(live ? { live } : {}),
+					...(drawings ? { drawings } : {}),
 					...place,
 				});
 				for (const event of scope.module.eventsByHost.get(item.id) ?? []) {
