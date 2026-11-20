@@ -14,11 +14,9 @@ public enum OverlayProtocol {
 
 /// What an event carries, by the field an `{ event }` expression names.
 public enum NativeEventField: String, Sendable {
-	case value, reason, pressTarget
+	case value, reason, pressTarget, key, text, detail
 	/// A pointer event's, as a phone's browser reports a touch.
 	case target, currentTarget, relatedTarget, button, buttons, clientX, clientY, pointerId, pointerType, isPrimary, timeStamp
-	/// A text field's `keydown` key, a `paste`'s plain text, a click's press count.
-	case key, text, detail
 }
 
 public enum NativeBuiltin: String, Sendable {
@@ -296,10 +294,12 @@ public enum NativeOp: Equatable, Sendable {
 	/// Runs function `fn` of the payload's script with the event (`type`, the web event's) and `bindings`, then writes the
 	/// cells it changed. A throw, or a rejection of what it returns, writes `{ name, message }` to `catch` when there is one.
 	case script(fn: String, type: String, bindings: [NativeScriptBinding], catch: String?)
-	/// `reset` of `@catch (error, reset)`: clears `catch` and runs again each of `cells` (read where the handler runs) that holds an error.
-	case reset(cells: [String], catch: String?)
 	/// `event.preventDefault()` in a text field's `keydown` or `paste` handler.
 	case preventDefault
+	/// `field.value = text` on a text field: its text becomes the value, with no input event; `node` evaluates to its id.
+	case fieldText(node: NativeExpr, value: NativeExpr)
+	/// `reset` of `@catch (error, reset)`: clears `catch` and runs again each of `cells` (read where the handler runs) that holds an error.
+	case reset(cells: [String], catch: String?)
 }
 
 public struct NativeCapture: Equatable, Sendable {
@@ -456,6 +456,10 @@ public struct NativeCell: Equatable, Sendable {
 	public var first: NativeExpr? = nil
 	/// On a row's state: the values the row passes to the part that owns it; when one changes the row's state starts over.
 	public var rebuiltBy: [NativeExpr]? = nil
+	/// Its first value is `undefined` on the web, which `initial` spells as null: a script reads it so until it is written.
+	public var unset = false
+	/// Written while rendering from a value that follows state: at mount, and again whenever that value changes.
+	public var follows: NativeExpr? = nil
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -508,9 +512,12 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "async", "object", "row", "clock", "first", "rebuiltBy"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "async", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
+			}
+			if field.has("unset"), try !field["unset"].bool() {
+				throw PayloadError(path: try field["unset"].path, reason: "unset is only ever true")
 			}
 			let initial = NativeValue(json: try field["initial"].value)
 			var styled = false
@@ -535,7 +542,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 				row: field.has("row") ? try field["row"].string() : nil,
 				clock: field.has("clock"),
 				first: field.has("first") ? try decodeExpr(try field["first"]) : nil,
-				rebuiltBy: field.has("rebuiltBy") ? try field["rebuiltBy"].array().map(decodeExpr) : nil)
+				rebuiltBy: field.has("rebuiltBy") ? try field["rebuiltBy"].array().map(decodeExpr) : nil,
+				unset: field.has("unset"),
+				follows: field.has("follows") ? try decodeExpr(try field["follows"]) : nil)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()
@@ -669,6 +678,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 						throw PayloadError(path: op.path + ".method", reason: "unknown dialog method \"\(method)\"")
 					}
 					return .dialog(node: try opField["node"].string(), open: method == "showModal")
+				case "fieldText":
+					let opField = try op.object(["op", "node", "value"])
+					let node = try opField["node"]
+					let target: NativeExpr = if let fixed = try? node.string() { .literal(.string(fixed)) } else { try decodeExpr(node) }
+					return .fieldText(node: target, value: try decodeExpr(try opField["value"]))
 				case "preventDefault":
 					_ = try op.object(["op"])
 					return .preventDefault
@@ -676,7 +690,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 					let keys = Set(try op.keys())
 					let opField = try op.object(required: ["op", "node", "command"], optional: ["preventScroll"])
 					let command = try opField["command"].string()
-					guard command == "focus" || command == "scrollIntoView" else {
+					guard ["focus", "scrollIntoView", "select"].contains(command) else {
 						throw PayloadError(path: op.path + ".command", reason: "unknown command \"\(command)\"")
 					}
 					let preventScroll = keys.contains("preventScroll") ? try opField["preventScroll"].bool() : false
@@ -864,7 +878,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 			case ["elements"]: return NativeScriptBinding(name: name, kind: .elements(try decodeExpr(try binding.field("elements"))))
 			case ["object"]: return NativeScriptBinding(name: name, kind: .object(try decodeBindings(try binding.field("object"))))
 			case ["shared"]: return NativeScriptBinding(name: name, kind: .shared(try decodeBindings(try binding.field("shared"))))
-			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { elements }, { object } or { shared }")
+			case ["bindings", "method"], ["method", "bindings"]:
+				return NativeScriptBinding(name: name, kind: .method(try binding.field("method").string(), try decodeBindings(try binding.field("bindings"))))
+			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { elements }, { object }, { shared } or { method, bindings }")
 			}
 		}
 	}
