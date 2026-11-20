@@ -855,8 +855,8 @@ class Runtime(
 	/** Every shown list's row keys, in order. */
 	fun rows(): List<Pair<String, List<String>>> = payload.nodes.filterIsInstance<Node.Repeat>().flatMap { r -> instances(r).map { it.id to rowsOf(r, it.scope).map { row -> row.key } } }
 
-	/** Every system sheet and whether its `open` is truthy. */
-	fun sheets(): List<Pair<String, Boolean>> = payload.nodes.filterIsInstance<Node.Sheet>().map { it.id to Js.truthy(evaluate(it.open)) }
+	/** Every system sheet and whether it is open: its `open` is truthy and, in an arm, the arm is shown. */
+	fun sheets(): List<Pair<String, Boolean>> = payload.nodes.filterIsInstance<Node.Sheet>().map { it.id to (isShown(it) && Js.truthy(evaluate(it.open))) }
 
 	/** Each `<dialog>`'s top-layer state; every dialog mounts closed. */
 	private val dialogs = LinkedHashMap<String, Boolean>().apply {

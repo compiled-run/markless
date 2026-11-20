@@ -1270,9 +1270,12 @@ export function createNativeRuntime(
 					)
 				: [],
 		);
+	/** Each system sheet and whether it is open: a sheet in an arm that is not shown is closed. */
 	const sheets = () =>
 		payload.nodes.flatMap((node) =>
-			node.kind === 'sheet' ? [[node.id, Boolean(evaluate(node.open))] as const] : [],
+			node.kind === 'sheet'
+				? [[node.id, shown(node) && Boolean(evaluate(node.open))] as const]
+				: [],
 		);
 	const keyed = <T>(list: ReadonlyArray<readonly [string, string, T]>) =>
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));

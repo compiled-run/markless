@@ -281,7 +281,7 @@ private fun decoderStrictness() {
 	check("decodes a sheet and its content", runCatching { Payload.decode(sheet.toByteArray()) }.getOrNull()?.nodes?.any { it is Node.Sheet && it.snapPoints == listOf(1.0) } == true) { runCatching { Payload.decode(sheet.toByteArray()) }.exceptionOrNull().toString() }
 	refuses("a sheet resting at one height below full", sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0.5]"), "snapPoints")
 	refuses("a sheet whose largest height is not full", sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0.3,0.8]"), "snapPoints")
-	refuses("a sheet in an arm", sheet.replace("\"modal\":true", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}"), "unknown field \"arm\"")
+	refuses("a sheet in an arm of no branch", sheet.replace("\"modal\":true", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}"), "which is not a preceding branch")
 	refuses("a sheet inside a sheet", sheet.replace("\"parent\":\"s\"}", "\"parent\":\"s\"},{\"kind\":\"sheet\",\"id\":\"s2\",\"parent\":\"s\",\"open\":{\"literal\":false},\"snapPoints\":[1],\"dismissible\":false,\"modal\":true}"), "has a Sheet node as its parent")
 	refuses("a dismiss event on an element", sheet.replace("\"host\":\"s\",\"event\":\"dismiss\"", "\"host\":\"h0\",\"event\":\"dismiss\""), "names no sheet")
 	val script = ok.replace("{\"op\":\"assign\",\"cell\":\"c\",\"value\":{\"literal\":1}}", "{\"op\":\"script\",\"fn\":\"fn:0\",\"type\":\"click\",\"bindings\":{\"c\":{\"cell\":\"c\"}}}")

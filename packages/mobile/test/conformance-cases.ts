@@ -1027,6 +1027,20 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'pointercancel', host: 'h2', pointerId: 2, x: 30, y: 90, time: 2016 },
 		],
 	},
+	{
+		// A system sheet in an @if arm: open only while the arm is shown, closed with it, open again when it comes back.
+		name: 'sheet-in-arm',
+		fixture: 'proofs/26-sheet-in-arm/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h8' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h9' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */

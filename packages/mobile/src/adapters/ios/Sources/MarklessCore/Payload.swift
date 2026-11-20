@@ -603,7 +603,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 					row: try decodeRow(field),
 					kind: .repeat(list: try decodeExpr(try field["list"]), key: byIndex ? nil : key))
 			case "sheet":
-				let field = try node.object(["kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"])
+				let field = try node.object(required: ["kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"], optional: ["arm"])
 				let snapPoints = try field["snapPoints"].array().map { try $0.number() }
 				let valid = switch snapPoints.count {
 				case 1: snapPoints[0] == 1
@@ -612,7 +612,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 				}
 				guard valid else { throw PayloadError(path: node.path + ".snapPoints", reason: "a sheet rests at [1] or [x, 1] with 0 < x < 1") }
 				return NativeNode(
-					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: nil, row: nil,
+					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field), row: nil,
 					kind: .sheet(
 						open: try decodeExpr(try field["open"]), snapPoints: snapPoints, dismissible: try field["dismissible"].bool(),
 						modal: try field["modal"].bool()))

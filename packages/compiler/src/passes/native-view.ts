@@ -5273,8 +5273,8 @@ export function createNativeViewPayload(
 		scope: Scope,
 	) {
 		const what = `<${PLATFORM_PIECES_NAMESPACE}.sheet>`;
-		if (place.arm || place.row) {
-			refuse(`a ${what} inside an @if arm or a @for row`, edge.sourceSpan);
+		if (place.row) {
+			refuse(`a ${what} inside a @for row`, edge.sourceSpan);
 			return;
 		}
 		const props = new Map(edge.props.map((prop) => [prop.name, prop]));
@@ -5364,8 +5364,8 @@ export function createNativeViewPayload(
 			refuse(`children passed to ${what} that have no markup`, edge.sourceSpan);
 		const id = `sheet:${scope.prefix}${edge.id}`;
 		if (open && snapPoints && dismissible !== null && modal !== null)
-			nodes.push({ kind: 'sheet', id, parent, open, snapPoints, dismissible, modal });
-		if (projected) lowerChunk(projected, id, {}, scope);
+			nodes.push({ kind: 'sheet', id, parent, open, snapPoints, dismissible, modal, ...place });
+		if (projected) lowerChunk(projected, id, place, scope);
 		if (onChange?.kind === 'callback' && dismissible === true) {
 			if (!onChange.nativeStatements) {
 				refuse(

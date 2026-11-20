@@ -291,7 +291,6 @@ final class ViewTree {
 		}
 		if layout == nil {
 			stackTree(root)
-			for sheet in sheets.values { stackTree(sheet.content) }
 			alignTables()
 		} else {
 			try sizePage()
@@ -1069,8 +1068,10 @@ final class ViewTree {
 				}
 				var childIndex = 0
 				_ = try build(template, in: sheet.content, at: &childIndex, Context())
+				if layout == nil { stackTree(sheet.content) }
 				sheets[id] = sheet
-				if try runtime.evaluate(open).isTruthy { sheet.open(from: nil) }
+				// Built with the page, it opens when the page appears; built later by an arm, it opens now.
+				if try runtime.evaluate(open).isTruthy { sheet.open(from: presenter) }
 			}
 		}
 		return built
@@ -1142,6 +1143,8 @@ final class ViewTree {
 			let suffix = String(id.dropFirst(template.count))
 			for child in slots[template] ?? [] { remove(child + suffix) }
 		}
+		// A sheet whose arm left closes with it, without a `dismiss` action; the arm builds a new one if it comes back.
+		sheets[id]?.close(animated: false)
 		labels.removeValue(forKey: id)?.removeFromSuperview()
 		scrollViews.removeValue(forKey: id)
 		paragraphs.removeValue(forKey: id)?.view.removeFromSuperview()

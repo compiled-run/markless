@@ -1,0 +1,41 @@
+{
+	"rung": 26,
+	"name": "A system sheet inside an @if arm opens only while its arm is shown, and closes with it",
+	"steps": [
+		{
+			"visible": ["Product", "Picked none", "Load"],
+			"absent": ["Mug", "Choose size", "Sizes"]
+		},
+		{
+			"do": { "tap": "Load" },
+			"visible": ["Mug", "Choose size", "Unload"],
+			"absent": ["Sizes"]
+		},
+		{ "do": { "tap": "Choose size" }, "visible": ["Sizes", "Large", "Remove product"] },
+		{
+			"do": { "tap": "Large" },
+			"visible": ["Picked large", "Choose size"],
+			"absent": ["Sizes", "Picked none"]
+		},
+		{ "do": { "tap": "Choose size" }, "visible": ["Sizes", "Remove product"] },
+		{
+			"do": { "tap": "Remove product" },
+			"visible": ["Load", "Picked large"],
+			"absent": ["Sizes", "Mug", "Choose size"]
+		},
+		{
+			"do": { "tap": "Load" },
+			"visible": ["Sizes", "Large", "Remove product"],
+			"absent": ["Load"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Product", "Picked none", "Load", "On the web, sizes open in a drawer"],
+				"absent": ["Mug", "Sizes"]
+			}
+		],
+		"absentFromOutput": ["Remove product", "@markless/device"]
+	}
+}

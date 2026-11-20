@@ -46,6 +46,7 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		22,
 		23,
 		24,
+		26,
 		'D1',
 		'D2',
 		'D3',

@@ -119,8 +119,7 @@ sealed interface Node {
 	/** [key] null: each row's key is its position (`byIndex`). */
 	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>?, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 	/** The platform's own sheet: its content is the nodes whose parent is this id, built at mount and kept; shown while [open] is truthy. */
-	data class Sheet(override val id: String, override val parent: String, val open: Expr, val snapPoints: List<Double>, val dismissible: Boolean, val modal: Boolean) : Node {
-		override val arm: ArmPlace? get() = null
+	data class Sheet(override val id: String, override val parent: String, val open: Expr, val snapPoints: List<Double>, val dismissible: Boolean, val modal: Boolean, override val arm: ArmPlace? = null) : Node {
 		override val row: String? get() = null
 	}
 }
@@ -691,12 +690,12 @@ data class Payload(
 					Node.Repeat(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("list", what), "$what.list"), if (byIndex) null else key, armPlace(o, what), rowPlace(o, what))
 				}
 				"sheet" -> {
-					o.only(setOf("kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"), what)
+					o.only(setOf("kind", "id", "parent", "open", "snapPoints", "dismissible", "modal", "arm"), what)
 					val snapPoints = o.field("snapPoints", what).arr("$what.snapPoints").map { it.num("$what.snapPoints[]") }
 					val two = snapPoints.size == 2 && snapPoints[0] > 0 && snapPoints[0] < 1 && snapPoints[1] == 1.0
 					if (snapPoints != listOf(1.0) && !two) throw MarklessDecodeError("$what has snapPoints $snapPoints; a sheet rests at [1] or [x, 1] with 0 < x < 1")
 					fun flag(k: String) = (o.field(k, what) as? Json.Bool ?: throw MarklessDecodeError("$what.$k must be a boolean")).value
-					Node.Sheet(id, o.field("parent", what).str("$what.parent"), expr(o.field("open", what), "$what.open"), snapPoints, flag("dismissible"), flag("modal"))
+					Node.Sheet(id, o.field("parent", what).str("$what.parent"), expr(o.field("open", what), "$what.open"), snapPoints, flag("dismissible"), flag("modal"), armPlace(o, what))
 				}
 				else -> throw MarklessDecodeError("$what has unknown node kind \"$kind\"")
 			}
