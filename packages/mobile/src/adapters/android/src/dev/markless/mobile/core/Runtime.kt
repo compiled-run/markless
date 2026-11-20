@@ -397,8 +397,11 @@ class Runtime(
 		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
 	}
 
+	/** Submissions held by a script promise not settled yet, by the engine's run number. */
+	private val scriptRuns = HashMap<Int, Submission>()
+
 	/** One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries, in that order. */
-	private fun enter(fields: String): List<JournalEntry> {
+	private fun enter(fields: String, submission: Submission? = null): List<JournalEntry> {
 		val entry = "{$fields${entryCells()}}"
 		val started = System.nanoTime()
 		scriptCall("enter", entry)
@@ -422,6 +425,12 @@ class Runtime(
 			logs.add(level to text)
 			onScriptLog?.invoke(level, text)
 		}
+		// A submit handler's promise keeps its submission running until the entry it settles in, as the web keeps the form busy.
+		for (run in list("pending")) if (submission != null) {
+			submission.pending++
+			scriptRuns[id(run)] = submission
+		}
+		for (run in list("settled")) scriptRuns.remove(id(run))?.let { it.pending--; settled(it) }
 		return list("aborts").map { JournalEntry.Abort(id(it)) } +
 			list("clears").map { JournalEntry.ClearTimer("$SCRIPT_TIMER${id(it)}") } +
 			list("timers").map { t -> t.arr("leave().timers[]").let { JournalEntry.Timer("$SCRIPT_TIMER${id(it[0])}", it[1].num("leave().timers[][1]")) } } +
@@ -1105,7 +1114,7 @@ class Runtime(
 				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
 				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$touch}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
-				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"event\":$event$catch"))
+				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"event\":$event$catch", submission))
 			}
 			is Op.Reset -> {
 				op.catch?.let { values[it] = JsValue.Null }

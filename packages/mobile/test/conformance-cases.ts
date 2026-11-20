@@ -523,6 +523,20 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'script-submit-async',
+		fixture: 'proofs/j17-async-submit-script/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'input', host: 'h3', value: 'Pump house' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'input', host: 'h3', value: 'admin' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:2' },
+		],
+	},
+	{
 		name: 'script-async',
 		fixture: 'proofs/j3-await-catch/App.tsrx',
 		modules: true,

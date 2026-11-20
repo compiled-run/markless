@@ -237,6 +237,8 @@ public final class NativeRuntime {
 	/// A field's text a person typed since its `value` binding last changed it.
 	private var edited: [String: String] = [:]
 	private var running: [String: [Submission]] = [:]
+	/// Submissions held by a script promise not settled yet, by the engine's run number.
+	private var scriptRuns: [Int: Submission] = [:]
 	private var timers: [String: (ops: [NativeOp], context: Context)] = [:]
 	private var timerCount = 0
 	/// Every non-row checkbox and radio button, in payload order.
@@ -529,12 +531,12 @@ public final class NativeRuntime {
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
-	private func enter(_ entry: [(String, JSONValue)]) throws -> [NativeJournalEntry] {
+	private func enter(_ entry: [(String, JSONValue)], submission: Submission? = nil) throws -> [NativeJournalEntry] {
 		let text = try scriptHost.unwrap().entry { () throws -> String in
 			_ = try callScript("enter", .object(entry + entryCells()))
 			return try callScript("leave")
 		}
-		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(["writes", "aborts", "timers", "clears", "requests", "logs"])
+		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
@@ -549,6 +551,17 @@ public final class NativeRuntime {
 			let pair = try line.array()
 			guard pair.count == 2 else { throw line.fail("a log line is [level, text]") }
 			scriptHost?.log(try pair[0].string(), try pair[1].string())
+		}
+		// A submit handler's promise keeps its submission running until the entry it settles in, as the web keeps the form busy.
+		for run in try result["pending"].array() {
+			guard let submission else { continue }
+			submission.pending += 1
+			scriptRuns[try wholeNumber(run)] = submission
+		}
+		for run in try result["settled"].array() {
+			guard let kept = scriptRuns.removeValue(forKey: try wholeNumber(run)) else { continue }
+			kept.pending -= 1
+			settle(kept)
 		}
 		let aborts = try result["aborts"].array().map { NativeJournalEntry.abort(id: try wholeNumber($0)) }
 		let clears = try result["clears"].array().map { NativeJournalEntry.clearTimer(timer: "\(scriptTimer)\(try wholeNumber($0))") }
@@ -1283,7 +1296,7 @@ public final class NativeRuntime {
 				let event: JSONValue = .object([("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? []) + touch)
 				calls.append(contentsOf: try enter(
 					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", try frame(of: bindings, in: scope)), ("event", event)]
-						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? [])))
+						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? []), submission: submission))
 			}
 		}
 		return calls

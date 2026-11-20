@@ -15,7 +15,7 @@ export type NativeScriptModuleInput = {
 // Installed once per engine and shared by every payload's script; each entry's output buffer is the running script's.
 const HOST_SERVICES = String.raw`var host = g.__marklessHost;
 if (!host) {
-	host = g.__marklessHost = { out: null, timers: {}, nextTimer: 1, requests: {}, nextRequest: 1, seed: null, counter: 0 };
+	host = g.__marklessHost = { out: null, timers: {}, nextTimer: 1, requests: {}, nextRequest: 1, nextRun: 1, seed: null, counter: 0 };
 	var output = function () {
 		if (!host.out) throw new Error('a host service was used outside a handler');
 		return host.out;
@@ -274,7 +274,7 @@ var begin = function (entry) {
 	cells = entry.cells;
 	before = {};
 	for (var slot in cells) before[slot] = JSON.stringify(cells[slot]);
-	host.out = { timers: [], clears: [], requests: [], aborts: [], logs: [] };
+	host.out = { timers: [], clears: [], requests: [], aborts: [], logs: [], pending: [], settled: [] };
 	host.seed = entry.seed || null;
 	host.counter = 0;
 };
@@ -368,7 +368,13 @@ g.__markless[id] = {
 			try {
 				var frame = frameOf(entry.frame);
 				var result = fn(entry.fn)(frame)(eventOf(entry.event, frame));
-				if (result && typeof result.then === 'function') result.then(null, settled);
+				if (result && typeof result.then === 'function') {
+					// The host keeps a submitted form busy from this entry until the entry the promise settles in.
+					var run = host.nextRun++;
+					host.out.pending.push(run);
+					var done = function () { host.out.settled.push(run); };
+					result.then(done, function (error) { settled(error); done(); });
+				}
 			} catch (error) {
 				settled(error);
 			}
@@ -419,7 +425,7 @@ g.__markless[id] = {
 		}
 		var out = host.out;
 		host.out = null;
-		return JSON.stringify({ writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs });
+		return JSON.stringify({ writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, pending: out.pending, settled: out.settled });
 	},
 };`;
 

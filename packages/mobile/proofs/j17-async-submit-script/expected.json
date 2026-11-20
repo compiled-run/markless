@@ -1,0 +1,39 @@
+{
+	"rung": "J17",
+	"name": "An async submit handler that runs as JavaScript keeps its form busy and its button unavailable until its promise settles",
+	"steps": [
+		{ "visible": ["Check-in", "Save", "Nothing saved"] },
+		{
+			"do": { "type": { "field": "Title", "text": "Pump house" } },
+			"visible": ["Nothing saved"],
+			"fields": { "Title": "Pump house" }
+		},
+		{
+			"do": { "tap": "Save" },
+			"visible": ["Saving"],
+			"absent": ["Nothing saved"],
+			"disabled": ["Save"]
+		},
+		{
+			"do": { "wait": 8000 },
+			"visible": ["Saved Pump house (site): 1 notes, 1 tags", "Save"],
+			"absent": ["Saving"]
+		},
+		{
+			"do": { "type": { "field": "Title", "text": "admin" } },
+			"visible": ["Saved Pump house (site): 1 notes, 1 tags"],
+			"fields": { "Title": "admin" }
+		},
+		{
+			"do": { "tap": "Save" },
+			"visible": ["Saving"],
+			"absent": ["Saved Pump house (site): 1 notes, 1 tags"],
+			"disabled": ["Save"]
+		},
+		{
+			"do": { "wait": 8000 },
+			"visible": ["The title admin is taken", "Save"],
+			"absent": ["Saving"]
+		}
+	]
+}

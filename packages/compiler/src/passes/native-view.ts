@@ -4879,13 +4879,11 @@ export function createNativeViewPayload(
 		// The web sends a form whose submit handler does not cancel it at once; only the analyzer's sync policy says it always does.
 		const form =
 			submitting && pressed && preventsAlways(event.syncPolicy) ? pressed.currentTarget : undefined;
-		// While a submit's promise runs the web marks its form busy; an engine does not report when its promise settles yet.
-		const awaited = submitting && (event.handlerReturnsPromise || event.handlerMayReject);
 		if (
 			scriptMode === 'never' ||
 			!event.handlerSpan ||
 			DATA_ONLY_EVENTS.has(event.eventName) ||
-			(submitting && (form === undefined || awaited)) ||
+			(submitting && form === undefined) ||
 			!scriptFacts(scope.module)
 		) {
 			if (!submitting || scriptMode === 'never' || !event.handlerSpan || !scriptFacts(scope.module))
@@ -4893,9 +4891,7 @@ export function createNativeViewPayload(
 			const data = attempt(() => dataHandlerOps(event, scope, handler, pressed));
 			if (data.failed)
 				refuseScript(
-					form === undefined
-						? 'the submit handler runs as JavaScript only when it calls `event.preventDefault()` first, outside any branch, as the web then never sends the form'
-						: 'the submit handler is async, and runs as JavaScript only when it is not: the web marks its form busy until its promise settles, which a phone script does not report yet',
+					'the submit handler runs as JavaScript only when it calls `event.preventDefault()` first, outside any branch, as the web then never sends the form',
 					event.handlerSpan,
 				);
 			return data.value;
@@ -4908,7 +4904,8 @@ export function createNativeViewPayload(
 		if (scriptMode === 'all') {
 			// The engine sees a cell whose first value is unset as null, where data reads it as unset: such a handler stays data.
 			const data = attempt(() => dataHandlerOps(event, scope, handler, pressed));
-			if (!data.failed && readsUndefinedFirst(data.value)) return data.value;
+			// A submit that data spells stays data: its timers are the host's, which an engine's cannot stand in for.
+			if (!data.failed && (submitting || readsUndefinedFirst(data.value))) return data.value;
 			data.rollBack();
 			const scripted = attempt(() => scriptOp(event, scope, form));
 			if (scripted.value && !scripted.failed) return ran(scripted.value);

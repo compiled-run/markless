@@ -610,9 +610,16 @@ export function createNativeRuntime(
 			: {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
-	const enter = (entry: Record<string, unknown>): NativeJournalEntry[] => {
+	/** Submissions held by a script promise not settled yet, by the engine's run number. */
+	const scriptRuns = new Map<number, Submission>();
+	const enter = (
+		entry: Record<string, unknown>,
+		submission?: Submission,
+	): NativeJournalEntry[] => {
 		call('enter', { ...entry, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
+			readonly pending: ReadonlyArray<number>;
+			readonly settled: ReadonlyArray<number>;
 			readonly writes: ReadonlyArray<readonly [string, Value]>;
 			readonly aborts: ReadonlyArray<number>;
 			readonly timers: ReadonlyArray<readonly [number, number]>;
@@ -632,6 +639,19 @@ export function createNativeRuntime(
 			if (key !== undefined) store.set(key, value);
 		}
 		logs.push(...result.logs);
+		// A submit handler's promise keeps its submission running until the entry it settles in, as the web keeps the form busy.
+		for (const run of result.pending)
+			if (submission) {
+				submission.pending++;
+				scriptRuns.set(run, submission);
+			}
+		for (const run of result.settled) {
+			const kept = scriptRuns.get(run);
+			if (!kept) continue;
+			scriptRuns.delete(run);
+			kept.pending--;
+			settled(kept);
+		}
 		return [
 			...result.aborts.map((id): NativeJournalEntry => ({ op: 'abort', id })),
 			...result.clears.map((id): NativeJournalEntry => ({
@@ -1617,7 +1637,7 @@ export function createNativeRuntime(
 							...Object.fromEntries(touch),
 						},
 						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),
-					}),
+					}, submission),
 				);
 				continue;
 			}
