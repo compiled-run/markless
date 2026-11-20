@@ -98,23 +98,46 @@ test('a literal select value with options from a @for compares each row value to
 	expect(selected(chunk)).toEqual(['selected', 'String("m")===String((option.id))']);
 });
 
-test('a phone build refuses a select and its options by element, as before', async () => {
+const phone = async (markup: string) => {
 	const source = `import { state } from '@markless/core';
 export function Page() @{
 	let size = state('m');
-	<main>
-		<select value={size}><option value="s">Small</option><option value="m">Medium</option></select>
-	</main>
+	const sizes = state(['s', 'm']);
+	<main>${markup}</main>
 }
 `;
-	const { payload, diagnostics } = createNativeViewPayload(
+	return createNativeViewPayload(
 		await buildSemanticGraph({ filename: 'src/App.tsrx', source, nativeFacts: NATIVE_FACT_COLLECTORS }),
 		{ readSource: (file) => (file === 'src/App.tsrx' ? source : undefined) },
 	);
+};
+
+test('a phone build chooses a row option by the literal select value it compares as text', async () => {
+	const { payload, diagnostics } = await phone(
+		'<select value="m">@for (const s of sizes; key s) {<option value={s}>{s}</option>}</select>',
+	);
+	expect(diagnostics).toEqual([]);
+	expect(payload!.nodes.find((node) => node.kind === 'element' && node.element === 'option')).toMatchObject({
+		bindings: [
+			{ attribute: 'value', value: { item: 'repeat:0' } },
+			{
+				property: 'selected',
+				value: {
+					binary: '===',
+					left: { template: ['', { literal: 'm' }] },
+					right: { template: ['', { item: 'repeat:0' }] },
+				},
+			},
+		],
+	});
+});
+
+test('a phone build refuses a bound select value by its own name, and nothing for the options', async () => {
+	const { payload, diagnostics } = await phone(
+		'<select value={size}><option value="s">Small</option><option value="m">Medium</option></select>',
+	);
 	expect(payload).toBeNull();
-	expect(diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.message])).toEqual([
-		['MARKLESS_NATIVE_ELEMENT', 'the <select> element has no native view yet'],
-		['MARKLESS_NATIVE_ELEMENT', 'the <option> element has no native view yet'],
-		['MARKLESS_NATIVE_ELEMENT', 'the <option> element has no native view yet'],
+	expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+		'the <select> h1 binds `value`; a native build chooses an option through its `selected`',
 	]);
 });

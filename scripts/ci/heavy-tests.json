@@ -171,6 +171,7 @@
 		"packages/router/test/vite/route-bound-kept-part.test.ts",
 		"packages/router/test/vite/route-href-build.test.ts",
 		"packages/router/test/vite/route-preload-data.test.ts",
+		"packages/router/test/vite/select-value-ssr.test.ts",
 		"packages/router/test/vite/shared-child-reader.test.ts",
 		"packages/router/test/vite/shared-import.test.ts",
 		"packages/router/test/vite/shared-layout-navigation.test.ts",

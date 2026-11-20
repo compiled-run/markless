@@ -1933,6 +1933,8 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				// An option's `selected`, true when its select's value names it: written by the
 				// server render only, since the browser writes `select.value` itself.
 				readonly selectedOption?: true;
+				/** That comparison as a tree, for native builds only (`nativeFacts`). */
+				readonly nativeExpression?: SemanticExpression;
 				readonly directClassMatch?: {
 					readonly stateGraphNodeId: string;
 					readonly statePath: ReadonlyArray<string>;

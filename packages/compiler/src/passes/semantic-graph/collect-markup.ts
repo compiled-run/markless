@@ -28,6 +28,7 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import type {
+	SemanticExpression,
 	SemanticMarkupArtifact,
 	SemanticMarkupChunk,
 	SemanticMarkupResidue,
@@ -761,9 +762,10 @@ function emitTextareaValue(
 	});
 }
 
-type MarkupValue =
+type MarkupValue = { readonly native?: SemanticExpression } & (
 	| { readonly literal: string }
-	| { readonly source: string; readonly repeatId: string | null; readonly readsRow: boolean };
+	| { readonly source: string; readonly repeatId: string | null; readonly readsRow: boolean }
+);
 
 function selectValue(
 	attributes: ReadonlyArray<AnyNode>,
@@ -782,7 +784,7 @@ function selectValue(
 	const literal = staticAttributeValue('value', value, expression);
 	if (literal) {
 		const text = attributeText('value', literal.value);
-		return text === null ? null : { literal: text };
+		return text === null ? null : literalValue(text, context);
 	}
 	return expression ? markupValue(expression, context, repeat, componentName) : null;
 }
@@ -795,6 +797,9 @@ function markupValue(
 ): MarkupValue {
 	const residue = expressionResidue(expression, context, repeat, componentName);
 	return {
+		...(NATIVE_FACTS && context.nativeFacts
+			? { native: nativeCollectors(context.nativeFacts).expression(expression as never) }
+			: {}),
 		source:
 			residue.kind === 'authored-expression'
 				? residue.source
@@ -820,7 +825,7 @@ function optionValue(
 		isStaticTextNode(child) ? staticTextValue(child) : literalContainerText(child),
 	);
 	if (texts.every((text) => text !== null))
-		return { literal: texts.join('').replace(/[\t\n\f\r ]+/g, ' ').trim() };
+		return literalValue(texts.join('').replace(/[\t\n\f\r ]+/g, ' ').trim(), context);
 	const [only] = children;
 	const expression =
 		children.length === 1 && only
@@ -829,6 +834,12 @@ function optionValue(
 				: markupInterpolationExpression(only)
 			: undefined;
 	return expression ? markupValue(expression, context, repeat, componentName) : null;
+}
+
+function literalValue(literal: string, context: CollectionContext): MarkupValue {
+	return NATIVE_FACTS && context.nativeFacts
+		? { literal, native: { kind: 'literal', value: literal } }
+		: { literal };
 }
 
 function valueSource(value: MarkupValue): string {
@@ -862,6 +873,16 @@ function emitSelectedOption(
 			source: `String(${valueSource(select)})===String(${valueSource(option)})`,
 		},
 		selectedOption: true,
+		...(select.native && option.native
+			? {
+					nativeExpression: {
+						kind: 'binary',
+						operator: '===',
+						left: { kind: 'template', parts: ['', select.native] },
+						right: { kind: 'template', parts: ['', option.native] },
+					},
+				}
+			: {}),
 	});
 }
 
