@@ -1,0 +1,104 @@
+{
+	"rung": 145,
+	"name": "Fields and a submit button in an @if arm of their form take part while the arm shows them, and start fresh when it shows them again, as on the web",
+	"steps": [
+		{
+			"visible": [
+				"Order",
+				"Send",
+				"Make it a gift",
+				"Typed nothing",
+				"Noted nothing",
+				"Not wrapped",
+				"Nothing sent"
+			],
+			"absent": ["Send gift", "No gift", "Sent , note null, wrap null"]
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent , note null, wrap null", "Make it a gift", "Typed nothing"],
+			"absent": ["Nothing sent", "Send gift"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Name",
+					"text": "Ann"
+				}
+			},
+			"visible": ["Typed Ann", "Sent , note null, wrap null", "Make it a gift"],
+			"absent": ["Typed nothing", "Send gift"]
+		},
+		{
+			"do": {
+				"tap": "Make it a gift"
+			},
+			"visible": [
+				"Send gift",
+				"No gift",
+				"Typed Ann",
+				"Sent , note null, wrap null",
+				"Noted nothing"
+			],
+			"absent": ["Make it a gift"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Note",
+					"text": "Red"
+				}
+			},
+			"visible": ["Noted Red", "Send gift", "Not wrapped", "Sent , note null, wrap null"],
+			"absent": ["Noted nothing", "Make it a gift", "Wrapped"]
+		},
+		{
+			"do": {
+				"tap": "Wrap it"
+			},
+			"visible": ["Wrapped", "Noted Red", "Send gift", "Sent , note null, wrap null"],
+			"absent": ["Not wrapped", "Sent Ann, note Red, wrap on"]
+		},
+		{
+			"do": {
+				"tap": "Send gift"
+			},
+			"visible": ["Sent Ann, note Red, wrap on", "Wrapped", "No gift"],
+			"absent": ["Sent , note null, wrap null", "Make it a gift"]
+		},
+		{
+			"do": {
+				"tap": "No gift"
+			},
+			"visible": ["Make it a gift", "Sent Ann, note Red, wrap on"],
+			"absent": ["Send gift", "No gift"]
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent Ann, note null, wrap null", "Make it a gift"],
+			"absent": ["Sent Ann, note Red, wrap on", "Send gift"]
+		},
+		{
+			"do": {
+				"tap": "Make it a gift"
+			},
+			"visible": ["Send gift", "No gift", "Sent Ann, note null, wrap null"],
+			"absent": ["Make it a gift"]
+		},
+		{
+			"do": {
+				"tap": "Send gift"
+			},
+			"visible": ["Sent Ann, note , wrap null", "No gift"],
+			"absent": [
+				"Sent Ann, note null, wrap null",
+				"Sent Ann, note Red, wrap on",
+				"Make it a gift"
+			]
+		}
+	]
+}

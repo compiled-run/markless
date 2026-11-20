@@ -939,6 +939,8 @@ function islandScopedFamilyRecord(
 	const { child, island } = context;
 	const mapped: Record<string, unknown> = { ...record };
 	if (typeof record.id === 'string') mapped.id = child.hostPrefix + record.id;
+	const enclosingRow = record.enclosingRow as { readonly prefix?: string } | undefined;
+	if (enclosingRow) mapped.enclosingRow = { ...enclosingRow, prefix: child.hostPrefix + (enclosingRow.prefix ?? '') };
 	for (const key of MDX_HOST_ID_KEYS)
 		if (typeof record[key] === 'string') mapped[key] = child.hostPrefix + record[key];
 	for (const key of MDX_SYMBOL_ID_KEYS)

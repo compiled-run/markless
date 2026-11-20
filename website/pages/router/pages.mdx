@@ -51,7 +51,7 @@ export default function Post({ params }: PageProps<{ slug: string }>) @{
 
 ## A page can answer with a status
 
-Every page gets four props: `params`, `url`, `status` and `http`. Set `http.response.status` to answer 404 for a missing invoice.
+Every page gets four props: `params`, `url`, `status` and `http`. `url` is the page's [URL](https://developer.mozilla.org/docs/Web/API/URL), so `url.searchParams.get('page')` reads its query. Set `http.response.status` to answer 404 for a missing invoice.
 
 ```tsrx title="pages/invoices/[id].tsrx"
 import type { PageProps } from '@markless/router';

@@ -967,6 +967,9 @@ function ownerRecordsInPageSpace<R extends { readonly state: ProtocolStatePayloa
 						keyedRepeats: view.keyedRepeats.map((repeat) => ({
 							...repeat,
 							id: ownerHostPrefix + repeat.id,
+							...(repeat.enclosingRow && {
+								enclosingRow: { ...repeat.enclosingRow, prefix: ownerHostPrefix + (repeat.enclosingRow.prefix ?? '') },
+							}),
 							parentHostNodeId: ownerHostPrefix + repeat.parentHostNodeId,
 							rowEvents: repeat.rowEvents.map((event) => ({
 								...event,

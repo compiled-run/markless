@@ -27,6 +27,8 @@ export async function wireArmLists(
 		input.fileHost(hostNodeId, parent);
 		records.push({ ...record, parentHostNodeId: hostNodeId });
 	}
+	// The lists nested in their rows go with them; the page's own are found by the nested wiring.
+	if (records.length) records.push(...(branch.armLists ?? []).filter((each) => each.enclosingRow));
 	if (records.length)
 		await (await input.armRegistrationDeps({ events: [], behaviors: [] })).registerKeyedRepeats(records);
 }

@@ -477,7 +477,7 @@ function applyKeyedRepeatRowOrder(
 	if (
 		currentRows.length === nextRows.length &&
 		currentRows.every((row, index) => row === nextRows[index]) &&
-		// Nothing-to-nothing still raises an `@empty` arm the first time.
+		// Nothing-to-nothing still raises the `@empty` arm.
 		(nextRows.length > 0 || arm.mounted || !repeat.emptyArm)
 	)
 		return;
@@ -540,7 +540,7 @@ function applyKeyedRepeatRowOrder(
 	if (census && (currentRows.length > 0 || nextRows.length > 0))
 		spliceDomOrderCensus(census, currentNodes, nextRows.flatMap(rowNodes));
 	if (nextRows.length > 0 || arm.mounted || !repeat.emptyArm || !mint) return;
-	const nodes = mint.renderEmptyArm(parent, repeat);
+	const nodes = mint.renderEmptyArm(parent, repeat, graph, arm);
 	const armAnchor =
 		rangeEnd ?? rowsAnchor(parent, repeat) ?? elementChildren(parent).slice(rowsFrom(parent, repeat))[0];
 	for (const node of nodes) insertRepeatNode(mutableParent, node, armAnchor);

@@ -197,15 +197,16 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		if (read.armScopeBranchSiteId || read.armScopeBoundaryId) return [];
 		// A read projected into a child edge's children has no element here either:
 		// written to the enclosing host it replaces that host's whole content.
-		if (read.projectedComponentEdgeId) return [];
+		if (read.projectedComponentEdgeId && !read.projectedBeside) return [];
+		const { hostNodeId, target } = read.projectedBeside ?? read;
 		if (read.computedGraphNodeId) {
 			return [
 				{
-					hostNodeId: read.hostNodeId,
+					hostNodeId,
 					source: read.source,
 					graphNodeId: read.computedGraphNodeId,
 					path: [],
-					target: read.target,
+					target,
 				},
 			];
 		}
@@ -215,11 +216,11 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 
 		return [
 			{
-				hostNodeId: read.hostNodeId,
+				hostNodeId,
 				source: read.source,
 				graphNodeId: resolved.binding.id,
 				path: runtimeGraphReadPath(resolved.binding, resolved.path),
-				target: read.target,
+				target,
 			},
 		];
 	});
@@ -434,7 +435,7 @@ function domUpdateTargetKey(
 	if (target.kind === 'attribute') return `attribute:${target.name}`;
 	if (target.kind === 'property') return `property:${target.name}`;
 	if (target.kind === 'text') {
-		return `text:${target.prefix ?? ''}:${target.suffix ?? ''}:${target.trueValue ?? ''}:${target.falseValue ?? ''}:${target.textNode ?? ''}`;
+		return `text:${target.prefix ?? ''}:${target.suffix ?? ''}:${target.trueValue ?? ''}:${target.falseValue ?? ''}:${target.textNode ?? ''}:${target.sibling ?? ''}`;
 	}
 	if (target.kind === 'class')
 		return `class:${target.trueValue ?? ''}:${target.falseValue ?? ''}`;

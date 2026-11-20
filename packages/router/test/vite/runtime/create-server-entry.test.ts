@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { servedLinkBridge } from '../../support/link-bridge.ts';
 import { MarklessCompileError, serializeMarklessDevError } from '@markless/bundler/dev-error';
-import { ASYNC_BOUNDARY_ARM } from '../../../../serializer/src/index.ts';
+import {
+	ASYNC_BOUNDARY_ARM,
+	type SerializedGraphPayload,
+} from '../../../../serializer/src/index.ts';
+import { deserializeGraphValue } from '../../../../serializer/src/value-decode.ts';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
 import { createServerEntry } from '../../../src/vite/runtime/create-server-entry.ts';
 import { INLINE_RESUMER_PAGE_TOKEN } from '@markless/web/inline/resumer';
@@ -303,7 +307,9 @@ describe('server entry rendering', () => {
 			routeFileIds: ['/pages/r/[id].tsrx'],
 		});
 
-		const response = await entry.fetch(new Request('http://markless-router.test/r/alpha'));
+		const response = await entry.fetch(
+			new Request('http://markless-router.test/r/alpha?saved=1&tag=a&tag=b'),
+		);
 		const html = await response.text();
 		const stateJson = html.slice(
 			html.indexOf('<script type="markless/state">') +
@@ -325,6 +331,13 @@ describe('server entry rendering', () => {
 		const encodedValue = JSON.stringify(propCell?.value);
 		expect(encodedValue).toContain('"alpha"');
 		expect(encodedValue).toContain('/r/alpha');
+		const { url } = deserializeGraphValue(
+			propCell?.value as SerializedGraphPayload,
+		) as { readonly url: URL };
+		expect(url).toBeInstanceOf(URL);
+		expect(url.pathname).toBe('/r/alpha');
+		expect(url.searchParams.get('saved')).toBe('1');
+		expect(url.searchParams.getAll('tag')).toEqual(['a', 'b']);
 	});
 
 	it('adds no prop cell to pages without a resumability payload', async () => {

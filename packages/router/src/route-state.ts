@@ -37,15 +37,10 @@ export interface RouteUpdate {
 }
 
 export function routePageProps(route: RouteState): Omit<PageProps, 'http'> {
-	const url = new URL(route.url);
 	return {
 		params: route.params,
 		status: route.status,
-		url: {
-			href: url.href,
-			pathname: url.pathname,
-			search: url.search,
-		},
+		url: new URL(route.url),
 	};
 }
 
