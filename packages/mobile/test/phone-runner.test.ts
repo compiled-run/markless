@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -16,8 +16,21 @@ import {
 	type CheckoutFacts,
 	type RefreshState,
 } from '../src/runner/refresh.ts';
+import {
+	earlierPass,
+	findReused,
+	hostFingerprint,
+	recordPass,
+	rungFingerprint,
+} from '../src/runner/reuse.ts';
 import { pickChunk, type QueuedJob } from '../src/runner/schedule.ts';
-import { rerunAfterPhoneLoss, transitionChunk, type Chunk } from '../src/runner/store.ts';
+import {
+	JOB_VERSION,
+	type JobSpec,
+	rerunAfterPhoneLoss,
+	transitionChunk,
+	type Chunk,
+} from '../src/runner/store.ts';
 
 const queued: Chunk = {
 	state: 'queued',
@@ -357,5 +370,107 @@ describe('the chunk a free phone takes', () => {
 			'started',
 		);
 		expect(pickChunk([job('new', 1)], 'ios', false)).toBeUndefined();
+	});
+});
+
+describe('a pass an earlier job already ran', () => {
+	const write = (path: string, text: string) => {
+		mkdirSync(join(path, '..'), { recursive: true });
+		writeFileSync(path, text);
+	};
+	const bundle = (job: string, rungs: Record<string, string>, iosHost: string) => {
+		write(join(job, 'bundle/mobile/src/adapters/ios/Sources/Host.swift'), iosHost);
+		write(join(job, 'bundle/mobile/src/adapters/android/src/Host.kt'), 'kotlin host');
+		write(join(job, 'bundle/mobile/conformance/counter.json'), '{}');
+		for (const [rung, payload] of Object.entries(rungs)) {
+			write(join(job, 'bundle/rungs', rung, 'rung.json'), JSON.stringify({ name: rung }));
+			for (const platform of ['ios', 'android'])
+				write(join(job, 'bundle/rungs', rung, 'assets', platform, 'payload.json'), payload);
+		}
+	};
+	const spec = (id: string, rungs: string[]): JobSpec => ({
+		version: JOB_VERSION,
+		id,
+		createdAt: 0,
+		worktree: '/w',
+		head: 'h',
+		dirty: false,
+		rungs,
+		platforms: ['ios', 'android'],
+		host: 'adapters',
+	});
+
+	it('is reused only on a platform whose host sources and the rung bundle are byte-identical', () => {
+		const home = mkdtempSync(join(tmpdir(), 'runner-reuse-'));
+		const before = process.env.MARKLESS_PHONES_HOME;
+		process.env.MARKLESS_PHONES_HOME = home;
+		try {
+			const first = join(home, 'jobs', 'first');
+			bundle(first, { '01-a': 'payload a', '02-b': 'payload b' }, 'swift host');
+			const firstSpec = spec('first', ['01-a', '02-b']);
+			for (const platform of ['ios', 'android'] as const) {
+				const host = hostFingerprint(first, firstSpec, platform);
+				recordPass(platform, rungFingerprint(first, '01-a', platform, host), {
+					job: 'first',
+					rung: '01-a',
+					at: 1,
+				});
+			}
+
+			const second = join(home, 'jobs', 'second');
+			bundle(second, { '01-a': 'payload a', '02-b': 'payload b' }, 'swift host');
+			expect(
+				findReused(second, spec('second', ['01-a', '02-b']), ['ios', 'android']),
+			).toEqual([
+				{
+					platform: 'ios',
+					result: {
+						name: '01-a',
+						failure: null,
+						installSeconds: 0,
+						flowSeconds: 0,
+						reusedFrom: 'first',
+					},
+				},
+				{
+					platform: 'android',
+					result: {
+						name: '01-a',
+						failure: null,
+						installSeconds: 0,
+						flowSeconds: 0,
+						reusedFrom: 'first',
+					},
+				},
+			]);
+
+			const iosChanged = join(home, 'jobs', 'ios-changed');
+			bundle(iosChanged, { '01-a': 'payload a' }, 'swift host, edited');
+			expect(
+				findReused(iosChanged, spec('ios-changed', ['01-a']), ['ios', 'android']).map(
+					(pass) => pass.platform,
+				),
+			).toEqual(['android']);
+
+			const recompiled = join(home, 'jobs', 'recompiled');
+			bundle(recompiled, { '01-a': 'payload a, compiled differently' }, 'swift host');
+			expect(
+				findReused(recompiled, spec('recompiled', ['01-a']), ['ios', 'android']),
+			).toEqual([]);
+
+			const host = hostFingerprint(second, spec('second', ['01-a']), 'ios');
+			recordPass('ios', rungFingerprint(second, '01-a', 'ios', host), {
+				job: 'second',
+				rung: '01-a',
+				at: 2,
+			});
+			expect(earlierPass('ios', rungFingerprint(second, '01-a', 'ios', host))?.job).toBe(
+				'first',
+			);
+		} finally {
+			if (before === undefined) delete process.env.MARKLESS_PHONES_HOME;
+			else process.env.MARKLESS_PHONES_HOME = before;
+			rmSync(home, { recursive: true, force: true });
+		}
 	});
 });
