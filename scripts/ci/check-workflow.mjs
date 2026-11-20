@@ -480,6 +480,19 @@ if (isCiSuite && !jobNames.includes(PLAYWRIGHT_JOB)) {
 		if (IMAGE_KEYS.some((image) => jobText(name).includes(image)) && jobs[name]?.['runs-on'] !== lanesRunner)
 			fail(`Job \`${name}\` keys a cache on \`${LANES_JOB}\`'s runner image but runs on \`${jobs[name]?.['runs-on']}\`, not \`${lanesRunner}\`.`);
 	}
+	// A self-hosted runner is reachable only from a merge_group run; the runner's own job-started hook refuses the rest.
+	const HOSTED_RUNNER = /^(ubuntu|macos|windows)-[0-9a-z.-]+$/;
+	const QUEUE_RUNNER =
+		/^\$\{\{ github\.event_name == 'merge_group' && (?:contains\(format\(' \{0\} ', vars\.MERGE_QUEUE_RUNNER_JOBS\), ' ([a-z0-9-]+) '\) && )?vars\.MERGE_QUEUE_RUNNER \|\| '(ubuntu-[0-9.]+)' \}\}$/;
+	for (const name of jobNames) {
+		const runsOn = jobs[name]?.['runs-on'];
+		if (typeof runsOn === 'string' && HOSTED_RUNNER.test(runsOn)) continue;
+		const queue = typeof runsOn === 'string' ? QUEUE_RUNNER.exec(runsOn) : null;
+		if (!queue)
+			fail(`Job \`${name}\` runs on \`${JSON.stringify(runsOn)}\`; use a GitHub-hosted image, or the merge_group-only MERGE_QUEUE_RUNNER expression with a hosted fallback.`);
+		else if (queue[1] !== undefined && queue[1] !== name)
+			fail(`Job \`${name}\` routes by MERGE_QUEUE_RUNNER_JOBS under the name \`${queue[1]}\`; use its own job name.`);
+	}
 	const launchers = nodeTestsLaunchingBrowsers();
 	if (launchers.length > 0 && jobNames.includes('unit')) {
 		const unitText = jobText('unit');
