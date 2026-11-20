@@ -399,6 +399,11 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'custom-elements',
+		fixture: 'proofs/u70-custom-elements/App.tsrx',
+		actions: [{ event: 'activate', host: 'h6' }],
+	},
+	{
 		name: 'ticks',
 		fixture: 'test/fixtures/Ticks.tsrx',
 		preferredLanguages: ['fr-CA', 'en'],

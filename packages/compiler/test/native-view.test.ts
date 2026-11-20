@@ -1714,6 +1714,22 @@ export function Page() @{
 		);
 	});
 
+	it('draws a custom element the app never defines as an inline container, as the browser renders an unknown element; not a reserved name', async () => {
+		const custom = await nativeView(`export function Shell() @{
+	<app-root><router-outlet></router-outlet><p>Feed</p></app-root>
+}`);
+		expect(custom.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		expect(custom.payload!.nodes.filter((node) => node.kind === 'element').map((node) => node.element)).toEqual([
+			'app-root',
+			'router-outlet',
+			'p',
+		]);
+		const unknown = await nativeView(`export function Old() @{
+	<blink>Hi</blink>
+}`);
+		expect(unknown.diagnostics.map((d) => d.message)).toContain('the <blink> element has no native view yet');
+	});
+
 	it('lowers a password field as a text field of its form: its text is sent, and required and maxlength are checked', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Login() @{

@@ -309,6 +309,29 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	svg: {},
 };
 
+/** Names HTML reserves though they hold a hyphen (SVG and MathML elements), so none is a custom element. */
+const RESERVED_HYPHENATED = new Set([
+	'annotation-xml',
+	'color-profile',
+	'font-face',
+	'font-face-src',
+	'font-face-uri',
+	'font-face-format',
+	'font-face-name',
+	'missing-glyph',
+]);
+
+/**
+ * An element's default look on a phone: a listed element's, or for a custom element the app never defines (a lowercase
+ * name with a hyphen, as `<app-root>`) the browser's for an unknown element, an inline container.
+ */
+export function nativeElementStyle(element: string): NativeDefaultStyle | undefined {
+	if (Object.hasOwn(NATIVE_ELEMENTS, element)) return NATIVE_ELEMENTS[element];
+	const custom =
+		element.includes('-') && /^[a-z][a-z0-9._-]*$/.test(element) && !RESERVED_HYPHENATED.has(element);
+	return custom ? { flow: 'inline' } : undefined;
+}
+
 /**
  * Elements the web never shows in the page, so a native page shows nothing for them either: document metadata and hints
  * (`<meta>`, `<link>` but a stylesheet, `<base>`), inert markup (`<template>`), and content for browsers that run no scripts

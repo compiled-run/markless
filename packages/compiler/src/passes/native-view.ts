@@ -23,7 +23,7 @@ import {
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 	NATIVE_DATA_SCRIPT_TYPES,
-	NATIVE_ELEMENTS,
+	nativeElementStyle,
 	NATIVE_DOCUMENT_BODY,
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_CLICK_FIELDS,
@@ -160,7 +160,7 @@ function defaultStyleOf(
 	attributes: Readonly<Record<string, string>>,
 	bindings: ReadonlyArray<{ readonly attribute: string } | { readonly property: string }>,
 ): NativeDefaultStyle | undefined {
-	const base = NATIVE_ELEMENTS[element];
+	const base = nativeElementStyle(element);
 	if (!base) return undefined;
 	const titled =
 		'title' in attributes ||
@@ -3987,7 +3987,7 @@ export function createNativeViewPayload(
 						'a <fieldset disabled>, which disables every control inside it on the web; a native build does not pass that to its controls yet',
 						span,
 					);
-				else if (!Object.hasOwn(NATIVE_ELEMENTS, element) && element !== 'title') {
+				else if (!nativeElementStyle(element) && element !== 'title') {
 					const written = attributesAt(item.path);
 					const bound = boundAt(item.path);
 					if (
