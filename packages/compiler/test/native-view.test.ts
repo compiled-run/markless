@@ -2901,7 +2901,7 @@ describe('inline svg', () => {
 		]);
 	});
 
-	it('writes what an object-literal spread holds, as the web writes each value; declared attributes win', async () => {
+	it('writes what an object-literal spread holds, as the web writes each value; declared attributes win; refuses any other spread by name', async () => {
 		const { payload, diagnostics } = await nativeView(`export function Note() @{
 	<p {...{ title: 'spread', 'aria-hidden': true, hidden: false, lang: 'en' }} lang="fr">Hi</p>
 }`);
@@ -2911,6 +2911,13 @@ describe('inline svg', () => {
 			'aria-hidden': 'true',
 			lang: 'fr',
 		});
+		const unread = await nativeView(`const extra = { title: 'x' };
+export function Note() @{
+	<p {...extra}>Hi</p>
+}`);
+		expect(unread.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'a spread of attributes from `extra`, which a native build cannot read; write them as attributes or an object literal',
+		]);
 	});
 
 	it('refuses what a drawing cannot hold by name, at the shape that holds it', async () => {

@@ -4560,6 +4560,11 @@ export function createNativeViewPayload(
 			const written: Record<string, string> = {};
 			for (const slot of chunk.slots) {
 				if (slot.kind !== 'spread-attributes' || comparePaths(slot.coordinate.path, path) !== 0) continue;
+				if (!slot.carriesProps && !slot.literalEntries)
+					refuse(
+						`a spread of attributes from \`${slot.residue.kind === 'authored-expression' ? slot.residue.source : 'a value'}\`, which a native build cannot read; write them as attributes or an object literal`,
+						scope.module.hostSpans.get(chunk.hosts.find((host) => comparePaths(host.coordinate.path, path) === 0)?.hostNodeId ?? ''),
+					);
 				for (const [name, value] of slot.literalEntries ?? []) {
 					if (slot.excludeNames.includes(name)) continue;
 					const attribute = marklessAttributeValue(name, value);
