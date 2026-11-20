@@ -204,7 +204,7 @@ private fun runVector(file: File, vector: Map<String, Json>, runtime: Runtime) {
 		val value = action[carried]?.str("action.$carried")
 		val reason = action["reason"]?.str("action.reason")
 		val detail = (action["detail"] as? Json.Num)?.value?.toInt()
-		val actual = runtime.dispatch(field(action, "host", "action").str("host"), name, if (name == EventName.Activate) null else value, reason, touchOf(action), detail).joinToString(",", "[", "]") { it.toJson() }
+		val actual = runtime.dispatch(field(action, "host", "action").str("host"), name, if (name == EventName.Activate) null else value, reason, detail, touchOf(action)).joinToString(",", "[", "]") { it.toJson() }
 		val expected = canonical(field(s, "journal", "steps[$n]"))
 		check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
 	}

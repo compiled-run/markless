@@ -27,6 +27,7 @@ import {
 	markArmGuardDependencies,
 } from './render-local-inline.ts';
 import type { WalkState } from './types.ts';
+import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 /**
  * One recombined expression - a ternary, a comparison, a template literal, a
@@ -475,6 +476,7 @@ export function collectCompositeTemplateExpression(
 		memberRoots(node),
 		false,
 		options.readsIntoProps,
+		node,
 	);
 }
 
@@ -529,6 +531,8 @@ export function mintTemplateExpressionComputed(
 	propObjectRoots?: ReadonlySet<string>,
 	joinsText = false,
 	readsIntoProps = false,
+	/** The expression itself, whose tree a native build lowers (`nativeFacts`). */
+	node?: AnyNode,
 ): { readonly graphNodeId: string } | null {
 	const dependencies = graphReadDependencies(readSources, state, scope);
 	if (!dependencies) return null;
@@ -547,6 +551,8 @@ export function mintTemplateExpressionComputed(
 		binding.id.startsWith('computed:templateExpression:'),
 	).length;
 	const graphNodeId = `computed:templateExpression:${index}`;
+	const nativeExpression =
+		NATIVE_FACTS && node && state.nativeFacts ? nativeCollectors(state.nativeFacts).expression(node as never) : undefined;
 	state.graph.graphBindings.push({
 		id: graphNodeId,
 		name: `marklessTemplateExpression${index}`,
@@ -558,6 +564,7 @@ export function mintTemplateExpressionComputed(
 			? `() => (${guard.source}) ? ${expression} : undefined`
 			: `() => ${expression}`,
 		dependencies: uniqueDependencies(guard ? [...dependencies, ...guard.reads] : dependencies),
+		...(nativeExpression ? { nativeExpression } : {}),
 		...(joinsText ? { joinsText: true as const } : {}),
 		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 	});
