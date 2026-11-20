@@ -1,5 +1,5 @@
 {
-	"rung": "J15",
+	"rung": "J19",
 	"name": "import.meta.env in an app module reads as the web's client build, and its server-only branch never runs",
 	"steps": [
 		{

@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: j15-client-build
+name: j19-client-build
 ---
 - launchApp:
     clearState: true
