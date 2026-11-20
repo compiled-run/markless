@@ -20,6 +20,7 @@ import {
 } from '../src/index.ts';
 import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
+import { nativeMaxLength } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
 import {
 	looksOnly,
@@ -33,12 +34,19 @@ import {
 	type LadderStep,
 } from '../proofs/ladder.ts';
 
+/** What typing `text` into an emptied field leaves, as a phone's field limits it: `maxlength` UTF-16 code units, never half a surrogate pair. */
+const typedInto = (text: string, maxlength: string | null) => {
+	const max = nativeMaxLength(maxlength);
+	if (max === undefined || text.length <= max) return text;
+	return text.slice(0, /[\uD800-\uDBFF]/.test(text[max - 1] ?? '') ? max - 1 : max);
+};
+
 // The native column before any device: each rung's payload, run by the reference runtime, must show what the
 // web build shows; a rung the compiler cannot lower yet must be refused by name, never emitted half right.
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
 const NATIVE_KEYBOARD_ONLY = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
-const REFUSED_RUNGS = new Set(['11-async', 'y4-sheet-beside-drawer', 'j7-page-refused']);
+const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
 
 /**
  * The script services as a phone's host provides them, on a clock that moves only when a step waits: a timer fires once
@@ -133,17 +141,28 @@ function mirror(
 			inClosedSheet(parent)
 		);
 	};
+	// In a list row the arms around a node are that row's copies (`<branch>@<key>`).
 	const shownNode = (id: string): boolean => {
 		if (inClosedSheet(id)) return false;
-		const place = nodeOf.get(id)?.arm;
-		return !place || (shownNode(place.branch) && chosen.get(place.branch) === place.index);
+		const at = id.indexOf('@');
+		const place = nodeOf.get(at < 0 ? id : id.slice(0, at))?.arm;
+		if (!place) return true;
+		const branch = nodeOf.get(place.branch)?.row
+			? `${place.branch}${id.slice(at)}`
+			: place.branch;
+		return shownNode(branch) && chosen.get(branch) === place.index;
 	};
 	// A row's copy (`<id>@<key>`) sits where its list does.
 	const inArm = (id: string, branch: string): boolean => {
-		const node = nodeOf.get(id.includes('@') ? id.slice(0, id.indexOf('@')) : id);
-		if (node?.row) return inArm(node.row, branch);
-		if (!node?.arm) return false;
-		return node.arm.branch === branch || inArm(node.arm.branch, branch);
+		const at = id.indexOf('@');
+		const node = nodeOf.get(at < 0 ? id : id.slice(0, at));
+		if (node?.arm) {
+			const own = nodeOf.get(node.arm.branch)?.row
+				? `${node.arm.branch}${id.slice(at)}`
+				: node.arm.branch;
+			return own === branch || inArm(own, branch);
+		}
+		return node?.row ? inArm(node.row, branch) : false;
 	};
 	// An element carrying `hidden`, bound or static, hides everything inside it, as the web's `[hidden]` rule does.
 	const hiddenWithin = (id: string): boolean => {
@@ -192,6 +211,8 @@ function mirror(
 			expect(entry.route, `step ${index}: the link's route`).toBe(payload.route?.pattern);
 			mount(createNativeRuntime(payload, store, entry.params));
 		} else if (entry.op === 'rows') {
+			for (const [node, index] of runtime.arms())
+				if (!chosen.has(node)) chosen.set(node, index);
 			const rowNodes = payload.nodes
 				.filter((node) => node.row === entry.node)
 				.map((node) => node.id);
@@ -230,7 +251,20 @@ function mirror(
 		apply,
 		elementReading,
 		disabled: (host: string) => attributes.get(`${host}\0disabled`) != null,
-		typed: (host: string, text: string) => properties.set(host, text),
+		/** Types into the emptied field and returns what it holds. */
+		typed: (host: string, text: string) => {
+			const bound = attributes.get(`${host}\0maxlength`);
+			const node = nodeOf.get(host);
+			const limit =
+				bound !== undefined
+					? bound
+					: node?.kind === 'element'
+						? (node.attributes?.['maxlength'] ?? null)
+						: null;
+			const held = typedInto(text, limit);
+			properties.set(host, held);
+			return held;
+		},
 		check(step: LadderStep, index: number) {
 			for (const [field, value] of Object.entries(step.fields ?? {})) {
 				const host = elementReading(field);
@@ -315,12 +349,18 @@ function walkApp(
 		return shown;
 	};
 	const stack = appRuntime.screens().map(open);
+	for (const entry of appRuntime.started) {
+		const answer = services.answer(entry);
+		if (answer) for (const next of appRuntime.dispatch(answer)) stack.at(-1)!.apply(next, -1);
+	}
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
 		if (action && 'back' in action) {
 			expect(
-				appRuntime.dispatch({ event: 'back' }),
-				`step ${index}: Back journals nothing`,
+				appRuntime
+					.dispatch({ event: 'back' })
+					.filter((entry) => entry.op !== 'abort' && entry.op !== 'clearTimer'),
+				`step ${index}: Back journals only what it cancels`,
 			).toEqual([]);
 			stack.pop();
 		} else if (looksOnly(action) || (action && ('swipe' in action || 'scrollTo' in action))) {
@@ -335,8 +375,11 @@ function walkApp(
 				'tap' in action
 					? appRuntime.dispatch({ event: 'activate', host })
 					: 'type' in action
-						? (top.typed(host, action.type.text),
-							appRuntime.dispatch({ event: 'input', host, value: action.type.text }))
+						? appRuntime.dispatch({
+								event: 'input',
+								host,
+								value: top.typed(host, action.type.text),
+							})
 						: [];
 			const answered: NativeAction[] = [];
 			for (const entry of journal) {
@@ -431,6 +474,7 @@ function walk(
 			if (permission === 'unknown') waiting.push(task.result!);
 			else apply(answer(task.result!), -1);
 		}
+		apply(runtime.start(), -1);
 	};
 	const texts = new Map(runtime.texts());
 	const attributes = new Map(
@@ -468,10 +512,16 @@ function walk(
 			inClosedSheet(parent)
 		);
 	};
+	// In a list row the arms around a node are that row's copies (`<branch>@<key>`).
 	const shownNode = (id: string): boolean => {
 		if (inClosedSheet(id)) return false;
-		const place = nodeOf.get(id)?.arm;
-		return !place || (shownNode(place.branch) && chosen.get(place.branch) === place.index);
+		const at = id.indexOf('@');
+		const place = nodeOf.get(at < 0 ? id : id.slice(0, at))?.arm;
+		if (!place) return true;
+		const branch = nodeOf.get(place.branch)?.row
+			? `${place.branch}${id.slice(at)}`
+			: place.branch;
+		return shownNode(branch) && chosen.get(branch) === place.index;
 	};
 	const openSheet = (index: number): string => {
 		const open = [...sheetOpen].filter(([, isOpen]) => isOpen).map(([node]) => node);
@@ -482,10 +532,15 @@ function walk(
 	const shownTexts = () => [...texts].filter(([node]) => shownNode(node));
 	// A row's copy (`<id>@<key>`) sits where its list does.
 	const inArm = (id: string, branch: string): boolean => {
-		const node = nodeOf.get(id.includes('@') ? id.slice(0, id.indexOf('@')) : id);
-		if (node?.row) return inArm(node.row, branch);
-		if (!node?.arm) return false;
-		return node.arm.branch === branch || inArm(node.arm.branch, branch);
+		const at = id.indexOf('@');
+		const node = nodeOf.get(at < 0 ? id : id.slice(0, at));
+		if (node?.arm) {
+			const own = nodeOf.get(node.arm.branch)?.row
+				? `${node.arm.branch}${id.slice(at)}`
+				: node.arm.branch;
+			return own === branch || inArm(own, branch);
+		}
+		return node?.row ? inArm(node.row, branch) : false;
 	};
 	// An element carrying `hidden`, bound or static, hides everything inside it, as the web's `[hidden]` rule does.
 	const hiddenWithin = (id: string): boolean => {
@@ -689,6 +744,7 @@ function walk(
 				runtime = createNativeRuntime(payload, store, entry.params);
 				mount();
 			} else if (entry.op === 'rows') {
+				for (const [node, index] of runtime.arms()) if (!chosen.has(node)) chosen.set(node, index);
 				const rowNodes = payload.nodes.filter((node) => node.row === entry.node).map((node) => node.id);
 				const kept = new Map<string, string>();
 				for (const [id, text] of texts) {
@@ -884,9 +940,13 @@ function walk(
 			if (attributeNow(host, 'disabled') != null)
 				throw new Error(`step ${index}: "${name}" is disabled`);
 			// Typing shows the text in the field at once; the input event then runs the handler.
-			if ('type' in action) {
-				if (properties.has(host)) properties.set(host, action.type.text);
-				else typed.set(host, action.type.text);
+			const text =
+				'type' in action
+					? typedInto(action.type.text, attributeNow(host, 'maxlength'))
+					: undefined;
+			if (text !== undefined) {
+				if (properties.has(host)) properties.set(host, text);
+				else typed.set(host, text);
 			}
 			// A tap is a touch going down and up on what it lands on, then the activation of the nearest element around it
 			// that handles a press, as on a phone.
@@ -920,7 +980,7 @@ function walk(
 						? runtime.dispatch({ event: 'activate', host: pressed ?? host })
 						: []
 					: 'type' in action
-						? runtime.dispatch({ event: 'input', host, value: action.type.text })
+						? runtime.dispatch({ event: 'input', host, value: text! })
 						: returns
 							? runtime.dispatch({ event: 'enter', host })
 							: [];
