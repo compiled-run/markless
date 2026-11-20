@@ -253,7 +253,7 @@ async function visit(path: string, run: (page: Page) => Promise<void>) {
 	}
 }
 
-test.fails('an @if arm can hold a modal (#869)', { timeout: 240_000 }, async () => {
+test('an @if arm can hold a modal (#869)', { timeout: 240_000 }, async () => {
 	expect(
 		(await buildError({
 			'index.tsrx': `import { state } from '@markless/core';
@@ -310,7 +310,7 @@ test.fails('a page the router prefetched shows a list derived from a storage() v
 	}
 });
 
-test.fails('a storage() value written in a page shows in a component from another module that reads the same key (#867)', async () => {
+test('a storage() value written in a page shows in a component from another module that reads the same key (#867)', async () => {
 	await visit('/shared', async (page) => {
 		await page.getByRole('button', { name: 'Add' }).click();
 		await expect.poll(() => page.locator('[data-badge]').textContent()).toBe('1');
@@ -324,7 +324,7 @@ test.fails("live text beside an element in a component's children follows its st
 	});
 });
 
-test.fails('a state() can start from a storage() value (#870)', { timeout: 240_000 }, async () => {
+test('a state() can start from a storage() value (#870)', { timeout: 240_000 }, async () => {
 	expect(
 		(await buildError({
 			'index.tsrx': `import { state, storage } from '@markless/core';
@@ -343,9 +343,9 @@ export default function Page() @{
 	).not.toContain('MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE');
 });
 
-test.fails('a page that reads url.searchParams in an attribute renders (#865)', async () => {
+test('a page that reads url.searchParams in an attribute renders (#865)', async () => {
 	await visit('/notice?saved=1', async (page) => {
-		await expect(page.getByRole('status')).toBeVisible();
+		await page.getByRole('status').waitFor({ state: 'visible' });
 	});
 });
 

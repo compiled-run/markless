@@ -259,7 +259,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			const props: PageComponentProps = {
 				http: createPageHttp(request, url).context,
 				params: match.params,
-				url: { href: url.href, pathname: url.pathname, search: url.search },
+				url: new URL(url),
 				status: 200,
 			};
 			head = renderDocumentShell(documentModule, props, '').then(stylesheetHrefs, () => []);
@@ -388,11 +388,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		const pageProps: PageComponentProps = {
 			http: http.context,
 			params,
-			url: {
-				href: url.href,
-				pathname: url.pathname,
-				search: url.search,
-			},
+			url: new URL(url),
 			status,
 		};
 		const documentModule = options.documentModuleLoader

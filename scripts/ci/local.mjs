@@ -101,6 +101,8 @@ const SETUP_COMMANDS = [
 ];
 const CI_ONLY_COMMANDS = [/^echo ok > \S+-completed\.txt$/];
 const CI_ONLY_CONDITION = /\b(needs|steps|github|runner)\./;
+// Every lane runs locally, so a lane's own content-hash verdict is always true here.
+const LANE_GATE = "steps.lane.outputs.run == 'true'";
 const SHARD_ARG = /\s+--shard[= ]\$\{\{\s*matrix\.shard\s*\}\}/g;
 
 const parseArgs = (argv) => {
@@ -208,8 +210,10 @@ const classifyStep = (step, combo) => {
 			env: plainEnv(step.env),
 			cwd: step['working-directory'],
 		};
-	if (step.if !== undefined) {
-		const condition = String(step.if);
+	if (step.if !== undefined && String(step.if).trim() !== LANE_GATE) {
+		const condition = String(step.if).trim().startsWith(`${LANE_GATE} && `)
+			? String(step.if).trim().slice(LANE_GATE.length + 4)
+			: String(step.if);
 		const verdict = matrixCondition(condition, combo);
 		if (verdict === false)
 			return {

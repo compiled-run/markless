@@ -39,7 +39,7 @@ private func appVectorFiles() throws -> [URL] { try allVectorFiles().filter { tr
 func reproducesAppConformanceVector(file: URL) throws {
 	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: file)) else { Issue.record("vector is not an object"); return }
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
-	#expect(fields.map(\.0) == ["version", "app", "open", "initial", "steps"])
+	#expect(fields.map(\.0) == ["version", "app", "open"] + (field("started") == nil ? [] : ["started"]) + ["initial", "steps"])
 	guard case let .string(open)? = field("open") else { Issue.record("open is not a path"); return }
 	let stack = try NativeAppStack(app: try NativeAppPayload.decode(try #require(field("app"))), path: open, scriptHost: conformanceScriptHost())
 	let look = { () throws -> [(String, JSONValue)] in
@@ -50,6 +50,8 @@ func reproducesAppConformanceVector(file: URL) throws {
 			("texts", .array(try top.texts().map { .array([.string($0.node), .string($0.text)]) })),
 		]
 	}
+	let started = stack.started.map(\.json)
+	#expect(started.isEmpty ? field("started") == nil : JSONValue.array(started).jsonText == field("started")?.jsonText)
 	#expect(JSONValue.object(try look()).jsonText == field("initial")?.jsonText)
 	guard case let .array(steps)? = field("steps") else { Issue.record("steps is not an array"); return }
 	for step in steps {
@@ -58,8 +60,7 @@ func reproducesAppConformanceVector(file: URL) throws {
 		else { Issue.record("malformed step \(step.jsonText)"); return }
 		let journal: [NativeJournalEntry]
 		if event == "back" {
-			try stack.back()
-			journal = []
+			journal = try stack.back()
 		} else {
 			guard case let .string(host)? = action.first(where: { $0.0 == "host" })?.1 else { Issue.record("no host"); return }
 			journal = try stack.dispatch(NativeAction(event: try #require(NativeEventName(rawValue: event)), host: host))
@@ -78,7 +79,7 @@ func reproducesConformanceVector(file: URL) throws {
 	let vector = try JSONValue.parse(Data(contentsOf: file))
 	guard case let .object(fields) = vector else { Issue.record("vector is not an object"); return }
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
-	let known = ["version", "payload", "params", "preferredLanguages", "now", "initial", "initialChecks", "initialSelections", "initialAttributes", "initialProperties", "initialArms", "initialRows", "initialSheets", "tasks", "steps"]
+	let known = ["version", "payload", "params", "preferredLanguages", "now", "initial", "initialChecks", "initialSelections", "initialAttributes", "initialProperties", "initialArms", "initialRows", "initialSheets", "tasks", "start", "steps", "leave"]
 	#expect(fields.map(\.0).allSatisfy(known.contains), "unknown vector fields \(fields.map(\.0))")
 	#expect(field("version") == .string("markless.native-conformance/0"))
 	let params = try field("params").map { try NativeViewPayload.decodeParams(try Reader($0, at: "params")) } ?? []
@@ -107,6 +108,12 @@ func reproducesConformanceVector(file: URL) throws {
 
 	let tasks = try runtime.tasks().map(\.json)
 	#expect(tasks.isEmpty ? field("tasks") == nil : JSONValue.array(tasks).jsonText == field("tasks")?.jsonText)
+	let start = try runtime.start().map(\.json)
+	#expect(start.isEmpty ? field("start") == nil : JSONValue.array(start).jsonText == field("start")?.jsonText)
+	defer {
+		let leave = runtime.payload.cells.contains { $0.async != nil } ? (try? runtime.leave().map(\.json)) ?? [.string("leave threw")] : []
+		#expect(leave.isEmpty ? field("leave") == nil : JSONValue.array(leave).jsonText == field("leave")?.jsonText)
+	}
 
 	guard case let .array(steps)? = field("steps") else { Issue.record("steps is not an array"); return }
 	for step in steps {

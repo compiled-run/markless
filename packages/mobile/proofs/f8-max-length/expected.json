@@ -1,0 +1,87 @@
+{
+	"rung": 144,
+	"name": "A text field's maxlength as the web keeps it: typing stops at the limit, a longer value the app set stays whole, and a typed value longer than the limit stops the submit",
+	"steps": [
+		{
+			"visible": ["Profile", "Nothing sent", "Codes up to 5"],
+			"fields": {
+				"Handle": "Alexandra",
+				"Code": ""
+			}
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent Alexandra with []", "Codes up to 5"],
+			"absent": ["Nothing sent"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Code",
+					"text": "abcdefg"
+				}
+			},
+			"visible": ["Sent Alexandra with []", "Codes up to 5"],
+			"fields": {
+				"Code": "abcde"
+			}
+		},
+		{
+			"do": {
+				"tap": "Shorter codes"
+			},
+			"visible": ["Codes up to 3", "Sent Alexandra with []"],
+			"fields": {
+				"Code": "abcde"
+			},
+			"absent": ["Codes up to 5"]
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent Alexandra with []"],
+			"invalid": "Please shorten this text to 3 characters or less (you are currently using 5 characters)."
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Code",
+					"text": "xy"
+				}
+			},
+			"visible": ["Sent Alexandra with []"],
+			"fields": {
+				"Code": "xy"
+			}
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent Alexandra with [xy]"],
+			"absent": ["Sent Alexandra with []"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Handle",
+					"text": "Bartholomew"
+				}
+			},
+			"visible": ["Sent Alexandra with [xy]"],
+			"fields": {
+				"Handle": "Barth"
+			}
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent Barth with [xy]"],
+			"absent": ["Sent Alexandra with [xy]"]
+		}
+	]
+}

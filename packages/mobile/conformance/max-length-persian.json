@@ -1,0 +1,957 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "MaxLength",
+		"cells": [
+			{
+				"id": "state:handle",
+				"name": "handle",
+				"initial": "Alexandra"
+			},
+			{
+				"id": "state:limit",
+				"name": "limit",
+				"initial": 5
+			},
+			{
+				"id": "state:sent",
+				"name": "sent",
+				"initial": ""
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "form",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "input",
+				"parent": "h1",
+				"attributes": {
+					"aria-label": "Handle",
+					"name": "handle",
+					"maxlength": "5"
+				},
+				"bindings": [
+					{
+						"property": "value",
+						"value": {
+							"cell": "state:handle"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "input",
+				"parent": "h1",
+				"attributes": {
+					"aria-label": "Code",
+					"name": "code"
+				},
+				"bindings": [
+					{
+						"attribute": "maxlength",
+						"value": {
+							"cell": "state:limit"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Send"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Shorter codes"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Rename"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "p",
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"cell": "state:sent"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "submit",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h2",
+				"event": "input",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h6",
+				"event": "activate",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:h4/submit"
+			},
+			{
+				"host": "h2",
+				"event": "enter",
+				"handler": "handler:h2/return"
+			},
+			{
+				"host": "h3",
+				"event": "input",
+				"handler": "handler:h3/edit"
+			},
+			{
+				"host": "h3",
+				"event": "enter",
+				"handler": "handler:h3/return"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:sent",
+						"value": {
+							"template": [
+								"",
+								{
+									"call": "String",
+									"arguments": [
+										{
+											"if": {
+												"method": "some",
+												"target": {
+													"formData": "h1"
+												},
+												"arguments": [
+													{
+														"lambda": ["formdata:entry"],
+														"body": {
+															"binary": "===",
+															"left": {
+																"member": {
+																	"local": "formdata:entry"
+																},
+																"property": "0"
+															},
+															"right": {
+																"call": "String",
+																"arguments": [
+																	{
+																		"literal": "handle"
+																	}
+																]
+															}
+														}
+													}
+												]
+											},
+											"whenTrue": {
+												"member": {
+													"member": {
+														"method": "filter",
+														"target": {
+															"formData": "h1"
+														},
+														"arguments": [
+															{
+																"lambda": ["formdata:entry"],
+																"body": {
+																	"binary": "===",
+																	"left": {
+																		"member": {
+																			"local": "formdata:entry"
+																		},
+																		"property": "0"
+																	},
+																	"right": {
+																		"call": "String",
+																		"arguments": [
+																			{
+																				"literal": "handle"
+																			}
+																		]
+																	}
+																}
+															}
+														]
+													},
+													"property": "0"
+												},
+												"property": "1"
+											},
+											"whenFalse": {
+												"literal": null
+											}
+										}
+									]
+								},
+								"|",
+								{
+									"call": "String",
+									"arguments": [
+										{
+											"if": {
+												"method": "some",
+												"target": {
+													"formData": "h1"
+												},
+												"arguments": [
+													{
+														"lambda": ["formdata:entry"],
+														"body": {
+															"binary": "===",
+															"left": {
+																"member": {
+																	"local": "formdata:entry"
+																},
+																"property": "0"
+															},
+															"right": {
+																"call": "String",
+																"arguments": [
+																	{
+																		"literal": "code"
+																	}
+																]
+															}
+														}
+													}
+												]
+											},
+											"whenTrue": {
+												"member": {
+													"member": {
+														"method": "filter",
+														"target": {
+															"formData": "h1"
+														},
+														"arguments": [
+															{
+																"lambda": ["formdata:entry"],
+																"body": {
+																	"binary": "===",
+																	"left": {
+																		"member": {
+																			"local": "formdata:entry"
+																		},
+																		"property": "0"
+																	},
+																	"right": {
+																		"call": "String",
+																		"arguments": [
+																			{
+																				"literal": "code"
+																			}
+																		]
+																	}
+																}
+															}
+														]
+													},
+													"property": "0"
+												},
+												"property": "1"
+											},
+											"whenFalse": {
+												"literal": null
+											}
+										}
+									]
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:handle",
+						"value": {
+							"event": "value"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:limit",
+						"value": {
+							"literal": 3
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:handle",
+						"value": {
+							"literal": "Bartholomew"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:h4/submit",
+				"ops": [
+					{
+						"op": "submit",
+						"form": "h1",
+						"submitter": "h4"
+					}
+				]
+			},
+			{
+				"id": "handler:h2/return",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"literal": null
+							},
+							"right": {
+								"literal": null
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "submit",
+								"form": "h1",
+								"submitter": "h4"
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:h3/edit",
+				"ops": []
+			},
+			{
+				"id": "handler:h3/return",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"binary": "===",
+							"left": {
+								"literal": null
+							},
+							"right": {
+								"literal": null
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "submit",
+								"form": "h1",
+								"submitter": "h4"
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			}
+		],
+		"forms": [
+			{
+				"node": "h1",
+				"fields": [
+					{
+						"node": "h2",
+						"kind": "text"
+					},
+					{
+						"node": "h3",
+						"kind": "text"
+					}
+				],
+				"submitters": ["h4"]
+			}
+		],
+		"valueMissing": {
+			"af": {
+				"text": "Vul asseblief hierdie veld in.",
+				"checkbox": "Merk asseblief hierdie blokkie as jy wil voortgaan.",
+				"radio": "Kies asseblief een van hierdie opsies."
+			},
+			"am": {
+				"text": "እባክዎ ይህን መስክ ይሙሉት።",
+				"checkbox": "ለመቀጠል ከፈለጉ እባክዎ ይህ ሳጥን ላይ ምልክት ያድርጉ።",
+				"radio": "እባክዎ ከእነዚህ አማራጮች ውስጥ አንዱን ይምረጡ።"
+			},
+			"ar": {
+				"text": "يُرجى ملء هذا الحقل.",
+				"checkbox": "يُرجى وضع علامة في هذا المربع إذا أردت المتابعة.",
+				"radio": "يُرجى اختيار أحد هذه الخيارات."
+			},
+			"bg": {
+				"text": "Моля, попълнете това поле.",
+				"checkbox": "Моля, поставете отметка в това квадратче, ако искате да продължите.",
+				"radio": "Моля, изберете една от тези опции."
+			},
+			"bn": {
+				"text": "দয়া করে এই ক্ষেত্রটি পূরণ করুন৷",
+				"checkbox": "আপনি এগিয়ে যেতে চাইলে এই বাক্সটি পরীক্ষা করুন৷",
+				"radio": "দয়া করে বিকল্পগুলির একটি নির্বাচন করুন৷"
+			},
+			"ca": {
+				"text": "Empleneu aquest camp.",
+				"checkbox": "Marqueu aquesta casella si voleu continuar.",
+				"radio": "Seleccioneu una d'aquestes opcions."
+			},
+			"cs": {
+				"text": "Vyplňte prosím toto pole.",
+				"checkbox": "Chcete-li pokračovat, zaškrtněte toto políčko.",
+				"radio": "Vyberte jednu z těchto možností."
+			},
+			"da": {
+				"text": "Udfyld dette felt.",
+				"checkbox": "Markér dette felt, hvis du vil fortsætte.",
+				"radio": "Vælg en af disse muligheder."
+			},
+			"de": {
+				"text": "Fülle dieses Feld aus.",
+				"checkbox": "Klicke dieses Kästchen an, wenn du fortfahren möchtest.",
+				"radio": "Wähle eine dieser Optionen aus."
+			},
+			"el": {
+				"text": "Συμπληρώστε αυτό το πεδίο.",
+				"checkbox": "Αν θέλετε να συνεχίσετε, επιλέξτε αυτό το πλαίσιο.",
+				"radio": "Ορίστε μία από αυτές τις επιλογές."
+			},
+			"en": {
+				"text": "Please fill out this field.",
+				"checkbox": "Please check this box if you want to proceed.",
+				"radio": "Please select one of these options."
+			},
+			"en-GB": {
+				"text": "Please fill in this field.",
+				"checkbox": "Please tick this box if you want to proceed.",
+				"radio": "Please select one of these options."
+			},
+			"es": {
+				"text": "Completa este campo",
+				"checkbox": "Selecciona esta casilla de verificación si quieres continuar",
+				"radio": "Selecciona una de estas opciones"
+			},
+			"es-419": {
+				"text": "Completa este campo",
+				"checkbox": "Controla esta casilla si deseas continuar.",
+				"radio": "Selecciona una de estas opciones."
+			},
+			"et": {
+				"text": "Täitke see väli.",
+				"checkbox": "Märkige see ruut, kui soovite jätkata.",
+				"radio": "Tehke üks nendest valikutest."
+			},
+			"fa": {
+				"text": "لطفاً این قسمت را تکمیل کنید.",
+				"checkbox": "درصورتی‌که می‌خواهید ادامه دهید، این کادر را انتخاب کنید.",
+				"radio": "لطفاً یکی از این گزینه‌ها را انتخاب کنید."
+			},
+			"fi": {
+				"text": "Täytä tämä kenttä.",
+				"checkbox": "Valitse tämä ruutu jatkaaksesi.",
+				"radio": "Valitse yksi vaihtoehdoista."
+			},
+			"fil": {
+				"text": "Pakipunan ang field na ito.",
+				"checkbox": "Pakitingnan ang kahon na ito kung gusto mong magpatuloy.",
+				"radio": "Mangyaring pumili ng isa sa mga opsyong ito."
+			},
+			"fr": {
+				"text": "Veuillez renseigner ce champ.",
+				"checkbox": "Veuillez cocher cette case si vous souhaitez continuer.",
+				"radio": "Veuillez sélectionner l'une de ces options."
+			},
+			"gu": {
+				"text": "કૃપા કરીને આ ફીલ્ડ ભરો.",
+				"checkbox": "જો તમે આગળ વધવા માંગતા હો તો કૃપા કરીને આ બૉક્સને ચેક કરો.",
+				"radio": "કૃપા કરીને આ વિકલ્પોમાંથી કોઈ એક પસંદ કરો."
+			},
+			"he": {
+				"text": "זהו שדה חובה.",
+				"checkbox": "יש לסמן את התיבה הזאת כדי להמשיך.",
+				"radio": "יש לבחור אחת מהאפשרויות הבאות."
+			},
+			"hi": {
+				"text": "कृपया इस फ़ील्ड को भरें.",
+				"checkbox": "अगर आप आगे बढ़ना चाहते हैं तो इस बॉक्‍स को सही का निशान लगाकर चुनें.",
+				"radio": "कृपया इनमें से कोई विकल्प चुनें."
+			},
+			"hr": {
+				"text": "Ispunite ovo polje.",
+				"checkbox": "Označite taj okvir ako želite ići dalje.",
+				"radio": "Izaberite jednu od tih opcija."
+			},
+			"hu": {
+				"text": "Kérjük, töltse ki ezt a mezőt.",
+				"checkbox": "Kérjük, jelölje be ezt a jelölőnégyzetet, ha tovább kíván haladni.",
+				"radio": "Kérjük, válassza ki az egyik opciót."
+			},
+			"id": {
+				"text": "Harap isi bidang ini.",
+				"checkbox": "Centang kotak ini jika Anda ingin melanjutkan.",
+				"radio": "Pilih salah satu opsi berikut."
+			},
+			"it": {
+				"text": "Compila questo campo.",
+				"checkbox": "Seleziona questa casella se intendi procedere.",
+				"radio": "Seleziona una di queste opzioni."
+			},
+			"ja": {
+				"text": "このフィールドを入力してください。",
+				"checkbox": "次に進むにはこのチェックボックスをオンにしてください。",
+				"radio": "これらのオプションから 1 つ選択してください。"
+			},
+			"kn": {
+				"text": "ದಯವಿಟ್ಟು ಈ ಕ್ಷೇತ್ರವನ್ನು ಭರ್ತಿ ಮಾಡಿ.",
+				"checkbox": "ನೀವು ಮುಂದುವರೆಯಬೇಕಾದರೆ ದಯವಿಟ್ಟು ಈ ಬಾಕ್ಸ್ ಅನ್ನು ಪರೀಕ್ಷಿಸಿ.",
+				"radio": "ದಯವಿಟ್ಟು ಈ ಕೆಳಗಿನ ಆಯ್ಕೆಗಳಲ್ಲಿ ಒಂದನ್ನು ಆರಿಸಿ."
+			},
+			"ko": {
+				"text": "이 입력란을 작성하세요.",
+				"checkbox": "계속하려면 이 확인란을 선택하세요.",
+				"radio": "다음 옵션 중 하나를 선택하세요."
+			},
+			"lt": {
+				"text": "Užpildykite šį lauką.",
+				"checkbox": "Jei norite tęsti, pažymėkite šį laukelį.",
+				"radio": "Pasirinkite vieną iš šių parinkčių."
+			},
+			"lv": {
+				"text": "Aizpildiet šo lauku.",
+				"checkbox": "Lai turpinātu, atzīmējiet šo izvēles rūtiņu.",
+				"radio": "Lūdzu, atlasiet vienu no šīm opcijām."
+			},
+			"ml": {
+				"text": "ദയവായി ഈ ഫീല്‍ഡ് പൂരിപ്പിക്കുക.",
+				"checkbox": "നിങ്ങള്‍ തുടരാന്‍ താല്‍പ്പര്യപ്പെടുന്നെങ്കില്‍ ഈ ബോക്സ് ദയവായി പരിശോധിക്കുക.",
+				"radio": "ഈ ഓപ്ഷനുകളിലൊന്ന് ദയവായി തിരഞ്ഞെടുക്കുക."
+			},
+			"mr": {
+				"text": "कृपया हे फील्ड भरा.",
+				"checkbox": "कृपया तुम्ही पुढे सुरू ठेवू इच्छित असल्यास हा बॉक्स पहा.",
+				"radio": "कृपया या पर्यायांपैकी एक निवडा."
+			},
+			"ms": {
+				"text": "Sila isikan medan ini.",
+				"checkbox": "Sila tandakan kotak ini jika anda mahu teruskan.",
+				"radio": "Sila pilih salah satu pilihan ini."
+			},
+			"nb": {
+				"text": "Vennligst fyll ut dette feltet.",
+				"checkbox": "Kryss av denne boksen hvis du vil fortsette.",
+				"radio": "Velg ett av følgende alternativer."
+			},
+			"nl": {
+				"text": "Vul dit veld in.",
+				"checkbox": "Vink dit selectievakje aan als je wilt doorgaan.",
+				"radio": "Selecteer een van deze opties."
+			},
+			"pl": {
+				"text": "Wypełnij to pole.",
+				"checkbox": "Zaznacz to pole, jeśli chcesz kontynuować.",
+				"radio": "Wybierz jedną z opcji."
+			},
+			"pt-BR": {
+				"text": "Preencha este campo.",
+				"checkbox": "Marque esta caixa se deseja continuar.",
+				"radio": "Selecione uma das opções."
+			},
+			"pt-PT": {
+				"text": "Preencha este campo.",
+				"checkbox": "Selecione esta caixa se pretender continuar.",
+				"radio": "Selecione uma destas opções."
+			},
+			"ro": {
+				"text": "Completează acest câmp.",
+				"checkbox": "Bifeză caseta dacă vrei să continui.",
+				"radio": "Selectează una dintre aceste opțiuni."
+			},
+			"ru": {
+				"text": "Заполните это поле.",
+				"checkbox": "Чтобы продолжить, установите этот флажок.",
+				"radio": "Выберите один из вариантов."
+			},
+			"sk": {
+				"text": "Vyplňte toto pole.",
+				"checkbox": "Ak chcete pokračovať, začiarknite toto políčko.",
+				"radio": "Vyberte jednu z týchto možností."
+			},
+			"sl": {
+				"text": "Izpolnite to polje",
+				"checkbox": "Potrdite to polje, če želite nadaljevati.",
+				"radio": "Izberite eno od teh možnosti."
+			},
+			"sr": {
+				"text": "Попуните ово поље.",
+				"checkbox": "Потврдите избор у овом пољу за потврду уколико желите да наставите.",
+				"radio": "Изаберите неку од ових опција."
+			},
+			"sv": {
+				"text": "Fyll i det här fältet.",
+				"checkbox": "Markera den här kryssrutan om du vill fortsätta.",
+				"radio": "Välj ett av följande alternativ."
+			},
+			"sw": {
+				"text": "Tafadhali jaza sehemu hii.",
+				"checkbox": "Tafadhali angalia kikasha hiki iwapo unataka kuendelea.",
+				"radio": "Tafadhali chagua moja wapo ya chaguo hizi."
+			},
+			"ta": {
+				"text": "இந்தப் புலத்தை நிரப்புக.",
+				"checkbox": "தொடர விரும்பினால், இந்தப் பெட்டியைத் தேர்ந்தெடுங்கள்.",
+				"radio": "தயவுசெய்து இந்த விருப்பங்களில் ஒன்றைத் தேர்ந்தெடுங்கள்."
+			},
+			"te": {
+				"text": "దయచేసి ఈ ఫీల్డ్‌ను పూర్తి చేయండి.",
+				"checkbox": "మీరు కొనసాగాలనుకుంటే దయచేసి ఈ బాక్స్‌కి టిక్కు పెట్టండి.",
+				"radio": "దయచేసి ఈ ఎంపికలలో ఒకదాన్ని ఎంచుకోండి."
+			},
+			"th": {
+				"text": "โปรดกรอกฟิลด์นี้",
+				"checkbox": "โปรดเลือกช่องนี้หากคุณต้องการดำเนินการต่อ",
+				"radio": "โปรดเลือกตัวเลือกอย่างหนึ่งอย่างใดเหล่านี้"
+			},
+			"tr": {
+				"text": "Lütfen bu alanı doldurun.",
+				"checkbox": "İlerlemek istiyorsanız lütfen bu kutuyu işaretleyin.",
+				"radio": "Lütfen bu seçeneklerden birini belirleyin."
+			},
+			"uk": {
+				"text": "Заповніть це поле.",
+				"checkbox": "Поставте тут прапорець, якщо хочете продовжити.",
+				"radio": "Виберіть один із запропонованих варіантів."
+			},
+			"ur": {
+				"text": "براہ کرم یہ فیلڈ پُر کریں۔",
+				"checkbox": "اگر آپ آگے بڑھنا چاہتے ہیں تو براہ کرم یہ باکس نشان زد کریں۔",
+				"radio": "براہ کرم ان اختیارات میں سے ایک کو منتخب کریں۔"
+			},
+			"vi": {
+				"text": "Vui lòng điền vào trường này.",
+				"checkbox": "Vui lòng chọn hộp kiểm này nếu bạn muốn tiếp tục.",
+				"radio": "Vui lòng chọn một trong các tùy chọn sau."
+			},
+			"zh-CN": {
+				"text": "请填写此字段。",
+				"checkbox": "如果要继续，请选中此框。",
+				"radio": "请从这些选项中选择一个。"
+			},
+			"zh-TW": {
+				"text": "請填寫這個欄位。",
+				"checkbox": "如果你要繼續執行，請勾選這個核取方塊。",
+				"radio": "請選取其中一個選項。"
+			}
+		},
+		"tooLong": {
+			"af": {
+				"text": "Verkort hierdie teks na {max} karakters of minder (jy gebruik tans {length} karakters)."
+			},
+			"am": {
+				"text": "እባክዎ ይህ ጽሁፍ ወደ {max} ወይም ከዚያ በታች ቁምፊዎች ያሳጥሩት (በአሁኑ ጊዜ {length} ቁምፊዎችን እየተጠቀሙ ነዎት)።"
+			},
+			"ar": {
+				"text": "يُرجى اختصار هذا النص حتى يصل إلى {max} من الحروف أو أقل (أنت الآن تستخدم {length} من الحروف)."
+			},
+			"bg": {
+				"text": "Моля, съкратете този текст до {max} знака или по-малко (понастоящем използвате {length} знака)."
+			},
+			"bn": {
+				"text": "দয়া করে এই পাঠ্যটি {max}টি অক্ষর বা তার কমে (আপনি বর্তমানে {length}টি অক্ষর ব্যবহার করছেন) সংক্ষিপ্ত করুন৷"
+			},
+			"ca": {
+				"text": "Escurceu aquest text a un màxim de {max} caràcters (ara n'esteu utilitzant {length})."
+			},
+			"cs": {
+				"text": "Zkraťte prosím tento text na {max} znaků nebo méně. (Aktuálně má {length} znaků.)"
+			},
+			"da": {
+				"text": "Forkort denne tekst til {max} tegn eller færre (du bruger i øjeblikket {length} tegn)."
+			},
+			"de": {
+				"text": "Kürze diesen Text auf max. {max} Zeichen. Zurzeit verwendest du {length} Zeichen."
+			},
+			"el": {
+				"text": "Κάντε πιο σύντομο αυτό το κείμενο ώστε να έχει το πολύ {max} χαρακτήρες (αυτήν τη στιγμή χρησιμοποιείτε {length} χαρακτήρες)."
+			},
+			"en": {
+				"text": "Please shorten this text to {max} characters or less (you are currently using {length} characters)."
+			},
+			"en-GB": {
+				"text": "Please shorten this text to {max} characters or less (you are currently using {length} characters)."
+			},
+			"es": {
+				"text": "Reduce la longitud de este texto a {max} caracteres o menos (actualmente, el texto tiene {length} caracteres)"
+			},
+			"es-419": {
+				"text": "Acorta este texto a {max} caracteres o menos (actualmente estás usando {length} caracteres)."
+			},
+			"et": {
+				"text": "Lühendage seda teksti {max} tähemärgini või rohkem (praegu kasutate {length} tähemärki)."
+			},
+			"fa": {
+				"text": "لطفاً این متن را به اندازه {max} نویسه یا کمتر کوتاه کنید (شما در حال حاضر از {length} نویسه استفاده می‌کنید).",
+				"digits": "۰۱۲۳۴۵۶۷۸۹"
+			},
+			"fi": {
+				"text": "Lyhennä tämä teksti alle {max} merkkiin (tällä hetkellä käytössä {length} merkkiä)."
+			},
+			"fil": {
+				"text": "Mangyaring paikliin ang tekstong ito ng {max} (na) character o mas mababa (kasalukuyan kang gumagamit ng {length} (na) character)."
+			},
+			"fr": {
+				"text": "Veuillez réduire ce texte à {max} caractères maximum (il compte actuellement {length} caractères)."
+			},
+			"gu": {
+				"text": "કૃપા કરીને આ ટેક્સ્ટને {max} અક્ષર અથવા તેથી ઓછા સુધી નાનો કરો (તમે હાલમાં {length} અક્ષરોનો ઉપયોગ કરી રહ્યા છો)."
+			},
+			"he": {
+				"text": "צריך לקצר את הטקסט ל-{max} תווים או פחות (כרגע: {length} תווים)."
+			},
+			"hi": {
+				"text": "कृपया इस टेक्स्ट को {max} वर्णों या कम तक छोटा करें (वर्तमान में आप {length} वर्णों का उपयोग कर रहे हैं)."
+			},
+			"hr": {
+				"text": "Skratite taj tekst na {max} znakova ili manje (trenutačno upotrebljavate {length} znakova)."
+			},
+			"hu": {
+				"text": "Kérjük, rövidítse le a szöveget legfeljebb {max} karakterre (jelenleg {length} karaktert használ)."
+			},
+			"id": {
+				"text": "Pendekkan teks ini menjadi {max} karakter atau kurang (saat ini Anda menggunakan {length} karakter)."
+			},
+			"it": {
+				"text": "Riduci questo testo a {max} caratteri o meno (attualmente stai utilizzando {length} caratteri)."
+			},
+			"ja": {
+				"text": "このテキストを半角 {max} 文字以下にしてください（現時点で半角 {length} 文字です）。"
+			},
+			"kn": {
+				"text": "ದಯವಿಟ್ಟು ಈ ಪಠ್ಯವನ್ನು {max} ಅಕ್ಷರಗಳಿಗೆ ಅಥವಾ ಅದಕ್ಕಿಂತಲೂ ಕಡಿಮೆಗೆ ಸೀಮಿತಗೊಳಿಸಿ (ನೀವು ಪ್ರಸ್ತುತ {length} ಅಕ್ಷರಗಳನ್ನು ಬಳಸುತ್ತಿರುವಿರಿ)."
+			},
+			"ko": {
+				"text": "이 텍스트를 {max}자 이하로 줄이세요(현재 {length}자 사용 중)."
+			},
+			"lt": {
+				"text": "Sutrumpinkite šį tekstą iki {max} simb. ar mažiau (šiuo metu naudojate {length} simb.)."
+			},
+			"lv": {
+				"text": "Lūdzu, saīsiniet šo tekstu līdz {max} vai mazāk zīmēm (pašreiz tas ietver {length} rakstzīmes)."
+			},
+			"ml": {
+				"text": "ഈ വാചകത്തെ {max} അല്ലെങ്കില്‍ അതില്‍‌ക്കുറവ് പ്രതീകങ്ങളായി ദയവായി കുറയ്ക്കുക (നിങ്ങള്‍ നിലവില്‍ {length} പ്രതീകങ്ങള്‍ ഉപയോഗിക്കുകയാണ്)."
+			},
+			"mr": {
+				"text": "कृपया हा मजकूर {max} वर्ण लहान किंवा कमी करा (तुम्ही सध्या {length} वर्ण वापरत आहात)."
+			},
+			"ms": {
+				"text": "Sila pendekkan teks ini menjadi {max} aksara atau kurang (anda kini menggunakan {length} aksara)."
+			},
+			"nb": {
+				"text": "Forkort denne teksten til {max} tegn eller færre (for øyeblikket bruker du {length} tegn)."
+			},
+			"nl": {
+				"text": "Kort deze tekst in tot {max} tekens of minder (je gebruikt momenteel {length} tekens)."
+			},
+			"pl": {
+				"text": "Skróć ten tekst do maksymalnie {max} znaków (w tej chwili korzystasz z {length} znaków)."
+			},
+			"pt-BR": {
+				"text": "Reduza este texto para {max} caracteres ou menos (você está usando {length} caracteres)."
+			},
+			"pt-PT": {
+				"text": "Encurte este texto para {max} caracteres ou menos (está atualmente a utilizar {length} caracteres)."
+			},
+			"ro": {
+				"text": "Micșorează acest text la cel mult {max} caractere (în prezent utilizezi {length} caractere)."
+			},
+			"ru": {
+				"text": "Длина текста не должна превышать {max} симв. (сейчас {length} симв.)."
+			},
+			"sk": {
+				"text": "Tento text musíte skrátiť na {max} znakov alebo menej (súčasný počet znakov: {length})."
+			},
+			"sl": {
+				"text": "Skrajšajte to besedilo na {max} znakov ali manj (trenutno uporabljate {length} znakov)."
+			},
+			"sr": {
+				"text": "Скратите овај текст на {max} знак(ов)а или мање (тренутно користите {length} знак(ов)а)."
+			},
+			"sv": {
+				"text": "Förkorta texten till {max} tecken eller mindre (nu är texten {length} tecken)."
+			},
+			"sw": {
+				"text": "Tafadhali fupisha maandishi haya hadi vibambo {max} au chini (kwa sasa unatumia vibambo {length} )."
+			},
+			"ta": {
+				"text": "இந்த உரையை {max} எழுத்துக்குறிகள் அல்லது அதற்கும் குறைவாக சுருக்கிடுங்கள் (நீங்கள் தற்போது {length} எழுத்துக்குறிகளைப் பயன்படுத்துகிறீர்கள்)."
+			},
+			"te": {
+				"text": "దయచేసి ఈ వచనాన్ని {max} అక్షరాలకు లేదా అంతకంటే తక్కువకు తగ్గించండి (మీరు ప్రస్తుతం {length} అక్షరాలను ఉపయోగిస్తున్నారు)."
+			},
+			"th": {
+				"text": "โปรดย่อข้อความนี้ให้เหลือไม่เกิน {max} อักขระ (ขณะนี้ข้อความของคุณมี {length} อักขระ)"
+			},
+			"tr": {
+				"text": "Lütfen bu metni {max} veya daha az karakter olacak şekilde kısaltın (şu anda {length} karakter kullanıyorsunuz)."
+			},
+			"uk": {
+				"text": "Скоротіть текст до такої кількості символів або менше: {max} (наразі використано символів: {length})."
+			},
+			"ur": {
+				"text": "براہ کرم اس متن کو مختصر کر کے {max} یا اس سے کم حروف تک لائیں (آپ فی الحال {length} حروف استعمال کر رہے ہیں)۔"
+			},
+			"vi": {
+				"text": "Hãy cắt ngắn văn bản này thành {max} ký tự hoặc ít hơn (bạn hiện đang sử dụng {length} ký tự)."
+			},
+			"zh-CN": {
+				"text": "请将该文本减少为 {max} 个字符或更少（您当前使用了 {length} 个字符）。"
+			},
+			"zh-TW": {
+				"text": "請將這段文字刪減至 {max} 個字元以下 (目前的字元數為 {length} 個)。"
+			}
+		}
+	},
+	"preferredLanguages": ["fa-IR"],
+	"initial": [
+		["h4:text0", "Send"],
+		["h5:text0", "Shorter codes"],
+		["h6:text0", "Rename"],
+		["h7:text0", ""]
+	],
+	"initialAttributes": [
+		["h3", "maxlength", "5"],
+		["h1", "aria-busy", null],
+		["h4", "aria-disabled", null]
+	],
+	"initialProperties": [["h2", "value", "Alexandra"]],
+	"steps": [
+		{
+			"action": {
+				"event": "input",
+				"host": "h3",
+				"value": "abcde"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "h3",
+					"name": "maxlength",
+					"value": "3"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "invalid",
+					"node": "h3",
+					"message": "لطفاً این متن را به اندازه ۳ نویسه یا کمتر کوتاه کنید (شما در حال حاضر از ۵ نویسه استفاده می‌کنید)."
+				}
+			]
+		}
+	]
+}

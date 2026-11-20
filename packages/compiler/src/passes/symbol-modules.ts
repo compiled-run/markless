@@ -62,6 +62,8 @@ import {
 	type ForeignScopeRefusal,
 } from './foreign-scope.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
+import { componentsWithWidgets } from './semantic-graph/idle-records.ts';
+import { importedEdgeComponent } from './link/component-target.ts';
 import { createSourceMemo, moduleSemantics, ownedModuleAstOrNull } from './semantic-graph/shared-ast.ts';
 import { valueModuleImports } from './semantic-graph/imports.ts';
 import {
@@ -1583,6 +1585,7 @@ function renderBranchArms(
 					escalationCandidates.push({
 						branchSiteId: branch.branchSiteId,
 						symbolId: symbol.id,
+						...(armRootsWidgets(input, branch) && { rootsWidgets: true as const }),
 					});
 					diagnostics.push(
 						branchArmRendersInBrowserDiagnostic(branch, refusals, symbol.id),
@@ -1600,6 +1603,37 @@ function renderBranchArms(
 		});
 	}
 	return { armsBySite, diagnostics, escalationCandidates, propDecided };
+}
+
+// Whether any arm renders a component that roots a widget, itself or through what it renders or is handed.
+function armRootsWidgets(input: SymbolModulesInput, branch: RenderDataBranch): boolean {
+	const semanticGraph = input.semanticGraph;
+	const chunks = input.renderData?.chunks ?? [];
+	if (!semanticGraph) return false;
+	const widgets = componentsWithWidgets(semanticGraph, input.source?.importedModuleInterfaces);
+	const interfaces = input.source?.importedModuleInterfaces;
+	const seen = new Set<string>();
+	const pending = [...branch.armChunkIds];
+	while (pending.length > 0) {
+		const id = pending.pop()!;
+		if (seen.has(id)) continue;
+		seen.add(id);
+		for (const slot of chunks.find((chunk) => chunk.id === id)?.slots ?? []) {
+			if (slot.kind === 'child-component') {
+				const edge = semanticGraph.componentEdges.find((candidate) => candidate.id === slot.componentEdgeId);
+				const imported = edge?.importSource
+					? importedEdgeComponent(edge, interfaces?.[edge.importSource])
+					: undefined;
+				if (edge && (edge.importSource ? imported?.widgets === true : widgets.has(edge.childComponentName)))
+					return true;
+				if (slot.projectionChunkId) pending.push(slot.projectionChunkId);
+			} else if (slot.kind === 'branch') pending.push(...slot.armTemplateIds);
+			else if (slot.kind === 'repeat') pending.push(slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : []));
+			else if (slot.kind === 'async') pending.push(...Object.values(slot.armTemplateIds).flatMap((arm) => (arm ? [arm] : [])));
+			else if (slot.kind === 'dynamic-host') pending.push(slot.childChunkId);
+		}
+	}
+	return false;
 }
 
 // A computed counts as a prop when everything it derives from is one: `@if (from <= 0)` is decided by `from`.
@@ -2230,7 +2264,7 @@ function staticChildComponentMarkup(
 }
 
 // Names the one value that kept the flip out. A child given only constants, or
-// one from another file without projected children, renders in the browser by running it.
+// one from another file, renders in the browser by running it.
 function childRefusalReason(
 	context: ArmPartsContext,
 	slot: Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>,
@@ -2249,9 +2283,9 @@ function childRefusalReason(
 				detail: 'has to run to produce its content',
 				escalatable:
 					edge !== undefined &&
-					edge.children.childCount === 0 &&
 					(edge.importSource !== undefined ||
-						edge.props.every((prop) => prop.kind === 'serializable')),
+						(edge.children.childCount === 0 &&
+							edge.props.every((prop) => prop.kind === 'serializable'))),
 			};
 }
 
@@ -3043,7 +3077,7 @@ function behaviorModuleScopeCarry(input: BehaviorEmissionInput): {
 // step rather than a side effect of this unit.
 // ---------------------------------------------------------------------------
 
-/** A component prop the initializer reads, before it becomes a graph read. */
+/** A component prop or graph value the initializer reads, before it becomes a graph read. */
 export type StateInitializerPropRead = {
 	readonly localName: string;
 	readonly graphNodeId: string;
@@ -3084,6 +3118,7 @@ export function buildStateInitializerEmission(
 		input.symbol.source,
 		input.moduleDeclarations,
 		input.sourceFileName,
+		new Set(input.propReads.map((read) => read.localName)),
 	);
 	const projection = stateInitializerProjection(
 		declarations,
@@ -3457,13 +3492,13 @@ function expressionFromSource(source: string, filename: string): EmissionNode {
 }
 
 /**
- * The prop reads a state initializer needs, as data.
+ * The prop and graph-value reads a state initializer needs, as data.
  *
- * The structured twin of `stateInitializerPropDeclarations`. It decides which
- * props the initializer mentions from the parsed tree rather than from a text
- * scan, because the scan lives in the band a migrated site may not call.
+ * It decides which names the initializer mentions from the parsed tree rather
+ * than from a text scan, because the scan lives in the band a migrated site may
+ * not call.
  */
-export function stateInitializerPropReads(
+export function stateInitializerReads(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'state-initializer' }>,
 	semanticGraph: SymbolModulesInput['semanticGraph'],
 	renderData: SymbolModulesInput['renderData'],
@@ -3476,7 +3511,21 @@ export function stateInitializerPropReads(
 		)?.componentName ?? renderData?.root?.componentName;
 	if (!componentName) return [];
 
-	return componentPropReads(componentName, symbol.source, semanticGraph, sourceFileName);
+	const propReads = componentPropReads(componentName, symbol.source, semanticGraph, sourceFileName);
+	const propLocals = new Set(propReads.map((read) => read.localName));
+	const referenced = initializerReferencedNames(symbol.source, sourceFileName);
+	// This component's and the module's own state, storage() and sync computed() cells, which the graph already holds by the time this runs.
+	const graphReads = semanticGraph.graphBindings.flatMap((binding) =>
+		(binding.kind === 'state' || (binding.kind === 'computed' && binding.async !== true)) &&
+		(binding.componentName === componentName || binding.componentName === undefined) &&
+		binding.sharedDefinitionId === undefined &&
+		binding.id !== symbol.graphNodeId &&
+		referenced.has(binding.name) &&
+		!propLocals.has(binding.name)
+			? [{ localName: binding.name, graphNodeId: binding.id, path: [] }]
+			: [],
+	);
+	return [...propReads, ...graphReads];
 }
 
 /**
@@ -3527,9 +3576,15 @@ function referencedModuleDeclarationSources(
 	initializerSource: string,
 	declarations: readonly string[],
 	filename: string,
+	graphReadLocals: ReadonlySet<string>,
 ): string[] {
+	// A name the function body binds to a graph read is not a reference to the module declaration it shadows.
 	return referencedModuleDeclarations(
-		initializerReferencedNames(initializerSource, filename),
+		new Set(
+			[...initializerReferencedNames(initializerSource, filename)].filter(
+				(name) => !graphReadLocals.has(name),
+			),
+		),
 		declarations,
 		filename,
 	);
@@ -8898,7 +8953,7 @@ export function buildSymbolModuleEmission(
 			symbol,
 			moduleDeclarations: input.moduleDeclarations,
 			moduleImports: input.moduleImports,
-			propReads: stateInitializerPropReads(
+			propReads: stateInitializerReads(
 				symbol,
 				input.semanticGraph,
 				input.renderData,

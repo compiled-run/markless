@@ -42,10 +42,10 @@ const USAGE = `usage: phones <command>
   affected [--base <rev> | --files <repo path>...]
                          the rungs a change since <rev> (default origin/cw/native-integration) can affect, and why
 
-Runner files: ${runnerHome()} (MARKLESS_PHONES_HOME). Ladder rungs refused by name never run: ${'11-async, y4-sheet-beside-drawer'}.`;
+Runner files: ${runnerHome()} (MARKLESS_PHONES_HOME). Ladder rungs refused by name never run: ${'y4-sheet-beside-drawer'}.`;
 
 /** Rungs the ladder lists that no phone build exists for yet (named in the conformance report). */
-const REFUSED = new Set(['11-async', 'y4-sheet-beside-drawer']);
+const REFUSED = new Set(['y4-sheet-beside-drawer']);
 const ladder = () => allRungFolders().filter((name) => !REFUSED.has(name));
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

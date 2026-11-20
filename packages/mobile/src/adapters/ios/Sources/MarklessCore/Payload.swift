@@ -287,6 +287,8 @@ public enum NativeOp: Equatable, Sendable {
 	/// Runs function `fn` of the payload's script with the event (`type`, the web event's) and `bindings`, then writes the
 	/// cells it changed. A throw, or a rejection of what it returns, writes `{ name, message }` to `catch` when there is one.
 	case script(fn: String, type: String, bindings: [NativeScriptBinding], catch: String?)
+	/// `reset` of `@catch (error, reset)`: clears `catch` and runs again each of `cells` (read where the handler runs) that holds an error.
+	case reset(cells: [String], catch: String?)
 }
 
 public struct NativeCapture: Equatable, Sendable {
@@ -303,6 +305,29 @@ public struct NativeValueMissing: Equatable, Sendable {
 	public let text: String
 	public let checkbox: String
 	public let radio: String
+}
+
+/// Chromium's message for a text field longer than its `maxlength`, with `{max}` and `{length}` written in `digits`.
+public struct NativeTooLong: Equatable, Sendable {
+	public let text: String
+	public let digits: [Character]
+
+	/// The message for these numbers, as Chromium writes them: no grouping, in the language's digits.
+	public func message(max: Int, length: Int) -> String {
+		func write(_ value: Int) -> String { String(String(value).map { digits[Int(String($0))!] }) }
+		return text.replacingOccurrences(of: "{max}", with: write(max)).replacingOccurrences(of: "{length}", with: write(length))
+	}
+}
+
+/// A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers; nil (no limit) when it has none.
+public func nativeMaxLength(_ attribute: String?) -> Int? {
+	guard var rest = attribute?.unicodeScalars[...] else { return nil }
+	rest = rest.drop { [" ", "\t", "\n", "\r", "\u{0C}"].contains($0) }
+	let negative = rest.first == "-"
+	if rest.first == "-" || rest.first == "+" { rest = rest.dropFirst() }
+	let digits = rest.prefix { ("0"..."9").contains($0) }
+	guard !digits.isEmpty, let value = Int(String(String.UnicodeScalarView(digits))) else { return nil }
+	return negative && value != 0 ? nil : value
 }
 
 /// The language a browser with these preferred languages shows its own text in, among `available`: an exact match, then
@@ -354,6 +379,14 @@ public struct NativeContinuation: Equatable, Sendable {
 	public var `catch`: String? = nil
 }
 
+/// An async value's script function and the names it reads.
+public struct NativeAsync: Equatable, Sendable {
+	public let script: String
+	public let bindings: [NativeScriptBinding]
+	/// The `@try` branches that read it: it runs while one of them is shown.
+	public let boundaries: [String]
+}
+
 /// A device call a task cell starts at mount.
 public struct NativeTask: Equatable, Sendable {
 	public let call: String
@@ -402,6 +435,8 @@ public struct NativeCell: Equatable, Sendable {
 	public var object: String? = nil
 	/// An async device call started at mount; the cell holds `{ state: 'pending' | 'value' | 'error', ... }`.
 	public var task: NativeTask? = nil
+	/// An async value the payload's script computes: the script settles the cell; the host never does.
+	public var async: NativeAsync? = nil
 	/// State of a component a list row renders: one value per row of this `repeat`, `initial` when the row is built.
 	public var row: String? = nil
 	/// The clock when the screen opened: written at mount, before the first build.
@@ -434,11 +469,14 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public let forms: [NativeForm]
 	/// What the web says when a required field has no value, by locale, in payload order.
 	public let valueMissing: [(locale: String, messages: NativeValueMissing)]
+	/// What the web says when a text field a person edited is longer than its `maxlength`, by locale, in payload order.
+	public var tooLong: [(locale: String, message: NativeTooLong)] = []
 
 	public static func == (a: NativeViewPayload, b: NativeViewPayload) -> Bool {
 		a.component == b.component && a.route == b.route && a.cells == b.cells && a.nodes == b.nodes && a.events == b.events
 			&& a.handlers == b.handlers && a.title == b.title && a.objects == b.objects && a.forms == b.forms && a.valueMissing.map(\.locale) == b.valueMissing.map(\.locale)
-			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages) && a.script == b.script
+			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages) && a.tooLong.map(\.locale) == b.tooLong.map(\.locale)
+			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.script == b.script
 	}
 	/// The JavaScript the page's script ops and computeds run; absent when every handler is data.
 	public var script: NativeScript? = nil
@@ -449,13 +487,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "script"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "script"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object", "row", "clock"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "async", "object", "row", "clock"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
 			}
@@ -473,6 +511,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 				task: field.has("task") ? try {
 					let task = try field["task"].object(["call", "arguments"])
 					return NativeTask(call: try task["call"].string(), arguments: try task["arguments"].array().map(decodeExpr))
+				}() : nil,
+				async: field.has("async") ? try {
+					let async = try field["async"].object(["script", "bindings", "boundaries"])
+					return NativeAsync(script: try async["script"].string(), bindings: try decodeBindings(try async["bindings"]),
+						boundaries: try async["boundaries"].array().map { try $0.string() })
 				}() : nil,
 				row: field.has("row") ? try field["row"].string() : nil,
 				clock: field.has("clock"))
@@ -642,6 +685,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 					return .script(
 						fn: try opField["fn"].string(), type: try opField["type"].string(), bindings: try decodeBindings(try opField["bindings"]),
 						catch: opField.has("catch") ? try opField["catch"].string() : nil)
+				case "reset":
+					let opField = try op.object(required: ["op", "cells"], optional: ["catch"])
+					return .reset(
+						cells: try opField["cells"].array().map { try $0.string() },
+						catch: opField.has("catch") ? try opField["catch"].string() : nil)
 				case "if":
 					let opField = try op.object(["op", "test", "whenTrue", "whenFalse"])
 					return .when(
@@ -679,6 +727,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 				return (locale, NativeValueMissing(text: try m["text"].string(), checkbox: try m["checkbox"].string(), radio: try m["radio"].string()))
 			}
 		}() : []
+		let tooLong: [(locale: String, message: NativeTooLong)] = fields.has("tooLong") ? try {
+			let reader = try fields["tooLong"]
+			return try reader.keys().map { locale in
+				let m = try reader.field(locale).object(required: ["text"], optional: ["digits"])
+				let digits = m.has("digits") ? Array(try m["digits"].string()) : Array("0123456789")
+				guard digits.count == 10 else { throw PayloadError(path: "payload.tooLong.\(locale).digits", reason: "not ten digits") }
+				return (locale, NativeTooLong(text: try m["text"].string(), digits: digits))
+			}
+		}() : []
 		let route: NativeRoute? = fields.has("route") ? try {
 			let r = try fields["route"].object(["pattern", "params"])
 			return NativeRoute(pattern: try r["pattern"].string(), params: try r["params"].array().map { try $0.string() })
@@ -686,7 +743,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		let payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
 			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
-			objects: objects, forms: forms, valueMissing: valueMissing,
+			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong,
 			script: fields.has("script") ? try decodeScript(try fields["script"]) : nil)
 		try payload.check()
 		return payload
@@ -958,6 +1015,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 		}
 		for cell in cells {
+			if let async = cell.async, !async.bindings.flatMap(\.cells).allSatisfy(cellIds.contains) {
+				throw PayloadError(path: "payload.cells", reason: "\(cell.id) computes an async value with an unknown cell")
+			}
 			if let row = cell.row, !repeats.contains(row) {
 				throw PayloadError(path: "payload.cells", reason: "\(cell.id) is state of rows of \(row), which is not a list")
 			}

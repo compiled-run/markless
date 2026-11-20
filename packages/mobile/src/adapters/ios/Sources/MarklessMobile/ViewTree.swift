@@ -201,6 +201,8 @@ final class ViewTree {
 	let dismissGestures: [UIGestureRecognizer] = [UITapGestureRecognizer()]
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 	private var forwards: [LabelForward] = []
+	/// Each text field's typing limit, kept here because a field holds its delegate weakly.
+	private var limits: [LengthLimit] = []
 	private var dialogIds = Set<String>()
 	/// The stacking layout's paragraphs, by each text node and phrase element instance in them.
 	private var paragraphs: [String: Paragraph] = [:]
@@ -257,10 +259,10 @@ final class ViewTree {
 		for node in payload.nodes {
 			let parent = node.parent ?? ""
 			let key: String
-			if let row = node.row, (nodes[row]?.parent ?? "") == parent {
-				key = row
-			} else if let arm = node.arm, (nodes[arm.branch]?.parent ?? "") == parent {
+			if let arm = node.arm, let branch = nodes[arm.branch], branch.row == node.row, (branch.parent ?? "") == parent {
 				key = "\(arm.branch)#\(arm.index)"
+			} else if let row = node.row, (nodes[row]?.parent ?? "") == parent {
+				key = row
 			} else {
 				key = parent
 			}
@@ -484,7 +486,7 @@ final class ViewTree {
 				if open { sheet.open(from: presenter) } else { sheet.close() }
 			case .navigate, .title:
 				throw HostError("navigate and title entries reach the screen's controller, not its views")
-			case .call, .release, .fetch:
+			case .call, .release, .fetch, .abort:
 				throw HostError("a \(entry.json.jsonText) entry reaches the page's device or script services, not its views")
 			case let .dialog(node, open):
 				try present(node, open: open)
@@ -560,8 +562,8 @@ final class ViewTree {
 				position = (container.subviews.firstIndex(of: list.anchor) ?? 0) + 1
 				var placed = Set<ObjectIdentifier>()
 				for key in keys {
-					for id in built[key] ?? [] {
-						guard let view = paragraphs[id]?.view ?? elements[id] ?? labels[id], placed.insert(ObjectIdentifier(view)).inserted else { continue }
+					for id in (built[key] ?? []).flatMap(withArms) {
+						guard let view = branches[id]?.anchor ?? paragraphs[id]?.view ?? elements[id] ?? labels[id], placed.insert(ObjectIdentifier(view)).inserted else { continue }
 						container.insertSubview(view, at: position)
 						position += 1
 					}
@@ -697,9 +699,14 @@ final class ViewTree {
 	private func settle(_ container: UIView, built: [String], _ context: Context) {
 		if let button = context.button { refreshLabel(of: button) }
 		if layout == nil {
-			for id in built { if let view = elements[id] { stackTree(view) } }
+			for id in built.flatMap(withArms) { if let view = elements[id] { stackTree(view) } }
 			restack(container)
 		}
+	}
+
+	/// A branch instance followed by what its shown arm placed, recursively; any other id alone.
+	private func withArms(_ id: String) -> [String] {
+		[id] + (branches[id]?.built.flatMap(withArms) ?? [])
 	}
 
 	private func buildRow(_ list: String, key: String, item: NativeValue, in container: UIView, at index: inout Int, _ context: Context) throws -> [String] {
@@ -849,6 +856,9 @@ final class ViewTree {
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = UITextField()
+					let limit = LengthLimit { [weak self] in nativeMaxLength(self?.attributes[id]?["maxlength"]) }
+					limits.append(limit)
+					field.delegate = limit
 					field.addAction(UIAction { [weak self, weak field] _ in
 						self?.dismissMessage()
 						field?.resignFirstResponder()
@@ -941,9 +951,8 @@ final class ViewTree {
 				if let style = style(of: id) { try place(id, label, style) }
 				if let button = context.button { refreshLabel(of: button) }
 			case .branch:
-				if !context.suffix.isEmpty { throw HostError("@if inside a list row (\(id)) has no iOS host support yet") }
 				let marker = anchor(in: container, at: &index)
-				let arm = try runtime.arm(of: template)
+				let arm = try runtime.arm(of: template, in: context.scope)
 				let armViews = try arm.map { try build("\(template)#\($0)", in: container, at: &index, context) } ?? []
 				branches[id] = (marker, arm, armViews)
 			case .repeat:
@@ -1565,6 +1574,32 @@ final class TopLayerView: UIView {
 	override func accessibilityPerformEscape() -> Bool {
 		onEscape?()
 		return onEscape != nil
+	}
+}
+
+/// Stops typing at a field's `maxlength` as the web does: an insertion is cut to fit, never through a surrogate pair, while
+/// text the app sets is kept whole. Text an input method is still composing is left to it.
+@MainActor
+final class LengthLimit: NSObject, UITextFieldDelegate {
+	private let limit: () -> Int?
+
+	init(limit: @escaping () -> Int?) { self.limit = limit }
+
+	func textField(_ field: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+		guard field.markedTextRange == nil, let max = limit() else { return true }
+		let current = (field.text ?? "") as NSString
+		let inserted = string as NSString
+		let room = Swift.max(0, max - (current.length - range.length))
+		if inserted.length <= room { return true }
+		var cut = room
+		if cut > 0, UTF16.isLeadSurrogate(inserted.character(at: cut - 1)) { cut -= 1 }
+		if cut == 0, range.length == 0 { return false }
+		field.text = current.replacingCharacters(in: range, with: inserted.substring(to: cut))
+		if let caret = field.position(from: field.beginningOfDocument, offset: range.location + cut) {
+			field.selectedTextRange = field.textRange(from: caret, to: caret)
+		}
+		field.sendActions(for: .editingChanged)
+		return false
 	}
 }
 
