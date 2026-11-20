@@ -141,7 +141,7 @@ public struct NativeNode: Equatable, Sendable {
 		case branch(tests: [NativeExpr?])
 		/// A keyed `@for`: one row per item of `list`, keyed by `String()` of the item at `key`.
 		/// `key` nil: each row's key is its position (`byIndex`).
-		case `repeat`(list: NativeExpr, key: [String]?)
+		case `repeat`(list: NativeExpr, key: [String]?, keyParts: [NativeKeyPart]? = nil)
 		/// The platform's own sheet: its content (the nodes whose parent it is) is built at mount and kept while closed.
 		case sheet(open: NativeExpr, snapPoints: [Double], dismissible: Bool, modal: Bool)
 	}
@@ -590,14 +590,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
 					row: try decodeRow(field), kind: .branch(tests: tests))
 			case "repeat":
-				let field = try node.object(required: ["kind", "id", "parent", "list", "key"], optional: place + ["byIndex"])
+				let field = try node.object(required: ["kind", "id", "parent", "list", "key"], optional: place + ["byIndex", "keyParts"])
 				let key = try field["key"].array().map { try $0.string() }
 				let byIndex = field.has("byIndex") ? try field["byIndex"].bool() : false
 				if byIndex && !key.isEmpty { throw try field["key"].fail("a list keyed by its index has no key path") }
 				return NativeNode(
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
 					row: try decodeRow(field),
-					kind: .repeat(list: try decodeExpr(try field["list"]), key: byIndex ? nil : key))
+					kind: .repeat(list: try decodeExpr(try field["list"]), key: byIndex ? nil : key,
+						keyParts: try field.has("keyParts") ? decodeKeyParts(field["keyParts"]) : nil))
 			case "sheet":
 				let field = try node.object(["kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"])
 				let snapPoints = try field["snapPoints"].array().map { try $0.number() }
@@ -860,7 +861,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 				let fields = try binding.field("fields")
 				return NativeScriptBinding(name: name, kind: .fields(try fields.keys().map { NativeScriptField(name: $0, cell: try fields.field($0).string()) }))
 			case ["value"]: return NativeScriptBinding(name: name, kind: .value(try decodeExpr(try binding.field("value"))))
-			default: throw binding.fail("a script binding is { cell }, { fields } or { value }")
+			case ["elements"]: return NativeScriptBinding(name: name, kind: .elements(try decodeExpr(try binding.field("elements"))))
+			case ["object"]: return NativeScriptBinding(name: name, kind: .object(try decodeBindings(try binding.field("object"))))
+			case ["shared"]: return NativeScriptBinding(name: name, kind: .shared(try decodeBindings(try binding.field("shared"))))
+			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { elements }, { object } or { shared }")
 			}
 		}
 	}
@@ -1021,7 +1025,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			case let .branch(tests):
 				branchArms[node.id] = tests.count
 				try checkCells(node, tests.compactMap { $0 })
-			case let .repeat(list, _):
+			case let .repeat(list, _, _):
 				repeats.insert(node.id)
 				try checkCells(node, [list])
 			case let .sheet(open, _, _, _):
@@ -1246,4 +1250,17 @@ public struct NativeDeviceObject: Equatable, Sendable {
 public struct NativeLive: Sendable, Equatable {
 	public let assertive: Bool
 	public let atomic: Bool
+}
+
+/// One piece of a key joined from a row's fields: fixed text, or the value at a path on the item, as a template literal writes it.
+public enum NativeKeyPart: Equatable, Sendable {
+	case text(String)
+	case path([String])
+}
+
+func decodeKeyParts(_ reader: Reader) throws -> [NativeKeyPart] {
+	try reader.array().map { part in
+		if case .string = part.value { return .text(try part.string()) }
+		return .path(try part.array().map { try $0.string() })
+	}
 }

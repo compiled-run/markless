@@ -41,7 +41,6 @@ export function pageCommentCensus(root: ResumeDomNode, live?: boolean): ResumeDo
 export const elementsOf = (nodes: readonly ResumeDomNode[]) =>
 	nodes.filter((node): node is ResumeDomElement => node.nodeType === 1);
 
-// Walks a ProtocolElementAddress.
 export function marklessElementAt(from: unknown, address: ReadonlyArray<number>) {
 	let node = from as ResumeDomNode | undefined;
 	for (const step of address) {

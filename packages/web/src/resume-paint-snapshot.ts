@@ -33,7 +33,6 @@ export function templateSlots(repeat: ResumeKeyedRepeatRecord) {
 function slotsOf(owner: SlotOwner) {
 	return [...(owner.textSlots ?? []), ...(owner.attributeSlots ?? [])];
 }
-// One group per text or attribute slot, then one for every @if value.
 export function slotReadGroups(repeat: ResumeKeyedRepeatRecord): SlotRead[][] {
 	const branches = (repeat.rowTemplate?.branchSlots ?? []).flatMap((branch) => [branch, ...branch.arms.flatMap(slotsOf)]);
 	return [...templateSlots(repeat).map((slot) => [slot]), branches].map((group: ReadonlyArray<(typeof branches)[number]>) =>

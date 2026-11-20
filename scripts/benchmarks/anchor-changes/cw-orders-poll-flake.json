@@ -109,6 +109,16 @@
 			"set": 1266,
 			"reason": "G10: new module holding the row slot-read helpers moved from resume-keyed-repeats and the PaintSnapshot type, loaded with resume-async-wiring (#1010): 1266 B rendered",
 			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-keyed-repeats"
+			],
+			"delta": -883,
+			"reason": "G10: the row slot-read helpers moved to resume-paint-snapshot; the wiring adopts painted rows under the snapshot collections (#1010): 22402 -> 21519 B rendered",
+			"date": "2026-11-20"
 		}
 	]
 }

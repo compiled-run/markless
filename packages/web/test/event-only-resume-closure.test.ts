@@ -156,9 +156,9 @@ const resumeOnDemandEntries = [
 // 2026-11-17: a first click on a keyed row climbs from the target to its row instead of walking every row at each
 // ancestor (1,000 rows, cell no handler owns: 1,000 rows walked -> 1): 37,236 -> 37,431 raw, in resume-keyed-repeats.ts.
 // 2026-11-20: rows an arm painted are adopted under a typed paint snapshot taken before the commit's first await, so a value
-// landing while the arm wires reconciles over them: 37,429 -> 37,981 raw. The row slot-read helpers moved from
+// landing while the arm wires reconciles over them: 37,364 -> 37,916 raw. The row slot-read helpers moved from
 // resume-keyed-repeats.ts to resume-paint-snapshot.ts unchanged; the growth is that module's imports and type plus the lookup.
-const sourceByteLimit = 37981;
+const sourceByteLimit = 37916;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',
