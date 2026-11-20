@@ -79,6 +79,16 @@
 			"delta": -4,
 			"reason": "resume-async-wiring +290 B rendered (16061 -> 16351): an arm commit reads each page-held list collection before its first await so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010)",
 			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": 368,
+			"reason": "an arm commit reads each page-held list collection before its first await so a value landing while the arm wires reconciles over the painted rows (16058 -> 16351 B, +293; orders poll flake, #1010)",
+			"date": "2026-11-20"
 		}
 	]
 }
