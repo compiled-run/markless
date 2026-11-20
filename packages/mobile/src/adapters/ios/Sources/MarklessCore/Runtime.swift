@@ -743,9 +743,13 @@ public final class NativeRuntime {
 	}
 
 	private func textOf(field id: String) throws -> String {
-		if let typed = edited[id] { return typed }
-		if let binding = try propertyBinding(id, "value") { return textOf(try evaluate(binding.value)) }
-		return try attributeNow(id, "value") ?? ""
+		let text: String
+		if let typed = edited[id] { text = typed }
+		else if let binding = try propertyBinding(id, "value") { text = textOf(try evaluate(binding.value)) }
+		else { text = try attributeNow(id, "value") ?? "" }
+		// A range keeps a number in its range and on its step, whatever it is given.
+		guard try attributeNow(id, "type") == "range" else { return text }
+		return nativeRangeValue(text, min: try attributeNow(id, "min"), max: try attributeNow(id, "max"), step: try attributeNow(id, "step"))
 	}
 
 	private func checkedBinding(_ id: String) throws -> Bool? {

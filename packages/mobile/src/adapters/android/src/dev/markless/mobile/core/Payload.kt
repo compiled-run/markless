@@ -284,6 +284,37 @@ data class EmailMismatch(val noAt: String, val emptyLocal: String, val emptyDoma
 /** An email field's value as the web keeps it: line breaks dropped, then ASCII whitespace trimmed from both ends. */
 fun emailValue(typed: String): String = typed.filter { it != '\n' && it != '\r' }.trim { it in " \t\n\r\u000C" }
 
+/**
+ * A range input's value as the web keeps it (`nativeRangeValue` in @markless/serializer): `min` 0 and `max` 100 by default
+ * (a `max` below `min` is `min`); a value that is not a number is the midpoint; clamped into the range and moved to the
+ * nearest step from `min` (the greater of two as near), at or below `max`; written as JavaScript writes the number.
+ */
+fun nativeRangeValue(value: String?, min: String?, max: String?, step: String?): String {
+	val numeric = Regex("^-?(\\d+(\\.\\d+)?|\\.\\d+)([eE][-+]?\\d+)?$")
+	fun number(text: String?): Double? = text?.takeIf { numeric.matches(it) }?.toDouble()
+	fun places(n: Double): Int {
+		val written = Js.toStr(JsValue.Num(n))
+		val mantissa = written.substringBefore('e')
+		val fraction = if ('.' in mantissa) mantissa.substringAfter('.').length else 0
+		val exponent = if ('e' in written) written.substringAfter('e').toInt() else 0
+		return maxOf(0, fraction - exponent)
+	}
+	val low = number(min) ?: 0.0
+	val high = maxOf(low, number(max) ?: 100.0)
+	val any = step?.trim()?.lowercase() == "any"
+	val size = if (any) null else number(step)?.takeIf { it > 0 } ?: 1.0
+	var v = minOf(high, maxOf(low, number(value) ?: (low + (high - low) / 2)))
+	if (size != null) {
+		val unit = Math.pow(10.0, maxOf(places(low), places(size), places(v)).toDouble())
+		fun whole(n: Double) = Math.round(n * unit).toDouble()
+		val stepUnits = whole(size)
+		var steps = Math.floor((whole(v) - whole(low)) / stepUnits + 0.5)
+		while (steps > 0 && whole(low) + steps * stepUnits > whole(high)) steps -= 1
+		v = (whole(low) + steps * stepUnits) / unit
+	}
+	return Js.toStr(JsValue.Num(v))
+}
+
 /** A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers; null (no limit) when it has none. */
 fun nativeMaxLength(attribute: String?): Int? {
 	if (attribute == null) return null

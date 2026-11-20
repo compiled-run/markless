@@ -25,7 +25,7 @@ import {
 } from '../src/index.ts';
 import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
-import { nativeMaxLength } from '@markless/serializer/native-view';
+import { nativeMaxLength, nativeRangeValue } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
 import {
 	looksOnly,
@@ -916,6 +916,18 @@ function walk(
 			if (!choice || choice.disabled)
 				throw new Error(`step ${index}: "${action.choose.field}" has no option "${action.choose.option}" to pick`);
 			apply(runtime.dispatch({ event: 'choose', host: choice.option }), index);
+		} else if (action && 'slide' in action) {
+			const slider = elementReading(action.slide.field);
+			if (!slider) throw new Error(`step ${index}: nothing reads "${action.slide.field}" to slide`);
+			// The phone reports the end the thumb reaches, on the slider's step, as an input.
+			const end = attributeNow(slider, action.slide.to === 'max' ? 'max' : 'min');
+			const value = nativeRangeValue(
+				end ?? (action.slide.to === 'max' ? '100' : '0'),
+				attributeNow(slider, 'min'),
+				attributeNow(slider, 'max'),
+				attributeNow(slider, 'step'),
+			);
+			apply(runtime.dispatch({ event: 'input', host: slider, value }), index);
 		} else if (action && 'drag' in action) {
 			const host = elementReading(action.drag.on);
 			if (!host) throw new Error(`step ${index}: nothing reads "${action.drag.on}" to drag`);

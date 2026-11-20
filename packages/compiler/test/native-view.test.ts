@@ -322,6 +322,38 @@ export function Settings() @{
 		expect(payload?.events.map((event) => [event.host, event.event])).toEqual([['h1', 'activate']]);
 	});
 
+	it('lowers a range input with its min, max and step, reports its moves in a form, and refuses its change by name', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Mixer() @{
+	let sent = state('');
+	<main>
+		<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget).get('level')); }}>
+			<input type="range" name="level" aria-label="Level" min="0" max="10" step="2" />
+			<input name="note" aria-label="Note" />
+			<button>Send</button>
+		</form>
+		<p>{sent}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.forms?.[0]?.fields).toEqual([
+			{ node: 'h2', kind: 'text' },
+			{ node: 'h3', kind: 'text' },
+		]);
+		// The range reports its moves; only the text field has a return key.
+		expect(payload?.events.filter((event) => event.host === 'h2').map((event) => event.event)).toEqual(['input']);
+		expect(payload?.events.filter((event) => event.host === 'h3').map((event) => event.event).sort()).toEqual([
+			'enter',
+			'input',
+		]);
+		const changed = await nativeView(`export function Mixer() @{
+	<input type="range" aria-label="Level" onChange={() => {}} />
+}`);
+		expect(changed.diagnostics.map((d) => d.message)).toEqual([
+			'the change handler on the <input type="range"> h0 runs when the slider is let go, which phones do not report yet',
+		]);
+	});
+
 	it('builds a dynamic element (`<{tag}>`) as the element its tag names for each use, with its attributes, events and children', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Box({ asChild, children, ...rest }) @{

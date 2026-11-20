@@ -43,6 +43,7 @@ import dev.markless.mobile.core.ScrollBox
 import dev.markless.mobile.core.ScrollRange
 import dev.markless.mobile.core.ScrollRect
 import dev.markless.mobile.core.nativeMaxLength
+import dev.markless.mobile.core.nativeRangeValue
 import dev.markless.mobile.core.scrollIntoView
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Instance
@@ -773,7 +774,7 @@ class MarklessHost(
 			}
 			// The select's list shows its options; their views only keep their text current.
 			"option" -> MarklessBox(context).apply { visibility = View.GONE }
-			"input" -> EditText(context).apply {
+			"input" -> if (node.attributes["type"] == "range") RangeBar(context).also { named(it, inst.id) } else EditText(context).apply {
 				filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
 				// Chrome gives an email field the email keyboard.
 				if (node.attributes["type"] == "email") inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
@@ -822,7 +823,7 @@ class MarklessHost(
 					else -> { apply(runtime.dispatch(inst.id, EventName.Enter)); true }
 				}
 			}
-			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
+			EventName.Input -> if (view is RangeBar) view.onInput = { value -> apply(runtime.dispatch(inst.id, EventName.Input, value)) } else (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
 				override fun afterTextChanged(s: Editable) {
@@ -947,6 +948,7 @@ class MarklessHost(
 		val current = attrs.getOrPut(id) { HashMap() }
 		if (value == null) current.remove(name) else current[name] = value
 		if (id in inert && (name == "aria-hidden" || name == "hidden")) return
+		if (view is RangeBar && name in RangeBar.SHAPE) view.show(current)
 		when (name) {
 			// A label names its control, so TalkBack reads it there and not a second time on the label; a press on it activates the control.
 			"for" -> if (value != null) {
@@ -1250,3 +1252,57 @@ private fun EditText.setAppText(text: String) {
 	limit?.appWriting = true
 	try { setText(text) } finally { limit?.appWriting = false }
 }
+
+/**
+ * `<input type="range">`: a seek bar whose progress counts the input's steps from its minimum (a thousandth of the range
+ * for `step="any"`), its value kept as the web keeps it (`nativeRangeValue`). A move reports the value it lands on once,
+ * as the web's input event does while the thumb crosses a step.
+ */
+class RangeBar(context: Context) : android.widget.SeekBar(context) {
+	var onInput: ((String) -> Unit)? = null
+	private var attributes: Map<String, String> = emptyMap()
+	private var low = 0.0
+	private var unit = 1.0
+	private var reported = ""
+	private var showing = false
+
+	init {
+		// Chrome's unstyled range input is 129 px wide.
+		minimumWidth = Math.round(129 * resources.displayMetrics.density)
+		setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+			override fun onProgressChanged(bar: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
+				if (!fromUser || showing) return
+				val landed = valueOf((low + progress * unit).toString())
+				if (landed == reported) return
+				reported = landed
+				onInput?.invoke(landed)
+			}
+			override fun onStartTrackingTouch(bar: android.widget.SeekBar) {}
+			override fun onStopTrackingTouch(bar: android.widget.SeekBar) {}
+		})
+	}
+
+	private fun valueOf(raw: String?) = nativeRangeValue(raw, attributes["min"], attributes["max"], attributes["step"])
+
+	/** Takes the input's attributes: its range, its step and the value the page gives it. */
+	fun show(current: Map<String, String>) {
+		attributes = HashMap(current)
+		low = valueOf(current["min"] ?: "0").toDouble()
+		val high = valueOf(current["max"] ?: "100").toDouble()
+		val step = current["step"]?.trim()
+		unit = if (step?.lowercase() == "any") maxOf((high - low) / 1000, Double.MIN_VALUE) else step?.toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0
+		reported = valueOf(current["value"])
+		showing = true
+		max = Math.round((high - low) / unit).toInt()
+		progress = Math.round((reported.toDouble() - low) / unit).toInt()
+		showing = false
+		isEnabled = current["disabled"] == null
+		contentDescription = current["aria-label"]
+	}
+
+	companion object {
+		/** The attributes that shape the bar or its value. */
+		val SHAPE = setOf("min", "max", "step", "value", "disabled", "aria-label")
+	}
+}
+

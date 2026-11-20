@@ -385,6 +385,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A slider's moves set its value on its step and in its range; the app sets it back.
+		name: 'range',
+		fixture: 'proofs/r153-range/App.tsrx',
+		actions: [
+			{ event: 'input', host: 'h2', value: '10' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h2', value: '7' },
+		],
+	},
+	{
 		name: 'forms',
 		fixture: 'test/fixtures/Forms.tsrx',
 		actions: [

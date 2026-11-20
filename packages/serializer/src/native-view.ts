@@ -812,6 +812,47 @@ export function nativeEmailMismatch(
 	return fill(messages.other);
 }
 
+/** A number as HTML parses a range input's attributes: a valid floating-point number, else undefined. */
+const rangeNumber = (text: string | null | undefined): number | undefined =>
+	text != null && /^-?(\d+(\.\d+)?|\.\d+)([eE][-+]?\d+)?$/.test(text) ? Number(text) : undefined;
+
+/** The decimal places a number is written with, so stepped values print as the browser writes them. */
+const decimals = (value: number): number => {
+	const [, fraction = '', exponent = '0'] = /^-?\d*(?:\.(\d+))?(?:e([-+]?\d+))?$/.exec(String(value)) ?? [];
+	return Math.max(0, fraction.length - Number(exponent));
+};
+
+/**
+ * A range input's value as the web keeps it, from its `value`, `min`, `max` and `step` attributes: `min` 0 and `max`
+ * 100 by default (a `max` below `min` is `min`); a value that is not a number is the midpoint; it is clamped into the
+ * range and moved to the nearest step from `min` (the greater of two as near), staying at or below `max`.
+ */
+export function nativeRangeValue(
+	value: string | null | undefined,
+	min: string | null | undefined,
+	max: string | null | undefined,
+	step: string | null | undefined,
+): string {
+	const low = rangeNumber(min) ?? 0;
+	const high = Math.max(low, rangeNumber(max) ?? 100);
+	const any = step?.trim().toLowerCase() === 'any';
+	const stepNumber = rangeNumber(step);
+	const size = any ? undefined : stepNumber !== undefined && stepNumber > 0 ? stepNumber : 1;
+	let number = rangeNumber(value) ?? low + (high - low) / 2;
+	number = Math.min(high, Math.max(low, number));
+	if (size !== undefined) {
+		// In whole units of the finest written place, as the browser's decimal arithmetic reads them.
+		const places = Math.max(decimals(low), decimals(size), decimals(number));
+		const unit = 10 ** places;
+		const whole = (n: number) => Math.round(n * unit);
+		const stepUnits = whole(size);
+		let steps = Math.floor((whole(number) - whole(low)) / stepUnits + 0.5);
+		while (steps > 0 && whole(low) + steps * stepUnits > whole(high)) steps--;
+		number = (whole(low) + steps * stepUnits) / unit;
+	}
+	return String(number);
+}
+
 /** A form's submittable fields and submit buttons, each in tree order. */
 export type NativeForm = {
 	readonly node: string;

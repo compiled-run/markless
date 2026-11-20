@@ -576,7 +576,11 @@ class Runtime(
 	private fun propertyBinding(id: String, name: String) = elementOf(id).bindings.firstOrNull { it.property && it.name == name }
 
 	/** A text field's text: what was typed since its binding last wrote it, else its `value` binding, else its `value` attribute. */
-	fun textOf(id: String): String = edited[id] ?: propertyBinding(id, "value")?.let(::property) ?: attributeNow(id, "value") ?: ""
+	fun textOf(id: String): String {
+		val text = edited[id] ?: propertyBinding(id, "value")?.let(::property) ?: attributeNow(id, "value") ?: ""
+		// A range keeps a number in its range and on its step, whatever it is given.
+		return if (attributeNow(id, "type") == "range") nativeRangeValue(text, attributeNow(id, "min"), attributeNow(id, "max"), attributeNow(id, "step")) else text
+	}
 
 	/** Every non-row checkbox and radio button, in payload order. */
 	private val ticked = payload.nodes.filterIsInstance<Node.Element>().filter { it.element == "input" && it.row == null && it.attributes["type"].let { t -> t == "checkbox" || t == "radio" } }

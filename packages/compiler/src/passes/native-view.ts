@@ -4201,7 +4201,7 @@ export function createNativeViewPayload(
 					drawnType !== undefined &&
 					drawnType !== '' &&
 					!TEXT_TYPES.has(drawnType) &&
-					!['checkbox', 'radio', 'hidden', 'submit'].includes(drawnType)
+					!['checkbox', 'radio', 'hidden', 'submit', 'range'].includes(drawnType)
 				)
 					refuse(`the <input type="${drawnType}"> ${id}, which no native host draws or checks yet`, span);
 				// A submit input is the button its `value` labels, as the web draws it.
@@ -4241,7 +4241,9 @@ export function createNativeViewPayload(
 					if (NOT_ON_PHONES.has(event.eventName)) continue;
 					if (
 						KEYBOARD_ONLY.has(event.eventName) &&
-						(!TEXT_ENTRY.has(element ?? '') || TICKED_TYPES.has(inputType ?? ''))
+						(!TEXT_ENTRY.has(element ?? '') ||
+							TICKED_TYPES.has(inputType ?? '') ||
+							inputType === 'range')
 					) {
 						keyboardOnly(
 							`the ${event.eventName} handler on <${element}> ${id}`,
@@ -6715,7 +6717,9 @@ export function createNativeViewPayload(
 				for (const pending of own)
 					if (pending.event.eventName === 'change')
 						refuse(
-							`the change handler on the <input> ${node.id}: a text field raises it when it loses focus, which a native build has no lowering for yet`,
+							node.attributes?.['type'] === 'range'
+								? `the change handler on the <input type="range"> ${node.id} runs when the slider is let go, which phones do not report yet`
+								: `the change handler on the <input> ${node.id}: a text field raises it when it loses focus, which a native build has no lowering for yet`,
 							pending.event.handlerSpan,
 						);
 				continue;
@@ -6808,6 +6812,7 @@ export function createNativeViewPayload(
 			const fields: NativeForm['fields'][number][] = [];
 			const submitters: string[] = [];
 			const textFields: string[] = [];
+			const ranges: string[] = [];
 			/** Fields and submit buttons in an @if arm inside the form: they take part only while it shows them. */
 			const armed = new Set<string>();
 			for (const node of nodes) {
@@ -6861,13 +6866,15 @@ export function createNativeViewPayload(
 					submitters.push(node.id);
 					continue;
 				}
+				const range = type === 'range';
+				// A range's min, max and step only shape its value, which is always valid; they never stop a submit.
 				for (const name of UNCHECKED_CONSTRAINTS)
-					if (attribute(node, name))
+					if (attribute(node, name) && !(range && ['min', 'max', 'step'].includes(name)))
 						refuse(
 							`${field} has \`${name}\`, which the web checks before a submit and no native host checks yet`,
 						);
 				let kind: NativeFieldKind;
-				if (type === undefined || TEXT_TYPES.has(type)) kind = 'text';
+				if (type === undefined || TEXT_TYPES.has(type) || range) kind = 'text';
 				else if (type === 'checkbox' || type === 'radio' || type === 'hidden') kind = type;
 				// Any other type is refused where the element is lowered.
 				else continue;
@@ -6876,7 +6883,9 @@ export function createNativeViewPayload(
 						`${field} binds the \`name\` of a radio button, which a native build reads only as written`,
 					);
 				fields.push({ node: node.id, kind });
-				if (kind === 'text') {
+				// A range is no text field: it blocks no implicit submission and has no return key.
+				if (range) ranges.push(node.id);
+				if (kind === 'text' && !range) {
 					textFields.push(node.id);
 					if (attribute(node, 'maxlength')) lengthLimited = true;
 					if (type === 'email') emailChecked = true;
@@ -6927,6 +6936,8 @@ export function createNativeViewPayload(
 					: textFields.length === 1
 						? [{ op: 'submit', form: form.id, submitter: null }]
 						: [];
+			// The runtime keeps each range's value from its moves, as each text field's text from its edits.
+			for (const field of ranges) ensureHandler(field, 'input', 'edit');
 			for (const field of textFields) {
 				// The runtime keeps each field's text from its edits, so every text field reports them.
 				ensureHandler(field, 'input', 'edit');

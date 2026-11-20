@@ -18,6 +18,7 @@ import {
 	nativeLocale,
 	nativeMaxLength,
 	nativeEmailMismatch,
+	nativeRangeValue,
 	nativeEmailValue,
 	nativeTooLongMessage,
 } from '@markless/serializer/native-view';
@@ -883,9 +884,16 @@ export function createNativeRuntime(
 	const propertyBinding = (id: string, name: string) =>
 		elementOf(id).bindings?.find((one) => 'property' in one && one.property === name);
 	const textOf = (id: string): string => {
-		if (edited.has(id)) return edited.get(id)!;
 		const binding = propertyBinding(id, 'value');
-		return binding ? String(evaluate(binding.value) ?? '') : (attributeNow(id, 'value') ?? '');
+		const text = edited.has(id)
+			? edited.get(id)!
+			: binding
+				? String(evaluate(binding.value) ?? '')
+				: (attributeNow(id, 'value') ?? '');
+		// A range keeps a number in its range and on its step, whatever it is given.
+		return attributeNow(id, 'type') === 'range'
+			? nativeRangeValue(text, attributeNow(id, 'min'), attributeNow(id, 'max'), attributeNow(id, 'step'))
+			: text;
 	};
 	const ticked = payload.nodes.flatMap((node) =>
 		node.kind === 'element' &&

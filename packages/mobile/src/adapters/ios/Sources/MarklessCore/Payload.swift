@@ -373,6 +373,44 @@ public struct NativeEmailMismatch: Equatable, Sendable {
 	}
 }
 
+/// A range input's value as the web keeps it (`nativeRangeValue` in @markless/serializer): `min` 0 and `max` 100 by default
+/// (a `max` below `min` is `min`); a value that is not a number is the midpoint; clamped into the range and moved to the
+/// nearest step from `min` (the greater of two as near), at or below `max`; written as JavaScript writes the number.
+public func nativeRangeValue(_ value: String?, min: String?, max: String?, step: String?) -> String {
+	func number(_ text: String?) -> Double? {
+		guard let text, text.range(of: #"^-?(\d+(\.\d+)?|\.\d+)([eE][-+]?\d+)?$"#, options: .regularExpression) != nil else { return nil }
+		return Double(text)
+	}
+	func places(_ n: Double) -> Int {
+		let written = jsNumber(n)
+		let parts = written.components(separatedBy: "e")
+		let mantissa = parts[0].components(separatedBy: ".")
+		let fraction = mantissa.count > 1 ? mantissa[1].count : 0
+		let exponent = parts.count > 1 ? Int(parts[1]) ?? 0 : 0
+		return Swift.max(0, fraction - exponent)
+	}
+	let low = number(min) ?? 0
+	let high = Swift.max(low, number(max) ?? 100)
+	let any = step?.trimmingCharacters(in: .whitespaces).lowercased() == "any"
+	let size: Double? = any ? nil : (number(step).flatMap { $0 > 0 ? $0 : nil } ?? 1)
+	var value = Swift.min(high, Swift.max(low, number(value) ?? low + (high - low) / 2))
+	if let size {
+		let unit = pow(10, Double(Swift.max(places(low), places(size), places(value))))
+		func whole(_ n: Double) -> Double { (n * unit).rounded() }
+		let stepUnits = whole(size)
+		var steps = ((whole(value) - whole(low)) / stepUnits + 0.5).rounded(.down)
+		while steps > 0 && whole(low) + steps * stepUnits > whole(high) { steps -= 1 }
+		value = (whole(low) + steps * stepUnits) / unit
+	}
+	return jsNumber(value)
+}
+
+/// A number as JavaScript's `String(n)` writes it for the values a range takes: whole numbers without a fraction.
+func jsNumber(_ n: Double) -> String {
+	if n == n.rounded(), abs(n) < 1e21 { return String(Int64(n)) }
+	return "\(n)"
+}
+
 /// A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers; nil (no limit) when it has none.
 public func nativeMaxLength(_ attribute: String?) -> Int? {
 	guard var rest = attribute?.unicodeScalars[...] else { return nil }
