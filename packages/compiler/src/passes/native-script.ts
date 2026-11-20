@@ -299,6 +299,10 @@ if (!host) {
 		if (!deviceCalls[call].object) host.devices[device] = callsOn(device, null);
 	});
 	host.deviceObject = callsOn;
+	g.getComputedStyle = function (element) {
+		if (!element || typeof element.__style !== 'function') throw new TypeError('getComputedStyle() takes an element');
+		return element.__style();
+	};
 	g.window = g.self = g;
 	host.Response = Response;
 	// The HTML structured clone, as Chromium runs it, for an engine that has none.
@@ -490,7 +494,8 @@ var pathOf = function (pattern, params) {
 	}).join('/');
 };
 // An element is a proxy that offers only what the host answers: the attributes it has now, whether it holds another
-// element, and the commands a handler's data can run. No tree walking, no selectors, no layout.
+// element, its box and direction as the host measured them when the entry began, and the commands a handler's data can
+// run. No tree walking, no selectors.
 var elementFacts = {};
 var proxies = {};
 var elementOf = function (id) {
@@ -516,10 +521,27 @@ var elementOf = function (id) {
 		showModal: function () { command('showModal', false); },
 		close: function () { command('close', false); },
 		getBoundingClientRect: function () {
-			throw new Error('getBoundingClientRect() asks the host to measure while JavaScript waits, which a phone does not answer');
+			var box = facts().box;
+			if (!box) throw new Error('the host measured no box for ' + id);
+			return { x: box.x, y: box.y, left: box.x, top: box.y, width: box.width, height: box.height, right: box.x + box.width, bottom: box.y + box.height };
 		},
+		// A touch on a phone keeps reaching the view it began on, as a captured pointer does.
+		setPointerCapture: function () {},
+		releasePointerCapture: function () {},
 	};
 	Object.defineProperty(proxy, '__node', { value: id });
+	Object.defineProperty(proxy, '__style', {
+		value: function () {
+			var direction = facts().direction || 'ltr';
+			return {
+				direction: direction,
+				getPropertyValue: function (name) {
+					if (name === 'direction') return direction;
+					throw new Error('a phone answers only an element\'s direction from getComputedStyle(), not ' + name);
+				},
+			};
+		},
+	});
 	proxies[id] = proxy;
 	return proxy;
 };

@@ -285,6 +285,9 @@ public final class NativeRuntime {
 	public private(set) var dialogs: [String: Bool]
 	/// Where a page with a script gets its engine; asked only when a script op runs or a script computed is read.
 	private let scriptHost: NativeScriptHost?
+	/// The screen's views: the box of an element (its node id, `<node>@<key>` in a row) a script reads, measured as an
+	/// entry begins; nil when it has no view.
+	public var measure: ((String) -> NativeElementBox?)?
 
 	/// The device's clock, in milliseconds since 1970 (UTC).
 	private let now: () -> Double
@@ -656,7 +659,12 @@ public final class NativeRuntime {
 				ancestors.append(.string(!key.isEmpty && nodesById[parent]?.row != nil ? parent + key : parent))
 				up = nodesById[parent]?.parent
 			}
-			facts.append((id, .object([("attributes", .object(attributes)), ("ancestors", .array(ancestors))])))
+			var fact: [(String, JSONValue)] = [("attributes", .object(attributes)), ("ancestors", .array(ancestors))]
+			if let box = measure?(id) {
+				fact.append(("box", .object([("x", .number(box.x)), ("y", .number(box.y)), ("width", .number(box.width)), ("height", .number(box.height))])))
+				fact.append(("direction", .string(box.rightToLeft ? "rtl" : "ltr")))
+			}
+			facts.append((id, .object(fact)))
 		}
 		func visit(_ frame: JSONValue) throws {
 			guard case let .object(names) = frame else { return }
@@ -1862,6 +1870,23 @@ public final class NativeAppStack {
 		guard screens.count > 1 else { throw RuntimeError(reason: "back on the first screen leaves the app") }
 		let left = try screens.removeLast().runtime.leave()
 		return left + (try screens[screens.count - 1].runtime.resume())
+	}
+}
+
+/// An element's box in CSS pixels from the screen's top left, and its text direction, as its view has them now.
+public struct NativeElementBox: Equatable {
+	public let x: Double
+	public let y: Double
+	public let width: Double
+	public let height: Double
+	public let rightToLeft: Bool
+
+	public init(x: Double, y: Double, width: Double, height: Double, rightToLeft: Bool) {
+		self.x = x
+		self.y = y
+		self.width = width
+		self.height = height
+		self.rightToLeft = rightToLeft
 	}
 }
 

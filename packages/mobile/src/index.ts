@@ -31,6 +31,7 @@ export {
 	formatNativeValue,
 	type NativeAction,
 	type NativeRuntime,
+	type NativeElementBox,
 	type NativeScriptHost,
 } from './runtime.ts';
 export type { NativeScriptEngine } from './script-engine.ts';

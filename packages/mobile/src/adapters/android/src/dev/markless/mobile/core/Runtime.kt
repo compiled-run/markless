@@ -135,6 +135,9 @@ data class FetchRequest(val url: String, val method: String, val headers: List<P
 	fun toJson() = "{\"url\":${jsonString(url)},\"method\":${jsonString(method)},\"headers\":${headers.joinToString(",", "[", "]") { "[${jsonString(it.first)},${jsonString(it.second)}]" }},\"body\":${body?.let(::jsonString) ?: "null"}}"
 }
 
+/** An element's box in CSS pixels from the screen's top left, and its text direction, as its view has them now. */
+data class ElementBox(val x: Double, val y: Double, val width: Double, val height: Double, val rightToLeft: Boolean)
+
 /** `JSON.stringify` of a value: non-finite numbers are `null`. */
 /** What a touch adds to a script pointer handler's event, in the order the reference writes them. */
 private val TOUCH_FIELDS = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp")
@@ -427,6 +430,9 @@ class Runtime(
 	/** Called with each line the script logs. */
 	var onScriptLog: ((level: String, text: String) -> Unit)? = null
 
+	/** The screen's views: the box of an element (its node id, `<node>@<key>` in a row) a script reads, measured as an entry begins; null when it has no view. */
+	var measure: ((id: String) -> ElementBox?)? = null
+
 	/** Called with each engine entry's duration in nanoseconds, including starting the engine when the entry had to. */
 	var onScriptEntry: ((nanos: Long) -> Unit)? = null
 
@@ -532,7 +538,11 @@ class Runtime(
 				ancestors.add(jsonString(if (key.isNotEmpty() && byId[up]?.row != null) up + key else up))
 				up = byId[up]?.parent
 			}
-			facts[id] = "{\"attributes\":${attributes.joinToString(",", "{", "}")},\"ancestors\":${ancestors.joinToString(",", "[", "]")}}"
+			val box = measure?.invoke(id)?.let { b ->
+				val n = { v: Double -> jsonValue(JsValue.Num(v)) }
+				",\"box\":{\"x\":${n(b.x)},\"y\":${n(b.y)},\"width\":${n(b.width)},\"height\":${n(b.height)}},\"direction\":\"${if (b.rightToLeft) "rtl" else "ltr"}\""
+			} ?: ""
+			facts[id] = "{\"attributes\":${attributes.joinToString(",", "{", "}")},\"ancestors\":${ancestors.joinToString(",", "[", "]")}$box}"
 		}
 		fun visit(named: Map<String, ScriptBinding>) {
 			for (b in named.values) when (b) {

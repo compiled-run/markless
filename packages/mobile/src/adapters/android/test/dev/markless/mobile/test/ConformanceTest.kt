@@ -3,6 +3,7 @@ package dev.markless.mobile.test
 import dev.markless.mobile.core.AppPayload
 import dev.markless.mobile.core.AppRuntime
 import dev.markless.mobile.core.AttributeValue
+import dev.markless.mobile.core.ElementBox
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Js
 import dev.markless.mobile.core.MemoryStore
@@ -124,6 +125,12 @@ private fun runVector(file: File) {
 	val now = (vector["now"] as? Json.Num)?.value
 	TestScriptHost().use { host ->
 		val runtime = if (now == null) Runtime(payload, params = params, preferredLanguages = languages, scriptHost = host) else Runtime(payload, params = params, preferredLanguages = languages, now = { now }, scriptHost = host)
+		val layout = vector["layout"]?.obj("layout")?.mapValues { (id, box) ->
+			val b = box.obj("layout.$id")
+			fun number(key: String) = (b[key] as? Json.Num)?.value ?: throw IllegalStateException("layout.$id.$key is not a number")
+			ElementBox(number("x"), number("y"), number("width"), number("height"), (b["direction"] as? Json.Str)?.value == "rtl")
+		}
+		if (layout != null) runtime.measure = { layout[it] }
 		runVector(file, vector, runtime)
 		if (payload.script == null) check("${file.name} starts no engine", !host.started) { "a payload without a script started the engine" }
 	}

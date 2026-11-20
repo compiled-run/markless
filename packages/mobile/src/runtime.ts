@@ -259,6 +259,15 @@ export type NativeRuntime = {
 	readonly resume: () => ReadonlyArray<NativeJournalEntry>;
 };
 
+/** An element's box in CSS pixels from the screen's top left, and its text direction, as its view has them now. */
+export type NativeElementBox = {
+	readonly x: number;
+	readonly y: number;
+	readonly width: number;
+	readonly height: number;
+	readonly direction: 'ltr' | 'rtl';
+};
+
 /** How the runtime gets a script engine and the bytes `crypto` draws from; a host owns both. */
 export type NativeScriptHost = {
 	/** The app's engine, started the first time any screen asks; later asks give the same one. */
@@ -580,6 +589,8 @@ export function createNativeRuntime(
 	scriptHost?: NativeScriptHost,
 	/** The app's values of its app-wide `shared()` cells, one for every page: read at mount and on `resume`, written on every change. */
 	session: Map<string, Value> = new Map(),
+	/** The screen's views: the box of an element (its node id, `<node>@<key>` in a row) a script reads, measured as an entry begins; null when it has no view. */
+	measure?: (id: string) => NativeElementBox | null,
 ): NativeRuntime {
 	const base: NativeScope = {
 		...EMPTY_SCOPE,
@@ -731,7 +742,15 @@ export function createNativeRuntime(
 	 * elements it is inside, nearest first.
 	 */
 	const elementFacts = (frame: Record<string, unknown>) => {
-		const facts: Record<string, { attributes: Record<string, string>; ancestors: string[] }> = {};
+		const facts: Record<
+			string,
+			{
+				attributes: Record<string, string>;
+				ancestors: string[];
+				box?: { x: number; y: number; width: number; height: number };
+				direction?: 'ltr' | 'rtl';
+			}
+		> = {};
 		const add = (id: unknown) => {
 			if (typeof id !== 'string' || facts[id] || !elements.isElement(id)) return;
 			const at = id.indexOf('@');
@@ -749,7 +768,15 @@ export function createNativeRuntime(
 			const ancestors: string[] = [];
 			for (let up = node?.parent; up; up = nodesById.get(up)?.parent)
 				ancestors.push(key && nodesById.get(up)?.row ? `${up}${key}` : up);
-			facts[id] = { attributes, ancestors };
+			const measured = measure?.(id);
+			facts[id] = measured
+				? {
+						attributes,
+						ancestors,
+						box: { x: measured.x, y: measured.y, width: measured.width, height: measured.height },
+						direction: measured.direction,
+					}
+				: { attributes, ancestors };
 		};
 		const visit = (names: Record<string, unknown>) => {
 			for (const entry of Object.values(names)) {

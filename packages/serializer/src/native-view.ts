@@ -173,8 +173,9 @@ export type NativeScriptBinding =
 	| { readonly device: NativeDeviceObject; readonly object: string }
 	/**
 	 * An element (its node id) or an array of them, which the function reads through proxies: `getAttribute`,
-	 * `hasAttribute`, `contains`, and the commands `focus` and `scrollIntoView`. The host answers each read from the
-	 * entry's `elements`: the attributes each element has now and the elements it is inside.
+	 * `hasAttribute`, `contains`, `getBoundingClientRect`, `getComputedStyle(element).direction`, and the commands
+	 * `focus` and `scrollIntoView`. The host answers each read from the entry's `elements`: the attributes each element
+	 * has now, the elements it is inside, and the box and direction its view had when the entry began.
 	 */
 	| { readonly elements: NativeExpr }
 	/** A family's shared object, member by member. */
@@ -1213,6 +1214,8 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		clearInterval: 'timers',
 		queueMicrotask: 'engine',
 		structuredClone: 'engine',
+		// Answers an element's `direction` only, from the host's facts.
+		getComputedStyle: 'engine',
 		console: 'console',
 		fetch: 'fetch',
 		crypto: 'crypto',
@@ -1272,7 +1275,6 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	sessionStorage:
 		"the browser's storage; use `storage()` from @markless/core, which a phone keeps",
 	matchMedia: 'a CSS media query, which a phone answers in its styles, not in a handler',
-	getComputedStyle: 'computed CSS, which a phone does not have at run time',
 	requestAnimationFrame: 'a browser frame, which a phone does not hand to handlers',
 	cancelAnimationFrame: 'a browser frame, which a phone does not hand to handlers',
 	HTMLElement: 'the DOM, which a phone does not have',

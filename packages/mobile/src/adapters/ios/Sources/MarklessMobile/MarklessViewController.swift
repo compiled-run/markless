@@ -146,6 +146,7 @@ public final class MarklessViewController: UIViewController {
 
 	/// Fills the device cells from the device, then builds the views and starts the page's async device calls.
 	private func buildPage() throws {
+		runtime.measure = { [weak self] id in self?.measureBox(id) }
 		for cell in payload.cells {
 			if let name = cell.device { _ = try runtime.device(cell.id, try device.read(name, object: cell.object)) }
 		}
@@ -263,6 +264,17 @@ public final class MarklessViewController: UIViewController {
 		if let idleObserver { CFRunLoopRemoveObserver(CFRunLoopGetMain(), idleObserver, .commonModes) }
 		idleObserver = nil
 		for host in (try? runtime.due(.idle)) ?? [] { perform(NativeAction(event: .idle, host: host)) }
+	}
+
+	/// An element's box in points from the top left of the page's part of the screen, as `getBoundingClientRect()` gives
+	/// it in CSS pixels; nil when it has no view on screen.
+	private func measureBox(_ id: String) -> NativeElementBox? {
+		guard let element = tree?.elements[id], element.window != nil else { return nil }
+		let page = view.safeAreaLayoutGuide.layoutFrame
+		let box = element.convert(element.bounds, to: view)
+		return NativeElementBox(
+			x: box.minX - page.minX, y: box.minY - page.minY, width: box.width, height: box.height,
+			rightToLeft: element.effectiveUserInterfaceLayoutDirection == .rightToLeft)
 	}
 
 	/// Raises `visible` for each element due one that has any of its box inside the page's part of the screen.

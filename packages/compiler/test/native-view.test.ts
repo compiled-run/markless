@@ -3828,6 +3828,26 @@ export function Picker() @{
 			},
 		]);
 	});
+
+	it('lets a JavaScript helper measure a handle and read its direction, which the host answers', async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+function quarter(track: HTMLElement | undefined): number {
+	if (!track) return -1;
+	const box = track.getBoundingClientRect();
+	const flipped = window.getComputedStyle(track).direction === 'rtl';
+	return flipped ? box.right - box.width / 4 : box.left + box.width / 4;
+}
+export function Track() @{
+	const track = element<HTMLDivElement>();
+	let at = state(0);
+	<main>
+		<div el={track} />
+		<button onClick={() => (at = quarter(track))}>{at}</button>
+	</main>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(payload!.handlers[0]?.ops.map((op) => op.op)).toEqual(['script']);
+	});
 });
 
 describe('overlays', () => {
