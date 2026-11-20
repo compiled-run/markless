@@ -320,6 +320,9 @@ export const NATIVE_KEYBOARD_ONLY_CODE = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
 /** Events a phone raises only from a connected mouse or trackpad: a touch scrolls and swipes without a wheel event. */
 const MOUSE_ONLY = new Set(['wheel']);
 export const NATIVE_MOUSE_ONLY_CODE = 'MARKLESS_NATIVE_MOUSE_ONLY';
+/** Events a drop target raises only while something is dragged onto it, which a phone's browser does only from another app. */
+const DROP_ONLY = new Set(['dragenter', 'dragover', 'dragleave', 'drop']);
+export const NATIVE_DROP_ONLY_CODE = 'MARKLESS_NATIVE_DROP_ONLY';
 
 type Item =
 	| {
@@ -1135,6 +1138,20 @@ export function createNativeViewPayload(
 			passId: 'native-view',
 			suggestions: [],
 			docsUrl: `https://markless.dev/errors/${NATIVE_KEYBOARD_ONLY_CODE}`,
+		});
+	};
+	const dropOnly = (what: string, span?: SourceSpan) => {
+		diagnostics.push({
+			code: NATIVE_DROP_ONLY_CODE,
+			severity: 'warning',
+			phase: 'serialization',
+			title: 'A drop handler is left out of the native build',
+			message: `${what} runs only while something is dragged onto it; native hosts take no drops yet, so it is left out`,
+			why: 'A phone raises drag and drop events only when something is dragged onto the page from another app.',
+			...(span ? { primarySpan: span } : {}),
+			passId: 'native-view',
+			suggestions: [],
+			docsUrl: `https://markless.dev/errors/${NATIVE_DROP_ONLY_CODE}`,
 		});
 	};
 	const mouseOnly = (what: string, span?: SourceSpan) => {
@@ -4135,6 +4152,10 @@ export function createNativeViewPayload(
 					}
 					if (MOUSE_ONLY.has(event.eventName)) {
 						mouseOnly(`the ${event.eventName} handler on <${element}> ${id}`, event.handlerSpan);
+						continue;
+					}
+					if (DROP_ONLY.has(event.eventName)) {
+						dropOnly(`the ${event.eventName} handler on <${element}> ${id}`, event.handlerSpan);
 						continue;
 					}
 					const semantic = SEMANTIC_EVENTS[event.eventName];

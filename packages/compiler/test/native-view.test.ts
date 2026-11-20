@@ -322,6 +322,25 @@ export function Settings() @{
 		expect(payload?.events.map((event) => [event.host, event.event])).toEqual([['h1', 'activate']]);
 	});
 
+	it('leaves out drop-target handlers with a warning, as a phone raises them only for a drag from another app', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Upload() @{
+	let note = state('Drop a file');
+	<main>
+		<div onDragEnter={() => (note = 'Release')} onDragOver={(event) => event.preventDefault()} onDragLeave={() => (note = 'Drop a file')} onDrop={() => (note = 'Dropped')}>{note}</div>
+		<button onClick={() => (note = 'Picked')}>Pick</button>
+	</main>
+}`);
+		expect(diagnostics.map((d) => [d.severity, d.code, d.message.split(' runs ')[0]])).toEqual(
+			['dragenter', 'dragover', 'dragleave', 'drop'].map((event) => [
+				'warning',
+				'MARKLESS_NATIVE_DROP_ONLY',
+				`the ${event} handler on <div> h1`,
+			]),
+		);
+		expect(payload?.events.map((event) => [event.host, event.event])).toEqual([['h2', 'activate']]);
+	});
+
 	it('leaves out a wheel handler with a warning, as a touch on a phone scrolls without wheel events', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Slides() @{

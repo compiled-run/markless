@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import {
 	NATIVE_KEYBOARD_ONLY_CODE,
+	NATIVE_DROP_ONLY_CODE,
 	NATIVE_MOUSE_ONLY_CODE,
 	NATIVE_REFUSALS,
 } from '@markless/compiler/native';
@@ -1131,8 +1132,8 @@ test.each(
 						? ['error', diagnostic.code]
 						: [
 								'warning',
-								diagnostic.code === NATIVE_MOUSE_ONLY_CODE
-									? NATIVE_MOUSE_ONLY_CODE
+								[NATIVE_MOUSE_ONLY_CODE, NATIVE_DROP_ONLY_CODE].includes(diagnostic.code)
+									? diagnostic.code
 									: NATIVE_KEYBOARD_ONLY_CODE,
 							],
 				),

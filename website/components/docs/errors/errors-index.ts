@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 336,
+	total: 337,
 	guided: 55,
 	groups: [
 		{
@@ -1666,6 +1666,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a device feature has no usage text markless_device_usage_missing a device feature has no usage text: a markless runtime error.',
+				},
+				{
+					code: 'MARKLESS_NATIVE_DROP_ONLY',
+					title: 'A drop handler is left out of the native build',
+					chip: 'error',
+					kind: 'compile error or warning',
+					guided: false,
+					words: 'a drop handler is left out of the native build markless_native_drop_only a drop handler is left out of the native build: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_DYNAMIC_TAG_INVALID',
