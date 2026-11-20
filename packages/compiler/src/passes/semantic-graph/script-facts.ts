@@ -710,6 +710,7 @@ export function scriptFactsOf(source: string, filename: string) {
 				imports: imported ? [{ slot: imported.index, name: imported.name }] : [],
 				globals: [],
 				framework: [],
+				navigates: [],
 				span,
 				unsupported: [],
 			};
