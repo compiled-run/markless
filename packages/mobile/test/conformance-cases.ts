@@ -307,6 +307,31 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'max-length',
+		fixture: 'test/fixtures/MaxLength.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'abcde' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'xy' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h2', value: 'Barth' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'max-length-persian',
+		fixture: 'test/fixtures/MaxLength.tsrx',
+		preferredLanguages: ['fa-IR'],
+		actions: [
+			{ event: 'input', host: 'h3', value: 'abcde' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'forms',
 		fixture: 'test/fixtures/Forms.tsrx',
 		actions: [

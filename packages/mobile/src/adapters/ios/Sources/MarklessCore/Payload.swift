@@ -303,6 +303,29 @@ public struct NativeValueMissing: Equatable, Sendable {
 	public let radio: String
 }
 
+/// Chromium's message for a text field longer than its `maxlength`, with `{max}` and `{length}` written in `digits`.
+public struct NativeTooLong: Equatable, Sendable {
+	public let text: String
+	public let digits: [Character]
+
+	/// The message for these numbers, as Chromium writes them: no grouping, in the language's digits.
+	public func message(max: Int, length: Int) -> String {
+		func write(_ value: Int) -> String { String(String(value).map { digits[Int(String($0))!] }) }
+		return text.replacingOccurrences(of: "{max}", with: write(max)).replacingOccurrences(of: "{length}", with: write(length))
+	}
+}
+
+/// A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers; nil (no limit) when it has none.
+public func nativeMaxLength(_ attribute: String?) -> Int? {
+	guard var rest = attribute?.unicodeScalars[...] else { return nil }
+	rest = rest.drop { [" ", "\t", "\n", "\r", "\u{0C}"].contains($0) }
+	let negative = rest.first == "-"
+	if rest.first == "-" || rest.first == "+" { rest = rest.dropFirst() }
+	let digits = rest.prefix { ("0"..."9").contains($0) }
+	guard !digits.isEmpty, let value = Int(String(String.UnicodeScalarView(digits))) else { return nil }
+	return negative && value != 0 ? nil : value
+}
+
 /// The language a browser with these preferred languages shows its own text in, among `available`: an exact match, then
 /// without a script subtag (`zh-Hant-TW` as `zh-TW`), then the language alone; else `en`.
 public func nativeLocale(_ preferred: [String], _ available: [String]) -> String {
@@ -432,11 +455,14 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public let forms: [NativeForm]
 	/// What the web says when a required field has no value, by locale, in payload order.
 	public let valueMissing: [(locale: String, messages: NativeValueMissing)]
+	/// What the web says when a text field a person edited is longer than its `maxlength`, by locale, in payload order.
+	public var tooLong: [(locale: String, message: NativeTooLong)] = []
 
 	public static func == (a: NativeViewPayload, b: NativeViewPayload) -> Bool {
 		a.component == b.component && a.route == b.route && a.cells == b.cells && a.nodes == b.nodes && a.events == b.events
 			&& a.handlers == b.handlers && a.title == b.title && a.objects == b.objects && a.forms == b.forms && a.valueMissing.map(\.locale) == b.valueMissing.map(\.locale)
-			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages) && a.script == b.script
+			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages) && a.tooLong.map(\.locale) == b.tooLong.map(\.locale)
+			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.script == b.script
 	}
 	/// The JavaScript the page's script ops and computeds run; absent when every handler is data.
 	public var script: NativeScript? = nil
@@ -447,7 +473,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "script"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "script"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
@@ -677,6 +703,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 				return (locale, NativeValueMissing(text: try m["text"].string(), checkbox: try m["checkbox"].string(), radio: try m["radio"].string()))
 			}
 		}() : []
+		let tooLong: [(locale: String, message: NativeTooLong)] = fields.has("tooLong") ? try {
+			let reader = try fields["tooLong"]
+			return try reader.keys().map { locale in
+				let m = try reader.field(locale).object(required: ["text"], optional: ["digits"])
+				let digits = m.has("digits") ? Array(try m["digits"].string()) : Array("0123456789")
+				guard digits.count == 10 else { throw PayloadError(path: "payload.tooLong.\(locale).digits", reason: "not ten digits") }
+				return (locale, NativeTooLong(text: try m["text"].string(), digits: digits))
+			}
+		}() : []
 		let route: NativeRoute? = fields.has("route") ? try {
 			let r = try fields["route"].object(["pattern", "params"])
 			return NativeRoute(pattern: try r["pattern"].string(), params: try r["params"].array().map { try $0.string() })
@@ -684,7 +719,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		let payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
 			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
-			objects: objects, forms: forms, valueMissing: valueMissing,
+			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong,
 			script: fields.has("script") ? try decodeScript(try fields["script"]) : nil)
 		try payload.check()
 		return payload

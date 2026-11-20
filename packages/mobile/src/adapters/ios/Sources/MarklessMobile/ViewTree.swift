@@ -199,6 +199,8 @@ final class ViewTree {
 	let dismissGestures: [UIGestureRecognizer] = [UITapGestureRecognizer()]
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 	private var forwards: [LabelForward] = []
+	/// Each text field's typing limit, kept here because a field holds its delegate weakly.
+	private var limits: [LengthLimit] = []
 	private var dialogIds = Set<String>()
 	/// The stacking layout's paragraphs, by each text node and phrase element instance in them.
 	private var paragraphs: [String: Paragraph] = [:]
@@ -847,6 +849,9 @@ final class ViewTree {
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = UITextField()
+					let limit = LengthLimit { [weak self] in nativeMaxLength(self?.attributes[id]?["maxlength"]) }
+					limits.append(limit)
+					field.delegate = limit
 					field.addAction(UIAction { [weak self, weak field] _ in
 						self?.dismissMessage()
 						field?.resignFirstResponder()
@@ -1499,6 +1504,32 @@ final class TopLayerView: UIView {
 	override func accessibilityPerformEscape() -> Bool {
 		onEscape?()
 		return onEscape != nil
+	}
+}
+
+/// Stops typing at a field's `maxlength` as the web does: an insertion is cut to fit, never through a surrogate pair, while
+/// text the app sets is kept whole. Text an input method is still composing is left to it.
+@MainActor
+final class LengthLimit: NSObject, UITextFieldDelegate {
+	private let limit: () -> Int?
+
+	init(limit: @escaping () -> Int?) { self.limit = limit }
+
+	func textField(_ field: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+		guard field.markedTextRange == nil, let max = limit() else { return true }
+		let current = (field.text ?? "") as NSString
+		let inserted = string as NSString
+		let room = Swift.max(0, max - (current.length - range.length))
+		if inserted.length <= room { return true }
+		var cut = room
+		if cut > 0, UTF16.isLeadSurrogate(inserted.character(at: cut - 1)) { cut -= 1 }
+		if cut == 0, range.length == 0 { return false }
+		field.text = current.replacingCharacters(in: range, with: inserted.substring(to: cut))
+		if let caret = field.position(from: field.beginningOfDocument, offset: range.location + cut) {
+			field.selectedTextRange = field.textRange(from: caret, to: caret)
+		}
+		field.sendActions(for: .editingChanged)
+		return false
 	}
 }
 

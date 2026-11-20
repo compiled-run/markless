@@ -246,6 +246,7 @@ public final class NativeRuntime {
 	/// The option a person chose in the action being dispatched.
 	private var chosenNow: String?
 	private let missing: NativeValueMissing?
+	private let tooLong: NativeTooLong?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
 	/// Where a page with a script gets its engine; asked only when a script op runs or a script computed is read.
@@ -295,6 +296,8 @@ public final class NativeRuntime {
 		}
 		let locale = nativeLocale(preferredLanguages, payload.valueMissing.map(\.locale))
 		missing = payload.valueMissing.first { $0.locale == locale }?.messages
+		let tooLongLocale = nativeLocale(preferredLanguages, payload.tooLong.map(\.locale))
+		tooLong = payload.tooLong.first { $0.locale == tooLongLocale }?.message
 		dialogs = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
 			return nil
@@ -821,21 +824,45 @@ public final class NativeRuntime {
 		}
 	}
 
-	/// The first field that stops a submit, or nil when none does.
-	private func firstInvalid(_ form: NativeForm, submitter: String?) throws -> NativeForm.Field? {
+	/// The first field that stops a submit and what the web says about it, or nil when none does.
+	private func firstInvalid(_ form: NativeForm, submitter: String?) throws -> (node: String, message: String)? {
 		if form.noValidate { return nil }
 		if let submitter, try attributeNow(submitter, "formnovalidate") != nil { return nil }
-		return try form.fields.first { field in
-			guard field.kind != .hidden, field.kind != .select, try isShownField(field.node) else { return false }
-			guard try attributeNow(field.node, "disabled") == nil else { return false }
-			// A radio button is missing its value when any button of its group is required and none is checked.
-			let required = field.kind == .radio
-				? try group(of: field.node).contains { try attributeNow($0.id, "required") != nil }
-				: try attributeNow(field.node, "required") != nil
-			guard required else { return false }
-			if field.kind == .radio { return try group(of: field.node).allSatisfy { !(try isChecked($0.id)) } }
-			return field.kind == .text ? try textOf(field: field.node) == "" : !(try isChecked(field.node))
+		for field in form.fields {
+			if let message = try invalidity(field) { return (field.node, message) }
 		}
+		return nil
+	}
+
+	/// Why a field stops a submit, as the web says it, or nil when it does not.
+	private func invalidity(_ field: NativeForm.Field) throws -> String? {
+		guard field.kind != .hidden, field.kind != .select, try isShownField(field.node) else { return nil }
+		guard try attributeNow(field.node, "disabled") == nil else { return nil }
+		// A radio button is missing its value when any button of its group is required and none is checked.
+		let required = field.kind == .radio
+			? try group(of: field.node).contains { try attributeNow($0.id, "required") != nil }
+			: try attributeNow(field.node, "required") != nil
+		if required {
+			let absent = switch field.kind {
+			case .radio: try group(of: field.node).allSatisfy { !(try isChecked($0.id)) }
+			case .text: try textOf(field: field.node) == ""
+			default: !(try isChecked(field.node))
+			}
+			if absent {
+				guard let missing else { throw RuntimeError(reason: "the payload has no message for a \(field.kind.rawValue) missing its value") }
+				switch field.kind {
+				case .checkbox: return missing.checkbox
+				case .radio: return missing.radio
+				default: return missing.text
+				}
+			}
+		}
+		// Only text a person typed is too long: a value the app set is kept whole and passes.
+		guard field.kind == .text, let max = nativeMaxLength(try attributeNow(field.node, "maxlength")), let typed = edited[field.node],
+			typed.utf16.count > max
+		else { return nil }
+		guard let tooLong else { throw RuntimeError(reason: "the payload has no message for a field longer than its maxlength") }
+		return tooLong.message(max: max, length: typed.utf16.count)
 	}
 
 	/// `aria-busy` on a form while a submission of it runs, `aria-disabled` on the button that sent a marking one.
@@ -1181,14 +1208,7 @@ public final class NativeRuntime {
 		guard let form = forms[formId] else { throw RuntimeError(reason: "\(formId) is not a form") }
 		if let submitter, try attributeNow(submitter, "disabled") != nil { return [] }
 		if let invalid = try firstInvalid(form, submitter: submitter) {
-			guard let missing else { throw RuntimeError(reason: "the payload has no message for a \(invalid.kind.rawValue) missing its value") }
-			let message = switch invalid.kind {
-			case .text, .hidden: missing.text
-			case .checkbox: missing.checkbox
-			case .radio: missing.radio
-			case .select: throw RuntimeError(reason: "a <select> is never required in a native build")
-			}
-			calls.append(.invalid(node: invalid.node, message: message))
+			calls.append(.invalid(node: invalid.node, message: invalid.message))
 			return []
 		}
 		let sent = try entries(of: formId)

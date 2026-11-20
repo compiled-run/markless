@@ -678,6 +678,8 @@ export type NativeViewPayload = {
 	 * wording); the host picks the device's language. Present with `forms`.
 	 */
 	readonly valueMissing?: Readonly<Record<string, NativeValueMissing>>;
+	/** What the web says when a text field a person edited is longer than its `maxlength`, by language; present when a form's text field has one. */
+	readonly tooLong?: Readonly<Record<string, NativeTooLong>>;
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	readonly script?: NativeScript;
 };
@@ -700,6 +702,29 @@ export type NativeValueMissing = {
 	readonly radio: string;
 };
 
+/** Chromium's message for a text field longer than its `maxlength`: `{max}` and `{length}` in `text` are written in `digits` (ASCII when absent). */
+export type NativeTooLong = { readonly text: string; readonly digits?: string };
+
+/** `message` with `{max}` and `{length}` filled in as Chromium writes them: no grouping, in the language's digits. */
+export function nativeTooLongMessage(message: NativeTooLong, max: number, length: number): string {
+	const digits = message.digits ?? '0123456789';
+	const write = (value: number) =>
+		String(value).replace(/[0-9]/g, (digit) => digits[Number(digit)]!);
+	return message.text.replace('{max}', write(max)).replace('{length}', write(length));
+}
+
+/**
+ * A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers: leading ASCII whitespace, an
+ * optional sign, then digits up to the first non-digit. Undefined (no limit) when there are no digits or it is negative.
+ */
+export function nativeMaxLength(attribute: string | null | undefined): number | undefined {
+	const match = attribute == null ? null : /^[\t\n\f\r ]*([+-]?)([0-9]+)/.exec(attribute);
+	if (!match) return undefined;
+	const value = Number(match[2]);
+	if (match[1] === '-' && value !== 0) return undefined;
+	return value;
+}
+
 /** A form's submittable fields and submit buttons, each in tree order. */
 export type NativeForm = {
 	readonly node: string;
@@ -714,7 +739,10 @@ export type NativeForm = {
 /** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */
 export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden' | 'select';
 
-export { NATIVE_VALUE_MISSING_BY_LOCALE } from './native-validation-messages.ts';
+export {
+	NATIVE_TOO_LONG_BY_LOCALE,
+	NATIVE_VALUE_MISSING_BY_LOCALE,
+} from './native-validation-messages.ts';
 
 /**
  * The language a browser on a device with these preferred languages shows its own text in, among `available`: the first
