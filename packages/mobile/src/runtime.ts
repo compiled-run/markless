@@ -933,26 +933,35 @@ export function createNativeRuntime(
 			if (!owner) throw new Error(`${object.id} is owned by unknown node ${object.owner}`);
 			return shown(owner) ? [object.id] : [];
 		});
-	/** A row's key as hosts and journal entries spell it: `String()` of the item's key path. */
+	/** A row's key as hosts and journal entries spell it: `String()` of the item's key path, or its key parts joined. */
 	const rowsOf = (repeat: Extract<NativeNode, { kind: 'repeat' }>) => {
 		const list = evaluate(repeat.list);
 		if (!Array.isArray(list))
 			throw new Error(`${repeat.id} lists a value that is not an array`);
-		return list.map((item, index) => {
-			if (repeat.byIndex) return { key: String(index), item };
+		const valueAt = (item: Value, path: ReadonlyArray<string>) => {
 			let key: Value = item;
-			for (const step of repeat.key) {
+			for (const step of path) {
 				if (
 					key === null ||
 					typeof key !== 'object' ||
 					Array.isArray(key) ||
 					!Object.hasOwn(key, step)
 				)
-					throw new Error(`${repeat.id}: a row has no key at ${repeat.key.join('.')}`);
+					throw new Error(`${repeat.id}: a row has no key at ${path.join('.')}`);
 				key = (key as Record<string, Value>)[step]!;
 			}
-			return { key: String(key), item };
-		});
+			return key;
+		};
+		return list.map((item, index) => ({
+			key: repeat.byIndex
+				? String(index)
+				: repeat.keyParts
+					? repeat.keyParts
+							.map((part) => (typeof part === 'string' ? part : String(valueAt(item, part))))
+							.join('')
+					: String(valueAt(item, repeat.key)),
+			item,
+		}));
 	};
 	/** Every instance of a node now shown: one outside lists, one per row inside one (`<id>@<key>`). */
 	const instances = (

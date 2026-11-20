@@ -63,7 +63,6 @@ export type ResumeDomElement = ResumeDomNode & {
 	__marklessShownAsyncArm?: (boundaryId: string) => ShownAsyncArm | undefined;
 	// Set on a keyed row's root when its repeat wires the row: the items that row names, read at dispatch.
 	__marklessRowLocals?: () => Record<string, unknown>;
-	__marklessRepeatRows?: Map<string, () => ReadonlyArray<ResumeRowRoot>>;
 	// Resume reads the host document off the root element (streamed arm patch
 	// scripts, template rendering); the DOM guarantees it, so the surface does too.
 	readonly ownerDocument?: ResumeDomOwnerDocument;

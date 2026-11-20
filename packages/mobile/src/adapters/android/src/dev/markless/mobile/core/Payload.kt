@@ -119,9 +119,9 @@ sealed interface Node {
 	data class Text(override val id: String, override val parent: String?, val parts: List<TextPart>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 	/** An `@if` with [test] (arm 0 while truthy, arm 1 otherwise), or a chain with [tests]: the first truthy arm, else the `null` arm. */
 	data class Branch(override val id: String, override val parent: String?, val test: Expr?, val arms: Int, override val arm: ArmPlace? = null, override val row: String? = null, val tests: List<Expr?>? = null) : Node
-	/** A keyed list: one row per item of [list], keyed by `String()` of the item at the [key] path. */
+	/** A keyed list: one row per item of [list], keyed by `String()` of the item at the [key] path, or by [keyParts] joined. */
 	/** [key] null: each row's key is its position (`byIndex`). */
-	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>?, override val arm: ArmPlace? = null, override val row: String? = null) : Node
+	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>?, override val arm: ArmPlace? = null, override val row: String? = null, val keyParts: List<Any>? = null) : Node
 	/** The platform's own sheet: its content is the nodes whose parent is this id, built at mount and kept; shown while [open] is truthy. */
 	data class Sheet(override val id: String, override val parent: String, val open: Expr, val snapPoints: List<Double>, val dismissible: Boolean, val modal: Boolean) : Node {
 		override val arm: ArmPlace? get() = null
@@ -688,12 +688,14 @@ data class Payload(
 					Node.Branch(id, if (parent == Json.Null) null else parent.str("$what.parent"), test, arms, armPlace(o, what), rowPlace(o, what), tests)
 				}
 				"repeat" -> {
-					o.only(setOf("kind", "id", "parent", "list", "key", "byIndex", "arm", "row"), what)
+					o.only(setOf("kind", "id", "parent", "list", "key", "byIndex", "keyParts", "arm", "row"), what)
 					val parent = o.field("parent", what)
 					val key = o.field("key", what).arr("$what.key").map { it.str("$what.key[]") }
 					val byIndex = o["byIndex"]?.let { (it as? Json.Bool)?.value ?: throw MarklessDecodeError("$what.byIndex must be a boolean") } ?: false
 					if (byIndex && key.isNotEmpty()) throw MarklessDecodeError("$what is keyed by its index and has a key path")
-					Node.Repeat(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("list", what), "$what.list"), if (byIndex) null else key, armPlace(o, what), rowPlace(o, what))
+					// Each key part is fixed text (a String) or a path on the item (a List<String>).
+					val keyParts = o["keyParts"]?.arr("$what.keyParts")?.map { p -> if (p is Json.Str) p.value else p.arr("$what.keyParts[]").map { it.str("$what.keyParts[][]") } }
+					Node.Repeat(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("list", what), "$what.list"), if (byIndex) null else key, armPlace(o, what), rowPlace(o, what), keyParts)
 				}
 				"sheet" -> {
 					o.only(setOf("kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"), what)

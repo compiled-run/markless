@@ -8,10 +8,13 @@ import { expect } from 'vitest';
 const child = resolve(import.meta.dirname, 'fixture-build-child.ts');
 // CI attribution measured builds at up to 2.8 GB each; a 16 GB runner holds one at a time.
 const BUILD_SLOTS = Math.min(3, Math.max(1, Math.floor(totalmem() / 12 / 2 ** 30)));
-const slotsDir = resolve(
-	tmpdir(),
-	`markless-fixture-builds-${createHash('sha256').update(child).digest('hex').slice(0, 16)}`,
-);
+// CI's unit budget names the folder, so it can tell which test files hold a slot while it samples memory.
+const slotsDir =
+	process.env.MARKLESS_BUILD_SLOTS_DIR ??
+	resolve(
+		tmpdir(),
+		`markless-fixture-builds-${createHash('sha256').update(child).digest('hex').slice(0, 16)}`,
+	);
 const HELD_FOR_FILE = 'file';
 
 const alive = (pid: number) => {
