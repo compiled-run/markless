@@ -173,6 +173,8 @@ final class ViewTree {
 	private let onAction: (NativeAction) -> Void
 	/// The view of a device object (a camera's preview), made by the page's device.
 	private let objectView: (_ object: String, _ device: String) throws -> UIView
+	/// The images the app packaged, by the src a page writes.
+	private let images: [String: NativeImageAsset]
 	private let nodes: [String: NativeNode]
 	/// The nodes each element, root (`""`), branch arm (`branch#index`) or list row (`repeat id`) places directly.
 	private let slots: [String: [String]]
@@ -239,8 +241,10 @@ final class ViewTree {
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:],
 		faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void,
-		objectView: @escaping (_ object: String, _ device: String) throws -> UIView = { object, _ in throw HostError("no device to show \(object)") }
+		objectView: @escaping (_ object: String, _ device: String) throws -> UIView = { object, _ in throw HostError("no device to show \(object)") },
+		images: [String: NativeImageAsset] = [:]
 	) throws {
+		self.images = images
 		self.runtime = runtime
 		self.objectView = objectView
 		self.layout = layout
@@ -803,14 +807,9 @@ final class ViewTree {
 					}
 					view = audio
 				} else if element == "img" {
-					let image = UIImageView()
-					image.contentMode = .scaleAspectFit
-					image.isAccessibilityElement = true
-					image.accessibilityTraits = .image
-					if layout == nil {
-						image.widthAnchor.constraint(equalToConstant: 120).isActive = true
-						image.heightAnchor.constraint(equalToConstant: 90).isActive = true
-					}
+					let image = ImageBox()
+					// The box lays out its picture and alt text itself; the stacking layout sizes only the box.
+					leaves.insert(ObjectIdentifier(image))
 					view = image
 				} else if element == "select" {
 					if context.button != nil { throw HostError("<select> \(id) is inside a button") }
@@ -1059,9 +1058,19 @@ final class ViewTree {
 			drawing.accessibilityLabel = current["aria-label"]
 			drawing.isAccessibilityElement = current["aria-label"] != nil && contexts[id]?.button == nil
 			drawing.accessibilityTraits = .image
-		} else if let image = view as? UIImageView {
-			image.accessibilityLabel = current["aria-label"] ?? current["alt"]
-			image.image = current["src"].flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }
+		} else if let box = view as? ImageBox {
+			let src = current["src"]
+			// A photo the device took is a `file:` URL; any other src is a file the app packaged when it was built.
+			let packaged = src.flatMap { images[$0] }
+			let image = packaged.flatMap { UIImage(data: $0.data) }
+				?? src.flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }
+			let length = { (name: String) in current[name].flatMap { Double($0.trimmingCharacters(in: .whitespaces)) } }
+			box.show(
+				image, natural: packaged.map { CGSize(width: $0.width, height: $0.height) } ?? image?.size, width: length("width"), height: length("height"),
+				alt: current["alt"], sized: layout == nil)
+			box.accessibilityLabel = current["aria-label"] ?? current["alt"]
+			// `alt=""` marks a decorative image, which a screen reader skips, as the web leaves it out of the tree.
+			box.isAccessibilityElement = current["aria-label"] != nil || current["alt"].map { !$0.isEmpty } ?? true
 		} else {
 			view.accessibilityLabel = current["aria-label"]
 		}

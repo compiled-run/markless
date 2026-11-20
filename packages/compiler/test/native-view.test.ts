@@ -1846,6 +1846,26 @@ export function Note() @{
 	expect(note.bindings).toMatchObject([{ attribute: 'class', value: { if: { script: expect.any(String) } } }]);
 });
 
+it('reads a default import of an asset as the URL the build gives it, in markup and in phone JavaScript', async () => {
+	const asked: string[] = [];
+	const { payload, diagnostics } = await nativeView(
+		`import logo from './logo.png';
+export function Header() @{
+	<main>
+		<img src={logo} alt="Logo" />
+		<button onClick={() => console.log(logo)}>Log</button>
+	</main>
+}`,
+		{ assetImport: (specifier) => (asked.push(specifier), `/@markless-asset/${specifier.slice(2)}`) },
+	);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	expect(asked).toContain('./logo.png');
+	const img = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'img');
+	if (img?.kind !== 'element') throw new Error('no img');
+	expect(img.bindings).toEqual([{ attribute: 'src', value: { literal: '/@markless-asset/logo.png' } }]);
+	expect(payload!.script?.source).toContain('{ "default": "/@markless-asset/logo.png" }');
+});
+
 describe('linked stylesheets', () => {
 	const source = `export function Page() @{
 	<main>

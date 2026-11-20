@@ -1,0 +1,11 @@
+{
+	"rung": 155,
+	"name": "images the app packages are drawn at the web's size, named by their alt text, and a missing image shows its alt text",
+	"steps": [
+		{
+			"visible": ["Images", "Green badge", "Orange photo", "No such picture", "Show square"],
+			"absent": ["Blue square"]
+		},
+		{ "do": { "tap": "Show square" }, "visible": ["Blue square", "Hide square"], "absent": ["Show square"] }
+	]
+}

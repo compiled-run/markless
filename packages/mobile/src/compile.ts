@@ -20,6 +20,7 @@ import {
 } from '@markless/router';
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
 import { isNativeStyleStateAttribute, NATIVE_APP_VERSION } from '@markless/serializer/native-view';
+import { imageHeader, type NativeImage } from './images.ts';
 import { nativeStyleInputs, type NativeStyleInput } from './style-input.ts';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
@@ -39,6 +40,8 @@ export type NativeBuild = {
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 	/** Each payload element's tag and where it is written, by node id, for build errors that name an element. */
 	readonly elementSources: NativeViewArtifact['elementSources'];
+	/** The images the app packages for this payload: each `<img src>` the build read, with its natural size. */
+	readonly images: ReadonlyArray<NativeImage>;
 };
 
 /** A stylesheet's text as the web build ships it, unscoped: its rules reach every page that imports it. */
@@ -46,6 +49,14 @@ export type NativeStylesheet = { readonly file: string; readonly cssText: string
 
 /** Reads a stylesheet a module imports for its effect (`./app.css`); the caller owns file access. */
 export type ReadStylesheet = (specifier: string, importer: string) => NativeStylesheet | undefined;
+/** A file the build reads as it is: one the app serves at a path, or one a module imports as an asset. */
+export type NativeFile = { readonly file: string; readonly bytes: Uint8Array };
+/** A file the app serves at `href` (`/static/y18.gif`, from its public folder), as the browser loads it. */
+export type ReadServedFile = (href: string) => NativeFile | undefined;
+/** A file a module imports as an asset (`import logo from './logo.png'`), resolved as Vite resolves it; else undefined. */
+export type ReadAsset = (specifier: string, importer: string) => NativeFile | undefined;
+/** The prefix of the URL an imported asset is shown by in a native app: the packaged file's path follows it. */
+export const NATIVE_ASSET_PREFIX = '/@markless-asset/';
 /** A stylesheet the app serves at `href` (`/static/news.css`, from its public folder), as a `<link>` loads it. */
 export type ReadServedStylesheet = (href: string) => NativeStylesheet | undefined;
 
@@ -68,12 +79,16 @@ type ReadModule = (
 	importer: string,
 ) => { readonly filename: string; readonly source: string } | undefined;
 
+/** Files a module imports as code (or as JSON's value); any other file it imports is an asset, as Vite treats it. */
+const MODULE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs', '.tsrx', '.json'];
+
 /** A JSON file imports as a module whose default export is its value, as the web build loads it. */
 const withJsonModules =
 	(read: ReadModule | undefined): ReadModule | undefined =>
 	read &&
 	((specifier, importer) => {
 		const module = read(specifier, importer);
+		if (module && !MODULE_EXTENSIONS.some((extension) => module.filename.endsWith(extension))) return undefined;
 		if (!module?.filename.endsWith('.json')) return module;
 		try {
 			JSON.parse(module.source);
@@ -101,6 +116,8 @@ export async function compileNativeComponent(input: {
 	readonly manifest?: RouteManifest;
 	readonly readStylesheet?: ReadStylesheet;
 	readonly readServedStylesheet?: ReadServedStylesheet;
+	readonly readServedFile?: ReadServedFile;
+	readonly readAsset?: ReadAsset;
 	/** The app config's `device` section (usage text per feature). */
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
@@ -183,6 +200,17 @@ export async function compileNativeComponent(input: {
 		interfaces.set(file, graph);
 		return graph;
 	};
+	const images = new Map<string, NativeImage>();
+	const imageAt = (src: string, read: NativeFile | undefined): boolean => {
+		const header = read && imageHeader(read.bytes);
+		if (header) images.set(src, { src, file: read.file, bytes: read.bytes, ...header });
+		return header !== null && header !== undefined;
+	};
+	const assetImport = (specifier: string, importer: string): string | undefined => {
+		const read = input.readAsset?.(specifier, importer);
+		const src = read && `${NATIVE_ASSET_PREFIX}${read.file}`;
+		return src !== undefined && imageAt(src, read) ? src : undefined;
+	};
 	const linked: NativeStylesheet[] = [];
 	const linkStylesheet = (href: string): boolean => {
 		const sheet = input.readServedStylesheet?.(href);
@@ -193,6 +221,7 @@ export async function compileNativeComponent(input: {
 	for (;;) {
 		native = createNativeViewPayload(compiled.semanticGraph, {
 			linkStylesheet,
+			assetImport,
 			...(route
 				? {
 						route: {
@@ -242,8 +271,15 @@ export async function compileNativeComponent(input: {
 	const unstyled = native.payload
 		? unstyledOnly(native.payload, native.elementSources, sheets.length > 0 || styles.some((style) => style.cssText.length > 0))
 		: [];
+	// A fixed `<img src>` the app serves: the browser loads it from the public folder, so the app packages it.
+	for (const node of native.payload?.nodes ?? []) {
+		const src = node.kind === 'element' && node.element === 'img' ? node.attributes?.src : undefined;
+		if (src && src.startsWith('/') && !src.startsWith('//') && !images.has(src))
+			imageAt(src, input.readServedFile?.(src));
+	}
 	return {
 		payload: errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,
+		images: [...images.values()],
 		styles,
 		stylesheets: sheets,
 		features: native.features,
@@ -313,6 +349,8 @@ export type NativeAppBuild = {
 	/** The Info.plist and AndroidManifest.xml entries for the device features any page uses. */
 	readonly manifest: DeviceManifest;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic & { readonly page: string }>;
+	/** Every page's packaged images, once each. */
+	readonly images: ReadonlyArray<NativeImage>;
 };
 
 /**
@@ -331,6 +369,8 @@ export async function compileNativeApp(input: {
 	readonly readModule?: Parameters<typeof compileNativeComponent>[0]['readModule'];
 	readonly readStylesheet?: ReadStylesheet;
 	readonly readServedStylesheet?: ReadServedStylesheet;
+	readonly readServedFile?: ReadServedFile;
+	readonly readAsset?: ReadAsset;
 	/** The app config's `device` section (usage text per feature), for every page. */
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
@@ -338,6 +378,7 @@ export async function compileNativeApp(input: {
 }): Promise<NativeAppBuild> {
 	const manifest = buildRouteManifestFromFileIds(input.pages.map((page) => page.page));
 	const routes: NativeAppPayload['routes'][number][] = [];
+	const images: NativeImage[] = [];
 	const styleInputs: NativeAppBuild['styleInputs'][number][] = [];
 	const diagnostics: (CompilerDiagnostic & { readonly page: string })[] = [];
 	const features = new Set<NativeDeviceFeature>();
@@ -362,10 +403,13 @@ export async function compileNativeApp(input: {
 			...(input.readModule ? { readModule: input.readModule } : {}),
 			...(input.readStylesheet ? { readStylesheet: input.readStylesheet } : {}),
 			...(input.readServedStylesheet ? { readServedStylesheet: input.readServedStylesheet } : {}),
+			...(input.readServedFile ? { readServedFile: input.readServedFile } : {}),
+			...(input.readAsset ? { readAsset: input.readAsset } : {}),
 			...(input.device ? { device: input.device } : {}),
 			...(input.target ? { target: input.target } : {}),
 		});
 		for (const feature of build.features) features.add(feature);
+		for (const image of build.images) if (!images.some((other) => other.src === image.src)) images.push(image);
 		diagnostics.push(
 			...build.diagnostics.map((diagnostic) => ({ ...diagnostic, page: page.page })),
 		);
@@ -397,6 +441,7 @@ export async function compileNativeApp(input: {
 	return {
 		payload: diagnostics.length > 0 ? null : { version: NATIVE_APP_VERSION, routes },
 		styleInputs: diagnostics.length > 0 ? [] : styleInputs,
+		images,
 		manifest: deviceManifest([...features], input.device).manifest,
 		diagnostics,
 	};

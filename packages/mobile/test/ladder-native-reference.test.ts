@@ -18,7 +18,14 @@ import {
 	type NativeRuntime,
 	type NativeScreen,
 } from '../src/index.ts';
-import { compileRungApp, readAppConfig, readWorkspaceModule, servedReader } from '../src/harness/rung.ts';
+import {
+	assetReader,
+	compileRungApp,
+	readAppConfig,
+	readWorkspaceModule,
+	servedFileReader,
+	servedReader,
+} from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
 import { nativeMaxLength } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
@@ -1099,6 +1106,8 @@ test.each(
 			...(page ? { page } : {}),
 			readModule: readWorkspaceModule,
 			readServedStylesheet: servedReader(join(proofsDir, folder)),
+			readServedFile: servedFileReader(join(proofsDir, folder)),
+			readAsset: assetReader,
 			...readAppConfig(join(proofsDir, folder)),
 			target,
 		});
