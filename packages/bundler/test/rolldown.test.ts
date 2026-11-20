@@ -121,14 +121,20 @@ describe('TSRX Rolldown plugin structure', () => {
 		).toMatchObject({
 			preserveEntrySignatures: 'strict',
 		});
+		// The server serves every page, so it always reads keys joined from row fields.
+		const serverDefine = { transform: { define: { __MARKLESS_JOINED_KEYS__: 'true' } } };
 		expect(callOptions(marklessServer(), {})).toEqual({
 			experimental: { attachDebugInfo: 'none' },
+			...serverDefine,
 		});
 		expect(callOptions(marklessLib(), {})).toEqual({});
+		expect(callOptions(marklessClient(), {})).toMatchObject({
+			transform: { define: { __MARKLESS_JOINED_KEYS__: 'false' } },
+		});
 		const warn = vi.fn();
 		expect(
 			callOptions(marklessServer(), { experimental: { attachDebugInfo: 'simple' } }, { warn }),
-		).toEqual({ experimental: { attachDebugInfo: 'none' } });
+		).toEqual({ experimental: { attachDebugInfo: 'none' }, ...serverDefine });
 		expect(warn).toHaveBeenCalledWith(expect.stringContaining('attachDebugInfo'));
 		const routeBuild = marklessClient();
 		(routeBuild as { api: { declareRouteModules(isRoute: () => boolean): void } }).api.declareRouteModules(

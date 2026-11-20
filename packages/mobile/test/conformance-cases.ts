@@ -95,6 +95,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'list-key-from-fields',
+		fixture: 'test/fixtures/JoinedKeys.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0@b-1' },
+			{ event: 'activate', host: 'component-edge:0/h0@b-1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'component-edge:0/h0@a-1' },
+			{ event: 'activate', host: 'h6@b-2' },
+		],
+	},
+	{
 		name: 'components',
 		fixture: 'proofs/07-child-component/App.tsrx',
 		actions: [

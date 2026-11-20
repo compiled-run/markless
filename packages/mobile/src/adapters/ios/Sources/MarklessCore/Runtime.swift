@@ -746,18 +746,28 @@ public final class NativeRuntime {
 
 	/// A list's rows now: each item with its key, `String()` of the item at the key path.
 	public func rows(of repeatId: String) throws -> [(key: String, item: NativeValue)] {
-		guard let node = nodesById[repeatId], case let .repeat(list, keyPath) = node.kind else { throw RuntimeError(reason: "unknown list \(repeatId)") }
+		guard let node = nodesById[repeatId], case let .repeat(list, keyPath, keyParts) = node.kind else { throw RuntimeError(reason: "unknown list \(repeatId)") }
 		guard case let .array(array) = try evaluate(list) else { throw RuntimeError(reason: "\(repeatId) lists a value that is not an array") }
 		guard let keyPath else { return array.items.enumerated().map { (String($0.offset), $0.element) } }
-		return try array.items.map { item in
+		let valueAt = { (item: NativeValue, path: [String]) throws -> NativeValue in
 			var key = item
-			for step in keyPath {
+			for step in path {
 				guard case let .object(object) = key, let next = object.get(step) else {
-					throw RuntimeError(reason: "\(repeatId): a row has no key at \(keyPath.joined(separator: "."))")
+					throw RuntimeError(reason: "\(repeatId): a row has no key at \(path.joined(separator: "."))")
 				}
 				key = next
 			}
-			return (key.text, item)
+			return key
+		}
+		return try array.items.map { item in
+			guard let keyParts else { return (try valueAt(item, keyPath).text, item) }
+			let key = try keyParts.map { part in
+				switch part {
+				case let .text(text): text
+				case let .path(path): try valueAt(item, path).text
+				}
+			}.joined()
+			return (key, item)
 		}
 	}
 

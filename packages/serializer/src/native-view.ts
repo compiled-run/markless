@@ -4,6 +4,7 @@ import {
 	type NativeDeviceObject,
 	type NativeDeviceValue,
 } from './native-device.ts';
+import type { ProtocolRepeatKeyParts } from './protocol.ts';
 
 // The target-neutral view a native host builds retained views from: no HTML, no DOM positions, no script.
 export const NATIVE_VIEW_VERSION = 'markless.native-view/0';
@@ -433,6 +434,8 @@ export type NativeNode = NativePlace &
 				readonly key: ReadonlyArray<string>;
 				/** `key i` on the index: a row's key is its position (`"0"`, `"1"`), and `key` is empty. */
 				readonly byIndex?: true;
+				/** A key joined from the item's fields, as the web joins it; `key` is then empty and is not the key. */
+				readonly keyParts?: ProtocolRepeatKeyParts;
 		  }
 		| {
 				/**

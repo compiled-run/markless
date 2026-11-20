@@ -931,6 +931,25 @@ export function Page() @{
 		});
 	});
 
+	it('keys a @for joined from its row fields by the same text and path pieces as the web', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Seats() @{
+	let seats = state([{ row: 'b', seat: { n: 2 } }]);
+	<ol>
+		@for (const s of seats; key s.row + '-' + s.seat.n) { <li>{s.row}</li> }
+	</ol>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.nodes.find((node) => node.kind === 'repeat')).toEqual({
+			kind: 'repeat',
+			id: 'repeat:0',
+			parent: 'h0',
+			list: { cell: 'state:seats' },
+			key: [],
+			keyParts: [['row'], '-', ['seat', 'n']],
+		});
+	});
+
 	it('lowers a keyed @for to a list region whose rows read their item, and array writes to methods', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function List() @{

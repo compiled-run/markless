@@ -98,6 +98,13 @@ local graph scopes. A keyed loop item keeps its component instances, local
 `state()`, `computed()` nodes, async nodes, DOM updates, and event wiring
 attached to the same logical item across reorder, insert, and delete operations.
 
+A key is read from the row item alone: the item (`key tag`), a path on it
+(`key product.id`, or a destructured name), or a template literal or string `+`
+join of such paths (``key `${line.id}:${line.size}` ``), which keys the row by
+the joined string. The browser computes a row's key without loading page code,
+so a key that calls a function, does arithmetic, or reads anything besides the
+row item is the build error `MARKLESS_REPEAT_KEY_UNSTABLE`.
+
 Today a row gets its own `state()` through a component: `state()`,
 `computed()` or `storage()` written directly in a `@for` body is the build error
 `MARKLESS_STATE_CREATION_SITE_UNSTABLE` ("inside a @for row"), because one
