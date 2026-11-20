@@ -162,6 +162,8 @@ final class DrawingView: UIView {
 /// The retained views of one payload: built by the view factory, then changed only by `apply(_:)`.
 @MainActor
 final class ViewTree {
+	/// The browser's `body { margin: 8px }`.
+	static let bodyMargin: CGFloat = 8
 	let root = UIView()
 	/// The page's own scroll view, as a browser's viewport: it fills the screen, insets its content by the safe areas and
 	/// scrolls it under the bars.
@@ -212,6 +214,8 @@ final class ViewTree {
 	private var fullWidth = Set<ObjectIdentifier>()
 	/// Start-side insets of blocks, in points.
 	private var indents: [ObjectIdentifier: CGFloat] = [:]
+	/// Blocks' default margins above and below, in points, before they collapse.
+	private var margins: [ObjectIdentifier: CGFloat] = [:]
 	/// Lists and the marker kind their items show; each item's marker label.
 	private var listMarkers: [ObjectIdentifier: String] = [:]
 	private var itemMarkers: [ObjectIdentifier: UILabel] = [:]
@@ -297,7 +301,7 @@ final class ViewTree {
 				view.accessibilityIdentifier.flatMap { id in self.elements[id] === view ? id : nil }
 			},
 			viewOf: { [unowned self] id in self.elements[id] },
-			restack: { [unowned self] container in if self.layout == nil { self.stack(container) } })
+			restack: { [unowned self] container in if self.layout == nil { self.restack(container) } })
 	}
 
 	/// Whether any of `view`'s box is inside `frame` (in `screen`'s space): an IntersectionObserver with no threshold, where a
@@ -357,8 +361,9 @@ final class ViewTree {
 		NSLayoutConstraint.activate([
 			root.topAnchor.constraint(equalTo: content.topAnchor),
 			root.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-			root.leadingAnchor.constraint(equalTo: screen.layoutMarginsGuide.leadingAnchor),
-			root.trailingAnchor.constraint(equalTo: screen.layoutMarginsGuide.trailingAnchor),
+			// The browser's body margin, 8 px; the stacking layout gives the top and bottom ones (`stack`).
+			root.leadingAnchor.constraint(equalTo: screen.safeAreaLayoutGuide.leadingAnchor, constant: ViewTree.bodyMargin),
+			root.trailingAnchor.constraint(equalTo: screen.safeAreaLayoutGuide.trailingAnchor, constant: -ViewTree.bodyMargin),
 			content.leadingAnchor.constraint(equalTo: page.frameLayoutGuide.leadingAnchor),
 			content.widthAnchor.constraint(equalTo: page.frameLayoutGuide.widthAnchor),
 		])
@@ -615,7 +620,7 @@ final class ViewTree {
 			view.backgroundColor = .clear
 			top.home.insertSubview(view, at: min(top.index, top.home.subviews.count))
 			root.accessibilityElementsHidden = false
-			if layout == nil { stack(top.home) }
+			if layout == nil { restack(top.home) }
 			topLayer = nil
 			UIAccessibility.post(notification: .screenChanged, argument: nil)
 		}
@@ -692,8 +697,8 @@ final class ViewTree {
 	private func settle(_ container: UIView, built: [String], _ context: Context) {
 		if let button = context.button { refreshLabel(of: button) }
 		if layout == nil {
-			stack(container)
 			for id in built { if let view = elements[id] { stackTree(view) } }
+			restack(container)
 		}
 	}
 
@@ -796,14 +801,11 @@ final class ViewTree {
 					}
 					view = audio
 				} else if element == "img" {
-					let image = UIImageView()
+					let image = PictureView(frame: .zero)
 					image.contentMode = .scaleAspectFit
 					image.isAccessibilityElement = true
 					image.accessibilityTraits = .image
-					if layout == nil {
-						image.widthAnchor.constraint(equalToConstant: 120).isActive = true
-						image.heightAnchor.constraint(equalToConstant: 90).isActive = true
-					}
+					leaves.insert(ObjectIdentifier(image))
 					view = image
 				} else if element == "select" {
 					if context.button != nil { throw HostError("<select> \(id) is inside a button") }
@@ -873,7 +875,7 @@ final class ViewTree {
 				inner.button = view is SelectButton ? nil : (view as? UIButton) ?? context.button
 				inner.heading = context.heading || headings.contains(element)
 				inner.look = context.look.applying(node.defaultStyle)
-				if layout == nil, let style = node.defaultStyle { applyBlockStyle(style, to: view) }
+				if layout == nil, let style = node.defaultStyle { applyBlockStyle(style, to: view, scale: inner.look.scale) }
 				if layout == nil, element == "li", listMarkers[ObjectIdentifier(container)] != nil { addMarker(to: view) }
 				view.accessibilityIdentifier = id
 				elements[id] = view
@@ -1050,9 +1052,10 @@ final class ViewTree {
 			drawing.accessibilityLabel = current["aria-label"]
 			drawing.isAccessibilityElement = current["aria-label"] != nil && contexts[id]?.button == nil
 			drawing.accessibilityTraits = .image
-		} else if let image = view as? UIImageView {
+		} else if let image = view as? PictureView {
 			image.accessibilityLabel = current["aria-label"] ?? current["alt"]
 			image.image = current["src"].flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }
+			image.alt = current["alt"] ?? ""
 		} else {
 			view.accessibilityLabel = current["aria-label"]
 		}
@@ -1085,7 +1088,7 @@ final class ViewTree {
 			let hidden = current["hidden"] != nil || view.superview is SelectButton
 			if view.isHidden != hidden {
 				view.isHidden = hidden
-				if let parent = view.superview, !(parent is UIButton || parent is OverlayCard) { stack(parent) }
+				if let parent = view.superview, !(parent is UIButton || parent is OverlayCard) { restack(parent) }
 			}
 		}
 	}
@@ -1132,7 +1135,7 @@ final class ViewTree {
 		for child in view.subviews where !anchors.contains(ObjectIdentifier(child)) { stackTree(child) }
 	}
 
-	/// The temporary layout for rungs without Dragon: children top to bottom, start-aligned.
+	/// The temporary layout for rungs without Dragon: children top to bottom, start-aligned, their margins collapsing as on the web.
 	private func stack(_ container: UIView) {
 		NSLayoutConstraint.deactivate(stackConstraints[ObjectIdentifier(container)] ?? [])
 		if tableRows.contains(ObjectIdentifier(container)) {
@@ -1144,11 +1147,24 @@ final class ViewTree {
 		let indent = indents[ObjectIdentifier(container)] ?? 0
 		var top = container
 		while let parent = top.superview { top = parent }
+		let collapses = self.collapses(container)
+		let body = container === root ? ViewTree.bodyMargin : 0
+		// The margin waiting above the next child; while `leading`, the first children's margins leave through the container.
+		var pending = body
+		var leading = collapses
 		for child in stacked(container) {
 			child.translatesAutoresizingMaskIntoConstraints = false
 			let wide = fullWidth.contains(ObjectIdentifier(child))
+			var gap: CGFloat = 0
+			if through(child) {
+				if !leading { pending = max(pending, marginAbove(child), marginBelow(child)) }
+			} else {
+				if !leading { gap = max(pending, marginAbove(child)) }
+				leading = false
+				pending = marginBelow(child)
+			}
 			constraints += [
-				child.topAnchor.constraint(equalTo: above),
+				child.topAnchor.constraint(equalTo: above, constant: gap),
 				child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
 				wide
 					? child.trailingAnchor.constraint(equalTo: container.trailingAnchor)
@@ -1162,7 +1178,7 @@ final class ViewTree {
 			}
 			above = child.bottomAnchor
 		}
-		constraints.append(above.constraint(equalTo: container.bottomAnchor))
+		constraints.append(container.bottomAnchor.constraint(equalTo: above, constant: collapses ? 0 : max(pending, body)))
 		NSLayoutConstraint.activate(constraints)
 		stackConstraints[ObjectIdentifier(container)] = constraints
 		if let kind = listMarkers[ObjectIdentifier(container)] {
@@ -1173,6 +1189,51 @@ final class ViewTree {
 				marker.text = kind == "decimal" ? "\(number)." : "\u{2022}"
 			}
 		}
+	}
+
+	/// Stacks `container` again, and each stacked container above it that its first or last child's margins reach.
+	private func restack(_ container: UIView) {
+		stack(container)
+		var at = container
+		while collapses(at), let parent = at.superview, stackConstraints[ObjectIdentifier(parent)] != nil {
+			stack(parent)
+			at = parent
+		}
+	}
+
+	/// Whether a first and last child's margins pass through the box, as through a web block with no border or padding.
+	private func collapses(_ view: UIView) -> Bool {
+		let id = ObjectIdentifier(view)
+		return type(of: view) == UIView.self && view !== root && !leaves.contains(id) && !tables.contains(id)
+			&& !tableRows.contains(id) && !tableCells.contains(id)
+	}
+
+	/// An empty paragraph, or a box with nothing shown in it: it has no height and margins collapse through it.
+	private func through(_ view: UIView) -> Bool {
+		if let label = view as? UILabel { return (label.attributedText?.length ?? 0) == 0 }
+		return collapses(view) && stacked(view).allSatisfy(through)
+	}
+
+	private func marginAbove(_ view: UIView) -> CGFloat {
+		var margin = margins[ObjectIdentifier(view)] ?? 0
+		guard collapses(view) else { return margin }
+		for child in stacked(view) {
+			margin = max(margin, marginAbove(child))
+			if !through(child) { break }
+			margin = max(margin, marginBelow(child))
+		}
+		return margin
+	}
+
+	private func marginBelow(_ view: UIView) -> CGFloat {
+		var margin = margins[ObjectIdentifier(view)] ?? 0
+		guard collapses(view) else { return margin }
+		for child in stacked(view).reversed() {
+			margin = max(margin, marginBelow(child))
+			if !through(child) { break }
+			margin = max(margin, marginAbove(child))
+		}
+		return margin
 	}
 
 	/// The children the stacking layout places: not anchors, decorations (a marker, a rule's line) or hidden views.
@@ -1232,9 +1293,10 @@ final class ViewTree {
 	}
 
 	/// The stacking layout's part of an element's default style: insets, rules, list markers and table structure.
-	private func applyBlockStyle(_ style: NativeDefaultStyle, to view: UIView) {
+	private func applyBlockStyle(_ style: NativeDefaultStyle, to view: UIView, scale: CGFloat) {
 		let id = ObjectIdentifier(view)
 		if let indent = style.indent { indents[id] = CGFloat(indent) }
+		if let margin = style.margin { margins[id] = CGFloat(margin) * TextLook.baseSize * scale }
 		if style.rule {
 			// Chrome's hr: a 1 px inset line with 0.5em above and below.
 			leaves.insert(id)
@@ -1408,7 +1470,11 @@ final class ViewTree {
 			}
 		}
 		flush()
+		let wasEmpty = (paragraph.label.attributedText?.length ?? 0) == 0
 		paragraph.label.attributedText = out
+		if layout == nil, wasEmpty != (out.length == 0), let container = paragraph.label.superview, stackConstraints[ObjectIdentifier(container)] != nil {
+			restack(container)
+		}
 		// UIKit's own label for a UILabel reads its line breaks as spaces; the text a person reads keeps them.
 		paragraph.label.accessibilityLabel = out.string
 	}
@@ -1652,3 +1718,45 @@ final class ContainerScrollView: UIScrollView {
 	}
 }
 #endif
+
+/// An `img`: its picture in a 120 by 90 box. Without a picture it shows its alt text in the picture's place, as the web
+/// does, and takes no space when that is empty.
+final class PictureView: UIImageView {
+	private let altLabel = UILabel()
+
+	var alt = "" {
+		didSet { update() }
+	}
+
+	override var image: UIImage? {
+		didSet { update() }
+	}
+
+	override init(frame: CGRect) {
+		super.init(frame: frame)
+		altLabel.numberOfLines = 0
+		altLabel.isAccessibilityElement = false
+		altLabel.translatesAutoresizingMaskIntoConstraints = false
+		addSubview(altLabel)
+		NSLayoutConstraint.activate([
+			altLabel.topAnchor.constraint(equalTo: topAnchor),
+			altLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
+			altLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
+		])
+		update()
+	}
+
+	@available(*, unavailable)
+	required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+	override var intrinsicContentSize: CGSize {
+		if image != nil { return CGSize(width: 120, height: 90) }
+		return altLabel.isHidden ? .zero : altLabel.intrinsicContentSize
+	}
+
+	private func update() {
+		altLabel.text = alt
+		altLabel.isHidden = image != nil || alt.isEmpty
+		invalidateIntrinsicContentSize()
+	}
+}

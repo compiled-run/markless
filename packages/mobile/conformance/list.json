@@ -33,7 +33,8 @@
 				"parent": "h0",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -101,7 +102,8 @@
 				"parent": "h0",
 				"defaultStyle": {
 					"indent": 40,
-					"marker": "disc"
+					"marker": "disc",
+					"margin": 1
 				}
 			},
 			{

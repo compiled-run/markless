@@ -48,7 +48,7 @@ export function Counter() @{
 					element: 'h1',
 					parent: 'h0',
 					attributes: { class: 'title' },
-					defaultStyle: { bold: true, size: 2 },
+					defaultStyle: { bold: true, size: 2, margin: 0.67 },
 				},
 				{ kind: 'text', id: 'h1:text0', parent: 'h1', parts: [{ text: 'Counter' }] },
 				{
@@ -98,7 +98,7 @@ export function Tally() @{
 		expect(diagnostics).toEqual([]);
 		expect(payload?.nodes).toEqual([
 			{ kind: 'element', id: 'h0', element: 'section', parent: null },
-			{ kind: 'element', id: 'h1', element: 'p', parent: 'h0' },
+			{ kind: 'element', id: 'h1', element: 'p', parent: 'h0', defaultStyle: { margin: 1 } },
 			{
 				kind: 'text',
 				id: 'h1:text0',
@@ -365,7 +365,10 @@ export function Page() @{
 }`);
 		expect(diagnostics).toEqual([]);
 		expect(payload?.handlers).toEqual([
-			{ id: 'handler:event:0', ops: [{ op: 'assign', cell: 'state:said', value: { event: 'value' } }] },
+			{
+				id: 'handler:event:0',
+				ops: [{ op: 'assign', cell: 'state:said', value: { event: 'value' } }],
+			},
 		]);
 		const elsewhere = await nativeView(`import { state } from '@markless/core';
 function textOf(from: EventTarget | null): string {
@@ -601,6 +604,7 @@ export function Toggle() @{
 				element: 'p',
 				parent: 'h0',
 				arm: { branch: 'branch-site:0', index: 0 },
+				defaultStyle: { margin: 1 },
 			},
 			{
 				kind: 'text',
@@ -615,6 +619,7 @@ export function Toggle() @{
 				element: 'p',
 				parent: 'h0',
 				arm: { branch: 'branch-site:0', index: 1 },
+				defaultStyle: { margin: 1 },
 			},
 			{
 				kind: 'text',
@@ -1684,13 +1689,38 @@ ${markup}
 		);
 		expect(styles).toEqual([
 			['main', undefined],
-			['p', undefined],
+			['p', { margin: 1 }],
 			['code', { flow: 'inline', monospace: true, size: 0.8125 }],
 			['br', { flow: 'break' }],
 			['kbd', { flow: 'inline', monospace: true, size: 0.8125 }],
-			['pre', { monospace: true, size: 0.8125, preformatted: true }],
+			['pre', { monospace: true, size: 0.8125, preformatted: true, margin: 1 }],
 			['abbr', { flow: 'inline', line: 'underline' }],
 			['button', undefined],
+		]);
+	});
+
+	it("drops a list's block margins inside another list, as Chrome's stylesheet does", async () => {
+		const { payload, diagnostics } = await nativeView(
+			source(`		<ul><li>a<ol><li>b</li></ol></li></ul>
+		<dl><dt>t</dt><dd><ul><li>c</li></ul></dd></dl>
+		<h2>h</h2>`),
+		);
+		expect(diagnostics).toEqual([]);
+		const margins = payload!.nodes.flatMap((node) =>
+			node.kind === 'element' && node.element !== 'li'
+				? [[node.element, node.defaultStyle?.margin ?? null]]
+				: [],
+		);
+		expect(margins).toEqual([
+			['main', null],
+			['ul', 1],
+			['ol', null],
+			['dl', 1],
+			['dt', null],
+			['dd', null],
+			['ul', null],
+			['h2', 0.83],
+			['button', null],
 		]);
 	});
 
@@ -2136,12 +2166,18 @@ ${markup}
 			(node) => node.kind === 'element' && node.element === 'option',
 		);
 		expect(option).toMatchObject({
-			parent: payload!.nodes.find((node) => node.kind === 'element' && node.element === 'select')!.id,
+			parent: payload!.nodes.find(
+				(node) => node.kind === 'element' && node.element === 'select',
+			)!.id,
 			bindings: [
 				{ attribute: 'value', value: { item: 'repeat:0' } },
 				{
 					property: 'selected',
-					value: { binary: '===', left: { item: 'repeat:0' }, right: { cell: 'state:size' } },
+					value: {
+						binary: '===',
+						left: { item: 'repeat:0' },
+						right: { cell: 'state:size' },
+					},
 				},
 			],
 		});
@@ -2176,7 +2212,8 @@ ${markup}
 
 describe('pointer events', () => {
 	it('lowers each pointer event a touch raises, the fields its handler reads, and capture', async () => {
-		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+		const { payload, diagnostics } =
+			await nativeView(`import { element, state } from '@markless/core';
 export function Drag() @{
 	let x = state(0);
 	let held = state(false);
@@ -2221,7 +2258,12 @@ export function Drag() @{
 			},
 		]);
 		expect(ops(2)).toEqual([
-			{ op: 'capture', node: { event: 'currentTarget' }, pointer: { event: 'pointerId' }, release: true },
+			{
+				op: 'capture',
+				node: { event: 'currentTarget' },
+				pointer: { event: 'pointerId' },
+				release: true,
+			},
 		]);
 		for (const field of ['clientX', 'clientY', 'timeStamp'])
 			expect(JSON.stringify(ops(1))).toContain(JSON.stringify({ event: field }));

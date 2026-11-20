@@ -22,10 +22,42 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 	private var columns: IntArray? = null
 	private val gap = (8 * context.resources.displayMetrics.density).toInt()
 
+	/** Without a style export: the element's default margins above and below, in px, before they collapse. */
+	internal var marginTop = 0
+	internal var marginBottom = 0
+	/** The page's body: its margin in px on every side, which its children's margins collapse into (`body { margin: 8px }`). */
+	internal var body = 0
+	/** Each shown child's top, worked out while measuring. */
+	private var tops = IntArray(0)
+
+	/** Whether a first and last child's margins pass through this box, as they do through a block with no border or padding. */
+	private val collapses get() = frames.isEmpty() && table == null && body == 0 && fixedSize == null && paddingTop == 0 && paddingBottom == 0
+
+	private fun shown(): List<View> = (0 until childCount).map { getChildAt(it) }.filter { it.visibility != View.GONE }
+
+	/** An empty paragraph, or a box with nothing shown in it: it has no height and margins collapse through it. */
+	private fun View.through(): Boolean = measuredHeight == 0 && (this is FlowText || (this is MarklessBox && collapses))
+
+	private fun View.marginAbove(): Int = (this as? MarklessBox)?.let { if (it.collapses) maxOf(it.marginTop, it.leading()) else it.marginTop } ?: 0
+	private fun View.marginBelow(): Int = (this as? MarklessBox)?.let { if (it.collapses) maxOf(it.marginBottom, it.trailing()) else it.marginBottom } ?: 0
+
+	/** The margins that reach this box's top edge from its first children. */
+	private fun leading(): Int {
+		var m = 0
+		for (c in shown()) { m = maxOf(m, c.marginAbove()); if (!c.through()) break; m = maxOf(m, c.marginBelow()) }
+		return m
+	}
+
+	private fun trailing(): Int {
+		var m = 0
+		for (c in shown().asReversed()) { m = maxOf(m, c.marginBelow()); if (!c.through()) break; m = maxOf(m, c.marginAbove()) }
+		return m
+	}
+
 	/** A list's markers (`•`, `1.`), drawn in its start padding beside each item's first line; not text a reader reaches. */
 	internal var markers: Map<View, String> = emptyMap()
 		set(value) { field = value; invalidate() }
-	private val markerPaint = TextView(context).let { t -> Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = t.textSize; color = t.currentTextColor } }
+	private val markerPaint = TextView(context).let { t -> Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = t.textSize } }
 
 	init {
 		setWillNotDraw(false)
@@ -79,16 +111,28 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 			}
 			for (row in rows) row.columns = widths.toIntArray()
 		}
-		var height = paddingTop + paddingBottom
 		var widest = 0
-		for (i in 0 until childCount) {
-			val child = getChildAt(i)
-			if (child.visibility == View.GONE) continue
+		val kids = shown()
+		for (child in kids) {
 			// Text fields span the stack's width, as platform fields do; everything else takes its content width.
 			child.measure(MeasureSpec.makeMeasureSpec(width, if (child is EditText) MeasureSpec.EXACTLY else MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
-			height += child.measuredHeight
 			widest = maxOf(widest, child.measuredWidth)
 		}
+		// Margins between siblings meet at the larger; the first and last child's leave through the box when it collapses.
+		tops = IntArray(kids.size)
+		var y = paddingTop
+		var pending = body
+		var leading = collapses
+		for ((i, child) in kids.withIndex()) {
+			if (child.through()) { pending = maxOf(pending, child.marginAbove(), child.marginBelow()); tops[i] = y; continue }
+			if (!leading) y += maxOf(pending, child.marginAbove())
+			leading = false
+			tops[i] = y
+			y += child.measuredHeight
+			pending = child.marginBelow()
+		}
+		if (!collapses) y += maxOf(pending, body)
+		val height = y + paddingBottom
 		val w = if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY) MeasureSpec.getSize(widthMeasureSpec) else widest + paddingLeft + paddingRight
 		setMeasuredDimension(maxOf(w, minimumWidth), resolveSize(maxOf(height, minimumHeight), heightMeasureSpec))
 	}
@@ -113,17 +157,15 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 			}
 			return
 		}
-		var y = paddingTop
-		for (i in 0 until childCount) {
-			val child = getChildAt(i)
-			if (child.visibility == View.GONE) continue
+		for ((i, child) in shown().withIndex()) {
+			val y = tops.getOrElse(i) { paddingTop }
 			child.layout(paddingLeft, y, paddingLeft + child.measuredWidth, y + child.measuredHeight)
-			y += child.measuredHeight
 		}
 	}
 
 	override fun dispatchDraw(canvas: Canvas) {
 		super.dispatchDraw(canvas)
+		markerPaint.color = canvasText(resources.configuration)
 		for ((child, marker) in markers) {
 			if (child.parent !== this || child.visibility == View.GONE) continue
 			val baseline = baselineIn(child) ?: markerPaint.textSize.toInt()

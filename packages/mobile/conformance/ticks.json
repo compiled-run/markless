@@ -131,7 +131,10 @@
 				"kind": "element",
 				"id": "h9",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",

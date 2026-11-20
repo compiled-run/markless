@@ -200,6 +200,11 @@ export type NativeDefaultStyle = {
 	readonly preformatted?: true;
 	/** Space before the content on the start side, in CSS pixels (`<blockquote>`, `<dd>`, `<ul>`). */
 	readonly indent?: number;
+	/**
+	 * Space above and below the box, in ems of its own font size (`<p>` 1, `<h1>` 0.67). Adjoining margins collapse as on the
+	 * web: two siblings' meet at the larger, and a box's first and last child's margins become the box's own.
+	 */
+	readonly margin?: number;
 	/** `<hr>`: a thin horizontal line across the box. */
 	readonly rule?: true;
 	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
@@ -226,24 +231,24 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	aside: {},
 	hgroup: {},
 	search: {},
-	p: {},
-	h1: { bold: true, size: 2 },
-	h2: { bold: true, size: 1.5 },
-	h3: { bold: true, size: 1.17 },
-	h4: { bold: true },
-	h5: { bold: true, size: 0.83 },
-	h6: { bold: true, size: 0.67 },
+	p: { margin: 1 },
+	h1: { bold: true, size: 2, margin: 0.67 },
+	h2: { bold: true, size: 1.5, margin: 0.83 },
+	h3: { bold: true, size: 1.17, margin: 1 },
+	h4: { bold: true, margin: 1.33 },
+	h5: { bold: true, size: 0.83, margin: 1.67 },
+	h6: { bold: true, size: 0.67, margin: 2.33 },
 	address: { italic: true },
-	blockquote: { indent: 40 },
-	figure: { indent: 40 },
+	blockquote: { indent: 40, margin: 1 },
+	figure: { indent: 40, margin: 1 },
 	figcaption: {},
 	hr: { rule: true },
-	pre: { ...MONOSPACE, preformatted: true },
-	ul: { indent: 40, marker: 'disc' },
-	ol: { indent: 40, marker: 'decimal' },
-	menu: { indent: 40, marker: 'disc' },
+	pre: { ...MONOSPACE, preformatted: true, margin: 1 },
+	ul: { indent: 40, marker: 'disc', margin: 1 },
+	ol: { indent: 40, marker: 'decimal', margin: 1 },
+	menu: { indent: 40, marker: 'disc', margin: 1 },
 	li: {},
-	dl: {},
+	dl: { margin: 1 },
 	dt: {},
 	dd: { indent: 40 },
 	table: { table: 'table' },
@@ -764,7 +769,12 @@ export type NativeJournalEntry =
 	 * An element marked `overlay` joined the overlay stack (its `hidden` binding showed it) or left it. A `modal` one (it or
 	 * an element inside it carries `aria-modal="true"`) goes in the host's top layer with the page behind inert.
 	 */
-	| { readonly op: 'overlay'; readonly node: string; readonly open: boolean; readonly modal: boolean }
+	| {
+			readonly op: 'overlay';
+			readonly node: string;
+			readonly open: boolean;
+			readonly modal: boolean;
+	  }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
 	| {
 			readonly op: 'attribute';
@@ -998,17 +1008,23 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	IntersectionObserver: 'the DOM, which a phone does not have',
 	customElements: 'the DOM, which a phone does not have',
 	FormData: 'an HTML form, which a phone does not have',
-	devicePixelRatio: 'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
-	innerWidth: 'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
-	innerHeight: 'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
+	devicePixelRatio:
+		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
+	innerWidth:
+		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
+	innerHeight:
+		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
 	outerWidth: 'the browser window, which a phone does not have',
 	outerHeight: 'the browser window, which a phone does not have',
 	visualViewport: 'the browser window, which a phone does not have',
 	scrollX: "the page's scroll position, which a phone's views keep",
 	scrollY: "the page's scroll position, which a phone's views keep",
-	scrollTo: "the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
-	scrollBy: "the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
-	addEventListener: 'listening on the browser window, which a phone does not have; use an event attribute',
+	scrollTo:
+		"the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
+	scrollBy:
+		"the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
+	addEventListener:
+		'listening on the browser window, which a phone does not have; use an event attribute',
 	removeEventListener: 'listening on the browser window, which a phone does not have',
 	dispatchEvent: 'events on the browser window, which a phone does not have',
 	getSelection: 'a text selection in the web page, which a phone does not have',
@@ -1017,7 +1033,7 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	NodeFilter: 'the DOM, which a phone does not have',
 	DOMParser: 'parsing HTML into a DOM, which a phone does not have',
 	CSS: 'the CSS object model, which a phone does not have at run time',
-	XMLHttpRequest: 'the browser\'s old request API; use `fetch`, which a phone provides',
+	XMLHttpRequest: "the browser's old request API; use `fetch`, which a phone provides",
 	alert: 'a browser dialog, which a phone does not have',
 	confirm: 'a browser dialog, which a phone does not have',
 	prompt: 'a browser dialog, which a phone does not have',
