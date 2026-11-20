@@ -1645,14 +1645,32 @@ export function Forms() @{
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the <input type="number"> h7, which no native host draws or checks yet',
 			'the submit handler builds FormData with a submitter, which a native build does not read yet',
 			'the <form> h1 has no onSubmit handler: the web sends it to its action and loads the answer (or sends a POST to an API route in place), and a phone app has no server or page to load',
 			'the submit handler on the <form> h4 does not call `event.preventDefault()` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for',
-			'the <input> h7 in the <form> h6 is an <input type="number">, which no native host draws or checks yet',
 			'the <input> h8 in the <form> h6 has `pattern`, which the web checks before a submit and no native host checks yet',
 			'the <input> h9 in the <form> h6 binds the `name` of a radio button, which a native build reads only as written',
 			'the <button> h10 in the <form> h6 is a reset button, which a native build has no lowering for yet',
 			'the <button> h11 in the <form> h6 has `formaction`, which says where the web sends the form; a phone app has no server to send it to',
+		]);
+	});
+
+	it('refuses an input type no phone draws by name outside a form too, instead of drawing it as a text field', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Profile() @{
+	<main>
+		<input type="file" aria-label="Photo" />
+		<input type="DATE" aria-label="Day" />
+		<input type="password" aria-label="Secret" />
+		<input type="search" aria-label="Find" />
+		<input type="checkbox" aria-label="News" />
+	</main>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the <input type="file"> h1, which no native host draws or checks yet',
+			'the <input type="date"> h2, which no native host draws or checks yet',
+			'the <input type="password"> h3, which no native host draws or checks yet',
 		]);
 	});
 

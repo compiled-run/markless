@@ -4105,6 +4105,15 @@ export function createNativeViewPayload(
 					if (result.title !== undefined && !('aria-label' in attributes))
 						attributes['aria-label'] = result.title;
 				}
+				// An <input> phones draw: a text field, a checkbox or radio button, a hidden input, or a submit input.
+				const drawnType = element === 'input' ? attributes['type']?.toLowerCase() : undefined;
+				if (
+					drawnType !== undefined &&
+					drawnType !== '' &&
+					!TEXT_TYPES.has(drawnType) &&
+					!['checkbox', 'radio', 'hidden', 'submit'].includes(drawnType)
+				)
+					refuse(`the <input type="${drawnType}"> ${id}, which no native host draws or checks yet`, span);
 				// A submit input is the button its `value` labels, as the web draws it.
 				const submitInput = element === 'input' && attributes['type'] === 'submit';
 				if (submitInput) {
@@ -6770,12 +6779,8 @@ export function createNativeViewPayload(
 				let kind: NativeFieldKind;
 				if (type === undefined || TEXT_TYPES.has(type)) kind = 'text';
 				else if (type === 'checkbox' || type === 'radio' || type === 'hidden') kind = type;
-				else {
-					refuse(
-						`${field} is an <input type="${type}">, which no native host draws or checks yet`,
-					);
-					continue;
-				}
+				// Any other type is refused where the element is lowered.
+				else continue;
 				if (kind === 'radio' && attribute(node, 'name') === 'bound')
 					refuse(
 						`${field} binds the \`name\` of a radio button, which a native build reads only as written`,
