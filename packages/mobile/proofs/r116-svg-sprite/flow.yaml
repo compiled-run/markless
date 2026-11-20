@@ -1,0 +1,9 @@
+appId: ${APP_ID}
+name: r116-svg-sprite
+---
+- launchApp:
+      clearState: true
+- assertVisible: Sprite
+- assertVisible: Sun from the sprite
+- assertVisible: Leaf from the sprite
+- assertVisible: Two icons from one sprite file

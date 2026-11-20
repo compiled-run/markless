@@ -1,0 +1,5 @@
+{
+	"rung": "R116",
+	"name": "A <use> names a symbol in a sprite file the app serves, its path computed by app code",
+	"steps": [{ "visible": ["Sprite", "Sun from the sprite", "Leaf from the sprite", "Two icons from one sprite file"] }]
+}

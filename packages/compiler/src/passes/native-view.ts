@@ -74,6 +74,7 @@ import type {
 	SourceSpan,
 } from '../artifacts.ts';
 import { compileDrawing, type DrawingElement } from './native-drawing.ts';
+import { readSvgFile } from './native-svg-file.ts';
 import { nativeScriptOf, type NativeScriptModuleInput } from './native-script.ts';
 import { scriptFactsOf, type ScriptFacts } from './semantic-graph/script-facts.ts';
 import { sharedDefinitionId } from './semantic-graph/collect-shared.ts';
@@ -88,6 +89,14 @@ export type NativeViewArtifact = {
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 	/** Modules the build resolved but was not given an analysis of; the caller analyzes them and builds again. */
 	readonly missingModules?: ReadonlyArray<string>;
+	/**
+	 * Values the build needs that only app code computes (a `<use>` href naming a sprite symbol), with the script that
+	 * computes them; the caller evaluates each with no cells and builds again with `builtValues`.
+	 */
+	readonly buildValues?: {
+		readonly script?: NativeViewPayload['script'];
+		readonly values: ReadonlyArray<{ readonly key: string; readonly value: NativeExpr }>;
+	};
 	/** Where each element node of the payload is written, by node id, for build errors that name an element. */
 	readonly elementSources: ReadonlyMap<
 		string,
@@ -917,7 +926,13 @@ export type NativeViewOptions = {
 	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
 	/** A module's source as the build read it, by filename: where a native build finds a value's own JavaScript. */
 	readonly readSource?: (filename: string) => string | undefined;
+	/** What the caller computed for each of a previous build's `buildValues`, by key. */
+	readonly builtValues?: ReadonlyMap<string, NativeBuiltValue>;
+	/** The text of the file the app serves at a site-root path (`/icons.svg`), as the browser fetches it; the caller owns file access. */
+	readonly readAsset?: (path: string) => string | undefined;
 };
+
+export type NativeBuiltValue = { readonly value: unknown } | { readonly error: string };
 
 /** One module's facts, indexed for lowering its templates. */
 type ModuleFacts = ReturnType<typeof moduleFactsOf>;
@@ -1086,6 +1101,51 @@ function cellsOf(expr: NativeExpr, into = new Set<string>()): Set<string> {
 		} else if (child && typeof child === 'object') cellsOf(child as NativeExpr, into);
 	}
 	return into;
+}
+
+/** Expression kinds whose value is only known while the app runs. */
+const RUNTIME_READS = [
+	'cell',
+	'route',
+	'event',
+	'checked',
+	'formData',
+	'focused',
+	'captures',
+	'contains',
+	'focusOrigin',
+] as const;
+
+/** What makes a value differ while the app runs: a list row's item, or state and the rest of `RUNTIME_READS`. */
+function variesWhileRunning(expr: NativeExpr): 'row' | 'state' | undefined {
+	if ('item' in expr) return 'row';
+	if (RUNTIME_READS.some((kind) => kind in expr)) return 'state';
+	if ('script' in expr) {
+		for (const binding of Object.values(expr.bindings)) {
+			if (!('value' in binding)) return 'state';
+			const found = variesWhileRunning(binding.value);
+			if (found) return found;
+		}
+		return undefined;
+	}
+	const visit = (value: unknown): 'row' | 'state' | undefined => {
+		if (Array.isArray(value)) {
+			for (const part of value) {
+				const found = visit(part);
+				if (found) return found;
+			}
+			return undefined;
+		}
+		if (value === null || typeof value !== 'object') return undefined;
+		return 'spread' in value
+			? visit(Object.values(value))
+			: variesWhileRunning(value as NativeExpr);
+	};
+	for (const child of Object.values(expr)) {
+		const found = visit(child);
+		if (found) return found;
+	}
+	return undefined;
 }
 
 const BUILTIN_CALLS: Readonly<Record<string, (...args: never[]) => unknown>> = {
@@ -1277,8 +1337,18 @@ export function createNativeViewPayload(
 		features: [...features],
 		diagnostics,
 		...(missingModules.size > 0 ? { missingModules: [...missingModules] } : {}),
+		...(buildValues.length > 0
+			? {
+					buildValues: {
+						...(payload?.script ? { script: payload.script } : {}),
+						values: buildValues,
+					},
+				}
+			: {}),
 		elementSources,
 	});
+	const buildValues: { readonly key: string; readonly value: NativeExpr }[] = [];
+	const sprites = new Map<string, ReturnType<typeof readSvgFile> | undefined>();
 
 	const root = graph.markup.root;
 	if (!root) return done(refuse('the module has no root component'));
@@ -4374,6 +4444,109 @@ export function createNativeViewPayload(
 		live: read.computedGraphNodeId !== undefined,
 		...(read.sourceSpan ? { span: read.sourceSpan } : {}),
 	});
+	/** A bound `<use>` href as the app is built: folded here, or computed by the caller's script engine (`buildValues`). */
+	const builtHref = (element: DrawingElement, name: string, scope: Scope): string | null => {
+		const span = scope.module.hostSpans.get(element.id);
+		const key = `${scope.prefix}${element.id}`;
+		const built = options.builtValues?.get(key);
+		if (built && 'error' in built)
+			return refuseAs(
+				'svg',
+				`\`${name}\` on <use> could not be computed when the app was built: ${built.error}`,
+				span,
+			);
+		if (built) return built.value === null || built.value === undefined ? '' : String(built.value);
+		const follows = `\`${name}\` on <use> follows state; a native drawing is compiled when the app is built`;
+		const read = (scope.module.readsByHost.get(element.id) ?? []).find(
+			(candidate) =>
+				candidate.target.kind === 'attribute' && candidate.target.name === name,
+		);
+		if (!read) return refuseAs('svg', follows, span);
+		const where = readScope(read, scope);
+		const lowered = attempt(() =>
+			renderValue(
+				read.expression,
+				() => readScript(where.module, read.sourceSpan),
+				`the \`${name}\` of <use>`,
+				where,
+			),
+		);
+		const varies =
+			lowered.failed || !lowered.value ? 'state' : variesWhileRunning(lowered.value);
+		if (varies) {
+			lowered.rollBack();
+			return refuseAs(
+				'svg',
+				varies === 'row'
+					? `\`${name}\` on <use> follows its @for row; a native drawing is compiled once for every row, so a row cannot name its own symbol yet`
+					: follows,
+				span,
+			);
+		}
+		const folded = foldConstant(lowered.value!, () => undefined);
+		if (folded) {
+			lowered.rollBack();
+			return folded.value === null || folded.value === undefined ? '' : String(folded.value);
+		}
+		buildValues.push({ key, value: lowered.value! });
+		return refuseAs(
+			'svg',
+			`\`${name}\` on <use> is computed by app code when the app is built, and this build has no script engine to compute it`,
+			span,
+		);
+	};
+	/**
+	 * A `<use>` of an inline svg with its href as the app is built; an href naming a file the app serves (`/icons.svg#sun`)
+	 * brings that file's elements, where its `#id` is looked up. Null when it is refused.
+	 */
+	const useOf = (
+		element: DrawingElement,
+		scope: Scope,
+	): { readonly element: DrawingElement; readonly sprite?: ReadonlyArray<DrawingElement> } | null => {
+		const span = scope.module.hostSpans.get(element.id);
+		const name = element.bound.find((bound) => bound === 'href' || bound === 'xlink:href');
+		const written = name ? builtHref(element, name, scope) : undefined;
+		if (written === null) return null;
+		const href = (
+			written ??
+			element.attributes.href ??
+			element.attributes['xlink:href'] ??
+			''
+		).trim();
+		const { 'xlink:href': _xlink, ...attributes } = element.attributes;
+		const resolved = (target: string): DrawingElement => ({
+			...element,
+			attributes: { ...attributes, href: target },
+			bound: element.bound.filter((bound) => bound !== 'href' && bound !== 'xlink:href'),
+		});
+		if (href === '' || href.startsWith('#')) return { element: resolved(href) };
+		const refused = (message: string) => refuseAs('svg', `<use href="${href}"${message}`, span);
+		const hash = href.indexOf('#');
+		const file = hash < 0 ? href : href.slice(0, hash);
+		const id = hash < 0 ? '' : href.slice(hash + 1);
+		if (id === '') return refused('>, which names a file but no symbol in it');
+		if (!file.startsWith('/') || file.startsWith('//'))
+			return refused(
+				`>: a sprite is read from the app's files when it is built, so its path starts at the site root${file.includes(':') ? '' : `, as \`/${file}\``}`,
+			);
+		const path = file.split('?')[0]!;
+		if (!options.readAsset)
+			return refused(`>: this build was not given the app's files to read ${path} from`);
+		if (!sprites.has(path)) {
+			const text = options.readAsset(path);
+			sprites.set(path, text === undefined ? undefined : readSvgFile(text));
+		}
+		const sprite = sprites.get(path);
+		if (!sprite) return refused(`>: the app serves no file at ${path}`);
+		if ('error' in sprite)
+			return refused(`>: ${path} is not an SVG file the build can read: ${sprite.error}`);
+		if (!sprite.elements.some((other) => other.attributes.id === id))
+			return refused(`>, which names nothing in ${path}`);
+		return {
+			element: resolved(`#${id}`),
+			sprite: sprite.elements.map((other) => ({ ...other, id: element.id })),
+		};
+	};
 	const textPartOf = (graphNodeId: string, scope: Scope): NativeTextPart | null => {
 		const cell = scope.cells.byBinding.get(graphNodeId);
 		if (cell) return { cell };
@@ -4776,17 +4949,21 @@ export function createNativeViewPayload(
 					const inside = items.filter((other) => isPrefix(item.path, other.path));
 					const relative = (path: ReadonlyArray<number>) => path.slice(item.path.length);
 					const drawn: DrawingElement[] = [];
+					const usedSprites = new Map<string, ReadonlyArray<DrawingElement>>();
 					const texts: { path: ReadonlyArray<number>; text: string }[] = [];
 					for (const other of inside) {
 						if (other.kind === 'host') {
 							const tag = scope.module.tagOf.get(other.id) ?? '*';
-							drawn.push({
+							const element: DrawingElement = {
 								id: other.id,
 								tag,
 								path: relative(other.path),
 								attributes: attributesAt(other.path),
 								bound: boundAt(other.path),
-							});
+							};
+							const use = tag === 'use' ? useOf(element, scope) : { element };
+							if (use) drawn.push(use.element);
+							if (use?.sprite) usedSprites.set(other.id, use.sprite);
 							for (const event of scope.module.eventsByHost.get(other.id) ?? []) {
 								if (scope.module === rootModule) loweredEvents.add(event.id);
 								refuseAs(
@@ -4804,7 +4981,7 @@ export function createNativeViewPayload(
 								span,
 							);
 					}
-					const result = compileDrawing(attributes, drawn, texts, item.id);
+					const result = compileDrawing(attributes, drawn, texts, item.id, usedSprites);
 					for (const refusal of result.refusals)
 						refuseAs(
 							'svg',

@@ -64,7 +64,7 @@ afterAll(() => browser.close(), 60_000);
  */
 const owns = (folder: string, name: string) => existsSync(join(proofsDir, folder, name));
 const SHARED = (folder: string, rung: LadderRung): boolean =>
-	!['pages', 'document.tsrx', 'styles', 'lib'].some((name) => owns(folder, name)) &&
+	!['pages', 'document.tsrx', 'styles', 'lib', 'public'].some((name) => owns(folder, name)) &&
 	rung.route === undefined &&
 	rung.start === undefined &&
 	rung.web === undefined &&
@@ -103,8 +103,8 @@ async function serveRung(
 	}
 	// Components a rung imports live in proofs/lib, which a page reaches as `../lib/...` from pages/ here too.
 	await cp(join(proofsDir, 'lib'), join(root, 'lib'), { recursive: true });
-	// An app rung may bring its own components, stylesheets and document (whose stylesheet imports reach every page).
-	for (const own of ['lib', 'styles'])
+	// An app rung may bring its own components, stylesheets, served files and document (whose stylesheet imports reach every page).
+	for (const own of ['lib', 'styles', 'public'])
 		if (existsSync(join(proofsDir, folder, own)))
 			await cp(join(proofsDir, folder, own), join(root, own), { recursive: true });
 	if (existsSync(join(proofsDir, folder, 'document.tsrx')))

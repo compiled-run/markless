@@ -87,6 +87,17 @@ export function readRelativeStylesheet(specifier: string, importer: string) {
 		: undefined;
 }
 
+/** A file the rung's app serves from its `public/` folder, at a site-root path (`/icons.svg`), as Vite serves it. */
+export function rungAssetReader(dir: string) {
+	const publicDir = resolve(repoRoot, dir, 'public');
+	return (path: string) => {
+		const file = resolve(publicDir, `.${path}`);
+		return file.startsWith(`${publicDir}/`) && existsSync(file)
+			? readFileSync(file, 'utf8')
+			: undefined;
+	};
+}
+
 /** The app's document, when the rung has its own (`document.tsrx`, whose stylesheet imports reach every page). */
 const APP_DOCUMENT = 'document.tsrx';
 
@@ -113,6 +124,7 @@ export function compileRungApp(
 			: {}),
 		readModule: readRelativeModule,
 		readStylesheet: readRelativeStylesheet,
+		readAsset: rungAssetReader(dir),
 	});
 }
 
@@ -308,6 +320,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				// A rung that is a page compiles as its page file, so the router derives its route.
 				...(expected.route === undefined ? {} : { page: `pages/${expected.route}.tsrx` }),
 				readModule: readWorkspaceModule,
+				readAsset: rungAssetReader(dir),
 				...(appConfig.device ? { device: appConfig.device } : {}),
 				target: platform,
 			});

@@ -2800,6 +2800,137 @@ describe('inline svg', () => {
 		expect(svg.drawing!.shapes[0]!.transform).toEqual([5, 0, 0, 5, 10, 0]);
 	});
 
+	const sprite = `<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg>
+<svg xmlns="http://www.w3.org/2000/svg" fill="red">
+	<!-- each mark is a symbol a page names -->
+	<symbol id="sun" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="#f4a261" /></symbol>
+	<symbol id="bar"><g transform="translate(1 0)"><rect width="2" height="1" /></g></symbol>
+	<symbol id="ring" viewBox="0 0 4 4"><use href="#sun" width="4" height="4" /></symbol>
+</svg>`;
+	const shapesOf = (payload: NonNullable<Awaited<ReturnType<typeof nativeView>>['payload']>) =>
+		payload.nodes.flatMap((node) =>
+			node.kind === 'element' && node.drawing ? [node.drawing.shapes] : [],
+		);
+
+	it('draws a <use> of a <symbol> in a sprite file the app serves, read when the app is built', async () => {
+		const reads: string[] = [];
+		const { payload, diagnostics } = await nativeView(
+			`export function Marks() @{
+	<main>
+		<svg viewBox="0 0 20 20"><use href="/art/marks.svg#sun" /></svg>
+		<svg viewBox="0 0 4 4"><use xlink:href="/art/marks.svg?v=2#bar" x="1" /></svg>
+		<svg viewBox="0 0 8 8"><use href="/art/marks.svg#ring" width="8" height="8" /></svg>
+	</main>
+}`,
+			{
+				readAsset: (url) => {
+					reads.push(url);
+					return url === '/art/marks.svg' ? sprite : undefined;
+				},
+			},
+		);
+		expect(diagnostics).toEqual([]);
+		expect(reads).toEqual(['/art/marks.svg']);
+		const [sun, bar, ring] = shapesOf(payload!);
+		expect(sun).toHaveLength(1);
+		expect(sun![0]).toMatchObject({
+			fill: { r: 244, g: 162, b: 97, alpha: 255 },
+			transform: [2, 0, 0, 2, 0, 0],
+		});
+		expect(bar).toEqual([
+			expect.objectContaining({
+				path: [0, 0, 0, 1, 2, 0, 1, 2, 1, 1, 0, 1, 4],
+				fill: { r: 0, g: 0, b: 0, alpha: 255 },
+				transform: [1, 0, 0, 1, 2, 0],
+			}),
+		]);
+		expect(ring![0]!.transform).toEqual([0.8, 0, 0, 0.8, 0, 0]);
+	});
+
+	it('asks the build for a <use> href that app code computes, then draws the symbol it names', async () => {
+		const source = `function asset(path: string): string {
+	return '/' + path.replace(/^\\/+/, '');
+}
+const INK = 'ink.svg';
+export function Nav() @{
+	const marks = asset(INK) + '#';
+	<svg viewBox="0 0 30 30"><use href={marks + 'sun'} x="5" /></svg>
+}`;
+		const first = await nativeView(source);
+		expect(first.payload).toBeNull();
+		expect(first.diagnostics.map((d) => d.message)).toEqual([
+			'`href` on <use> is computed by app code when the app is built, and this build has no script engine to compute it',
+		]);
+		expect(first.buildValues?.values).toEqual([
+			{ key: expect.any(String), value: expect.objectContaining({ script: expect.any(String) }) },
+		]);
+		expect(first.buildValues?.script?.source).toContain('function asset(path)');
+		const [{ key }] = first.buildValues!.values as [{ key: string }];
+		const { payload, diagnostics } = await nativeView(source, {
+			builtValues: new Map([[key, { value: '/ink.svg#sun' }]]),
+			readAsset: (url) => (url === '/ink.svg' ? sprite : undefined),
+		});
+		expect(diagnostics).toEqual([]);
+		expect(payload!.script).toBeUndefined();
+		expect(shapesOf(payload!)[0]![0]!.transform).toEqual([3, 0, 0, 3, 5, 0]);
+		const failed = await nativeView(source, {
+			builtValues: new Map([[key, { error: 'ReferenceError: window is not defined' }]]),
+		});
+		expect(failed.diagnostics.map((d) => d.message)).toEqual([
+			'`href` on <use> could not be computed when the app was built: ReferenceError: window is not defined',
+		]);
+	});
+
+	it('refuses a <use> href it cannot read when the app is built, by name', async () => {
+		const text = `import { state } from '@markless/core';
+const ROWS = [{ id: 1, icon: 'sun' }, { id: 2, icon: 'bar' }];
+export function Marks() @{
+	let pick = state('sun');
+	<main>
+		<svg viewBox="0 0 10 10"><use href={'/art/marks.svg#' + pick} /></svg>
+		@for (const row of ROWS; key row.id) {
+			<svg viewBox="0 0 10 10"><use href={'/art/marks.svg#' + row.icon} /></svg>
+		}
+		<svg viewBox="0 0 10 10"><use href="/art/marks.svg#moon" /></svg>
+		<svg viewBox="0 0 10 10"><use href="/art/gone.svg#sun" /></svg>
+		<svg viewBox="0 0 10 10"><use href="marks.svg#sun" /></svg>
+		<svg viewBox="0 0 10 10"><use href="/art/broken.svg#sun" /></svg>
+		<svg viewBox="0 0 10 10"><use href="/art/marks.svg" /></svg>
+	</main>
+}`;
+		const { payload, diagnostics } = await nativeView(text, {
+			readAsset: (url) =>
+				url === '/art/marks.svg'
+					? sprite
+					: url === '/art/broken.svg'
+						? '<svg><symbol id="sun"></svg>'
+						: undefined,
+		});
+		expect(payload).toBeNull();
+		expect(diagnostics.every((d) => d.code === 'MARKLESS_NATIVE_SVG')).toBe(true);
+		expect(
+			diagnostics.map((d) => [d.message, text.slice(0, d.primarySpan!.start).split('\n').length]),
+		).toEqual([
+			['`href` on <use> follows state; a native drawing is compiled when the app is built', 6],
+			[
+				'`href` on <use> follows its @for row; a native drawing is compiled once for every row, so a row cannot name its own symbol yet',
+				8,
+			],
+			['<use href="/art/marks.svg#moon">, which names nothing in /art/marks.svg', 10],
+			['<use href="/art/gone.svg#sun">: the app serves no file at /art/gone.svg', 11],
+			[
+				'<use href="marks.svg#sun">: a sprite is read from the app\'s files when it is built, so its path starts at the site root, as `/marks.svg`',
+				12,
+			],
+			[
+				'<use href="/art/broken.svg#sun">: /art/broken.svg is not an SVG file the build can read: <symbol> is closed by </svg>',
+				13,
+			],
+			['<use href="/art/marks.svg">, which names a file but no symbol in it', 14],
+		]);
+	});
+
 	it('turns arcs and quadratics into cubics that end where the web ends them', async () => {
 		const { payload } = await nativeView(`export function Arc() @{
 	<svg viewBox="0 0 20 20"><path d="M0 10A10 10 0 0 1 20 10Q20 20 10 20" /></svg>

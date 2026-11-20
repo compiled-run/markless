@@ -11,6 +11,7 @@ import {
 	DEVICE_TARGET_FACTS,
 	NATIVE_FACT_COLLECTORS,
 	nativeUnsupported,
+	type NativeBuiltValue,
 	type NativeViewArtifact,
 } from '@markless/compiler/native';
 import {
@@ -23,6 +24,8 @@ import { isNativeStyleStateAttribute, NATIVE_APP_VERSION } from '@markless/seria
 import { nativeStyleInputs, type NativeStyleInput } from './style-input.ts';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
+import { nodeScriptHost } from './node-engine.ts';
+import { evaluateWithScript } from './runtime.ts';
 
 export type NativeBuild = {
 	readonly payload: NativeViewPayload | null;
@@ -46,6 +49,9 @@ export type NativeStylesheet = { readonly file: string; readonly cssText: string
 
 /** Reads a stylesheet a module imports for its effect (`./app.css`); the caller owns file access. */
 export type ReadStylesheet = (specifier: string, importer: string) => NativeStylesheet | undefined;
+
+/** Reads the file the app serves at a site-root path (`/icons.svg`), as the browser fetches it; the caller owns file access. */
+export type ReadAsset = (path: string) => string | undefined;
 
 const stylesheetsOf = (
 	requests: ReadonlyArray<string>,
@@ -98,6 +104,8 @@ export async function compileNativeComponent(input: {
 	/** In an app build: every page's route, so links and `navigate()` are checked and resolved against them. */
 	readonly manifest?: RouteManifest;
 	readonly readStylesheet?: ReadStylesheet;
+	/** Reads a file the app serves, such as a sprite a `<use href>` names. */
+	readonly readAsset?: ReadAsset;
 	/** The app config's `device` section (usage text per feature). */
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
@@ -206,6 +214,8 @@ export async function compileNativeComponent(input: {
 		}
 		if (Object.keys(linked).length > 0) compiled = await compileTsrxModule({ ...rootInput, importedModuleInterfaces: linked });
 	}
+	// Values only app code computes (a sprite's path) are computed by the reference engine, as the web's server renders them.
+	const builtValues = new Map<string, NativeBuiltValue>();
 	let native: NativeViewArtifact;
 	for (;;) {
 		native = createNativeViewPayload(compiled.semanticGraph, {
@@ -219,6 +229,8 @@ export async function compileNativeComponent(input: {
 				: {}),
 			modules: { graphs, resolve },
 			readSource: (file: string) => (file === input.filename ? input.source : read.get(file)?.source),
+			builtValues,
+			...(input.readAsset ? { readAsset: input.readAsset } : {}),
 			...(input.scriptHandlers ? { scriptHandlers: input.scriptHandlers } : {}),
 			...(input.manifest
 				? {
@@ -236,8 +248,20 @@ export async function compileNativeComponent(input: {
 				: {}),
 		});
 		const missing = (native.missingModules ?? []).filter((file) => !graphs.has(file));
-		if (missing.length === 0) break;
+		const pending = (native.buildValues?.values ?? []).filter(
+			(entry) => !builtValues.has(entry.key),
+		);
+		if (missing.length === 0 && pending.length === 0) break;
 		for (const file of missing) graphs.set(file, await analyze(file, new Set()));
+		if (missing.length > 0) continue;
+		const evaluate = evaluateWithScript(native.buildValues!, nodeScriptHost());
+		for (const entry of pending) {
+			try {
+				builtValues.set(entry.key, { value: evaluate(entry.value, new Map()) });
+			} catch (error) {
+				builtValues.set(entry.key, { error: String(error) });
+			}
+		}
 	}
 	// A phone build reads only the analysis; what the web's emission passes cannot emit does not bind it.
 	const errors = collectTsrxModuleDiagnostics(compiled).filter(
@@ -346,6 +370,7 @@ export async function compileNativeApp(input: {
 	readonly document?: { readonly filename: string; readonly source: string };
 	readonly readModule?: Parameters<typeof compileNativeComponent>[0]['readModule'];
 	readonly readStylesheet?: ReadStylesheet;
+	readonly readAsset?: ReadAsset;
 	/** The app config's `device` section (usage text per feature), for every page. */
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
@@ -376,6 +401,7 @@ export async function compileNativeApp(input: {
 			manifest,
 			...(input.readModule ? { readModule: input.readModule } : {}),
 			...(input.readStylesheet ? { readStylesheet: input.readStylesheet } : {}),
+			...(input.readAsset ? { readAsset: input.readAsset } : {}),
 			...(input.device ? { device: input.device } : {}),
 			...(input.target ? { target: input.target } : {}),
 		});

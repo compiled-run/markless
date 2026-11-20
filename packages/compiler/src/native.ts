@@ -8,6 +8,7 @@ export {
 	nativeUnsupported,
 	NATIVE_REFUSALS,
 	NATIVE_UNSUPPORTED_CODE,
+	type NativeBuiltValue,
 	type NativeRefusalKind,
 	type NativeViewArtifact,
 	type NativeViewOptions,

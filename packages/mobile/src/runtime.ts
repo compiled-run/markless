@@ -462,7 +462,7 @@ export function evaluateNativeExpr(
  * a payload (Dragon's style input), with the cell values they choose. A script only computes here; it writes nothing.
  */
 export function evaluateWithScript(
-	payload: NativeViewPayload,
+	payload: Pick<NativeViewPayload, 'script'>,
 	host: NativeScriptHost,
 ): (expr: NativeExpr, values: ReadonlyMap<string, Value>) => Value {
 	let engine: NativeScriptEngine | undefined;
