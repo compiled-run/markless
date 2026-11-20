@@ -5833,6 +5833,13 @@ export function createNativeViewPayload(
 				return { ops, returns: true };
 			}
 			if (statement.kind === 'return') return { ops, returns: true };
+			if (statement.kind === 'await' && statement.value.kind === 'apply') {
+				const imported = scope.module.imports.get(statement.value.callee);
+				if (imported?.source === '@markless/router' && imported.importedName === 'navigate') {
+					ops.push(...navigateOps(statement.value.arguments, what, span));
+					continue;
+				}
+			}
 			const awaited = awaitOf(statement);
 			if (awaited === null) {
 				refuse(
