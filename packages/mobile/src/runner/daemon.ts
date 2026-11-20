@@ -51,6 +51,7 @@ import {
 	transitionChunk,
 	writeJson,
 } from './store.ts';
+import { pickChunk } from './schedule.ts';
 import { spawnRunner } from './spawn-runner.ts';
 
 /** Machine-queue reservations: a chunk with host tests peaked at 0.9 GB (heavy-history, 2026-11-18); a boot holds a phone's memory. */
@@ -195,20 +196,13 @@ const chunkNames = (job: string) =>
 const chunksOf = (job: string) =>
 	chunkNames(job).map((name) => ({ name, chunk: readJson<Chunk>(chunkFile(job, name))! }));
 
-/** The oldest job's next queued chunk for this platform; while the runner waits to restart on origin/main, no new job starts. */
+/** The next chunk for a free phone of this platform; while the runner waits to restart on origin/main, no new job starts. */
 function nextChunk(
 	platform: PhoneSpec['platform'],
 ): { job: string; name: string; chunk: Chunk } | undefined {
 	const holding = refresh.state === 'pending' || refresh.state === 'moving';
-	for (const id of jobIds()) {
-		const job = jobDir(id);
-		const chunks = chunksOf(job);
-		if (holding && !jobStarted(chunks.map(({ chunk }) => chunk))) continue;
-		for (const { name, chunk } of chunks)
-			if (chunk.state === 'queued' && chunk.platform === platform)
-				return { job, name, chunk };
-	}
-	return undefined;
+	const jobs = jobIds().map((id) => ({ id: jobDir(id), chunks: chunksOf(jobDir(id)) }));
+	return pickChunk(jobs, platform, !holding);
 }
 
 let refresh: RefreshState = { state: 'idle', checkedAt: 0, kept: null };

@@ -28,8 +28,10 @@ pnpm --filter @markless/mobile phones affected [--base <rev>]             # whic
     - a copy of your hosts (`src/adapters`), shells and conformance vectors.
 3. After that the runner never reads your checkout. You can keep editing, switch branches or delete the worktree while
    the job waits.
-4. The job is split into chunks: up to 8 rungs on one platform each (`--chunk <n>` changes the size). Any free phone of
-   that platform takes the oldest job's next chunk. With two phones of a platform, a job's chunks for that platform run
+4. The job is split into chunks: up to 8 rungs on one platform each (`--chunk <n>` changes the size). A free phone of
+   that platform takes the next chunk of the oldest short job, one with at most 2 chunks left on that platform (a
+   long job's last chunks count). When no short job waits, it takes the oldest job's next chunk. So a 1-rung job no
+   longer waits behind a 115-rung one. With two phones of a platform, a job's chunks for that platform run
    on both at once.
 5. Each chunk runs through the machine queue (`~/.claude/bin/heavy`, reserving 2 GB; the measured peak was 0.9 GB):
     - it builds or reuses the shell around **your** hosts, cached by source content in `~/.cache/markless-proof`;

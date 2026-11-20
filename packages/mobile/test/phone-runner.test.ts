@@ -16,6 +16,7 @@ import {
 	type CheckoutFacts,
 	type RefreshState,
 } from '../src/runner/refresh.ts';
+import { pickChunk, type QueuedJob } from '../src/runner/schedule.ts';
 import { rerunAfterPhoneLoss, transitionChunk, type Chunk } from '../src/runner/store.ts';
 
 const queued: Chunk = {
@@ -301,5 +302,60 @@ describe("the runner's checkout", () => {
 		} finally {
 			rmSync(scratch, { recursive: true, force: true });
 		}
+	});
+});
+
+describe('the chunk a free phone takes', () => {
+	const job = (id: string, ios: number, android = 0, started = false): QueuedJob => ({
+		id,
+		chunks: [
+			...Array.from({ length: ios }, (_, at) => ({
+				name: `ios-${at}`,
+				chunk: { ...queued, platform: 'ios' as const },
+			})),
+			...Array.from({ length: android }, (_, at) => ({
+				name: `android-${at}`,
+				chunk: { ...queued, platform: 'android' as const },
+			})),
+			...(started
+				? [
+						{
+							name: 'ios-done',
+							chunk: transitionChunk(queued, {
+								type: 'claim',
+								phone: 'ios:a',
+								at: 0,
+							}),
+						},
+					]
+				: []),
+		],
+	});
+
+	it('goes to a short job before an older long one', () => {
+		expect(pickChunk([job('long', 14), job('short', 1)], 'ios', true)).toMatchObject({
+			job: 'short',
+			name: 'ios-0',
+		});
+	});
+
+	it('takes the oldest short job, and the oldest long job when no short one waits', () => {
+		expect(pickChunk([job('long', 14), job('a', 2), job('b', 1)], 'ios', true)?.job).toBe('a');
+		expect(pickChunk([job('old', 14), job('new', 9)], 'ios', true)?.job).toBe('old');
+	});
+
+	it("counts a long job's last chunks as short, and only the chunks on the phone's platform", () => {
+		expect(pickChunk([job('tail', 2), job('short', 1)], 'ios', true)?.job).toBe('tail');
+		expect(pickChunk([job('ios-only', 1), job('both', 3, 1)], 'android', true)?.job).toBe(
+			'both',
+		);
+		expect(pickChunk([job('ios-only', 1)], 'android', true)).toBeUndefined();
+	});
+
+	it('starts no new job while the runner waits to restart, but finishes started ones', () => {
+		expect(pickChunk([job('started', 14, 0, true), job('new', 1)], 'ios', false)?.job).toBe(
+			'started',
+		);
+		expect(pickChunk([job('new', 1)], 'ios', false)).toBeUndefined();
 	});
 });
