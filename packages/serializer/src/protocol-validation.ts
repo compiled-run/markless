@@ -569,6 +569,7 @@ function assertOptionalEnclosingRow(record: Record<string, unknown>, context: st
 	if (enclosingRow === undefined) return;
 	assertRecordShape(enclosingRow, context);
 	assertStringField(enclosingRow, 'repeatId', context);
+	if (enclosingRow.prefix !== undefined) assertStringField(enclosingRow, 'prefix', context);
 	assertElementAddressField(enclosingRow, 'parentHostPath', context);
 	assertOptionalStringArrayField(enclosingRow, 'itemPath', context);
 	if (enclosingRow.arm !== undefined) {
