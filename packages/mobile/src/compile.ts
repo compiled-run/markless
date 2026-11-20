@@ -329,6 +329,8 @@ export async function compileNativeApp(input: {
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
 	readonly target?: 'ios' | 'android';
+	/** Keep the routes whose page builds when others refuse (their diagnostics are still returned). */
+	readonly partial?: boolean;
 }): Promise<NativeAppBuild> {
 	const manifest = buildRouteManifestFromFileIds(input.pages.map((page) => page.page));
 	const routes: NativeAppPayload['routes'][number][] = [];
@@ -403,8 +405,11 @@ export async function compileNativeApp(input: {
 		}
 	}
 	return {
-		payload: diagnostics.length > 0 ? null : { version: NATIVE_APP_VERSION, routes },
-		styleInputs: diagnostics.length > 0 ? [] : styleInputs,
+		payload:
+			diagnostics.length > 0 && !(input.partial && routes.length > 0)
+				? null
+				: { version: NATIVE_APP_VERSION, routes },
+		styleInputs: diagnostics.length > 0 && !input.partial ? [] : styleInputs,
 		manifest: deviceManifest([...features], input.device).manifest,
 		diagnostics,
 	};
