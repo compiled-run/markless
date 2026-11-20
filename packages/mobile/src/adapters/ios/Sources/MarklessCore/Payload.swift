@@ -860,8 +860,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 				let fields = try binding.field("fields")
 				return NativeScriptBinding(name: name, kind: .fields(try fields.keys().map { NativeScriptField(name: $0, cell: try fields.field($0).string()) }))
 			case ["value"]: return NativeScriptBinding(name: name, kind: .value(try decodeExpr(try binding.field("value"))))
+			case ["elements"]: return NativeScriptBinding(name: name, kind: .elements(try decodeExpr(try binding.field("elements"))))
+			case ["object"]: return NativeScriptBinding(name: name, kind: .object(try decodeBindings(try binding.field("object"))))
+			case ["shared"]: return NativeScriptBinding(name: name, kind: .shared(try decodeBindings(try binding.field("shared"))))
 			case ["callback"]: return NativeScriptBinding(name: name, kind: .callback(try binding.field("callback").string()))
-			default: throw binding.fail("a script binding is { cell }, { fields }, { value } or { callback }")
+			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { elements }, { object }, { shared } or { callback }")
 			}
 		}
 	}

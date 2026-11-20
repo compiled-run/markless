@@ -85,6 +85,12 @@ sealed interface ScriptBinding {
 	data class Value(val value: Expr) : ScriptBinding
 	/** A function a parent passed as a prop: the script function it names, its own names bound as `<name>.<its name>`. */
 	data class Callback(val fn: String) : ScriptBinding
+	/** An element, or an array of them, the function reads through proxies the host answers. */
+	data class Elements(val value: Expr) : ScriptBinding
+	/** A family's shared object, member by member. */
+	data class Object(val members: Map<String, ScriptBinding>) : ScriptBinding
+	/** A `shared()` accessor: a function that returns that object. */
+	data class Shared(val members: Map<String, ScriptBinding>) : ScriptBinding
 }
 
 /** The JavaScript a payload's script ops and script computeds run, kept in the engine under [id]; [services] are the host services it uses. */
@@ -440,6 +446,9 @@ data class Payload(
 				is ScriptBinding.Fields -> b.fields.values.toList()
 				is ScriptBinding.Value -> cellsOf(b.value)
 				is ScriptBinding.Callback -> emptyList()
+				is ScriptBinding.Elements -> cellsOf(b.value)
+				is ScriptBinding.Object -> cellsOf(b.members)
+				is ScriptBinding.Shared -> cellsOf(b.members)
 			}
 		}
 
@@ -455,6 +464,9 @@ data class Payload(
 				}
 				bo.containsKey("value") -> { bo.only(setOf("value"), "$what.$name"); ScriptBinding.Value(expr(bo.field("value", what), "$what.$name.value")) }
 				bo.containsKey("callback") -> { bo.only(setOf("callback"), "$what.$name"); ScriptBinding.Callback(bo.field("callback", what).str("$what.$name.callback")) }
+				bo.containsKey("elements") -> { bo.only(setOf("elements"), "$what.$name"); ScriptBinding.Elements(expr(bo.field("elements", what), "$what.$name.elements")) }
+				bo.containsKey("object") -> { bo.only(setOf("object"), "$what.$name"); ScriptBinding.Object(scriptBindings(bo.field("object", what), "$what.$name.object")) }
+				bo.containsKey("shared") -> { bo.only(setOf("shared"), "$what.$name"); ScriptBinding.Shared(scriptBindings(bo.field("shared", what), "$what.$name.shared")) }
 				else -> throw MarklessDecodeError("$what.$name is an unknown script binding (fields ${bo.keys})")
 			}
 		}

@@ -2215,10 +2215,44 @@ export function createNativeViewPayload(
 	}
 
 	/** What each name a script function reads from its component means there: a cell, a state object's cells, or a value. */
+	/**
+	 * A shared object's members as a script reads them: cells it may write, element handles as proxies, and values. Its
+	 * methods run only as data: a handler that has the object stays data (its helpers may still run as JavaScript); a
+	 * computed, which only reads, gets the object without them.
+	 */
+	function sharedMembers(
+		instance: SharedInstance,
+		name: string,
+		reading: boolean,
+		span: SourceSpan | undefined,
+	): Record<string, NativeScriptBinding> | null {
+		const members: Record<string, NativeScriptBinding> = {};
+		for (const [field, member] of instance.fields) {
+			const label = `\`${name}.${field}\``;
+			if (member.kind === 'cell') members[field] = { cell: member.cell };
+			else if (member.kind === 'method') {
+				if (!reading)
+					return refuseScript(`JavaScript on a phone calls no method of a shared object (${label} runs as data), so this handler stays data`, span);
+			} else if (member.kind === 'handle') {
+				// A computed never reads an element handle (the web refuses it), so only a handler's object carries them.
+				if (reading) continue;
+				const value = handleValue(member.key, member.plural, label);
+				if (!value) return null;
+				members[field] = { elements: value };
+			} else if (member.kind === 'expr' && member.expression) {
+				const value = exprOf(member.expression, label, { ...instance.scope, live: true });
+				if (!value) return null;
+				members[field] = mentionsElement(value) ? { elements: value } : { value };
+			}
+		}
+		return members;
+	}
+
 	function scriptBindings(
 		fact: SemanticScriptFunction,
 		scope: Scope,
 		what: string,
+		reading = false,
 		forms = false,
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
@@ -2229,7 +2263,7 @@ export function createNativeViewPayload(
 				const callback = written ? undefined : prop.span && scriptFacts(prop.scope.module)?.handler(prop.span);
 				const label = `the \`${name}\` function ${what} calls`;
 				const fn = callback && scriptFunctionId(callback, prop.scope.module, label, forms);
-				const own = callback && fn && scriptBindings(callback, prop.scope, label, forms);
+				const own = callback && fn && scriptBindings(callback, prop.scope, label, false, forms);
 				if (!fn || !own) {
 					ok = false;
 					if (!callback)
@@ -2251,10 +2285,27 @@ export function createNativeViewPayload(
 				bindings[name] = { fields: Object.fromEntries(object.cells) };
 				continue;
 			}
-			if (object?.kind === 'instance' || scope.deviceObjects.has(name)) {
+			// A family's shared object, or the accessor that returns it, reaches the script member by member.
+			const owned =
+				object?.kind === 'instance'
+					? object.instance
+					: [...scope.objects.values()].find(
+							(candidate): candidate is Extract<ObjectRef, { kind: 'instance' }> =>
+								candidate.kind === 'instance' && candidate.instance.definition.name === name,
+						)?.instance;
+			if (owned && !scope.locals.has(name)) {
+				const members = sharedMembers(owned, name, reading, span);
+				if (!members) {
+					ok = false;
+					continue;
+				}
+				bindings[name] = object?.kind === 'instance' ? { object: members } : { shared: members };
+				continue;
+			}
+			if (scope.deviceObjects.has(name)) {
 				ok = false;
 				refuseScript(
-					`${what} uses \`${name}\` (${object ? 'a shared() object' : 'a device object'}), which JavaScript on a phone cannot reach yet`,
+					`${what} uses \`${name}\` (a device object), which JavaScript on a phone cannot reach yet`,
 					span,
 				);
 				continue;
@@ -2284,13 +2335,9 @@ export function createNativeViewPayload(
 				}
 				continue;
 			}
+			// An element handle (or a list of them) reaches the script as proxies the host answers.
 			if (mentionsElement(read.value)) {
-				read.rollBack();
-				ok = false;
-				refuseScript(
-					`${what} uses the element \`${name}\`, which JavaScript on a phone cannot reach yet`,
-					span,
-				);
+				bindings[name] = { elements: read.value };
 				continue;
 			}
 			bindings[name] = { value: read.value };
@@ -2319,7 +2366,7 @@ export function createNativeViewPayload(
 			(global) => !global.typeofOnly && RENDER_UNSTEADY.has(global.property ?? global.name),
 		);
 		const fn = attempt(() => scriptFunctionId(script, scope.module, what));
-		const bindings = attempt(() => scriptBindings(script, scope, what));
+		const bindings = attempt(() => scriptBindings(script, scope, what, true));
 		if (fn.value !== null && bindings.value !== null && unsteady.length === 0)
 			return { script: fn.value, bindings: bindings.value };
 		// Neither runs it: the data path's refusal is the specific one; what the script lacks (a global, a framework call) adds to it.
@@ -2404,7 +2451,7 @@ export function createNativeViewPayload(
 				);
 			const label = `the computed \`${computed.name}\``;
 			const fn = scriptFunctionId(fact, scope.module, label);
-			const bindings = scriptBindings(fact, scope, label);
+			const bindings = scriptBindings(fact, scope, label, true);
 			return fn === null || bindings === null ? null : { script: fn, bindings };
 		});
 	}
@@ -5472,26 +5519,52 @@ export function createNativeViewPayload(
 		const lowered = () => (submitting ? helped() : dataHandlerOps(event, scope, handler, pressed));
 		if (scriptMode === 'all') {
 			// The engine has no fields and no press count, and sees an unset cell as null: such a handler stays data.
-			const data = attempt(lowered);
+			const first = attempt(lowered);
 			// A submit that data spells stays data: its timers are the host's, which an engine's cannot stand in for.
 			if (
-				!data.failed &&
-				(submitting || mentionsDataOnly(data.value) || readsUndefinedFirst(data.value))
+				!first.failed &&
+				(submitting || mentionsDataOnly(first.value) || readsUndefinedFirst(first.value))
 			)
-				return data.value;
-			data.rollBack();
+				return first.value;
+			first.rollBack();
 			const scripted = attempt(() => scriptOp(event, scope, form));
 			if (scripted.value && !scripted.failed) return ran(scripted.value);
 			scripted.rollBack();
-			return lowered();
+			const data = attempt(lowered);
+			if (!data.failed) return data.value;
+			data.rollBack();
+			return mixedHandlerOps(event, scope, handler, pressed);
 		}
 		const data = attempt(lowered);
 		if (!data.failed) return data.value;
 		data.rollBack();
+		const scripted = attempt(() => scriptOp(event, scope, form));
+		if (scripted.value && !scripted.failed) return ran(scripted.value);
+		scripted.rollBack();
+		// A handler whose JavaScript cannot reach what it reads (a family's shared state) stays data, and only the
+		// helpers it calls for their effects that data cannot spell run as JavaScript, their elements as proxies.
+		const mixed = attempt(() => mixedHandlerOps(event, scope, handler, pressed));
+		if (!mixed.failed) return mixed.value;
+		mixed.rollBack();
 		// When the script cannot run it either, what stops the script names what a phone lacks: those refusals stay.
-		const scripted = scriptOp(event, scope, form);
+		const again = scriptOp(event, scope, form);
 		// A refused script still cancels its submit, so the form is not refused a second time for that.
-		return scripted ? ran(scripted) : form === undefined ? [] : [PREVENT];
+		return again ? ran(again) : form === undefined ? [] : [PREVENT];
+	}
+	/** While a handler is lowered as data with its helpers allowed to run as JavaScript. */
+	let scriptCalls = false;
+	function mixedHandlerOps(
+		event: SemanticEvent,
+		scope: Scope,
+		handler: string,
+		pressed?: NonNullable<Scope['pressed']>,
+	): NativeOp[] {
+		scriptCalls = true;
+		try {
+			return dataHandlerOps(event, scope, handler, pressed);
+		} finally {
+			scriptCalls = false;
+		}
 	}
 
 	/** Runs `run`, then says whether it refused, and can undo what it added (refusals, cells, dialog ops, features). */
@@ -5544,6 +5617,48 @@ export function createNativeViewPayload(
 		return value;
 	}
 
+	/**
+	 * A call, made for its effects, to a module function data cannot spell: the function runs as JavaScript in its module,
+	 * each argument passed as a value, or as proxies when it is an element or an array of elements.
+	 */
+	function scriptCallOf(
+		{ module, fn }: ModuleFunction,
+		args: ReadonlyArray<SemanticExpression>,
+		scope: Scope,
+		what: string,
+	): NativeOp | null {
+		const facts = scriptFacts(module);
+		if (!facts) return refuseScript(`${what} calls \`${fn.name}\`, whose module has no script facts`), null;
+		const names = args.map((_, index) => `__a${index}`);
+		const bindings: Record<string, NativeScriptBinding> = {};
+		for (const [index, argument] of args.entries()) {
+			const value = exprOf(argument, `${what}'s call to \`${fn.name}\``, scope);
+			if (!value) return null;
+			bindings[names[index]!] = mentionsElement(value) ? { elements: value } : { value };
+		}
+		const key = `${module.graph.filename}\0call:${fn.name}/${args.length}`;
+		let id = scriptFunctions.get(key)?.id;
+		if (!id) {
+			id = `fn:${scriptFunctions.size}`;
+			scriptFunctions.set(key, {
+				id,
+				module,
+				fact: {
+					code: `return function () { return ${fn.name}(${names.map((name) => `__s.${name}`).join(', ')}); };`,
+					names: [],
+					module: [fn.name],
+					imports: [],
+					globals: [],
+					framework: [],
+					unsupported: [],
+					span: { filename: module.graph.filename, start: 0, end: 0 },
+				},
+			});
+		}
+		const caught = scope.catches ? scope.catches.cell() : undefined;
+		return { op: 'script', fn: id, type: 'call', bindings, ...(caught ? { catch: caught } : {}) };
+	}
+
 	function scriptOp(event: SemanticEvent, scope: Scope, form?: string): NativeOp | null {
 		return keepingFunctions(() => scriptOpOf(event, scope, form));
 	}
@@ -5592,7 +5707,7 @@ export function createNativeViewPayload(
 		}
 		const forms = form !== undefined;
 		const fn = scriptFunctionId(fact, scope.module, what, forms);
-		const own = scriptBindings(fact, scope, what, forms);
+		const own = scriptBindings(fact, scope, what, false, forms);
 		if (fn === null || own === null || readsMissing) return null;
 		const bindings = forms
 			? { ...own, [NATIVE_SCRIPT_SUBMITTED_FORM]: { value: { formData: form } } }
@@ -6775,6 +6890,10 @@ export function createNativeViewPayload(
 				return [];
 			}
 			if (!body?.statements) return notCallable();
+			const helperOps = (
+				body: { statements: ReadonlyArray<SemanticHandlerStatement> | undefined; parameters: ReadonlyArray<string>; scope: Scope },
+				calling: string | undefined,
+			): NativeOp[] => {
 			// Arguments past the parameters are never read, so passing the event a callback ignores costs nothing.
 			const args = (statement.arguments ?? [])
 				.slice(0, body.parameters.length)
@@ -6791,7 +6910,7 @@ export function createNativeViewPayload(
 						const bound = new Map(inner.args);
 						parameters.forEach((name, index) => bound.set(name, values[index]!));
 						return lowerStatements(
-							statements,
+							statements ?? [],
 							{
 								...inner,
 								live: true,
@@ -6809,6 +6928,18 @@ export function createNativeViewPayload(
 			} finally {
 				if (calling) inlining.delete(calling);
 			}
+			};
+			// A helper called for its effects that data cannot spell runs as JavaScript, its element arguments as proxies.
+			if (calling && scriptCalls && path.length === 0) {
+				const fn = functionAt(scope.module, statement.name)!;
+				const data = attempt(() => helperOps(body!, calling!));
+				if (!data.failed) return data.value;
+				data.rollBack();
+				const scripted = attempt(() => scriptCallOf(fn, statement.arguments ?? [], scope, what));
+				if (scripted.value && !scripted.failed) return [scripted.value];
+				scripted.rollBack();
+			}
+			return helperOps(body, calling);
 		}
 		if (statement.path && statement.path.length > 0) {
 			const object = scope.objects.get(statement.target);
