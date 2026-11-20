@@ -236,7 +236,67 @@ data class Continuation(val id: String, val local: String, val ops: List<Op>, va
 /** A device object a component makes (`const cam = camera()`); it lives while its [owner] node is shown. */
 data class DeviceObject(val id: String, val device: String, val owner: String)
 
-enum class FieldKind(val wire: String) { Text("text"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden"), Select("select") }
+enum class FieldKind(val wire: String) { Text("text"), Number("number"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden"), Select("select") }
+
+/** Why a number field fails before a submit, after a missing value; see [nativeNumberProblem]. */
+sealed interface NumberProblem {
+	data object BadInput : NumberProblem
+	data class Underflow(val min: Double) : NumberProblem
+	data class Overflow(val max: Double) : NumberProblem
+	data class Step(val low: Double, val high: Double) : NumberProblem
+	data class StepOne(val value: Double) : NumberProblem
+}
+
+/** Chromium's messages for a number field in one language, with `{min}`, `{max}`, `{low}`, `{high}`, `{value}` for the numbers. */
+data class NumberMessages(val underflow: String, val overflow: String, val step: String, val stepOne: String, val badInput: String, val digits: String = "0123456789", val decimal: String = ".") {
+	/** The message for [problem], its numbers written as Chromium writes them: no grouping, in the language's digits and mark. */
+	fun message(problem: NumberProblem): String {
+		fun write(value: Double) = JsString.number(value).map { if (it == '.') decimal else digits[it - '0'].toString() }.joinToString("")
+		return when (problem) {
+			NumberProblem.BadInput -> badInput
+			is NumberProblem.Underflow -> underflow.replace("{min}", write(problem.min))
+			is NumberProblem.Overflow -> overflow.replace("{max}", write(problem.max))
+			is NumberProblem.Step -> step.replace("{low}", write(problem.low)).replace("{high}", write(problem.high))
+			is NumberProblem.StepOne -> stepOne.replace("{value}", write(problem.value))
+		}
+	}
+}
+
+/** HTML's valid floating-point number. */
+private val VALID_FLOAT = Regex("^-?(?:[0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$")
+
+/** A number field's value from its text, by HTML's sanitization: text that is no valid number is the empty string. */
+fun nativeNumberValue(text: String): String = if (VALID_FLOAT.matches(text)) text else ""
+
+private fun floatOf(attribute: String?): Double? = attribute?.takeIf { VALID_FLOAT.matches(it) }?.toDouble()
+
+private fun decimalsOf(value: Double): Int {
+	val written = JsString.number(value)
+	val e = written.indexOf("e-")
+	if (e >= 0) return written.substring(e + 2).toInt() + (written.substring(0, e).substringAfter('.', "").length)
+	return written.substringAfter('.', "").length
+}
+
+/** Why a number field holding [text] fails before a submit, in Chromium's order after a missing value (as the reference's). */
+fun nativeNumberProblem(text: String, min: String?, max: String?, step: String?, value: String?): NumberProblem? {
+	if (text.isEmpty()) return null
+	if (!VALID_FLOAT.matches(text)) return NumberProblem.BadInput
+	val v = text.toDouble()
+	val low = floatOf(min)
+	val high = floatOf(max)
+	if (low != null && v < low) return NumberProblem.Underflow(low)
+	if (high != null && v > high) return NumberProblem.Overflow(high)
+	if (step?.lowercase() == "any") return null
+	val by = floatOf(step)?.takeIf { it > 0 } ?: 1.0
+	val base = low ?: floatOf(value) ?: 0.0
+	// Whole numbers at the finest decimal any of them has, so 0.1 steps do not drift.
+	val scale = Math.pow(10.0, maxOf(decimalsOf(base), decimalsOf(by), decimalsOf(v)).toDouble())
+	val at = Math.rint(v * scale); val from = Math.rint(base * scale); val unit = Math.rint(by * scale)
+	if ((at - from) % unit == 0.0) return null
+	val lowAt = from + Math.floor((at - from) / unit) * unit
+	val below = lowAt / scale; val above = (lowAt + unit) / scale
+	return if (high != null && above > high) NumberProblem.StepOne(below) else NumberProblem.Step(below, above)
+}
 
 data class Field(val node: String, val kind: FieldKind)
 
@@ -283,6 +343,8 @@ data class Payload(
 	val valueMissing: Map<String, ValueMissing> = emptyMap(),
 	/** [TooLong] by the locale the browser shows its own text in. */
 	val tooLong: Map<String, TooLong> = emptyMap(),
+	/** [NumberMessages] by the locale the browser shows its own text in. */
+	val numberMessages: Map<String, NumberMessages> = emptyMap(),
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	val script: ScriptSource? = null,
 	/** A click handler reads where its tap landed, so the host reports touches even with no pointer handler. */
@@ -293,7 +355,7 @@ data class Payload(
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "script", "tapPoints"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "numberMessages", "script", "tapPoints"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -356,6 +418,15 @@ data class Payload(
 				if (digits.length != 10) throw MarklessDecodeError("payload.tooLong.$locale.digits is not ten digits")
 				locale to TooLong(mo.field("text", "payload.tooLong.$locale").str("payload.tooLong.$locale.text"), digits)
 			} ?: emptyMap()
+			val numberMessages = root["numberMessages"]?.obj("payload.numberMessages")?.entries?.associateTo(LinkedHashMap()) { (locale, m) ->
+				val what = "payload.numberMessages.$locale"
+				val mo = m.obj(what)
+				mo.only(setOf("underflow", "overflow", "step", "stepOne", "badInput", "digits", "decimal"), what)
+				fun text(key: String) = mo.field(key, what).str("$what.$key")
+				val digits = mo["digits"]?.str("$what.digits") ?: "0123456789"
+				if (digits.length != 10) throw MarklessDecodeError("$what.digits is not ten digits")
+				locale to NumberMessages(text("underflow"), text("overflow"), text("step"), text("stepOne"), text("badInput"), digits, mo["decimal"]?.str("$what.decimal") ?: ".")
+			} ?: emptyMap()
 			val script = root["script"]?.obj("payload.script")?.let { o ->
 				o.only(setOf("id", "source", "services"), "payload.script")
 				val services = o.field("services", "payload.script").arr("payload.script.services").map { it.str("payload.script.services[]") }
@@ -367,7 +438,7 @@ data class Payload(
 				if (runsScript) throw MarklessDecodeError("a script op or computed in a payload with no script")
 			}
 			val tapPoints = root["tapPoints"]?.let { it == Json.Bool(true) || throw MarklessDecodeError("payload.tapPoints is true when present") } ?: false
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, script, tapPoints)
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, numberMessages, script, tapPoints)
 		}
 
 		private fun readsOf(node: Node): List<Expr> = when (node) {

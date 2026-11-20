@@ -596,6 +596,27 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A number field: below min, off its step, text that is no number (submitted empty), above max, then a valid save.
+		name: 'number-fields',
+		fixture: 'proofs/f11-number/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'input', host: 'h3', value: '3' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h3', value: '15.5' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h3', value: '1e' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h3', value: '18' },
+			{ event: 'input', host: 'h4', value: '12' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h4', value: '1.2' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h4', value: '2.5' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
 		name: 'script-loop',
 		fixture: 'proofs/j1-loop-local/App.tsrx',
 		modules: true,

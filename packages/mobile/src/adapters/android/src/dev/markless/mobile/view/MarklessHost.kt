@@ -779,6 +779,8 @@ class MarklessHost(
 				isSingleLine = true
 				// After isSingleLine, whose transformation would show a password's text.
 				if (type == "password") inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+				// Chrome's keyboard for a number field: digits, a decimal mark and a sign.
+				if (type == "number") inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
 				includeFontPadding = false
 				if (style != null) { background = null; setPadding(0, 0, 0, 0) }
 				addTextChangedListener(object : TextWatcher {

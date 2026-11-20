@@ -1548,6 +1548,33 @@ export function Armed() @{
 		]);
 	});
 
+	it("lowers a number field of a form with its range and step, which the host checks with Chromium's messages", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Size() @{
+	let sent = state('');
+	<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget).get('size')); }}>
+		<input type="number" name="size" min="14" max="40" step="0.5" />
+		<input name="note" min="3" />
+		<p>{sent}</p>
+	</form>
+}`);
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the <input> h2 in the <form> h0 has `min`, which the web checks before a submit and no native host checks yet',
+		]);
+		const { payload: ok } = await nativeView(`import { state } from '@markless/core';
+export function Size() @{
+	let sent = state('');
+	<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget).get('size')); }}>
+		<input type="number" name="size" min="14" max="40" step="0.5" />
+		<p>{sent}</p>
+	</form>
+}`);
+		expect(payload).toBeNull();
+		expect(ok!.forms).toEqual([{ node: 'h0', fields: [{ node: 'h1', kind: 'number' }], submitters: [] }]);
+		expect(ok!.numberMessages?.['en']?.underflow).toBe('Value must be greater than or equal to {min}.');
+		expect(ok!.numberMessages?.['fa']?.decimal).toBe('٫');
+	});
+
 	it('lowers a password field as a text field of its form: its text is sent, and required and maxlength are checked', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Login() @{

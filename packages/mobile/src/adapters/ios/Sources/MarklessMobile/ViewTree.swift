@@ -858,6 +858,8 @@ final class ViewTree {
 						field.isSecureTextEntry = true
 						field.textContentType = .password
 					}
+					// Safari's keyboard for a number field: digits with the punctuation a number needs.
+					if staticAttributes["type"] == "number" { field.keyboardType = .numbersAndPunctuation }
 					let limit = LengthLimit { [weak self] in nativeMaxLength(self?.attributes[id]?["maxlength"]) }
 					limits.append(limit)
 					field.delegate = limit

@@ -713,6 +713,8 @@ export type NativeViewPayload = {
 	readonly valueMissing?: Readonly<Record<string, NativeValueMissing>>;
 	/** What the web says when a text field a person edited is longer than its `maxlength`, by language; present when a form's text field has one. */
 	readonly tooLong?: Readonly<Record<string, NativeTooLong>>;
+	/** What the web says when a number field is out of its range, off its step or holds no number, by language; present when a form has one. */
+	readonly numberMessages?: Readonly<Record<string, NativeNumberMessages>>;
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	readonly script?: NativeScript;
 	/** A click handler reads where its tap landed: the host reports touches even with no pointer handler, as a browser fires them. */
@@ -739,6 +741,94 @@ export type NativeValueMissing = {
 
 /** Chromium's message for a text field longer than its `maxlength`: `{max}` and `{length}` in `text` are written in `digits` (ASCII when absent). */
 export type NativeTooLong = { readonly text: string; readonly digits?: string };
+
+/**
+ * Chromium's messages for a number field, by language: below `min`, above `max`, off its step (the two nearest valid
+ * values, or the one when the other is past `max`), and text that is no number; with the language's digits and decimal mark.
+ */
+export type NativeNumberMessages = {
+	readonly underflow: string;
+	readonly overflow: string;
+	readonly step: string;
+	readonly stepOne: string;
+	readonly badInput: string;
+	readonly digits?: string;
+	readonly decimal?: string;
+};
+
+/** HTML's valid floating-point number: what a number field's value may be. */
+const VALID_FLOAT = /^-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/;
+
+/** A number field's value from its text, by HTML's sanitization: text that is no valid number is the empty string. */
+export const nativeNumberValue = (text: string): string => (VALID_FLOAT.test(text) ? text : '');
+
+/** What a number field's attributes give, by HTML's rules for parsing floating-point numbers; undefined when invalid. */
+const floatOf = (attribute: string | null | undefined): number | undefined =>
+	attribute != null && VALID_FLOAT.test(attribute) ? Number(attribute) : undefined;
+
+const decimalsOf = (value: number): number => {
+	const written = String(value);
+	const exponent = /e-(\d+)$/.exec(written);
+	if (exponent) return Number(exponent[1]) + (written.split('e')[0]!.split('.')[1]?.length ?? 0);
+	return written.split('.')[1]?.length ?? 0;
+};
+
+/**
+ * Why a number field holding `text` fails before a submit, in Chromium's order after a missing value: text that is no
+ * number, below `min`, above `max`, then off its step (from `min`, else the `value` attribute, else 0; 1 unless `step`
+ * says otherwise or `any`), with the two nearest valid values, or the one when the next is past `max`.
+ */
+export function nativeNumberProblem(
+	text: string,
+	attributes: {
+		readonly min: string | null;
+		readonly max: string | null;
+		readonly step: string | null;
+		readonly value: string | null;
+	},
+):
+	| { readonly message: 'badInput' }
+	| { readonly message: 'underflow'; readonly values: { readonly min: number } }
+	| { readonly message: 'overflow'; readonly values: { readonly max: number } }
+	| { readonly message: 'step'; readonly values: { readonly low: number; readonly high: number } }
+	| { readonly message: 'stepOne'; readonly values: { readonly value: number } }
+	| undefined {
+	if (text === '') return undefined;
+	if (!VALID_FLOAT.test(text)) return { message: 'badInput' };
+	const value = Number(text);
+	const min = floatOf(attributes.min);
+	const max = floatOf(attributes.max);
+	if (min !== undefined && value < min) return { message: 'underflow', values: { min } };
+	if (max !== undefined && value > max) return { message: 'overflow', values: { max } };
+	if (attributes.step?.toLowerCase() === 'any') return undefined;
+	const given = floatOf(attributes.step);
+	const step = given !== undefined && given > 0 ? given : 1;
+	const base = min ?? floatOf(attributes.value) ?? 0;
+	// Whole numbers at the finest decimal any of them has, so 0.1 steps do not drift.
+	const scale = 10 ** Math.max(decimalsOf(base), decimalsOf(step), decimalsOf(value));
+	const [at, from, by] = [value, base, step].map((one) => Math.round(one * scale)) as [number, number, number];
+	if ((at - from) % by === 0) return undefined;
+	const lowAt = from + Math.floor((at - from) / by) * by;
+	const low = lowAt / scale;
+	const high = (lowAt + by) / scale;
+	return max !== undefined && high > max
+		? { message: 'stepOne', values: { value: low } }
+		: { message: 'step', values: { low, high } };
+}
+
+/** `message` with its `{name}`s filled in as Chromium writes numbers: no grouping, in the language's digits and decimal mark. */
+export function nativeNumberMessage(
+	message: string,
+	language: Pick<NativeNumberMessages, 'digits' | 'decimal'>,
+	values: Readonly<Record<string, number>>,
+): string {
+	const digits = language.digits ?? '0123456789';
+	const write = (value: number) =>
+		String(value).replace(/[0-9.]/g, (char) =>
+			char === '.' ? (language.decimal ?? '.') : digits[Number(char)]!,
+		);
+	return Object.entries(values).reduce((text, [name, value]) => text.replace(`{${name}}`, write(value)), message);
+}
 
 /** `message` with `{max}` and `{length}` filled in as Chromium writes them: no grouping, in the language's digits. */
 export function nativeTooLongMessage(message: NativeTooLong, max: number, length: number): string {
@@ -772,9 +862,10 @@ export type NativeForm = {
 };
 
 /** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */
-export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden' | 'select';
+export type NativeFieldKind = 'text' | 'number' | 'checkbox' | 'radio' | 'hidden' | 'select';
 
 export {
+	NATIVE_NUMBER_MESSAGES_BY_LOCALE,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 } from './native-validation-messages.ts';

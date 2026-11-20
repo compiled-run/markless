@@ -264,6 +264,7 @@ public final class NativeRuntime {
 	private var chosenNow: String?
 	private let missing: NativeValueMissing?
 	private let tooLong: NativeTooLong?
+	private let numberMessages: NativeNumberMessages?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
 	/// Where a page with a script gets its engine; asked only when a script op runs or a script computed is read.
@@ -326,6 +327,8 @@ public final class NativeRuntime {
 		missing = payload.valueMissing.first { $0.locale == locale }?.messages
 		let tooLongLocale = nativeLocale(preferredLanguages, payload.tooLong.map(\.locale))
 		tooLong = payload.tooLong.first { $0.locale == tooLongLocale }?.message
+		let numberLocale = nativeLocale(preferredLanguages, payload.numberMessages.map(\.locale))
+		numberMessages = payload.numberMessages.first { $0.locale == numberLocale }?.messages
 		dialogs = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
 			return nil
@@ -1048,6 +1051,7 @@ public final class NativeRuntime {
 			case .checkbox, .radio: return try isChecked(field.node) ? [name, try attributeNow(field.node, "value") ?? "on"] : nil
 			case .hidden: return [name, try attributeNow(field.node, "value") ?? ""]
 			case .text: return [name, try textOf(field: field.node)]
+			case .number: return [name, nativeNumberValue(try textOf(field: field.node))]
 			case .select:
 				guard let chosen = try options(of: field.node).first(where: { selectedness[$0.id] == true }) else { return nil }
 				return [name, try value(of: chosen)]
@@ -1076,7 +1080,7 @@ public final class NativeRuntime {
 		if required {
 			let absent = switch field.kind {
 			case .radio: try group(of: field.node).allSatisfy { !(try isChecked($0.id)) }
-			case .text: try textOf(field: field.node) == ""
+			case .text, .number: try textOf(field: field.node) == ""
 			default: !(try isChecked(field.node))
 			}
 			if absent {
@@ -1087,6 +1091,14 @@ public final class NativeRuntime {
 				default: return missing.text
 				}
 			}
+		}
+		if field.kind == .number {
+			guard let problem = nativeNumberProblem(
+				try textOf(field: field.node), min: try attributeNow(field.node, "min"), max: try attributeNow(field.node, "max"),
+				step: try attributeNow(field.node, "step"), value: try attributeNow(field.node, "value"))
+			else { return nil }
+			guard let numberMessages else { throw RuntimeError(reason: "the payload has no messages for a number field") }
+			return numberMessages.message(problem)
 		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		guard field.kind == .text, let max = nativeMaxLength(try attributeNow(field.node, "maxlength")), let typed = edited[field.node],
@@ -1218,7 +1230,12 @@ public final class NativeRuntime {
 			eventValue = nil
 			eventFields = nil
 		}
-		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
+		// A number field keeps what was typed, and its handlers read its value, which is empty while that is no number.
+		let numeric = action.event == .input && { if case let .element(_, attributes, _) = node.kind { attributes["type"] == "number" } else { false } }()
+		return try change(host: action.host) {
+			if numeric, let typed = self.eventValue { self.eventValue = nativeNumberValue(typed) }
+			return try self.run(self.handlers[bound.handler] ?? [], in: scope)
+		}
 	}
 
 	/// A touch as a phone's browser raises it: `pointerover`, `pointerenter` outermost first, the overlay's outside press and

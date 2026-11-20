@@ -821,6 +821,7 @@ class Runtime(
 
 	private val missing: ValueMissing? = payload.valueMissing[nativeLocale(preferredLanguages, payload.valueMissing.keys)]
 	private val tooLong: TooLong? = payload.tooLong[nativeLocale(preferredLanguages, payload.tooLong.keys)]
+	private val numberMessages: NumberMessages? = payload.numberMessages[nativeLocale(preferredLanguages, payload.numberMessages.keys)]
 
 	private fun entriesOf(id: String): JsValue {
 		val form = forms[id] ?: throw MarklessRuntimeError("\"$id\" is not a form")
@@ -832,6 +833,7 @@ class Runtime(
 				FieldKind.Checkbox, FieldKind.Radio -> if (checkedOf(node)) attributeNow(node, "value") ?: "on" else continue
 				FieldKind.Hidden -> attributeNow(node, "value") ?: ""
 				FieldKind.Text -> textOf(node)
+				FieldKind.Number -> nativeNumberValue(textOf(node))
 				FieldKind.Select -> optionsOf(node).firstOrNull { selectedness[it.id] == true }?.let(::optionValue) ?: continue
 			}
 			out.add(JsValue.Arr(mutableListOf(JsValue.Str(name), JsValue.Str(value))))
@@ -854,12 +856,16 @@ class Runtime(
 		val required = if (kind == FieldKind.Radio) groupOf(node).any { attributeNow(it.id, "required") != null } else attributeNow(node, "required") != null
 		val absent = required && when (kind) {
 			FieldKind.Radio -> groupOf(node).none { checkedOf(it.id) }
-			FieldKind.Text -> textOf(node) == ""
+			FieldKind.Text, FieldKind.Number -> textOf(node) == ""
 			else -> !checkedOf(node)
 		}
 		if (absent) {
 			val messages = missing ?: throw MarklessRuntimeError("the payload has no message for a ${kind.wire} missing its value")
 			return when (kind) { FieldKind.Radio -> messages.radio; FieldKind.Checkbox -> messages.checkbox; else -> messages.text }
+		}
+		if (kind == FieldKind.Number) {
+			val problem = nativeNumberProblem(textOf(node), attributeNow(node, "min"), attributeNow(node, "max"), attributeNow(node, "step"), attributeNow(node, "value")) ?: return null
+			return (numberMessages ?: throw MarklessRuntimeError("the payload has no messages for a number field")).message(problem)
 		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		if (kind != FieldKind.Text) return null
@@ -1004,7 +1010,9 @@ class Runtime(
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
 		// A press focuses the control it presses, as the browser does.
 		if (event == EventName.Activate) focused = host
-		val given = if (event == EventName.Activate) clickFields(trusted = true) else value?.let { mapOf("value" to JsValue.Str(it)) }
+		// A number field keeps what was typed, and its handlers read its value, which is empty while that is no number.
+		val numeric = event == EventName.Input && (node(template) as? Node.Element)?.attributes?.get("type") == "number"
+		val given = if (event == EventName.Activate) clickFields(trusted = true) else value?.let { mapOf("value" to JsValue.Str(if (numeric) nativeNumberValue(it) else it)) }
 		return change(host, value) {
 			withFields(given) { run(handler.ops, scope) }
 		}

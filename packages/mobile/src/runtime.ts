@@ -17,6 +17,9 @@ import {
 	NATIVE_SCRIPT_CLICK_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	nativeLocale,
+	nativeNumberMessage,
+	nativeNumberProblem,
+	nativeNumberValue,
 	nativeMaxLength,
 	nativeTooLongMessage,
 } from '@markless/serializer/native-view';
@@ -1280,6 +1283,8 @@ export function createNativeRuntime(
 	const missing = messages[nativeLocale(preferredLanguages, Object.keys(messages))];
 	const tooLongMessages = payload.tooLong ?? {};
 	const tooLong = tooLongMessages[nativeLocale(preferredLanguages, Object.keys(tooLongMessages))];
+	const numberMessageSets = payload.numberMessages ?? {};
+	const numberMessages = numberMessageSets[nativeLocale(preferredLanguages, Object.keys(numberMessageSets))];
 	function entriesOf(id: string): Value {
 		const form = forms.get(id);
 		if (!form) throw new Error(`${id} is not a form`);
@@ -1293,6 +1298,7 @@ export function createNativeRuntime(
 				const chosen = chosenOf(node);
 				return chosen ? [[name, optionValue(chosen)]] : [];
 			}
+			if (kind === 'number') return [[name, nativeNumberValue(textOf(node))]];
 			return [[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : textOf(node)]];
 		});
 	}
@@ -1308,12 +1314,23 @@ export function createNativeRuntime(
 		const absent = () =>
 			kind === 'radio'
 				? groupOf(node).every((member) => !checkedOf(member.id))
-				: kind === 'text'
+				: kind === 'text' || kind === 'number'
 					? textOf(node) === ''
 					: !checkedOf(node);
 		if (required && absent()) {
 			if (!missing) throw new Error(`the payload has no message for a ${kind} missing its value`);
-			return missing[kind as 'text' | 'checkbox' | 'radio'];
+			return missing[kind === 'number' ? 'text' : (kind as 'text' | 'checkbox' | 'radio')];
+		}
+		if (kind === 'number') {
+			const problem = nativeNumberProblem(textOf(node), {
+				min: attributeNow(node, 'min'),
+				max: attributeNow(node, 'max'),
+				step: attributeNow(node, 'step'),
+				value: attributeNow(node, 'value'),
+			});
+			if (!problem) return undefined;
+			if (!numberMessages) throw new Error('the payload has no messages for a number field');
+			return nativeNumberMessage(numberMessages[problem.message], numberMessages, 'values' in problem ? problem.values : {});
 		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		const max = kind === 'text' ? nativeMaxLength(attributeNow(node, 'maxlength')) : undefined;
@@ -1737,7 +1754,14 @@ export function createNativeRuntime(
 			const eventValue = action.event === 'input' ? action.value : undefined;
 			// A press focuses the control it presses, as the browser does.
 			if (action.event === 'activate') focused = action.host;
-			const fields = action.event === 'activate' ? clickFields(true) : eventValue;
+			// A number field's handlers read its value, which is empty while its text is no number.
+			const numeric = action.event === 'input' && elementOf(host).attributes?.['type'] === 'number';
+			const fields =
+				action.event === 'activate'
+					? clickFields(true)
+					: numeric && eventValue !== undefined
+						? nativeNumberValue(eventValue)
+						: eventValue;
 			return change(action.host, eventValue, () =>
 				run(handlers.get(event.handler) ?? [], fields, scope),
 			);

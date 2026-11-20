@@ -19,6 +19,7 @@ import type {
 import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
 import {
 	isNativeStyleStateAttribute,
+	NATIVE_NUMBER_MESSAGES_BY_LOCALE,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 	NATIVE_DATA_SCRIPT_TYPES,
@@ -305,6 +306,8 @@ const UNCHECKED_CONSTRAINTS = [
 	'readonly',
 	'form',
 ];
+/** What a number field's own checks cover: its range and its step. */
+const NUMBER_CONSTRAINTS = new Set(['min', 'max', 'step']);
 /** A submit button's own overrides of where and how its form is sent. */
 const SUBMITTER_OVERRIDES = ['formaction', 'formmethod', 'formenctype', 'formtarget'];
 
@@ -4028,7 +4031,7 @@ export function createNativeViewPayload(
 					item.id,
 					scope,
 					new Set(handleAttrs.map((attribute) => attribute.name)),
-					inputType === undefined || inputType === '' || TEXT_TYPES.has(inputType),
+					inputType === undefined || inputType === '' || TEXT_TYPES.has(inputType) || inputType === 'number',
 				);
 				const bindings = [
 					...restBindings.filter(
@@ -6552,6 +6555,7 @@ export function createNativeViewPayload(
 	wireTicks();
 	checkSelects();
 	let lengthLimited = false;
+	let numbered = false;
 	const forms = wireForms();
 	for (const handler of handlers) {
 		if (mentionsElement(handler.ops)) {
@@ -6623,6 +6627,7 @@ export function createNativeViewPayload(
 		...(objects.length > 0 ? { objects } : {}),
 		...(forms.length > 0 ? { forms, valueMissing: NATIVE_VALUE_MISSING_BY_LOCALE } : {}),
 		...(lengthLimited ? { tooLong: NATIVE_TOO_LONG_BY_LOCALE } : {}),
+		...(numbered ? { numberMessages: NATIVE_NUMBER_MESSAGES_BY_LOCALE } : {}),
 		...(script ? { script } : {}),
 		...(tapPoints ? { tapPoints: true as const } : {}),
 	});
@@ -6821,12 +6826,13 @@ export function createNativeViewPayload(
 					continue;
 				}
 				for (const name of UNCHECKED_CONSTRAINTS)
-					if (attribute(node, name))
+					if (attribute(node, name) && !(type === 'number' && NUMBER_CONSTRAINTS.has(name)))
 						refuse(
 							`${field} has \`${name}\`, which the web checks before a submit and no native host checks yet`,
 						);
 				let kind: NativeFieldKind;
 				if (type === undefined || TEXT_TYPES.has(type)) kind = 'text';
+				else if (type === 'number') kind = 'number';
 				else if (type === 'checkbox' || type === 'radio' || type === 'hidden') kind = type;
 				else {
 					refuse(
@@ -6839,10 +6845,9 @@ export function createNativeViewPayload(
 						`${field} binds the \`name\` of a radio button, which a native build reads only as written`,
 					);
 				fields.push({ node: node.id, kind });
-				if (kind === 'text') {
-					textFields.push(node.id);
-					if (attribute(node, 'maxlength')) lengthLimited = true;
-				}
+				if (kind === 'text' || kind === 'number') textFields.push(node.id);
+				if (kind === 'text' && attribute(node, 'maxlength')) lengthLimited = true;
+				if (kind === 'number') numbered = true;
 			}
 			if (!submit) {
 				if (submitters.length > 0 || textFields.length === 1)

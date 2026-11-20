@@ -1,0 +1,109 @@
+{
+	"rung": 147,
+	"name": "A number field: a numeric keyboard, its range and step checked before a submit with the web's messages, and its value sent with its form",
+	"steps": [
+		{
+			"visible": ["Settings", "Save", "Typed nothing", "Not saved"],
+			"absent": ["Typed 3", "Saved size 18, gap 2.5"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Font size",
+					"text": "3"
+				}
+			},
+			"visible": ["Typed 3", "Not saved"],
+			"absent": ["Typed nothing"]
+		},
+		{
+			"do": {
+				"tap": "Save"
+			},
+			"visible": ["Typed 3", "Not saved"],
+			"invalid": "Value must be greater than or equal to 14.",
+			"absent": ["Saved size 18, gap 2.5"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Font size",
+					"text": "15.5"
+				}
+			},
+			"visible": ["Typed 15.5", "Not saved"],
+			"absent": ["Typed 3"]
+		},
+		{
+			"do": {
+				"tap": "Save"
+			},
+			"visible": ["Typed 15.5", "Not saved"],
+			"invalid": "Please enter a valid value. The two nearest valid values are 15 and 16.",
+			"absent": ["Saved size 18, gap 2.5"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Font size",
+					"text": "18"
+				}
+			},
+			"visible": ["Typed 18", "Not saved"],
+			"absent": ["Typed 15.5"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Spacing",
+					"text": "12"
+				}
+			},
+			"visible": ["Typed 12", "Not saved"],
+			"absent": ["Typed 18"]
+		},
+		{
+			"do": {
+				"tap": "Save"
+			},
+			"visible": ["Typed 12", "Not saved"],
+			"invalid": "Value must be less than or equal to 10.",
+			"absent": ["Saved size 18, gap 2.5"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Spacing",
+					"text": "1.2"
+				}
+			},
+			"visible": ["Typed 1.2", "Not saved"],
+			"absent": ["Typed 12"]
+		},
+		{
+			"do": {
+				"tap": "Save"
+			},
+			"visible": ["Typed 1.2", "Not saved"],
+			"invalid": "Please enter a valid value. The two nearest valid values are 1 and 1.5.",
+			"absent": ["Saved size 18, gap 2.5"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Spacing",
+					"text": "2.5"
+				}
+			},
+			"visible": ["Typed 2.5", "Not saved"],
+			"absent": ["Typed 1.2"]
+		},
+		{
+			"do": {
+				"tap": "Save"
+			},
+			"visible": ["Saved size 18, gap 2.5", "Typed 2.5"],
+			"absent": ["Not saved"]
+		}
+	]
+}

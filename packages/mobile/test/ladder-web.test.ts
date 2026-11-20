@@ -156,6 +156,9 @@ function recordDeviceCalls() {
 
 // A visible text or an accessible name, the two ways a Maestro selector finds a view.
 // A closed select shows its chosen option's label, as the phones draw it.
+/** The field a person types into by its name: a text field, or a number field (a spinbutton). */
+const typedField = (page: Page, name: string): Locator =>
+	page.getByRole('textbox', { name, exact: true }).or(page.getByRole('spinbutton', { name, exact: true }));
 const shown = (page: Page, text: string): Locator =>
 	page
 		.getByText(text, { exact: true })
@@ -242,11 +245,11 @@ async function act(page: Page, step: LadderStep) {
 					: shown(page, action.tap)
 		).click();
 	} else if ('type' in action) {
-		const field = page.getByRole('textbox', { name: action.type.field, exact: true });
+		const field = typedField(page, action.type.field);
 		await field.fill('');
 		await field.pressSequentially(action.type.text);
 	} else if ('submit' in action)
-		await page.getByRole('textbox', { name: action.submit, exact: true }).press('Enter');
+		await typedField(page, action.submit).press('Enter');
 	else if ('choose' in action)
 		await page
 			.getByRole('combobox', { name: action.choose.field, exact: true })

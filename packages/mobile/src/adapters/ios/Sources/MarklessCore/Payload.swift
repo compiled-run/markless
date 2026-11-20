@@ -298,7 +298,97 @@ public struct NativeCapture: Equatable, Sendable {
 }
 
 public enum NativeFieldKind: String, Sendable {
-	case text, checkbox, radio, hidden, select
+	case text, number, checkbox, radio, hidden, select
+}
+
+/// Chromium's messages for a number field in one language, with `{min}`, `{max}`, `{low}`, `{high}`, `{value}` for the numbers.
+public struct NativeNumberMessages: Equatable, Sendable {
+	public let underflow: String
+	public let overflow: String
+	public let step: String
+	public let stepOne: String
+	public let badInput: String
+	public let digits: [Character]
+	public let decimal: String
+
+	/// `key`'s message with these numbers written as Chromium writes them: no grouping, in the language's digits and mark.
+	public func message(_ problem: NativeNumberProblem) -> String {
+		func write(_ value: Double) -> String {
+			NativeValue.number(value).text.map { $0 == "." ? decimal : String(digits[Int(String($0)) ?? 0]) }.joined()
+		}
+		switch problem {
+		case .badInput: return badInput
+		case let .underflow(min): return underflow.replacingOccurrences(of: "{min}", with: write(min))
+		case let .overflow(max): return overflow.replacingOccurrences(of: "{max}", with: write(max))
+		case let .step(low, high):
+			return step.replacingOccurrences(of: "{low}", with: write(low)).replacingOccurrences(of: "{high}", with: write(high))
+		case let .stepOne(value): return stepOne.replacingOccurrences(of: "{value}", with: write(value))
+		}
+	}
+}
+
+/// Why a number field fails before a submit, after a missing value; see `nativeNumberProblem`.
+public enum NativeNumberProblem: Equatable, Sendable {
+	case badInput, underflow(Double), overflow(Double), step(Double, Double), stepOne(Double)
+}
+
+/// HTML's valid floating-point number: `-`? digits with an optional fraction (or a fraction alone), then an optional exponent.
+private func isValidFloat(_ text: String) -> Bool {
+	var rest = Substring(text)
+	if rest.first == "-" { rest = rest.dropFirst() }
+	let whole = rest.prefix { $0.isASCII && $0.isNumber }
+	rest = rest.dropFirst(whole.count)
+	var fraction = Substring("")
+	if rest.first == "." {
+		rest = rest.dropFirst()
+		fraction = rest.prefix { $0.isASCII && $0.isNumber }
+		if fraction.isEmpty { return false }
+		rest = rest.dropFirst(fraction.count)
+	}
+	if whole.isEmpty && fraction.isEmpty { return false }
+	if rest.first == "e" || rest.first == "E" {
+		rest = rest.dropFirst()
+		if rest.first == "+" || rest.first == "-" { rest = rest.dropFirst() }
+		let exponent = rest.prefix { $0.isASCII && $0.isNumber }
+		if exponent.isEmpty { return false }
+		rest = rest.dropFirst(exponent.count)
+	}
+	return rest.isEmpty
+}
+
+/// A number field's value from its text, by HTML's sanitization: text that is no valid number is the empty string.
+public func nativeNumberValue(_ text: String) -> String { isValidFloat(text) ? text : "" }
+
+private func floatOf(_ attribute: String?) -> Double? { attribute.flatMap { isValidFloat($0) ? Double($0) : nil } }
+
+private func decimalsOf(_ value: Double) -> Int {
+	let written = NativeValue.number(value).text
+	if let e = written.range(of: "e-") {
+		return (Int(written[e.upperBound...]) ?? 0) + (written[..<e.lowerBound].split(separator: ".").dropFirst().first?.count ?? 0)
+	}
+	return written.split(separator: ".").dropFirst().first?.count ?? 0
+}
+
+/// Why a number field holding `text` fails before a submit, in Chromium's order after a missing value (as the reference's).
+public func nativeNumberProblem(_ text: String, min minAttribute: String?, max maxAttribute: String?, step stepAttribute: String?, value valueAttribute: String?) -> NativeNumberProblem? {
+	if text.isEmpty { return nil }
+	guard isValidFloat(text), let value = Double(text) else { return .badInput }
+	let min = floatOf(minAttribute)
+	let max = floatOf(maxAttribute)
+	if let min, value < min { return .underflow(min) }
+	if let max, value > max { return .overflow(max) }
+	if stepAttribute?.lowercased() == "any" { return nil }
+	let given = floatOf(stepAttribute)
+	let step = given.map { $0 > 0 ? $0 : 1 } ?? 1
+	let base = min ?? floatOf(valueAttribute) ?? 0
+	// Whole numbers at the finest decimal any of them has, so 0.1 steps do not drift.
+	let scale = pow(10, Double(Swift.max(decimalsOf(base), decimalsOf(step), decimalsOf(value))))
+	let at = (value * scale).rounded(), from = (base * scale).rounded(), by = (step * scale).rounded()
+	if (at - from).truncatingRemainder(dividingBy: by) == 0 { return nil }
+	let lowAt = from + ((at - from) / by).rounded(.down) * by
+	let low = lowAt / scale, high = (lowAt + by) / scale
+	if let max, high > max { return .stepOne(low) }
+	return .step(low, high)
 }
 
 /// What the web says when a required field has no value, in one language.
@@ -474,12 +564,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public let valueMissing: [(locale: String, messages: NativeValueMissing)]
 	/// What the web says when a text field a person edited is longer than its `maxlength`, by locale, in payload order.
 	public var tooLong: [(locale: String, message: NativeTooLong)] = []
+	/// What the web says when a number field is out of range, off its step or holds no number, by locale, in payload order.
+	public var numberMessages: [(locale: String, messages: NativeNumberMessages)] = []
 
 	public static func == (a: NativeViewPayload, b: NativeViewPayload) -> Bool {
 		a.component == b.component && a.route == b.route && a.cells == b.cells && a.nodes == b.nodes && a.events == b.events
 			&& a.handlers == b.handlers && a.title == b.title && a.objects == b.objects && a.forms == b.forms && a.valueMissing.map(\.locale) == b.valueMissing.map(\.locale)
 			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages) && a.tooLong.map(\.locale) == b.tooLong.map(\.locale)
 			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.script == b.script && a.tapPoints == b.tapPoints
+			&& a.numberMessages.map(\.locale) == b.numberMessages.map(\.locale) && a.numberMessages.map(\.messages) == b.numberMessages.map(\.messages)
 	}
 	/// The JavaScript the page's script ops and computeds run; absent when every handler is data.
 	public var script: NativeScript? = nil
@@ -492,7 +585,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "script", "tapPoints"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "numberMessages", "script", "tapPoints"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
@@ -751,6 +844,18 @@ public struct NativeViewPayload: Equatable, Sendable {
 			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
 			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong,
 			script: fields.has("script") ? try decodeScript(try fields["script"]) : nil)
+		if fields.has("numberMessages") {
+			let reader = try fields["numberMessages"]
+			payload.numberMessages = try reader.keys().map { locale in
+				let m = try reader.field(locale).object(required: ["underflow", "overflow", "step", "stepOne", "badInput"], optional: ["digits", "decimal"])
+				let digits = m.has("digits") ? Array(try m["digits"].string()) : Array("0123456789")
+				guard digits.count == 10 else { throw PayloadError(path: "payload.numberMessages.\(locale).digits", reason: "not ten digits") }
+				return (locale, NativeNumberMessages(
+					underflow: try m["underflow"].string(), overflow: try m["overflow"].string(), step: try m["step"].string(),
+					stepOne: try m["stepOne"].string(), badInput: try m["badInput"].string(), digits: digits,
+					decimal: m.has("decimal") ? try m["decimal"].string() : "."))
+			}
+		}
 		if fields.has("tapPoints") {
 			guard try fields["tapPoints"].bool() else { throw PayloadError(path: "payload.tapPoints", reason: "true when present") }
 			payload.tapPoints = true
