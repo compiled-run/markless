@@ -2688,6 +2688,32 @@ test('renderToString rejects duplicate runtime keys on the static output path', 
 	});
 });
 
+test('renderToString keys a list keyed by its index by position, so repeated items render', async () => {
+	const view = duplicateKeyRepeatView();
+	const html = await renderToString(() => ({
+		html: '<ul><li>apple</li><li>apple</li><li>kale</li></ul>',
+		state: createProtocolStatePayload({
+			cells: [
+				{
+					graphNodeId: 'state:rows',
+					name: 'rows',
+					valueKind: 'array',
+					value: ['apple', 'apple', 'kale'],
+				},
+			],
+		}),
+		view: {
+			...view,
+			keyedRepeats: view.keyedRepeats!.map((repeat) => ({
+				...repeat,
+				keyPath: [],
+				indexKey: true as const,
+			})),
+		},
+	}));
+	expect(html).toContain('<li>apple</li><li>apple</li>');
+});
+
 test('renderToString keeps fragment sibling roots as direct container children and offsets their locators', async () => {
 	const html = await renderToString({
 		renderSsr: () => ({

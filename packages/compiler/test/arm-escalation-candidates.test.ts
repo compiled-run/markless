@@ -189,6 +189,89 @@ test('an imported child given a value that changes escalates and says it renders
 	).toBeUndefined();
 });
 
+const PANEL_FAMILY = `
+import { shared, state } from '@markless/core';
+
+export const panelState = shared(() => {
+	const panel = state({ open: false });
+	return { ...panel };
+}, { scope: 'subtree' });
+
+export function PanelRoot({ children }) @{
+	const panel = panelState();
+	<div ui-open={panel.open}>{children}</div>
+}
+
+export function PanelToggle({ children }) @{
+	const panel = panelState();
+	<button aria-expanded={panel.open ? 'true' : 'false'} onClick={() => panel.open = !panel.open}>{children}</button>
+}
+`;
+
+const FRAME = `
+import { state } from '@markless/core';
+
+export function Frame({ children }) @{
+	let hits = state(0);
+	<section onClick={() => hits = hits + 1}>{hits}{children}</section>
+}
+`;
+
+// Projected children render with the page, so an imported child given them runs in the browser like one given constants.
+for (const [shape, childSource, names, arm, runs, widget] of [
+	['a family root holding its parts', PANEL_FAMILY, 'PanelRoot, PanelToggle', '<PanelRoot><PanelToggle>Open</PanelToggle></PanelRoot>', 'PanelRoot', true],
+	['a stateful frame holding page markup', FRAME, 'Frame', '<Frame><p>{label}</p></Frame>', 'Frame', false],
+] as const)
+	test(`an imported child given children escalates: ${shape}`, async () => {
+		const child = await compileTsrxModule({ filename: 'src/Parts.tsrx', source: childSource, symbols: [] });
+		const compileWith = (unlinked: string) =>
+			compileTsrxModule({
+				filename: 'src/PartsHost.tsrx',
+				source:
+					`
+import { state } from '@markless/core';
+import { ${names} } from './Parts.tsrx';
+
+export function App() @{
+	let label = state('note');
+	let visible = state(false);
+
+	<main>
+		@if (visible) { ${arm} }
+		<button type="button" onClick={() => visible = !visible}>Show</button>
+	</main>
+}
+` + unlinked,
+				symbols: [],
+				importedModuleInterfaces: { './Parts.tsrx': child.moduleGraphInterface },
+			});
+		const result = await compileWith('');
+		expect(result.symbolModules.armEscalationCandidates ?? []).toHaveLength(1);
+		// Only an arm that can root a widget files one, so a page without such an @if downloads nothing for it.
+		const escalation = linkedRenderDataBoundarySymbols({
+			...linkInput(result),
+			link: { importedModuleInterfaces: { './Parts.tsrx': child.moduleGraphInterface } },
+			branchExportName: (index: number) => `branchUpdate${String(index)}`,
+		} as never).find((symbol) => symbol.manifest.kind === 'branch-update');
+		expect(result.symbolModules.armEscalationCandidates?.[0]?.rootsWidgets === true).toBe(widget);
+		expect(escalation?.module.source.includes('for (const definition of rendered.sharedDefinitions ?? [])')).toBe(widget);
+		expect(
+			result.symbolModules.diagnostics.map((candidate) => [candidate.code, candidate.severity, candidate.message]),
+		).toEqual([
+			[
+				'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
+				'warning',
+				`when visible changes, the browser renders this @if's content by running <${runs}>, instead of rebuilding it from compiled markup. Each time the content appears, <${runs}> starts fresh: anything it kept from the last time it was shown is gone.`,
+			],
+		]);
+		const unlinked = await compileWith(UNLINKED_RENDER);
+		expect(
+			unlinked.symbolModules.diagnostics.find(
+				(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+			)?.message,
+		).toBe(`this @if (visible) cannot be rebuilt when visible changes because <${runs}> has to run to produce its content.`);
+	});
+
 const IMPORTED_SCENE = `
 function describe(seed) {
 	return 'scene-' + seed;

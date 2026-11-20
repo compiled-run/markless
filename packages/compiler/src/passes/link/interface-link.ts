@@ -265,6 +265,7 @@ function linkedBranchEscalationSymbols(
 						exportName,
 						source: linkedRenderDataBranchSymbolSource({
 							branchSiteId: candidate.branchSiteId,
+							rootsWidgets: candidate.rootsWidgets === true,
 							exportName,
 							renderDataId: input.renderDataId,
 							resolverId: input.resolverId,
@@ -304,8 +305,19 @@ function linkedRenderDataBoundarySymbolSource(input: {
 	].join('\n');
 }
 
+// Files the widgets an arm rooted in page space; emitted only where one can be, since a runtime module would ride page loads.
+const branchWidgetFiling = [
+	'\tconst qualify = context.graph.marklessQualifyGraphNodeId ?? ((graphNodeId) => graphNodeId);',
+	'\tconst widgets = marklessGraphWidgetRegistry(context.graph.marklessPageGraph ?? context.graph);',
+	"\tfor (const definition of rendered.sharedDefinitions ?? []) if (definition.scope === 'subtree') {",
+	'\t\tconst id = qualify(definition.id);',
+	'\t\tfor (const widgetId of [id, ...(definition.projectionIds ?? []).map(qualify)]) marklessNoteWidgetRoot(widgets, widgetId, marklessInstancePath(id));',
+	'\t}',
+];
+
 function linkedRenderDataBranchSymbolSource(input: {
 	readonly branchSiteId: string;
+	readonly rootsWidgets: boolean;
 	readonly exportName: string;
 	readonly renderDataId: string;
 	readonly resolverId: string;
@@ -313,8 +325,12 @@ function linkedRenderDataBranchSymbolSource(input: {
 }): string {
 	return [
 		...linkedRenderDataSymbolPreamble(input, 'renderPrerenderBranch'),
+		...(input.rootsWidgets
+			? ["import { marklessGraphWidgetRegistry, marklessInstancePath, marklessNoteWidgetRoot } from '@markless/web/fns/instance-scope';"]
+			: []),
 		`export async function ${input.exportName}(context) {`,
 		`\tconst rendered = await renderPrerenderBranch(marklessPrerenderData, ${JSON.stringify(input.branchSiteId)}, context.graph, marklessLoadLinkedSymbol, context.composedBranchId, context.element);`,
+		...(input.rootsWidgets ? branchWidgetFiling : []),
 		// `resolved` marks the render authoritative: an arm that legitimately shows
 		// nothing must not be mistaken for a module that found no parts.
 		'\treturn { ...rendered, arm: context.arm, resolved: true };',
