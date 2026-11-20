@@ -119,6 +119,17 @@
 			"delta": -883,
 			"reason": "G10: the row slot-read helpers moved to resume-paint-snapshot; the wiring adopts painted rows under the snapshot collections (#1010): 22402 -> 21519 B rendered",
 			"date": "2026-11-20"
+		},
+		{
+			"surface": "build-scale",
+			"path": [
+				"budgets",
+				"clientModules",
+				"value"
+			],
+			"delta": 1,
+			"reason": "new client module web/resume-paint-snapshot: the row slot-read helpers and PaintSnapshot type, loaded with resume-async-wiring so an arm commit reads its paint snapshot before its first await (#1010)",
+			"date": "2026-11-20"
 		}
 	]
 }
