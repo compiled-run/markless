@@ -240,6 +240,8 @@ public final class NativeRuntime {
 	private var edit: String?
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
+	/// The arms on screen when the running action began; nil between actions, when what shows is what the cells say.
+	private var drawnArms: [String: Int?]?
 	/// What a touch adds to a script pointer handler's event, in the order the reference writes them.
 	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp]
 	/// The element that has focus, or nil.
@@ -517,6 +519,14 @@ public final class NativeRuntime {
 		case let .isElement(inner):
 			guard case let .string(id) = try evaluate(inner) else { return .bool(false) }
 			return .bool(isElement(id))
+		case let .drawn(node):
+			let chosen = try drawnArms ?? Dictionary(uniqueKeysWithValues: arms().map { ($0.node, $0.index) })
+			var at = nodesById[node]?.arm
+			while let place = at {
+				guard let shown = chosen[place.branch], shown == place.index else { return .null }
+				at = nodesById[place.branch]?.arm
+			}
+			return .string(node)
 		case let .contains(within, node):
 			let outer = try evaluate(within)
 			let inner = try evaluate(node)
@@ -1612,6 +1622,8 @@ public final class NativeRuntime {
 		let focusBefore = focused
 		let stackBefore = stack
 		let signaturesBefore = try rowSignatures()
+		drawnArms = beforeArms
+		defer { drawnArms = nil }
 		var calls = try apply()
 		if case .navigate? = calls.first { return calls }
 		// A row that left takes its state with it; a later row with the same key starts from the first values.

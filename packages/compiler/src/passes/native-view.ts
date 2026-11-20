@@ -807,6 +807,7 @@ function mentionsBuildValue(expr: unknown): boolean {
 function mentionsElement(expr: unknown): boolean {
 	if (!expr || typeof expr !== 'object') return false;
 	if ('element' in expr && typeof (expr as ElementValue).element === 'string') return true;
+	if ('drawn' in expr && typeof expr.drawn === 'string') return true;
 	return Object.values(expr).some((child) =>
 		Array.isArray(child) ? child.some(mentionsElement) : mentionsElement(child),
 	);
@@ -3032,9 +3033,17 @@ export function createNativeViewPayload(
 		if (!lateLowering) return refuse(`${what} as a value outside a handler`);
 		const bound = boundHandles.get(key) ?? [];
 		const byId = nodeById();
-		// An element in an @if arm is bound only while its arm shows, which the app knows only while it runs.
+		if (bound.some((id) => byId.get(id)?.arm) && !bound.some((id) => byId.get(id)?.row)) {
+			if (plural) return refuse(`${what}, a handle list bound inside an @if arm`);
+			const unarmed = bound.filter((id) => !byId.get(id)?.arm);
+			if (unarmed.length > 0 && bound.length > 1)
+				return refuse(`${what}, a handle bound to more than one element`);
+			return bound
+				.map((id): NativeExpr => ({ drawn: id }))
+				.reduceRight((right, left) => ({ logical: '??', left, right }));
+		}
 		if (bound.some((id) => byId.get(id)?.arm))
-			return refuse(`${what}, a handle bound inside an @if arm`);
+			return refuse(`${what}, a handle bound inside an @if arm within a @for row`);
 		if (scriptReading && plural && bound.some((id) => byId.get(id)?.row)) {
 			// JavaScript gets every row's copy, in the rows' order, as the web's handle list holds them.
 			const repeat = byId.get(bound[0]!)?.row;

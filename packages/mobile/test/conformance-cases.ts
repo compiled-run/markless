@@ -1210,6 +1210,24 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'pointercancel', host: 'h2', pointerId: 2, x: 30, y: 90, time: 2016 },
 		],
 	},
+	{
+		// A handle bound inside an @if arm: the element only while the arm is drawn, so not in the press that opens it.
+		name: 'arm-handle',
+		fixture: 'proofs/j44-arm-handle/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'focus', host: 'h3' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'focus', host: 'h3' },
+		],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */

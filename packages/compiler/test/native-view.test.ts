@@ -942,7 +942,7 @@ export function Page() @{
 		expect(counted.diagnostics.map((d) => d.message).join('\n')).toContain('a @for');
 	});
 
-	it("reads a shared() factory's own handle by its name in the factory's methods, and refuses one bound inside an @if arm", async () => {
+	it("reads a shared() factory's own handle by its name in the factory's methods, and one bound inside an @if arm as drawn", async () => {
 		const source = (field: string) => `import { element, shared, state } from '@markless/core';
 const boxState = shared(() => {
 	const box = state({ note: '' });
@@ -975,13 +975,24 @@ export function Page() @{
 				value: { literal: 'has field' },
 			},
 		]);
-		const armed = await nativeView(
-			source('@if (shown) { <input aria-label="Field" el={box.fieldEl} /> }'),
+		const armed = await nativeView(source('@if (shown) { <input aria-label="Field" el={box.fieldEl} /> }'), dataOnly);
+		expect(armed.diagnostics).toEqual([]);
+		const input = armed.payload!.nodes.find((node) => node.kind === 'element' && node.element === 'input')!;
+		expect(armed.payload?.handlers[0]?.ops).toEqual([
+			{
+				op: 'assign',
+				cell: 'shared:src/App.tsrx#boxState/state:box.note',
+				value: { if: { drawn: input.id }, whenTrue: { literal: 'has field' }, whenFalse: { literal: 'no field' } },
+			},
+		]);
+		const either = await nativeView(
+			source('@if (shown) { <input aria-label="Field" el={box.fieldEl} /> } @else { <input aria-label="Other" el={box.fieldEl} /> }'),
 			dataOnly,
 		);
-		expect(armed.payload).toBeNull();
-		expect(armed.diagnostics.map((d) => d.message)).toContain(
-			'the click handler reads `fieldEl`, a handle bound inside an @if arm',
+		expect(either.diagnostics).toEqual([]);
+		const [first, second] = either.payload!.nodes.filter((node) => node.kind === 'element' && node.element === 'input');
+		expect(JSON.stringify(either.payload?.handlers[0]?.ops)).toContain(
+			JSON.stringify({ logical: '??', left: { drawn: first!.id }, right: { drawn: second!.id } }),
 		);
 	});
 

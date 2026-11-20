@@ -141,6 +141,12 @@ export type NativeExpr =
 	| { readonly focusOrigin: NativeExpr }
 	/** Whether the value is an element (`value instanceof HTMLElement`). */
 	| { readonly isElement: NativeExpr }
+	/**
+	 * The element `drawn` (a node id in an `@if` arm) if it was on screen when this run began, else null: a handle bound
+	 * inside an arm, which the web binds only once the arm is drawn, so a write in the same handler that opens the arm
+	 * does not bind it yet.
+	 */
+	| { readonly drawn: string }
 	/** A computed whose body runs in the script engine: function `script` of the payload's script, called with `bindings`. */
 	| { readonly script: string; readonly bindings: NativeScriptBindings };
 
