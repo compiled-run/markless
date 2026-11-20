@@ -489,7 +489,10 @@ export function emitSourceModule(input: {
 					input.scalarActions !== undefined,
 				)
 			: '',
-		routeSymbols && !symbolsOnly && input.directCsr === true
+		// An arm that holds a component re-renders in this module's own id space, whichever page or island loads it.
+		routeSymbols &&
+		((!symbolsOnly && input.directCsr === true) ||
+			demandsBranchModule(input.runtimeDemandMap, COMPOSED_ARMS_RUNTIME_MODULE_ID))
 			? emitComposedArmRecordsInstall()
 			: null,
 		symbolsOnly && routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
@@ -838,6 +841,13 @@ function demandsKeyedRepeatModule(runtimeDemandMap: unknown, moduleId: string): 
 
 const ROW_MINT_RUNTIME_MODULE_ID = 'web/fns/row-mint';
 const NESTED_REPEATS_RUNTIME_MODULE_ID = 'web/fns/nested-repeats';
+const COMPOSED_ARMS_RUNTIME_MODULE_ID = 'web/fns/instance-scope';
+
+// True when a branch record demands the module: the compiler folds instance-scope into a branch whose arms hold components.
+function demandsBranchModule(runtimeDemandMap: unknown, moduleId: string): boolean {
+	const records = (runtimeDemandMap as { readonly payloadRecords?: ReadonlyArray<{ readonly kind?: string; readonly runtimeModuleIds?: ReadonlyArray<string> }> })?.payloadRecords;
+	return Array.isArray(records) && records.some((record) => record.kind === 'branch' && record.runtimeModuleIds?.includes(moduleId) === true);
+}
 const ROW_COMPONENT_MINT_RUNTIME_MODULE_ID = 'web/fns/row-component-mint';
 const ROW_SLOT_MINT_RUNTIME_MODULE_ID = 'web/fns/row-slot-mint';
 const ROW_BRANCH_MINT_RUNTIME_MODULE_ID = 'web/fns/row-branch-mint';

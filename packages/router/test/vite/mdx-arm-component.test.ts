@@ -44,6 +44,8 @@ for (const [name, path, hasList] of [
 	['an MDX island arm holding a component', '/panel', false],
 	['an MDX island arm holding a keyed list and a component', '/rich', true],
 	['the same arm on a page', '/page-rich', true],
+	['an MDX island arm holding only markup and a handler', '/plain', false],
+	['an MDX island arm whose component is two levels down', '/deep', false],
 ] as const)
 	test(
 		name,
@@ -75,3 +77,52 @@ for (const [name, path, hasList] of [
 		},
 		60_000,
 	);
+
+async function opened(path: string) {
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(`${server!.origin}${path}`);
+	return { page, errors };
+}
+
+test('an MDX island arm opened by an idle and a visible trigger, before any event', async () => {
+	const { page, errors } = await opened('/idle');
+	const shown = () =>
+		page.evaluate(() =>
+			[...document.querySelectorAll('.idle .badge, .seen .badge')]
+				.map((badge) => badge.textContent)
+				.join(','),
+		);
+	await expect.poll(async () => errors.join() || (await shown())).toBe('0,0');
+	await page.locator('.seen .badge').click();
+	await expect.poll(async () => errors.join() || (await shown())).toBe('0,1');
+	await page.close();
+});
+
+test("an MDX island's @try arm holding a component settles in the browser and the component works", async () => {
+	const { page, errors } = await opened('/try');
+	const shown = () =>
+		page.evaluate(() => document.querySelector('.settled .badge')?.textContent ?? '-');
+	await page.click('.settled .badge');
+	await expect.poll(async () => errors.join() || (await shown())).toBe('1');
+	await page.close();
+});
+
+test('two islands, and two instances of one island: each arm opens with its own component', async () => {
+	const { page, errors } = await opened('/two');
+	const shown = () =>
+		page.evaluate(() =>
+			[...document.querySelectorAll('section')]
+				.map((section) => section.querySelector('.badge')?.textContent ?? '-')
+				.join(','),
+		);
+	await page.locator('[data-open]').nth(2).click();
+	await expect.poll(async () => errors.join() || (await shown())).toBe('-,-,0');
+	await page.locator('[data-open]').nth(0).click();
+	await page.locator('[data-open]').nth(1).click();
+	await expect.poll(async () => errors.join() || (await shown())).toBe('0,0,0');
+	await page.locator('.badge').nth(2).click();
+	await expect.poll(async () => errors.join() || (await shown())).toBe('0,0,1');
+	await page.close();
+});
