@@ -602,7 +602,7 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled", "device", "task", "object", "row", "clock", "async"), what)
+			o.only(setOf("id", "name", "initial", "nonFinite", "storage", "styled", "device", "task", "object", "row", "clock", "async"), what)
 			val clock = o["clock"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.clock must be true when present"); true } ?: false
 			val styled = o["styled"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.styled must be true when present"); true } ?: false
 			val storage = o["storage"]?.obj("$what.storage")?.let { it.only(setOf("key"), "$what.storage"); it.field("key", what).str("$what.storage.key") }
@@ -614,7 +614,7 @@ data class Payload(
 				a.only(setOf("script", "bindings", "boundaries"), "$what.async")
 				AsyncValue(a.field("script", what).str("$what.async.script"), scriptBindings(a.field("bindings", what), "$what.async.bindings"), a.field("boundaries", what).arr("$what.async.boundaries").map { it.str("$what.async.boundaries[]") })
 			}
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, async)
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), nonFiniteJoin(o.field("initial", what), o["nonFinite"]), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, async)
 		}
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {

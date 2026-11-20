@@ -18,6 +18,9 @@ import {
 	nativeLocale,
 	nativeMaxLength,
 	nativeEmailMismatch,
+	nativeNonFiniteJoin,
+	nativeNonFiniteSplit,
+	type NativeNonFinite,
 	nativeEmailValue,
 	nativeTooLongMessage,
 } from '@markless/serializer/native-view';
@@ -93,6 +96,12 @@ export const SCRIPT_TIMER = 'script:';
 
 /** Each screen's async values run under their own name in an engine the app's screens share. */
 let screens = 0;
+
+/** The cells as an engine entry carries them: their JSON, and where each non-finite number was (paths from the slot). */
+const bridgedCells = (values: ReadonlyMap<string, Value>) => {
+	const { json, nonFinite } = nativeNonFiniteSplit(Object.fromEntries(values));
+	return { cells: json, ...(nonFinite.length > 0 ? { nonFinite } : {}) };
+};
 
 /** Runs a script function a `{ script }` expression names, with its bindings resolved where it is read. */
 type Compute = (fn: string, bindings: NativeScriptBindings, scope: NativeScope) => Value;
@@ -465,14 +474,15 @@ export function evaluateWithScript(
 					kind: 'compute',
 					fn,
 					frame,
-					cells: Object.fromEntries(values),
+					...bridgedCells(values),
 					...(host.seed ? { seed: host.seed() } : {}),
 				};
-				return JSON.parse(
+				const result = JSON.parse(
 					engine.evaluate(
 						`globalThis.__markless[${JSON.stringify(script.id)}].enter(${JSON.stringify(JSON.stringify(entry))})`,
 					),
-				) as Value;
+				) as { json: unknown; nonFinite: NativeNonFinite };
+				return nativeNonFiniteJoin(result.json, result.nonFinite) as Value;
 			},
 		);
 	return evaluate;
@@ -506,7 +516,7 @@ export function createNativeRuntime(
 				? now()
 				: cell.storage && store.has(cell.storage.key)
 					? store.get(cell.storage.key)!
-					: cell.initial,
+					: (nativeNonFiniteJoin(cell.initial, cell.nonFinite) as Value),
 		]),
 	);
 	const storageKeys = new Map(
@@ -602,7 +612,7 @@ export function createNativeRuntime(
 			]),
 		);
 	const entryCells = () => ({
-		cells: Object.fromEntries(values),
+		...bridgedCells(values),
 		...(script?.services.includes('crypto') && scriptHost?.seed
 			? { seed: scriptHost.seed() }
 			: {}),
@@ -611,7 +621,7 @@ export function createNativeRuntime(
 	const enter = (entry: Record<string, unknown>): NativeJournalEntry[] => {
 		call('enter', { ...entry, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
-			readonly writes: ReadonlyArray<readonly [string, Value]>;
+			readonly writes: ReadonlyArray<readonly [string, Value, NativeNonFinite?]>;
 			readonly aborts: ReadonlyArray<number>;
 			readonly timers: ReadonlyArray<readonly [number, number]>;
 			readonly clears: ReadonlyArray<number>;
@@ -621,7 +631,8 @@ export function createNativeRuntime(
 			}>;
 			readonly logs: ReadonlyArray<readonly [string, string]>;
 		};
-		for (const [slot, value] of result.writes) {
+		for (const [slot, json, nonFinite] of result.writes) {
+			const value = nativeNonFiniteJoin(json, nonFinite) as Value;
 			const at = slot.indexOf('@');
 			const cell = at < 0 ? slot : slot.slice(0, at);
 			if (!values.has(cell)) throw new Error(`the script wrote unknown cell ${cell}`);
@@ -697,15 +708,17 @@ export function createNativeRuntime(
 					? Object.values(binding.fields).map((cell) => read(cell, scope))
 					: evaluate(binding.value, undefined, scope),
 		);
-	const compute: Compute = (fn, bindings, scope) =>
-		JSON.parse(
+	const compute: Compute = (fn, bindings, scope) => {
+		const result = JSON.parse(
 			call('enter', {
 				kind: 'compute',
 				fn,
 				frame: frameOf(bindings, undefined, scope),
 				...entryCells(),
 			}),
-		) as Value;
+		) as { json: unknown; nonFinite: NativeNonFinite };
+		return nativeNonFiniteJoin(result.json, result.nonFinite) as Value;
+	};
 	/** Focus, the overlay stack (topmost last) and each overlay's focus origin, kept as the web's overlay behaviour keeps them. */
 	let focused: string | null = null;
 	let stack: string[] = [];

@@ -542,11 +542,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "async", "object", "row", "clock"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "async", "object", "row", "clock", "nonFinite"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
 			}
-			let initial = NativeValue(json: try field["initial"].value)
+			let initial = try NativeValue.nonFiniteJoin(try field["initial"].value, field.has("nonFinite") ? try field["nonFinite"].value : nil)
 			var styled = false
 			if field.has("styled") {
 				guard try field["styled"].bool() else { throw PayloadError(path: try field["styled"].path, reason: "styled is only ever true") }

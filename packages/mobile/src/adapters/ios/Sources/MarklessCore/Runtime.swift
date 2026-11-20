@@ -502,7 +502,8 @@ public final class NativeRuntime {
 			let frame = try frame(of: bindings, in: scope)
 			return try scriptHost.unwrap().entry {
 				let text = try callScript("enter", .object([("kind", .string("compute")), ("fn", .string(fn)), ("frame", frame)] + entryCells()))
-				return NativeValue(json: try JSONValue.parse(Data(text.utf8)))
+				let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "compute").object(["json", "nonFinite"])
+				return try NativeValue.nonFiniteJoin(result["json"].value, result["nonFinite"].value)
 			}
 		}
 	}
@@ -530,10 +531,13 @@ public final class NativeRuntime {
 	/// Every current value by slot (the page's cells in payload order, then row slots), and a seed when `crypto` is used.
 	private func entryCells() -> [(String, JSONValue)] {
 		let ids = Set(payload.cells.map(\.id))
-		let cells = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0.json) } }
-			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!.json) }
+		let slots = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0) } }
+			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!) }
+		// JSON writes Infinity and NaN as null: the entry lists where they were, each path starting with its slot.
+		let split = NativeValue.object(slots.map { (key: $0.0, value: $0.1) }).nonFiniteSplit
 		let crypto = payload.script?.services.contains(.crypto) == true
-		return [("cells", .object(cells))] + (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
+		let nonFinite: [(String, JSONValue)] = if case let .array(found) = split.nonFinite, !found.isEmpty { [("nonFinite", split.nonFinite)] } else { [] }
+		return [("cells", split.json)] + nonFinite + (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
@@ -545,11 +549,11 @@ public final class NativeRuntime {
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(["writes", "aborts", "timers", "clears", "requests", "logs"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
-			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
+			guard pair.count == 2 || pair.count == 3 else { throw write.fail("a write is [slot, value] or [slot, value, nonFinite]") }
 			let slot = try pair[0].string()
 			let cell = slot.firstIndex(of: "@").map { String(slot[..<$0]) } ?? slot
 			guard values[cell] != nil, payload.cells.contains(where: { $0.id == cell }) else { throw RuntimeError(reason: "the script wrote unknown cell \(cell)") }
-			let value = NativeValue(json: pair[1].value)
+			let value = try NativeValue.nonFiniteJoin(pair[1].value, pair.count == 3 ? pair[2].value : nil)
 			values[slot] = value
 			if let key = storageKeys[cell] { store.write(key, value) }
 		}

@@ -17,6 +17,7 @@ import type {
 } from '@markless/serializer';
 import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
 import {
+	nativeNonFiniteSplit,
 	isNativeStyleStateAttribute,
 	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
 	NATIVE_SUBMIT_LABEL_BY_LOCALE,
@@ -359,11 +360,12 @@ type Item =
 			readonly path: ReadonlyArray<number>;
 	  };
 
+// A non-finite number is a value too: the payload carries it beside its JSON (nativeNonFiniteSplit).
 const isNativeValue = (value: unknown): value is NativeValue =>
 	value === null ||
 	typeof value === 'string' ||
 	typeof value === 'boolean' ||
-	(typeof value === 'number' && Number.isFinite(value)) ||
+	typeof value === 'number' ||
 	(Array.isArray(value) && value.every(isNativeValue)) ||
 	(typeof value === 'object' &&
 		Object.getPrototypeOf(value) === Object.prototype &&
@@ -6494,11 +6496,12 @@ export function createNativeViewPayload(
 		...(options.route
 			? { route: { pattern: options.route.pattern, params: options.route.params } }
 			: {}),
-		cells: cells.map((cell) =>
-			styledCells.has(cell.id) && !rowCells.has(cell.id)
-				? { ...cell, styled: true as const }
-				: cell,
-		),
+		cells: cells.map((given) => {
+			// JSON writes Infinity and NaN as null: the cell carries where they were beside its first value.
+			const { json, nonFinite } = nativeNonFiniteSplit(given.initial);
+			const cell = nonFinite.length > 0 ? { ...given, initial: json as NativeValue, nonFinite } : given;
+			return styledCells.has(cell.id) && !rowCells.has(cell.id) ? { ...cell, styled: true as const } : cell;
+		}),
 		nodes,
 		events,
 		handlers,
