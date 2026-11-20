@@ -557,6 +557,21 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A tap's click reports where the touch came up; a click a script raised is untrusted at 0, 0; one no touch made is at 0, 0.
+		name: 'click-fields',
+		fixture: 'proofs/u65-click-fields/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'pointerdown', host: 'h2', pointerId: 1, x: 40, y: 120, time: 1000 },
+			{ event: 'pointerup', host: 'h2', pointerId: 1, x: 44, y: 122, time: 1080 },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'pointerdown', host: 'h3', pointerId: 2, x: 60, y: 200, time: 2000 },
+			{ event: 'pointerup', host: 'h3', pointerId: 2, x: 60, y: 200, time: 2080 },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
 		name: 'script-loop',
 		fixture: 'proofs/j1-loop-local/App.tsrx',
 		modules: true,

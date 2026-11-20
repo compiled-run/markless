@@ -131,7 +131,7 @@ data class FetchRequest(val url: String, val method: String, val headers: List<P
 
 /** `JSON.stringify` of a value: non-finite numbers are `null`. */
 /** What a touch adds to a script pointer handler's event, in the order the reference writes them. */
-private val TOUCH_FIELDS = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp")
+private val TOUCH_FIELDS = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp", "shiftKey", "ctrlKey", "altKey", "metaKey", "isTrusted")
 
 fun jsonValue(v: JsValue): String = when (v) {
 	JsValue.Null -> "null"
@@ -531,7 +531,7 @@ class Runtime(
 			if (type == "click") {
 				val pressed = chain.firstOrNull { handlerFor(it.substringBefore('@'), EventName.Activate) != null } ?: return emptyList()
 				val scope = scopeOf(pressed) ?: return emptyList()
-				return run(handlers[handlerFor(pressed.substringBefore('@'), EventName.Activate)]?.ops.orEmpty(), scope)
+				return withFields(clickFields(trusted = false)) { run(handlers[handlerFor(pressed.substringBefore('@'), EventName.Activate)]?.ops.orEmpty(), scope) }
 			}
 			val name = EventName.entries.firstOrNull { it.wire == type } ?: return emptyList()
 			fun optional(key: String, fallback: JsValue): JsValue = event[key]?.let { JsValue.fromJson(it) } ?: fallback
@@ -539,8 +539,9 @@ class Runtime(
 			for (node in if ((event["bubbles"] as? Json.Bool)?.value == true) chain else chain.take(1)) {
 				val own = handlerFor(node.substringBefore('@'), name) ?: continue
 				val scope = scopeOf(node) ?: continue
-				val f = if (name == EventName.Dismiss) mapOf("reason" to optional("reason", JsValue.Str("")), "pressTarget" to JsValue.Null)
+				val f = if (name == EventName.Dismiss) mapOf("reason" to optional("reason", JsValue.Str("")), "pressTarget" to JsValue.Null, "isTrusted" to JsValue.Bool(false))
 				else mapOf(
+					"isTrusted" to JsValue.Bool(false),
 					"target" to JsValue.Str(target), "currentTarget" to JsValue.Str(node), "relatedTarget" to optional("relatedTarget", JsValue.Null),
 					"button" to optional("button", JsValue.Num(0.0)), "buttons" to optional("buttons", JsValue.Num(0.0)),
 					"clientX" to optional("clientX", JsValue.Num(0.0)), "clientY" to optional("clientY", JsValue.Num(0.0)),
@@ -1003,9 +1004,22 @@ class Runtime(
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
 		// A press focuses the control it presses, as the browser does.
 		if (event == EventName.Activate) focused = host
+		val given = if (event == EventName.Activate) clickFields(trusted = true) else value?.let { mapOf("value" to JsValue.Str(it)) }
 		return change(host, value) {
-			withFields(value?.let { mapOf("value" to JsValue.Str(it)) }) { run(handler.ops, scope) }
+			withFields(given) { run(handler.ops, scope) }
 		}
+	}
+
+	/** Where the last touch came up, which the click it makes reports; a click no touch made is at 0, 0. */
+	private var tapPoint: Pair<Double, Double>? = null
+
+	private fun clickFields(trusted: Boolean): Map<String, JsValue> {
+		val at = if (trusted) tapPoint else null
+		tapPoint = null
+		return mapOf(
+			"isTrusted" to JsValue.Bool(trusted), "clientX" to JsValue.Num(at?.first ?: 0.0), "clientY" to JsValue.Num(at?.second ?: 0.0),
+			"shiftKey" to JsValue.Bool(false), "ctrlKey" to JsValue.Bool(false), "altKey" to JsValue.Bool(false), "metaKey" to JsValue.Bool(false),
+		)
 	}
 
 	private class Touching(var capture: String?, var over: String, val primary: Boolean)
@@ -1035,6 +1049,7 @@ class Runtime(
 		return change(null, null) {
 			val calls = ArrayList<JournalEntry>()
 			val state = down ?: Touching(host, host, touches.values.none { it.primary }).also { touches[pointerId] = it }
+			if (event != EventName.PointerMove) tapPoint = if (event == EventName.PointerUp) point.x to point.y else null
 			fun fieldsOf(type: EventName, target: String, currentTarget: String, related: String?): Map<String, JsValue> {
 				val lifted = type == EventName.PointerUp || type == EventName.PointerCancel || type == EventName.PointerOut || type == EventName.PointerLeave
 				val cancelled = event == EventName.PointerCancel

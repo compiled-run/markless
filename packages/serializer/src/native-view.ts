@@ -710,6 +710,8 @@ export type NativeViewPayload = {
 	readonly tooLong?: Readonly<Record<string, NativeTooLong>>;
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	readonly script?: NativeScript;
+	/** A click handler reads where its tap landed: the host reports touches even with no pointer handler, as a browser fires them. */
+	readonly tapPoints?: true;
 };
 
 export const NATIVE_APP_VERSION = 'markless.native-app/0';
@@ -1006,6 +1008,7 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> = [
 	['type'],
 	['key'],
+	['isTrusted'],
 	['defaultPrevented'],
 	['preventDefault'],
 	['stopPropagation'],
@@ -1027,6 +1030,19 @@ export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [
 	'pointerType',
 	'isPrimary',
 	'timeStamp',
+];
+
+/**
+ * What a tap's click adds to a script click handler's event, as a phone browser fills it: where the touch ended, and no
+ * modifier key held (a phone has no hardware keyboard). A click no touch made (a screen reader's) is at 0, 0.
+ */
+export const NATIVE_SCRIPT_CLICK_FIELDS: ReadonlyArray<string> = [
+	'clientX',
+	'clientY',
+	'shiftKey',
+	'ctrlKey',
+	'altKey',
+	'metaKey',
 ];
 
 /** A script pointer handler's event's elements, which reach JavaScript as proxies (`relatedTarget` null when none). */

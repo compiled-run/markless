@@ -28,7 +28,7 @@ import kotlin.math.roundToInt
  */
 internal class Overlays(private val host: MarklessHost, private val context: Context, private val dpr: Double) {
 	private val reportsTouches = host.payload.nodes.any { it is Node.Element && OVERLAY_ATTRIBUTE in it.attributes } ||
-		host.payload.events.any { it.event.pointer }
+		host.payload.events.any { it.event.pointer } || host.payload.tapPoints
 
 	private val appeared = SystemClock.uptimeMillis()
 	/** The next touch's number: from 1 for each screen, one more for each new touch, as Chrome on Android numbers them. */

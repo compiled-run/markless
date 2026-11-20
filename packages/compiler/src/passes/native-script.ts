@@ -1,5 +1,9 @@
 import type { NativeScript, NativeScriptService } from '@markless/serializer';
-import { NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS, NATIVE_SCRIPT_POINTER_FIELDS } from '@markless/serializer/native-view';
+import {
+	NATIVE_SCRIPT_CLICK_FIELDS,
+	NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS,
+	NATIVE_SCRIPT_POINTER_FIELDS,
+} from '@markless/serializer/native-view';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
@@ -329,11 +333,12 @@ var eventOf = function (given) {
 		target: target,
 		currentTarget: target,
 		key: given.key,
+		isTrusted: given.isTrusted !== false,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
 		stopPropagation: function () {},
 	};
-	${JSON.stringify(NATIVE_SCRIPT_POINTER_FIELDS)}.forEach(function (field) { if (field in given) event[field] = given[field]; });
+	${JSON.stringify([...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS])])}.forEach(function (field) { if (field in given) event[field] = given[field]; });
 	if (given.nodes)
 		${JSON.stringify(NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS)}.forEach(function (field) {
 			event[field] = given.nodes[field] == null ? null : elementOf(given.nodes[field]);

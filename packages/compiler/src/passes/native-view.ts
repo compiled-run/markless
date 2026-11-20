@@ -24,6 +24,7 @@ import {
 	NATIVE_ELEMENTS,
 	NATIVE_DOCUMENT_BODY,
 	NATIVE_UNSHOWN_ELEMENTS,
+	NATIVE_SCRIPT_CLICK_FIELDS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
 	NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
@@ -4916,6 +4917,8 @@ export function createNativeViewPayload(
 	}
 	/** While a handler is lowered as data with its helpers allowed to run as JavaScript. */
 	let scriptCalls = false;
+	/** A click handler's JavaScript reads where its tap landed. */
+	let tapPoints = false;
 	function mixedHandlerOps(
 		event: SemanticEvent,
 		scope: Scope,
@@ -5039,6 +5042,10 @@ export function createNativeViewPayload(
 		const touch = POINTER_EVENTS.has(semantic ?? '');
 		for (const read of fact.event ?? []) {
 			if (touch && NATIVE_SCRIPT_POINTER_FIELDS.includes(read.path[0] ?? '')) continue;
+			if (semantic === 'activate' && read.path.length === 1 && NATIVE_SCRIPT_CLICK_FIELDS.includes(read.path[0]!)) {
+				if (read.path[0] === 'clientX' || read.path[0] === 'clientY') tapPoints = true;
+				continue;
+			}
 			if (touch && NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS.includes(read.path[0] ?? '')) continue;
 			const known = NATIVE_SCRIPT_EVENT_MEMBERS.some(
 				(members) =>
@@ -6586,6 +6593,7 @@ export function createNativeViewPayload(
 		...(forms.length > 0 ? { forms, valueMissing: NATIVE_VALUE_MISSING_BY_LOCALE } : {}),
 		...(lengthLimited ? { tooLong: NATIVE_TOO_LONG_BY_LOCALE } : {}),
 		...(script ? { script } : {}),
+		...(tapPoints ? { tapPoints: true as const } : {}),
 	});
 
 	/**

@@ -18,6 +18,8 @@ public enum NativeEventField: String, Sendable {
 	case value, reason, pressTarget
 	/// A pointer event's, as a phone's browser reports a touch.
 	case target, currentTarget, relatedTarget, button, buttons, clientX, clientY, pointerId, pointerType, isPrimary, timeStamp
+	/// A click's, as a phone's browser fills it for a tap; `isTrusted` is false only for an event a script raised.
+	case shiftKey, ctrlKey, altKey, metaKey, isTrusted
 }
 
 public enum NativeBuiltin: String, Sendable {
@@ -475,10 +477,12 @@ public struct NativeViewPayload: Equatable, Sendable {
 		a.component == b.component && a.route == b.route && a.cells == b.cells && a.nodes == b.nodes && a.events == b.events
 			&& a.handlers == b.handlers && a.title == b.title && a.objects == b.objects && a.forms == b.forms && a.valueMissing.map(\.locale) == b.valueMissing.map(\.locale)
 			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages) && a.tooLong.map(\.locale) == b.tooLong.map(\.locale)
-			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.script == b.script
+			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.script == b.script && a.tapPoints == b.tapPoints
 	}
 	/// The JavaScript the page's script ops and computeds run; absent when every handler is data.
 	public var script: NativeScript? = nil
+	/// A click handler reads where its tap landed, so the host reports touches even with no pointer handler.
+	public var tapPoints = false
 
 	public static func decode(_ data: Data) throws -> NativeViewPayload {
 		try decode(JSONValue.parse(data))
@@ -486,7 +490,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "script"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "script", "tapPoints"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
@@ -739,11 +743,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let r = try fields["route"].object(["pattern", "params"])
 			return NativeRoute(pattern: try r["pattern"].string(), params: try r["params"].array().map { try $0.string() })
 		}() : nil
-		let payload = NativeViewPayload(
+		var payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
 			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
 			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong,
 			script: fields.has("script") ? try decodeScript(try fields["script"]) : nil)
+		if fields.has("tapPoints") {
+			guard try fields["tapPoints"].bool() else { throw PayloadError(path: "payload.tapPoints", reason: "true when present") }
+			payload.tapPoints = true
+		}
 		try payload.check()
 		return payload
 	}

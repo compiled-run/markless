@@ -1098,13 +1098,27 @@ export function Find() @{
 	<main>
 		<input el={field} />
 		<button onClick={() => { count++; field.focus(); missing?.scrollIntoView(); }}>Go</button>
-		<button onClick={(event) => (count = event.clientX)}>Where</button>
+		<button onClick={(event) => (count = event.screenX)}>Where</button>
 	</main>
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
-			'the click handler reads `event.clientX`, which a tap on a phone does not have',
+			'the click handler reads `event.screenX`, which a tap on a phone does not have',
 		]);
+		// A tap's click has where the touch came up, its trust and no key held; reading the point has the host report touches.
+		const tapped = await nativeView(`import { state } from '@markless/core';
+export function Where() @{
+	let at = state('');
+	<button onClick={(event) => (at = \`\${event.isTrusted} \${event.clientX} \${event.clientY} \${event.shiftKey || event.metaKey}\`)}>{at}</button>
+}`);
+		expect(tapped.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		expect(tapped.payload!.tapPoints).toBe(true);
+		const trusted = await nativeView(`import { state } from '@markless/core';
+export function Trust() @{
+	let at = state('');
+	<button onClick={(event) => (at = String(event.isTrusted))}>{at}</button>
+}`);
+		expect(trusted.payload!.tapPoints).toBeUndefined();
 		const { payload: ok } = await nativeView(`import { element, state } from '@markless/core';
 export function Find() @{
 	let count = state(0);

@@ -949,12 +949,12 @@ function walk(
 				else typed.set(host, text);
 			}
 			// A tap is a touch going down and up on what it lands on, then the activation of the nearest element around it
-			// that handles a press, as on a phone.
+			// that handles a press, as on a phone; it lands inside the screen, never at its corner.
 			const touched =
 				'tap' in action
 					? [
-							...runtime.dispatch({ event: 'pointerdown', host }),
-							...runtime.dispatch({ event: 'pointerup', host }),
+							...runtime.dispatch({ event: 'pointerdown', host, x: 1, y: 1 }),
+							...runtime.dispatch({ event: 'pointerup', host, x: 1, y: 1 }),
 						]
 					: [];
 			apply(touched, index);

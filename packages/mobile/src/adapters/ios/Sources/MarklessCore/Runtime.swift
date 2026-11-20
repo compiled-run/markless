@@ -224,7 +224,18 @@ public final class NativeRuntime {
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
 	/// What a touch adds to a script pointer handler's event, in the order the reference writes them.
-	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp]
+	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp, .shiftKey, .ctrlKey, .altKey, .metaKey, .isTrusted]
+	/// Where the last touch came up, which the click it makes reports; a click no touch made is at 0, 0.
+	private var tapPoint: (x: Double, y: Double)?
+
+	private func clickFields(trusted: Bool) -> [NativeEventField: NativeValue] {
+		let at = trusted ? tapPoint : nil
+		tapPoint = nil
+		return [
+			.isTrusted: .bool(trusted), .clientX: .number(at?.x ?? 0), .clientY: .number(at?.y ?? 0),
+			.shiftKey: .bool(false), .ctrlKey: .bool(false), .altKey: .bool(false), .metaKey: .bool(false),
+		]
+	}
 	/// The element that has focus, or nil.
 	public private(set) var focused: String?
 	/// The overlay stack, topmost last, and the focus each overlay found when it joined, as the web's overlay behaviour keeps them.
@@ -648,7 +659,11 @@ public final class NativeRuntime {
 	private func raise(_ reader: Reader) throws -> [NativeJournalEntry] {
 		guard raising < raiseDepth else { throw RuntimeError(reason: "events raised from JavaScript nest deeper than \(raiseDepth)") }
 		raising += 1
-		defer { raising -= 1 }
+		let outer = eventFields
+		defer {
+			raising -= 1
+			eventFields = outer
+		}
 		let event = try reader.object(
 			required: ["node", "type", "bubbles"],
 			optional: ["reason", "relatedTarget", "pointerId", "pointerType", "isPrimary", "button", "buttons", "clientX", "clientY"])
@@ -667,6 +682,7 @@ public final class NativeRuntime {
 		let handlerOf = { (id: String, name: NativeEventName) in self.payload.events.first { $0.host == self.nodeOf(id) && $0.event == name } }
 		if type == "click" {
 			guard let pressed = chain.first(where: { handlerOf($0, .activate) != nil }), let scope = try scopeOf(pressed) else { return [] }
+			eventFields = clickFields(trusted: false)
 			return try run(handlers[handlerOf(pressed, .activate)!.handler] ?? [], in: scope)
 		}
 		guard let name = NativeEventName(rawValue: type) else { return [] }
@@ -676,15 +692,15 @@ public final class NativeRuntime {
 		for node in bubbles ? chain : Array(chain.prefix(1)) {
 			guard let own = handlerOf(node, name), let scope = try scopeOf(node) else { continue }
 			eventFields = name == .dismiss
-				? [.reason: try optional("reason", .string("")), .pressTarget: .null]
+				? [.reason: try optional("reason", .string("")), .pressTarget: .null, .isTrusted: .bool(false)]
 				: [
+					.isTrusted: .bool(false),
 					.target: .string(target), .currentTarget: .string(node), .relatedTarget: try optional("relatedTarget", .null),
 					.button: try optional("button", .number(0)), .buttons: try optional("buttons", .number(0)),
 					.clientX: try optional("clientX", .number(0)), .clientY: try optional("clientY", .number(0)),
 					.pointerId: try optional("pointerId", .number(0)), .pointerType: try optional("pointerType", .string("")),
 					.isPrimary: try optional("isPrimary", .bool(false)), .timeStamp: .number(0),
 				]
-			defer { eventFields = nil }
 			let taken = try run(handlers[own.handler] ?? [], in: scope)
 			if case .navigate? = taken.first { return taken }
 			calls += taken
@@ -1187,7 +1203,11 @@ public final class NativeRuntime {
 		// A press focuses the control it presses, as the browser does.
 		if action.event == .activate { focused = action.host }
 		eventValue = action.event == .input ? action.value ?? "" : nil
-		defer { eventValue = nil }
+		if action.event == .activate { eventFields = clickFields(trusted: true) }
+		defer {
+			eventValue = nil
+			eventFields = nil
+		}
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
 	}
 
@@ -1208,6 +1228,7 @@ public final class NativeRuntime {
 			let state = down ?? TouchState(capture: action.host, over: action.host, primary: self.touches.values.allSatisfy { !$0.primary })
 			if down == nil { self.touches[pointerId] = state }
 			let x = action.x ?? 0, y = action.y ?? 0
+			if action.event != .pointermove { self.tapPoint = action.event == .pointerup ? (x, y) : nil }
 			/// The elements from `id` out to the root, innermost first.
 			let chain = { (id: String) -> [String] in
 				var out: [String] = []

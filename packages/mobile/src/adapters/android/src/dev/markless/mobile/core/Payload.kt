@@ -285,13 +285,15 @@ data class Payload(
 	val tooLong: Map<String, TooLong> = emptyMap(),
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	val script: ScriptSource? = null,
+	/** A click handler reads where its tap landed, so the host reports touches even with no pointer handler. */
+	val tapPoints: Boolean = false,
 ) {
 	companion object {
 		fun decode(bytes: ByteArray): Payload = decode(Json.parse(bytes))
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "script"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "script", "tapPoints"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -364,7 +366,8 @@ data class Payload(
 				val runsScript = cells.any { it.async != null } || handlers.any { h -> scriptOps(h.ops) } || nodes.any { n -> readsOf(n).any(::hasScript) } || title.orEmpty().any { it is TextPart.Value && hasScript(it.expr) }
 				if (runsScript) throw MarklessDecodeError("a script op or computed in a payload with no script")
 			}
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, script)
+			val tapPoints = root["tapPoints"]?.let { it == Json.Bool(true) || throw MarklessDecodeError("payload.tapPoints is true when present") } ?: false
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, script, tapPoints)
 		}
 
 		private fun readsOf(node: Node): List<Expr> = when (node) {

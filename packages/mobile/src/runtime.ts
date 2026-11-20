@@ -14,6 +14,7 @@ import type {
 } from '@markless/serializer';
 import {
 	NATIVE_DOCUMENT_BODY,
+	NATIVE_SCRIPT_CLICK_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	nativeLocale,
 	nativeMaxLength,
@@ -147,6 +148,12 @@ export type NativeEventFields = {
 	readonly pointerType?: string;
 	readonly isPrimary?: boolean;
 	readonly timeStamp?: number;
+	/** False for an event a script raised; a host's event is trusted. */
+	readonly isTrusted?: boolean;
+	readonly shiftKey?: boolean;
+	readonly ctrlKey?: boolean;
+	readonly altKey?: boolean;
+	readonly metaKey?: boolean;
 };
 
 /** The element facts an expression reads: focus, each overlay's focus origin, and the element tree. */
@@ -792,7 +799,7 @@ export function createNativeRuntime(
 			if (event.type === 'click') {
 				const pressed = chain.find((node) => handlerOf(nodeOf(node), 'activate'));
 				const scope = pressed && scopeOf(pressed);
-				return pressed && scope ? run(handlers.get(handlerOf(nodeOf(pressed), 'activate')!.handler) ?? [], undefined, scope) : [];
+				return pressed && scope ? run(handlers.get(handlerOf(nodeOf(pressed), 'activate')!.handler) ?? [], clickFields(false), scope) : [];
 			}
 			for (const node of event.bubbles ? chain : chain.slice(0, 1)) {
 				const own = handlerOf(nodeOf(node), event.type as NativePointerEventName);
@@ -800,8 +807,9 @@ export function createNativeRuntime(
 				if (!own || !scope) continue;
 				const fields: NativeEventFields =
 					event.type === DISMISS_EVENT
-						? { reason: event.reason ?? '', pressTarget: null }
+						? { reason: event.reason ?? '', pressTarget: null, isTrusted: false }
 						: {
+								isTrusted: false,
 								target: event.node,
 								currentTarget: node,
 								relatedTarget: event.relatedTarget ?? null,
@@ -910,6 +918,21 @@ export function createNativeRuntime(
 		number,
 		{ capture: string | null; over: string; readonly primary: boolean }
 	>();
+	/** Where the last touch came up, which the click it makes reports; a click no touch made is at 0, 0. */
+	let tapPoint: { readonly x: number; readonly y: number } | null = null;
+	const clickFields = (trusted: boolean): NativeEventFields => {
+		const at = trusted ? tapPoint : null;
+		tapPoint = null;
+		return {
+			isTrusted: trusted,
+			clientX: at?.x ?? 0,
+			clientY: at?.y ?? 0,
+			shiftKey: false,
+			ctrlKey: false,
+			altKey: false,
+			metaKey: false,
+		};
+	};
 	/** A row's copy (`<node>@<key>`) sits where its node does in the tree. */
 	const nodeOf = (id: string) => (id.includes('@') ? id.slice(0, id.indexOf('@')) : id);
 	const elements: NativeElements = {
@@ -1571,6 +1594,7 @@ export function createNativeRuntime(
 					};
 					if (!down) touches.set(pointerId, state);
 					const at = { x: touch.x ?? 0, y: touch.y ?? 0 };
+					if (touch.event !== 'pointermove') tapPoint = touch.event === 'pointerup' ? at : null;
 					/** The elements from `id` out to the root, innermost first. */
 					const chain = (id: string): string[] => {
 						const out: string[] = [];
@@ -1711,8 +1735,9 @@ export function createNativeRuntime(
 			const eventValue = action.event === 'input' ? action.value : undefined;
 			// A press focuses the control it presses, as the browser does.
 			if (action.event === 'activate') focused = action.host;
+			const fields = action.event === 'activate' ? clickFields(true) : eventValue;
 			return change(action.host, eventValue, () =>
-				run(handlers.get(event.handler) ?? [], eventValue, scope),
+				run(handlers.get(event.handler) ?? [], fields, scope),
 			);
 		},
 		due,
@@ -1851,7 +1876,7 @@ export function createNativeRuntime(
 				const text = typeof eventValue === 'string' ? eventValue : eventValue?.value;
 				const touch =
 					typeof eventValue === 'object'
-						? NATIVE_SCRIPT_POINTER_FIELDS.flatMap((field) => {
+						? [...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, 'isTrusted'])].flatMap((field) => {
 								const value = eventValue[field as keyof NativeEventFields];
 								return value === undefined ? [] : [[field, value] as const];
 							})
