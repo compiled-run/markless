@@ -4009,6 +4009,30 @@ export function createNativeViewPayload(
 					? [slot.name]
 					: [],
 			);
+		/**
+		 * Bound attributes of a drawn element whose value is known when the app is built (a prop its caller fixed, a module
+		 * constant), as the text the web renders: the drawing takes them as written. One that follows state is left out.
+		 */
+		const foldedAttributes = (
+			host: string,
+			names: ReadonlyArray<string>,
+			scope: Scope,
+		): Record<string, string> => {
+			if (names.length === 0) return {};
+			const lowered = attempt(() => bindingsOf(host, scope, new Set(), false));
+			lowered.rollBack();
+			const out: Record<string, string> = {};
+			for (const binding of lowered.value) {
+				if (!('attribute' in binding) || !names.includes(binding.attribute)) continue;
+				const folded = foldConstant(binding.value, () => undefined);
+				if (
+					folded &&
+					(typeof folded.value === 'string' || typeof folded.value === 'number')
+				)
+					out[binding.attribute] = String(folded.value);
+			}
+			return out;
+		};
 		/** Subtrees lowered whole (an `<svg>`) or never shown (`<template>`): their items are not lowered one by one. */
 		const consumed: ReadonlyArray<number>[] = [];
 		for (const item of items) {
@@ -4176,12 +4200,13 @@ export function createNativeViewPayload(
 					for (const other of inside) {
 						if (other.kind === 'host') {
 							const tag = scope.module.tagOf.get(other.id) ?? '*';
+							const folded = foldedAttributes(other.id, boundAt(other.path), scope);
 							drawn.push({
 								id: other.id,
 								tag,
 								path: relative(other.path),
-								attributes: attributesAt(other.path),
-								bound: boundAt(other.path),
+								attributes: { ...attributesAt(other.path), ...folded },
+								bound: boundAt(other.path).filter((name) => !(name in folded)),
 							});
 							for (const event of scope.module.eventsByHost.get(other.id) ?? []) {
 								if (scope.module === rootModule) loweredEvents.add(event.id);
@@ -4200,7 +4225,12 @@ export function createNativeViewPayload(
 								span,
 							);
 					}
-					const result = compileDrawing(attributes, drawn, texts, item.id);
+					const result = compileDrawing(
+						{ ...attributes, ...foldedAttributes(item.id, boundAt(item.path), scope) },
+						drawn,
+						texts,
+						item.id,
+					);
 					for (const refusal of result.refusals)
 						refuseAs(
 							'svg',
