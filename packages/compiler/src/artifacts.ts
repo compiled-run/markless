@@ -643,6 +643,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly overlayRecords?: true;
 			/** This component or one it renders resolves a shared() instance that outlives the page. */
 			readonly liveShared?: true;
+			/** This component or one it renders resolves a subtree-scoped shared() instance: a widget. */
+			readonly widgets?: true;
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
 			/**
@@ -2994,6 +2996,8 @@ export type SymbolModulesDiagnostic = CompilerDiagnostic & {
 export type ArmEscalationCandidate = {
 	readonly branchSiteId: string;
 	readonly symbolId: string;
+	/** An arm content can render a widget in, which the flip files before its records register. */
+	readonly rootsWidgets?: true;
 };
 
 /**

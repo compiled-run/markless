@@ -253,7 +253,7 @@ async function visit(path: string, run: (page: Page) => Promise<void>) {
 	}
 }
 
-test.fails('an @if arm can hold a modal (#869)', { timeout: 240_000 }, async () => {
+test('an @if arm can hold a modal (#869)', { timeout: 240_000 }, async () => {
 	expect(
 		(await buildError({
 			'index.tsrx': `import { state } from '@markless/core';
