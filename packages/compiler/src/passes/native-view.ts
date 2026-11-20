@@ -166,6 +166,8 @@ function defaultStyleOf(
 	return Object.keys(style).length > 0 ? style : undefined;
 }
 
+const LIST_ELEMENTS: ReadonlySet<string> = new Set(['dl', 'menu', 'ol', 'ul']);
+
 const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][number]['event']>> = {
 	click: 'activate',
 	input: 'input',
@@ -3218,7 +3220,11 @@ export function createNativeViewPayload(
 									`${what} reads \`.${expression.property}\` of an error; a native build reads its \`message\` and \`name\``,
 								);
 				const element = elementOf(object);
-				if (element !== undefined && element === typedField && expression.property === 'value')
+				if (
+					element !== undefined &&
+					element === typedField &&
+					expression.property === 'value'
+				)
 					return { event: 'value' };
 				if (element !== undefined && isTicked(element)) {
 					if (expression.property === 'checked') return { checked: element };
@@ -5109,7 +5115,8 @@ export function createNativeViewPayload(
 							};
 		snapshots = { handler, count: 0 };
 		continuations = { base: handler, next: 0 };
-		typedField = 'event' in inner && inner.event !== undefined ? pressed?.currentTarget : undefined;
+		typedField =
+			'event' in inner && inner.event !== undefined ? pressed?.currentTarget : undefined;
 		try {
 			return lowerStatements(event.handlerStatements, inner, what, event.handlerSpan, 0, {
 				next: [],
@@ -6363,6 +6370,21 @@ export function createNativeViewPayload(
 		const { defaultStyle: _style, ...plain } = node;
 		nodes[index] = Object.keys(rest).length > 0 ? { ...plain, defaultStyle: rest } : plain;
 	}
+	// Chrome's stylesheet drops a list's block margins inside another: `:is(dl, menu, ol, ul) :is(dl, menu, ol, ul) { margin-block: 0 }`.
+	const byId = new Map(nodes.map((node) => [node.id, node]));
+	const isList = (node: (typeof nodes)[number] | undefined) =>
+		node?.kind === 'element' && LIST_ELEMENTS.has(node.element);
+	for (let index = 0; index < nodes.length; index++) {
+		const node = nodes[index]!;
+		if (node.kind !== 'element' || node.defaultStyle?.margin === undefined || !isList(node))
+			continue;
+		let above = node.parent ? byId.get(node.parent) : undefined;
+		while (above && !isList(above)) above = above.parent ? byId.get(above.parent) : undefined;
+		if (!above) continue;
+		const { margin: _margin, ...rest } = node.defaultStyle;
+		const { defaultStyle: _style, ...plain } = node;
+		nodes[index] = Object.keys(rest).length > 0 ? { ...plain, defaultStyle: rest } : plain;
+	}
 	rootObjects.own(0);
 	// A backstop for markup nothing lowered: a refused @for or arm already says why its markup was not.
 	if (
@@ -6588,22 +6610,49 @@ export function createNativeViewPayload(
 						);
 			if (node.element === 'select') {
 				if (node.row)
-					refuse(`${where} sits inside a @for row, which a native build does not draw yet`, span);
+					refuse(
+						`${where} sits inside a @for row, which a native build does not draw yet`,
+						span,
+					);
 				for (const name of ['multiple', 'size'])
-					if (node.attributes?.[name] !== undefined || node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === name))
-						refuse(`${where} has \`${name}\`, a list box a native build does not draw yet`, span);
-				if (node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === 'value'))
-					refuse(`${where} binds \`value\`; a native build chooses an option through its \`selected\``, span);
+					if (
+						node.attributes?.[name] !== undefined ||
+						node.bindings?.some(
+							(binding) => 'attribute' in binding && binding.attribute === name,
+						)
+					)
+						refuse(
+							`${where} has \`${name}\`, a list box a native build does not draw yet`,
+							span,
+						);
+				if (
+					node.bindings?.some(
+						(binding) => 'attribute' in binding && binding.attribute === 'value',
+					)
+				)
+					refuse(
+						`${where} binds \`value\`; a native build chooses an option through its \`selected\``,
+						span,
+					);
 				continue;
 			}
 			const parent = node.parent === null ? undefined : byId.get(node.parent);
 			const inSelect = parent?.kind === 'element' && parent.element === 'select';
 			if (node.element === 'option' && !inSelect)
-				refuse(`${where} is not inside a <select>, which a native build does not show yet`, span);
+				refuse(
+					`${where} is not inside a <select>, which a native build does not show yet`,
+					span,
+				);
 			else if (node.element !== 'option' && inSelect)
-				refuse(`${where} sits inside a <select>, which a native build shows only <option>s of`, span);
+				refuse(
+					`${where} sits inside a <select>, which a native build shows only <option>s of`,
+					span,
+				);
 			else if (parent?.kind === 'element' && parent.element === 'option')
-				refuse(`${where} sits inside an <option>, which a native build shows only text of`, span);
+				refuse(
+					`${where} sits inside an <option>, which a native build shows only text of`,
+					span,
+				);
 		}
 	}
 
@@ -6718,7 +6767,11 @@ export function createNativeViewPayload(
 					refuse(`${field}, a form inside a form`);
 					continue;
 				}
-				if (node.element !== 'input' && node.element !== 'button' && node.element !== 'select')
+				if (
+					node.element !== 'input' &&
+					node.element !== 'button' &&
+					node.element !== 'select'
+				)
 					continue;
 				if (node.element === 'button' && node.attributes?.['type'] === 'button') continue;
 				if (node.row !== form.row) {

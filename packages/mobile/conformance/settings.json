@@ -36,7 +36,8 @@
 				"parent": "h8",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -59,7 +60,10 @@
 				"kind": "element",
 				"id": "component-edge:0/h1",
 				"element": "p",
-				"parent": "component-edge:0/h0"
+				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -116,6 +120,9 @@
 				"id": "component-edge:0/h3",
 				"element": "p",
 				"parent": "component-edge:0/h2",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "component-edge:0/branch-site:0",
 					"index": 0
@@ -197,6 +204,9 @@
 				"id": "component-edge:0/h5",
 				"element": "p",
 				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "component-edge:0/boundary:0",
 					"index": 0
@@ -232,6 +242,9 @@
 				"id": "component-edge:0/h7",
 				"element": "p",
 				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "component-edge:0/boundary:0",
 					"index": 1
@@ -256,6 +269,9 @@
 				"id": "component-edge:0/h6",
 				"element": "p",
 				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "component-edge:0/boundary:0",
 					"index": 2

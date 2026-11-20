@@ -24,7 +24,8 @@
 				"parent": "h0",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -57,7 +58,10 @@
 				"kind": "element",
 				"id": "h3",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -101,7 +105,8 @@
 				"parent": "h5",
 				"defaultStyle": {
 					"bold": true,
-					"size": 1.5
+					"size": 1.5,
+					"margin": 0.83
 				}
 			},
 			{
@@ -162,7 +167,8 @@
 				"parent": "h9",
 				"defaultStyle": {
 					"bold": true,
-					"size": 1.5
+					"size": 1.5,
+					"margin": 0.83
 				}
 			},
 			{

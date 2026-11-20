@@ -95,6 +95,9 @@
 				"id": "h3",
 				"element": "p",
 				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 0
@@ -119,6 +122,9 @@
 				"id": "h4",
 				"element": "p",
 				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 1
@@ -143,6 +149,9 @@
 				"id": "h5",
 				"element": "p",
 				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 2
@@ -194,6 +203,9 @@
 				"id": "h6",
 				"element": "p",
 				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:1",
 					"index": 0
@@ -218,6 +230,9 @@
 				"id": "h7",
 				"element": "p",
 				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:1",
 					"index": 1
@@ -242,6 +257,9 @@
 				"id": "h8",
 				"element": "p",
 				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:1",
 					"index": 2

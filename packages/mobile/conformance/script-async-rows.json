@@ -43,7 +43,8 @@
 				"parent": "h3",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -60,7 +61,10 @@
 				"kind": "element",
 				"id": "h5",
 				"element": "p",
-				"parent": "h3"
+				"parent": "h3",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -119,7 +123,8 @@
 				"parent": "h3",
 				"defaultStyle": {
 					"indent": 40,
-					"marker": "disc"
+					"marker": "disc",
+					"margin": 1
 				}
 			},
 			{

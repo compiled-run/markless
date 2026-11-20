@@ -34,7 +34,8 @@
 				"parent": "h0",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -77,6 +78,9 @@
 				"id": "h3",
 				"element": "p",
 				"parent": "h2",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "boundary:0",
 					"index": 0
@@ -104,6 +108,9 @@
 				"id": "h4",
 				"element": "p",
 				"parent": "h2",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "boundary:0",
 					"index": 0
@@ -179,6 +186,9 @@
 				"id": "h7",
 				"element": "p",
 				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "boundary:0",
 					"index": 2
@@ -226,6 +236,9 @@
 				"id": "boundary:0:caught/h7",
 				"element": "p",
 				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "boundary:0:caught",
 					"index": 0

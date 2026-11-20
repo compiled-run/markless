@@ -43,7 +43,8 @@
 				"parent": "h3",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -136,6 +137,9 @@
 				"id": "component-edge:0/h0",
 				"element": "p",
 				"parent": "h3",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"row": "repeat:0",
 				"arm": {
 					"branch": "component-edge:0/boundary:0",
@@ -167,6 +171,9 @@
 				"id": "component-edge:0/h2",
 				"element": "p",
 				"parent": "h3",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"row": "repeat:0",
 				"arm": {
 					"branch": "component-edge:0/boundary:0",
@@ -193,6 +200,9 @@
 				"id": "component-edge:0/h1",
 				"element": "p",
 				"parent": "h3",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"row": "repeat:0",
 				"arm": {
 					"branch": "component-edge:0/boundary:0",
@@ -261,6 +271,9 @@
 				"id": "component-edge:0/component-edge:0/boundary:0:caught/h1",
 				"element": "p",
 				"parent": "h3",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"row": "repeat:0",
 				"arm": {
 					"branch": "component-edge:0/boundary:0:caught",
