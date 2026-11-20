@@ -2278,6 +2278,21 @@ export function Chart() @{
 		]);
 	});
 
+	it('clips a group by the <clipPath> its clip-path names, mapped into the drawing; refuses one in bounding-box units', async () => {
+		const shapesOf = async (clipPath: string) => {
+			const { payload, diagnostics } = await nativeView(`export function Moon() @{
+	<svg viewBox="0 0 10 10"><defs>${clipPath}</defs><g clip-path="url(#c)" transform="translate(2 0)"><rect width="10" height="10" /></g></svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return { shapes: svg?.kind === 'element' ? svg.drawing?.shapes : undefined, messages: diagnostics.map((d) => d.message) };
+		};
+		const { shapes } = await shapesOf('<clipPath id="c"><rect width="5" height="10" /></clipPath>');
+		expect(shapes?.[0]?.clip).toEqual([[0, 2, 0, 1, 7, 0, 1, 7, 10, 1, 2, 10, 4]]);
+		expect(
+			(await shapesOf('<clipPath id="c" clipPathUnits="objectBoundingBox"><rect width="1" height="1" /></clipPath>')).messages,
+		).toContain('`clipPathUnits="objectBoundingBox"` on <clipPath>: a clip is drawn in user space only');
+	});
+
 	it('places the viewBox by preserveAspectRatio, and refuses a value that is not one', async () => {
 		const aspectOf = async (value: string) => {
 			const { payload, diagnostics } = await nativeView(`export function Banner() @{

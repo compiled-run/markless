@@ -207,6 +207,8 @@ public struct NativeShape: Equatable, Sendable {
 	public let transform: [Double]?
 	/// A `<text>`: the path is empty, and these runs are laid out and filled instead.
 	public var text: NativeDrawingText?
+	/// Clip outlines in the drawing's units (nonzero); the shape shows only where all of them cover.
+	public var clip: [[Double]] = []
 }
 
 /// An SVG `<text>`: runs laid out from the pen, each chunk placed by `anchor`, glyphs on `baseline` relative to the pen.
@@ -961,7 +963,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))
 		}
 		let shapes = try field["shapes"].array().map { shape -> NativeShape in
-			let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text"])
+			let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text", "clip"])
 			let transform = s.has("transform") ? try s["transform"].array().map { try $0.number() } : nil
 			if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
 			let rule = try s["fillRule"].string()
@@ -970,6 +972,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 				path: try s["path"].array().map { try $0.number() }, fill: try paint(try s["fill"]), evenOdd: rule == "evenodd",
 				stroke: try paint(try s["stroke"]), width: try s["width"].number(), cap: try s["cap"].string(), join: try s["join"].string(),
 				miterLimit: try s["miterLimit"].number(), transform: transform)
+			if s.has("clip") { decoded.clip = try s["clip"].array().map { try $0.array().map { try $0.number() } } }
 			if s.has("text") {
 				let t = try s["text"].object(["anchor", "baseline", "runs"])
 				let anchor = try t["anchor"].string()

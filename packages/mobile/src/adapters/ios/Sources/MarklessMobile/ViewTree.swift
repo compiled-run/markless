@@ -129,21 +129,12 @@ final class DrawingView: UIView {
 			}
 		}
 		for shape in drawing.shapes {
-			let path = CGMutablePath()
-			var i = 0
-			let p = shape.path
-			while i < p.count {
-				switch Int(p[i]) {
-				case 0: path.move(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
-				case 1: path.addLine(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
-				case 3:
-					path.addCurve(to: CGPoint(x: p[i + 5], y: p[i + 6]), control1: CGPoint(x: p[i + 1], y: p[i + 2]), control2: CGPoint(x: p[i + 3], y: p[i + 4]))
-					i += 7
-				case 4: path.closeSubpath(); i += 1
-				default: i = p.count
-				}
-			}
+			let path = Self.path(shape.path)
 			context.saveGState()
+			for clip in shape.clip {
+				context.addPath(Self.path(clip))
+				context.clip(using: .winding)
+			}
 			if let t = shape.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
 			if let text = shape.text {
 				draw(text)
@@ -166,6 +157,24 @@ final class DrawingView: UIView {
 			}
 			context.restoreGState()
 		}
+	}
+
+	/// A verb-coded outline: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close.
+	private static func path(_ p: [Double]) -> CGMutablePath {
+		let path = CGMutablePath()
+		var i = 0
+		while i < p.count {
+			switch Int(p[i]) {
+			case 0: path.move(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
+			case 1: path.addLine(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
+			case 3:
+				path.addCurve(to: CGPoint(x: p[i + 5], y: p[i + 6]), control1: CGPoint(x: p[i + 1], y: p[i + 2]), control2: CGPoint(x: p[i + 3], y: p[i + 4]))
+				i += 7
+			case 4: path.closeSubpath(); i += 1
+			default: i = p.count
+			}
+		}
+		return path
 	}
 
 	/// Lays out an SVG `<text>`'s runs from the pen, each chunk placed by its anchor, as the browser lays them out.

@@ -160,19 +160,19 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 	/** What `currentColor` paints: the svg's text colour from a style export, else black. */
 	var currentColor: Int = Color.BLACK
 		set(value) { field = value; invalidate() }
-	private val paths = drawing.shapes.map { shape ->
-		Path().apply {
-			fillType = if (shape.evenOdd) Path.FillType.EVEN_ODD else Path.FillType.WINDING
-			val v = shape.path
-			var i = 0
-			while (i < v.size) {
-				when (v[i].toInt()) {
-					0 -> { moveTo(v[i + 1].toFloat(), v[i + 2].toFloat()); i += 3 }
-					1 -> { lineTo(v[i + 1].toFloat(), v[i + 2].toFloat()); i += 3 }
-					3 -> { cubicTo(v[i + 1].toFloat(), v[i + 2].toFloat(), v[i + 3].toFloat(), v[i + 4].toFloat(), v[i + 5].toFloat(), v[i + 6].toFloat()); i += 7 }
-					4 -> { close(); i += 1 }
-					else -> throw MarklessHostError("unknown path verb ${v[i]}")
-				}
+	private val paths = drawing.shapes.map { shape -> pathOf(shape.path).apply { fillType = if (shape.evenOdd) Path.FillType.EVEN_ODD else Path.FillType.WINDING } }
+	private val clips = drawing.shapes.map { shape -> shape.clip.map(::pathOf) }
+
+	/** A verb-coded outline: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close. */
+	private fun pathOf(v: List<Double>) = Path().apply {
+		var i = 0
+		while (i < v.size) {
+			when (v[i].toInt()) {
+				0 -> { moveTo(v[i + 1].toFloat(), v[i + 2].toFloat()); i += 3 }
+				1 -> { lineTo(v[i + 1].toFloat(), v[i + 2].toFloat()); i += 3 }
+				3 -> { cubicTo(v[i + 1].toFloat(), v[i + 2].toFloat(), v[i + 3].toFloat(), v[i + 4].toFloat(), v[i + 5].toFloat(), v[i + 6].toFloat()); i += 7 }
+				4 -> { close(); i += 1 }
+				else -> throw MarklessHostError("unknown path verb ${v[i]}")
 			}
 		}
 	}
@@ -213,6 +213,7 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 		} ?: canvas.scale(density, density)
 		for ((index, shape) in drawing.shapes.withIndex()) {
 			canvas.save()
+			for (clip in clips[index]) canvas.clipPath(clip)
 			shape.transform?.let { (a, b, c, d, e, f) ->
 				canvas.concat(Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
 			}

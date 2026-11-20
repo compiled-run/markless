@@ -54,6 +54,8 @@ type Inherited = {
 	/** In user units, or in ems of the font size. */
 	readonly letterSpacing: { readonly value: number; readonly em: boolean };
 	readonly preserve: boolean;
+	/** The clip outlines of it and its groups, in the drawing's units. */
+	readonly clips: ReadonlyArray<ReadonlyArray<number>>;
 };
 const INITIAL: Inherited = {
 	fill: { r: 0, g: 0, b: 0, alpha: 255 },
@@ -75,11 +77,12 @@ const INITIAL: Inherited = {
 	baseline: 'alphabetic',
 	letterSpacing: { value: 0, em: false },
 	preserve: false,
+	clips: [],
 };
 
 const SHAPES = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 /** Elements that draw nothing themselves and whose content is never drawn in place. */
-const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata']);
+const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata', 'clipPath']);
 /** Attributes that change nothing a native drawing shows. */
 const NO_DRAWING_EFFECT = new Set([
 	'class',
@@ -135,6 +138,7 @@ const PRESENTATION = new Set([
 	'text-anchor',
 	'dominant-baseline',
 	'letter-spacing',
+	'clip-path',
 ]);
 
 const GENERIC_FAMILIES = new Set(['serif', 'sans-serif', 'monospace']);
@@ -358,6 +362,7 @@ export function compileDrawing(
 			);
 		if (outline.length === 0) return;
 		shapes.push({
+			...(style.clips.length > 0 ? { clip: style.clips } : {}),
 			path: outline,
 			fill: alpha(style.fill, style.fillOpacity * style.opacity),
 			fillRule: style.fillRule,
@@ -516,6 +521,7 @@ export function compileDrawing(
 		if (shown.every((run) => run.text === '')) return;
 		spoken.push(shown.map((run) => run.text).join('').trim());
 		shapes.push({
+			...(style.clips.length > 0 ? { clip: style.clips } : {}),
 			path: [],
 			fill: paintOf(style),
 			fillRule: 'nonzero',
@@ -540,6 +546,36 @@ export function compileDrawing(
 		return parsed;
 	};
 
+	/** `clip-path="url(#id)"`: the <clipPath>'s shapes, in the user space of the element that names it, joined as one outline. */
+	const clipped = (element: DrawingElement, style: Inherited, own: Matrix): Inherited => {
+		const raw = element.attributes['clip-path']?.trim();
+		if (raw === undefined || raw === 'none') return style;
+		const id = raw.startsWith('url(#') && raw.endsWith(')') ? raw.slice(5, -1).trim() : undefined;
+		const target = id === undefined ? undefined : byId.get(id);
+		if (!target || target.tag !== 'clipPath') {
+			refuse(element.id, `\`clip-path="${raw}"\` on <${element.tag}>, which names no <clipPath> inside this <svg>`);
+			return style;
+		}
+		const units = target.attributes.clipPathUnits?.trim();
+		if (units !== undefined && units !== 'userSpaceOnUse') {
+			refuse(target.id, `\`clipPathUnits="${units}"\` on <clipPath>: a clip is drawn in user space only`);
+			return style;
+		}
+		const base = multiply(own, transformOf(target));
+		const outline: number[] = [];
+		for (const child of childrenOf(target.path)) {
+			if (!SHAPES.has(child.tag)) {
+				if (!NEVER_DRAWN.has(child.tag))
+					refuse(child.id, `<${child.tag}> inside <clipPath>, whose shapes alone clip natively yet`);
+				continue;
+			}
+			if (child.attributes['clip-path'] !== undefined)
+				refuse(child.id, `\`clip-path\` on a shape inside <clipPath>`);
+			outline.push(...mapOutline(outlineOf(child), multiply(base, transformOf(child))));
+		}
+		return { ...style, clips: [...style.clips, outline] };
+	};
+
 	const visit = (
 		element: DrawingElement,
 		from: Inherited,
@@ -555,8 +591,8 @@ export function compileDrawing(
 			return;
 		}
 		checkAttributes(element);
-		const style = inherit(element, from);
 		const own = multiply(matrix, transformOf(element));
+		const style = clipped(element, inherit(element, from), own);
 		if (SHAPES.has(element.tag)) {
 			emit(element, outlineOf(element), style, own);
 			return;
@@ -654,6 +690,29 @@ function parseAspect(raw: string): NativeDrawing['aspect'] | 'default' | null {
 }
 
 // Geometry.
+
+/** A verb-coded outline with every point mapped by `m`; an affine map keeps lines and cubics what they are. */
+function mapOutline(outline: ReadonlyArray<number>, m: Matrix): number[] {
+	const out: number[] = [];
+	let i = 0;
+	const point = () => {
+		const x = outline[i]!;
+		const y = outline[i + 1]!;
+		out.push(m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]);
+		i += 2;
+	};
+	while (i < outline.length) {
+		const verb = outline[i++]!;
+		out.push(verb);
+		if (verb === 0 || verb === 1) point();
+		else if (verb === 3) {
+			point();
+			point();
+			point();
+		}
+	}
+	return out;
+}
 
 function multiply(m: Matrix, n: Matrix): Matrix {
 	return [

@@ -159,7 +159,7 @@ sealed interface ShapePaint {
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
-data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val text: DrawingText? = null)
+data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val text: DrawingText? = null, val clip: List<List<Double>> = emptyList())
 
 /** An SVG `<text>`: runs laid out from the pen, each chunk placed by [anchor], glyphs on [baseline] relative to the pen. */
 data class DrawingText(val anchor: String, val baseline: String, val runs: List<TextRun>)
@@ -707,7 +707,7 @@ data class Payload(
 			val shapes = o.field("shapes", what).arr("$what.shapes").mapIndexed { n, sv ->
 				val w = "$what.shapes[$n]"
 				val so = sv.obj(w)
-				so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text"), w)
+				so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text", "clip"), w)
 				val path = so.field("path", w).arr("$w.path").map { it.num("$w.path[]") }
 				val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
 				if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
@@ -735,6 +735,7 @@ data class Payload(
 							},
 						)
 					},
+					so["clip"]?.arr("$w.clip")?.map { c -> c.arr("$w.clip[]").map { it.num("$w.clip[][]") } } ?: emptyList(),
 				)
 			}
 			val aspect = o["aspect"]?.let { av ->

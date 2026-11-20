@@ -384,6 +384,11 @@ export type NativeShape = {
 	readonly transform?: readonly [number, number, number, number, number, number];
 	/** A `<text>` element: its `path` is empty, and the host lays out and fills these runs instead. */
 	readonly text?: NativeDrawingText;
+	/**
+	 * The `clip-path`s on it and its groups, each an outline (verb-coded, nonzero) already in the drawing's units: it is
+	 * drawn only where every one of them covers, as the browser clips it.
+	 */
+	readonly clip?: ReadonlyArray<ReadonlyArray<number>>;
 };
 
 /**

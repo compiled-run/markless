@@ -348,6 +348,11 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'svg-clip',
+		fixture: 'proofs/u76-svg-clip/App.tsrx',
+		actions: [{ event: 'activate', host: 'h2' }],
+	},
+	{
 		name: 'types',
 		fixture: 'test/fixtures/Types.tsrx',
 		actions: [
