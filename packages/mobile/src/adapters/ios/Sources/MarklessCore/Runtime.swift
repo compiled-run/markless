@@ -535,7 +535,7 @@ public final class NativeRuntime {
 		case let .script(fn, bindings):
 			let frame = try frame(of: bindings, in: scope)
 			return try scriptHost.unwrap().entry {
-				let text = try callScript("enter", .object([("kind", .string("compute")), ("fn", .string(fn)), ("frame", frame)] + entryCells()))
+				let text = try callScript("enter", .object([("kind", .string("compute")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame))] + entryCells()))
 				return NativeValue(json: try JSONValue.parse(Data(text.utf8)))
 			}
 		}
@@ -557,8 +557,46 @@ public final class NativeRuntime {
 			case let .fields(fields):
 				return (binding.name, .object([("fields", .object(try fields.map { ($0.name, .string(try slot(of: $0.cell, in: scope))) }))]))
 			case let .value(expr): return (binding.name, .object([("value", try evaluate(expr, in: scope).json)]))
+			case let .elements(expr): return (binding.name, .object([("elements", try evaluate(expr, in: scope).json)]))
+			case let .object(members): return (binding.name, .object([("object", try frame(of: members, in: scope))]))
+			case let .shared(members): return (binding.name, .object([("shared", try frame(of: members, in: scope))]))
 			}
 		})
+	}
+
+	/// What the host tells a script about the elements its frame passes as proxies: each one's attributes now and the
+	/// elements it is inside, nearest first.
+	private func elementFacts(_ frame: JSONValue) throws -> JSONValue {
+		var facts: [(String, JSONValue)] = []
+		var seen = Set<String>()
+		func add(_ value: JSONValue) throws {
+			guard case let .string(id) = value, !seen.contains(id), isElement(id), id != nativeDocumentBody else { return }
+			seen.insert(id)
+			let key = id.firstIndex(of: "@").map { String(id[$0...]) } ?? ""
+			let found = try element(nodeOf(id))
+			var names: [String] = []
+			for name in found.attributes.keys.sorted() + found.bindings.filter({ !$0.isProperty }).map(\.name) where !names.contains(name) { names.append(name) }
+			var attributes: [(String, JSONValue)] = []
+			for name in names { if let value = try attributeNow(nodeOf(id), name) { attributes.append((name, .string(value))) } }
+			var ancestors: [JSONValue] = []
+			var up = found.node.parent
+			while let parent = up {
+				ancestors.append(.string(!key.isEmpty && nodesById[parent]?.row != nil ? parent + key : parent))
+				up = nodesById[parent]?.parent
+			}
+			facts.append((id, .object([("attributes", .object(attributes)), ("ancestors", .array(ancestors))])))
+		}
+		func visit(_ frame: JSONValue) throws {
+			guard case let .object(names) = frame else { return }
+			for (_, binding) in names {
+				guard case let .object(fields) = binding else { continue }
+				for (key, inner) in fields where key == "object" || key == "shared" { try visit(inner) }
+				guard let given = fields.first(where: { $0.0 == "elements" })?.1 else { continue }
+				if case let .array(items) = given { for item in items { try add(item) } } else { try add(given) }
+			}
+		}
+		try visit(frame)
+		return .object(facts)
 	}
 
 	/// Every current value by slot (the page's cells in payload order, then row slots), and a seed when `crypto` is used.
@@ -576,7 +614,7 @@ public final class NativeRuntime {
 			_ = try callScript("enter", .object(entry + entryCells()))
 			return try callScript("leave")
 		}
-		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(["writes", "aborts", "timers", "clears", "requests", "logs"])
+		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(required: ["writes", "aborts", "timers", "clears", "requests", "logs"], optional: ["commands"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
@@ -606,7 +644,21 @@ public final class NativeRuntime {
 				url: try asked["url"].string(), method: try asked["method"].string(), headers: try decodeHeaders(asked["headers"]),
 				body: try asked["body"].optionalString()))
 		}
-		return aborts + clears + timers + requests
+		let commands = try (result.has("commands") ? result["commands"].array() : []).compactMap { command -> NativeJournalEntry? in
+			let parts = try command.array()
+			guard parts.count == 3 else { throw command.fail("a command is [node, command, preventScroll]") }
+			let node = try parts[0].string()
+			let name = try parts[1].string()
+			// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
+			if name == "showModal" || name == "close" {
+				guard dialogs[node] != nil else { throw RuntimeError(reason: "\(name)() on \(node), which is not a dialog") }
+				dialogs[node] = name == "showModal"
+				return nil
+			}
+			if name == "focus" { focused = node }
+			return .command(node: node, command: name, preventScroll: try parts[2].bool())
+		}
+		return aborts + clears + timers + requests + commands
 	}
 
 	/// Tells the engine which async values are shown and what they read, when that moved; it starts and aborts runs.
@@ -694,18 +746,28 @@ public final class NativeRuntime {
 
 	/// A list's rows now: each item with its key, `String()` of the item at the key path.
 	public func rows(of repeatId: String) throws -> [(key: String, item: NativeValue)] {
-		guard let node = nodesById[repeatId], case let .repeat(list, keyPath) = node.kind else { throw RuntimeError(reason: "unknown list \(repeatId)") }
+		guard let node = nodesById[repeatId], case let .repeat(list, keyPath, keyParts) = node.kind else { throw RuntimeError(reason: "unknown list \(repeatId)") }
 		guard case let .array(array) = try evaluate(list) else { throw RuntimeError(reason: "\(repeatId) lists a value that is not an array") }
 		guard let keyPath else { return array.items.enumerated().map { (String($0.offset), $0.element) } }
-		return try array.items.map { item in
+		let valueAt = { (item: NativeValue, path: [String]) throws -> NativeValue in
 			var key = item
-			for step in keyPath {
+			for step in path {
 				guard case let .object(object) = key, let next = object.get(step) else {
-					throw RuntimeError(reason: "\(repeatId): a row has no key at \(keyPath.joined(separator: "."))")
+					throw RuntimeError(reason: "\(repeatId): a row has no key at \(path.joined(separator: "."))")
 				}
 				key = next
 			}
-			return (key.text, item)
+			return key
+		}
+		return try array.items.map { item in
+			guard let keyParts else { return (try valueAt(item, keyPath).text, item) }
+			let key = try keyParts.map { part in
+				switch part {
+				case let .text(text): text
+				case let .path(path): try valueAt(item, path).text
+				}
+			}.joined()
+			return (key, item)
 		}
 	}
 
@@ -1338,8 +1400,9 @@ public final class NativeRuntime {
 			case let .script(fn, type, bindings, catchCell):
 				let touch = touchFields.compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
 				let event: JSONValue = .object([("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? []) + touch)
+				let frame = try frame(of: bindings, in: scope)
 				calls.append(contentsOf: try enter(
-					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", try frame(of: bindings, in: scope)), ("event", event)]
+					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame)), ("event", event)]
 						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? [])))
 			}
 		}

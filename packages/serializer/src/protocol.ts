@@ -422,6 +422,12 @@ export type ProtocolStreamedArmPatch = readonly [
  * A row rebuilds when any slot value moves: its item changed under its key, or a
  * graph node a slot reads was written.
  */
+/**
+ * A `@for` key joined from fields of the row item, in order: each piece is fixed
+ * text, or a path on the item whose value is written as a template literal writes it.
+ */
+export type ProtocolRepeatKeyParts = ReadonlyArray<string | ReadonlyArray<string>>;
+
 export type ProtocolRowTemplateSlotValue =
 	| { readonly itemPath: ReadonlyArray<string> }
 	| { readonly graphNodeId: string; readonly graphPath: ReadonlyArray<string> }
@@ -602,6 +608,12 @@ export type ProtocolViewPayload = {
 		readonly collectionGraphNodeId?: string;
 		readonly collectionPath: ReadonlyArray<string>;
 		readonly keyPath: ReadonlyArray<string>;
+		/**
+		 * A key joined from the row's own fields (`` key `${line.id}:${line.size}` ``):
+		 * `keyPath` is then empty and is not the key. Pay-per-use: a key that is one
+		 * path on the item omits the field.
+		 */
+		readonly keyParts?: ProtocolRepeatKeyParts;
 		/**
 		 * `key i`: a row's key is its position, not a value read off the item.
 		 * Pay-per-use: a repeat keyed by item data omits the field.

@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, openSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { allRungFolders } from '../../proofs/ladder.ts';
@@ -26,6 +25,7 @@ import {
 	type Summary,
 	writeJson,
 } from './store.ts';
+import { spawnRunner } from './spawn-runner.ts';
 
 const USAGE = `usage: phones <command>
 
@@ -57,19 +57,9 @@ function start(pool: ReadonlyArray<PhoneSpec>): void {
 		);
 		return;
 	}
-	mkdirSync(runnerHome(), { recursive: true });
-	const out = openSync(daemonLog(), 'a');
-	const child = spawn(
-		process.execPath,
-		[join(import.meta.dirname, 'daemon.ts'), JSON.stringify(pool)],
-		{
-			detached: true,
-			stdio: ['ignore', out, out],
-		},
-	);
-	child.unref();
+	const pid = spawnRunner(pool);
 	console.log(
-		`runner started (pid ${child.pid}) with ${pool.map(phoneId).join(', ')}; log ${daemonLog()}`,
+		`runner started (pid ${pid}) with ${pool.map(phoneId).join(', ')}; log ${daemonLog()}`,
 	);
 }
 
@@ -263,7 +253,8 @@ function printResult(id: string): Summary | undefined {
 				);
 		}
 	}
-	for (const rung of summary.rerun) console.log(`ran again because its phone was unreachable: ${rung}`);
+	for (const rung of summary.rerun)
+		console.log(`ran again because its phone was unreachable: ${rung}`);
 	for (const problem of summary.problems) console.log(`FAIL ${problem}`);
 	console.log(
 		`job ${id} ${summary.passed ? 'passed' : 'failed'} in ${summary.seconds.toFixed(0)} s; reports in ${resultDir(job)}, screenshots in ${join(job, 'screenshots')}`,
