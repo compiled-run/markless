@@ -78,6 +78,10 @@ installs an app and drives Maestro (`src/harness/{ios,android,maestro}.ts`, `src
 If you changed that code, restart the runner from your checkout before you submit, or run the harness directly as
 before (`pnpm --filter @markless/mobile proof ...`).
 
+A rung that fetches (`server: 'echo'` in its `expected.json`) reaches the test's echo server, which the runner serves on
+`127.0.0.1:28761` while a chunk holding such a rung runs, and closes after, so a web test or the harness can take the port
+between jobs; on Android the chunk forwards that port to the emulator (`adb reverse`).
+
 ## Which rungs `--affected` picks
 
 The choice comes from the yuku project graph (`packages/analyzer/test-support/project-graph.ts`), the same graph the

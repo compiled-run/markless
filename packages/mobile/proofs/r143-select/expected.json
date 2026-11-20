@@ -1,0 +1,40 @@
+{
+	"rung": 143,
+	"name": "A <select> of listed options whose `selected` follows state: a person's choice, a bound choice and what the form sends",
+	"steps": [
+		{
+			"visible": ["Nothing sent", "Home", "Small"],
+			"absent": ["Work", "Ideas", "Large", "Medium"]
+		},
+		{
+			"do": { "tap": "Send" },
+			"visible": ["Sent Home at s", "Home", "Small"],
+			"absent": ["Nothing sent", "Work", "Ideas", "Large"]
+		},
+		{
+			"do": { "choose": { "field": "Tag", "option": "Work" } },
+			"visible": ["Work", "Small", "Sent Home at s"],
+			"absent": ["Home", "Ideas", "Large"]
+		},
+		{
+			"do": { "choose": { "field": "Size", "option": "Large" } },
+			"visible": ["Large", "Work", "Sent Home at s"],
+			"absent": ["Small", "Medium", "Home"]
+		},
+		{
+			"do": { "tap": "Send" },
+			"visible": ["Sent Work at l", "Work", "Large"],
+			"absent": ["Sent Home at s", "Home", "Small"]
+		},
+		{
+			"do": { "tap": "Use the last tag" },
+			"visible": ["Ideas", "Large", "Sent Work at l"],
+			"absent": ["Work", "Home"]
+		},
+		{
+			"do": { "tap": "Send" },
+			"visible": ["Sent Ideas at l", "Ideas"],
+			"absent": ["Sent Work at l", "Work"]
+		}
+	]
+}

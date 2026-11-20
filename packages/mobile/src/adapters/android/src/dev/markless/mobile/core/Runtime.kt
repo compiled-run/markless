@@ -82,6 +82,11 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"property\",\"node\":${jsonString(node)},\"name\":\"checked\",\"value\":$checked}"
 	}
 
+	/** An option's selectedness changed; a row's new option arrives unselected. */
+	data class Selected(override val node: String, val selected: Boolean) : JournalEntry {
+		override fun toJson() = "{\"op\":\"property\",\"node\":${jsonString(node)},\"name\":\"selected\",\"value\":$selected}"
+	}
+
 	/** An element marked `overlay` joined the overlay stack ([open]) or left it; a [modal] one goes in the host's top layer. */
 	data class Overlay(override val node: String, val open: Boolean, val modal: Boolean) : JournalEntry {
 		override fun toJson() = "{\"op\":\"overlay\",\"node\":${jsonString(node)},\"open\":$open,\"modal\":$modal}"
@@ -106,6 +111,12 @@ sealed interface JournalEntry {
 	data class Fetch(val id: Int, val request: FetchRequest) : JournalEntry {
 		override val node get() = ""
 		override fun toJson() = "{\"op\":\"fetch\",\"id\":$id,\"request\":${request.toJson()}}"
+	}
+
+	/** The script aborted request [id] (its async value was superseded or left the screen): cancel it and send no response. */
+	data class Abort(val id: Int) : JournalEntry {
+		override val node get() = ""
+		override fun toJson() = "{\"op\":\"abort\",\"id\":$id}"
 	}
 }
 
@@ -172,6 +183,9 @@ data class Row(val key: String, val item: JsValue)
 
 /** Runs handler ops on cells and reports what changed on shown nodes as journal entries, in document order. Free of android.*. */
 /** [now]: the device's clock, in ms since 1970 (UTC); a conformance run fixes it. */
+/** Each screen's async values run under their own number in an engine the app's screens share. */
+private var screens = 0
+
 class Runtime(
 	val payload: Payload,
 	private val store: Store = MemoryStore(),
@@ -335,12 +349,40 @@ class Runtime(
 		return (engine ?: load(script)).evaluate(if (argument == null) "$target()" else "$target(${jsonString(argument)})")
 	}
 
-	/** The names a script function reads, as its engine entry spells them: slots of this scope's cells, and values. */
-	private fun frameOf(bindings: Map<String, ScriptBinding>, scope: Scope): String = bindings.entries.joinToString(",", "{", "}") { (name, b) ->
+	/** A script function's name as its engine entry spells it: a slot of this scope's cell, slots by field, or a value. */
+	private sealed interface Bound {
+		data class Slot(val slot: String) : Bound
+		data class Fields(val fields: Map<String, String>) : Bound
+		data class Value(val value: JsValue) : Bound
+	}
+
+	private fun bind(bindings: Map<String, ScriptBinding>, scope: Scope): Map<String, Bound> = bindings.mapValuesTo(LinkedHashMap()) { (_, b) ->
+		when (b) {
+			is ScriptBinding.Cell -> Bound.Slot(slot(b.cell, scope))
+			is ScriptBinding.Fields -> Bound.Fields(b.fields.mapValuesTo(LinkedHashMap()) { slot(it.value, scope) })
+			is ScriptBinding.Value -> Bound.Value(evaluate(b.value, scope))
+		}
+	}
+
+	private fun frameJson(frame: Map<String, Bound>): String = frame.entries.joinToString(",", "{", "}") { (name, b) ->
 		jsonString(name) + ":" + when (b) {
-			is ScriptBinding.Cell -> "{\"slot\":${jsonString(slot(b.cell, scope))}}"
-			is ScriptBinding.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(slot(it.value, scope))}" }}}"
-			is ScriptBinding.Value -> "{\"value\":${jsonValue(evaluate(b.value, scope))}}"
+			is Bound.Slot -> "{\"slot\":${jsonString(b.slot)}}"
+			is Bound.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}}"
+			is Bound.Value -> "{\"value\":${jsonValue(b.value)}}"
+		}
+	}
+
+	/** The names a script function reads, as its engine entry spells them: slots of this scope's cells, and values. */
+	private fun frameOf(bindings: Map<String, ScriptBinding>, scope: Scope): String = frameJson(bind(bindings, scope))
+
+	private fun nullish(v: JsValue?): JsValue? = v?.takeIf { it != JsValue.Null }
+
+	/** A frame's names as the values they hold now. */
+	private fun readFrame(frame: Map<String, Bound>): String = frame.values.joinToString(",", "[", "]") { b ->
+		when (b) {
+			is Bound.Slot -> jsonValue(nullish(values[b.slot]) ?: nullish(values[b.slot.substringBefore('@')]) ?: JsValue.Null)
+			is Bound.Fields -> b.fields.values.joinToString(",", "[", "]") { jsonValue(values[it] ?: values[it.substringBefore('@')] ?: JsValue.Null) }
+			is Bound.Value -> jsonValue(b.value)
 		}
 	}
 
@@ -376,7 +418,8 @@ class Runtime(
 			logs.add(level to text)
 			onScriptLog?.invoke(level, text)
 		}
-		return list("clears").map { JournalEntry.ClearTimer("$SCRIPT_TIMER${id(it)}") } +
+		return list("aborts").map { JournalEntry.Abort(id(it)) } +
+			list("clears").map { JournalEntry.ClearTimer("$SCRIPT_TIMER${id(it)}") } +
 			list("timers").map { t -> t.arr("leave().timers[]").let { JournalEntry.Timer("$SCRIPT_TIMER${id(it[0])}", it[1].num("leave().timers[][1]")) } } +
 			list("requests").map { r ->
 				val o = r.obj("leave().requests[]")
@@ -392,21 +435,63 @@ class Runtime(
 	}
 
 
+	private val screen = ++screens
+	private val asyncCells = payload.cells.filter { it.async != null }
+	/** What the async values' runs depend on as last told to the engine; null before the first. */
+	private var asyncSent: String? = null
+	/** Async values a `reset` asked to run again, by slot: sent with the next `tasks` entry. */
+	private val retry = LinkedHashSet<String>()
+
+	/** Tells the engine which async values are shown and what they read, when that moved; it starts and aborts runs. */
+	private fun syncAsync(): List<JournalEntry> {
+		if (asyncCells.isEmpty()) return emptyList()
+		val out = ArrayList<JournalEntry>()
+		// A run that settles at once can show another; the engine is asked again until nothing moves.
+		repeat(16) {
+			val shown = asyncCells.flatMap { c ->
+				val at = LinkedHashMap<String, Scope>()
+				for (id in c.async!!.boundaries) for (inst in byId[id]?.let(::instances).orEmpty()) at.putIfAbsent(slot(c.id, inst.scope), inst.scope)
+				at.map { (slot, scope) -> Triple(c, slot, bind(c.async.bindings, scope)) }
+			}
+			val frames = shown.map { it.third }
+			val tasks = shown.joinToString(",", "[", "]") { (c, slot, frame) -> "{\"slot\":${jsonString(slot)},\"fn\":${jsonString(c.async!!.fn)},\"frame\":${frameJson(frame)}}" }
+			val sent = "[$tasks,${frames.joinToString(",", "[", "]", transform = ::readFrame)}]"
+			if (sent == asyncSent && retry.isEmpty()) return out
+			asyncSent = sent
+			val again = if (retry.isEmpty()) "" else retry.joinToString(",", ",\"retry\":[", "]", transform = ::jsonString)
+			retry.clear()
+			out.addAll(enter("\"kind\":\"tasks\",\"screen\":$screen,\"tasks\":$tasks$again"))
+		}
+		throw MarklessRuntimeError("async values that keep starting each other")
+	}
+
+	/** Starts the async values the script computes, once the screen is built; the host applies its journal as an action's. */
+	fun start(): List<JournalEntry> = if (asyncCells.isEmpty()) emptyList() else change(null, null) { emptyList() }
+
+	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
+	fun leave(): List<JournalEntry> =
+		if (asyncSent == null) emptyList()
+		else enter("\"kind\":\"tasks\",\"screen\":$screen,\"tasks\":[],\"leave\":true").filter { it is JournalEntry.Abort }
+
 	/** The host's answer to a `fetch` entry: `{ status, statusText, headers, body }`, or `{ error }` for a network failure. */
 	fun response(id: Int, response: JsValue): List<JournalEntry> =
 		change(null, null) { enter("\"kind\":\"response\",\"request\":$id,\"response\":${jsonValue(response)}") }
 
-	fun armOf(branch: Node.Branch): Int? {
-		val tests = branch.tests ?: return if (Js.truthy(evaluate(branch.test!!))) 0 else if (branch.arms > 1) 1 else null
-		for ((i, t) in tests.withIndex()) if (t != null && Js.truthy(evaluate(t))) return i
+	fun armOf(branch: Node.Branch, scope: Scope = Scope.EMPTY): Int? {
+		val tests = branch.tests ?: return if (Js.truthy(evaluate(branch.test!!, scope))) 0 else if (branch.arms > 1) 1 else null
+		for ((i, t) in tests.withIndex()) if (t != null && Js.truthy(evaluate(t, scope))) return i
 		return tests.indexOfFirst { it == null }.takeIf { it >= 0 }
 	}
 
-	fun isShown(node: Node): Boolean {
+	/** Whether [node] shows where [scope] is: in a list row, the arms around it are that row's. */
+	fun shownIn(node: Node, scope: Scope): Boolean {
 		val a = node.arm ?: return true
 		val b = byId[a.branch] as? Node.Branch ?: return false
-		return isShown(b) && armOf(b) == a.index
+		return shownIn(b, scope) && armOf(b, scope) == a.index
 	}
+
+	/** Whether any instance of [node] shows. */
+	fun isShown(node: Node): Boolean = instances(node).isNotEmpty()
 
 	fun rowsOf(repeat: Node.Repeat): List<Row> {
 		val list = evaluate(repeat.list) as? JsValue.Arr ?: throw MarklessRuntimeError("${repeat.id} lists a value that is not an array")
@@ -419,11 +504,10 @@ class Runtime(
 
 	/** Every shown instance of [node]: one outside lists, one per row inside one. */
 	fun instances(node: Node): List<Instance> {
-		if (!isShown(node)) return emptyList()
-		val r = node.row ?: return listOf(Instance(node.id, node, Scope.EMPTY))
+		val r = node.row ?: return if (shownIn(node, Scope.EMPTY)) listOf(Instance(node.id, node, Scope.EMPTY)) else emptyList()
 		val repeat = byId[r] as? Node.Repeat ?: return emptyList()
-		if (!isShown(repeat)) return emptyList()
-		return rowsOf(repeat).map { Instance("${node.id}@${it.key}", node, Scope(items = mapOf(repeat.id to it.item), keys = mapOf(repeat.id to it.key)), it.key) }
+		if (!shownIn(repeat, Scope.EMPTY)) return emptyList()
+		return rowsOf(repeat).map { Instance("${node.id}@${it.key}", node, Scope(items = mapOf(repeat.id to it.item), keys = mapOf(repeat.id to it.key)), it.key) }.filter { shownIn(node, it.scope) }
 	}
 
 	fun text(t: Node.Text, scope: Scope): String = text(t.parts, scope)
@@ -509,6 +593,103 @@ class Runtime(
 	/** Every shown checkbox's and radio button's checkedness. */
 	fun checks(): List<Pair<String, Boolean>> = ticked.filter(::isShown).map { it.id to checkedOf(it.id) }
 
+	private class OptionInstance(val id: String, val node: Node.Element, val scope: Scope)
+
+	/** Every `<select>`, in payload order. */
+	private val selects = payload.nodes.filterIsInstance<Node.Element>().filter { it.element == "select" }
+
+	/** An attribute of one instance as the web has it now: a binding's value in its row, else the attribute as built. */
+	private fun attributeIn(node: Node.Element, name: String, scope: Scope): String? {
+		val binding = node.bindings.firstOrNull { !it.property && it.name == name }
+		return if (binding != null) attribute(binding, scope) else node.attributes[name]
+	}
+
+	/** A select's shown options in tree order: a list's rows where the list stands, each row's options in order. */
+	private fun optionsOf(select: String): List<OptionInstance> {
+		val children = payload.nodes.filterIsInstance<Node.Element>().filter { it.element == "option" && it.parent == select }
+		val listed = HashSet<String>()
+		val found = ArrayList<OptionInstance>()
+		for (node in children) {
+			val row = node.row
+			if (row == null) {
+				instances(node).mapTo(found) { OptionInstance(it.id, node, it.scope) }
+				continue
+			}
+			if (!listed.add(row)) continue
+			val repeat = byId[row] as? Node.Repeat ?: continue
+			if (!isShown(repeat)) continue
+			val siblings = children.filter { it.row == row }
+			val shown = HashMap<String, OptionInstance>()
+			for (child in siblings) for (inst in instances(child)) shown[inst.id] = OptionInstance(inst.id, child, inst.scope)
+			for (r in rowsOf(repeat)) for (child in siblings) shown["${child.id}@${r.key}"]?.let(found::add)
+		}
+		return found
+	}
+
+	/** An option's text: its text with ASCII whitespace stripped and collapsed, as `option.text` gives it. */
+	private fun optionText(option: OptionInstance): String =
+		payload.nodes.filterIsInstance<Node.Text>().filter { it.parent == option.node.id }.joinToString("") { text(it, option.scope) }
+			.split('\t', '\n', '\u000C', '\r', ' ').filter { it.isNotEmpty() }.joinToString(" ")
+
+	private fun optionValue(option: OptionInstance): String = attributeIn(option.node, "value", option.scope) ?: optionText(option)
+
+	private fun selectedBinding(option: OptionInstance): Boolean? =
+		option.node.bindings.firstOrNull { it.property && it.name == "selected" }?.let { Js.truthy(evaluate(it.value, option.scope)) }
+
+	/** Each shown option's selectedness, kept as the web keeps it (HTML's selectedness setting algorithm). */
+	private val selectedness = HashMap<String, Boolean>()
+	/** What each option's `selected` binding last wrote: a binding sets the selectedness only when its value changes. */
+	private val selectedBound = HashMap<String, Boolean?>()
+	/** The option a person chose in the action being dispatched. */
+	private var chosenNow: String? = null
+
+	/** Brings each select's options up to date: rows that came or left, `selected` bindings that changed, then the rule. */
+	private fun settleSelects(chosen: String? = null) {
+		for (select in selects) {
+			val options = optionsOf(select.id)
+			val ids = options.mapTo(HashSet()) { it.id }
+			for (id in selectedBound.keys.filter { byId[it.substringBefore('@')]?.parent == select.id && it !in ids }) {
+				selectedBound.remove(id)
+				selectedness.remove(id)
+			}
+			fun choose(id: String) { for (o in options) selectedness[o.id] = o.id == id }
+			for (option in options) {
+				if (!selectedBound.containsKey(option.id)) {
+					val first = selectedBinding(option)
+					selectedBound[option.id] = first
+					val selected = first ?: (attributeIn(option.node, "selected", option.scope) != null)
+					selectedness[option.id] = selected
+					if (selected) choose(option.id)
+					continue
+				}
+				val bound = selectedBinding(option)
+				if (bound != null && bound != selectedBound[option.id]) {
+					selectedBound[option.id] = bound
+					selectedness[option.id] = bound
+					if (bound) choose(option.id)
+				}
+			}
+			if (chosen != null && chosen in ids) choose(chosen)
+			if (options.none { selectedness[it.id] == true })
+				options.firstOrNull { attributeIn(it.node, "disabled", it.scope) == null }?.let { selectedness[it.id] = true }
+		}
+	}
+
+	init {
+		settleSelects()
+	}
+
+	/** Each shown option of each `<select>`, in tree order, and whether it is selected. */
+	fun selections(): List<Pair<String, Boolean>> = selects.flatMap { s -> optionsOf(s.id).map { it.id to (selectedness[it.id] ?: false) } }
+
+	/** One option as a select's list shows it: its instance id, its label, whether it cannot be chosen, whether it is chosen. */
+	data class Choice(val option: String, val label: String, val disabled: Boolean, val selected: Boolean)
+
+	/** What [select]'s list shows: each shown option in tree order; a label is its `label` attribute when not empty, else its text. */
+	fun choices(select: String): List<Choice> = optionsOf(select).map { o ->
+		Choice(o.id, attributeIn(o.node, "label", o.scope)?.takeIf { it.isNotEmpty() } ?: optionText(o), attributeIn(o.node, "disabled", o.scope) != null, selectedness[o.id] ?: false)
+	}
+
 	private fun formOf(id: String): String? = payload.forms.firstOrNull { f -> f.fields.any { it.node == id } }?.node
 
 	/** The radio buttons of [id]'s group: the same `name`, in the same form or in none. */
@@ -519,6 +700,7 @@ class Runtime(
 	}
 
 	private val missing: ValueMissing? = payload.valueMissing[nativeLocale(preferredLanguages, payload.valueMissing.keys)]
+	private val tooLong: TooLong? = payload.tooLong[nativeLocale(preferredLanguages, payload.tooLong.keys)]
 
 	private fun entriesOf(id: String): JsValue {
 		val form = forms[id] ?: throw MarklessRuntimeError("\"$id\" is not a form")
@@ -530,6 +712,7 @@ class Runtime(
 				FieldKind.Checkbox, FieldKind.Radio -> if (checkedOf(node)) attributeNow(node, "value") ?: "on" else continue
 				FieldKind.Hidden -> attributeNow(node, "value") ?: ""
 				FieldKind.Text -> textOf(node)
+				FieldKind.Select -> optionsOf(node).firstOrNull { selectedness[it.id] == true }?.let(::optionValue) ?: continue
 			}
 			out.add(JsValue.Arr(mutableListOf(JsValue.Str(name), JsValue.Str(value))))
 		}
@@ -537,18 +720,33 @@ class Runtime(
 	}
 
 	/** The first field that stops a submit, or null when none does. */
-	private fun firstInvalid(form: Form, submitter: String?): Field? {
+	private fun firstInvalid(form: Form, submitter: String?): Pair<String, String>? {
 		if (form.noValidate || (submitter != null && attributeNow(submitter, "formnovalidate") != null)) return null
-		return form.fields.firstOrNull { (node, kind) ->
-			if (kind == FieldKind.Hidden || !isShown(elementOf(node)) || attributeNow(node, "disabled") != null) return@firstOrNull false
-			// A radio button is missing its value when any button of its group is required and none is checked.
-			val required = if (kind == FieldKind.Radio) groupOf(node).any { attributeNow(it.id, "required") != null } else attributeNow(node, "required") != null
-			required && when (kind) {
-				FieldKind.Radio -> groupOf(node).none { checkedOf(it.id) }
-				FieldKind.Text -> textOf(node) == ""
-				else -> !checkedOf(node)
-			}
+		for (field in form.fields) invalidity(field)?.let { return field.node to it }
+		return null
+	}
+
+	/** Why a field stops a submit, as the web says it, or null when it does not. */
+	private fun invalidity(field: Field): String? {
+		val (node, kind) = field
+		if (kind == FieldKind.Hidden || kind == FieldKind.Select || !isShown(elementOf(node)) || attributeNow(node, "disabled") != null) return null
+		// A radio button is missing its value when any button of its group is required and none is checked.
+		val required = if (kind == FieldKind.Radio) groupOf(node).any { attributeNow(it.id, "required") != null } else attributeNow(node, "required") != null
+		val absent = required && when (kind) {
+			FieldKind.Radio -> groupOf(node).none { checkedOf(it.id) }
+			FieldKind.Text -> textOf(node) == ""
+			else -> !checkedOf(node)
 		}
+		if (absent) {
+			val messages = missing ?: throw MarklessRuntimeError("the payload has no message for a ${kind.wire} missing its value")
+			return when (kind) { FieldKind.Radio -> messages.radio; FieldKind.Checkbox -> messages.checkbox; else -> messages.text }
+		}
+		// Only text a person typed is too long: a value the app set is kept whole and passes.
+		if (kind != FieldKind.Text) return null
+		val max = nativeMaxLength(attributeNow(node, "maxlength")) ?: return null
+		val typed = edited[node] ?: return null
+		if (typed.length <= max) return null
+		return (tooLong ?: throw MarklessRuntimeError("the payload has no message for a field longer than its maxlength")).message(max, typed.length)
 	}
 
 	/** `aria-busy` on a form while a submission of it runs, `aria-disabled` on the button that sent a marking one. */
@@ -564,7 +762,7 @@ class Runtime(
 	}
 
 	/** Every shown branch's chosen arm. */
-	fun arms(): List<Pair<String, Int?>> = payload.nodes.filterIsInstance<Node.Branch>().filter { isShown(it) }.map { it.id to armOf(it) }
+	fun arms(): List<Pair<String, Int?>> = payload.nodes.filterIsInstance<Node.Branch>().flatMap { b -> instances(b).map { it.id to armOf(b, it.scope) } }
 
 	/** Every shown list's row keys, in order. */
 	fun rows(): List<Pair<String, List<String>>> = payload.nodes.filterIsInstance<Node.Repeat>().filter { isShown(it) }.map { r -> r.id to rowsOf(r).map { it.key } }
@@ -641,6 +839,16 @@ class Runtime(
 	 * `pointerdown` lands outside it.
 	 */
 	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, point: TouchPoint? = null): List<JournalEntry> {
+		if (event == EventName.Choose) {
+			val option = byId[host.substringBefore('@')] as? Node.Element
+			val select = option?.parent
+			if (option?.element != "option" || select == null) throw MarklessRuntimeError("\"$host\" is not an option of a select")
+			val instance = optionsOf(select).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")
+			return change(null, null) {
+				if (attributeNow(select, "disabled") == null && attributeIn(option, "disabled", instance.scope) == null) chosenNow = host
+				emptyList()
+			}
+		}
 		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
 		if (point != null && !event.touch) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
@@ -899,6 +1107,15 @@ class Runtime(
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"event\":$event$catch"))
 			}
+			is Op.Reset -> {
+				op.catch?.let { values[it] = JsValue.Null }
+				for (cell in op.cells) {
+					val shown = read(cell, scope) as? JsValue.Obj ?: continue
+					val state = shown.fields["state"]
+					val error = shown.fields["error"]
+					if (state == JsValue.Str("error") || (state == JsValue.Str("value") && error != null && error != JsValue.Null)) retry.add(slot(cell, scope))
+				}
+			}
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)
 				values[slot(op.cell, scope)] = v
@@ -950,6 +1167,7 @@ class Runtime(
 		val beforeAttributes = boundAttributes().associate { (n, a, v) -> (n to a) to v }
 		val beforeMarks = marks()
 		val checkedBefore = HashMap(checkedness)
+		val selectedBefore = HashMap(selectedness)
 		val bindingsBefore = ticked.associate { it.id to checkedBinding(it.id) }
 		val beforeProperties = properties().associate { (n, a, v) -> (n to a) to v }.toMutableMap()
 		// The edited field already shows what was typed, so its own value counts as written.
@@ -968,6 +1186,7 @@ class Runtime(
 		val calls = apply()
 		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
 		follow(cellsBefore)
+		val synced = calls + syncAsync()
 		val shownNow = shownOverlays()
 		val released = stackBefore.filter { it !in shownNow }
 		val enlisted = shownNow.filter { it !in stackBefore }
@@ -994,7 +1213,7 @@ class Runtime(
 				if (b != null && a != null && b != a) journal.add(JournalEntry.Rows(node.id, a))
 			}
 			is Node.Sheet -> afterSheets.getValue(node.id).let { if (beforeSheets[node.id] != it) journal.add(JournalEntry.Sheet(node.id, it)) }
-			is Node.Branch -> if (node.id in beforeArms && node.id in afterArms && beforeArms[node.id] != afterArms[node.id]) journal.add(JournalEntry.Arm(node.id, afterArms[node.id]))
+			is Node.Branch -> for (inst in instances(node)) if (inst.id in beforeArms && inst.id in afterArms && beforeArms[inst.id] != afterArms[inst.id]) journal.add(JournalEntry.Arm(inst.id, afterArms[inst.id]))
 			is Node.Text -> for (inst in instances(node)) {
 				val b = beforeTexts[inst.id]; val a = afterTexts[inst.id]
 				if (b != null && a != null && a != b) journal.add(JournalEntry.Text(inst.id, a))
@@ -1012,6 +1231,10 @@ class Runtime(
 		// A `checked` binding whose value changed sets the checkedness, as the web's property write does.
 		for (n in ticked) checkedBinding(n.id)?.let { if (it != bindingsBefore[n.id]) checkedness[n.id] = it }
 		for (n in ticked) if (isShown(n) && checkedBefore[n.id] != checkedness[n.id]) journal.add(JournalEntry.Check(n.id, checkedness.getValue(n.id)))
+		settleSelects(chosenNow)
+		chosenNow = null
+		// An option a new row builds starts unselected on the host, so only a selected one is sent.
+		for ((id, selected) in selections()) if ((selectedBefore[id] ?: false) != selected) journal.add(JournalEntry.Selected(id, selected))
 		for ((key, v) in marks()) if (beforeMarks[key] != v) journal.add(JournalEntry.Attribute(key.first, key.second, v))
 		// A field whose binding wrote it shows that value now, not what was typed before.
 		for (entry in journal) if (entry is JournalEntry.Property) edited.remove(entry.node)
@@ -1021,7 +1244,7 @@ class Runtime(
 		for (o in payload.objects) if (o.id in ownedBefore && o.id !in owned) journal.add(JournalEntry.Release(o.id))
 		for (o in released) journal.add(JournalEntry.Overlay(o, open = false, modal = isModal(o)))
 		for (o in enlisted) journal.add(JournalEntry.Overlay(o, open = true, modal = isModal(o)))
-		journal.addAll(calls)
+		journal.addAll(synced)
 		return journal
 	}
 
@@ -1029,9 +1252,8 @@ class Runtime(
 	private fun submit(op: Op.Submit, scope: Scope, calls: MutableList<JournalEntry>): List<JournalEntry> {
 		val form = forms[op.form] ?: throw MarklessRuntimeError("\"${op.form}\" is not a form")
 		if (op.submitter != null && attributeNow(op.submitter, "disabled") != null) return emptyList()
-		firstInvalid(form, op.submitter)?.let { field ->
-			val messages = missing ?: throw MarklessRuntimeError("the payload has no message for a ${field.kind.wire} missing its value")
-			calls.add(JournalEntry.Invalid(field.node, when (field.kind) { FieldKind.Radio -> messages.radio; FieldKind.Checkbox -> messages.checkbox; else -> messages.text }))
+		firstInvalid(form, op.submitter)?.let { (node, message) ->
+			calls.add(JournalEntry.Invalid(node, message))
 			return emptyList()
 		}
 		val sent = jsonValue(entriesOf(op.form))

@@ -1,7 +1,7 @@
 // A record that CI's fast jobs passed on one exact tree (git's own tree hash), so the commit hook does not rerun them on that tree.
 
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -16,7 +16,12 @@ export function workingTree(root) {
 	const index = join(scratch, 'index');
 	try {
 		const realIndex = resolve(root, git(root, ['rev-parse', '--git-path', 'index']));
-		if (existsSync(realIndex)) copyFileSync(realIndex, index);
+		if (existsSync(realIndex)) {
+			copyFileSync(realIndex, index);
+			// git re-hashes a file whose mtime is not older than the index's; a fresh copy's mtime hid same-second edits.
+			const { atime, mtime } = statSync(realIndex);
+			utimesSync(index, atime, mtime);
+		}
 		const env = { ...process.env, GIT_INDEX_FILE: index };
 		git(root, ['add', '-A'], env);
 		return git(root, ['write-tree'], env);

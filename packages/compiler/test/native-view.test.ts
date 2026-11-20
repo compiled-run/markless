@@ -349,6 +349,39 @@ export function Page() @{
 		]);
 	});
 
+	it("reads an input event's target as the field typed into, whose value is the typed text, only in that handler", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function textOf(from: EventTarget | null): string {
+	const control = from as HTMLInputElement | null;
+	if (!control) return '';
+	return control.value;
+}
+export function Page() @{
+	let said = state('');
+	<main>
+		<input aria-label="Name" onInput={(event) => (said = textOf(event.target))} />
+		<p>{said}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers).toEqual([
+			{ id: 'handler:event:0', ops: [{ op: 'assign', cell: 'state:said', value: { event: 'value' } }] },
+		]);
+		const elsewhere = await nativeView(`import { state } from '@markless/core';
+function textOf(from: EventTarget | null): string {
+	const control = from as HTMLInputElement | null;
+	return control ? control.value : '';
+}
+export function Page() @{
+	let said = state('');
+	<main>
+		<button onClick={(event) => (said = textOf(event.target))}>Read</button>
+		<p>{said}</p>
+	</main>
+}`);
+		expect(elsewhere.payload).toBeNull();
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{
@@ -1345,16 +1378,16 @@ export function Tags() @{
 		]);
 	});
 
-	it('refuses a @for keyed by its index by name', async () => {
+	it('refuses a @for keyed by its index by name, and not again as markup it left out', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Words() @{
 	let words = state(['a', 'b']);
 	<ul>@for (const word of words; index at; key at) { <li>{word}</li> }</ul>
 }`);
 		expect(payload).toBeNull();
-		expect(diagnostics.map((d) => d.message)).toContain(
+		expect(diagnostics.map((d) => d.message)).toEqual([
 			'a @for keyed by its index; a native list keys each row by its item',
-		);
+		]);
 	});
 
 	it('lowers a form: its fields and submit buttons, a press that submits after its own click, and the return key', async () => {
@@ -1486,6 +1519,38 @@ export function Forms() @{
 			'the <button> h10 in the <form> h6 is a reset button, which a native build has no lowering for yet',
 			'the <button> h11 in the <form> h6 has `formaction`, which says where the web sends the form; a phone app has no server to send it to',
 		]);
+	});
+
+	it("keeps a text field's maxlength, written or bound, and carries Chromium's too-long messages only for a form that has one", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Codes() @{
+	let limit = state(4);
+	let sent = state('');
+	<main>
+		<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget).get('pin')); }}>
+			<input name="name" maxlength="20" />
+			<input name="pin" maxlength={limit} />
+			<button>Send</button>
+		</form>
+		<p>{sent}</p>
+	</main>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(payload!.nodes.find((node) => node.id === 'h2')).toMatchObject({
+			attributes: { name: 'name', maxlength: '20' },
+		});
+		expect(payload!.tooLong?.['en']).toEqual({
+			text: 'Please shorten this text to {max} characters or less (you are currently using {length} characters).',
+		});
+		expect(payload!.tooLong?.['fa']?.digits).toBe('۰۱۲۳۴۵۶۷۸۹');
+		const plain = await nativeView(`export function Plain() @{
+	<form onSubmit={(event) => event.preventDefault()}>
+		<input name="name" />
+		<button>Send</button>
+	</form>
+}`);
+		expect(plain.payload!.valueMissing).toBeDefined();
+		expect(plain.payload!.tooLong).toBeUndefined();
 	});
 
 	it('lowers an await of a timer promise to an after op that captures what the rest reads, with try, catch and finally', async () => {
@@ -1939,6 +2004,25 @@ export function Page() @{
 }`);
 		expect(plain.payload!.script).toBeUndefined();
 	});
+
+	it('passes a component a prop that calls app code through the script', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function total(text: string): number {
+	return (JSON.parse(text) as number[]).reduce((sum, n) => sum + n, 0);
+}
+function Badge({ count }: { count: number }) @{
+	<span>{count}</span>
+}
+export function Page() @{
+	let cart = state('[1,2]');
+	<Badge count={total(cart)} />
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.nodes.find((node) => node.kind === 'text')).toMatchObject({
+			parts: [{ expr: { script: expect.any(String), bindings: { cart: { cell: 'state:cart' } } } }],
+		});
+		expect(payload!.script!.source).toContain('function total(text)');
+	});
 });
 
 describe('overlays', () => {
@@ -2093,6 +2177,69 @@ export function Tip() @{
 }`);
 		expect(diagnostics.map((d) => d.message)).toEqual([
 			'an `overlay-hint` surface (a tooltip or hovercard), which phones do not show yet',
+		]);
+	});
+});
+
+describe('selects', () => {
+	const page = (markup: string) => `import { state } from '@markless/core';
+export function Page() @{
+	let size = state('M');
+	let sent = state('');
+${markup}
+}`;
+
+	it('lowers a select of listed options, their `selected` binding, and its place in a form', async () => {
+		const { payload, diagnostics } = await nativeView(
+			page(`	<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget).get('size')); }}>
+		<select name="size" aria-label="Size">
+			@for (const option of ['S', 'M']; key option) {
+				<option value={option} selected={option === size}>{option}</option>
+			}
+		</select>
+		<button>Send</button>
+		<p>{sent}</p>
+	</form>`),
+		);
+		expect(diagnostics).toEqual([]);
+		const option = payload!.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'option',
+		);
+		expect(option).toMatchObject({
+			parent: payload!.nodes.find((node) => node.kind === 'element' && node.element === 'select')!.id,
+			bindings: [
+				{ attribute: 'value', value: { item: 'repeat:0' } },
+				{
+					property: 'selected',
+					value: { binary: '===', left: { item: 'repeat:0' }, right: { cell: 'state:size' } },
+				},
+			],
+		});
+		expect(payload!.forms![0]!.fields).toEqual([{ node: 'h1', kind: 'select' }]);
+	});
+
+	it('refuses by name what a native select does not draw or run yet', async () => {
+		const { payload, diagnostics } = await nativeView(
+			page(`	<main>
+		<select multiple onChange={() => (sent = 'x')}><option>A</option></select>
+		<select value={size}><option>B</option><hr /></select>
+		<select><option><b>C</b></option></select>
+		<option>Loose</option>
+		<form onSubmit={(event) => { event.preventDefault(); sent = 'y'; }}>
+			<select name="r" required><option>D</option></select>
+			<button>Send</button>
+		</form>
+	</main>`),
+		);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'the change handler on the <select> h1, which a native build does not run yet',
+			'the <select> h1 has `multiple`, a list box a native build does not draw yet',
+			'the <select> h3 binds `value`; a native build chooses an option through its `selected`',
+			'the <hr> h5 sits inside a <select>, which a native build shows only <option>s of',
+			'the <b> h8 sits inside an <option>, which a native build shows only text of',
+			'the <option> h9 is not inside a <select>, which a native build does not show yet',
+			'the <select> h11 in the <form> h10 has `required`, which the web checks before a submit and no native host checks yet',
 		]);
 	});
 });

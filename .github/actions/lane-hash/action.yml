@@ -1,0 +1,284 @@
+name: Lane content hash
+description: >-
+    A lane's content-hash key and, with `probe`, whether that key already carries a green marker. Each lane runs
+    this first instead of waiting for a `lanes` job, so a run waits for runners one time fewer. Run it straight
+    after checkout, before any install, so the globs see no node_modules or dist.
+
+inputs:
+    lane:
+        description: The lane's job name in ci.yml.
+        required: true
+    probe:
+        description: "'true' to look the key up and decide whether the lane runs; 'false' for the key alone."
+        required: false
+        default: 'true'
+
+outputs:
+    key:
+        description: The lane's marker key.
+        value: ${{ steps.decide.outputs.key }}
+    run:
+        description: "'true' unless the key already carries a green marker or the merge queue tested this commit."
+        value: ${{ steps.decide.outputs.run }}
+    queue_run:
+        description: The green merge-queue run of this commit, on a push to main.
+        value: ${{ steps.queue.outputs.run }}
+    playwright_version:
+        description: The pinned playwright-core version, which names the browser caches.
+        value: ${{ steps.playwright.outputs.version }}
+    image_os:
+        description: The runner image, which names the browser caches.
+        value: ${{ steps.playwright.outputs.image }}
+
+runs:
+    using: composite
+    steps:
+        # The merge queue lands the exact commit it tested, so a green merge_group run for this sha already ran every lane.
+        - name: Find the merge queue's run of this commit
+          id: queue
+          if: github.event_name == 'push'
+          shell: bash
+          env:
+              GH_TOKEN: ${{ github.token }}
+          run: |
+              run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${GITHUB_SHA}&event=merge_group&status=success&per_page=1" \
+                --jq '.workflow_runs[0].id // empty' || true)
+              if [ -n "$run" ]; then
+                echo "tested=true" >> "$GITHUB_OUTPUT"
+                echo "run=$run" >> "$GITHUB_OUTPUT"
+                echo "already tested by run $run"
+              fi
+
+        - name: Name the Playwright caches
+          id: playwright
+          shell: bash
+          run: |
+              version=$(grep -oE '^  playwright-core@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2 | sort -u | paste -sd+ -)
+              if [ -z "$version" ]; then echo 'pnpm-lock.yaml names no playwright-core version'; exit 1; fi
+              echo "version=$version" >> "$GITHUB_OUTPUT"
+              echo "image=${ImageOS:-${{ runner.os }}}" >> "$GITHUB_OUTPUT"
+
+        # Inputs every lane shares. `.github/**` and `scripts/ci/**` stay out, so CI-only edits do not invalidate every
+        # lane; the per-package manifests are in, because a changed `exports` map changes what every lane imports.
+        - name: Record the shared input hash
+          shell: bash
+          run: >-
+              echo 'markless-base-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.json',
+              'vite.config.ts', 'packages/*/package.json', 'packages/*/*/package.json', 'packages/*/tsconfig*.json',
+              'packages/*/src/**/*', 'scripts/**/*', '!scripts/ci/**') }}' > ci-base-key.txt
+
+
+        # The node project is `packages/*/test/**/*.test.ts` plus `scripts/**/*.test.ts`, and those files read more than their own
+        # directory: fixtures, CLI templates and `demos/**` sources, and `scripts/benchmarks/ci-workflow.test.ts` asserts on ci.yml.
+        # Leave an input out and editing it skips the lane that would have caught the break.
+        - name: Hash the unit lane
+          id: unit
+          if: inputs.lane == 'unit'
+          shell: bash
+          env:
+              MARKER_PATHS: |
+                  unit-completed.txt
+              KEY: >-
+                  unit-${{ hashFiles('ci-base-key.txt', 'packages/*/test/**/*', 'packages/*/test-support/**/*',
+                  'packages/*/fixtures/**/*', 'packages/cli/templates/**/*', 'demos/**/*',
+                  '.github/workflows/ci.yml', 'scripts/ci/**/*', '!**/node_modules/**', '!**/dist/**',
+                  '!**/.witness/**') }}
+          run: |
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              { echo "paths<<MARKER_PATHS"; printf '%s' "$MARKER_PATHS"; echo MARKER_PATHS; } >> "$GITHUB_OUTPUT"
+
+        - name: Hash the browser lane
+          id: browser
+          if: inputs.lane == 'browser'
+          shell: bash
+          env:
+              MARKER_PATHS: |
+                  browser-completed.txt
+              KEY: >-
+                  browser-${{ hashFiles('ci-base-key.txt', 'packages/vitest-browser/**/*', 'packages/headless/**/*',
+                  'packages/*/fixtures/**/*', 'packages/*/test-support/**/*', '!**/node_modules/**',
+                  '!**/dist/**') }}
+          run: |
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              { echo "paths<<MARKER_PATHS"; printf '%s' "$MARKER_PATHS"; echo MARKER_PATHS; } >> "$GITHUB_OUTPUT"
+
+        - name: Hash the completion-matrix lane
+          id: completion_matrix
+          if: inputs.lane == 'completion-matrix'
+          shell: bash
+          env:
+              MARKER_PATHS: |
+                  completion-matrix-completed.txt
+              KEY: completion-matrix-${{ hashFiles('ci-base-key.txt', 'packages/typescript-plugin/**/*', '!**/node_modules/**', '!**/dist/**') }}
+          run: |
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              { echo "paths<<MARKER_PATHS"; printf '%s' "$MARKER_PATHS"; echo MARKER_PATHS; } >> "$GITHUB_OUTPUT"
+
+        - name: Hash the boxes-bundler lane
+          id: boxes_bundler
+          if: inputs.lane == 'boxes-bundler'
+          shell: bash
+          env:
+              MARKER_PATHS: |
+                  boxes-bundler-completed.txt
+                  packages/bundler/.witness/receipts
+              KEY: >-
+                  boxes-bundler-${{ hashFiles('ci-base-key.txt', 'packages/bundler/**/*', '!**/node_modules/**', '!**/dist/**',
+                  '!**/.witness/**') }}
+          run: |
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              { echo "paths<<MARKER_PATHS"; printf '%s' "$MARKER_PATHS"; echo MARKER_PATHS; } >> "$GITHUB_OUTPUT"
+
+        - name: Hash the boxes-router lane
+          id: boxes_router
+          if: inputs.lane == 'boxes-router'
+          shell: bash
+          env:
+              MARKER_PATHS: |
+                  boxes-router-completed.txt
+                  packages/router/.witness/receipts
+              KEY: >-
+                  boxes-router-${{ hashFiles('ci-base-key.txt', 'packages/router/**/*', '!**/node_modules/**', '!**/dist/**',
+                  '!**/.witness/**') }}
+          run: |
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              { echo "paths<<MARKER_PATHS"; printf '%s' "$MARKER_PATHS"; echo MARKER_PATHS; } >> "$GITHUB_OUTPUT"
+
+        - name: Hash the boxes-music-player lane
+          id: boxes_music_player
+          if: inputs.lane == 'boxes-music-player'
+          shell: bash
+          env:
+              MARKER_PATHS: |
+                  boxes-music-player-completed.txt
+                  demos/music-player/.witness/receipts
+              KEY: >-
+                  boxes-music-player-${{ hashFiles('ci-base-key.txt', 'demos/music-player/**/*', '!**/node_modules/**', '!**/dist/**',
+                  '!**/.witness/**') }}
+          run: |
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              { echo "paths<<MARKER_PATHS"; printf '%s' "$MARKER_PATHS"; echo MARKER_PATHS; } >> "$GITHUB_OUTPUT"
+
+        - name: Hash the boxes-music-player-ssr lane
+          id: boxes_music_player_ssr
+          if: inputs.lane == 'boxes-music-player-ssr'
+          shell: bash
+          env:
+              MARKER_PATHS: |
+                  boxes-music-player-ssr-completed.txt
+                  demos/music-player-ssr/.witness/receipts
+              KEY: >-
+                  boxes-music-player-ssr-${{ hashFiles('ci-base-key.txt', 'demos/music-player-ssr/**/*', '!**/node_modules/**', '!**/dist/**',
+                  '!**/.witness/**') }}
+          run: |
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              { echo "paths<<MARKER_PATHS"; printf '%s' "$MARKER_PATHS"; echo MARKER_PATHS; } >> "$GITHUB_OUTPUT"
+
+        - name: Hash the website-boxes lane
+          id: website_boxes
+          if: inputs.lane == 'website-boxes'
+          shell: bash
+          env:
+              MARKER_PATHS: |
+                  website-boxes-completed.txt
+              KEY: >-
+                  website-boxes-${{ hashFiles('ci-base-key.txt', 'website/**/*', 'packages/headless/components/api/**/*',
+                  '!**/node_modules/**', '!**/dist/**', '!**/.witness/**', '!**/.output/**') }}
+          run: |
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              { echo "paths<<MARKER_PATHS"; printf '%s' "$MARKER_PATHS"; echo MARKER_PATHS; } >> "$GITHUB_OUTPUT"
+
+        # The guards build the benchmark app, the docs site and the bundler and router fixtures; their code is in scripts/, under the base key.
+        - name: Hash the perf-guards lane
+          id: perf_guards
+          if: inputs.lane == 'perf-guards'
+          shell: bash
+          env:
+              MARKER_PATHS: |
+                  perf-guards-completed.txt
+              KEY: >-
+                  perf-guards-${{ hashFiles('ci-base-key.txt', 'website/**/*', 'demos/**/*', 'packages/headless/**/*',
+                  'packages/*/fixtures/**/*', 'packages/*/test/fixtures/**/*',
+                  'packages/bundler/test/perf-guards/**/*', '!**/node_modules/**', '!**/dist/**',
+                  '!**/.witness/**', '!**/.output/**') }}
+          run: |
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              { echo "paths<<MARKER_PATHS"; printf '%s' "$MARKER_PATHS"; echo MARKER_PATHS; } >> "$GITHUB_OUTPUT"
+
+        - name: Hash the demo-boxes lane
+          id: demo_boxes
+          if: inputs.lane == 'demo-boxes'
+          shell: bash
+          env:
+              MARKER_PATHS: |
+                  demo-boxes-completed.txt
+              KEY: >-
+                  demo-boxes-${{ hashFiles('ci-base-key.txt', 'demos/live-feed/**/*', 'demos/same-module-branch/**/*',
+                  'demos/executed-at-load/**/*', '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
+          run: |
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              { echo "paths<<MARKER_PATHS"; printf '%s' "$MARKER_PATHS"; echo MARKER_PATHS; } >> "$GITHUB_OUTPUT"
+
+        # The generated app is built through packages/*/src, which the base key already covers.
+        - name: Hash the build-scale lane
+          id: build_scale
+          if: inputs.lane == 'build-scale'
+          shell: bash
+          env:
+              MARKER_PATHS: |
+                  build-scale-completed.txt
+              KEY: build-scale-${{ hashFiles('ci-base-key.txt') }}
+          run: |
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              { echo "paths<<MARKER_PATHS"; printf '%s' "$MARKER_PATHS"; echo MARKER_PATHS; } >> "$GITHUB_OUTPUT"
+
+        # The guard script lives in scripts/ci/, which the base key leaves out.
+        - name: Hash the build-warnings lane
+          id: build_warnings
+          if: inputs.lane == 'build-warnings'
+          shell: bash
+          env:
+              MARKER_PATHS: |
+                  build-warnings-completed.txt
+              KEY: >-
+                  build-warnings-${{ hashFiles('ci-base-key.txt', 'website/**/*', 'demos/**/*', 'packages/headless/**/*',
+                  'scripts/ci/build-warnings.mjs', 'scripts/ci/browser-output-scan.mjs', '!**/node_modules/**',
+                  '!**/dist/**', '!**/.witness/**', '!**/.output/**') }}
+          run: |
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              { echo "paths<<MARKER_PATHS"; printf '%s' "$MARKER_PATHS"; echo MARKER_PATHS; } >> "$GITHUB_OUTPUT"
+
+        - name: Name the lane key
+          id: key
+          shell: bash
+          env:
+              KEY: ${{ steps.unit.outputs.key }}${{ steps.browser.outputs.key }}${{ steps.completion_matrix.outputs.key }}${{ steps.boxes_bundler.outputs.key }}${{ steps.boxes_router.outputs.key }}${{ steps.boxes_music_player.outputs.key }}${{ steps.boxes_music_player_ssr.outputs.key }}${{ steps.website_boxes.outputs.key }}${{ steps.perf_guards.outputs.key }}${{ steps.demo_boxes.outputs.key }}${{ steps.build_scale.outputs.key }}${{ steps.build_warnings.outputs.key }}
+              PATHS: ${{ steps.unit.outputs.paths }}${{ steps.browser.outputs.paths }}${{ steps.completion_matrix.outputs.paths }}${{ steps.boxes_bundler.outputs.paths }}${{ steps.boxes_router.outputs.paths }}${{ steps.boxes_music_player.outputs.paths }}${{ steps.boxes_music_player_ssr.outputs.paths }}${{ steps.website_boxes.outputs.paths }}${{ steps.perf_guards.outputs.paths }}${{ steps.demo_boxes.outputs.paths }}${{ steps.build_scale.outputs.paths }}${{ steps.build_warnings.outputs.paths }}
+          run: |
+              # The `lanes` job hashes the receipts key on top of the shared one; a lane deletes it before installing.
+              if [ '${{ inputs.probe }}' = true ]; then rm -f ci-base-key.txt; fi
+              if [ -z "$KEY" ]; then echo "::error::ci.yml has a lane '${{ inputs.lane }}' with no content hash here."; exit 1; fi
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              { echo "paths<<MARKER_PATHS"; printf '%s\n' "$PATHS"; echo MARKER_PATHS; } >> "$GITHUB_OUTPUT"
+
+        # Read-only: a key is only ever marked green by the lane that ran. actions/cache versions an entry by its path
+        # list, so the lane's save names the same paths as its MARKER_PATHS above.
+        - name: Look up the lane's green marker
+          id: marker
+          if: inputs.probe == 'true'
+          uses: actions/cache/restore@v4
+          with:
+              lookup-only: true
+              key: ${{ steps.key.outputs.key }}
+              path: ${{ steps.key.outputs.paths }}
+
+        - name: Decide whether the lane runs
+          id: decide
+          shell: bash
+          env:
+              KEY: ${{ steps.key.outputs.key }}
+              RUN: ${{ steps.queue.outputs.tested != 'true' && steps.marker.outputs.cache-hit != 'true' }}
+          run: |
+              echo "key=$KEY" >> "$GITHUB_OUTPUT"
+              echo "run=$RUN" >> "$GITHUB_OUTPUT"
+              echo "${{ inputs.lane }}: key $KEY, runs: $RUN"

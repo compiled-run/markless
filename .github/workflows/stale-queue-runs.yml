@@ -3,7 +3,11 @@ name: Stale merge-queue runs
 # A merge queue rebuild deletes its gh-readonly-queue/* branches but leaves their runs waiting for runners: on
 # 2026-10-28 five such runs, about 32 jobs each, queued behind the live groups. This cancels a merge_group run
 # whose branch is gone, and lists what it cancelled.
+# A rebuild requests new merge-queue CI runs, so each request sweeps; under load GitHub ran the schedule 4 times in 30 hours.
 on:
+    workflow_run:
+        workflows: [CI]
+        types: [requested]
     schedule:
         - cron: '*/10 * * * *'
     workflow_dispatch:
@@ -11,12 +15,13 @@ on:
 permissions:
     contents: read
 
-concurrency:
-    group: stale-queue-runs
-    cancel-in-progress: false
-
 jobs:
     cancel:
+        if: github.event_name != 'workflow_run' || github.event.workflow_run.event == 'merge_group'
+        # On the job, so a pull request's skipped run cannot replace a pending sweep in the group.
+        concurrency:
+            group: stale-queue-runs
+            cancel-in-progress: false
         runs-on: ubuntu-latest
         timeout-minutes: 5
         permissions:

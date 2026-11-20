@@ -2,9 +2,10 @@ import { execFile, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { readdir, readFile, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { chromium, type Route } from '@playwright/test';
+import { type Route } from '@playwright/test';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -37,7 +38,7 @@ test.each([false, true])(
 		});
 		const [port] = (await once(server.stdout, 'data')) as [Buffer];
 		const origin = `http://127.0.0.1:${String(port).trim()}`;
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage();
 			const errors: string[] = [];
@@ -119,7 +120,7 @@ test.each([false, true])(
 		});
 		const [port] = (await once(server.stdout, 'data')) as [Buffer];
 		const origin = `http://127.0.0.1:${String(port).trim()}`;
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const page = await browser.newPage();
 			const errors: string[] = [];

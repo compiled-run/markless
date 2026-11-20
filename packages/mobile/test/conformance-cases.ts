@@ -8,7 +8,10 @@ import { readWorkspaceModule } from '../src/harness/rung.ts';
 
 /** Resolves what a case imports (`@markless/ui`) from packages/mobile, where the case's `src/<name>.tsrx` stands. */
 export const readCaseModule = (specifier: string, importer: string) =>
-	readWorkspaceModule(specifier, importer.startsWith('src/') ? `packages/mobile/${importer}` : importer);
+	readWorkspaceModule(
+		specifier,
+		importer.startsWith('src/') ? `packages/mobile/${importer}` : importer,
+	);
 
 /** Each committed vector file: its component (a path inside packages/mobile) and the actions it records. */
 export const CONFORMANCE_CASES: ReadonlyArray<{
@@ -307,6 +310,31 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'max-length',
+		fixture: 'test/fixtures/MaxLength.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'abcde' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'xy' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h2', value: 'Barth' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'max-length-persian',
+		fixture: 'test/fixtures/MaxLength.tsrx',
+		preferredLanguages: ['fa-IR'],
+		actions: [
+			{ event: 'input', host: 'h3', value: 'abcde' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'forms',
 		fixture: 'test/fixtures/Forms.tsrx',
 		actions: [
@@ -328,6 +356,27 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'timer', timer: 'timer:1' },
 			{ event: 'activate', host: 'h24' },
 			{ event: 'timer', timer: 'timer:2' },
+		],
+	},
+	{
+		name: 'choose',
+		fixture: 'test/fixtures/Choose.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h12' },
+			{ event: 'choose', host: 'h3@Large' },
+			{ event: 'activate', host: 'h12' },
+			{ event: 'choose', host: 'h7' },
+			{ event: 'choose', host: 'h5' },
+			{ event: 'choose', host: 'h9' },
+			{ event: 'activate', host: 'h14' },
+			{ event: 'activate', host: 'h12' },
+			{ event: 'activate', host: 'h13' },
+			{ event: 'activate', host: 'h12' },
+			{ event: 'choose', host: 'h11@Kiwi' },
+			{ event: 'activate', host: 'h15' },
+			{ event: 'activate', host: 'h12' },
+			{ event: 'activate', host: 'h16' },
+			{ event: 'activate', host: 'h12' },
 		],
 	},
 	{
@@ -374,6 +423,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h8' },
 			{ event: 'activate', host: 'component-edge:0/h5' },
 			{ event: 'activate', host: 'h8' },
+		],
+	},
+	{
+		name: 'typed-target',
+		fixture: 'test/fixtures/TypedTarget.tsrx',
+		actions: [
+			{ event: 'input', host: 'component-edge:0/h1', value: 'ada' },
+			{ event: 'input', host: 'component-edge:0/h1', value: 'ada' },
+			{ event: 'input', host: 'component-edge:0/h1', value: 'bo' },
 		],
 	},
 	{
@@ -485,6 +543,164 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'timer', timer: 'script:1' },
 			{ event: 'timer', timer: 'script:1' },
 			{ event: 'timer', timer: 'script:1' },
+		],
+	},
+	{
+		// Pending, the value, a refresh that holds it, a change while pending, a stale answer dropped, a failed refresh beside
+		// the value, a refresh that clears it; the vector's `leave` aborts the request still in flight.
+		name: 'script-async-value',
+		fixture: 'proofs/j11-async-fetch/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'timer', timer: 'script:1' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=apple - ',
+				},
+			},
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:3' },
+			{ event: 'activate', host: 'h5' },
+			{
+				event: 'response',
+				id: 2,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=cherry - ',
+				},
+			},
+			{ event: 'timer', timer: 'script:4' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'timer', timer: 'script:5' },
+			{
+				event: 'response',
+				id: 3,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=banana - ',
+				},
+			},
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:6' },
+		],
+	},
+	{
+		// A @try in an @if arm and one inside it: the inner starts once the outer shows; its failed refresh stays its own;
+		// hidden and shown again, a finished value is kept (the failed one as @catch alone) and a run in flight starts over.
+		name: 'script-async-nested',
+		fixture: 'proofs/j12-async-nested/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'timer', timer: 'script:1' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=apple - ',
+				},
+			},
+			{ event: 'timer', timer: 'script:2' },
+			{
+				event: 'response',
+				id: 2,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=pear - ',
+				},
+			},
+			{ event: 'activate', host: 'h5' },
+			{ event: 'timer', timer: 'script:3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:5' },
+		],
+	},
+	{
+		// A @try per list row: each row waits, answers or fails on its own (the riddle's first answer fails: @catch alone).
+		name: 'script-async-row',
+		fixture: 'proofs/11-async/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'timer', timer: 'script:2' },
+		],
+	},
+	{
+		// Rows that start together and settle apart; a new row starts its own; a row that leaves aborts its lookup.
+		name: 'script-async-rows',
+		fixture: 'proofs/j13-async-rows/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'timer', timer: 'script:2' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=apple - ',
+				},
+			},
+			{ event: 'activate', host: 'h6' },
+			{ event: 'timer', timer: 'script:3' },
+			{ event: 'activate', host: 'h7' },
+			{
+				event: 'response',
+				id: 2,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=cherry - ',
+				},
+			},
+		],
+	},
+	{
+		// `reset` (an arrow that calls it, and `onClick={reset}`) runs the failed value again with the same key while @catch
+		// stays; a key change while that run waits starts over; a later answer shows the value.
+		name: 'script-async-retry',
+		fixture: 'proofs/j14-async-retry/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'activate', host: 'h8' },
+			{ event: 'timer', timer: 'script:2' },
+			{ event: 'activate', host: 'h9' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:4' },
+			{
+				event: 'response',
+				id: 1,
+				response: {
+					status: 200,
+					statusText: 'OK',
+					headers: [['content-type', 'text/plain; charset=utf-8']],
+					body: 'GET /j11/word?word=apple - ',
+				},
+			},
 		],
 	},
 	{
@@ -653,7 +869,11 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		name: 'navigation-deep-link',
 		app: 'proofs/n4-deep-link',
 		open: '/orders/42',
-		actions: [{ event: 'back' }, { event: 'back' }, { event: 'activate', host: 'component-edge:0' }],
+		actions: [
+			{ event: 'back' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'component-edge:0' },
+		],
 	},
 	{
 		name: 'script-first-render',
