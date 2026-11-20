@@ -201,8 +201,6 @@ final class ViewTree {
 	let dismissGestures: [UIGestureRecognizer] = [UITapGestureRecognizer()]
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 	private var forwards: [LabelForward] = []
-	/// Each text field's typing limit, kept here because a field holds its delegate weakly.
-	private var limits: [LengthLimit] = []
 	private var dialogIds = Set<String>()
 	/// The stacking layout's paragraphs, by each text node and phrase element instance in them.
 	private var paragraphs: [String: Paragraph] = [:]
@@ -501,6 +499,12 @@ final class ViewTree {
 				// As on the web: scrollIntoView aligns the element to the start; focus brings it into view unless told not to.
 				if command == "scrollIntoView" {
 					bringIntoView(view, block: scrollIntoViewAlign.block, inline: scrollIntoViewAlign.inline)
+					break
+				}
+				// `select()` selects a field's whole text; it does not move focus, as on the web.
+				if command == "select" {
+					if let field = view as? UITextField { field.selectedTextRange = field.textRange(from: field.beginningOfDocument, to: field.endOfDocument) }
+					else if let area = view as? TextArea { area.selectedTextRange = area.textRange(from: area.beginningOfDocument, to: area.endOfDocument) }
 					break
 				}
 				if !preventScroll { bringIntoView(view, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline) }
@@ -904,9 +908,7 @@ final class ViewTree {
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = TextField()
-					let limit = LengthLimit { [weak self] in nativeMaxLength(self?.attributes[id]?["maxlength"]) }
-					limits.append(limit)
-					field.lengthLimit = limit
+					field.lengthLimit = LengthLimit { [weak self] in nativeMaxLength(self?.attributes[id]?["maxlength"]) }
 					field.addAction(UIAction { [weak self, weak field] _ in
 						self?.dismissMessage()
 						field?.resignFirstResponder()
@@ -1816,16 +1818,10 @@ extension KeyedInput {
 final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
 	var onKey: ((String) -> Bool)?
 	var onPaste: ((String) -> Bool)?
-	/// `maxlength`: the field stays its own delegate, so its Return key keeps reaching the keydown handler.
-	var lengthLimit: LengthLimit?
 
 	override init(frame: CGRect) {
 		super.init(frame: frame)
 		delegate = self
-	}
-
-	func textField(_ field: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
-		lengthLimit?.textField(field, shouldChangeCharactersIn: range, replacementString: string) ?? true
 	}
 
 	@available(*, unavailable)
@@ -1837,6 +1833,13 @@ final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
 	}
 
 	func textFieldShouldReturn(_ textField: UITextField) -> Bool { !keyLeavesOut("\n") }
+
+	/// The field is its own delegate, so `maxlength` is asked here.
+	var lengthLimit: LengthLimit?
+
+	func textField(_ field: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+		lengthLimit?.textField(field, shouldChangeCharactersIn: range, replacementString: string) ?? true
+	}
 
 	override func deleteBackward() {
 		if onKey?("Backspace") == true { return }
