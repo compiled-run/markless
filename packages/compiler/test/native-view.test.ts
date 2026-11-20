@@ -1718,8 +1718,7 @@ export function App() @{
 		const cancels = await nativeView(
 			form(`(event) => {
 			event.preventDefault();
-			const data = new FormData(event.currentTarget);
-			onSave(String(data.get('title') ?? ''));
+			onSave(JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))));
 		}`),
 		);
 		expect(cancels.diagnostics).toEqual([]);
@@ -1741,7 +1740,7 @@ export function App() @{
 			form(`(event) => {
 			const data = new FormData(event.currentTarget);
 			if (data.has('title')) event.preventDefault();
-			onSave(String(data.get('title')));
+			onSave(JSON.stringify(Object.fromEntries(data)));
 		}`),
 		);
 		expect(late.payload).toBeNull();

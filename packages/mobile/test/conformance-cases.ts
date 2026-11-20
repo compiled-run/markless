@@ -511,7 +511,7 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	},
 	{
 		name: 'script-submit',
-		fixture: 'proofs/j15-submit-script/App.tsrx',
+		fixture: 'proofs/j18-submit-script/App.tsrx',
 		modules: true,
 		actions: [
 			{ event: 'activate', host: 'component-edge:0/h3' },
