@@ -28,6 +28,8 @@ public struct NativeScriptBinding: Equatable, Sendable {
 		case object([NativeScriptBinding])
 		/// A `shared()` accessor: a function that returns that object.
 		case shared([NativeScriptBinding])
+		/// A shared object's method: the script function that returns it, run over its own bindings when called.
+		case method(String, [NativeScriptBinding])
 	}
 	public let name: String
 	public let kind: Kind
@@ -37,7 +39,7 @@ public struct NativeScriptBinding: Equatable, Sendable {
 		case let .cell(cell): return [cell]
 		case let .fields(fields): return fields.map(\.cell)
 		case let .value(expr), let .elements(expr): return expr.cells
-		case let .object(members), let .shared(members): return members.flatMap(\.cells)
+		case let .object(members), let .shared(members), let .method(_, members): return members.flatMap(\.cells)
 		}
 	}
 }

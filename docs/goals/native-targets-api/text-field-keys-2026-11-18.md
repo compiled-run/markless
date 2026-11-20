@@ -57,5 +57,20 @@ sends (Backspace in an empty field, Return in a `<textarea>`, or any hardware ke
 - iOS: Shift sends no `keydown` (Safari sends one); `event.key` of the typed character is the same.
 - Not measured: whether `preventDefault()` on a typed character's `keydown` keeps it out. The iOS host keeps it out; the
   Android host lets it in. No family prevents a typed character.
-- A `paste` handler on an element that is not a text field (datebox's and timebox's segments, tokenbox's editable
-  `<div>`) is refused by name.
+- A `paste` handler on an editable element that is not a text field (tokenbox's `contenteditable` `<div>`) is refused
+  by name.
+
+## Paste off a text field (measured 2026-11-19)
+
+With `receipts/2026-11-19-paste-off-a-text-field.html` (two focusable, non-editable `<span role="spinbutton">`, as
+datebox's and timebox's segments are, and an `<input>`), on the same simulator and AVD, with text on the clipboard:
+
+| What the person does | iOS Safari | Android Chrome |
+|---|---|---|
+| Tap a segment | `focus`; no keyboard opens | `focus`; no keyboard opens |
+| Long-press a segment | the text is selected; the menu offers Copy, Look Up, Translate, Find; no Paste | `contextmenu`; Copy, Share, Select all, Web search, and Read aloud under the overflow; no Paste |
+| Long-press the text field | the menu offers Paste | the menu offers Paste |
+
+No `paste` event reached a segment on either phone (`receipts/2026-11-19-paste-off-a-text-field.json`). On a phone a
+non-editable element hears `paste` only from a hardware keyboard's Cmd+V or Ctrl+V while it has focus, so a native build
+leaves that handler out with the keyboard-only warning, as it does the segments' `keydown`.

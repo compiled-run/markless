@@ -48,3 +48,25 @@ jobs:
                     echo "cancelled $id ($name) on $branch"
                     echo "| $id | $name | $branch |" >> "$GITHUB_STEP_SUMMARY"
                   done
+
+            # A self-hosted job waits up to 24 hours for its runner, so a dead Mac mini would hold every group until the
+            # queue's 240-minute timeout. Cancelling the run lets the queue drop the entry and rebuild the groups behind it.
+            - name: Cancel merge_group runs stuck waiting for a self-hosted runner
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  STUCK_MINUTES: 15
+              run: |
+                  set -euo pipefail
+                  cutoff=$(date -u -d "-${STUCK_MINUTES} minutes" +%Y-%m-%dT%H:%M:%SZ)
+                  for status in queued in_progress; do
+                    gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?event=merge_group&status=$status&per_page=100" \
+                      --jq '.workflow_runs[] | [.id, .head_branch] | @tsv'
+                  done | sort -u | while IFS=$'\t' read -r id branch; do
+                    stuck=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs?per_page=100" \
+                      --jq ".jobs[] | select(.status == \"queued\" and .created_at < \"$cutoff\")
+                        | select(all(.labels[]; test(\"^(ubuntu|macos|windows)-\") | not)) | .name")
+                    [ -n "$stuck" ] || continue
+                    gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/cancel" --silent || true
+                    echo "::warning::cancelled merge_group run $id on $branch: $(echo "$stuck" | paste -sd, -) waited over ${STUCK_MINUTES} minutes for a self-hosted runner"
+                    echo "| $id | CI, self-hosted runner did not answer | $branch |" >> "$GITHUB_STEP_SUMMARY"
+                  done
