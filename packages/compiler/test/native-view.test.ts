@@ -2892,14 +2892,14 @@ describe('inline svg', () => {
 	<svg viewBox="0 0 10 10">
 		<text>a<tspan x="1" y="1">b</tspan></text>
 		<text><tspan>d</tspan></text>
-		<text stroke="red" style="font-size: 4px">c</text>
+		<text stroke="red" style="font-size: 4px; text-shadow: 1px 1px red">c</text>
 	</svg>
 }`);
 		expect(refused.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
 			'text beside <tspan>s in a <text>, which a native drawing does not place after them yet',
 			'a <tspan> with no `x` of its own, which a native drawing does not place after the run before it yet',
 			'a <tspan> with no `y` of its own, which a native drawing does not place after the run before it yet',
-			'`style` on <text>, whose font and anchor a native drawing does not read from styles yet',
+			'`text-shadow: 1px 1px red` in the `style` of <text>, which a native drawing does not read from styles yet',
 			'a stroke on <text>, which a native drawing does not outline yet',
 		]);
 	});
@@ -2960,6 +2960,16 @@ export function Icon() @{
 }`);
 		expect(refused.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
 			'an @if arm inside an <svg> that holds a value, a component, a block or an attribute that follows state, which a native drawing does not draw per arm yet',
+		]);
+	});
+
+	it('reads the style declarations mermaid writes on <text> over its presentation attributes', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Diagram() @{
+	<svg viewBox="0 0 100 50"><text x="50" y="20" text-anchor="start" font-size="8" style="text-anchor: middle; font-size: 16px; font-weight: 400;">Actor</text></svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect((payload!.nodes.find((node) => 'drawing' in node && node.drawing) as { drawing: { shapes: object[] } }).drawing.shapes).toEqual([
+			{ text: 'Actor', x: 50, y: 20, size: 16, weight: 400, anchor: 'middle', baseline: 'alphabetic', fill: { r: 0, g: 0, b: 0, alpha: 255 } },
 		]);
 	});
 

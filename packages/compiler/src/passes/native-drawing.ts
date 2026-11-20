@@ -84,6 +84,20 @@ const INITIAL: Inherited = {
 
 const SHAPES = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 /** Elements that draw nothing themselves and whose content is never drawn in place. */
+/** The `style` declarations a `<text>` may carry: those a native drawing reads as presentation attributes. */
+const TEXT_STYLE_PROPERTIES: ReadonlySet<string> = new Set([
+	'text-anchor',
+	'dominant-baseline',
+	'font-size',
+	'font-family',
+	'font-weight',
+	'font-style',
+	'letter-spacing',
+	'fill',
+	'fill-opacity',
+	'opacity',
+	'white-space',
+]);
 const NEVER_DRAWN = new Set([
 	'defs',
 	'symbol',
@@ -337,17 +351,38 @@ export function compileDrawing(
 	};
 
 	/**
+	 * A `<text>` whose `style` declarations replace the presentation attributes they name, as the browser's cascade puts
+	 * a style above them; `white-space: pre` is `xml:space="preserve"`. Any other declaration is refused by name.
+	 */
+	const withTextStyle = (element: DrawingElement): DrawingElement => {
+		const declared = element.attributes.style?.trim();
+		if (!declared) return element;
+		const { style: _style, ...attributes } = element.attributes;
+		const written: Record<string, string> = { ...attributes };
+		for (const declaration of declared.split(';')) {
+			if (declaration.trim() === '') continue;
+			const colon = declaration.indexOf(':');
+			const name = declaration.slice(0, colon).trim().toLowerCase();
+			const value = declaration.slice(colon + 1).trim();
+			if (colon < 0 || value === '' || /!important$/i.test(value) || !TEXT_STYLE_PROPERTIES.has(name)) {
+				refuse(element.id, `\`${declaration.trim()}\` in the \`style\` of <text>, which a native drawing does not read from styles yet`);
+				continue;
+			}
+			if (name === 'white-space') {
+				if (value === 'pre') written['xml:space'] = 'preserve';
+				else if (value === 'normal') delete written['xml:space'];
+				else refuse(element.id, `\`white-space: ${value}\` on <text>`);
+			} else written[name] = value;
+		}
+		return { ...element, attributes: written };
+	};
+
+	/**
 	 * A `<text>` as runs: its own text at its x and y, or each `<tspan>` at the x and y it gives (as diagram exports
 	 * write them), each filled and not stroked.
 	 */
 	const emitText = (element: DrawingElement, style: Inherited, matrix: Matrix) => {
-		const declared = (element.attributes.style ?? '').trim();
-		let preserve = element.attributes['xml:space'] === 'preserve';
-		if (declared !== '') {
-			const whiteSpace = /^white-space\s*:\s*(pre|normal)\s*;?$/.exec(declared);
-			if (whiteSpace) preserve = whiteSpace[1] === 'pre';
-			else refuse(element.id, `\`style\` on <text>, whose font and anchor a native drawing does not read from styles yet`);
-		}
+		const preserve = element.attributes['xml:space'] === 'preserve';
 		const ownText = (of: DrawingElement) =>
 			texts
 				.filter((text) => text.path.length === of.path.length + 1 && isPrefix(of.path, text.path))
@@ -645,6 +680,7 @@ export function compileDrawing(
 			);
 			return;
 		}
+		if (element.tag === 'text') element = withTextStyle(element);
 		checkAttributes(element);
 		const style = inherit(element, from);
 		const own = multiply(matrix, transformOf(element));

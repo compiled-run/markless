@@ -9,6 +9,7 @@ export default function App() @{
 				<tspan x="78" y="50">module</tspan>
 				<tspan x="78" y="57">graph</tspan>
 			</text>
+			<text x="60" y="40" fill="#3c3c43" style="text-anchor: middle; font-size: 6px; font-weight: 400;">mermaid label</text>
 			<g transform="translate(4 48)" font-size="8" font-style="italic" fill="hsl(30, 100%, 40%)">
 				<text dominant-baseline="middle">runs code</text>
 			</g>

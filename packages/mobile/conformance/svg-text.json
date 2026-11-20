@@ -116,6 +116,21 @@
 							}
 						},
 						{
+							"text": "mermaid label",
+							"x": 60,
+							"y": 40,
+							"size": 6,
+							"weight": 400,
+							"anchor": "middle",
+							"baseline": "alphabetic",
+							"fill": {
+								"r": 60,
+								"g": 60,
+								"b": 67,
+								"alpha": 255
+							}
+						},
+						{
 							"text": "runs code",
 							"x": 0,
 							"y": 0,
@@ -137,14 +152,14 @@
 			},
 			{
 				"kind": "element",
-				"id": "h11",
+				"id": "h12",
 				"element": "p",
 				"parent": "h0"
 			},
 			{
 				"kind": "text",
-				"id": "h11:text0",
-				"parent": "h11",
+				"id": "h12:text0",
+				"parent": "h12",
 				"parts": [
 					{
 						"text": "Diagram drawn"
@@ -157,7 +172,7 @@
 	},
 	"initial": [
 		["h1:text0", "Diagram"],
-		["h11:text0", "Diagram drawn"]
+		["h12:text0", "Diagram drawn"]
 	],
 	"steps": []
 }
