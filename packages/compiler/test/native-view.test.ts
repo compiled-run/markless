@@ -996,6 +996,28 @@ export function Page() @{
 		);
 	});
 
+	it('reads names a component body destructures from an array as those indexes, skipping holes', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Page() @{
+	<main>
+		<Files files={[{ name: 'a' }, { name: 'b' }, { name: 'c' }]} />
+		<Files files={[{ name: 'only' }]} />
+	</main>
+}
+function Files({ files }: { readonly files: readonly { readonly name: string }[] }) @{
+	const [first, , third] = files;
+	<section>
+		<p>{first.name}</p>
+		@if (third) {
+			<p>{third.name}</p>
+		}
+	</section>
+}`);
+		expect(diagnostics).toEqual([]);
+		const texts = JSON.stringify(payload!.nodes.filter((node) => node.kind === 'text'));
+		for (const name of ['"a"', '"c"', '"only"']) expect(texts).toContain(name);
+		expect(texts).not.toContain('"b"');
+	});
+
 	it('leaves out a <select> hidden from sight and screen readers, and refuses one inside a form by name', async () => {
 		const select =
 			'<select aria-hidden="true" tabindex={-1} name="size"><option>{size}</option></select>';
