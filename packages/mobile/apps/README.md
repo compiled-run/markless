@@ -36,7 +36,7 @@ config) are what moved it.
 
 ## On phones
 
-Measured on the branch that adds the import.meta fold, relative fetch, inline lines and Chrome's default looks (2026-11-20). There 11 of 18 screens build: notes 3, shop 5, checkin 3.
+Measured on the branch that adds relative fetch, inline lines and Chrome's default looks (2026-11-20). There 6 of 18 screens build: notes 3, checkin 3; with #959's `import.meta.env` fold, which is queued, shop's 5 more build too (11 of 18).
 
 Styled, the apps do not reach a phone: Dragon refuses every screen that builds (web font asset, `@media` bands, `:active`
 and `:focus-visible`, `<img>` sources from state). So the phone runs below use the same screens with their CSS left out,

@@ -29,13 +29,23 @@
 				"parent": "h0",
 				"attributes": {
 					"name": "name"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
 				}
 			},
 			{
 				"kind": "element",
 				"id": "h2",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -64,6 +74,11 @@
 				"attributes": {
 					"name": "note"
 				},
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
+				},
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 0
@@ -78,6 +93,9 @@
 					"type": "checkbox",
 					"name": "wrap"
 				},
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 0
@@ -88,6 +106,11 @@
 				"id": "h5",
 				"element": "button",
 				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				},
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 0
@@ -114,6 +137,11 @@
 				"parent": "h0",
 				"attributes": {
 					"type": "button"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
 				}
 			},
 			{
@@ -130,7 +158,10 @@
 				"kind": "element",
 				"id": "h7",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
