@@ -1263,11 +1263,18 @@ export function createNativeRuntime(
 				if (!instance) throw new Error(`${action.host} is not shown`);
 				return change(undefined, undefined, () => {
 					if (
-						attributeNow(select.id, 'disabled') === null &&
-						attributeIn(option, 'disabled', instance.scope) === null
+						attributeNow(select.id, 'disabled') !== null ||
+						attributeIn(option, 'disabled', instance.scope) !== null
 					)
-						chosenNow = action.host;
-					return [];
+						return [];
+					chosenNow = action.host;
+					// A choice that changes the select fires its input and change handlers, as the web does, with the option's value.
+					const was = optionsOf(select.id).find((one) => selectedness.get(one.id))?.id;
+					const handler = payload.events.find(
+						(candidate) => candidate.host === select.id && candidate.event === 'input',
+					);
+					if (was === action.host || !handler) return [];
+					return run(handlers.get(handler.handler) ?? [], optionValue(instance), instance.scope);
 				});
 			}
 			if (action.event === 'timer' && action.timer.startsWith(SCRIPT_TIMER))

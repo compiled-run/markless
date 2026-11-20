@@ -556,6 +556,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'select-events',
+		fixture: 'proofs/r119-select-events/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'choose', host: 'h5' },
+			{ event: 'choose', host: 'h5' },
+			{ event: 'choose', host: 'h3' },
+			{ event: 'activate', host: 'h10' },
+		],
+	},
+	{
 		name: 'script-async',
 		fixture: 'proofs/j3-await-catch/App.tsrx',
 		modules: true,

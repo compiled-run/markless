@@ -1008,6 +1008,9 @@ final class ViewTree {
 					for: .editingChanged)
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
+			case (.input, _) where element == "select":
+				// A select's input and change run when a choice lands, from the runtime's choose.
+				continue
 			case (.idle, _), (.visible, _), (.dismiss, _), (_, _) where event.event.isPointer:
 				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host.
 				continue

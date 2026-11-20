@@ -1,0 +1,54 @@
+appId: ${APP_ID}
+name: r119-select-events
+---
+- launchApp:
+    clearState: true
+- assertVisible: Sizes
+- assertVisible: Medium
+- assertVisible: Size is m
+- assertVisible: Fired nothing
+- assertVisible: Medium copy
+- assertNotVisible: Small
+- assertNotVisible: Large
+- assertNotVisible: Small copy
+- assertNotVisible: Large copy
+- tapOn: Size
+- tapOn:
+    text: Large
+- assertVisible: Large
+- assertVisible: Large copy
+- assertNotVisible: Medium
+- assertNotVisible: Size is m
+- assertNotVisible: Fired nothing
+- assertNotVisible: Medium copy
+- assertVisible: Large
+- assertVisible: Size is l
+- assertVisible: Fired input l, change l
+- assertVisible: Large copy
+- assertNotVisible: Medium
+- assertNotVisible: Size is m
+- assertNotVisible: Fired nothing
+- assertNotVisible: Medium copy
+- tapOn: Size
+- tapOn:
+    text: Small
+- assertNotVisible: Large
+- assertNotVisible: Size is l
+- assertNotVisible: Fired input l, change l
+- assertNotVisible: Large copy
+- assertVisible: Small
+- assertVisible: Size is s
+- assertVisible: Fired input s, change s
+- assertVisible: Small copy
+- assertNotVisible: Large
+- assertNotVisible: Size is l
+- assertNotVisible: Fired input l, change l
+- assertNotVisible: Large copy
+- tapOn: Reset
+- assertNotVisible: Small copy
+- assertNotVisible: Size is s
+- assertVisible: Small
+- assertVisible: Medium copy
+- assertVisible: Size is m
+- assertNotVisible: Small copy
+- assertNotVisible: Size is s

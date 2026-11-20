@@ -1,0 +1,75 @@
+{
+	"rung": "R119",
+	"name": "A choice that changes a <select> fires its input and then its change handler, each reading the chosen value; a bound value chooses its option",
+	"steps": [
+		{
+			"visible": [
+				"Sizes",
+				"Medium",
+				"Size is m",
+				"Fired nothing",
+				"Medium copy"
+			],
+			"absent": [
+				"Small",
+				"Large",
+				"Small copy",
+				"Large copy"
+			]
+		},
+		{
+			"do": {
+				"choose": {
+					"field": "Size",
+					"option": "Large"
+				}
+			},
+			"visible": [
+				"Large",
+				"Size is l",
+				"Fired input l, change l",
+				"Large copy"
+			],
+			"absent": [
+				"Medium",
+				"Size is m",
+				"Fired nothing",
+				"Medium copy"
+			]
+		},
+		{
+			"do": {
+				"choose": {
+					"field": "Size",
+					"option": "Small"
+				}
+			},
+			"visible": [
+				"Small",
+				"Size is s",
+				"Fired input s, change s",
+				"Small copy"
+			],
+			"absent": [
+				"Large",
+				"Size is l",
+				"Fired input l, change l",
+				"Large copy"
+			]
+		},
+		{
+			"do": {
+				"tap": "Reset"
+			},
+			"visible": [
+				"Small",
+				"Medium copy",
+				"Size is m"
+			],
+			"absent": [
+				"Small copy",
+				"Size is s"
+			]
+		}
+	]
+}

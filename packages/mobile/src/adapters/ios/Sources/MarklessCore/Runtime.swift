@@ -1013,10 +1013,15 @@ public final class NativeRuntime {
 				let instance = try options(of: select).first(where: { $0.id == action.host })
 			else { throw RuntimeError(reason: "\(action.host) is not a shown option of a select") }
 			return try change(host: nil) {
-				if try self.attributeNow(select, "disabled") == nil, try self.attribute(of: option, "disabled", in: instance.scope) == nil {
-					self.chosenNow = action.host
-				}
-				return []
+				guard try self.attributeNow(select, "disabled") == nil, try self.attribute(of: option, "disabled", in: instance.scope) == nil
+				else { return [] }
+				self.chosenNow = action.host
+				// A choice that changes the select fires its input and change handlers, as the web does, with the option's value.
+				let was = try self.options(of: select).first(where: { self.selectedness[$0.id] == true })?.id
+				guard was != action.host, let bound = self.payload.events.first(where: { $0.host == select && $0.event == .input }) else { return [] }
+				self.eventValue = try self.value(of: instance)
+				defer { self.eventValue = nil }
+				return try self.run(self.handlers[bound.handler] ?? [], in: instance.scope)
 			}
 		}
 		if action.event == .timer, let timer = action.timer, timer.hasPrefix(scriptTimer) {
