@@ -2101,6 +2101,11 @@ export type SemanticGraphArtifact = {
 	readonly sharedCallbackBindings: ReadonlyArray<SemanticSharedCallbackBinding>;
 	readonly hostNodes: ReadonlyArray<SemanticHostNode>;
 	readonly keyedRepeats: ReadonlyArray<SemanticKeyedRepeat>;
+	/**
+	 * A `@for` written straight inside a component's tag whose rows this module cannot place, because it was analyzed
+	 * without the child's interface. Left out of `keyedRepeats`; a build that places rows itself (native) still reads it.
+	 */
+	readonly unplacedProjectedRepeats?: ReadonlyArray<SemanticKeyedRepeat>;
 	readonly events: ReadonlyArray<SemanticEvent>;
 	readonly syncPolicyConstants?: ReadonlyArray<SemanticSyncPolicyConstant>;
 	readonly behaviors: ReadonlyArray<SemanticBehavior>;

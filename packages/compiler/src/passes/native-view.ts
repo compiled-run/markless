@@ -1003,7 +1003,9 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 		),
 		edgesById: new Map(graph.componentEdges.map((edge) => [edge.id, edge])),
 		eventsByHost: index(graph.events, (event) => event.hostNodeId),
-		repeatsById: new Map(graph.keyedRepeats.map((repeat) => [repeat.id, repeat])),
+		repeatsById: new Map(
+			[...graph.keyedRepeats, ...(graph.unplacedProjectedRepeats ?? [])].map((repeat) => [repeat.id, repeat]),
+		),
 		/** Sync computeds by component, then name: a read of one inlines its expression. */
 		computeds: graph.graphBindings.reduce((byComponent, binding) => {
 			if (binding.kind !== 'computed') return byComponent;
