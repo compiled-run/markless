@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
+import android.text.InputType
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
@@ -235,9 +236,12 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 	}
 
 	/** Where [view]'s first line of text sits from its top once measured; a box with no text sits on its bottom edge, as an image does. */
-	private fun baselineOf(view: View): Int = when (view) {
+	private fun baselineOf(view: View): Int =
+		// A textarea scrolls its text, so it sits on its bottom edge (Chrome's inline-block with overflow), not its first line.
+		if (view is EditText && (view.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0) view.measuredHeight else when (view) {
 		is TextView -> view.baseline.takeIf { it >= 0 } ?: view.measuredHeight
 		is MarklessBox -> view.firstBaseline() ?: view.measuredHeight
+		is SizedImage -> view.baseline.takeIf { it >= 0 } ?: view.measuredHeight
 		else -> view.measuredHeight
 	}
 

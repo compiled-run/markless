@@ -552,13 +552,25 @@ class MarklessHost(
 			setStroke(maxOf(1, dpr.roundToInt()), line.toInt())
 			cornerRadius = (2 * dpr).toFloat()
 		}
-		// The border box is 2 px; the text sits 6 px (a field 2 px) in from the sides and 1 px from the top and bottom.
-		val side = ((if (control == "button") 8 else 4) * dpr).roundToInt()
+		// The border box is 2 px; the text sits 6 px (a field 2 px) in from the sides and 1 px from the top and bottom; a
+		// textarea's 2 px padding is the same on every side.
+		val side = ((when (control) { "button" -> 8; "area" -> 3; else -> 4 }) * dpr).roundToInt()
 		val top = ((if (control == "select") 2 else 3) * dpr).roundToInt()
 		view.setPadding(side, top, side, top)
 		if (view is SelectBox) view.chromeLook(canvasText(configuration), dpr.toFloat())
 		(view as? TextView)?.setTextColor(canvasText(configuration))
 		if (control == "field" && view is EditText) (153 * dpr).roundToInt().let { view.minWidth = it; view.maxWidth = it }
+		if (control == "area" && view is EditText) view.typeface = Typeface.MONOSPACE
+	}
+
+	/**
+	 * A textarea's size as Chrome gives it: `cols` monospace characters across and `rows` lines down (20 and 2 unless the
+	 * attribute is a positive integer), plus the 16 px scrollbar gutter, the 2 px padding and the 1 px border.
+	 */
+	private fun sizeArea(view: EditText, current: Map<String, String>) {
+		val column = view.paint.measureText("0")
+		view.width = (Math.ceil(textareaExtent(current["cols"], 20) * column.toDouble()) + 22 * dpr).roundToInt()
+		view.height = textareaExtent(current["rows"], 2) * view.lineHeight + (6 * dpr).roundToInt()
 	}
 
 	/** The colour behind the page: the current assignment's canvas (else the web canvas's white), or unstyled the web's Canvas. */
@@ -889,6 +901,7 @@ class MarklessHost(
 			val controlText = (baseTextSize * unstyled.size * flow!!.blockText(node.parent).size).toFloat()
 			if (view is EditText) view.setTextSize(TypedValue.COMPLEX_UNIT_PX, controlText)
 			if (view is SelectBox) view.textSize(controlText)
+			if (control == "area" && view is EditText) sizeArea(view, attrs[inst.id].orEmpty() + node.attributes)
 		}
 		layoutOf(inst.node)?.let { l -> l.export.assignments[l.assignment].byId[inst.id] }?.let { styled -> scrollContainer(inst.id, view, styled) }
 		views[inst.id] = view
@@ -1064,6 +1077,7 @@ class MarklessHost(
 			}
 			"controls" -> if (view is AudioButton) view.visibility = if (value == null) View.GONE else View.VISIBLE
 			"disabled" -> view.isEnabled = value == null
+			"cols", "rows" -> if (controls[view] == "area" && view is EditText) sizeArea(view, current)
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
 			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else if (view is DrawingView) (if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO) else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
@@ -1350,3 +1364,7 @@ private fun EditText.setAppText(text: String) {
 	limit?.appWriting = true
 	try { setText(text) } finally { limit?.appWriting = false }
 }
+
+/** A textarea's `cols` or `rows` as HTML reads it: the digits after any leading whitespace, if they make a number above zero, else [fallback]. */
+internal fun textareaExtent(value: String?, fallback: Int): Int =
+	(value ?: "").trimStart(' ', '\t', '\n', '\r', '\u000C').takeWhile { it in '0'..'9' }.toIntOrNull()?.takeIf { it > 0 } ?: fallback

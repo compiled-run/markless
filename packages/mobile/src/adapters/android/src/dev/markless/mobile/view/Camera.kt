@@ -63,6 +63,9 @@ class SizedImage(context: Context) : FrameLayout(context) {
 		update()
 	}
 
+	/** While it shows its alt text, the text's baseline, so it sits on its line as the web's broken image does; else none. */
+	override fun getBaseline(): Int = if (altText.visibility == View.VISIBLE) altText.top + altText.baseline else -1
+
 	fun alt(text: String?) {
 		altText.text = text ?: ""
 		update()

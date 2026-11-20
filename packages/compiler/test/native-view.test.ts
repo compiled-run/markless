@@ -2407,10 +2407,11 @@ ${markup}
 }`;
 	const lineOf = (text: string, offset: number) => text.slice(0, offset).split('\n').length;
 
-	it("draws a text field, a checkbox and a button as Chrome's controls", async () => {
+	it("draws a text field, a checkbox, a textarea and a button as Chrome's controls", async () => {
 		const { payload, diagnostics } = await nativeView(
 			source(`		<input aria-label="Name" />
-		<input type="checkbox" aria-label="Urgent" />`),
+		<input type="checkbox" aria-label="Urgent" />
+		<textarea aria-label="Notes"></textarea>`),
 		);
 		expect(diagnostics).toEqual([]);
 		expect(
@@ -2422,7 +2423,26 @@ ${markup}
 		).toEqual([
 			['input', { inline: true, size: 13.3333 / 16, control: 'field' }],
 			['input', { inline: true, control: 'tick' }],
+			['textarea', { inline: true, monospace: true, size: 13.3333 / 16, control: 'area' }],
 			['button', { inline: true, size: 13.3333 / 16, control: 'button' }],
+		]);
+	});
+
+	it("makes a textarea's text its starting value, as the HTML parser does, instead of a child", async () => {
+		const { payload, diagnostics } = await nativeView(
+			source(`		<textarea aria-label="Notes">{'\\nTen across'}</textarea>`),
+		);
+		expect(diagnostics).toEqual([]);
+		const area = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'textarea')!;
+		expect(area.kind === 'element' && area.attributes).toEqual({ 'aria-label': 'Notes', value: 'Ten across' });
+		expect(payload!.nodes.filter((node) => node.parent === area.id)).toEqual([]);
+	});
+
+	it('refuses text inside a textarea that follows state', async () => {
+		const { payload, diagnostics } = await nativeView(source(`		<textarea aria-label="Notes">{n}</textarea>`));
+		expect(payload).toBeNull();
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			expect.stringContaining('the text inside the <textarea> h1 follows state'),
 		]);
 	});
 

@@ -224,8 +224,11 @@ export type NativeDefaultStyle = {
 	 * its text 2px in and 1px down, inside a 2px border box. `select`: a field's fill and border round its chosen option's
 	 * text and a chevron. `tick`: a checkbox's 13px box or a radio button's circle, unchecked in a field's colours, checked in
 	 * Chrome's accent (#0075ff, #99c8ff dark), with a checkbox's margins 3px 3px 3px 4px and a radio's 3px 3px 0 5px.
+	 * `area`: a `<textarea>`, a field's fill, border and corners round monospace text 3px in from each side, sized by its
+	 * `cols` and `rows` (20 and 2 when absent or not a positive integer): each column one monospace character, each row one
+	 * line, plus Chrome's 16px scrollbar gutter at the end (182 by 36px by default).
 	 */
-	readonly control?: 'button' | 'field' | 'select' | 'tick';
+	readonly control?: 'button' | 'field' | 'select' | 'tick' | 'area';
 	/** `<hr>`: Chrome's 2px inset line across the box (#9a9a9a over #eeeeee). */
 	readonly rule?: true;
 	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
@@ -314,7 +317,7 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	br: { flow: 'break' },
 	button: { inline: true, size: CONTROL_TEXT, control: 'button' },
 	input: { inline: true, size: CONTROL_TEXT, control: 'field' },
-	textarea: {},
+	textarea: { inline: true, monospace: true, size: CONTROL_TEXT, control: 'area' },
 	a: { inline: true, line: 'underline', link: true },
 	img: { inline: true },
 	audio: { inline: true },

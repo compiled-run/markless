@@ -232,6 +232,8 @@ final class ViewTree {
 	private var paddings: [ObjectIdentifier: UIEdgeInsets] = [:]
 	/// Checkboxes and radio buttons drawn as Chrome draws them unstyled (`control: tick`).
 	private var chromeTicks = Set<ObjectIdentifier>()
+	/// Textareas drawn as Chrome draws them unstyled (`control: area`), with the width and height their `cols` and `rows` set.
+	private var chromeAreas: [ObjectIdentifier: (width: NSLayoutConstraint, height: NSLayoutConstraint)] = [:]
 	/// Inline-level boxes (`<a>`, `<button>`, `<input>`, `<img>`) of the stacking layout: they share lines with text.
 	private var inlineViews = Set<ObjectIdentifier>()
 	/// Whether a paragraph's text starts or ends with whitespace, by its label: a space beside an inline box on its line.
@@ -960,7 +962,7 @@ final class ViewTree {
 						guard let self, let area else { return }
 						self.bringIntoView(area, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
 					}
-					if layout == nil {
+					if layout == nil, node.defaultStyle?.control == nil {
 						area.font = .preferredFont(forTextStyle: .body)
 						area.layer.borderWidth = 1
 						area.layer.borderColor = UIColor.separator.cgColor
@@ -1203,7 +1205,17 @@ final class ViewTree {
 				NSAttributedString(string: $0, attributes: [.foregroundColor: UIColor(white: 117 / 255, alpha: 1), .font: field.font ?? UIFont.systemFont(ofSize: TextLook.baseSize)])
 			}
 		}
-		if let area = view as? TextArea { area.isEditable = current["disabled"] == nil }
+		if let area = view as? TextArea {
+			area.isEditable = current["disabled"] == nil
+			area.placeholder = current["placeholder"]
+			if let size = chromeAreas[ObjectIdentifier(area)], let font = area.font {
+				// A column is one monospace character and a row one line, as Chrome sizes a textarea; then its 16 pt scrollbar
+				// gutter, the 2 pt padding and the 1 pt border.
+				let column = ("0" as NSString).size(withAttributes: [.font: font]).width
+				size.width.constant = ceil(CGFloat(textareaExtent(current["cols"], 20)) * column) + 16 + 6
+				size.height.constant = CGFloat(textareaExtent(current["rows"], 2)) * ceil(font.lineHeight) + 6
+			}
+		}
 		// aria-disabled only reads as dimmed: a press still reaches the button, as on the web.
 		let disabled = (view is UIButton || view is UITextField || view is TextArea) && current["disabled"] != nil
 		if disabled || current["aria-disabled"] == "true" {
@@ -1385,6 +1397,18 @@ final class ViewTree {
 		let side: CGFloat = button ? 8 : 4
 		paddings[ObjectIdentifier(view)] = UIEdgeInsets(top: control == "select" ? 2 : 3, left: side, bottom: control == "select" ? 2 : 3, right: control == "select" ? side + 13 : side)
 		if let select = view as? SelectButton { select.chromeLook(fontSize: TextLook.baseSize * scale, decorations: &decorations) }
+		if let area = view as? TextArea {
+			// Monospace text at the control size, 2 pt inside the 1 pt border; `applyAttributes` sizes it by `cols` and `rows`.
+			area.font = UIFont.monospacedSystemFont(ofSize: TextLook.baseSize * scale, weight: .regular)
+			area.textContainerInset = UIEdgeInsets(top: 3, left: 3, bottom: 3, right: 3)
+			area.textContainer.lineFragmentPadding = 0
+			area.textColor = .label
+			let width = area.widthAnchor.constraint(equalToConstant: 0)
+			let height = area.heightAnchor.constraint(equalToConstant: 0)
+			NSLayoutConstraint.activate([width, height])
+			chromeAreas[ObjectIdentifier(area)] = (width, height)
+			return
+		}
 		guard let field = view as? UITextField else { return }
 		field.borderStyle = .none
 		field.font = UIFont.systemFont(ofSize: TextLook.baseSize * scale)
@@ -1413,6 +1437,8 @@ final class ViewTree {
 	private func baselineLabel(_ view: UIView) -> UIView? {
 		if let label = view as? UILabel { return (label.attributedText?.length ?? 0) > 0 ? label : nil }
 		if view is UITextField { return view }
+		// A textarea scrolls its text, so its baseline is its bottom edge, as an image's (Chrome's inline-block with overflow).
+		if view is TextArea { return nil }
 		for child in stacked(view) {
 			if let found = baselineLabel(child) { return found }
 		}
@@ -1481,6 +1507,10 @@ final class ViewTree {
 				let item = entry.view
 				let pinTop = item.topAnchor.constraint(equalTo: guide.topAnchor)
 				pinTop.priority = .defaultLow
+				// No wider than it was measured, as the web sizes an inline box to its content: no box in the line takes its slack.
+				let fit = item.widthAnchor.constraint(lessThanOrEqualToConstant: entry.width)
+				fit.priority = .init(999)
+				constraints.append(fit)
 				// The width it was measured at holds, down to the text a button or link holds: nothing in a line wraps early.
 				var held: UIView? = item
 				while let box = held {
@@ -1532,7 +1562,7 @@ final class ViewTree {
 		// An unstyled button or link is its text and nothing around it.
 		let inside = stacked(view)
 		let pad = paddings[ObjectIdentifier(view)] ?? .zero
-		if inside.count == 1, !(view is UITextField) { return fittingWidth(inside[0]) + pad.left + pad.right }
+		if inside.count == 1, !(view is UITextField || view is TextArea) { return fittingWidth(inside[0]) + pad.left + pad.right }
 		return ceil(view.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).width)
 	}
 
@@ -2255,6 +2285,13 @@ final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
 	}
 }
 
+/// A textarea's `cols` or `rows` as HTML reads it: the digits after any leading whitespace, if they make a number above zero,
+/// else `fallback`.
+func textareaExtent(_ value: String?, _ fallback: Int) -> Int {
+	let digits = (value ?? "").drop { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" || $0 == "\u{0C}" }.prefix { $0.isASCII && $0.isNumber }
+	return Int(digits).flatMap { $0 > 0 ? $0 : nil } ?? fallback
+}
+
 /// A `<textarea>`: a text view that reports each edit as a text field's `editingChanged` does; Return adds a line.
 final class TextArea: UITextView, UITextViewDelegate, KeyedInput {
 	var onChange: [(String) -> Void] = []
@@ -2263,11 +2300,38 @@ final class TextArea: UITextView, UITextViewDelegate, KeyedInput {
 	var onBegin: (() -> Void)?
 	var onFocus: [() -> Void] = []
 	var onBlur: [() -> Void] = []
+	/// The `placeholder` attribute's text, shown while the textarea is empty in Chrome's placeholder grey (#757575).
+	private let placeholderLabel = UILabel()
+	var placeholder: String? {
+		get { placeholderLabel.text }
+		set {
+			placeholderLabel.text = newValue
+			showPlaceholder()
+		}
+	}
+	override var text: String! { didSet { showPlaceholder() } }
+	override var font: UIFont? { didSet { placeholderLabel.font = font } }
 
 	init() {
 		super.init(frame: .zero, textContainer: nil)
 		delegate = self
 		isScrollEnabled = true
+		placeholderLabel.textColor = UIColor(white: 117 / 255, alpha: 1)
+		placeholderLabel.numberOfLines = 0
+		placeholderLabel.isAccessibilityElement = false
+		placeholderLabel.isHidden = true
+		addSubview(placeholderLabel)
+	}
+
+	private func showPlaceholder() { placeholderLabel.isHidden = (placeholderLabel.text ?? "").isEmpty || !(text ?? "").isEmpty }
+
+	override func layoutSubviews() {
+		super.layoutSubviews()
+		// Where the first line of text starts, wrapped to the text's width.
+		let inset = textContainerInset
+		let width = bounds.width - inset.left - inset.right - 2 * textContainer.lineFragmentPadding
+		let height = placeholderLabel.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
+		placeholderLabel.frame = CGRect(x: inset.left + textContainer.lineFragmentPadding, y: inset.top, width: max(0, width), height: height)
 	}
 
 	@available(*, unavailable)
@@ -2289,6 +2353,7 @@ final class TextArea: UITextView, UITextViewDelegate, KeyedInput {
 	}
 
 	func textViewDidChange(_ textView: UITextView) {
+		showPlaceholder()
 		for change in onChange { change(text) }
 	}
 

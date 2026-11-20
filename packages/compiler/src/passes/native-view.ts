@@ -7075,6 +7075,7 @@ export function createNativeViewPayload(
 	}
 	tapRun = false;
 	wireTicks();
+	foldTextareaText();
 	checkSelects();
 	let lengthLimited = false;
 	const forms = wireForms();
@@ -7249,6 +7250,43 @@ export function createNativeViewPayload(
 					`${where} sits inside an <option>, which a native build shows only text of`,
 					span,
 				);
+		}
+	}
+
+	/**
+	 * A `<textarea>`'s text is its starting value, as the HTML parser makes it the element's default value (less one leading
+	 * line break): fixed text becomes its `value` attribute, which each host shows until the field is edited or bound, and
+	 * no child. Text that follows state, or an element inside, is refused.
+	 */
+	function foldTextareaText() {
+		for (const [at, area] of nodes.entries()) {
+			if (area.kind !== 'element' || area.element !== 'textarea') continue;
+			const inside = nodes.filter((node) => node.parent === area.id);
+			if (inside.length === 0) continue;
+			const span = nodeSpans.get(area.id);
+			const where = `the <textarea> ${area.id}`;
+			let text = '';
+			let fixed = true;
+			for (const node of inside) {
+				if (node.kind !== 'text') {
+					refuse(`${where} holds more than text, which is its starting value`, span);
+					fixed = false;
+					break;
+				}
+				for (const part of node.parts) {
+					if ('text' in part) text += part.text;
+					else fixed = false;
+				}
+			}
+			if (!fixed) {
+				refuse(`the text inside ${where} follows state; bind its \`value\` instead`, span);
+				continue;
+			}
+			for (const node of inside) nodes.splice(nodes.indexOf(node), 1);
+			nodes[at] = {
+				...area,
+				attributes: { ...area.attributes, value: text.startsWith('\n') ? text.slice(1) : text },
+			};
 		}
 	}
 

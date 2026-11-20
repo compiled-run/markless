@@ -43,6 +43,12 @@
 				"parent": "h0",
 				"attributes": {
 					"aria-label": "Notes"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"monospace": true,
+					"size": 0.83333125,
+					"control": "area"
 				}
 			},
 			{
