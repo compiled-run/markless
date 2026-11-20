@@ -74,6 +74,18 @@ if (!host) {
 		signal.listeners.slice().forEach(function (fn) { fn.call(signal, event); });
 	};
 	if (typeof g.queueMicrotask !== 'function') g.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
+	if (typeof g.performance !== 'object' || typeof g.performance.now !== 'function') {
+		var origin = Date.now(), last = 0;
+		// Date.now() can step back when the device clock is set; elapsed time never does.
+		g.performance = { timeOrigin: origin, now: function () { return (last = Math.max(last, Date.now() - origin)); } };
+	}
+	if (typeof g.DOMException !== 'function') {
+		g.DOMException = function DOMException(message, name) {
+			this.message = message === undefined ? '' : String(message);
+			this.name = name === undefined ? 'Error' : String(name);
+		};
+		g.DOMException.prototype = Object.create(Error.prototype, { constructor: { value: g.DOMException, writable: true, configurable: true } });
+	}
 	var Headers = function (pairs) {
 		this.get = function (name) {
 			var key = String(name).toLowerCase(), found = [];

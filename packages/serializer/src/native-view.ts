@@ -1042,7 +1042,12 @@ export type NativeJournalEntry =
 	 * An element marked `overlay` joined the overlay stack (its `hidden` binding showed it) or left it. A `modal` one (it or
 	 * an element inside it carries `aria-modal="true"`) goes in the host's top layer with the page behind inert.
 	 */
-	| { readonly op: 'overlay'; readonly node: string; readonly open: boolean; readonly modal: boolean }
+	| {
+			readonly op: 'overlay';
+			readonly node: string;
+			readonly open: boolean;
+			readonly modal: boolean;
+	  }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
 	| {
 			readonly op: 'attribute';
@@ -1214,6 +1219,8 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		clearInterval: 'timers',
 		queueMicrotask: 'engine',
 		structuredClone: 'engine',
+		performance: 'engine',
+		DOMException: 'engine',
 		// Answers an element's `direction` only, from the host's facts.
 		getComputedStyle: 'engine',
 		console: 'console',
@@ -1287,17 +1294,23 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	IntersectionObserver: 'the DOM, which a phone does not have',
 	customElements: 'the DOM, which a phone does not have',
 	FormData: 'an HTML form, which a phone does not have',
-	devicePixelRatio: 'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
-	innerWidth: 'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
-	innerHeight: 'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
+	devicePixelRatio:
+		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
+	innerWidth:
+		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
+	innerHeight:
+		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
 	outerWidth: 'the browser window, which a phone does not have',
 	outerHeight: 'the browser window, which a phone does not have',
 	visualViewport: 'the browser window, which a phone does not have',
 	scrollX: "the page's scroll position, which a phone's views keep",
 	scrollY: "the page's scroll position, which a phone's views keep",
-	scrollTo: "the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
-	scrollBy: "the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
-	addEventListener: 'listening on the browser window, which a phone does not have; use an event attribute',
+	scrollTo:
+		"the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
+	scrollBy:
+		"the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
+	addEventListener:
+		'listening on the browser window, which a phone does not have; use an event attribute',
 	removeEventListener: 'listening on the browser window, which a phone does not have',
 	dispatchEvent: 'events on the browser window, which a phone does not have',
 	getSelection: 'a text selection in the web page, which a phone does not have',
@@ -1306,7 +1319,7 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	NodeFilter: 'the DOM, which a phone does not have',
 	DOMParser: 'parsing HTML into a DOM, which a phone does not have',
 	CSS: 'the CSS object model, which a phone does not have at run time',
-	XMLHttpRequest: 'the browser\'s old request API; use `fetch`, which a phone provides',
+	XMLHttpRequest: "the browser's old request API; use `fetch`, which a phone provides",
 	alert: 'a browser dialog, which a phone does not have',
 	confirm: 'a browser dialog, which a phone does not have',
 	prompt: 'a browser dialog, which a phone does not have',

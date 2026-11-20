@@ -3830,7 +3830,8 @@ export function Picker() @{
 	});
 
 	it('lets a JavaScript helper measure a handle and read its direction, which the host answers', async () => {
-		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+		const { payload, diagnostics } =
+			await nativeView(`import { element, state } from '@markless/core';
 function quarter(track: HTMLElement | undefined): number {
 	if (!track) return -1;
 	const box = track.getBoundingClientRect();
@@ -3843,6 +3844,30 @@ export function Track() @{
 	<main>
 		<div el={track} />
 		<button onClick={() => (at = quarter(track))}>{at}</button>
+	</main>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(payload!.handlers[0]?.ops.map((op) => op.op)).toEqual(['script']);
+	});
+
+	it("lets a JavaScript helper time a gesture with performance.now() and tell a DOMException's name, which the engine provides", async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { element, state } from '@markless/core';
+function capture(track: HTMLElement | undefined): number {
+	const start = performance.now();
+	try {
+		track?.setPointerCapture(1);
+	} catch (error) {
+		if (!(error instanceof DOMException) || error.name !== 'NotFoundError') throw error;
+	}
+	return performance.now() - start;
+}
+export function Track() @{
+	const track = element<HTMLDivElement>();
+	let took = state(0);
+	<main>
+		<div el={track} />
+		<button onClick={() => (took = capture(track))}>{took}</button>
 	</main>
 }`);
 		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
