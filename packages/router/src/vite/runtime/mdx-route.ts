@@ -1,4 +1,5 @@
 import {
+	installMarklessComposedArmRecords,
 	marklessInstanceScopedLoadSymbol,
 	marklessIslandSpacedSymbol,
 } from '../../../../web/src/fns/instance-scope.ts';
@@ -17,7 +18,13 @@ import {
 import { isUncountedComment } from '../../../../web/src/resume-anchor-census.ts';
 import type { ProtocolViewPayload } from '../../../../serializer/src/protocol.ts';
 import type { ResumeKeyedRepeatRecord } from '../../../../web/src/resume-types.ts';
-export { tryResumeMdxScalar } from './mdx-scalar.ts';
+import { tryResumeMdxScalar as tryScalar } from './mdx-scalar.ts';
+
+// Every page wake starts here; an island's arm re-renders spell their records in the island's own space, as a composed child's do.
+export function tryResumeMdxScalar(...input: Parameters<typeof tryScalar>): ReturnType<typeof tryScalar> {
+	installMarklessComposedArmRecords();
+	return tryScalar(...input);
+}
 
 export type MdxRoutePart =
 	| {
