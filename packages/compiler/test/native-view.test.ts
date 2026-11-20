@@ -2890,12 +2890,15 @@ describe('inline svg', () => {
 		]);
 		const refused = await nativeView(`export function Chart() @{
 	<svg viewBox="0 0 10 10">
-		<text>a<tspan>b</tspan></text>
+		<text>a<tspan x="1" y="1">b</tspan></text>
+		<text><tspan>d</tspan></text>
 		<text stroke="red" style="font-size: 4px">c</text>
 	</svg>
 }`);
 		expect(refused.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
-			'a <tspan> inside <text>, which a native drawing does not place yet',
+			'text beside <tspan>s in a <text>, which a native drawing does not place after them yet',
+			'a <tspan> with no `x` of its own, which a native drawing does not place after the run before it yet',
+			'a <tspan> with no `y` of its own, which a native drawing does not place after the run before it yet',
 			'`style` on <text>, whose font and anchor a native drawing does not read from styles yet',
 			'a stroke on <text>, which a native drawing does not outline yet',
 		]);
@@ -2917,6 +2920,20 @@ export function Note() @{
 }`);
 		expect(unread.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
 			'a spread of attributes from `extra`, which a native build cannot read; write them as attributes or an object literal',
+		]);
+	});
+
+	it('draws each positioned <tspan> as its own run, with letter-spacing and white-space: pre from its <text>', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Figure() @{
+	<svg viewBox="0 0 100 100">
+		<text style="white-space: pre" font-size="20" letter-spacing="0.5em" fill="#000"><tspan x="5" y="10">a  b</tspan><tspan x="5" y="40" fill="red">c</tspan></text>
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const runs = (payload!.nodes.find((node) => 'drawing' in node && node.drawing) as { drawing: { shapes: object[] } }).drawing.shapes;
+		expect(runs).toEqual([
+			{ text: 'a  b', x: 5, y: 10, size: 20, weight: 400, anchor: 'start', baseline: 'alphabetic', letterSpacing: 10, fill: { r: 0, g: 0, b: 0, alpha: 255 } },
+			{ text: 'c', x: 5, y: 40, size: 20, weight: 400, anchor: 'start', baseline: 'alphabetic', letterSpacing: 10, fill: { r: 255, g: 0, b: 0, alpha: 255 } },
 		]);
 	});
 

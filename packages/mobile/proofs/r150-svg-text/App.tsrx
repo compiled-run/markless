@@ -5,6 +5,10 @@ export default function App() @{
 			<title>Dev server to runtime</title>
 			<rect x="4" y="8" width="112" height="24" fill="#f2ecfc" stroke="#c2c2c4" />
 			<text x="60" y="20" text-anchor="middle" dominant-baseline="central" font-family="Arial" font-size="9" fill="#3c3c43">Vite Dev Server</text>
+			<text fill="#15505C" {...{ 'xml:space': 'preserve' }} style="white-space: pre" font-size="6" font-weight="600" letter-spacing="0.1em">
+				<tspan x="78" y="50">module</tspan>
+				<tspan x="78" y="57">graph</tspan>
+			</text>
 			<g transform="translate(4 48)" font-size="8" font-style="italic" fill="hsl(30, 100%, 40%)">
 				<text dominant-baseline="middle">runs code</text>
 			</g>

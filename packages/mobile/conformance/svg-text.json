@@ -84,6 +84,38 @@
 							}
 						},
 						{
+							"text": "module",
+							"x": 78,
+							"y": 50,
+							"size": 6,
+							"weight": 600,
+							"anchor": "start",
+							"baseline": "alphabetic",
+							"letterSpacing": 0.6000000000000001,
+							"fill": {
+								"r": 21,
+								"g": 80,
+								"b": 92,
+								"alpha": 255
+							}
+						},
+						{
+							"text": "graph",
+							"x": 78,
+							"y": 57,
+							"size": 6,
+							"weight": 600,
+							"anchor": "start",
+							"baseline": "alphabetic",
+							"letterSpacing": 0.6000000000000001,
+							"fill": {
+								"r": 21,
+								"g": 80,
+								"b": 92,
+								"alpha": 255
+							}
+						},
+						{
 							"text": "runs code",
 							"x": 0,
 							"y": 0,
@@ -105,14 +137,14 @@
 			},
 			{
 				"kind": "element",
-				"id": "h8",
+				"id": "h11",
 				"element": "p",
 				"parent": "h0"
 			},
 			{
 				"kind": "text",
-				"id": "h8:text0",
-				"parent": "h8",
+				"id": "h11:text0",
+				"parent": "h11",
 				"parts": [
 					{
 						"text": "Diagram drawn"
@@ -125,7 +157,7 @@
 	},
 	"initial": [
 		["h1:text0", "Diagram"],
-		["h8:text0", "Diagram drawn"]
+		["h11:text0", "Diagram drawn"]
 	],
 	"steps": []
 }

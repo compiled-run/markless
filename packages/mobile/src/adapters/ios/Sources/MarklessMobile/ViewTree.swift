@@ -197,7 +197,7 @@ final class DrawingView: UIView {
 		if text.weight >= 600 { traits.insert(.traitBold) }
 		if text.italic { traits.insert(.traitItalic) }
 		if let descriptor = font.fontDescriptor.withSymbolicTraits(traits) { font = UIFont(descriptor: descriptor, size: size) }
-		let string = NSAttributedString(string: text.text, attributes: [.font: font, .foregroundColor: color(text.fill)])
+		let string = NSAttributedString(string: text.text, attributes: [.font: font, .foregroundColor: color(text.fill), .kern: CGFloat(text.letterSpacing)])
 		let width = string.size().width
 		let x = CGFloat(text.x) - (text.anchor == "middle" ? width / 2 : text.anchor == "end" ? width : 0)
 		// draw(at:) places the line's top; move from the requested baseline to it.

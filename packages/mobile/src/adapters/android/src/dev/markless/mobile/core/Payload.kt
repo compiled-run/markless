@@ -174,7 +174,7 @@ sealed interface ShapePaint {
 sealed interface DrawingPart
 
 /** A run of SVG text at one point: [anchor] start/middle/end at x, [baseline] alphabetic/middle/central at y. */
-data class DrawingText(val text: String, val x: Double, val y: Double, val size: Double, val weight: Int, val italic: Boolean, val family: String?, val anchor: String, val baseline: String, val fill: ShapePaint, val transform: List<Double>?) : DrawingPart
+data class DrawingText(val text: String, val x: Double, val y: Double, val size: Double, val weight: Int, val italic: Boolean, val family: String?, val anchor: String, val baseline: String, val fill: ShapePaint, val transform: List<Double>?, val letterSpacing: Double = 0.0) : DrawingPart
 
 data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val dash: List<Double>? = null, val dashOffset: Double = 0.0) : DrawingPart
 
@@ -673,7 +673,7 @@ data class Payload(
 				val w = "$what.shapes[$n]"
 				val so = sv.obj(w)
 				if ("text" in so) {
-					so.only(setOf("text", "x", "y", "size", "weight", "italic", "family", "anchor", "baseline", "fill", "transform"), w)
+					so.only(setOf("text", "x", "y", "size", "weight", "italic", "family", "anchor", "baseline", "letterSpacing", "fill", "transform"), w)
 					val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
 					if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
 					return@mapIndexed DrawingText(
@@ -683,6 +683,7 @@ data class Payload(
 						so["family"]?.str("$w.family"), oneOf(so, "anchor", setOf("start", "middle", "end"), w),
 						oneOf(so, "baseline", setOf("alphabetic", "middle", "central"), w),
 						paint(so.field("fill", w), "$w.fill") ?: throw MarklessDecodeError("$w.fill must be a paint"), transform,
+						so["letterSpacing"]?.num("$w.letterSpacing") ?: 0.0,
 					)
 				}
 				so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "dash", "dashOffset"), w)

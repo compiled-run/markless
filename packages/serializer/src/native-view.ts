@@ -407,6 +407,8 @@ export type NativeDrawingText = {
 	readonly family?: string;
 	readonly anchor: 'start' | 'middle' | 'end';
 	readonly baseline: 'alphabetic' | 'middle' | 'central';
+	/** Space added after each character, in user units. */
+	readonly letterSpacing?: number;
 	readonly fill: NativeColor | 'currentColor';
 	readonly transform?: readonly [number, number, number, number, number, number];
 };

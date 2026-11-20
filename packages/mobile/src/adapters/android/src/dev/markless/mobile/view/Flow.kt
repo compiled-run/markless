@@ -260,6 +260,7 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 		paint.style = Paint.Style.FILL
 		use(paint, part.fill)
 		paint.textSize = part.size.toFloat()
+		if (part.size > 0) paint.letterSpacing = (part.letterSpacing / part.size).toFloat()
 		paint.typeface = Typeface.create(Typeface.create(part.family ?: "sans-serif", Typeface.NORMAL), part.weight.coerceIn(1, 1000), part.italic)
 		paint.textAlign = when (part.anchor) { "middle" -> Paint.Align.CENTER; "end" -> Paint.Align.RIGHT; else -> Paint.Align.LEFT }
 		val metrics = paint.fontMetrics

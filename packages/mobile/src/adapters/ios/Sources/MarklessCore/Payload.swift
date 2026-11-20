@@ -239,6 +239,8 @@ public struct NativeDrawingText: Equatable, Sendable {
 	public let baseline: String
 	public let fill: NativeShape.Paint
 	public let transform: [Double]?
+	/// Space added after each character, in user units.
+	public var letterSpacing: Double = 0
 }
 
 /// What a drawing paints, in order.
@@ -898,8 +900,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))
 		}
 		let shapes = try field["shapes"].array().map { shape -> NativeDrawingPart in
-			if try shape.object(required: [], optional: ["text", "x", "y", "size", "weight", "italic", "family", "anchor", "baseline", "fill", "transform", "path", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "dash", "dashOffset"]).has("text") {
-				let t = try shape.object(required: ["text", "x", "y", "size", "weight", "anchor", "baseline", "fill"], optional: ["italic", "family", "transform"])
+			if try shape.object(required: [], optional: ["text", "x", "y", "size", "weight", "italic", "family", "anchor", "baseline", "letterSpacing", "fill", "transform", "path", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "dash", "dashOffset"]).has("text") {
+				let t = try shape.object(required: ["text", "x", "y", "size", "weight", "anchor", "baseline", "fill"], optional: ["italic", "family", "transform", "letterSpacing"])
 				let anchor = try t["anchor"].string()
 				guard ["start", "middle", "end"].contains(anchor) else { throw shape.fail("unknown anchor \(anchor)") }
 				let baseline = try t["baseline"].string()
@@ -910,7 +912,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 				return .text(NativeDrawingText(
 					text: try t["text"].string(), x: try t["x"].number(), y: try t["y"].number(), size: try t["size"].number(),
 					weight: Int(try t["weight"].number()), italic: t.has("italic") ? try t["italic"].bool() : false,
-					family: t.has("family") ? try t["family"].string() : nil, anchor: anchor, baseline: baseline, fill: fill, transform: transform))
+					family: t.has("family") ? try t["family"].string() : nil, anchor: anchor, baseline: baseline, fill: fill, transform: transform,
+					letterSpacing: t.has("letterSpacing") ? try t["letterSpacing"].number() : 0))
 			}
 			let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "dash", "dashOffset"])
 			let dash = s.has("dash") ? try s["dash"].array().map { try $0.number() } : nil

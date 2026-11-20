@@ -54,6 +54,8 @@ type Inherited = {
 	readonly italic: boolean;
 	readonly anchor: NativeDrawingText['anchor'];
 	readonly baseline: NativeDrawingText['baseline'];
+	/** `letter-spacing` in user units, an `em` resolved against the font size where it is written. */
+	readonly letterSpacing: number;
 	/** What `currentColor` is, when an ancestor's `color` attribute says; else the svg's text colour. */
 	readonly color: NativeColor | null;
 };
@@ -76,6 +78,7 @@ const INITIAL: Inherited = {
 	italic: false,
 	anchor: 'start',
 	baseline: 'alphabetic',
+	letterSpacing: 0,
 	color: null,
 };
 
@@ -123,6 +126,7 @@ const GEOMETRY: Readonly<Record<string, ReadonlyArray<string>>> = {
 	use: ['href', 'xlink:href', 'x', 'y', 'width', 'height'],
 	symbol: ['viewBox', 'width', 'height', 'x', 'y'],
 	text: ['x', 'y', 'xml:space'],
+	tspan: ['x', 'y'],
 };
 const PRESENTATION = new Set([
 	'fill',
@@ -144,6 +148,7 @@ const PRESENTATION = new Set([
 	'font-style',
 	'text-anchor',
 	'dominant-baseline',
+	'letter-spacing',
 	'color',
 ]);
 
@@ -315,6 +320,13 @@ export function compileDrawing(
 			if (anchor === 'start' || anchor === 'middle' || anchor === 'end') next.anchor = anchor;
 			else refuse(element.id, `\`text-anchor="${anchor}"\` on <${element.tag}>`);
 		}
+		const spacing = attribute('letter-spacing')?.trim();
+		if (spacing !== undefined) {
+			const em = /^(-?[\d.]+)em$/.exec(spacing);
+			const value = spacing === 'normal' ? 0 : em ? Number(em[1]) * next.fontSize : parseLength(spacing);
+			if (value === null || !Number.isFinite(value)) refuse(element.id, `\`letter-spacing="${spacing}"\` on <${element.tag}>`);
+			else next.letterSpacing = value;
+		}
 		const baseline = attribute('dominant-baseline')?.trim();
 		if (baseline !== undefined) {
 			if (baseline === 'auto' || baseline === 'alphabetic') next.baseline = 'alphabetic';
@@ -324,59 +336,83 @@ export function compileDrawing(
 		return next;
 	};
 
-	/** A `<text>` run: one string at one point, no `<tspan>`s, filled and not stroked. */
+	/**
+	 * A `<text>` as runs: its own text at its x and y, or each `<tspan>` at the x and y it gives (as diagram exports
+	 * write them), each filled and not stroked.
+	 */
 	const emitText = (element: DrawingElement, style: Inherited, matrix: Matrix) => {
-		const children = childrenOf(element.path);
-		if (children.length > 0) {
-			refuse(element.id, `a <${children[0]!.tag}> inside <text>, which a native drawing does not place yet`);
-			return;
+		const declared = (element.attributes.style ?? '').trim();
+		let preserve = element.attributes['xml:space'] === 'preserve';
+		if (declared !== '') {
+			const whiteSpace = /^white-space\s*:\s*(pre|normal)\s*;?$/.exec(declared);
+			if (whiteSpace) preserve = whiteSpace[1] === 'pre';
+			else refuse(element.id, `\`style\` on <text>, whose font and anchor a native drawing does not read from styles yet`);
 		}
-		if ((element.attributes.style ?? '').trim() !== '')
-			refuse(element.id, `\`style\` on <text>, whose font and anchor a native drawing does not read from styles yet`);
-		const position = (name: 'x' | 'y') => {
-			const raw = element.attributes[name]?.trim() ?? '0';
+		const ownText = (of: DrawingElement) =>
+			texts
+				.filter((text) => text.path.length === of.path.length + 1 && isPrefix(of.path, text.path))
+				.map((text) => text.text)
+				.join('');
+		const position = (of: DrawingElement, name: 'x' | 'y', required: boolean): number | null => {
+			const raw = of.attributes[name]?.trim();
+			if (raw === undefined) {
+				if (required) refuse(of.id, `a <${of.tag}> with no \`${name}\` of its own, which a native drawing does not place after the run before it yet`);
+				return required ? null : 0;
+			}
 			const parts = raw.split(/[\s,]+/).filter((part) => part !== '');
-			if (parts.length > 1) refuse(element.id, `\`${name}="${raw}"\` on <text>, a position per character, which a native drawing does not place yet`);
+			if (parts.length > 1) refuse(of.id, `\`${name}="${raw}"\` on <${of.tag}>, a position per character, which a native drawing does not place yet`);
 			const value = parseLength(parts[0] ?? '0');
-			if (value === null) refuse(element.id, `\`${name}="${raw}"\` on <text>, which is not a length in user units`);
+			if (value === null) refuse(of.id, `\`${name}="${raw}"\` on <${of.tag}>, which is not a length in user units`);
 			return value ?? 0;
 		};
-		const written = texts
-			.filter((text) => text.path.length === element.path.length + 1 && isPrefix(element.path, text.path))
-			.map((text) => text.text)
-			.join('');
-		// xml:space="preserve" keeps every space and turns line breaks into spaces; otherwise runs of white space collapse.
-		const text =
-			element.attributes['xml:space'] === 'preserve'
-				? written.replace(/[\n\r\t]/g, ' ')
-				: written.replace(/\s+/g, ' ').trim();
-		const x = position('x');
-		const y = position('y');
-		if (style.stroke !== null && style.width > 0)
-			refuse(element.id, 'a stroke on <text>, which a native drawing does not outline yet');
-		const fill = style.fill;
-		if (fill !== null && typeof fill === 'object' && 'gradient' in fill) {
-			refuse(element.id, 'a gradient fill on <text>, which a native drawing does not paint yet');
+		const run = (of: DrawingElement, runStyle: Inherited, x: number, y: number) => {
+			const written = ownText(of);
+			// Preserved white space keeps every space and turns line breaks into spaces; otherwise runs of it collapse.
+			const text = preserve ? written.replace(/[\n\r\t]/g, ' ') : written.replace(/\s+/g, ' ').trim();
+			if (runStyle.stroke !== null && runStyle.width > 0)
+				refuse(of.id, `a stroke on <${of.tag}>, which a native drawing does not outline yet`);
+			const fill = runStyle.fill;
+			if (fill !== null && typeof fill === 'object' && 'gradient' in fill) {
+				refuse(of.id, `a gradient fill on <${of.tag}>, which a native drawing does not paint yet`);
+				return;
+			}
+			if (fill === null || text === '') return;
+			const opacity = runStyle.fillOpacity * runStyle.opacity;
+			const resolved = fill === 'currentColor' && runStyle.color ? runStyle.color : fill;
+			if (resolved === 'currentColor' && opacity !== 1)
+				refuse(of.id, `a see-through \`currentColor\` paint on <${of.tag}>: its colour comes from the page's styles`);
+			shapes.push({
+				text,
+				x,
+				y,
+				size: runStyle.fontSize,
+				weight: runStyle.fontWeight,
+				...(runStyle.italic ? { italic: true as const } : {}),
+				...(runStyle.fontFamily ? { family: runStyle.fontFamily } : {}),
+				anchor: runStyle.anchor,
+				baseline: runStyle.baseline,
+				...(runStyle.letterSpacing !== 0 ? { letterSpacing: runStyle.letterSpacing } : {}),
+				fill: resolved === 'currentColor' || opacity === 1 ? resolved : { ...resolved, alpha: Math.round(resolved.alpha * opacity) },
+				...(matrix.every((value, index) => value === IDENTITY[index]) ? {} : { transform: matrix }),
+			});
+		};
+		const spans = childrenOf(element.path);
+		if (spans.length === 0) {
+			run(element, style, position(element, 'x', false)!, position(element, 'y', false)!);
 			return;
 		}
-		if (fill === null || text === '') return;
-		const opacity = style.fillOpacity * style.opacity;
-		const resolved = fill === 'currentColor' && style.color ? style.color : fill;
-		if (resolved === 'currentColor' && opacity !== 1)
-			refuse(element.id, "a see-through `currentColor` paint on <text>: its colour comes from the page's styles");
-		shapes.push({
-			text,
-			x,
-			y,
-			size: style.fontSize,
-			weight: style.fontWeight,
-			...(style.italic ? { italic: true as const } : {}),
-			...(style.fontFamily ? { family: style.fontFamily } : {}),
-			anchor: style.anchor,
-			baseline: style.baseline,
-			fill: resolved === 'currentColor' || opacity === 1 ? resolved : { ...resolved, alpha: Math.round(resolved.alpha * opacity) },
-			...(matrix.every((value, index) => value === IDENTITY[index]) ? {} : { transform: matrix }),
-		});
+		if (ownText(element).trim() !== '')
+			refuse(element.id, 'text beside <tspan>s in a <text>, which a native drawing does not place after them yet');
+		for (const span of spans) {
+			if (span.tag !== 'tspan' || childrenOf(span.path).length > 0) {
+				refuse(span.id, `a <${span.tag}> inside <${span.tag === 'tspan' ? 'tspan' : 'text'}>, which a native drawing does not place yet`);
+				continue;
+			}
+			checkAttributes(span);
+			const x = position(span, 'x', true);
+			const y = position(span, 'y', true);
+			if (x !== null && y !== null) run(span, inherit(span, style), x, y);
+		}
 	};
 
 	const checkAttributes = (element: DrawingElement) => {
