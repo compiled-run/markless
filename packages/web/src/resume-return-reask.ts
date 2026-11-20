@@ -1,4 +1,5 @@
 import type { AsyncComputedPlane, PaintHoldInternals, PaintHoldPlane, RuntimeGraph } from '@markless/runtime';
+import { setDataField } from '../../serializer/src/value-own-field.ts';
 import type { RuntimeAsyncComputedNode } from '@markless/runtime/graph-async-load';
 import { currentDispatch, dispatchSpans, holdBusy, type DispatchSpan } from './event-current-target.ts';
 import { IN_PLACE_LOCATION_HEADER, IN_PLACE_REQUEST_HEADER } from './fns/in-place-headers.ts';
@@ -63,7 +64,10 @@ function shallowCopy(value: unknown): unknown {
 	if (Array.isArray(value)) return value.slice();
 	if (value instanceof Map) return new Map(value);
 	if (value instanceof Set) return new Set(value);
-	return isObject(value) ? Object.assign(Object.create(Object.getPrototypeOf(value)), value) : value;
+	if (!isObject(value)) return value;
+	const copy = Object.create(Object.getPrototypeOf(value)) as Record<string, unknown>;
+	for (const key of Object.keys(value)) setDataField(copy, key, value[key]);
+	return copy;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

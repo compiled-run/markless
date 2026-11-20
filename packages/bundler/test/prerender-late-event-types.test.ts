@@ -3,9 +3,9 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { readFile, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { chromium } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterAll, expect, test } from 'vitest';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 // A prerendered page's startup script lists only the event types its served
 // markup needs. An element an @if inside @try commits after resume can ask for
@@ -57,7 +57,7 @@ for (const { page, script } of pages) {
 		});
 		await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
 		const { port } = server.address() as AddressInfo;
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const tab = await browser.newPage();
 			const errors: string[] = [];

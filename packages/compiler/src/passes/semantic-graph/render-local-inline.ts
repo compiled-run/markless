@@ -786,7 +786,7 @@ function classifyDeclaration(
 							? { kind: 'definition', init }
 							: init.type === 'ArrowFunctionExpression' ||
 								  init.type === 'FunctionExpression' ||
-								  isClassInstanceValue(init)
+								  isClassInstanceValue(init, state.semantic)
 								? { kind: 'capture-owned' }
 								: candidate.kind === 'const'
 									? { kind: 'definition', init: declarator.init as AnyNode }

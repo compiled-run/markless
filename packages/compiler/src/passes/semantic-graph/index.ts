@@ -92,6 +92,7 @@ import { collectSemanticMarkup, componentStyleScopeClass } from './collect-marku
 import { moduleIdOf } from '../../module-id.ts';
 import { inlineNestedTemplateLocals } from './render-local-inline.ts';
 import { collectDirectEvalDiagnostics } from './direct-eval.ts';
+import { parameterPropertyDiagnostics } from './parameter-properties.ts';
 import { mintAsyncBoundaryGates } from '../public-render/boundary-runner.ts';
 import { componentsWithRejectingHandlers, keepRejectingChildCatches } from './rejecting-handlers.ts';
 import {
@@ -122,6 +123,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 			source: input.source,
 			filename: input.filename,
 		}),
+		...parameterPropertyDiagnostics(ast, input.source, input.filename),
 	);
 	const apiSources = frameworkApiSources(input.additionalFrameworkApiSources);
 	graph.moduleImports.push(...collectModuleImports(statements, apiSources));

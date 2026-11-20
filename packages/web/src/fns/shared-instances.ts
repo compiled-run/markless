@@ -1,5 +1,6 @@
 // The browser half of shared(): one instance per document (spec 03, "Where an instance lives").
 import type { ProtocolStatePayload } from '@markless/serializer/protocol';
+import { setDataField } from '../../../serializer/src/value-own-field.ts';
 import type { RuntimeGraph } from '@markless/runtime';
 import {
 	PROTOCOL_SHARED_INSTANCES_PROPERTY,
@@ -121,7 +122,7 @@ function mergeWrite(base: unknown, theirs: unknown, ours: unknown): unknown {
 	const before = base as Record<string, unknown>;
 	for (const [key, value] of Object.entries(ours as Record<string, unknown>))
 		if (!sameValue(value, before[key]))
-			merged[key] = mergeWrite(before[key], merged[key], value);
+			setDataField(merged, key, mergeWrite(before[key], merged[key], value));
 	return merged;
 }
 

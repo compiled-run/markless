@@ -1,10 +1,10 @@
 import { createServer } from 'node:http';
 import { readFile, rm } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
-import { chromium } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterAll, expect, test } from 'vitest';
 import { buildFixture } from '../../router/test/support/fixture-build.ts';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 const fixtures = resolve(import.meta.dirname, '../fixtures');
 const outRoots: string[] = [];
@@ -56,7 +56,7 @@ test('a directly rendered app imported through @markless/core preloads none of t
 	console.info(`direct startup: ${direct.startup.length} scripts, ${direct.code.length} B raw, ${direct.gzip} B gzip`);
 
 	const { server, origin } = await serve(direct.outDir);
-	const browser = await chromium.launch();
+	const browser = await launchBrowser();
 	try {
 		const page = await browser.newPage();
 		const errors: string[] = [];
