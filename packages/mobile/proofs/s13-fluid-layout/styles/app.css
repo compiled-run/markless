@@ -1,0 +1,58 @@
+body {
+	margin: 0;
+	font-family: sans-serif;
+	color: #1d3557;
+}
+
+.page {
+	max-width: 560px;
+	margin: 0 auto;
+	padding: 16px;
+}
+
+.hero {
+	padding: 3vw;
+	background: #a8dadc;
+}
+
+.row {
+	display: flex;
+	gap: 12px;
+	margin-top: 16px;
+}
+
+.cell {
+	flex: 1;
+	padding: 10px;
+	background: #f1faee;
+	border: 1px solid #457b9d;
+}
+
+.bar {
+	width: 60%;
+	height: 12px;
+	margin-top: 16px;
+	background: #e63946;
+}
+
+.chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 16px;
+}
+
+.chip {
+	width: 104px;
+	padding: 6px 0;
+	text-align: center;
+	background: #457b9d;
+	color: #ffffff;
+	font-size: 14px;
+}
+
+.story {
+	margin-top: 16px;
+	font-size: 17px;
+	line-height: 1.4;
+}

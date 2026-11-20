@@ -1,0 +1,101 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Board",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "cards"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Seeds sown on Monday"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Beds turned on Wednesday"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "card"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Harvest on Saturday"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "note"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Cards stack on a narrow screen and sit in a row from 600 px."
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "wide-only"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "Shown in landscape only."
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n\tcolor: #22223b;\n}\n\n.page {\n\tpadding: 16px;\n}\n\n.cards {\n\tdisplay: flex;\n\tflex-direction: column;\n\tgap: 12px;\n}\n\n.card {\n\tpadding: 12px;\n\tbackground: #f2e9e4;\n\tborder: 1px solid #4a4e69;\n}\n\n.note {\n\tmargin-top: 16px;\n\tfont-size: 15px;\n}\n\n.wide-only {\n\tdisplay: none;\n}\n\n@media (min-width: 600px) {\n\t.cards {\n\t\tflex-direction: row;\n\t}\n\n\t.card {\n\t\tflex: 1;\n\t}\n}\n\n@media (max-width: 399px) {\n\t.page {\n\t\tpadding: 8px;\n\t}\n}\n\n@media (400px <= width < 700px) {\n\t.note {\n\t\tfont-size: 17px;\n\t\tcolor: #9a031e;\n\t}\n}\n\n@media (orientation: landscape) {\n\t.wide-only {\n\t\tdisplay: block;\n\t\tmargin-top: 12px;\n\t\tpadding: 8px;\n\t\tbackground: #c9ada7;\n\t}\n}\n",
+	"states": []
+}

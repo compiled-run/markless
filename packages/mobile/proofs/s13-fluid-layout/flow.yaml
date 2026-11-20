@@ -1,0 +1,11 @@
+appId: ${APP_ID}
+name: s13-fluid-layout
+---
+- launchApp:
+      clearState: true
+- assertVisible: Field notes
+- assertVisible: Left half
+- assertVisible: Right half
+- assertVisible: Basil
+- assertVisible: Chervil
+- assertVisible: Field notes

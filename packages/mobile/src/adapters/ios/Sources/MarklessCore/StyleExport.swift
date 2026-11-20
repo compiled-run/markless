@@ -104,11 +104,51 @@ public struct StyleState: Sendable {
 }
 
 public let nativeAppStyleVersion = "markless.native-app-style/0"
+public let dragonMarklessPlanVersion = "dragon.markless-plan/1"
 
-/// One media feature of a sheet's `@media` bands, as Dragon wrote it for the device to evaluate.
+/// A number of Dragon's plan layout: its IEEE 754 bit pattern as 16 hex digits; arrays of them element by element.
+private func planNumbers(_ value: JSONValue) throws -> JSONValue {
+	switch value {
+	case .array(let items): return .array(try items.map(planNumbers))
+	default: return .number(try planNumber(value))
+	}
+}
+
+extension String {
+	fileprivate func leftPadded(_ count: Int) -> String { String(repeating: "0", count: max(0, count - self.count)) + self }
+}
+
+private func planNumber(_ value: JSONValue) throws -> Double {
+	guard case let .string(hex) = value, hex.utf8.count == 16, let bits = UInt64(hex, radix: 16) else {
+		throw PayloadError(path: "plan layout", reason: "\(value.jsonText) is not a number's bit pattern")
+	}
+	return Double(bitPattern: bits)
+}
+
+/// Dragon's border operations of a box, as [[origin x, y], [width, height], widths, [[op, side, alpha, antialias, points]]], in the export's shape.
+private func planBorderOps(_ reader: Reader) throws -> JSONValue {
+	let p = try reader.array()
+	guard p.count == 4 else { throw reader.fail("expected origin, size, widths and operations") }
+	let origin = try p[0].array().map { try planNumber($0.value) }
+	let size = try p[1].array().map { try planNumber($0.value) }
+	guard origin.count == 2, size.count == 2 else { throw reader.fail("expected an origin and a size") }
+	return .object([
+		("origin", .object([("x", .number(origin[0])), ("y", .number(origin[1]))])),
+		("size", .object([("width", .number(size[0])), ("height", .number(size[1]))])),
+		("widths", try planNumbers(p[2].value)),
+		("ops", .array(try p[3].array().map { op in
+			let o = try op.array()
+			guard o.count == 5 else { throw op.fail("expected op, side, alpha, antialias and points") }
+			return .object([("op", o[0].value), ("side", o[1].value), ("alpha", try planNumbers(o[2].value)), ("antialias", o[3].value), ("points", try planNumbers(o[4].value))])
+		})),
+	])
+}
+
+/// One media feature of a sheet's `@media` bands, as Dragon wrote it for the device to evaluate: each comparison is
+/// (op, value, num, den) as Dragon's `rt-band` reads it.
 public struct StyleAtom: Sendable {
 	public let feature: String
-	public let comparisons: Int
+	public let comparisons: [(op: String, value: Double, num: Double, den: Double)]
 	public let keyword: String
 }
 
@@ -118,11 +158,38 @@ public struct StyleBands: Sendable {
 	public let atoms: [StyleAtom]
 	public let bands: [[Bool]]
 
-	/// The band the device is in: only `prefers-color-scheme` is read on a phone so far; any other feature is refused.
+	/// Dragon's translated `runLibraryCase`, which looks a band up by the root's size (`rt-band`); set by a host that links it.
+	nonisolated(unsafe) public static var library: ((String) -> String)?
+
+	/// The band of a page area `widthPx` x `heightPx` device px at `scale`: Dragon's own lookup (Chrome's media evaluation)
+	/// when any atom reads more than the colour scheme, else the colour scheme alone.
+	public func band(dark: Bool, widthPx: Double, heightPx: Double, scale: Double) throws -> Int {
+		guard atoms.contains(where: { $0.feature != "prefers-color-scheme" }) else { return try band(dark: dark) }
+		guard let library = StyleBands.library else {
+			throw PayloadError(path: "style.bands", reason: "@media \(atoms.map(\.feature)) needs Dragon's band lookup, which this host does not link")
+		}
+		let bits = { (v: Double) in "\"\(String(v.bitPattern, radix: 16).leftPadded(16))\"" }
+		let atomsText = atoms.map { atom in
+			"[\"\(atom.feature)\",\"\(atom.keyword)\",[\(atom.comparisons.map { "[\"\($0.op)\",\(bits($0.value)),\(bits($0.num)),\(bits($0.den))]" }.joined(separator: ","))]]"
+		}.joined(separator: ",")
+		let bandsText = bands.map { "[\($0.map { $0 ? "true" : "false" }.joined(separator: ","))]" }.joined(separator: ",")
+		// A phone's readings: a coarse primary pointer that does not hover, and no fine pointer.
+		let readings = "[\"coarse\",false,true,false,false,false,\(dark)]"
+		let line = "[\"rt-band\",[[\(atomsText)],[\(bandsText)]],[[\(bits(widthPx.rounded())),\(bits(heightPx.rounded())),\(bits(scale)),\(readings)]]]"
+		let result = try Reader(JSONValue.parse(Data(library(line).utf8)), at: "band lookup").array()
+		guard result.count == 2, try result[0].string() == "ok", let size = try result[1].array().first, try size.array().count == 3 else {
+			throw PayloadError(path: "band lookup", reason: "Dragon's band lookup failed at \(widthPx) x \(heightPx) px: \(String(decoding: Data(library(line).utf8), as: UTF8.self))")
+		}
+		let index = try planNumber(try size.array()[2].value)
+		guard index >= 0, index < Double(bands.count), index == index.rounded() else { throw PayloadError(path: "band lookup", reason: "band \(index) is not a band") }
+		return Int(index)
+	}
+
+	/// The band the device is in by the colour scheme alone; an atom of any other feature needs the size (above).
 	public func band(dark: Bool) throws -> Int {
 		let truth = try atoms.map { atom -> Bool in
-			guard atom.feature == "prefers-color-scheme", atom.comparisons == 0 else {
-				throw PayloadError(path: "style.bands", reason: "the media feature \(atom.feature) is not evaluated on iOS yet")
+			guard atom.feature == "prefers-color-scheme", atom.comparisons.isEmpty else {
+				throw PayloadError(path: "style.bands", reason: "the media feature \(atom.feature) needs the page's size")
 			}
 			switch atom.keyword {
 			case "any": return true
@@ -147,12 +214,12 @@ public struct SheetStyle: Sendable {
 /// One target of a decoded `dragon.native-style-export/0` or `/1` file; `/0` reads as one assignment and no states.
 public struct StyleExport: Sendable {
 	public let fonts: [(id: String, file: String)]
-	public let viewport: (width: Double, height: Double)
-	public let dpr: Double
+	public private(set) var viewport: (width: Double, height: Double)
+	public private(set) var dpr: Double
 	public let states: [StyleState]
 	public let initial: Int
 	/// Every reachable combination of states, each a complete node list, with each state's value in it.
-	public let assignments: [(values: [String: NativeValue], nodes: [StyleNode], canvas: RGBA?, body: RGBA?)]
+	public private(set) var assignments: [(values: [String: NativeValue], nodes: [StyleNode], canvas: RGBA?, body: RGBA?)]
 	/// `next[a][s][v]`: the assignment reached from `a` by setting state `s` to its `v`-th value; -1 when unreachable.
 	public let next: [[[Int]]]
 	/// Why Dragon does not call this target shipping output yet; nil when it is `ready`.
@@ -160,18 +227,26 @@ public struct StyleExport: Sendable {
 	/// Only for a sheet with `@media`: its bands, selected by the state `@env#band`.
 	public let bands: StyleBands?
 	/// Each assignment's page scroll range in device px; nil when Dragon does not decide it (see `pageScrollUndecided`).
-	public let pageScrolls: [ScrollOffsetRange?]
+	public private(set) var pageScrolls: [ScrollOffsetRange?]
 	/// Dragon's reason, for this target, when it leaves a page scroll range undecided.
 	public let pageScrollUndecided: String?
 	/// Each system sheet's content, laid out as its own document at every resting height (app style files only).
 	public var sheets: [SheetStyle] = []
 	/// Each system face the export names, by id: the platform font this host draws it with.
 	public var systemFaces: [String: SystemFace] = [:]
+	/// Dragon's layout plan (`dragon.markless-plan/1`) as JSON text: with it the page lays out at the screen's own size.
+	public var plan: String?
+	/// Per assignment: each Dragon id the plan's geometry names, with the export's id for it (empty: no ids differ).
+	public var planNames: [[String: String]] = []
 
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
 		let root = try Reader(JSONValue.parse(data), at: "style")
-		let fields = try root.object(required: ["schema", "units", "fonts", "targets"], optional: ["compiler", "component", "source", "warnings", "systemFonts"])
+		let fields = try root.object(required: ["schema", "units", "fonts", "targets"], optional: ["compiler", "component", "source", "warnings", "systemFonts", "fontMode"])
+		if fields.has("fontMode") {
+			let fontMode = try fields["fontMode"]
+			guard ["system", "pinned"].contains(try fontMode.string()) else { throw fontMode.fail("is neither system nor pinned") }
+		}
 		let schema = try fields["schema"].string()
 		guard dragonStyleExportSchemas.contains(schema) else {
 			throw PayloadError(path: "style.schema", reason: "unsupported schema \"\(schema)\", this host reads \(dragonStyleExportSchemas)")
@@ -235,11 +310,13 @@ public struct StyleExport: Sendable {
 				try raw(f, "readiness"), try raw(f, "states"), try raw(f, "initial"), ("assignments", .array(assignments)), try raw(f, "next"),
 			]
 			if f.has("bands") { page.append(("bands", try f["bands"].value)) }
+			for key in ["plan", "planNames"] where f.has(key) { page.append((key, try f[key].value)) }
 			return try decodeTarget(try Reader(.object(page), at: reader.path), perState: true, fonts: fonts, backend: backend)
 		}
 		for route in try targetFields["routes"].array() {
 			let f = try route.object(
-				required: ["pattern", "component", "compiler", "readiness", "states", "initial", "next", "assignments"], optional: ["bands", "sheets"])
+				required: ["pattern", "component", "compiler", "readiness", "states", "initial", "next", "assignments"],
+				optional: ["bands", "sheets", "plan", "planNames"])
 			let pattern = try f["pattern"].string()
 			_ = (try f["component"].string(), try f["compiler"].string())
 			guard routes[pattern] == nil else { throw route.fail("route \(pattern) is listed twice") }
@@ -292,7 +369,7 @@ public struct StyleExport: Sendable {
 		return out
 	}
 
-	private static func decodeLines(_ reader: Reader) throws -> [TextLine] {
+	fileprivate static func decodeLines(_ reader: Reader) throws -> [TextLine] {
 		try reader.array().map { line in
 			let l = try line.object(["top", "baseline", "runs"])
 			let runs = try l["runs"].array().map { run in
@@ -325,7 +402,7 @@ public struct StyleExport: Sendable {
 	) throws -> StyleExport {
 		let targetFields = try chosen.object(
 			required: perState ? ["backend", "viewport", "dpr", "states", "initial", "assignments", "next"] : ["backend", "viewport", "dpr", "nodes"],
-			optional: perState ? ["readiness", "bands"] : [])
+			optional: perState ? ["readiness", "bands", "plan", "planNames"] : [])
 		var notReady: String?
 		if targetFields.has("readiness") {
 			let readiness = try targetFields["readiness"]
@@ -400,7 +477,11 @@ public struct StyleExport: Sendable {
 			let b = try reader.object(["atoms", "bands", "conditions"])
 			let atoms = try b["atoms"].array().map { atom in
 				let a = try atom.object(["feature", "comparisons", "keyword"])
-				return StyleAtom(feature: try a["feature"].string(), comparisons: try a["comparisons"].array().count, keyword: try a["keyword"].string())
+				let comparisons = try a["comparisons"].array().map { c in
+					let f = try c.object(["op", "value", "num", "den"])
+					return (op: try f["op"].string(), value: try f["value"].number(), num: try f["num"].number(), den: try f["den"].number())
+				}
+				return StyleAtom(feature: try a["feature"].string(), comparisons: comparisons, keyword: try a["keyword"].string())
 			}
 			let rows = try b["bands"].array().map { row in try row.array().map { try $0.bool() } }
 			_ = try b["conditions"].array().map { try $0.string() }
@@ -411,14 +492,92 @@ public struct StyleExport: Sendable {
 		} else if states.contains(where: { $0.key == StyleBands.state }) {
 			throw PayloadError(path: chosen.path, reason: "\(StyleBands.state) is a state, but there are no bands")
 		}
-		return StyleExport(
+		var style = StyleExport(
 			fonts: fonts, viewport: (try viewport["width"].number(), try viewport["height"].number()),
 			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: assignments, next: next, notReady: notReady,
 			bands: bands, pageScrolls: pageScrolls, pageScrollUndecided: pageScrollUndecided)
+		if targetFields.has("plan") {
+			let plan = try targetFields["plan"]
+			guard try plan.field("version").string() == dragonMarklessPlanVersion else {
+				throw PayloadError(path: plan.path + ".version", reason: "this host reads \(dragonMarklessPlanVersion)")
+			}
+			style.plan = plan.value.jsonText
+		}
+		if targetFields.has("planNames") {
+			let perAssignment = try targetFields["planNames"]
+			style.planNames = try perAssignment.array().map { assignment in
+				var map: [String: String] = [:]
+				for pair in try assignment.array() {
+					let names = try pair.array()
+					guard names.count == 2 else { throw pair.fail("expected a Dragon id and the export's id") }
+					map[try names[0].string()] = try names[1].string()
+				}
+				return map
+			}
+			guard style.planNames.count == assignments.count else {
+				throw perAssignment.fail("names \(style.planNames.count) assignments; the export has \(assignments.count)")
+			}
+		}
+		return style
+	}
+
+	/// This export laid out again by Dragon's plan for a page `width` x `height` points at `scale`: every assignment's frames,
+	/// border widths, text lines, dashed borders and scroll ranges, in this screen's device pixels. `layout` is Dragon's
+	/// translated `runMarklessLayout`. Without a plan the export is returned as it is.
+	public func laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String) throws -> StyleExport {
+		guard let plan else { return self }
+		var out = self
+		var pages: [ScrollOffsetRange?] = []
+		out.assignments = try assignments.indices.map { k in
+			let line = "{\"assignment\":\(k),\"dpr\":\(JSONValue.number(scale).jsonText),\"viewport\":{\"width\":\(JSONValue.number(width).jsonText),\"height\":\(JSONValue.number(height).jsonText)},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":\(plan)}"
+			let result = try Reader(JSONValue.parse(Data(layout(line).utf8)), at: "plan layout")
+			let parts = try result.array()
+			guard parts.count == 3, try parts[0].string() == "ok" else {
+				throw PayloadError(path: "plan layout", reason: "Dragon's layout at \(width) x \(height) points and \(scale)x failed: \(result.value.jsonText)")
+			}
+			let bits = { (reader: Reader) throws -> JSONValue in try planNumbers(reader.value) }
+			let page = try parts[1].array()
+			pages.append(page.count == 3 ? nil : try StyleExport.decodeRange(Reader(.object(zip(["minX", "maxX", "minY", "maxY"], try page.map { try bits($0) }).map { ($0, $1) }), at: parts[1].path)))
+			let names = k < planNames.count ? planNames[k] : [:]
+			var geometry: [String: Reader] = [:]
+			for node in try parts[2].array() {
+				let id = try node.array()[0].string()
+				geometry[names[id] ?? id] = node
+			}
+			let assignment = assignments[k]
+			let nodes = try assignment.nodes.map { node -> StyleNode in
+				guard node.frame != nil else { return node }
+				guard let g = geometry[node.id] else { throw PayloadError(path: "plan layout", reason: "Dragon's layout has no box for \(node.id)") }
+				let f = try g.array()
+				guard f.count == 6 else { throw g.fail("expected id, frame, border widths, lines, border operations and scroll range") }
+				let frame = try f[1].array().map { try planNumber($0.value) }
+				guard frame.count == 4 else { throw f[1].fail("expected x, y, width and height") }
+				let widths = f[2].isNull ? nil : try f[2].array().map { try planNumber($0.value) }
+				let lines = f[3].isNull ? nil : try StyleExport.decodeLines(Reader(.array(try f[3].array().map { line in
+					let l = try line.array()
+					return .object([("top", try bits(l[0])), ("baseline", try bits(l[1])), ("runs", .array(try l[2].array().map { run in
+						let r = try run.array()
+						return .object([("face", r[0].value), ("size", try bits(r[1])), ("glyphs", try bits(r[2])), ("xs", try bits(r[3]))])
+					}))])
+				}), at: f[3].path))
+				let ops = f[4].isNull ? nil : try StyleExport.decodeBorderOps(Reader(try planBorderOps(f[4]), at: f[4].path))
+				let range = f[5].isNull ? nil : try StyleExport.decodeRange(Reader(.object(zip(["minX", "maxX", "minY", "maxY"], try f[5].array().map { try bits($0) }).map { ($0, $1) }), at: f[5].path))
+				return StyleNode(
+					id: node.id, parent: node.parent, isText: node.isText, isAnonymous: node.isAnonymous, text: node.text,
+					frame: Frame(x: frame[0], y: frame[1], width: frame[2], height: frame[3]),
+					borderWidths: widths.map { ($0[0], $0[1], $0[2], $0[3]) }, writes: node.writes, borderOps: ops,
+					scrollRange: range, lines: node.isText ? lines : nil)
+			}
+			return (assignment.values, nodes, assignment.canvas, assignment.body)
+		}
+		out.pageScrolls = pages
+		out.viewport = (width, height)
+		out.dpr = scale
+		return out
 	}
 
 	/// A scroll range, or nil for JSON null.
-	private static func decodeRange(_ reader: Reader) throws -> ScrollOffsetRange? {
+	fileprivate static func decodeRange(_ reader: Reader) throws -> ScrollOffsetRange? {
 		if reader.isNull { return nil }
 		let r = try reader.object(["minX", "maxX", "minY", "maxY"])
 		return ScrollOffsetRange(minX: try r["minX"].number(), maxX: try r["maxX"].number(), minY: try r["minY"].number(), maxY: try r["maxY"].number())
@@ -457,7 +616,7 @@ public struct StyleExport: Sendable {
 			scrollRange: field.has("scrollRange") ? try decodeRange(try field["scrollRange"]) : nil, lines: lines)
 	}
 
-	private static func decodeBorderOps(_ reader: Reader) throws -> BorderOps {
+	fileprivate static func decodeBorderOps(_ reader: Reader) throws -> BorderOps {
 		let f = try reader.object(["origin", "size", "widths", "ops"])
 		let origin = try f["origin"].object(["x", "y"])
 		_ = try f["size"].object(["width", "height"])
