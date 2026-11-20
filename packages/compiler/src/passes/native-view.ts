@@ -291,8 +291,8 @@ function returningInto(
 /** `<input>` types a person ticks: a press checks them before their handlers run. */
 const TICKED_TYPES = new Set(['checkbox', 'radio']);
 
-/** `<input>` types a host draws as a single-line text field; each blocks the return key's submit when a form has two. */
-const TEXT_TYPES = new Set(['text', 'search', 'tel']);
+/** `<input>` types a host draws as a single-line text field (a password masked); each blocks the return key's submit when a form has two. */
+const TEXT_TYPES = new Set(['text', 'search', 'tel', 'password']);
 /** Field attributes the web checks before a submit (or that limit typing) and no host checks yet. */
 const UNCHECKED_CONSTRAINTS = [
 	'pattern',

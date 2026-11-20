@@ -1482,6 +1482,23 @@ export function Search() @{
 		);
 	});
 
+	it('lowers a password field as a text field of its form: its text is sent, and required and maxlength are checked', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Login() @{
+	let sent = state('');
+	<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget).get('secret')); }}>
+		<input type="password" name="secret" required maxlength="8" />
+		<p>{sent}</p>
+	</form>
+}`);
+		expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		expect(payload!.forms).toEqual([
+			{ node: 'h0', fields: [{ node: 'h1', kind: 'text' }], submitters: [] },
+		]);
+		expect(payload!.tooLong).toBeDefined();
+		expect(payload!.events.some((event) => event.host === 'h1' && event.event === 'enter')).toBe(true);
+	});
+
 	it('names a form the web would send to its action, and fields and calls no native host checks', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Forms() @{

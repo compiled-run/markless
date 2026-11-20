@@ -1,0 +1,48 @@
+{
+	"rung": 146,
+	"name": "A password field masks what is typed, keeps its text for the form, and is checked like a text field, as on the web",
+	"steps": [
+		{
+			"visible": ["Account", "0 characters typed", "Not signed in"],
+			"absent": ["Signed in as ann with 7 characters"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "User",
+					"text": "ann"
+				}
+			},
+			"visible": ["0 characters typed", "Not signed in"],
+			"absent": ["7 characters typed"],
+			"fields": {
+				"User": "ann"
+			}
+		},
+		{
+			"do": {
+				"tap": "Sign in"
+			},
+			"visible": ["Not signed in", "0 characters typed"],
+			"invalid": "Please fill out this field.",
+			"absent": ["Signed in as ann with 7 characters"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Password",
+					"text": "hunter2"
+				}
+			},
+			"visible": ["7 characters typed", "Not signed in"],
+			"absent": ["0 characters typed", "hunter2"]
+		},
+		{
+			"do": {
+				"tap": "Sign in"
+			},
+			"visible": ["Signed in as ann with 7 characters", "7 characters typed"],
+			"absent": ["Not signed in", "hunter2"]
+		}
+	]
+}

@@ -854,6 +854,10 @@ final class ViewTree {
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = UITextField()
+					if staticAttributes["type"] == "password" {
+						field.isSecureTextEntry = true
+						field.textContentType = .password
+					}
 					let limit = LengthLimit { [weak self] in nativeMaxLength(self?.attributes[id]?["maxlength"]) }
 					limits.append(limit)
 					field.delegate = limit

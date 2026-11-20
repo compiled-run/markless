@@ -26,6 +26,7 @@ import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.EditorInfo
 import android.text.Editable
+import android.text.InputType
 import android.text.InputFilter
 import android.text.Spanned
 import android.text.TextWatcher
@@ -776,6 +777,8 @@ class MarklessHost(
 				filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
 				setOnFocusChangeListener { v, focused -> if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW) }
 				isSingleLine = true
+				// After isSingleLine, whose transformation would show a password's text.
+				if (type == "password") inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
 				includeFontPadding = false
 				if (style != null) { background = null; setPadding(0, 0, 0, 0) }
 				addTextChangedListener(object : TextWatcher {
