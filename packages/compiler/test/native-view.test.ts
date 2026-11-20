@@ -2438,11 +2438,19 @@ ${markup}
 		expect(payload!.nodes.filter((node) => node.parent === area.id)).toEqual([]);
 	});
 
-	it('refuses text inside a textarea that follows state', async () => {
+	it("binds a textarea's value to the one value inside it, as <input value={…}> binds it", async () => {
 		const { payload, diagnostics } = await nativeView(source(`		<textarea aria-label="Notes">{n}</textarea>`));
+		expect(diagnostics).toEqual([]);
+		const area = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'textarea')!;
+		expect(area.kind === 'element' && area.bindings).toEqual([{ property: 'value', value: { cell: 'state:n' } }]);
+		expect(payload!.nodes.filter((node) => node.parent === area.id)).toEqual([]);
+	});
+
+	it('refuses fixed text mixed with a value inside a textarea', async () => {
+		const { payload, diagnostics } = await nativeView(source(`		<textarea aria-label="Notes">Count {n}</textarea>`));
 		expect(payload).toBeNull();
 		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
-			expect.stringContaining('the text inside the <textarea> h1 follows state'),
+			expect.stringContaining('the text inside the <textarea> h1 mixes fixed text with a value that follows state'),
 		]);
 	});
 

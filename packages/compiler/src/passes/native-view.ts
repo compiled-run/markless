@@ -7254,9 +7254,10 @@ export function createNativeViewPayload(
 	}
 
 	/**
-	 * A `<textarea>`'s text is its starting value, as the HTML parser makes it the element's default value (less one leading
-	 * line break): fixed text becomes its `value` attribute, which each host shows until the field is edited or bound, and
-	 * no child. Text that follows state, or an element inside, is refused.
+	 * A `<textarea>`'s text is its value, as the web makes it the element's default value (less one leading line break):
+	 * fixed text becomes its `value` attribute, which each host shows until the field is edited, and one value that follows
+	 * state (`<textarea>{body}</textarea>`) binds its `value` as `<input value={…}>` does. Neither leaves a child. Fixed
+	 * text mixed with a value, or an element inside, is refused.
 	 */
 	function foldTextareaText() {
 		for (const [at, area] of nodes.entries()) {
@@ -7265,28 +7266,33 @@ export function createNativeViewPayload(
 			if (inside.length === 0) continue;
 			const span = nodeSpans.get(area.id);
 			const where = `the <textarea> ${area.id}`;
-			let text = '';
-			let fixed = true;
-			for (const node of inside) {
-				if (node.kind !== 'text') {
-					refuse(`${where} holds more than text, which is its starting value`, span);
-					fixed = false;
-					break;
-				}
-				for (const part of node.parts) {
-					if ('text' in part) text += part.text;
-					else fixed = false;
-				}
+			if (inside.some((node) => node.kind !== 'text')) {
+				refuse(`${where} holds more than text, which is its value`, span);
+				continue;
 			}
-			if (!fixed) {
-				refuse(`the text inside ${where} follows state; bind its \`value\` instead`, span);
+			const parts = inside.flatMap((node) => (node.kind === 'text' ? node.parts : []));
+			const values = parts.filter(
+				(part): part is Exclude<NativeTextPart, { readonly text: string }> => !('text' in part),
+			);
+			const text = parts.map((part) => ('text' in part ? part.text : '')).join('');
+			if (values.length > 1 || (values.length === 1 && text.trim() !== '')) {
+				refuse(`the text inside ${where} mixes fixed text with a value that follows state`, span);
 				continue;
 			}
 			for (const node of inside) nodes.splice(nodes.indexOf(node), 1);
-			nodes[at] = {
-				...area,
-				attributes: { ...area.attributes, value: text.startsWith('\n') ? text.slice(1) : text },
-			};
+			const value = values[0];
+			nodes[at] = value
+				? {
+						...area,
+						bindings: [
+							...(area.bindings ?? []),
+							{ property: 'value', value: 'cell' in value ? { cell: value.cell } : value.expr },
+						],
+					}
+				: {
+						...area,
+						attributes: { ...area.attributes, value: text.startsWith('\n') ? text.slice(1) : text },
+					};
 		}
 	}
 
