@@ -1022,12 +1022,13 @@ class Runtime(
 		instances(node).map { it.id }.filter { "${event.wire}\u0000$it" !in fired }
 	}
 
+	private fun shownInstance(id: String): Boolean = byId[id.substringBefore('@')]?.let { node -> instances(node).any { it.id == id } } ?: false
+
+	/** A field an arm hid is a new element when it shows again: it starts from its markup, as the web builds it. */
 	private fun forgetHidden() {
-		fired.removeAll { key ->
-			val id = key.substringAfter('\u0000')
-			val node = byId[id.substringBefore('@')]
-			node == null || instances(node).none { it.id == id }
-		}
+		fired.removeAll { !shownInstance(it.substringAfter('\u0000')) }
+		edited.keys.removeAll { !shownInstance(it) }
+		for (n in ticked) if (!isShown(n)) checkedness[n.id] = checkedBinding(n.id) ?: ("checked" in n.attributes)
 	}
 
 	/** A device call a handler awaited answered: its continuation runs with the answer as its local. */
