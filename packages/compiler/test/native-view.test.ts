@@ -303,6 +303,25 @@ export function Choice() @{
 		expect(payload).toBeNull();
 	});
 
+	it('leaves out a keypress handler on an element that is not a text field, as only a hardware keyboard presses it there', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Settings() @{
+	let open = state(false);
+	<main>
+		<span role="button" tabindex="0" onClick={() => (open = !open)} onKeyPress={() => (open = !open)}>Settings</span>
+		<p>{open ? 'open' : 'closed'}</p>
+	</main>
+}`);
+		expect(diagnostics.map((d) => [d.severity, d.code, d.message])).toEqual([
+			[
+				'warning',
+				'MARKLESS_NATIVE_KEYBOARD_ONLY',
+				'the keypress handler on <span> h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out',
+			],
+		]);
+		expect(payload?.events.map((event) => [event.host, event.event])).toEqual([['h1', 'activate']]);
+	});
+
 	it('leaves out a wheel handler with a warning, as a touch on a phone scrolls without wheel events', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Slides() @{
