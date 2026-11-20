@@ -415,6 +415,101 @@ export function Page() @{
 		]);
 	});
 
+	describe('a component that tests whether it was given children', () => {
+		const branches = (payload: { nodes: ReadonlyArray<unknown> } | null | undefined) =>
+			(payload?.nodes ?? []).flatMap((node) =>
+				(node as { kind: string }).kind === 'branch' ? [(node as { test?: unknown }).test] : [],
+			);
+
+		it('shows the @if arm where children are passed and the @else arm where none are', async () => {
+			const { payload, diagnostics } = await nativeView(`function Label({ children }) @{
+	<span>
+		@if (children) {
+			<>{children}</>
+		} @else {
+			<>No label</>
+		}
+	</span>
+}
+export function Page() @{
+	<main>
+		<Label><b>Given</b></Label>
+		<Label />
+	</main>
+}`);
+			expect(diagnostics).toEqual([]);
+			expect(branches(payload)).toEqual([{ literal: true }, { literal: null }]);
+		});
+
+		it('reads `!children`, `children ? a : b` and `children && a` as the truth of whether children were passed', async () => {
+			const { payload, diagnostics } = await nativeView(`function Hint({ tone, children }: { readonly tone: string; readonly children?: unknown }) @{
+	<p data-given={children ? 'yes' : 'no'} data-tone={children && tone}>
+		@if (!children) {
+			<>Nothing here</>
+		}
+		{children}
+	</p>
+}
+export function Page() @{
+	<main>
+		<Hint tone="warm" />
+		<Hint tone="cold"><i>Hello</i> there</Hint>
+	</main>
+}`);
+			expect(diagnostics).toEqual([]);
+			expect(branches(payload)).toEqual([
+				{ unary: '!', value: { literal: null } },
+				{ unary: '!', value: { literal: true } },
+			]);
+			const bindings = (payload?.nodes ?? []).flatMap((node) =>
+				node.kind === 'element' && node.element === 'p' ? [node.bindings] : [],
+			);
+			const given = (passed: true | null, tone: string) => [
+				{
+					attribute: 'data-given',
+					value: { if: { literal: passed }, whenTrue: { literal: 'yes' }, whenFalse: { literal: 'no' } },
+				},
+				{
+					attribute: 'data-tone',
+					value: { logical: '&&', left: { literal: passed }, right: { literal: tone } },
+				},
+			];
+			expect(bindings).toEqual([given(null, 'warm'), given(true, 'cold')]);
+		});
+
+		it('reads text-only children as their text, as the web passes them', async () => {
+			const { payload, diagnostics } = await nativeView(`function Caption({ children }) @{
+	<figcaption title={typeof children === 'string' ? children : 'markup'}>{children}</figcaption>
+}
+export function Page() @{
+	<main>
+		<Caption>30 of 100 rows</Caption>
+	</main>
+}`);
+			expect(diagnostics).toEqual([]);
+			const caption = payload?.nodes.find(
+				(node) => node.kind === 'element' && node.element === 'figcaption',
+			);
+			const text = { literal: '30 of 100 rows' };
+			expect(caption).toMatchObject({
+				bindings: [
+					{
+						attribute: 'title',
+						value: {
+							if: {
+								binary: '===',
+								left: { unary: 'typeof', value: text },
+								right: { literal: 'string' },
+							},
+							whenTrue: text,
+							whenFalse: { literal: 'markup' },
+						},
+					},
+				],
+			});
+		});
+	});
+
 	it('inlines each component instance with its props, and resolves a called callback to the writes of its caller', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Chip({ label, onPick }) @{
