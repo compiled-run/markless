@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished } from 'vitest';
 import { loadProjectGraph, type ProjectGraph } from '../../analyzer/test-support/project-graph.ts';
 import { allRungFolders } from '../proofs/ladder.ts';
 import { affectedRungs } from '../src/runner/affected.ts';
@@ -272,6 +272,13 @@ describe("the runner's checkout", () => {
 	});
 
 	it('reads a checkout behind origin/main from git, after fetching it', async () => {
+		// A pre-commit hook runs this suite with git's own variables set (GIT_DIR, GIT_INDEX_FILE): left in place, every git
+		// command here, the runner's included, would act on the repository being committed instead of these scratch ones.
+		const hookGit = Object.entries(process.env).filter(([name]) => name.startsWith('GIT_'));
+		for (const [name] of hookGit) delete process.env[name];
+		onTestFinished(() => {
+			for (const [name, value] of hookGit) process.env[name] = value;
+		});
 		const scratch = mkdtempSync(join(tmpdir(), 'runner-refresh-'));
 		const git = (cwd: string, ...args: string[]) =>
 			execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
