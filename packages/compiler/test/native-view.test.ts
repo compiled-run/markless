@@ -3123,6 +3123,27 @@ export function Page() @{
 	});
 });
 
+it('lowers a @try with no @catch: its error shows nothing, and the rest of the page stays, as the web renders it', async () => {
+	const { payload, diagnostics } = await nativeView(`import { computed } from '@markless/core';
+async function load(): Promise<string> { throw new Error('down'); }
+export function Account() @{
+	const account = computed(async () => load());
+	<main>
+		<h1>Account</h1>
+		@try {
+			<p>{account}</p>
+		} @pending {
+			<p>Loading</p>
+		}
+	</main>
+}`);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	const branch = payload!.nodes.find((node) => node.kind === 'branch')!;
+	expect(branch).toMatchObject({ kind: 'branch', arms: 3 });
+	expect(payload!.nodes.some((node) => node.kind === 'branch' && node.id.endsWith(':caught'))).toBe(false);
+	expect(payload!.nodes.some((node) => 'arm' in node && node.arm?.index === 2)).toBe(false);
+});
+
 describe('linked stylesheets', () => {
 	const source = `export function Page() @{
 	<main>
