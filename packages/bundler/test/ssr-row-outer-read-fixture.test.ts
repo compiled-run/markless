@@ -4,7 +4,7 @@ import { readFile, rm } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { chromium, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterEach, describe, expect, test } from 'vitest';
 import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
@@ -12,6 +12,7 @@ import { runtimeModuleIdFromOrigin } from '../src/build/bundle-graph.ts';
 import { MARKLESS_INTERACTION_CLOSURES } from '../src/build/chunking.ts';
 import { readInteractionClosuresAsset } from '../src/build/interaction-closures.ts';
 import { lazyRenderDataEntryId, servedRenderDataEntryId } from '../src/transform.ts';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -102,7 +103,7 @@ function rowsKeepScope(page: Page) {
 
 // Row markup reading page state outside the @for follows writes to it, whichever handler wrote it.
 async function exerciseOuterReads(url: string, ready: (page: Page) => Promise<void>) {
-	const browser = await chromium.launch();
+	const browser = await launchBrowser();
 	try {
 		const page = await browser.newPage();
 		const errors: string[] = [];
@@ -176,7 +177,7 @@ async function leftOutOfThePage(): Promise<{ files: Set<string>; runtime: string
 }
 
 async function exerciseComponentRows(url: string) {
-	const browser = await chromium.launch();
+	const browser = await launchBrowser();
 	try {
 		const page = await browser.newPage();
 		const errors: string[] = [];
@@ -294,7 +295,7 @@ test(`a component row added right after load or once the page is idle fetches no
 	expect(await routePackRenderData()).toEqual(
 		path === 'served' ? { served: true, whole: false } : { served: false, whole: true },
 	);
-	const browser = await chromium.launch();
+	const browser = await launchBrowser();
 	try {
 		for (const idle of ['held', 'reached'] as const) {
 			const page = await browser.newPage();

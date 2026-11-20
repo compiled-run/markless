@@ -2413,7 +2413,7 @@ export function App() @{
 		`@media (min-width: 40rem) { .card > h2.${scope}:first-child { font-weight: 700; } }`,
 	);
 	expect(styleScope!.cssText).toContain(
-		`@KEYFRAMES pulse { from { opacity: 0; } 50% { opacity: .5; } to { opacity: 1; } }`,
+		`@KEYFRAMES pulse-${scope} { from { opacity: 0; } 50% { opacity: .5; } to { opacity: 1; } }`,
 	);
 	expect(styleScope!.cssText).not.toContain(`from.${scope}`);
 	expect(styleScope!.cssText).not.toContain(`50%.${scope}`);

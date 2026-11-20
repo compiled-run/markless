@@ -1,4 +1,5 @@
 import type { SerializedGraphPayload, SerializedRecord, SerializedSlot } from './value.ts';
+import { setDataField } from './value-own-field.ts';
 
 export type { SerializedGraphPayload, SerializedRecord, SerializedSlot } from './value.ts';
 
@@ -46,9 +47,8 @@ function deserializeGraphValueWithExtensions(
 		const shell = shells.get(record.id);
 		if (record.type === 'object') {
 			const object = shell as Record<string, unknown>;
-			for (const [key, slot] of record.fields) {
-				object[key] = decodeSlot(slot, shells, extensions);
-			}
+			for (const [key, slot] of record.fields)
+				setDataField(object, key, decodeSlot(slot, shells, extensions));
 		}
 		if (record.type === 'array') {
 			const array = shell as unknown[];

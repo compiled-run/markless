@@ -99,7 +99,7 @@ sealed interface TextPart {
 
 data class ArmPlace(val branch: String, val index: Int)
 
-/** An attribute that follows state, or (when [property]) an input's `value`, `checked` or `indeterminate` property. */
+/** An attribute that follows state, or (when [property]) an input's `value`, `checked` or `indeterminate`, or an option's `selected`. */
 data class Binding(val name: String, val value: Expr, val property: Boolean = false)
 
 sealed interface Node {
@@ -170,6 +170,7 @@ enum class EventName(val wire: String, val pointer: Boolean = false, val touch: 
 	Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"),
 	PointerDown("pointerdown", true, true), PointerMove("pointermove", true, true), PointerUp("pointerup", true, true), PointerCancel("pointercancel", true, true),
 	PointerOver("pointerover", true), PointerOut("pointerout", true), PointerEnter("pointerenter", true), PointerLeave("pointerleave", true),
+	Choose("choose"),
 }
 
 sealed interface Op {
@@ -230,7 +231,7 @@ data class Continuation(val id: String, val local: String, val ops: List<Op>, va
 /** A device object a component makes (`const cam = camera()`); it lives while its [owner] node is shown. */
 data class DeviceObject(val id: String, val device: String, val owner: String)
 
-enum class FieldKind(val wire: String) { Text("text"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden") }
+enum class FieldKind(val wire: String) { Text("text"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden"), Select("select") }
 
 data class Field(val node: String, val kind: FieldKind)
 
@@ -601,7 +602,7 @@ data class Payload(
 						val value = expr(bo.field("value", what), "$what.bindings[$n].value")
 						if (bo.containsKey("property")) {
 							bo.only(setOf("property", "value"), "$what.bindings[$n]")
-							Binding(oneOf(bo, "property", setOf("value", "checked", "indeterminate"), "$what.bindings[$n]"), value, property = true)
+							Binding(oneOf(bo, "property", setOf("value", "checked", "indeterminate", "selected"), "$what.bindings[$n]"), value, property = true)
 						} else {
 							bo.only(setOf("attribute", "value"), "$what.bindings[$n]")
 							Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), value)

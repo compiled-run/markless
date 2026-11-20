@@ -243,6 +243,7 @@ class MarklessHost(
 		for (cell in payload.cells) cell.device?.let { name -> needDevice().watch(name, cell.obj) { if (!released) apply(runtime.device(cell.id, it)) } }
 		for (call in runtime.tasks()) runCall(call)
 		refreshRelations()
+		refreshSelects()
 		root.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
 			override fun onViewAttachedToWindow(view: View) = startLoadEvents()
 			override fun onViewDetachedFromWindow(view: View) = stopLoadEvents()
@@ -445,6 +446,8 @@ class MarklessHost(
 					for (s in sheetLayouts.values) for (l in s.layouts) l.advance(entry.node, entry.value)
 					repaint()
 				}
+				// Each select's shown choice is read again once the whole journal is applied.
+				is JournalEntry.Selected -> {}
 				is JournalEntry.Check -> if (entry.node !in inert) (view(entry.node) as? CompoundButton ?: throw MarklessHostError("journal sets the checkedness of \"${entry.node}\", which is not a checkbox or radio button")).isChecked = entry.checked
 				is JournalEntry.Dialog -> dialog(entry.node, entry.open)
 				is JournalEntry.Command -> command(view(entry.node), entry.command, entry.preventScroll)
@@ -476,6 +479,7 @@ class MarklessHost(
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
 		refreshRelations()
+		refreshSelects()
 		onJournal?.invoke(journal)
 		scheduleLoadEvents()
 	}
@@ -647,8 +651,9 @@ class MarklessHost(
 		val rowIndex = runtime.rows().associate { (id, keys) -> id to keys.withIndex().associate { it.value to it.index } }
 		val ids = HashMap<View, Instance>().apply { for ((id, v) in views) if (v.parent === box) put(v, built.getValue(id)) }
 		val current = (0 until box.childCount).map { box.getChildAt(it) }
+		// A view no node owns (a select's shown choice) stays first.
 		val wanted = current.sortedWith { a, b ->
-			val pa = position(ids.getValue(a), rowIndex); val pb = position(ids.getValue(b), rowIndex)
+			val pa = ids[a]?.let { position(it, rowIndex) } ?: emptyList(); val pb = ids[b]?.let { position(it, rowIndex) } ?: emptyList()
 			(0 until minOf(pa.size, pb.size)).map { pa[it].compareTo(pb[it]) }.firstOrNull { it != 0 } ?: pa.size.compareTo(pb.size)
 		}
 		if (wanted == current) return
@@ -727,6 +732,19 @@ class MarklessHost(
 				visibility = View.GONE
 				named(this, inst.id)
 			}
+			"select" -> SelectBox(context).apply {
+				if (style == null) { minimumWidth = (120 * dpr).roundToInt(); minimumHeight = (48 * dpr).roundToInt() }
+				named(this, inst.id, control = true)
+				setOnClickListener {
+					if (attrs[inst.id]?.containsKey("disabled") == true) return@setOnClickListener
+					val choices = runtime.choices(node.id)
+					choose(choices.map { it.label }, choices.map { it.disabled }, choices.indexOfFirst { it.selected }) { picked ->
+						apply(runtime.dispatch(choices[picked].option, EventName.Choose))
+					}
+				}
+			}
+			// The select's list shows its options; their views only keep their text current.
+			"option" -> MarklessBox(context).apply { visibility = View.GONE }
 			"input" -> EditText(context).apply {
 				setOnFocusChangeListener { v, focused -> if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW) }
 				isSingleLine = true
@@ -757,7 +775,7 @@ class MarklessHost(
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
 			EventName.Dismiss -> if (OVERLAY_ATTRIBUTE !in node.attributes) throw MarklessHostError("dismiss event on \"${node.id}\", which is neither a sheet nor an overlay")
 			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
-			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave -> {}
+			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.Choose -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->
 				val now = android.os.SystemClock.uptimeMillis()
@@ -1029,6 +1047,11 @@ class MarklessHost(
 	}
 
 	/** `aria-labelledby` as the content description, kept current after every journal. */
+	/** Each select shows its chosen option's label, as the web's closed `<select>` does. */
+	private fun refreshSelects() {
+		for ((id, view) in views) if (view is SelectBox) view.show(runtime.choices(id).firstOrNull { it.selected }?.label ?: "")
+	}
+
 	private fun refreshRelations() {
 		for ((id, current) in attrs) {
 			val view = views[id] ?: continue

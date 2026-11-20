@@ -3,9 +3,10 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { readFile, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { chromium, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterAll, expect, test } from 'vitest';
+import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
 // A prerendered page's startup script records each event it forwards before the runtime starts,
 // in the container's record of unhandled events an in-place navigation waits for.
@@ -63,7 +64,7 @@ for (const { page, boot, press, shows, text } of pages) {
 		expect(html.includes('data-markless-settle-module')).toBe(boot === 'settle');
 		expect(html).not.toContain('data-markless-self-wake');
 		const server = await serve(dist);
-		const browser = await chromium.launch();
+		const browser = await launchBrowser();
 		try {
 			const tab = await browser.newPage();
 			const errors: string[] = [];

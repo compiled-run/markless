@@ -1,0 +1,74 @@
+name: Node compile cache
+
+# Fills Node's compile cache from main, the only scope pull requests and merge-queue runs can read; see "Node's compile cache" in docs/ci-process.md.
+# Test results here are not a check: the run only loads each unit shard's modules.
+
+on:
+    push:
+        branches: [main]
+    schedule:
+        - cron: '41 */6 * * *'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: node-compile-cache
+    cancel-in-progress: false
+
+jobs:
+    warm:
+        runs-on: ubuntu-26.04
+        timeout-minutes: 30
+        strategy:
+            fail-fast: false
+            matrix:
+                shard: ['1/3', '2/3', '3/3']
+        env:
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              id: node
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            # Same key as the unit job's restore, plus the day: the newest day's cache is what a shard restores.
+            - name: Name today's cache
+              id: key
+              run: echo "key=node-compile-cache-${RUNNER_OS}-node${{ steps.node.outputs.node-version }}-shard${{ strategy.job-index }}-${{ hashFiles('pnpm-lock.yaml') }}-$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+
+            - name: Probe today's cache
+              id: probe
+              uses: actions/cache/restore@v4
+              with:
+                  lookup-only: true
+                  key: ${{ steps.key.outputs.key }}
+                  path: node_modules/.cache/node-compile-cache
+
+            - name: Install Markless dependencies
+              if: steps.probe.outputs.cache-hit != 'true'
+              run: pnpm install --frozen-lockfile
+
+            - name: Run the shard's unit tests to compile what they load
+              if: steps.probe.outputs.cache-hit != 'true'
+              continue-on-error: true
+              run: pnpm exec vp test run --project node --shard=${{ matrix.shard }}
+
+            - name: Save the cache
+              if: steps.probe.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ steps.key.outputs.key }}
+                  path: node_modules/.cache/node-compile-cache
