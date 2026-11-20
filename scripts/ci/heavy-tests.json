@@ -142,6 +142,7 @@
 		"packages/router/test/vite/fragment-scripts.test.ts",
 		"packages/router/test/vite/hash-route-settle.test.ts",
 		"packages/router/test/vite/idle-wake-refresh.test.ts",
+		"packages/router/test/vite/if-arm-guard.test.ts",
 		"packages/router/test/vite/inline-css.test.ts",
 		"packages/router/test/vite/intent-preloads.test.ts",
 		"packages/router/test/vite/kept-late-handler-built.test.ts",

@@ -285,7 +285,7 @@ test.fails('@empty with live text shows when a filtered list goes from some rows
 	});
 });
 
-test.fails('an @if arm does not run its expressions once its condition turns false (#863)', async () => {
+test('an @if arm does not run its expressions once its condition turns false (#863)', async () => {
 	await visit('/guarded', async (page) => {
 		await page.getByRole('button', { name: 'Delete' }).click();
 		await expect.poll(() => page.locator('main').textContent()).toBe('Deleted');
