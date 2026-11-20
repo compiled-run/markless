@@ -253,6 +253,9 @@ public final class NativeRuntime {
 	private var chosenNow: String?
 	private let missing: NativeValueMissing?
 	private let tooLong: NativeTooLong?
+	private let emailMismatch: NativeEmailMismatch?
+	/// An input's text as typed, which the field keeps; the handler reads `eventValue`, sanitized as the web sanitizes it.
+	private var edit: String?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
 	/// Where a page with a script gets its engine; asked only when a script op runs or a script computed is read.
@@ -313,6 +316,8 @@ public final class NativeRuntime {
 		missing = payload.valueMissing.first { $0.locale == locale }?.messages
 		let tooLongLocale = nativeLocale(preferredLanguages, payload.tooLong.map(\.locale))
 		tooLong = payload.tooLong.first { $0.locale == tooLongLocale }?.message
+		let emailLocale = nativeLocale(preferredLanguages, payload.emailMismatch.map(\.locale))
+		emailMismatch = payload.emailMismatch.first { $0.locale == emailLocale }?.messages
 		dialogs = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
 			return nil
@@ -735,8 +740,13 @@ public final class NativeRuntime {
 		try element(id).bindings.first { $0.isProperty && $0.name == name }
 	}
 
+	/// An email field's value is sanitized as HTML does; the field itself shows what was typed.
+	private func sanitized(_ id: String, _ text: String) throws -> String {
+		try attributeNow(id, "type") == "email" ? nativeEmailValue(text) : text
+	}
+
 	private func textOf(field id: String) throws -> String {
-		if let typed = edited[id] { return typed }
+		if let typed = edited[id] { return try sanitized(id, typed) }
 		if let binding = try propertyBinding(id, "value") { return textOf(try evaluate(binding.value)) }
 		return try attributeNow(id, "value") ?? ""
 	}
@@ -936,6 +946,10 @@ public final class NativeRuntime {
 				}
 			}
 		}
+		if field.kind == .text, try attributeNow(field.node, "type") == "email" {
+			guard let emailMismatch else { throw RuntimeError(reason: "the payload has no message for an email field that holds no email address") }
+			if let message = emailMismatch.message(for: try textOf(field: field.node)) { return message }
+		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		guard field.kind == .text, let max = nativeMaxLength(try attributeNow(field.node, "maxlength")), let typed = edited[field.node],
 			typed.utf16.count > max
@@ -1060,8 +1074,9 @@ public final class NativeRuntime {
 		let scope = instance.scope
 		// A press focuses the control it presses, as the browser does.
 		if action.event == .activate { focused = action.host }
-		eventValue = action.event == .input ? action.value ?? "" : nil
-		defer { eventValue = nil }
+		edit = action.event == .input ? action.value ?? "" : nil
+		eventValue = try edit.map { try sanitized(action.host, $0) }
+		defer { eventValue = nil; edit = nil }
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
 	}
 
@@ -1362,9 +1377,9 @@ public final class NativeRuntime {
 		let selectedBefore = selectedness
 		let bindingsBefore = Dictionary(uniqueKeysWithValues: try ticked.map { ($0.id, try checkedBinding($0.id)) })
 		var beforeProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
-		if let eventValue, let host {
-			beforeProperties["\(host)\u{0}value"] = eventValue
-			edited[host] = eventValue
+		if let edit, let host {
+			beforeProperties["\(host)\u{0}value"] = edit
+			edited[host] = edit
 		}
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })

@@ -18,6 +18,7 @@ import type {
 import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
 import {
 	isNativeStyleStateAttribute,
+	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 	NATIVE_DATA_SCRIPT_TYPES,
@@ -290,7 +291,7 @@ function returningInto(
 const TICKED_TYPES = new Set(['checkbox', 'radio']);
 
 /** `<input>` types a host draws as a single-line text field; each blocks the return key's submit when a form has two. */
-const TEXT_TYPES = new Set(['text', 'search', 'tel']);
+const TEXT_TYPES = new Set(['text', 'search', 'tel', 'email']);
 /** Field attributes the web checks before a submit (or that limit typing) and no host checks yet. */
 const UNCHECKED_CONSTRAINTS = [
 	'pattern',
@@ -6431,6 +6432,7 @@ export function createNativeViewPayload(
 	wireTicks();
 	checkSelects();
 	let lengthLimited = false;
+	let emailChecked = false;
 	const forms = wireForms();
 	for (const handler of handlers) {
 		if (mentionsElement(handler.ops)) {
@@ -6502,6 +6504,7 @@ export function createNativeViewPayload(
 		...(objects.length > 0 ? { objects } : {}),
 		...(forms.length > 0 ? { forms, valueMissing: NATIVE_VALUE_MISSING_BY_LOCALE } : {}),
 		...(lengthLimited ? { tooLong: NATIVE_TOO_LONG_BY_LOCALE } : {}),
+		...(emailChecked ? { emailMismatch: NATIVE_EMAIL_MISMATCH_BY_LOCALE } : {}),
 		...(script ? { script } : {}),
 	});
 
@@ -6720,6 +6723,7 @@ export function createNativeViewPayload(
 				if (kind === 'text') {
 					textFields.push(node.id);
 					if (attribute(node, 'maxlength')) lengthLimited = true;
+					if (type === 'email') emailChecked = true;
 				}
 			}
 			if (!submit) {

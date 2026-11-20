@@ -698,6 +698,8 @@ export type NativeViewPayload = {
 	readonly valueMissing?: Readonly<Record<string, NativeValueMissing>>;
 	/** What the web says when a text field a person edited is longer than its `maxlength`, by language; present when a form's text field has one. */
 	readonly tooLong?: Readonly<Record<string, NativeTooLong>>;
+	/** What the web says when an email field's value is not an email address, by language; present when a form has an email field. */
+	readonly emailMismatch?: Readonly<Record<string, NativeEmailMismatch>>;
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	readonly script?: NativeScript;
 };
@@ -732,6 +734,66 @@ export function nativeTooLongMessage(message: NativeTooLong, max: number, length
 }
 
 /**
+ * Chromium's messages for an email field whose value is not an email address, one for each way it is not, in the order
+ * Chromium tells them apart; `{value}`, `{symbol}` and `{domain}` stand for the value, the first character not allowed
+ * and the part after the `@`.
+ */
+export type NativeEmailMismatch = {
+	readonly missingAt: string;
+	readonly noLocal: string;
+	readonly noDomain: string;
+	readonly localSymbol: string;
+	readonly domainSymbol: string;
+	readonly dot: string;
+	readonly other: string;
+};
+
+const EMAIL_LOCAL_SYMBOLS = ".!#$%&'*+/=?^_`{|}~-";
+const isAsciiAlphanumeric = (character: string) =>
+	(character >= 'a' && character <= 'z') ||
+	(character >= 'A' && character <= 'Z') ||
+	(character >= '0' && character <= '9');
+/** A label of an email address's domain, as HTML's valid email address has it: letters and digits, inner hyphens, at most 63. */
+const isEmailLabel = (label: string) =>
+	label.length >= 1 &&
+	label.length <= 63 &&
+	[...label].every((character) => isAsciiAlphanumeric(character) || character === '-') &&
+	label[0] !== '-' &&
+	label[label.length - 1] !== '-';
+
+/** An email field's value as HTML sanitizes it: line breaks removed, then ASCII whitespace stripped from both ends. */
+export function nativeEmailValue(value: string): string {
+	return value.replace(/[\r\n]/g, '').replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/g, '');
+}
+
+/**
+ * What Chromium says about an email field's (sanitized) `value`, or undefined when it is empty or a valid email address
+ * (HTML's "valid email address", ASCII only, as Chromium checks it).
+ */
+export function nativeEmailMismatch(messages: NativeEmailMismatch, value: string): string | undefined {
+	if (value === '') return undefined;
+	const at = value.indexOf('@');
+	if (at < 0) return messages.missingAt.replace('{value}', value);
+	const local = value.slice(0, at);
+	const domain = value.slice(at + 1);
+	const notLocal = (character: string) =>
+		!isAsciiAlphanumeric(character) && !EMAIL_LOCAL_SYMBOLS.includes(character);
+	if (local !== '' && ![...local].some(notLocal) && domain.split('.').every(isEmailLabel))
+		return undefined;
+	if (local === '') return messages.noLocal.replace('{value}', value);
+	if (domain === '') return messages.noDomain.replace('{value}', value);
+	const localSymbol = [...local].find(notLocal);
+	if (localSymbol !== undefined) return messages.localSymbol.replace('{symbol}', localSymbol);
+	const domainSymbol = [...domain].find(
+		(character) => !isAsciiAlphanumeric(character) && character !== '.' && character !== '-',
+	);
+	if (domainSymbol !== undefined) return messages.domainSymbol.replace('{symbol}', domainSymbol);
+	if (domain.startsWith('.') || domain.endsWith('.') || domain.includes('..'))
+		return messages.dot.replace('{domain}', domain);
+	return messages.other;
+}
+
+/**
  * A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers: leading ASCII whitespace, an
  * optional sign, then digits up to the first non-digit. Undefined (no limit) when there are no digits or it is negative.
  */
@@ -754,10 +816,11 @@ export type NativeForm = {
 	readonly authoredAriaDisabled?: true;
 };
 
-/** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */
+/** A text field (`<input>` of type text, search, tel or email), a checkbox, a radio button, a hidden input, or a `<select>`. */
 export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden' | 'select';
 
 export {
+	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 } from './native-validation-messages.ts';

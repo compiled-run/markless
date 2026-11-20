@@ -1481,7 +1481,7 @@ export function Forms() @{
 			<button>Send</button>
 		</form>
 		<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget, null).get('x')); }}>
-			<input type="email" name="x" />
+			<input type="url" name="x" />
 			<input name="code" pattern="[0-9]+" />
 			<input type="radio" name={sent} />
 			<button type="reset">Clear</button>
@@ -1494,7 +1494,7 @@ export function Forms() @{
 			'the submit handler builds FormData with a submitter, which a native build does not read yet',
 			'the <form> h1 has no onSubmit handler: the web sends it to its action and loads the answer (or sends a POST to an API route in place), and a phone app has no server or page to load',
 			'the submit handler on the <form> h4 does not call `event.preventDefault()` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for',
-			'the <input> h7 in the <form> h6 is an <input type="email">, which no native host draws or checks yet',
+			'the <input> h7 in the <form> h6 is an <input type="url">, which no native host draws or checks yet',
 			'the <input> h8 in the <form> h6 has `pattern`, which the web checks before a submit and no native host checks yet',
 			'the <input> h9 in the <form> h6 binds the `name` of a radio button, which a native build reads only as written',
 			'the <button> h10 in the <form> h6 is a reset button, which a native build has no lowering for yet',

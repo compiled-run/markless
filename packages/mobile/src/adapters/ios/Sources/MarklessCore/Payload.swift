@@ -324,6 +324,46 @@ public struct NativeTooLong: Equatable, Sendable {
 	}
 }
 
+/// Chromium's messages for an email field whose value is not an email address, one for each way it is not; `{value}`,
+/// `{symbol}` and `{domain}` stand for the value, the first character not allowed and the part after the `@`.
+public struct NativeEmailMismatch: Equatable, Sendable {
+	public let missingAt, noLocal, noDomain, localSymbol, domainSymbol, dot, other: String
+
+	private static let localSymbols = Set(".!#$%&'*+/=?^_`{|}~-")
+	private static func isAlphanumeric(_ c: Character) -> Bool { c.isASCII && (c.isLetter || c.isNumber) }
+	private static func isLabel(_ label: Substring) -> Bool {
+		!label.isEmpty && label.count <= 63 && label.allSatisfy { isAlphanumeric($0) || $0 == "-" } && label.first != "-" && label.last != "-"
+	}
+
+	/// What Chromium says about an email field's (sanitized) value; nil when it is empty or a valid email address.
+	public func message(for value: String) -> String? {
+		if value.isEmpty { return nil }
+		guard let at = value.firstIndex(of: "@") else { return missingAt.replacingOccurrences(of: "{value}", with: value) }
+		let local = value[..<at]
+		let domain = value[value.index(after: at)...]
+		let notLocal = { (c: Character) in !Self.isAlphanumeric(c) && !Self.localSymbols.contains(c) }
+		if !local.isEmpty, !local.contains(where: notLocal), domain.split(separator: ".", omittingEmptySubsequences: false).allSatisfy(Self.isLabel) {
+			return nil
+		}
+		if local.isEmpty { return noLocal.replacingOccurrences(of: "{value}", with: value) }
+		if domain.isEmpty { return noDomain.replacingOccurrences(of: "{value}", with: value) }
+		if let symbol = local.first(where: notLocal) { return localSymbol.replacingOccurrences(of: "{symbol}", with: String(symbol)) }
+		if let symbol = domain.first(where: { !Self.isAlphanumeric($0) && $0 != "." && $0 != "-" }) {
+			return domainSymbol.replacingOccurrences(of: "{symbol}", with: String(symbol))
+		}
+		if domain.hasPrefix(".") || domain.hasSuffix(".") || domain.contains("..") { return dot.replacingOccurrences(of: "{domain}", with: domain) }
+		return other
+	}
+}
+
+/// An email field's value as HTML sanitizes it: line breaks removed, then ASCII whitespace stripped from both ends.
+public func nativeEmailValue(_ value: String) -> String {
+	let unbroken = value.unicodeScalars.filter { $0 != "\r" && $0 != "\n" }
+	let space: Set<Unicode.Scalar> = [" ", "\t", "\n", "\r", "\u{0C}"]
+	let trimmed = unbroken.drop { space.contains($0) }.reversed().drop { space.contains($0) }.reversed()
+	return String(String.UnicodeScalarView(trimmed))
+}
+
 /// A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers; nil (no limit) when it has none.
 public func nativeMaxLength(_ attribute: String?) -> Int? {
 	guard var rest = attribute?.unicodeScalars[...] else { return nil }
@@ -476,12 +516,14 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public let valueMissing: [(locale: String, messages: NativeValueMissing)]
 	/// What the web says when a text field a person edited is longer than its `maxlength`, by locale, in payload order.
 	public var tooLong: [(locale: String, message: NativeTooLong)] = []
+	public var emailMismatch: [(locale: String, messages: NativeEmailMismatch)] = []
 
 	public static func == (a: NativeViewPayload, b: NativeViewPayload) -> Bool {
 		a.component == b.component && a.route == b.route && a.cells == b.cells && a.nodes == b.nodes && a.events == b.events
 			&& a.handlers == b.handlers && a.title == b.title && a.objects == b.objects && a.forms == b.forms && a.valueMissing.map(\.locale) == b.valueMissing.map(\.locale)
 			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages) && a.tooLong.map(\.locale) == b.tooLong.map(\.locale)
-			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.script == b.script
+			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.emailMismatch.map(\.locale) == b.emailMismatch.map(\.locale)
+			&& a.emailMismatch.map(\.messages) == b.emailMismatch.map(\.messages) && a.script == b.script
 	}
 	/// The JavaScript the page's script ops and computeds run; absent when every handler is data.
 	public var script: NativeScript? = nil
@@ -492,7 +534,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "script"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "emailMismatch", "script"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
@@ -741,6 +783,16 @@ public struct NativeViewPayload: Equatable, Sendable {
 				return (locale, NativeTooLong(text: try m["text"].string(), digits: digits))
 			}
 		}() : []
+		let emailMismatch: [(locale: String, messages: NativeEmailMismatch)] = fields.has("emailMismatch") ? try {
+			let reader = try fields["emailMismatch"]
+			return try reader.keys().map { locale in
+				let m = try reader.field(locale).object(["missingAt", "noLocal", "noDomain", "localSymbol", "domainSymbol", "dot", "other"])
+				return (locale, NativeEmailMismatch(
+					missingAt: try m["missingAt"].string(), noLocal: try m["noLocal"].string(), noDomain: try m["noDomain"].string(),
+					localSymbol: try m["localSymbol"].string(), domainSymbol: try m["domainSymbol"].string(), dot: try m["dot"].string(),
+					other: try m["other"].string()))
+			}
+		}() : []
 		let route: NativeRoute? = fields.has("route") ? try {
 			let r = try fields["route"].object(["pattern", "params"])
 			return NativeRoute(pattern: try r["pattern"].string(), params: try r["params"].array().map { try $0.string() })
@@ -748,7 +800,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		let payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
 			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
-			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong,
+			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong, emailMismatch: emailMismatch,
 			script: fields.has("script") ? try decodeScript(try fields["script"]) : nil)
 		try payload.check()
 		return payload

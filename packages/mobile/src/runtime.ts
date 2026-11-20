@@ -17,6 +17,8 @@ import {
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	nativeLocale,
 	nativeMaxLength,
+	nativeEmailMismatch,
+	nativeEmailValue,
 	nativeTooLongMessage,
 } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
@@ -878,8 +880,11 @@ export function createNativeRuntime(
 	};
 	const propertyBinding = (id: string, name: string) =>
 		elementOf(id).bindings?.find((one) => 'property' in one && one.property === name);
+	// An email field's value is sanitized as HTML does; the field itself shows what was typed.
+	const sanitized = (id: string, text: string) =>
+		attributeNow(id, 'type') === 'email' ? nativeEmailValue(text) : text;
 	const textOf = (id: string): string => {
-		if (edited.has(id)) return edited.get(id)!;
+		if (edited.has(id)) return sanitized(id, edited.get(id)!);
 		const binding = propertyBinding(id, 'value');
 		return binding ? String(evaluate(binding.value) ?? '') : (attributeNow(id, 'value') ?? '');
 	};
@@ -1046,6 +1051,8 @@ export function createNativeRuntime(
 	const missing = messages[nativeLocale(preferredLanguages, Object.keys(messages))];
 	const tooLongMessages = payload.tooLong ?? {};
 	const tooLong = tooLongMessages[nativeLocale(preferredLanguages, Object.keys(tooLongMessages))];
+	const emailMessages = payload.emailMismatch ?? {};
+	const emailMismatch = emailMessages[nativeLocale(preferredLanguages, Object.keys(emailMessages))];
 	function entriesOf(id: string): Value {
 		const form = forms.get(id);
 		if (!form) throw new Error(`${id} is not a form`);
@@ -1080,6 +1087,12 @@ export function createNativeRuntime(
 		if (required && absent()) {
 			if (!missing) throw new Error(`the payload has no message for a ${kind} missing its value`);
 			return missing[kind as 'text' | 'checkbox' | 'radio'];
+		}
+		if (kind === 'text' && attributeNow(node, 'type') === 'email') {
+			if (!emailMismatch)
+				throw new Error('the payload has no message for an email field that holds no email address');
+			const mismatch = nativeEmailMismatch(emailMismatch, textOf(node));
+			if (mismatch !== undefined) return mismatch;
 		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		const max = kind === 'text' ? nativeMaxLength(attributeNow(node, 'maxlength')) : undefined;
@@ -1459,10 +1472,11 @@ export function createNativeRuntime(
 				.find((shown) => shown.id === action.host);
 			if (!instance) throw new Error(`${action.host} is not shown`);
 			const scope = instance.scope;
-			const eventValue = action.event === 'input' ? action.value : undefined;
+			const eventValue = action.event === 'input' ? sanitized(action.host, action.value) : undefined;
 			// A press focuses the control it presses, as the browser does.
 			if (action.event === 'activate') focused = action.host;
-			return change(action.host, eventValue, () =>
+			// The field keeps what was typed (a trailing space stays while typing on); its value reads sanitized.
+			return change(action.host, action.event === 'input' ? action.value : undefined, () =>
 				run(handlers.get(event.handler) ?? [], eventValue, scope),
 			);
 		},

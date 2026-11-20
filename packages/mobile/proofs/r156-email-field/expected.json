@@ -1,0 +1,37 @@
+{
+	"rung": 156,
+	"name": "an email field takes the email keyboard, stops a submit with Chromium's message when its value is not an email address",
+	"steps": [
+		{ "visible": ["Sign in", "Not signed in"] },
+		{
+			"do": { "type": { "field": "Email", "text": "ada" } },
+			"visible": ["Not signed in"],
+			"fields": { "Email": "ada" }
+		},
+		{
+			"do": { "tap": "Continue" },
+			"visible": ["Not signed in"],
+			"invalid": "Please include an '@' in the email address. 'ada' is missing an '@'."
+		},
+		{
+			"do": { "type": { "field": "Email", "text": "ada@" } },
+			"visible": ["Not signed in"],
+			"fields": { "Email": "ada@" }
+		},
+		{
+			"do": { "tap": "Continue" },
+			"visible": ["Not signed in"],
+			"invalid": "Please enter a part following '@'. 'ada@' is incomplete."
+		},
+		{
+			"do": { "type": { "field": "Email", "text": "ada@example.com" } },
+			"visible": ["Not signed in"],
+			"fields": { "Email": "ada@example.com" }
+		},
+		{
+			"do": { "tap": "Continue" },
+			"visible": ["Signed in as [ada@example.com]"],
+			"absent": ["Not signed in"]
+		}
+	]
+}

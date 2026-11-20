@@ -246,6 +246,47 @@ data class TooLong(val text: String, val digits: String = "0123456789") {
 	}
 }
 
+/**
+ * Chromium's messages for an email field whose value is not an email address, one for each way it is not; `{value}`,
+ * `{symbol}` and `{domain}` stand for the value, the first character not allowed and the part after the `@`.
+ */
+data class EmailMismatch(
+	val missingAt: String, val noLocal: String, val noDomain: String, val localSymbol: String, val domainSymbol: String, val dot: String, val other: String,
+) {
+	/** What Chromium says about an email field's (sanitized) value; null when it is empty or a valid email address. */
+	fun message(value: String): String? {
+		if (value.isEmpty()) return null
+		val at = value.indexOf('@')
+		if (at < 0) return missingAt.replace("{value}", value)
+		val local = value.substring(0, at)
+		val domain = value.substring(at + 1)
+		val notLocal = { c: Char -> !alphanumeric(c) && c !in LOCAL_SYMBOLS }
+		if (local.isNotEmpty() && local.none(notLocal) && domain.split('.').all(::label)) return null
+		if (local.isEmpty()) return noLocal.replace("{value}", value)
+		if (domain.isEmpty()) return noDomain.replace("{value}", value)
+		symbolOf(local, notLocal)?.let { return localSymbol.replace("{symbol}", it) }
+		symbolOf(domain) { !alphanumeric(it) && it != '.' && it != '-' }?.let { return domainSymbol.replace("{symbol}", it) }
+		if (domain.startsWith('.') || domain.endsWith('.') || domain.contains("..")) return dot.replace("{domain}", domain)
+		return other
+	}
+
+	private companion object {
+		const val LOCAL_SYMBOLS = ".!#\$%&'*+/=?^_`{|}~-"
+		fun alphanumeric(c: Char) = c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9'
+		fun label(part: String) = part.length in 1..63 && part.all { alphanumeric(it) || it == '-' } && part.first() != '-' && part.last() != '-'
+		/** The first code point of [text] that [bad] picks, whole even when it takes two UTF-16 units, as Chromium shows it. */
+		fun symbolOf(text: String, bad: (Char) -> Boolean): String? {
+			val at = text.indexOfFirst(bad)
+			if (at < 0) return null
+			return String(Character.toChars(text.codePointAt(at)))
+		}
+	}
+}
+
+/** An email field's value as HTML sanitizes it: line breaks removed, then ASCII whitespace stripped from both ends. */
+fun nativeEmailValue(value: String): String =
+	value.filter { it != '\r' && it != '\n' }.trim { it == ' ' || it == '\t' || it == '\n' || it == '\r' || it == '\u000C' }
+
 /** A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers; null (no limit) when it has none. */
 fun nativeMaxLength(attribute: String?): Int? {
 	if (attribute == null) return null
@@ -277,6 +318,8 @@ data class Payload(
 	val valueMissing: Map<String, ValueMissing> = emptyMap(),
 	/** [TooLong] by the locale the browser shows its own text in. */
 	val tooLong: Map<String, TooLong> = emptyMap(),
+	/** [EmailMismatch] by the locale the browser shows its own text in. */
+	val emailMismatch: Map<String, EmailMismatch> = emptyMap(),
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	val script: ScriptSource? = null,
 ) {
@@ -285,7 +328,7 @@ data class Payload(
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "script"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "emailMismatch", "script"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -358,7 +401,15 @@ data class Payload(
 				val runsScript = cells.any { it.async != null } || handlers.any { h -> scriptOps(h.ops) } || nodes.any { n -> readsOf(n).any(::hasScript) } || title.orEmpty().any { it is TextPart.Value && hasScript(it.expr) }
 				if (runsScript) throw MarklessDecodeError("a script op or computed in a payload with no script")
 			}
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, script)
+			val emailMismatch = root["emailMismatch"]?.obj("payload.emailMismatch")?.entries?.associateTo(LinkedHashMap()) { (locale, m) ->
+				val what = "payload.emailMismatch.$locale"
+				val mo = m.obj(what)
+				val kinds = listOf("missingAt", "noLocal", "noDomain", "localSymbol", "domainSymbol", "dot", "other")
+				mo.only(kinds.toSet(), what)
+				val t = kinds.map { mo.field(it, what).str("$what.$it") }
+				locale to EmailMismatch(t[0], t[1], t[2], t[3], t[4], t[5], t[6])
+			} ?: emptyMap()
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, emailMismatch, script)
 		}
 
 		private fun readsOf(node: Node): List<Expr> = when (node) {

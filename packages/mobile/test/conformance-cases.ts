@@ -58,6 +58,22 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'email-field',
+		fixture: 'proofs/r156-email-field/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'ada' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'a b@c' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'ada@x..y' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: ' ada@example.com ' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'switches',
 		fixture: 'test/fixtures/Switches.tsrx',
 		actions: [

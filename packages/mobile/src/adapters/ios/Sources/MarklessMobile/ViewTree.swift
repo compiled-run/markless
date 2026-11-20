@@ -853,6 +853,13 @@ final class ViewTree {
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = UITextField()
+					if staticAttributes["type"] == "email" {
+						// The keyboard Safari gives an email field: @ and . on it, no capitals or corrections.
+						field.keyboardType = .emailAddress
+						field.textContentType = .emailAddress
+						field.autocapitalizationType = .none
+						field.autocorrectionType = .no
+					}
 					let limit = LengthLimit { [weak self] in nativeMaxLength(self?.attributes[id]?["maxlength"]) }
 					limits.append(limit)
 					field.delegate = limit

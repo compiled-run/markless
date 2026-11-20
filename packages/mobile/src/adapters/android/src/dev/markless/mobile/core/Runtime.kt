@@ -574,7 +574,10 @@ class Runtime(
 	private fun propertyBinding(id: String, name: String) = elementOf(id).bindings.firstOrNull { it.property && it.name == name }
 
 	/** A text field's text: what was typed since its binding last wrote it, else its `value` binding, else its `value` attribute. */
-	fun textOf(id: String): String = edited[id] ?: propertyBinding(id, "value")?.let(::property) ?: attributeNow(id, "value") ?: ""
+	fun textOf(id: String): String = edited[id]?.let { sanitized(id, it) } ?: propertyBinding(id, "value")?.let(::property) ?: attributeNow(id, "value") ?: ""
+
+	/** An email field's value is sanitized as HTML does; the field itself shows what was typed. */
+	private fun sanitized(id: String, text: String): String = if (attributeNow(id, "type") == "email") nativeEmailValue(text) else text
 
 	/** Every non-row checkbox and radio button, in payload order. */
 	private val ticked = payload.nodes.filterIsInstance<Node.Element>().filter { it.element == "input" && it.row == null && it.attributes["type"].let { t -> t == "checkbox" || t == "radio" } }
@@ -697,6 +700,7 @@ class Runtime(
 
 	private val missing: ValueMissing? = payload.valueMissing[nativeLocale(preferredLanguages, payload.valueMissing.keys)]
 	private val tooLong: TooLong? = payload.tooLong[nativeLocale(preferredLanguages, payload.tooLong.keys)]
+	private val emailMismatch: EmailMismatch? = payload.emailMismatch[nativeLocale(preferredLanguages, payload.emailMismatch.keys)]
 
 	private fun entriesOf(id: String): JsValue {
 		val form = forms[id] ?: throw MarklessRuntimeError("\"$id\" is not a form")
@@ -736,6 +740,10 @@ class Runtime(
 		if (absent) {
 			val messages = missing ?: throw MarklessRuntimeError("the payload has no message for a ${kind.wire} missing its value")
 			return when (kind) { FieldKind.Radio -> messages.radio; FieldKind.Checkbox -> messages.checkbox; else -> messages.text }
+		}
+		if (kind == FieldKind.Text && attributeNow(node, "type") == "email") {
+			val messages = emailMismatch ?: throw MarklessRuntimeError("the payload has no message for an email field that holds no email address")
+			messages.message(textOf(node))?.let { return it }
 		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		if (kind != FieldKind.Text) return null
@@ -878,7 +886,7 @@ class Runtime(
 		// A press focuses the control it presses, as the browser does.
 		if (event == EventName.Activate) focused = host
 		return change(host, value) {
-			withFields(value?.let { mapOf("value" to JsValue.Str(it)) }) { run(handler.ops, scope) }
+			withFields(value?.let { mapOf("value" to JsValue.Str(sanitized(host, it))) }) { run(handler.ops, scope) }
 		}
 	}
 

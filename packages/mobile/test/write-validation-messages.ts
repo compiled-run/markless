@@ -1,11 +1,16 @@
 // Rewrites @markless/serializer's validation messages from Chromium itself: `node packages/mobile/test/write-validation-messages.ts`
 // (macOS). For each language Chrome for Testing ships, it sets that app's AppleLanguages, reads `validationMessage` of a
-// required text field, checkbox and radio, and of an edited text field longer than its maxlength, and restores the setting.
+// required text field, checkbox and radio, of an edited text field longer than its maxlength, and of an email field for
+// each way its value is not an email address, and restores the setting.
 import { execFileSync } from 'node:child_process';
 import { readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { chromium, type Page } from '@playwright/test';
-import { nativeTooLongMessage } from '@markless/serializer/native-view';
+import {
+	nativeEmailMismatch,
+	nativeTooLongMessage,
+	type NativeEmailMismatch,
+} from '@markless/serializer/native-view';
 
 const executable = chromium.executablePath();
 const app = join(dirname(executable), '..', '..');
@@ -27,6 +32,17 @@ const kept = (() => {
 })();
 const table: Record<string, { text: string; checkbox: string; radio: string }> = {};
 const tooLong: Record<string, { text: string; digits?: string }> = {};
+const emailMismatch: Record<string, NativeEmailMismatch> = {};
+/** A value for each of Chromium's email messages, and what in the message stands for it; none of them occurs in a translation. */
+const EMAIL_SAMPLES = {
+	missingAt: ['qzxwv', { '{value}': 'qzxwv' }],
+	noLocal: ['@qzxwv', { '{value}': '@qzxwv' }],
+	noDomain: ['qzxwv@', { '{value}': 'qzxwv@' }],
+	localSymbol: ['q§z@x.w', { '{symbol}': '§' }],
+	domainSymbol: ['q@x§z.w', { '{symbol}': '§' }],
+	dot: ['q@xz..wv', { '{domain}': 'xz..wv' }],
+	other: ['q@-xz.wv', {}],
+} as const;
 /** The message for an edited field of `length` characters whose maxlength is `max`. */
 const tooLongMessage = async (page: Page, max: number, length: number) => {
 	await page.setContent(`<input id="long" maxlength="${max}">`);
@@ -60,6 +76,15 @@ try {
 				(id) => (document.getElementById(id) as HTMLInputElement).validationMessage,
 			),
 		);
+		const emails: Record<string, string> = {};
+		for (const [kind, [value]] of Object.entries(EMAIL_SAMPLES)) {
+			await page.setContent('<input id="email" type="email">');
+			emails[kind] = await page.evaluate((given) => {
+				const field = document.getElementById('email') as HTMLInputElement;
+				field.value = given;
+				return field.validationMessage;
+			}, value);
+		}
 		const wide = await tooLongMessage(page, 1234, 56789);
 		const narrow = await tooLongMessage(page, 10, 100);
 		await browser.close();
@@ -85,6 +110,25 @@ try {
 				`${locale}: ${JSON.stringify(entry)} does not give ${JSON.stringify(narrow)}`,
 			);
 		tooLong[locale] = entry;
+		const templates = Object.fromEntries(
+			Object.entries(EMAIL_SAMPLES).map(([kind, [, stands]]) => {
+				let message = emails[kind]!;
+				for (const [placeholder, value] of Object.entries(stands)) {
+					if (!message.includes(value))
+						throw new Error(
+							`${locale}: ${kind} ${JSON.stringify(message)} has no ${value}`,
+						);
+					message = message.replace(value, placeholder);
+				}
+				return [kind, message];
+			}),
+		) as unknown as NativeEmailMismatch;
+		for (const [kind, [value]] of Object.entries(EMAIL_SAMPLES))
+			if (nativeEmailMismatch(templates, value) !== emails[kind])
+				throw new Error(
+					`${locale}: ${kind} gives ${JSON.stringify(nativeEmailMismatch(templates, value))}, not ${JSON.stringify(emails[kind])}`,
+				);
+		emailMismatch[locale] = templates;
 	}
 } finally {
 	execFileSync('defaults', ['delete', bundle, 'AppleLanguages']);
@@ -98,5 +142,5 @@ writeFileSync(
 			const version = browser.version();
 			await browser.close();
 			return `Chromium ${version}`;
-		})}; do not edit.\n\nimport type { NativeTooLong } from './native-view.ts';\n\n/** Chromium's \`validationMessage\` for a required field with no value, by the language Chromium shows its own text in. */\nexport const NATIVE_VALUE_MISSING_BY_LOCALE: Readonly<Record<string, { readonly text: string; readonly checkbox: string; readonly radio: string }>> = ${JSON.stringify(table, null, '\t')};\n\n/** Chromium's \`validationMessage\` for a text field a person edited to longer than its maxlength, with \`{max}\` and \`{length}\` for the numbers. */\nexport const NATIVE_TOO_LONG_BY_LOCALE: Readonly<Record<string, NativeTooLong>> = ${JSON.stringify(tooLong, null, '\t')};\n`,
+		})}; do not edit.\n\nimport type { NativeEmailMismatch, NativeTooLong } from './native-view.ts';\n\n/** Chromium's \`validationMessage\` for a required field with no value, by the language Chromium shows its own text in. */\nexport const NATIVE_VALUE_MISSING_BY_LOCALE: Readonly<Record<string, { readonly text: string; readonly checkbox: string; readonly radio: string }>> = ${JSON.stringify(table, null, '\t')};\n\n/** Chromium's \`validationMessage\` for a text field a person edited to longer than its maxlength, with \`{max}\` and \`{length}\` for the numbers. */\nexport const NATIVE_TOO_LONG_BY_LOCALE: Readonly<Record<string, NativeTooLong>> = ${JSON.stringify(tooLong, null, '\t')};\n\n/** Chromium's \`validationMessage\` for an email field whose value is not an email address, one template for each way it is not. */\nexport const NATIVE_EMAIL_MISMATCH_BY_LOCALE: Readonly<Record<string, NativeEmailMismatch>> = ${JSON.stringify(emailMismatch, null, '\t')};\n`,
 );
