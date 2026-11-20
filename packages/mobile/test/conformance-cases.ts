@@ -537,6 +537,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'spread-callback',
+		fixture: 'proofs/r117-spread-callback/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+		],
+	},
+	{
 		name: 'script-async',
 		fixture: 'proofs/j3-await-catch/App.tsrx',
 		modules: true,

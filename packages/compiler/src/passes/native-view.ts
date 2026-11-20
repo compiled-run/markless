@@ -73,6 +73,7 @@ import type {
 	SemanticSyncPolicy,
 	SourceSpan,
 } from '../artifacts.ts';
+import { isEventAttribute, normalizeEventName } from '../ast/events.ts';
 import { compileDrawing, type DrawingElement } from './native-drawing.ts';
 import { nativeScriptOf, type NativeScriptModuleInput } from './native-script.ts';
 import { scriptFactsOf, type ScriptFacts } from './semantic-graph/script-facts.ts';
@@ -398,6 +399,29 @@ type Prop =
 			readonly span?: SourceSpan;
 	  };
 
+/** A caller's event callback a part carries in its rest props, with the scope it was written in. */
+type Forwarded = {
+	readonly prop: Extract<SemanticComponentEdge['props'][number], { readonly kind: 'callback' | 'serializable' | 'opaque' }>;
+	readonly edge: string;
+	readonly scope: Scope;
+};
+
+/** A forwarded callback as the event it is on the element that spreads it, as the web's spread forwarding records it. */
+const forwardedEvent = ({ prop, edge }: Forwarded, host: string): SemanticEvent => ({
+	id: `forwarded:${edge}:${prop.name}`,
+	hostNodeId: host,
+	eventName: normalizeEventName(prop.name),
+	...(prop.source ? { handlerSource: prop.source } : {}),
+	...(prop.sourceSpan ? { handlerSpan: prop.sourceSpan } : {}),
+	...(prop.catchResets ? { handlerCatchResets: prop.catchResets } : {}),
+	...(prop.catchBoundaryId ? { handlerCatchBoundaryId: prop.catchBoundaryId } : {}),
+	...(prop.returnsPromise ? { handlerReturnsPromise: true as const } : {}),
+	handlerParameters: prop.parameters ?? [],
+	...(prop.nativeStatements ? { handlerStatements: prop.nativeStatements } : {}),
+	hasSyncPolicyCandidate: prop.hasSyncPolicyCandidate ?? false,
+	...(prop.syncPolicy ? { syncPolicy: prop.syncPolicy } : {}),
+});
+
 /** One rendered instance of a `shared()` definition: its cells, handles and methods, resolved for one subtree. */
 type SharedInstance = {
 	readonly definition: SemanticSharedDefinition;
@@ -465,6 +489,8 @@ type Scope = {
 	readonly shared: ReadonlyMap<string, SharedInstance>;
 	/** Props the caller passed that the component does not declare: written where it spreads `{...rest}`. */
 	readonly rest?: ReadonlyArray<readonly [string, NativeExpr]>;
+	/** Event callbacks this instance was given and does not declare: they run on the element its rest spreads onto. */
+	readonly forwarded?: ReadonlyArray<Forwarded>;
 	/** This instance's device objects by local name (`cam`), each with its payload id. */
 	readonly deviceObjects: ReadonlyMap<
 		string,
@@ -3714,6 +3740,8 @@ export function createNativeViewPayload(
 		readonly event: SemanticEvent;
 		readonly scope: Scope;
 		readonly host: string;
+		/** A forwarded callback's run, added after what the handler already runs. */
+		readonly after?: true;
 	}[] = [];
 	const loweredEvents = new Set<string>();
 	const lowerChunk = (
@@ -4134,6 +4162,35 @@ export function createNativeViewPayload(
 					handlers.push(handler);
 					pendingHandlers.push({ handler, event, scope, host: id });
 				}
+				// A caller's callback the part spreads here runs after the part's own handler, as the web merges the two.
+				for (const carried of spread ? (scope.forwarded ?? []) : []) {
+					const event = forwardedEvent(carried, item.id);
+					if (NOT_ON_PHONES.has(event.eventName)) continue;
+					if (
+						KEYBOARD_ONLY.has(event.eventName) &&
+						(!TEXT_ENTRY.has(element ?? '') || TICKED_TYPES.has(inputType ?? ''))
+					) {
+						keyboardOnly(`the ${event.eventName} handler on <${element}> ${id}`, event.handlerSpan);
+						continue;
+					}
+					const semantic = SEMANTIC_EVENTS[event.eventName];
+					if (!semantic || (semantic === 'submit' && element !== 'form')) {
+						refuse(
+							`the \`${carried.prop.name}\` callback spread onto <${element}> ${id}, which has no native meaning there yet`,
+							event.handlerSpan,
+						);
+						continue;
+					}
+					const own = events.find((entry) => entry.host === id && entry.event === semantic);
+					const handler = own
+						? handlers.find((entry) => entry.id === own.handler)!
+						: { id: `handler:${event.id}@${id}`, ops: [] as NativeOp[] };
+					if (!own) {
+						events.push({ host: id, event: semantic, handler: handler.id });
+						handlers.push(handler);
+					}
+					pendingHandlers.push({ handler, event, scope: carried.scope, host: id, after: true });
+				}
 				continue;
 			}
 			if (item.kind === 'children') {
@@ -4322,6 +4379,7 @@ export function createNativeViewPayload(
 					target.module.propNames.get(target.component)?.values() ?? [],
 				);
 				const rest: [string, NativeExpr][] = [];
+				const forwarded: Forwarded[] = [];
 				const ownRest = scope.module.componentFacts.get(scope.component)?.native?.restProp;
 				for (const prop of edge.props) {
 					let value: Prop | undefined;
@@ -4334,6 +4392,16 @@ export function createNativeViewPayload(
 						for (const [name, expr] of scope.rest ?? [])
 							if (declared.has(name)) props.set(name, { kind: 'value', expr });
 							else rest.push([name, expr]);
+						for (const carried of scope.forwarded ?? [])
+							if (!declared.has(carried.prop.name)) forwarded.push(carried);
+							else
+								props.set(carried.prop.name, {
+									kind: 'callback',
+									statements: carried.prop.nativeStatements,
+									parameters: carried.prop.parameters ?? [],
+									scope: carried.scope,
+									...(carried.prop.sourceSpan ? { span: carried.prop.sourceSpan } : {}),
+								});
 						continue;
 					}
 					if (prop.kind === 'callback') {
@@ -4406,6 +4474,8 @@ export function createNativeViewPayload(
 					}
 					if (declared.has(prop.name)) props.set(prop.name, value);
 					else if (value.kind === 'value') rest.push([prop.name, value.expr]);
+					else if (value.kind === 'callback' && prop.kind === 'callback' && isEventAttribute(prop.name))
+						forwarded.push({ prop, edge: `${scope.prefix}${edge.id}`, scope });
 					else
 						refuse(
 							`the \`${prop.name}\` callback of <${edge.childComponentName}>, which it only spreads onto an element`,
@@ -4426,6 +4496,7 @@ export function createNativeViewPayload(
 				lowerChunk(template, parent, place, {
 					...childScope,
 					...(rest.length > 0 ? { rest } : {}),
+					...(forwarded.length > 0 ? { forwarded } : {}),
 					deviceObjects: childObjects.byName,
 					...(scope.catches ? { catches: scope.catches } : {}),
 				});
@@ -6390,10 +6461,19 @@ export function createNativeViewPayload(
 	// A tap lands on the innermost element that handles it, so a handler that reads `event.target` runs once per element a
 	// part names inside its host (rows, triggers): the containment it asks about is the same for every element within one.
 	lateLowering = true;
-	for (const { handler, event, scope, host } of pendingHandlers) {
+	const extended = new Set(pendingHandlers.flatMap((pending) => (pending.after ? [pending.handler] : [])));
+	for (const { handler, event, scope, host, after } of pendingHandlers) {
 		pressedTargetRead = false;
-		handler.ops = handlerOps(event, scope, handler.id, { target: host, currentTarget: host });
-		if (!pressedTargetRead || SEMANTIC_EVENTS[event.eventName] !== 'activate') continue;
+		const ops = handlerOps(event, scope, handler.id, { target: host, currentTarget: host });
+		handler.ops = after ? [...handler.ops, ...ops] : ops;
+		if (after || !pressedTargetRead || SEMANTIC_EVENTS[event.eventName] !== 'activate') continue;
+		if (extended.has(handler)) {
+			refuse(
+				`the handler on ${host} reads where a press landed, and a caller's callback spread onto ${host} runs after it`,
+				event.handlerSpan,
+			);
+			continue;
+		}
 		const named = new Set([...boundHandles.values()].flat());
 		// What a tap on each element runs; a tap on an element with no handler of its own reaches the nearest one around it.
 		const runs = new Map<string, { readonly id: string; readonly spelled: string }>([
