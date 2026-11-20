@@ -198,7 +198,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -228,7 +230,9 @@
 														},
 														"arguments": [
 															{
-																"lambda": ["formdata:entry"],
+																"lambda": [
+																	"formdata:entry"
+																],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -271,7 +275,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -301,7 +307,9 @@
 														},
 														"arguments": [
 															{
-																"lambda": ["formdata:entry"],
+																"lambda": [
+																	"formdata:entry"
+																],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -452,7 +460,9 @@
 						"kind": "text"
 					}
 				],
-				"submitters": ["h4"]
+				"submitters": [
+					"h4"
+				]
 			}
 		],
 		"valueMissing": {
@@ -901,19 +911,51 @@
 			}
 		}
 	},
-	"preferredLanguages": ["fa-IR"],
+	"preferredLanguages": [
+		"fa-IR"
+	],
 	"initial": [
-		["h4:text0", "Send"],
-		["h5:text0", "Shorter codes"],
-		["h6:text0", "Rename"],
-		["h7:text0", ""]
+		[
+			"h4:text0",
+			"Send"
+		],
+		[
+			"h5:text0",
+			"Shorter codes"
+		],
+		[
+			"h6:text0",
+			"Rename"
+		],
+		[
+			"h7:text0",
+			""
+		]
 	],
 	"initialAttributes": [
-		["h3", "maxlength", "5"],
-		["h1", "aria-busy", null],
-		["h4", "aria-disabled", null]
+		[
+			"h3",
+			"maxlength",
+			"5"
+		],
+		[
+			"h1",
+			"aria-busy",
+			null
+		],
+		[
+			"h4",
+			"aria-disabled",
+			null
+		]
 	],
-	"initialProperties": [["h2", "value", "Alexandra"]],
+	"initialProperties": [
+		[
+			"h2",
+			"value",
+			"Alexandra"
+		]
+	],
 	"steps": [
 		{
 			"action": {

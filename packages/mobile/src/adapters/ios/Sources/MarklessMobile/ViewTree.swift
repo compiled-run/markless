@@ -7,7 +7,7 @@ import UIKit.UIGestureRecognizerSubclass
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
 	"canvas", "details", "embed", "iframe", "object",
-	"picture", "summary", "textarea", "video",
+	"picture", "summary", "video",
 ]
 
 /// Where an instance is built: its row (`@key`, empty outside lists), the names its expressions see, and what encloses it.
@@ -171,6 +171,8 @@ final class ViewTree {
 	private let layout: StyleLayout?
 	private let faces: [String: UIFontDescriptor]
 	private let onAction: (NativeAction) -> Void
+	/// Runs a text field's `keydown` or `paste` and answers whether its handler called `preventDefault()`.
+	private let ask: (NativeAction) -> Bool
 	/// The view of a device object (a camera's preview), made by the page's device.
 	private let objectView: (_ object: String, _ device: String) throws -> UIView
 	private let nodes: [String: NativeNode]
@@ -239,6 +241,7 @@ final class ViewTree {
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:],
 		faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void,
+		ask: @escaping (NativeAction) -> Bool = { _ in false },
 		objectView: @escaping (_ object: String, _ device: String) throws -> UIView = { object, _ in throw HostError("no device to show \(object)") }
 	) throws {
 		self.runtime = runtime
@@ -246,6 +249,7 @@ final class ViewTree {
 		self.layout = layout
 		self.faces = faces
 		self.onAction = onAction
+		self.ask = ask
 		keyboard = KeyboardDismisser(page)
 		assignment = layout?.start ?? 0
 		let payload = runtime.payload
@@ -440,13 +444,15 @@ final class ViewTree {
 	}
 
 	/// The focused text field in this page, if any.
-	var focusedField: UITextField? { elements.values.lazy.compactMap { $0 as? UITextField }.first { $0.isFirstResponder } }
+	var focusedField: UIView? { elements.values.first { ($0 is UITextField || $0 is TextArea) && $0.isFirstResponder } }
 
 	/// The journal applier: the only code that changes a retained view after the first build.
 	func apply(_ journal: [NativeJournalEntry]) throws {
+		var liveChanges: [(region: String, text: String)] = []
 		for entry in journal {
 			switch entry {
 			case let .text(node, value):
+				if let region = liveRegion(around: node) { liveChanges.append((region, value)) }
 				if let paragraph = paragraphs[node] {
 					paragraphTexts[node] = value
 					try render(paragraph)
@@ -466,6 +472,10 @@ final class ViewTree {
 				drawTick(node, view)
 			case let .property(node, _, value):
 				if elements[node] is AbsentField { continue }
+				if let area = elements[node] as? TextArea {
+					area.text = value
+					continue
+				}
 				guard let field = elements[node] as? UITextField else { throw HostError("journal names input \(node), which is not a shown field") }
 				field.text = value
 			case let .attribute(node, name, value):
@@ -494,19 +504,22 @@ final class ViewTree {
 					break
 				}
 				if !preventScroll { bringIntoView(view, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline) }
-				if view is UITextField {
+				if view is UITextField || view is TextArea {
 					view.becomeFirstResponder()
 				} else {
 					try overlays.focus(node)
 				}
 			case let .invalid(node, text):
 				guard let view = elements[node] else { throw HostError("journal names field \(node), which is not shown") }
-				if let field = view as? UITextField {
+				if view is UITextField || view is TextArea {
 					root.layoutIfNeeded()
-					bringIntoView(field, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
-					field.becomeFirstResponder()
+					bringIntoView(view, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
+					view.becomeFirstResponder()
 				}
 				show(text)
+			case .preventDefault:
+				// Read by the field that dispatched the key or paste, which leaves out what it would do.
+				continue
 			case let .timer(timer, ms):
 				timers.removeValue(forKey: timer)?.cancel()
 				timers[timer] = Task { @MainActor [weak self] in
@@ -571,6 +584,43 @@ final class ViewTree {
 		refreshSelects()
 		if layout == nil { alignTables() }
 		overlays.flush()
+		announce(liveChanges)
+	}
+
+	/// How a live region's change is spoken; replaced in tests.
+	var announce: (_ text: String, _ assertive: Bool) -> Void = { text, assertive in
+		UIAccessibility.post(
+			notification: .announcement,
+			argument: assertive ? text as Any : NSAttributedString(string: text, attributes: [.accessibilitySpeechQueueAnnouncement: true]))
+	}
+
+	/// The live region holding a text node (a row's copy keeps its `@key`), if any.
+	private func liveRegion(around text: String) -> String? {
+		let at = text.firstIndex(of: "@")
+		let base = at.map { String(text[..<$0]) } ?? text
+		let suffix = at.map { String(text[$0...]) } ?? ""
+		var parent = nodes[base]?.parent
+		while let id = parent, let node = nodes[id] {
+			if node.live != nil { return id + suffix }
+			parent = node.parent
+		}
+		return nil
+	}
+
+	/// Each live region a journal changed, spoken once: whole when atomic, else the text that changed.
+	private func announce(_ changes: [(region: String, text: String)]) {
+		var order: [String] = []
+		var changed: [String: [String]] = [:]
+		for (region, text) in changes {
+			if changed[region] == nil { order.append(region) }
+			changed[region, default: []].append(text)
+		}
+		for region in order {
+			let base = region.split(separator: "@").first.map(String.init) ?? region
+			guard let live = nodes[base]?.live, let view = elements[region] ?? paragraphs[region]?.view else { continue }
+			let spoken = live.atomic ? text(within: view) : changed[region, default: []].joined(separator: " ")
+			if !spoken.isEmpty { announce(spoken, live.assertive) }
+		}
 	}
 
 	/// The top layer: a full-screen view above the page and the bars holding the dialog's own view (styled by its CSS, not a
@@ -856,10 +906,10 @@ final class ViewTree {
 					view = RangeSlider()
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
-					let field = UITextField()
+					let field = TextField()
 					let limit = LengthLimit { [weak self] in nativeMaxLength(self?.attributes[id]?["maxlength"]) }
 					limits.append(limit)
-					field.delegate = limit
+					field.lengthLimit = limit
 					// Safari gives an email field the email keyboard with no capitals or corrections.
 					if staticAttributes["type"] == "email" {
 						field.keyboardType = .emailAddress
@@ -885,6 +935,24 @@ final class ViewTree {
 					let overlay = OverlayElementView()
 					overlay.onEscape = { [unowned self] in self.overlays.escape() }
 					view = overlay
+				} else if element == "textarea" {
+					if context.button != nil { throw HostError("<textarea> \(id) is inside a button") }
+					let area = TextArea()
+					area.onChange.append { [weak self] _ in self?.dismissMessage() }
+					area.onBegin = { [weak self, weak area] in
+						guard let self, let area else { return }
+						self.bringIntoView(area, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
+					}
+					if layout == nil {
+						area.font = .preferredFont(forTextStyle: .body)
+						area.layer.borderWidth = 1
+						area.layer.borderColor = UIColor.separator.cgColor
+						area.layer.cornerRadius = 5
+						area.widthAnchor.constraint(equalToConstant: 240).isActive = true
+						// Chrome's default `rows="2"`.
+						area.heightAnchor.constraint(equalToConstant: 2 * area.font!.lineHeight + area.textContainerInset.top + area.textContainerInset.bottom).isActive = true
+					}
+					view = area
 				} else {
 					view = UIView()
 					view.isUserInteractionEnabled = context.button == nil
@@ -927,12 +995,13 @@ final class ViewTree {
 					current[binding.name] = marklessAttributeValue(binding.name, try runtime.evaluate(binding.value, in: context.scope))
 				}
 				attributes[id] = current
-				if let field = view as? UITextField {
+				if view is UITextField || view is TextArea {
 					let bound = bindings.first { $0.isProperty && $0.name == "value" }
-					field.text = try bound.map { binding in
+					let text = try bound.map { binding in
 						let value = try runtime.evaluate(binding.value, in: context.scope)
 						return value == .null ? "" : value.text
 					} ?? staticAttributes["value"]
+					if let area = view as? TextArea { area.text = text ?? "" } else { (view as? UITextField)?.text = text }
 				}
 				var childIndex = 0
 				_ = try build(template, in: scrollViews[id] ?? view, at: &childIndex, inner)
@@ -1003,15 +1072,20 @@ final class ViewTree {
 	/// `id` is the view's own id, a row's copy included (`<node>@<key>`): the runtime runs the handler in that row.
 	private func wire(_ bound: [NativeEvent], on view: UIView, element: String, id: String) throws {
 		let onAction = onAction
+		let ask = ask
 		for event in bound {
 			if event.event == .submit { continue }
 			switch (event.event, view) {
 			case let (.activate, control as UIButton):
-				control.addAction(UIAction { _ in onAction(NativeAction(event: .activate, host: id)) }, for: .touchUpInside)
-			case (.activate, _) where !(view is UITextField):
+				// UIKit's own count of quick taps in one place: a touch down starts it, a repeated touch down adds one.
+				let taps = TapCount()
+				control.addAction(UIAction { _ in taps.value = 1 }, for: .touchDown)
+				control.addAction(UIAction { _ in taps.value += 1 }, for: .touchDownRepeat)
+				control.addAction(UIAction { _ in onAction(NativeAction(event: .activate, host: id, detail: taps.value)) }, for: .touchUpInside)
+			case (.activate, _) where !(view is UITextField || view is TextArea):
 				// An element that is not a button (a list row): a tap anywhere in it, its text included, presses it.
 				view.isUserInteractionEnabled = true
-				view.addGestureRecognizer(ActivateGesture { onAction(NativeAction(event: .activate, host: id)) })
+				view.addGestureRecognizer(ActivateGesture { taps in onAction(NativeAction(event: .activate, host: id, detail: taps)) })
 			case let (.input, slider as RangeSlider):
 				slider.onInput = { value in onAction(NativeAction(event: .input, host: id, value: value)) }
 			case let (.commit, slider as RangeSlider):
@@ -1020,6 +1094,24 @@ final class ViewTree {
 				field.addAction(
 					UIAction { [weak field] _ in onAction(NativeAction(event: .input, host: id, value: field?.text ?? "")) },
 					for: .editingChanged)
+			case let (.input, area as TextArea):
+				area.onChange.append { text in onAction(NativeAction(event: .input, host: id, value: text)) }
+			case let (.focus, field as UITextField):
+				field.addAction(UIAction { _ in onAction(NativeAction(event: .focus, host: id)) }, for: .editingDidBegin)
+			case let (.blur, field as UITextField):
+				field.addAction(UIAction { _ in onAction(NativeAction(event: .blur, host: id)) }, for: .editingDidEnd)
+			case let (.focus, area as TextArea):
+				area.onFocus.append { onAction(NativeAction(event: .focus, host: id)) }
+			case let (.blur, area as TextArea):
+				area.onBlur.append { onAction(NativeAction(event: .blur, host: id)) }
+			case let (.keydown, field as TextField):
+				field.onKey = { key in ask(NativeAction(event: .keydown, host: id, value: key)) }
+			case let (.keydown, area as TextArea):
+				area.onKey = { key in ask(NativeAction(event: .keydown, host: id, value: key)) }
+			case let (.paste, field as TextField):
+				field.onPaste = { text in ask(NativeAction(event: .paste, host: id, value: text)) }
+			case let (.paste, area as TextArea):
+				area.onPaste = { text in ask(NativeAction(event: .paste, host: id, value: text)) }
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
 			case (.idle, _), (.visible, _), (.dismiss, _), (_, _) where event.event.isPointer:
@@ -1082,8 +1174,9 @@ final class ViewTree {
 			view.accessibilityLabel = current["aria-label"]
 		}
 		if let field = view as? UITextField { field.isEnabled = current["disabled"] == nil }
+		if let area = view as? TextArea { area.isEditable = current["disabled"] == nil }
 		// aria-disabled only reads as dimmed: a press still reaches the button, as on the web.
-		let disabled = (view is UIButton || view is UITextField) && current["disabled"] != nil
+		let disabled = (view is UIButton || view is UITextField || view is TextArea) && current["disabled"] != nil
 		if disabled || current["aria-disabled"] == "true" {
 			view.accessibilityTraits.insert(.notEnabled)
 		} else {
@@ -1152,7 +1245,7 @@ final class ViewTree {
 	}
 
 	private func stackTree(_ view: UIView) {
-		guard !(view is UILabel || view is UITextField || view is AudioButton), !leaves.contains(ObjectIdentifier(view)) else { return }
+		guard !(view is UILabel || view is UITextField || view is TextArea || view is AudioButton), !leaves.contains(ObjectIdentifier(view)) else { return }
 		stack(view)
 		for child in view.subviews where !anchors.contains(ObjectIdentifier(child)) { stackTree(child) }
 	}
@@ -1786,14 +1879,23 @@ private final class TouchWatcher: UIGestureRecognizer {
 
 /// A tap that presses an element which is not a button.
 private final class ActivateGesture: UITapGestureRecognizer {
-	private let action: () -> Void
-	init(_ action: @escaping () -> Void) {
+	private let action: (Int) -> Void
+	/// UIKit's own count of quick taps in one place (`UITouch.tapCount`), which is a press's `event.detail`.
+	private var taps = 1
+	init(_ action: @escaping (Int) -> Void) {
 		self.action = action
 		super.init(target: nil, action: nil)
 		addTarget(self, action: #selector(fire))
 	}
-	@objc private func fire() { if state == .ended { action() } }
+	override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+		taps = touches.first?.tapCount ?? 1
+		super.touchesEnded(touches, with: event)
+	}
+	@objc private func fire() { if state == .ended { action(taps) } }
 }
+
+/// How many quick taps in one place a button's current press is: its `event.detail`.
+final class TapCount { var value = 1 }
 
 /// A scroll container's scroll view over its padding box. A drag that starts toward an edge it is already at goes to the
 /// scroll view around it, as the web chains a scroll to the page once a box is at its end.
@@ -1825,6 +1927,104 @@ final class ContainerScrollView: UIScrollView {
 		let toward = vertical ? -velocity.y : -velocity.x
 		if (toward > 0 && at >= end - 0.5) || (toward < 0 && at <= 0.5) { return false }
 		return super.gestureRecognizerShouldBegin(gesture)
+	}
+}
+
+/// Keys and pastes as Safari on iOS reports them for the on-screen keyboard: each typed character is its own key, a delete is
+/// `Backspace` (in an empty field too), Return is `Enter`. Each callback answers whether the handler called `preventDefault()`,
+/// which leaves out what the key or paste would do.
+@MainActor protocol KeyedInput: AnyObject {
+	var onKey: ((String) -> Bool)? { get }
+	var onPaste: ((String) -> Bool)? { get }
+}
+
+extension KeyedInput {
+	func keyLeavesOut(_ text: String) -> Bool { onKey?(text == "\n" ? "Enter" : text) ?? false }
+	func pasteLeavesOut() -> Bool { onPaste?(UIPasteboard.general.string ?? "") ?? false }
+}
+
+/// An `<input>`'s field, whose `keydown` and `paste` handlers run before the key or paste edits it. Return reaches it as
+/// `textFieldShouldReturn`, not as typed text; a prevented Return neither returns nor puts the keyboard away.
+final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
+	var onKey: ((String) -> Bool)?
+	var onPaste: ((String) -> Bool)?
+	/// `maxlength`: the field stays its own delegate, so its Return key keeps reaching the keydown handler.
+	var lengthLimit: LengthLimit?
+
+	override init(frame: CGRect) {
+		super.init(frame: frame)
+		delegate = self
+	}
+
+	func textField(_ field: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+		lengthLimit?.textField(field, shouldChangeCharactersIn: range, replacementString: string) ?? true
+	}
+
+	@available(*, unavailable)
+	required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+	override func insertText(_ text: String) {
+		if text != "\n" && keyLeavesOut(text) { return }
+		super.insertText(text)
+	}
+
+	func textFieldShouldReturn(_ textField: UITextField) -> Bool { !keyLeavesOut("\n") }
+
+	override func deleteBackward() {
+		if onKey?("Backspace") == true { return }
+		super.deleteBackward()
+	}
+
+	override func paste(_ sender: Any?) {
+		if pasteLeavesOut() { return }
+		super.paste(sender)
+	}
+}
+
+/// A `<textarea>`: a text view that reports each edit as a text field's `editingChanged` does; Return adds a line.
+final class TextArea: UITextView, UITextViewDelegate, KeyedInput {
+	var onChange: [(String) -> Void] = []
+	var onKey: ((String) -> Bool)?
+	var onPaste: ((String) -> Bool)?
+	var onBegin: (() -> Void)?
+	var onFocus: [() -> Void] = []
+	var onBlur: [() -> Void] = []
+
+	init() {
+		super.init(frame: .zero, textContainer: nil)
+		delegate = self
+		isScrollEnabled = true
+	}
+
+	@available(*, unavailable)
+	required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+	override func insertText(_ text: String) {
+		if keyLeavesOut(text) { return }
+		super.insertText(text)
+	}
+
+	override func deleteBackward() {
+		if onKey?("Backspace") == true { return }
+		super.deleteBackward()
+	}
+
+	override func paste(_ sender: Any?) {
+		if pasteLeavesOut() { return }
+		super.paste(sender)
+	}
+
+	func textViewDidChange(_ textView: UITextView) {
+		for change in onChange { change(text) }
+	}
+
+	func textViewDidBeginEditing(_ textView: UITextView) {
+		onBegin?()
+		for focus in onFocus { focus() }
+	}
+
+	func textViewDidEndEditing(_ textView: UITextView) {
+		for blur in onBlur { blur() }
 	}
 }
 #endif
