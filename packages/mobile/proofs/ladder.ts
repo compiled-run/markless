@@ -211,6 +211,8 @@ export type LadderRung = {
 	readonly web?: {
 		readonly steps?: readonly LadderStep[];
 		readonly absentFromOutput?: readonly string[];
+		/** Console errors the browser logs as part of what the rung proves (a 404 answer it loads), each once per time. */
+		readonly consoleErrors?: readonly string[];
 	};
 	/** The test runs the echo server (`ECHO_SERVER_PORT`) while the rung runs, on the web and on phones. */
 	readonly server?: 'echo';

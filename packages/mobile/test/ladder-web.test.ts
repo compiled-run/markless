@@ -417,7 +417,7 @@ describe.each(allRungFolders())('%s', (folder) => {
 					});
 				}
 			}
-			expect(errors).toEqual([]);
+			expect(errors).toEqual(rung.web?.consoleErrors ?? []);
 			await context.close();
 		},
 	);

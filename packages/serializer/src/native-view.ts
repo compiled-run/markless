@@ -708,6 +708,9 @@ export type NativeViewPayload = {
 
 export const NATIVE_APP_VERSION = 'markless.native-app/0';
 
+/** The route an app payload carries its `pages/404.tsrx` under: where a link to a path no route matches opens, as on the web. */
+export const NATIVE_NOT_FOUND_ROUTE = '/404';
+
 /** An app of several routes: each route's page, in the router's match order (static before `[param]` segments). */
 export type NativeAppPayload = {
 	readonly version: typeof NATIVE_APP_VERSION;

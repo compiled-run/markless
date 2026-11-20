@@ -839,6 +839,11 @@ export type NativeViewOptions = {
 		readonly pattern: string;
 		readonly params: ReadonlyArray<string>;
 	}>;
+	/**
+	 * The route the app's not-found page is under, when it has one: a path inside the app that no route matches opens it,
+	 * as the web's router answers that path with the app's `pages/404.tsrx`.
+	 */
+	readonly notFound?: string;
 	/** Matches a path written in `navigate()` against the app's routes, as the router matches a URL. */
 	readonly resolvePath?: (
 		path: string,
@@ -1704,12 +1709,17 @@ export function createNativeViewPayload(
 		return Object.fromEntries(entries);
 	};
 	/** A link or `navigate()` target as a route pattern and params, checked against the app's routes when they are known. */
+	/** A path inside the app (`/logout`), not another site (`//cdn.example`, `https://…`): only it falls to the not-found page. */
+	const inApp = (start: string | NativeExpr | undefined) =>
+		typeof start === 'string' && start.startsWith('/') && !start.startsWith('//');
 	const linkRoute = (
 		pattern: string,
 		params: Record<string, string | NativeExpr>,
 		span: SourceSpan | undefined,
 	): { route: string; params: Record<string, string | NativeExpr> } | null => {
-		const known = options.routes?.find((route) => route.pattern === pattern);
+		const known =
+			options.routes?.find((route) => route.pattern === pattern) ??
+			(pattern === options.notFound ? { pattern, params: [] } : undefined);
 		if (options.routes && !known)
 			return refuse(`a link to ${pattern}, which is not a route of this app`, span);
 		const names = Object.keys(params).sort().join(',');
@@ -1810,6 +1820,8 @@ export function createNativeViewPayload(
 		const [only] = candidates;
 		if (candidates.length === 1 && only?.exact)
 			return linkRoute(only.route.pattern, only.params, span);
+		if (candidates.length === 0 && options.notFound && inApp(parts[0]))
+			return linkRoute(options.notFound, {}, span);
 		return refuse(
 			candidates.length === 0
 				? `${what} that matches no route of this app`
@@ -4282,7 +4294,11 @@ export function createNativeViewPayload(
 								: pathRoute(hrefValue, href?.sourceSpan ?? edge.sourceSpan)
 							: matched
 								? linkRoute(matched.pattern, matched.params, edge.sourceSpan)
-								: linkRoute(fixedHref, paramValues, edge.sourceSpan);
+								: options.notFound &&
+									  inApp(fixedHref) &&
+									  !options.routes?.some((known) => known.pattern === fixedHref)
+									? linkRoute(options.notFound, {}, edge.sourceSpan)
+									: linkRoute(fixedHref, paramValues, edge.sourceSpan);
 					if (!route) continue;
 					// The anchor's attributes as the router renders them, so styles see a link (`:any-link`) as the web does.
 					if (fixedHref === undefined)
@@ -6256,7 +6272,9 @@ export function createNativeViewPayload(
 			);
 			return [];
 		}
-		const matched = options.resolvePath?.(path);
+		const matched =
+			options.resolvePath?.(path) ??
+			(options.notFound && inApp(path) ? { pattern: options.notFound, params: {} } : undefined);
 		if (!matched) {
 			refuse(`${what} navigates to ${path}, which is not a route of this app`, span);
 			return [];
