@@ -1474,11 +1474,12 @@ export async function navigate(
 			state.keep(key, text);
 			const parsed = parsedVisits.get(state) ?? new Map<string, FragmentFetched>();
 			parsedVisits.set(state, parsed);
-			// Parsing runs no page code; done at idle, a Back to this page only swaps. Only the page just left is held parsed.
+			// Parsing runs no page code; done at idle, a Back to the page just left only swaps. Only that page is held parsed.
 			const idle = () => {
 				parsed.clear();
-				if (state.visited.get(key) === text)
-					parsed.set(key, state.parse(fetched.url, text));
+				const left = state.visited.get(leaving.key);
+				if (left !== undefined && leaving.key !== key)
+					parsed.set(leaving.key, state.parse(new URL(leaving.key, w.location.href).href, left));
 			};
 			if (w.requestIdleCallback) w.requestIdleCallback(idle, { timeout: 2000 });
 			else w.setTimeout(idle, 200);
