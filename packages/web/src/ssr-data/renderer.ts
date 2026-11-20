@@ -19,7 +19,6 @@ import {
 	type ProtocolViewPayload,
 	type RenderedPayloadScripts,
 } from '@markless/serializer';
-import { joinRepeatKeyParts } from '../repeat-key-parts.ts';
 import type { ProtocolRepeatKeyParts } from '@markless/serializer/protocol';
 
 // False when no @for of the app joins its key from fields, so each joined-key branch folds away.
@@ -919,7 +918,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 								...(keyed
 									? { key: readValuePath(item, keyPath ?? []) }
 									: (typeof __MARKLESS_JOINED_KEYS__ === 'undefined' || __MARKLESS_JOINED_KEYS__) && record?.keyParts
-										? { key: joinRepeatKeyParts(item, record.keyParts, readValuePath) }
+										? { key: record.keyParts.map((p) => (typeof p == 'string' ? p : `${readValuePath(item, p)}`)).join('') }
 										: {}),
 							}),
 						);

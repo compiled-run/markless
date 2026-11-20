@@ -4,7 +4,6 @@ import {
 } from '@markless/serializer/decode-client';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
 import type { RuntimeGraph } from '@markless/runtime';
-import { joinRepeatKeyParts } from './repeat-key-parts.ts';
 
 // False when no @for of the app joins its key from fields, so each joined-key branch folds away.
 declare const __MARKLESS_JOINED_KEYS__: boolean;
@@ -97,7 +96,7 @@ export function repeatItemKey(
 	return repeat.indexKey
 		? index
 		: (typeof __MARKLESS_JOINED_KEYS__ === 'undefined' || __MARKLESS_JOINED_KEYS__) && repeat.keyParts
-			? joinRepeatKeyParts(item, repeat.keyParts, readPath)
+			? repeat.keyParts.map((p) => (typeof p == 'string' ? p : `${readPath(item, p)}`)).join('')
 			: readPath(item, repeat.keyPath);
 }
 

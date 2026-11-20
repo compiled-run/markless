@@ -7,7 +7,7 @@ import { markless } from '../src/vite/index.ts';
 import { marklessSourceAliases } from './helpers.ts';
 
 // A client build that compiles a @for keyed by fields joined into a string runs once more with the key-joining
-// runtime; an app with no such key builds once, and its bundle leaves the key-joining module out.
+// runtime; an app with no such key builds once, with the key-joining branches folded away.
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const roots: string[] = [];
 afterEach(async () => {
@@ -42,14 +42,20 @@ async function build(key: string) {
 		"import { render } from '@markless/core';\nimport { App } from './root.tsrx';\nawait render(App, { target: document.querySelector('#app')! });\n",
 	);
 	await writeFile(join(root, 'src/root.tsrx'), page(key));
-	const builds: string[][] = [];
+	// What each client build defined the flag the key-joining branches fold on.
+	const builds: unknown[] = [];
 	const watch: Plugin = {
 		name: 'client-builds',
+		enforce: 'post',
 		applyToEnvironment: (environment) => environment.config.consumer === 'client',
-		generateBundle(_options, bundle) {
-			builds.push(
-				Object.values(bundle).flatMap((output) => (output.type === 'chunk' ? output.moduleIds : [])),
-			);
+		options: {
+			order: 'post',
+			handler(options) {
+				builds.push(
+					(options as { transform?: { define?: Record<string, string> } }).transform?.define
+						?.__MARKLESS_JOINED_KEYS__,
+				);
+			},
 		},
 	};
 	const builder = await createBuilder({
@@ -64,18 +70,10 @@ async function build(key: string) {
 	return builds;
 }
 
-const joinsKeys = (moduleIds: ReadonlyArray<string>) =>
-	moduleIds.some((id) => id.endsWith('/packages/web/src/repeat-key-parts.ts'));
-
 test('an app whose @for keys are paths on the item builds its client once, without the key-joining runtime', async () => {
-	const builds = await build('seat.row');
-	expect(builds).toHaveLength(1);
-	expect(joinsKeys(builds[0]!)).toBe(false);
+	expect(await build('seat.row')).toEqual(['false']);
 });
 
 test('an app with a @for keyed by fields joined into a string builds its client again with the key-joining runtime', async () => {
-	const builds = await build('`${seat.row}${seat.n}`');
-	expect(builds).toHaveLength(2);
-	expect(joinsKeys(builds[0]!)).toBe(false);
-	expect(joinsKeys(builds[1]!)).toBe(true);
+	expect(await build('`${seat.row}${seat.n}`')).toEqual(['false', 'true']);
 });

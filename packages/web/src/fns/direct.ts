@@ -1,6 +1,5 @@
 import { marklessRunAtCurrentTarget } from '../event-current-target.ts';
 import type { SsrDataResidue, SsrDataSlot } from '../ssr-data/renderer.ts';
-import { joinRepeatKeyParts } from '../repeat-key-parts.ts';
 import type { ProtocolRepeatKeyParts } from '@markless/serializer/protocol';
 
 // False when no @for of the app joins its key from fields, so each joined-key branch folds away.
@@ -404,7 +403,7 @@ function syncDirectRepeat(
 		const item = items[itemIndex];
 		const key =
 			(typeof __MARKLESS_JOINED_KEYS__ === 'undefined' || __MARKLESS_JOINED_KEYS__) && repeat.keyParts
-				? joinRepeatKeyParts(item, repeat.keyParts, readMarklessPublicPath)
+				? repeat.keyParts.map((p) => (typeof p == 'string' ? p : `${readMarklessPublicPath(item, p)}`)).join('')
 				: readMarklessPublicPath(item, repeat.keyPath);
 		assertUniqueMarklessPublicRepeatKey(
 			seenKeys,

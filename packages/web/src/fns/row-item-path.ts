@@ -1,4 +1,3 @@
-import { joinRepeatKeyParts } from '../repeat-key-parts.ts';
 import type { ProtocolRepeatKeyParts } from '@markless/serializer/protocol';
 
 // False when no @for of the app joins its key from fields, so each joined-key branch folds away.
@@ -30,8 +29,10 @@ export function marklessRowItemPath(
 	let index = items.indexOf(item);
 	if (index < 0 && keyPath && item != null) {
 		if ((typeof __MARKLESS_JOINED_KEYS__ === 'undefined' || __MARKLESS_JOINED_KEYS__) && keyParts) {
-			const key = joinRepeatKeyParts(item, keyParts, readPath);
-			index = items.findIndex((candidate) => joinRepeatKeyParts(candidate, keyParts, readPath) === key);
+			const joined = (value: unknown) =>
+				keyParts.map((p) => (typeof p == 'string' ? p : `${readPath(value, p)}`)).join('');
+			const key = joined(item);
+			index = items.findIndex((candidate) => joined(candidate) === key);
 		} else {
 			const key = readPath(item, keyPath);
 			index = items.findIndex((candidate) => readPath(candidate, keyPath) === key);
