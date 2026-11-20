@@ -309,6 +309,32 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'tap-mouse',
+		fixture: 'proofs/u73-tap-mouse/App.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h3', x: 20, y: 40 },
+			{ event: 'pointerup', host: 'h3', x: 20, y: 40 },
+			{ event: 'pointerdown', host: 'h4', x: 20, y: 80 },
+			{ event: 'pointerup', host: 'h4', x: 20, y: 80 },
+			{ event: 'pointerdown', host: 'h4', x: 20, y: 80 },
+			{ event: 'pointerup', host: 'h4', x: 20, y: 80 },
+			{ event: 'pointerdown', host: 'h3', x: 20, y: 40 },
+			{ event: 'pointercancel', host: 'h3', x: 20, y: 90 },
+			{ event: 'pointerdown', host: 'h3', x: 20, y: 40 },
+			{ event: 'pointerup', host: 'h3', x: 20, y: 40 },
+		],
+	},
+	{
+		name: 'mouse-fields',
+		fixture: 'test/fixtures/MouseFields.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h1', x: 30, y: 12 },
+			{ event: 'pointerup', host: 'h1', x: 30, y: 12 },
+			{ event: 'pointerdown', host: 'h2', x: 44, y: 50 },
+			{ event: 'pointerup', host: 'h2', x: 44, y: 50 },
+		],
+	},
+	{
 		name: 'types',
 		fixture: 'test/fixtures/Types.tsrx',
 		actions: [

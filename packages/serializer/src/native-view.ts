@@ -492,7 +492,8 @@ export type NativeEventName =
 	| 'submit'
 	| 'idle'
 	| 'visible'
-	| NativePointerEventName;
+	| NativePointerEventName
+	| NativeMouseEventName;
 
 /**
  * The pointer events a touch raises, in a phone browser's order (Safari on iOS, Chrome on Android): `pointerover`, then
@@ -511,6 +512,22 @@ export type NativePointerEventName =
 	| 'pointerout'
 	| 'pointerenter'
 	| 'pointerleave';
+
+/**
+ * The compatibility mouse events a phone's browser fires after a tap (Chrome on Android's order), raised by the runtime
+ * once the tap's `pointerup`, `pointerout` and `pointerleave` have run and before its click: `mouseover` and
+ * `mouseenter` on the tapped element (after `mouseout` and `mouseleave` on the element tapped before, which kept the
+ * mouse until now), then `mousemove`, `mousedown` and `mouseup`. A touch the platform takes for a scroll fires none. A
+ * handler reads the pointer fields a MouseEvent has: not `pointerId`, `pointerType` or `isPrimary`.
+ */
+export type NativeMouseEventName =
+	| 'mouseover'
+	| 'mouseout'
+	| 'mouseenter'
+	| 'mouseleave'
+	| 'mousemove'
+	| 'mousedown'
+	| 'mouseup';
 
 /**
  * What a pointer handler reads off its event. `target`, `currentTarget` and `relatedTarget` are elements (`relatedTarget`

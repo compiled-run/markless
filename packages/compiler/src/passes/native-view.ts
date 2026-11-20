@@ -37,6 +37,7 @@ import {
 	NATIVE_VIEW_VERSION,
 	type NativeFieldKind,
 	type NativeForm,
+	type NativeMouseEventName,
 	type NativePointerEventName,
 	PLATFORM_PIECES_NAMESPACE,
 	PLATFORM_PIECES_PACKAGE,
@@ -188,12 +189,32 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	pointerout: 'pointerout',
 	pointerenter: 'pointerenter',
 	pointerleave: 'pointerleave',
+	mouseover: 'mouseover',
+	mouseout: 'mouseout',
+	mouseenter: 'mouseenter',
+	mouseleave: 'mouseleave',
+	mousemove: 'mousemove',
+	mousedown: 'mousedown',
+	mouseup: 'mouseup',
 };
 
 const CAPTURE_METHODS: ReadonlySet<string> = new Set([
 	'setPointerCapture',
 	'releasePointerCapture',
 ]);
+
+const MOUSE_EVENTS: ReadonlySet<string> = new Set<NativeMouseEventName>([
+	'mouseover',
+	'mouseout',
+	'mouseenter',
+	'mouseleave',
+	'mousemove',
+	'mousedown',
+	'mouseup',
+]);
+
+/** Fields a PointerEvent has and a MouseEvent does not. */
+const POINTER_ONLY_FIELDS: ReadonlySet<string> = new Set(['pointerId', 'pointerType', 'isPrimary']);
 
 const POINTER_EVENTS: ReadonlySet<string> = new Set<NativePointerEventName>([
 	'pointerdown',
@@ -209,7 +230,7 @@ const POINTER_EVENTS: ReadonlySet<string> = new Set<NativePointerEventName>([
 /** The fields a dismiss or pointer event carries, by how a handler reads them off its event parameter. */
 const EVENT_FIELDS: Readonly<
 	Record<
-		'dismiss' | 'pointer',
+		'dismiss' | 'pointer' | 'mouse',
 		Readonly<Record<string, Extract<NativeExpr, { event: string }>['event']>>
 	>
 > = {
@@ -225,6 +246,16 @@ const EVENT_FIELDS: Readonly<
 		pointerId: 'pointerId',
 		pointerType: 'pointerType',
 		isPrimary: 'isPrimary',
+		timeStamp: 'timeStamp',
+	},
+	mouse: {
+		target: 'target',
+		currentTarget: 'currentTarget',
+		relatedTarget: 'relatedTarget',
+		button: 'button',
+		buttons: 'buttons',
+		clientX: 'clientX',
+		clientY: 'clientY',
 		timeStamp: 'timeStamp',
 	},
 };
@@ -456,7 +487,7 @@ type Scope = {
 	/** The element a tap landed on (`event.target`) and the one whose handler runs (`event.currentTarget`). */
 	readonly pressed?: { readonly target: string; readonly currentTarget: string };
 	/** A dismiss or pointer handler's event parameter, whose fields in `EVENT_FIELDS` it may read. */
-	readonly carried?: { readonly name: string; readonly kind: 'dismiss' | 'pointer' };
+	readonly carried?: { readonly name: string; readonly kind: 'dismiss' | 'pointer' | 'mouse' };
 	/** In a form's submit handler: the form, which `event.preventDefault()` keeps from being sent. */
 	readonly submitting?: string;
 	readonly locals: ReadonlySet<string>;
@@ -5011,6 +5042,8 @@ export function createNativeViewPayload(
 	let scriptCalls = false;
 	/** A click handler's JavaScript reads where its tap landed. */
 	let tapPoints = false;
+	/** A pointerdown handler's JavaScript reads `preventDefault`, which keeps a tap's mouse events back on the web. */
+	let pointerdownPrevented = false;
 	function mixedHandlerOps(
 		event: SemanticEvent,
 		scope: Scope,
@@ -5131,9 +5164,16 @@ export function createNativeViewPayload(
 			);
 		let readsMissing = false;
 		const semantic = SEMANTIC_EVENTS[event.eventName];
-		const touch = POINTER_EVENTS.has(semantic ?? '');
+		const mouse = MOUSE_EVENTS.has(semantic ?? '');
+		const touch = POINTER_EVENTS.has(semantic ?? '') || mouse;
 		for (const read of fact.event ?? []) {
-			if (touch && NATIVE_SCRIPT_POINTER_FIELDS.includes(read.path[0] ?? '')) continue;
+			if (semantic === 'pointerdown' && read.path[0] === 'preventDefault') pointerdownPrevented = true;
+			if (
+				touch &&
+				NATIVE_SCRIPT_POINTER_FIELDS.includes(read.path[0] ?? '') &&
+				!(mouse && POINTER_ONLY_FIELDS.has(read.path[0] ?? ''))
+			)
+				continue;
 			if (semantic === 'activate' && read.path.length === 1 && NATIVE_SCRIPT_CLICK_FIELDS.includes(read.path[0]!)) {
 				if (read.path[0] === 'clientX' || read.path[0] === 'clientY') tapPoints = true;
 				continue;
@@ -5203,7 +5243,10 @@ export function createNativeViewPayload(
 		const submitting =
 			event.eventName === 'submit' && pressed ? { submitting: pressed.currentTarget } : {};
 		const semantic = SEMANTIC_EVENTS[event.eventName];
-		const carried = semantic === 'dismiss' || POINTER_EVENTS.has(semantic ?? '');
+		const carried =
+			semantic === 'dismiss' ||
+			POINTER_EVENTS.has(semantic ?? '') ||
+			MOUSE_EVENTS.has(semantic ?? '');
 		const inner: Scope =
 			parameter === undefined
 				? { ...running, ...submitting }
@@ -5212,7 +5255,12 @@ export function createNativeViewPayload(
 							...running,
 							carried: {
 								name: parameter,
-								kind: semantic === 'dismiss' ? 'dismiss' : 'pointer',
+								kind:
+									semantic === 'dismiss'
+										? 'dismiss'
+										: MOUSE_EVENTS.has(semantic ?? '')
+											? 'mouse'
+											: 'pointer',
 							},
 						}
 					: event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))
@@ -6667,6 +6715,11 @@ export function createNativeViewPayload(
 						if (written.has(cell) && typeof initialOf(cell) === 'boolean')
 							styledCells.add(cell);
 			}
+
+	if (pointerdownPrevented && events.some((event) => MOUSE_EVENTS.has(event.event)))
+		refuse(
+			'a pointerdown handler may call `preventDefault()`, which keeps back the mouse events this page listens for; a native build does not follow that yet',
+		);
 
 	const script = buildScript();
 	return done({

@@ -1044,6 +1044,9 @@ class Runtime(
 	/** Where the last touch came up, which the click it makes reports; a click no touch made is at 0, 0. */
 	private var tapPoint: Pair<Double, Double>? = null
 
+	/** The element a phone browser's mouse is over: the last one tapped, until a tap elsewhere moves it. */
+	private var mouseOver: String? = null
+
 	private fun clickFields(trusted: Boolean): Map<String, JsValue> {
 		val at = if (trusted) tapPoint else null
 		tapPoint = null
@@ -1108,23 +1111,23 @@ class Runtime(
 					"timeStamp" to JsValue.Num(point.time),
 				)
 			}
-			val runs = ArrayList<Pair<String, Map<String, JsValue>>>()
+			val runs = ArrayList<Triple<String, Map<String, JsValue>, Scope?>>()
 			fun raise(type: EventName, target: String, related: String? = null) {
-				for (node in chain(target)) handlerFor(node.substringBefore('@'), type)?.let { runs.add(it to fieldsOf(type, target, node, related)) }
+				for (node in chain(target)) handlerFor(node.substringBefore('@'), type)?.let { runs.add(Triple(it, fieldsOf(type, target, node, related), null)) }
 			}
 			/** `pointerenter` on each element [target] is in that [from] is not, outermost first; `pointerleave` the other way. */
 			fun crossing(type: EventName, target: String, from: String?, related: String?) {
 				val outside = if (from == null) emptySet() else chain(from).toSet()
 				val nodes = chain(target).filter { it !in outside }
 				for (node in if (type == EventName.PointerEnter) nodes.asReversed() else nodes)
-					handlerFor(node.substringBefore('@'), type)?.let { runs.add(it to fieldsOf(type, node, node, related)) }
+					handlerFor(node.substringBefore('@'), type)?.let { runs.add(Triple(it, fieldsOf(type, node, node, related), null)) }
 			}
 			fun flush(): List<JournalEntry>? {
 				val taken = runs.toList()
 				runs.clear()
-				for ((id, f) in taken) {
+				for ((id, f, at) in taken) {
 					val handler = handlers[id] ?: throw MarklessRuntimeError("unknown handler \"$id\"")
-					val out = withFields(f) { run(handler.ops, scope) }
+					val out = withFields(f) { run(handler.ops, at ?: scope) }
 					if (out.firstOrNull() is JournalEntry.Navigate) return out
 					calls.addAll(out)
 				}
@@ -1136,7 +1139,7 @@ class Runtime(
 				// The overlay behaviour's document listener hears the press: the topmost hint and the topmost other overlay it landed outside are told.
 				for (top in listOf(stack.lastOrNull { isHint(it) }, stack.lastOrNull { !isHint(it) })) {
 					if (top == null || contains(top, host)) continue
-					handlerFor(top, EventName.Dismiss)?.let { runs.add(it to mapOf("reason" to JsValue.Str("outside-press"), "pressTarget" to JsValue.Str(host))) }
+					handlerFor(top, EventName.Dismiss)?.let { runs.add(Triple(it, mapOf("reason" to JsValue.Str("outside-press"), "pressTarget" to JsValue.Str(host)), null)) }
 				}
 				raise(EventName.PointerDown, host)
 				return@change flush() ?: calls
@@ -1161,6 +1164,46 @@ class Runtime(
 			if (early != null) return@change early
 			raise(EventName.PointerOut, target)
 			crossing(EventName.PointerLeave, target, null, null)
+			flush()?.let { return@change it }
+			if (event != EventName.PointerUp) return@change calls
+			// A tap's compatibility mouse events, as a phone browser fires them before its click.
+			fun scopeOf(id: String): Scope? = byId[id.substringBefore('@')]?.let { at -> instances(at).firstOrNull { it.id == id }?.scope }
+			fun mouseRun(type: EventName, target: String, node: String, related: String?) {
+				val handler = handlerFor(node.substringBefore('@'), type) ?: return
+				val f = mapOf(
+					"target" to JsValue.Str(target),
+					"currentTarget" to JsValue.Str(node),
+					"relatedTarget" to (related?.let(JsValue::Str) ?: JsValue.Null),
+					"button" to JsValue.Num(0.0),
+					"buttons" to JsValue.Num(if (type == EventName.MouseDown) 1.0 else 0.0),
+					"clientX" to JsValue.Num(point.x),
+					"clientY" to JsValue.Num(point.y),
+					"timeStamp" to JsValue.Num(point.time),
+				)
+				runs.add(Triple(handler, f, scopeOf(target)))
+			}
+			fun mouse(type: EventName, target: String, related: String? = null) {
+				for (node in chain(target)) mouseRun(type, target, node, related)
+			}
+			fun mouseCrossing(type: EventName, target: String, from: String?, related: String?) {
+				val outside = if (from == null) emptySet() else chain(from).toSet()
+				val nodes = chain(target).filter { it !in outside }
+				for (node in if (type == EventName.MouseEnter) nodes.asReversed() else nodes) mouseRun(type, node, node, related)
+			}
+			// An element that left the screen took the mouse with it.
+			val from = mouseOver?.takeIf { scopeOf(it) != null }
+			if (from != host) {
+				if (from != null) {
+					mouse(EventName.MouseOut, from, host)
+					mouseCrossing(EventName.MouseLeave, from, host, host)
+				}
+				mouse(EventName.MouseOver, host, from)
+				mouseCrossing(EventName.MouseEnter, host, from, from)
+				mouseOver = host
+			}
+			mouse(EventName.MouseMove, host)
+			mouse(EventName.MouseDown, host)
+			mouse(EventName.MouseUp, host)
 			flush() ?: calls
 		}
 	}

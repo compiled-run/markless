@@ -244,11 +244,21 @@ public enum NativeEventName: String, Sendable {
 	case pointerdown, pointermove, pointerup, pointercancel
 	/// Raised by the runtime around a touch; a host never sends them.
 	case pointerover, pointerout, pointerenter, pointerleave
+	/// A phone browser's compatibility mouse events, raised by the runtime after a tap's pointer events; a host never sends them.
+	case mouseover, mouseout, mouseenter, mouseleave, mousemove, mousedown, mouseup
 
-	/// The pointer events a page's handlers may listen for.
+	/// The pointer events a page's handlers may listen for, and the mouse events a tap raises after them.
 	public var isPointer: Bool {
 		switch self {
 		case .pointerdown, .pointermove, .pointerup, .pointercancel, .pointerover, .pointerout, .pointerenter, .pointerleave: true
+		default: isMouse
+		}
+	}
+
+	/// The mouse events a tap raises.
+	public var isMouse: Bool {
+		switch self {
+		case .mouseover, .mouseout, .mouseenter, .mouseleave, .mousemove, .mousedown, .mouseup: true
 		default: false
 		}
 	}

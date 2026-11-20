@@ -170,6 +170,9 @@ enum class EventName(val wire: String, val pointer: Boolean = false, val touch: 
 	Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Close("close"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"),
 	PointerDown("pointerdown", true, true), PointerMove("pointermove", true, true), PointerUp("pointerup", true, true), PointerCancel("pointercancel", true, true),
 	PointerOver("pointerover", true), PointerOut("pointerout", true), PointerEnter("pointerenter", true), PointerLeave("pointerleave", true),
+	// A phone browser's compatibility mouse events, raised by the runtime after a tap's pointer events.
+	MouseOver("mouseover", true), MouseOut("mouseout", true), MouseEnter("mouseenter", true), MouseLeave("mouseleave", true),
+	MouseMove("mousemove", true), MouseDown("mousedown", true), MouseUp("mouseup", true),
 	Choose("choose"),
 }
 

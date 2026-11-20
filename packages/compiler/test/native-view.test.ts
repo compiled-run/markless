@@ -1736,6 +1736,36 @@ export function Panel() @{
 		expect(other.diagnostics.map((d) => d.message)).toContain('a close handler on <div>; the web raises close only on a <dialog>');
 	});
 
+	it('lowers the mouse events a tap fires, with the fields a MouseEvent has', async () => {
+		const shown = await nativeView(`import { state } from '@markless/core';
+export function Stand() @{
+	let x = state(0);
+	let over = state('');
+	<main>
+		<p onMousedown={(event) => (x = event.clientX)} onMouseenter={() => (over = 'in')} onMouseleave={() => (over = 'out')}>Apples</p>
+		<p>{x} {over}</p>
+	</main>
+}`);
+		expect(shown.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		expect(shown.payload!.events.map((event) => event.event)).toEqual(['mousedown', 'mouseenter', 'mouseleave']);
+		const pointerOnly = await nativeView(`import { state } from '@markless/core';
+export function Stand() @{
+	let id = state(0);
+	<p onMousedown={(event) => (id = event.pointerId)}>{id}</p>
+}`);
+		expect(pointerOnly.diagnostics.map((d) => d.message)).toContain(
+			'the mousedown handler reads `event.pointerId`, which a touch on a phone does not have',
+		);
+		const prevented = await nativeView(`import { state } from '@markless/core';
+export function Stand() @{
+	let n = state(0);
+	<p onPointerdown={(event) => { if (event.clientX > 5) event.preventDefault(); }} onMousedown={() => n++}>{n}</p>
+}`);
+		expect(prevented.diagnostics.map((d) => d.message)).toContain(
+			'a pointerdown handler may call `preventDefault()`, which keeps back the mouse events this page listens for; a native build does not follow that yet',
+		);
+	});
+
 	it('draws a custom element the app never defines as an inline container, as the browser renders an unknown element; not a reserved name', async () => {
 		const custom = await nativeView(`export function Shell() @{
 	<app-root><router-outlet></router-outlet><p>Feed</p></app-root>

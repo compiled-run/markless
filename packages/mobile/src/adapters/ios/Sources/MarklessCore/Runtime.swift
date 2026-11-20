@@ -230,6 +230,8 @@ public final class NativeRuntime {
 	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp, .shiftKey, .ctrlKey, .altKey, .metaKey, .isTrusted]
 	/// Where the last touch came up, which the click it makes reports; a click no touch made is at 0, 0.
 	private var tapPoint: (x: Double, y: Double)?
+	/// The element a phone browser's mouse is over: the last one tapped, until a tap elsewhere moves it.
+	private var mouseOver: String?
 
 	private func clickFields(trusted: Bool) -> [NativeEventField: NativeValue] {
 		let at = trusted ? tapPoint : nil
@@ -1187,7 +1189,9 @@ public final class NativeRuntime {
 
 	/// Runs the handler bound to the action and returns the journal the host applies.
 	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
-		if action.event == .close { throw RuntimeError(reason: "close is raised by the runtime, not dispatched") }
+		if action.event == .close || action.event.isMouse {
+			throw RuntimeError(reason: "\(action.event.rawValue) is raised by the runtime, not dispatched")
+		}
 		if action.event == .choose {
 			guard let option = nodesById[nodeOf(action.host)], case .element("option", _, _) = option.kind, let select = option.parent,
 				let instance = try options(of: select).first(where: { $0.id == action.host })
@@ -1310,10 +1314,10 @@ public final class NativeRuntime {
 					.timeStamp: .number(action.time ?? 0),
 				]
 			}
-			var runs: [(handler: String, fields: [NativeEventField: NativeValue])] = []
+			var runs: [(handler: String, fields: [NativeEventField: NativeValue], scope: NativeScope?)] = []
 			let raise = { (type: NativeEventName, target: String, related: String?) in
 				for node in chain(target) {
-					if let own = handlerOf(self.nodeOf(node), type) { runs.append((own.handler, fieldsOf(type, target, node, related))) }
+					if let own = handlerOf(self.nodeOf(node), type) { runs.append((own.handler, fieldsOf(type, target, node, related), nil)) }
 				}
 			}
 			/// `pointerenter` on each element `target` is in that `from` is not, outermost first; `pointerleave` the other way.
@@ -1321,7 +1325,7 @@ public final class NativeRuntime {
 				let outside = Set(from.map(chain) ?? [])
 				let nodes = chain(target).filter { !outside.contains($0) }
 				for node in type == .pointerenter ? nodes.reversed() : nodes {
-					if let own = handlerOf(self.nodeOf(node), type) { runs.append((own.handler, fieldsOf(type, node, node, related))) }
+					if let own = handlerOf(self.nodeOf(node), type) { runs.append((own.handler, fieldsOf(type, node, node, related), nil)) }
 				}
 			}
 			let flush = { () throws -> [NativeJournalEntry]? in
@@ -1330,7 +1334,7 @@ public final class NativeRuntime {
 				runs = []
 				for step in steps {
 					self.eventFields = step.fields
-					let taken = try self.run(self.handlers[step.handler] ?? [], in: instance.scope)
+					let taken = try self.run(self.handlers[step.handler] ?? [], in: step.scope ?? instance.scope)
 					if case .navigate? = taken.first { return taken }
 					calls.append(contentsOf: taken)
 				}
@@ -1342,7 +1346,7 @@ public final class NativeRuntime {
 				// The behaviour's document listener hears the press: the topmost hint and the topmost other overlay it landed outside are told.
 				for top in [self.stack.last(where: self.isHint), self.stack.last(where: { !self.isHint($0) })] {
 					guard let top, !self.contains(top, action.host), let dismiss = handlerOf(top, .dismiss) else { continue }
-					runs.append((dismiss.handler, [.reason: .string("outside-press"), .pressTarget: .string(action.host)]))
+					runs.append((dismiss.handler, [.reason: .string("outside-press"), .pressTarget: .string(action.host)], nil))
 				}
 				raise(.pointerdown, action.host, nil)
 				return try flush() ?? calls
@@ -1370,6 +1374,45 @@ public final class NativeRuntime {
 			self.touches[pointerId] = nil
 			raise(.pointerout, target, nil)
 			crossing(.pointerleave, target, nil, nil)
+			if let lifted = try flush() { return lifted }
+			guard action.event == .pointerup else { return calls }
+			// A tap's compatibility mouse events, as a phone browser fires them before its click.
+			let scopeOf = { (id: String) throws -> NativeScope? in
+				guard let node = self.nodesById[self.nodeOf(id)] else { return nil }
+				return try self.instances(of: node).first { $0.id == id }?.scope
+			}
+			let mouseRun = { (type: NativeEventName, target: String, node: String, related: String?) throws in
+				guard let own = handlerOf(self.nodeOf(node), type) else { return }
+				let fields: [NativeEventField: NativeValue] = [
+					.target: .string(target), .currentTarget: .string(node), .relatedTarget: related.map(NativeValue.string) ?? .null,
+					.button: .number(0), .buttons: .number(type == .mousedown ? 1 : 0),
+					.clientX: .number(x), .clientY: .number(y), .timeStamp: .number(action.time ?? 0),
+				]
+				runs.append((own.handler, fields, try scopeOf(target)))
+			}
+			let mouse = { (type: NativeEventName, target: String, related: String?) throws in
+				for node in chain(target) { try mouseRun(type, target, node, related) }
+			}
+			let mouseCrossing = { (type: NativeEventName, target: String, from: String?, related: String?) throws in
+				let outside = Set(from.map(chain) ?? [])
+				let nodes = chain(target).filter { !outside.contains($0) }
+				for node in type == .mouseenter ? nodes.reversed() : nodes { try mouseRun(type, node, node, related) }
+			}
+			let tapped = action.host
+			// An element that left the screen took the mouse with it.
+			let from = try self.mouseOver.flatMap { try scopeOf($0) != nil ? $0 : nil }
+			if from != tapped {
+				if let from {
+					try mouse(.mouseout, from, tapped)
+					try mouseCrossing(.mouseleave, from, tapped, tapped)
+				}
+				try mouse(.mouseover, tapped, from)
+				try mouseCrossing(.mouseenter, tapped, from, from)
+				self.mouseOver = tapped
+			}
+			try mouse(.mousemove, tapped, nil)
+			try mouse(.mousedown, tapped, nil)
+			try mouse(.mouseup, tapped, nil)
 			return try flush() ?? calls
 		}
 	}

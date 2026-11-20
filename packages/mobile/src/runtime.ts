@@ -5,6 +5,7 @@ import type {
 	NativeFieldKind,
 	NativeFetchResponse,
 	NativeJournalEntry,
+	NativeMouseEventName,
 	NativeScriptBindings,
 	NativeNode,
 	NativeOp,
@@ -116,6 +117,13 @@ const TOUCHES: ReadonlySet<string> = new Set<NativeTouch>([
 const CLOSE_DEPTH = 16;
 const RAISED: ReadonlySet<string> = new Set([
 	'close',
+	'mouseover',
+	'mouseout',
+	'mouseenter',
+	'mouseleave',
+	'mousemove',
+	'mousedown',
+	'mouseup',
 	'pointerover',
 	'pointerout',
 	'pointerenter',
@@ -941,6 +949,8 @@ export function createNativeRuntime(
 	>();
 	/** Where the last touch came up, which the click it makes reports; a click no touch made is at 0, 0. */
 	let tapPoint: { readonly x: number; readonly y: number } | null = null;
+	/** The element a phone browser's mouse is over: the last one tapped, until a tap elsewhere moves it. */
+	let mouseOver: string | null = null;
 	const clickFields = (trusted: boolean): NativeEventFields => {
 		const at = trusted ? tapPoint : null;
 		tapPoint = null;
@@ -1696,8 +1706,11 @@ export function createNativeRuntime(
 							timeStamp: touch.time ?? 0,
 						};
 					};
-					const runs: { readonly handler: string; readonly fields: NativeEventFields }[] =
-						[];
+					const runs: {
+						readonly handler: string;
+						readonly fields: NativeEventFields;
+						readonly scope?: NativeScope;
+					}[] = [];
 					const raise = (
 						type: NativePointerEventName,
 						target: string,
@@ -1732,7 +1745,7 @@ export function createNativeRuntime(
 					};
 					const flush = (): NativeJournalEntry[] | undefined => {
 						for (const step of runs.splice(0)) {
-							const out = run(handlers.get(step.handler) ?? [], step.fields, scope);
+							const out = run(handlers.get(step.handler) ?? [], step.fields, step.scope ?? scope);
 							if (out[0]?.op === 'navigate') return out;
 							calls.push(...out);
 						}
@@ -1775,6 +1788,61 @@ export function createNativeRuntime(
 					touches.delete(pointerId);
 					raise('pointerout', target);
 					crossing('pointerleave', target, null, null);
+					const lifted = flush();
+					if (lifted || touch.event !== 'pointerup') return lifted ?? calls;
+					// A tap's compatibility mouse events, as a phone browser fires them before its click.
+					const mouseRun = (
+						type: NativeMouseEventName,
+						target: string,
+						node: string,
+						related: string | null,
+					) => {
+						const own = handlerOf(nodeOf(node), type);
+						if (own)
+							runs.push({
+								handler: own.handler,
+								fields: {
+									target,
+									currentTarget: node,
+									relatedTarget: related,
+									button: 0,
+									buttons: type === 'mousedown' ? 1 : 0,
+									clientX: at.x,
+									clientY: at.y,
+									timeStamp: touch.time ?? 0,
+								},
+								scope: scopeOf(target) ?? scope,
+							});
+					};
+					const mouse = (type: NativeMouseEventName, target: string, related: string | null = null) => {
+						for (const node of chain(target)) mouseRun(type, target, node, related);
+					};
+					const mouseCrossing = (
+						type: 'mouseenter' | 'mouseleave',
+						target: string,
+						from: string | null,
+						related: string | null,
+					) => {
+						const outside = new Set(from === null ? [] : chain(from));
+						const nodes = chain(target).filter((node) => !outside.has(node));
+						for (const node of type === 'mouseenter' ? nodes.reverse() : nodes)
+							mouseRun(type, node, node, related);
+					};
+					const tapped = touch.host;
+					// An element that left the screen took the mouse with it.
+					const from = mouseOver !== null && scopeOf(mouseOver) ? mouseOver : null;
+					if (from !== tapped) {
+						if (from !== null) {
+							mouse('mouseout', from, tapped);
+							mouseCrossing('mouseleave', from, tapped, tapped);
+						}
+						mouse('mouseover', tapped, from);
+						mouseCrossing('mouseenter', tapped, from, from);
+						mouseOver = tapped;
+					}
+					mouse('mousemove', tapped);
+					mouse('mousedown', tapped);
+					mouse('mouseup', tapped);
 					return flush() ?? calls;
 				});
 			}
