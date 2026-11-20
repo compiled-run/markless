@@ -210,7 +210,10 @@ async function open(setup: Setup) {
 		mostOpen = Math.max(mostOpen, open);
 		request.on('close', () => request.destroyed && open--);
 		const hold = setup.holdMs ?? 0;
-		if (hold === Infinity) return void servers.at(-1)!.held.push(response);
+		if (hold === Infinity)
+			return void servers.at(-1)!.held.push(
+				Object.assign(response, { page: destination.pathname }),
+			);
 		await new Promise((done) => setTimeout(done, hold));
 		open--;
 		const answer = setup.answer?.(destination.pathname) ?? {
@@ -223,7 +226,8 @@ async function open(setup: Setup) {
 		response.end(answer.body.slice(half));
 	});
 	await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
-	servers.push({ server, held: [] });
+	const own: { server: Server; held: ServerResponse[] } = { server, held: [] };
+	servers.push(own);
 	const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 	page.on('requestfailed', (request) => {
 		const destination = fragmentPageUrl(new URL(request.url()));
@@ -241,6 +245,16 @@ async function open(setup: Setup) {
 		fetches,
 		paths,
 		mostOpen: () => mostOpen,
+		// Answers every response held so far, as an instantly answering server would have.
+		release: () => {
+			for (const response of own.held.splice(0)) {
+				const path = (response as ServerResponse & { page: string }).page;
+				if (response.destroyed) continue;
+				open--;
+				response.writeHead(200, { 'content-type': 'text/html;charset=utf-8' });
+				response.end(`<main>${path}</main>${FRAGMENT_REGION_END}`);
+			}
+		},
 		// Runs the idle callbacks the page queued; the idle tier's fetches start inside them.
 		idle: () => page.evaluate(() => (window as unknown as { __idle: () => number }).__idle()),
 		// The page's first idle moment: guessing arms in the idle callback queued once the page is measured.
@@ -632,9 +646,10 @@ describe('guess budget, every exit', () => {
 	});
 
 	test('a guess cancelled to make room for intent is not guessed again on that page', async () => {
+		// Every answer is held until the test releases it, so the guess is still arriving when the hover lands.
 		const s = await open({
 			prefetch: { viewport: 'all', idle: 'none', concurrency: 1 },
-			holdMs: 300,
+			holdMs: Infinity,
 		});
 		await s.measured(true);
 		await s.armed();
@@ -643,7 +658,16 @@ describe('guess budget, every exit', () => {
 		const hovered = inView.find((path) => path !== guess)!;
 		await s.page.hover(`a[href="${hovered}"]`);
 		await expect.poll(() => s.aborted).toEqual([guess]);
-		await expect.poll(async () => (await s.fetches()).length, { timeout: 15_000 }).toBe(IN_VIEW);
+		await expect
+			.poll(
+				async () => {
+					s.release();
+					return (await s.fetches()).length;
+				},
+				{ timeout: 15_000 },
+			)
+			.toBe(IN_VIEW);
+		s.release();
 		await expect.poll(s.allArrived).toBe(true);
 		await afterFrames(s.page);
 		const paths = await s.paths();
