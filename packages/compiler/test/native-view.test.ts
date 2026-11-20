@@ -270,11 +270,13 @@ export function Card() @{
 		<p style={HIDDEN}>Constant</p>
 		<p style={\`margin-top: \${GAP}px\`}>Template</p>
 		<p style={null}>None</p>
+		<p style={{ paddingLeft: '8px', color: 'red' }}>Object</p>
 	</main>
 }`);
 		expect(fixed.diagnostics).toEqual([]);
 		const styles = fixed.payload?.nodes.flatMap((node) => (node.kind === 'element' && node.element === 'p' ? [node.attributes?.style ?? null] : []));
-		expect(styles).toEqual(['position: absolute; width: 1px', 'margin-top: 12px', null]);
+		// A style object the build knows is written as the web writes it, not dropped.
+		expect(styles).toEqual(['position: absolute; width: 1px', 'margin-top: 12px', null, 'padding-left:8px;color:red;']);
 		expect(fixed.payload?.nodes.some((node) => node.kind === 'element' && node.bindings?.some((b) => 'attribute' in b && b.attribute === 'style'))).toBe(false);
 		const follows = await nativeView(`import { state } from '@markless/core';
 export function Card() @{
