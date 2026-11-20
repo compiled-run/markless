@@ -762,7 +762,8 @@ export function createNativeRuntime(
 		const list = evaluate(repeat.list);
 		if (!Array.isArray(list))
 			throw new Error(`${repeat.id} lists a value that is not an array`);
-		return list.map((item) => {
+		return list.map((item, index) => {
+			if (repeat.byIndex) return { key: String(index), item };
 			let key: Value = item;
 			for (const step of repeat.key) {
 				if (

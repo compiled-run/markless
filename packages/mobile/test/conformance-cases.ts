@@ -735,6 +735,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
+		// Rows keyed by position: two rows show the same line, then rows are added, changed and dropped at the end.
+		name: 'for-index-key',
+		fixture: 'proofs/18-for-index-key/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
 		name: 'script-render-list',
 		fixture: 'proofs/j9-render-list/App.tsrx',
 		modules: true,

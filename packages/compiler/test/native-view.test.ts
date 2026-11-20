@@ -1359,15 +1359,38 @@ export function Tags() @{
 		]);
 	});
 
-	it('refuses a @for keyed by its index by name, and not again as markup it left out', async () => {
+	it('keys the rows of a @for keyed by its index by position', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Words() @{
-	let words = state(['a', 'b']);
+	let words = state(['a', 'a']);
 	<ul>@for (const word of words; index at; key at) { <li>{word}</li> }</ul>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.nodes.find((node) => node.kind === 'repeat')).toMatchObject({
+			list: { cell: 'state:words' },
+			key: [],
+			byIndex: true,
+		});
+	});
+
+	it("refuses an element's id reference inside a row of a @for keyed by its index", async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { element, state } from '@markless/core';
+function Entry({ title }) @{
+	const heading = element();
+	<section aria-labelledby={heading}>
+		<h2 el={heading}>{title}</h2>
+	</section>
+}
+export function Entries() @{
+	let titles = state(['A', 'A']);
+	<div>
+		@for (const title of titles; index at; key at) { <Entry title={title} /> }
+	</div>
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
-			'a @for keyed by its index; a native list keys each row by its item',
+			expect.stringContaining('names an element in a row of a @for keyed by its index'),
 		]);
 	});
 
