@@ -38,12 +38,16 @@ export type RowMintGraph = Pick<RuntimeGraph, 'read'>;
  * flipped `@if` arm; it is spelled here rather than threaded in because the
  * repeat runtime is reached from two call sites that hand it no renderer.
  */
+// The graph and arm are read by the live-arm render `fns/empty-arm-slots` puts in this one's place; the overload costs no bytes.
 export function renderEmptyArm(
 	parent: ResumeDomElement,
 	repeat: ResumeKeyedRepeatRecord,
-	// Read by the live-arm render `fns/empty-arm-slots` puts in this one's place on a page that has one.
-	_graph?: RuntimeGraph,
-	_arm?: { readonly nodes: ReadonlyArray<ResumeDomNode> },
+	graph?: RuntimeGraph,
+	arm?: { readonly nodes: ReadonlyArray<ResumeDomNode> },
+): ReadonlyArray<ResumeDomNode>;
+export function renderEmptyArm(
+	parent: ResumeDomElement,
+	repeat: ResumeKeyedRepeatRecord,
 ): ReadonlyArray<ResumeDomNode> {
 	const template = parent.ownerDocument?.createElement?.('template');
 	if (!template)
@@ -435,7 +439,7 @@ function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	}
 	return cursor;
 }
-export function repeatRuntimeError(repeat: ResumeKeyedRepeatRecord, code: string, detail: string): Error {
+function repeatRuntimeError(repeat: ResumeKeyedRepeatRecord, code: string, detail: string): Error {
 	const error = new Error(`${code}: ${repeat.id} ${detail}`) as Error & Record<string, unknown>;
 	error.name = 'KeyedRepeatRuntimeError';
 	error.code = code;

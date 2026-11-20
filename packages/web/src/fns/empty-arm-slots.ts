@@ -3,7 +3,6 @@ import type { ResumeDomElement, ResumeDomNode, ResumeKeyedRepeatRecord } from '.
 import {
 	nodeAtPath,
 	renderEmptyArm,
-	repeatRuntimeError,
 	writeAttribute,
 	type AttributableNode,
 	type MintingDocument,
@@ -80,4 +79,16 @@ function renderLiveEmptyArm(
 		}),
 	);
 	return shown;
+}
+
+// Spelled here, as row-mint spells its own helpers, so the mint every row page loads exports nothing for this module.
+function repeatRuntimeError(repeat: ResumeKeyedRepeatRecord, code: string, detail: string): Error {
+	const error = new Error(`${code}: ${repeat.id} ${detail}`) as Error & Record<string, unknown>;
+	error.name = 'KeyedRepeatRuntimeError';
+	error.code = code;
+	error.severity = 'error';
+	error.phase = 'runtime';
+	error.repeatId = repeat.id;
+	error.docsUrl = `https://markless.dev/errors/${code}`;
+	return error;
 }
