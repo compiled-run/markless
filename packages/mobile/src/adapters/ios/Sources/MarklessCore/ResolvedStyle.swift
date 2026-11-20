@@ -219,8 +219,9 @@ extension StyleExport {
 			case .branch, .repeat, .sheet: break
 			case .text:
 				guard styled.isText else { throw styleError("\(node.id) is text in the payload and an element in the style export") }
-				if let texts, styled.text != texts[node.id] {
-					throw styleError("\(node.id) reads \(texts[node.id].map { "\"\($0)\"" } ?? "nothing") but the style export laid out \(styled.text.map { "\"\($0)\"" } ?? "nothing")")
+				// A text in an arm not shown at mount is read when its arm opens.
+				if let texts, let shown = texts[node.id], styled.text != shown {
+					throw styleError("\(node.id) reads \"\(shown)\" but the style export laid out \(styled.text.map { "\"\($0)\"" } ?? "nothing")")
 				}
 			}
 			var offset = (x: 0.0, y: 0.0)
