@@ -18,6 +18,7 @@ import type {
 import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
 import {
 	isNativeStyleStateAttribute,
+	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 	NATIVE_DATA_SCRIPT_TYPES,
 	NATIVE_ELEMENTS,
@@ -294,7 +295,6 @@ const TEXT_TYPES = new Set(['text', 'search', 'tel']);
 const UNCHECKED_CONSTRAINTS = [
 	'pattern',
 	'minlength',
-	'maxlength',
 	'min',
 	'max',
 	'step',
@@ -4385,9 +4385,10 @@ export function createNativeViewPayload(
 						(prop.kind === 'opaque' || prop.kind === 'graph-reference') &&
 						prop.nativeExpression
 					) {
-						// A value the page renders the child with (a constant, a body const, an item's field): lowered where it is written.
-						const expr = exprOf(
+						// A value the page renders the child with: lowered where it is written, else a call into the script.
+						const expr = renderValue(
 							prop.nativeExpression,
+							() => readScript(scope.module, prop.sourceSpan),
 							`the \`${prop.name}\` prop of <${edge.childComponentName}>`,
 							{
 								...scope,
@@ -6517,6 +6518,7 @@ export function createNativeViewPayload(
 	}
 	wireTicks();
 	checkSelects();
+	let lengthLimited = false;
 	const forms = wireForms();
 	for (const handler of handlers) {
 		if (mentionsElement(handler.ops)) {
@@ -6587,6 +6589,7 @@ export function createNativeViewPayload(
 		...(title ? { title } : {}),
 		...(objects.length > 0 ? { objects } : {}),
 		...(forms.length > 0 ? { forms, valueMissing: NATIVE_VALUE_MISSING_BY_LOCALE } : {}),
+		...(lengthLimited ? { tooLong: NATIVE_TOO_LONG_BY_LOCALE } : {}),
 		...(script ? { script } : {}),
 	});
 
@@ -6758,7 +6761,7 @@ export function createNativeViewPayload(
 				}
 				const type = node.attributes?.['type'];
 				if (node.element === 'select') {
-					for (const name of [...UNCHECKED_CONSTRAINTS, 'required'])
+					for (const name of [...UNCHECKED_CONSTRAINTS, 'maxlength', 'required'])
 						if (attribute(node, name))
 							refuse(
 								`${field} has \`${name}\`, which the web checks before a submit and no native host checks yet`,
@@ -6802,7 +6805,10 @@ export function createNativeViewPayload(
 						`${field} binds the \`name\` of a radio button, which a native build reads only as written`,
 					);
 				fields.push({ node: node.id, kind });
-				if (kind === 'text') textFields.push(node.id);
+				if (kind === 'text') {
+					textFields.push(node.id);
+					if (attribute(node, 'maxlength')) lengthLimited = true;
+				}
 			}
 			if (!submit) {
 				if (submitters.length > 0 || textFields.length === 1)

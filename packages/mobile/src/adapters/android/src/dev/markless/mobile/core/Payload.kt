@@ -243,6 +243,28 @@ data class Field(val node: String, val kind: FieldKind)
 /** What the web says when a required field of each kind has no value, in one language. */
 data class ValueMissing(val text: String, val checkbox: String, val radio: String)
 
+/** Chromium's message for a text field longer than its `maxlength`, with `{max}` and `{length}` written in [digits]. */
+data class TooLong(val text: String, val digits: String = "0123456789") {
+	/** The message for these numbers, as Chromium writes them: no grouping, in the language's digits. */
+	fun message(max: Int, length: Int): String {
+		fun write(value: Int) = value.toString().map { digits[it - '0'] }.joinToString("")
+		return text.replace("{max}", write(max)).replace("{length}", write(length))
+	}
+}
+
+/** A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers; null (no limit) when it has none. */
+fun nativeMaxLength(attribute: String?): Int? {
+	if (attribute == null) return null
+	var at = 0
+	while (at < attribute.length && attribute[at] in " \t\n\r\u000C") at++
+	val negative = attribute.getOrNull(at) == '-'
+	if (negative || attribute.getOrNull(at) == '+') at++
+	val start = at
+	while (at < attribute.length && attribute[at] in '0'..'9') at++
+	val value = attribute.substring(start, at).toIntOrNull() ?: return null
+	return if (negative && value != 0) null else value
+}
+
 /** A form's submittable fields and submit buttons, each in tree order. */
 data class Form(val node: String, val fields: List<Field>, val submitters: List<String>, val noValidate: Boolean = false, val authoredAriaDisabled: Boolean = false)
 
@@ -259,6 +281,8 @@ data class Payload(
 	val forms: List<Form> = emptyList(),
 	/** [ValueMissing] by the locale the browser shows its own text in. */
 	val valueMissing: Map<String, ValueMissing> = emptyMap(),
+	/** [TooLong] by the locale the browser shows its own text in. */
+	val tooLong: Map<String, TooLong> = emptyMap(),
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	val script: ScriptSource? = null,
 ) {
@@ -267,7 +291,7 @@ data class Payload(
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "script"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "script"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -323,6 +347,13 @@ data class Payload(
 				fun text(k: String) = mo.field(k, "payload.valueMissing.$locale").str("payload.valueMissing.$locale.$k")
 				locale to ValueMissing(text("text"), text("checkbox"), text("radio"))
 			} ?: emptyMap()
+			val tooLong = root["tooLong"]?.obj("payload.tooLong")?.entries?.associateTo(LinkedHashMap()) { (locale, m) ->
+				val mo = m.obj("payload.tooLong.$locale")
+				mo.only(setOf("text", "digits"), "payload.tooLong.$locale")
+				val digits = mo["digits"]?.str("payload.tooLong.$locale.digits") ?: "0123456789"
+				if (digits.length != 10) throw MarklessDecodeError("payload.tooLong.$locale.digits is not ten digits")
+				locale to TooLong(mo.field("text", "payload.tooLong.$locale").str("payload.tooLong.$locale.text"), digits)
+			} ?: emptyMap()
 			val script = root["script"]?.obj("payload.script")?.let { o ->
 				o.only(setOf("id", "source", "services"), "payload.script")
 				val services = o.field("services", "payload.script").arr("payload.script.services").map { it.str("payload.script.services[]") }
@@ -333,7 +364,7 @@ data class Payload(
 				val runsScript = cells.any { it.async != null } || handlers.any { h -> scriptOps(h.ops) } || nodes.any { n -> readsOf(n).any(::hasScript) } || title.orEmpty().any { it is TextPart.Value && hasScript(it.expr) }
 				if (runsScript) throw MarklessDecodeError("a script op or computed in a payload with no script")
 			}
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, script)
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, script)
 		}
 
 		private fun readsOf(node: Node): List<Expr> = when (node) {

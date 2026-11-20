@@ -755,6 +755,7 @@ class Runtime(
 	}
 
 	private val missing: ValueMissing? = payload.valueMissing[nativeLocale(preferredLanguages, payload.valueMissing.keys)]
+	private val tooLong: TooLong? = payload.tooLong[nativeLocale(preferredLanguages, payload.tooLong.keys)]
 
 	private fun entriesOf(id: String): JsValue {
 		val form = forms[id] ?: throw MarklessRuntimeError("\"$id\" is not a form")
@@ -774,18 +775,33 @@ class Runtime(
 	}
 
 	/** The first field that stops a submit, or null when none does. */
-	private fun firstInvalid(form: Form, submitter: String?): Field? {
+	private fun firstInvalid(form: Form, submitter: String?): Pair<String, String>? {
 		if (form.noValidate || (submitter != null && attributeNow(submitter, "formnovalidate") != null)) return null
-		return form.fields.firstOrNull { (node, kind) ->
-			if (kind == FieldKind.Hidden || kind == FieldKind.Select || !isShown(elementOf(node)) || attributeNow(node, "disabled") != null) return@firstOrNull false
-			// A radio button is missing its value when any button of its group is required and none is checked.
-			val required = if (kind == FieldKind.Radio) groupOf(node).any { attributeNow(it.id, "required") != null } else attributeNow(node, "required") != null
-			required && when (kind) {
-				FieldKind.Radio -> groupOf(node).none { checkedOf(it.id) }
-				FieldKind.Text -> textOf(node) == ""
-				else -> !checkedOf(node)
-			}
+		for (field in form.fields) invalidity(field)?.let { return field.node to it }
+		return null
+	}
+
+	/** Why a field stops a submit, as the web says it, or null when it does not. */
+	private fun invalidity(field: Field): String? {
+		val (node, kind) = field
+		if (kind == FieldKind.Hidden || kind == FieldKind.Select || !isShown(elementOf(node)) || attributeNow(node, "disabled") != null) return null
+		// A radio button is missing its value when any button of its group is required and none is checked.
+		val required = if (kind == FieldKind.Radio) groupOf(node).any { attributeNow(it.id, "required") != null } else attributeNow(node, "required") != null
+		val absent = required && when (kind) {
+			FieldKind.Radio -> groupOf(node).none { checkedOf(it.id) }
+			FieldKind.Text -> textOf(node) == ""
+			else -> !checkedOf(node)
 		}
+		if (absent) {
+			val messages = missing ?: throw MarklessRuntimeError("the payload has no message for a ${kind.wire} missing its value")
+			return when (kind) { FieldKind.Radio -> messages.radio; FieldKind.Checkbox -> messages.checkbox; else -> messages.text }
+		}
+		// Only text a person typed is too long: a value the app set is kept whole and passes.
+		if (kind != FieldKind.Text) return null
+		val max = nativeMaxLength(attributeNow(node, "maxlength")) ?: return null
+		val typed = edited[node] ?: return null
+		if (typed.length <= max) return null
+		return (tooLong ?: throw MarklessRuntimeError("the payload has no message for a field longer than its maxlength")).message(max, typed.length)
 	}
 
 	/** `aria-busy` on a form while a submission of it runs, `aria-disabled` on the button that sent a marking one. */
@@ -1277,9 +1293,8 @@ class Runtime(
 	private fun submit(op: Op.Submit, scope: Scope, calls: MutableList<JournalEntry>): List<JournalEntry> {
 		val form = forms[op.form] ?: throw MarklessRuntimeError("\"${op.form}\" is not a form")
 		if (op.submitter != null && attributeNow(op.submitter, "disabled") != null) return emptyList()
-		firstInvalid(form, op.submitter)?.let { field ->
-			val messages = missing ?: throw MarklessRuntimeError("the payload has no message for a ${field.kind.wire} missing its value")
-			calls.add(JournalEntry.Invalid(field.node, when (field.kind) { FieldKind.Radio -> messages.radio; FieldKind.Checkbox -> messages.checkbox; else -> messages.text }))
+		firstInvalid(form, op.submitter)?.let { (node, message) ->
+			calls.add(JournalEntry.Invalid(node, message))
 			return emptyList()
 		}
 		val sent = jsonValue(entriesOf(op.form))

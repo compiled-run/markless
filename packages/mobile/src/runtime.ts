@@ -1,6 +1,7 @@
 import type {
 	NativeBuiltin,
 	NativeExpr,
+	NativeFieldKind,
 	NativeFetchResponse,
 	NativeJournalEntry,
 	NativeScriptBindings,
@@ -15,6 +16,8 @@ import {
 	NATIVE_DOCUMENT_BODY,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	nativeLocale,
+	nativeMaxLength,
+	nativeTooLongMessage,
 } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeScriptEngine } from './script-engine.ts';
@@ -1174,6 +1177,8 @@ export function createNativeRuntime(
 
 	const messages = payload.valueMissing ?? {};
 	const missing = messages[nativeLocale(preferredLanguages, Object.keys(messages))];
+	const tooLongMessages = payload.tooLong ?? {};
+	const tooLong = tooLongMessages[nativeLocale(preferredLanguages, Object.keys(tooLongMessages))];
 	function entriesOf(id: string): Value {
 		const form = forms.get(id);
 		if (!form) throw new Error(`${id} is not a form`);
@@ -1190,6 +1195,32 @@ export function createNativeRuntime(
 			return [[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : textOf(node)]];
 		});
 	}
+	/** Why a field stops a submit, as the web says it, or undefined when it does not. */
+	const invalidity = (node: string, kind: NativeFieldKind): string | undefined => {
+		if (kind === 'hidden' || !shown(elementOf(node))) return undefined;
+		if (attributeNow(node, 'disabled') !== null) return undefined;
+		// A radio button is missing its value when any button of its group is required and none is checked.
+		const required =
+			kind === 'radio'
+				? groupOf(node).some((member) => attributeNow(member.id, 'required') !== null)
+				: attributeNow(node, 'required') !== null;
+		const absent = () =>
+			kind === 'radio'
+				? groupOf(node).every((member) => !checkedOf(member.id))
+				: kind === 'text'
+					? textOf(node) === ''
+					: !checkedOf(node);
+		if (required && absent()) {
+			if (!missing) throw new Error(`the payload has no message for a ${kind} missing its value`);
+			return missing[kind as 'text' | 'checkbox' | 'radio'];
+		}
+		// Only text a person typed is too long: a value the app set is kept whole and passes.
+		const max = kind === 'text' ? nativeMaxLength(attributeNow(node, 'maxlength')) : undefined;
+		const typed = edited.get(node);
+		if (max === undefined || typed === undefined || typed.length <= max) return undefined;
+		if (!tooLong) throw new Error('the payload has no message for a field longer than its maxlength');
+		return nativeTooLongMessage(tooLong, max, typed.length);
+	};
 	/** The first field that stops a submit, with what the web says about it, or undefined when none does. */
 	const firstInvalid = (id: string, submitter: string | null) => {
 		const form = forms.get(id)!;
@@ -1198,18 +1229,11 @@ export function createNativeRuntime(
 			(submitter !== null && attributeNow(submitter, 'formnovalidate') !== null)
 		)
 			return undefined;
-		return form.fields.find(({ node, kind }) => {
-			if (kind === 'hidden' || !shown(elementOf(node))) return false;
-			if (attributeNow(node, 'disabled') !== null) return false;
-			// A radio button is missing its value when any button of its group is required and none is checked.
-			const required =
-				kind === 'radio'
-					? groupOf(node).some((member) => attributeNow(member.id, 'required') !== null)
-					: attributeNow(node, 'required') !== null;
-			if (!required) return false;
-			if (kind === 'radio') return groupOf(node).every((member) => !checkedOf(member.id));
-			return kind === 'text' ? textOf(node) === '' : !checkedOf(node);
-		});
+		for (const { node, kind } of form.fields) {
+			const message = invalidity(node, kind);
+			if (message !== undefined) return { node, message };
+		}
+		return undefined;
 	};
 	/** `aria-busy` on a form while a submission of it runs, `aria-disabled` on the button that sent a marking one. */
 	const marks = () => {
@@ -1818,15 +1842,7 @@ export function createNativeRuntime(
 		if (op.submitter !== null && attributeNow(op.submitter, 'disabled') !== null) return [];
 		const invalid = firstInvalid(op.form, op.submitter);
 		if (invalid) {
-			if (!missing)
-				throw new Error(
-					`the payload has no message for a ${invalid.kind} missing its value`,
-				);
-			calls.push({
-				op: 'invalid',
-				node: invalid.node,
-				message: missing[invalid.kind as 'text' | 'checkbox' | 'radio'],
-			});
+			calls.push({ op: 'invalid', node: invalid.node, message: invalid.message });
 			return [];
 		}
 		const sent = JSON.stringify(entriesOf(op.form));
