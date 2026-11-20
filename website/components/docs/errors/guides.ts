@@ -9,7 +9,65 @@ export type GuideSource = {
 	readonly example?: readonly string[];
 };
 
+const CLASS_STATE_NOT_CAUGHT =
+	'What the build does not catch yet: an instance returned from a function or a static factory (`state(makeCart())`, `Cart.create()`), one nested in an array of arrays, inside an object in an array, behind a condition (`ok ? new Cart() : null`), as a Map value, under a computed key, made with `Object.create`, or assigned or pushed later in a handler (`cart = new Cart()`, `carts.push(new Cart())`). Those still build, then fail at server render or leave the page stale.';
+
 export const guides: Readonly<Record<string, GuideSource>> = {
+	MARKLESS_STATE_CLASS_INSTANCE: {
+		summary: 'state() starts with a class instance, which cannot cross from the server to the browser.',
+		what: `State reaches the browser as data. A class instance is data plus methods, and the methods do not come along, so the server render could not write it into the page and a method that changes \`this\` would leave the page stale. Markless refuses \`new X()\` in a state() initializer, alone or as array elements, unless X is a built-in it can send, such as \`Date\`, \`Map\` or \`Set\`. ${CLASS_STATE_NOT_CAUGHT}`,
+		how: 'Keep the fields as plain data in state and move each method into a function beside it that takes the data. Markless tracks what that function changes. Or keep plain data in state and build the instance inside the handler that needs it.',
+		before: [
+			"import { state } from '@markless/core';",
+			'',
+			'class Cart {',
+			'\tbags = 0;',
+			'\tadd(n: number) {',
+			'\t\tthis.bags += n;',
+			'\t}',
+			'}',
+			'',
+			'export function Shop() @{',
+			'\tlet cart = state(new Cart());',
+			'',
+			'\t<button onClick={() => cart.add(1)}>{cart.bags}</button>',
+			'}',
+		],
+		example: [
+			'function add(cart: { bags: number }, n: number) {',
+			'\tcart.bags += n;',
+			'}',
+			'',
+			'export function Shop() @{',
+			'\tlet cart = state({ bags: 0 });',
+			'',
+			'\t<button onClick={() => add(cart, 1)}>{cart.bags}</button>',
+			'}',
+		],
+	},
+	MARKLESS_STATE_CLASS_METHOD_CALL: {
+		summary: 'Code calls a method on a class instance held in state.',
+		what: `Markless cannot see what a method changes through \`this\`, so the page would not update, and a method named like a Map or Set method (\`add\`, \`set\`) is not treated as one. This comes with the refusal of the instance itself. ${CLASS_STATE_NOT_CAUGHT}`,
+		how: 'Turn the method into a function that takes the plain data, called as `add(cart, 1)`, or build the instance inside the handler and write the fields you need back to state.',
+	},
+	MARKLESS_STATE_CLASS_METHOD_UNBOUND: {
+		summary: 'An event handler is a method read off a class instance in state.',
+		what: `\`onClick={cart.add}\` hands the event a method of an instance that state holds. The method does not reach the browser, and even in plain JavaScript a method passed without its object runs with no \`this\`. Only element event attributes are checked: \`items.forEach(cart.add)\` and a component prop such as \`onPick={cart.add}\` are not. ${CLASS_STATE_NOT_CAUGHT}`,
+		how: 'Call the method inside an arrow function, `onClick={() => cart.add()}`, and keep the data plain as the page for MARKLESS_STATE_CLASS_INSTANCE describes.',
+	},
+	MARKLESS_TYPE_STRIP_PARAMETER_PROPERTY: {
+		summary: 'A class constructor declares a field in its parameter list (`constructor(public sku: string)`).',
+		what: 'Markless turns .tsrx code into JavaScript only by removing types. A TypeScript parameter property declares a field and assigns it; with only the types removed it would be an ordinary parameter and the field would be gone.',
+		how: 'Declare the field in the class body and assign it in the constructor.',
+		example: [
+			'class Item {',
+			'\tsku: string;',
+			'\tconstructor(sku: string) {',
+			'\t\tthis.sku = sku;',
+			'\t}',
+			'}',
+		],
+	},
 	MARKLESS_ATTACH_NO_START_TRIGGER: {
 		summary: 'Nothing on a server-rendered page starts this attach function.',
 		what: 'On a page the server renders, `attach` waits until something on its element asks for code: an event handler on the element or inside it, or `onVisible` or `onIdle` on the element itself. This element has none of those, so the function never runs there.',

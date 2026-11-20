@@ -1,5 +1,7 @@
 // Written by packages/mobile/test/write-validation-messages.ts from Chromium 156.0.8078.4; do not edit.
 
+import type { NativeTooLong } from './native-view.ts';
+
 /** Chromium's `validationMessage` for a required field with no value, by the language Chromium shows its own text in. */
 export const NATIVE_VALUE_MISSING_BY_LOCALE: Readonly<
 	Record<string, { readonly text: string; readonly checkbox: string; readonly radio: string }>
@@ -278,5 +280,175 @@ export const NATIVE_VALUE_MISSING_BY_LOCALE: Readonly<
 		text: '請填寫這個欄位。',
 		checkbox: '如果你要繼續執行，請勾選這個核取方塊。',
 		radio: '請選取其中一個選項。',
+	},
+};
+
+/** Chromium's `validationMessage` for a text field a person edited to longer than its maxlength, with `{max}` and `{length}` for the numbers. */
+export const NATIVE_TOO_LONG_BY_LOCALE: Readonly<Record<string, NativeTooLong>> = {
+	af: {
+		text: 'Verkort hierdie teks na {max} karakters of minder (jy gebruik tans {length} karakters).',
+	},
+	am: {
+		text: 'እባክዎ ይህ ጽሁፍ ወደ {max} ወይም ከዚያ በታች ቁምፊዎች ያሳጥሩት (በአሁኑ ጊዜ {length} ቁምፊዎችን እየተጠቀሙ ነዎት)።',
+	},
+	ar: {
+		text: 'يُرجى اختصار هذا النص حتى يصل إلى {max} من الحروف أو أقل (أنت الآن تستخدم {length} من الحروف).',
+	},
+	bg: {
+		text: 'Моля, съкратете този текст до {max} знака или по-малко (понастоящем използвате {length} знака).',
+	},
+	bn: {
+		text: 'দয়া করে এই পাঠ্যটি {max}টি অক্ষর বা তার কমে (আপনি বর্তমানে {length}টি অক্ষর ব্যবহার করছেন) সংক্ষিপ্ত করুন৷',
+	},
+	ca: {
+		text: "Escurceu aquest text a un màxim de {max} caràcters (ara n'esteu utilitzant {length}).",
+	},
+	cs: {
+		text: 'Zkraťte prosím tento text na {max} znaků nebo méně. (Aktuálně má {length} znaků.)',
+	},
+	da: {
+		text: 'Forkort denne tekst til {max} tegn eller færre (du bruger i øjeblikket {length} tegn).',
+	},
+	de: {
+		text: 'Kürze diesen Text auf max. {max} Zeichen. Zurzeit verwendest du {length} Zeichen.',
+	},
+	el: {
+		text: 'Κάντε πιο σύντομο αυτό το κείμενο ώστε να έχει το πολύ {max} χαρακτήρες (αυτήν τη στιγμή χρησιμοποιείτε {length} χαρακτήρες).',
+	},
+	en: {
+		text: 'Please shorten this text to {max} characters or less (you are currently using {length} characters).',
+	},
+	'en-GB': {
+		text: 'Please shorten this text to {max} characters or less (you are currently using {length} characters).',
+	},
+	es: {
+		text: 'Reduce la longitud de este texto a {max} caracteres o menos (actualmente, el texto tiene {length} caracteres)',
+	},
+	'es-419': {
+		text: 'Acorta este texto a {max} caracteres o menos (actualmente estás usando {length} caracteres).',
+	},
+	et: {
+		text: 'Lühendage seda teksti {max} tähemärgini või rohkem (praegu kasutate {length} tähemärki).',
+	},
+	fa: {
+		text: 'لطفاً این متن را به اندازه {max} نویسه یا کمتر کوتاه کنید (شما در حال حاضر از {length} نویسه استفاده می‌کنید).',
+		digits: '۰۱۲۳۴۵۶۷۸۹',
+	},
+	fi: {
+		text: 'Lyhennä tämä teksti alle {max} merkkiin (tällä hetkellä käytössä {length} merkkiä).',
+	},
+	fil: {
+		text: 'Mangyaring paikliin ang tekstong ito ng {max} (na) character o mas mababa (kasalukuyan kang gumagamit ng {length} (na) character).',
+	},
+	fr: {
+		text: 'Veuillez réduire ce texte à {max} caractères maximum (il compte actuellement {length} caractères).',
+	},
+	gu: {
+		text: 'કૃપા કરીને આ ટેક્સ્ટને {max} અક્ષર અથવા તેથી ઓછા સુધી નાનો કરો (તમે હાલમાં {length} અક્ષરોનો ઉપયોગ કરી રહ્યા છો).',
+	},
+	he: {
+		text: 'צריך לקצר את הטקסט ל-{max} תווים או פחות (כרגע: {length} תווים).',
+	},
+	hi: {
+		text: 'कृपया इस टेक्स्ट को {max} वर्णों या कम तक छोटा करें (वर्तमान में आप {length} वर्णों का उपयोग कर रहे हैं).',
+	},
+	hr: {
+		text: 'Skratite taj tekst na {max} znakova ili manje (trenutačno upotrebljavate {length} znakova).',
+	},
+	hu: {
+		text: 'Kérjük, rövidítse le a szöveget legfeljebb {max} karakterre (jelenleg {length} karaktert használ).',
+	},
+	id: {
+		text: 'Pendekkan teks ini menjadi {max} karakter atau kurang (saat ini Anda menggunakan {length} karakter).',
+	},
+	it: {
+		text: 'Riduci questo testo a {max} caratteri o meno (attualmente stai utilizzando {length} caratteri).',
+	},
+	ja: {
+		text: 'このテキストを半角 {max} 文字以下にしてください（現時点で半角 {length} 文字です）。',
+	},
+	kn: {
+		text: 'ದಯವಿಟ್ಟು ಈ ಪಠ್ಯವನ್ನು {max} ಅಕ್ಷರಗಳಿಗೆ ಅಥವಾ ಅದಕ್ಕಿಂತಲೂ ಕಡಿಮೆಗೆ ಸೀಮಿತಗೊಳಿಸಿ (ನೀವು ಪ್ರಸ್ತುತ {length} ಅಕ್ಷರಗಳನ್ನು ಬಳಸುತ್ತಿರುವಿರಿ).',
+	},
+	ko: {
+		text: '이 텍스트를 {max}자 이하로 줄이세요(현재 {length}자 사용 중).',
+	},
+	lt: {
+		text: 'Sutrumpinkite šį tekstą iki {max} simb. ar mažiau (šiuo metu naudojate {length} simb.).',
+	},
+	lv: {
+		text: 'Lūdzu, saīsiniet šo tekstu līdz {max} vai mazāk zīmēm (pašreiz tas ietver {length} rakstzīmes).',
+	},
+	ml: {
+		text: 'ഈ വാചകത്തെ {max} അല്ലെങ്കില്‍ അതില്‍‌ക്കുറവ് പ്രതീകങ്ങളായി ദയവായി കുറയ്ക്കുക (നിങ്ങള്‍ നിലവില്‍ {length} പ്രതീകങ്ങള്‍ ഉപയോഗിക്കുകയാണ്).',
+	},
+	mr: {
+		text: 'कृपया हा मजकूर {max} वर्ण लहान किंवा कमी करा (तुम्ही सध्या {length} वर्ण वापरत आहात).',
+	},
+	ms: {
+		text: 'Sila pendekkan teks ini menjadi {max} aksara atau kurang (anda kini menggunakan {length} aksara).',
+	},
+	nb: {
+		text: 'Forkort denne teksten til {max} tegn eller færre (for øyeblikket bruker du {length} tegn).',
+	},
+	nl: {
+		text: 'Kort deze tekst in tot {max} tekens of minder (je gebruikt momenteel {length} tekens).',
+	},
+	pl: {
+		text: 'Skróć ten tekst do maksymalnie {max} znaków (w tej chwili korzystasz z {length} znaków).',
+	},
+	'pt-BR': {
+		text: 'Reduza este texto para {max} caracteres ou menos (você está usando {length} caracteres).',
+	},
+	'pt-PT': {
+		text: 'Encurte este texto para {max} caracteres ou menos (está atualmente a utilizar {length} caracteres).',
+	},
+	ro: {
+		text: 'Micșorează acest text la cel mult {max} caractere (în prezent utilizezi {length} caractere).',
+	},
+	ru: {
+		text: 'Длина текста не должна превышать {max} симв. (сейчас {length} симв.).',
+	},
+	sk: {
+		text: 'Tento text musíte skrátiť na {max} znakov alebo menej (súčasný počet znakov: {length}).',
+	},
+	sl: {
+		text: 'Skrajšajte to besedilo na {max} znakov ali manj (trenutno uporabljate {length} znakov).',
+	},
+	sr: {
+		text: 'Скратите овај текст на {max} знак(ов)а или мање (тренутно користите {length} знак(ов)а).',
+	},
+	sv: {
+		text: 'Förkorta texten till {max} tecken eller mindre (nu är texten {length} tecken).',
+	},
+	sw: {
+		text: 'Tafadhali fupisha maandishi haya hadi vibambo {max} au chini (kwa sasa unatumia vibambo {length} ).',
+	},
+	ta: {
+		text: 'இந்த உரையை {max} எழுத்துக்குறிகள் அல்லது அதற்கும் குறைவாக சுருக்கிடுங்கள் (நீங்கள் தற்போது {length} எழுத்துக்குறிகளைப் பயன்படுத்துகிறீர்கள்).',
+	},
+	te: {
+		text: 'దయచేసి ఈ వచనాన్ని {max} అక్షరాలకు లేదా అంతకంటే తక్కువకు తగ్గించండి (మీరు ప్రస్తుతం {length} అక్షరాలను ఉపయోగిస్తున్నారు).',
+	},
+	th: {
+		text: 'โปรดย่อข้อความนี้ให้เหลือไม่เกิน {max} อักขระ (ขณะนี้ข้อความของคุณมี {length} อักขระ)',
+	},
+	tr: {
+		text: 'Lütfen bu metni {max} veya daha az karakter olacak şekilde kısaltın (şu anda {length} karakter kullanıyorsunuz).',
+	},
+	uk: {
+		text: 'Скоротіть текст до такої кількості символів або менше: {max} (наразі використано символів: {length}).',
+	},
+	ur: {
+		text: 'براہ کرم اس متن کو مختصر کر کے {max} یا اس سے کم حروف تک لائیں (آپ فی الحال {length} حروف استعمال کر رہے ہیں)۔',
+	},
+	vi: {
+		text: 'Hãy cắt ngắn văn bản này thành {max} ký tự hoặc ít hơn (bạn hiện đang sử dụng {length} ký tự).',
+	},
+	'zh-CN': {
+		text: '请将该文本减少为 {max} 个字符或更少（您当前使用了 {length} 个字符）。',
+	},
+	'zh-TW': {
+		text: '請將這段文字刪減至 {max} 個字元以下 (目前的字元數為 {length} 個)。',
 	},
 };

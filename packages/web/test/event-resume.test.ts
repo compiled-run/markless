@@ -152,6 +152,42 @@ test('event resume dispatches a lazy event and applies subscribed DOM updates', 
 	expect(button.textContent).toBe('1');
 });
 
+test('event resume decodes a "__proto__" field as an own field, not as the prototype', async () => {
+	const button = element('BUTTON');
+	const root = element('DIV', [button]);
+	const hostile = JSON.parse('{"profile":{"__proto__":{"admin":true},"name":"ada"}}');
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:user', name: 'user', valueKind: 'object', value: hostile }],
+	});
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:event'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+	let seen: Record<string, unknown> | undefined;
+	await resumeEventFromPayloadDocument({
+		document: payloadDocument(scripts.stateScript, scripts.viewScript),
+		root,
+		event: { type: 'click', target: button },
+		loadSymbol: () => (context) => {
+			seen = context.graph.read('state:user', ['profile']) as Record<string, unknown>;
+		},
+	});
+	expect(seen).toBeDefined();
+	expect(Object.getPrototypeOf(seen)).toBe(Object.prototype);
+	expect(seen!.admin).toBeUndefined();
+	expect(Object.keys(seen!)).toEqual(['__proto__', 'name']);
+	expect(({} as Record<string, unknown>).admin).toBeUndefined();
+});
+
 test('event resume accepts wildcard dynamic-tag locators', async () => {
 	const widget = element('H1');
 	const button = element('BUTTON');

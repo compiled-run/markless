@@ -13,7 +13,12 @@ import {
 	type ProtocolViewPayload,
 	type StorageSeedMetadata,
 } from '@markless/serializer';
-import { encodeProtocolPayloadLists, renderPayloadScripts, serializeGraphValue } from '@markless/serializer';
+import {
+	encodeProtocolPayloadLists,
+	renderPayloadScripts,
+	serializeGraphValue,
+	setDataField,
+} from '@markless/serializer';
 import {
 	type ProtocolArmRecordSet,
 	protocolEventDispatchesMarkless,
@@ -857,7 +862,7 @@ export function withoutReadSources<Value>(value: Value): Value {
 	const read = typeof record.source === 'string' && 'graphNodeId' in record && 'path' in record;
 	const copy: Record<string, unknown> = {};
 	for (const key in record)
-		if (!(read && key === 'source')) copy[key] = withoutReadSources(record[key]);
+		if (!(read && key === 'source')) setDataField(copy, key, withoutReadSources(record[key]));
 	return copy as Value;
 }
 

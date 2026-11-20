@@ -1,5 +1,9 @@
 import { expect, test } from 'vitest';
-import { deserializeGraphValue, serializeGraphValue } from '../src/index.ts';
+import {
+	deserializeGraphValue,
+	SERIALIZABLE_BUILT_IN_CONSTRUCTORS,
+	serializeGraphValue,
+} from '../src/index.ts';
 
 class AppToken {
 	constructor(readonly label: string) {}
@@ -89,6 +93,37 @@ test('serializeGraphValue diagnoses class and runtime resource instances', () =>
 	}
 });
 
+test('every constructor the build accepts in state encodes, and a constructor outside the list does not', () => {
+	const realm = globalThis as unknown as Record<string, new (...args: unknown[]) => unknown>;
+	const argumentsFor: Record<string, unknown[]> = {
+		URL: ['https://example.test/'],
+		DataView: [new ArrayBuffer(2)],
+	};
+	for (const name of SERIALIZABLE_BUILT_IN_CONSTRUCTORS) {
+		const value = new realm[name]!(...(argumentsFor[name] ?? []));
+		expect(serializeGraphValue({ value }).ok, name).toBe(true);
+	}
+	expect(serializeGraphValue({ value: new AbortController() }).ok).toBe(false);
+});
+
+test('every global constructor whose instance encodes is on the list the build accepts', () => {
+	const realm = globalThis as unknown as Record<string, unknown>;
+	const encodes: string[] = [];
+	for (const name of Object.getOwnPropertyNames(globalThis)) {
+		const constructor = realm[name];
+		if (typeof constructor !== 'function' || !/^[A-Z]/.test(name)) continue;
+		let instance: unknown;
+		try {
+			instance = new (constructor as new () => unknown)();
+		} catch {
+			continue;
+		}
+		if (serializeGraphValue({ value: instance }).ok) encodes.push(name);
+	}
+	expect(encodes.length).toBeGreaterThan(0);
+	expect(encodes.filter((name) => !SERIALIZABLE_BUILT_IN_CONSTRUCTORS.includes(name))).toEqual([]);
+});
+
 test('serializeGraphValue keeps current behavior for supported and function values', () => {
 	const nullPrototype = Object.create(null) as Record<string, unknown>;
 	nullPrototype.ready = true;
@@ -120,4 +155,22 @@ test('serializeGraphValue keeps current behavior for supported and function valu
 		path: ['session', 'socket'],
 		valueKind: 'function',
 	});
+});
+
+test('a decoded "__proto__" key is an own field and never replaces the object prototype', async () => {
+	const { deserializeGraphValueForClient } = await import('../src/value-decode-client.ts');
+	const fromRequestBody = JSON.parse('{"profile":{"__proto__":{"admin":true},"name":"ada"}}');
+	const encoded = serializeGraphValue(fromRequestBody);
+	expect(encoded.ok).toBe(true);
+	if (!encoded.ok) return;
+	for (const decoded of [
+		deserializeGraphValue(encoded.payload),
+		await deserializeGraphValueForClient(encoded.payload),
+	]) {
+		const profile = (decoded as { profile: Record<string, unknown> }).profile;
+		expect(Object.getPrototypeOf(profile)).toBe(Object.prototype);
+		expect(profile.admin).toBeUndefined();
+		expect(Object.keys(profile)).toEqual(['__proto__', 'name']);
+		expect(Object.getOwnPropertyDescriptor(profile, '__proto__')?.value).toEqual({ admin: true });
+	}
 });

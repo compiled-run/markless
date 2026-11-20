@@ -9,7 +9,7 @@
  */
 import { expect, test } from 'vitest';
 import { parse } from '@tsrx/yuku';
-import { compileTsrxModule } from '../../src/index.ts';
+import { collectTsrxModuleDiagnostics, compileTsrxModule } from '../../src/index.ts';
 
 type Compiled = Awaited<ReturnType<typeof compileTsrxModule>>;
 
@@ -155,7 +155,7 @@ export function Root() @{
 // one refuses by name instead of emitting a module missing the assignment.
 // An enum never reaches this path: an enum declaration is not carried into a
 // symbol module at all, so its name is left free rather than stripped.
-test('a carried parameter property is refused by name', async () => {
+test('a parameter property carried into a handler module is refused as a diagnostic', async () => {
 	await expect(
 		compile(`
 import { state } from '@markless/core';
@@ -172,8 +172,18 @@ export function Root() @{
 	<button onClick={() => { count = count + rate.read(); }}>{count}</button>
 }
 `),
-	).rejects.toThrow('parameter properties cannot be stripped to JavaScript');
+	).resolves.toSatisfy(refusesParameterProperty('step'));
 });
+
+function refusesParameterProperty(name: string) {
+	return (compiled: Compiled) =>
+		collectTsrxModuleDiagnostics(compiled).some(
+			(diagnostic) =>
+				diagnostic.code === 'MARKLESS_TYPE_STRIP_PARAMETER_PROPERTY' &&
+				diagnostic.severity === 'error' &&
+				diagnostic.message.includes(`"${name}"`),
+		);
+}
 
 /**
  * The SSR module is still assembled as TEXT by `public-render` — the template
@@ -252,7 +262,7 @@ export function Root() @{
  * one refuses by name rather than emitting an SSR module missing the assignment.
  * The refusal names the construct AND the splice site it came from.
  */
-test('an SSR span that cannot be reprinted refuses by name', async () => {
+test('a parameter property carried into the SSR module is refused as a diagnostic', async () => {
 	await expect(
 		compile(`
 import { state } from '@markless/core';
@@ -269,7 +279,5 @@ export function Root() @{
 	<button onClick={() => { count = count + 1; }}>{count}</button>
 }
 `),
-	).rejects.toThrow(
-		/a module-scope declaration carried into the SSR module.*parameter properties cannot be stripped to JavaScript/s,
-	);
+	).resolves.toSatisfy(refusesParameterProperty('step'));
 });

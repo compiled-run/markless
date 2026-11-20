@@ -1,0 +1,151 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 72,
+			"reason": "the serializer client decoder defines a decoded \"__proto__\" field as an own field (setDataField) instead of assigning it",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 72,
+			"reason": "the serializer client decoder defines a decoded \"__proto__\" field as an own field (setDataField) instead of assigning it",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"serializer/value-own-field"
+			],
+			"set": 302,
+			"reason": "setDataField keeps a \"__proto__\" key from decoded or copied state data as an own field; graph path writes are unchanged (issue #926)",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"serializer/value-decode-client"
+			],
+			"delta": 13,
+			"reason": "setDataField keeps a \"__proto__\" key from decoded or copied state data as an own field; graph path writes are unchanged (issue #926)",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"delta": 85,
+			"reason": "setDataField keeps a \"__proto__\" key from decoded or copied state data as an own field; graph path writes are unchanged (issue #926)",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 23,
+			"reason": "setDataField keeps a \"__proto__\" key from decoded or copied state data as an own field; graph path writes are unchanged (issue #926)",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"serializer/value-own-field"
+			],
+			"set": 302,
+			"reason": "setDataField keeps a \"__proto__\" key from decoded or copied state data as an own field; graph path writes are unchanged (issue #926)",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"serializer/value-decode-client"
+			],
+			"delta": 13,
+			"reason": "setDataField keeps a \"__proto__\" key from decoded or copied state data as an own field; graph path writes are unchanged (issue #926)",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"delta": 85,
+			"reason": "setDataField keeps a \"__proto__\" key from decoded or copied state data as an own field; graph path writes are unchanged (issue #926)",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "setDataField keeps a \"__proto__\" key from decoded or copied state data as an own field; graph path writes are unchanged (issue #926)",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 5,
+			"reason": "setDataField keeps a \"__proto__\" key from decoded or copied state data as an own field; graph path writes are unchanged (issue #926)",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"serializer/value-own-field"
+			],
+			"set": 302,
+			"reason": "setDataField is the single helper that keeps a __proto__ key from decoded or copied state data as an own field; folding it into an existing module would either duplicate the rule or add a larger module to pages that lack it",
+			"date": "2026-11-19"
+		},
+		{
+			"surface": "build-scale",
+			"path": [
+				"budgets",
+				"clientModules",
+				"value"
+			],
+			"delta": 1,
+			"reason": "one new client module: the serializer helper that keeps a __proto__ key from state data as an own field (setDataField)",
+			"date": "2026-11-19"
+		}
+	]
+}
