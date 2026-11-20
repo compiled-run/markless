@@ -1317,6 +1317,7 @@ function nestedRowSteps(
 		const step = {
 			rowIndex,
 			keyPath: repeat.keyPath,
+			...(repeat.keyParts ? { keyParts: repeat.keyParts } : {}),
 			...(repeat.indexKey ? { indexKey: true as const } : {}),
 		};
 		if (repeat.collectionGraphNodeId) {

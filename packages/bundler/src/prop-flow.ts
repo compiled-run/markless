@@ -199,6 +199,7 @@ function rowValue(
 	if (
 		!index &&
 		!repeat.indexKey &&
+		!repeat.keyParts &&
 		path.length === repeat.keyPath.length &&
 		path.every((segment, at) => segment === repeat.keyPath[at])
 	)

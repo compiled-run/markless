@@ -931,6 +931,25 @@ export function Page() @{
 		});
 	});
 
+	it('keys a @for joined from its row fields by the same text and path pieces as the web', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Seats() @{
+	let seats = state([{ row: 'b', seat: { n: 2 } }]);
+	<ol>
+		@for (const s of seats; key s.row + '-' + s.seat.n) { <li>{s.row}</li> }
+	</ol>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.nodes.find((node) => node.kind === 'repeat')).toEqual({
+			kind: 'repeat',
+			id: 'repeat:0',
+			parent: 'h0',
+			list: { cell: 'state:seats' },
+			key: [],
+			keyParts: [['row'], '-', ['seat', 'n']],
+		});
+	});
+
 	it('lowers a keyed @for to a list region whose rows read their item, and array writes to methods', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function List() @{
@@ -2976,6 +2995,57 @@ export function Page() @{
 }`);
 		expect(diagnostics.map((d) => d.message)).toEqual([
 			'the click handler calls `location` from @markless/device inside JavaScript that runs on the phone, which it cannot reach there yet',
+		]);
+	});
+});
+
+describe('element proxies', () => {
+	const source = `import { element, shared, state } from '@markless/core';
+const pickerState = shared(
+	() => {
+		const picker = state({ open: false });
+		const optionEls = element<HTMLButtonElement[]>();
+		return { ...picker, optionEls, setOpen(next: boolean) { picker.open = next; } };
+	},
+	{ scope: 'subtree' },
+);
+function focusFirst(options: ReadonlyArray<HTMLElement> | undefined): void {
+	if (!options) return;
+	for (const option of options) {
+		if (option.getAttribute('aria-disabled') !== 'true') { option.focus(); return; }
+	}
+}
+function Trigger() @{
+	const picker = pickerState();
+	<button onClick={() => { picker.setOpen(true); focusFirst(picker.optionEls); }}>Open</button>
+}
+function Option() @{
+	const picker = pickerState();
+	<button el={picker.optionEls}>Option</button>
+}
+export function Picker() @{
+	const picker = pickerState();
+	const list = element<HTMLDivElement[]>();
+	<main ui-open={picker.open}>
+		<Trigger />
+		<Option />
+		<div el={list} />
+		<button onClick={() => { for (const one of list) one.focus(); }}>All</button>
+	</main>
+}`;
+
+	it('passes element handles to a JavaScript handler as proxies, and runs a helper data cannot spell as JavaScript beside the data a shared object needs', async () => {
+		const { payload, diagnostics } = await nativeView(source);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		const [trigger, all] = payload!.handlers;
+		expect(trigger?.ops.map((op) => op.op)).toEqual(['assign', 'script']);
+		expect(trigger?.ops[1]).toMatchObject({
+			op: 'script',
+			type: 'call',
+			bindings: { __a0: { elements: { array: [{ spread: false, value: { literal: 'component-edge:1/h1' } }] } } },
+		});
+		expect(all?.ops).toEqual([
+			{ op: 'script', fn: expect.any(String), type: 'click', bindings: { list: { elements: { array: [{ spread: false, value: { literal: 'h3' } }] } } } },
 		]);
 	});
 });

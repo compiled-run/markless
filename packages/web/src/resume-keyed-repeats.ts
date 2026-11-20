@@ -15,6 +15,7 @@ import type { DisposedRepeatRow, ResumeEventWiring } from './resume-events.ts';
 import { asyncPlanes } from './reconcile-plane-slot.ts';
 import { PROTOCOL_PROP_GRAPH_NODE_PREFIX } from '../../serializer/src/protocol-prop-prefix.ts';
 import { elementsOf, marklessElementAt, pageNodes } from './resume-anchor-census.ts';
+declare const __MARKLESS_JOINED_KEYS__: boolean;
 
 // Nothing has moved yet, so deriving a computed collection reproduces the served rows.
 export async function primeKeyedRepeatCollections(input: {
@@ -113,7 +114,6 @@ export function findRepeatItemByKey(
 	for (const [index, item] of readKeyedRepeatCollection(graph, repeat).entries())
 		if (Object.is(repeatItemKey(item, repeat, index), key)) return item;
 }
-// A row handler's locals: the item under the key, and the index when the handler reads it.
 export function rowLocals(
 	graph: RepeatReadableGraph,
 	repeat: ResumeKeyedRepeatRecord,
@@ -634,7 +634,11 @@ export function readKeyedRepeatCollection(
 	return Array.isArray(value) ? value : Array.from((value ?? []) as Iterable<unknown>);
 }
 function repeatItemKey(item: unknown, repeat: ResumeKeyedRepeatRecord, index: number): unknown {
-	return repeat.indexKey ? index : readItemPath(item, repeat.keyPath);
+	return repeat.indexKey
+		? index
+		: (typeof __MARKLESS_JOINED_KEYS__ === 'undefined' || __MARKLESS_JOINED_KEYS__) && repeat.keyParts
+			? repeat.keyParts.map((p) => (typeof p == 'string' ? p : `${readItemPath(item, p)}`)).join('')
+			: readItemPath(item, repeat.keyPath);
 }
 function readItemPath(item: unknown, path: ReadonlyArray<string>): unknown {
 	let cursor = item as Record<string, unknown> | null | undefined;
@@ -769,7 +773,6 @@ function templateSlots(repeat: ResumeKeyedRepeatRecord) {
 function slotsOf(owner: SlotOwner) {
 	return [...(owner.textSlots ?? []), ...(owner.attributeSlots ?? [])];
 }
-// One group per text or attribute slot, then one for every @if value.
 function slotReadGroups(repeat: ResumeKeyedRepeatRecord): SlotRead[][] {
 	const branches = (repeat.rowTemplate?.branchSlots ?? []).flatMap((branch) => [branch, ...branch.arms.flatMap(slotsOf)]);
 	return [...templateSlots(repeat).map((slot) => [slot]), branches].map((group: ReadonlyArray<(typeof branches)[number]>) =>
