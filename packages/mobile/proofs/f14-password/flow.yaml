@@ -1,8 +1,8 @@
 appId: ${APP_ID}
-name: f10-password
+name: f14-password
 ---
 - launchApp:
-    clearState: true
+      clearState: true
 - assertVisible: Account
 - assertVisible: 0 characters typed
 - assertVisible: Not signed in

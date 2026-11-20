@@ -15,20 +15,20 @@
 					},
 					"cells": [
 						{
-							"id": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.track",
+							"id": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track",
 							"name": "box.track",
 							"initial": "Harbour Lights",
 							"storage": {
-								"key": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.track",
+								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track",
 								"session": true
 							}
 						},
 						{
-							"id": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.playing",
+							"id": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
 							"name": "box.playing",
 							"initial": false,
 							"storage": {
-								"key": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.playing",
+								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
 								"session": true
 							}
 						}
@@ -80,7 +80,7 @@
 								{
 									"expr": {
 										"if": {
-											"cell": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.playing"
+											"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing"
 										},
 										"whenTrue": {
 											"literal": "Playing"
@@ -94,7 +94,7 @@
 									"text": ": "
 								},
 								{
-									"cell": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.track"
+									"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track"
 								}
 							]
 						},
@@ -154,11 +154,11 @@
 							"ops": [
 								{
 									"op": "assign",
-									"cell": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.playing",
+									"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
 									"value": {
 										"unary": "!",
 										"value": {
-											"cell": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.playing"
+											"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing"
 										}
 									}
 								}
@@ -194,20 +194,20 @@
 					},
 					"cells": [
 						{
-							"id": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.track",
+							"id": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track",
 							"name": "box.track",
 							"initial": "Harbour Lights",
 							"storage": {
-								"key": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.track",
+								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track",
 								"session": true
 							}
 						},
 						{
-							"id": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.playing",
+							"id": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
 							"name": "box.playing",
 							"initial": false,
 							"storage": {
-								"key": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.playing",
+								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
 								"session": true
 							}
 						}
@@ -259,7 +259,7 @@
 								{
 									"expr": {
 										"if": {
-											"cell": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.playing"
+											"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing"
 										},
 										"whenTrue": {
 											"literal": "Playing"
@@ -273,7 +273,7 @@
 									"text": ": "
 								},
 								{
-									"cell": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.track"
+									"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track"
 								}
 							]
 						},
@@ -309,11 +309,11 @@
 							"ops": [
 								{
 									"op": "assign",
-									"cell": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.playing",
+									"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
 									"value": {
 										"unary": "!",
 										"value": {
-											"cell": "app:shared:packages/mobile/proofs/n5-app-shared/lib/player.tsrx#player/state:box.playing"
+											"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing"
 										}
 									}
 								}

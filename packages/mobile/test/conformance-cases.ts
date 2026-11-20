@@ -1096,7 +1096,7 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		// An app-scoped shared() is one copy for every screen: the second screen reads what the first wrote, and Back shows
 		// the first screen the copy as the second left it.
 		name: 'app-shared',
-		app: 'proofs/n5-app-shared',
+		app: 'proofs/n7-app-shared',
 		open: '/',
 		actions: [
 			{ event: 'activate', host: 'component-edge:0/h2' },

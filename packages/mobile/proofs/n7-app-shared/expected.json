@@ -1,5 +1,5 @@
 {
-	"rung": "N5",
+	"rung": "N7",
 	"name": "An app-scoped shared() is one copy for the whole app: a second screen reads and writes the copy the first wrote, and Back shows the copy as it is now",
 	"steps": [
 		{
