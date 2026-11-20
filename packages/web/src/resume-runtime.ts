@@ -506,8 +506,11 @@ export function createResumeRuntime(
 			installArmEventType,
 			rowComponentHost,
 		});
-		// The seeded-value reconcile flushed before the journal listener existed; the graph kept its entries.
-		if (storagePlane) await input.graph.flush();
+		// Each storage cell's first read commits its saved value; only now is every computed, branch and list subscribed to follow it.
+		if (storagePlane) {
+			for (const record of input.state!.storage!) input.graph.read(record.graphNodeId);
+			await input.graph.flush();
+		}
 		// After the journal listener exists, or what a served arm's attach writes never reaches the page.
 		for (const hostNodeId of servedBehaviors) await behaviorRuntime?.activateBehaviors(hostNodeId);
 		if (

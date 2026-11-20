@@ -433,6 +433,13 @@ export type ProtocolRowTemplateSlotValue =
 			}>;
 	  };
 
+/** A live value in a keyed repeat's `@empty` arm: the graph node it reads, at its FRAGMENT-relative path. */
+export type ProtocolEmptyArmSlot = {
+	readonly path: ReadonlyArray<number>;
+	readonly graphNodeId: string;
+	readonly graphPath: ReadonlyArray<string>;
+};
+
 /** One arm of a row's branch: its markup and slots, FRAGMENT-relative to the arm's first node. */
 export type ProtocolRowTemplateArm = {
 	readonly html: string;
@@ -485,6 +492,12 @@ export type ProtocolViewPayload = {
 					 * Negative counts back from the end: -1 is the last child node.
 					 */
 					readonly textNode?: number;
+					/**
+					 * The text node just before (`previous`) or after (`next`) the host,
+					 * which this write owns when both are projected into another
+					 * component's element and this module has no element around the text.
+					 */
+					readonly sibling?: 'previous' | 'next';
 			  }
 			| {
 					readonly kind: 'attribute';
@@ -570,14 +583,17 @@ export type ProtocolViewPayload = {
 		 * collection then reads the outermost enclosing collection with a `'*'`
 		 * segment for each enclosing row (`['*', 'items']`), which reads nothing on
 		 * its own and which each instance replaces with its enclosing row's index.
-		 * `repeatId` is spelled as the authoring module spells it: composition
-		 * prefixes a record's `id` but not this, so it resolves under the record's
-		 * own prefix.
+		 * `repeatId` is spelled as the authoring module spells it, which a row
+		 * reader keys on. Composition prefixes a record's `id` and adds the same
+		 * prefix to `prefix`, so the enclosing record's id is exactly
+		 * `prefix + repeatId` and this record's authored id is its `id` after `prefix`.
 		 *
 		 * Pay-per-use: a repeat inside no other repeat omits the field.
 		 */
 		readonly enclosingRow?: {
 			readonly repeatId: string;
+			/** What composition put in front of this record's `id`; absent while it put nothing. */
+			readonly prefix?: string;
 			readonly parentHostPath: ProtocolElementAddress;
 			readonly itemPath?: ReadonlyArray<string>;
 			/** The parent sits in an arm of the enclosing row's `@if`/`@switch`, as on a row event: `parentHostPath` is then arm-relative. */
@@ -635,14 +651,22 @@ export type ProtocolViewPayload = {
 		 */
 		readonly fixed?: true;
 		/**
-		 * The `@empty` arm's finished markup, for the mint that raises it when the
-		 * collection empties after resume and takes it back out when a row returns.
-		 * Carried only for a repeat that HAS an `@empty` arm whose markup is fully
-		 * static and whose elements no record names: everything else would need
-		 * wiring the mint cannot do, so it ships nothing and the served behaviour
-		 * stands. A repeat with no `@empty` arm omits the field entirely.
+		 * The `@empty` arm's markup, for the mint that raises it when the collection
+		 * empties after resume and takes it back out when a row returns. `html` keeps
+		 * the slot markers; `textSlots` and `attributeSlots` address the arm's live
+		 * values FRAGMENT-relative, as a row template's do, and each reads a graph
+		 * node: the mint fills them when it raises the arm and writes them again
+		 * while it shows. Carried only for an arm whose every slot reads a graph
+		 * node and whose elements no event, behavior or element handle names:
+		 * everything else would need wiring the mint cannot do, so it ships nothing
+		 * and the served behaviour stands. A repeat with no `@empty` arm omits the
+		 * field entirely, and a static arm omits both slot lists.
 		 */
-		readonly emptyArm?: { readonly html: string };
+		readonly emptyArm?: {
+			readonly html: string;
+			readonly textSlots?: ReadonlyArray<ProtocolEmptyArmSlot>;
+			readonly attributeSlots?: ReadonlyArray<ProtocolEmptyArmSlot & { readonly name: string }>;
+		};
 		/**
 		 * One row's compiled markup, for the mint that builds a row the server never
 		 * rendered - an item appended to the collection after resume.

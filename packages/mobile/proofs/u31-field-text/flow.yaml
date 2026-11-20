@@ -1,0 +1,22 @@
+appId: ${APP_ID}
+name: u31-field-text
+---
+- launchApp:
+      clearState: true
+- assertVisible: Trip
+- assertVisible: Nothing saved
+- tapOn: Save
+- assertNotVisible: Nothing saved
+- assertVisible: Saved Lima
+- assertNotVisible: Nothing saved
+- tapOn: City
+- eraseText
+- inputText: Oslo
+- hideKeyboard
+- assertVisible: Oslo
+- assertVisible: Saved Lima
+- assertVisible: Oslo
+- tapOn: Save
+- assertNotVisible: Saved Lima
+- assertVisible: Saved Oslo
+- assertNotVisible: Saved Lima

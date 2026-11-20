@@ -73,11 +73,7 @@ export interface PageProps<
 	 */
 	readonly http: HttpContext<Locals>;
 	readonly params: Readonly<Params>;
-	readonly url: {
-		readonly href: string;
-		readonly pathname: string;
-		readonly search: string;
-	};
+	readonly url: URL;
 	readonly status: number;
 }
 

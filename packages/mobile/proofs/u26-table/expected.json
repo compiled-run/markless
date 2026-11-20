@@ -1,0 +1,24 @@
+{
+	"rung": 126,
+	"name": "@markless/ui table: a tap picks the row it landed on; `&&`, `||` and `??` whose left side is known when the app is built run only the side that decides (`row !== null && isReachable(row)`)",
+	"steps": [
+		{
+			"visible": ["Files", "README.md", "LICENSE", "secret.key", "Picked none"],
+			"absent": ["Picked readme", "Picked license"]
+		},
+		{
+			"do": {
+				"tap": "LICENSE"
+			},
+			"visible": ["Picked license"],
+			"absent": ["Picked none", "Picked readme"]
+		},
+		{
+			"do": {
+				"tap": "README.md"
+			},
+			"visible": ["Picked readme"],
+			"absent": ["Picked none", "Picked license"]
+		}
+	]
+}

@@ -1215,6 +1215,9 @@ function composedBoundaryArmRecords(
 		keyedRepeats: set.keyedRepeats?.map((repeat) => ({
 			...repeat,
 			id: prefix + repeat.id,
+			...(repeat.enclosingRow && {
+				enclosingRow: { ...repeat.enclosingRow, prefix: prefix + (repeat.enclosingRow.prefix ?? '') },
+			}),
 			parentHostNodeId: prefix + repeat.parentHostNodeId,
 			...(repeat.ownerHostNodeId ? { ownerHostNodeId: prefix + repeat.ownerHostNodeId } : {}),
 			...(repeat.collectionGraphNodeId &&
