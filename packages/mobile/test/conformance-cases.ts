@@ -337,7 +337,7 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	{
 		// Each of Chromium's reasons an email field stops a submit, then a value it keeps without its line break and spaces.
 		name: 'email',
-		fixture: 'proofs/f9-email/App.tsrx',
+		fixture: 'proofs/f10-email/App.tsrx',
 		actions: [
 			{ event: 'input', host: 'h3', value: 'abc' },
 			{ event: 'activate', host: 'h4' },
@@ -359,7 +359,7 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	},
 	{
 		name: 'email-japanese',
-		fixture: 'proofs/f9-email/App.tsrx',
+		fixture: 'proofs/f10-email/App.tsrx',
 		preferredLanguages: ['ja-JP'],
 		actions: [
 			{ event: 'input', host: 'h3', value: 'a@b..c' },

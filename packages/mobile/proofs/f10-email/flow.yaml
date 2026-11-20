@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: f9-email
+name: f10-email
 ---
 - launchApp:
     clearState: true
