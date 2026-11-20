@@ -1,0 +1,30 @@
+{
+	"rung": 129,
+	"name": "a text field's focus handler runs when it takes the keyboard, and its blur handler when a tap elsewhere takes the keyboard away",
+	"steps": [
+		{
+			"visible": ["Sign up", "Not editing", "Focused 0 times", "Pressed 0"],
+			"absent": ["Editing email", "Email left", "Focused 1 times"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Email",
+					"text": "ada@example.com"
+				}
+			},
+			"visible": ["Focused 1 times", "Pressed 0"],
+			"absent": ["Not editing", "Focused 0 times"],
+			"fields": {
+				"Email": "ada@example.com"
+			}
+		},
+		{
+			"do": {
+				"tap": "Pressed 0"
+			},
+			"visible": ["Email left", "Pressed 1", "Focused 1 times"],
+			"absent": ["Editing email", "Pressed 0"]
+		}
+	]
+}

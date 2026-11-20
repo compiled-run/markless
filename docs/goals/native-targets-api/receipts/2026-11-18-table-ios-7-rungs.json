@@ -1,0 +1,48 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u26-table",
+			"failure": null,
+			"installSeconds": 3.355130333000001,
+			"flowSeconds": 24.271775750000007
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 0.291872000000003,
+			"flowSeconds": 24.427563375
+		},
+		{
+			"name": "u11-pagination",
+			"failure": null,
+			"installSeconds": 0.33137275000000954,
+			"flowSeconds": 24.799350000000008
+		},
+		{
+			"name": "u12-buttongroup",
+			"failure": null,
+			"installSeconds": 0.2724301249999844,
+			"flowSeconds": 46.474856417000005
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 0.280686875000014,
+			"flowSeconds": 46.24055679099995
+		},
+		{
+			"name": "05b-choices",
+			"failure": null,
+			"installSeconds": 0.3166918750000186,
+			"flowSeconds": 26.364835083000013
+		},
+		{
+			"name": "u23-textbox",
+			"failure": null,
+			"installSeconds": 0.26559612499998186,
+			"flowSeconds": 25.51637541700003
+		}
+	]
+}

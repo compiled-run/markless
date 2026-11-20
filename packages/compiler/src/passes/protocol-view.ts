@@ -306,7 +306,7 @@ function domUpdateTargetKey(
 	if (target.kind === 'attribute') return `attribute:${target.name}`;
 	if (target.kind === 'property') return `property:${target.name}`;
 	if (target.kind === 'text') {
-		return `text:${target.prefix ?? ''}:${target.suffix ?? ''}:${target.trueValue ?? ''}:${target.falseValue ?? ''}:${target.textNode ?? ''}`;
+		return `text:${target.prefix ?? ''}:${target.suffix ?? ''}:${target.trueValue ?? ''}:${target.falseValue ?? ''}:${target.textNode ?? ''}:${target.sibling ?? ''}`;
 	}
 	if (target.kind === 'class')
 		return `class:${target.trueValue ?? ''}:${target.falseValue ?? ''}`;
@@ -947,38 +947,61 @@ function rowArmParent(
  *
  * The arm was never served on a page whose list had matches at boot, so the only
  * way it can ever speak is for the client to build it - and the client has no
- * renderer, only the payload. This ships the finished markup, which is honest
- * for exactly one shape: a chunk with NO slots. Every slot is a part the mint
- * cannot fill (a text read, an attribute read, a nested construct, a child
- * component), and a half-built arm is worse than none.
+ * renderer, only the payload. This ships the arm chunk's markup, slot markers
+ * kept, with each text or attribute slot that reads a graph node the page holds:
+ * the mint fills those when it raises the arm and writes them again while it
+ * shows. Any other slot (a nested construct, a child component, a value only the
+ * render produces) is a part the mint cannot fill, and a half-built arm is worse
+ * than none.
  *
- * A host inside the arm that any record names is refused for the same reason.
- * The mint registers nothing, so an arm carrying an event would paint a dead
- * button. Both refusals leave the served behaviour exactly as it is today.
+ * A host inside the arm that an event, behavior or element handle names is
+ * refused for the same reason: the mint registers nothing, so an arm carrying an
+ * event would paint a dead button. Both refusals leave the served behaviour
+ * exactly as it is today.
  *
- * Pay-per-use: a repeat with no `@empty` arm emits no field at all, so its
- * render data is byte-identical to what it was before this existed.
+ * Pay-per-use: a repeat with no `@empty` arm emits no field at all, and a static
+ * arm carries its html alone.
  */
 function mintableEmptyArm(
 	input: ProtocolViewPayloadInput,
 	render: RenderDataArtifact['repeats'][number],
-): { readonly emptyArm?: { readonly html: string } } {
+): { readonly emptyArm?: MintableEmptyArm } {
 	if (!render.emptyChunkId) return {};
 	const chunk = renderDataOf(input).chunks.find(
 		(candidate) => candidate.id === render.emptyChunkId,
 	);
-	if (!chunk || chunk.slots.length > 0) return {};
+	if (!chunk) return {};
+	const textSlots: Array<NonNullable<MintableEmptyArm['textSlots']>[number]> = [];
+	const attributeSlots: Array<NonNullable<MintableEmptyArm['attributeSlots']>[number]> = [];
+	for (const slot of chunk.slots) {
+		const value = mintableSlotValue(slot);
+		if (!value || !('graphNodeId' in value)) return {};
+		if (slot.kind === 'text') textSlots.push({ path: slot.coordinate.path, ...value });
+		else if (slot.kind === 'attribute')
+			attributeSlots.push({ path: slot.coordinate.path, name: slot.name, ...value });
+	}
 	const armHosts = new Set(chunk.hosts.map((host) => host.hostNodeId));
 	const wired = [
 		...input.payloadArena.view.events,
-		...input.payloadArena.view.domUpdates,
 		...input.payloadArena.view.behaviors,
 		...input.payloadArena.view.elementHandles,
 	].some((record) => armHosts.has(record.hostNodeId));
 	if (wired) return {};
 	const html = chunk.statics.join('');
-	return html ? { emptyArm: { html } } : {};
+	return html
+		? {
+				emptyArm: {
+					html,
+					...(textSlots.length > 0 ? { textSlots } : {}),
+					...(attributeSlots.length > 0 ? { attributeSlots } : {}),
+				},
+			}
+		: {};
 }
+
+type MintableEmptyArm = NonNullable<
+	NonNullable<ProtocolViewPayload['keyedRepeats']>[number]['emptyArm']
+>;
 
 /**
  * One row's markup, carried only when the mint can finish the row alone.
@@ -1081,6 +1104,8 @@ function mintableRowTemplate(
 			branchSlots.push(branch);
 			continue;
 		}
+		// A minted option leaves its selection to the select's own `value` write.
+		if (slot.kind === 'attribute' && slot.selectedOption) continue;
 		// Every slot that is neither text nor an attribute is wiring the mint does
 		// not do, and a value only the render can produce has no channel at all.
 		if (slot.kind !== 'text' && slot.kind !== 'attribute') return {};
@@ -1153,6 +1178,7 @@ function rowBranchSlot(
 		for (const armSlot of chunk.slots) {
 			if (armSlot.kind === 'repeat' && nestedRepeatMints(input, render, armSlot.repeatId, chunkId))
 				continue;
+			if (armSlot.kind === 'attribute' && armSlot.selectedOption) continue;
 			if (armSlot.kind !== 'text' && armSlot.kind !== 'attribute') return null;
 			const value = slotValue(armSlot);
 			if (!value) return null;

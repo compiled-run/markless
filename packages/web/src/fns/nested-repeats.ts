@@ -42,20 +42,12 @@ export function wireNestedRepeats(
 ): void | Promise<void> {
 	const repeats = input.view.keyedRepeats ?? [],
 		nested = new Map<string, ResumeKeyedRepeatRecord[]>();
-	for (const repeat of repeats) {
-		const authoredId = repeat.enclosingRow?.repeatId;
-		if (!authoredId) continue;
-		// Composition prefixes ids but not the enclosing id a record names: the enclosing
-		// record is the one whose prefix is the longest this record's id also carries.
-		let enclosingId: string | undefined;
-		for (const { id } of repeats)
-			if (
-				id.endsWith(authoredId) &&
-				repeat.id.startsWith(id.slice(0, id.length - authoredId.length)) &&
-				id.length > (enclosingId?.length ?? -1)
-			)
-				enclosingId = id;
-		if (enclosingId) nested.set(enclosingId, [...(nested.get(enclosingId) ?? []), repeat]);
+	// An arm wires its lists one at a time: the lists nested in their rows are found among the page's.
+	for (const repeat of new Map([...(input.pageRepeats ?? []), ...repeats].map((each) => [each.id, each])).values()) {
+		const at = repeat.enclosingRow;
+		if (!at) continue;
+		const enclosingId = (at.prefix ?? '') + at.repeatId;
+		nested.set(enclosingId, [...(nested.get(enclosingId) ?? []), repeat]);
 	}
 	const wired = new WeakMap<ResumeKeyedRepeatRecord, Map<unknown, () => void>>(),
 		// Instances whose parent sits in an arm of the row's @if, rewired whenever the row's arms change.
@@ -154,14 +146,12 @@ function nestedInstance(
 ): NestedRecord {
 	const { enclosingRow, ...own } = record;
 	const enclosingId = enclosingRow?.repeatId ?? enclosing.id,
-		prefix = enclosing.id.endsWith(enclosingId)
-			? enclosing.id.slice(0, enclosing.id.length - enclosingId.length)
-			: '';
+		prefix = enclosingRow?.prefix ?? '';
 	const instance: NestedRecord = {
 		...own,
 		rowPath: (enclosing.rowPath ?? '') + protocolRowSegment(rowKey),
 		locals: () => ({ ...enclosing.locals?.(), [enclosing.itemName]: item() }),
-		authoredId: record.id.startsWith(prefix) ? record.id.slice(prefix.length) : record.id,
+		authoredId: record.id.slice(prefix.length),
 		rowOuter: () => ({
 			repeatId: enclosingId,
 			repeatItem: item(),
