@@ -83,13 +83,7 @@
 												"literal": "flag"
 											},
 											"whenFalse": {
-												"logical": "??",
-												"left": {
-													"literal": null
-												},
-												"right": {
-													"literal": "other"
-												}
+												"literal": "other"
 											}
 										},
 										"whenFalse": {

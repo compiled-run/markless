@@ -1,0 +1,5 @@
+proof passed on iOS and Android (5 rungs, u28-row-rebuild included)
+
+Android in-app device conformance (AVD markless_mac):
+pass row-seed.json
+pass rows.json

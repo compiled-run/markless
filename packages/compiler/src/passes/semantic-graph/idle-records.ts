@@ -76,3 +76,23 @@ export function componentsWithLiveShared(
 		(component) => component.liveShared === true,
 	);
 }
+
+/** Components that resolve a subtree-scoped shared() instance (a widget) themselves, or render a component that does. */
+export function componentsWithWidgets(
+	graph: Pick<SemanticGraphArtifact, 'sharedInstances' | 'sharedDefinitions' | 'componentEdges'>,
+	importedModuleInterfaces: ImportedInterfaces,
+): ReadonlySet<string> {
+	const widgets = new Set(
+		graph.sharedDefinitions
+			.filter((definition) => definition.scope === 'subtree')
+			.map((definition) => definition.id),
+	);
+	return componentsRenderingAny(
+		graph,
+		graph.sharedInstances.flatMap((instance) =>
+			instance.componentName && widgets.has(instance.definitionId) ? [instance.componentName] : [],
+		),
+		importedModuleInterfaces,
+		(component) => component.widgets === true,
+	);
+}

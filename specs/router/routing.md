@@ -127,6 +127,7 @@ render of a `#/` route.
 ## Page request and response
 
 A page component receives `PageProps`: `params`, `url`, `status`, and `http`.
+`url` is the page's `URL`, on the server and in the browser, so `url.searchParams` reads its query.
 `http` is the same `HttpContext` that API routes and middleware receive:
 
 ```txt

@@ -31,7 +31,12 @@
 						"component-edge:0/boundary:0"
 					]
 				},
-				"row": "repeat:0"
+				"row": "repeat:0",
+				"rebuiltBy": [
+					{
+						"item": "repeat:0"
+					}
+				]
 			}
 		],
 		"nodes": [

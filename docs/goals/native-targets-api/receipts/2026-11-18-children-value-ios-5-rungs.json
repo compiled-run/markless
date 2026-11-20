@@ -1,0 +1,36 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "07d-children",
+			"failure": null,
+			"installSeconds": 3.771787458999999,
+			"flowSeconds": 21.462396541
+		},
+		{
+			"name": "u2-collapsible",
+			"failure": null,
+			"installSeconds": 0.2827695420000091,
+			"flowSeconds": 20.43524566599999
+		},
+		{
+			"name": "u6-base-rows",
+			"failure": null,
+			"installSeconds": 0.3300340830000059,
+			"flowSeconds": 35.69735841700001
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 0.334502542000002,
+			"flowSeconds": 45.980516084
+		},
+		{
+			"name": "u22-radio-group",
+			"failure": null,
+			"installSeconds": 0.3325282080000034,
+			"flowSeconds": 30.18638962500001
+		}
+	]
+}
