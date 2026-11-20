@@ -1,22 +1,22 @@
-// A test named under "inWorkerBuilds" or "slotHolders" in heavy-tests.json holds a build slot until the file ends: it builds in
-// this worker, or keeps so much memory outside the slot that no build may run beside it.
+// A test heavy-tests.json names under "inWorkerBuilds" or "slotHolders" holds a build slot until the file ends.
 import { readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { afterAll, beforeAll, expect } from 'vitest';
 import { holdBuildSlot } from '../../packages/router/test/support/build-slots.ts';
-import type { InWorkerBuildRule, SlotHolderRule } from './in-worker-builds.ts';
+import { holdsSlotForFile, type HeavyTestsManifest } from './in-worker-builds.ts';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const { inWorkerBuilds, slotHolders } = JSON.parse(
+const manifest = JSON.parse(
 	readFileSync(resolve(import.meta.dirname, 'heavy-tests.json'), 'utf8'),
-) as { inWorkerBuilds: InWorkerBuildRule; slotHolders: SlotHolderRule };
+) as HeavyTestsManifest;
 const file = expect.getState().testPath;
 const test = file && relative(repoRoot, file);
 
-if (test && [...inWorkerBuilds.tests, ...slotHolders.tests].some((entry) => entry.test === test)) {
+if (test && holdsSlotForFile(manifest, test)) {
 	let release: (() => Promise<void>) | undefined;
 	beforeAll(async () => {
 		release = await holdBuildSlot();
 	}, 600_000);
+	// The slot frees here, before the worker exits, so a build elsewhere can start while this worker's memory is still resident.
 	afterAll(() => release?.());
 }

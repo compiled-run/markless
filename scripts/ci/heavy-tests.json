@@ -156,15 +156,15 @@
 		"packages/router/test/vite/lookup-table-imports.test.ts",
 		"packages/router/test/vite/many-interactions.test.ts",
 		"packages/router/test/vite/mdx-row-arm-popover.test.ts",
-		"packages/router/test/vite/modal-in-if-arm.test.ts",
-		"packages/router/test/vite/overlay-dismiss.test.ts",
 		"packages/router/test/vite/migration-defects.test.ts",
 		"packages/router/test/vite/migration-shapes.test.ts",
+		"packages/router/test/vite/modal-in-if-arm.test.ts",
 		"packages/router/test/vite/native-packing-build.test.ts",
 		"packages/router/test/vite/navigation-release.test.ts",
 		"packages/router/test/vite/navigation-restyle.test.ts",
 		"packages/router/test/vite/navigation-stream.test.ts",
 		"packages/router/test/vite/one-server-module.test.ts",
+		"packages/router/test/vite/overlay-dismiss.test.ts",
 		"packages/router/test/vite/page-http.test.ts",
 		"packages/router/test/vite/page-region.test.ts",
 		"packages/router/test/vite/page-url-prop.test.ts",
@@ -200,6 +200,7 @@
 		"packages/web/test/early-stream-events.test.ts",
 		"packages/web/test/native-census.test.ts",
 		"packages/web/test/served-census.test.ts",
+		"scripts/ci/build-slots-dir.test.ts",
 		"scripts/test-utils/built-server.test.ts"
 	],
 	"declared": [
@@ -302,7 +303,7 @@
 		]
 	},
 	"slotHolders": {
-		"why": "Each listed test keeps more memory outside the build slot than scripts/ci/unit-budget.mjs allows (SLOT_HOLDER_MB), measured by CI's unit budget (peakMb in that run). It holds a build slot for its whole run (scripts/ci/in-worker-build-slot.ts), so no build overlaps it and a shard's peak does not depend on which files happen to run together.",
+		"why": "A listed test kept more memory outside the build slot than scripts/ci/unit-budget.mjs allows (SLOT_HOLDER_MB), measured by CI's unit budget (peakMb in that run), or came within the 90th-percentile swing of it. It holds a build slot for its whole run (scripts/ci/in-worker-build-slot.ts), so no build overlaps it. Pages in the shared Chromium of global setup are charged to no file, so they count toward no entry.",
 		"tests": [
 			{
 				"test": "packages/analyzer/test/project-graph.test.ts",
@@ -314,7 +315,7 @@
 				"test": "packages/bundler/test/arm-flip-same-task.test.ts",
 				"peakMb": 1406,
 				"run": "44705540466",
-				"why": "builds through execFile, outside the build slot, and drives its own Chromium"
+				"why": "builds through execFile, outside the build slot; its pages run in the shared Chromium, charged to no file"
 			},
 			{
 				"test": "packages/bundler/test/build-determinism.test.ts",
@@ -329,10 +330,22 @@
 				"why": "builds through execFile, outside the build slot"
 			},
 			{
+				"test": "packages/bundler/test/computed-chain-growth.test.ts",
+				"peakMb": 1278,
+				"run": "44711088992",
+				"why": "builds through execFile, outside the build slot"
+			},
+			{
+				"test": "packages/bundler/test/fixture-builds.test.ts",
+				"peakMb": 1209,
+				"run": "44711088992",
+				"why": "builds the bundler fixtures through execFile, outside the build slot"
+			},
+			{
 				"test": "packages/bundler/test/kernel-placed-rows-fixture.test.ts",
 				"peakMb": 1638,
 				"run": "44705540466",
-				"why": "builds through execFile, outside the build slot, serves the app and drives its own Chromium"
+				"why": "builds through execFile, outside the build slot and serves the app; its pages run in the shared Chromium, charged to no file"
 			},
 			{
 				"test": "packages/bundler/test/music-player-csr-budget.test.ts",
@@ -348,21 +361,57 @@
 			},
 			{
 				"test": "packages/bundler/test/render-order-sweep.test.ts",
-				"peakMb": 2094,
+				"peakMb": 1425,
+				"run": "44721932991",
+				"why": "runs its census of every @markless/ui scenario in child processes, each with its own Vite dev server, outside the build slot (#981)"
+			},
+			{
+				"test": "packages/bundler/test/ssr-arm-attribute-fixture.test.ts",
+				"peakMb": 1277,
 				"run": "44705540466",
-				"why": "SSR-loads every @markless/ui scenario through a Vite dev server (in its worker on main; in child processes with #981)"
+				"why": "builds through execFile, outside the build slot, and serves its app; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/ssr-arm-nested-rows-fixture.test.ts",
+				"peakMb": 1475,
+				"run": "44721932991",
+				"why": "builds through execFile, outside the build slot, and serves its app; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/ssr-constant-props-fixture.test.ts",
+				"peakMb": 1302,
+				"run": "44705540466",
+				"why": "builds through execFile, outside the build slot, and serves its app; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/ssr-idle-fixture.test.ts",
+				"peakMb": 1318,
+				"run": "44721518685",
+				"why": "builds through execFile, outside the build slot, and serves its app; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/ssr-imported-rows-fixture.test.ts",
+				"peakMb": 1280,
+				"run": "44721518685",
+				"why": "builds through execFile, outside the build slot, and serves its app; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/ssr-nested-rows-fixture.test.ts",
+				"peakMb": 1283,
+				"run": "44721518685",
+				"why": "builds through execFile, outside the build slot, and serves its app; its pages run in the shared Chromium, charged to no file"
 			},
 			{
 				"test": "packages/bundler/test/ssr-prerender-wake-fixture.test.ts",
 				"peakMb": 1506,
 				"run": "44705540466",
-				"why": "builds through execFile, outside the build slot, serves the app and drives its own Chromium"
+				"why": "builds through execFile, outside the build slot and serves the app; its pages run in the shared Chromium, charged to no file"
 			},
 			{
 				"test": "packages/bundler/test/ssr-row-outer-read-fixture.test.ts",
 				"peakMb": 1500,
 				"run": "44705540466",
-				"why": "builds and serves its fixture and drives its own Chromium"
+				"why": "builds and serves its fixture; its pages run in the shared Chromium, charged to no file"
 			},
 			{
 				"test": "packages/cli/test/starter-build.test.ts",
