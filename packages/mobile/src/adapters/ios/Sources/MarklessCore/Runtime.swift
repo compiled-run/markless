@@ -535,6 +535,9 @@ public final class NativeRuntime {
 		case let .isElement(inner):
 			guard case let .string(id) = try evaluate(inner) else { return .bool(false) }
 			return .bool(isElement(id))
+		case let .shown(id):
+			guard let node = nodesById[id] else { return .bool(false) }
+			return .bool(try !instances(of: node).isEmpty)
 		case let .contains(within, node):
 			let outer = try evaluate(within)
 			let inner = try evaluate(node)

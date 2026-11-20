@@ -307,6 +307,7 @@ class Runtime(
 			Expr.Focused -> JsValue.Str(focused ?: NATIVE_DOCUMENT_BODY)
 			is Expr.FocusOrigin -> (eval(e.overlay) as? JsValue.Str)?.let { o -> origins[o.value]?.let(JsValue::Str) } ?: JsValue.Null
 			is Expr.IsElement -> JsValue.Bool((eval(e.value) as? JsValue.Str)?.let { isElement(it.value) } ?: false)
+			is Expr.Shown -> JsValue.Bool(byId[e.node]?.let { isShown(it) } ?: false)
 			is Expr.Captures -> {
 				val node = eval(e.node)
 				val pointer = eval(e.pointer)

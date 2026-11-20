@@ -683,7 +683,7 @@ export function Page() @{
 		expect(counted.diagnostics.map((d) => d.message).join('\n')).toContain('a @for');
 	});
 
-	it("reads a shared() factory's own handle by its name in the factory's methods, and refuses one bound inside an @if arm", async () => {
+	it("reads a shared() factory's own handle by its name in the factory's methods, and one bound inside an @if arm holds its field only while the arm shows", async () => {
 		const source = (field: string) => `import { element, shared, state } from '@markless/core';
 const boxState = shared(() => {
 	const box = state({ note: '' });
@@ -710,10 +710,9 @@ export function Page() @{
 			{ op: 'assign', cell: 'shared:src/App.tsrx#boxState/state:box.note', value: { literal: 'has field' } },
 		]);
 		const armed = await nativeView(source('@if (shown) { <input aria-label="Field" el={box.fieldEl} /> }'), dataOnly);
-		expect(armed.payload).toBeNull();
-		expect(armed.diagnostics.map((d) => d.message)).toContain(
-			"the click handler reads `fieldEl`, a handle bound inside an @if arm",
-		);
+		expect(armed.diagnostics).toEqual([]);
+		// The handle holds the field only while its arm shows, so the read asks the host whether the field is shown.
+		expect(JSON.stringify(armed.payload?.handlers[0]?.ops)).toContain('{"shown":');
 	});
 
 	it('leaves out a <select> hidden from sight and screen readers, and refuses one inside a form by name', async () => {

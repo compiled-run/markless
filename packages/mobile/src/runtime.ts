@@ -189,6 +189,8 @@ export type NativeElements = {
 	readonly focused: () => string | null;
 	readonly focusOrigin: (overlay: string) => string | null;
 	readonly isElement: (id: string) => boolean;
+	/** Whether a node is shown now. */
+	readonly shown: (id: string) => boolean;
 	readonly contains: (within: string, node: string) => boolean;
 	/** Whether `node` has captured the touch `pointer`. */
 	readonly captures: (node: string, pointer: number) => boolean;
@@ -324,6 +326,7 @@ export function evaluateNativeExpr(
 		const value = evaluate(expr.isElement);
 		return typeof value === 'string' && dom().isElement(value);
 	}
+	if ('shown' in expr) return dom().shown(expr.shown);
 	if ('captures' in expr) {
 		const node = evaluate(expr.captures);
 		const pointer = evaluate(expr.pointer);
@@ -1003,6 +1006,10 @@ export function createNativeRuntime(
 		focusOrigin: (overlay) => origins.get(overlay) ?? null,
 		isElement: (id) =>
 			id === NATIVE_DOCUMENT_BODY || nodesById.get(nodeOf(id))?.kind === 'element',
+		shown: (id) => {
+			const node = nodesById.get(id);
+			return node !== undefined && shown(node);
+		},
 		contains: (within, node) => {
 			if (within === NATIVE_DOCUMENT_BODY) return true;
 			for (

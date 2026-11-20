@@ -68,6 +68,8 @@ sealed interface Expr {
 	/** The element that had focus when the overlay [overlay] was last shown, or null. */
 	data class FocusOrigin(val overlay: Expr) : Expr
 	data class IsElement(val value: Expr) : Expr
+	/** Whether a node is shown now: every @if arm around it holds. */
+	data class Shown(val node: String) : Expr
 	/** The page's route params, an object of strings. */
 	data object RouteParams : Expr
 	/** `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order. */
@@ -491,6 +493,7 @@ data class Payload(
 			is Expr.Captures -> hasScript(e.node) || hasScript(e.pointer)
 			is Expr.FocusOrigin -> hasScript(e.overlay)
 			is Expr.IsElement -> hasScript(e.value)
+			is Expr.Shown -> false
 		}
 
 		private fun scriptOps(ops: List<Op>): Boolean = ops.any { op ->
@@ -528,6 +531,7 @@ data class Payload(
 			is Expr.Captures -> cellsOf(e.node) + cellsOf(e.pointer)
 			is Expr.FocusOrigin -> cellsOf(e.overlay)
 			is Expr.IsElement -> cellsOf(e.value)
+			is Expr.Shown -> emptyList()
 			is Expr.Script -> cellsOf(e.bindings)
 		}
 
@@ -632,6 +636,7 @@ data class Payload(
 				o.containsKey("captures") -> { o.only(setOf("captures", "pointer"), what); Expr.Captures(sub("captures"), sub("pointer")) }
 				o.containsKey("focusOrigin") -> { o.only(setOf("focusOrigin"), what); Expr.FocusOrigin(sub("focusOrigin")) }
 				o.containsKey("isElement") -> { o.only(setOf("isElement"), what); Expr.IsElement(sub("isElement")) }
+				o.containsKey("shown") -> { o.only(setOf("shown"), what); Expr.Shown(o.field("shown", what).str("$what.shown")) }
 				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
 				o.containsKey("field") -> { o.only(setOf("field"), what); Expr.Field(o.field("field", what).str("$what.field")) }
 				o.containsKey("formData") -> { o.only(setOf("formData"), what); Expr.FormData(o.field("formData", what).str("$what.formData")) }

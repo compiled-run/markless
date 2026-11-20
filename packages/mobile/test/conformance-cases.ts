@@ -460,6 +460,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'arm-handles',
+		fixture: 'test/fixtures/ArmHandles.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'object-spread',
 		fixture: 'test/fixtures/ObjectSpread.tsrx',
 		actions: [

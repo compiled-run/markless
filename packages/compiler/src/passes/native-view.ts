@@ -2781,9 +2781,29 @@ export function createNativeViewPayload(
 		if (!lateLowering) return refuse(`${what} as a value outside a handler`);
 		const bound = boundHandles.get(key) ?? [];
 		const byId = nodeById();
-		// An element in an @if arm is bound only while its arm shows, which the app knows only while it runs.
-		if (bound.some((id) => byId.get(id)?.arm))
-			return refuse(`${what}, a handle bound inside an @if arm`);
+		// An element in an @if arm is bound only while its arm shows.
+		const armed = (id: string) => byId.get(id)?.arm !== undefined;
+		if (bound.some((id) => armed(id) && byId.get(id)?.row))
+			return refuse(`${what}, a handle bound inside an @if arm of a @for row`);
+		if (bound.some(armed)) {
+			if (plural)
+				return {
+					array: bound.map((id) =>
+						armed(id)
+							? {
+									spread: true,
+									value: {
+										if: { shown: id },
+										whenTrue: { array: [{ spread: false, value: elementValue(id) }] },
+										whenFalse: { array: [] },
+									},
+								}
+							: { spread: false, value: elementValue(id) },
+					),
+				};
+			if (bound.length > 1) return refuse(`${what}, a handle bound to more than one element`);
+			return { if: { shown: bound[0]! }, whenTrue: elementValue(bound[0]!), whenFalse: { literal: null } };
+		}
 		if (bound.some((id) => byId.get(id)?.row)) {
 			// In the run of a tap on one row, the row's copy is the only one that holds what was tapped.
 			const rows = new Set(bound.map((id) => byId.get(id)?.row));
