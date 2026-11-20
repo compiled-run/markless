@@ -26,6 +26,8 @@ import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.EditorInfo
 import android.text.Editable
+import android.text.InputFilter
+import android.text.Spanned
 import android.text.TextWatcher
 import android.widget.Button
 import android.widget.CheckBox
@@ -39,6 +41,7 @@ import dev.markless.mobile.core.ScrollAlignment
 import dev.markless.mobile.core.ScrollBox
 import dev.markless.mobile.core.ScrollRange
 import dev.markless.mobile.core.ScrollRect
+import dev.markless.mobile.core.nativeMaxLength
 import dev.markless.mobile.core.scrollIntoView
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Instance
@@ -448,7 +451,7 @@ class MarklessHost(
 				} else attribute(entry.node, entry.name, entry.value)
 				is JournalEntry.Property -> if (entry.node !in inert) {
 					val field = view(entry.node) as? EditText ?: throw MarklessHostError("journal sets the value of \"${entry.node}\", which is not an input")
-					if (field.text.toString() != entry.value) { field.setText(entry.value); field.setSelection(entry.value.length) }
+					if (field.text.toString() != entry.value) { field.setAppText(entry.value); field.setSelection(entry.value.length) }
 				}
 				is JournalEntry.State -> if (page != null) {
 					if (!page.advance(entry.node, entry.value)) throw MarklessHostError("style export has no state for cell \"${entry.node}\"")
@@ -770,6 +773,7 @@ class MarklessHost(
 			// The select's list shows its options; their views only keep their text current.
 			"option" -> MarklessBox(context).apply { visibility = View.GONE }
 			"input" -> EditText(context).apply {
+				filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
 				setOnFocusChangeListener { v, focused -> if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW) }
 				isSingleLine = true
 				includeFontPadding = false
@@ -792,9 +796,9 @@ class MarklessHost(
 		}
 		layoutOf(inst.node)?.let { l -> l.export.assignments[l.assignment].byId[inst.id] }?.let { styled -> scrollContainer(inst.id, view, styled) }
 		views[inst.id] = view
-		if (!unseen && type !in TICKABLE) for (b in node.bindings) if (b.property && b.name == "value") (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
+		if (!unseen && type !in TICKABLE) for (b in node.bindings) if (b.property && b.name == "value") (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setAppText(runtime.property(b, inst.scope))
 		// A field's `value` attribute is its text until something sets it, as on the web.
-		if (view is EditText && node.bindings.none { it.property && it.name == "value" }) node.attributes["value"]?.let { view.setText(it) }
+		if (view is EditText && node.bindings.none { it.property && it.name == "value" }) node.attributes["value"]?.let { view.setAppText(it) }
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
 			EventName.Dismiss -> if (OVERLAY_ATTRIBUTE !in node.attributes) throw MarklessHostError("dismiss event on \"${node.id}\", which is neither a sheet nor an overlay")
@@ -1217,4 +1221,29 @@ class MarklessHost(
 		private val HEADINGS = setOf("h1", "h2", "h3", "h4", "h5", "h6")
 		private val TICKABLE = setOf("checkbox", "radio")
 	}
+}
+
+/**
+ * Stops typing at a field's `maxlength` as the web does: an insertion is cut to fit, never through a surrogate pair, while
+ * text the app sets ([setAppText]) is kept whole.
+ */
+private class LengthLimit(private val limit: () -> Int?) : InputFilter {
+	var appWriting = false
+
+	override fun filter(source: CharSequence, start: Int, end: Int, dest: Spanned, dstart: Int, dend: Int): CharSequence? {
+		if (appWriting) return null
+		val max = limit() ?: return null
+		val room = maxOf(0, max - (dest.length - (dend - dstart)))
+		if (end - start <= room) return null
+		var cut = room
+		if (cut > 0 && Character.isHighSurrogate(source[start + cut - 1])) cut--
+		return source.subSequence(start, start + cut)
+	}
+}
+
+/** Writes text the app set, which the web never shortens to the field's `maxlength`. */
+private fun EditText.setAppText(text: String) {
+	val limit = filters.filterIsInstance<LengthLimit>().singleOrNull()
+	limit?.appWriting = true
+	try { setText(text) } finally { limit?.appWriting = false }
 }
