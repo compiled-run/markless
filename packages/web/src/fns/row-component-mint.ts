@@ -866,7 +866,7 @@ function ownerProjectionView(
 }
 
 // A minted row has no render above it to qualify ids spelled in its owner's module, so they take its prefix here.
-// Branches pass through unprefixed: the compiler refuses to mint a row whose projected parts hold a list in an @if arm.
+// Branches pass through unprefixed: an owner's list in an @if arm makes the row unbuildable; a row component's own arm list is unverified (such rows ignore their handlers).
 function ownerRecordsInPageSpace<R extends { readonly state: ProtocolStatePayload; readonly view: ProtocolViewPayload }>(
 	rendered: R,
 	owner: { readonly symbolPrefix: string; readonly edge?: OwningSurfaceEdge; readonly edgePrefix?: string },

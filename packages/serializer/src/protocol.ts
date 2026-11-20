@@ -625,7 +625,7 @@ export type ProtocolViewPayload = {
 		 * that range's anchors, and only while `arm` is the one shown. `branchId` is
 		 * the branch site or async boundary id as the authoring module spells it.
 		 * Composition does not prefix it: the runtime finds the branch under the
-		 * prefix this record's `id` carries (see #980).
+		 * prefix this record's `id` carries.
 		 */
 		readonly branchArm?: { readonly branchId: string; readonly arm: number };
 		readonly itemName: string;
