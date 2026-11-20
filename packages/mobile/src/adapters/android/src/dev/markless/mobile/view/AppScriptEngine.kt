@@ -93,25 +93,47 @@ object AppScriptEngine : ScriptHost {
 	private fun millis(nanos: Long) = String.format(Locale.ROOT, "%.1f", nanos / 1e6)
 }
 
-/** The requests one screen's script sent: each is sent on its own thread and answered on the main thread. */
+/** The requests one screen's script sent: each is sent on its own thread and answered on the main thread, unless aborted first. */
 internal class ScriptServices {
 	private val main = Handler(Looper.getMainLooper())
 	private var stopped = false
+	private val inFlight = HashMap<Int, Request>()
 
-	fun fetch(request: FetchRequest, answered: (JsValue) -> Unit) {
+	private class Request {
+		@Volatile var connection: HttpURLConnection? = null
+		@Volatile var cancelled = false
+
+		fun cancel() {
+			cancelled = true
+			connection?.let { runCatching { it.disconnect() } }
+		}
+	}
+
+	fun fetch(id: Int, request: FetchRequest, answered: (JsValue) -> Unit) {
+		val call = Request()
+		inFlight[id] = call
 		Thread {
-			val response = send(request)
-			main.post { if (!stopped) answered(response) }
+			val response = send(request, call)
+			main.post { if (inFlight[id] === call) inFlight.remove(id); if (!stopped && !call.cancelled) answered(response) }
 		}.start()
 	}
 
-	/** The screen is gone: no answer lands after this. */
-	fun stop() {
-		stopped = true
+	/** The script aborted request [id]: it is cancelled and its answer, if one still arrives, is dropped. */
+	fun abort(id: Int) {
+		inFlight.remove(id)?.cancel()
 	}
 
-	private fun send(request: FetchRequest): JsValue = try {
+	/** The screen is gone: every request is cancelled and no answer lands after this. */
+	fun stop() {
+		stopped = true
+		for (call in inFlight.values) call.cancel()
+		inFlight.clear()
+	}
+
+	private fun send(request: FetchRequest, call: Request): JsValue = try {
 		val connection = URL(request.url).openConnection() as HttpURLConnection
+		call.connection = connection
+		if (call.cancelled) connection.disconnect()
 		try {
 			connection.requestMethod = request.method
 			for ((name, value) in request.headers) connection.addRequestProperty(name, value)

@@ -1502,6 +1502,38 @@ export function Forms() @{
 		]);
 	});
 
+	it("keeps a text field's maxlength, written or bound, and carries Chromium's too-long messages only for a form that has one", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Codes() @{
+	let limit = state(4);
+	let sent = state('');
+	<main>
+		<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget).get('pin')); }}>
+			<input name="name" maxlength="20" />
+			<input name="pin" maxlength={limit} />
+			<button>Send</button>
+		</form>
+		<p>{sent}</p>
+	</main>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(payload!.nodes.find((node) => node.id === 'h2')).toMatchObject({
+			attributes: { name: 'name', maxlength: '20' },
+		});
+		expect(payload!.tooLong?.['en']).toEqual({
+			text: 'Please shorten this text to {max} characters or less (you are currently using {length} characters).',
+		});
+		expect(payload!.tooLong?.['fa']?.digits).toBe('۰۱۲۳۴۵۶۷۸۹');
+		const plain = await nativeView(`export function Plain() @{
+	<form onSubmit={(event) => event.preventDefault()}>
+		<input name="name" />
+		<button>Send</button>
+	</form>
+}`);
+		expect(plain.payload!.valueMissing).toBeDefined();
+		expect(plain.payload!.tooLong).toBeUndefined();
+	});
+
 	it('lowers an await of a timer promise to an after op that captures what the rest reads, with try, catch and finally', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function later(name: string, wait: number) {
@@ -1952,6 +1984,25 @@ export function Page() @{
 	<p aria-label={name.toUpperCase()}>{name.toUpperCase()}</p>
 }`);
 		expect(plain.payload!.script).toBeUndefined();
+	});
+
+	it('passes a component a prop that calls app code through the script', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function total(text: string): number {
+	return (JSON.parse(text) as number[]).reduce((sum, n) => sum + n, 0);
+}
+function Badge({ count }: { count: number }) @{
+	<span>{count}</span>
+}
+export function Page() @{
+	let cart = state('[1,2]');
+	<Badge count={total(cart)} />
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.nodes.find((node) => node.kind === 'text')).toMatchObject({
+			parts: [{ expr: { script: expect.any(String), bindings: { cart: { cell: 'state:cart' } } } }],
+		});
+		expect(payload!.script!.source).toContain('function total(text)');
 	});
 });
 
