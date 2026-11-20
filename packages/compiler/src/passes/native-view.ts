@@ -851,6 +851,11 @@ export type NativeViewOptions = {
 	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
 	/** A module's source as the build read it, by filename: where a native build finds a value's own JavaScript. */
 	readonly readSource?: (filename: string) => string | undefined;
+	/**
+	 * Where the app's site is served (`https://shop.example`): a URL from the root (`/api/products`) that the phone's
+	 * JavaScript fetches resolves against it, as the web resolves one against the page's origin.
+	 */
+	readonly origin?: string;
 };
 
 /** One module's facts, indexed for lowering its templates. */
@@ -1858,12 +1863,7 @@ export function createNativeViewPayload(
 		const call = methodCallSite(body?.kind === 'await' ? body.value : body);
 		const device = call ? deviceName(call.calleePath, scope) : undefined;
 		const id = `${scope.prefix}task:${computed.id}`;
-		if (
-			!call ||
-			device === undefined ||
-			!isDeviceCall(device) ||
-			!DEVICE_CALLS[device].async
-		) {
+		if (!call || device === undefined || !isDeviceCall(device) || !DEVICE_CALLS[device].async) {
 			if (!cells.some((cell) => cell.id === id)) {
 				const script = scriptAsync(computed, { ...scope, boundary: undefined }, what);
 				if (script === null) return null;
@@ -2424,7 +2424,7 @@ export function createNativeViewPayload(
 					.map((fn) => ({ id: fn.id, code: fn.fact.code })),
 			};
 		});
-		return nativeScriptOf(inputs, [...scriptServices].sort());
+		return nativeScriptOf(inputs, [...scriptServices].sort(), options.origin);
 	}
 
 	const inlining = new Set<string>();
@@ -4599,7 +4599,10 @@ export function createNativeViewPayload(
 					lowerChunk(
 						chunk,
 						parent,
-						{ ...(place.row ? { row: place.row } : {}), arm: { branch: branchId, index } },
+						{
+							...(place.row ? { row: place.row } : {}),
+							arm: { branch: branchId, index },
+						},
 						{
 							...scope,
 							...(arm === 'try' ? { catches } : {}),
@@ -4655,7 +4658,10 @@ export function createNativeViewPayload(
 					const cell = cells[index]!;
 					cells[index] = {
 						...cell,
-						async: { ...cell.async!, boundaries: [...cell.async!.boundaries, branchId] },
+						async: {
+							...cell.async!,
+							boundaries: [...cell.async!.boundaries, branchId],
+						},
 					};
 				}
 				// A handler that rejects keeps the shown content and opens @catch after it, as the web's spec says (a failed
@@ -4701,7 +4707,10 @@ export function createNativeViewPayload(
 					lowerChunk(
 						scope.module.chunks.get(item.arms.catch)!,
 						parent,
-						{ ...(place.row ? { row: place.row } : {}), arm: { branch: caughtId, index: 0 } },
+						{
+							...(place.row ? { row: place.row } : {}),
+							arm: { branch: caughtId, index: 0 },
+						},
 						{
 							...scope,
 							prefix: `${scope.prefix}${caughtId}/`,
@@ -5087,7 +5096,11 @@ export function createNativeViewPayload(
 			live: true,
 			...(event.handlerSpan ? { span: event.handlerSpan } : {}),
 			...(event.handlerCatchResets?.length
-				? { resets: new Map(event.handlerCatchResets.map((reset) => [reset.name, reset.boundaryId])) }
+				? {
+						resets: new Map(
+							event.handlerCatchResets.map((reset) => [reset.name, reset.boundaryId]),
+						),
+					}
 				: {}),
 		};
 		const submitting =
@@ -5852,18 +5865,35 @@ export function createNativeViewPayload(
 	}
 
 	/** `reset()` of the `@catch` the handler is in: its async values that failed run again, its handler error clears. */
-	function resetOps(boundaryId: string, scope: Scope, what: string, span: SourceSpan | undefined): NativeOp[] {
+	function resetOps(
+		boundaryId: string,
+		scope: Scope,
+		what: string,
+		span: SourceSpan | undefined,
+	): NativeOp[] {
 		const boundary = scope.boundary;
 		if (boundary?.id !== boundaryId || boundary.arm !== 'catch') {
-			refuse(`${what} calls the \`reset\` of a @catch it is not in (handed to a component), which phones cannot do yet`, span);
+			refuse(
+				`${what} calls the \`reset\` of a @catch it is not in (handed to a component), which phones cannot do yet`,
+				span,
+			);
 			return [];
 		}
 		const tasks = [...boundary.tasks];
 		if (tasks.some((task) => !cells[cellIndex.get(task) ?? -1]?.async)) {
-			refuse(`${what} calls \`reset\` of a @try that waits on a device call, which phones cannot run again yet`, span);
+			refuse(
+				`${what} calls \`reset\` of a @try that waits on a device call, which phones cannot run again yet`,
+				span,
+			);
 			return [];
 		}
-		return [{ op: 'reset', cells: tasks, ...(boundary.catches.used() ? { catch: boundary.catches.cell() } : {}) }];
+		return [
+			{
+				op: 'reset',
+				cells: tasks,
+				...(boundary.catches.used() ? { catch: boundary.catches.cell() } : {}),
+			},
+		];
 	}
 
 	function statementOps(
