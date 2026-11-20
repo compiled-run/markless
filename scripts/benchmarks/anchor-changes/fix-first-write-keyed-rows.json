@@ -1,86 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-keyed-repeats"
-			],
-			"delta": 161,
-			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-locators"
-			],
-			"delta": -5,
-			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": -17,
-			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-keyed-repeats"
-			],
-			"delta": 161,
-			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-locators"
-			],
-			"delta": -5,
-			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": -2,
-			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": -9,
-			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
-			"date": "2026-11-20"
-		},
-		{
 			"surface": "perf-guards",
 			"path": [
 				"runtimeModules",
@@ -124,6 +44,86 @@
 			],
 			"delta": 43,
 			"reason": "bench pages render keyed lists, and each wired list now publishes the rows it has on screen so a row handle holds exactly those rows instead of every child of the list's parent",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 308,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-locators"
+			],
+			"delta": 97,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -10,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 308,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-locators"
+			],
+			"delta": 97,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -3,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -4,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
 			"date": "2026-11-20"
 		}
 	]

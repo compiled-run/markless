@@ -99,6 +99,12 @@ const cases: ReadonlyArray<readonly [string, string, string, string]> = [
 	['rows after an @if, add', '/page-from-end', 'add', 'dom [x,y,t2] handle [i:x,i:y,i:t2]'],
 	['rows after an @if, delete', '/page-from-end', 'del', 'dom [y] handle [i:y]'],
 	['a list in a closed @if arm', '/page-arm-list', 'peek', 'dom [] handle []'],
+	// The handle lists the rows in screen order, whatever order the write leaves the keys in.
+	['a row put in front', '/page-order', 'unshift', 'dom [w,x,y] handle [i:w,i:x,i:y]'],
+	['a row put in the middle', '/page-order', 'splice', 'dom [x,m,y] handle [i:x,i:m,i:y]'],
+	['rows reversed in place', '/page-order', 'reverse', 'dom [y,x] handle [i:y,i:x]'],
+	['rows sorted in place', '/page-order', 'sort', 'dom [y,x] handle [i:y,i:x]'],
+	['rows reordered by one assignment', '/page-order', 'assign', 'dom [y,x] handle [i:y,i:x]'],
 	[
 		'a list in an @if arm, once a write has opened it',
 		'/page-arm-list',

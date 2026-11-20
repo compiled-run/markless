@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { materializeElementHandles } from '../src/resume-locators.ts';
 import type { ResumeDomElement, ResumeRowRoot, ResumeViewRecord } from '../src/resume-types.ts';
 
-// An array handle bound in keyed rows holds the rows its list's runtime has on screen, and nothing before that list is wired.
+// An array handle bound in keyed rows holds the rows its list's runtime has on screen; until that list wires, the elements as served.
 
 const element = (id: string): ResumeDomElement =>
 	({ nodeType: 1, tagName: 'I', id, childNodes: [] }) as unknown as ResumeDomElement;
@@ -56,7 +56,13 @@ test('the handle follows the list as it changes', () => {
 	expect(ids()).toEqual(['y', 'z']);
 });
 
-test('before the list is wired the handle holds no rows', () => {
+test("before the list is wired the handle holds the parent's elements as served", () => {
 	const [x, tail] = ['x', 'tail'].map(element);
-	expect(handleOf([x!, tail!])()).toEqual([]);
+	expect(handleOf([x!, tail!])()).toEqual(['x', 'tail']);
+});
+
+// A list with no row code takes leaving rows out of the page but keeps them in its map.
+test('a row the list took out of the page is not in the handle', () => {
+	const [x, gone] = ['x', 'gone'].map(element);
+	expect(handleOf([x!], () => [x!, gone!])()).toEqual(['x']);
 });
