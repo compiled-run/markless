@@ -8,9 +8,9 @@
 				"bench /",
 				"executedChars"
 			],
-			"delta": 718,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state, one phase per fetch ahead, intent outside the guess limit, a cap on held text and a per-page guess budget; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
-			"date": "2026-11-19"
+			"delta": 1190,
+			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state armed at idle, one phase per fetch ahead, intent outside the guess limit, a cap on held text, a per-page guess budget and its performance marks; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"date": "2026-11-20"
 		},
 		{
 			"surface": "perf-guards",
@@ -20,9 +20,9 @@
 				"bench /",
 				"jsGzipBytes"
 			],
-			"delta": 1105,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state, one phase per fetch ahead, intent outside the guess limit, a cap on held text and a per-page guess budget; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
-			"date": "2026-11-19"
+			"delta": 1308,
+			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state armed at idle, one phase per fetch ahead, intent outside the guess limit, a cap on held text, a per-page guess budget and its performance marks; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"date": "2026-11-20"
 		},
 		{
 			"surface": "perf-guards",
@@ -32,9 +32,9 @@
 				"bench /records",
 				"executedChars"
 			],
-			"delta": 942,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state, one phase per fetch ahead, intent outside the guess limit, a cap on held text and a per-page guess budget; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
-			"date": "2026-11-19"
+			"delta": 1190,
+			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state armed at idle, one phase per fetch ahead, intent outside the guess limit, a cap on held text, a per-page guess budget and its performance marks; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"date": "2026-11-20"
 		},
 		{
 			"surface": "perf-guards",
@@ -44,9 +44,9 @@
 				"bench /records",
 				"jsGzipBytes"
 			],
-			"delta": 1105,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state, one phase per fetch ahead, intent outside the guess limit, a cap on held text and a per-page guess budget; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
-			"date": "2026-11-19"
+			"delta": 1308,
+			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state armed at idle, one phase per fetch ahead, intent outside the guess limit, a cap on held text, a per-page guess budget and its performance marks; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"date": "2026-11-20"
 		},
 		{
 			"surface": "perf-guards",
@@ -56,9 +56,9 @@
 				"bench /settings",
 				"executedChars"
 			],
-			"delta": 718,
-			"reason": "router prefetch policy run half at idle: +718 chars, as on bench / and the same CI runs; G16 runs on main flip a 224-char function in and out on bench / and /settings (merge-queue runs 44637590549 and 44643186980: 11996 vs 11772, 11738 vs 11962), and the earlier +494 paired this PR's low reading with the base's high one",
-			"date": "2026-11-19"
+			"delta": 966,
+			"reason": "router prefetch policy run half at idle: +966 chars; this run read /settings in G16's low mode (12,704) against the base's high reading (11,962), and main flips a 224-char function in and out on bench / and /settings (merge-queue runs 44637590549 and 44643186980), so the entry is the same-mode difference",
+			"date": "2026-11-20"
 		},
 		{
 			"surface": "perf-guards",
@@ -68,9 +68,9 @@
 				"bench /settings",
 				"jsGzipBytes"
 			],
-			"delta": 1105,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state, one phase per fetch ahead, intent outside the guess limit, a cap on held text and a per-page guess budget; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
-			"date": "2026-11-19"
+			"delta": 1308,
+			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state armed at idle, one phase per fetch ahead, intent outside the guess limit, a cap on held text, a per-page guess budget and its performance marks; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"date": "2026-11-20"
 		},
 		{
 			"surface": "perf-guards",
@@ -80,9 +80,9 @@
 				"docs /",
 				"executedChars"
 			],
-			"delta": 1408,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state, one phase per fetch ahead, intent outside the guess limit, a cap on held text and a per-page guess budget; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
-			"date": "2026-11-19"
+			"delta": 1697,
+			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state armed at idle, one phase per fetch ahead, intent outside the guess limit, a cap on held text, a per-page guess budget and its performance marks; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"date": "2026-11-20"
 		},
 		{
 			"surface": "perf-guards",
@@ -92,9 +92,9 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 1104,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state, one phase per fetch ahead, intent outside the guess limit, a cap on held text and a per-page guess budget; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
-			"date": "2026-11-19"
+			"delta": 1374,
+			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state armed at idle, one phase per fetch ahead, intent outside the guess limit, a cap on held text, a per-page guess budget and its performance marks; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"date": "2026-11-20"
 		},
 		{
 			"surface": "perf-guards",
@@ -104,9 +104,9 @@
 				"docs /concepts/state",
 				"executedChars"
 			],
-			"delta": 1408,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state, one phase per fetch ahead, intent outside the guess limit, a cap on held text and a per-page guess budget; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
-			"date": "2026-11-19"
+			"delta": 1697,
+			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state armed at idle, one phase per fetch ahead, intent outside the guess limit, a cap on held text, a per-page guess budget and its performance marks; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"date": "2026-11-20"
 		},
 		{
 			"surface": "perf-guards",
@@ -116,9 +116,9 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 1104,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state, one phase per fetch ahead, intent outside the guess limit, a cap on held text and a per-page guess budget; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
-			"date": "2026-11-19"
+			"delta": 1374,
+			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state armed at idle, one phase per fetch ahead, intent outside the guess limit, a cap on held text, a per-page guess budget and its performance marks; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"date": "2026-11-20"
 		},
 		{
 			"surface": "perf-guards",
@@ -128,9 +128,9 @@
 				"docs /ui/accordion",
 				"executedChars"
 			],
-			"delta": 1408,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state, one phase per fetch ahead, intent outside the guess limit, a cap on held text and a per-page guess budget; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
-			"date": "2026-11-19"
+			"delta": 1697,
+			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state armed at idle, one phase per fetch ahead, intent outside the guess limit, a cap on held text, a per-page guess budget and its performance marks; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"date": "2026-11-20"
 		},
 		{
 			"surface": "perf-guards",
@@ -140,9 +140,9 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 1104,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state, one phase per fetch ahead, intent outside the guess limit, a cap on held text and a per-page guess budget; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
-			"date": "2026-11-19"
+			"delta": 1374,
+			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state armed at idle, one phase per fetch ahead, intent outside the guess limit, a cap on held text, a per-page guess budget and its performance marks; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"date": "2026-11-20"
 		},
 		{
 			"surface": "perf-guards",
@@ -152,9 +152,9 @@
 				"docs / playground",
 				"jsGzipBytes"
 			],
-			"delta": 484,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click and the wire-byte budget in the link bridge and its run half, which loads at idle (bridge +61 B, run half +424 B gzip measured on the docs site build)",
-			"date": "2026-11-19"
+			"delta": 4903,
+			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state armed at idle, one phase per fetch ahead, intent outside the guess limit, a cap on held text, a per-page guess budget and its performance marks; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"date": "2026-11-20"
 		},
 		{
 			"surface": "perf-guards",
@@ -164,9 +164,9 @@
 				"docs /concepts/state playground",
 				"jsGzipBytes"
 			],
-			"delta": 484,
-			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click and the wire-byte budget in the link bridge and its run half, which loads at idle (bridge +61 B, run half +424 B gzip measured on the docs site build)",
-			"date": "2026-11-19"
+			"delta": 5133,
+			"reason": "router prefetch policy: per-network gates, Save-Data and hidden-tab rules, abort on click, the wire-byte budget, one guessing state armed at idle, one phase per fetch ahead, intent outside the guess limit, a cap on held text, a per-page guess budget and its performance marks; the page link bridge is +89 B at load, the rest is the run half, which loads at idle",
+			"date": "2026-11-20"
 		}
 	]
 }
