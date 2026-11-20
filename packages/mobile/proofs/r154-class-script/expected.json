@@ -1,0 +1,9 @@
+{
+	"rung": 154,
+	"name": "a class a helper computes in JavaScript (cn) follows state on a styled page, as on the web",
+	"steps": [
+		{ "visible": ["Helper classes", "Quiet note", "Toggle loud"], "absent": ["Loud note"] },
+		{ "do": { "tap": "Toggle loud" }, "visible": ["Loud note"], "absent": ["Quiet note"] },
+		{ "do": { "tap": "Toggle loud" }, "visible": ["Quiet note"], "absent": ["Loud note"] }
+	]
+}
