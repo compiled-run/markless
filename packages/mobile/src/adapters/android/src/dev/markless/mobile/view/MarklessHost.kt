@@ -822,6 +822,7 @@ class MarklessHost(
 				unstyled?.let { s ->
 					table = s.table?.takeIf { it != "cell" }
 					if (s.indent > 0) setPaddingRelative((s.indent * dpr).roundToInt(), 0, 0, 0)
+					if (s.disclosure) disclosure = false
 				}
 			}
 		}
@@ -997,7 +998,10 @@ class MarklessHost(
 			"controls" -> if (view is AudioButton) view.visibility = if (value == null) View.GONE else View.VISIBLE
 			"disabled" -> view.isEnabled = value == null
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
-			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
+			"aria-expanded" -> {
+				expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
+				if (view is MarklessBox && view.disclosure != null) view.disclosure = value == "true"
+			}
 			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else if (view is DrawingView) (if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO) else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
 			// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
 			"hidden" -> if (style == null) view.visibility = if (value != null) View.GONE else View.VISIBLE

@@ -138,3 +138,25 @@ export default function List() @{
 		),
 	]);
 });
+
+test("a styled page refuses a <summary> by name, since Dragon does not draw its disclosure triangle yet", async () => {
+	const build = await compileNativeApp({
+		pages: [
+			{
+				page: 'pages/index.tsrx',
+				filename: 'packages/mobile/test/fixtures/pages/index.tsrx',
+				source: `export default function Help() @{
+	<main>
+		<style>
+			p { padding: 4px; }
+		</style>
+		<details><summary>Shipping</summary><p>Two days.</p></details>
+	</main>
+}`,
+			},
+		],
+	});
+	expect(build.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+		'the <summary> h2 on a styled page, whose disclosure triangle Dragon does not draw yet',
+	]);
+});

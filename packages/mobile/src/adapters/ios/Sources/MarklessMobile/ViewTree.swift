@@ -6,8 +6,8 @@ import UIKit.UIGestureRecognizerSubclass
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"canvas", "details", "embed", "iframe", "object",
-	"picture", "summary", "video",
+	"canvas", "embed", "iframe", "object",
+	"picture", "video",
 ]
 
 /// Where an instance is built: its row (`@key`, empty outside lists), the names its expressions see, and what encloses it.
@@ -217,6 +217,8 @@ final class ViewTree {
 	/// Lists and the marker kind their items show; each item's marker label.
 	private var listMarkers: [ObjectIdentifier: String] = [:]
 	private var itemMarkers: [ObjectIdentifier: UILabel] = [:]
+	/// Each summary's disclosure triangle, in its start inset.
+	private var disclosures: [ObjectIdentifier: UILabel] = [:]
 	/// Table structure: tables, their rows and the rows' cells.
 	private var tables = Set<ObjectIdentifier>()
 	private var tableRows = Set<ObjectIdentifier>()
@@ -832,7 +834,7 @@ final class ViewTree {
 						}
 					}
 					view = drawn
-				} else if element == "button" || element == "a" {
+				} else if element == "button" || element == "a" || element == "summary" {
 					if context.button != nil { throw HostError("<\(element)> \(id) is inside another control") }
 					let control = UIButton(type: .custom)
 					control.isAccessibilityElement = true
@@ -1182,6 +1184,7 @@ final class ViewTree {
 			}
 			view.accessibilityValue = current["aria-expanded"].map { $0 == "true" ? "expanded" : "collapsed" }
 		}
+		disclosures[ObjectIdentifier(view)]?.text = current["aria-expanded"] == "true" ? "\u{25BE}" : "\u{25B8}"
 		view.accessibilityElementsHidden = current["aria-hidden"] == "true"
 		// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
 		if layout == nil, !dialogIds.contains(id) {
@@ -1223,7 +1226,7 @@ final class ViewTree {
 		}
 		func texts(_ view: UIView) -> [String] {
 			view.subviews.flatMap { child -> [String] in
-				if let label = child as? UILabel { return [label.text ?? ""] }
+				if let label = child as? UILabel { return decorations.contains(ObjectIdentifier(label)) ? [] : [label.text ?? ""] }
 				return texts(child)
 			}
 		}
@@ -1358,6 +1361,7 @@ final class ViewTree {
 			])
 		}
 		if let marker = style.marker { listMarkers[id] = marker }
+		if style.disclosure { addDisclosure(to: view) }
 		switch style.table {
 		case "table":
 			tables.insert(id)
@@ -1366,6 +1370,24 @@ final class ViewTree {
 		case "cell": tableCells.insert(id)
 		default: break
 		}
+	}
+
+	/// A summary's triangle (`list-style: disclosure-closed inside`), in an inset before its content; it is not read.
+	private func addDisclosure(to summary: UIView) {
+		let marker = UILabel()
+		marker.isAccessibilityElement = false
+		marker.isUserInteractionEnabled = false
+		marker.translatesAutoresizingMaskIntoConstraints = false
+		marker.text = "\u{25B8}"
+		summary.addSubview(marker)
+		decorations.insert(ObjectIdentifier(marker))
+		disclosures[ObjectIdentifier(summary)] = marker
+		let glyphs = ["\u{25B8} ", "\u{25BE} "].map { ($0 as NSString).size(withAttributes: [.font: marker.font as Any]).width }
+		indents[ObjectIdentifier(summary)] = ceil(glyphs.max() ?? 0)
+		NSLayoutConstraint.activate([
+			marker.leadingAnchor.constraint(equalTo: summary.leadingAnchor),
+			marker.topAnchor.constraint(equalTo: summary.topAnchor),
+		])
 	}
 
 	/// A list item's marker, beside it in its list's inset; it is neither read nor part of the item's text.

@@ -222,6 +222,8 @@ export type NativeDefaultStyle = {
 	readonly rule?: true;
 	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
 	readonly marker?: 'disc' | 'decimal';
+	/** On `<summary>`: a triangle before its content, not read aloud: ▸ while its `aria-expanded` is false, ▾ while true. */
+	readonly disclosure?: true;
 	/** Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`. */
 	readonly table?: 'table' | 'row' | 'cell';
 };
@@ -310,6 +312,8 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	audio: {},
 	label: {},
 	dialog: {},
+	details: {},
+	summary: { disclosure: true },
 	form: {},
 	select: {},
 	option: {},
