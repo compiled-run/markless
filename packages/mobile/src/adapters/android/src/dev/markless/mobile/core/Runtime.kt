@@ -1049,8 +1049,11 @@ class Runtime(
 
 	// Last, once every field a script entry reads is set: a first value the build could not know is taken when the screen
 	// opens, in cell order, as the body runs once on the web.
+	/** Seeded cells whose arm is hidden: their seed runs again when the arm shows, as its component renders then. */
+	private val reseed = HashSet<String>()
+
 	init {
-		for (c in payload.cells) c.seed?.let { values[c.id] = evaluate(it) }
+		for (c in payload.cells) c.seed?.let { if (armShown(c.arm)) values[c.id] = evaluate(it) else reseed.add(c.id) }
 	}
 
 	private fun touching(pointer: JsValue): Touching? = (pointer as? JsValue.Num)?.let { touches[it.value + 0.0] }
@@ -1196,8 +1199,14 @@ class Runtime(
 			val node = byId[id.substringBefore('@')]
 			node == null || instances(node).none { it.id == id }
 		}
-		// A component an arm hid renders anew when it shows again, so its state starts over.
-		for (c in payload.cells) if (c.arm != null && !armShown(c.arm)) values[c.id] = c.initial
+		// A component an arm hid renders anew when it shows again, so its state starts over (a seed runs again then).
+		for (c in payload.cells) {
+			if (c.arm == null) continue
+			if (!armShown(c.arm)) {
+				values[c.id] = c.initial
+				if (c.seed != null) reseed.add(c.id)
+			} else if (c.seed != null && reseed.remove(c.id)) values[c.id] = evaluate(c.seed)
+		}
 	}
 
 	/** A device call a handler awaited answered: its continuation runs with the answer as its local. */

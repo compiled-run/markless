@@ -968,8 +968,6 @@ export function createNativeRuntime(
 		eventValue?: string | NativeEventFields,
 		scope?: NativeScope,
 	): Value => evaluateNativeExpr(expr, read, eventValue, scope ?? base, compute, elements);
-	// A first value the build could not know is taken when the screen opens, in cell order, as the body runs once on the web.
-	for (const cell of payload.cells) if (cell.seed) values.set(cell.id, evaluate(cell.seed));
 	const armOf = (
 		branch: Extract<NativeNode, { kind: 'branch' }>,
 		scope: NativeScope = base,
@@ -990,6 +988,14 @@ export function createNativeRuntime(
 		const branch = branches.get(arm.branch);
 		return !!branch && shownIn(branch, scope) && armOf(branch, scope) === arm.index;
 	};
+	/** Seeded cells whose arm is hidden: their seed runs again when the arm shows, as its component renders then. */
+	const reseed = new Set<string>();
+	// A first value the build could not know is taken when the screen opens, in cell order, as the body runs once on the web.
+	for (const cell of payload.cells) {
+		if (!cell.seed) continue;
+		if (armShown(cell.arm)) values.set(cell.id, evaluate(cell.seed));
+		else reseed.add(cell.id);
+	}
 	/** Whether any instance of a node shows. */
 	const shown = (node: NativeNode): boolean => instances(node).length > 0;
 	const nodesById = new Map(payload.nodes.map((node) => [node.id, node]));
@@ -1459,8 +1465,14 @@ export function createNativeRuntime(
 			const node = nodesById.get(id.split('@')[0]!);
 			if (!node || !instances(node).some((shownNow) => shownNow.id === id)) fired.delete(key);
 		}
-		// A component an arm hid renders anew when it shows again, so its state starts over.
-		for (const cell of payload.cells) if (cell.arm && !armShown(cell.arm)) values.set(cell.id, cell.initial);
+		// A component an arm hid renders anew when it shows again, so its state starts over (a seed runs again then).
+		for (const cell of payload.cells) {
+			if (!cell.arm) continue;
+			if (!armShown(cell.arm)) {
+				values.set(cell.id, cell.initial);
+				if (cell.seed) reseed.add(cell.id);
+			} else if (cell.seed && reseed.delete(cell.id)) values.set(cell.id, evaluate(cell.seed));
+		}
 	};
 
 	return {

@@ -1516,7 +1516,7 @@ export function Errands() @{
 		]);
 	});
 
-	it("takes a state's first value the build cannot know when the screen opens, as data or as JavaScript; not in an @if arm", async () => {
+	it("takes a state's first value the build cannot know when the screen opens, as data or as JavaScript; in an @if arm, when the arm opens", async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 const WORDS = ['pear', 'fig'];
 function titled(word: string) { return word.charAt(0).toUpperCase() + word.slice(1); }
@@ -1542,10 +1542,11 @@ export function Armed() @{
 		@if (open) { <Shown start={total} /> }
 	</main>
 }`);
-		expect(armed.diagnostics.map((d) => d.message)).toEqual([
-			'state `count` of Shown, which an @if arm or @for row shows, takes a first value the build cannot know each time it shows; a native build takes one only when the screen opens',
-			'a text expression reads `count`, which is not state of this component',
-		]);
+		expect(armed.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		expect(armed.payload!.cells.find((cell) => cell.name === 'count')).toMatchObject({
+			seed: { binary: '*' },
+			arm: { branch: 'branch-site:0', index: 0 },
+		});
 	});
 
 	it("lowers a number field of a form with its range and step, which the host checks with Chromium's messages", async () => {

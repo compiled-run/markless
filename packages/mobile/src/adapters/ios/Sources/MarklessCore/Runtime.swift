@@ -285,6 +285,8 @@ public final class NativeRuntime {
 	private var retry: [String] = []
 	/// Why a first value taken when the screen opened failed; every later read fails with it, as the web's render does.
 	private var seedFailure: Error?
+	/// Seeded cells whose arm is hidden: their seed runs again when the arm shows, as its component renders then.
+	private var reseed = Set<String>()
 
 	/// `params`: the route params the page opened with; `now`: the clock (a conformance run fixes it).
 	/// `preferredLanguages`: the device's, most preferred first; the web's messages are shown in the first one the payload has.
@@ -341,7 +343,10 @@ public final class NativeRuntime {
 		})
 		// A first value the build could not know is taken when the screen opens, in cell order, as the body runs once on the web.
 		do {
-			for cell in payload.cells { if let seed = cell.seed { values[cell.id] = try evaluate(seed) } }
+			for cell in payload.cells {
+				guard let seed = cell.seed else { continue }
+				if try isShown(cell.arm) { values[cell.id] = try evaluate(seed) } else { reseed.insert(cell.id) }
+			}
 		} catch {
 			seedFailure = error
 		}
@@ -1375,9 +1380,14 @@ public final class NativeRuntime {
 			let shown = try nodesById[template].map { node in try instances(of: node).contains { $0.id == id } } ?? false
 			if !shown { fired.remove(key) }
 		}
-		// A component an arm hid renders anew when it shows again, so its state starts over.
+		// A component an arm hid renders anew when it shows again, so its state starts over (a seed runs again then).
 		for cell in payload.cells where cell.arm != nil {
-			if !(try isShown(cell.arm)) { values[cell.id] = cell.initial }
+			if !(try isShown(cell.arm)) {
+				values[cell.id] = cell.initial
+				if cell.seed != nil { reseed.insert(cell.id) }
+			} else if let seed = cell.seed, reseed.remove(cell.id) != nil {
+				values[cell.id] = try evaluate(seed)
+			}
 		}
 	}
 

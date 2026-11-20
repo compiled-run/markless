@@ -653,6 +653,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A component an @if arm shows takes its first value from its props each time the arm opens.
+		name: 'arm-seed',
+		fixture: 'proofs/u71-arm-seed/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h6' },
+		],
+	},
+	{
 		name: 'script-loop',
 		fixture: 'proofs/j1-loop-local/App.tsrx',
 		modules: true,

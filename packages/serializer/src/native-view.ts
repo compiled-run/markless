@@ -706,7 +706,7 @@ export type NativeViewPayload = {
 		readonly seed?: NativeExpr;
 		/**
 		 * State of a component an `@if` arm shows (its innermost arm): back to `initial` while the arm is hidden, so it starts
-		 * over each time the arm shows it, as the web renders the arm anew.
+		 * over each time the arm shows it, as the web renders the arm anew; a `seed` is evaluated again then, not at mount.
 		 */
 		readonly arm?: NativeArmPlace;
 	}>;

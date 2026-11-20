@@ -1328,7 +1328,7 @@ export function createNativeViewPayload(
 	/** state() written inside an @if arm, by its cell id (its fields are `<id>.<field>`): back to its first value each time the arm opens. */
 	const armedCells = new Map<string, NativeArmPlace>();
 	const armOfCell = (cell: NativeViewPayload['cells'][number]): NativeArmPlace | undefined => {
-		if (cell.row || cell.storage || cell.device || cell.object || cell.task || cell.async || cell.clock || cell.seed)
+		if (cell.row || cell.storage || cell.device || cell.object || cell.task || cell.async || cell.clock)
 			return undefined;
 		const own = armedCells.get(cell.id) ?? armedCells.get(cell.id.slice(0, Math.max(0, cell.id.lastIndexOf('.'))));
 		if (own) return own;
@@ -1493,8 +1493,6 @@ export function createNativeViewPayload(
 		includeModuleState: boolean,
 		/** The list whose rows this instance renders in: its state is per row. */
 		row?: string,
-		/** The @if arm this instance renders in, which renders it again each time it shows. */
-		arm?: NativeArmPlace,
 	): Scope => {
 		const byName = new Map<string, string>();
 		const byBinding = new Map<string, string>();
@@ -1598,9 +1596,9 @@ export function createNativeViewPayload(
 					known = true;
 				} else lowered.rollBack();
 			}
-			if (!known && !binding.storage && (row || arm)) {
+			if (!known && !binding.storage && row) {
 				refuse(
-					`state \`${binding.name}\` of ${component}, which an @if arm or @for row shows, takes a first value the build cannot know each time it shows; a native build takes one only when the screen opens`,
+					`state \`${binding.name}\` of ${component}, which a @for row shows, takes a first value the build cannot know for each row; a native build takes one only when the screen opens`,
 					binding.sourceSpan,
 				);
 				continue;
@@ -4500,7 +4498,6 @@ export function createNativeViewPayload(
 					scope.shared,
 					target.module === rootModule,
 					place.row,
-					place.arm,
 				);
 				lowerChunk(template, parent, place, {
 					...childScope,
