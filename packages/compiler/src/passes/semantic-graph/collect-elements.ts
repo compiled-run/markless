@@ -220,8 +220,11 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	}
 	const previousTextTarget = state.currentTextTarget;
 	const previousProjectionScope = state.currentProjectionScope;
-	if (componentEdgeId)
+	if (componentEdgeId) {
+		placeProjectedTextBeside(node, state);
 		state.currentProjectionScope = { componentEdgeId, hostNodeId: previousHost };
+	}
+	const firstRead = state.graph.templateReads.length;
 	const detached = isHostElement && tagName ? detachedContentMode(tagName) : null;
 	for (const child of asNodes(node.children)) {
 		if (detached && isDetachedChild(detached, child)) {
@@ -235,6 +238,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 		if (isHostElement && child.type === 'JSXTryExpression') placeAsyncBoundary(node, child);
 		walk(child, state);
 	}
+	if (componentEdgeId) hostProjectedTextBeside(firstRead, state);
 	state.currentProjectionScope = previousProjectionScope;
 	state.currentTextTarget = previousTextTarget;
 
@@ -291,7 +295,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		!!state.currentProjectionScope &&
 		state.currentProjectionScope.hostNodeId === state.currentHostNodeId;
 
-	state.graph.templateReads.push({
+	const read: SemanticTemplateRead = {
 		...rowScope(state),
 		hostNodeId: state.currentHostNodeId,
 		...(joined ? { source: joined.source } : templateReadSource(composite, expression, state)),
@@ -309,7 +313,10 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		...(composite ? {} : rowAsyncGateReads(expression, state)),
 		...unroutedReadNames(expression, composite, state),
 		componentName: state.currentComponentName ?? undefined,
-	});
+	};
+	state.graph.templateReads.push(read);
+	const beside = projected ? projectedTextBeside.get(expression) : undefined;
+	if (beside) besideReads.set(read, beside);
 }
 
 function rowAsyncGateReads(
@@ -386,6 +393,79 @@ function joinHostText(host: AnyNode, state: WalkState): void {
 		return;
 	}
 	joinTextParts(children, state);
+}
+
+// Where a projected text run sits beside an element of the same children: the element and the target beside it.
+const projectedTextBeside = new WeakMap<AnyNode, ProjectedTextBeside>();
+
+// Projected text has no element of its own here, but beside a projected element it is that element's sibling text node.
+function placeProjectedTextBeside(node: AnyNode, state: WalkState): void {
+	if (state.currentArmScope && state.currentArmScope.hostNodeId === state.currentHostNodeId)
+		return;
+	if (state.currentAsyncBoundaryId && state.currentAsyncArmHostNodeId === state.currentHostNodeId)
+		return;
+	if (state.currentKeyedRepeatScopeIds.length > 0) return;
+	const children = asNodes(node.children).filter((child) => !isIgnorableJsxTextNode(child));
+	const shapes = children.map(hostChildShape);
+	for (const run of textRuns(shapes)) {
+		const after = shapes[run.end] === 'node' ? children[run.end] : undefined;
+		const before = shapes[run.start - 1] === 'node' ? children[run.start - 1] : undefined;
+		const element = after ?? before;
+		if (!element) continue;
+		const sibling = after ? 'previous' : 'next';
+		const parts = children
+			.slice(run.start, run.end)
+			.filter((_, at) => shapes[run.start + at] !== 'none');
+		const holes = parts.filter(isTemplateExpressionChild);
+		const anchor = element.type === 'ExpressionStatement' ? (element.expression as AnyNode) : element;
+		if (run.holes > 1) {
+			if (!joinTextParts(parts, state)) continue;
+			projectedTextBeside.set(holes[0]!.expression as AnyNode, {
+				element: anchor,
+				target: { kind: 'text', sibling },
+			});
+			continue;
+		}
+		const hole = holes[0]!;
+		projectedTextBeside.set(hole.expression as AnyNode, {
+			element: anchor,
+			target: { kind: 'text', ...holeAffixes(parts, hole), sibling },
+		});
+	}
+}
+
+// The static text before and after a run's one hole.
+function holeAffixes(
+	parts: ReadonlyArray<AnyNode>,
+	hole: AnyNode,
+): { readonly prefix?: string; readonly suffix?: string } {
+	let prefix = '';
+	let suffix = '';
+	let seen = false;
+	for (const part of parts) {
+		if (part === hole) seen = true;
+		else if (seen) suffix += textPartValue(part);
+		else prefix += textPartValue(part);
+	}
+	return { ...(prefix ? { prefix } : {}), ...(suffix ? { suffix } : {}) };
+}
+
+type ProjectedTextBeside = {
+	readonly element: AnyNode;
+	readonly target: SemanticTemplateBindingTarget;
+};
+
+const besideReads = new WeakMap<SemanticTemplateRead, ProjectedTextBeside>();
+
+// The element a projected text sits beside may come after it, so its host is known once the children are walked.
+function hostProjectedTextBeside(firstRead: number, state: WalkState): void {
+	const reads = state.graph.templateReads;
+	for (let at = firstRead; at < reads.length; at++) {
+		const beside = besideReads.get(reads[at]!);
+		const hostNodeId = beside && state.hostIds.get(beside.element);
+		if (hostNodeId)
+			reads[at] = { ...reads[at]!, projectedBeside: { hostNodeId, target: beside.target } };
+	}
 }
 
 // Text-only children render as one text node the child writes with its `{children}`
@@ -735,18 +815,9 @@ export function placeAsyncArmText(boundary: AnyNode, arm: AnyNode, state: WalkSt
 			continue;
 		}
 		const hole = holes[0]!;
-		let prefix = '';
-		let suffix = '';
-		let seen = false;
-		for (const part of parts) {
-			if (part === hole) seen = true;
-			else if (seen) suffix += textPartValue(part);
-			else prefix += textPartValue(part);
-		}
 		asyncArmTextTargets.set(hole.expression as AnyNode, {
 			kind: 'text',
-			...(prefix ? { prefix } : {}),
-			...(suffix ? { suffix } : {}),
+			...holeAffixes(parts, hole),
 			textNode,
 		});
 	}

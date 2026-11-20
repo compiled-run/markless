@@ -116,6 +116,7 @@
 		"packages/router/test/vite/back-revalidate.test.ts",
 		"packages/router/test/vite/child-async-catch.test.ts",
 		"packages/router/test/vite/child-component-styles.test.ts",
+		"packages/router/test/vite/children-text-beside-element.test.ts",
 		"packages/router/test/vite/cloudflare-output.test.ts",
 		"packages/router/test/vite/compile-error-cascade.test.ts",
 		"packages/router/test/vite/component-link-build.test.ts",

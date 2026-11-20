@@ -2567,12 +2567,16 @@ export function buildDomBindingEmission(input: DomBindingEmissionInput): Emissio
 		? domTextLeafBody(exportName, input.symbol.hostNodeId)
 		: [
 				...(input.symbol.target.kind === 'text' &&
-				input.symbol.target.textNode !== undefined
+				(input.symbol.target.textNode !== undefined || input.symbol.target.sibling !== undefined)
 					? [
 							moduleImportNode({
 								kind: 'named',
-								localName: 'marklessTextNode',
-								source: '@markless/web/fns/text-node',
+								...(input.symbol.target.textNode !== undefined
+									? { localName: 'marklessTextNode', source: '@markless/web/fns/text-node' }
+									: {
+											localName: 'marklessSiblingText',
+											source: '@markless/web/fns/sibling-text',
+										}),
 							}),
 						]
 					: []),
@@ -2614,7 +2618,8 @@ function isPlainTextUpdateLeaf(target: DomUpdateTarget): boolean {
 		target.suffix === undefined &&
 		target.trueValue === undefined &&
 		target.falseValue === undefined &&
-		target.textNode === undefined
+		target.textNode === undefined &&
+		target.sibling === undefined
 	);
 }
 
@@ -2657,9 +2662,11 @@ function domJournalEntryNode(
 			propertyNode('type', literalNode('setText')),
 			propertyNode('locator', locator),
 			propertyNode('value', textDomUpdateValueNode(target)),
-			...(target.textNode === undefined
-				? []
-				: [propertyNode('node', textNodeLocatorNode(target.textNode))]),
+			...(target.textNode !== undefined
+				? [propertyNode('node', textNodeLocatorNode(target.textNode))]
+				: target.sibling !== undefined
+					? [propertyNode('node', siblingTextLocatorNode(target.sibling))]
+					: []),
 		]);
 	}
 
@@ -2695,6 +2702,14 @@ function textNodeLocatorNode(textNode: number): EmissionNode {
 	return arrowFunctionNode(
 		['host'],
 		callNode(identifierNode('marklessTextNode'), [identifierNode('host'), at]),
+	);
+}
+
+/** `(host) => marklessSiblingText(host, <side>)`. */
+function siblingTextLocatorNode(side: 'previous' | 'next'): EmissionNode {
+	return arrowFunctionNode(
+		['host'],
+		callNode(identifierNode('marklessSiblingText'), [identifierNode('host'), literalNode(side)]),
 	);
 }
 
