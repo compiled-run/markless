@@ -155,7 +155,9 @@ const resumeOnDemandEntries = [
 // item in place before the reader arrives still repaints it: 37,220 -> 37,236 raw, one condition in resume-keyed-repeats.ts.
 // 2026-11-17: a first click on a keyed row climbs from the target to its row instead of walking every row at each
 // ancestor (1,000 rows, cell no handler owns: 1,000 rows walked -> 1): 37,236 -> 37,431 raw, in resume-keyed-repeats.ts.
-const sourceByteLimit = 37431;
+// 2026-11-20: each wired list publishes the rows it has on screen, so a handle bound in rows that share their parent
+// with other elements holds the rows only (it held every child of the parent): 37,431 -> 37,629 raw, in resume-keyed-repeats.ts.
+const sourceByteLimit = 37629;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

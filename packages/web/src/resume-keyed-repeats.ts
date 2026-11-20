@@ -268,6 +268,10 @@ export function wireKeyedRepeats(
 				items,
 			);
 		}
+		// What a handle bound in these rows holds.
+		(parent.__marklessRepeatRows ??= new Map()).set(repeat.id, () =>
+			follow && !follow.showing(rowRootsByKey) ? [] : [...rowRootsByKey.values()],
+		);
 		if (!repeat.collectionGraphNodeId || repeat.fixed) continue;
 		const apply = (mint: RowMint | undefined): void => {
 			if (follow && !follow.showing(rowRootsByKey)) return;

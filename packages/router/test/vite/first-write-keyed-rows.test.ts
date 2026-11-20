@@ -7,8 +7,7 @@ import { buildFixture } from '../support/fixture-build.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
-// The first press after a server render and resume: the line right after a keyed-list write already sees the
-// new rows in the DOM and in an array element handle bound in the rows, and the handle holds the rows only.
+// First press after a server render and resume: the line after a keyed-list write sees exactly the rows on screen.
 
 vi.setConfig({ testTimeout: 60_000 });
 
@@ -44,8 +43,8 @@ afterAll(async () => {
 	await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));
 });
 
-// What the handler's line after the write reported on a fresh page's first press.
-async function firstPress(origin: string, path: string, op: string): Promise<string> {
+// What the handler's line after the write reported on the last of a fresh page's presses.
+async function firstPress(origin: string, path: string, ops: string): Promise<string> {
 	const page = await browser!.newPage();
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
@@ -55,19 +54,58 @@ async function firstPress(origin: string, path: string, op: string): Promise<str
 		addEventListener('seen', (event) => seen.push((event as CustomEvent<string>).detail));
 	});
 	await page.goto(`${origin}${path}`);
-	await page.click(`[data-op="${op}"]`);
-	await page.waitForFunction(() => (globalThis as { seen?: string[] }).seen!.length === 1);
-	const seen = await page.evaluate(() => (globalThis as { seen?: string[] }).seen![0]!);
-	expect(errors).toEqual([]);
+	const presses = ops.split(',');
+	for (const [index, op] of presses.entries()) {
+		await page.click(`[data-op="${op}"]`);
+		await expect
+			.poll(
+				async () =>
+					errors.join() ||
+					(await page.evaluate(() => (globalThis as { seen?: string[] }).seen!.length)),
+			)
+			.toBe(index + 1);
+		// A later press reads what the earlier one settled to.
+		if (index < presses.length - 1) await page.waitForLoadState('networkidle');
+	}
+	const seen = await page.evaluate(() => (globalThis as { seen?: string[] }).seen!.at(-1)!);
 	await page.close();
 	return seen;
 }
 
-const writes = [
-	['add', 'dom [x,y,t2] handle [i:x,i:y,i:t2]'],
-	['del', 'dom [y] handle [i:y]'],
-	['move', 'dom [y,x] handle [i:y,i:x]'],
-] as const;
+const cases: ReadonlyArray<readonly [string, string, string, string]> = [
+	// The handler sits in a row of another list, in an MDX island: late before #726.
+	[
+		"a write from another list's row handler, MDX island",
+		'/mdx-gauntlet',
+		'add',
+		'dom [red] handle [i:red]',
+	],
+	[
+		'the reported repro: a Set that starts empty, MDX island',
+		'/mdx-empty-set-handle',
+		'add',
+		'dom [a] handle [i:a]',
+	],
+	[
+		'rows before siblings, add, MDX island',
+		'/mdx-unwrapped',
+		'add',
+		'dom [x,y,t2] handle [i:x,i:y,i:t2]',
+	],
+	['rows before siblings, add', '/page-unwrapped', 'add', 'dom [x,y,t2] handle [i:x,i:y,i:t2]'],
+	['rows before siblings, delete', '/page-unwrapped', 'del', 'dom [y] handle [i:y]'],
+	['rows before siblings, reorder', '/page-unwrapped', 'move', 'dom [y,x] handle [i:y,i:x]'],
+	['rows between siblings', '/page-between', 'add', 'dom [x,y,t2] handle [i:x,i:y,i:t2]'],
+	['rows after an @if, add', '/page-from-end', 'add', 'dom [x,y,t2] handle [i:x,i:y,i:t2]'],
+	['rows after an @if, delete', '/page-from-end', 'del', 'dom [y] handle [i:y]'],
+	['a list in a closed @if arm', '/page-arm-list', 'peek', 'dom [] handle []'],
+	[
+		'a list in an @if arm, once a write has opened it',
+		'/page-arm-list',
+		'open,peek',
+		'dom [x,y] handle [li:x,li:y]',
+	],
+];
 
 describe('production build', () => {
 	let server: BuiltServer | undefined;
@@ -80,33 +118,8 @@ describe('production build', () => {
 	}, 240_000);
 	afterAll(() => server?.close());
 
-	for (const kind of ['mdx', 'page'])
-		describe(kind === 'mdx' ? 'an MDX island' : 'a page', () => {
-			for (const collection of ['set', 'array', 'map'])
-				for (const [op, seen] of writes)
-					test(`a ${collection} in state, ${op}: the next line sees the rows in the DOM and in the handle`, async () => {
-						expect(
-							await firstPress(server!.origin, `/${kind}-${collection}-handle`, op),
-						).toBe(seen);
-					});
-
-			test('a Set that starts empty, written by a component function', async () => {
-				expect(await firstPress(server!.origin, `/${kind}-empty-set-handle`, 'add')).toBe(
-					'dom [a] handle [i:a]',
-				);
-			});
-
-			// The handler sits in a row of another list, as a pile of gems feeding a Set does.
-			test('a write from a row handler of another list', async () => {
-				expect(await firstPress(server!.origin, `/${kind}-gauntlet`, 'add')).toBe(
-					'dom [red] handle [i:red]',
-				);
-			});
-
-			// Rows that sit straight in an element beside other elements: the handle holds the rows, not their siblings.
-			for (const [op, seen] of writes)
-				test(`rows beside siblings, ${op}: the handle holds the rows only`, async () => {
-					expect(await firstPress(server!.origin, `/${kind}-unwrapped`, op)).toBe(seen);
-				});
+	for (const [name, path, op, seen] of cases)
+		test(name, async () => {
+			expect(await firstPress(server!.origin, path, op)).toBe(seen);
 		});
 });

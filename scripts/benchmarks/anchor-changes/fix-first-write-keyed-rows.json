@@ -5,10 +5,10 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
-				"web/resume"
+				"web/resume-keyed-repeats"
 			],
-			"delta": 13,
-			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
+			"delta": 161,
+			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
 			"date": "2026-11-20"
 		},
 		{
@@ -18,8 +18,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-locators"
 			],
-			"delta": 402,
-			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
+			"delta": -5,
+			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
 			"date": "2026-11-20"
 		},
 		{
@@ -30,8 +30,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 18,
-			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
+			"delta": -17,
+			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
 			"date": "2026-11-20"
 		},
 		{
@@ -39,10 +39,10 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-plus",
-				"web/resume"
+				"web/resume-keyed-repeats"
 			],
-			"delta": 13,
-			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
+			"delta": 161,
+			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
 			"date": "2026-11-20"
 		},
 		{
@@ -52,8 +52,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-locators"
 			],
-			"delta": 402,
-			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
+			"delta": -5,
+			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
 			"date": "2026-11-20"
 		},
 		{
@@ -64,8 +64,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": -1,
-			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
+			"delta": -2,
+			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
 			"date": "2026-11-20"
 		},
 		{
@@ -76,66 +76,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 8,
-			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-locators"
-			],
-			"delta": 460,
-			"reason": "an array element handle bound in keyed rows beside other elements holds only the rows; resume-locators reads the rows' span",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /",
-				"jsGzipBytes"
-			],
-			"delta": 110,
-			"reason": "an array element handle bound in keyed rows beside other elements holds only the rows; resume-locators reads the rows' span",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"jsGzipBytes"
-			],
-			"delta": 110,
-			"reason": "an array element handle bound in keyed rows beside other elements holds only the rows; resume-locators reads the rows' span",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
-				"jsGzipBytes"
-			],
-			"delta": 110,
-			"reason": "an array element handle bound in keyed rows beside other elements holds only the rows; resume-locators reads the rows' span",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 104,
-			"reason": "an array element handle bound in keyed rows beside other elements holds only the rows; resume-locators reads the rows' span",
+			"delta": -9,
+			"reason": "each wired keyed list publishes its rows on screen, so a handle bound in its rows holds exactly those rows; only pages with keyed lists load this module",
 			"date": "2026-11-20"
 		}
 	]
