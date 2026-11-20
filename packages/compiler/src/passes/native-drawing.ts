@@ -1,4 +1,10 @@
-import type { NativeColor, NativeDrawing, NativeGradient, NativeShape } from '@markless/serializer';
+import type {
+	NativeColor,
+	NativeDrawing,
+	NativeDrawingText,
+	NativeGradient,
+	NativeShape,
+} from '@markless/serializer';
 
 // An inline <svg> as data a native host draws: SVG 2's attribute grammars (path data, points, transforms, viewBox, paint)
 // read once when the app is built, so no phone parses SVG.
@@ -42,6 +48,12 @@ type Inherited = {
 	/** `stroke-dasharray` with an even count (an odd list repeats itself), or null for a solid stroke. */
 	readonly dash: ReadonlyArray<number> | null;
 	readonly dashOffset: number;
+	readonly fontSize: number;
+	readonly fontFamily: string | null;
+	readonly fontWeight: number;
+	readonly italic: boolean;
+	readonly anchor: NativeDrawingText['anchor'];
+	readonly baseline: NativeDrawingText['baseline'];
 	/** What `currentColor` is, when an ancestor's `color` attribute says; else the svg's text colour. */
 	readonly color: NativeColor | null;
 };
@@ -58,6 +70,12 @@ const INITIAL: Inherited = {
 	miterLimit: 4,
 	dash: null,
 	dashOffset: 0,
+	fontSize: 16,
+	fontFamily: null,
+	fontWeight: 400,
+	italic: false,
+	anchor: 'start',
+	baseline: 'alphabetic',
 	color: null,
 };
 
@@ -104,6 +122,7 @@ const GEOMETRY: Readonly<Record<string, ReadonlyArray<string>>> = {
 	polygon: ['points'],
 	use: ['href', 'xlink:href', 'x', 'y', 'width', 'height'],
 	symbol: ['viewBox', 'width', 'height', 'x', 'y'],
+	text: ['x', 'y', 'xml:space'],
 };
 const PRESENTATION = new Set([
 	'fill',
@@ -119,6 +138,12 @@ const PRESENTATION = new Set([
 	'transform',
 	'stroke-dasharray',
 	'stroke-dashoffset',
+	'font-size',
+	'font-family',
+	'font-weight',
+	'font-style',
+	'text-anchor',
+	'dominant-baseline',
 	'color',
 ]);
 
@@ -265,7 +290,93 @@ export function compileDrawing(
 			if (value === null) refuse(element.id, `\`stroke-dashoffset="${offset}"\` on <${element.tag}>, which is not a length in user units`);
 			else next.dashOffset = value;
 		}
+		const size = attribute('font-size')?.trim();
+		if (size !== undefined) {
+			const value = parseLength(size);
+			if (value === null || value < 0) refuse(element.id, `\`font-size="${size}"\` on <${element.tag}>, which is not a length in user units`);
+			else next.fontSize = value;
+		}
+		const family = attribute('font-family')?.trim();
+		if (family !== undefined) next.fontFamily = family.split(',')[0]!.trim().replace(/^['"]|['"]$/g, '') || null;
+		const weight = attribute('font-weight')?.trim();
+		if (weight !== undefined) {
+			const value = weight === 'normal' ? 400 : weight === 'bold' ? 700 : Number(weight);
+			if (!Number.isInteger(value) || value < 1 || value > 1000) refuse(element.id, `\`font-weight="${weight}"\` on <${element.tag}>`);
+			else next.fontWeight = value;
+		}
+		const fontStyle = attribute('font-style')?.trim();
+		if (fontStyle !== undefined) {
+			if (fontStyle === 'italic' || fontStyle === 'oblique') next.italic = true;
+			else if (fontStyle === 'normal') next.italic = false;
+			else refuse(element.id, `\`font-style="${fontStyle}"\` on <${element.tag}>`);
+		}
+		const anchor = attribute('text-anchor')?.trim();
+		if (anchor !== undefined) {
+			if (anchor === 'start' || anchor === 'middle' || anchor === 'end') next.anchor = anchor;
+			else refuse(element.id, `\`text-anchor="${anchor}"\` on <${element.tag}>`);
+		}
+		const baseline = attribute('dominant-baseline')?.trim();
+		if (baseline !== undefined) {
+			if (baseline === 'auto' || baseline === 'alphabetic') next.baseline = 'alphabetic';
+			else if (baseline === 'middle' || baseline === 'central') next.baseline = baseline;
+			else refuse(element.id, `\`dominant-baseline="${baseline}"\` on <${element.tag}>, a baseline a native drawing does not place yet`);
+		}
 		return next;
+	};
+
+	/** A `<text>` run: one string at one point, no `<tspan>`s, filled and not stroked. */
+	const emitText = (element: DrawingElement, style: Inherited, matrix: Matrix) => {
+		const children = childrenOf(element.path);
+		if (children.length > 0) {
+			refuse(element.id, `a <${children[0]!.tag}> inside <text>, which a native drawing does not place yet`);
+			return;
+		}
+		if ((element.attributes.style ?? '').trim() !== '')
+			refuse(element.id, `\`style\` on <text>, whose font and anchor a native drawing does not read from styles yet`);
+		const position = (name: 'x' | 'y') => {
+			const raw = element.attributes[name]?.trim() ?? '0';
+			const parts = raw.split(/[\s,]+/).filter((part) => part !== '');
+			if (parts.length > 1) refuse(element.id, `\`${name}="${raw}"\` on <text>, a position per character, which a native drawing does not place yet`);
+			const value = parseLength(parts[0] ?? '0');
+			if (value === null) refuse(element.id, `\`${name}="${raw}"\` on <text>, which is not a length in user units`);
+			return value ?? 0;
+		};
+		const written = texts
+			.filter((text) => text.path.length === element.path.length + 1 && isPrefix(element.path, text.path))
+			.map((text) => text.text)
+			.join('');
+		// xml:space="preserve" keeps every space and turns line breaks into spaces; otherwise runs of white space collapse.
+		const text =
+			element.attributes['xml:space'] === 'preserve'
+				? written.replace(/[\n\r\t]/g, ' ')
+				: written.replace(/\s+/g, ' ').trim();
+		const x = position('x');
+		const y = position('y');
+		if (style.stroke !== null && style.width > 0)
+			refuse(element.id, 'a stroke on <text>, which a native drawing does not outline yet');
+		const fill = style.fill;
+		if (fill !== null && typeof fill === 'object' && 'gradient' in fill) {
+			refuse(element.id, 'a gradient fill on <text>, which a native drawing does not paint yet');
+			return;
+		}
+		if (fill === null || text === '') return;
+		const opacity = style.fillOpacity * style.opacity;
+		const resolved = fill === 'currentColor' && style.color ? style.color : fill;
+		if (resolved === 'currentColor' && opacity !== 1)
+			refuse(element.id, "a see-through `currentColor` paint on <text>: its colour comes from the page's styles");
+		shapes.push({
+			text,
+			x,
+			y,
+			size: style.fontSize,
+			weight: style.fontWeight,
+			...(style.italic ? { italic: true as const } : {}),
+			...(style.fontFamily ? { family: style.fontFamily } : {}),
+			anchor: style.anchor,
+			baseline: style.baseline,
+			fill: resolved === 'currentColor' || opacity === 1 ? resolved : { ...resolved, alpha: Math.round(resolved.alpha * opacity) },
+			...(matrix.every((value, index) => value === IDENTITY[index]) ? {} : { transform: matrix }),
+		});
 	};
 
 	const checkAttributes = (element: DrawingElement) => {
@@ -374,7 +485,7 @@ export function compileDrawing(
 		return { gradient: element.tag === 'linearGradient' ? 'linear' : 'radial', points, stops, transform };
 	};
 
-	const shapes: NativeShape[] = [];
+	const shapes: (NativeShape | NativeDrawingText)[] = [];
 	const emit = (element: DrawingElement, outline: number[], style: Inherited, matrix: Matrix) => {
 		const alpha = (given: Paint, opacity: number): NativeShape['fill'] => {
 			if (given !== null && typeof given === 'object' && 'gradient' in given)
@@ -503,6 +614,10 @@ export function compileDrawing(
 		const own = multiply(matrix, transformOf(element));
 		if (SHAPES.has(element.tag)) {
 			emit(element, outlineOf(element), style, own);
+			return;
+		}
+		if (element.tag === 'text') {
+			emitText(element, style, own);
 			return;
 		}
 		if (element.tag === 'use') {

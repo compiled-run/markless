@@ -392,6 +392,25 @@ export type NativeShape = {
 	readonly transform?: readonly [number, number, number, number, number, number];
 };
 
+/**
+ * A run of SVG `<text>` at one point in the drawing's user units, painted in its place among the shapes: `x` is where
+ * its `anchor` falls, `y` where its `baseline` does (`middle`: half the x-height above the alphabetic baseline;
+ * `central`: the middle of the em box). `family` is the first family written; a host without it uses its own sans-serif.
+ */
+export type NativeDrawingText = {
+	readonly text: string;
+	readonly x: number;
+	readonly y: number;
+	readonly size: number;
+	readonly weight: number;
+	readonly italic?: true;
+	readonly family?: string;
+	readonly anchor: 'start' | 'middle' | 'end';
+	readonly baseline: 'alphabetic' | 'middle' | 'central';
+	readonly fill: NativeColor | 'currentColor';
+	readonly transform?: readonly [number, number, number, number, number, number];
+};
+
 /** An inline `<svg>`, compiled when the app is built: the host draws `shapes` in the element's box. */
 export type NativeDrawing = {
 	/** min-x, min-y, width and height; drawn centred and scaled to fit the box (`xMidYMid meet`), as the web does. */
@@ -401,7 +420,7 @@ export type NativeDrawing = {
 	readonly height?: number;
 	/** `width` and `height` are in ems of the svg's font size (`width="1em"`), not CSS pixels. */
 	readonly em?: true;
-	readonly shapes: ReadonlyArray<NativeShape>;
+	readonly shapes: ReadonlyArray<NativeShape | NativeDrawingText>;
 };
 
 export type NativeNode = NativePlace &

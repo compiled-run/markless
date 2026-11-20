@@ -4555,12 +4555,28 @@ export function createNativeViewPayload(
 			});
 			open = null;
 		};
-		const attributesAt = (path: ReadonlyArray<number>) =>
-			Object.fromEntries(
+		/** What an object-literal spread on the element at `path` writes, as the web writes each value; declared names win. */
+		const spreadLiteralsAt = (path: ReadonlyArray<number>): Record<string, string> => {
+			const written: Record<string, string> = {};
+			for (const slot of chunk.slots) {
+				if (slot.kind !== 'spread-attributes' || comparePaths(slot.coordinate.path, path) !== 0) continue;
+				for (const [name, value] of slot.literalEntries ?? []) {
+					if (slot.excludeNames.includes(name)) continue;
+					const attribute = marklessAttributeValue(name, value);
+					if (attribute === null) delete written[name];
+					else written[name] = attribute;
+				}
+			}
+			return written;
+		};
+		const attributesAt = (path: ReadonlyArray<number>) => ({
+			...spreadLiteralsAt(path),
+			...(Object.fromEntries(
 				(chunk.attributes ?? [])
 					.filter((attribute) => comparePaths(attribute.coordinate.path, path) === 0)
 					.map((attribute) => [attribute.name, attribute.value]),
-			) as Record<string, string>;
+			) as Record<string, string>),
+		});
 		const boundAt = (path: ReadonlyArray<number>) =>
 			chunk.slots.flatMap((slot) =>
 				slot.kind === 'attribute' && comparePaths(slot.coordinate.path, path) === 0
@@ -4665,6 +4681,7 @@ export function createNativeViewPayload(
 				);
 				const attributes: Record<string, string> = {
 					...restAttributes,
+					...spreadLiteralsAt(item.path),
 					...staticAttributes,
 					...(scope.module.overlayHosts.has(item.id) ? { [OVERLAY_ATTRIBUTE]: '' } : {}),
 				};

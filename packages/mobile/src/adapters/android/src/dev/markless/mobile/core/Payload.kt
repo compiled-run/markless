@@ -170,10 +170,16 @@ sealed interface ShapePaint {
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
-data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val dash: List<Double>? = null, val dashOffset: Double = 0.0)
+/** What a drawing paints, in order: a [Shape] or a [DrawingText]. */
+sealed interface DrawingPart
+
+/** A run of SVG text at one point: [anchor] start/middle/end at x, [baseline] alphabetic/middle/central at y. */
+data class DrawingText(val text: String, val x: Double, val y: Double, val size: Double, val weight: Int, val italic: Boolean, val family: String?, val anchor: String, val baseline: String, val fill: ShapePaint, val transform: List<Double>?) : DrawingPart
+
+data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val dash: List<Double>? = null, val dashOffset: Double = 0.0) : DrawingPart
 
 /** An inline `<svg>` compiled to shapes. */
-data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
+data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<DrawingPart>, val em: Boolean = false)
 
 /** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Dismiss] is a sheet's platform close or an overlay's Escape or outside press. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
 /** [pointer]: an event a touch raises; [touch]: one of those a host reports, from which the runtime raises the rest. */
@@ -666,6 +672,19 @@ data class Payload(
 			val shapes = o.field("shapes", what).arr("$what.shapes").mapIndexed { n, sv ->
 				val w = "$what.shapes[$n]"
 				val so = sv.obj(w)
+				if ("text" in so) {
+					so.only(setOf("text", "x", "y", "size", "weight", "italic", "family", "anchor", "baseline", "fill", "transform"), w)
+					val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
+					if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
+					return@mapIndexed DrawingText(
+						so.field("text", w).str("$w.text"), so.field("x", w).num("$w.x"), so.field("y", w).num("$w.y"),
+						so.field("size", w).num("$w.size"), so.field("weight", w).num("$w.weight").toInt(),
+						so["italic"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$w.italic must be true when present"); true } ?: false,
+						so["family"]?.str("$w.family"), oneOf(so, "anchor", setOf("start", "middle", "end"), w),
+						oneOf(so, "baseline", setOf("alphabetic", "middle", "central"), w),
+						paint(so.field("fill", w), "$w.fill") ?: throw MarklessDecodeError("$w.fill must be a paint"), transform,
+					)
+				}
 				so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "dash", "dashOffset"), w)
 				val dash = so["dash"]?.arr("$w.dash")?.map { it.num("$w.dash[]") }
 				if (dash != null && (dash.isEmpty() || dash.size % 2 != 0 || dash.any { it < 0 })) throw MarklessDecodeError("$w.dash must hold an even count of lengths")

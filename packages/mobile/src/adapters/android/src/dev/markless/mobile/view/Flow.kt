@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.DashPathEffect
 import android.graphics.LinearGradient
 import android.graphics.RadialGradient
+import android.graphics.Rect
 import android.graphics.Shader
 import android.graphics.Color
 import android.graphics.Matrix
@@ -25,6 +26,8 @@ import android.text.style.UnderlineSpan
 import android.view.View
 import dev.markless.mobile.core.DefaultStyle
 import dev.markless.mobile.core.Drawing
+import dev.markless.mobile.core.DrawingText
+import dev.markless.mobile.core.Shape
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.ShapePaint
@@ -161,7 +164,8 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 	/** What `currentColor` paints: the svg's text colour from a style export, else black. */
 	var currentColor: Int = Color.BLACK
 		set(value) { field = value; invalidate() }
-	private val paths = drawing.shapes.map { shape ->
+	private val paths = drawing.shapes.map { part ->
+		val shape = part as? Shape ?: return@map Path()
 		Path().apply {
 			fillType = if (shape.evenOdd) Path.FillType.EVEN_ODD else Path.FillType.WINDING
 			val v = shape.path
@@ -196,7 +200,12 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 			canvas.translate((-x * scale + (width - w * scale) / 2).toFloat(), (-y * scale + (height - h * scale) / 2).toFloat())
 			canvas.scale(scale.toFloat(), scale.toFloat())
 		} ?: canvas.scale(density, density)
-		for ((index, shape) in drawing.shapes.withIndex()) {
+		for ((index, part) in drawing.shapes.withIndex()) {
+			if (part is DrawingText) {
+				drawText(canvas, part)
+				continue
+			}
+			val shape = part as Shape
 			canvas.save()
 			shape.transform?.let { (a, b, c, d, e, f) ->
 				canvas.concat(Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
@@ -239,6 +248,28 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 			val (a, b, cc, d, e, f) = given.transform
 			setLocalMatrix(Matrix().apply { setValues(floatArrayOf(a.toFloat(), cc.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
 		}
+	}
+
+	/** A run of SVG text: its anchor at x and its baseline at y, in the drawing's user units. */
+	private fun drawText(canvas: Canvas, part: DrawingText) {
+		canvas.save()
+		part.transform?.let { (a, b, c, d, e, f) ->
+			canvas.concat(Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
+		}
+		paint.reset(); paint.isAntiAlias = true
+		paint.style = Paint.Style.FILL
+		use(paint, part.fill)
+		paint.textSize = part.size.toFloat()
+		paint.typeface = Typeface.create(Typeface.create(part.family ?: "sans-serif", Typeface.NORMAL), part.weight.coerceIn(1, 1000), part.italic)
+		paint.textAlign = when (part.anchor) { "middle" -> Paint.Align.CENTER; "end" -> Paint.Align.RIGHT; else -> Paint.Align.LEFT }
+		val metrics = paint.fontMetrics
+		val shift = when (part.baseline) {
+			"middle" -> Rect().also { paint.getTextBounds("x", 0, 1, it) }.height() / 2f
+			"central" -> -(metrics.ascent + metrics.descent) / 2f
+			else -> 0f
+		}
+		canvas.drawText(part.text, part.x.toFloat(), part.y.toFloat() + shift, paint)
+		canvas.restore()
 	}
 
 	private fun colorOf(paint: ShapePaint): Int = when (paint) {

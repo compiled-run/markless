@@ -1962,6 +1962,8 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly kind: 'spread-attributes';
 				readonly residue: SemanticMarkupResidue;
 				readonly excludeNames: ReadonlyArray<string>;
+				/** The spread is an object literal of fixed values (native builds only): each entry it writes, in order. */
+				readonly literalEntries?: ReadonlyArray<readonly [string, string | number | boolean | null]>;
 				// The spread is the component's props rest binding, so it carries what a consumer passed.
 				readonly carriesProps?: true;
 				// Prop names the component signature already took out of the rest

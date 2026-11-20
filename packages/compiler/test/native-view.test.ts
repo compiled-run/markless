@@ -2874,6 +2874,45 @@ describe('inline svg', () => {
 		]);
 	});
 
+	it('draws <text> runs among the shapes, its font from it or its groups; refuses tspans, outlines and styles by name', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Chart() @{
+	<svg viewBox="0 0 100 50" font-family="'Helvetica Neue', sans-serif" font-size="10">
+		<rect width="100" height="20" fill="#eee" />
+		<text x="50" y="10" text-anchor="end" font-weight="bold" opacity="0.5" fill="#000">  Two   words  </text>
+		<text {...{ 'xml:space': 'preserve' }} y="30" font-size="6">a  b</text>
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const parts = (payload!.nodes.find((node) => 'drawing' in node && node.drawing) as { drawing: { shapes: object[] } }).drawing.shapes;
+		expect(parts.slice(1)).toEqual([
+			{ text: 'Two words', x: 50, y: 10, size: 10, weight: 700, family: 'Helvetica Neue', anchor: 'end', baseline: 'alphabetic', fill: { r: 0, g: 0, b: 0, alpha: 128 } },
+			{ text: 'a  b', x: 0, y: 30, size: 6, weight: 400, family: 'Helvetica Neue', anchor: 'start', baseline: 'alphabetic', fill: { r: 0, g: 0, b: 0, alpha: 255 } },
+		]);
+		const refused = await nativeView(`export function Chart() @{
+	<svg viewBox="0 0 10 10">
+		<text>a<tspan>b</tspan></text>
+		<text stroke="red" style="font-size: 4px">c</text>
+	</svg>
+}`);
+		expect(refused.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'a <tspan> inside <text>, which a native drawing does not place yet',
+			'`style` on <text>, whose font and anchor a native drawing does not read from styles yet',
+			'a stroke on <text>, which a native drawing does not outline yet',
+		]);
+	});
+
+	it('writes what an object-literal spread holds, as the web writes each value; declared attributes win', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Note() @{
+	<p {...{ title: 'spread', 'aria-hidden': true, hidden: false, lang: 'en' }} lang="fr">Hi</p>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect((payload!.nodes[0] as { attributes?: object }).attributes).toEqual({
+			title: 'spread',
+			'aria-hidden': 'true',
+			lang: 'fr',
+		});
+	});
+
 	it('refuses what a drawing cannot hold by name, at the shape that holds it', async () => {
 		const text = `import { state } from '@markless/core';
 export function Chart() @{
@@ -2881,7 +2920,7 @@ export function Chart() @{
 	<svg viewBox="0 0 10 10"><defs><pattern id="g" /></defs>
 		<path d="M0 0h10" stroke-dasharray="2%" />
 		<rect width={w} height="2" fill="url(#g)" />
-		<text x="0" y="5">label</text>
+		<text x="0 1" y="5">label</text>
 	</svg>
 }`;
 		const { payload, diagnostics } = await nativeView(text);
@@ -2902,7 +2941,7 @@ export function Chart() @{
 				'`fill="url(#g)"` on <rect>, a paint a native drawing does not have (patterns are not drawn yet)',
 				6,
 			],
-			['the SVG <text> element, which a native drawing does not draw yet', 7],
+			['`x="0 1"` on <text>, a position per character, which a native drawing does not place yet', 7],
 		]);
 	});
 

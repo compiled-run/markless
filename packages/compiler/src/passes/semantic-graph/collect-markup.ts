@@ -604,11 +604,14 @@ function emitNode(
 					if (spreadClassResidue && !excludeNames.includes('class'))
 						excludeNames.push('class');
 				}
+				const literalEntries =
+					NATIVE_FACTS && context.nativeFacts !== null ? literalObjectEntries(expression) : undefined;
 				addSlot(builder, {
 					kind: 'spread-attributes',
 					coordinate: { kind: 'child-index', path },
 					residue,
 					excludeNames,
+					...(literalEntries ? { literalEntries } : {}),
 					...(spreadsRestBinding ? { carriesProps: true as const } : {}),
 					...(context.destructuredNames.length > 0
 						? { destructuredNames: context.destructuredNames }
@@ -1638,4 +1641,25 @@ function isAlwaysPresentValue(expression: AnyNode): boolean {
 			(typeof node.value === 'string' || typeof node.value === 'number')
 		);
 	});
+}
+
+/** An object literal whose every entry is a fixed key and a string, number, boolean or null; undefined otherwise. */
+function literalObjectEntries(
+	node: AnyNode,
+): Array<readonly [string, string | number | boolean | null]> | undefined {
+	if (node.type !== 'ObjectExpression') return undefined;
+	const entries: Array<readonly [string, string | number | boolean | null]> = [];
+	for (const property of (node.properties as AnyNode[] | undefined) ?? []) {
+		const key = property.key as AnyNode | undefined;
+		const value = property.value as AnyNode | undefined;
+		if (property.type !== 'Property' || property.computed || property.kind !== 'init' || !key || !value)
+			return undefined;
+		const name =
+			key.type === 'Identifier' ? key.name : key.type === 'Literal' && typeof key.value === 'string' ? key.value : undefined;
+		if (typeof name !== 'string' || value.type !== 'Literal') return undefined;
+		const literal = value.value;
+		if (literal !== null && !['string', 'number', 'boolean'].includes(typeof literal)) return undefined;
+		entries.push([name, literal as string | number | boolean | null]);
+	}
+	return entries;
 }

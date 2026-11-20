@@ -226,13 +226,34 @@ public struct NativeShape: Equatable, Sendable {
 	public var dashOffset: Double = 0
 }
 
+/// A run of SVG text at one point: `anchor` start/middle/end at x, `baseline` alphabetic/middle/central at y.
+public struct NativeDrawingText: Equatable, Sendable {
+	public let text: String
+	public let x: Double
+	public let y: Double
+	public let size: Double
+	public let weight: Int
+	public let italic: Bool
+	public let family: String?
+	public let anchor: String
+	public let baseline: String
+	public let fill: NativeShape.Paint
+	public let transform: [Double]?
+}
+
+/// What a drawing paints, in order.
+public enum NativeDrawingPart: Equatable, Sendable {
+	case shape(NativeShape)
+	case text(NativeDrawingText)
+}
+
 /// An inline `<svg>` compiled when the app was built.
 public struct NativeDrawing: Equatable, Sendable {
 	/// min-x, min-y, width, height.
 	public let viewBox: [Double]?
 	public let width: Double?
 	public let height: Double?
-	public let shapes: [NativeShape]
+	public let shapes: [NativeDrawingPart]
 	/// `width` and `height` are in ems of the font size of the text the svg sits in, not CSS px.
 	public var em = false
 }
@@ -876,7 +897,21 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let color = try reader.object(["r", "g", "b", "alpha"])
 			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))
 		}
-		let shapes = try field["shapes"].array().map { shape -> NativeShape in
+		let shapes = try field["shapes"].array().map { shape -> NativeDrawingPart in
+			if try shape.object(required: [], optional: ["text", "x", "y", "size", "weight", "italic", "family", "anchor", "baseline", "fill", "transform", "path", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "dash", "dashOffset"]).has("text") {
+				let t = try shape.object(required: ["text", "x", "y", "size", "weight", "anchor", "baseline", "fill"], optional: ["italic", "family", "transform"])
+				let anchor = try t["anchor"].string()
+				guard ["start", "middle", "end"].contains(anchor) else { throw shape.fail("unknown anchor \(anchor)") }
+				let baseline = try t["baseline"].string()
+				guard ["alphabetic", "middle", "central"].contains(baseline) else { throw shape.fail("unknown baseline \(baseline)") }
+				let transform = t.has("transform") ? try t["transform"].array().map { try $0.number() } : nil
+				if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
+				guard let fill = try paint(try t["fill"]) else { throw shape.fail("a text's fill is a paint") }
+				return .text(NativeDrawingText(
+					text: try t["text"].string(), x: try t["x"].number(), y: try t["y"].number(), size: try t["size"].number(),
+					weight: Int(try t["weight"].number()), italic: t.has("italic") ? try t["italic"].bool() : false,
+					family: t.has("family") ? try t["family"].string() : nil, anchor: anchor, baseline: baseline, fill: fill, transform: transform))
+			}
 			let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "dash", "dashOffset"])
 			let dash = s.has("dash") ? try s["dash"].array().map { try $0.number() } : nil
 			if let dash, dash.isEmpty || dash.count % 2 != 0 || dash.contains(where: { $0 < 0 }) { throw shape.fail("a dash list holds an even count of lengths") }
@@ -884,11 +919,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 			if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
 			let rule = try s["fillRule"].string()
 			guard rule == "nonzero" || rule == "evenodd" else { throw shape.fail("unknown fillRule \(rule)") }
-			return NativeShape(
+			return .shape(NativeShape(
 				path: try s["path"].array().map { try $0.number() }, fill: try paint(try s["fill"]), evenOdd: rule == "evenodd",
 				stroke: try paint(try s["stroke"]), width: try s["width"].number(), cap: try s["cap"].string(), join: try s["join"].string(),
 				miterLimit: try s["miterLimit"].number(), transform: transform, dash: dash,
-				dashOffset: s.has("dashOffset") ? try s["dashOffset"].number() : 0)
+				dashOffset: s.has("dashOffset") ? try s["dashOffset"].number() : 0))
 		}
 		return NativeDrawing(
 			viewBox: viewBox, width: field.has("width") ? try field["width"].number() : nil,

@@ -1,0 +1,7 @@
+appId: ${APP_ID}
+name: r150-svg-text
+---
+- launchApp:
+      clearState: true
+- assertVisible: Diagram
+- assertVisible: Diagram drawn

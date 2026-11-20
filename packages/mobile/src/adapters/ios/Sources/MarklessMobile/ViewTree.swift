@@ -119,7 +119,14 @@ final class DrawingView: UIView {
 			context.translateBy(x: -box[0] * scale + (bounds.width - box[2] * scale) / 2, y: -box[1] * scale + (bounds.height - box[3] * scale) / 2)
 			context.scaleBy(x: scale, y: scale)
 		}
-		for shape in drawing.shapes {
+		for part in drawing.shapes {
+			let shape: NativeShape
+			switch part {
+			case let .text(text):
+				draw(text, in: context)
+				continue
+			case let .shape(one): shape = one
+			}
 			let path = CGMutablePath()
 			var i = 0
 			let p = shape.path
@@ -176,6 +183,31 @@ final class DrawingView: UIView {
 		case let .color(c): UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: c.alpha / 255)
 		case .gradient: .clear
 		}
+	}
+
+	/// A run of SVG text: its anchor at x and its baseline at y, in the drawing's user units.
+	private func draw(_ text: NativeDrawingText, in context: CGContext) {
+		context.saveGState()
+		if let t = text.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
+		let size = CGFloat(text.size)
+		let weights: [(Int, UIFont.Weight)] = [(100, .ultraLight), (200, .thin), (300, .light), (400, .regular), (500, .medium), (600, .semibold), (700, .bold), (800, .heavy), (900, .black)]
+		let weight = weights.min(by: { abs($0.0 - text.weight) < abs($1.0 - text.weight) })!.1
+		var font = text.family.flatMap { UIFont(name: $0, size: size) } ?? UIFont.systemFont(ofSize: size, weight: weight)
+		var traits = font.fontDescriptor.symbolicTraits
+		if text.weight >= 600 { traits.insert(.traitBold) }
+		if text.italic { traits.insert(.traitItalic) }
+		if let descriptor = font.fontDescriptor.withSymbolicTraits(traits) { font = UIFont(descriptor: descriptor, size: size) }
+		let string = NSAttributedString(string: text.text, attributes: [.font: font, .foregroundColor: color(text.fill)])
+		let width = string.size().width
+		let x = CGFloat(text.x) - (text.anchor == "middle" ? width / 2 : text.anchor == "end" ? width : 0)
+		// draw(at:) places the line's top; move from the requested baseline to it.
+		let baseline: CGFloat = switch text.baseline {
+		case "middle": font.xHeight / 2
+		case "central": (font.ascender + font.descender) / 2
+		default: 0
+		}
+		string.draw(at: CGPoint(x: x, y: CGFloat(text.y) + baseline - font.ascender))
+		context.restoreGState()
 	}
 
 	/// Paints a pad gradient over the clipped area, in its own space mapped into the shape's.
