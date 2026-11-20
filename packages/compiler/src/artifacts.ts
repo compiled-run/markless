@@ -501,6 +501,8 @@ export type SemanticGraphBinding = {
 	readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
 	/** A sync computed's body as a tree, for native builds only (`nativeFacts`). */
 	readonly nativeExpression?: SemanticExpression;
+	/** Where a computed's function is written, for native builds only: the script engine runs it when data cannot. */
+	readonly nativeFunctionSpan?: SourceSpan;
 	readonly functionSource?: string;
 	// A synthetic computed spelling one run of text: inside @try it waits on its async inputs, not on itself.
 	readonly joinsText?: true;

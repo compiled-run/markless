@@ -168,6 +168,10 @@ class MarklessHost(
 	private val events = payload.events.groupBy { it.host }
 	private val views = HashMap<String, View>()
 	private val built = HashMap<String, Instance>()
+	/** Shapes inside an svg, by instance: the drawing that draws each one. */
+	private val shapeOwners = HashMap<String, DrawingView>()
+	/** svgs whose viewBox follows state: the journal's `viewBox` attribute gives it. */
+	private val followingViewBox = HashSet<String>()
 	private val textViews = HashMap<String, TextView>()
 	/** Each text view that draws Dragon's glyph lines over itself instead of its own text. */
 	private val glyphLines = HashMap<TextView, GlyphLines>()
@@ -766,6 +770,10 @@ class MarklessHost(
 		heldTexts.keys.removeAll { it !in live && inScope(it, only) }
 		for (inst in built.values.sortedByDescending { order.getValue(it.node.id) }) {
 			if (inst.id in live || (only != null && !only(inst))) continue
+			if (shapeOwners.remove(inst.id) != null) {
+				built.remove(inst.id)
+				continue
+			}
 			val view = views.remove(inst.id)!!
 			built.remove(inst.id)
 			scrollers.remove(inst.id)
@@ -793,7 +801,17 @@ class MarklessHost(
 				val lead = flow.leadOf[node.id]
 				if (lead != null && lead != node.id) { members.add(inst.id); continue }
 			}
-			if (inst.id in views) continue
+			if (inst.id in views || inst.id in shapeOwners) continue
+			val shape = (node as? Node.Element)?.shape
+			if (shape != null) {
+				// A shape inside an svg is drawn by the svg's view; it has no view of its own.
+				val drawn = parentOf(inst)?.let { views[it] } as? DrawingView ?: throw MarklessHostError("the shape \"${inst.id}\" is not inside a drawing")
+				val outline = (node as Node.Element).bindings.firstOrNull { !it.property && it.name == "d" }?.let { runtime.attribute(it, inst.scope) }
+				shapeOwners[inst.id] = drawn
+				drawn.addShape(inst.id, shape, outline)
+				built[inst.id] = inst
+				continue
+			}
 			val view = when {
 				flow != null && flow.leadOf[node.id] == node.id -> paragraph(inst).also { fresh.add(inst.id) }
 				node is Node.Element -> element(node, inst)
@@ -1054,6 +1072,7 @@ class MarklessHost(
 		// A dialog shows nothing until showModal() puts it in the top layer (the UA's dialog:not([open]) { display: none }).
 		if (node.element == "dialog") view.visibility = View.GONE
 		for ((name, value) in node.attributes) if (name != "class") attribute(inst.id, name, value)
+		if (drawing != null && node.bindings.any { !it.property && it.name == "viewBox" }) followingViewBox.add(inst.id)
 		for (b in node.bindings) if (!b.property) attribute(inst.id, b.name, runtime.attribute(b, inst.scope))
 		if (unseen) {
 			view.visibility = View.GONE
@@ -1161,7 +1180,15 @@ class MarklessHost(
 
 	/** Attributes per the contract's Android mapping; `class` reaches views only through Dragon's style states, and any other attribute is ignored. */
 	private fun attribute(id: String, name: String, value: String?) {
+		shapeOwners[id]?.let { drawn ->
+			if (name == "d") drawn.setOutline(id, value)
+			return
+		}
 		val view = view(id)
+		if (name == "viewBox" && id in followingViewBox) {
+			(view as DrawingView).setViewBox(value)
+			return
+		}
 		val current = attrs.getOrPut(id) { HashMap() }
 		if (value == null) current.remove(name) else current[name] = value
 		if (id in inert && (name == "aria-hidden" || name == "hidden")) return

@@ -420,8 +420,18 @@ export type NativeNode = NativePlace &
 				readonly parent: string | null;
 				/** The browser's default look of this element, when it differs from a plain box of plain text. */
 				readonly defaultStyle?: NativeDefaultStyle;
-				/** On an `<svg>`: what it draws. Its shapes are not nodes. */
+				/**
+				 * On an `<svg>`: what it draws when the app is built. Shapes from a component or its `{children}` are nodes inside
+				 * it with a `shape`, drawn after these in tree order. A `viewBox` binding gives the viewBox while the app runs, as the
+				 * engine's four numbers, space-separated (null: none).
+				 */
 				readonly drawing?: NativeDrawing;
+				/**
+				 * On a shape inside an `<svg>` (a `<path>`): its paint, read when the app is built, and its outline when that is
+				 * fixed. A `d` binding gives the outline while the app runs, as the engine's verb-coded numbers, space-separated.
+				 * The svg draws it; it has no view of its own.
+				 */
+				readonly shape?: NativeShape;
 				/**
 				 * A live region (`aria-live`, `role="status"`, `"alert"` or `"log"`, `<output>`): a change to the text inside is
 				 * announced, after the screen reader's current speech when polite; `atomic` reads the whole region, else the changed text.

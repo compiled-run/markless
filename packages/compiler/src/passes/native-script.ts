@@ -4,6 +4,7 @@ import {
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_SUBMITTED_FORM,
 } from '@markless/serializer/native-view';
+import { SVG_GEOMETRY_SOURCE } from './native-svg-geometry.ts';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
@@ -722,6 +723,8 @@ export function nativeScriptOf(
 	services: ReadonlyArray<NativeScriptService>,
 	/** For `navigate()`: the page's route pattern, and the app's route patterns in the router's order. */
 	navigation?: { readonly here: string; readonly routes: ReadonlyArray<string> },
+	/** A drawing's geometry follows state: the engine carries the svg grammars (`__svgPath`, `__svgViewBox`). */
+	svg = false,
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -742,6 +745,7 @@ export function nativeScriptOf(
 		`var owners = ${JSON.stringify(owners)};`,
 		`var navigation = ${JSON.stringify(navigation ?? null)};`,
 		...definitions,
+		...(svg ? [SVG_GEOMETRY_SOURCE] : []),
 		ENTRIES,
 	].join('\n');
 	const id = contentId(body);
