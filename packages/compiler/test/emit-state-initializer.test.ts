@@ -29,7 +29,7 @@ import { moduleScopeLines } from '../src/passes/public-render/shared.ts';
 import {
 	buildStateInitializerEmission,
 	emitStateInitializerModuleNodes,
-	stateInitializerPropReads,
+	stateInitializerReads,
 	type StateInitializerEmissionInput,
 } from '../src/passes/symbol-modules.ts';
 
@@ -137,7 +137,7 @@ async function bothPaths(fixture: Fixture, omitAuthoredSource = false): Promise<
 		symbol,
 		moduleDeclarations: moduleScopeLines(fixture.source, fixture.filename),
 		moduleImports: result.semanticGraph.moduleImports,
-		propReads: stateInitializerPropReads(
+		propReads: stateInitializerReads(
 			symbol,
 			result.semanticGraph,
 			result.renderData,

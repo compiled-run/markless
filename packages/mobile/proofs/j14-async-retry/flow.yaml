@@ -1,0 +1,40 @@
+appId: ${APP_ID}
+name: j14-async-retry
+---
+- launchApp:
+      clearState: true
+- assertVisible: Retry
+- assertVisible: 'Tries: 0'
+- assertVisible: Looking up
+- assertNotVisible: 'Failed: No entry for missing'
+- extendedWaitUntil:
+      visible: 'Failed: No entry for missing'
+      timeout: 15500
+- assertVisible: 'Failed: No entry for missing'
+- assertNotVisible: Looking up
+- assertVisible: 'Failed: No entry for missing'
+- assertVisible: Try again
+- assertNotVisible: Looking up
+- assertNotVisible: 'Tries: 1'
+- tapOn: Try again
+- assertVisible: 'Tries: 1'
+- assertVisible: 'Tries: 1'
+- assertVisible: 'Failed: No entry for missing'
+- assertNotVisible: 'Tries: 0'
+- assertNotVisible: Looking up
+- assertNotVisible: 'Asked: apple'
+- tapOn: Ask apple
+- assertVisible: 'Asked: apple'
+- assertVisible: 'Asked: apple'
+- assertVisible: 'Failed: No entry for missing'
+- assertNotVisible: 'Asked: missing'
+- assertNotVisible: Looking up
+- assertNotVisible: 'Word: apple'
+- extendedWaitUntil:
+      visible: 'Word: apple'
+      timeout: 15500
+- assertVisible: 'Word: apple'
+- assertNotVisible: 'Failed: No entry for missing'
+- assertVisible: 'Word: apple'
+- assertNotVisible: 'Failed: No entry for missing'
+- assertNotVisible: Try again

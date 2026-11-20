@@ -1,0 +1,42 @@
+{
+	"rung": "J13",
+	"name": "@try in @for rows: each row waits, answers and fails on its own; a row that leaves aborts its lookup",
+	"server": "echo",
+	"steps": [
+		{
+			"visible": ["Rows", "Words: 2", "Looking up apple", "Looking up missing"],
+			"absent": ["Echo of apple: apple"],
+			"onWeb": {
+				"why": "The web's server render waits for each row's value before it sends the page; a phone shows each row's @pending first.",
+				"visible": ["Rows", "Echo of apple: apple", "No entry for missing"],
+				"absent": ["Looking up apple"]
+			}
+		},
+		{
+			"do": {
+				"wait": 5500
+			},
+			"visible": ["Echo of apple: apple", "No entry for missing"],
+			"absent": ["Looking up apple", "Looking up missing", "Words: 3"]
+		},
+		{
+			"do": {
+				"tap": "Add cherry"
+			},
+			"visible": [
+				"Words: 3",
+				"Echo of apple: apple",
+				"No entry for missing",
+				"Looking up cherry"
+			],
+			"absent": ["Words: 2"]
+		},
+		{
+			"do": {
+				"tap": "Only apple"
+			},
+			"visible": ["Words: 1", "Echo of apple: apple"],
+			"absent": ["Looking up cherry", "No entry for missing", "Words: 3"]
+		}
+	]
+}
