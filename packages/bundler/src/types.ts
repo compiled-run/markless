@@ -287,6 +287,7 @@ export type MarklessRolldownPluginApi = {
 		nextSource?: string,
 	) => string[] | Promise<string[]>;
 	runtimeDemandMaps: () => Iterable<RuntimeDemandMapManifest | undefined>;
+	joinedRepeatKeys: () => boolean;
 	runtimeDemandSources: () => Iterable<{
 		readonly source: string;
 		readonly map: RuntimeDemandMapManifest | undefined;
