@@ -1,0 +1,12 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u25-textbox-textarea",
+			"failure": null,
+			"installSeconds": 4.656947,
+			"flowSeconds": 18.126755957999993
+		}
+	]
+}

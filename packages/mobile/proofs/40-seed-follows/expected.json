@@ -1,5 +1,5 @@
 {
-	"rung": 18,
+	"rung": 40,
 	"name": "A shared field a part seeds from a prop that follows state takes the prop's new value when the page changes it; the part's own write stands until then",
 	"steps": [
 		{

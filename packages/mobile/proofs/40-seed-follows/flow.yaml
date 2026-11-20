@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: 18-seed-follows
+name: 40-seed-follows
 ---
 - launchApp:
     clearState: true

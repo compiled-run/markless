@@ -7,6 +7,9 @@ const val OVERLAY_ATTRIBUTE = "overlay"
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
+/** The events that carry a string: an `input` the field's text, a `keydown` its key, a `paste` the pasted text. */
+private val VALUED = setOf(EventName.Input, EventName.Keydown, EventName.Paste)
+
 sealed interface JournalEntry {
 	val node: String
 	fun toJson(): String
@@ -70,6 +73,12 @@ sealed interface JournalEntry {
 	/** A submit stopped at the field [node]: focus moves there and [message] shows until the next action. */
 	data class Invalid(override val node: String, val message: String) : JournalEntry {
 		override fun toJson() = "{\"op\":\"invalid\",\"node\":${jsonString(node)},\"message\":${jsonString(message)}}"
+	}
+
+	/** The `keydown` or `paste` handler called `preventDefault()`: the host leaves out what the key or paste does. */
+	data object PreventDefault : JournalEntry {
+		override val node get() = ""
+		override fun toJson() = "{\"op\":\"preventDefault\"}"
 	}
 
 	/** Dispatch a `timer` action for the timer [node] in [ms] milliseconds. */
@@ -226,8 +235,53 @@ class Runtime(
 		return "$cell@$key"
 	}
 
-	/** A row's state reads its first value until the row writes it. */
-	private fun read(cell: String, scope: Scope): JsValue = value(cell).let { values[slot(cell, scope)] ?: it }
+	private val firstOfCell = payload.cells.mapNotNull { c -> c.first?.let { c.id to it } }.toMap()
+
+	/**
+	 * A row's state reads its first value until the row writes it; one taken from the row's item is seeded before any change
+	 * ([seedRows]), so until the first change it reads the item as the row was built.
+	 */
+	private fun read(cell: String, scope: Scope): JsValue {
+		val initial = value(cell)
+		values[slot(cell, scope)]?.let { return it }
+		firstOfCell[cell]?.let { return evaluate(it, scope) }
+		return initial
+	}
+
+	/** For each row's state that has `rebuiltBy`, by slot (`<cell>@<key>`): those values now, as JSON. */
+	private fun rowSignatures(): Map<String, String> {
+		val signatures = HashMap<String, String>()
+		for (cell in payload.cells) {
+			val row = cell.row ?: continue
+			val rebuiltBy = cell.rebuiltBy ?: continue
+			val list = byId[row] as? Node.Repeat ?: continue
+			if (!isShown(list)) continue
+			for (r in rowsOf(list)) {
+				val scope = Scope(items = mapOf(row to r.item), keys = mapOf(row to r.key))
+				signatures["${cell.id}@${r.key}"] = rebuiltBy.joinToString(",") { jsonValue(evaluate(it, scope)) }
+			}
+		}
+		return signatures
+	}
+
+	/** As on the web, a part a row passes a changed value to is built again: that row's state starts over. */
+	private fun resetChangedRows(before: Map<String, String>) {
+		for ((slot, now) in rowSignatures()) if (before[slot]?.let { it != now } == true) values.remove(slot)
+	}
+
+	/** A row's state with a `first` takes it once, from the row's item, when the row is built. */
+	private fun seedRows() {
+		for (cell in payload.cells) {
+			val row = cell.row ?: continue
+			val first = cell.first ?: continue
+			val list = byId[row] as? Node.Repeat ?: continue
+			if (!isShown(list)) continue
+			for (r in rowsOf(list)) {
+				val slot = "${cell.id}@${r.key}"
+				if (slot !in values) values[slot] = evaluate(first, Scope(items = mapOf(row to r.item), keys = mapOf(row to r.key)))
+			}
+		}
+	}
 
 	fun node(id: String): Node = byId[id] ?: throw MarklessRuntimeError("unknown node \"$id\"")
 
@@ -238,6 +292,7 @@ class Runtime(
 			is Expr.Event -> fields?.get(e.field) ?: throw MarklessRuntimeError("the event's ${e.field} read where the event has none")
 			is Expr.FormData -> entriesOf(e.form)
 			is Expr.Checked -> JsValue.Bool(checkedOf(e.node))
+			is Expr.Field -> JsValue.Str(textOf(e.node))
 			is Expr.CellRef -> read(e.cell, scope)
 			Expr.Focused -> JsValue.Str(focused ?: NATIVE_DOCUMENT_BODY)
 			is Expr.FocusOrigin -> (eval(e.overlay) as? JsValue.Str)?.let { o -> origins[o.value]?.let(JsValue::Str) } ?: JsValue.Null
@@ -495,9 +550,10 @@ class Runtime(
 
 	fun rowsOf(repeat: Node.Repeat): List<Row> {
 		val list = evaluate(repeat.list) as? JsValue.Arr ?: throw MarklessRuntimeError("${repeat.id} lists a value that is not an array")
+		val keyPath = repeat.key ?: return list.items.mapIndexed { index, item -> Row(index.toString(), item) }
 		return list.items.map { item ->
 			var key = item
-			for (step in repeat.key) key = (key as? JsValue.Obj)?.fields?.get(step) ?: throw MarklessRuntimeError("${repeat.id}: a row has no key at ${repeat.key.joinToString(".")}")
+			for (step in keyPath) key = (key as? JsValue.Obj)?.fields?.get(step) ?: throw MarklessRuntimeError("${repeat.id}: a row has no key at ${keyPath.joinToString(".")}")
 			Row(Js.toStr(key), item)
 		}
 	}
@@ -834,11 +890,12 @@ class Runtime(
 
 	/**
 	 * Runs the handler for [event] on [host] (a row instance as `<node>@<key>`); an `input` event carries the field's whole
-	 * text as [value]. A `dismiss` with a [reason] is an overlay's Escape; without one, a sheet's platform close. A touch
+	 * text as [value], a `keydown` its key and a `paste` the pasted text; a press carries [detail], how many presses in a
+	 * row. A `dismiss` with a [reason] is an overlay's Escape; without one, a sheet's platform close. A touch
 	 * ([EventName.touch], at [point]) raises the browser's pointer events, after a `dismiss` of the topmost overlay when a
 	 * `pointerdown` lands outside it.
 	 */
-	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, point: TouchPoint? = null): List<JournalEntry> {
+	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, point: TouchPoint? = null, detail: Int? = null): List<JournalEntry> {
 		if (event == EventName.Choose) {
 			val option = byId[host.substringBefore('@')] as? Node.Element
 			val select = option?.parent
@@ -849,7 +906,8 @@ class Runtime(
 				emptyList()
 			}
 		}
-		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
+		if (detail != null && event != EventName.Activate) throw MarklessRuntimeError("a ${event.wire} event carries no press count")
+		if ((event in VALUED) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
 		if (point != null && !event.touch) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
 		if (event == EventName.Dismiss && reason != null) {
@@ -881,8 +939,15 @@ class Runtime(
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
 		// A press focuses the control it presses, as the browser does.
 		if (event == EventName.Activate) focused = host
-		return change(host, value) {
-			withFields(value?.let { mapOf("value" to JsValue.Str(it)) }) { run(handler.ops, scope) }
+		val carried = when (event) {
+			EventName.Input -> value?.let { mapOf("value" to JsValue.Str(it)) }
+			EventName.Keydown -> mapOf("key" to JsValue.Str(value!!))
+			EventName.Paste -> mapOf("text" to JsValue.Str(value!!))
+			EventName.Activate -> mapOf("detail" to JsValue.Num((detail ?: 1).toDouble()))
+			else -> null
+		}
+		return change(host, if (event == EventName.Input) value else null) {
+			withFields(carried) { run(handler.ops, scope) }
 		}
 	}
 
@@ -1026,12 +1091,13 @@ class Runtime(
 		instances(node).map { it.id }.filter { "${event.wire}\u0000$it" !in fired }
 	}
 
+	private fun shownInstance(id: String): Boolean = byId[id.substringBefore('@')]?.let { node -> instances(node).any { it.id == id } } ?: false
+
+	/** A field an arm hid is a new element when it shows again: it starts from its markup, as the web builds it. */
 	private fun forgetHidden() {
-		fired.removeAll { key ->
-			val id = key.substringAfter('\u0000')
-			val node = byId[id.substringBefore('@')]
-			node == null || instances(node).none { it.id == id }
-		}
+		fired.removeAll { !shownInstance(it.substringAfter('\u0000')) }
+		edited.keys.removeAll { !shownInstance(it) }
+		for (n in ticked) if (!isShown(n)) checkedness[n.id] = checkedBinding(n.id) ?: ("checked" in n.attributes)
 	}
 
 	/** A device call a handler awaited answered: its continuation runs with the answer as its local. */
@@ -1116,6 +1182,7 @@ class Runtime(
 					if (state == JsValue.Str("error") || (state == JsValue.Str("value") && error != null && error != JsValue.Null)) retry.add(slot(cell, scope))
 				}
 			}
+			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)
 				values[slot(op.cell, scope)] = v
@@ -1162,6 +1229,7 @@ class Runtime(
 	}
 
 	private inline fun change(host: String?, value: String?, apply: () -> List<JournalEntry>): List<JournalEntry> {
+		seedRows()
 		val cellsBefore = HashMap(values)
 		val beforeTexts = texts().toMap()
 		val beforeAttributes = boundAttributes().associate { (n, a, v) -> (n to a) to v }
@@ -1183,6 +1251,7 @@ class Runtime(
 		val ownedBefore = liveObjects()
 		val focusBefore = focused
 		val stackBefore = stack
+		val signaturesBefore = rowSignatures()
 		val calls = apply()
 		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
 		follow(cellsBefore)
@@ -1198,6 +1267,8 @@ class Runtime(
 			val list = rowOfCell[slot.substringBefore('@')]
 			list != null && '@' in slot && "$list\u0000${slot.substringAfter('@')}" !in kept
 		}
+		resetChangedRows(signaturesBefore)
+		seedRows()
 		forgetHidden()
 		val afterTexts = texts().toMap()
 		val afterAttributes = boundAttributes().associate { (n, a, v) -> (n to a) to v }

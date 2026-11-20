@@ -1839,6 +1839,8 @@ function renderChunkParts(
 		for (const slot of chunk.slots.filter(
 			(candidate) => candidate.staticIndex === staticIndex,
 		)) {
+			// A rebuilt select takes its value from its own `value` write, not from its options.
+			if (slot.kind === 'attribute' && slot.selectedOption) continue;
 			if (slot.kind === 'text' && slot.residue.kind === 'graph-read') {
 				const scoped = scopedPropPart(scope, slot.residue.graphNodeId, slot.residue.path);
 				if (scoped === 'unsupported')
@@ -1918,6 +1920,7 @@ function renderChunkParts(
 					for (const rowSlot of row.slots.filter(
 						(candidate) => candidate.staticIndex === rowIndex,
 					)) {
+						if (rowSlot.kind === 'attribute' && rowSlot.selectedOption) continue;
 						if (
 							rowAttributes &&
 							rowSlot.kind === 'attribute' &&
@@ -2567,12 +2570,16 @@ export function buildDomBindingEmission(input: DomBindingEmissionInput): Emissio
 		? domTextLeafBody(exportName, input.symbol.hostNodeId)
 		: [
 				...(input.symbol.target.kind === 'text' &&
-				input.symbol.target.textNode !== undefined
+				(input.symbol.target.textNode !== undefined || input.symbol.target.sibling !== undefined)
 					? [
 							moduleImportNode({
 								kind: 'named',
-								localName: 'marklessTextNode',
-								source: '@markless/web/fns/text-node',
+								...(input.symbol.target.textNode !== undefined
+									? { localName: 'marklessTextNode', source: '@markless/web/fns/text-node' }
+									: {
+											localName: 'marklessSiblingText',
+											source: '@markless/web/fns/sibling-text',
+										}),
 							}),
 						]
 					: []),
@@ -2614,7 +2621,8 @@ function isPlainTextUpdateLeaf(target: DomUpdateTarget): boolean {
 		target.suffix === undefined &&
 		target.trueValue === undefined &&
 		target.falseValue === undefined &&
-		target.textNode === undefined
+		target.textNode === undefined &&
+		target.sibling === undefined
 	);
 }
 
@@ -2657,9 +2665,11 @@ function domJournalEntryNode(
 			propertyNode('type', literalNode('setText')),
 			propertyNode('locator', locator),
 			propertyNode('value', textDomUpdateValueNode(target)),
-			...(target.textNode === undefined
-				? []
-				: [propertyNode('node', textNodeLocatorNode(target.textNode))]),
+			...(target.textNode !== undefined
+				? [propertyNode('node', textNodeLocatorNode(target.textNode))]
+				: target.sibling !== undefined
+					? [propertyNode('node', siblingTextLocatorNode(target.sibling))]
+					: []),
 		]);
 	}
 
@@ -2695,6 +2705,14 @@ function textNodeLocatorNode(textNode: number): EmissionNode {
 	return arrowFunctionNode(
 		['host'],
 		callNode(identifierNode('marklessTextNode'), [identifierNode('host'), at]),
+	);
+}
+
+/** `(host) => marklessSiblingText(host, <side>)`. */
+function siblingTextLocatorNode(side: 'previous' | 'next'): EmissionNode {
+	return arrowFunctionNode(
+		['host'],
+		callNode(identifierNode('marklessSiblingText'), [identifierNode('host'), literalNode(side)]),
 	);
 }
 
