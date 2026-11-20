@@ -97,6 +97,13 @@ export type NativeViewArtifact = {
 		readonly script?: NativeViewPayload['script'];
 		readonly values: ReadonlyArray<{ readonly key: string; readonly value: NativeExpr }>;
 	};
+	/** Shapes and groups drawn inside an <svg> that carry a `class`: a drawing reads no CSS, so a styled page refuses them. */
+	readonly classedShapes?: ReadonlyArray<{
+		readonly element: string;
+		/** Its own class tokens (not its component's scope class), or null when its class follows a value. */
+		readonly classes: ReadonlyArray<string> | null;
+		readonly span?: SourceSpan;
+	}>;
 	/** Where each element node of the payload is written, by node id, for build errors that name an element. */
 	readonly elementSources: ReadonlyMap<
 		string,
@@ -1103,6 +1110,25 @@ function cellsOf(expr: NativeExpr, into = new Set<string>()): Set<string> {
 	return into;
 }
 
+/** What an <svg>'s own attributes give its drawing: its geometry and the paint its shapes inherit. */
+const DRAWN_SVG_ATTRIBUTES = new Set([
+	'viewBox',
+	'width',
+	'height',
+	'preserveAspectRatio',
+	'fill',
+	'stroke',
+	'stroke-width',
+	'fill-opacity',
+	'stroke-opacity',
+	'opacity',
+	'fill-rule',
+	'stroke-linecap',
+	'stroke-linejoin',
+	'stroke-miterlimit',
+	'color',
+]);
+
 /** Expression kinds whose value is only known while the app runs. */
 const RUNTIME_READS = [
 	'cell',
@@ -1205,8 +1231,10 @@ const BUILTIN_CALLS: Readonly<Record<string, (...args: never[]) => unknown>> = {
 function foldConstant(
 	expr: NativeExpr,
 	initial: (cell: string) => NativeValue | undefined,
+	/** A property an object lacks reads as `undefined`, as on the web, instead of leaving the value unknown. */
+	missingIsUndefined = false,
 ): { readonly value: unknown } | undefined {
-	const fold = (inner: NativeExpr) => foldConstant(inner, initial);
+	const fold = (inner: NativeExpr) => foldConstant(inner, initial, missingIsUndefined);
 	if ('literal' in expr) return { value: expr.literal };
 	const element = elementOf(expr);
 	if (element !== undefined) {
@@ -1299,9 +1327,9 @@ function foldConstant(
 		if (holder && typeof holder === 'object' && tokenElement.has(holder)) return undefined;
 		if (expr.property === 'length' && (typeof holder === 'string' || Array.isArray(holder)))
 			return { value: holder.length };
-		return holder && typeof holder === 'object' && Object.hasOwn(holder, expr.property)
-			? { value: (holder as Record<string, unknown>)[expr.property] }
-			: undefined;
+		if (holder && typeof holder === 'object' && Object.hasOwn(holder, expr.property))
+			return { value: (holder as Record<string, unknown>)[expr.property] };
+		return missingIsUndefined && holder && typeof holder === 'object' ? { value: undefined } : undefined;
 	}
 	if ('call' in expr) {
 		const args = expr.arguments.map(fold);
@@ -1376,6 +1404,7 @@ export function createNativeViewPayload(
 		features: [...features],
 		diagnostics,
 		...(missingModules.size > 0 ? { missingModules: [...missingModules] } : {}),
+		...(classedShapes.length > 0 ? { classedShapes } : {}),
 		...(buildValues.length > 0
 			? {
 					buildValues: {
@@ -1387,6 +1416,7 @@ export function createNativeViewPayload(
 		elementSources,
 	});
 	const buildValues: { readonly key: string; readonly value: NativeExpr }[] = [];
+	const classedShapes: NonNullable<NativeViewArtifact['classedShapes']>[number][] = [];
 	const sprites = new Map<string, ReturnType<typeof readSvgFile> | undefined>();
 
 	const root = graph.markup.root;
@@ -4492,7 +4522,7 @@ export function createNativeViewPayload(
 	): { readonly value: unknown } | { readonly error: string } | 'pending' => {
 		const built = options.builtValues?.get(key);
 		if (built) return built;
-		const folded = foldConstant(value, () => undefined);
+		const folded = foldConstant(value, () => undefined, true);
 		if (folded) return folded;
 		buildValues.push({ key, value });
 		return 'pending';
@@ -4774,6 +4804,276 @@ export function createNativeViewPayload(
 		readonly host: string;
 	}[] = [];
 	const loweredEvents = new Set<string>();
+	/** Each item of an @for the build unrolled inside an <svg>: the list id its rows' expressions read, and the item. */
+	type UnrolledRow = { readonly list: string; readonly value: unknown };
+	const withRows = (expr: NativeExpr, rows: ReadonlyArray<UnrolledRow>) =>
+		rows.reduce((value, row) => withItem(value, row.list, row.value), expr);
+	/** A drawn element's bound attributes as the app is built; one that follows state or a list row stays bound. */
+	const builtAttributes = (
+		host: string,
+		tag: string,
+		written: Readonly<Record<string, string>>,
+		bound: ReadonlyArray<string>,
+		scope: Scope,
+		rows: ReadonlyArray<UnrolledRow>,
+		key: string,
+	): { readonly attributes: Record<string, string>; readonly bound: string[]; readonly refused: boolean } => {
+		const attributes = { ...written };
+		const left: string[] = [];
+		let refused = false;
+		const span = scope.module.hostSpans.get(host);
+		for (const name of bound) {
+			const read = (scope.module.readsByHost.get(host) ?? []).find(
+				(candidate) => candidate.target.kind === 'attribute' && candidate.target.name === name,
+			);
+			if (
+				!read ||
+				name === 'class' ||
+				name === 'style' ||
+				name.startsWith('aria-') ||
+				name.startsWith('data-')
+			) {
+				left.push(name);
+				continue;
+			}
+			const where = readScope(read, scope);
+			const lowered = attempt(() =>
+				renderValue(
+					read.expression,
+					() => readScript(where.module, read.sourceSpan),
+					`the \`${name}\` of <${tag}>`,
+					where,
+				),
+			);
+			const value = !lowered.failed && lowered.value ? withRows(lowered.value, rows) : undefined;
+			if (!value || variesWhileRunning(value)) {
+				lowered.rollBack();
+				left.push(name);
+				continue;
+			}
+			const built = builtValue(value, `${scope.prefix}${host}/${name}#${key}`);
+			if (built === 'pending') {
+				refused = true;
+				refuseAs('svg', `\`${name}\` on <${tag}> ${PENDING_HREF}`, span);
+				continue;
+			}
+			lowered.rollBack();
+			if ('error' in built) {
+				refused = true;
+				refuseAs('svg', `\`${name}\` on <${tag}> could not be computed when the app was built: ${built.error}`, span);
+				continue;
+			}
+			if (built.value === null || built.value === undefined || built.value === false) continue;
+			attributes[name] = built.value === true ? '' : String(built.value);
+		}
+		return { attributes, bound: left, refused };
+	};
+	/**
+	 * An <svg>'s content as drawing elements in paint order. An @for whose list and an @if whose test are fixed when the app
+	 * is built are unrolled, as the web renders them; one that follows state is refused by name.
+	 */
+	const svgContent = (chunk: SemanticMarkupChunk, svgPath: ReadonlyArray<number>, scope: Scope, svgSpan: SourceSpan | undefined) => {
+		const drawn: DrawingElement[] = [];
+		const texts: { path: ReadonlyArray<number>; text: string }[] = [];
+		const sprites = new Map<string, ReadonlyArray<DrawingElement>>();
+		const spans = new Map<string, SourceSpan | undefined>();
+		let perRow: (NonNullable<NonNullable<ReturnType<typeof useOf>>['perRow']> & { readonly at: number }) | undefined;
+		const follows = (what: string) =>
+			refuseAs('svg', `${what} inside an <svg> whose ${what === 'an @for' ? 'list' : 'test'} follows state; a native drawing is compiled when the app is built`, svgSpan);
+		const skip = (skipped: SemanticMarkupChunk) => {
+			if (scope.module === rootModule) lowered.add(skipped.id);
+			for (const host of skipped.hosts)
+				for (const event of scope.module.eventsByHost.get(host.hostNodeId) ?? [])
+					if (scope.module === rootModule) loweredEvents.add(event.id);
+		};
+		const walk = (
+			at: SemanticMarkupChunk,
+			under: ReadonlyArray<number>,
+			out: ReadonlyArray<number>,
+			start: number,
+			scope: Scope,
+			rows: ReadonlyArray<UnrolledRow>,
+			key: string,
+		): number => {
+			if (scope.module === rootModule) lowered.add(at.id);
+			const child = (path: ReadonlyArray<number>) =>
+				path.length === under.length + 1 && under.every((value, index) => path[index] === value);
+			type Entry =
+				| { readonly kind: 'host'; readonly id: string; readonly path: ReadonlyArray<number> }
+				| { readonly kind: 'text'; readonly text: string; readonly path: ReadonlyArray<number> }
+				| { readonly kind: 'slot'; readonly slot: SemanticMarkupChunk['slots'][number]; readonly path: ReadonlyArray<number> };
+			const entries: Entry[] = [
+				...at.hosts.map((host): Entry => ({ kind: 'host', id: host.hostNodeId, path: host.coordinate.path })),
+				...(at.texts ?? []).map((text): Entry => ({ kind: 'text', text: text.text, path: text.coordinate.path })),
+				...at.slots
+					.filter((slot) => slot.kind !== 'attribute' && slot.kind !== 'spread-attributes')
+					.map((slot): Entry => ({ kind: 'slot', slot, path: slot.coordinate.path })),
+			]
+				.filter((entry) => child(entry.path))
+				.sort((a, b) => a.path.at(-1)! - b.path.at(-1)!);
+			let n = start;
+			for (const entry of entries) {
+				if (entry.kind === 'text') {
+					texts.push({ path: [...out, n++], text: entry.text });
+					continue;
+				}
+				if (entry.kind === 'host') {
+					const tag = scope.module.tagOf.get(entry.id) ?? '*';
+					const path = [...out, n++];
+					const id = rows.length > 0 ? `${entry.id}@${key}` : entry.id;
+					spans.set(id, scope.module.hostSpans.get(entry.id));
+					const resolved = builtAttributes(
+						entry.id,
+						tag,
+						Object.fromEntries(
+							(at.attributes ?? [])
+								.filter((attribute) => comparePaths(attribute.coordinate.path, entry.path) === 0)
+								.map((attribute) => [attribute.name, attribute.value]),
+						),
+						at.slots.flatMap((slot) =>
+							slot.kind === 'attribute' && comparePaths(slot.coordinate.path, entry.path) === 0
+								? [slot.name]
+								: [],
+						),
+						scope,
+						rows,
+						key,
+					);
+					const element: DrawingElement = {
+						id: entry.id,
+						tag,
+						path,
+						attributes: resolved.attributes,
+						bound: resolved.bound,
+					};
+					const own = element.bound.includes('class')
+						? null
+						: (element.attributes.class ?? '')
+								.split(/\s+/)
+								.filter(
+									(token) =>
+										token !== '' &&
+										token !== scope.module.graph.markup.scopeClasses?.[at.componentName],
+								);
+					if (own === null || own.length > 0)
+						classedShapes.push({ element: tag, classes: own, ...(spans.get(id) ? { span: spans.get(id)! } : {}) });
+					const use = resolved.refused ? null : tag === 'use' ? useOf(element, scope) : { element };
+					if (use?.perRow && perRow)
+						refuseAs(
+							'svg',
+							'a second <use> in this <svg> whose `href` follows its @for row; one per <svg> picks its symbol per row',
+							spans.get(id) ?? svgSpan,
+						);
+					else if (use?.perRow) perRow = { ...use.perRow, at: drawn.length };
+					else if (use) drawn.push({ ...use.element, id });
+					if (use?.sprite) sprites.set(id, use.sprite.map((other) => ({ ...other, id })));
+					for (const event of scope.module.eventsByHost.get(entry.id) ?? []) {
+						if (scope.module === rootModule) loweredEvents.add(event.id);
+						refuseAs(
+							'svg',
+							`the ${event.eventName} handler on <${tag}> inside an <svg>: its shapes are drawn, not views`,
+							event.handlerSpan,
+						);
+					}
+					walk(at, entry.path, path, 0, scope, rows, key);
+					continue;
+				}
+				const slot = entry.slot;
+				if (slot.kind === 'repeat') {
+					const repeat = scope.module.repeatsById.get(slot.repeatId);
+					const rowChunk = scope.module.chunks.get(slot.rowTemplateId);
+					if (!repeat?.collectionExpression || !rowChunk) {
+						refuseAs('svg', 'an @for inside an <svg> over something the build cannot read', svgSpan);
+						continue;
+					}
+					const list = attempt(() =>
+						renderValue(
+							repeat.collectionExpression,
+							() => listScript(scope.module, repeat.rowHostNodeId),
+							'the @for list',
+							scope,
+						),
+					);
+					const value = !list.failed && list.value ? withRows(list.value, rows) : undefined;
+					if (!value || variesWhileRunning(value)) {
+						list.rollBack();
+						follows('an @for');
+						continue;
+					}
+					const built = builtValue(value, `${scope.prefix}${slot.repeatId}#${key}`);
+					if (built === 'pending') {
+						refuseAs('svg', `an @for inside an <svg> ${PENDING_HREF}`, svgSpan);
+						continue;
+					}
+					list.rollBack();
+					if ('error' in built || !Array.isArray(built.value)) {
+						refuseAs('svg', `the list of an @for inside an <svg> could not be computed when the app was built${'error' in built ? `: ${built.error}` : ''}`, svgSpan);
+						continue;
+					}
+					const listId = `${scope.prefix}${slot.repeatId}#${key}`;
+					const inRow: Scope = { ...scope, items: new Map([...scope.items, [repeat.itemName, listId]]) };
+					built.value.forEach((item: unknown, index: number) => {
+						n = walk(rowChunk, [], out, n, inRow, [...rows, { list: listId, value: item }], `${key}.${index}`);
+					});
+					if (built.value.length === 0 && slot.emptyTemplateId) {
+						const empty = scope.module.chunks.get(slot.emptyTemplateId);
+						if (empty) n = walk(empty, [], out, n, scope, rows, key);
+					} else if (slot.emptyTemplateId) {
+						const empty = scope.module.chunks.get(slot.emptyTemplateId);
+						if (empty) skip(empty);
+					}
+					if (built.value.length === 0) skip(rowChunk);
+					continue;
+				}
+				if (slot.kind === 'branch') {
+					const site = scope.module.branchSites.get(slot.branchSiteId);
+					const arms = slot.armTemplateIds;
+					const plain = site?.kind === 'if' && site.armIndexSource === undefined;
+					const tests = plain ? [site.testExpression] : site?.armTestExpressions;
+					let chosen: number | null = null;
+					let refused = !tests;
+					for (const [index, test] of (tests ?? []).entries()) {
+						if (test === null) {
+							chosen = index;
+							break;
+						}
+						const lowered = attempt(() => testOf(test, 'the @if test', scope));
+						const value = !lowered.failed && lowered.value ? withRows(lowered.value, rows) : undefined;
+						lowered.rollBack();
+						const folded = value && !variesWhileRunning(value) ? foldConstant(value, () => undefined, true) : undefined;
+						if (!folded) {
+							refused = true;
+							break;
+						}
+						if (folded.value) {
+							chosen = index;
+							break;
+						}
+					}
+					if (refused) {
+						follows('an @if');
+						continue;
+					}
+					if (chosen === null && plain && arms.length > 1) chosen = 1;
+					arms.forEach((armId, index) => {
+						const arm = scope.module.chunks.get(armId);
+						if (!arm) return;
+						if (index === chosen) n = walk(arm, [], out, n, scope, rows, key);
+						else skip(arm);
+					});
+					continue;
+				}
+				refuseAs(
+					'svg',
+					`${slot.kind === 'text' ? 'a value' : slot.kind === 'child-component' ? 'a component' : slot.kind === 'async' ? 'an @try' : `a ${slot.kind}`} inside an <svg>, which is drawn once when the app is built`,
+					svgSpan,
+				);
+			}
+			return n;
+		};
+		walk(chunk, svgPath, [], 0, scope, [], '');
+		return { drawn, texts, sprites, spans, perRow };
+	};
 	const lowerChunk = (
 		chunk: SemanticMarkupChunk,
 		baseParent: string | null,
@@ -5142,50 +5442,30 @@ export function createNativeViewPayload(
 				let drawings: Record<string, NativeDrawing> | undefined;
 				if (element === 'svg') {
 					consumed.push(item.path);
-					const inside = items.filter((other) => isPrefix(item.path, other.path));
-					const relative = (path: ReadonlyArray<number>) => path.slice(item.path.length);
-					const drawn: DrawingElement[] = [];
-					const usedSprites = new Map<string, ReadonlyArray<DrawingElement>>();
-					let perRow: (NonNullable<NonNullable<ReturnType<typeof useOf>>['perRow']> & { readonly at: number }) | undefined;
-					const texts: { path: ReadonlyArray<number>; text: string }[] = [];
-					for (const other of inside) {
-						if (other.kind === 'host') {
-							const tag = scope.module.tagOf.get(other.id) ?? '*';
-							const element: DrawingElement = {
-								id: other.id,
-								tag,
-								path: relative(other.path),
-								attributes: attributesAt(other.path),
-								bound: boundAt(other.path),
-							};
-							const use = tag === 'use' ? useOf(element, scope) : { element };
-							if (use?.perRow && perRow)
-								refuseAs(
-									'svg',
-									'a second <use> in this <svg> whose `href` follows its @for row; one per <svg> picks its symbol per row',
-									scope.module.hostSpans.get(other.id) ?? span,
-								);
-							else if (use?.perRow) perRow = { ...use.perRow, at: drawn.length };
-							else if (use) drawn.push(use.element);
-							if (use?.sprite) usedSprites.set(other.id, use.sprite);
-							for (const event of scope.module.eventsByHost.get(other.id) ?? []) {
-								if (scope.module === rootModule) loweredEvents.add(event.id);
-								refuseAs(
-									'svg',
-									`the ${event.eventName} handler on <${tag}> inside an <svg>: its shapes are drawn, not views`,
-									event.handlerSpan,
-								);
-							}
-						} else if (other.kind === 'part' && 'text' in other.part)
-							texts.push({ path: relative(other.path), text: other.part.text });
-						else
-							refuseAs(
-								'svg',
-								`${other.kind === 'part' ? 'a value' : other.kind === 'child' ? 'a component' : `an @${other.kind === 'repeat' ? 'for' : other.kind === 'boundary' ? 'try' : 'if'}`} inside an <svg>, which is drawn once when the app is built`,
-								span,
-							);
+					const content = svgContent(chunk, item.path, scope, span);
+					const { drawn, texts, perRow } = content;
+					const usedSprites = content.sprites;
+					const own = builtAttributes(
+						item.id,
+						'svg',
+						{},
+						bindings.flatMap((binding) =>
+							'attribute' in binding && DRAWN_SVG_ATTRIBUTES.has(binding.attribute)
+								? [binding.attribute]
+								: [],
+						),
+						scope,
+						[],
+						'',
+					);
+					const drawnAttributes = { ...attributes, ...own.attributes };
+					for (const name of Object.keys(own.attributes)) {
+						const at = bindings.findIndex(
+							(binding) => 'attribute' in binding && binding.attribute === name,
+						);
+						if (at >= 0) bindings.splice(at, 1);
 					}
-					const result = compileDrawing(attributes, drawn, texts, item.id, usedSprites);
+					const result = compileDrawing(drawnAttributes, drawn, texts, item.id, usedSprites);
 					const refusals = new Map(
 						result.refusals.map((refusal) => [`${refusal.element} ${refusal.message}`, refusal]),
 					);
@@ -5193,7 +5473,7 @@ export function createNativeViewPayload(
 						const choices: Record<string, NativeDrawing> = {};
 						for (const choice of perRow.choices) {
 							const compiled = compileDrawing(
-								attributes,
+								drawnAttributes,
 								drawn.toSpliced(perRow.at, 0, choice.element),
 								texts,
 								item.id,
@@ -5212,7 +5492,7 @@ export function createNativeViewPayload(
 						refuseAs(
 							'svg',
 							refusal.message,
-							scope.module.hostSpans.get(refusal.element) ?? span,
+							content.spans.get(refusal.element) ?? scope.module.hostSpans.get(refusal.element) ?? span,
 						);
 					drawing = result.drawing;
 					if (result.title !== undefined && !('aria-label' in attributes))

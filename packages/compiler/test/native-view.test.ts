@@ -3055,6 +3055,114 @@ export function Marks() @{
 		]);
 	});
 
+	const drawingsOf = (payload: NonNullable<Awaited<ReturnType<typeof nativeView>>['payload']>) =>
+		payload.nodes.flatMap((node) => (node.kind === 'element' && node.drawing ? [node.drawing] : []));
+
+	it('draws an @for of shapes over a fixed list, its rows in order, with attributes from each item', async () => {
+		const { payload, diagnostics } = await nativeView(`const DOTS = [
+	{ x: 2, color: '#e63946' },
+	{ x: 6, color: '#2a9d8f' },
+];
+export function Dots() @{
+	<svg viewBox="0 0 10 10">
+		<rect width="1" height="1" />
+		@for (const dot of DOTS; key dot.x) {
+			<circle cx={dot.x} cy="5" r="1" fill={dot.color} />
+		}
+		<rect x="9" width="1" height="1" />
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const [drawing] = drawingsOf(payload!);
+		expect(drawing!.shapes.map((shape) => [shape.path.slice(0, 3), shape.fill])).toEqual([
+			[[0, 0, 0], { r: 0, g: 0, b: 0, alpha: 255 }],
+			[[0, 3, 5], { r: 230, g: 57, b: 70, alpha: 255 }],
+			[[0, 7, 5], { r: 42, g: 157, b: 143, alpha: 255 }],
+			[[0, 9, 0], { r: 0, g: 0, b: 0, alpha: 255 }],
+		]);
+	});
+
+	it('unrolls nested @for and @if/@else on build-time data, per call site, with <use> of ids it draws', async () => {
+		const { payload, diagnostics } = await nativeView(`const ART = {
+	small: { size: 10, layers: [{ name: 1, kind: 'mark', id: 'a', d: 'M0 0h4' }, { name: 2, kind: 'copies', uses: ['a'] }] },
+	big: {
+		size: 20,
+		layers: [
+			{ name: 1, kind: 'mark', id: 'p', d: 'M0 0v4' },
+			{ name: 2, kind: 'mark', d: 'M1 1h1' },
+			{ name: 3, kind: 'copies', uses: ['p', 'p2'] },
+			{ name: 4, kind: 'mark', id: 'p2', d: 'M2 2h2' },
+		],
+	},
+};
+function Art({ which }: { readonly which: 'small' | 'big' }) @{
+	const drawing = which === 'big' ? ART.big : ART.small;
+	<svg viewBox={'0 0 ' + drawing.size + ' ' + drawing.size}>
+		@for (const layer of drawing.layers; key layer.name) {
+			@if (layer.kind === 'copies') {
+				<g transform="translate(5 0)">
+					@for (const ref of layer.uses!; key ref) {
+						<use href={'#' + ref} />
+					}
+				</g>
+			} @else {
+				<path id={layer.id} d={layer.d} stroke="red" fill="none" />
+			}
+		}
+	</svg>
+}
+export function Page() @{
+	<main>
+		<Art which="small" />
+		<Art which="big" />
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const [small, big] = drawingsOf(payload!);
+		expect(small!.viewBox).toEqual([0, 0, 10, 10]);
+		expect(small!.shapes.map((shape) => [shape.path, shape.transform ?? null])).toEqual([
+			[[0, 0, 0, 1, 4, 0], null],
+			[[0, 0, 0, 1, 4, 0], [1, 0, 0, 1, 5, 0]],
+		]);
+		expect(big!.viewBox).toEqual([0, 0, 20, 20]);
+		expect(big!.shapes.map((shape) => [shape.path.slice(0, 3), shape.transform?.[4] ?? 0])).toEqual([
+			[[0, 0, 0], 0],
+			[[0, 1, 1], 0],
+			[[0, 0, 0], 5],
+			[[0, 2, 2], 5],
+			[[0, 2, 2], 0],
+		]);
+	});
+
+	it('refuses an @for or @if inside an <svg> that follows state, by name', async () => {
+		const text = `import { state } from '@markless/core';
+export function Live() @{
+	let dots = state([{ x: 1 }]);
+	let on = state(true);
+	<main>
+		<svg viewBox="0 0 10 10">
+			@for (const dot of dots; key dot.x) {
+				<circle cx={dot.x} cy="5" r="1" />
+			}
+		</svg>
+		<svg viewBox="0 0 10 10">
+			@if (on) {
+				<rect width="1" height="1" />
+			}
+		</svg>
+		<button onClick={() => (on = !on)}>Flip</button>
+	</main>
+}`;
+		const { payload, diagnostics } = await nativeView(text);
+		expect(payload).toBeNull();
+		expect(
+			diagnostics.map((d) => [d.message, text.slice(0, d.primarySpan!.start).split('\n').length]),
+		).toEqual([
+			['an @for inside an <svg> whose list follows state; a native drawing is compiled when the app is built', 6],
+			['an @if inside an <svg> whose test follows state; a native drawing is compiled when the app is built', 11],
+		]);
+	});
+
 	it('turns arcs and quadratics into cubics that end where the web ends them', async () => {
 		const { payload } = await nativeView(`export function Arc() @{
 	<svg viewBox="0 0 20 20"><path d="M0 10A10 10 0 0 1 20 10Q20 20 10 20" /></svg>

@@ -164,3 +164,29 @@ export default function App() @{
 		]);
 	});
 });
+
+describe('a shape drawn inside an <svg> on a styled page', () => {
+	it('is refused when it carries a class, which a native drawing cannot read CSS for', async () => {
+		const source = `const LOGO = { tone: 'M0 0h4v4z', ink: 'M1 1h2' };
+export default function App() @{
+	<svg viewBox="0 0 4 4">
+		<path class="tone" d={LOGO.tone} />
+		<path d={LOGO.ink} stroke="currentColor" />
+		<style>
+			.tone { fill: currentColor; opacity: 0.25; }
+		</style>
+	</svg>
+}`;
+		const styled = await compileNativeComponent({ filename: 'site/Logo.tsrx', source });
+		expect(styled.payload).toBeNull();
+		expect(styled.diagnostics.map((d) => d.message)).toEqual([
+			'the `class` of a <path> drawn inside an <svg> on a styled page: a native drawing reads no CSS, so the page\'s styles cannot paint it; write its paint as attributes (fill, stroke, opacity)',
+		]);
+		const plain = await compileNativeComponent({
+			filename: 'site/Logo.tsrx',
+			source: source.replace(/\s*<style>[\s\S]*<\/style>/, ''),
+		});
+		expect(plain.diagnostics).toEqual([]);
+		expect(plain.payload!.nodes[0]).toMatchObject({ drawing: { shapes: [{ path: [0, 0, 0, 1, 4, 0, 1, 4, 4, 4] }, {}] } });
+	});
+});

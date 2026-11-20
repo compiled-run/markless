@@ -1,0 +1,14 @@
+{
+	"rung": "R119",
+	"name": "An svg drawn from a constant list of layers, an @if per layer and a nested @for, per call site",
+	"steps": [
+		{
+			"visible": [
+				"Layers",
+				"Hill at noon",
+				"Hill at dusk",
+				"Two scenes drawn from one list of layers"
+			]
+		}
+	]
+}

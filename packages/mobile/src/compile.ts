@@ -42,6 +42,8 @@ export type NativeBuild = {
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 	/** Each payload element's tag and where it is written, by node id, for build errors that name an element. */
 	readonly elementSources: NativeViewArtifact['elementSources'];
+	/** Shapes drawn inside an <svg> that carry a `class`, which a styled page refuses. */
+	readonly classedShapes: NonNullable<NativeViewArtifact['classedShapes']>;
 };
 
 /** A stylesheet's text as the web build ships it, unscoped: its rules reach every page that imports it. */
@@ -279,9 +281,12 @@ export async function compileNativeComponent(input: {
 	const sheets = stylesheets.filter(
 		(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 	);
-	const unstyled = native.payload
-		? unstyledOnly(native.payload, native.elementSources, sheets.length > 0 || styles.some((style) => style.cssText.length > 0))
-		: [];
+	const classedShapes = native.classedShapes ?? [];
+	const styled = sheets.length > 0 || styles.some((style) => style.cssText.length > 0);
+	const unstyled = [
+		...classedOnly(classedShapes, styled),
+		...(native.payload ? unstyledOnly(native.payload, native.elementSources, styled) : []),
+	];
 	return {
 		payload: errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,
 		styles,
@@ -289,6 +294,7 @@ export async function compileNativeComponent(input: {
 		features: native.features,
 		manifest: deviceEntries,
 		elementSources: native.elementSources,
+		classedShapes,
 		diagnostics: [...errors, ...native.diagnostics, ...usage, ...unstyled],
 	};
 }
@@ -334,6 +340,17 @@ function unstyledOnly(
 				: [],
 		);
 	});
+}
+
+/** Shapes drawn inside an <svg> with a class of their own on a styled page: a native drawing reads no CSS to paint them. */
+function classedOnly(classedShapes: NativeBuild['classedShapes'], styled: boolean): CompilerDiagnostic[] {
+	if (!styled) return [];
+	return classedShapes.map((shape) =>
+			nativeUnsupported(
+				`the \`class\` of a <${shape.element}> drawn inside an <svg> on a styled page: a native drawing reads no CSS, so the page's styles cannot paint it; write its paint as attributes (fill, stroke, opacity)`,
+				shape.span,
+			),
+		);
 }
 
 export type NativeAppBuild = {
@@ -409,11 +426,14 @@ export async function compileNativeApp(input: {
 		diagnostics.push(
 			...build.diagnostics.map((diagnostic) => ({ ...diagnostic, page: page.page })),
 		);
-		if (!build.payload) continue;
 		const sheets = [...documentSheets, ...build.stylesheets].filter(
 			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 		);
 		const styled = sheets.length > 0 || build.styles.some((style) => style.cssText.length > 0);
+		const ownStyled = build.stylesheets.length > 0 || build.styles.some((style) => style.cssText.length > 0);
+		const classed = classedOnly(build.classedShapes, styled && !ownStyled);
+		diagnostics.push(...classed.map((diagnostic) => ({ ...diagnostic, page: page.page })));
+		if (!build.payload || classed.length > 0) continue;
 		const unstyled = unstyledOnly(build.payload, build.elementSources, styled);
 		if (unstyled.length > 0) {
 			diagnostics.push(...unstyled.map((diagnostic) => ({ ...diagnostic, page: page.page })));

@@ -194,10 +194,12 @@ export function collectSemanticMarkup(input: {
 		});
 	}
 
+	const scopeClasses: Record<string, string> = {};
 	for (const component of components) {
 		context.styleScopeClass =
 			collectStyleScopes(component.root, input.filename, input.moduleId).styleScopes[0]
 				?.scopeId ?? null;
+		if (context.styleScopeClass) scopeClasses[component.name] = context.styleScopeClass;
 		const restSignature = propsRestSignature(component.node);
 		context.destructuredNames = [...(restSignature?.destructuredNames ?? [])];
 		context.restName = restSignature?.restName ?? null;
@@ -221,6 +223,7 @@ export function collectSemanticMarkup(input: {
 			? { componentName: selected.name, templateId: `template:${selected.name}` }
 			: null,
 		chunks,
+		...(NATIVE_FACTS && Object.keys(scopeClasses).length > 0 ? { scopeClasses } : {}),
 	};
 }
 
