@@ -79,6 +79,64 @@
 			"delta": 8,
 			"reason": "an array element handle bound in keyed rows that share their parent with other elements holds the rows only, not the siblings",
 			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-locators"
+			],
+			"delta": 460,
+			"reason": "an array element handle bound in keyed rows beside other elements holds only the rows; resume-locators reads the rows' span",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 110,
+			"reason": "an array element handle bound in keyed rows beside other elements holds only the rows; resume-locators reads the rows' span",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 110,
+			"reason": "an array element handle bound in keyed rows beside other elements holds only the rows; resume-locators reads the rows' span",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 110,
+			"reason": "an array element handle bound in keyed rows beside other elements holds only the rows; resume-locators reads the rows' span",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 104,
+			"reason": "an array element handle bound in keyed rows beside other elements holds only the rows; resume-locators reads the rows' span",
+			"date": "2026-11-20"
 		}
 	]
 }
