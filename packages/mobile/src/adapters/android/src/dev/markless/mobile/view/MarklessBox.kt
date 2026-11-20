@@ -62,6 +62,13 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 	/** A list's markers (`•`, `1.`), drawn in its start padding beside each item's first line; not text a reader reaches. */
 	internal var markers: Map<View, String> = emptyMap()
 		set(value) { field = value; invalidate() }
+	/** A summary's triangle, ▸ collapsed or ▾ expanded, drawn in a start inset beside its first line; null on any other box. */
+	internal var disclosure: Boolean? = null
+		set(value) {
+			if (field == null && value != null) setPadding(disclosureInset(), paddingTop, paddingRight, paddingBottom)
+			field = value
+			invalidate()
+		}
 	private val markerPaint = TextView(context).let { t -> Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = t.textSize; color = t.currentTextColor } }
 
 	init {
@@ -166,6 +173,9 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 			field = value
 		}
 
+	private fun disclosureInset(): Int =
+		kotlin.math.ceil(maxOf(markerPaint.measureText(DISCLOSURE_CLOSED), markerPaint.measureText(DISCLOSURE_OPEN)) + gap).toInt()
+
 	override fun dispatchDraw(canvas: Canvas) {
 		val radii = childClipRadii
 		if (radii == null) super.dispatchDraw(canvas)
@@ -174,6 +184,11 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 			canvas.clipPath(Path().apply { addRoundRect(RectF(0f, 0f, width.toFloat(), height.toFloat()), radii, Path.Direction.CW) })
 			super.dispatchDraw(canvas)
 			canvas.restoreToCount(saved)
+		}
+		disclosure?.let { open ->
+			val first = (0 until childCount).map(::getChildAt).firstOrNull { it.visibility != View.GONE }
+			val baseline = first?.let { (it.top + (baselineIn(it) ?: markerPaint.textSize.toInt())).toFloat() } ?: markerPaint.textSize
+			canvas.drawText(if (open) DISCLOSURE_OPEN else DISCLOSURE_CLOSED, 0f, baseline, markerPaint)
 		}
 		for ((child, marker) in markers) {
 			if (child.parent !== this || child.visibility == View.GONE) continue
@@ -190,3 +205,6 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		else -> null
 	}
 }
+
+private const val DISCLOSURE_CLOSED = "\u25B8"
+private const val DISCLOSURE_OPEN = "\u25BE"

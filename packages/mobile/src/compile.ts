@@ -440,7 +440,7 @@ export async function compileNativeComponent(input: {
 	};
 }
 
-/** Elements a native host draws only on a page Dragon does not lay out: Dragon has no box for a pop-up list yet. */
+/** Elements a native host draws only on a page Dragon does not lay out: Dragon has no box for a pop-up list or a summary's triangle yet. */
 function unstyledOnly(
 	payload: NativeViewPayload,
 	sources: NativeViewArtifact['elementSources'],
@@ -455,6 +455,13 @@ function unstyledOnly(
 			return [
 				nativeUnsupported(
 					`the <select> ${node.id} on a styled page, which Dragon does not lay out yet`,
+					span,
+				),
+			];
+		if (node.element === 'summary')
+			return [
+				nativeUnsupported(
+					`the <summary> ${node.id} on a styled page, whose disclosure triangle Dragon does not draw yet`,
 					span,
 				),
 			];
