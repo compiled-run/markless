@@ -173,11 +173,26 @@
 		}
 	},
 	"initial": [
-		["h1:text0", "Words"],
-		["h2:text0", "Sorted: apple, banana, cherry"],
-		["h3:text0", "Longest: banana"],
-		["h4:text0", "Add date"],
-		["h5:text0", "Replace"]
+		[
+			"h1:text0",
+			"Words"
+		],
+		[
+			"h2:text0",
+			"Sorted: apple, banana, cherry"
+		],
+		[
+			"h3:text0",
+			"Longest: banana"
+		],
+		[
+			"h4:text0",
+			"Add date"
+		],
+		[
+			"h5:text0",
+			"Replace"
+		]
 	],
 	"steps": [
 		{

@@ -1,0 +1,380 @@
+{
+ "measured": "2026-11-18",
+ "page": "soft-keyboard-events.html",
+ "runs": [
+  {
+   "name": "ios-safari-taps",
+   "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
+   "steps": [
+    {
+     "step": "tap-press",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 21453
+      },
+      {
+       "el": "b",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 21569
+      },
+      {
+       "el": "b",
+       "type": "click",
+       "detail": 1,
+       "pointerType": "mouse",
+       "t": 21577
+      }
+     ]
+    },
+    {
+     "step": "tap-press-again",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 37088
+      },
+      {
+       "el": "b",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 37205
+      },
+      {
+       "el": "b",
+       "type": "click",
+       "detail": 1,
+       "pointerType": "mouse",
+       "t": 37227
+      }
+     ]
+    },
+    {
+     "step": "double-press",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 52909
+      },
+      {
+       "el": "b",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 53026
+      },
+      {
+       "el": "b",
+       "type": "click",
+       "detail": 1,
+       "pointerType": "mouse",
+       "t": 53043
+      },
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 53241
+      },
+      {
+       "el": "b",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 53358
+      },
+      {
+       "el": "b",
+       "type": "click",
+       "detail": 2,
+       "pointerType": "mouse",
+       "t": 53377
+      },
+      {
+       "el": "b",
+       "type": "dblclick",
+       "detail": 2,
+       "t": 53377
+      }
+     ]
+    },
+    {
+     "step": "tap-manip",
+     "events": [
+      {
+       "el": "t",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 72258
+      },
+      {
+       "el": "t",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 72375
+      },
+      {
+       "el": "t",
+       "type": "click",
+       "detail": 1,
+       "pointerType": "mouse",
+       "t": 72394
+      }
+     ]
+    },
+    {
+     "step": "double-manip",
+     "events": [
+      {
+       "el": "t",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 89876
+      },
+      {
+       "el": "t",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 89993
+      },
+      {
+       "el": "t",
+       "type": "click",
+       "detail": 1,
+       "pointerType": "mouse",
+       "t": 90010
+      },
+      {
+       "el": "t",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 90255
+      },
+      {
+       "el": "t",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 90371
+      },
+      {
+       "el": "t",
+       "type": "click",
+       "detail": 1,
+       "pointerType": "mouse",
+       "t": 90376
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "android-chrome-taps",
+   "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Mobile Safari/537.36",
+   "steps": [
+    {
+     "step": "tap-press",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 11164
+      },
+      {
+       "el": "b",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 11164
+      },
+      {
+       "el": "b",
+       "type": "click",
+       "detail": 1,
+       "pointerType": "touch",
+       "t": 11164
+      }
+     ]
+    },
+    {
+     "step": "tap-press-again",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 13220
+      },
+      {
+       "el": "b",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 13220
+      },
+      {
+       "el": "b",
+       "type": "click",
+       "detail": 1,
+       "pointerType": "touch",
+       "t": 13220
+      }
+     ]
+    },
+    {
+     "step": "double-press",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 15261
+      },
+      {
+       "el": "b",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 15261
+      },
+      {
+       "el": "b",
+       "type": "click",
+       "detail": 1,
+       "pointerType": "touch",
+       "t": 15261
+      },
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 15268
+      },
+      {
+       "el": "b",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 15268
+      },
+      {
+       "el": "b",
+       "type": "click",
+       "detail": 2,
+       "pointerType": "touch",
+       "t": 15268
+      },
+      {
+       "el": "b",
+       "type": "dblclick",
+       "detail": 2,
+       "t": 15273
+      }
+     ]
+    },
+    {
+     "step": "tap-manip",
+     "events": [
+      {
+       "el": "t",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 17304
+      },
+      {
+       "el": "t",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 17304
+      },
+      {
+       "el": "t",
+       "type": "click",
+       "detail": 1,
+       "pointerType": "touch",
+       "t": 17304
+      }
+     ]
+    },
+    {
+     "step": "double-manip",
+     "events": [
+      {
+       "el": "t",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 19347
+      },
+      {
+       "el": "t",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 19347
+      },
+      {
+       "el": "t",
+       "type": "click",
+       "detail": 1,
+       "pointerType": "touch",
+       "t": 19347
+      },
+      {
+       "el": "t",
+       "type": "pointerdown",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 19355
+      },
+      {
+       "el": "t",
+       "type": "pointerup",
+       "detail": 0,
+       "pointerType": "touch",
+       "t": 19355
+      },
+      {
+       "el": "t",
+       "type": "click",
+       "detail": 2,
+       "pointerType": "touch",
+       "t": 19355
+      },
+      {
+       "el": "t",
+       "type": "dblclick",
+       "detail": 2,
+       "t": 19360
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

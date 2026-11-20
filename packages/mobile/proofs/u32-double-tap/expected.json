@@ -1,0 +1,22 @@
+{
+	"rung": 140,
+	"name": "a click handler reads event.detail as the number of presses in a row: 1 for a tap, 2 for a double tap's second press",
+	"steps": [
+		{ "visible": ["Photo", "Not pressed", "Presses 0"] },
+		{
+			"do": { "tap": "Sunset" },
+			"visible": ["Pressed once (1)", "Presses 1"],
+			"absent": ["Not pressed"]
+		},
+		{
+			"do": { "doubleTap": "Sunset" },
+			"visible": ["Liked by a double tap", "Presses 3"],
+			"absent": ["Pressed once (1)"]
+		},
+		{
+			"do": { "tap": "Sunset" },
+			"visible": ["Pressed once (1)", "Presses 4"],
+			"absent": ["Liked by a double tap"]
+		}
+	]
+}

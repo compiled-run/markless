@@ -1,0 +1,372 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Projected",
+		"cells": [
+			{
+				"id": "state:count",
+				"name": "count",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "div",
+				"parent": "h4"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h1",
+				"element": "p",
+				"parent": "component-edge:0/h0"
+			},
+			{
+				"kind": "branch",
+				"id": "component-edge:0/branch-site:0",
+				"parent": "component-edge:0/h1",
+				"test": {
+					"literal": true
+				},
+				"arms": 2
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h1:text0",
+				"parent": "component-edge:0/h1",
+				"parts": [
+					{
+						"text": "Plain words"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h1:text1",
+				"parent": "component-edge:0/h1",
+				"parts": [
+					{
+						"text": "empty"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h2",
+				"element": "p",
+				"parent": "component-edge:0/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h2:text0",
+				"parent": "component-edge:0/h2",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Spoken: ",
+								{
+									"literal": "Plain words"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h3",
+				"element": "section",
+				"parent": "h4"
+			},
+			{
+				"kind": "branch",
+				"id": "component-edge:1/branch-site:1",
+				"parent": "component-edge:1/h3",
+				"test": {
+					"literal": true
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "b",
+				"parent": "component-edge:1/h3",
+				"defaultStyle": {
+					"flow": "inline",
+					"bold": true
+				},
+				"arm": {
+					"branch": "component-edge:1/branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Bold"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:1/branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h3:text0",
+				"parent": "component-edge:1/h3",
+				"parts": [
+					{
+						"text": " words"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:1/branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h3:text1",
+				"parent": "component-edge:1/h3",
+				"parts": [
+					{
+						"text": "no frame"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:1/branch-site:1",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:2/h3",
+				"element": "section",
+				"parent": "h4"
+			},
+			{
+				"kind": "branch",
+				"id": "component-edge:2/branch-site:1",
+				"parent": "component-edge:2/h3",
+				"test": {
+					"literal": null
+				},
+				"arms": 2
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:2/h3:text0",
+				"parent": "component-edge:2/h3",
+				"parts": [
+					{
+						"text": "no frame"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:2/branch-site:1",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/h0",
+				"element": "div",
+				"parent": "h4"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/h1",
+				"element": "p",
+				"parent": "component-edge:3/h0"
+			},
+			{
+				"kind": "branch",
+				"id": "component-edge:3/branch-site:0",
+				"parent": "component-edge:3/h1",
+				"test": {
+					"literal": null
+				},
+				"arms": 2
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:3/h1:text0",
+				"parent": "component-edge:3/h1",
+				"parts": [
+					{
+						"text": "empty"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:3/branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/h2",
+				"element": "p",
+				"parent": "component-edge:3/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:3/h2:text0",
+				"parent": "component-edge:3/h2",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Spoken: ",
+								{
+									"literal": "no text"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "button",
+				"parent": "h4"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Pressed ",
+								{
+									"cell": "state:count"
+								},
+								""
+							]
+						}
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h6",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:count",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:count"
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"component-edge:0/h1:text0",
+			"Plain words"
+		],
+		[
+			"component-edge:0/h2:text0",
+			"Spoken: Plain words"
+		],
+		[
+			"h5:text0",
+			"Bold"
+		],
+		[
+			"component-edge:1/h3:text0",
+			" words"
+		],
+		[
+			"component-edge:2/h3:text0",
+			"no frame"
+		],
+		[
+			"component-edge:3/h1:text0",
+			"empty"
+		],
+		[
+			"component-edge:3/h2:text0",
+			"Spoken: no text"
+		],
+		[
+			"h6:text0",
+			"Pressed 0"
+		]
+	],
+	"initialArms": [
+		[
+			"component-edge:0/branch-site:0",
+			0
+		],
+		[
+			"component-edge:1/branch-site:1",
+			0
+		],
+		[
+			"component-edge:2/branch-site:1",
+			1
+		],
+		[
+			"component-edge:3/branch-site:0",
+			1
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "Pressed 1"
+				}
+			]
+		}
+	]
+}
