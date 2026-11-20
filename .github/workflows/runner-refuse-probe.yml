@@ -1,0 +1,12 @@
+name: Runner refuse probe
+# Throwaway: a pull request that asks for the merge-queue label must be refused by the runner's job-started hook.
+on:
+    pull_request:
+permissions:
+    contents: read
+jobs:
+    probe:
+        runs-on: markless-merge-queue
+        timeout-minutes: 5
+        steps:
+            - run: echo "THIS STEP MUST NEVER RUN on a self-hosted runner"; id; ls -la ~
