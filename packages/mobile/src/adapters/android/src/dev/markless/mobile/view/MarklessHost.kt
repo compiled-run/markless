@@ -819,7 +819,7 @@ class MarklessHost(
 					else -> { apply(runtime.dispatch(inst.id, EventName.Enter)); true }
 				}
 			}
-			// A select's input and change run when a choice lands, from the runtime's choose.
+			// A select's input handler runs when a choice lands, from the runtime's choose.
 			EventName.Input -> if (node.element == "select") Unit else (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}

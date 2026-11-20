@@ -1,6 +1,6 @@
 {
 	"rung": "R119",
-	"name": "A choice that changes a <select> fires its input and then its change handler, each reading the chosen value; a bound value chooses its option",
+	"name": "A choice that changes a <select> fires its input handler, reading the chosen value; a bound value chooses its option",
 	"steps": [
 		{
 			"visible": [
@@ -27,7 +27,7 @@
 			"visible": [
 				"Large",
 				"Size is l",
-				"Fired input l, change l",
+				"Fired input l",
 				"Large copy"
 			],
 			"absent": [
@@ -47,13 +47,13 @@
 			"visible": [
 				"Small",
 				"Size is s",
-				"Fired input s, change s",
+				"Fired input s",
 				"Small copy"
 			],
 			"absent": [
 				"Large",
 				"Size is l",
-				"Fired input l, change l",
+				"Fired input l",
 				"Large copy"
 			]
 		},

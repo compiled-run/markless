@@ -2292,10 +2292,10 @@ ${markup}
 		expect(payload!.forms![0]!.fields).toEqual([{ node: 'h1', kind: 'select' }]);
 	});
 
-	it("runs a select's input then change handler as one run of its choice, each reading the chosen value", async () => {
+	it("runs a select's input handler when a choice changes it, reading the chosen value", async () => {
 		const { payload, diagnostics } = await nativeView(
 			page(`	<main>
-		<select onChange={(event) => (sent = sent + '/' + event.target.value)} onInput={(event) => (sent = event.target.value)}>
+		<select onInput={(event) => (sent = event.target.value)}>
 			<option value="a">A</option>
 			<option value="b">B</option>
 		</select>
@@ -2303,24 +2303,13 @@ ${markup}
 		);
 		expect(diagnostics).toEqual([]);
 		expect(payload!.events).toEqual([{ host: 'h1', event: 'input', handler: expect.any(String) }]);
-		expect(payload!.handlers[0]!.ops).toEqual([
-			{ op: 'assign', cell: 'state:sent', value: { event: 'value' } },
-			{
-				op: 'assign',
-				cell: 'state:sent',
-				value: {
-					binary: '+',
-					left: { binary: '+', left: { cell: 'state:sent' }, right: { literal: '/' } },
-					right: { event: 'value' },
-				},
-			},
-		]);
+		expect(payload!.handlers[0]!.ops).toEqual([{ op: 'assign', cell: 'state:sent', value: { event: 'value' } }]);
 	});
 
 	it('refuses by name what a native select does not draw or run yet', async () => {
 		const { payload, diagnostics } = await nativeView(
 			page(`	<main>
-		<select multiple onClick={() => (sent = 'x')}><option>A</option></select>
+		<select multiple onChange={() => (sent = 'x')}><option>A</option></select>
 		<select value={size}><option selected>B</option><hr /></select>
 		<select><option><b>C</b></option></select>
 		<option>Loose</option>
@@ -2332,7 +2321,7 @@ ${markup}
 		);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
-			'the click handler on the <select> h1, which a native build does not run yet',
+			'the change handler on the <select> h1, which a native build does not run yet',
 			'the <select> h1 has `multiple`, a list box a native build does not draw yet',
 			'the <select> h3 binds `value`; a native build chooses an option through its `selected`',
 			'the <hr> h5 sits inside a <select>, which a native build shows only <option>s of',

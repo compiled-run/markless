@@ -984,8 +984,8 @@ export function nativeUnsupported(message: string, span?: SourceSpan): CompilerD
 const LANGUAGE_GLOBALS = new Set(NATIVE_SCRIPT_LANGUAGE_GLOBALS);
 // A box's checkedness is the host's; a script's event cannot report it back yet.
 const DATA_ONLY_EVENTS = new Set(['change']);
-/** A select's own events: a choice that changes it fires `input`, then `change`, each reading the chosen value. */
-const SELECT_EVENTS: ReadonlySet<string> = new Set(['input', 'change']);
+/** A select's own events: a choice that changes it fires `input`, reading the chosen value. */
+const SELECT_EVENTS: ReadonlySet<string> = new Set(['input']);
 const RENDER_UNSTEADY = new Set(['Date', 'crypto', 'performance']);
 const GLOBAL_OBJECTS = new Set(NATIVE_SCRIPT_GLOBAL_OBJECTS);
 
@@ -2500,10 +2500,6 @@ export function createNativeViewPayload(
 	};
 
 	/** Whether a node is an `<input>` a person ticks: a checkbox or a radio button. */
-	const isSelect = (id: string): boolean => {
-		const node = nodeById().get(id);
-		return node?.kind === 'element' && node.element === 'select';
-	};
 	const isTicked = (id: string): boolean => {
 		const node = nodeById().get(id);
 		return (
@@ -4146,15 +4142,7 @@ export function createNativeViewPayload(
 					...(drawing ? { drawing } : {}),
 					...place,
 				});
-				const hostEvents = scope.module.eventsByHost.get(item.id) ?? [];
-				// A select's input handler runs before its change handler, both in one run, as a choice fires them.
-				const ordered =
-					element === 'select'
-						? [...hostEvents].sort(
-								(a, b) => Number(a.eventName === 'change') - Number(b.eventName === 'change'),
-							)
-						: hostEvents;
-				for (const event of ordered) {
+				for (const event of scope.module.eventsByHost.get(item.id) ?? []) {
 					if (scope.module === rootModule) loweredEvents.add(event.id);
 					if (NOT_ON_PHONES.has(event.eventName)) continue;
 					if (
@@ -4180,15 +4168,6 @@ export function createNativeViewPayload(
 							`a submit handler on <${element}>; a native build runs one only on a <form>`,
 							event.handlerSpan,
 						);
-						continue;
-					}
-					const joined =
-						element === 'select'
-							? events.find((entry) => entry.host === id && entry.event === semantic)
-							: undefined;
-					if (joined) {
-						const handler = handlers.find((entry) => entry.id === joined.handler)!;
-						pendingHandlers.push({ handler, event, scope, host: id, after: true });
 						continue;
 					}
 					const handler = {
@@ -4990,8 +4969,7 @@ export function createNativeViewPayload(
 		if (
 			scriptMode === 'never' ||
 			!event.handlerSpan ||
-			(DATA_ONLY_EVENTS.has(event.eventName) &&
-				!(pressed !== undefined && isSelect(pressed.currentTarget))) ||
+			DATA_ONLY_EVENTS.has(event.eventName) ||
 			(submitting && form === undefined) ||
 			!scriptFacts(scope.module)
 		) {
@@ -5191,9 +5169,7 @@ export function createNativeViewPayload(
 								kind: semantic === 'dismiss' ? 'dismiss' : 'pointer',
 							},
 						}
-					: (event.eventName === 'input' ||
-								(event.eventName === 'change' && pressed !== undefined && isSelect(pressed.currentTarget))) &&
-						  !(pressed && isTicked(pressed.currentTarget))
+					: event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))
 						? { ...running, event: parameter }
 						: {
 								...running,

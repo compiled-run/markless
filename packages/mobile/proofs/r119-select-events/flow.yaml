@@ -23,7 +23,7 @@ name: r119-select-events
 - assertNotVisible: Medium copy
 - assertVisible: Large
 - assertVisible: Size is l
-- assertVisible: Fired input l, change l
+- assertVisible: Fired input l
 - assertVisible: Large copy
 - assertNotVisible: Medium
 - assertNotVisible: Size is m
@@ -34,15 +34,15 @@ name: r119-select-events
     text: Small
 - assertNotVisible: Large
 - assertNotVisible: Size is l
-- assertNotVisible: Fired input l, change l
+- assertNotVisible: Fired input l
 - assertNotVisible: Large copy
 - assertVisible: Small
 - assertVisible: Size is s
-- assertVisible: Fired input s, change s
+- assertVisible: Fired input s
 - assertVisible: Small copy
 - assertNotVisible: Large
 - assertNotVisible: Size is l
-- assertNotVisible: Fired input l, change l
+- assertNotVisible: Fired input l
 - assertNotVisible: Large copy
 - tapOn: Reset
 - assertNotVisible: Small copy

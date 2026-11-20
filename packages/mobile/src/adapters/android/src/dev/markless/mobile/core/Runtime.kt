@@ -856,7 +856,7 @@ class Runtime(
 			return change(null, null) {
 				if (attributeNow(select, "disabled") != null || attributeIn(option, "disabled", instance.scope) != null) return@change emptyList()
 				chosenNow = host
-				// A choice that changes the select fires its input and change handlers, as the web does, with the option's value.
+				// A choice that changes the select fires its input handler, as the web does, with the option's value.
 				val was = optionsOf(select).firstOrNull { selectedness[it.id] == true }?.id
 				val handler = handlerFor(select, EventName.Input)?.let { handlers[it] }
 				if (was == host || handler == null) emptyList()

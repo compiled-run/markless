@@ -1268,7 +1268,7 @@ export function createNativeRuntime(
 					)
 						return [];
 					chosenNow = action.host;
-					// A choice that changes the select fires its input and change handlers, as the web does, with the option's value.
+					// A choice that changes the select fires its input handler, as the web does, with the option's value.
 					const was = optionsOf(select.id).find((one) => selectedness.get(one.id))?.id;
 					const handler = payload.events.find(
 						(candidate) => candidate.host === select.id && candidate.event === 'input',

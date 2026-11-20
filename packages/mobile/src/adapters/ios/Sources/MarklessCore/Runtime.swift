@@ -1016,7 +1016,7 @@ public final class NativeRuntime {
 				guard try self.attributeNow(select, "disabled") == nil, try self.attribute(of: option, "disabled", in: instance.scope) == nil
 				else { return [] }
 				self.chosenNow = action.host
-				// A choice that changes the select fires its input and change handlers, as the web does, with the option's value.
+				// A choice that changes the select fires its input handler, as the web does, with the option's value.
 				let was = try self.options(of: select).first(where: { self.selectedness[$0.id] == true })?.id
 				guard was != action.host, let bound = self.payload.events.first(where: { $0.host == select && $0.event == .input }) else { return [] }
 				self.eventValue = try self.value(of: instance)

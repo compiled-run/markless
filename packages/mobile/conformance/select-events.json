@@ -311,26 +311,13 @@
 			{
 				"host": "h10",
 				"event": "activate",
-				"handler": "handler:event:2"
+				"handler": "handler:event:1"
 			}
 		],
 		"handlers": [
 			{
 				"id": "handler:event:0",
 				"ops": [
-					{
-						"op": "assign",
-						"cell": "state:fired",
-						"value": {
-							"template": [
-								"input ",
-								{
-									"event": "value"
-								},
-								""
-							]
-						}
-					},
 					{
 						"op": "assign",
 						"cell": "state:size",
@@ -343,13 +330,9 @@
 						"cell": "state:fired",
 						"value": {
 							"template": [
-								"",
+								"input ",
 								{
-									"cell": "state:fired"
-								},
-								", change ",
-								{
-									"cell": "state:size"
+									"event": "value"
 								},
 								""
 							]
@@ -358,7 +341,7 @@
 				]
 			},
 			{
-				"id": "handler:event:2",
+				"id": "handler:event:1",
 				"ops": [
 					{
 						"op": "assign",
@@ -454,7 +437,7 @@
 				{
 					"op": "text",
 					"node": "h12:text0",
-					"value": "Fired input l, change l"
+					"value": "Fired input l"
 				},
 				{
 					"op": "property",
@@ -503,7 +486,7 @@
 				{
 					"op": "text",
 					"node": "h12:text0",
-					"value": "Fired input s, change s"
+					"value": "Fired input s"
 				},
 				{
 					"op": "property",

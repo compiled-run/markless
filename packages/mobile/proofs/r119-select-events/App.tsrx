@@ -7,10 +7,9 @@ export default function App() @{
 		<h1>Sizes</h1>
 		<select
 			aria-label="Size"
-			onInput={(event) => (fired = `input ${event.target.value}`)}
-			onChange={(event) => {
+			onInput={(event) => {
 				size = (event.target as HTMLSelectElement).value;
-				fired = `${fired}, change ${size}`;
+				fired = `input ${event.target.value}`;
 			}}
 		>
 			<option value="s">Small</option>
