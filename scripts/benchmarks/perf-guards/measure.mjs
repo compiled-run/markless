@@ -43,6 +43,7 @@ import {
 	BENCH_ROUTE_SOURCES,
 	EXECUTION_ACTIONS,
 	LOAD_WEIGHT_CPU_SLOWDOWN,
+	LOAD_WEIGHT_PRELOAD_RACE_RERUNS,
 	LOAD_WEIGHT_RUNS,
 	NAVIGATIONS,
 	PORTS,
@@ -387,7 +388,8 @@ export function splitLoadFiles(loaded, { playground, preloaded }) {
 
 // What a reader's browser downloads and runs from load until the page goes idle, before any input: JS downloaded
 // (gzip bytes of the files fetched, read from the build) and JS executed (V8 coverage), each the lowest of `loads` runs.
-// The window ends where G2's first input starts, at the first idle period that starts no request. `executedRuns` keeps each run's count.
+// The window ends where G2's first input starts, at the first idle period that starts no request. `executedRuns` keeps each counted
+// load's count; `preloadRaceLost` counts the loads discarded because a head modulepreload arrived after the load event.
 // A site with a <Code> playground reports its prefetch apart, as `playground`.
 async function loadWeight(browser, origin, route, read, split, loads = LOAD_WEIGHT_RUNS) {
 	const executedRuns = [];
@@ -395,7 +397,8 @@ async function loadWeight(browser, origin, route, read, split, loads = LOAD_WEIG
 	let files = [];
 	let playground = split.playground && { jsGzipBytes: Infinity, files: [] };
 	const bytesOf = (paths) => paths.reduce((total, path) => total + (read(path)?.gzipBytes ?? 0), 0);
-	for (let run = 0; run < loads; run++) {
+	let preloadRaceLost = 0;
+	while (executedRuns.length < loads) {
 		const visit = await openPage(browser, {
 			coverage: true,
 			untouched: true,
@@ -405,7 +408,16 @@ async function loadWeight(browser, origin, route, read, split, loads = LOAD_WEIG
 			await visit.goto(new URL(route, origin).href);
 			// The page as G2's first input finds it: idle, with what idle-time work fetches already fetched.
 			await visit.idle();
-			executedRuns.push(windowExecution(await visit.coverage.take()).executedChars);
+			const executed = windowExecution(await visit.coverage.take()).executedChars;
+			// Preload race lost, not a regression: a load counts only if every head modulepreload arrived before its load event.
+			if ((await visit.latePreloads()) !== 0) {
+				if (++preloadRaceLost > LOAD_WEIGHT_PRELOAD_RACE_RERUNS)
+					throw new Error(
+						`G16 ${route}: ${preloadRaceLost} loads fired the load event before every head modulepreload arrived, so none of them measures the page G16 defines; the page or the runner changed, not a flake to rerun`,
+					);
+				continue;
+			}
+			executedRuns.push(executed);
 			const loaded = [
 				...new Set(
 					visit.state.fetched.load
@@ -429,6 +441,7 @@ async function loadWeight(browser, origin, route, read, split, loads = LOAD_WEIG
 	return {
 		executedChars: Math.min(...executedRuns),
 		executedRuns,
+		preloadRaceLost,
 		jsGzipBytes,
 		files,
 		...(playground ? { playground } : {}),

@@ -26,11 +26,14 @@ export const COST_MODEL = {
 // minification, independent of what shares its chunk) and per compiled construct.
 // Loads per route for G16; the lowest of them is the page's weight.
 export const LOAD_WEIGHT_RUNS = 3;
-// Unthrottled, Linux CI's load event beat the bench pages' last modulepreload in 22 of 24 loads of / and /settings, and a 107-char branch of the link bridge ran or not; at 4x it came after it in all 36.
+// Unthrottled, Linux CI's load event beat the bench pages' last modulepreload in 22 of 24 loads of / and /settings, so a 107-char
+// branch of the link bridge ran or not; at 4x it came after it in 36 of 36. Rarer, not gone: a slow network or disk still loses it.
 export const LOAD_WEIGHT_CPU_SLOWDOWN = 4;
+// A load whose load event fired before every head modulepreload arrived is discarded; past this many per page G16 fails.
+export const LOAD_WEIGHT_PRELOAD_RACE_RERUNS = 6;
 
 export const BUDGETS = {
-	// The lowest of three loads moved by at most 107 chars across three measurements of one build (bench /settings); 2.4x that.
+	// One build's lowest of three loads: bench pages 0 chars apart over 11 CI runs, docs pages 33 (2026-11-20); kept at 256 for now, tightening is a follow-up.
 	loadExecutionSwingChars: 256,
 	// Gzip is not additive: a PR's download growth measured up to 48 B more in the merge queue than on its own run (42 queue runs, 2026-10-30 to 11-11).
 	loadDownloadCompositionBytes: 48,

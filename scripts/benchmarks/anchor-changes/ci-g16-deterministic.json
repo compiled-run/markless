@@ -41,6 +41,18 @@
 			"path": [
 				"loadWeight",
 				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -215,
+			"reason": "G16 now measures docs / at 25710 chars as the lowest of three loads in all ten proof jobs and the PR run; accept drops moves under 256 as noise, so this entry sets the anchor to that measured value by hand rather than leave 215 chars of room",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
 				"docs /concepts/state",
 				"executedChars"
 			],
