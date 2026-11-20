@@ -700,6 +700,8 @@ export type NativeViewPayload = {
 	readonly tooLong?: Readonly<Record<string, NativeTooLong>>;
 	/** What the web says when an email field's value is not an email address, by language; present when a form has an email field. */
 	readonly emailMismatch?: Readonly<Record<string, NativeEmailMismatch>>;
+	/** The label the web draws on an `<input type="submit">` with no `value`, by language; present when a form has one. */
+	readonly submitLabel?: Readonly<Record<string, string>>;
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	readonly script?: NativeScript;
 };
@@ -821,6 +823,7 @@ export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden' | 'select
 
 export {
 	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
+	NATIVE_SUBMIT_LABEL_BY_LOCALE,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 } from './native-validation-messages.ts';

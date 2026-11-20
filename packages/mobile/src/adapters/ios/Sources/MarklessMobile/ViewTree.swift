@@ -89,6 +89,9 @@ final class Paragraph {
 	}
 }
 
+/// An `<input type="submit">`: a button labelled by its `value`, else the browser's own label in the device's language.
+final class SubmitInput: UIButton {}
+
 /// A `<pre>` paragraph's sideways scroller: its line is never wrapped.
 final class PreformattedScroll: UIScrollView {}
 
@@ -782,6 +785,16 @@ final class ViewTree {
 						}
 					}
 					view = drawn
+				} else if element == "input", staticAttributes["type"] == "submit" {
+					if context.button != nil { throw HostError("<input type=\"submit\"> \(id) is inside another control") }
+					// A button whose label is its value, as the browser draws it; the stacking layout sizes it to its label.
+					let control = SubmitInput(type: .custom)
+					control.setTitleColor(.label, for: .normal)
+					control.titleLabel?.font = UIFont.systemFont(ofSize: TextLook.baseSize * context.look.scale)
+					control.isAccessibilityElement = true
+					control.accessibilityTraits = .button
+					if layout == nil { leaves.insert(ObjectIdentifier(control)) }
+					view = control
 				} else if element == "button" || element == "a" {
 					if context.button != nil { throw HostError("<\(element)> \(id) is inside another control") }
 					let control = UIButton(type: .custom)
@@ -1059,6 +1072,7 @@ final class ViewTree {
 			audio.update(source: current["src"], label: current["aria-label"])
 		} else if let button = view as? UIButton {
 			button.isEnabled = current["disabled"] == nil
+			if button is SubmitInput { button.setTitle(current["value"] ?? runtime.submitLabel, for: .normal) }
 			refreshLabel(of: button)
 		} else if let drawing = view as? DrawingView {
 			// A named svg is an image to VoiceOver; an unnamed one, or one inside a control, is decoration.

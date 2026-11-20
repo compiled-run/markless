@@ -1,7 +1,8 @@
 // Rewrites @markless/serializer's validation messages from Chromium itself: `node packages/mobile/test/write-validation-messages.ts`
 // (macOS). For each language Chrome for Testing ships, it sets that app's AppleLanguages, reads `validationMessage` of a
 // required text field, checkbox and radio, of an edited text field longer than its maxlength, and of an email field for
-// each way its value is not an email address, and restores the setting.
+// each way its value is not an email address, and the label of an <input type="submit"> without a value (the text of
+// its user-agent shadow tree, which neither the DOM nor its accessible name gives), and restores the setting.
 import { execFileSync } from 'node:child_process';
 import { readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -33,6 +34,28 @@ const kept = (() => {
 const table: Record<string, { text: string; checkbox: string; radio: string }> = {};
 const tooLong: Record<string, { text: string; digits?: string }> = {};
 const emailMismatch: Record<string, NativeEmailMismatch> = {};
+const submitLabel: Record<string, string> = {};
+/** The text in `page`'s first <input type="submit">, read through its user-agent shadow tree. */
+const submitLabelOf = async (page: Page) => {
+	await page.setContent('<input type="submit">');
+	const session = await page.context().newCDPSession(page);
+	const { root } = await session.send('DOM.getDocument', { depth: -1, pierce: true });
+	type DomNode = {
+		nodeType: number;
+		nodeValue: string;
+		children?: DomNode[];
+		shadowRoots?: DomNode[];
+	};
+	const texts = (node: DomNode): string[] => [
+		...(node.nodeType === 3 ? [node.nodeValue] : []),
+		...[...(node.children ?? []), ...(node.shadowRoots ?? [])].flatMap(texts),
+	];
+	const found = texts(root as DomNode);
+	await session.detach();
+	if (found.length !== 1)
+		throw new Error(`expected one label text, found ${JSON.stringify(found)}`);
+	return found[0]!;
+};
 /** A value for each of Chromium's email messages, and what in the message stands for it; none of them occurs in a translation. */
 const EMAIL_SAMPLES = {
 	missingAt: ['qzxwv', { '{value}': 'qzxwv' }],
@@ -85,6 +108,7 @@ try {
 				return field.validationMessage;
 			}, value);
 		}
+		submitLabel[locale] = await submitLabelOf(page);
 		const wide = await tooLongMessage(page, 1234, 56789);
 		const narrow = await tooLongMessage(page, 10, 100);
 		await browser.close();
@@ -142,5 +166,5 @@ writeFileSync(
 			const version = browser.version();
 			await browser.close();
 			return `Chromium ${version}`;
-		})}; do not edit.\n\nimport type { NativeEmailMismatch, NativeTooLong } from './native-view.ts';\n\n/** Chromium's \`validationMessage\` for a required field with no value, by the language Chromium shows its own text in. */\nexport const NATIVE_VALUE_MISSING_BY_LOCALE: Readonly<Record<string, { readonly text: string; readonly checkbox: string; readonly radio: string }>> = ${JSON.stringify(table, null, '\t')};\n\n/** Chromium's \`validationMessage\` for a text field a person edited to longer than its maxlength, with \`{max}\` and \`{length}\` for the numbers. */\nexport const NATIVE_TOO_LONG_BY_LOCALE: Readonly<Record<string, NativeTooLong>> = ${JSON.stringify(tooLong, null, '\t')};\n\n/** Chromium's \`validationMessage\` for an email field whose value is not an email address, one template for each way it is not. */\nexport const NATIVE_EMAIL_MISMATCH_BY_LOCALE: Readonly<Record<string, NativeEmailMismatch>> = ${JSON.stringify(emailMismatch, null, '\t')};\n`,
+		})}; do not edit.\n\nimport type { NativeEmailMismatch, NativeTooLong } from './native-view.ts';\n\n/** Chromium's \`validationMessage\` for a required field with no value, by the language Chromium shows its own text in. */\nexport const NATIVE_VALUE_MISSING_BY_LOCALE: Readonly<Record<string, { readonly text: string; readonly checkbox: string; readonly radio: string }>> = ${JSON.stringify(table, null, '\t')};\n\n/** Chromium's \`validationMessage\` for a text field a person edited to longer than its maxlength, with \`{max}\` and \`{length}\` for the numbers. */\nexport const NATIVE_TOO_LONG_BY_LOCALE: Readonly<Record<string, NativeTooLong>> = ${JSON.stringify(tooLong, null, '\t')};\n\n/** Chromium's \`validationMessage\` for an email field whose value is not an email address, one template for each way it is not. */\nexport const NATIVE_EMAIL_MISMATCH_BY_LOCALE: Readonly<Record<string, NativeEmailMismatch>> = ${JSON.stringify(emailMismatch, null, '\t')};\n\n/** The label Chromium draws on an \`<input type="submit">\` with no \`value\`. */\nexport const NATIVE_SUBMIT_LABEL_BY_LOCALE: Readonly<Record<string, string>> = ${JSON.stringify(submitLabel, null, '\t')};\n`,
 );

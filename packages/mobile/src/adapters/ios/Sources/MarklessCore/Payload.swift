@@ -517,13 +517,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 	/// What the web says when a text field a person edited is longer than its `maxlength`, by locale, in payload order.
 	public var tooLong: [(locale: String, message: NativeTooLong)] = []
 	public var emailMismatch: [(locale: String, messages: NativeEmailMismatch)] = []
+	public var submitLabel: [(locale: String, label: String)] = []
 
 	public static func == (a: NativeViewPayload, b: NativeViewPayload) -> Bool {
 		a.component == b.component && a.route == b.route && a.cells == b.cells && a.nodes == b.nodes && a.events == b.events
 			&& a.handlers == b.handlers && a.title == b.title && a.objects == b.objects && a.forms == b.forms && a.valueMissing.map(\.locale) == b.valueMissing.map(\.locale)
 			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages) && a.tooLong.map(\.locale) == b.tooLong.map(\.locale)
 			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.emailMismatch.map(\.locale) == b.emailMismatch.map(\.locale)
-			&& a.emailMismatch.map(\.messages) == b.emailMismatch.map(\.messages) && a.script == b.script
+			&& a.emailMismatch.map(\.messages) == b.emailMismatch.map(\.messages) && a.submitLabel.map(\.locale) == b.submitLabel.map(\.locale)
+			&& a.submitLabel.map(\.label) == b.submitLabel.map(\.label) && a.script == b.script
 	}
 	/// The JavaScript the page's script ops and computeds run; absent when every handler is data.
 	public var script: NativeScript? = nil
@@ -534,7 +536,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "emailMismatch", "script"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "emailMismatch", "submitLabel", "script"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
@@ -793,6 +795,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 					other: try m["other"].string()))
 			}
 		}() : []
+		let submitLabel: [(locale: String, label: String)] = fields.has("submitLabel") ? try {
+			let reader = try fields["submitLabel"]
+			return try reader.keys().map { ($0, try reader.field($0).string()) }
+		}() : []
 		let route: NativeRoute? = fields.has("route") ? try {
 			let r = try fields["route"].object(["pattern", "params"])
 			return NativeRoute(pattern: try r["pattern"].string(), params: try r["params"].array().map { try $0.string() })
@@ -800,7 +806,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		let payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
 			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
-			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong, emailMismatch: emailMismatch,
+			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong, emailMismatch: emailMismatch, submitLabel: submitLabel,
 			script: fields.has("script") ? try decodeScript(try fields["script"]) : nil)
 		try payload.check()
 		return payload

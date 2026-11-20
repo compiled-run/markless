@@ -254,6 +254,8 @@ public final class NativeRuntime {
 	private let missing: NativeValueMissing?
 	private let tooLong: NativeTooLong?
 	private let emailMismatch: NativeEmailMismatch?
+	/// The label the web draws on an `<input type="submit">` without a `value`, in the device's language.
+	public let submitLabel: String?
 	/// An input's text as typed, which the field keeps; the handler reads `eventValue`, sanitized as the web sanitizes it.
 	private var edit: String?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
@@ -318,6 +320,8 @@ public final class NativeRuntime {
 		tooLong = payload.tooLong.first { $0.locale == tooLongLocale }?.message
 		let emailLocale = nativeLocale(preferredLanguages, payload.emailMismatch.map(\.locale))
 		emailMismatch = payload.emailMismatch.first { $0.locale == emailLocale }?.messages
+		let submitLocale = nativeLocale(preferredLanguages, payload.submitLabel.map(\.locale))
+		submitLabel = payload.submitLabel.first { $0.locale == submitLocale }?.label
 		dialogs = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
 			return nil

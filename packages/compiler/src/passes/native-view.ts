@@ -19,6 +19,7 @@ import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless
 import {
 	isNativeStyleStateAttribute,
 	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
+	NATIVE_SUBMIT_LABEL_BY_LOCALE,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 	NATIVE_DATA_SCRIPT_TYPES,
@@ -6433,6 +6434,7 @@ export function createNativeViewPayload(
 	checkSelects();
 	let lengthLimited = false;
 	let emailChecked = false;
+	let submitLabel = false;
 	const forms = wireForms();
 	for (const handler of handlers) {
 		if (mentionsElement(handler.ops)) {
@@ -6505,6 +6507,7 @@ export function createNativeViewPayload(
 		...(forms.length > 0 ? { forms, valueMissing: NATIVE_VALUE_MISSING_BY_LOCALE } : {}),
 		...(lengthLimited ? { tooLong: NATIVE_TOO_LONG_BY_LOCALE } : {}),
 		...(emailChecked ? { emailMismatch: NATIVE_EMAIL_MISMATCH_BY_LOCALE } : {}),
+		...(submitLabel ? { submitLabel: NATIVE_SUBMIT_LABEL_BY_LOCALE } : {}),
 		...(script ? { script } : {}),
 	});
 
@@ -6684,7 +6687,10 @@ export function createNativeViewPayload(
 					fields.push({ node: node.id, kind: 'select' });
 					continue;
 				}
-				if (node.element === 'button') {
+				// An <input type="submit"> is its form's submit button, as a <button> is.
+				const submitInput = node.element === 'input' && type === 'submit';
+				if (submitInput) submitLabel = true;
+				if (node.element === 'button' || submitInput) {
 					if (type === 'button') continue;
 					if (type === 'reset') {
 						refuse(

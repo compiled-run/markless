@@ -74,6 +74,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'submit-input',
+		fixture: 'proofs/r157-submit-input/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'Ada' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
 		name: 'switches',
 		fixture: 'test/fixtures/Switches.tsrx',
 		actions: [

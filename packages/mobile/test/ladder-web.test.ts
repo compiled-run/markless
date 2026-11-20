@@ -162,6 +162,8 @@ const shown = (page: Page, text: string): Locator =>
 		.or(page.getByLabel(text, { exact: true }))
 		// An image is found by its alt text, its accessible name, as a phone's screen reader names it.
 		.or(page.getByAltText(text, { exact: true }))
+		// An <input type="submit"> shows its label, which is no text node.
+		.or(page.locator('input[type="submit"]').and(page.getByRole('button', { name: text, exact: true })))
 		.or(page.getByRole('combobox').filter({ has: page.locator('option:checked').getByText(text, { exact: true }) }));
 
 // The phone the style exports lay out for (Dragon's iOS viewport): a rung that scrolls scrolls here as on the phones.

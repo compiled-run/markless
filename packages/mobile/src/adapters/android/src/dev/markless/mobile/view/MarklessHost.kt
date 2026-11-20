@@ -726,7 +726,7 @@ class MarklessHost(
 		// A family's visually hidden checkbox (aria-hidden) draws nothing; a plain one is a platform control.
 		val unseen = type == "hidden" || (type in TICKABLE && node.attributes["aria-hidden"] == "true")
 		if (unseen) inert.add(inst.id)
-		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (drawing != null) "drawing" else if (unstyled?.rule == true) "rule" else if (unseen) "unseen" else if (type in TICKABLE) type else node.element) {
+		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (drawing != null) "drawing" else if (unstyled?.rule == true) "rule" else if (unseen) "unseen" else if (type in TICKABLE) type else if (type == "submit") "submit-input" else node.element) {
 			"drawing" -> DrawingView(context, drawing!!, baseTextSize * (flow?.blockText(node.parent)?.size ?: 1.0)).also { named(it, inst.id, image = true) }
 			"rule" -> RuleView(context).also { named(it, inst.id) }
 			"unseen" -> View(context)
@@ -749,6 +749,18 @@ class MarklessHost(
 				includeFontPadding = false
 				setPadding(0, 0, 0, 0)
 				gravity = Gravity.TOP or Gravity.START
+				named(this, inst.id)
+			}
+			// A button whose label is its value, as the browser draws it; `value` (an attribute) sets the label.
+			"submit-input" -> SubmitInput(context).apply {
+				background = null
+				minWidth = 0; minHeight = 0; minimumWidth = 0; minimumHeight = 0
+				isAllCaps = false
+				stateListAnimator = null
+				includeFontPadding = false
+				setPadding(0, 0, 0, 0)
+				gravity = Gravity.TOP or Gravity.START
+				text = runtime.submitLabel
 				named(this, inst.id)
 			}
 			"camera" -> {
@@ -971,6 +983,7 @@ class MarklessHost(
 			}
 			"controls" -> if (view is AudioButton) view.visibility = if (value == null) View.GONE else View.VISIBLE
 			"disabled" -> view.isEnabled = value == null
+			"value" -> if (view is SubmitInput) view.text = value ?: runtime.submitLabel
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
 			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else if (view is DrawingView) (if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO) else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
@@ -1257,3 +1270,6 @@ private fun EditText.setAppText(text: String) {
 	limit?.appWriting = true
 	try { setText(text) } finally { limit?.appWriting = false }
 }
+
+/** An `<input type="submit">`: a button labelled by its `value`, else the browser's own label in the device's language. */
+class SubmitInput(context: android.content.Context) : Button(context)

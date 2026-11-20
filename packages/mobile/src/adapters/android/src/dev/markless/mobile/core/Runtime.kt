@@ -701,6 +701,8 @@ class Runtime(
 	private val missing: ValueMissing? = payload.valueMissing[nativeLocale(preferredLanguages, payload.valueMissing.keys)]
 	private val tooLong: TooLong? = payload.tooLong[nativeLocale(preferredLanguages, payload.tooLong.keys)]
 	private val emailMismatch: EmailMismatch? = payload.emailMismatch[nativeLocale(preferredLanguages, payload.emailMismatch.keys)]
+	/** The label the web draws on an `<input type="submit">` without a `value`, in the device's language. */
+	val submitLabel: String? = payload.submitLabel[nativeLocale(preferredLanguages, payload.submitLabel.keys)]
 
 	private fun entriesOf(id: String): JsValue {
 		val form = forms[id] ?: throw MarklessRuntimeError("\"$id\" is not a form")

@@ -320,6 +320,8 @@ data class Payload(
 	val tooLong: Map<String, TooLong> = emptyMap(),
 	/** [EmailMismatch] by the locale the browser shows its own text in. */
 	val emailMismatch: Map<String, EmailMismatch> = emptyMap(),
+	/** The label the web draws on an `<input type="submit">` with no `value`, by the locale the browser shows its own text in. */
+	val submitLabel: Map<String, String> = emptyMap(),
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	val script: ScriptSource? = null,
 ) {
@@ -328,7 +330,7 @@ data class Payload(
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "emailMismatch", "script"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "emailMismatch", "submitLabel", "script"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -409,7 +411,10 @@ data class Payload(
 				val t = kinds.map { mo.field(it, what).str("$what.$it") }
 				locale to EmailMismatch(t[0], t[1], t[2], t[3], t[4], t[5], t[6])
 			} ?: emptyMap()
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, emailMismatch, script)
+			val submitLabel = root["submitLabel"]?.obj("payload.submitLabel")?.entries?.associateTo(LinkedHashMap()) { (locale, label) ->
+				locale to label.str("payload.submitLabel.$locale")
+			} ?: emptyMap()
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, emailMismatch, submitLabel, script)
 		}
 
 		private fun readsOf(node: Node): List<Expr> = when (node) {
