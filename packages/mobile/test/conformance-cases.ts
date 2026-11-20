@@ -993,6 +993,18 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A plain <a href> to one of the app's pages opens it in place with its params, as a <Link> does.
+		name: 'plain-links',
+		app: 'proofs/n6-plain-links',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'back' },
+		],
+	},
+	{
 		name: 'script-app',
 		app: 'proofs/j6-engine-on-demand',
 		open: '/',

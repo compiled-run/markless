@@ -1,0 +1,365 @@
+{
+	"version": "markless.native-app-conformance/0",
+	"app": {
+		"version": "markless.native-app/0",
+		"routes": [
+			{
+				"pattern": "/",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Home",
+					"route": {
+						"pattern": "/",
+						"params": []
+					},
+					"cells": [],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Start page"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h3",
+							"element": "a",
+							"parent": "h0",
+							"attributes": {
+								"href": "/about"
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h3:text0",
+							"parent": "h3",
+							"parts": [
+								{
+									"text": "About us"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h4",
+							"element": "a",
+							"parent": "h0",
+							"attributes": {
+								"href": "/items/7"
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h4:text0",
+							"parent": "h4",
+							"parts": [
+								{
+									"text": "Item seven"
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "h3",
+							"event": "activate",
+							"handler": "handler:h3/link"
+						},
+						{
+							"host": "h4",
+							"event": "activate",
+							"handler": "handler:h4/link"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:h3/link",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/about",
+									"params": {}
+								}
+							]
+						},
+						{
+							"id": "handler:h4/link",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/items/[id]",
+									"params": {
+										"id": "7"
+									}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Links"
+						}
+					]
+				}
+			},
+			{
+				"pattern": "/about",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "About",
+					"route": {
+						"pattern": "/about",
+						"params": []
+					},
+					"cells": [],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "We make lists"
+								}
+							]
+						}
+					],
+					"events": [],
+					"handlers": [],
+					"title": [
+						{
+							"text": "About"
+						}
+					]
+				}
+			},
+			{
+				"pattern": "/items/[id]",
+				"params": [
+					"id"
+				],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Item",
+					"route": {
+						"pattern": "/items/[id]",
+						"params": [
+							"id"
+						]
+					},
+					"cells": [],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Showing item "
+								},
+								{
+									"expr": {
+										"member": {
+											"route": "params"
+										},
+										"property": "id"
+									}
+								}
+							]
+						}
+					],
+					"events": [],
+					"handlers": [],
+					"title": [
+						{
+							"text": "Item "
+						},
+						{
+							"expr": {
+								"member": {
+									"route": "params"
+								},
+								"property": "id"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"open": "/",
+	"initial": {
+		"stack": [
+			"/"
+		],
+		"title": "Links",
+		"texts": [
+			[
+				"h2:text0",
+				"Start page"
+			],
+			[
+				"h3:text0",
+				"About us"
+			],
+			[
+				"h4:text0",
+				"Item seven"
+			]
+		]
+	},
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/about",
+					"params": {}
+				}
+			],
+			"stack": [
+				"/",
+				"/about"
+			],
+			"title": "About",
+			"texts": [
+				[
+					"h2:text0",
+					"We make lists"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "back"
+			},
+			"journal": [],
+			"stack": [
+				"/"
+			],
+			"title": "Links",
+			"texts": [
+				[
+					"h2:text0",
+					"Start page"
+				],
+				[
+					"h3:text0",
+					"About us"
+				],
+				[
+					"h4:text0",
+					"Item seven"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/items/[id]",
+					"params": {
+						"id": "7"
+					}
+				}
+			],
+			"stack": [
+				"/",
+				"/items/7"
+			],
+			"title": "Item 7",
+			"texts": [
+				[
+					"h2:text0",
+					"Showing item 7"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "back"
+			},
+			"journal": [],
+			"stack": [
+				"/"
+			],
+			"title": "Links",
+			"texts": [
+				[
+					"h2:text0",
+					"Start page"
+				],
+				[
+					"h3:text0",
+					"About us"
+				],
+				[
+					"h4:text0",
+					"Item seven"
+				]
+			]
+		}
+	]
+}

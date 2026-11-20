@@ -1,0 +1,43 @@
+{
+	"rung": "N6",
+	"name": "A plain <a href> to one of the app's pages opens that page in place, with its params, as a <Link> does on the web",
+	"steps": [
+		{
+			"visible": ["Start page", "About us", "Item seven"],
+			"absent": ["We make lists", "Showing item 7"],
+			"title": "Links"
+		},
+		{
+			"do": {
+				"tap": "About us"
+			},
+			"visible": ["We make lists"],
+			"absent": ["Start page"],
+			"title": "About"
+		},
+		{
+			"do": {
+				"back": "gesture"
+			},
+			"visible": ["Start page", "Item seven"],
+			"absent": ["We make lists"],
+			"title": "Links"
+		},
+		{
+			"do": {
+				"tap": "Item seven"
+			},
+			"visible": ["Showing item 7"],
+			"absent": ["Start page"],
+			"title": "Item 7"
+		},
+		{
+			"do": {
+				"back": "gesture"
+			},
+			"visible": ["Start page", "About us"],
+			"absent": ["Showing item 7"],
+			"title": "Links"
+		}
+	]
+}

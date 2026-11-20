@@ -1617,6 +1617,41 @@ export function Nav() @{
 		);
 	});
 
+	it("opens one of the app's pages from a plain <a href> as a <Link> does; other anchors keep no action", async () => {
+		const routes = [
+			{ pattern: '/about', params: [] },
+			{ pattern: '/items/[id]', params: ['id'] },
+		];
+		const resolvePath = (path: string) =>
+			path === '/about'
+				? { pattern: '/about', params: {} }
+				: path.startsWith('/items/')
+					? { pattern: '/items/[id]', params: { id: path.slice('/items/'.length) } }
+					: undefined;
+		const { payload, diagnostics } = await nativeView(
+			`export function Home() @{
+	<main>
+		<a href="/about">About</a>
+		<a href="/items/7">Seven</a>
+		<a href="/about#team">Team</a>
+		<a href="https://example.com">Elsewhere</a>
+		<a href="/about" onClick={(event) => event.preventDefault()}>Held</a>
+	</main>
+}`,
+			{ routes, resolvePath } as never,
+		);
+		expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const navigations = payload!.events.flatMap((event) =>
+			payload!.handlers
+				.filter((handler) => handler.id === event.handler && handler.id.endsWith('/link'))
+				.map((handler) => [event.host, handler.ops]),
+		);
+		expect(navigations).toEqual([
+			['h1', [{ op: 'navigate', route: '/about', params: {} }]],
+			['h2', [{ op: 'navigate', route: '/items/[id]', params: { id: '7' } }]],
+		]);
+	});
+
 	it('lowers a password field as a text field of its form: its text is sent, and required and maxlength are checked', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Login() @{

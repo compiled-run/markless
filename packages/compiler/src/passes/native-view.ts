@@ -6586,6 +6586,7 @@ export function createNativeViewPayload(
 		}
 	}
 	wireTicks();
+	wireLinks();
 	checkSelects();
 	let lengthLimited = false;
 	let numbered = false;
@@ -6677,6 +6678,27 @@ export function createNativeViewPayload(
 	 * by name: a list box (`multiple`, `size`), a select whose choice a binding sets, handlers on either element, and
 	 * anything but text inside an option or options inside a select.
 	 */
+	/**
+	 * A plain `<a href>` to one of the app's pages navigates in place, as a <Link> does on the web: a fixed path the
+	 * router matches opens that route. An anchor with a press of its own, or one to another site, is left as it is.
+	 */
+	function wireLinks() {
+		if (!options.resolvePath) return;
+		for (const node of nodes) {
+			if (node.kind !== 'element' || node.element !== 'a') continue;
+			const href = node.attributes?.['href'];
+			if (href === undefined || !href.startsWith('/') || href.startsWith('//')) continue;
+			// A query or fragment is more than a route; a phone screen opens from the route and its params alone.
+			if (href.includes('?') || href.includes('#')) continue;
+			if (events.some((event) => event.host === node.id && event.event === 'activate')) continue;
+			const matched = options.resolvePath(href);
+			if (!matched) continue;
+			const handler = `handler:${node.id}/link`;
+			events.push({ host: node.id, event: 'activate', handler });
+			handlers.push({ id: handler, ops: [{ op: 'navigate', route: matched.pattern, params: { ...matched.params } }] });
+		}
+	}
+
 	function checkSelects() {
 		const byId = nodeById();
 		for (const node of nodes) {

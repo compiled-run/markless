@@ -163,6 +163,7 @@ test('the navigation ladder has one app folder per rung, in rung order', () => {
 		'N3',
 		'N4',
 		'N5',
+		'N6',
 		138,
 		139,
 		140,
