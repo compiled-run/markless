@@ -3,7 +3,14 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { attribute, describePeak, processLabel, suiteKey } from './unit-budget.mjs';
+import {
+	attribute,
+	describePeak,
+	processLabel,
+	SLOT_HOLDER_FAIL_MB,
+	slotHolders,
+	suiteKey,
+} from './unit-budget.mjs';
 
 const script = resolve(import.meta.dirname, 'unit-budget.mjs');
 const scratch: string[] = [];
@@ -23,6 +30,7 @@ type Shard = {
 	exitCode?: number;
 	platform?: string;
 	fileMs?: Record<string, number>;
+	fileUnslottedPeaksMb?: Record<string, number>;
 };
 
 const measurementsDir = (shards: Shard[]) => {
@@ -643,5 +651,61 @@ describe('peak attribution', () => {
 		expect(
 			processLabel(['/usr/bin/node', '/repo/test/support/fixture-build-child.ts', '{}']),
 		).toBe('node fixture-build-child.ts');
+	});
+});
+
+describe('memory held outside the build slot', () => {
+	const heavyFile = (slotHolders: { test: string }[]) => {
+		const dir = mkdtempSync(join(tmpdir(), 'unit-budget-heavy-'));
+		scratch.push(dir);
+		const path = join(dir, 'heavy-tests.json');
+		writeFileSync(path, JSON.stringify({ inWorkerBuilds: { tests: [] }, slotHolders: { tests: slotHolders } }));
+		return path;
+	};
+	const shards = (mb: number): Shard[] => [
+		{ shard: '1/2', cpuS: 100, peakRssMb: 2000, fileUnslottedPeaksMb: { 'packages/a/test/big.test.ts': mb } },
+		{ shard: '2/2', cpuS: 200, peakRssMb: 1500 },
+	];
+	const checkWith = (mb: number, slotHolders: { test: string }[]) =>
+		run(
+			'check',
+			'--budget',
+			budgetFile(anchored),
+			'--measurements',
+			measurementsDir(shards(mb)),
+			'--heavy',
+			heavyFile(slotHolders),
+		);
+
+	test('fails for an unlisted file over the line, naming it and both ways out', () => {
+		const result = checkWith(SLOT_HOLDER_FAIL_MB + 1, []);
+		expect(result.status).toBe(1);
+		expect(result.output).toContain(
+			`packages/a/test/big.test.ts held ${SLOT_HOLDER_FAIL_MB + 1} MB outside the build slot (shard 1/2, run 42)`,
+		);
+		expect(result.output).toContain('list it under "slotHolders"');
+		expect(result.output).toContain('or make it keep less outside the slot');
+	});
+
+	test('a file hovering just over 1 GB is noise, not a failure', () => {
+		expect(checkWith(SLOT_HOLDER_FAIL_MB, []).status).toBe(0);
+	});
+
+	test('a listed file passes', () => {
+		expect(checkWith(SLOT_HOLDER_FAIL_MB + 500, [{ test: 'packages/a/test/big.test.ts' }]).status).toBe(0);
+	});
+
+	test('reads which test files hold a slot from the pid each slot records', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'unit-budget-slots-'));
+		scratch.push(dir);
+		mkdirSync(join(dir, '0'));
+		writeFileSync(join(dir, '0', 'pid'), '20');
+		mkdirSync(join(dir, '1'));
+		const fileOf = new Map([
+			[10, 'packages/a/test/a.test.ts'],
+			[20, 'packages/b/test/b.test.ts'],
+		]);
+		expect([...slotHolders(dir, fileOf)]).toEqual(['packages/b/test/b.test.ts']);
+		expect(slotHolders(join(dir, 'missing'), fileOf).size).toBe(0);
 	});
 });

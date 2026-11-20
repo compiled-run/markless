@@ -13,6 +13,16 @@ export type InWorkerBuildRule = {
 	readonly tests: readonly InWorkerBuild[];
 };
 
+/** A test that keeps much memory outside the build slot, measured by CI's unit budget, so it holds the slot for its run. */
+export type SlotHolder = {
+	readonly test: string;
+	readonly peakMb: number;
+	readonly run: string;
+	readonly why: string;
+};
+
+export type SlotHolderRule = { readonly why: string; readonly tests: readonly SlotHolder[] };
+
 export type InWorkerBuildProblem = { kind: 'unlisted' | 'stale'; path: string; detail: string };
 
 /**

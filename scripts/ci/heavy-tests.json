@@ -300,5 +300,9 @@
 				"why": "reads the compiler's in-process transform memos from a plugin"
 			}
 		]
+	},
+	"slotHolders": {
+		"why": "Each listed test keeps more memory outside the build slot than scripts/ci/unit-budget.mjs allows (SLOT_HOLDER_MB), measured by CI's unit budget (peakMb in that run). It holds a build slot for its whole run (scripts/ci/in-worker-build-slot.ts), so no build overlaps it and a shard's peak does not depend on which files happen to run together.",
+		"tests": []
 	}
 }

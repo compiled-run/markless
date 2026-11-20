@@ -18,11 +18,16 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const DEFAULT_BUDGET = join(repoRoot, 'scripts/ci/unit-budget.json');
+const DEFAULT_HEAVY = join(repoRoot, 'scripts/ci/heavy-tests.json');
+// A file holding this much outside the build slot, beside a slotted build (up to 2.6 GB) and the base processes (up to 1.5 GB), moves a shard's peak past the RSS band.
+export const SLOT_HOLDER_MB = 1024;
+// One file's own peak swung by up to 29% across 49 merge-queue runs (child-async-catch, 1,469 to 1,894 MB), so the check fails only 30% above the line.
+export const SLOT_HOLDER_FAIL_MB = Math.round(SLOT_HOLDER_MB * 1.3);
 const PLATFORM = `${process.platform}-${process.arch}`;
 const ARTIFACT_PATTERN = 'unit-budget-*';
 
 const USAGE = `usage: node scripts/ci/unit-budget.mjs measure -- <command...>
-       node scripts/ci/unit-budget.mjs check --measurements <dir> [--budget <file>]
+       node scripts/ci/unit-budget.mjs check --measurements <dir> [--budget <file>] [--heavy <file>]
        node scripts/ci/unit-budget.mjs accept --from <run id | dir>... --reason "<why>" [--budget <file>]
        node scripts/ci/unit-budget.mjs margin --from <run id | dir>... --reason "<why>" [--budget <file>]
        node scripts/ci/unit-budget.mjs models --from <run id | dir>... --reason "<why>" [--budget <file>]
@@ -31,7 +36,8 @@ const USAGE = `usage: node scripts/ci/unit-budget.mjs measure -- <command...>
   measure  runs the command; with MARKLESS_UNIT_BUDGET_OUT set (CI) it writes the process tree's
            CPU-seconds and sampled peak RSS there, for MARKLESS_UNIT_BUDGET_SHARD (Linux only)
   check    fails when the shards' summed CPU-seconds or their largest peak RSS leaves the anchor's
-           noise band: above it is over budget, below it is a stale anchor
+           noise band: above it is over budget, below it is a stale anchor; and when a test file held
+           more memory outside the build slot than SLOT_HOLDER_FAIL_MB without being listed to hold it
   accept   takes new anchors from CI artifacts (the median per shard over every attempt of the runs)
   margin   derives the noise band from repeated CI measurements of one test set
   models   derives each CPU model's correction: how far the calibration misjudges its speed on the unit
@@ -166,6 +172,26 @@ function readFileOwners(dir, known) {
 	return known;
 }
 
+/** The test files whose vitest worker holds a build slot now, from the pid each slot records (build-slots.ts). */
+export function slotHolders(slotsDir, fileOf) {
+	const files = new Set();
+	let slots = [];
+	try {
+		slots = readdirSync(slotsDir);
+	} catch {
+		return files;
+	}
+	for (const slot of slots) {
+		try {
+			const file = fileOf.get(Number(readFileSync(join(slotsDir, slot, 'pid'), 'utf8')));
+			if (file) files.add(file);
+		} catch {
+			continue;
+		}
+	}
+	return files;
+}
+
 // A fixed JavaScript workload; the shard's CPU-seconds divided by its CPU-seconds is the work done,
 // whatever the speed of the runner's CPU model.
 export function calibrationRound() {
@@ -258,9 +284,12 @@ async function measure(command) {
 		before = procStat('self');
 	}
 	const filesDir = out ? mkdtempSync(join(tmpdir(), 'unit-budget-files-')) : null;
+	const slotsDir = filesDir && join(filesDir, 'build-slots');
 	const child = spawn(command[0], command.slice(1), {
 		stdio: 'inherit',
-		env: filesDir ? { ...process.env, MARKLESS_UNIT_BUDGET_FILES: filesDir } : process.env,
+		env: filesDir
+			? { ...process.env, MARKLESS_UNIT_BUDGET_FILES: filesDir, MARKLESS_BUILD_SLOTS_DIR: slotsDir }
+			: process.env,
 	});
 	for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
 	if (!out)
@@ -274,6 +303,7 @@ async function measure(command) {
 	let peakAt = null;
 	const fileOf = new Map();
 	const filePeaks = new Map();
+	const unslottedPeaks = new Map();
 	const sample = () => {
 		const procs = descendants(process.pid, pageSize);
 		const total = procs.reduce((sum, proc) => sum + proc.rss, 0);
@@ -282,6 +312,10 @@ async function measure(command) {
 		const groups = attribute(procs, fileOf, isNewPeak ? labelOf : undefined);
 		for (const group of groups)
 			filePeaks.set(group.file, Math.max(filePeaks.get(group.file) ?? 0, group.mb));
+		const holding = slotHolders(slotsDir, fileOf);
+		for (const group of groups)
+			if (!holding.has(group.file) && group.file !== UNATTRIBUTED)
+				unslottedPeaks.set(group.file, Math.max(unslottedPeaks.get(group.file) ?? 0, group.mb));
 		if (isNewPeak) {
 			peak = total;
 			peakAt = { atS: round((performance.now() - started) / 1000), groups };
@@ -322,6 +356,10 @@ async function measure(command) {
 		wrapperCpuS: round((own.user + own.system) / 1e6, 2),
 		atPeak: peakAt,
 		filePeaksMb: Object.fromEntries([...filePeaks].sort(([, a], [, b]) => b - a).slice(0, 25)),
+		// Each file's peak over the samples where its worker held no build slot.
+		fileUnslottedPeaksMb: Object.fromEntries(
+			[...unslottedPeaks].sort(([, a], [, b]) => b - a).slice(0, 25),
+		),
 		fileMs,
 	};
 	rmSync(filesDir, { recursive: true, force: true });
@@ -485,9 +523,28 @@ export function countShards(budget, latest) {
 }
 
 /** The verdict for one run's shards against the budget file. */
-export function evaluate(budget, measurements) {
+/** Files over the slot line that hold no slot for their run: each must hold it, or keep less outside it. */
+export function unslottedHolders(measurements, heavy) {
+	const listed = new Set(
+		[...(heavy?.inWorkerBuilds?.tests ?? []), ...(heavy?.slotHolders?.tests ?? [])].map(
+			(entry) => entry.test,
+		),
+	);
+	const found = [];
+	for (const m of measurements)
+		for (const [file, mb] of Object.entries(m.fileUnslottedPeaksMb ?? {}))
+			if (mb > SLOT_HOLDER_FAIL_MB && !listed.has(file))
+				found.push({ file, mb, shard: m.shard, run: m.run });
+	return found.sort((a, b) => b.mb - a.mb);
+}
+
+export function evaluate(budget, measurements, heavy) {
 	const latest = latestPerShard(measurements);
 	const failures = validate([...latest.values()], budget);
+	for (const { file, mb, shard, run } of unslottedHolders([...latest.values()], heavy))
+		failures.push(
+			`${file} held ${mb} MB outside the build slot (shard ${shard}, run ${run}), over the ${SLOT_HOLDER_MB} MB line (the check fails above ${SLOT_HOLDER_FAIL_MB} MB). Either list it under "slotHolders" in scripts/ci/heavy-tests.json with that peak, the run and why, so it holds the slot for its whole run and no build overlaps it; or make it keep less outside the slot (build through buildFixture, which takes the slot per build, or free its memory)`,
+		);
 	const warnings = [];
 	const lines = [];
 	const measured = [...latest.keys()];
@@ -988,7 +1045,10 @@ async function main(argv) {
 		const dir = flags(args, '--measurements')[0];
 		if (!dir) throw new Error(USAGE);
 		const measurements = readMeasurements(dir);
-		const result = evaluate(budget, measurements);
+		const heavy = JSON.parse(
+			readFileSync(resolve(flags(args, '--heavy')[0] ?? DEFAULT_HEAVY), 'utf8'),
+		);
+		const result = evaluate(budget, measurements, heavy);
 		console.log(result.report);
 		for (const warning of result.warnings) console.log(`::warning::${warning}`);
 		for (const [, m] of [...latestPerShard(measurements)].sort(([a], [b]) =>

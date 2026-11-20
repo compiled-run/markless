@@ -22,3 +22,9 @@ export declare function descendants(
 	pageSize: number,
 ): Array<{ readonly pid: number; readonly ppid: number; readonly rss: number }>;
 export declare function suiteKey(budget: { readonly suite?: unknown }): string | null;
+export declare const SLOT_HOLDER_MB: number;
+export declare const SLOT_HOLDER_FAIL_MB: number;
+export declare function slotHolders(
+	slotsDir: string,
+	fileOf: ReadonlyMap<number, string>,
+): Set<string>;
