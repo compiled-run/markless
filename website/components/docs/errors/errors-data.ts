@@ -7648,7 +7648,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_JOINED_KEYS_REBUILD_UNAVAILABLE',
-		title: '',
+		title: 'A list keyed by joined fields needs Vite’s app builder',
 		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',

@@ -1540,14 +1540,6 @@ export const errorIndex: ErrorIndex = {
 			blurb: 'Markless checking itself. If you see one, it is a Markless bug: please open an issue.',
 			codes: [
 				{
-					code: 'MARKLESS_JOINED_KEYS_REBUILD_UNAVAILABLE',
-					title: '',
-					chip: 'error',
-					kind: 'build error',
-					guided: false,
-					words: ' markless_joined_keys_rebuild_unavailable a markless build tooling error from @markless/bundler.',
-				},
-				{
 					code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
 					title: 'A @catch reset has no graph to re-run values in',
 					chip: 'error',
@@ -1762,6 +1754,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a list count has no answer markless_roster_count_unresolved a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_JOINED_KEYS_REBUILD_UNAVAILABLE',
+					title: 'A list keyed by joined fields needs Vite’s app builder',
+					chip: 'error',
+					kind: 'build error',
+					guided: false,
+					words: 'a list keyed by joined fields needs vite’s app builder markless_joined_keys_rebuild_unavailable a markless build tooling error from @markless/bundler.',
 				},
 				{
 					code: 'MARKLESS_REPEAT_ROW_COMPONENT_EMPTY',
