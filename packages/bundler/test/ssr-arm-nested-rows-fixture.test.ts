@@ -9,8 +9,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { listenOnFreePort } from './helpers/listen.ts';
 import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 
-// Lists inside another list's rows, inside an @if arm: a production build, served, resumed, then written.
-// The inner lists are wired through each enclosing row, so they must be wired wherever the enclosing list is.
+// Lists inside another list's rows inside an @if, @else or @switch arm: a production build, served, resumed, then written.
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -150,7 +149,7 @@ describe('an arm shown after resume', () => {
 	for (const [op, after, cell, chosen] of later)
 		test(`${op}: each outer row shows its own inner rows, whose handlers run`, async () => {
 			const { page, errors } = await served();
-			const read = () => rows(page, '#later li', 'b');
+			const read = () => rows(page, '#later > ul > li', 'b');
 			await page.click('[data-open]');
 			await expect.poll(read).toBe('p0,p1|q0,q1');
 			await page.click(`[data-later="${op}"]`);
@@ -160,4 +159,117 @@ describe('an arm shown after resume', () => {
 			expect(errors).toEqual([]);
 			await page.close();
 		});
+});
+
+// Each `.pair` row's two nested lists, left then right.
+function pairs(page: Page) {
+	return page.evaluate(() =>
+		[...document.querySelectorAll('#pair .pair')]
+			.map((pair) =>
+				[...pair.querySelectorAll('ul')]
+					.map((list) =>
+						[...list.querySelectorAll('li')].map((row) => row.textContent).join(','),
+					)
+					.join('/'),
+			)
+			.join('|'),
+	);
+}
+
+describe('lists the review asked for', () => {
+	test("a child component's nested list beside a page list with the same authored id", async () => {
+		const { page, errors } = await served();
+		const child = () => rows(page, '#child li', 'b');
+		await page.click('[data-child="add"]');
+		await expect.poll(child).toBe('k0,k1|l0,l1|o20,o21');
+		await page.click('[data-child-row="k"]');
+		await expect.poll(child).toBe('k0,k1,x|l0,l1|o20,o21');
+		expect(await rows(page, '#weeks tr', 'td')).toBe('0.0.0,0.0.1|0.1.0,0.1.1|0.2.0,0.2.1');
+		expect(errors).toEqual([]);
+		await page.close();
+	});
+
+	test('two nested lists in one row', async () => {
+		const { page, errors } = await served();
+		await page.click('[data-pair]');
+		await expect.poll(() => pairs(page)).toBe('v/w|y/z');
+		expect(errors).toEqual([]);
+		await page.close();
+	});
+
+	test('an arm painted open, closed, written while closed, then opened again: no lost or doubled rows', async () => {
+		const { page, errors } = await served();
+		const toggled = () => rows(page, '#toggled li', 'b');
+		expect(await toggled()).toBe('f0,f1|g0,g1');
+		await page.click('[data-toggle]');
+		await expect.poll(() => page.locator('#toggled').count()).toBe(0);
+		await page.click('[data-flip]');
+		await page.click('[data-toggle]');
+		await expect.poll(toggled).toBe('f0,f1|g0,g1|h20,h21');
+		await page.click('[data-flip]');
+		await expect.poll(toggled).toBe('f0,f1|g0,g1|h20,h21|h30,h31');
+		await page.click('#toggled b:text-is("h31")');
+		await expect.poll(toggled).toBe('f0,f1|g0,g1|h20,h21|h30,h31*');
+		expect(errors).toEqual([]);
+		await page.close();
+	});
+
+	test('three levels in an arm shown after resume', async () => {
+		const { page, errors } = await served();
+		const deep = () =>
+			page.evaluate(() =>
+				[...document.querySelectorAll('#later .deep')]
+					.map((shelf) =>
+						[...shelf.querySelectorAll('ol')]
+							.map((row) =>
+								[...row.querySelectorAll('li')]
+									.map((cell) => cell.textContent)
+									.join(','),
+							)
+							.join('/'),
+					)
+					.join('|'),
+			);
+		await page.click('[data-open]');
+		await expect.poll(deep).toBe('da0,da1/db0,db1');
+		await page.click('[data-deep="add"]');
+		await expect.poll(deep).toBe('da0,da1/db0,db1|u1a0,u1a1/u1b0,u1b1');
+		await page.click('[data-deep-row="d"]');
+		await expect.poll(deep).toBe('da0,da1/db0,db1/dc0,dc1|u1a0,u1a1/u1b0,u1b1');
+		await page.click('#later li:text-is("u1b1")');
+		await expect.poll(() => picked(page)).toBe('u1b1');
+		expect(errors).toEqual([]);
+		await page.close();
+	});
+
+	test('a @switch case, written, switched away and back', async () => {
+		const { page, errors } = await served();
+		const switched = () => rows(page, '#switched li', 'b');
+		await page.click('[data-switched]');
+		await expect.poll(switched).toBe('f0,f1|g0,g1|s20,s21');
+		await page.click('[data-mode]');
+		await expect.poll(() => page.locator('#none').count()).toBe(1);
+		await page.click('[data-mode]');
+		await expect.poll(switched).toBe('f0,f1|g0,g1|s20,s21');
+		expect(errors).toEqual([]);
+		await page.close();
+	});
+
+	test('an @else arm', async () => {
+		const { page, errors } = await served();
+		await page.click('[data-elsed]');
+		await expect.poll(() => rows(page, '#elsed li', 'b')).toBe('a0,a1|b0,b1|e20,e21');
+		expect(errors).toEqual([]);
+		await page.close();
+	});
+
+	test("an @if inside an async boundary's arm", async () => {
+		const { page, errors } = await served();
+		const bounded = () => rows(page, '#bounded li', 'b');
+		await expect.poll(bounded).toBe('i0,i1|j0,j1');
+		await page.click('[data-bounded]');
+		await expect.poll(bounded).toBe('i0,i1|j0,j1|q20,q21');
+		expect(errors).toEqual([]);
+		await page.close();
+	});
 });

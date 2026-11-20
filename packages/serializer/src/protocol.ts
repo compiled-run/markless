@@ -570,14 +570,17 @@ export type ProtocolViewPayload = {
 		 * collection then reads the outermost enclosing collection with a `'*'`
 		 * segment for each enclosing row (`['*', 'items']`), which reads nothing on
 		 * its own and which each instance replaces with its enclosing row's index.
-		 * `repeatId` is spelled as the authoring module spells it: composition
-		 * prefixes a record's `id` but not this, so it resolves under the record's
-		 * own prefix.
+		 * `repeatId` is spelled as the authoring module spells it, which a row
+		 * reader keys on. Composition prefixes a record's `id` and adds the same
+		 * prefix to `prefix`, so the enclosing record's id is exactly
+		 * `prefix + repeatId` and this record's authored id is its `id` after `prefix`.
 		 *
 		 * Pay-per-use: a repeat inside no other repeat omits the field.
 		 */
 		readonly enclosingRow?: {
 			readonly repeatId: string;
+			/** What composition put in front of this record's `id`; absent while it put nothing. */
+			readonly prefix?: string;
 			readonly parentHostPath: ProtocolElementAddress;
 			readonly itemPath?: ReadonlyArray<string>;
 			/** The parent sits in an arm of the enclosing row's `@if`/`@switch`, as on a row event: `parentHostPath` is then arm-relative. */

@@ -1,8 +1,7 @@
 import { expect, test } from 'vitest';
 import { marklessSsrArmizeBranches } from '../src/fns/ssr.ts';
 
-// A list inside another list's rows is wired through each enclosing row, so its record must stay beside the
-// enclosing list's record: an arm that keeps that list on the page keeps its nested lists there too.
+// A nested list's record stays beside its enclosing list's record, found by exact id.
 const list = (id: string, enclosing?: string) => ({
 	id,
 	parentHostNodeId: 'h3',
@@ -59,4 +58,52 @@ test('an arm keeps a page list and every list nested in its rows on the page; on
 			branch as { servedArmRecords?: { keyedRepeats: { id: string }[] } }
 		).servedArmRecords?.keyedRepeats.map((repeat) => repeat.id),
 	).toEqual(['repeat:3']);
+});
+
+test("a child's nested list is never taken for one in a page list's rows with the same authored id", () => {
+	const structure = {
+		anchors: [{ kind: 'branch', id: 'branch-site:0', elementStart: 0, elementEnd: 9 }],
+		locators: [
+			{ hostNodeId: 'h3', index: 3, tagName: 'tbody' },
+			{ hostNodeId: 'c0:h1', index: 6, tagName: 'ul' },
+		],
+	};
+	const streams = {
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [
+			list('repeat:0'),
+			{
+				...list('c0:repeat:1'),
+				parentHostNodeId: 'c0:h1',
+				enclosingRow: { repeatId: 'repeat:0', prefix: 'c0:', parentHostPath: [] },
+			},
+		],
+	};
+	const [branch] = marklessSsrArmizeBranches(
+		structure as never,
+		[
+			{
+				id: 'branch-site:0',
+				armRecords: [
+					{
+						events: [],
+						repeatParents: [{ repeatId: 'repeat:0', parentHostPath: [0, 1, 0] }],
+					},
+				],
+			},
+		] as never,
+		streams as never,
+		'',
+	);
+
+	expect(streams.keyedRepeats.map((repeat) => repeat.id)).toEqual(['repeat:0']);
+	expect(
+		(
+			branch as { servedArmRecords?: { keyedRepeats: { id: string }[] } }
+		).servedArmRecords?.keyedRepeats.map((repeat) => repeat.id),
+	).toEqual(['c0:repeat:1']);
 });

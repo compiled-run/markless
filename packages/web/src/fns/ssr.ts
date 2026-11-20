@@ -78,7 +78,7 @@ type SsrKeyedRepeatRecord = SsrRecord & {
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly rowTemplate?: ComposeRowTemplate;
 	readonly rowEvents: ReadonlyArray<SsrRowEventRecord>;
-	readonly enclosingRow?: { readonly repeatId: string };
+	readonly enclosingRow?: { readonly repeatId: string; readonly prefix?: string };
 };
 type SsrAnchoredRecord = SsrRecord & {
 	readonly id: string;
@@ -1427,25 +1427,18 @@ function withEnclosedLists(ids: ReadonlyArray<string>, repeats: ReadonlyArray<Ss
 	const lists = new Set(ids);
 	for (let grew = lists.size > 0; grew; ) {
 		grew = false;
-		for (const repeat of repeats) {
-			const enclosing = lists.has(repeat.id) ? undefined : enclosingListId(repeat, repeats);
-			if (enclosing && lists.has(enclosing)) {
-				lists.add(repeat.id);
+		for (const { id, enclosingRow: at } of repeats)
+			if (at && !lists.has(id) && lists.has((at.prefix ?? '') + at.repeatId)) {
+				lists.add(id);
 				grew = true;
 			}
-		}
 	}
 	return lists;
 }
-// Composition prefixes record ids but not the enclosing id a record names, so the enclosing record is the longest id matching both.
-function enclosingListId(inner: SsrKeyedRepeatRecord, repeats: ReadonlyArray<SsrKeyedRepeatRecord>): string | undefined {
-	const at = inner.enclosingRow?.repeatId;
-	let found: string | undefined;
-	if (at)
-		for (const { id } of repeats)
-			if (id.endsWith(at) && inner.id.startsWith(id.slice(0, id.length - at.length)) && id.length > (found?.length ?? -1))
-				found = id;
-	return found;
+// Composition prefixes a nested list's enclosing record id as it prefixes the list's own.
+function prefixedEnclosingRow(repeat: { readonly enclosingRow?: SsrKeyedRepeatRecord['enclosingRow'] }, prefix: string) {
+	const at = repeat.enclosingRow;
+	return at ? { enclosingRow: { ...at, prefix: prefix + (at.prefix ?? '') } } : {};
 }
 // The page record ids of the lists whose parent element the branches' arms render.
 function marklessSsrArmListIds(branches: ReadonlyArray<SsrBranchRecord>): string[] {
@@ -1725,6 +1718,7 @@ export function marklessSsrAppendChildView(context: {
 		context.keyedRepeats.push({
 			...repeat,
 			id: context.child.hostPrefix + repeat.id,
+			...prefixedEnclosingRow(repeat, context.child.hostPrefix),
 			parentHostNodeId: context.child.hostPrefix + repeat.parentHostNodeId,
 			...(repeat.ownerHostNodeId
 				? { ownerHostNodeId: context.child.hostPrefix + repeat.ownerHostNodeId }
@@ -1973,6 +1967,7 @@ export function marklessSsrPrefixBoundaryArmRecords(
 						{
 							...repeat,
 							id: child.hostPrefix + repeat.id,
+							...prefixedEnclosingRow(repeat, child.hostPrefix),
 							parentHostNodeId: child.hostPrefix + repeat.parentHostNodeId,
 							...(repeat.ownerHostNodeId
 								? { ownerHostNodeId: child.hostPrefix + repeat.ownerHostNodeId }

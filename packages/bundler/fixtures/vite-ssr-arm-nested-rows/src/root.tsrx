@@ -1,4 +1,5 @@
 import { computed, state } from '@markless/core';
+import Grid from './grid.tsrx';
 import { row, shelf, weeksOf } from './model.ts';
 
 const SHOWN = true;
@@ -11,6 +12,13 @@ export default function Lists() @{
 	let open = state(false);
 	let later = state([row('p'), row('q')]);
 	let picked = state('');
+	let toggled = state(true);
+	let flip = state([row('f'), row('g')]);
+	let deep = state([shelf('d')]);
+	let mode = state('lists');
+	let bounded = state([row('i'), row('j')]);
+	const label = computed(async () => `${bounded.length} rows`);
+	let pair = state([{ key: 'v', left: [row('v')], right: [row('w')] }]);
 
 	<>
 		<p id="picked">{picked}</p>
@@ -60,7 +68,97 @@ export default function Lists() @{
 						</div>
 					}
 				</section>
+				<Grid />
+				<section id="pair">
+					<button data-pair onClick={() => pair.push({ key: 'z', left: [row('y')], right: [row('z')] })}>add</button>
+					@for (const p of pair; key p.key) {
+						<div class="pair">
+							<ul class="left">
+								@for (const r of p.left; key r.key) {
+									<li>{r.key}</li>
+								}
+							</ul>
+							<ul class="right">
+								@for (const r of p.right; key r.key) {
+									<li>{r.key}</li>
+								}
+							</ul>
+						</div>
+					}
+				</section>
 			</main>
+		}
+		<button data-toggle onClick={() => (toggled = !toggled)}>toggle</button>
+		<button data-flip onClick={() => flip.push(row(`h${flip.length}`))}>flip</button>
+		@if (toggled) {
+			<section id="toggled">
+				<ul>
+					@for (const r of flip; key r.key) {
+						<li>
+							@for (const c of r.cells; key c.key) {
+								<b data-on={c.text === picked ? 'on' : 'off'} onClick={() => (picked = c.text)}>{c.text}</b>
+							}
+						</li>
+					}
+				</ul>
+			</section>
+		}
+		<button data-mode onClick={() => (mode = mode === 'lists' ? 'none' : 'lists')}>mode</button>
+		@switch (mode) {
+			@case 'lists': {
+				<section id="switched">
+					<button data-switched onClick={() => flip.push(row(`s${flip.length}`))}>add</button>
+					<ul>
+						@for (const r of flip; key r.key) {
+							<li>
+								@for (const c of r.cells; key c.key) {
+									<b>{c.text}</b>
+								}
+							</li>
+						}
+					</ul>
+				</section>
+			}
+			@case 'none': {
+				<p id="none">none</p>
+			}
+		}
+		@if (!SHOWN) {
+			<p>hidden</p>
+		} @else {
+			<section id="elsed">
+				<button data-elsed onClick={() => grid.push(row(`e${grid.length}`))}>add</button>
+				<ul>
+					@for (const r of grid; key r.key) {
+						<li>
+							@for (const c of r.cells; key c.key) {
+								<b>{c.text}</b>
+							}
+						</li>
+					}
+				</ul>
+			</section>
+		}
+		@try {
+			<div id="boundary">
+				<p>{label}</p>
+				@if (SHOWN) {
+					<section id="bounded">
+						<button data-bounded onClick={() => bounded.push(row(`q${bounded.length}`))}>add</button>
+						<ul>
+							@for (const r of bounded; key r.key) {
+								<li>
+									@for (const c of r.cells; key c.key) {
+										<b>{c.text}</b>
+									}
+								</li>
+							}
+						</ul>
+					</section>
+				}
+			</div>
+		} @pending {
+			<p>loading</p>
 		}
 		<button data-open onClick={() => (open = !open)}>open</button>
 		@if (open) {
@@ -76,6 +174,19 @@ export default function Lists() @{
 						</li>
 					}
 				</ul>
+				<button data-deep="add" onClick={() => deep.push(shelf(`u${deep.length}`))}>add</button>
+				@for (const s of deep; key s.key) {
+					<div class="deep">
+						<button data-deep-row={s.key} onClick={() => s.rows.push(row(`${s.key}c`))}>+</button>
+						@for (const r of s.rows; key r.key) {
+							<ol>
+								@for (const c of r.cells; key c.key) {
+									<li onClick={() => (picked = c.text)}>{c.text}</li>
+								}
+							</ol>
+						}
+					</div>
+				}
 			</section>
 		}
 	</>
