@@ -89,6 +89,8 @@ sealed interface ScriptBinding {
 	data class Object(val members: Map<String, ScriptBinding>) : ScriptBinding
 	/** A `shared()` accessor: a function that returns that object. */
 	data class Shared(val members: Map<String, ScriptBinding>) : ScriptBinding
+	/** A shared object's method: the script function [fn] returns it, run over its own [members] when called. */
+	data class Method(val fn: String, val members: Map<String, ScriptBinding>) : ScriptBinding
 }
 
 /** The JavaScript a payload's script ops and script computeds run, kept in the engine under [id]; [services] are the host services it uses. */
@@ -198,12 +200,14 @@ sealed interface Op {
 	data class Tick(val node: String) : Op
 	/** Runs function [fn] of the payload's script with [bindings]; a throw or rejection writes `{ name, message }` to [catch] when there is one. */
 	data class Script(val fn: String, val type: String, val bindings: Map<String, ScriptBinding>, val catch: String? = null) : Op
+	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler. */
+	data object PreventDefault : Op
+	/** `field.value = text` on a text field: its text becomes [value], with no input event; [node] evaluates to its id. */
+	data class FieldText(val node: Expr, val value: Expr) : Op
 	/** `reset` of `@catch (error, reset)`: clears [catch] and runs again each of [cells] that holds an error. */
 	data class Reset(val cells: List<String>, val catch: String? = null) : Op
 	/** `setPointerCapture(pointer)` on the element [node] evaluates to, or with [release] `releasePointerCapture(pointer)`. */
 	data class Capture(val node: Expr, val pointer: Expr, val release: Boolean) : Op
-	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler. */
-	data object PreventDefault : Op
 }
 
 /** A device call a task cell starts at mount. */
@@ -229,7 +233,7 @@ data class Route(val pattern: String, val params: List<String>) {
 /** [device]: a live device value the host fills at mount and on change. [task]: an async device call started at mount. [row]: state of a component a list row renders, one value per row of that `repeat`, [initial] when the row is built. */
 /** [clock]: the clock when the screen opened, written at mount before the first build. */
 /** [async]: an async value function [AsyncValue.fn] of the payload's script computes while one of its [AsyncValue.boundaries] branches is shown; the script settles the cell. */
-data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null, val clock: Boolean = false, val first: Expr? = null, val rebuiltBy: List<Expr>? = null, val async: AsyncValue? = null)
+data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null, val clock: Boolean = false, val first: Expr? = null, val rebuiltBy: List<Expr>? = null, val unset: Boolean = false, val follows: Expr? = null, val async: AsyncValue? = null)
 
 data class AsyncValue(val fn: String, val bindings: Map<String, ScriptBinding>, val boundaries: List<String>)
 data class Event(val host: String, val event: EventName, val handler: String)
@@ -410,7 +414,8 @@ data class Payload(
 				is Op.Navigate -> op.params.values.any(::hasScript)
 				is Op.After -> hasScript(op.ms) || op.capture.any { hasScript(it.second) } || scriptOps(op.ops)
 				is Op.Capture -> hasScript(op.node) || hasScript(op.pointer)
-				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick, is Op.Reset, Op.PreventDefault -> false
+				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick, Op.PreventDefault, is Op.Reset -> false
+				is Op.FieldText -> hasScript(op.node) || hasScript(op.value)
 			}
 		}
 
@@ -446,6 +451,7 @@ data class Payload(
 				is ScriptBinding.Elements -> cellsOf(b.value)
 				is ScriptBinding.Object -> cellsOf(b.members)
 				is ScriptBinding.Shared -> cellsOf(b.members)
+				is ScriptBinding.Method -> cellsOf(b.members)
 			}
 		}
 
@@ -463,6 +469,10 @@ data class Payload(
 				bo.containsKey("elements") -> { bo.only(setOf("elements"), "$what.$name"); ScriptBinding.Elements(expr(bo.field("elements", what), "$what.$name.elements")) }
 				bo.containsKey("object") -> { bo.only(setOf("object"), "$what.$name"); ScriptBinding.Object(scriptBindings(bo.field("object", what), "$what.$name.object")) }
 				bo.containsKey("shared") -> { bo.only(setOf("shared"), "$what.$name"); ScriptBinding.Shared(scriptBindings(bo.field("shared", what), "$what.$name.shared")) }
+				bo.containsKey("method") -> {
+					bo.only(setOf("method", "bindings"), "$what.$name")
+					ScriptBinding.Method(bo.field("method", what).str("$what.$name.method"), scriptBindings(bo.field("bindings", what), "$what.$name.bindings"))
+				}
 				else -> throw MarklessDecodeError("$what.$name is an unknown script binding (fields ${bo.keys})")
 			}
 		}
@@ -564,7 +574,8 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled", "device", "task", "object", "row", "clock", "async", "first", "rebuiltBy"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled", "device", "task", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows", "async"), what)
+			val unset = o["unset"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.unset must be true when present"); true } ?: false
 			val clock = o["clock"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.clock must be true when present"); true } ?: false
 			val styled = o["styled"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.styled must be true when present"); true } ?: false
 			val storage = o["storage"]?.obj("$what.storage")?.let { it.only(setOf("key"), "$what.storage"); it.field("key", what).str("$what.storage.key") }
@@ -576,7 +587,7 @@ data class Payload(
 				a.only(setOf("script", "bindings", "boundaries"), "$what.async")
 				AsyncValue(a.field("script", what).str("$what.async.script"), scriptBindings(a.field("bindings", what), "$what.async.bindings"), a.field("boundaries", what).arr("$what.async.boundaries").map { it.str("$what.async.boundaries[]") })
 			}
-						return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, o["first"]?.let { expr(it, "$what.first") }, o["rebuiltBy"]?.arr("$what.rebuiltBy")?.mapIndexed { n, e -> expr(e, "$what.rebuiltBy[$n]") }, async)
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, o["first"]?.let { expr(it, "$what.first") }, o["rebuiltBy"]?.arr("$what.rebuiltBy")?.mapIndexed { n, e -> expr(e, "$what.rebuiltBy[$n]") }, unset, o["follows"]?.let { expr(it, "$what.follows") }, async)
 		}
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
@@ -782,10 +793,18 @@ data class Payload(
 				o.only(setOf("op"), what)
 				return Op.PreventDefault
 			}
+			if (name == "fieldText") {
+				o.only(setOf("op", "node", "value"), what)
+				val raw = o.field("node", what)
+				val node = if (raw is Json.Str) Expr.Literal(JsValue.Str(raw.value)) else expr(raw, "$what.node")
+				val value = expr(o.field("value", what), "$what.value")
+				for (c in cellsOf(node) + cellsOf(value)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				return Op.FieldText(node, value)
+			}
 			if (name == "command") {
 				o.only(setOf("op", "node", "command", "preventScroll"), what)
 				val command = o.field("command", what).str("$what.command")
-				if (command != "focus" && command != "scrollIntoView") throw MarklessDecodeError("$what has unknown command \"$command\"")
+				if (command != "focus" && command != "scrollIntoView" && command != "select") throw MarklessDecodeError("$what has unknown command \"$command\"")
 				val preventScroll = if (o.containsKey("preventScroll")) ((o.field("preventScroll", what) as? Json.Bool ?: throw MarklessDecodeError("$what.preventScroll must be a boolean")).value) else false
 				val raw = o.field("node", what)
 				val node = if (raw is Json.Str) Expr.Literal(JsValue.Str(raw.value)) else expr(raw, "$what.node")
