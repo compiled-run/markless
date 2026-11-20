@@ -278,29 +278,28 @@ export function assertProtocolViewPayload(
 	assertEnclosingRowsResolve(payload);
 }
 
-// A nested list is wired through its enclosing list's rows: one naming a list the page does not hold would wire under nothing or the wrong list.
+// A nested list is wired through its enclosing list's rows, whose record sits in the same record set: one naming no list there would wire under nothing or the wrong list.
 function assertEnclosingRowsResolve(view: Record<string, unknown>): void {
-	const records: Record<string, unknown>[] = [];
 	const visit = (set: unknown): void => {
 		if (!isRecord(set)) return;
-		if (Array.isArray(set.keyedRepeats)) records.push(...set.keyedRepeats.filter(isRecord));
+		const records = Array.isArray(set.keyedRepeats) ? set.keyedRepeats.filter(isRecord) : [];
+		const ids = new Set(records.map((record) => record.id));
+		for (const record of records) {
+			const at = record.enclosingRow;
+			if (!isRecord(at)) continue;
+			const enclosing = String(at.prefix ?? '') + String(at.repeatId);
+			if (!ids.has(enclosing))
+				throw invalidPayloadShapeError(
+					'markless/view',
+					`Invalid markless/view keyedRepeat ${String(record.id)}: its enclosingRow names ${enclosing}, which is not a list in its record set.`,
+				);
+		}
 		for (const branch of Array.isArray(set.branches) ? set.branches : [])
 			if (isRecord(branch)) visit(branch.servedArmRecords);
 		for (const boundary of Array.isArray(set.asyncBoundaries) ? set.asyncBoundaries : [])
 			if (isRecord(boundary)) for (const arm of [boundary.armRecords].flat()) visit(arm);
 	};
 	visit(view);
-	const ids = new Set(records.map((record) => record.id));
-	for (const record of records) {
-		const at = record.enclosingRow;
-		if (!isRecord(at)) continue;
-		const enclosing = String(at.prefix ?? '') + String(at.repeatId);
-		if (!ids.has(enclosing))
-			throw invalidPayloadShapeError(
-				'markless/view',
-				`Invalid markless/view keyedRepeat ${String(record.id)}: its enclosingRow names ${enclosing}, which is not a list on the page.`,
-			);
-	}
 }
 
 const EVENT_ACTION_VALIDATORS = {

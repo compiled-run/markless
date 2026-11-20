@@ -34,6 +34,7 @@ import {
 	marklessComposedGraphNodeId,
 	marklessInstancePath,
 	marklessPrefixedRepeatId,
+	marklessPrefixedRepeatParents,
 	marklessWidgetHandleId,
 	marklessRowPath,
 } from './instance-scope.ts';
@@ -2142,9 +2143,7 @@ export function marklessSsrPrefixArmRecord(arm: SsrArmRecordSet, child: SsrPrefi
 				marklessSsrBindBehavior(behavior, child, instancePath),
 			),
 		}),
-		...(arm.repeatParents && {
-			repeatParents: arm.repeatParents.map((list) => ({ ...list, repeatId: child.hostPrefix + list.repeatId })),
-		}),
+		...marklessPrefixedRepeatParents(arm, child.hostPrefix),
 	};
 }
 function marklessSsrBindBehavior<T extends SsrBehaviorRecord>(

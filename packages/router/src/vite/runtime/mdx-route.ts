@@ -2,6 +2,7 @@ import {
 	marklessInstanceScopedLoadSymbol,
 	marklessIslandSpacedSymbol,
 	marklessPrefixedRepeatId,
+	marklessPrefixedRepeatParents,
 } from '../../../../web/src/fns/instance-scope.ts';
 import { marklessThen } from '../../../../web/src/ssr-data/awaitable.ts';
 import { marklessWhenLoaded, PACK_RESIDENT } from '../../../../web/src/fns/resident-load.ts';
@@ -968,12 +969,7 @@ function islandScopedFamilyRecord(
 		if (isFamilyRecord(anchor) && anchor.strategy === MDX_PAGE_ANCHOR_STRATEGY)
 			mapped[key] = { ...anchor, index: context.commentOffset + Number(anchor.index) };
 	}
-	// An arm names the lists it renders the parent of by record id, which carries the island's prefix.
-	if (Array.isArray(record.repeatParents))
-		mapped.repeatParents = record.repeatParents.map((list: { readonly repeatId: string }) => ({
-			...list,
-			repeatId: child.hostPrefix + list.repeatId,
-		}));
+	Object.assign(mapped, marklessPrefixedRepeatParents(record as { readonly repeatParents?: ReadonlyArray<{ readonly repeatId: string }> }, child.hostPrefix));
 	if (isFamilyRecord(record.rowTemplate))
 		mapped.rowTemplate = islandScopedRowTemplate(record.rowTemplate, island);
 	// A minted row reads through the owning component's reader, which spells ids without the island's segment.

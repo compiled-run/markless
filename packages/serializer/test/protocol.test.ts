@@ -24,9 +24,7 @@ test('streamed arm patches keep the served arm beside its records', () => {
 		{ locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [] },
 	] satisfies ProtocolStreamedArmPatch;
 
-	expect(JSON.stringify(patch)).toBe(
-		'[0,{"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[]}]',
-	);
+	expect(JSON.stringify(patch)).toBe('[0,{"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[]}]');
 });
 
 test('protocol payloads share the current async protocol version', () => {
@@ -144,18 +142,16 @@ test('async boundary armRecords round-trip payload scripts in both protocol shap
 		events: [{ hostNodeId: 'h3', eventName: 'click', symbolIds: ['symbol:3'] }],
 		behaviors: [],
 		elementHandles: [],
-		keyedRepeats: [
-			{
-				id: 'repeat:rows',
-				parentHostNodeId: 'h3',
-				collectionGraphNodeId: 'computed:rows',
-				collectionPath: [],
-				keyPath: ['id'],
-				itemName: 'row',
-				rowElementCount: 1,
-				rowEvents: [{ hostPath: [], eventName: 'click', symbolIds: ['symbol:row'] }],
-			},
-		],
+		keyedRepeats: [{
+			id: 'repeat:rows',
+			parentHostNodeId: 'h3',
+			collectionGraphNodeId: 'computed:rows',
+			collectionPath: [],
+			keyPath: ['id'],
+			itemName: 'row',
+			rowElementCount: 1,
+			rowEvents: [{ hostPath: [], eventName: 'click', symbolIds: ['symbol:row'] }],
+		}],
 		branches: [],
 	};
 	const boundaryBase = {
@@ -304,11 +300,7 @@ test('keyed repeat enclosing row round-trips and refuses a malformed shape', () 
 		keyedRepeats: [outer, inner],
 		asyncBoundaries: [],
 	};
-	const state: ProtocolStatePayload = {
-		version: ASYNC_PROTOCOL_VERSION,
-		cells: [],
-		computed: [],
-	};
+	const state: ProtocolStatePayload = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
 
 	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
 	expect(decoded.view.keyedRepeats?.[1]?.enclosingRow).toEqual(inner.enclosingRow);
@@ -328,51 +320,26 @@ test('keyed repeat enclosing row round-trips and refuses a malformed shape', () 
 		).toThrow(/keyedRepeat\[1\]\.enclosingRow/);
 });
 
-// A nested repeat's enclosing list is prefix + repeatId, and the page must hold it.
-test('keyed repeat enclosing row must name a list the page holds', () => {
-	const list = (id: string, enclosingRow?: object) => ({
-		id,
-		parentHostNodeId: 'c0:h0',
-		...(enclosingRow && { enclosingRow }),
-		collectionPath: [],
-		keyPath: ['id'],
-		itemName: 'item',
-		rowElementCount: 1,
-		rowEvents: [],
-	});
-	const state: ProtocolStatePayload = {
-		version: ASYNC_PROTOCOL_VERSION,
-		cells: [],
-		computed: [],
-	};
-	const view = (keyedRepeats: unknown[]) =>
-		({
-			version: ASYNC_PROTOCOL_VERSION,
-			locators: [],
-			events: [],
-			domUpdates: [],
-			behaviors: [],
-			elementHandles: [],
-			keyedRepeats,
-			asyncBoundaries: [],
-		}) as never;
-	const composed = list('c0:repeat:1', {
-		repeatId: 'repeat:0',
-		prefix: 'c0:',
-		parentHostPath: [],
-	});
+// A nested repeat's enclosing list is prefix + repeatId, held in the same record set: the page, a branch's served arm or an @try arm.
+test('keyed repeat enclosing row must name a list in its record set', () => {
+	const list = (id: string, enclosingRow?: object) => ({ id, parentHostNodeId: 'c0:h0', ...(enclosingRow && { enclosingRow }), collectionPath: [], keyPath: ['id'], itemName: 'item', rowElementCount: 1, rowEvents: [] });
+	const state: ProtocolStatePayload = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
+	const base = { version: ASYNC_PROTOCOL_VERSION, locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [] };
+	const decode = (view: object) => () => decodePayloadScripts(renderPayloadScripts({ state, view: { ...base, ...view } as never }));
+	const outer = list('c0:repeat:0');
+	const inner = list('c0:repeat:1', { repeatId: 'repeat:0', prefix: 'c0:', parentHostPath: [] });
+	const arm = { locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [], keyedRepeats: [outer, inner], branches: [] };
+	const anchor = (index: number) => ({ strategy: 'dom-order-comment', index });
+	const branch = { id: 'branch-site:0', startAnchor: anchor(0), endAnchor: anchor(1), symbolId: 'symbol:0', testReads: [], escalates: true, servedArmRecords: arm, takenArm: 0 };
+	const boundary = { id: 'async:0', runnerGraphNodeId: null, initiallyServedArm: 0, startAnchor: anchor(2), endAnchor: anchor(3), asyncReads: [], armRecords: [arm, { ...arm, keyedRepeats: [] }] };
 
-	expect(() =>
-		decodePayloadScripts(
-			renderPayloadScripts({ state, view: view([list('c0:repeat:0'), composed]) }),
-		),
-	).not.toThrow();
-	// A missed prefix: the page holds only a page list with the same authored id.
-	expect(() =>
-		decodePayloadScripts(
-			renderPayloadScripts({ state, view: view([list('repeat:0'), composed]) }),
-		),
-	).toThrow(/c0:repeat:1: its enclosingRow names c0:repeat:0/);
+	expect(decode({ keyedRepeats: [outer, inner] })).not.toThrow();
+	expect(decode({ keyedRepeats: [], branches: [branch] })).not.toThrow();
+	expect(decode({ keyedRepeats: [], asyncBoundaries: [boundary] })).not.toThrow();
+	// A missed prefix: the set holds only a list with the same authored id.
+	expect(decode({ keyedRepeats: [list('repeat:0'), inner] })).toThrow(/c0:repeat:1: its enclosingRow names c0:repeat:0/);
+	// The enclosing list in another record set does not count.
+	expect(decode({ keyedRepeats: [outer], branches: [{ ...branch, servedArmRecords: { ...arm, keyedRepeats: [inner] } }] })).toThrow(/not a list in its record set/);
 });
 
 // A composed row's prop routes cross the wire on its record and are refused malformed.
@@ -521,10 +488,7 @@ test('keyed repeat row markup round-trips and refuses a malformed shape', () => 
 					keyedRepeats: [
 						{
 							...repeat,
-							rowTemplate: {
-								...rowTemplate,
-								textSlots: [{ path: [-1], itemPath: ['title'] }],
-							},
+							rowTemplate: { ...rowTemplate, textSlots: [{ path: [-1], itemPath: ['title'] }] },
 						},
 					],
 				} as never,
@@ -541,10 +505,7 @@ test('keyed repeat row markup round-trips and refuses a malformed shape', () => 
 					keyedRepeats: [
 						{
 							...repeat,
-							rowTemplate: {
-								...rowTemplate,
-								textSlots: [{ path: [0], itemPath: [7] }],
-							},
+							rowTemplate: { ...rowTemplate, textSlots: [{ path: [0], itemPath: [7] }] },
 						},
 					],
 				} as never,
@@ -605,15 +566,11 @@ test('a row slot names the item or a graph node, and exactly one of the two', ()
 	// Both channels ride one ordered list, because a row mixing them - a hidden
 	// input named from the page's state and valued from the item - is the shape
 	// that needs this at all.
-	expect(
-		decodePayloadScripts(renderPayloadScripts({ state, view })).view.keyedRepeats?.[0]
-			?.rowTemplate,
-	).toEqual(rowTemplate);
+	expect(decodePayloadScripts(renderPayloadScripts({ state, view })).view.keyedRepeats?.[0]
+		?.rowTemplate).toEqual(rowTemplate);
 
 	expect(() =>
-		withTextSlots([
-			{ path: [1], itemPath: ['title'], graphNodeId: 'state:box', graphPath: [] },
-		]),
+		withTextSlots([{ path: [1], itemPath: ['title'], graphNodeId: 'state:box', graphPath: [] }]),
 	).toThrow(/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]/);
 	expect(() => withTextSlots([{ path: [1] }])).toThrow(
 		/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]/,
@@ -677,10 +634,7 @@ test('keyed repeat row component identity round-trips and refuses a malformed sh
 			decodePayloadScripts(
 				renderPayloadScripts({
 					state,
-					view: {
-						...view,
-						keyedRepeats: [{ ...repeat, rowComponent: malformed }],
-					} as never,
+					view: { ...view, keyedRepeats: [{ ...repeat, rowComponent: malformed }] } as never,
 				}),
 			),
 		).toThrow(/keyedRepeat\[0\]\.rowComponent/);
@@ -722,9 +676,7 @@ test('branch content reads round-trip and refuse a malformed shape', () => {
 				state,
 				view: {
 					...view,
-					branches: [
-						{ ...branch, contentReads: [{ graphNodeId: 'g', path: [], source: 7 }] },
-					],
+					branches: [{ ...branch, contentReads: [{ graphNodeId: 'g', path: [], source: 7 }] }],
 				} as never,
 			}),
 		),
@@ -735,7 +687,9 @@ test('branch content reads round-trip and refuse a malformed shape', () => {
 // arm-relative: page-absolute indexes would re-register against the wrong DOM.
 test('served arm records need the escalates mark and arm-relative locators', () => {
 	const armRecords = {
-		locators: [{ hostNodeId: 'h0', tagName: 'EM', index: 0 }],
+		locators: [
+			{ hostNodeId: 'h0', tagName: 'EM', index: 0 },
+		],
 		events: [],
 		behaviors: [],
 		elementHandles: [],
@@ -900,11 +854,7 @@ test('a row slot may carry an authored expression, with its component and reads'
 		keyedRepeats: [repeat],
 		asyncBoundaries: [],
 	};
-	const state: ProtocolStatePayload = {
-		version: ASYNC_PROTOCOL_VERSION,
-		cells: [],
-		computed: [],
-	};
+	const state: ProtocolStatePayload = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
 	const withTemplate = (template: unknown) =>
 		decodePayloadScripts(
 			renderPayloadScripts({
@@ -916,9 +866,9 @@ test('a row slot may carry an authored expression, with its component and reads'
 	expect(withTemplate(rowTemplate).view.keyedRepeats?.[0]?.rowTemplate).toEqual(rowTemplate);
 	const { componentName: _dropped, ...withoutComponent } = rowTemplate;
 	expect(() => withTemplate(withoutComponent)).toThrow(/keyedRepeat\[0\]\.rowTemplate/);
-	expect(() => withTemplate({ html: '<li></li>', componentName: 'Rows', textSlots: [] })).toThrow(
-		/keyedRepeat\[0\]\.rowTemplate/,
-	);
+	expect(() =>
+		withTemplate({ html: '<li></li>', componentName: 'Rows', textSlots: [] }),
+	).toThrow(/keyedRepeat\[0\]\.rowTemplate/);
 	expect(() =>
 		withTemplate({
 			...rowTemplate,
@@ -940,11 +890,7 @@ test('a row slot may carry an authored expression, with its component and reads'
 });
 
 test('a submit event record carries authoredSubmitAriaDisabled through payload scripts, templated or not', () => {
-	const state: ProtocolStatePayload = {
-		version: ASYNC_PROTOCOL_VERSION,
-		cells: [],
-		computed: [],
-	};
+	const state: ProtocolStatePayload = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
 	const form = (hostNodeId: string) => ({
 		hostNodeId,
 		eventName: 'submit',
@@ -954,22 +900,14 @@ test('a submit event record carries authoredSubmitAriaDisabled through payload s
 	const view: ProtocolViewPayload = {
 		version: ASYNC_PROTOCOL_VERSION,
 		locators: [],
-		events: [
-			form('h1'),
-			form('h2'),
-			{ hostNodeId: 'h3', eventName: 'submit', symbolIds: ['symbol:h3'] },
-		],
+		events: [form('h1'), form('h2'), { hostNodeId: 'h3', eventName: 'submit', symbolIds: ['symbol:h3'] }],
 		domUpdates: [],
 		behaviors: [],
 		elementHandles: [],
 		asyncBoundaries: [],
 	};
 	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
-	expect(decoded.view.events.map((event) => event.authoredSubmitAriaDisabled)).toEqual([
-		true,
-		true,
-		undefined,
-	]);
+	expect(decoded.view.events.map((event) => event.authoredSubmitAriaDisabled)).toEqual([true, true, undefined]);
 });
 
 test('authoredSubmitAriaDisabled other than true is refused', () => {
@@ -977,14 +915,7 @@ test('authoredSubmitAriaDisabled other than true is refused', () => {
 	const view = {
 		version: ASYNC_PROTOCOL_VERSION,
 		locators: [],
-		events: [
-			{
-				hostNodeId: 'h1',
-				eventName: 'submit',
-				symbolIds: [],
-				authoredSubmitAriaDisabled: false,
-			},
-		],
+		events: [{ hostNodeId: 'h1', eventName: 'submit', symbolIds: [], authoredSubmitAriaDisabled: false }],
 		domUpdates: [],
 		behaviors: [],
 		elementHandles: [],
@@ -1069,19 +1000,11 @@ test('branch arm records round-trip the lists an arm holds, and a malformed fiel
 			},
 		],
 	});
-	const state: ProtocolStatePayload = {
-		version: ASYNC_PROTOCOL_VERSION,
-		cells: [],
-		computed: [],
-	};
+	const state: ProtocolStatePayload = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
 
-	const decoded = decodePayloadScripts(
-		renderPayloadScripts({ state, view: view([arm, { ...arm, repeatParents: undefined }]) }),
-	);
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view: view([arm, { ...arm, repeatParents: undefined }]) }));
 	expect(decoded.view.branches?.[0]?.armRecords?.[0]?.repeatParents).toEqual(arm.repeatParents);
 	expect(() =>
-		decodePayloadScripts(
-			renderPayloadScripts({ state, view: view([{ ...arm, repeatParents: 'repeat:0' }]) }),
-		),
+		decodePayloadScripts(renderPayloadScripts({ state, view: view([{ ...arm, repeatParents: 'repeat:0' }]) })),
 	).toThrow(/repeatParents/);
 });

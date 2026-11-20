@@ -59,3 +59,42 @@ test('a write adds its row, before and after the arm closes and opens again', as
 	expect(errors).toEqual([]);
 	await page.close();
 }, 60_000);
+
+// A refresh marks busy a binding that reads the async value through a sync computed, in an island as on a page.
+for (const path of ['/page-busy', '/busy'])
+	test(`a refreshing @try marks its binding busy: ${path}`, async () => {
+		const page = await browser!.newPage();
+		const errors: string[] = [];
+		page.on('pageerror', (error) => errors.push(error.message));
+		await page.goto(`${server!.origin}${path}`);
+		const total = () =>
+			page.evaluate(() => {
+				const shown = document.querySelector('.total');
+				return `${shown?.textContent} ${shown?.getAttribute('aria-busy') ?? '-'}`;
+			});
+		await expect.poll(total).toBe('1 -');
+		await page.click('[data-more]');
+		await expect.poll(total).toBe('1 true');
+		await expect.poll(total).toBe('2 -');
+		expect(errors).toEqual([]);
+		await page.close();
+	}, 60_000);
+
+test("two islands of one component: a refresh marks only its own island's binding busy", async () => {
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(`${server!.origin}/busy-two`);
+	const totals = () =>
+		page.evaluate(() =>
+			[...document.querySelectorAll('.total')]
+				.map((shown) => `${shown.textContent} ${shown.getAttribute('aria-busy') ?? '-'}`)
+				.join('|'),
+		);
+	await expect.poll(totals).toBe('1 -|1 -');
+	await page.locator('[data-more]').nth(1).click();
+	await expect.poll(totals).toBe('1 -|1 true');
+	await expect.poll(totals).toBe('1 -|2 -');
+	expect(errors).toEqual([]);
+	await page.close();
+}, 60_000);

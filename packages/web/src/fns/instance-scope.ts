@@ -1246,9 +1246,7 @@ function composedBoundaryArmRecords(
 							? {
 									armRecords: branch.armRecords.map((arm) => ({
 										...arm,
-										...(arm.repeatParents && {
-											repeatParents: arm.repeatParents.map((list) => ({ ...list, repeatId: prefix + list.repeatId })),
-										}),
+										...marklessPrefixedRepeatParents(arm, prefix),
 										events: (arm.events ?? []).map((event) => ({
 											...event,
 											symbolIds: (event.symbolIds ?? []).map(
@@ -1472,4 +1470,12 @@ export function marklessPrefixedRepeatId<R extends { readonly id: string; readon
 ): Pick<R, 'id' | 'enclosingRow'> {
 	const at = repeat.enclosingRow;
 	return { id: prefix + repeat.id, ...(at && { enclosingRow: { ...at, prefix: prefix + (at.prefix ?? '') } }) } as Pick<R, 'id' | 'enclosingRow'>;
+}
+
+/** An arm record set's references to the lists it renders the parent of, under the same prefix their records take. */
+export function marklessPrefixedRepeatParents<A extends { readonly repeatParents?: ReadonlyArray<{ readonly repeatId: string }> }>(
+	arm: A,
+	prefix: string,
+): Pick<A, 'repeatParents'> {
+	return (arm.repeatParents ? { repeatParents: arm.repeatParents.map((list) => ({ ...list, repeatId: prefix + list.repeatId })) } : {}) as Pick<A, 'repeatParents'>;
 }
