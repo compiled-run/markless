@@ -11,7 +11,11 @@ permissions:
 jobs:
     diagnose:
         runs-on: ubuntu-26.04
-        timeout-minutes: 30
+        timeout-minutes: 40
+        strategy:
+            fail-fast: false
+            matrix:
+                run: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         env:
             PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
             PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
@@ -37,13 +41,10 @@ jobs:
             - run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
             - if: steps.playwright-cache.outputs.cache-hit != 'true'
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
-            - run: node scripts/ci/g16-diagnose.mjs
-              env:
-                  G16_RUNS: '12'
-                  G16_VARIANTS: plain,park,park-cpu4
+            - run: mkdir -p /tmp/g16-diagnose && node scripts/benchmarks/perf-guards/cli.mjs measure --sites bench,docs --out /tmp/g16-diagnose/measurement.json
             - if: always()
               uses: actions/upload-artifact@v4
               with:
-                  name: g16-diagnose
+                  name: g16-proof-${{ matrix.run }}
                   path: /tmp/g16-diagnose
                   retention-days: 3

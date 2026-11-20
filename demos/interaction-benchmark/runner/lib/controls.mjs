@@ -65,15 +65,38 @@ export async function distinctControls(page) {
 	);
 }
 
+// Linux headless Chromium keeps its pointer at (0,0) and hovers whatever lays out there, racing the page's own listeners.
+function dropHover() {
+	for (const type of [
+		'pointerover',
+		'pointerenter',
+		'pointermove',
+		'pointerout',
+		'pointerleave',
+		'mouseover',
+		'mouseenter',
+		'mousemove',
+		'mouseout',
+		'mouseleave',
+	])
+		addEventListener(type, (event) => event.stopImmediatePropagation(), { capture: true });
+}
+
 /**
  * Opens a fresh page with the benchmark page agent, JS request tracking, and optional coverage.
- * `phase` splits requests into load / input windows.
+ * `phase` splits requests into load / input windows. `untouched` is for a visit that sends no input: no page
+ * listener sees a hover the browser makes up. `cpuSlowdown` throttles the page's CPU by that factor.
  */
-export async function openPage(browser, { coverage = false } = {}) {
+export async function openPage(browser, { coverage = false, untouched = false, cpuSlowdown = 1 } = {}) {
 	const context = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block' });
 	await context.addInitScript(pageAgent);
+	if (untouched) await context.addInitScript(dropHover);
 	const page = await context.newPage();
 	const cov = coverage ? await startCoverage(context, page) : null;
+	if (cpuSlowdown > 1)
+		await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', {
+			rate: cpuSlowdown,
+		});
 	const state = {
 		phase: 'load',
 		js: { load: [], input: [] },

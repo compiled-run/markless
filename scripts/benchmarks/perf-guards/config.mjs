@@ -26,6 +26,8 @@ export const COST_MODEL = {
 // minification, independent of what shares its chunk) and per compiled construct.
 // Loads per route for G16; the lowest of them is the page's weight.
 export const LOAD_WEIGHT_RUNS = 3;
+// Unthrottled, Linux CI's load event beat the bench pages' last modulepreload in 22 of 24 loads of / and /settings, and a 107-char branch of the link bridge ran or not; at 4x it came after it in all 36.
+export const LOAD_WEIGHT_CPU_SLOWDOWN = 4;
 
 export const BUDGETS = {
 	// The lowest of three loads moved by at most 107 chars across three measurements of one build (bench /settings); 2.4x that.
