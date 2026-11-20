@@ -1482,6 +1482,24 @@ export function Search() @{
 		);
 	});
 
+	it('lowers an @if inside a @for row: the branch and its arms belong to the row, each row choosing its own arm', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Errands() @{
+	let items = state([{ id: 'a', done: false }]);
+	<ul>@for (const item of items; key item.id) { <li>@if (item.done) { <b>done</b> } @else { <i>open</i> }</li> }</ul>
+}`);
+		expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const repeat = payload!.nodes.find((node) => node.kind === 'repeat')!;
+		const branch = payload!.nodes.find((node) => node.kind === 'branch')!;
+		expect(branch).toMatchObject({ row: repeat.id, test: { member: { item: repeat.id }, property: 'done' } });
+		expect(payload!.nodes.filter((node) => node.arm?.branch === branch.id).map((node) => node.row)).toEqual([
+			repeat.id,
+			repeat.id,
+			repeat.id,
+			repeat.id,
+		]);
+	});
+
 	it("takes a state's first value the build cannot know when the screen opens, as data or as JavaScript; not in an @if arm", async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 const WORDS = ['pear', 'fig'];

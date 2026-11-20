@@ -584,6 +584,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// Each row shows its own @if arm, from its own item: a press in one row flips that row's arm alone.
+		name: 'row-arms',
+		fixture: 'proofs/u67-row-arms/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5@a' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h5@b' },
+		],
+	},
+	{
 		name: 'script-loop',
 		fixture: 'proofs/j1-loop-local/App.tsrx',
 		modules: true,

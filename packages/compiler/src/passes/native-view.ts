@@ -4702,10 +4702,6 @@ export function createNativeViewPayload(
 			}
 			if (item.kind === 'branch') {
 				close();
-				if (place.row) {
-					refuse('@if inside a @for row');
-					continue;
-				}
 				const site = scope.module.branchSites.get(item.id);
 				if (!site) {
 					refuse(`the branch ${item.id}`);
@@ -4750,7 +4746,12 @@ export function createNativeViewPayload(
 				item.arms.forEach((armId, index) => {
 					const armChunk = scope.module.chunks.get(armId);
 					if (armChunk)
-						lowerChunk(armChunk, parent, { arm: { branch: branchId, index } }, scope);
+						lowerChunk(
+							armChunk,
+							parent,
+							{ ...(place.row ? { row: place.row } : {}), arm: { branch: branchId, index } },
+							scope,
+						);
 					else refuse(`arm ${armId} has no markup`);
 				});
 				continue;
