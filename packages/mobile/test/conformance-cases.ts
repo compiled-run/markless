@@ -1002,6 +1002,9 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'back' },
 			{ event: 'activate', host: 'h4' },
 			{ event: 'back' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'back' },
 		],
 	},
 	{

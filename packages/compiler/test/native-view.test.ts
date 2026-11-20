@@ -1640,6 +1640,21 @@ export function Nav() @{
 }`,
 			{ routes, resolvePath } as never,
 		);
+		const built = await nativeView(
+			`import { state } from '@markless/core';
+export function Pick() @{
+	let id = state('3');
+	<main>
+		<a href={\`/items/\${id}\`}>Open</a>
+		<a href={\`https://example.com/\${id}\`}>Away</a>
+	</main>
+}`,
+			{ routes, resolvePath } as never,
+		);
+		expect(built.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		expect(built.payload!.handlers.filter((handler) => handler.id.endsWith('/link')).map((handler) => handler.ops)).toEqual([
+			[{ op: 'navigate', route: '/items/[id]', params: { id: { template: [{ cell: 'state:id' }] } } }],
+		]);
 		expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
 		const navigations = payload!.events.flatMap((event) =>
 			payload!.handlers

@@ -6,6 +6,7 @@ name: n6-plain-links
 - assertVisible: Start page
 - assertVisible: About us
 - assertVisible: Item seven
+- assertVisible: Open item 3
 - assertNotVisible: We make lists
 - assertNotVisible: Showing item 7
 - assertVisible: Links
@@ -40,5 +41,25 @@ name: n6-plain-links
 - assertVisible: Links
 - assertVisible: Start page
 - assertVisible: About us
+- assertVisible: Open item 3
 - assertNotVisible: Showing item 7
+- assertVisible: Links
+- tapOn: Pick 9
+- assertNotVisible: Open item 3
+- assertVisible: Open item 9
+- assertVisible: Start page
+- assertNotVisible: Open item 3
+- tapOn: Open item 9
+- assertNotVisible: Start page
+- assertVisible: Item 9
+- assertVisible: Showing item 9
+- assertNotVisible: Start page
+- assertVisible: Item 9
+- *a1
+- assertVisible: Start page
+- assertNotVisible: Showing item 9
+- assertVisible: Links
+- assertVisible: Start page
+- assertVisible: Open item 9
+- assertNotVisible: Showing item 9
 - assertVisible: Links

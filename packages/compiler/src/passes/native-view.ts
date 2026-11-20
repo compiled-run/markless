@@ -6686,17 +6686,35 @@ export function createNativeViewPayload(
 		if (!options.resolvePath) return;
 		for (const node of nodes) {
 			if (node.kind !== 'element' || node.element !== 'a') continue;
-			const href = node.attributes?.['href'];
-			if (href === undefined || !href.startsWith('/') || href.startsWith('//')) continue;
-			// A query or fragment is more than a route; a phone screen opens from the route and its params alone.
-			if (href.includes('?') || href.includes('#')) continue;
 			if (events.some((event) => event.host === node.id && event.event === 'activate')) continue;
-			const matched = options.resolvePath(href);
-			if (!matched) continue;
+			const route = linkedRoute(node);
+			if (!route) continue;
 			const handler = `handler:${node.id}/link`;
 			events.push({ host: node.id, event: 'activate', handler });
-			handlers.push({ id: handler, ops: [{ op: 'navigate', route: matched.pattern, params: { ...matched.params } }] });
+			handlers.push({ id: handler, ops: [{ op: 'navigate', ...route }] });
 		}
+	}
+
+	/** The app route an anchor's href opens: a fixed path the router matches, or one built while rendering that `pathRoute` places. */
+	function linkedRoute(
+		node: Extract<NativeNode, { kind: 'element' }>,
+	): { route: string; params: Record<string, string | NativeExpr> } | null {
+		const bound = node.bindings?.find((binding) => 'attribute' in binding && binding.attribute === 'href');
+		if (bound) {
+			// An href pathRoute cannot place keeps no action, as it had: the refusal is for a <Link>, which promises navigation.
+			const placed = attempt(() => pathRoute(bound.value, undefined));
+			if (placed.failed || !placed.value) {
+				placed.rollBack();
+				return null;
+			}
+			return placed.value;
+		}
+		const href = node.attributes?.['href'];
+		if (href === undefined || !href.startsWith('/') || href.startsWith('//')) return null;
+		// A query or fragment is more than a route; a phone screen opens from the route and its params alone.
+		if (href.includes('?') || href.includes('#')) return null;
+		const matched = options.resolvePath!(href);
+		return matched ? { route: matched.pattern, params: { ...matched.params } } : null;
 	}
 
 	function checkSelects() {

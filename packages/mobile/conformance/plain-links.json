@@ -13,7 +13,13 @@
 						"pattern": "/",
 						"params": []
 					},
-					"cells": [],
+					"cells": [
+						{
+							"id": "state:pick",
+							"name": "pick",
+							"initial": "3"
+						}
+					],
 					"nodes": [
 						{
 							"kind": "element",
@@ -78,9 +84,63 @@
 									"text": "Item seven"
 								}
 							]
+						},
+						{
+							"kind": "element",
+							"id": "h5",
+							"element": "a",
+							"parent": "h0",
+							"bindings": [
+								{
+									"attribute": "href",
+									"value": {
+										"template": [
+											"/items/",
+											{
+												"cell": "state:pick"
+											},
+											""
+										]
+									}
+								}
+							]
+						},
+						{
+							"kind": "text",
+							"id": "h5:text0",
+							"parent": "h5",
+							"parts": [
+								{
+									"text": "Open item "
+								},
+								{
+									"cell": "state:pick"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h6",
+							"element": "button",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h6:text0",
+							"parent": "h6",
+							"parts": [
+								{
+									"text": "Pick 9"
+								}
+							]
 						}
 					],
 					"events": [
+						{
+							"host": "h6",
+							"event": "activate",
+							"handler": "handler:event:0"
+						},
 						{
 							"host": "h3",
 							"event": "activate",
@@ -90,9 +150,26 @@
 							"host": "h4",
 							"event": "activate",
 							"handler": "handler:h4/link"
+						},
+						{
+							"host": "h5",
+							"event": "activate",
+							"handler": "handler:h5/link"
 						}
 					],
 					"handlers": [
+						{
+							"id": "handler:event:0",
+							"ops": [
+								{
+									"op": "assign",
+									"cell": "state:pick",
+									"value": {
+										"literal": "9"
+									}
+								}
+							]
+						},
 						{
 							"id": "handler:h3/link",
 							"ops": [
@@ -111,6 +188,24 @@
 									"route": "/items/[id]",
 									"params": {
 										"id": "7"
+									}
+								}
+							]
+						},
+						{
+							"id": "handler:h5/link",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/items/[id]",
+									"params": {
+										"id": {
+											"template": [
+												{
+													"cell": "state:pick"
+												}
+											]
+										}
 									}
 								}
 							]
@@ -259,6 +354,14 @@
 			[
 				"h4:text0",
 				"Item seven"
+			],
+			[
+				"h5:text0",
+				"Open item 3"
+			],
+			[
+				"h6:text0",
+				"Pick 9"
 			]
 		]
 	},
@@ -308,6 +411,14 @@
 				[
 					"h4:text0",
 					"Item seven"
+				],
+				[
+					"h5:text0",
+					"Open item 3"
+				],
+				[
+					"h6:text0",
+					"Pick 9"
 				]
 			]
 		},
@@ -358,6 +469,117 @@
 				[
 					"h4:text0",
 					"Item seven"
+				],
+				[
+					"h5:text0",
+					"Open item 3"
+				],
+				[
+					"h6:text0",
+					"Pick 9"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "h5",
+					"name": "href",
+					"value": "/items/9"
+				},
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "Open item 9"
+				}
+			],
+			"stack": [
+				"/"
+			],
+			"title": "Links",
+			"texts": [
+				[
+					"h2:text0",
+					"Start page"
+				],
+				[
+					"h3:text0",
+					"About us"
+				],
+				[
+					"h4:text0",
+					"Item seven"
+				],
+				[
+					"h5:text0",
+					"Open item 9"
+				],
+				[
+					"h6:text0",
+					"Pick 9"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/items/[id]",
+					"params": {
+						"id": "9"
+					}
+				}
+			],
+			"stack": [
+				"/",
+				"/items/9"
+			],
+			"title": "Item 9",
+			"texts": [
+				[
+					"h2:text0",
+					"Showing item 9"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "back"
+			},
+			"journal": [],
+			"stack": [
+				"/"
+			],
+			"title": "Links",
+			"texts": [
+				[
+					"h2:text0",
+					"Start page"
+				],
+				[
+					"h3:text0",
+					"About us"
+				],
+				[
+					"h4:text0",
+					"Item seven"
+				],
+				[
+					"h5:text0",
+					"Open item 9"
+				],
+				[
+					"h6:text0",
+					"Pick 9"
 				]
 			]
 		}
