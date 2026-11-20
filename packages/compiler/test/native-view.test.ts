@@ -1482,6 +1482,22 @@ export function Search() @{
 		);
 	});
 
+	it('builds a component whose body marks a prop used with `void`, which runs nothing; other render-time statements stay refused', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Banner({ path }: { readonly path: string }) @{
+	void path;
+	void 0;
+	<p>Banner</p>
+}`);
+		expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		expect(payload).not.toBeNull();
+		const called = await nativeView(`function log(text: string) { return text; }
+export function Noisy() @{
+	void log('x');
+	<p>Noisy</p>
+}`);
+		expect(called.payload).toBeNull();
+	});
+
 	it('lowers an @if inside a @for row: the branch and its arms belong to the row, each row choosing its own arm', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Errands() @{

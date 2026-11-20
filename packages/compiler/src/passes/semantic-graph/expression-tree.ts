@@ -916,6 +916,9 @@ export function componentNativeFactsOf(
 		if (statement.type !== 'ExpressionStatement') continue;
 		const expression = statement.expression as AnyNode | undefined;
 		if (expression?.type?.startsWith('JSX')) continue;
+		// `void name;` (marking a prop used) reads a name and does nothing else, so rendering has nothing to run for it.
+		const voided = expression?.type === 'UnaryExpression' && expression.operator === 'void' ? (expression.argument as AnyNode | undefined) : undefined;
+		if (voided?.type === 'Identifier' || voided?.type === 'Literal') continue;
 		renderStatements.push(statementOf(expression ?? null));
 	}
 	return {
