@@ -2020,6 +2020,42 @@ export function Page() @{
 	});
 });
 
+describe("a <select>'s change handler", () => {
+	it("lowers to the select's input event, reading the chosen value; one that needs JavaScript runs as a script", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function shout(text: string): string {
+	let out = '';
+	for (const letter of text) out += letter.toUpperCase();
+	return out;
+}
+export function Page() @{
+	let make = state('');
+	let size = state('');
+	<main>
+		<select onChange={(event) => (make = (event.target as HTMLSelectElement).value)}>
+			<option>a</option><option>b</option>
+		</select>
+		<select onChange={(event) => (size = shout(event.currentTarget.value))}>
+			<option>c</option><option>d</option>
+		</select>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const [first, second] = payload!.nodes.filter(
+			(node) => node.kind === 'element' && node.element === 'select',
+		);
+		const opsOf = (host: string) =>
+			payload!.handlers.find(
+				(handler) =>
+					handler.id ===
+					payload!.events.find((event) => event.host === host && event.event === 'input')
+						?.handler,
+			)?.ops;
+		expect(opsOf(first!.id)).toEqual([{ op: 'assign', cell: 'state:make', value: { event: 'value' } }]);
+		expect(opsOf(second!.id)).toMatchObject([{ op: 'script', type: 'change' }]);
+	});
+});
+
 describe('a GET form on another site', () => {
 	const form = (attributes: string, button = '<button>Go</button>') =>
 		nativeView(`export function Page() @{
@@ -2406,7 +2442,7 @@ ${markup}
 	it('refuses by name what a native select does not draw or run yet', async () => {
 		const { payload, diagnostics } = await nativeView(
 			page(`	<main>
-		<select multiple onChange={() => (sent = 'x')}><option>A</option></select>
+		<select multiple onInput={() => (sent = 'x')}><option>A</option></select>
 		<select value={size}><option>B</option><hr /></select>
 		<select><option><b>C</b></option></select>
 		<option>Loose</option>
@@ -2418,7 +2454,7 @@ ${markup}
 		);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
-			'the change handler on the <select> h1, which a native build does not run yet',
+			'the input handler on the <select> h1, which a native build does not run yet',
 			'the <select> h1 has `multiple`, a list box a native build does not draw yet',
 			'the <select> h3 binds `value`; a native build chooses an option through its `selected`',
 			'the <hr> h5 sits inside a <select>, which a native build shows only <option>s of',

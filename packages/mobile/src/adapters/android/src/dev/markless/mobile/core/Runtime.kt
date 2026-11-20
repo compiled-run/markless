@@ -875,8 +875,14 @@ class Runtime(
 			if (option?.element != "option" || select == null) throw MarklessRuntimeError("\"$host\" is not an option of a select")
 			val instance = optionsOf(select).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")
 			return change(null, null) {
-				if (attributeNow(select, "disabled") == null && attributeIn(option, "disabled", instance.scope) == null) chosenNow = host
-				emptyList()
+				if (attributeNow(select, "disabled") != null || attributeIn(option, "disabled", instance.scope) != null) return@change emptyList()
+				val before = optionsOf(select).firstOrNull { selectedness[it.id] == true }?.id
+				chosenNow = host
+				// A different choice fires the select's `change` (an `input` event here), its value the new option's.
+				val changed = handlerFor(select, EventName.Input)
+				if (before == host || changed == null) return@change emptyList()
+				for (one in optionsOf(select)) selectedness[one.id] = one.id == host
+				withFields(mapOf("value" to JsValue.Str(optionValue(instance)))) { run(handlers[changed]?.ops.orEmpty(), instance.scope) }
 			}
 		}
 		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")

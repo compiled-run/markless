@@ -773,6 +773,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A select's change: a different option runs it with that option's value, the same one again does not; data and JavaScript.
+		name: 'select-change',
+		fixture: 'proofs/22-select-change/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'choose', host: 'h4' },
+			{ event: 'choose', host: 'h4' },
+			{ event: 'choose', host: 'h5' },
+			{ event: 'choose', host: 'h8' },
+		],
+	},
+	{
 		name: 'script-render-list',
 		fixture: 'proofs/j9-render-list/App.tsrx',
 		modules: true,

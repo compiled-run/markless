@@ -2492,6 +2492,12 @@ export function createNativeViewPayload(
 		);
 	};
 
+	/** Whether a node is a `<select>`, whose `change` handler reads the chosen option's value as its event's. */
+	const isSelect = (id: string): boolean => {
+		const node = nodeById().get(id);
+		return node?.kind === 'element' && node.element === 'select';
+	};
+
 	/** Whether `inner` is `outer` or inside it. */
 	const isWithin = (inner: string, outer: string): boolean => {
 		const byId = nodeById();
@@ -4899,7 +4905,8 @@ export function createNativeViewPayload(
 		if (
 			scriptMode === 'never' ||
 			!event.handlerSpan ||
-			DATA_ONLY_EVENTS.has(event.eventName) ||
+			(DATA_ONLY_EVENTS.has(event.eventName) &&
+				!(event.eventName === 'change' && pressed && isSelect(pressed.currentTarget))) ||
 			!scriptFacts(scope.module)
 		)
 			return dataHandlerOps(event, scope, handler, pressed);
@@ -5071,7 +5078,10 @@ export function createNativeViewPayload(
 								kind: semantic === 'dismiss' ? 'dismiss' : 'pointer',
 							},
 						}
-					: event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))
+					: (event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))) ||
+						  (event.eventName === 'change' &&
+								pressed !== undefined &&
+								isSelect(pressed.currentTarget))
 						? { ...running, event: parameter }
 						: {
 								...running,
@@ -6533,8 +6543,9 @@ export function createNativeViewPayload(
 	 */
 	/**
 	 * A `<select>` is a pop-up list of its `<option>`s, one chosen. What a native build does not draw or run yet is refused
-	 * by name: a list box (`multiple`, `size`), a select whose choice a binding sets, handlers on either element, and
-	 * anything but text inside an option or options inside a select.
+	 * by name: a list box (`multiple`, `size`), a select whose choice a binding sets, handlers on either element other
+	 * than a select's `change` (run with the new value when a person picks another option), and anything but text inside
+	 * an option or options inside a select.
 	 */
 	function checkSelects() {
 		const byId = nodeById();
@@ -6544,7 +6555,10 @@ export function createNativeViewPayload(
 			const where = `the <${node.element}> ${node.id}`;
 			if (node.element === 'select' || node.element === 'option')
 				for (const pending of pendingHandlers)
-					if (pending.host === node.id)
+					if (
+						pending.host === node.id &&
+						!(node.element === 'select' && pending.event.eventName === 'change')
+					)
 						refuse(
 							`the ${pending.event.eventName} handler on ${where}, which a native build does not run yet`,
 							pending.event.handlerSpan,
