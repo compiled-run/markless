@@ -10,11 +10,16 @@
 				"initial": [
 					{
 						"name": "Fruit",
-						"items": ["Apple", "Pear"]
+						"items": [
+							"Apple",
+							"Pear"
+						]
 					},
 					{
 						"name": "Veg",
-						"items": ["Kale"]
+						"items": [
+							"Kale"
+						]
 					}
 				]
 			}
@@ -53,7 +58,9 @@
 				"list": {
 					"cell": "state:groups"
 				},
-				"key": ["name"]
+				"key": [
+					"name"
+				]
 			},
 			{
 				"kind": "element",
@@ -212,7 +219,9 @@
 							},
 							"arguments": [
 								{
-									"lambda": ["other"],
+									"lambda": [
+										"other"
+									],
 									"body": {
 										"object": [
 											[
@@ -236,7 +245,9 @@
 													},
 													"arguments": [
 														{
-															"lambda": ["kept"],
+															"lambda": [
+																"kept"
+															],
 															"body": {
 																"binary": "!==",
 																"left": {
@@ -271,7 +282,9 @@
 							},
 							"arguments": [
 								{
-									"lambda": ["other"],
+									"lambda": [
+										"other"
+									],
 									"body": {
 										"if": {
 											"binary": "===",
@@ -381,20 +394,64 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Groups"],
-		["h3:text0@Fruit", "Fruit"],
-		["h3:text0@Veg", "Veg"],
-		["h4:text0@Fruit@Apple", "Drop Fruit Apple"],
-		["h4:text0@Fruit@Pear", "Drop Fruit Pear"],
-		["h4:text0@Veg@Kale", "Drop Veg Kale"],
-		["h5:text0@Fruit", "Add to Fruit"],
-		["h5:text0@Veg", "Add to Veg"],
-		["h6:text0", "Add group"]
+		[
+			"h1:text0",
+			"Groups"
+		],
+		[
+			"h3:text0@Fruit",
+			"Fruit"
+		],
+		[
+			"h3:text0@Veg",
+			"Veg"
+		],
+		[
+			"h4:text0@Fruit@Apple",
+			"Drop Fruit Apple"
+		],
+		[
+			"h4:text0@Fruit@Pear",
+			"Drop Fruit Pear"
+		],
+		[
+			"h4:text0@Veg@Kale",
+			"Drop Veg Kale"
+		],
+		[
+			"h5:text0@Fruit",
+			"Add to Fruit"
+		],
+		[
+			"h5:text0@Veg",
+			"Add to Veg"
+		],
+		[
+			"h6:text0",
+			"Add group"
+		]
 	],
 	"initialRows": [
-		["repeat:0", ["Fruit", "Veg"]],
-		["repeat:1@Fruit", ["Apple", "Pear"]],
-		["repeat:1@Veg", ["Kale"]]
+		[
+			"repeat:0",
+			[
+				"Fruit",
+				"Veg"
+			]
+		],
+		[
+			"repeat:1@Fruit",
+			[
+				"Apple",
+				"Pear"
+			]
+		],
+		[
+			"repeat:1@Veg",
+			[
+				"Kale"
+			]
+		]
 	],
 	"steps": [
 		{
@@ -406,7 +463,10 @@
 				{
 					"op": "rows",
 					"node": "repeat:1@Veg",
-					"keys": ["Kale", "Fig"]
+					"keys": [
+						"Kale",
+						"Fig"
+					]
 				}
 			]
 		},
@@ -419,7 +479,11 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["Fruit", "Veg", "Nuts"]
+					"keys": [
+						"Fruit",
+						"Veg",
+						"Nuts"
+					]
 				}
 			]
 		},
@@ -432,7 +496,10 @@
 				{
 					"op": "rows",
 					"node": "repeat:1@Nuts",
-					"keys": ["Pecan", "Fig"]
+					"keys": [
+						"Pecan",
+						"Fig"
+					]
 				}
 			]
 		},
@@ -445,7 +512,9 @@
 				{
 					"op": "rows",
 					"node": "repeat:1@Fruit",
-					"keys": ["Apple"]
+					"keys": [
+						"Apple"
+					]
 				}
 			]
 		},
@@ -458,12 +527,16 @@
 				{
 					"op": "rows",
 					"node": "repeat:1@Veg",
-					"keys": ["Kale"]
+					"keys": [
+						"Kale"
+					]
 				},
 				{
 					"op": "rows",
 					"node": "repeat:1@Nuts",
-					"keys": ["Pecan"]
+					"keys": [
+						"Pecan"
+					]
 				}
 			]
 		}

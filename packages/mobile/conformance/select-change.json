@@ -292,22 +292,64 @@
 		}
 	},
 	"initial": [
-		["h1:text0", "Pick a car"],
-		["h3:text0", "Audi"],
-		["h4:text0", "Toyota"],
-		["h5:text0", "BMW"],
-		["h7:text0", "small"],
-		["h8:text0", "large"],
-		["h9:text0", "Make none"],
-		["h10:text0", "Changes 0"],
-		["h11:text0", "Size none"]
+		[
+			"h1:text0",
+			"Pick a car"
+		],
+		[
+			"h3:text0",
+			"Audi"
+		],
+		[
+			"h4:text0",
+			"Toyota"
+		],
+		[
+			"h5:text0",
+			"BMW"
+		],
+		[
+			"h7:text0",
+			"small"
+		],
+		[
+			"h8:text0",
+			"large"
+		],
+		[
+			"h9:text0",
+			"Make none"
+		],
+		[
+			"h10:text0",
+			"Changes 0"
+		],
+		[
+			"h11:text0",
+			"Size none"
+		]
 	],
 	"initialSelections": [
-		["h3", true],
-		["h4", false],
-		["h5", false],
-		["h7", true],
-		["h8", false]
+		[
+			"h3",
+			true
+		],
+		[
+			"h4",
+			false
+		],
+		[
+			"h5",
+			false
+		],
+		[
+			"h7",
+			true
+		],
+		[
+			"h8",
+			false
+		]
 	],
 	"steps": [
 		{

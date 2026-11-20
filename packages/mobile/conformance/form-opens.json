@@ -154,7 +154,9 @@
 						"kind": "text"
 					}
 				],
-				"submitters": ["h5"],
+				"submitters": [
+					"h5"
+				],
 				"opens": "https://duckduckgo.com/?ia=web#results"
 			}
 		],
@@ -437,12 +439,26 @@
 		}
 	},
 	"initial": [
-		["h1:text0", "Search the web"],
-		["h5:text0", "Search"]
+		[
+			"h1:text0",
+			"Search the web"
+		],
+		[
+			"h5:text0",
+			"Search"
+		]
 	],
 	"initialAttributes": [
-		["h2", "aria-busy", null],
-		["h5", "aria-disabled", null]
+		[
+			"h2",
+			"aria-busy",
+			null
+		],
+		[
+			"h5",
+			"aria-disabled",
+			null
+		]
 	],
 	"steps": [
 		{

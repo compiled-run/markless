@@ -1,0 +1,31 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>keys</title>
+<style>body{font:16px system-ui;margin:12px}input,textarea{font-size:18px;width:90%;margin:6px 0;display:block}#out{font-size:9px;white-space:pre-wrap}</style></head>
+<body><input id="field" aria-label="field" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+<input id="plain" aria-label="plain">
+<textarea id="notes" aria-label="notes" rows="2" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+<button id="outside">outside</button><button id="mark">mark</button>
+<input id="last" aria-label="last">
+<pre id="out"></pre>
+<script>
+const out = document.getElementById('out');
+const log = [];
+let step = 'start'; let seq = 0;
+function send(rec){ rec.n = seq++; log.push(rec); fetch('/log', {method:'POST', body: JSON.stringify(rec)}).catch(()=>{}); out.textContent = log.slice(-14).map(r=>JSON.stringify(r)).join('\n'); }
+document.getElementById('mark').addEventListener('click', ()=>{ step = prompt ? 'mark' : 'mark'; });
+window.setStep = (s)=>{ step = s; send({step:s, type:'step'}); };
+const types = ['keydown','keypress','keyup','beforeinput','input','change','paste','compositionstart','compositionupdate','compositionend','focus','blur','select','cut','copy'];
+for (const id of ['field','plain','notes','last']) {
+  const el = document.getElementById(id);
+  for (const t of types) el.addEventListener(t, (e)=>{
+    const r = {el:id, type:t};
+    if ('key' in e) { r.key = e.key; r.code = e.code; r.keyCode = e.keyCode; r.which = e.which; r.isComposing = e.isComposing; r.repeat = e.repeat; }
+    if ('inputType' in e) { r.inputType = e.inputType; r.data = e.data; r.isComposing = e.isComposing; }
+    if (t === 'paste') { r.text = e.clipboardData && e.clipboardData.getData('text/plain'); r.types = e.clipboardData && [...e.clipboardData.types]; }
+    if (t.startsWith('composition')) r.data = e.data;
+    r.value = el.value; r.cancelable = e.cancelable;
+    if (location.search.includes('prevent') && ((t==='keydown' && (e.key==='Enter'||e.key==='Backspace')) || t==='paste')) { e.preventDefault(); r.prevented = true; }
+    send(r);
+  });
+}
+send({type:'ready', ua: navigator.userAgent});
+</script></body></html>

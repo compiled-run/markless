@@ -152,7 +152,11 @@
 						{
 							"id": "state:words",
 							"name": "words",
-							"initial": ["kiwi", "fig", "banana"]
+							"initial": [
+								"kiwi",
+								"fig",
+								"banana"
+							]
 						}
 					],
 					"nodes": [
@@ -271,12 +275,23 @@
 	},
 	"open": "/",
 	"initial": {
-		"stack": ["/"],
+		"stack": [
+			"/"
+		],
 		"title": "Home",
 		"texts": [
-			["h2:text0", "Data only"],
-			["h3:text0", "Taps 0"],
-			["component-edge:0:text0", "Open words"]
+			[
+				"h2:text0",
+				"Data only"
+			],
+			[
+				"h3:text0",
+				"Taps 0"
+			],
+			[
+				"component-edge:0:text0",
+				"Open words"
+			]
 		]
 	},
 	"steps": [
@@ -292,12 +307,23 @@
 					"value": "Taps 1"
 				}
 			],
-			"stack": ["/"],
+			"stack": [
+				"/"
+			],
 			"title": "Home",
 			"texts": [
-				["h2:text0", "Data only"],
-				["h3:text0", "Taps 1"],
-				["component-edge:0:text0", "Open words"]
+				[
+					"h2:text0",
+					"Data only"
+				],
+				[
+					"h3:text0",
+					"Taps 1"
+				],
+				[
+					"component-edge:0:text0",
+					"Open words"
+				]
 			]
 		},
 		{
@@ -312,14 +338,32 @@
 					"params": {}
 				}
 			],
-			"stack": ["/", "/words"],
+			"stack": [
+				"/",
+				"/words"
+			],
 			"title": "Words",
 			"texts": [
-				["h2:text0", "Words page"],
-				["h3:text0", "Initials: KFB"],
-				["h5:text0@fig", "fig"],
-				["h5:text0@kiwi", "kiwi"],
-				["h5:text0@banana", "banana"]
+				[
+					"h2:text0",
+					"Words page"
+				],
+				[
+					"h3:text0",
+					"Initials: KFB"
+				],
+				[
+					"h5:text0@fig",
+					"fig"
+				],
+				[
+					"h5:text0@kiwi",
+					"kiwi"
+				],
+				[
+					"h5:text0@banana",
+					"banana"
+				]
 			]
 		}
 	]

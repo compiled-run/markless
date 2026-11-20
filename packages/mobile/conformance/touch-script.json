@@ -141,8 +141,14 @@
 		}
 	},
 	"initial": [
-		["h1:text0", ""],
-		["h2:text0", "Pad"]
+		[
+			"h1:text0",
+			""
+		],
+		[
+			"h2:text0",
+			"Pad"
+		]
 	],
 	"steps": [
 		{

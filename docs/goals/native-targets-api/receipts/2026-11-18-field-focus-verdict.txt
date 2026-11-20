@@ -1,0 +1,3 @@
+iOS: proof passed (7 rungs, u29-field-focus included; 2026-11-18-field-focus-ios-7-rungs.json)
+Android: proof passed (9 rungs, u29-field-focus included; 2026-11-18-field-focus-android-9-rungs.json)
+First run (2026-11-18-field-focus-first-*): u29 failed on both phones before the rung and the Android touch fix; the other 6 rungs passed on both.

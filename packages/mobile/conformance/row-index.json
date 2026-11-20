@@ -7,7 +7,11 @@
 			{
 				"id": "state:fruits",
 				"name": "fruits",
-				"initial": ["Fig", "Kiwi", "Lime"]
+				"initial": [
+					"Fig",
+					"Kiwi",
+					"Lime"
+				]
 			}
 		],
 		"nodes": [
@@ -174,14 +178,41 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Ranked"],
-		["h2:text0@Fig", "1. Fig"],
-		["h2:text0@Kiwi", "2. Kiwi"],
-		["h2:text0@Lime", "3. Lime"],
-		["h3:text0", "Reverse"],
-		["h4:text0", "Drop the first"]
+		[
+			"h1:text0",
+			"Ranked"
+		],
+		[
+			"h2:text0@Fig",
+			"1. Fig"
+		],
+		[
+			"h2:text0@Kiwi",
+			"2. Kiwi"
+		],
+		[
+			"h2:text0@Lime",
+			"3. Lime"
+		],
+		[
+			"h3:text0",
+			"Reverse"
+		],
+		[
+			"h4:text0",
+			"Drop the first"
+		]
 	],
-	"initialRows": [["repeat:0", ["Fig", "Kiwi", "Lime"]]],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"Fig",
+				"Kiwi",
+				"Lime"
+			]
+		]
+	],
 	"steps": [
 		{
 			"action": {
@@ -192,7 +223,11 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["Lime", "Kiwi", "Fig"]
+					"keys": [
+						"Lime",
+						"Kiwi",
+						"Fig"
+					]
 				},
 				{
 					"op": "text",
@@ -215,7 +250,10 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["Kiwi", "Fig"]
+					"keys": [
+						"Kiwi",
+						"Fig"
+					]
 				},
 				{
 					"op": "text",

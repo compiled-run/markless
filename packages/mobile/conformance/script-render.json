@@ -147,12 +147,30 @@
 		}
 	},
 	"initial": [
-		["h1:text0", "Render"],
-		["h2:text0", "Initials: AL"],
-		["h3:text0", "Vowels: 6"],
-		["h4:text0", "Rename"]
+		[
+			"h1:text0",
+			"Render"
+		],
+		[
+			"h2:text0",
+			"Initials: AL"
+		],
+		[
+			"h3:text0",
+			"Vowels: 6"
+		],
+		[
+			"h4:text0",
+			"Rename"
+		]
 	],
-	"initialAttributes": [["h4", "aria-label", "Rename AL"]],
+	"initialAttributes": [
+		[
+			"h4",
+			"aria-label",
+			"Rename AL"
+		]
+	],
 	"steps": [
 		{
 			"action": {
