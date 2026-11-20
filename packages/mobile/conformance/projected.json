@@ -34,7 +34,7 @@
 				"id": "component-edge:0/branch-site:0",
 				"parent": "component-edge:0/h1",
 				"test": {
-					"literal": "Plain words"
+					"literal": true
 				},
 				"arms": 2
 			},

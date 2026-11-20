@@ -2635,8 +2635,6 @@ export function createNativeViewPayload(
 	};
 	/** Set while handlers are lowered, after the whole tree: only then does every handle know the elements it is bound to. */
 	let lateLowering = false;
-	/** Set while an `@if` test that is one bare name is lowered: there, children the caller passed are only present. */
-	let childrenAsTest = false;
 	/** The @for row whose element a tap run is lowered for, while it is. */
 	let pressedRow: string | undefined;
 	/** Set while a tap's handler is lowered for where the tap landed. */
@@ -3163,6 +3161,35 @@ export function createNativeViewPayload(
 			inlining.delete(key);
 		}
 	}
+	/** The text a caller's children are when they are text alone (`<Caption>30 rows</Caption>`), which the web passes as a string. */
+	const projectedText = (chunk: SemanticMarkupChunk): string | undefined => {
+		const [only, ...more] = chunk.texts ?? [];
+		return chunk.hosts.length === 0 &&
+			chunk.slots.length === 0 &&
+			only &&
+			more.length === 0 &&
+			only.coordinate.path.length === 1
+			? only.text
+			: undefined;
+	};
+
+	/** `expression` where only its truth is read: children a caller passed are true there, as on the web. */
+	function testOf(
+		expression: SemanticExpression | undefined,
+		what: string,
+		scope: Scope,
+	): NativeExpr | null {
+		if (
+			expression?.kind === 'read' &&
+			!scope.locals.has(expression.name) &&
+			!scope.args.has(expression.name) &&
+			!scope.items.has(expression.name) &&
+			propOf(expression.name, scope)?.kind === 'children'
+		)
+			return { literal: true };
+		return exprOf(expression, what, scope);
+	}
+
 	function exprOf(
 		expression: SemanticExpression | undefined,
 		what: string,
@@ -3222,17 +3249,8 @@ export function createNativeViewPayload(
 				if (repeat) return { item: repeat };
 				const prop = propOf(expression.name, scope);
 				if (prop?.kind === 'value') return prop.expr;
-				if (prop?.kind === 'children') {
-					// The web passes children that are one run of plain text as that string; other markup is no value.
-					const chunk = prop.chunk;
-					if (
-						chunk.hosts.length === 0 &&
-						chunk.slots.length === 0 &&
-						chunk.texts?.length === 1
-					)
-						return { literal: chunk.texts[0]!.text };
-					if (childrenAsTest) return { literal: true };
-				}
+				const text = prop?.kind === 'children' ? projectedText(prop.chunk) : undefined;
+				if (text !== undefined) return { literal: text };
 				if (prop)
 					return refuse(`${what} reads the callback \`${expression.name}\` as a value`);
 				if (isPropName(expression.name, scope)) {
@@ -3316,7 +3334,10 @@ export function createNativeViewPayload(
 					return refuse(
 						`${what} uses \`typeof\` other than compared with 'string', 'number' or 'boolean'; a native value does not tell undefined from null`,
 					);
-				const value = exprOf(expression.value, what, scope);
+				const value =
+					expression.operator === '!'
+						? testOf(expression.value, what, scope)
+						: exprOf(expression.value, what, scope);
 				return value && { unary: expression.operator, value };
 			}
 			case 'binary':
@@ -3332,7 +3353,10 @@ export function createNativeViewPayload(
 						}
 					);
 				}
-				const left = exprOf(expression.left, what, scope);
+				const left =
+					expression.kind === 'logical' && expression.operator === '&&'
+						? testOf(expression.left, what, scope)
+						: exprOf(expression.left, what, scope);
 				// As in JavaScript, a left side known when the app is built either decides `&&`, `||` or `??` (the right side never
 				// runs) or hands the whole value to the right side.
 				if (left && expression.kind === 'logical') {
@@ -3376,7 +3400,7 @@ export function createNativeViewPayload(
 					: { logical: expression.operator, left, right };
 			}
 			case 'conditional': {
-				const test = exprOf(expression.test, what, scope);
+				const test = testOf(expression.test, what, scope);
 				// A test known when the app is built picks its branch; the other never runs, as in JavaScript.
 				const decided = test ? buildTime(test) : undefined;
 				if (decided)
@@ -5151,15 +5175,13 @@ export function createNativeViewPayload(
 					...scope,
 					live: site.testComputedGraphNodeId !== undefined,
 				};
-				childrenAsTest = site.testExpression?.kind === 'read';
 				const test = plain
-					? exprOf(site.testExpression, 'the @if test', testScope)
+					? testOf(site.testExpression, 'the @if test', testScope)
 					: undefined;
-				childrenAsTest = false;
 				const recorded = site.armTestExpressions?.map((expression) =>
 					expression === null
 						? null
-						: exprOf(expression, `the @${site.kind} test`, testScope),
+						: testOf(expression, `the @${site.kind} test`, testScope),
 				);
 				// A chain with no @else still has an empty last arm; showing it when nothing matches shows nothing.
 				const tests =
