@@ -452,6 +452,7 @@ export async function renderPrerenderBranch(
 	readonly armRecords: ResumeArmRecordSet;
 	readonly computed: ProtocolStatePayload['computed'];
 	readonly cells: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
+	readonly sharedDefinitions?: ProtocolStatePayload['sharedDefinitions'];
 	// Bound symbol ids are spelled from the module root, which stands here on the page.
 	readonly moduleRootPath?: string;
 }> {
@@ -481,7 +482,8 @@ export async function renderPrerenderBranch(
 	}
 	const records = await prepareSsrResumeRecords(output);
 	const inArm = armBranchRange(output, records.view, siteId, drawnAt);
-	const placed = owner ? { moduleRootPath: owner.moduleRootPath } : {};
+	// The widgets this render rooted, which a flip whose arm can root one files before its records register.
+	const placed = { ...(owner && { moduleRootPath: owner.moduleRootPath }), sharedDefinitions: records.state.sharedDefinitions };
 	if (inArm)
 		return {
 			...inArm,

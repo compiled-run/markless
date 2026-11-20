@@ -54,7 +54,7 @@ export default function Page() @{
 `,
 	);
 	expect(errors(result)).toEqual([]);
-	expect(runInitializer(result, { 'storage:src/Page.tsrx#site': 'East' })).toBe('East');
+	expect(runInitializer(result, { 'storage:site': 'East' })).toBe('East');
 });
 
 test('a state() starting from a field of another state() reads that state through the graph', async () => {
@@ -115,5 +115,5 @@ export function Picker() @{
 `,
 	);
 	expect(errors(result)).toEqual([]);
-	expect(runInitializer(result, { 'storage:src/Theme.tsrx#theme-mode': 'dark' })).toBe('moon');
+	expect(runInitializer(result, { 'storage:theme-mode': 'dark' })).toBe('moon');
 });

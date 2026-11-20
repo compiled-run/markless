@@ -297,6 +297,7 @@ export function emitSourceModule(input: {
 	readonly linkedRowTemplates?: boolean;
 	readonly linkedNestedRepeats?: boolean;
 	readonly linkedRowBranches?: boolean;
+	readonly linkedEmptyArmSlots?: boolean;
 	readonly canonicalRenderData?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly behaviorSymbols?: ReadonlyArray<SourceSymbolRow>;
@@ -739,6 +740,7 @@ function componentRowLoader(input: {
 	readonly linkedRowTemplates?: boolean;
 	readonly linkedNestedRepeats?: boolean;
 	readonly linkedRowBranches?: boolean;
+	readonly linkedEmptyArmSlots?: boolean;
 }): string | undefined {
 	if (!input.renderDataId) return undefined;
 	// A child module's install runs only if that module is ever evaluated, which resume never needs.
@@ -753,11 +755,24 @@ function componentRowLoader(input: {
 		: undefined;
 }
 
-// Beside the mint loader, only on a page whose rows flip an @if of their own.
-function rowBranchesLoader(runtimeDemandMap: unknown, linked = false): string | null {
-	return linked || demandsKeyedRepeatModule(runtimeDemandMap, ROW_BRANCH_MINT_RUNTIME_MODULE_ID)
-		? "globalThis.__marklessRowBranches ??= () => import('@markless/web/fns/row-branch-mint').then((branches) => branches.marklessRowBranches());"
-		: null;
+// The parts the repeat runtime spreads over the mint it loads: a row's own @if, and an @empty arm's live values, each only where a page has one.
+function rowBranchesLoader(
+	runtimeDemandMap: unknown,
+	linked = false,
+	linkedEmptyArms = false,
+): string | null {
+	const parts = [
+		linked || demandsKeyedRepeatModule(runtimeDemandMap, ROW_BRANCH_MINT_RUNTIME_MODULE_ID)
+			? "import('@markless/web/fns/row-branch-mint').then((branches) => branches.marklessRowBranches())"
+			: null,
+		linkedEmptyArms || demandsKeyedRepeatModule(runtimeDemandMap, EMPTY_ARM_SLOTS_RUNTIME_MODULE_ID)
+			? "import('@markless/web/fns/empty-arm-slots').then((arms) => arms.marklessEmptyArmSlots())"
+			: null,
+	].filter((part): part is string => part !== null);
+	if (parts.length === 0) return null;
+	return parts.length === 1
+		? `globalThis.__marklessRowBranches ??= () => ${parts[0]};`
+		: `globalThis.__marklessRowBranches ??= () => Promise.all([${parts.join(', ')}]).then((loaded) => Object.assign({}, ...loaded));`;
 }
 
 // Whichever mint this page's repeats demand, for client output that has no resume module.
@@ -769,6 +784,7 @@ function clientRowMintLoader(input: {
 	readonly linkedRowTemplates?: boolean;
 	readonly linkedNestedRepeats?: boolean;
 	readonly linkedRowBranches?: boolean;
+	readonly linkedEmptyArmSlots?: boolean;
 }): string | null {
 	const mint = demandsRowComponentMint(input.runtimeDemandMap)
 		? emitRowComponentMintLoaderInstall()
@@ -780,7 +796,7 @@ function clientRowMintLoader(input: {
 	const lines = [
 		mint,
 		nestedRepeatsLoader(input.runtimeDemandMap, input.linkedNestedRepeats),
-		rowBranchesLoader(input.runtimeDemandMap, input.linkedRowBranches),
+		rowBranchesLoader(input.runtimeDemandMap, input.linkedRowBranches, input.linkedEmptyArmSlots),
 	].filter((line): line is string => line !== null);
 	return lines.length > 0 ? lines.join('\n') : null;
 }
@@ -825,6 +841,7 @@ const NESTED_REPEATS_RUNTIME_MODULE_ID = 'web/fns/nested-repeats';
 const ROW_COMPONENT_MINT_RUNTIME_MODULE_ID = 'web/fns/row-component-mint';
 const ROW_SLOT_MINT_RUNTIME_MODULE_ID = 'web/fns/row-slot-mint';
 const ROW_BRANCH_MINT_RUNTIME_MODULE_ID = 'web/fns/row-branch-mint';
+const EMPTY_ARM_SLOTS_RUNTIME_MODULE_ID = 'web/fns/empty-arm-slots';
 
 /** True when the compiler recorded an `overlay` mark for this module. */
 export function demandsOverlay(runtimeDemandMap: unknown): boolean {
@@ -872,6 +889,7 @@ export function emitResumeModule(input: {
 	readonly linkedRowTemplates?: boolean;
 	readonly linkedNestedRepeats?: boolean;
 	readonly linkedRowBranches?: boolean;
+	readonly linkedEmptyArmSlots?: boolean;
 	// The page's component tree derives from an element() roster, possibly through a child module whose computeds this payload never holds.
 	readonly rosterDerivation?: boolean;
 	// A component this module renders, here or in a module it imports, resolves a shared() instance outliving the page.
@@ -1001,7 +1019,7 @@ export function emitResumeModule(input: {
 				? emitRowMintLoaderInstall()
 				: null),
 		nestedRepeatsLoader(input.runtimeDemandMap, input.linkedNestedRepeats),
-		rowBranchesLoader(input.runtimeDemandMap, input.linkedRowBranches),
+		rowBranchesLoader(input.runtimeDemandMap, input.linkedRowBranches, input.linkedEmptyArmSlots),
 		scalarSpecializations.length > 0
 			? [
 					"import { marklessDecodeScalarCell, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",
