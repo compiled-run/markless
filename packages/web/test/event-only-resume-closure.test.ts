@@ -155,7 +155,10 @@ const resumeOnDemandEntries = [
 // item in place before the reader arrives still repaints it: 37,220 -> 37,236 raw, one condition in resume-keyed-repeats.ts.
 // 2026-11-17: a first click on a keyed row climbs from the target to its row instead of walking every row at each
 // ancestor (1,000 rows, cell no handler owns: 1,000 rows walked -> 1): 37,236 -> 37,431 raw, in resume-keyed-repeats.ts.
-const sourceByteLimit = 37431;
+// 2026-11-20: a list nested in a row the runtime just built adopts no rows from that row (#977, an added outer row showed
+// none of its inner rows): 37,431 -> 37,551 raw, a `built` flag passed from the row mint to the nested list in
+// resume-keyed-repeats.ts.
+const sourceByteLimit = 37551;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

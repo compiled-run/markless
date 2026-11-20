@@ -175,6 +175,8 @@ export type ResumeRepeatRowHook = (
 	armHost?: (at: ResumeKeyedRepeatRecord['rowEvents'][number]) => ResumeDomElement | undefined,
 	/** Only the row's arms changed: rewire what sits in them. */
 	armsOnly?: true,
+	/** This runtime just built the row: the lists in it have no rows on the page yet. */
+	built?: true,
 ) => void;
 /** The app's own module installs this only when a repeat nests inside another's rows. */
 export type ResumeNestedRepeatsHost = {

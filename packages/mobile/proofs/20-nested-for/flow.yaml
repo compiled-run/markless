@@ -36,3 +36,9 @@ name: 20-nested-for
 - assertVisible: Drop Fruit Apple
 - assertNotVisible: Drop Veg Fig
 - assertNotVisible: Drop Fruit Fig
+- assertNotVisible: Drop Nuts Pecan
+- tapOn: Add group
+- assertVisible: Drop Nuts Pecan
+- assertVisible: Drop Nuts Pecan
+- assertVisible: Add to Nuts
+- assertVisible: Drop Veg Kale

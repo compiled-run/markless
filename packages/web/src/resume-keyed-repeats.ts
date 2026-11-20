@@ -172,6 +172,7 @@ export function wireKeyedRepeats(
 		readonly root?: ResumeDomElement;
 		readonly pageRepeats?: ReadonlyArray<ResumeKeyedRepeatRecord>;
 		readonly moved?: (read: SlotRead) => boolean;
+		readonly built?: true;
 	},
 	rowComponentHost?: RowComponentHost,
 	onRow?: ResumeRepeatRowHook,
@@ -212,7 +213,7 @@ export function wireKeyedRepeats(
 				values: new Map(),
 				ready: !repeat.rowTemplate?.componentName && !repeat.rowTemplate?.branchSlots,
 			};
-		const registerRowEvents = (rowRoot: ResumeRowRoot, rowKey: unknown, arms?: true): void => {
+		const registerRowEvents = (rowRoot: ResumeRowRoot, rowKey: unknown, arms?: true, built?: true): void => {
 			rowRoot.__marklessRowLocals = () => rowLocals(input.graph, repeat, rowKey);
 			// A ranged row holds no @if and no nested list: its events address the nodes between its comments.
 			if (rowRoot.nodeType !== 1) {
@@ -230,7 +231,7 @@ export function wireKeyedRepeats(
 				if (!host) continue;
 				input.events.addRowEvent(host, { repeat, parent, rowRoot, rowKey, rowEvent });
 			}
-			onRow?.(repeat, rowRoot, rowKey, (at) => cell?.mint?.armEventHost?.(rowRoot, repeat, at, slots.values.get(rowKey)), arms);
+			onRow?.(repeat, rowRoot, rowKey, (at) => cell?.mint?.armEventHost?.(rowRoot, repeat, at, slots.values.get(rowKey)), arms, built);
 		};
 		// A server-painted `@empty` arm is not this runtime's to remove.
 		const arm: MountedEmptyArm = { mounted: false, nodes: [] };
@@ -260,9 +261,11 @@ export function wireKeyedRepeats(
 				)
 			: undefined;
 		if (!follow) {
-			arm.mounted = items.length === 0;
+			arm.mounted = !input.built && items.length === 0;
 			adopt(
-				repeat.rowRange
+				input.built
+					? []
+					: repeat.rowRange
 					? rowRanges!.servedRowRanges(parent, repeat, items.length)
 					: repeatRowElements(parent, repeat, items.length),
 				items,
@@ -425,7 +428,7 @@ function applyKeyedRepeatRowOrder(
 	rowRootsByKey: Map<unknown, ResumeRowRoot>,
 	arm: MountedEmptyArm,
 	mint: RowMint | undefined,
-	registerRowEvents?: (rowRoot: ResumeRowRoot, rowKey: unknown, arms?: true) => void,
+	registerRowEvents?: (rowRoot: ResumeRowRoot, rowKey: unknown, arms?: true, built?: true) => void,
 	slots: RowSlots = { values: new Map(), ready: true },
 	rangeEnd?: ResumeDomNode,
 ): void {
@@ -464,7 +467,7 @@ function applyKeyedRepeatRowOrder(
 			rowRootsByKey.set(rowKey, rowRoot);
 			// Known before the anchor walk, which puts rows in front of anything unknown.
 			knownRows.add(rowRoot);
-			registerRowEvents?.(rowRoot, rowKey);
+			registerRowEvents?.(rowRoot, rowKey, undefined, true);
 		}
 		nextRows.push(rowRoot);
 	}
