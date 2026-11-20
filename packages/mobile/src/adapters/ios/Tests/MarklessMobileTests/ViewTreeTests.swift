@@ -159,6 +159,28 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(views.labels["h6:text0@pear"] === pear)
 }
 
+@MainActor @Test func aRowsArmIsBuiltFromItsRowAndRebuiltAlone() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("script-async-rows"), store: MemoryStore())
+	let views = try tree(controller)
+	let list = try #require(views.elements["h8"])
+	let rows = { list.subviews.filter { !$0.isHidden }.compactMap(\.accessibilityIdentifier) }
+	#expect(rows() == ["component-edge:0/h2@apple", "component-edge:0/h2@missing"])
+	#expect(views.labels["component-edge:0/h2:text0@missing"]?.text == "Looking up missing")
+	controller.perform(NativeAction(event: .activate, host: "h6"))
+	#expect(rows() == ["component-edge:0/h2@apple", "component-edge:0/h2@missing", "component-edge:0/h2@cherry"])
+	let apple = try #require(views.elements["component-edge:0/h2@apple"])
+	try views.apply([.arm(node: "component-edge:0/boundary:0@missing", index: nil)])
+	#expect(rows() == ["component-edge:0/h2@apple", "component-edge:0/h2@cherry"])
+	try views.apply([.arm(node: "component-edge:0/boundary:0@missing", index: 1)])
+	#expect(rows() == ["component-edge:0/h2@apple", "component-edge:0/h2@missing", "component-edge:0/h2@cherry"])
+	#expect(views.elements["component-edge:0/h2@apple"] === apple)
+	try views.apply([.rows(node: "repeat:0", keys: ["cherry", "missing", "apple"])])
+	#expect(rows() == ["component-edge:0/h2@cherry", "component-edge:0/h2@missing", "component-edge:0/h2@apple"])
+	controller.perform(NativeAction(event: .activate, host: "h7"))
+	#expect(rows() == ["component-edge:0/h2@apple"])
+	#expect(views.labels["component-edge:0/h2:text0@missing"] == nil)
+}
+
 @MainActor @Test func aPageOpensAtItsRouteAndNavigatesFromScratch() throws {
 	let controller = try MarklessViewController(payload: vectorPayload("route"), store: MemoryStore(), route: "/apple")
 	let before = try tree(controller)

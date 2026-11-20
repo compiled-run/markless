@@ -253,10 +253,10 @@ final class ViewTree {
 		for node in payload.nodes {
 			let parent = node.parent ?? ""
 			let key: String
-			if let row = node.row, (nodes[row]?.parent ?? "") == parent {
-				key = row
-			} else if let arm = node.arm, (nodes[arm.branch]?.parent ?? "") == parent {
+			if let arm = node.arm, let branch = nodes[arm.branch], branch.row == node.row, (branch.parent ?? "") == parent {
 				key = "\(arm.branch)#\(arm.index)"
+			} else if let row = node.row, (nodes[row]?.parent ?? "") == parent {
+				key = row
 			} else {
 				key = parent
 			}
@@ -479,7 +479,7 @@ final class ViewTree {
 				if open { sheet.open(from: presenter) } else { sheet.close() }
 			case .navigate, .title:
 				throw HostError("navigate and title entries reach the screen's controller, not its views")
-			case .call, .release, .fetch:
+			case .call, .release, .fetch, .abort:
 				throw HostError("a \(entry.json.jsonText) entry reaches the page's device or script services, not its views")
 			case let .dialog(node, open):
 				try present(node, open: open)
@@ -555,8 +555,8 @@ final class ViewTree {
 				position = (container.subviews.firstIndex(of: list.anchor) ?? 0) + 1
 				var placed = Set<ObjectIdentifier>()
 				for key in keys {
-					for id in built[key] ?? [] {
-						guard let view = paragraphs[id]?.view ?? elements[id] ?? labels[id], placed.insert(ObjectIdentifier(view)).inserted else { continue }
+					for id in (built[key] ?? []).flatMap(withArms) {
+						guard let view = branches[id]?.anchor ?? paragraphs[id]?.view ?? elements[id] ?? labels[id], placed.insert(ObjectIdentifier(view)).inserted else { continue }
 						container.insertSubview(view, at: position)
 						position += 1
 					}
@@ -693,8 +693,13 @@ final class ViewTree {
 		if let button = context.button { refreshLabel(of: button) }
 		if layout == nil {
 			stack(container)
-			for id in built { if let view = elements[id] { stackTree(view) } }
+			for id in built.flatMap(withArms) { if let view = elements[id] { stackTree(view) } }
 		}
+	}
+
+	/// A branch instance followed by what its shown arm placed, recursively; any other id alone.
+	private func withArms(_ id: String) -> [String] {
+		[id] + (branches[id]?.built.flatMap(withArms) ?? [])
 	}
 
 	private func buildRow(_ list: String, key: String, item: NativeValue, in container: UIView, at index: inout Int, _ context: Context) throws -> [String] {
@@ -939,9 +944,8 @@ final class ViewTree {
 				if let style = style(of: id) { try place(id, label, style) }
 				if let button = context.button { refreshLabel(of: button) }
 			case .branch:
-				if !context.suffix.isEmpty { throw HostError("@if inside a list row (\(id)) has no iOS host support yet") }
 				let marker = anchor(in: container, at: &index)
-				let arm = try runtime.arm(of: template)
+				let arm = try runtime.arm(of: template, in: context.scope)
 				let armViews = try arm.map { try build("\(template)#\($0)", in: container, at: &index, context) } ?? []
 				branches[id] = (marker, arm, armViews)
 			case .repeat:

@@ -285,6 +285,8 @@ public enum NativeOp: Equatable, Sendable {
 	/// Runs function `fn` of the payload's script with the event (`type`, the web event's) and `bindings`, then writes the
 	/// cells it changed. A throw, or a rejection of what it returns, writes `{ name, message }` to `catch` when there is one.
 	case script(fn: String, type: String, bindings: [NativeScriptBinding], catch: String?)
+	/// `reset` of `@catch (error, reset)`: clears `catch` and runs again each of `cells` (read where the handler runs) that holds an error.
+	case reset(cells: [String], catch: String?)
 }
 
 public struct NativeCapture: Equatable, Sendable {
@@ -352,6 +354,14 @@ public struct NativeContinuation: Equatable, Sendable {
 	public var `catch`: String? = nil
 }
 
+/// An async value's script function and the names it reads.
+public struct NativeAsync: Equatable, Sendable {
+	public let script: String
+	public let bindings: [NativeScriptBinding]
+	/// The `@try` branches that read it: it runs while one of them is shown.
+	public let boundaries: [String]
+}
+
 /// A device call a task cell starts at mount.
 public struct NativeTask: Equatable, Sendable {
 	public let call: String
@@ -400,6 +410,8 @@ public struct NativeCell: Equatable, Sendable {
 	public var object: String? = nil
 	/// An async device call started at mount; the cell holds `{ state: 'pending' | 'value' | 'error', ... }`.
 	public var task: NativeTask? = nil
+	/// An async value the payload's script computes: the script settles the cell; the host never does.
+	public var async: NativeAsync? = nil
 	/// State of a component a list row renders: one value per row of this `repeat`, `initial` when the row is built.
 	public var row: String? = nil
 	/// The clock when the screen opened: written at mount, before the first build.
@@ -453,7 +465,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object", "row", "clock"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "async", "object", "row", "clock"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
 			}
@@ -471,6 +483,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 				task: field.has("task") ? try {
 					let task = try field["task"].object(["call", "arguments"])
 					return NativeTask(call: try task["call"].string(), arguments: try task["arguments"].array().map(decodeExpr))
+				}() : nil,
+				async: field.has("async") ? try {
+					let async = try field["async"].object(["script", "bindings", "boundaries"])
+					return NativeAsync(script: try async["script"].string(), bindings: try decodeBindings(try async["bindings"]),
+						boundaries: try async["boundaries"].array().map { try $0.string() })
 				}() : nil,
 				row: field.has("row") ? try field["row"].string() : nil,
 				clock: field.has("clock"))
@@ -639,6 +656,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 					let opField = try op.object(required: ["op", "fn", "type", "bindings"], optional: ["catch"])
 					return .script(
 						fn: try opField["fn"].string(), type: try opField["type"].string(), bindings: try decodeBindings(try opField["bindings"]),
+						catch: opField.has("catch") ? try opField["catch"].string() : nil)
+				case "reset":
+					let opField = try op.object(required: ["op", "cells"], optional: ["catch"])
+					return .reset(
+						cells: try opField["cells"].array().map { try $0.string() },
 						catch: opField.has("catch") ? try opField["catch"].string() : nil)
 				case "if":
 					let opField = try op.object(["op", "test", "whenTrue", "whenFalse"])
@@ -955,6 +977,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 		}
 		for cell in cells {
+			if let async = cell.async, !async.bindings.flatMap(\.cells).allSatisfy(cellIds.contains) {
+				throw PayloadError(path: "payload.cells", reason: "\(cell.id) computes an async value with an unknown cell")
+			}
 			if let row = cell.row, !repeats.contains(row) {
 				throw PayloadError(path: "payload.cells", reason: "\(cell.id) is state of rows of \(row), which is not a list")
 			}
