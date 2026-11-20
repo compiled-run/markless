@@ -22,7 +22,24 @@
 				"id": "component-edge:0/state:taps",
 				"name": "taps",
 				"initial": 0,
-				"row": "repeat:0"
+				"row": "repeat:0",
+				"rebuiltBy": [
+					{
+						"binary": "+",
+						"left": {
+							"member": {
+								"item": "repeat:0"
+							},
+							"property": "row"
+						},
+						"right": {
+							"member": {
+								"item": "repeat:0"
+							},
+							"property": "n"
+						}
+					}
+				]
 			}
 		],
 		"nodes": [
@@ -82,7 +99,15 @@
 					"cell": "state:seats"
 				},
 				"key": [],
-				"keyParts": [["row"], "-", ["n"]]
+				"keyParts": [
+					[
+						"row"
+					],
+					"-",
+					[
+						"n"
+					]
+				]
 			},
 			{
 				"kind": "element",
@@ -263,7 +288,9 @@
 							},
 							"arguments": [
 								{
-									"lambda": ["other"],
+									"lambda": [
+										"other"
+									],
 									"body": {
 										"logical": "||",
 										"left": {
@@ -306,14 +333,40 @@
 		]
 	},
 	"initial": [
-		["h2:text0", "Flip"],
-		["h3:text0", "Add"],
-		["component-edge:0/h0:text0@b-2", "b2 0"],
-		["component-edge:0/h0:text0@b-1", "b1 0"],
-		["h6:text0@b-2", "Drop"],
-		["h6:text0@b-1", "Drop"]
+		[
+			"h2:text0",
+			"Flip"
+		],
+		[
+			"h3:text0",
+			"Add"
+		],
+		[
+			"component-edge:0/h0:text0@b-2",
+			"b2 0"
+		],
+		[
+			"component-edge:0/h0:text0@b-1",
+			"b1 0"
+		],
+		[
+			"h6:text0@b-2",
+			"Drop"
+		],
+		[
+			"h6:text0@b-1",
+			"Drop"
+		]
 	],
-	"initialRows": [["repeat:0", ["b-2", "b-1"]]],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"b-2",
+				"b-1"
+			]
+		]
+	],
 	"steps": [
 		{
 			"action": {
@@ -350,7 +403,10 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["b-1", "b-2"]
+					"keys": [
+						"b-1",
+						"b-2"
+					]
 				}
 			]
 		},
@@ -363,7 +419,11 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["a-1", "b-1", "b-2"]
+					"keys": [
+						"a-1",
+						"b-1",
+						"b-2"
+					]
 				}
 			]
 		},
@@ -389,7 +449,10 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["a-1", "b-1"]
+					"keys": [
+						"a-1",
+						"b-1"
+					]
 				}
 			]
 		}
