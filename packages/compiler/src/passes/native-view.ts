@@ -4489,10 +4489,6 @@ export function createNativeViewPayload(
 				close();
 				const boundary = scope.module.boundaries.get(item.id);
 
-				if (item.arms.catch === undefined) {
-					refuse('a @try with no @catch; its error would leave this screen');
-					continue;
-				}
 				const branchId = scope.prefix + item.id;
 				const at = nodes.length;
 				const tasks = new Set<string>();
@@ -4581,7 +4577,7 @@ export function createNativeViewPayload(
 				}
 				// A handler that rejects keeps the shown content and opens @catch after it, as the web's spec says (a failed
 				// value on the first load still shows only @catch).
-				if (caught || refreshes) {
+				if ((caught || refreshes) && item.arms.catch !== undefined) {
 					const caughtId = `${branchId}:caught`;
 					const handlerFailed: NativeExpr = {
 						binary: '!==',
