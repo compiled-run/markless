@@ -6326,6 +6326,13 @@ export function createNativeViewPayload(
 				return { ops, returns: true };
 			}
 			if (statement.kind === 'return') return { ops, returns: true };
+			if (statement.kind === 'await' && statement.value.kind === 'apply') {
+				const imported = scope.module.imports.get(statement.value.callee);
+				if (imported?.source === '@markless/router' && imported.importedName === 'navigate') {
+					ops.push(...navigateOps(statement.value.arguments, what, span));
+					continue;
+				}
+			}
 			const awaited = awaitOf(statement);
 			if (awaited === null) {
 				refuse(
@@ -6714,6 +6721,20 @@ export function createNativeViewPayload(
 				}
 				if (first.callee === 'setTimeout') {
 					const [callback, ms, ...more] = first.arguments;
+					const handedOn =
+						callback?.kind === 'read' &&
+						(callback.name === names.resolve || callback.name === names.reject)
+							? callback.name
+							: undefined;
+					if (handedOn !== undefined && more.length === 0) {
+						const delay = ms ? exprOf(ms, what, scope) : { literal: 0 };
+						if (!delay || !nothingAfter()) return null;
+						const settles: Settle =
+							handedOn === names.resolve
+								? { resolve: { literal: null } }
+								: { reject: { literal: null } };
+						return { after: delay, capture: [], settles };
+					}
 					if (
 						callback?.kind !== 'function' ||
 						callback.parameters.length > 0 ||
