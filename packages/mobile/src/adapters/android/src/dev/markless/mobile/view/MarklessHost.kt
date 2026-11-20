@@ -56,6 +56,7 @@ import dev.markless.mobile.core.Store
 import dev.markless.mobile.style.Assignment
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.StyleExport
+import dev.markless.mobile.style.shownRows
 import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.StyledNode
 import kotlin.math.roundToInt
@@ -151,6 +152,8 @@ class MarklessHost(
 		private set
 	/** The export as built, which Dragon's plan lays out again at each size. */
 	private val planned = style
+	/** Dragon's HarfBuzz over this phone's system fonts, made when a page first lays its rows out. */
+	private var rowShaper: RowShaper? = null
 	private var laidOutFor: Pair<Int, Int>? = null
 	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
 	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
@@ -557,6 +560,10 @@ class MarklessHost(
 		}
 		refreshRelations()
 		refreshSelects()
+		// A styled list's rows, a row's text or an attribute of a row's copy moved: the page is laid out again with its rows.
+		if (planned?.planRepeats?.isNotEmpty() == true && journal.any { it is JournalEntry.Rows || ((it is JournalEntry.Text || it is JournalEntry.Attribute) && '@' in it.node) }) {
+			laidOutFor?.let { (w, h) -> layOutAt(w, h, rowsMoved = true) }
+		}
 		onJournal?.invoke(journal)
 		scheduleLoadEvents()
 	}
@@ -590,11 +597,17 @@ class MarklessHost(
 	 * area. Chrome on Android lays a page out at a whole CSS px width, the screen's width in dp rounded up. Returns whether it
 	 * laid out again.
 	 */
-	fun layOutAt(widthPx: Int, heightPx: Int): Boolean {
+	fun layOutAt(widthPx: Int, heightPx: Int, rowsMoved: Boolean = false): Boolean {
 		val p = page ?: return false
 		val layout = planLayout ?: return false
-		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0 || laidOutFor == widthPx to heightPx) return false
-		val next = planned.laidOut(Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout)
+		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0 || (!rowsMoved && laidOutFor == widthPx to heightPx)) return false
+		val withRows = planned.planRepeats.isNotEmpty()
+		val shaper = if (withRows) rowShaper ?: RowShaper(planned.systemFaces).also { rowShaper = it } else null
+		val next = planned.laidOut(
+			Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout,
+			rows = if (withRows) planned.shownRows(payload, runtime) else null,
+			rowsLayout = shaper?.let { RowShaper.rowsLayout(it) ?: throw MarklessHostError("a page with styled rows needs Dragon's rows layout in the app") },
+		)
 		style = next
 		p.relaid(next)
 		laidOutFor = widthPx to heightPx

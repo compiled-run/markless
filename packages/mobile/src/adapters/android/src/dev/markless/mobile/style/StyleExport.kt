@@ -166,6 +166,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 	val plan: String? = null,
 	/** Per assignment: each Dragon id the plan's geometry names, with the export's id for it (empty: no ids differ). */
 	val planNames: List<Map<String, String>> = emptyList(),
+	/** Each list whose rows the phone lays out: the box its rows hang from and the Dragon ids of one row's top boxes, in order. */
+	val planRepeats: List<PlanRepeat> = emptyList(),
 ) {
 
 	/** The index of [BAND_KEY] among [states], or -1 for an export without @media. */
@@ -235,24 +237,59 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 	 * widths, text lines, dashed borders and scroll ranges, in this screen's device px. [layout] is Dragon's translated
 	 * `runMarklessLayout`. Without a plan the export is returned as it is.
 	 */
-	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String): StyleExport {
+	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String, rows: ((Int) -> Map<String, List<LaidOutRow>>)? = null, rowsLayout: ((String) -> String)? = null): StyleExport {
 		val plan = plan ?: return this
 		val laid = assignments.indices.map { k ->
-			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan}"
-			val result = Json.parse(layout(line))
+			val names = planNames.getOrNull(k) ?: emptyMap()
+			val dragonId = names.entries.associate { (d, m) -> m to d }
+			val shown = if (planRepeats.isEmpty()) null else rows?.invoke(k)
+			val lists = shown?.let { byList ->
+				Json.Arr(planRepeats.map { r ->
+					obj("parent" to Json.Str(r.parent), "template" to Json.Arr(r.template.map { Json.Str(it) }), "rows" to Json.Arr((byList[r.id] ?: emptyList()).map { row ->
+						obj("key" to Json.Str(row.key), "assignment" to Json.Num(row.assignment.toDouble()), "texts" to Json.Arr(row.texts.entries.sortedBy { it.key }.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }))
+					}))
+				}).text()
+			}
+			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan${if (lists != null) ",\"rows\":$lists" else ""}}"
+			if (lists != null && rowsLayout == null) throw MarklessDecodeError("a page with rows needs Dragon's rows layout")
+			val result = Json.parse(if (lists == null) layout(line) else rowsLayout!!(line))
 			val parts = result.arr("plan layout")
 			if (parts.size != 3 || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
 			val page = parts[1].arr("plan layout page scroll")
 			val pageScroll = if (page.size == 3) null else range(rangeJson(page, "plan layout page scroll"), "plan layout page scroll")
-			val names = planNames.getOrNull(k) ?: emptyMap()
 			val geometry = HashMap<String, List<Json>>()
 			for (g in parts[2].arr("plan layout nodes")) {
 				val f = g.arr("plan layout node")
 				val id = f.firstOrNull()?.str("plan layout node id") ?: throw MarklessDecodeError("plan layout node has no id")
-				geometry[names[id] ?: id] = f
+				// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
+				val at = id.indexOf('@')
+				if (at < 0) geometry[names[id] ?: id] = f else geometry[(names[id.substring(0, at)] ?: id.substring(0, at)) + id.substring(at)] = f
 			}
 			val assignment = assignments[k]
-			assignment.copy(pageScroll = pageScroll, nodes = assignment.nodes.map { node ->
+			// The template of each list: one row's nodes, which no view shows; each row is a copy of them laid out here.
+			val template = HashMap<String, Pair<PlanRepeat, Boolean>>()
+			if (shown != null) for (r in planRepeats) {
+				val tops = r.template.map { names[it] ?: it }.toSet()
+				for (node in assignment.nodes) {
+					var at: String? = node.id
+					while (at != null && at !in tops) at = assignment.byId[at]?.parent
+					if (at != null) template[node.id] = r to (node.id in tops)
+				}
+			}
+			val withRows = ArrayList<StyledNode>()
+			for (node in assignment.nodes) {
+				val place = template[node.id]
+				if (place == null || shown == null) {
+					withRows.add(node)
+					continue
+				}
+				withRows.add(node.copy(frame = null, borderWidths = null, borderOps = null, scrollRange = null, lines = null))
+				for (row in shown[place.first.id] ?: emptyList()) {
+					val own = assignments[row.assignment].byId[node.id] ?: throw MarklessDecodeError("assignment ${row.assignment} has no node ${node.id} for row ${row.key}")
+					withRows.add(own.copy(id = "${node.id}@${row.key}", parent = if (place.second) node.parent else node.parent?.let { "$it@${row.key}" }, text = if (own.kind == "text") (row.texts[node.id] ?: own.text) else own.text))
+				}
+			}
+			assignment.copy(pageScroll = pageScroll, nodes = withRows.map { node ->
 				if (node.frame == null) return@map node
 				val f = geometry[node.id] ?: throw MarklessDecodeError("Dragon's layout has no box for ${node.id}")
 				val what = "plan layout of ${node.id}"
@@ -331,7 +368,14 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}
 			} ?: emptyList()
 			if (t.containsKey("planNames") && names.size != style.assignments.size) throw MarklessDecodeError("$what.planNames names ${names.size} assignments; the export has ${style.assignments.size}")
-			return style.copy(plan = plan, planNames = names)
+			val repeats = t["planRepeats"]?.arr("$what.planRepeats")?.mapIndexed { i, r ->
+				val o = r.obj("$what.planRepeats[$i]")
+				o.only(setOf("id", "parent", "template"), "$what.planRepeats[$i]")
+				val template = o.field("template", "$what.planRepeats[$i]").arr("$what.planRepeats[$i].template").map { it.str("$what.planRepeats[$i].template[]") }
+				if (template.isEmpty()) throw MarklessDecodeError("$what.planRepeats[$i]: a row has at least one box")
+				PlanRepeat(o.field("id", "$what.planRepeats[$i]").str("id"), o.field("parent", "$what.planRepeats[$i]").str("parent"), template)
+			} ?: emptyList()
+			return style.copy(plan = plan, planNames = names, planRepeats = repeats)
 		}
 
 		fun decode(bytes: ByteArray, target: String = "android"): StyleExport {
@@ -454,7 +498,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val routes = LinkedHashMap<String, StyleExport>()
 			for ((n, r) in t.field("routes", target).arr("routes").withIndex()) {
 				val o = r.obj("routes[$n]")
-				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets", "plan", "planNames"), "routes[$n]")
+				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets", "plan", "planNames", "planRepeats"), "routes[$n]")
 				val pattern = o.field("pattern", "routes[$n]").str("pattern")
 				if (pattern in routes) throw MarklessDecodeError("app style lists route $pattern twice")
 				val listed = { w: Json, what: String ->
@@ -606,3 +650,9 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		}
 	}
 }
+
+/** A list whose rows a phone lays out (Dragon's `planRepeats`): the box its rows hang from and one row's top boxes, by Dragon id. */
+data class PlanRepeat(val id: String, val parent: String, val template: List<String>)
+
+/** A row a page shows now: its key, the assignment its own states reach from the page's, and its texts by text node id. */
+data class LaidOutRow(val key: String, val assignment: Int, val texts: Map<String, String>)

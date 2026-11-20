@@ -210,7 +210,7 @@ extension StyleExport {
 		var styles: [String: ResolvedStyle] = [:]
 		for node in payloadNodes {
 			if case .branch = node.kind { continue }
-			if case .repeat = node.kind { throw styleError("\(node.id): @for is not styled on iOS yet, the style export lays out one state") }
+			if case .repeat = node.kind { continue }
 			if case .sheet = node.kind { throw styleError("\(node.id): a system sheet inside another sheet's content is not styled on iOS") }
 			guard let styled = byId[node.id] else { throw styleError("no style export node for \(node.id)") }
 			switch node.kind {
@@ -243,6 +243,24 @@ extension StyleExport {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
 			styles[node.id] = style
+		}
+		// Each row's copy of a payload node ("<id>@<key>"), placed in its own copies of the boxes around it.
+		let base = { (id: String) -> String in id.firstIndex(of: "@").map { String(id[..<$0]) } ?? id }
+		let isView = { (id: String) in payloadIds.contains(id) || (id.contains("@") && payloadIds.contains(base(id))) }
+		for styled in nodes where styled.id.contains("@") && payloadIds.contains(base(styled.id)) {
+			var offset = (x: 0.0, y: 0.0)
+			var cursor = styled.parent
+			while let id = cursor, !isView(id) {
+				guard let skipped = byId[id] else { throw styleError("\(styled.id)'s style parent \(id) is missing") }
+				offset.x += skipped.frame?.x ?? 0
+				offset.y += skipped.frame?.y ?? 0
+				cursor = skipped.parent
+			}
+			var style = try resolve(styled, styled.writes)
+			if let frame = style.frame {
+				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
+			}
+			styles[styled.id] = style
 		}
 		return styles
 	}

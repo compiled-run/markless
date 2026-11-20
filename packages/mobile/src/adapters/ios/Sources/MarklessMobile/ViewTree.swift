@@ -770,7 +770,8 @@ final class ViewTree {
 			guard let styles = sheetStyles[sheet] else { return nil }
 			return styles.heights[styles.height].layout.assignments[styles.assignments[styles.height]][template]
 		}
-		return layout?.assignments[assignment][template]
+		// A row's copy has its own box once the page's rows are laid out; until then its template's.
+		return layout?.assignments[assignment][id] ?? layout?.assignments[assignment][template]
 	}
 
 	private func repaint(where included: (String) -> Bool) throws {
