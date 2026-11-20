@@ -497,6 +497,15 @@ public final class NativeRuntime {
 			}
 			return .array(values)
 		case let .object(fields): return .object(try fields.map { (key: $0.key, value: try evaluate($0.value)) })
+		case let .merge(parts):
+			var fields: [(key: String, value: NativeValue)] = []
+			for part in parts {
+				let value = try evaluate(part)
+				if case .null = value { continue }
+				guard case let .object(object) = value else { throw RuntimeError(reason: "a spread of a value that is not an object") }
+				fields += object.fields
+			}
+			return .object(fields)
 		case .lambda: throw RuntimeError(reason: "a function value outside a method call")
 		case let .method(method, target, arguments):
 			let targetValue = try evaluate(target)

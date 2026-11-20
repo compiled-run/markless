@@ -244,7 +244,13 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 			};
 		case 'ObjectExpression': {
 			const entries: (readonly [string, SemanticExpression])[] = [];
+			const parts: SemanticExpression[] = [];
 			for (const property of asNodes(node.properties)) {
+				if (property.type === 'SpreadElement') {
+					if (entries.length > 0) parts.push({ kind: 'object', entries: entries.splice(0) });
+					parts.push(expressionTreeOf(property.argument as AnyNode));
+					continue;
+				}
 				const key = property.key as AnyNode | undefined;
 				const name =
 					key?.type === 'Identifier'
@@ -261,7 +267,9 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 					return unsupported('an object with a spread, computed key or method');
 				entries.push([name, expressionTreeOf(property.value as AnyNode)]);
 			}
-			return { kind: 'object', entries };
+			if (parts.length === 0) return { kind: 'object', entries };
+			if (entries.length > 0) parts.push({ kind: 'object', entries });
+			return { kind: 'merge', parts };
 		}
 		default:
 			return unsupported(`a ${String(node.type)}`);
@@ -535,6 +543,8 @@ function readsName(tree: SemanticExpression, name: string): boolean {
 			return tree.items.some((item) => readsName(item.value, name));
 		case 'object':
 			return tree.entries.some(([, value]) => readsName(value, name));
+		case 'merge':
+			return tree.parts.some((part) => readsName(part, name));
 		case 'lambda':
 			return !tree.parameters.includes(name) && readsName(tree.body, name);
 		case 'let':

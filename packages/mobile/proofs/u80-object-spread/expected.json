@@ -1,0 +1,56 @@
+{
+	"rung": 190,
+	"name": "An object built with spreads copies each part's fields in order, a later key winning, as JavaScript does",
+	"steps": [
+		{
+			"visible": [
+				"a Ada x",
+				"b Bo y",
+				"first Ada x"
+			],
+			"absent": [
+				"a Cy x"
+			]
+		},
+		{
+			"do": {
+				"tap": "Rename"
+			},
+			"visible": [
+				"a Cy x",
+				"b Bo y",
+				"first Cy x"
+			],
+			"absent": [
+				"a Ada x",
+				"first Ada x"
+			]
+		},
+		{
+			"do": {
+				"tap": "Tag"
+			},
+			"visible": [
+				"first Cy z",
+				"a Cy x"
+			],
+			"absent": [
+				"first Cy x",
+				"a! Cy x"
+			]
+		},
+		{
+			"do": {
+				"tap": "Keep"
+			},
+			"visible": [
+				"a! Cy x",
+				"b! Bo y"
+			],
+			"absent": [
+				"a Cy x",
+				"b Bo y"
+			]
+		}
+	]
+}

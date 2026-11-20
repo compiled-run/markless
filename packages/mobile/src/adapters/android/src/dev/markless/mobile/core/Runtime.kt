@@ -354,6 +354,13 @@ class Runtime(
 				}
 			})
 			is Expr.ObjectLit -> JsValue.Obj(LinkedHashMap<String, JsValue>().apply { for ((k, x) in e.entries) put(k, eval(x)) })
+			is Expr.Merge -> JsValue.Obj(LinkedHashMap<String, JsValue>().apply {
+				for (part in e.parts) when (val value = eval(part)) {
+					JsValue.Null -> {}
+					is JsValue.Obj -> putAll(value.fields)
+					else -> throw MarklessRuntimeError("a spread of a value that is not an object")
+				}
+			})
 			is Expr.Lambda -> throw MarklessRuntimeError("a function value outside a method call")
 			is Expr.Method -> {
 				val target = eval(e.target)

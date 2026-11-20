@@ -53,6 +53,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case at(NativeExpr, of: NativeExpr)
 	case array([NativeArrayItem])
 	case object([NativeObjectField])
+	/// An object from its parts in order (`{ ...row, name }`): each part's own fields, a later key winning; a null part adds nothing.
+	case merge([NativeExpr])
 	case method(NativeMethod, target: NativeExpr, arguments: [NativeExpr])
 	/// Only as a method argument; its parameters read as `local`.
 	case lambda(parameters: [String], body: NativeExpr)
@@ -92,6 +94,7 @@ public indirect enum NativeExpr: Equatable, Sendable {
 		case let .captures(node, pointer): return node.cells + pointer.cells
 		case let .array(items): return items.flatMap(\.value.cells)
 		case let .object(fields): return fields.flatMap(\.value.cells)
+		case let .merge(parts): return parts.flatMap(\.cells)
 		case let .method(_, target, arguments): return target.cells + arguments.flatMap(\.cells)
 		case let .binary(_, a, b), let .logical(_, a, b), let .at(a, b): return a.cells + b.cells
 		case let .conditional(test, whenTrue, whenFalse): return test.cells + whenTrue.cells + whenFalse.cells
@@ -1161,6 +1164,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 				guard items.count == 2 else { throw PayloadError(path: pair.path, reason: "an object field is [key, expression]") }
 				return NativeObjectField(key: try items[0].string(), value: try decodeExpr(items[1]))
 			})
+		case ["merge"]: return .merge(try field("merge").array().map(decodeExpr))
 		case ["arguments", "method", "target"]:
 			let name = try field("method").string()
 			guard let method = NativeMethod(rawValue: name) else { throw PayloadError(path: reader.path + ".method", reason: "unknown method \"\(name)\"") }

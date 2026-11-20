@@ -361,6 +361,17 @@ export function evaluateNativeExpr(
 		});
 	if ('object' in expr)
 		return Object.fromEntries(expr.object.map(([key, value]) => [key, evaluate(value)]));
+	if ('merge' in expr) {
+		const merged: Record<string, NativeValue> = {};
+		for (const part of expr.merge) {
+			const value = evaluate(part);
+			if (value === null) continue;
+			if (typeof value !== 'object' || Array.isArray(value))
+				throw new Error('a spread of a value that is not an object');
+			Object.assign(merged, value);
+		}
+		return merged;
+	}
 	if ('lambda' in expr) throw new Error('a function value outside a method call');
 	if ('method' in expr) {
 		const target = evaluate(expr.target);

@@ -460,6 +460,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'object-spread',
+		fixture: 'test/fixtures/ObjectSpread.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h6' },
+			{ event: 'input', host: 'h5', value: 'Di' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h8' },
+		],
+	},
+	{
 		name: 'dom-classes',
 		fixture: 'test/fixtures/DomClasses.tsrx',
 		actions: [

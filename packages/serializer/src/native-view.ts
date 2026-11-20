@@ -91,6 +91,8 @@ export type NativeExpr =
 	| { readonly at: NativeExpr; readonly of: NativeExpr }
 	| { readonly array: ReadonlyArray<{ readonly spread: boolean; readonly value: NativeExpr }> }
 	| { readonly object: ReadonlyArray<readonly [string, NativeExpr]> }
+	/** An object from its parts in order (`{ ...row, name }`): each part's own fields, a later key winning; a null part adds nothing. */
+	| { readonly merge: ReadonlyArray<NativeExpr> }
 	| {
 			readonly method: NativeMethod;
 			readonly target: NativeExpr;

@@ -1200,6 +1200,17 @@ function foldConstant(
 		}
 		return { value: object };
 	}
+	if ('merge' in expr) {
+		const object: Record<string, unknown> = {};
+		for (const part of expr.merge) {
+			const folded = fold(part);
+			if (!folded) return undefined;
+			if (folded.value === null) continue;
+			if (typeof folded.value !== 'object' || Array.isArray(folded.value)) return undefined;
+			Object.assign(object, folded.value);
+		}
+		return { value: object };
+	}
 	if ('array' in expr) {
 		const array: unknown[] = [];
 		for (const item of expr.array) {
@@ -2430,7 +2441,8 @@ export function createNativeViewPayload(
 		'formData' in value ||
 		entryLists.has(JSON.stringify(value)) ||
 		('object' in value && value.object.some(([, field]) => holdsEntries(field))) ||
-		('array' in value && value.array.some((item) => holdsEntries(item.value)));
+		('array' in value && value.array.some((item) => holdsEntries(item.value))) ||
+		('merge' in value && value.merge.some(holdsEntries));
 
 	/** A call to an app function as a call into the script, its arguments evaluated as data and passed as JSON. */
 	function scriptCall(
@@ -3884,6 +3896,10 @@ export function createNativeViewPayload(
 				return entries.every((entry) => entry !== null)
 					? { object: entries as (readonly [string, NativeExpr])[] }
 					: null;
+			}
+			case 'merge': {
+				const parts = expression.parts.map((part) => exprOf(part, what, scope));
+				return parts.every((part) => part !== null) ? { merge: parts as NativeExpr[] } : null;
 			}
 			case 'method': {
 				if (

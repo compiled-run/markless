@@ -48,6 +48,8 @@ sealed interface Expr {
 	/** Each item, spread when [spread] (its value must be an array). */
 	data class ArrayLit(val items: List<Pair<Boolean, Expr>>) : Expr
 	data class ObjectLit(val entries: List<Pair<String, Expr>>) : Expr
+	/** An object from its parts in order (`{ ...row, name }`): each part's own fields, a later key winning; a null part adds nothing. */
+	data class Merge(val parts: List<Expr>) : Expr
 	data class Method(val name: String, val target: Expr, val arguments: List<Expr>) : Expr
 	/** An arrow function; only a method argument. */
 	data class Lambda(val params: List<String>, val body: Expr) : Expr
@@ -480,6 +482,7 @@ data class Payload(
 			is Expr.At -> hasScript(e.index) || hasScript(e.list)
 			is Expr.ArrayLit -> e.items.any { hasScript(it.second) }
 			is Expr.ObjectLit -> e.entries.any { hasScript(it.second) }
+			is Expr.Merge -> e.parts.any { hasScript(it) }
 			is Expr.Method -> hasScript(e.target) || e.arguments.any(::hasScript)
 			is Expr.Lambda -> hasScript(e.body)
 			is Expr.Call -> e.arguments.any(::hasScript)
@@ -515,6 +518,7 @@ data class Payload(
 			is Expr.At -> cellsOf(e.index) + cellsOf(e.list)
 			is Expr.ArrayLit -> e.items.flatMap { cellsOf(it.second) }
 			is Expr.ObjectLit -> e.entries.flatMap { cellsOf(it.second) }
+			is Expr.Merge -> e.parts.flatMap { cellsOf(it) }
 			is Expr.Method -> cellsOf(e.target) + e.arguments.flatMap(::cellsOf)
 			is Expr.Lambda -> cellsOf(e.body)
 			is Expr.Local, is Expr.Item, Expr.RouteParams -> emptyList()
@@ -601,6 +605,10 @@ data class Payload(
 						if (pair.size != 2) throw MarklessDecodeError("$what.object[$n] is not a [key, value] pair")
 						pair[0].str("$what.object[$n][0]") to expr(pair[1], "$what.object[$n][1]")
 					})
+				}
+				o.containsKey("merge") -> {
+					o.only(setOf("merge"), what)
+					Expr.Merge(o.field("merge", what).arr("$what.merge").mapIndexed { n, e -> expr(e, "$what.merge[$n]") })
 				}
 				o.containsKey("method") -> {
 					o.only(setOf("method", "target", "arguments"), what)

@@ -1543,6 +1543,8 @@ export type SemanticExpression =
 			readonly kind: 'object';
 			readonly entries: ReadonlyArray<readonly [string, SemanticExpression]>;
 	  }
+	/** An object literal with spreads (`{ ...row, name }`): each part's own fields in order, a later key winning. */
+	| { readonly kind: 'merge'; readonly parts: ReadonlyArray<SemanticExpression> }
 	/** A method called on a value: an array's or string's (with JavaScript's meaning), or an element's, which a native build resolves itself. */
 	| {
 			readonly kind: 'method';

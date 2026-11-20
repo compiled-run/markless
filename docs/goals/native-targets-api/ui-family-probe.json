@@ -404,8 +404,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: ToasterItem while rendering sets `item.tone` from a value that follows state; pass a fixed value or leave the prop out",
 			"MARKLESS_NATIVE_UNSUPPORTED: ToasterItem while rendering sets `item.icon` from a value that follows state; pass a fixed value or leave the prop out",
 			"MARKLESS_NATIVE_UNSUPPORTED: a style binding",
-			"MARKLESS_NATIVE_UNSUPPORTED: the `role` of a <div> follows state; a native host makes a live region when it builds the view",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`toasterState.toast` runs as data), so this handler stays data"
+			"MARKLESS_NATIVE_UNSUPPORTED: the `role` of a <div> follows state; a native host makes a live region when it builds the view"
 		]
 	},
 	"toggle": {
