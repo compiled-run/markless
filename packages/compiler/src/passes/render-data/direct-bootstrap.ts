@@ -53,6 +53,7 @@ export function directChunkBootstrapData(input: {
 				collectionGraphNodeId: repeat.collectionGraphNodeId,
 				collectionPath: repeat.collectionPath,
 				keyPath: repeat.keyPath,
+				...(repeat.keyParts ? { keyParts: repeat.keyParts } : {}),
 				rowChunkId: chunk.rowChunkId,
 				...(chunk.emptyChunkId ? { emptyChunkId: chunk.emptyChunkId } : {}),
 				classWrites: repeat.classWrites ?? [],

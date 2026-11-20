@@ -5,6 +5,9 @@ import {
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
 import type { RuntimeGraph } from '@markless/runtime';
 
+// False when no @for of the app joins its key from fields, so each joined-key branch folds away.
+declare const __MARKLESS_JOINED_KEYS__: boolean;
+
 export class KeyedRepeatRuntimeError extends Error {
 	readonly code = 'MARKLESS_REPEAT_KEY_DUPLICATE';
 	readonly severity = 'error';
@@ -90,7 +93,11 @@ export function repeatItemKey(
 	repeat: RuntimeKeyedRepeatRecord,
 	index: number,
 ): unknown {
-	return repeat.indexKey ? index : readPath(item, repeat.keyPath);
+	return repeat.indexKey
+		? index
+		: (typeof __MARKLESS_JOINED_KEYS__ === 'undefined' || __MARKLESS_JOINED_KEYS__) && repeat.keyParts
+			? repeat.keyParts.map((p) => (typeof p == 'string' ? p : `${readPath(item, p)}`)).join('')
+			: readPath(item, repeat.keyPath);
 }
 
 function assertUniqueRepeatKeys(

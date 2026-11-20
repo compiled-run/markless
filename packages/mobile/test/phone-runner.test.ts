@@ -1,9 +1,21 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadProjectGraph, type ProjectGraph } from '../../analyzer/test-support/project-graph.ts';
 import { allRungFolders } from '../proofs/ladder.ts';
 import { affectedRungs } from '../src/runner/affected.ts';
 import { repoRoot } from '../src/runner/bundle.ts';
 import { parsePhone, transitionPhone, type PhoneState } from '../src/runner/pool.ts';
+import {
+	checkoutFacts,
+	jobStarted,
+	planRefresh,
+	transitionRefresh,
+	type CheckoutFacts,
+	type RefreshState,
+} from '../src/runner/refresh.ts';
 import { rerunAfterPhoneLoss, transitionChunk, type Chunk } from '../src/runner/store.ts';
 
 const queued: Chunk = {
@@ -185,4 +197,113 @@ describe('the rungs a change affects, from the project graph', () => {
 			rungs: [],
 		});
 	}, 60_000);
+});
+
+describe("the runner's checkout", () => {
+	const behind: CheckoutFacts = {
+		head: 'a'.repeat(40),
+		upstream: 'b'.repeat(40),
+		branch: null,
+		dirty: false,
+		headInUpstream: true,
+	};
+	const plan = planRefresh(behind);
+
+	it('moves to origin/main when it is a clean detached or main checkout behind it', () => {
+		expect(plan).toEqual({
+			kind: 'refresh',
+			from: behind.head,
+			to: behind.upstream,
+			branch: null,
+		});
+		expect(planRefresh({ ...behind, branch: 'main' })).toMatchObject({
+			kind: 'refresh',
+			branch: 'main',
+		});
+		expect(planRefresh({ ...behind, upstream: behind.head })).toEqual({ kind: 'current' });
+	});
+
+	it("never moves a checkout that is somebody's work", () => {
+		expect(planRefresh({ ...behind, branch: 'cw/runner-change' }).kind).toBe('kept');
+		expect(planRefresh({ ...behind, dirty: true }).kind).toBe('kept');
+		expect(planRefresh({ ...behind, headInUpstream: false }).kind).toBe('kept');
+	});
+
+	it('counts a job as under way once one of its chunks left the queue', () => {
+		const claimed = transitionChunk(queued, { type: 'claim', phone: 'ios:a', at: 0 });
+		expect(jobStarted([queued, queued])).toBe(false);
+		expect(jobStarted([queued, claimed])).toBe(true);
+	});
+
+	it('checks, waits while behind, moves, and checks again after a failed move', () => {
+		let refresh: RefreshState = { state: 'idle', checkedAt: 0, kept: null };
+		refresh = transitionRefresh(refresh, { type: 'check' });
+		expect(refresh.state).toBe('checking');
+		refresh = transitionRefresh(refresh, { type: 'checked', plan }, 5);
+		expect(refresh).toEqual({ state: 'pending', plan });
+		refresh = transitionRefresh(refresh, { type: 'move' });
+		expect(refresh.state).toBe('moving');
+		refresh = transitionRefresh(refresh, { type: 'move-failed' }, 9);
+		expect(refresh).toEqual({ state: 'idle', checkedAt: 9, kept: null });
+
+		const checking = transitionRefresh(refresh, { type: 'check' });
+		const kept = planRefresh({ ...behind, dirty: true });
+		expect(transitionRefresh(checking, { type: 'checked', plan: kept }, 12)).toEqual({
+			state: 'idle',
+			checkedAt: 12,
+			kept: kept.kind === 'kept' ? kept.reason : null,
+		});
+		expect(transitionRefresh(checking, { type: 'check-failed' }, 13)).toEqual({
+			state: 'idle',
+			checkedAt: 13,
+			kept: null,
+		});
+	});
+
+	it('refuses every other move', () => {
+		const idle: RefreshState = { state: 'idle', checkedAt: 0, kept: null };
+		const pending = transitionRefresh(transitionRefresh(idle, { type: 'check' }), {
+			type: 'checked',
+			plan,
+		});
+		expect(() => transitionRefresh(idle, { type: 'move' })).toThrow('cannot take move');
+		expect(() => transitionRefresh(pending, { type: 'check' })).toThrow('cannot take check');
+		expect(() => transitionRefresh(pending, { type: 'move-failed' })).toThrow();
+	});
+
+	it('reads a checkout behind origin/main from git, after fetching it', async () => {
+		// Inside a git hook GIT_DIR and GIT_INDEX_FILE name the repository being committed; every git here must use its own.
+		const inherited = Object.entries(process.env).filter(([name]) => name.startsWith('GIT_'));
+		for (const [name] of inherited) delete process.env[name];
+		const scratch = mkdtempSync(join(tmpdir(), 'runner-refresh-'));
+		const git = (cwd: string, ...args: string[]) =>
+			execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+				cwd,
+				encoding: 'utf8',
+			}).trim();
+		try {
+			const upstream = join(scratch, 'upstream');
+			const runner = join(scratch, 'runner');
+			git(scratch, 'init', '--quiet', '--initial-branch=main', upstream);
+			git(upstream, 'commit', '--quiet', '--allow-empty', '-m', 'one');
+			git(scratch, 'clone', '--quiet', upstream, runner);
+			const first = git(runner, 'rev-parse', 'HEAD');
+			git(runner, 'checkout', '--quiet', '--detach');
+			git(upstream, 'commit', '--quiet', '--allow-empty', '-m', 'two');
+			const second = git(upstream, 'rev-parse', 'HEAD');
+
+			expect(await checkoutFacts(runner)).toEqual({
+				head: first,
+				upstream: second,
+				branch: null,
+				dirty: false,
+				headInUpstream: true,
+			});
+			writeFileSync(join(runner, 'note.txt'), 'local work');
+			expect(planRefresh(await checkoutFacts(runner)).kind).toBe('kept');
+		} finally {
+			rmSync(scratch, { recursive: true, force: true });
+			for (const [name, value] of inherited) process.env[name] = value;
+		}
+	});
 });

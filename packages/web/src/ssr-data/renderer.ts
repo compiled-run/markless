@@ -19,6 +19,10 @@ import {
 	type ProtocolViewPayload,
 	type RenderedPayloadScripts,
 } from '@markless/serializer';
+import type { ProtocolRepeatKeyParts } from '@markless/serializer/protocol';
+
+// False when no @for of the app joins its key from fields, so each joined-key branch folds away.
+declare const __MARKLESS_JOINED_KEYS__: boolean;
 
 export type SsrDataResidue =
 	| {
@@ -147,6 +151,7 @@ export type SsrRenderData = {
 		readonly collectionSource?: string;
 		readonly collectionPath?: ReadonlyArray<string>;
 		readonly keyPath?: ReadonlyArray<string>;
+		readonly keyParts?: ProtocolRepeatKeyParts;
 		// Set only for `key row`: read the item itself as the key.
 		readonly itemKey?: true;
 		readonly rowChunkId: string;
@@ -910,7 +915,11 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 								// way branch and async keep it: a part's pre-row write rides here.
 								sharedSeeds: context.sharedSeeds,
 								enclosingBoundaryIds: context.enclosingBoundaryIds,
-								...(keyed ? { key: readValuePath(item, keyPath ?? []) } : {}),
+								...(keyed
+									? { key: readValuePath(item, keyPath ?? []) }
+									: (typeof __MARKLESS_JOINED_KEYS__ === 'undefined' || __MARKLESS_JOINED_KEYS__) && record?.keyParts
+										? { key: record.keyParts.map((p) => (typeof p == 'string' ? p : `${readValuePath(item, p)}`)).join('') }
+										: {}),
 							}),
 						);
 						return marklessThen(
