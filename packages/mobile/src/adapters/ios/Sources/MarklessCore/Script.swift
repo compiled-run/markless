@@ -22,6 +22,8 @@ public struct NativeScriptBinding: Equatable, Sendable {
 		case fields([NativeScriptField])
 		/// A value it only reads.
 		case value(NativeExpr)
+		/// A function a parent passed as a prop: the script function it names, its own names bound as `<name>.<its name>`.
+		case callback(String)
 	}
 	public let name: String
 	public let kind: Kind
@@ -31,6 +33,7 @@ public struct NativeScriptBinding: Equatable, Sendable {
 		case let .cell(cell): return [cell]
 		case let .fields(fields): return fields.map(\.cell)
 		case let .value(expr): return expr.cells
+		case .callback: return []
 		}
 	}
 }

@@ -1480,7 +1480,7 @@ export function Forms() @{
 		<form onSubmit={(event) => { if (sent === '') return; event.preventDefault(); }}>
 			<button>Send</button>
 		</form>
-		<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget, null).get('x')); }}>
+		<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget, event.submitter).get('x')); }}>
 			<input type="email" name="x" />
 			<input name="code" pattern="[0-9]+" />
 			<input type="radio" name={sent} />
@@ -1491,7 +1491,7 @@ export function Forms() @{
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
-			'the submit handler builds FormData with a submitter, which a native build does not read yet',
+			'the submit handler reads `event.submitter`, which a submit on a phone does not have',
 			'the <form> h1 has no onSubmit handler: the web sends it to its action and loads the answer (or sends a POST to an API route in place), and a phone app has no server or page to load',
 			'the submit handler on the <form> h4 does not call `event.preventDefault()` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for',
 			'the <input> h7 in the <form> h6 is an <input type="email">, which no native host draws or checks yet',
@@ -1633,8 +1633,11 @@ export function Waits() @{
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
 			'the submit handler awaits inside an `if`, a loop or a called function; a native build awaits only at the top of a handler or of its `try`',
+			'the submit handler is async, and runs as JavaScript only when it is not: the web marks its form busy until its promise settles, which a phone script does not report yet',
 			'the submit handler awaits inside an expression; a native build awaits only the whole value of a statement',
+			'the submit handler is async, and runs as JavaScript only when it is not: the web marks its form busy until its promise settles, which a phone script does not report yet',
 			'the submit handler awaits a promise that can fail outside a `try` with a `catch`; on the web the failure shows in the nearest @catch, which a native build has no lowering for yet',
+			'the submit handler is async, and runs as JavaScript only when it is not: the web marks its form busy until its promise settles, which a phone script does not report yet',
 		]);
 	});
 
@@ -1690,6 +1693,79 @@ export function Ticks() @{
 				],
 			},
 		]);
+	});
+	it('runs a submit handler that cancels first as JavaScript, with its form for FormData and its parent\'s function prop', async () => {
+		const form = (handler: string) => `import { state } from '@markless/core';
+function stamp(title: string): string {
+	return JSON.stringify({ title, at: (35).toString(36) });
+}
+function Editor({ onSave }: { readonly onSave: (title: string) => void }) @{
+	<form onSubmit={${handler}}>
+		<input name="title" />
+		<button type="submit">Save</button>
+	</form>
+}
+export function App() @{
+	let saved = state('none');
+	<main>
+		<Editor onSave={(title) => { saved = stamp(title); }} />
+		<p>{saved}</p>
+	</main>
+}`;
+		const cancels = await nativeView(
+			form(`(event) => {
+			event.preventDefault();
+			const data = new FormData(event.currentTarget);
+			onSave(String(data.get('title') ?? ''));
+		}`),
+		);
+		expect(cancels.diagnostics).toEqual([]);
+		expect(cancels.payload?.handlers[0]?.ops).toEqual([
+			{
+				op: 'script',
+				fn: 'fn:0',
+				type: 'submit',
+				bindings: {
+					onSave: { callback: 'fn:1' },
+					'onSave.saved': { cell: 'state:saved' },
+					'submitted form': { value: { formData: 'component-edge:0/h0' } },
+				},
+			},
+		]);
+		expect(cancels.payload?.script?.source).toContain('__s.onSave(');
+
+		const late = await nativeView(
+			form(`(event) => {
+			const data = new FormData(event.currentTarget);
+			if (data.has('title')) event.preventDefault();
+			onSave(String(data.get('title')));
+		}`),
+		);
+		expect(late.payload).toBeNull();
+		expect(late.diagnostics.map((d) => d.message)).toContain(
+			'the submit handler runs as JavaScript only when it calls `event.preventDefault()` first, outside any branch, as the web then never sends the form',
+		);
+
+		const awaited = await nativeView(
+			form(`async (event) => {
+			event.preventDefault();
+			await Promise.resolve();
+			onSave(String(new FormData(event.currentTarget).get('title')));
+		}`),
+		);
+		expect(awaited.payload).toBeNull();
+		expect(awaited.diagnostics.map((d) => d.message)).toContain(
+			'the submit handler is async, and runs as JavaScript only when it is not: the web marks its form busy until its promise settles, which a phone script does not report yet',
+		);
+
+		const elsewhere = await nativeView(`import { state } from '@markless/core';
+export function App() @{
+	let size = state(0);
+	<button onClick={() => (size = [...new FormData()].length + JSON.stringify(size).length)}>{size}</button>
+}`);
+		expect(elsewhere.diagnostics.map((d) => d.message)).toContain(
+			'the click handler uses `FormData`: an HTML form, which a phone does not have',
+		);
 	});
 });
 

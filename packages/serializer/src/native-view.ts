@@ -146,7 +146,9 @@ export const NATIVE_DOCUMENT_BODY = '#body';
 export type NativeScriptBinding =
 	| { readonly cell: string }
 	| { readonly fields: Readonly<Record<string, string>> }
-	| { readonly value: NativeExpr };
+	| { readonly value: NativeExpr }
+	/** A function a parent passed as a prop: the script function `callback`, its own names bound as `<name>.<its name>`. */
+	| { readonly callback: string };
 
 export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
 
@@ -1002,6 +1004,9 @@ export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> =
 	['currentTarget', 'value'],
 	['currentTarget', 'checked'],
 ];
+
+/** A submit handler's binding for its form's entries now, which its event's `target` and `currentTarget` carry for FormData. */
+export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */
 export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [

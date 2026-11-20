@@ -1,5 +1,8 @@
 import type { NativeScript, NativeScriptService } from '@markless/serializer';
-import { NATIVE_SCRIPT_POINTER_FIELDS } from '@markless/serializer/native-view';
+import {
+	NATIVE_SCRIPT_POINTER_FIELDS,
+	NATIVE_SCRIPT_SUBMITTED_FORM,
+} from '@markless/serializer/native-view';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
@@ -168,6 +171,46 @@ if (!host) {
 	};
 	g.window = g.self = g;
 	host.Response = Response;
+	// The form a submit handler's event names: only FormData reads it, as its entries when the form was sent.
+	host.Form = function (entries) { Object.defineProperty(this, 'entries', { value: entries }); };
+	if (typeof g.FormData !== 'function') {
+		var FormData = function FormData(form, submitter) {
+			if (!(this instanceof FormData)) throw new TypeError("Failed to construct 'FormData': Please use the 'new' operator");
+			if (submitter !== undefined && submitter !== null) throw new TypeError("FormData on a phone does not read a submitter yet");
+			if (form !== undefined && !(form instanceof host.Form))
+				throw new TypeError("Failed to construct 'FormData': parameter 1 is not of type 'HTMLFormElement'.");
+			this.list = form ? form.entries.map(function (entry) { return [String(entry[0]), String(entry[1])]; }) : [];
+		};
+		var named = function (data, name) { return data.list.filter(function (entry) { return entry[0] === String(name); }); };
+		FormData.prototype.get = function (name) { var found = named(this, name); return found.length ? found[0][1] : null; };
+		FormData.prototype.getAll = function (name) { return named(this, name).map(function (entry) { return entry[1]; }); };
+		FormData.prototype.has = function (name) { return named(this, name).length > 0; };
+		FormData.prototype.append = function (name, value) { this.list.push([String(name), String(value)]); };
+		FormData.prototype['delete'] = function (name) { this.list = this.list.filter(function (entry) { return entry[0] !== String(name); }); };
+		FormData.prototype.set = function (name, value) {
+			var at = -1;
+			for (var index = 0; index < this.list.length; index++) if (this.list[index][0] === String(name)) { at = index; break; }
+			if (at < 0) return this.append(name, value);
+			this.list[at] = [String(name), String(value)];
+			var kept = this.list.slice(0, at + 1);
+			this.list = kept.concat(this.list.slice(at + 1).filter(function (entry) { return entry[0] !== String(name); }));
+		};
+		FormData.prototype.forEach = function (fn, that) {
+			var self = this;
+			this.list.slice().forEach(function (entry) { fn.call(that, entry[1], entry[0], self); });
+		};
+		var iterate = function (data, pick) {
+			var list = data.list.slice(), at = 0;
+			var it = { next: function () { return at < list.length ? { value: pick(list[at++]), done: false } : { value: undefined, done: true }; } };
+			it[Symbol.iterator] = function () { return it; };
+			return it;
+		};
+		FormData.prototype.entries = function () { return iterate(this, function (entry) { return [entry[0], entry[1]]; }); };
+		FormData.prototype.keys = function () { return iterate(this, function (entry) { return entry[0]; }); };
+		FormData.prototype.values = function () { return iterate(this, function (entry) { return entry[1]; }); };
+		FormData.prototype[Symbol.iterator] = FormData.prototype.entries;
+		g.FormData = FormData;
+	}
 }`;
 
 // One payload's script: its modules, its functions, and the entry points a host calls (`enter`, then `leave`).
@@ -213,6 +256,16 @@ var frameOf = function (bindings) {
 			var object = {};
 			Object.keys(binding.fields).forEach(function (field) { cellProperty(object, field, binding.fields[field]); });
 			Object.defineProperty(names, name, { enumerable: true, value: object });
+		} else if ('callback' in binding) {
+			// A parent's function prop: its own names are this frame's under '<name>.'.
+			var prefix = name + '.', own = {};
+			Object.keys(bindings).forEach(function (other) {
+				if (other.indexOf(prefix) === 0) own[other.slice(prefix.length)] = bindings[other];
+			});
+			Object.defineProperty(names, name, {
+				enumerable: true,
+				value: function () { return fn(binding.callback)(frameOf(own)).apply(this, arguments); },
+			});
 		} else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
 	});
 	return names;
@@ -233,8 +286,9 @@ var fail = function (slot, error) {
 			message: error && error.message !== undefined ? String(error.message) : String(error),
 		};
 };
-var eventOf = function (given) {
-	var target = { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
+var eventOf = function (given, frame) {
+	var entries = frame[${JSON.stringify(NATIVE_SCRIPT_SUBMITTED_FORM)}];
+	var target = entries ? new host.Form(entries) : { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
 	var event = {
 		type: given.type,
 		target: target,
@@ -312,7 +366,8 @@ g.__markless[id] = {
 		if (entry.kind === 'dispatch') {
 			var settled = function (error) { fail(entry['catch'], error); };
 			try {
-				var result = fn(entry.fn)(frameOf(entry.frame))(eventOf(entry.event));
+				var frame = frameOf(entry.frame);
+				var result = fn(entry.fn)(frame)(eventOf(entry.event, frame));
 				if (result && typeof result.then === 'function') result.then(null, settled);
 			} catch (error) {
 				settled(error);

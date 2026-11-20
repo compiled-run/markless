@@ -354,6 +354,7 @@ class Runtime(
 		data class Slot(val slot: String) : Bound
 		data class Fields(val fields: Map<String, String>) : Bound
 		data class Value(val value: JsValue) : Bound
+		data class Callback(val fn: String) : Bound
 	}
 
 	private fun bind(bindings: Map<String, ScriptBinding>, scope: Scope): Map<String, Bound> = bindings.mapValuesTo(LinkedHashMap()) { (_, b) ->
@@ -361,6 +362,7 @@ class Runtime(
 			is ScriptBinding.Cell -> Bound.Slot(slot(b.cell, scope))
 			is ScriptBinding.Fields -> Bound.Fields(b.fields.mapValuesTo(LinkedHashMap()) { slot(it.value, scope) })
 			is ScriptBinding.Value -> Bound.Value(evaluate(b.value, scope))
+			is ScriptBinding.Callback -> Bound.Callback(b.fn)
 		}
 	}
 
@@ -369,6 +371,7 @@ class Runtime(
 			is Bound.Slot -> "{\"slot\":${jsonString(b.slot)}}"
 			is Bound.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}}"
 			is Bound.Value -> "{\"value\":${jsonValue(b.value)}}"
+			is Bound.Callback -> "{\"callback\":${jsonString(b.fn)}}"
 		}
 	}
 
@@ -383,6 +386,7 @@ class Runtime(
 			is Bound.Slot -> jsonValue(nullish(values[b.slot]) ?: nullish(values[b.slot.substringBefore('@')]) ?: JsValue.Null)
 			is Bound.Fields -> b.fields.values.joinToString(",", "[", "]") { jsonValue(values[it] ?: values[it.substringBefore('@')] ?: JsValue.Null) }
 			is Bound.Value -> jsonValue(b.value)
+			is Bound.Callback -> "null"
 		}
 	}
 

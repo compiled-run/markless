@@ -514,6 +514,7 @@ public final class NativeRuntime {
 			case let .fields(fields):
 				return (binding.name, .object([("fields", .object(try fields.map { ($0.name, .string(try slot(of: $0.cell, in: scope))) }))]))
 			case let .value(expr): return (binding.name, .object([("value", try evaluate(expr, in: scope).json)]))
+			case let .callback(fn): return (binding.name, .object([("callback", .string(fn))]))
 			}
 		})
 	}
@@ -612,6 +613,7 @@ public final class NativeRuntime {
 		switch (kind, inner) {
 		case let ("slot", .string(slot)): return slotValue(slot)
 		case let ("fields", .object(slots)): return .array(slots.map { if case let .string(slot) = $0.1 { slotValue(slot) } else { .null } })
+		case ("callback", _): return .null
 		default: return inner
 		}
 	}

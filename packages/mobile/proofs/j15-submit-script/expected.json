@@ -1,0 +1,37 @@
+{
+	"rung": "J15",
+	"name": "A submit handler runs as JavaScript: it reads its form through FormData and calls the function its parent passed",
+	"steps": [
+		{ "visible": ["Notes", "Save note", "Nothing saved"] },
+		{
+			"do": { "tap": "Save note" },
+			"visible": ["Nothing saved"],
+			"invalid": "Please fill out this field."
+		},
+		{
+			"do": { "type": { "field": "Title", "text": "Groceries" } },
+			"visible": ["Nothing saved"],
+			"fields": { "Title": "Groceries" }
+		},
+		{
+			"do": { "tap": "Save note" },
+			"visible": ["Saved Groceries (home): 1 notes, 1 tags"],
+			"absent": ["Nothing saved"]
+		},
+		{
+			"do": { "type": { "field": "Title", "text": "Call Ada" } },
+			"visible": ["Saved Groceries (home): 1 notes, 1 tags"],
+			"fields": { "Title": "Call Ada" }
+		},
+		{
+			"do": { "type": { "field": "Tag", "text": "work" } },
+			"visible": ["Saved Groceries (home): 1 notes, 1 tags"],
+			"fields": { "Tag": "work" }
+		},
+		{
+			"do": { "tap": "Save note" },
+			"visible": ["Saved Call Ada (work): 2 notes, 2 tags"],
+			"absent": ["Saved Groceries (home): 1 notes, 1 tags"]
+		}
+	]
+}

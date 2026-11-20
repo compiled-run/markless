@@ -26,6 +26,7 @@ import {
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
+	NATIVE_SCRIPT_SUBMITTED_FORM,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
 	NATIVE_SCRIPT_HOST_GLOBALS,
 	NATIVE_SCRIPT_LANGUAGE_GLOBALS,
@@ -69,6 +70,7 @@ import type {
 	SemanticSharedDefinition,
 	SemanticScriptFunction,
 	SemanticScriptGlobal,
+	SemanticSyncPolicy,
 	SourceSpan,
 } from '../artifacts.ts';
 import { compileDrawing, type DrawingElement } from './native-drawing.ts';
@@ -392,6 +394,8 @@ type Prop =
 			readonly statements: ReadonlyArray<SemanticHandlerStatement> | undefined;
 			readonly parameters: ReadonlyArray<string>;
 			readonly scope: Scope;
+			/** Where the caller wrote the function, for JavaScript that calls it. */
+			readonly span?: SourceSpan;
 	  };
 
 /** One rendered instance of a `shared()` definition: its cells, handles and methods, resolved for one subtree. */
@@ -589,6 +593,14 @@ const messageOfError = (expr: NativeExpr | null | undefined): NativeExpr | undef
 	expr && 'error' in expr ? (expr as unknown as { error: NativeExpr }).error : undefined;
 /** An op that marks where `event.preventDefault()` ran in a submit handler; checked, then taken out. */
 const PREVENT = { op: 'prevent' } as unknown as NativeOp;
+
+/** Whether a handler's sync policy cancels its event on every run, before any of its code can await or return. */
+const preventsAlways = (policy: SemanticSyncPolicy | undefined): boolean =>
+	!!policy &&
+	'when' in policy &&
+	policy.when.type === 'constant-truthy' &&
+	!!policy.when.value &&
+	policy.actions.includes('preventDefault');
 
 /** Whether every way through `ops` runs `preventDefault()` before the handler's synchronous part ends. */
 const prevents = (ops: ReadonlyArray<NativeOp>): boolean =>
@@ -944,8 +956,8 @@ export function nativeUnsupported(message: string, span?: SourceSpan): CompilerD
 }
 
 const LANGUAGE_GLOBALS = new Set(NATIVE_SCRIPT_LANGUAGE_GLOBALS);
-// A submit's default action and a box's checkedness are the host's; a script's event cannot report them back yet.
-const DATA_ONLY_EVENTS = new Set(['submit', 'change']);
+// A box's checkedness is the host's; a script's event cannot report it back yet.
+const DATA_ONLY_EVENTS = new Set(['change']);
 const RENDER_UNSTEADY = new Set(['Date', 'crypto', 'performance']);
 const GLOBAL_OBJECTS = new Set(NATIVE_SCRIPT_GLOBAL_OBJECTS);
 
@@ -1977,13 +1989,19 @@ export function createNativeViewPayload(
 		{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }
 	>();
 	const scriptServices = new Set<NativeScriptService>();
+	/** Forms whose submit handler runs as JavaScript: their script may build FormData from the form it is given. */
+	const scriptSubmits = new Set<string>();
 	const refuseScript = (message: string, span?: SourceSpan): null => {
 		diagnostics.push(nativeRefusal('javascript', message, span));
 		return null;
 	};
 
 	/** Whether every global a script reads is one a phone's engine has; refuses each other one by name, file and line. */
-	function checkGlobals(globals: ReadonlyArray<SemanticScriptGlobal>, what: string): boolean {
+	function checkGlobals(
+		globals: ReadonlyArray<SemanticScriptGlobal>,
+		what: string,
+		forms: boolean,
+	): boolean {
 		let ok = true;
 		for (const global of globals) {
 			if (global.typeofOnly) continue;
@@ -1991,6 +2009,7 @@ export function createNativeViewPayload(
 				GLOBAL_OBJECTS.has(global.name) && global.property !== undefined
 					? global.property
 					: global.name;
+			if (name === 'FormData' && forms) continue;
 			if (GLOBAL_OBJECTS.has(name) && name === 'globalThis' && global.property === undefined)
 				continue;
 			if (LANGUAGE_GLOBALS.has(name)) continue;
@@ -2021,11 +2040,12 @@ export function createNativeViewPayload(
 		fact: SemanticScriptFunction,
 		module: ModuleFacts,
 		what: string,
+		forms = false,
 	): string | null {
 		const key = `${fact.span.filename}\0${fact.span.start}`;
 		const known = scriptFunctions.get(key);
 		if (known) return known.id;
-		let ok = checkGlobals(fact.globals, what);
+		let ok = checkGlobals(fact.globals, what, forms);
 		for (const use of fact.framework) {
 			ok = false;
 			refuseScript(
@@ -2051,10 +2071,33 @@ export function createNativeViewPayload(
 		fact: SemanticScriptFunction,
 		scope: Scope,
 		what: string,
+		forms = false,
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
 		let ok = true;
 		for (const { name, written, span } of fact.names) {
+			const prop = propOf(name, scope);
+			if (prop?.kind === 'callback') {
+				const callback = written ? undefined : prop.span && scriptFacts(prop.scope.module)?.handler(prop.span);
+				const label = `the \`${name}\` function ${what} calls`;
+				const fn = callback && scriptFunctionId(callback, prop.scope.module, label, forms);
+				const own = callback && fn && scriptBindings(callback, prop.scope, label, forms);
+				if (!fn || !own) {
+					ok = false;
+					if (!callback)
+						refuseScript(
+							written
+								? `${what} assigns \`${name}\`, which is not state`
+								: `${what} calls \`${name}\`, a function whose source the build did not read`,
+							span,
+						);
+					continue;
+				}
+				bindings[name] = { callback: fn };
+				for (const [inner, binding] of Object.entries(own))
+					bindings[`${name}.${inner}`] = binding;
+				continue;
+			}
 			const object = scope.objects.get(name);
 			if (object?.kind === 'fields') {
 				bindings[name] = { fields: Object.fromEntries(object.cells) };
@@ -2262,7 +2305,7 @@ export function createNativeViewPayload(
 					`${at} uses ${construct.construct}, which a phone's script cannot run`,
 					construct.span,
 				);
-			checkGlobals(statement.globals, at);
+			checkGlobals(statement.globals, at, scriptSubmits.size > 0);
 			for (const name of statement.uses) local(entry, name);
 			for (const use of statement.imports) imported(entry, use.slot, use.name);
 		};
@@ -4299,6 +4342,7 @@ export function createNativeViewPayload(
 							statements: prop.nativeStatements,
 							parameters: prop.parameters ?? [],
 							scope,
+							...(prop.sourceSpan ? { span: prop.sourceSpan } : {}),
 						};
 					} else if (prop.kind === 'serializable' && isNativeValue(prop.value)) {
 						const expr = expressionOfValue(prop.value);
@@ -4831,20 +4875,43 @@ export function createNativeViewPayload(
 		handler: string,
 		pressed?: NonNullable<Scope['pressed']>,
 	): NativeOp[] {
+		const submitting = event.eventName === 'submit';
+		// The web sends a form whose submit handler does not cancel it at once; only the analyzer's sync policy says it always does.
+		const form =
+			submitting && pressed && preventsAlways(event.syncPolicy) ? pressed.currentTarget : undefined;
+		// While a submit's promise runs the web marks its form busy; an engine does not report when its promise settles yet.
+		const awaited = submitting && (event.handlerReturnsPromise || event.handlerMayReject);
 		if (
 			scriptMode === 'never' ||
 			!event.handlerSpan ||
 			DATA_ONLY_EVENTS.has(event.eventName) ||
+			(submitting && (form === undefined || awaited)) ||
 			!scriptFacts(scope.module)
-		)
-			return dataHandlerOps(event, scope, handler, pressed);
+		) {
+			if (!submitting || scriptMode === 'never' || !event.handlerSpan || !scriptFacts(scope.module))
+				return dataHandlerOps(event, scope, handler, pressed);
+			const data = attempt(() => dataHandlerOps(event, scope, handler, pressed));
+			if (data.failed)
+				refuseScript(
+					form === undefined
+						? 'the submit handler runs as JavaScript only when it calls `event.preventDefault()` first, outside any branch, as the web then never sends the form'
+						: 'the submit handler is async, and runs as JavaScript only when it is not: the web marks its form busy until its promise settles, which a phone script does not report yet',
+					event.handlerSpan,
+				);
+			return data.value;
+		}
+		const ran = (op: NativeOp): NativeOp[] => {
+			if (form === undefined) return [op];
+			scriptSubmits.add(form);
+			return [PREVENT, op];
+		};
 		if (scriptMode === 'all') {
 			// The engine sees a cell whose first value is unset as null, where data reads it as unset: such a handler stays data.
 			const data = attempt(() => dataHandlerOps(event, scope, handler, pressed));
 			if (!data.failed && readsUndefinedFirst(data.value)) return data.value;
 			data.rollBack();
-			const scripted = attempt(() => scriptOp(event, scope));
-			if (scripted.value && !scripted.failed) return [scripted.value];
+			const scripted = attempt(() => scriptOp(event, scope, form));
+			if (scripted.value && !scripted.failed) return ran(scripted.value);
 			scripted.rollBack();
 			return dataHandlerOps(event, scope, handler, pressed);
 		}
@@ -4852,8 +4919,9 @@ export function createNativeViewPayload(
 		if (!data.failed) return data.value;
 		data.rollBack();
 		// When the script cannot run it either, what stops the script names what a phone lacks: those refusals stay.
-		const scripted = scriptOp(event, scope);
-		return scripted ? [scripted] : [];
+		const scripted = scriptOp(event, scope, form);
+		// A refused script still cancels its submit, so the form is not refused a second time for that.
+		return scripted ? ran(scripted) : form === undefined ? [] : [PREVENT];
 	}
 
 	/** Runs `run`, then says whether it refused, and can undo what it added (refusals, cells, dialog ops, features). */
@@ -4906,11 +4974,11 @@ export function createNativeViewPayload(
 		return value;
 	}
 
-	function scriptOp(event: SemanticEvent, scope: Scope): NativeOp | null {
-		return keepingFunctions(() => scriptOpOf(event, scope));
+	function scriptOp(event: SemanticEvent, scope: Scope, form?: string): NativeOp | null {
+		return keepingFunctions(() => scriptOpOf(event, scope, form));
 	}
 
-	function scriptOpOf(event: SemanticEvent, scope: Scope): NativeOp | null {
+	function scriptOpOf(event: SemanticEvent, scope: Scope, form?: string): NativeOp | null {
 		const fact = event.handlerSpan && scriptFacts(scope.module)?.handler(event.handlerSpan);
 		const what = `the ${event.eventName} handler`;
 		if (!fact)
@@ -4939,15 +5007,26 @@ export function createNativeViewPayload(
 				);
 				continue;
 			}
-			const doing = semantic === 'input' ? 'a text edit' : touch ? 'a touch' : 'a tap';
+			const doing =
+				semantic === 'input'
+					? 'a text edit'
+					: touch
+						? 'a touch'
+						: event.eventName === 'submit'
+							? 'a submit'
+							: 'a tap';
 			refuseScript(
 				`${what} reads \`event.${read.path.join('.')}\`, which ${doing} on a phone does not have`,
 				read.span,
 			);
 		}
-		const fn = scriptFunctionId(fact, scope.module, what);
-		const bindings = scriptBindings(fact, scope, what);
-		if (fn === null || bindings === null || readsMissing) return null;
+		const forms = form !== undefined;
+		const fn = scriptFunctionId(fact, scope.module, what, forms);
+		const own = scriptBindings(fact, scope, what, forms);
+		if (fn === null || own === null || readsMissing) return null;
+		const bindings = forms
+			? { ...own, [NATIVE_SCRIPT_SUBMITTED_FORM]: { value: { formData: form } } }
+			: own;
 		const caught =
 			(event.handlerCatchBoundaryId !== undefined ||
 				event.dispatchCatchBoundaryId !== undefined) &&

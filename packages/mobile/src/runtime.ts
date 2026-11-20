@@ -456,7 +456,9 @@ export function evaluateWithScript(
 							? { slot: binding.cell }
 							: 'fields' in binding
 								? { fields: binding.fields }
-								: { value: evaluate(binding.value, values) },
+								: 'callback' in binding
+									? binding
+									: { value: evaluate(binding.value, values) },
 					]),
 				);
 				const entry = {
@@ -596,7 +598,9 @@ export function createNativeRuntime(
 									]),
 								),
 							}
-						: { value: evaluate(binding.value, eventValue, scope) },
+						: 'callback' in binding
+							? binding
+							: { value: evaluate(binding.value, eventValue, scope) },
 			]),
 		);
 	const entryCells = () => ({
@@ -693,7 +697,9 @@ export function createNativeRuntime(
 				? read(binding.cell, scope)
 				: 'fields' in binding
 					? Object.values(binding.fields).map((cell) => read(cell, scope))
-					: evaluate(binding.value, undefined, scope),
+					: 'callback' in binding
+						? null
+						: evaluate(binding.value, undefined, scope),
 		);
 	const compute: Compute = (fn, bindings, scope) =>
 		JSON.parse(
