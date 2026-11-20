@@ -101,6 +101,8 @@ export type NativeExpr =
 	| { readonly local: string }
 	/** The current row's item of a list (`repeat` node id). */
 	| { readonly item: string }
+	/** The current row's position in its list (`repeat` node id), from 0: a `@for`'s `index`. */
+	| { readonly index: string }
 	/** The page's route params, an object of strings (the page component's `params` prop). */
 	| { readonly route: 'params' }
 	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> }

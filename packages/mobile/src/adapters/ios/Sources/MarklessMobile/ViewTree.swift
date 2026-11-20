@@ -554,9 +554,9 @@ final class ViewTree {
 				}
 				let items = Dictionary(try runtime.rows(of: template, in: context.scope).map { ($0.key, $0.item) }, uniquingKeysWith: { $1 })
 				var position = container.subviews.count
-				for key in keys where built[key] == nil {
+				for (place, key) in keys.enumerated() where built[key] == nil {
 					guard let item = items[key] else { throw HostError("\(node) has no current row \(key)") }
-					built[key] = try buildRow(template, key: key, item: item, in: container, at: &position, context)
+					built[key] = try buildRow(template, key: key, item: item, position: place, in: container, at: &position, context)
 				}
 				position = (container.subviews.firstIndex(of: list.anchor) ?? 0) + 1
 				var placed = Set<ObjectIdentifier>()
@@ -708,12 +708,13 @@ final class ViewTree {
 		[id] + (branches[id]?.built.flatMap(withArms) ?? [])
 	}
 
-	private func buildRow(_ list: String, key: String, item: NativeValue, in container: UIView, at index: inout Int, _ context: Context) throws -> [String] {
+	private func buildRow(_ list: String, key: String, item: NativeValue, position: Int, in container: UIView, at index: inout Int, _ context: Context) throws -> [String] {
 		// A row of a list inside another list's row is keyed by both (`<id>@<outer>@<key>`), as the runtime names it.
 		var row = context
 		row.suffix = "\(context.suffix)@\(key)"
 		row.scope.items[list] = item
 		row.scope.keys[list] = String(row.suffix.dropFirst())
+		row.scope.positions[list] = position
 		return try build(list, in: container, at: &index, row)
 	}
 
@@ -974,10 +975,10 @@ final class ViewTree {
 				let marker = anchor(in: container, at: &index)
 				var rows: [String: [String]] = [:]
 				var keys: [String] = []
-				for row in try runtime.rows(of: template, in: context.scope) {
+				for (position, row) in try runtime.rows(of: template, in: context.scope).enumerated() {
 					if rows[row.key] != nil { throw HostError("\(id) has two rows keyed \(row.key)") }
 					keys.append(row.key)
-					rows[row.key] = try buildRow(template, key: row.key, item: row.item, in: container, at: &index, context)
+					rows[row.key] = try buildRow(template, key: row.key, item: row.item, position: position, in: container, at: &index, context)
 				}
 				lists[id] = (marker, keys, rows)
 			case let .sheet(open, snapPoints, dismissible, modal):

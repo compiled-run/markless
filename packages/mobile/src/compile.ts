@@ -258,6 +258,7 @@ function unstyledOnly(
 			: tree !== null &&
 				typeof tree === 'object' &&
 				('item' in tree ||
+					'index' in tree ||
 					('cell' in tree && rowCells.has((tree as { cell: string }).cell)) ||
 					Object.values(tree).some(readsRow));
 	return payload.nodes.flatMap((node) => {

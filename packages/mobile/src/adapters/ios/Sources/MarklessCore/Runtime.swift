@@ -176,6 +176,8 @@ public struct NativeScope: Sendable {
 	public var items: [String: NativeValue] = [:]
 	/// The row keys by `repeat` id, where a row's own state is read.
 	public var keys: [String: String] = [:]
+	/// Each row's position in its list by `repeat` id, from 0: what a `@for`'s `index` reads.
+	public var positions: [String: Int] = [:]
 	public var locals: [String: NativeValue] = [:]
 	public static let empty = NativeScope()
 }
@@ -397,6 +399,9 @@ public final class NativeRuntime {
 		case let .item(repeatId):
 			guard let item = scope.items[repeatId] else { throw RuntimeError(reason: "the row item of \(repeatId) read outside its row") }
 			return item
+		case let .index(repeatId):
+			guard let position = scope.positions[repeatId] else { throw RuntimeError(reason: "the row index of \(repeatId) read outside its row") }
+			return .number(Double(position))
 		case let .local(name):
 			guard let value = scope.locals[name] else { throw RuntimeError(reason: "the parameter \(name) read outside its function") }
 			return value
@@ -686,11 +691,12 @@ public final class NativeRuntime {
 		guard let list = nodesById[row] else { return [] }
 		return try instances(of: list).flatMap { copy in
 			let outer = list.row.flatMap { copy.scope.keys[$0] }
-			return try rows(of: row, in: copy.scope).map { entry -> NativeInstance in
+			return try rows(of: row, in: copy.scope).enumerated().map { position, entry -> NativeInstance in
 				let suffix = outer.map { "\($0)@\(entry.key)" } ?? entry.key
 				var scope = copy.scope
 				scope.items[row] = entry.item
 				scope.keys[row] = suffix
+				scope.positions[row] = position
 				return NativeInstance(id: "\(node.id)@\(suffix)", scope: scope)
 			}
 		}.filter { try isShown(node.arm, in: $0.scope) }

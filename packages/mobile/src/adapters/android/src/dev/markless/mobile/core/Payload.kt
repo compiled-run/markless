@@ -54,6 +54,8 @@ sealed interface Expr {
 	data class Local(val name: String) : Expr
 	/** The current row's item of a list. */
 	data class Item(val repeat: String) : Expr
+	/** The current row's position in its list, from 0: a `@for`'s `index`. */
+	data class Index(val repeat: String) : Expr
 	data class Call(val name: String, val arguments: List<Expr>) : Expr
 	/** A field of the event running the handler: an input's `value`, a dismissal's `reason` and `pressTarget`, or a pointer field. */
 	data class Event(val field: String) : Expr
@@ -386,7 +388,7 @@ data class Payload(
 			is Expr.Method -> hasScript(e.target) || e.arguments.any(::hasScript)
 			is Expr.Lambda -> hasScript(e.body)
 			is Expr.Call -> e.arguments.any(::hasScript)
-			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked -> false
+			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, is Expr.Index, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked -> false
 			is Expr.Contains -> hasScript(e.within) || hasScript(e.node)
 			is Expr.Captures -> hasScript(e.node) || hasScript(e.pointer)
 			is Expr.FocusOrigin -> hasScript(e.overlay)
@@ -420,7 +422,7 @@ data class Payload(
 			is Expr.ObjectLit -> e.entries.flatMap { cellsOf(it.second) }
 			is Expr.Method -> cellsOf(e.target) + e.arguments.flatMap(::cellsOf)
 			is Expr.Lambda -> cellsOf(e.body)
-			is Expr.Local, is Expr.Item, Expr.RouteParams -> emptyList()
+			is Expr.Local, is Expr.Item, is Expr.Index, Expr.RouteParams -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
 			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked -> emptyList()
 			is Expr.Contains -> cellsOf(e.within) + cellsOf(e.node)
@@ -511,6 +513,7 @@ data class Payload(
 				o.containsKey("lambda") -> { o.only(setOf("lambda", "body"), what); Expr.Lambda(o.field("lambda", what).arr("$what.lambda").map { it.str("$what.lambda[]") }, sub("body")) }
 				o.containsKey("local") -> { o.only(setOf("local"), what); Expr.Local(o.field("local", what).str("$what.local")) }
 				o.containsKey("item") -> { o.only(setOf("item"), what); Expr.Item(o.field("item", what).str("$what.item")) }
+				o.containsKey("index") -> { o.only(setOf("index"), what); Expr.Index(o.field("index", what).str("$what.index")) }
 				o.containsKey("call") -> {
 					o.only(setOf("call", "arguments"), what)
 					Expr.Call(oneOf(o, "call", BUILTINS, what), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })

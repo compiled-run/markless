@@ -452,6 +452,8 @@ type Scope = {
 	readonly submitting?: string;
 	readonly locals: ReadonlySet<string>;
 	readonly items: ReadonlyMap<string, string>;
+	/** A `@for`'s `index` name, by the `repeat` node whose row position it reads. */
+	readonly indexes?: ReadonlyMap<string, string>;
 	readonly props: ReadonlyMap<string, Prop>;
 	/** Names whose members resolve to cells, handles and methods. */
 	readonly objects: ReadonlyMap<string, ObjectRef>;
@@ -2946,6 +2948,8 @@ export function createNativeViewPayload(
 					);
 				const repeat = scope.items.get(expression.name);
 				if (repeat) return { item: repeat };
+				const positioned = scope.indexes?.get(expression.name);
+				if (positioned) return { index: positioned };
 				const prop = propOf(expression.name, scope);
 				if (prop?.kind === 'value') return prop.expr;
 				if (prop)
@@ -4529,7 +4533,13 @@ export function createNativeViewPayload(
 					rowChunk,
 					parent,
 					{ row: repeatId },
-					{ ...scope, items: new Map([...scope.items, [repeat.itemName, repeatId]]) },
+					{
+						...scope,
+						items: new Map([...scope.items, [repeat.itemName, repeatId]]),
+						...(repeat.indexName
+							? { indexes: new Map([...(scope.indexes ?? []), [repeat.indexName, repeatId]]) }
+							: {}),
+					},
 				);
 				if (item.empty) {
 					const emptyChunk = scope.module.chunks.get(item.empty);

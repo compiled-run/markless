@@ -164,6 +164,8 @@ export type NativeScope = {
 	readonly items: ReadonlyMap<string, Value>;
 	/** The row keys by repeat id, where a row's own state is read. */
 	readonly keys?: ReadonlyMap<string, string>;
+	/** Each row's position in its list by repeat id, from 0: what a `@for`'s `index` reads. */
+	readonly positions?: ReadonlyMap<string, number>;
 	readonly locals: ReadonlyMap<string, Value>;
 	/** The page's route params. */
 	readonly params?: Readonly<Record<string, string>>;
@@ -303,6 +305,11 @@ export function evaluateNativeExpr(
 		if (!scope.items.has(expr.item))
 			throw new Error(`the row item of ${expr.item} read outside its row`);
 		return scope.items.get(expr.item)!;
+	}
+	if ('index' in expr) {
+		const position = scope.positions?.get(expr.index);
+		if (position === undefined) throw new Error(`the row index of ${expr.index} read outside its row`);
+		return position;
 	}
 	if ('local' in expr) {
 		if (!scope.locals.has(expr.local))
@@ -856,7 +863,7 @@ export function createNativeRuntime(
 		return instances(repeat)
 			.flatMap(({ scope }) => {
 				const outer = repeat.row ? scope.keys?.get(repeat.row) : undefined;
-				return rowsOf(repeat, scope).map(({ key, item }) => {
+				return rowsOf(repeat, scope).map(({ key, item }, position) => {
 					const suffix = outer === undefined ? key : `${outer}@${key}`;
 					return {
 						id: `${node.id}@${suffix}`,
@@ -864,6 +871,7 @@ export function createNativeRuntime(
 							...scope,
 							items: new Map([...scope.items, [repeat.id, item]]),
 							keys: new Map([...(scope.keys ?? []), [repeat.id, suffix]]),
+							positions: new Map([...(scope.positions ?? []), [repeat.id, position]]),
 						},
 					};
 				});

@@ -2020,6 +2020,21 @@ export function Page() @{
 	});
 });
 
+describe('a @for row reading its index', () => {
+	it("lowers the index name to the row's position", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let fruits = state(['a', 'b']);
+	<main>@for (const fruit of fruits; index i; key fruit) { <p>{i + 1}</p> }</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const repeat = payload!.nodes.find((node) => node.kind === 'repeat')!;
+		expect(payload!.nodes.find((node) => node.kind === 'text' && node.row === repeat.id)).toMatchObject({
+			parts: [{ expr: { binary: '+', left: { index: repeat.id }, right: { literal: 1 } } }],
+		});
+	});
+});
+
 describe('<iframe>', () => {
 	const frame = async (attributes: string) =>
 		nativeView(`import { state } from '@markless/core';

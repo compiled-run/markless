@@ -166,7 +166,8 @@ class MemoryStore(private val values: MutableMap<String, JsValue> = HashMap()) :
 
 /** What names mean inside a list row or an arrow function: the row items by repeat id, the function's parameters. */
 /** [keys]: the row keys by repeat id, where a row's own state is read. */
-data class Scope(val items: Map<String, JsValue> = emptyMap(), val locals: Map<String, JsValue> = emptyMap(), val keys: Map<String, String> = emptyMap()) {
+/** [positions]: each row's place in its list by repeat id, from 0, which a `@for`'s `index` reads. */
+data class Scope(val items: Map<String, JsValue> = emptyMap(), val locals: Map<String, JsValue> = emptyMap(), val keys: Map<String, String> = emptyMap(), val positions: Map<String, Int> = emptyMap()) {
 	companion object {
 		val EMPTY = Scope()
 	}
@@ -254,6 +255,7 @@ class Runtime(
 			}
 			is Expr.Literal -> e.value
 			is Expr.Item -> scope.items[e.repeat] ?: throw MarklessRuntimeError("the row item of ${e.repeat} read outside its row")
+			is Expr.Index -> JsValue.Num((scope.positions[e.repeat] ?: throw MarklessRuntimeError("the row index of ${e.repeat} read outside its row")).toDouble())
 			is Expr.Local -> scope.locals[e.name] ?: throw MarklessRuntimeError("the parameter ${e.name} read outside its function")
 			is Expr.Unary -> Js.unary(e.op, eval(e.value))
 			is Expr.Binary -> { val l = eval(e.left); Js.binary(e.op, l, eval(e.right)) }
@@ -537,9 +539,9 @@ class Runtime(
 		val repeat = byId[r] as? Node.Repeat ?: return emptyList()
 		return instances(repeat).flatMap { copy ->
 			val outer = repeat.row?.let { copy.scope.keys[it] }
-			rowsOf(repeat, copy.scope).map {
+			rowsOf(repeat, copy.scope).mapIndexed { position, it ->
 				val suffix = if (outer == null) it.key else "$outer@${it.key}"
-				Instance("${node.id}@$suffix", node, copy.scope.copy(items = copy.scope.items + (repeat.id to it.item), keys = copy.scope.keys + (repeat.id to suffix)), suffix)
+				Instance("${node.id}@$suffix", node, copy.scope.copy(items = copy.scope.items + (repeat.id to it.item), keys = copy.scope.keys + (repeat.id to suffix), positions = copy.scope.positions + (repeat.id to position)), suffix)
 			}
 		}.filter { shownIn(node, it.scope) }
 	}

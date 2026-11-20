@@ -54,6 +54,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case local(String)
 	/// The current row's item of a list (`repeat` id).
 	case item(String)
+	/// The current row's position in its list (`repeat` id), from 0: a `@for`'s `index`.
+	case index(String)
 	case call(NativeBuiltin, [NativeExpr])
 	/// A field of the event running the handler: an `input`'s text, a `dismiss`'s reason and press target, a pointer event's fields.
 	case event(NativeEventField)
@@ -79,7 +81,7 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked: return []
+		case .literal, .event, .focused, .local, .item, .index, .routeParams, .formData, .checked: return []
 		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .captures(node, pointer): return node.cells + pointer.cells
@@ -934,6 +936,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			guard name == "params" else { throw PayloadError(path: reader.path + ".route", reason: "unknown route read \"\(name)\"") }
 			return .routeParams
 		case ["item"]: return .item(try field("item").string())
+		case ["index"]: return .index(try field("index").string())
 		case ["formData"]: return .formData(try field("formData").string())
 		case ["checked"]: return .checked(try field("checked").string())
 		case ["bindings", "script"]: return .script(fn: try field("script").string(), bindings: try decodeBindings(try field("bindings")))
