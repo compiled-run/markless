@@ -3608,26 +3608,32 @@ export function createNativeViewPayload(
 				);
 				return value ? [{ attribute: target.name, value }] : [];
 			}
-			if (
-				target.kind === 'class' &&
-				target.trueValue !== undefined &&
-				target.falseValue !== undefined &&
-				target.constantClass === undefined &&
-				target.leadingClass === undefined
-			) {
-				const test = exprOf(read.expression, 'the class test', scope);
-				return test
-					? [
-							{
-								attribute: 'class',
-								value: {
-									if: test,
-									whenTrue: { literal: target.trueValue },
-									whenFalse: { literal: target.falseValue },
-								},
-							},
-						]
-					: [];
+			if (target.kind === 'class') {
+				const given = exprOf(read.expression, 'the class', scope);
+				if (!given) return [];
+				const value: NativeExpr =
+					target.trueValue !== undefined && target.falseValue !== undefined
+						? { if: given, whenTrue: { literal: target.trueValue }, whenFalse: { literal: target.falseValue } }
+						: given;
+				const lead = target.leadingClass || undefined;
+				const constant = target.constantClass || undefined;
+				// As the web writes it: `[leading, value, constant].filter(Boolean).join(' ')`, the scopes kept around the value.
+				const fixed = [lead, constant].filter(Boolean).join(' ');
+				return [
+					{
+						attribute: 'class',
+						value:
+							fixed === ''
+								? value
+								: {
+										if: value,
+										whenTrue: {
+											template: [...(lead ? [`${lead} `] : []), value, ...(constant ? [` ${constant}`] : [])],
+										},
+										whenFalse: { literal: fixed },
+									},
+					},
+				];
 			}
 			refuse(`a ${target.kind} binding${'name' in target ? ` (\`${target.name}\`)` : ''}`);
 			return [];

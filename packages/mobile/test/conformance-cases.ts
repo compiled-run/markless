@@ -39,6 +39,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A class that follows state keeps the module's style scope class around it, as the web writes it.
+		name: 'class-scope',
+		fixture: 'proofs/r152-class-scope/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
 		name: 'switches',
 		fixture: 'test/fixtures/Switches.tsrx',
 		actions: [

@@ -1809,6 +1809,35 @@ export function Page() @{
 	});
 });
 
+describe('class bindings', () => {
+	it('keeps the style scope class around a class that follows state, as the web writes it', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Notes() @{
+	const shown = state({ loud: false, tone: '' });
+	<main>
+		<style>.note { color: red; }</style>
+		<p class={\`note \${shown.loud ? 'loud' : 'quiet'}\`}>A</p>
+		<p class={shown.tone}>B</p>
+	</main>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		const [first, second] = payload!.nodes.filter((node) => node.kind === 'element' && node.element === 'p');
+		if (first?.kind !== 'element' || second?.kind !== 'element') throw new Error('not elements');
+		const scope = /mk-[a-z0-9]+/.exec(JSON.stringify(first.bindings))![0];
+		expect(first.bindings).toEqual([
+			{
+				attribute: 'class',
+				value: {
+					if: expect.anything(),
+					whenTrue: { template: [expect.anything(), ` ${scope}`] },
+					whenFalse: { literal: scope },
+				},
+			},
+		]);
+		expect(second.bindings).toMatchObject([{ attribute: 'class', value: { whenFalse: { literal: scope } } }]);
+	});
+});
+
 describe('inline svg', () => {
 	it("compiles an svg's shapes into a drawing, with its <title> as its name", async () => {
 		const { payload, diagnostics } = await nativeView(`export function Icon() @{

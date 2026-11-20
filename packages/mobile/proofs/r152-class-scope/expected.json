@@ -1,0 +1,20 @@
+{
+	"rung": 152,
+	"name": "class binding with the style scope: a class that follows state keeps the module's scope class, so its scoped rules apply on the phone as on the web",
+	"steps": [
+		{
+			"visible": ["Notes", "Door shut", "Quiet note", "Toggle door"],
+			"absent": ["Door open", "Loud note"]
+		},
+		{
+			"do": { "tap": "Toggle door" },
+			"visible": ["Door open", "Quiet note"],
+			"absent": ["Door shut"]
+		},
+		{
+			"do": { "tap": "Toggle loud" },
+			"visible": ["Loud note", "Door open"],
+			"absent": ["Quiet note"]
+		}
+	]
+}
