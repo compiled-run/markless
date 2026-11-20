@@ -31,6 +31,8 @@ import {
 	NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
+	NATIVE_ELEMENT_INTERFACES,
+	NATIVE_SCRIPT_DOM_CLASSES,
 	NATIVE_SCRIPT_HOST_GLOBALS,
 	NATIVE_SCRIPT_LANGUAGE_GLOBALS,
 	NATIVE_SCRIPT_PAGE_GLOBALS,
@@ -2198,6 +2200,7 @@ export function createNativeViewPayload(
 		{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }
 	>();
 	const scriptServices = new Set<NativeScriptService>();
+	let scriptNamesDomClasses = false;
 	const refuseScript = (message: string, span?: SourceSpan): null => {
 		diagnostics.push(nativeRefusal('javascript', message, span));
 		return null;
@@ -2220,6 +2223,7 @@ export function createNativeViewPayload(
 				: undefined;
 			if (service) {
 				if (service !== 'engine') scriptServices.add(service);
+				if (Object.hasOwn(NATIVE_SCRIPT_DOM_CLASSES, name)) scriptNamesDomClasses = true;
 				continue;
 			}
 			ok = false;
@@ -2690,7 +2694,17 @@ export function createNativeViewPayload(
 					.map((fn) => ({ id: fn.id, code: fn.fact.code })),
 			};
 		});
-		return nativeScriptOf(inputs, [...scriptServices].sort());
+		// Each element's DOM interface, so a proxy answers `instanceof` as the browser's element does.
+		const classes = scriptNamesDomClasses
+			? Object.fromEntries(
+					nodes.flatMap((node) =>
+						node.kind === 'element'
+							? [[node.id, NATIVE_ELEMENT_INTERFACES[node.element] ?? 'HTMLElement'] as const]
+							: [],
+					),
+				)
+			: undefined;
+		return nativeScriptOf(inputs, [...scriptServices].sort(), classes);
 	}
 
 	const inlining = new Set<string>();

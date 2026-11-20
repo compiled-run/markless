@@ -1218,6 +1218,75 @@ export const NATIVE_SCRIPT_LANGUAGE_GLOBALS: ReadonlyArray<string> = [
 	'globalThis',
 ];
 
+/**
+ * The DOM interface an element of each tag is an instance of, as the HTML spec assigns them; any other tag's element is an
+ * `HTMLElement`. In a phone's script an element proxy is an instance of its tag's interface, so `instanceof` answers as
+ * in the browser.
+ */
+export const NATIVE_ELEMENT_INTERFACES: Readonly<Record<string, string>> = {
+	a: 'HTMLAnchorElement',
+	audio: 'HTMLAudioElement',
+	blockquote: 'HTMLQuoteElement',
+	body: 'HTMLBodyElement',
+	br: 'HTMLBRElement',
+	button: 'HTMLButtonElement',
+	canvas: 'HTMLCanvasElement',
+	details: 'HTMLDetailsElement',
+	dialog: 'HTMLDialogElement',
+	div: 'HTMLDivElement',
+	dl: 'HTMLDListElement',
+	fieldset: 'HTMLFieldSetElement',
+	form: 'HTMLFormElement',
+	h1: 'HTMLHeadingElement',
+	h2: 'HTMLHeadingElement',
+	h3: 'HTMLHeadingElement',
+	h4: 'HTMLHeadingElement',
+	h5: 'HTMLHeadingElement',
+	h6: 'HTMLHeadingElement',
+	hr: 'HTMLHRElement',
+	iframe: 'HTMLIFrameElement',
+	img: 'HTMLImageElement',
+	input: 'HTMLInputElement',
+	label: 'HTMLLabelElement',
+	legend: 'HTMLLegendElement',
+	li: 'HTMLLIElement',
+	ol: 'HTMLOListElement',
+	option: 'HTMLOptionElement',
+	output: 'HTMLOutputElement',
+	p: 'HTMLParagraphElement',
+	pre: 'HTMLPreElement',
+	progress: 'HTMLProgressElement',
+	q: 'HTMLQuoteElement',
+	select: 'HTMLSelectElement',
+	span: 'HTMLSpanElement',
+	svg: 'SVGSVGElement',
+	table: 'HTMLTableElement',
+	tbody: 'HTMLTableSectionElement',
+	td: 'HTMLTableCellElement',
+	textarea: 'HTMLTextAreaElement',
+	tfoot: 'HTMLTableSectionElement',
+	th: 'HTMLTableCellElement',
+	thead: 'HTMLTableSectionElement',
+	time: 'HTMLTimeElement',
+	tr: 'HTMLTableRowElement',
+	ul: 'HTMLUListElement',
+	video: 'HTMLVideoElement',
+};
+
+/** The DOM interfaces a phone's script has, each with the one it extends; constructing one throws, as in the browser. */
+export const NATIVE_SCRIPT_DOM_CLASSES: Readonly<Record<string, string | null>> = {
+	Node: null,
+	Element: 'Node',
+	HTMLElement: 'Element',
+	SVGElement: 'Element',
+	...Object.fromEntries(
+		[...new Set(Object.values(NATIVE_ELEMENT_INTERFACES))].map((name) => [
+			name,
+			name.startsWith('SVG') ? 'SVGElement' : 'HTMLElement',
+		]),
+	),
+};
+
 /** Globals a host provides to scripts, by the service that backs each. */
 export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptService | 'engine'>> =
 	{
@@ -1233,6 +1302,7 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		CustomEvent: 'engine',
 		MouseEvent: 'engine',
 		PointerEvent: 'engine',
+		...Object.fromEntries(Object.keys(NATIVE_SCRIPT_DOM_CLASSES).map((name) => [name, 'engine' as const])),
 	};
 
 /**
@@ -1303,9 +1373,6 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	getComputedStyle: 'computed CSS, which a phone does not have at run time',
 	requestAnimationFrame: 'a browser frame, which a phone does not hand to handlers',
 	cancelAnimationFrame: 'a browser frame, which a phone does not hand to handlers',
-	HTMLElement: 'the DOM, which a phone does not have',
-	Element: 'the DOM, which a phone does not have',
-	Node: 'the DOM, which a phone does not have',
 	Event: 'the DOM, which a phone does not have',
 	CustomEvent: 'the DOM, which a phone does not have',
 	MutationObserver: 'the DOM, which a phone does not have',

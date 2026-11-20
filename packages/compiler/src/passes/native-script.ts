@@ -1,5 +1,6 @@
 import type { NativeScript, NativeScriptService } from '@markless/serializer';
 import {
+	NATIVE_SCRIPT_DOM_CLASSES,
 	NATIVE_SCRIPT_CLICK_FIELDS,
 	NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
@@ -98,6 +99,19 @@ if (!host) {
 	g.CustomEvent = eventKind(EventBase, { detail: null });
 	g.MouseEvent = eventKind(EventBase, { detail: 0, button: 0, buttons: 0, clientX: 0, clientY: 0, relatedTarget: null });
 	g.PointerEvent = eventKind(g.MouseEvent, { pointerId: 0, pointerType: '', isPrimary: false });
+	// The DOM's interfaces, so an element proxy answers instanceof as the browser's element does; none can be constructed.
+	var domClasses = ${JSON.stringify(NATIVE_SCRIPT_DOM_CLASSES)};
+	var defineClass = function (name) {
+		if (Object.prototype.hasOwnProperty.call(g, name) && g[name].__dom) return g[name];
+		var parent = domClasses[name] ? defineClass(domClasses[name]) : null;
+		var Class = function () { throw new TypeError('Illegal constructor'); };
+		if (parent) Class.prototype = Object.create(parent.prototype);
+		Object.defineProperty(Class, '__dom', { value: true });
+		Object.defineProperty(Class, 'name', { value: name });
+		g[name] = Class;
+		return Class;
+	};
+	for (var domName in domClasses) defineClass(domName);
 	var Headers = function (pairs) {
 		this.get = function (name) {
 			var key = String(name).toLowerCase(), found = [];
@@ -302,6 +316,8 @@ var elementOf = function (id) {
 			throw new Error('getBoundingClientRect() asks the host to measure while JavaScript waits, which a phone does not answer');
 		},
 	};
+	var tag = (typeof classes === 'object' && classes[id.split('@')[0]]) || 'HTMLElement';
+	if (g[tag] && g[tag].__dom) Object.setPrototypeOf(proxy, g[tag].prototype);
 	Object.defineProperty(proxy, '__node', { value: id });
 	proxies[id] = proxy;
 	return proxy;
@@ -485,6 +501,8 @@ function contentId(text: string): string {
 export function nativeScriptOf(
 	modules: ReadonlyArray<NativeScriptModuleInput>,
 	services: ReadonlyArray<NativeScriptService>,
+	/** Each element's DOM interface by node id, given when the script names one of the DOM's classes. */
+	classes?: Readonly<Record<string, string>>,
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -503,6 +521,7 @@ export function nativeScriptOf(
 	const body = [
 		'var modules = [];',
 		`var owners = ${JSON.stringify(owners)};`,
+		...(classes ? [`var classes = ${JSON.stringify(classes)};`] : []),
 		...definitions,
 		ENTRIES,
 	].join('\n');

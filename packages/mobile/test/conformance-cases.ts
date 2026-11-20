@@ -460,6 +460,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'dom-classes',
+		fixture: 'test/fixtures/DomClasses.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
 		name: 'roster-place',
 		fixture: 'proofs/u78-roster-place/App.tsrx',
 		actions: [
