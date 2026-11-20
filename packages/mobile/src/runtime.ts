@@ -17,6 +17,8 @@ import {
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	nativeLocale,
 	nativeMaxLength,
+	nativeEmailMismatch,
+	nativeEmailValue,
 	nativeTooLongMessage,
 } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
@@ -1047,6 +1049,12 @@ export function createNativeRuntime(
 	const missing = messages[nativeLocale(preferredLanguages, Object.keys(messages))];
 	const tooLongMessages = payload.tooLong ?? {};
 	const tooLong = tooLongMessages[nativeLocale(preferredLanguages, Object.keys(tooLongMessages))];
+	const mismatchMessages = payload.typeMismatch ?? {};
+	const mismatch =
+		mismatchMessages[nativeLocale(preferredLanguages, Object.keys(mismatchMessages))];
+	/** A text field's value as the web keeps it: an email field drops line breaks and trims its ends. */
+	const valueOf = (node: string) =>
+		attributeNow(node, 'type') === 'email' ? nativeEmailValue(textOf(node)) : textOf(node);
 	function entriesOf(id: string): Value {
 		const form = forms.get(id);
 		if (!form) throw new Error(`${id} is not a form`);
@@ -1060,7 +1068,7 @@ export function createNativeRuntime(
 				const chosen = chosenOf(node);
 				return chosen ? [[name, optionValue(chosen)]] : [];
 			}
-			return [[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : textOf(node)]];
+			return [[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : valueOf(node)]];
 		});
 	}
 	/** Why a field stops a submit, as the web says it, or undefined when it does not. */
@@ -1076,11 +1084,16 @@ export function createNativeRuntime(
 			kind === 'radio'
 				? groupOf(node).every((member) => !checkedOf(member.id))
 				: kind === 'text'
-					? textOf(node) === ''
+					? valueOf(node) === ''
 					: !checkedOf(node);
 		if (required && absent()) {
 			if (!missing) throw new Error(`the payload has no message for a ${kind} missing its value`);
 			return missing[kind as 'text' | 'checkbox' | 'radio'];
+		}
+		if (kind === 'text' && attributeNow(node, 'type') === 'email') {
+			if (!mismatch) throw new Error('the payload has no message for an email field');
+			const message = nativeEmailMismatch(mismatch, valueOf(node));
+			if (message !== undefined) return message;
 		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		const max = kind === 'text' ? nativeMaxLength(attributeNow(node, 'maxlength')) : undefined;

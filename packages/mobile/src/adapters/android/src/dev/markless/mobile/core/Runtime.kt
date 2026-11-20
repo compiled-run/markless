@@ -698,6 +698,10 @@ class Runtime(
 
 	private val missing: ValueMissing? = payload.valueMissing[nativeLocale(preferredLanguages, payload.valueMissing.keys)]
 	private val tooLong: TooLong? = payload.tooLong[nativeLocale(preferredLanguages, payload.tooLong.keys)]
+	private val emailMismatch: EmailMismatch? = payload.typeMismatch[nativeLocale(preferredLanguages, payload.typeMismatch.keys)]
+
+	/** A text field's value as the web keeps it: an email field drops line breaks and trims its ends. */
+	private fun valueOf(node: String): String = textOf(node).let { if (attributeNow(node, "type") == "email") emailValue(it) else it }
 
 	private fun entriesOf(id: String): JsValue {
 		val form = forms[id] ?: throw MarklessRuntimeError("\"$id\" is not a form")
@@ -708,7 +712,7 @@ class Runtime(
 			val value = when (kind) {
 				FieldKind.Checkbox, FieldKind.Radio -> if (checkedOf(node)) attributeNow(node, "value") ?: "on" else continue
 				FieldKind.Hidden -> attributeNow(node, "value") ?: ""
-				FieldKind.Text -> textOf(node)
+				FieldKind.Text -> valueOf(node)
 				FieldKind.Select -> optionsOf(node).firstOrNull { selectedness[it.id] == true }?.let(::optionValue) ?: continue
 			}
 			out.add(JsValue.Arr(mutableListOf(JsValue.Str(name), JsValue.Str(value))))
@@ -731,15 +735,17 @@ class Runtime(
 		val required = if (kind == FieldKind.Radio) groupOf(node).any { attributeNow(it.id, "required") != null } else attributeNow(node, "required") != null
 		val absent = required && when (kind) {
 			FieldKind.Radio -> groupOf(node).none { checkedOf(it.id) }
-			FieldKind.Text -> textOf(node) == ""
+			FieldKind.Text -> valueOf(node) == ""
 			else -> !checkedOf(node)
 		}
 		if (absent) {
 			val messages = missing ?: throw MarklessRuntimeError("the payload has no message for a ${kind.wire} missing its value")
 			return when (kind) { FieldKind.Radio -> messages.radio; FieldKind.Checkbox -> messages.checkbox; else -> messages.text }
 		}
-		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		if (kind != FieldKind.Text) return null
+		if (attributeNow(node, "type") == "email")
+			(emailMismatch ?: throw MarklessRuntimeError("the payload has no message for an email field")).message(valueOf(node))?.let { return it }
+		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		val max = nativeMaxLength(attributeNow(node, "maxlength")) ?: return null
 		val typed = edited[node] ?: return null
 		if (typed.length <= max) return null

@@ -1597,7 +1597,7 @@ export function Forms() @{
 			<button>Send</button>
 		</form>
 		<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget, null).get('x')); }}>
-			<input type="email" name="x" />
+			<input type="number" name="x" />
 			<input name="code" pattern="[0-9]+" />
 			<input type="radio" name={sent} />
 			<button type="reset">Clear</button>
@@ -1610,11 +1610,72 @@ export function Forms() @{
 			'the submit handler builds FormData with a submitter, which a native build does not read yet',
 			'the <form> h1 has no onSubmit handler: the web sends it to its action and loads the answer (or sends a POST to an API route in place), and a phone app has no server or page to load',
 			'the submit handler on the <form> h4 does not call `event.preventDefault()` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for',
-			'the <input> h7 in the <form> h6 is an <input type="email">, which no native host draws or checks yet',
+			'the <input> h7 in the <form> h6 is an <input type="number">, which no native host draws or checks yet',
 			'the <input> h8 in the <form> h6 has `pattern`, which the web checks before a submit and no native host checks yet',
 			'the <input> h9 in the <form> h6 binds the `name` of a radio button, which a native build reads only as written',
 			'the <button> h10 in the <form> h6 is a reset button, which a native build has no lowering for yet',
 			'the <button> h11 in the <form> h6 has `formaction`, which says where the web sends the form; a phone app has no server to send it to',
+		]);
+	});
+
+	it("lowers an email field as a text field, and carries Chromium's email messages only for a form that has one", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Join() @{
+	let sent = state('');
+	<main>
+		<form onSubmit={(event) => { event.preventDefault(); sent = 'sent'; }}>
+			<input type="email" name="email" aria-label="Email" />
+			<button>Join</button>
+		</form>
+		<form onSubmit={(event) => { event.preventDefault(); sent = 'other'; }}>
+			<input name="name" aria-label="Name" />
+		</form>
+		<p>{sent}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.forms?.map((form) => form.fields)).toEqual([
+			[{ node: 'h2', kind: 'text' }],
+			[{ node: 'h5', kind: 'text' }],
+		]);
+		expect(payload?.typeMismatch?.en?.noAt).toBe(
+			"Please include an '@' in the email address. '{value}' is missing an '@'.",
+		);
+		const plain = await nativeView(`export function Name() @{
+	<form onSubmit={(event) => event.preventDefault()}><input name="name" aria-label="Name" /></form>
+}`);
+		expect(plain.payload?.typeMismatch).toBeUndefined();
+	});
+
+	it('lowers a submit input as the button its value labels, and refuses one with no value or a bound one by name', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Join() @{
+	let sent = state('');
+	<main>
+		<form onSubmit={(event) => { event.preventDefault(); sent = 'sent'; }}>
+			<input name="name" aria-label="Name" />
+			<input type="submit" value="Join" />
+		</form>
+		<p>{sent}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.nodes.filter((node) => node.id.startsWith('h3'))).toEqual([
+			{ kind: 'element', id: 'h3', element: 'button', parent: 'h1', attributes: { type: 'submit' } },
+			{ kind: 'text', id: 'h3:text0', parent: 'h3', parts: [{ text: 'Join' }] },
+		]);
+		expect(payload?.forms?.[0]?.submitters).toEqual(['h3']);
+		const refused = await nativeView(`import { state } from '@markless/core';
+export function Join() @{
+	let label = state('Join');
+	<form onSubmit={(event) => event.preventDefault()}>
+		<input type="submit" />
+		<input type="submit" value={label} />
+	</form>
+}`);
+		expect(refused.diagnostics.map((d) => d.message)).toEqual([
+			"the <input type=\"submit\"> h1 has no `value`: the web labels it with the browser's own word for Submit, in the browser's language",
+			'the <input type="submit"> h2 binds its `value`, its label, which a native build reads only as written',
 		]);
 	});
 

@@ -26,6 +26,7 @@ import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.EditorInfo
 import android.text.Editable
+import android.text.InputType
 import android.text.InputFilter
 import android.text.Spanned
 import android.text.TextWatcher
@@ -774,6 +775,8 @@ class MarklessHost(
 			"option" -> MarklessBox(context).apply { visibility = View.GONE }
 			"input" -> EditText(context).apply {
 				filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
+				// Chrome gives an email field the email keyboard.
+				if (node.attributes["type"] == "email") inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
 				setOnFocusChangeListener { v, focused -> if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW) }
 				isSingleLine = true
 				includeFontPadding = false

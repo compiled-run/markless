@@ -253,6 +253,7 @@ public final class NativeRuntime {
 	private var chosenNow: String?
 	private let missing: NativeValueMissing?
 	private let tooLong: NativeTooLong?
+	private let emailMismatch: NativeEmailMismatch?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
 	/// Where a page with a script gets its engine; asked only when a script op runs or a script computed is read.
@@ -313,6 +314,8 @@ public final class NativeRuntime {
 		missing = payload.valueMissing.first { $0.locale == locale }?.messages
 		let tooLongLocale = nativeLocale(preferredLanguages, payload.tooLong.map(\.locale))
 		tooLong = payload.tooLong.first { $0.locale == tooLongLocale }?.message
+		let mismatchLocale = nativeLocale(preferredLanguages, payload.typeMismatch.map(\.locale))
+		emailMismatch = payload.typeMismatch.first { $0.locale == mismatchLocale }?.message
 		dialogs = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
 			return nil
@@ -896,12 +899,18 @@ public final class NativeRuntime {
 			switch field.kind {
 			case .checkbox, .radio: return try isChecked(field.node) ? [name, try attributeNow(field.node, "value") ?? "on"] : nil
 			case .hidden: return [name, try attributeNow(field.node, "value") ?? ""]
-			case .text: return [name, try textOf(field: field.node)]
+			case .text: return [name, try valueOf(field: field.node)]
 			case .select:
 				guard let chosen = try options(of: field.node).first(where: { selectedness[$0.id] == true }) else { return nil }
 				return [name, try value(of: chosen)]
 			}
 		}
+	}
+
+	/// A text field's value as the web keeps it: an email field drops line breaks and trims its ends.
+	private func valueOf(field node: String) throws -> String {
+		let text = try textOf(field: node)
+		return try attributeNow(node, "type") == "email" ? NativeEmailMismatch.value(text) : text
 	}
 
 	/// The first field that stops a submit and what the web says about it, or nil when none does.
@@ -925,7 +934,7 @@ public final class NativeRuntime {
 		if required {
 			let absent = switch field.kind {
 			case .radio: try group(of: field.node).allSatisfy { !(try isChecked($0.id)) }
-			case .text: try textOf(field: field.node) == ""
+			case .text: try valueOf(field: field.node) == ""
 			default: !(try isChecked(field.node))
 			}
 			if absent {
@@ -936,6 +945,10 @@ public final class NativeRuntime {
 				default: return missing.text
 				}
 			}
+		}
+		if field.kind == .text, try attributeNow(field.node, "type") == "email" {
+			guard let emailMismatch else { throw RuntimeError(reason: "the payload has no message for an email field") }
+			if let message = emailMismatch.message(for: try valueOf(field: field.node)) { return message }
 		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		guard field.kind == .text, let max = nativeMaxLength(try attributeNow(field.node, "maxlength")), let typed = edited[field.node],

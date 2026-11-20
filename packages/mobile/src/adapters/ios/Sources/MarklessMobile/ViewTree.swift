@@ -857,6 +857,13 @@ final class ViewTree {
 					let limit = LengthLimit { [weak self] in nativeMaxLength(self?.attributes[id]?["maxlength"]) }
 					limits.append(limit)
 					field.delegate = limit
+					// Safari gives an email field the email keyboard with no capitals or corrections.
+					if staticAttributes["type"] == "email" {
+						field.keyboardType = .emailAddress
+						field.textContentType = .emailAddress
+						field.autocapitalizationType = .none
+						field.autocorrectionType = .no
+					}
 					field.addAction(UIAction { [weak self, weak field] _ in
 						self?.dismissMessage()
 						field?.resignFirstResponder()

@@ -335,6 +335,38 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// Each of Chromium's reasons an email field stops a submit, then a value it keeps without its line break and spaces.
+		name: 'email',
+		fixture: 'proofs/f9-email/App.tsrx',
+		actions: [
+			{ event: 'input', host: 'h3', value: 'abc' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: '@x' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'a@' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'a,b@c' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'a@b_c' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'a@b..c' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'a@b-' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: ' sam@exam\nple.com ' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'email-japanese',
+		fixture: 'proofs/f9-email/App.tsrx',
+		preferredLanguages: ['ja-JP'],
+		actions: [
+			{ event: 'input', host: 'h3', value: 'a@b..c' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'forms',
 		fixture: 'test/fixtures/Forms.tsrx',
 		actions: [

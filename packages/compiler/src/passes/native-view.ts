@@ -18,6 +18,7 @@ import type {
 import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
 import {
 	isNativeStyleStateAttribute,
+	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 	NATIVE_DATA_SCRIPT_TYPES,
@@ -290,7 +291,7 @@ function returningInto(
 const TICKED_TYPES = new Set(['checkbox', 'radio']);
 
 /** `<input>` types a host draws as a single-line text field; each blocks the return key's submit when a form has two. */
-const TEXT_TYPES = new Set(['text', 'search', 'tel']);
+const TEXT_TYPES = new Set(['text', 'search', 'tel', 'email']);
 /** Field attributes the web checks before a submit (or that limit typing) and no host checks yet. */
 const UNCHECKED_CONSTRAINTS = [
 	'pattern',
@@ -4075,17 +4076,38 @@ export function createNativeViewPayload(
 					if (result.title !== undefined && !('aria-label' in attributes))
 						attributes['aria-label'] = result.title;
 				}
+				// A submit input is the button its `value` labels, as the web draws it.
+				const submitInput = element === 'input' && attributes['type'] === 'submit';
+				if (submitInput) {
+					if (bindings.some((binding) => 'attribute' in binding && binding.attribute === 'value'))
+						refuse(
+							`the <input type="submit"> ${id} binds its \`value\`, its label, which a native build reads only as written`,
+							span,
+						);
+					else if (!('value' in attributes))
+						refuse(
+							`the <input type="submit"> ${id} has no \`value\`: the web labels it with the browser's own word for Submit, in the browser's language`,
+							span,
+						);
+				}
+				const { value: label, ...unlabelled } = attributes;
 				nodes.push({
 					kind: 'element',
 					id,
-					element: element ?? '*',
+					element: submitInput ? 'button' : (element ?? '*'),
 					parent,
-					...(Object.keys(attributes).length > 0 ? { attributes } : {}),
+					...(Object.keys(submitInput ? unlabelled : attributes).length > 0
+						? { attributes: submitInput ? unlabelled : attributes }
+						: {}),
 					...(bindings.length > 0 ? { bindings } : {}),
 					...(defaultStyle ? { defaultStyle } : {}),
 					...(drawing ? { drawing } : {}),
 					...place,
 				});
+				if (submitInput && label !== undefined) {
+					textRuns.set(id, 1);
+					nodes.push({ kind: 'text', id: `${id}:text0`, parent: id, parts: [{ text: label }], ...place });
+				}
 				for (const event of scope.module.eventsByHost.get(item.id) ?? []) {
 					if (scope.module === rootModule) loweredEvents.add(event.id);
 					if (NOT_ON_PHONES.has(event.eventName)) continue;
@@ -6428,6 +6450,7 @@ export function createNativeViewPayload(
 	wireTicks();
 	checkSelects();
 	let lengthLimited = false;
+	let emailChecked = false;
 	const forms = wireForms();
 	for (const handler of handlers) {
 		if (mentionsElement(handler.ops)) {
@@ -6499,6 +6522,7 @@ export function createNativeViewPayload(
 		...(objects.length > 0 ? { objects } : {}),
 		...(forms.length > 0 ? { forms, valueMissing: NATIVE_VALUE_MISSING_BY_LOCALE } : {}),
 		...(lengthLimited ? { tooLong: NATIVE_TOO_LONG_BY_LOCALE } : {}),
+		...(emailChecked ? { typeMismatch: NATIVE_EMAIL_MISMATCH_BY_LOCALE } : {}),
 		...(script ? { script } : {}),
 	});
 
@@ -6721,6 +6745,7 @@ export function createNativeViewPayload(
 				if (kind === 'text') {
 					textFields.push(node.id);
 					if (attribute(node, 'maxlength')) lengthLimited = true;
+					if (type === 'email') emailChecked = true;
 				}
 			}
 			if (!submit) {

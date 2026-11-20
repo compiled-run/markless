@@ -700,6 +700,8 @@ export type NativeViewPayload = {
 	readonly valueMissing?: Readonly<Record<string, NativeValueMissing>>;
 	/** What the web says when a text field a person edited is longer than its `maxlength`, by language; present when a form's text field has one. */
 	readonly tooLong?: Readonly<Record<string, NativeTooLong>>;
+	/** What the web says when an email field holds no email address, by language; present when a form has an email field. */
+	readonly typeMismatch?: Readonly<Record<string, NativeEmailMismatch>>;
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	readonly script?: NativeScript;
 };
@@ -745,6 +747,63 @@ export function nativeMaxLength(attribute: string | null | undefined): number | 
 	return value;
 }
 
+/**
+ * Chromium's `validationMessage` for an email field whose value is not an email address, one per reason: `{value}` is the
+ * whole value, `{symbol}` the first character not allowed, `{domain}` the part after the `@`.
+ */
+export type NativeEmailMismatch = {
+	readonly noAt: string;
+	readonly emptyLocal: string;
+	readonly emptyDomain: string;
+	readonly invalidLocal: string;
+	readonly invalidDomain: string;
+	readonly invalidDots: string;
+	readonly other: string;
+};
+
+/** An email field's value as the web keeps it: line breaks dropped, then ASCII whitespace trimmed from both ends. */
+export function nativeEmailValue(typed: string): string {
+	return typed.replace(/[\r\n]/g, '').replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/g, '');
+}
+
+const EMAIL_LOCAL = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]$/;
+const EMAIL_LABEL = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
+
+/**
+ * Why an email field's value (as {@link nativeEmailValue} keeps it) is not an email address, in Chromium's words, or
+ * undefined when it is one or is empty. Validity is HTML's valid e-mail address; the reason is the first of Chromium's
+ * checks the value fails.
+ */
+export function nativeEmailMismatch(
+	messages: NativeEmailMismatch,
+	value: string,
+): string | undefined {
+	if (value === '') return undefined;
+	const at = value.indexOf('@');
+	const local = at < 0 ? value : value.slice(0, at);
+	const domain = at < 0 ? '' : value.slice(at + 1);
+	if (
+		at > 0 &&
+		[...local].every((character) => EMAIL_LOCAL.test(character)) &&
+		domain.split('.').every((label) => EMAIL_LABEL.test(label))
+	)
+		return undefined;
+	const fill = (message: string, symbol = '') =>
+		message.replace(/\{(value|symbol|domain)\}/g, (_, name: string) =>
+			name === 'value' ? value : name === 'domain' ? domain : symbol,
+		);
+	if (at < 0) return fill(messages.noAt);
+	if (at === 0) return fill(messages.emptyLocal);
+	if (domain === '') return fill(messages.emptyDomain);
+	const inLocal = [...local].find((character) => !EMAIL_LOCAL.test(character));
+	if (inLocal !== undefined) return fill(messages.invalidLocal, inLocal);
+	const inDomain = [...domain].find((character) => !/^[a-zA-Z0-9.-]$/.test(character));
+	if (inDomain !== undefined) return fill(messages.invalidDomain, inDomain);
+	if (domain.startsWith('.') || domain.endsWith('.') || domain.includes('..'))
+		return fill(messages.invalidDots);
+	return fill(messages.other);
+}
+
 /** A form's submittable fields and submit buttons, each in tree order. */
 export type NativeForm = {
 	readonly node: string;
@@ -760,6 +819,7 @@ export type NativeForm = {
 export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden' | 'select';
 
 export {
+	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 } from './native-validation-messages.ts';
