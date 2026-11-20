@@ -17,6 +17,16 @@ import {
 	withAdmission,
 } from './phones.ts';
 import { parsePhone, phoneId, type PhoneSpec, type PhoneState, transitionPhone } from './pool.ts';
+import {
+	checkoutFacts,
+	jobStarted,
+	moveCheckout,
+	planRefresh,
+	type RefreshEvent,
+	type RefreshState,
+	runnerCheckout,
+	transitionRefresh,
+} from './refresh.ts';
 import type { BundledRung } from './bundle.ts';
 import {
 	bundleRung,
@@ -41,6 +51,7 @@ import {
 	transitionChunk,
 	writeJson,
 } from './store.ts';
+import { spawnRunner } from './spawn-runner.ts';
 
 /** Machine-queue reservations: a chunk with host tests peaked at 0.9 GB (heavy-history, 2026-11-18); a boot holds a phone's memory. */
 const CHUNK_GB = 2;
@@ -49,6 +60,7 @@ const CHUNK_CORES = 2;
 const BOOT_GB = { ios: 3, android: 4 } as const;
 const BOOT_ATTEMPTS = 3;
 const HEALTH_EVERY_MS = 30_000;
+const REFRESH_EVERY_MS = 60_000;
 
 type Phone = {
 	readonly spec: PhoneSpec;
@@ -180,19 +192,75 @@ const chunkNames = (job: string) =>
 				.sort()
 		: [];
 
-/** The oldest job's next queued chunk for this platform. */
+const chunksOf = (job: string) =>
+	chunkNames(job).map((name) => ({ name, chunk: readJson<Chunk>(chunkFile(job, name))! }));
+
+/** The oldest job's next queued chunk for this platform; while the runner waits to restart on origin/main, no new job starts. */
 function nextChunk(
 	platform: PhoneSpec['platform'],
 ): { job: string; name: string; chunk: Chunk } | undefined {
+	const holding = refresh.state === 'pending' || refresh.state === 'moving';
 	for (const id of jobIds()) {
 		const job = jobDir(id);
-		for (const name of chunkNames(job)) {
-			const chunk = readJson<Chunk>(chunkFile(job, name))!;
+		const chunks = chunksOf(job);
+		if (holding && !jobStarted(chunks.map(({ chunk }) => chunk))) continue;
+		for (const { name, chunk } of chunks)
 			if (chunk.state === 'queued' && chunk.platform === platform)
 				return { job, name, chunk };
-		}
 	}
 	return undefined;
+}
+
+let refresh: RefreshState = { state: 'idle', checkedAt: 0, kept: null };
+const moveRefresh = (event: RefreshEvent) => {
+	refresh = transitionRefresh(refresh, event);
+};
+const refreshNow = (): RefreshState => refresh;
+const short = (commit: string) => commit.slice(0, 9);
+
+async function checkUpstream(): Promise<void> {
+	const kept = refresh.state === 'idle' ? refresh.kept : null;
+	moveRefresh({ type: 'check' });
+	try {
+		const plan = planRefresh(await checkoutFacts(runnerCheckout));
+		moveRefresh({ type: 'checked', plan });
+		if (plan.kind === 'refresh')
+			log(
+				`origin/main is at ${short(plan.to)}, the runner's code at ${short(plan.from)}: no new job starts until the runner restarts on it`,
+			);
+		else if (plan.kind === 'kept' && plan.reason !== kept)
+			log(`the runner's checkout stays where it is: ${plan.reason}`);
+	} catch (error) {
+		moveRefresh({ type: 'check-failed' });
+		log(
+			`could not check origin/main: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
+}
+
+/** Between jobs only: moves the checkout to origin/main, installs, and hands the phones to a runner started from it. */
+async function restartOnUpstream(): Promise<void> {
+	if (refresh.state !== 'pending') return;
+	const { plan } = refresh;
+	moveRefresh({ type: 'move' });
+	log(
+		`moving the runner's checkout from ${short(plan.from)} to ${short(plan.to)} and installing`,
+	);
+	try {
+		await moveCheckout(runnerCheckout, plan);
+	} catch (error) {
+		moveRefresh({ type: 'move-failed' });
+		log(
+			`the runner stays on ${short(plan.from)}: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		return;
+	}
+	stopping = true;
+	const record = readJson<DaemonRecord>(daemonFile());
+	if (record?.pid === process.pid) writeJson(daemonFile(), { ...record, pid: -1 });
+	const next = spawnRunner(pool);
+	log(`runner ${process.pid} hands its phones to runner ${next} on ${short(plan.to)}`);
+	process.exit(0);
 }
 
 async function run(phone: Phone, job: string, name: string, queued: Chunk): Promise<void> {
@@ -402,6 +470,16 @@ for (const phone of phones) {
 	void boot(phone, false).finally(() => busy.delete(phone));
 }
 for (;;) {
+	// Before the phones take work (each stays in `busy` until its pass settles); read through a call, async moves change it.
+	const upstream = refreshNow();
+	if (upstream.state === 'idle') {
+		if (Date.now() - upstream.checkedAt >= REFRESH_EVERY_MS) void checkUpstream();
+	} else if (
+		upstream.state === 'pending' &&
+		busy.size === 0 &&
+		!jobIds().some((id) => jobStarted(chunksOf(jobDir(id)).map(({ chunk }) => chunk)))
+	)
+		await restartOnUpstream();
 	for (const phone of phones) {
 		if (busy.has(phone)) continue;
 		const work =
