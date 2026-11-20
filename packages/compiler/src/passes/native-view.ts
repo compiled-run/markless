@@ -1873,17 +1873,7 @@ export function createNativeViewPayload(
 		const device = call ? deviceName(call.calleePath, scope) : undefined;
 		const id = `${scope.prefix}task:${computed.id}`;
 		if (!call || device === undefined || !isDeviceCall(device) || !DEVICE_CALLS[device].async) {
-			if (!cells.some((cell) => cell.id === id)) {
-				const script = scriptAsync(computed, { ...scope, boundary: undefined }, what);
-				if (script === null) return null;
-				addCell({
-					id,
-					name: computed.name,
-					initial: { state: 'pending' },
-					async: { ...script, boundaries: [] },
-					...(scope.row ? { row: scope.row } : {}),
-				});
-			}
+			if (scriptTaskCell(computed, scope, what) === null) return null;
 			scope.boundary.tasks.add(id);
 			return { member: { cell: id }, property: 'value' };
 		}
@@ -1985,9 +1975,17 @@ export function createNativeViewPayload(
 	/** Script functions by where they are written; each payload numbers its own. */
 	const scriptFunctions = new Map<
 		string,
-		{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }
+		{
+			readonly id: string;
+			readonly module: ModuleFacts;
+			readonly fact: SemanticScriptFunction;
+			/** The async values it reads as their settled values (`__settled` in the engine). */
+			settled?: ReadonlyArray<string>;
+		}
 	>();
 	const scriptServices = new Set<NativeScriptService>();
+	/** Task cells whose script is being lowered: an async value that reads one of them back would never settle. */
+	const taskCellsBuilding = new Set<string>();
 	const refuseScript = (message: string, span?: SourceSpan): null => {
 		diagnostics.push(nativeRefusal('javascript', message, span));
 		return null;
@@ -2062,10 +2060,26 @@ export function createNativeViewPayload(
 		fact: SemanticScriptFunction,
 		scope: Scope,
 		what: string,
+		settled?: string[],
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
 		let ok = true;
 		for (const { name, written, span } of fact.names) {
+			const upstream =
+				settled && !written && !scope.locals.has(name)
+					? asyncComputedOf(name, scope)
+					: undefined;
+			if (upstream) {
+				// An async value read by another waits for it, as on the web: the reader sees its settled value.
+				const cell = scriptTaskCell(upstream, scope, `${what}'s \`${name}\``);
+				if (cell === null) {
+					ok = false;
+					continue;
+				}
+				bindings[name] = { cell };
+				settled!.push(name);
+				continue;
+			}
 			const object = scope.objects.get(name);
 			if (object?.kind === 'fields') {
 				bindings[name] = { fields: Object.fromEntries(object.cells) };
@@ -2243,9 +2257,50 @@ export function createNativeViewPayload(
 				);
 			const label = `the async value \`${computed.name}\``;
 			const fn = scriptFunctionId(fact, scope.module, label);
-			const bindings = scriptBindings(fact, scope, label);
-			return fn === null || bindings === null ? null : { script: fn, bindings };
+			const settled: string[] = [];
+			const bindings = scriptBindings(fact, scope, label, settled);
+			if (fn === null || bindings === null) return null;
+			if (settled.length > 0)
+				scriptFunctions.get(`${fact.span.filename}\0${fact.span.start}`)!.settled = settled;
+			return { script: fn, bindings };
 		});
+	}
+
+	/** The async computed a name reads in this component, if it is one. */
+	function asyncComputedOf(name: string, scope: Scope) {
+		const computed =
+			scope.module.computeds.get(scope.component)?.get(name) ??
+			scope.module.computeds.get('')?.get(name);
+		return computed?.kind === 'computed' && computed.async ? computed : undefined;
+	}
+
+	/** The task cell of an async value its script runs, made the first time something reads it. */
+	function scriptTaskCell(
+		computed: SemanticGraphArtifact['graphBindings'][number],
+		scope: Scope,
+		what: string,
+	): string | null {
+		const id = `${scope.prefix}task:${computed.id}`;
+		if (cells.some((cell) => cell.id === id)) return id;
+		if (taskCellsBuilding.has(id))
+			return refuse(
+				`${what} reads the async value \`${computed.name}\`, which reads it back`,
+			);
+		taskCellsBuilding.add(id);
+		try {
+			const script = scriptAsync(computed, { ...scope, boundary: undefined }, what);
+			if (script === null) return null;
+			addCell({
+				id,
+				name: computed.name,
+				initial: { state: 'pending' },
+				async: { ...script, boundaries: [] },
+				...(scope.row ? { row: scope.row } : {}),
+			});
+			return id;
+		} finally {
+			taskCellsBuilding.delete(id);
+		}
 	}
 
 	/**
@@ -2430,7 +2485,12 @@ export function createNativeViewPayload(
 				imports: facts.imports.map((_, slot) => entry.slots.get(slot) ?? null),
 				functions: [...scriptFunctions.values()]
 					.filter((fn) => fn.module === entry.module)
-					.map((fn) => ({ id: fn.id, code: fn.fact.code })),
+					.map((fn) => ({
+						id: fn.id,
+						code: fn.settled?.length
+							? `__s = __settled(__s, ${JSON.stringify(fn.settled)});\n${fn.fact.code}`
+							: fn.fact.code,
+					})),
 			};
 		});
 		return nativeScriptOf(inputs, [...scriptServices].sort(), options.origin);
@@ -6605,6 +6665,30 @@ export function createNativeViewPayload(
 							styledCells.add(cell);
 			}
 
+	// An async value another one reads runs wherever that one runs.
+	for (let changed = true; changed;) {
+		changed = false;
+		for (const reader of cells) {
+			for (const binding of Object.values(reader.async?.bindings ?? {})) {
+				if (!('cell' in binding)) continue;
+				const index = cellIndex.get(binding.cell);
+				const upstream = index === undefined ? undefined : cells[index];
+				if (!upstream?.async) continue;
+				const missing = reader.async!.boundaries.filter(
+					(id) => !upstream.async!.boundaries.includes(id),
+				);
+				if (missing.length === 0) continue;
+				cells[index!] = {
+					...upstream,
+					async: {
+						...upstream.async,
+						boundaries: [...upstream.async.boundaries, ...missing],
+					},
+				};
+				changed = true;
+			}
+		}
+	}
 	const script = buildScript();
 	return done({
 		version: NATIVE_VIEW_VERSION,

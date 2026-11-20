@@ -266,6 +266,28 @@ var keyOf = function (frame) {
 		return binding.value;
 	}));
 };
+// An async value another one reads: its settled value, its error thrown again, or, while it is pending, a wait the run
+// leaves unsettled until the value it reads changes, as the web's reader waits for it.
+var PENDING = {};
+var __settled = function (frame, names) {
+	var out = Object.create(frame);
+	names.forEach(function (name) {
+		Object.defineProperty(out, name, {
+			enumerable: true,
+			get: function () {
+				var shown = frame[name];
+				if (!shown || shown.state === 'pending') throw PENDING;
+				if (shown.state === 'error') {
+					var error = new Error(shown.error.message);
+					error.name = shown.error.name;
+					throw error;
+				}
+				return shown.value;
+			},
+		});
+	});
+	return out;
+};
 var startRun = function (at, task, key) {
 	var signal = host.signal();
 	var run = runs[at] = { key: key, signal: signal, done: false };
@@ -276,6 +298,7 @@ var startRun = function (at, task, key) {
 		cells[task.slot] = value;
 	};
 	var failed = function (error) {
+		if (error === PENDING) return;
 		var shown = slotValue(task.slot);
 		var caught = errorOf(error);
 		settle(shown && shown.state === 'value' ? { state: 'value', value: shown.value, error: caught } : { state: 'error', error: caught });
