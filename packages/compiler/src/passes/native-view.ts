@@ -2783,6 +2783,7 @@ export function createNativeViewPayload(
 		{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }
 	>();
 	const scriptServices = new Set<NativeScriptService>();
+	let scriptReadsUrl = false;
 	/** A script adds listeners to the document, so the hosts report every touch for them. */
 	let documentEvents = false;
 	scriptsMakeKeys = () =>
@@ -2902,7 +2903,8 @@ export function createNativeViewPayload(
 				continue;
 			}
 			if (service) {
-				if (service !== 'engine') scriptServices.add(service);
+				if (service === 'url') scriptReadsUrl = true;
+				else if (service !== 'engine') scriptServices.add(service);
 				if (Object.hasOwn(NATIVE_SCRIPT_DOM_CLASSES, name)) scriptNamesDomClasses = true;
 				continue;
 			}
@@ -3572,6 +3574,7 @@ export function createNativeViewPayload(
 			svgGeometry,
 			options.origin,
 			options.scriptEngine,
+			scriptReadsUrl,
 		);
 	}
 

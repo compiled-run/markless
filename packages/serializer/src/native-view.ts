@@ -1668,34 +1668,37 @@ export const NATIVE_SCRIPT_DOM_CLASSES: Readonly<Record<string, string | null>> 
 	),
 };
 
-/** Globals a host provides to scripts, by the service that backs each. */
-export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptService | 'engine'>> =
-	{
-		setTimeout: 'timers',
-		clearTimeout: 'timers',
-		setInterval: 'timers',
-		clearInterval: 'timers',
-		queueMicrotask: 'engine',
-		structuredClone: 'engine',
-		performance: 'engine',
-		DOMException: 'engine',
-		File: 'engine',
-		DataTransfer: 'engine',
-		// Answers an element's `direction` only, from the host's facts.
-		getComputedStyle: 'engine',
-		console: 'console',
-		fetch: 'fetch',
-		crypto: 'crypto',
-		matchMedia: 'media',
-		Event: 'engine',
-		CustomEvent: 'engine',
-		MouseEvent: 'engine',
-		PointerEvent: 'engine',
-		KeyboardEvent: 'engine',
-		...Object.fromEntries(
-			Object.keys(NATIVE_SCRIPT_DOM_CLASSES).map((name) => [name, 'engine' as const]),
-		),
-	};
+/** Globals a host provides to scripts, by the service behind each; for `url` the build adds the URL Standard's code. */
+export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<
+	Record<string, NativeScriptService | 'engine' | 'url'>
+> = {
+	setTimeout: 'timers',
+	clearTimeout: 'timers',
+	setInterval: 'timers',
+	clearInterval: 'timers',
+	queueMicrotask: 'engine',
+	structuredClone: 'engine',
+	performance: 'engine',
+	DOMException: 'engine',
+	File: 'engine',
+	DataTransfer: 'engine',
+	// Answers an element's `direction` only, from the host's facts.
+	getComputedStyle: 'engine',
+	URL: 'url',
+	URLSearchParams: 'url',
+	console: 'console',
+	fetch: 'fetch',
+	crypto: 'crypto',
+	matchMedia: 'media',
+	Event: 'engine',
+	CustomEvent: 'engine',
+	MouseEvent: 'engine',
+	PointerEvent: 'engine',
+	KeyboardEvent: 'engine',
+	...Object.fromEntries(
+		Object.keys(NATIVE_SCRIPT_DOM_CLASSES).map((name) => [name, 'engine' as const]),
+	),
+};
 
 /**
  * What a script handler's event has on a phone, as member paths: a deeper read below `target.value` is a string's. Any

@@ -1741,6 +1741,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
+		name: 'script-url',
+		fixture: 'proofs/j52-url/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
 		name: 'details',
 		fixture: 'proofs/r145-details/App.tsrx',
 		modules: true,
