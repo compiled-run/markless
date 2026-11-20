@@ -91,7 +91,7 @@ export function Tagged(props: { tag: string }) @{
 }
 `,
 	);
-	const [tagged] = liftedIds(compiled, ['() => art.ink + props.tag']);
+	const [tagged] = liftedIds(compiled, ['() => ((open)) ? art.ink + props.tag : undefined']);
 	expect(tagged).toBeDefined();
 	expect(servedGraphNodeIds(compiled).ssr).toContain(tagged);
 });

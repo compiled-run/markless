@@ -4021,12 +4021,26 @@ export function createNativeViewPayload(
 					);
 				const handleAttrs = handleAttributes(chunk, item.path);
 				const inputType = element === 'input' ? (attributes['type'] ?? '') : undefined;
-				const own = bindingsOf(
-					item.id,
-					scope,
-					new Set(handleAttrs.map((attribute) => attribute.name)),
-					inputType === undefined || inputType === '' || TEXT_TYPES.has(inputType),
+				const selectedOption = chunk.slots.find(
+					(slot) =>
+						slot.kind === 'attribute' &&
+						slot.selectedOption &&
+						comparePaths(slot.coordinate.path, item.path) === 0,
 				);
+				const chosen =
+					selectedOption?.kind === 'attribute' && selectedOption.nativeExpression
+						? exprOf(selectedOption.nativeExpression, 'the `selected` property', scope)
+						: null;
+				// An option inside a <select value> is chosen when the select's value names it, as the server marks it.
+				const own: ElementBindings = [
+					...bindingsOf(
+						item.id,
+						scope,
+						new Set(handleAttrs.map((attribute) => attribute.name)),
+						inputType === undefined || inputType === '' || TEXT_TYPES.has(inputType),
+					),
+					...(chosen ? [{ property: 'selected' as const, value: chosen }] : []),
+				];
 				const bindings = [
 					...restBindings.filter(
 						(binding) =>

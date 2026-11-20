@@ -28,9 +28,9 @@ type DecodedStateCell = {
 // and loading this module there would be a fetch the page can never use.
 //
 // The gate is load-time only, never behavior-changing: on a page that does have
-// cells the plane is still awaited before the start wiring runs, because the
-// read-initializer pass below must reconcile SSR bindings from their fallback to
-// the slot-seeded value before anything else reads them.
+// cells the plane is awaited before the start wiring runs, so its driver
+// subscriptions see every write a handler makes. The resume runtime commits the
+// saved values itself, once everything derived from them is subscribed.
 
 export function createStoragePlane(input: {
 	readonly graph: RuntimeGraph;
@@ -59,14 +59,6 @@ export function createStoragePlane(input: {
 			},
 		}),
 	);
-
-	// Trigger each storage cell's read initializer now, so the slot-seeded value
-	// is adopted into the graph and its dependents (the SSR text bindings)
-	// reconcile from the fallback to the seeded value. Without this the
-	// initializer only fires if some later read happens to touch the cell, and an
-	// SSR-rendered binding never re-reads on its own — the warm/write-remount bug.
-	// Reads go through the slot-backed initializer, so no extra driver read occurs.
-	for (const record of records) input.graph.read(record.graphNodeId);
 
 	return {
 		dispose() {
