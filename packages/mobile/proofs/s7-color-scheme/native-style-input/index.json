@@ -1,0 +1,77 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Shelf",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "shelf mk-1sz0xg9"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-1sz0xg9"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Seeds at night"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-1sz0xg9"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Plain text takes the scheme's colour"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "accent mk-1sz0xg9"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "The accent has its own dark colour"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "press mk-1sz0xg9"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Pressed 0"
+		}
+	],
+	"css": ":root {\n\tcolor-scheme: light dark;\n}\n\nbody {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.shelf.mk-1sz0xg9 {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.heading.mk-1sz0xg9 {\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.accent.mk-1sz0xg9 {\n\t\t\t\tcolor: #1d4ed8;\n\t\t\t\tfont-size: 17px;\n\t\t\t}\n\t\t\t.press.mk-1sz0xg9 {\n\t\t\t\tdisplay: block;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #8d99ae;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t@media (prefers-color-scheme: dark) {\n\t\t\t\t.accent.mk-1sz0xg9 {\n\t\t\t\t\tcolor: #93c5fd;\n\t\t\t\t}\n\t\t\t}",
+	"states": []
+}

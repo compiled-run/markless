@@ -1,0 +1,166 @@
+{
+ "version": "markless.native-view/0",
+ "component": "App",
+ "cells": [
+  {
+   "id": "state:taps",
+   "name": "taps",
+   "initial": 0
+  }
+ ],
+ "nodes": [
+  {
+   "kind": "element",
+   "id": "h0",
+   "element": "main",
+   "parent": null,
+   "attributes": {
+    "class": "mk-1vc04wk"
+   }
+  },
+  {
+   "kind": "element",
+   "id": "h1",
+   "element": "h1",
+   "parent": "h0",
+   "attributes": {
+    "class": "mk-1vc04wk"
+   }
+  },
+  {
+   "kind": "text",
+   "id": "h1:text0",
+   "parent": "h1",
+   "parts": [
+    {
+     "text": "Borders"
+    }
+   ]
+  },
+  {
+   "kind": "element",
+   "id": "h2",
+   "element": "div",
+   "parent": "h0",
+   "attributes": {
+    "class": "dashed mk-1vc04wk"
+   }
+  },
+  {
+   "kind": "text",
+   "id": "h2:text0",
+   "parent": "h2",
+   "parts": [
+    {
+     "text": "Dashed all round"
+    }
+   ]
+  },
+  {
+   "kind": "element",
+   "id": "h3",
+   "element": "div",
+   "parent": "h0",
+   "attributes": {
+    "class": "dotted mk-1vc04wk"
+   }
+  },
+  {
+   "kind": "text",
+   "id": "h3:text0",
+   "parent": "h3",
+   "parts": [
+    {
+     "text": "Dotted all round"
+    }
+   ]
+  },
+  {
+   "kind": "element",
+   "id": "h4",
+   "element": "div",
+   "parent": "h0",
+   "attributes": {
+    "class": "mixed mk-1vc04wk"
+   }
+  },
+  {
+   "kind": "text",
+   "id": "h4:text0",
+   "parent": "h4",
+   "parts": [
+    {
+     "text": "Mixed sides"
+    }
+   ]
+  },
+  {
+   "kind": "element",
+   "id": "h5",
+   "element": "button",
+   "parent": "h0",
+   "attributes": {
+    "class": "tap mk-1vc04wk"
+   }
+  },
+  {
+   "kind": "text",
+   "id": "h5:text0",
+   "parent": "h5",
+   "parts": [
+    {
+     "text": "Tap"
+    }
+   ]
+  },
+  {
+   "kind": "element",
+   "id": "h6",
+   "element": "p",
+   "parent": "h0",
+   "attributes": {
+    "class": "mk-1vc04wk"
+   }
+  },
+  {
+   "kind": "text",
+   "id": "h6:text0",
+   "parent": "h6",
+   "parts": [
+    {
+     "text": "Taps "
+    },
+    {
+     "cell": "state:taps"
+    }
+   ]
+  }
+ ],
+ "events": [
+  {
+   "host": "h5",
+   "event": "activate",
+   "handler": "handler:event:0"
+  }
+ ],
+ "handlers": [
+  {
+   "id": "handler:event:0",
+   "ops": [
+    {
+     "op": "assign",
+     "cell": "state:taps",
+     "value": {
+      "binary": "+",
+      "left": {
+       "cell": "state:taps"
+      },
+      "right": {
+       "literal": 1
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

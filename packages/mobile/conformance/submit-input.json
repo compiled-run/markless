@@ -12,7 +12,12 @@
 			{
 				"id": "state:second",
 				"name": "second",
-				"initial": "Second form not sent"
+				"initial": "Second form not sent",
+				"styled": true,
+				"domain": [
+					"Second form not sent",
+					"Second form sent"
+				]
 			}
 		],
 		"nodes": [
@@ -736,6 +741,11 @@
 				"host": "h7"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:second",
+					"value": "Second form sent"
+				},
 				{
 					"op": "text",
 					"node": "h8:text0",

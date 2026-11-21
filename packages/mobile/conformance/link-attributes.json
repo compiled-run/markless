@@ -17,7 +17,12 @@
 						{
 							"id": "state:choice",
 							"name": "choice",
-							"initial": "apple"
+							"initial": "apple",
+							"styled": true,
+							"domain": [
+								"apple",
+								"pear"
+							]
 						}
 					],
 					"nodes": [
@@ -533,6 +538,11 @@
 				"host": "h2"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:choice",
+					"value": "pear"
+				},
 				{
 					"op": "attribute",
 					"node": "component-edge:1",

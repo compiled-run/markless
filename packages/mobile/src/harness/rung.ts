@@ -13,7 +13,13 @@ import { createRequire, findPackageJSON } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
-import { nativeAppStyle, nativeAppStyleSize, type DragonStyleExport } from '../app-style.ts';
+import {
+	appStyleFonts,
+	nativeAppStyle,
+	nativeAppStyleSize,
+	type DragonStyleExport,
+	type StyleFont,
+} from '../app-style.ts';
 import {
 	compileNativeApp,
 	compileNativeComponent,
@@ -24,7 +30,7 @@ import type { DeviceAppConfig, DeviceManifest } from '../permissions.ts';
 import { pageScrollDiagnostics } from '../page-scroll.ts';
 import { dragonDir, dragonStyleExport } from '../style-export.ts';
 import type { NativeImage, NativeImageManifest } from '../images.ts';
-import { nativeStyleInput } from '../style-input.ts';
+import { nativeStyleInput, nativeStyleInputAt, type NativeStyleInput } from '../style-input.ts';
 import { readProofExpected } from './expected.ts';
 import {
 	PROOF_FONTS_FOLDER,
@@ -243,14 +249,26 @@ const HAND_MADE_PAYLOAD = 'payload.json';
 /** Written here for Dragon, which turns it into the style export at proof time (DRAGON_DIR, `../style-export.ts`). */
 const STYLE_INPUT = 'native-style-input.json';
 
-type StyleExportFonts = {
-	readonly fonts?: ReadonlyArray<{ readonly id: string; readonly file: string }>;
-};
+type StyleExportFonts = { readonly fonts?: ReadonlyArray<StyleFont> };
+
+/** Writes a style input for Dragon, each font file relative to it; a font file the CSS names that is not there is a build error. */
+function writeStyleInput(file: string, input: NativeStyleInput, name: string): void {
+	mkdirSync(dirname(file), { recursive: true });
+	const at = nativeStyleInputAt(input, (font) => {
+		const path = resolve(repoRoot, font);
+		if (!existsSync(path))
+			throw new Error(
+				`${name}: the stylesheets name the font file ${font}, which is not there`,
+			);
+		return relative(dirname(file), path);
+	});
+	writeFileSync(file, `${JSON.stringify(at, null, '\t')}\n`);
+}
 
 /** Dragon's export for one style input file, or the rung's refusal naming Dragon's reasons. */
-function styleExport(inputPath: string, name: string): Uint8Array {
+function styleExport(inputPath: string, name: string, plan = false): Uint8Array {
 	try {
-		return dragonStyleExport(inputPath, dragonDir());
+		return dragonStyleExport(inputPath, dragonDir(), plan);
 	} catch (error) {
 		throw new Error(
 			`${name}: the component has styles, and its style export could not be made: ${(error as Error).message}`,
@@ -266,17 +284,27 @@ const APP_STYLE_INPUTS = 'native-style-input';
 /** Runs Dragon once per styled page and joins the exports into the app's one style file. */
 function appStyle(dir: string, name: string, inputs: NativeAppBuild['styleInputs']) {
 	rmSync(join(dir, APP_STYLE_INPUTS), { recursive: true, force: true });
-	const exportOf = (file: string, input: unknown): DragonStyleExport => {
-		mkdirSync(dirname(file), { recursive: true });
-		writeFileSync(file, `${JSON.stringify(input, null, '\t')}\n`);
-		return JSON.parse(new TextDecoder().decode(styleExport(file, name))) as DragonStyleExport;
+	const exportOf = (file: string, input: NativeStyleInput, plan: boolean): DragonStyleExport => {
+		writeStyleInput(file, input, name);
+		const exported = JSON.parse(
+			new TextDecoder().decode(styleExport(file, name, plan)),
+		) as DragonStyleExport;
+		// The inputs sit at different depths; the app style names an input's font file from the rung folder.
+		return {
+			...exported,
+			fonts: exported.fonts.map((font) =>
+				font.from === 'input'
+					? { ...font, file: relative(dir, resolve(dirname(file), font.file)) }
+					: font,
+			),
+		};
 	};
 	const pages = inputs.map(({ pattern, page, input, sheets }) => {
 		const base = join(dir, APP_STYLE_INPUTS, relative('pages', page).slice(0, -'.tsrx'.length));
 		const sheetNodes = [...new Set(sheets.map((sheet) => sheet.node))];
 		return {
 			pattern,
-			exported: exportOf(`${base}.json`, input),
+			exported: exportOf(`${base}.json`, input, true),
 			sheets: sheets.map((sheet) => ({
 				node: sheet.node,
 				snapPoint: sheet.snapPoint,
@@ -284,6 +312,7 @@ function appStyle(dir: string, name: string, inputs: NativeAppBuild['styleInputs
 				exported: exportOf(
 					`${base}.sheet${sheetNodes.indexOf(sheet.node)}-${sheet.snapPoint}.json`,
 					sheet.input,
+					false,
 				),
 			})),
 		};
@@ -293,7 +322,7 @@ function appStyle(dir: string, name: string, inputs: NativeAppBuild['styleInputs
 		join(dir, STYLE_SIZE),
 		`${JSON.stringify(nativeAppStyleSize(pages, style), null, '\t')}\n`,
 	);
-	return new TextEncoder().encode(JSON.stringify(style));
+	return { bytes: new TextEncoder().encode(JSON.stringify(style)), fonts: appStyleFonts(pages) };
 }
 
 /** A styled page whose scroll range Dragon cannot decide is a build error naming the file and the element. */
@@ -314,16 +343,25 @@ function checkPageScroll(
 	return bytes;
 }
 
-/** The style file and every font face it names, checked against the face's `sha256:` id. */
-function styleAssets(bytes: Uint8Array, name: string): Array<[string, Uint8Array]> {
+/**
+ * The style file and every font face it names, checked against the face's `sha256:` id: a face `from` the input is a file of
+ * the rung, relative to `dir`; any other is in the Dragon checkout.
+ */
+function styleAssets(
+	bytes: Uint8Array,
+	fonts: ReadonlyArray<StyleFont>,
+	name: string,
+	dir: string,
+): Array<[string, Uint8Array]> {
 	const dragon = dragonDir();
 	const assets: Array<[string, Uint8Array]> = [[PROOF_STYLE_PATH, bytes]];
-	const fonts = (JSON.parse(new TextDecoder().decode(bytes)) as StyleExportFonts).fonts ?? [];
 	for (const font of fonts) {
-		const file = resolve(dragon, font.file);
+		const file = resolve(font.from === 'input' ? dir : dragon, font.file);
 		if (!existsSync(file)) {
 			throw new Error(
-				`${name}: font ${font.id} is not at ${file} in the Dragon checkout ${dragon}`,
+				font.from === 'input'
+					? `${name}: font ${font.id} is not at ${file}`
+					: `${name}: font ${font.id} is not at ${file} in the Dragon checkout ${dragon}`,
 			);
 		}
 		const face = readFileSync(file);
@@ -395,20 +433,22 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 					throw new Error(
 						`${name}: a styled rung whose views differ per phone has no single style export yet`,
 					);
-				writeFileSync(
+				writeStyleInput(
 					join(dir, STYLE_INPUT),
-					`${JSON.stringify(nativeStyleInput(build.payload, build.styles, build.stylesheets), null, '\t')}\n`,
+					nativeStyleInput(build.payload, build.styles, build.stylesheets),
+					name,
 				);
 				if (platform === 'android') {
-					const styled = styleAssets(
-						checkPageScroll(
-							styleExport(join(dir, STYLE_INPUT), name),
-							build,
-							relative(repoRoot, component),
-							name,
-						),
+					const style = checkPageScroll(
+						styleExport(join(dir, STYLE_INPUT), name, true),
+						build,
+						relative(repoRoot, component),
 						name,
 					);
+					const fonts =
+						(JSON.parse(new TextDecoder().decode(style)) as StyleExportFonts).fonts ??
+						[];
+					const styled = styleAssets(style, fonts, name, dir);
 					assets.ios.push(...styled);
 					assets.android.push(...styled);
 				}
@@ -423,13 +463,17 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			});
 			if (!build.payload) {
 				const lines = build.diagnostics.map(
-					(diagnostic) => `  ${diagnostic.page}: ${diagnostic.code}: ${diagnostic.message}`,
+					(diagnostic) =>
+						`  ${diagnostic.page}: ${diagnostic.code}: ${diagnostic.message}`,
 				);
 				throw new Error(`${name}: the app has no ${platform} build\n${lines.join('\n')}`);
 			}
 			manifest = build.manifest;
 			payloads[platform] = JSON.stringify(build.payload);
-			assets[platform].push([PROOF_PAYLOAD_PATH, new TextEncoder().encode(payloads[platform])]);
+			assets[platform].push([
+				PROOF_PAYLOAD_PATH,
+				new TextEncoder().encode(payloads[platform]),
+			]);
 			assets[platform].push(...imageAssets(build.images));
 			if (build.styleInputs.length > 0 && platform === 'android') {
 				// Dragon lays out one input for both phones, so both must build the same views.
@@ -437,7 +481,8 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 					throw new Error(
 						`${name}: a styled app whose views differ per phone has no single style export yet`,
 					);
-				const styled = styleAssets(appStyle(dir, name, build.styleInputs), name);
+				const style = appStyle(dir, name, build.styleInputs);
+				const styled = styleAssets(style.bytes, style.fonts, name, dir);
 				assets.ios.push(...styled);
 				assets.android.push(...styled);
 			}

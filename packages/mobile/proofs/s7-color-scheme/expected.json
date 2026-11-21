@@ -1,0 +1,37 @@
+{
+	"rung": "S7",
+	"name": "A page that opts into dark with color-scheme: light dark takes Chrome's dark canvas and default text colours in dark mode, and stays light in light mode",
+	"steps": [
+		{
+			"visible": [
+				"Seeds at night",
+				"Plain text takes the scheme's colour",
+				"The accent has its own dark colour",
+				"Pressed 0"
+			],
+			"title": "Night shelf"
+		},
+		{
+			"do": {
+				"appearance": "dark"
+			},
+			"visible": ["Seeds at night", "Plain text takes the scheme's colour", "Pressed 0"],
+			"title": "Night shelf"
+		},
+		{
+			"do": {
+				"tap": "Pressed 0"
+			},
+			"visible": ["Pressed 1"],
+			"title": "Night shelf",
+			"absent": ["Pressed 0"]
+		},
+		{
+			"do": {
+				"appearance": "light"
+			},
+			"visible": ["Seeds at night", "Pressed 1"],
+			"title": "Night shelf"
+		}
+	]
+}

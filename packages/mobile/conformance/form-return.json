@@ -7,7 +7,8 @@
 			{
 				"id": "state:ready",
 				"name": "ready",
-				"initial": false
+				"initial": false,
+				"styled": true
 			},
 			{
 				"id": "state:clicks",
@@ -704,6 +705,11 @@
 				"host": "h4"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:ready",
+					"value": true
+				},
 				{
 					"op": "attribute",
 					"node": "h3",

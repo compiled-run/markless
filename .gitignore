@@ -64,3 +64,6 @@ packages/vitest-browser/browser/**/__screenshots__/
 
 # Tool caches (Playwright browsers on CI runners and similar) are never source
 .cache/
+
+# Dragon's decoded sfnt of a WOFF or WOFF2 author font, written beside a proof rung's style input at build time
+packages/mobile/proofs/**/dragon-decoded-fonts/

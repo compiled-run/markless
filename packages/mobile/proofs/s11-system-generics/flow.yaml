@@ -1,0 +1,12 @@
+appId: ${APP_ID}
+name: s11-system-generics
+---
+- launchApp:
+      clearState: true
+- assertVisible: Harbour tides
+- assertVisible: Drawn in the phone's own font
+- assertVisible: 'Sans-serif: waffles, quays and fjords along the harbour wall'
+- assertVisible: 'Serif: the quick brown fox jumps over the lazy dog'
+- assertVisible: 'Bold serif: AVATAR Type office'
+- assertVisible: 'Monospace: tide table 0412'
+- assertVisible: Generics

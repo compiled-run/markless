@@ -1,0 +1,19 @@
+html {
+	background: rgba(38, 70, 83, 0.8);
+}
+
+body {
+	margin: 16px;
+	font-family: sans-serif;
+	background: #fefae0;
+}
+
+@media (prefers-color-scheme: dark) {
+	html {
+		background: #10212a;
+	}
+
+	body {
+		background: rgba(231, 111, 81, 0.35);
+	}
+}

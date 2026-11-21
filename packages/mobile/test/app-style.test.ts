@@ -152,3 +152,35 @@ test('a sheet laid out at another pixel ratio than its page is refused by name',
 		]),
 	).toThrow("/: sheet:component-edge:1's ios export at 1 was laid out for another device");
 });
+
+test("the pages' system faces are listed once each by id, and one id rebuilt two ways is refused", () => {
+	const ui = {
+		id: 'system:system-ui:700',
+		ios: { face: { kind: 'system', weight: 0.4, design: 'default' } },
+		android: { file: 'Roboto-Regular.ttf', index: 0, axes: { wght: 700 }, sha256: 'a' },
+	};
+	const serif = {
+		id: 'system:serif:400',
+		ios: { face: { kind: 'name', postScriptName: 'TimesNewRomanPSMT' } },
+	};
+	const style = nativeAppStyle([
+		{ pattern: '/', exported: { ...page('Home', 255), systemFonts: [ui, serif] } },
+		{ pattern: '/about', exported: { ...page('About', 255), systemFonts: [ui] } },
+	]);
+	expect(style.systemFonts).toEqual([serif, ui]);
+	expect(
+		nativeAppStyle([{ pattern: '/', exported: page('Home', 255) }]).systemFonts,
+	).toBeUndefined();
+	expect(() =>
+		nativeAppStyle([
+			{ pattern: '/', exported: { ...page('Home', 255), systemFonts: [ui] } },
+			{
+				pattern: '/about',
+				exported: {
+					...page('About', 255),
+					systemFonts: [{ ...ui, android: { ...ui.android, file: 'Other.ttf' } }],
+				},
+			},
+		]),
+	).toThrow('system face system:system-ui:700 is rebuilt two ways');
+});
