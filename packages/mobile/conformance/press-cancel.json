@@ -32,7 +32,8 @@
 			{
 				"id": "component-edge:0/shared:packages/headless/components/src/numberbox/numberbox.tsrx#numberboxState/state:numberbox.settled",
 				"name": "numberbox.settled",
-				"initial": false
+				"initial": false,
+				"styled": true
 			},
 			{
 				"id": "component-edge:0/shared:packages/headless/components/src/numberbox/numberbox.tsrx#numberboxState/state:numberbox.min",
@@ -119,7 +120,8 @@
 			{
 				"id": "component-edge:0/shared:packages/headless/components/src/numberbox/numberbox.tsrx#numberboxState/state:numberbox.repeatUp",
 				"name": "numberbox.repeatUp",
-				"initial": true
+				"initial": true,
+				"styled": true
 			}
 		],
 		"nodes": [
@@ -12945,6 +12947,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/numberbox/numberbox.tsrx#numberboxState/state:numberbox.settled",
+					"value": true
+				},
+				{
 					"op": "text",
 					"node": "component-edge:0/h1:text0",
 					"value": "3"
@@ -12986,6 +12993,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/numberbox/numberbox.tsrx#numberboxState/state:numberbox.repeatUp",
+					"value": false
+				},
+				{
 					"op": "text",
 					"node": "component-edge:0/h1:text0",
 					"value": "2"
@@ -13026,6 +13038,11 @@
 				"host": "component-edge:4/h5"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:packages/headless/components/src/numberbox/numberbox.tsrx#numberboxState/state:numberbox.repeatUp",
+					"value": true
+				},
 				{
 					"op": "text",
 					"node": "component-edge:0/h1:text0",
