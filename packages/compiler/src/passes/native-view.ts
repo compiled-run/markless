@@ -315,6 +315,16 @@ function returningInto(
 
 /** `<input>` types a person ticks: a press checks them before their handlers run. */
 const TICKED_TYPES = new Set(['checkbox', 'radio']);
+/** The elements a <label> names (HTML's labelable elements), the first inside it when it has no `for`. */
+const LABELABLE_ELEMENTS = new Set([
+	'button',
+	'input',
+	'meter',
+	'output',
+	'progress',
+	'select',
+	'textarea',
+]);
 
 /** `<input>` types a host draws as a single-line text field; each blocks the return key's submit when a form has two. */
 const TEXT_TYPES = new Set(['text', 'search', 'tel', 'email']);
@@ -3855,10 +3865,8 @@ export function createNativeViewPayload(
 				if (scope.locals.has(expression.name)) return { local: expression.name };
 				const bound = scope.args.get(expression.name);
 				if (bound) return bound;
-				if (expression.name === 'Infinity')
-					return { nonFinite: 'Infinity' };
-				if (expression.name === 'NaN')
-					return { nonFinite: 'NaN' };
+				if (expression.name === 'Infinity') return { nonFinite: 'Infinity' };
+				if (expression.name === 'NaN') return { nonFinite: 'NaN' };
 				if (scope.opaque === expression.name || scope.carried?.name === expression.name)
 					return refuse(`${what} reads its event`);
 				if (scope.deviceObjects.has(expression.name))
@@ -8300,6 +8308,44 @@ export function createNativeViewPayload(
 			...node,
 			bindings: [...(node.bindings ?? []), { attribute: reference.attribute, value }],
 		};
+	}
+
+	// A <label> with no `for` names the first labelable element inside it, as the web resolves the control it activates.
+	{
+		const byId = nodeById();
+		const inside = (id: string, ancestor: string) => {
+			for (let at = byId.get(id)?.parent; at; at = byId.get(at)?.parent)
+				if (at === ancestor) return true;
+			return false;
+		};
+		for (const [index, label] of nodes.entries()) {
+			if (
+				label.kind !== 'element' ||
+				label.element !== 'label' ||
+				label.attributes?.['for'] !== undefined ||
+				label.bindings?.some(
+					(binding) => 'attribute' in binding && binding.attribute === 'for',
+				)
+			)
+				continue;
+			const control = nodes.find(
+				(node) =>
+					node.kind === 'element' &&
+					LABELABLE_ELEMENTS.has(node.element) &&
+					!(node.element === 'input' && node.attributes?.['type'] === 'hidden') &&
+					inside(node.id, label.id),
+			);
+			if (control === undefined || control.row !== label.row) continue;
+			const rowKey = control.row && rowKeys.get(control.row);
+			if (control.row && !rowKey) continue;
+			const value: NativeExpr = rowKey
+				? { template: [`${control.id}@`, ...rowKey] }
+				: { literal: control.id };
+			nodes[index] = {
+				...label,
+				bindings: [...(label.bindings ?? []), { attribute: 'for', value }],
+			};
+		}
 	}
 
 	// A tap lands on the innermost element that handles it, so a handler that reads `event.target` runs once per element a

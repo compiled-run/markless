@@ -1,0 +1,26 @@
+appId: ${APP_ID}
+name: u121-label-focus
+---
+- launchApp:
+      clearState: true
+- assertVisible: New note
+- assertVisible: Title
+- assertVisible: Body
+- assertVisible: Pin to top
+- assertVisible: Not editing
+- assertVisible: Pinned no
+- tapOn: Title
+- assertNotVisible: Not editing
+- assertVisible: Editing title
+- assertVisible: Pinned no
+- assertNotVisible: Not editing
+- tapOn: Body
+- assertNotVisible: Editing title
+- assertVisible: Editing body
+- assertVisible: Pinned no
+- assertNotVisible: Editing title
+- tapOn: Pin to top
+- assertNotVisible: Pinned no
+- assertVisible: Pinned yes
+- assertVisible: Editing body
+- assertNotVisible: Pinned no
