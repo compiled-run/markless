@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: y5-sheet-in-arm
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Colours
 - assertVisible: Picked nothing
 - assertVisible: Show choices

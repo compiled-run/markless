@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u12-buttongroup
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Format
 - assertVisible: Alignment
 - assertVisible: Left

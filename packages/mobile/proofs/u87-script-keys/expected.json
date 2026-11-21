@@ -1,0 +1,38 @@
+{
+	"rung": 217,
+	"name": "a KeyboardEvent a script dispatches runs the element's keydown handler with its key, as on the web",
+	"steps": [
+		{
+			"visible": [
+				"No key yet",
+				"Send Home",
+				"Send End"
+			],
+			"absent": [
+				"Script sent Home"
+			]
+		},
+		{
+			"do": {
+				"tap": "Send Home"
+			},
+			"visible": [
+				"Script sent Home"
+			],
+			"absent": [
+				"No key yet"
+			]
+		},
+		{
+			"do": {
+				"tap": "Send End"
+			},
+			"visible": [
+				"Script sent End"
+			],
+			"absent": [
+				"Script sent Home"
+			]
+		}
+	]
+}

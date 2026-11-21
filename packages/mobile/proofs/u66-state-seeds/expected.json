@@ -1,0 +1,31 @@
+{
+	"rung": 176,
+	"name": "A state's first value the build cannot know is taken when the screen opens, and a child's state seeded from a prop keeps it after the prop moves, as the web runs the body once",
+	"steps": [
+		{
+			"visible": ["Seeds", "Pear, Fig, Plum", "First Pear", "Total 2", "Tally 20"],
+			"absent": ["Total 3", "Tally 21", "Pear, Fig, Plum, Kiwi"]
+		},
+		{
+			"do": {
+				"tap": "Grow total"
+			},
+			"visible": ["Total 3", "Tally 20"],
+			"absent": ["Total 2", "Tally 30"]
+		},
+		{
+			"do": {
+				"tap": "Tally 20"
+			},
+			"visible": ["Tally 21", "Total 3", "Pear, Fig, Plum"],
+			"absent": ["Tally 20"]
+		},
+		{
+			"do": {
+				"tap": "Add kiwi"
+			},
+			"visible": ["Pear, Fig, Plum, Kiwi", "First Pear", "Tally 21"],
+			"absent": ["Pear, Fig, Plum", "First Kiwi"]
+		}
+	]
+}

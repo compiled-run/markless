@@ -1,0 +1,291 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "ArmHandles",
+		"cells": [
+			{
+				"id": "state:open",
+				"name": "open",
+				"initial": false
+			},
+			{
+				"id": "state:seen",
+				"name": "seen",
+				"initial": ""
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Toggle"
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:0",
+				"parent": "h0",
+				"test": {
+					"cell": "state:open"
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Extra"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Count"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"cell": "state:seen"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:open",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:open"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:seen",
+						"value": {
+							"template": [
+								"",
+								{
+									"member": {
+										"array": [
+											{
+												"spread": false,
+												"value": {
+													"literal": "h1"
+												}
+											},
+											{
+												"spread": true,
+												"value": {
+													"if": {
+														"drawn": "h2"
+													},
+													"whenTrue": {
+														"array": [
+															{
+																"spread": false,
+																"value": {
+																	"literal": "h2"
+																}
+															}
+														]
+													},
+													"whenFalse": {
+														"array": []
+													}
+												}
+											},
+											{
+												"spread": false,
+												"value": {
+													"literal": "h3"
+												}
+											}
+										]
+									},
+									"property": "length"
+								},
+								" ",
+								{
+									"if": {
+										"drawn": "h2"
+									},
+									"whenTrue": {
+										"literal": "with extra"
+									},
+									"whenFalse": {
+										"literal": "no extra"
+									}
+								},
+								""
+							]
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Toggle"
+		],
+		[
+			"h3:text0",
+			"Count"
+		],
+		[
+			"h4:text0",
+			""
+		]
+	],
+	"initialArms": [
+		[
+			"branch-site:0",
+			1
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "2 no extra"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 0
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "3 with extra"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 1
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "2 no extra"
+				}
+			]
+		}
+	]
+}

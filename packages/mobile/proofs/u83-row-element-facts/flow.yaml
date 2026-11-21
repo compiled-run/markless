@@ -1,0 +1,18 @@
+appId: ${APP_ID}
+name: u83-row-element-facts
+---
+- launchApp:
+    clearState: true
+- assertVisible: Ada
+- assertVisible: Bo
+- assertNotVisible: pressed Ada
+- assertNotVisible: pressed Bo
+- tapOn: Bo
+- assertVisible: pressed Bo
+- assertVisible: pressed Bo
+- assertNotVisible: pressed Ada
+- tapOn: Ada
+- assertVisible: pressed Ada
+- assertNotVisible: pressed Bo
+- assertVisible: pressed Ada
+- assertNotVisible: pressed Bo

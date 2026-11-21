@@ -213,6 +213,13 @@ public struct StyleBands: Sendable {
 }
 
 /// A system sheet's styles: one export per resting height, each laid out in that height's content area.
+/// A number the page's styles read while the app runs (a payload slot), with the value Dragon exported the page at.
+public struct StyleSlot: Equatable, Sendable {
+	public let id: String
+	public let initial: Double
+	public let integer: Bool
+}
+
 public struct SheetStyle: Sendable {
 	public let node: String
 	public let heights: [(snapPoint: Double, style: StyleExport)]
@@ -245,13 +252,15 @@ public struct StyleExport: Sendable {
 	public var plan: String?
 	/// Per assignment: each Dragon id the plan's geometry names, with the export's id for it (empty: no ids differ).
 	public var planNames: [[String: String]] = []
+	/// The slots `laidOut` takes values for, in the order it takes them; empty when no style follows a slot.
+	public var slots: [StyleSlot] = []
 	/// Each list whose rows the phone lays out: the box its rows hang from and the Dragon ids of one row's top boxes, in order.
 	public var planRepeats: [PlanRepeat] = []
 
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
 		let root = try Reader(JSONValue.parse(data), at: "style")
-		let fields = try root.object(required: ["schema", "units", "fonts", "targets"], optional: ["compiler", "component", "source", "warnings", "systemFonts", "fontMode"])
+		let fields = try root.object(required: ["schema", "units", "fonts", "targets"], optional: ["compiler", "component", "source", "warnings", "systemFonts", "fontMode", "slots"])
 		if fields.has("fontMode") {
 			let fontMode = try fields["fontMode"]
 			guard ["system", "pinned"].contains(try fontMode.string()) else { throw fontMode.fail("is neither system nor pinned") }
@@ -278,7 +287,20 @@ public struct StyleExport: Sendable {
 			try fields["targets"].field(target), perState: perState, fonts: try decodeFonts(fields["fonts"]), backend: backend,
 			pageScrollUndecided: pageScrollUndecided)
 		if fields.has("systemFonts") { style.systemFaces = try decodeSystemFonts(fields["systemFonts"], target: target) }
+		if fields.has("slots") { style.slots = try decodeSlots(fields["slots"], plan: style.plan) }
 		return style
+	}
+
+	/// An export's `slots`: each number Dragon's plan reads, once, with the value it is laid out at.
+	private static func decodeSlots(_ reader: Reader, plan: String?) throws -> [StyleSlot] {
+		let slots = try reader.array().map { slot in
+			let f = try slot.object(required: ["id", "initial"], optional: ["integer"])
+			if f.has("integer"), try !f["integer"].bool() { throw PayloadError(path: try f["integer"].path, reason: "integer is only ever true") }
+			return StyleSlot(id: try f["id"].string(), initial: try f["initial"].number(), integer: f.has("integer"))
+		}
+		guard Set(slots.map(\.id)).count == slots.count else { throw PayloadError(path: "style.slots", reason: "a slot is listed twice") }
+		guard slots.isEmpty || plan != nil else { throw PayloadError(path: "style.slots", reason: "style values that follow state need Dragon's layout plan, and the export has none") }
+		return slots
 	}
 
 	/// Reads an app's `markless.native-app-style/0` for one target: each styled route's styles, by route pattern.
@@ -325,12 +347,13 @@ public struct StyleExport: Sendable {
 		for route in try targetFields["routes"].array() {
 			let f = try route.object(
 				required: ["pattern", "component", "compiler", "readiness", "states", "initial", "next", "assignments"],
-				optional: ["bands", "sheets", "plan", "planNames", "planRepeats"])
+				optional: ["bands", "sheets", "plan", "planNames", "planRepeats", "slots"])
 			let pattern = try f["pattern"].string()
 			_ = (try f["component"].string(), try f["compiler"].string())
 			guard routes[pattern] == nil else { throw route.fail("route \(pattern) is listed twice") }
 			var style = try expanded(route, f, try raw(targetFields, "viewport"))
 			style.systemFaces = systemFaces
+			if f.has("slots") { style.slots = try decodeSlots(f["slots"], plan: style.plan) }
 			if f.has("sheets") {
 				style.sheets = try f["sheets"].array().map { sheet in
 					let s = try sheet.object(["node", "heights"])
@@ -540,19 +563,25 @@ public struct StyleExport: Sendable {
 
 	/// This export laid out again by Dragon's plan for a page `width` x `height` points at `scale`: every assignment's frames,
 	/// border widths, text lines, dashed borders and scroll ranges, in this screen's device pixels. `layout` is Dragon's
-	/// translated `runMarklessLayout`. Without a plan the export is returned as it is.
+	/// translated `runMarklessLayout`. `slots` holds a value for each of the export's `slots`, in that order; the colours
+	/// that follow them are written into each assignment's nodes. Without a plan the export is returned as it is.
 	public func laidOut(
-		width: Double, height: Double, scale: Double, layout: (String) -> String,
+		width: Double, height: Double, scale: Double, slots values: [Double] = [], layout: (String) -> String,
 		rows: ((Int) throws -> [String: [LaidOutRow]])? = nil, rowsLayout: ((String) -> String)? = nil
 	) throws -> StyleExport {
 		guard let plan else { return self }
+		guard values.count == slots.count else {
+			throw PayloadError(path: "plan layout", reason: "the export has \(slots.count) slots and the layout was given \(values.count) values")
+		}
+		let slotted = !slots.isEmpty
+		let slotLine = slotted ? ",\"slots\":[" + values.map { "\"" + String($0.bitPattern, radix: 16).leftPadded(16) + "\"" }.joined(separator: ",") + "]" : ""
 		var out = self
 		var pages: [ScrollOffsetRange?] = []
 		out.assignments = try assignments.indices.map { k in
 			let names = k < planNames.count ? planNames[k] : [:]
 			let dragonId = Dictionary(names.map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
 			let shown = !planRepeats.isEmpty ? try rows?(k) : nil
-			var line = "{\"assignment\":\(k),\"dpr\":\(JSONValue.number(scale).jsonText),\"viewport\":{\"width\":\(JSONValue.number(width).jsonText),\"height\":\(JSONValue.number(height).jsonText)},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":\(plan)"
+			var line = "{\"assignment\":\(k),\"dpr\":\(JSONValue.number(scale).jsonText),\"viewport\":{\"width\":\(JSONValue.number(width).jsonText),\"height\":\(JSONValue.number(height).jsonText)},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":\(plan)\(slotLine)"
 			if let shown {
 				let lists = planRepeats.map { r -> JSONValue in
 					// A list an arm hides at this assignment has no box to hold rows: its rows are not laid out there.
@@ -571,10 +600,11 @@ public struct StyleExport: Sendable {
 				line += ",\"rows\":\(JSONValue.array(lists).jsonText)"
 			}
 			line += "}"
+			guard shown == nil || !slotted else { throw PayloadError(path: "plan layout", reason: "a page with rows and style values that follow state, which Dragon's rows layout does not take yet") }
 			guard shown == nil || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page with rows needs Dragon's rows layout") }
 			let result = try Reader(JSONValue.parse(Data((shown == nil ? layout(line) : rowsLayout!(line)).utf8)), at: "plan layout")
 			let parts = try result.array()
-			guard parts.count == 3, try parts[0].string() == "ok" else {
+			guard parts.count == (slotted ? 4 : 3), try parts[0].string() == "ok" else {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout at \(width) x \(height) points and \(scale)x failed: \(result.value.jsonText)")
 			}
 			let bits = { (reader: Reader) throws -> JSONValue in try planNumbers(reader.value) }
@@ -589,6 +619,14 @@ public struct StyleExport: Sendable {
 					geometry["\(names[base] ?? base)\(id[at...])"] = node
 				} else {
 					geometry[names[id] ?? id] = node
+				}
+			}
+			var slotWrites: [String: [(kind: String, path: Reader, value: Double)]] = [:]
+			if slotted {
+				for write in try parts[3].array() {
+					let w = try write.array()
+					guard w.count == 4 else { throw write.fail("expected node, write kind, path and value") }
+					slotWrites[try w[0].string(), default: []].append((try w[1].string(), w[2], try planNumber(w[3].value)))
 				}
 			}
 			let assignment = assignments[k]
@@ -622,7 +660,12 @@ public struct StyleExport: Sendable {
 						lines: own.lines))
 				}
 			}
-			let nodes = try withRows.map { node -> StyleNode in
+			if let missing = slotWrites.keys.first(where: { id in !assignment.nodes.contains { $0.id == id } }) {
+				throw PayloadError(path: "plan layout", reason: "Dragon's layout writes a slot into \(missing), which assignment \(k) does not have")
+			}
+			let nodes = try withRows.map { node in
+				try (slotWrites[node.id] ?? []).reduce(node) { try StyleExport.patched($0, kind: $1.kind, path: $1.path, value: $1.value) }
+			}.map { node -> StyleNode in
 				guard node.frame != nil else { return node }
 				guard let g = geometry[node.id] else { throw PayloadError(path: "plan layout", reason: "Dragon's layout has no box for \(node.id)") }
 				let f = try g.array()
@@ -651,6 +694,49 @@ public struct StyleExport: Sendable {
 		out.viewport = (width, height)
 		out.dpr = scale
 		return out
+	}
+
+	/// The node with one number of its `kind` write replaced: a colour channel the app computes, as Dragon's layout gives it.
+	private static func patched(_ node: StyleNode, kind: String, path: Reader, value: Double) throws -> StyleNode {
+		let steps = try path.array()
+		let refused = PayloadError(path: "plan layout", reason: "Dragon's layout writes a slot into \(node.id)'s \(kind) at \(path.value.jsonText), which this host does not apply")
+		func channel(_ color: RGBA, _ step: Reader) throws -> RGBA {
+			guard step.isString else { throw refused }
+			switch try step.string() {
+			case "r": return RGBA(r: value, g: color.g, b: color.b, alpha: color.alpha)
+			case "g": return RGBA(r: color.r, g: value, b: color.b, alpha: color.alpha)
+			case "b": return RGBA(r: color.r, g: color.g, b: value, alpha: color.alpha)
+			case "alpha": return RGBA(r: color.r, g: color.g, b: color.b, alpha: value)
+			default: throw refused
+			}
+		}
+		func named(_ step: Reader, _ name: String) -> Bool { step.isString && (try? step.string()) == name }
+		var found = false
+		let writes = try node.writes.map { write -> StyleWrite in
+			switch (kind, write) {
+			case let ("background-color", .backgroundColor(color)):
+				guard steps.count == 2, named(steps[0], "color") else { throw refused }
+				found = true
+				return .backgroundColor(try channel(color, steps[1]))
+			case let ("text-color", .textColor(color)):
+				guard steps.count == 2, named(steps[0], "color") else { throw refused }
+				found = true
+				return .textColor(try channel(color, steps[1]))
+			case let ("border-colors", .borderColors(colors)):
+				guard steps.count == 3, named(steps[0], "colors"), case let .number(side) = steps[1].value, let index = colors.indices.first(where: { Double($0) == side }) else {
+					throw refused
+				}
+				found = true
+				var moved = colors
+				moved[index] = try channel(colors[index], steps[2])
+				return .borderColors(moved)
+			default: return write
+			}
+		}
+		guard found else { throw refused }
+		return StyleNode(
+			id: node.id, parent: node.parent, isText: node.isText, isAnonymous: node.isAnonymous, text: node.text, frame: node.frame,
+			borderWidths: node.borderWidths, writes: writes, borderOps: node.borderOps, scrollRange: node.scrollRange, lines: node.lines)
 	}
 
 	/// A scroll range, or nil for JSON null.

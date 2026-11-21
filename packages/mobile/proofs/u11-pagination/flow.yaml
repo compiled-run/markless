@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u11-pagination
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Pages
 - assertVisible: Previous page
 - assertVisible: One
@@ -18,15 +18,15 @@ name: u11-pagination
 - assertVisible: Last page
 - assertNotVisible: Page 2
 - assertVisible:
-      text: Next page
-      enabled: false
+    text: Next page
+    enabled: false
 - tapOn: One
 - assertNotVisible: Last page
 - assertVisible: Page 1
 - assertNotVisible: Last page
 - assertVisible:
-      text: Previous page
-      enabled: false
+    text: Previous page
+    enabled: false
 - tapOn: Next page
 - assertNotVisible: Page 1
 - assertVisible: Page 2
@@ -37,5 +37,5 @@ name: u11-pagination
 - assertVisible: Page 1
 - assertNotVisible: Page 2
 - assertVisible:
-      text: Previous page
-      enabled: false
+    text: Previous page
+    enabled: false

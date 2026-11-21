@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u33-editable
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Documents
 - assertVisible: Document name
 - assertVisible: Quarterly plan
@@ -20,10 +20,10 @@ name: u33-editable
 - tapOn: Document name
 - pressKey: Enter
 - assertVisible:
-      text: Annual plan
-      below: Documents
+    text: Annual plan
+    below: Documents
 - assertVisible: Annual plan
 - assertNotVisible: Quarterly plan
 - assertVisible:
-      text: Annual plan
-      below: Documents
+    text: Annual plan
+    below: Documents

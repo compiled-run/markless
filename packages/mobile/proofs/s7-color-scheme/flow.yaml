@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: s7-color-scheme
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - setDarkMode: disabled
 - assertVisible: Seeds at night
 - assertVisible: Plain text takes the scheme's colour
@@ -11,7 +11,7 @@ name: s7-color-scheme
 - assertVisible: Night shelf
 - setDarkMode: enabled
 - waitForAnimationToEnd:
-      timeout: 5000
+    timeout: 5000
 - assertVisible: Seeds at night
 - assertVisible: Plain text takes the scheme's colour
 - assertVisible: Pressed 0
@@ -23,7 +23,7 @@ name: s7-color-scheme
 - assertVisible: Night shelf
 - setDarkMode: disabled
 - waitForAnimationToEnd:
-      timeout: 5000
+    timeout: 5000
 - assertVisible: Seeds at night
 - assertVisible: Pressed 1
 - assertVisible: Night shelf

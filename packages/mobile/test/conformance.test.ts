@@ -56,7 +56,7 @@ describe('native conformance vectors', () => {
 				readModule: entry.modules ? readWorkspaceModule : readCaseModule,
 			});
 			expect(committed(`${entry.name}.json`), entry.name).toEqual(
-				nativeConformance(payload!, entry.actions, entry.params, entry.preferredLanguages, entry.now, CONFORMANCE_SCRIPT_HOST()),
+				nativeConformance(payload!, entry.actions, entry.params, entry.preferredLanguages, entry.now, CONFORMANCE_SCRIPT_HOST(), entry.layout),
 			);
 		}
 	});

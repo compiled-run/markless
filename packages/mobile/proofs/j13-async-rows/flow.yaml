@@ -2,36 +2,36 @@ appId: ${APP_ID}
 name: j13-async-rows
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Rows
-- assertVisible: 'Words: 2'
+- assertVisible: "Words: 2"
 - assertVisible: Looking up apple
 - assertVisible: Looking up missing
-- assertNotVisible: 'Echo of apple: apple'
+- assertNotVisible: "Echo of apple: apple"
 - extendedWaitUntil:
-      visible: 'Echo of apple: apple'
-      timeout: 15500
-- assertVisible: 'Echo of apple: apple'
+    visible: "Echo of apple: apple"
+    timeout: 15500
+- assertVisible: "Echo of apple: apple"
 - assertNotVisible: Looking up apple
 - assertNotVisible: Looking up missing
-- assertVisible: 'Echo of apple: apple'
+- assertVisible: "Echo of apple: apple"
 - assertVisible: No entry for missing
 - assertNotVisible: Looking up apple
 - assertNotVisible: Looking up missing
-- assertNotVisible: 'Words: 3'
+- assertNotVisible: "Words: 3"
 - tapOn: Add cherry
-- assertVisible: 'Words: 3'
-- assertVisible: 'Words: 3'
-- assertVisible: 'Echo of apple: apple'
+- assertVisible: "Words: 3"
+- assertVisible: "Words: 3"
+- assertVisible: "Echo of apple: apple"
 - assertVisible: No entry for missing
 - assertVisible: Looking up cherry
-- assertNotVisible: 'Words: 2'
+- assertNotVisible: "Words: 2"
 - tapOn: Only apple
 - assertNotVisible: Looking up cherry
 - assertNotVisible: No entry for missing
-- assertNotVisible: 'Words: 3'
-- assertVisible: 'Words: 1'
-- assertVisible: 'Echo of apple: apple'
+- assertNotVisible: "Words: 3"
+- assertVisible: "Words: 1"
+- assertVisible: "Echo of apple: apple"
 - assertNotVisible: Looking up cherry
 - assertNotVisible: No entry for missing
-- assertNotVisible: 'Words: 3'
+- assertNotVisible: "Words: 3"

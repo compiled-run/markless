@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: s10-web-font-woff2
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Tide almanac
 - assertVisible: Lato from WOFF2, regular weight
 - assertVisible: Waffles, quays and fjords
