@@ -83,6 +83,8 @@ import {
 	FRAGMENT_HELD_CHARS,
 	PREFETCH_MARKS,
 	FRAGMENT_REGION_END,
+	NITRO_PRERENDER_HEADER,
+	FRAGMENT_PRERENDERED,
 	FRAGMENT_PATH_PREFIX,
 	STYLESHEET_KEY_ATTRIBUTE,
 	checkBridgeMove,
@@ -497,6 +499,11 @@ export function createServerEntry(options: ServerEntryOptions) {
 
 		// A landing the router swaps away from needs its served <html> and <body> attributes: scripts may change them before it runs.
 		// A navigation lands in a document whose import map already resolves every chunk, and a later map could not change it.
+		// A prerendered fragment is one file every visitor gets until the next build, so the router may keep it that long.
+		const regionEnd = () =>
+			fragment && status === 200 && request.headers.has(NITRO_PRERENDER_HEADER)
+				? FRAGMENT_PRERENDERED + FRAGMENT_REGION_END
+				: FRAGMENT_REGION_END;
 		const headStart =
 			(fragmentNavigation && !fragment ? servedHtmlAttributesScript() : '') +
 			(fragment ? '' : (options.importMap ?? ''));
@@ -514,7 +521,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 				headStart,
 			);
 			return new Response(
-				wholeDocument(shell, pageHtml, fragment, documentLoads),
+				wholeDocument(shell, pageHtml, fragment, documentLoads, regionEnd()),
 				http.commit(status, headers),
 			);
 		}
@@ -534,14 +541,14 @@ export function createServerEntry(options: ServerEntryOptions) {
 		);
 		if (stream.pendingArmCount === 0) {
 			return new Response(
-				wholeDocument(shell, pageHtml, fragment, documentLoads),
+				wholeDocument(shell, pageHtml, fragment, documentLoads, regionEnd()),
 				http.commit(status, headers),
 			);
 		}
 		const placed = placePage(shell, DOCUMENT_CHILDREN_PLACEHOLDER, pageHtml);
 		// A fragment is a whole region document first; each settled arm then follows on its own, delimited.
 		const prefix = fragment
-			? fragmentDocument(shell, pageHtml, documentLoads) + FRAGMENT_REGION_END
+			? fragmentDocument(shell, pageHtml, documentLoads) + regionEnd()
 			: placed.prefix;
 		const suffix = fragment ? '' : placed.suffix;
 		const appendEnd = fragment ? FRAGMENT_APPEND_END : '';
@@ -969,8 +976,9 @@ function wholeDocument(
 	page: PageHtml,
 	fragment: boolean,
 	documentLoads: boolean,
+	regionEnd = FRAGMENT_REGION_END,
 ): string {
-	if (fragment) return fragmentDocument(shell, page, documentLoads) + FRAGMENT_REGION_END;
+	if (fragment) return fragmentDocument(shell, page, documentLoads) + regionEnd;
 	const placed = placePage(shell, DOCUMENT_CHILDREN_PLACEHOLDER, page);
 	return placed.prefix + placed.suffix;
 }
@@ -1374,6 +1382,7 @@ function fragmentConfig(
 		renderedEvent: MARKLESS_ROUTER_RENDERED_EVENT,
 		requestPrefix: FRAGMENT_PATH_PREFIX,
 		regionEndMarker: FRAGMENT_REGION_END,
+		prerenderedMarker: FRAGMENT_PRERENDERED,
 		appendMarker: FRAGMENT_APPEND_END,
 		pageEndComment: PROTOCOL_CONTAINER_END_COMMENT,
 		pageStartComment: PROTOCOL_CONTAINER_START_COMMENT,

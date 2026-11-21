@@ -737,6 +737,41 @@ export function fragmentNavigationSuite(name: string, browserType: BrowserType):
 			await page.close();
 		});
 
+		test('Back to the page just left swaps the copy parsed at idle: no parse on the Back', async () => {
+			const { page, errors } = await open(browser);
+			await page.locator('[data-nav="other"]').click();
+			await landedOn(page, 'other');
+			await page.locator('[data-nav="home"]').first().click();
+			await landedOn(page, 'home');
+			// The router's idle step was queued before these (WebKit: a 200 ms timer), so it has run once they have.
+			await page.evaluate(
+				() =>
+					new Promise((done) =>
+						typeof requestIdleCallback === 'function'
+							? requestIdleCallback(() => requestIdleCallback(done))
+							: setTimeout(done, 300),
+					),
+			);
+			await page.evaluate(() => {
+				const state = (
+					document as unknown as {
+						__marklessFragmentNav: { parse: (...args: unknown[]) => unknown };
+					}
+				).__marklessFragmentNav;
+				const parse = state.parse;
+				(window as unknown as { __parses: number }).__parses = 0;
+				state.parse = (...args) => {
+					(window as unknown as { __parses: number }).__parses++;
+					return parse(...args);
+				};
+			});
+			await page.goBack();
+			await landedOn(page, 'other');
+			expect(await page.evaluate(() => (window as unknown as { __parses: number }).__parses)).toBe(0);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
 		test('the page a clicked link lands on is not fetched again, and Back to it needs no request', async () => {
 			const { page, requests, errors } = await open(browser);
 			await page.locator('[data-nav="other"]').click();

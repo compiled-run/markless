@@ -602,7 +602,11 @@ export function runFragmentNavigation(
 	};
 	const move = (entry: FragmentPrefetch, next: number) => {
 		if (entry.phase === next) return;
-		if (entry.phase === GONE || (entry.phase === ARRIVED && next !== GONE) || next < entry.phase)
+		if (
+			entry.phase === GONE ||
+			(entry.phase === ARRIVED && next !== GONE) ||
+			next < entry.phase
+		)
 			return illegal(`no prefetch move from ${entry.phase} to ${next}`);
 		entry.phase = next;
 	};
@@ -778,25 +782,43 @@ export function runFragmentNavigation(
 	const inFlight = (entry: FragmentPrefetch) => entry.phase < ARRIVED;
 	// Pages fetched ahead are kept as text up to config.heldChars in all; past it the earliest started go first.
 	const sizes = new WeakMap<FragmentPrefetch, number>();
-	const hold = (entry: FragmentPrefetch, arrived: FragmentFetched, size: number) => {
-		sizes.set(entry, size);
+	// Pages fetched ahead go first, then the pages the tab showed (at most 8), never the one just added.
+	const trim = (spare?: FragmentPrefetch | string) => {
 		let held = 0;
 		for (const other of state.prefetches.values()) held += sizes.get(other) ?? 0;
+		for (const text of state.visited.values()) held += text.length;
 		for (const [key, other] of state.prefetches) {
 			if (held <= config.heldChars) break;
-			if (other === entry || !sizes.has(other)) continue;
+			if (other === spare || !sizes.has(other)) continue;
 			held -= sizes.get(other)!;
 			state.prefetches.delete(key);
 			other.abort();
 		}
+		for (const [key, text] of state.visited) {
+			if ((held <= config.heldChars && state.visited.size <= 8) || key === spare) break;
+			held -= text.length;
+			state.visited.delete(key);
+		}
+	};
+	const hold = (entry: FragmentPrefetch, arrived: FragmentFetched, size: number) => {
+		sizes.set(entry, size);
+		trim(entry);
 		return arrived;
+	};
+	const keep = (key: string, text: string) => {
+		state.visited.delete(key);
+		state.visited.set(key, text);
+		trim(key);
 	};
 	const prefetch = (url: URL, code = true, started?: FragmentEarly, idle = false) => {
 		const key = pageKey(url);
 		// A hover timer can fire after its link's page is already shown.
 		if (!config.prefetch || key === state.shown) return;
 		const existing = state.prefetches.get(key);
+		const visit = state.visited.get(key);
 		// An idle-fetched page still needs its code on intent, or the swap fetches it a round late.
+		// A page the tab showed, prerendered, is swapped in from the copy it keeps: nothing to fetch.
+		if (visit && prerendered(visit)) return void (code && preloadCode(url, false));
 		if (existing && fresh(existing, w.performance.now())) {
 			if (code) {
 				existing.want();
@@ -936,7 +958,10 @@ export function runFragmentNavigation(
 					? 'save-data'
 					: d.visibilityState === 'hidden'
 						? 'hidden'
-						: would.some((trigger) => !onNetwork(trigger === 'idle' ? idleLevel : viewportLevel))
+						: would.some(
+									(trigger) =>
+										!onNetwork(trigger === 'idle' ? idleLevel : viewportLevel),
+							  )
 							? 'network'
 							: '';
 				if (would.length && reason)
@@ -950,7 +975,8 @@ export function runFragmentNavigation(
 					});
 				if (
 					loadViewport &&
-					(viewportLevel || d.querySelector(`a[href][${config.prefetchAttribute}="viewport"]`))
+					(viewportLevel ||
+						d.querySelector(`a[href][${config.prefetchAttribute}="viewport"]`))
 				)
 					startViewport().then(
 						(started) => current() && speculation.phase >= ARMED && started.watch(),
@@ -967,13 +993,17 @@ export function runFragmentNavigation(
 					const box = anchor.getBoundingClientRect();
 					if (!box.width || box.bottom < 0 || box.top > w.innerHeight) continue;
 					if (box.right < 0 || box.left > w.innerWidth) continue;
-					const hit = d.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+					const hit = d.elementFromPoint(
+						box.left + box.width / 2,
+						box.top + box.height / 2,
+					);
 					if (!hit || (hit !== anchor && !anchor.contains(hit))) continue;
 					visible.set(pageKey(url), url);
 				}
 				idleQueue = [];
 				for (const url of visible.values())
-					if (idleQueue.length < config.idleFragments && unfetched(url)) idleQueue.push(url);
+					if (idleQueue.length < config.idleFragments && unfetched(url))
+						idleQueue.push(url);
 				pumpIdle();
 			};
 			if (w.requestIdleCallback) w.requestIdleCallback(arm, { timeout: 3000 });
@@ -991,6 +1021,11 @@ export function runFragmentNavigation(
 	};
 	// A page left for a document load and brought back from the back/forward cache shows again.
 	w.addEventListener('pageshow', (event) => (event as PageTransitionEvent).persisted && resume());
+	// A page's text the prerenderer wrote: one file every visitor gets until the next deploy.
+	const prerendered = (text: string) => {
+		const end = text.indexOf(config.regionEndMarker);
+		return text.slice(0, end === -1 ? text.length : end).endsWith(config.prerenderedMarker);
+	};
 	const fresh = (entry: FragmentPrefetch, now: number) =>
 		entry.writes === state.writes &&
 		now - entry.at < config.prefetchTtlMs &&
@@ -1002,6 +1037,8 @@ export function runFragmentNavigation(
 		visited: new Map(),
 		writes: 0,
 		fresh,
+		prerendered,
+		keep,
 		shown: pageKey(new URL(location.href)),
 		eligible,
 		preloadCode,
@@ -1226,7 +1263,8 @@ export function watchViewport(
 		)) {
 			if (more && levels.has(anchor)) continue;
 			const asked = anchor.getAttribute(prefetchAttribute);
-			const linkLevel = asked === 'viewport' ? Math.max(level, 1) : asked === 'intent' ? 0 : level;
+			const linkLevel =
+				asked === 'viewport' ? Math.max(level, 1) : asked === 'intent' ? 0 : level;
 			const url = linkLevel ? candidate(anchor) : undefined;
 			if (!url) continue;
 			levels.set(anchor, [url, linkLevel]);
@@ -1265,7 +1303,10 @@ export function fragmentRequestUrl(url: string | URL): URL {
 	return target;
 }
 
-// The page URL a fragment request names, or undefined for any other request.
+/**
+ * The page URL a request to the router's fragment endpoint asks for, or `undefined` when the URL is not a fragment request.
+ * Lets a service worker, host rule or test tell the router's page fetches from other requests without restating the endpoint path.
+ */
 export function fragmentPageUrl(url: URL): URL | undefined {
 	if (!url.pathname.startsWith(`${FRAGMENT_PATH_PREFIX}/`)) return undefined;
 	const page = new URL(url);
@@ -1275,6 +1316,10 @@ export function fragmentPageUrl(url: URL): URL | undefined {
 
 // The response's region document ends here; each streamed @pending arm after it ends with the append marker.
 export const FRAGMENT_REGION_END = '<!--markless:region-end-->';
+// Just before the region end of a fragment the prerenderer wrote: one file every visitor gets until the next deploy.
+export const FRAGMENT_PRERENDERED = '<!--markless:prerendered-->';
+// Nitro's prerenderer names the route it renders in this request header.
+export const NITRO_PRERENDER_HEADER = 'x-nitro-prerender';
 export const FRAGMENT_APPEND_END = '<!--markless:append-end-->';
 export const FRAGMENT_HOVER_DWELL_MS = 20;
 export const FRAGMENT_PREFETCH_TTL_MS = 30_000;
@@ -1283,7 +1328,10 @@ export const FRAGMENT_PREFETCH_CONNECTIONS = 2;
 // Wire bytes viewport and idle fetches may spend per page shown: about what the Next.js original of the shadcn docs prefetched (1.5 MB).
 export const FRAGMENT_GUESS_BUDGET_BYTES = 2 * 1024 * 1024;
 /** Performance marks a tool can read: the page's guess budget ran out; guessing was ruled out (detail.reason). */
-export const PREFETCH_MARKS = ['markless:prefetch-budget-spent', 'markless:prefetch-skipped'] as const;
+export const PREFETCH_MARKS = [
+	'markless:prefetch-budget-spent',
+	'markless:prefetch-skipped',
+] as const;
 export const FRAGMENT_IDLE_FRAGMENTS = 6;
 // Characters of page text kept for pages fetched ahead: 8 MB as one-byte strings, 16 MB if a page has text outside Latin-1.
 // Parsed documents (pages intent wanted, the page shown) are not counted.

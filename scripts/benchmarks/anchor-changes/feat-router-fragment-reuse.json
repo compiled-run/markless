@@ -1,0 +1,148 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 126,
+			"reason": "a prerendered page the tab has shown is swapped in again with no request: the run half (loaded at idle) reads the prerendered mark and keeps shown pages under the held-text cap: 96,795 B gzip downloaded in this PR's CI run 44874259668 (8770857e2) minus 96,669 in main's merge-queue run 44870813250 (57eead6c9) = +126, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 126,
+			"reason": "a prerendered page the tab has shown is swapped in again with no request: the run half (loaded at idle) reads the prerendered mark and keeps shown pages under the held-text cap: 96,795 B gzip downloaded in this PR's CI run 44874259668 (8770857e2) minus 96,669 in main's merge-queue run 44870813250 (57eead6c9) = +126, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 126,
+			"reason": "a prerendered page the tab has shown is swapped in again with no request: the run half (loaded at idle) reads the prerendered mark and keeps shown pages under the held-text cap: 96,795 B gzip downloaded in this PR's CI run 44874259668 (8770857e2) minus 96,669 in main's merge-queue run 44870813250 (57eead6c9) = +126, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 122,
+			"reason": "a prerendered page the tab has shown is swapped in again with no request: the run half (loaded at idle) reads the prerendered mark and keeps shown pages under the held-text cap: 514,921 B gzip downloaded in this PR's CI run 44874259668 (8770857e2) minus 514,799 in main's merge-queue run 44870813250 (57eead6c9) = +122, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 122,
+			"reason": "a prerendered page the tab has shown is swapped in again with no request: the run half (loaded at idle) reads the prerendered mark and keeps shown pages under the held-text cap: 584,362 B gzip downloaded in this PR's CI run 44874259668 (8770857e2) minus 584,240 in main's merge-queue run 44870813250 (57eead6c9) = +122, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 122,
+			"reason": "a prerendered page the tab has shown is swapped in again with no request: the run half (loaded at idle) reads the prerendered mark and keeps shown pages under the held-text cap: 466,354 B gzip downloaded in this PR's CI run 44874259668 (8770857e2) minus 466,232 in main's merge-queue run 44870813250 (57eead6c9) = +122, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 175,
+			"reason": "a prerendered page the tab has shown is swapped in again with no request: the run half (loaded at idle) reads the prerendered mark and keeps shown pages under the held-text cap: 12,550 chars run in this PR's CI run 44874259668 (8770857e2) minus 12,375 in main's merge-queue run 44870813250 (57eead6c9) = +175, both under the G16 measure of #951 (under the 256-char swing; recorded so the anchor matches the measure)",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 175,
+			"reason": "a prerendered page the tab has shown is swapped in again with no request: the run half (loaded at idle) reads the prerendered mark and keeps shown pages under the held-text cap: 12,566 chars run in this PR's CI run 44874259668 (8770857e2) minus 12,391 in main's merge-queue run 44870813250 (57eead6c9) = +175, both under the G16 measure of #951 (under the 256-char swing; recorded so the anchor matches the measure)",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 175,
+			"reason": "a prerendered page the tab has shown is swapped in again with no request: the run half (loaded at idle) reads the prerendered mark and keeps shown pages under the held-text cap: 12,516 chars run in this PR's CI run 44874259668 (8770857e2) minus 12,341 in main's merge-queue run 44870813250 (57eead6c9) = +175, both under the G16 measure of #951 (under the 256-char swing; recorded so the anchor matches the measure)",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 174,
+			"reason": "a prerendered page the tab has shown is swapped in again with no request: the run half (loaded at idle) reads the prerendered mark and keeps shown pages under the held-text cap: 27,499 chars run in this PR's CI run 44874259668 (8770857e2) minus 27,325 in main's merge-queue run 44870813250 (57eead6c9) = +174, both under the G16 measure of #951 (under the 256-char swing; recorded so the anchor matches the measure)",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 174,
+			"reason": "a prerendered page the tab has shown is swapped in again with no request: the run half (loaded at idle) reads the prerendered mark and keeps shown pages under the held-text cap: 27,533 chars run in this PR's CI run 44874259668 (8770857e2) minus 27,359 in main's merge-queue run 44870813250 (57eead6c9) = +174, both under the G16 measure of #951 (under the 256-char swing; recorded so the anchor matches the measure)",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 174,
+			"reason": "a prerendered page the tab has shown is swapped in again with no request: the run half (loaded at idle) reads the prerendered mark and keeps shown pages under the held-text cap: 26,291 chars run in this PR's CI run 44874259668 (8770857e2) minus 26,117 in main's merge-queue run 44870813250 (57eead6c9) = +174, both under the G16 measure of #951 (under the 256-char swing; recorded so the anchor matches the measure)",
+			"date": "2026-11-21"
+		}
+	]
+}

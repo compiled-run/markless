@@ -131,6 +131,7 @@ async function install(page: Page): Promise<void> {
 			routes: {},
 			prefetches: new Map(),
 			visited: new Map(),
+			keep: (key: string, text: string) => state.visited.set(key, text),
 			writes: 0,
 			fresh: (entry: Entry, now: number) => {
 				log.push(`fresh ${now}`);

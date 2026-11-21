@@ -55,6 +55,15 @@ export const PREFETCH_DEFAULTS = {
 	budget: FRAGMENT_GUESS_BUDGET_BYTES,
 } as const satisfies Required<RouterPrefetchOptions>;
 
+/**
+ * Checks a `router({ prefetch })` setting and resolves it the way the router will use it.
+ * Takes what `prefetch` accepts (`true`, `false`, `'none'`, an options object, or `undefined` for the defaults).
+ * Returns the resolved policy: `levels` as `[intent, viewport, idle]`, each 0 (none), 1 (fast) or 2 (all),
+ * plus `concurrency` and `budget` with defaults filled in.
+ * Throws an `Error` naming the setting on anything the router does not accept: an unknown option,
+ * a trigger value other than `'all'`, `'fast'` or `'none'`, a `concurrency` below 1 or not whole,
+ * a `budget` below 0 or not whole, or a `prefetch` that is not a boolean, `'none'` or an object.
+ */
 export function prefetchPolicy(prefetch: RouterPrefetch | undefined): PrefetchPolicy {
 	if (prefetch === false || prefetch === 'none')
 		return { levels: [0, 0, 0], concurrency: PREFETCH_DEFAULTS.concurrency, budget: 0 };
