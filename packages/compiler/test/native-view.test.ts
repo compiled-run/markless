@@ -5263,3 +5263,124 @@ export function Tilt() @{
 		]);
 	});
 });
+
+describe('context menu events', () => {
+	const androidOnly = (where: string) => [
+		'MARKLESS_NATIVE_ANDROID_ONLY',
+		`the contextmenu handler on ${where} runs only on Android, which raises it for a long press as Chrome does; Safari on iOS raises none, so the iOS app never runs it`,
+	];
+
+	it('lowers a contextmenu handler to the long press Android raises, its point, and a preventDefault with nothing to prevent', async () => {
+		const { payload, diagnostics } = await nativeView(
+			`import { state } from '@markless/core';
+export function Inbox() @{
+	let picked = state('none');
+	<main>
+		<ul>
+			<li onContextmenu={(event) => {
+				event.preventDefault();
+				picked = 'Milk at ' + event.clientX + ',' + event.clientY;
+			}}>Milk</li>
+		</ul>
+		<p>{picked}</p>
+	</main>
+}`,
+			dataOnly,
+		);
+		expect(diagnostics.map((d) => [d.code, d.message])).toEqual([androidOnly('<li> h2')]);
+		expect(diagnostics[0]!.severity).toBe('warning');
+		expect(payload!.events).toEqual([
+			{ host: 'h2', event: 'contextmenu', handler: 'handler:event:0' },
+		]);
+		expect(payload!.handlers[0]!.ops).toEqual([
+			{
+				op: 'assign',
+				cell: 'state:picked',
+				value: {
+					binary: '+',
+					left: {
+						binary: '+',
+						left: {
+							binary: '+',
+							left: { literal: 'Milk at ' },
+							right: { event: 'clientX' },
+						},
+						right: { literal: ',' },
+					},
+					right: { event: 'clientY' },
+				},
+			},
+		]);
+	});
+
+	it('lowers another shape: a section whose handler names its event differently, never prevents, and one that runs as JavaScript', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Board() @{
+	let note = state('');
+	let log = state('');
+	<section>
+		<article onContextmenu={(press) => (note = press.target === press.currentTarget ? 'own' : 'inner')}>
+			<span>Card</span>
+		</article>
+		<div onContextmenu={(e) => {
+			e.preventDefault();
+			for (const part of [e.clientY, e.timeStamp]) log = log + part;
+		}}>{log}</div>
+		<em>{note}</em>
+	</section>
+}`);
+		expect(diagnostics.map((d) => [d.code, d.message])).toEqual([
+			androidOnly('<article> h1'),
+			androidOnly('<div> h3'),
+		]);
+		expect(payload!.events.map((event) => [event.host, event.event])).toEqual([
+			['h1', 'contextmenu'],
+			['h3', 'contextmenu'],
+		]);
+		expect(payload!.handlers[0]!.ops).toEqual([
+			{
+				op: 'assign',
+				cell: 'state:note',
+				value: {
+					if: {
+						binary: '===',
+						left: { event: 'target' },
+						right: { event: 'currentTarget' },
+					},
+					whenTrue: { literal: 'own' },
+					whenFalse: { literal: 'inner' },
+				},
+			},
+		]);
+		expect(payload!.handlers[1]!.ops.map((op) => op.op)).toEqual(['script']);
+	});
+
+	it('refuses by name a field a long press does not report yet', async () => {
+		const source = `import { state } from '@markless/core';
+export function Pressure() @{
+	let p = state(0);
+	<div onContextmenu={(event) => (p = event.pointerId)}>{p}</div>
+}`;
+		const data = await nativeView(source, dataOnly);
+		expect(data.payload).toBeNull();
+		expect(data.diagnostics.map((d) => d.message)).toContain(
+			'the contextmenu handler reads `event.pointerId`, which a phone does not report yet',
+		);
+		const script = await nativeView(source);
+		expect(script.payload).toBeNull();
+		expect(script.diagnostics.map((d) => d.message)).toContain(
+			'the contextmenu handler reads `event.pointerId`, which a long press on a phone does not have',
+		);
+		const element = await nativeView(`import { state } from '@markless/core';
+export function Pressed() @{
+	let log = state('');
+	<div onContextmenu={(e) => {
+		for (const part of [e.target]) log = log + String(part);
+	}}>{log}</div>
+}`);
+		expect(element.payload).toBeNull();
+		expect(element.diagnostics.map((d) => d.message)).toContain(
+			'the contextmenu handler reads `event.target`, an element, which JavaScript on a phone cannot hold yet',
+		);
+	});
+});

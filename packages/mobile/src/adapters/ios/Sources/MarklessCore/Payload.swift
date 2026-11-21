@@ -310,6 +310,8 @@ public enum NativeEventName: String, Sendable {
 	case pointerover, pointerout, pointerenter, pointerleave
 	/// A phone browser's compatibility mouse events, raised by the runtime after a tap's pointer events; a host never sends them.
 	case mouseover, mouseout, mouseenter, mouseleave, mousemove, mousedown, mouseup
+	/// A long press, as Chrome on Android raises `contextmenu`; Safari on iOS raises none, so this host never sends it.
+	case contextmenu
 
 	/// The pointer events a page's handlers may listen for, and the mouse events a tap raises after them.
 	public var isPointer: Bool {

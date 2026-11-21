@@ -527,8 +527,8 @@ class MarklessHost(
 		for ((id, inst) in built) if (inst.node is Node.Element) views[id]?.let { put(it, id) }
 	}
 
-	/** Reports a touch in window coordinates to the runtime as pointer events; call it before the views see the touch. */
-	fun touch(event: android.view.MotionEvent) = overlays.touch(event)
+	/** Reports a touch in window coordinates to the runtime as pointer events; call it before the views see the touch. True when a long press took the gesture. */
+	fun touch(event: android.view.MotionEvent): Boolean = overlays.touch(event)
 
 	private var lastPress: Triple<String, Long, Int>? = null
 
@@ -1071,7 +1071,7 @@ class MarklessHost(
 			EventName.Paste -> (view as? MarklessField ?: throw MarklessHostError("paste event on \"${node.id}\", which is not a text field")).onPaste = { text -> prevents(runtime.dispatch(inst.id, EventName.Paste, text)) }
 			EventName.Cancel, EventName.Close, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
 			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.MouseOver, EventName.MouseOut,
-			EventName.MouseEnter, EventName.MouseLeave, EventName.MouseMove, EventName.MouseDown, EventName.MouseUp, EventName.Choose -> {}
+			EventName.MouseEnter, EventName.MouseLeave, EventName.MouseMove, EventName.MouseDown, EventName.MouseUp, EventName.Choose, EventName.ContextMenu -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->
 				val now = android.os.SystemClock.uptimeMillis()

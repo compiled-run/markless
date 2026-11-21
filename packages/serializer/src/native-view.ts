@@ -125,7 +125,16 @@ export type NativeExpr =
 	 * handler's pasted plain text (`event.clipboardData.getData('text')`); a click handler's `event.detail`, how many presses
 	 * in a row on the element (a double tap's second press is 2).
 	 */
-	| { readonly event: 'value' | 'reason' | 'pressTarget' | 'key' | 'text' | 'detail' | NativePointerField }
+	| {
+			readonly event:
+				| 'value'
+				| 'reason'
+				| 'pressTarget'
+				| 'key'
+				| 'text'
+				| 'detail'
+				| NativePointerField;
+	  }
 	/** Whether the element `node` has captured the pointer `pointer` (`node.hasPointerCapture(pointer)`). */
 	| { readonly captures: NativeExpr; readonly pointer: NativeExpr }
 	/**
@@ -218,7 +227,8 @@ export function nativeExprCells(expr: NativeExpr, into = new Set<string>()): Set
 	if ('cell' in expr) into.add(expr.cell);
 	// A script binding's `fields` names the cells of a state object the script reads.
 	if ('fields' in expr && expr.fields && typeof expr.fields === 'object')
-		for (const cell of Object.values(expr.fields as Record<string, unknown>)) if (typeof cell === 'string') into.add(cell);
+		for (const cell of Object.values(expr.fields as Record<string, unknown>))
+			if (typeof cell === 'string') into.add(cell);
 	for (const child of Object.values(expr)) {
 		if (Array.isArray(child)) {
 			for (const item of child)
@@ -389,7 +399,9 @@ const RESERVED_HYPHENATED = new Set([
 export function nativeElementStyle(element: string): NativeDefaultStyle | undefined {
 	if (Object.hasOwn(NATIVE_ELEMENTS, element)) return NATIVE_ELEMENTS[element];
 	const custom =
-		element.includes('-') && /^[a-z][a-z0-9._-]*$/.test(element) && !RESERVED_HYPHENATED.has(element);
+		element.includes('-') &&
+		/^[a-z][a-z0-9._-]*$/.test(element) &&
+		!RESERVED_HYPHENATED.has(element);
 	return custom ? { flow: 'inline' } : undefined;
 }
 
@@ -461,7 +473,14 @@ export type NativeShape = {
 export type NativeDrawingText = {
 	readonly anchor: 'start' | 'middle' | 'end';
 	/** `auto` and `alphabetic` put the alphabetic baseline at `y`; the others move the em box as the browser does. */
-	readonly baseline: 'alphabetic' | 'middle' | 'central' | 'hanging' | 'text-top' | 'text-bottom' | 'ideographic';
+	readonly baseline:
+		| 'alphabetic'
+		| 'middle'
+		| 'central'
+		| 'hanging'
+		| 'text-top'
+		| 'text-bottom'
+		| 'ideographic';
 	readonly runs: ReadonlyArray<NativeDrawingTextRun>;
 };
 
@@ -524,12 +543,18 @@ export type NativeNode = NativePlace &
 				 * A live region (`aria-live`, `role="status"`, `"alert"` or `"log"`, `<output>`): a change to the text inside is
 				 * announced, after the screen reader's current speech when polite; `atomic` reads the whole region, else the changed text.
 				 */
-				readonly live?: { readonly politeness: 'polite' | 'assertive'; readonly atomic: boolean };
+				readonly live?: {
+					readonly politeness: 'polite' | 'assertive';
+					readonly atomic: boolean;
+				};
 				/**
 				 * A live region whose `role`, `aria-live` or `aria-atomic` follows state: its politeness (`'polite'`,
 				 * `'assertive'` or null for none) and atomicity now, which the host evaluates each time it speaks.
 				 */
-				readonly liveFollows?: { readonly politeness: NativeExpr; readonly atomic: NativeExpr };
+				readonly liveFollows?: {
+					readonly politeness: NativeExpr;
+					readonly atomic: NativeExpr;
+				};
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
 				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */
@@ -613,7 +638,10 @@ export type NativeProperty = 'value' | 'checked' | 'indeterminate' | 'selected';
  * `idle` and `visible` mean what the web runtime gives them, once for each shown instance of their element (shown again
  * after it left, it is a new one): `idle` at the first moment the host is idle after the screen's first frame (or after
  * the element appears), `visible` the first time any of the element is on the screen. `close` is a `<dialog>`'s, raised
- * after the handler (or the host's back gesture) that closed it, as the browser queues it.
+ * after the handler (or the host's back gesture) that closed it, as the browser queues it. `contextmenu` is a long press as
+ * Chrome on Android raises it: on the element pressed, then each element it is inside, innermost first, with the press's
+ * place (`NativeContextMenuField`); the tap that press would end in does not follow. Safari on iOS raises none for a long
+ * press, so the iOS host never sends it.
  */
 /**
  * `focus` and `blur` are a text field's: it took the keyboard, or gave it up. `keydown` and `paste` are a text field's too:
@@ -637,6 +665,7 @@ export type NativeEventName =
 	| 'visible'
 	/** A range input let go after its value moved: the web's `change` on it. */
 	| 'commit'
+	| 'contextmenu'
 	| NativePointerEventName
 	| NativeMouseEventName;
 
@@ -691,6 +720,14 @@ export type NativePointerField =
 	| 'pointerId'
 	| 'pointerType'
 	| 'isPrimary'
+	| 'timeStamp';
+
+/** What a `contextmenu` handler reads off its event: the elements pressed and handling it, and the press's place and time as a pointer's. */
+export type NativeContextMenuField =
+	| 'target'
+	| 'currentTarget'
+	| 'clientX'
+	| 'clientY'
 	| 'timeStamp';
 
 /** Why the overlay behaviour reported a dismissal; the vocabulary of `OverlayGestureReason` in `@markless/web`. */
@@ -836,7 +873,9 @@ export function nativeNonFiniteSplit(value: unknown): {
 	readonly json: unknown;
 	readonly nonFinite: NativeNonFinite;
 } {
-	const found: Array<readonly [ReadonlyArray<string | number>, 'Infinity' | '-Infinity' | 'NaN']> = [];
+	const found: Array<
+		readonly [ReadonlyArray<string | number>, 'Infinity' | '-Infinity' | 'NaN']
+	> = [];
 	const walk = (v: unknown, path: ReadonlyArray<string | number>): unknown => {
 		if (typeof v === 'number' && !Number.isFinite(v)) {
 			found.push([path, Number.isNaN(v) ? 'NaN' : v > 0 ? 'Infinity' : '-Infinity']);
@@ -844,7 +883,9 @@ export function nativeNonFiniteSplit(value: unknown): {
 		}
 		if (Array.isArray(v)) return v.map((item, index) => walk(item, [...path, index]));
 		if (v !== null && typeof v === 'object')
-			return Object.fromEntries(Object.entries(v).map(([key, item]) => [key, walk(item, [...path, key])]));
+			return Object.fromEntries(
+				Object.entries(v).map(([key, item]) => [key, walk(item, [...path, key])]),
+			);
 		return v;
 	};
 	const json = walk(value, []);
@@ -852,7 +893,10 @@ export function nativeNonFiniteSplit(value: unknown): {
 }
 
 /** A value JSON carried, with each non-finite number nativeNonFiniteSplit took out put back at its path. */
-export function nativeNonFiniteJoin(json: unknown, nonFinite: NativeNonFinite | undefined): unknown {
+export function nativeNonFiniteJoin(
+	json: unknown,
+	nonFinite: NativeNonFinite | undefined,
+): unknown {
 	if (!nonFinite || nonFinite.length === 0) return json;
 	const copy = structuredClone(json) as unknown;
 	const number = { Infinity: Infinity, '-Infinity': -Infinity, NaN: Number.NaN } as const;
@@ -1105,7 +1149,11 @@ export function nativeNumberProblem(
 	const base = min ?? floatOf(attributes.value) ?? 0;
 	// Whole numbers at the finest decimal any of them has, so 0.1 steps do not drift.
 	const scale = 10 ** Math.max(decimalsOf(base), decimalsOf(step), decimalsOf(value));
-	const [at, from, by] = [value, base, step].map((one) => Math.round(one * scale)) as [number, number, number];
+	const [at, from, by] = [value, base, step].map((one) => Math.round(one * scale)) as [
+		number,
+		number,
+		number,
+	];
 	if ((at - from) % by === 0) return undefined;
 	const lowAt = from + Math.floor((at - from) / by) * by;
 	const low = lowAt / scale;
@@ -1126,7 +1174,10 @@ export function nativeNumberMessage(
 		String(value).replace(/[0-9.]/g, (char) =>
 			char === '.' ? (language.decimal ?? '.') : digits[Number(char)]!,
 		);
-	return Object.entries(values).reduce((text, [name, value]) => text.replace(`{${name}}`, write(value)), message);
+	return Object.entries(values).reduce(
+		(text, [name, value]) => text.replace(`{${name}}`, write(value)),
+		message,
+	);
 }
 
 /** `message` with `{max}` and `{length}` filled in as Chromium writes them: no grouping, in the language's digits. */
@@ -1212,7 +1263,8 @@ const rangeNumber = (text: string | null | undefined): number | undefined =>
 
 /** The decimal places a number is written with, so stepped values print as the browser writes them. */
 const decimals = (value: number): number => {
-	const [, fraction = '', exponent = '0'] = /^-?\d*(?:\.(\d+))?(?:e([-+]?\d+))?$/.exec(String(value)) ?? [];
+	const [, fraction = '', exponent = '0'] =
+		/^-?\d*(?:\.(\d+))?(?:e([-+]?\d+))?$/.exec(String(value)) ?? [];
 	return Math.max(0, fraction.length - Number(exponent));
 };
 
@@ -1587,7 +1639,9 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		MouseEvent: 'engine',
 		PointerEvent: 'engine',
 		KeyboardEvent: 'engine',
-		...Object.fromEntries(Object.keys(NATIVE_SCRIPT_DOM_CLASSES).map((name) => [name, 'engine' as const])),
+		...Object.fromEntries(
+			Object.keys(NATIVE_SCRIPT_DOM_CLASSES).map((name) => [name, 'engine' as const]),
+		),
 	};
 
 /**
@@ -1642,7 +1696,10 @@ export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [
  * while the finger is down and 0 otherwise (a screen that reports no pressure), and `getCoalescedEvents()` gives the
  * move itself (nothing for any other type).
  */
-export const NATIVE_SCRIPT_POINTER_ENGINE_FIELDS: ReadonlyArray<string> = ['pressure', 'getCoalescedEvents'];
+export const NATIVE_SCRIPT_POINTER_ENGINE_FIELDS: ReadonlyArray<string> = [
+	'pressure',
+	'getCoalescedEvents',
+];
 
 /**
  * What a tap's click adds to a script click handler's event, as a phone browser fills it: where the touch ended, no
@@ -1663,7 +1720,18 @@ export const NATIVE_SCRIPT_CLICK_FIELDS: ReadonlyArray<string> = [
 export const NATIVE_SCRIPT_KEY_FIELDS: ReadonlyArray<string> = ['key'];
 
 /** A script pointer handler's event's elements, which reach JavaScript as proxies (`relatedTarget` null when none). */
-export const NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS: ReadonlyArray<string> = ['target', 'currentTarget', 'relatedTarget'];
+export const NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS: ReadonlyArray<string> = [
+	'target',
+	'currentTarget',
+	'relatedTarget',
+];
+
+/** What a long press adds to a script `contextmenu` handler's event. */
+export const NATIVE_SCRIPT_CONTEXTMENU_FIELDS: ReadonlyArray<string> = [
+	'clientX',
+	'clientY',
+	'timeStamp',
+];
 
 /** Names for the global object itself: `window.setTimeout` reads a provided global, `window.document` does not. */
 export const NATIVE_SCRIPT_GLOBAL_OBJECTS: ReadonlyArray<string> = ['window', 'self', 'globalThis'];

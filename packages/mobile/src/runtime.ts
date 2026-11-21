@@ -98,6 +98,17 @@ export type NativeAction =
 			readonly y?: number;
 			readonly time?: number;
 	  }
+	/**
+	 * A long press on `host`, the innermost element under it, at `x`, `y` (points or dp from the screen's top left) and
+	 * `time` (ms since the screen appeared): Android's host sends it as Chrome raises `contextmenu`; iOS's never does.
+	 */
+	| {
+			readonly event: 'contextmenu';
+			readonly host: string;
+			readonly x?: number;
+			readonly y?: number;
+			readonly time?: number;
+	  }
 	/** The host's back gesture (or Escape) on an open `<dialog>`: it closes, as the browser's cancel does. */
 	| { readonly event: 'cancel'; readonly host: string }
 	/** The keyboard's return key in a single-line text field. */
@@ -1556,7 +1567,9 @@ export function createNativeRuntime(
 		bound('attribute', (name, value) => marklessAttributeValue(name, value));
 	// A slot is a number Dragon's layout takes; anything else is refused here, as no layout of it was proven.
 	const caseValues = () =>
-		(payload.styleCases ?? []).map((styleCase) => [styleCase.id, Boolean(evaluate(styleCase.value))] as const);
+		(payload.styleCases ?? []).map(
+			(styleCase) => [styleCase.id, Boolean(evaluate(styleCase.value))] as const,
+		);
 	// A slot whose style case does not show its text keeps its last value: its expression may not hold then (`point.x`).
 	const keptSlots = new Map<string, number>();
 	const slotValues = () => {
@@ -1566,7 +1579,9 @@ export function createNativeRuntime(
 				return [slot.id, keptSlots.get(slot.id) ?? 0] as const;
 			const value = evaluate(slot.value);
 			if (typeof value !== 'number' || !Number.isFinite(value))
-				throw new Error(`style slot ${slot.id} is ${JSON.stringify(value)}, not a finite number`);
+				throw new Error(
+					`style slot ${slot.id} is ${JSON.stringify(value)}, not a finite number`,
+				);
 			if (slot.integer && !Number.isInteger(value))
 				throw new Error(`style slot ${slot.id} is ${value}, not a whole number`);
 			keptSlots.set(slot.id, value);
@@ -2000,6 +2015,19 @@ export function createNativeRuntime(
 		payload.nodes
 			.flatMap((node) => (node.id === nodeOf(id) ? instances(node) : []))
 			.find((instance) => instance.id === id)?.scope;
+	/** The elements from `id` out to the root, innermost first; a row's copy keeps its own id. */
+	/** The elements from `id` out to the root, innermost first; those in its row keep its row's key. */
+	const chainOf = (id: string): string[] => {
+		const key = id.includes('@') ? id.slice(id.indexOf('@')) : '';
+		const out: string[] = [];
+		for (
+			let node: string | null | undefined = nodeOf(id);
+			node;
+			node = nodesById.get(node)?.parent
+		)
+			out.push(node === nodeOf(id) ? id : key && nodesById.get(node)?.row ? `${node}${key}` : node);
+		return out;
+	};
 	/** `idle` and `visible` handlers that ran, by `<event>\0<instance>`; an instance that leaves the screen is forgotten. */
 	const fired = new Set<string>();
 	const due = (event: 'idle' | 'visible'): string[] =>
@@ -2218,6 +2246,28 @@ export function createNativeRuntime(
 			}
 			if (RAISED.has(action.event))
 				throw new Error(`${action.event} is raised by the runtime, not sent by a host`);
+			if (action.event === 'contextmenu') {
+				const scope = scopeOf(action.host);
+				if (!scope) throw new Error(`${action.host} is not shown`);
+				return change(undefined, undefined, () => {
+					const calls: NativeJournalEntry[] = [];
+					for (const node of chainOf(action.host)) {
+						const own = handlerOf(nodeOf(node), 'contextmenu');
+						if (!own) continue;
+						const fields: NativeEventFields = {
+							target: action.host,
+							currentTarget: node,
+							clientX: action.x ?? 0,
+							clientY: action.y ?? 0,
+							timeStamp: action.time ?? 0,
+						};
+						const out = run(handlers.get(own.handler) ?? [], fields, scope);
+						if (out[0]?.op === 'navigate') return out;
+						calls.push(...out);
+					}
+					return calls;
+				});
+			}
 			if (TOUCHES.has(action.event) && 'host' in action) {
 				const touch = action as Extract<NativeAction, { readonly event: NativeTouch }>;
 				const scope = scopeOf(touch.host);
@@ -2237,24 +2287,7 @@ export function createNativeRuntime(
 					const at = { x: touch.x ?? 0, y: touch.y ?? 0 };
 					if (touch.event !== 'pointermove')
 						tapPoint = touch.event === 'pointerup' ? at : null;
-					/** The elements from `id` out to the root, innermost first; those in its row keep its row's key. */
-					const chain = (id: string): string[] => {
-						const key = id.includes('@') ? id.slice(id.indexOf('@')) : '';
-						const out: string[] = [];
-						for (
-							let node: string | null | undefined = nodeOf(id);
-							node;
-							node = nodesById.get(node)?.parent
-						)
-							out.push(
-								node === nodeOf(id)
-									? id
-									: key && nodesById.get(node)?.row
-										? `${node}${key}`
-										: node,
-							);
-						return out;
-					};
+					const chain = chainOf;
 					const fieldsOf = (
 						type: NativePointerEventName,
 						target: string,
@@ -2899,7 +2932,9 @@ export function createNativeRuntime(
 						: [],
 				),
 				...caseValues().flatMap(([styleCase, value]): NativeJournalEntry[] =>
-					casesBefore.get(styleCase) === value ? [] : [{ op: 'state', cell: styleCase, value }],
+					casesBefore.get(styleCase) === value
+						? []
+						: [{ op: 'state', cell: styleCase, value }],
 				),
 				...slotValues().flatMap(([slot, value]): NativeJournalEntry[] =>
 					Object.is(slotsBefore.get(slot), value) ? [] : [{ op: 'slot', slot, value }],

@@ -35,6 +35,7 @@ import {
 	NATIVE_SCRIPT_EVENT_MEMBERS,
 	NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS,
 	NATIVE_SCRIPT_POINTER_ENGINE_FIELDS,
+	NATIVE_SCRIPT_CONTEXTMENU_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_SUBMITTED_FORM,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
@@ -48,6 +49,7 @@ import {
 	type NativeFieldKind,
 	type NativeForm,
 	type NativeMouseEventName,
+	type NativeContextMenuField,
 	type NativePointerEventName,
 	PLATFORM_PIECES_NAMESPACE,
 	PLATFORM_PIECES_PACKAGE,
@@ -313,6 +315,7 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	mousemove: 'mousemove',
 	mousedown: 'mousedown',
 	mouseup: 'mouseup',
+	contextmenu: 'contextmenu',
 };
 
 const CAPTURE_METHODS: ReadonlySet<string> = new Set([
@@ -333,6 +336,8 @@ const MOUSE_EVENTS: ReadonlySet<string> = new Set<NativeMouseEventName>([
 /** Fields a PointerEvent has and a MouseEvent does not. */
 const POINTER_ONLY_FIELDS: ReadonlySet<string> = new Set(['pointerId', 'pointerType', 'isPrimary']);
 
+type CarriedEvent = 'dismiss' | 'pointer' | 'mouse' | 'contextmenu';
+
 const POINTER_EVENTS: ReadonlySet<string> = new Set<NativePointerEventName>([
 	'pointerdown',
 	'pointermove',
@@ -344,12 +349,9 @@ const POINTER_EVENTS: ReadonlySet<string> = new Set<NativePointerEventName>([
 	'pointerleave',
 ]);
 
-/** The fields a dismiss or pointer event carries, by how a handler reads them off its event parameter. */
+/** The fields a dismiss, pointer or contextmenu event carries, by how a handler reads them off its event parameter. */
 const EVENT_FIELDS: Readonly<
-	Record<
-		'dismiss' | 'pointer' | 'mouse',
-		Readonly<Record<string, Extract<NativeExpr, { event: string }>['event']>>
-	>
+	Record<CarriedEvent, Readonly<Record<string, Extract<NativeExpr, { event: string }>['event']>>>
 > = {
 	dismiss: { 'detail.reason': 'reason', 'detail.pressTarget': 'pressTarget' },
 	pointer: {
@@ -375,6 +377,13 @@ const EVENT_FIELDS: Readonly<
 		clientY: 'clientY',
 		timeStamp: 'timeStamp',
 	},
+	contextmenu: {
+		target: 'target',
+		currentTarget: 'currentTarget',
+		clientX: 'clientX',
+		clientY: 'clientY',
+		timeStamp: 'timeStamp',
+	} satisfies Record<NativeContextMenuField, NativeContextMenuField>,
 };
 
 /** `event.detail.reason` as `detail.reason` when `expression` is a member path of the read `event`. */
@@ -478,6 +487,7 @@ export const NATIVE_MOUSE_ONLY_CODE = 'MARKLESS_NATIVE_MOUSE_ONLY';
 /** Events a drop target raises only while something is dragged onto it, which a phone's browser does only from another app. */
 const DROP_ONLY = new Set(['dragenter', 'dragover', 'dragleave', 'drop']);
 export const NATIVE_DROP_ONLY_CODE = 'MARKLESS_NATIVE_DROP_ONLY';
+export const NATIVE_ANDROID_ONLY_CODE = 'MARKLESS_NATIVE_ANDROID_ONLY';
 
 type Item =
 	| {
@@ -750,7 +760,7 @@ type Scope = {
 	/** The element a tap landed on (`event.target`) and the one whose handler runs (`event.currentTarget`). */
 	readonly pressed?: { readonly target: string; readonly currentTarget: string };
 	/** A dismiss or pointer handler's event parameter, whose fields in `EVENT_FIELDS` it may read. */
-	readonly carried?: { readonly name: string; readonly kind: 'dismiss' | 'pointer' | 'mouse' };
+	readonly carried?: { readonly name: string; readonly kind: CarriedEvent };
 	/** In a text field's keydown or paste handler: `event.key` or the pasted text is the event's, and `preventDefault()` an op. */
 	readonly typing?: 'keydown' | 'keyup' | 'paste';
 	/** In a click handler: `event.detail` is the number of presses in a row. */
@@ -1572,6 +1582,20 @@ export function createNativeViewPayload(
 			passId: 'native-view',
 			suggestions: [],
 			docsUrl: `https://markless.dev/errors/${NATIVE_MOUSE_ONLY_CODE}`,
+		});
+	};
+	const androidOnly = (what: string, span?: SourceSpan) => {
+		diagnostics.push({
+			code: NATIVE_ANDROID_ONLY_CODE,
+			severity: 'warning',
+			phase: 'serialization',
+			title: 'A long-press handler runs only on Android',
+			message: `${what} runs only on Android, which raises it for a long press as Chrome does; Safari on iOS raises none, so the iOS app never runs it`,
+			why: 'Chrome on Android raises `contextmenu` when a person long-presses an element; Safari on iOS raises it for no touch.',
+			...(span ? { primarySpan: span } : {}),
+			passId: 'native-view',
+			suggestions: [],
+			docsUrl: `https://markless.dev/errors/${NATIVE_ANDROID_ONLY_CODE}`,
 		});
 	};
 	const elementSources = new Map<
@@ -5921,6 +5945,11 @@ export function createNativeViewPayload(
 							);
 						continue;
 					}
+					if (semantic === 'contextmenu')
+						androidOnly(
+							`the ${event.eventName} handler on <${element}> ${id}`,
+							event.handlerSpan,
+						);
 					if (semantic === 'submit' && element !== 'form') {
 						refuse(
 							`a submit handler on <${element}>; a native build runs one only on a <form>`,
@@ -7117,6 +7146,7 @@ export function createNativeViewPayload(
 			semantic === 'dismiss'
 				? [...NATIVE_SCRIPT_EVENT_MEMBERS, ...NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS]
 				: NATIVE_SCRIPT_EVENT_MEMBERS;
+		const press = semantic === 'contextmenu';
 		for (const read of fact.event ?? []) {
 			if (semantic === 'pointerdown' && read.path[0] === 'preventDefault')
 				pointerdownPrevented = true;
@@ -7132,6 +7162,16 @@ export function createNativeViewPayload(
 				NATIVE_SCRIPT_CLICK_FIELDS.includes(read.path[0]!)
 			) {
 				if (read.path[0] === 'clientX' || read.path[0] === 'clientY') tapPoints = true;
+				continue;
+			}
+			if (press && NATIVE_SCRIPT_CONTEXTMENU_FIELDS.includes(read.path[0] ?? '')) continue;
+			// A long press's script event carries no element, so `event.target` there is refused, not read as the generic member.
+			if (press && (read.path[0] === 'target' || read.path[0] === 'currentTarget')) {
+				readsMissing = true;
+				refuseScript(
+					`${what} reads \`event.${read.path.join('.')}\`, an element, which JavaScript on a phone cannot hold yet`,
+					read.span,
+				);
 				continue;
 			}
 			if (touch && NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS.includes(read.path[0] ?? ''))
@@ -7159,7 +7199,9 @@ export function createNativeViewPayload(
 						? 'a touch'
 						: event.eventName === 'submit'
 							? 'a submit'
-							: 'a tap';
+							: press
+								? 'a long press'
+								: 'a tap';
 			refuseScript(
 				`${what} reads \`event.${read.path.join('.')}\`, which ${doing} on a phone does not have`,
 				read.span,
@@ -7222,10 +7264,14 @@ export function createNativeViewPayload(
 		const submitting =
 			event.eventName === 'submit' && pressed ? { submitting: pressed.currentTarget } : {};
 		const semantic = SEMANTIC_EVENTS[event.eventName];
-		const carried =
-			semantic === 'dismiss' ||
-			POINTER_EVENTS.has(semantic ?? '') ||
-			MOUSE_EVENTS.has(semantic ?? '');
+		const carried: CarriedEvent | undefined =
+			semantic === 'dismiss' || semantic === 'contextmenu'
+				? semantic
+				: MOUSE_EVENTS.has(semantic ?? '')
+					? 'mouse'
+					: POINTER_EVENTS.has(semantic ?? '')
+						? 'pointer'
+						: undefined;
 		const typing =
 			semantic === 'keydown' || semantic === 'keyup' || semantic === 'paste'
 				? { typing: semantic }
@@ -7238,18 +7284,7 @@ export function createNativeViewPayload(
 			parameter === undefined
 				? { ...running, ...submitting, ...typing }
 				: carried
-					? {
-							...running,
-							carried: {
-								name: parameter,
-								kind:
-									semantic === 'dismiss'
-										? 'dismiss'
-										: MOUSE_EVENTS.has(semantic ?? '')
-											? 'mouse'
-											: 'pointer',
-							},
-						}
+					? { ...running, carried: { name: parameter, kind: carried } }
 					: (event.eventName === 'input' &&
 								!(pressed && isTicked(pressed.currentTarget))) ||
 						  (event.eventName === 'change' &&
@@ -8192,6 +8227,15 @@ export function createNativeViewPayload(
 				(statement.arguments ?? []).length === 0
 			)
 				return scope.typing === 'keyup' ? [] : [{ op: 'preventDefault' }];
+			// A host shows no menu of its own for a long press, so there is nothing for it to prevent.
+			if (
+				scope.carried?.kind === 'contextmenu' &&
+				statement.name === scope.carried.name &&
+				statement.path?.length === 1 &&
+				statement.path[0] === 'preventDefault' &&
+				(statement.arguments ?? []).length === 0
+			)
+				return [];
 			if (
 				scope.pressed &&
 				statement.name === scope.opaque &&

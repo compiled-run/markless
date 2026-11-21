@@ -76,12 +76,23 @@ export type LadderAction =
 	 * a box that scrolls that way, so the platform takes the touch for the scroll (the web's `pointercancel`); the phones and
 	 * the browser find that out for themselves, the reference ladder, which lays nothing out, is told.
 	 */
-	| { readonly drag: { readonly on: string; readonly direction: 'right' | 'up'; readonly scrolls?: true } }
+	| {
+			readonly drag: {
+				readonly on: string;
+				readonly direction: 'right' | 'up';
+				readonly scrolls?: true;
+			};
+	  }
 	/**
 	 * Moves the slider (`<input type="range">`) with this accessible name to its end, as a finger does from its thumb (a
 	 * rung starts the slider at its midpoint, where the thumb is); the web presses End or Home on it.
 	 */
-	| { readonly slide: { readonly field: string; readonly to: 'max' | 'min' } };
+	| { readonly slide: { readonly field: string; readonly to: 'max' | 'min' } }
+	/**
+	 * A finger held still on the element showing this text, then lifted: Chrome on Android raises `contextmenu` for it,
+	 * Safari on iOS does not, so a rung says what each shows with `visibleOn`.
+	 */
+	| { readonly longPress: string };
 
 /** Where a phone flow presses the backdrop: above a centred surface, below the status bar. */
 export const BACKDROP_POINT = '50%,8%';
@@ -248,8 +259,7 @@ export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
 		.filter(
 			(entry) =>
-				entry.isDirectory() &&
-				/^((\d\d|[dp]\d)[a-z]?|[fjrtuy]\d+)-/.test(entry.name),
+				entry.isDirectory() && /^((\d\d|[dp]\d)[a-z]?|[fjrtuy]\d+)-/.test(entry.name),
 		)
 		.filter((entry) => !isApp(entry.name))
 		.map((entry) => entry.name)
@@ -374,7 +384,9 @@ const assertions = (step: LadderStep): unknown[] =>
 								{
 									runFlow: {
 										when: { platform: MAESTRO_PLATFORM.android },
-										commands: step.embedded.map((text) => ({ assertVisible: selector(text) })),
+										commands: step.embedded.map((text) => ({
+											assertVisible: selector(text),
+										})),
 									},
 								},
 							]
@@ -558,6 +570,7 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 				},
 			},
 		];
+	if ('longPress' in action) return [{ longPressOn: { text: selector(action.longPress) } }];
 	if ('escape' in action) return ['back'];
 	if ('pressBackdrop' in action) return [{ tapOn: { point: BACKDROP_POINT } }];
 	return [

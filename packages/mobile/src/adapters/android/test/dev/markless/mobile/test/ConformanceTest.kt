@@ -322,6 +322,9 @@ private fun pointerDecoding() {
 	check("decodes every pointer field, captures and the capture op", decoded.getOrNull()?.handlers?.single()?.ops?.size == fields.size + 2) { decoded.exceptionOrNull().toString() }
 	for (name in listOf("pointerdown", "pointermove", "pointerup", "pointercancel", "pointerover", "pointerout", "pointerenter", "pointerleave"))
 		check("decodes the $name event", runCatching { Payload.decode(page(read("clientX"), event = name).toByteArray()) }.isSuccess) { "" }
+	val placed = Runtime(Payload.decode(page("""{"op":"assign","cell":"c","value":{"event":"clientX"}}""", event = "contextmenu").toByteArray()))
+	val at = placed.dispatch("h0", EventName.ContextMenu, point = TouchPoint(x = 30.5, y = 4.0)).joinToString(",") { it.toJson() }
+	check("a contextmenu handler reads the long press's place", at == """{"op":"text","node":"h0:text0","value":"30.5"}""") { at }
 	refuses("a pointer event on a text", page(read("clientX"), host = "h0:text0"), "names no element")
 	refuses("an unknown pointer field", page(read("offsetX")), "unknown event \"offsetX\"")
 	refuses("captures without a pointer", page(read("clientX", """{"captures":{"event":"target"}}""")), "is missing \"pointer\"")
