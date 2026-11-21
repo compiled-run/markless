@@ -2517,6 +2517,59 @@ export function Save() @{
 		expect(submit).toHaveLength(2);
 	});
 
+	it('settles a promise whose executor hands its own resolve or reject to setTimeout, after the delay', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Waits() @{
+	let status = state('Idle');
+	<main>
+		<form
+			onSubmit={async (event) => {
+				event.preventDefault();
+				status = 'Saving';
+				await new Promise((done) => setTimeout(done));
+				status = 'Saved';
+			}}
+		>
+			<button>Save</button>
+		</form>
+		<form
+			onSubmit={async (event) => {
+				event.preventDefault();
+				try {
+					await new Promise<void>((finish, fail) => {
+						setTimeout(fail, 40);
+					});
+					status = 'kept';
+				} catch {
+					status = 'failed';
+				}
+			}}
+		>
+			<button>Fail</button>
+		</form>
+		<p>{status}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const handler = (id: string) => payload!.handlers.find((entry) => entry.id === id)!.ops;
+		expect(handler('handler:event:0')).toEqual([
+			{ op: 'assign', cell: 'state:status', value: { literal: 'Saving' } },
+			{
+				op: 'after',
+				ms: { literal: 0 },
+				capture: [],
+				ops: [{ op: 'assign', cell: 'state:status', value: { literal: 'Saved' } }],
+			},
+		]);
+		expect(handler('handler:event:1')).toMatchObject([
+			{
+				op: 'after',
+				ms: { literal: 40 },
+				ops: [{ op: 'assign', cell: 'state:status', value: { literal: 'failed' } }],
+			},
+		]);
+	});
+
 	it('names an await that cannot be lowered: inside an if, in an expression, or failing outside a catch', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function later(wait: number) {
@@ -2905,6 +2958,44 @@ export function Page() @{
 			parts: [{ expr: { script: expect.any(String), bindings: { cart: { cell: 'state:cart' } } } }],
 		});
 		expect(payload!.script!.source).toContain('function total(text)');
+	});
+
+	it("reads import.meta.env as the web's client build does and leaves out the branch only a server runs", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+async function load(): Promise<string> {
+	if (import.meta.env.SSR) {
+		const { fromDisk } = await import('./server-only.ts');
+		return fromDisk(serverPath);
+	}
+	return \`\${import.meta.env.MODE} \${import.meta.env?.DEV ? 'dev' : 'built'} \${!import.meta.env.PROD}\`;
+}
+export function Page() @{
+	let text = state('');
+	<button onClick={async () => (text = await load())}>{text}</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		const source = payload!.script!.source;
+		expect(source).toContain('"production"');
+		expect(source).toContain("'built'");
+		expect(source).not.toContain('import');
+		expect(source).not.toContain('serverPath');
+	});
+
+	it('refuses another import.meta and a dynamic import() a client build would keep, by name', async () => {
+		const { diagnostics } = await nativeView(`import { state } from '@markless/core';
+async function load(): Promise<string> {
+	const { word } = await import('./words.ts');
+	return word + import.meta.url + import.meta.env.BASE_URL;
+}
+export function Page() @{
+	let text = state('');
+	<button onClick={async () => (text = await load())}>{text}</button>
+}`);
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			expect.stringContaining("uses a dynamic `import()`, which a phone's script cannot run"),
+			expect.stringContaining("uses `import.meta.url`, which a phone's script cannot run"),
+			expect.stringContaining("uses `import.meta.env.BASE_URL`, which a phone's script cannot run"),
+		]);
 	});
 });
 

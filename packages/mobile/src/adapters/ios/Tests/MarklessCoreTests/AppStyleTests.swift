@@ -47,9 +47,11 @@ private func settings() throws -> (StyleExport, NativeViewPayload) {
 	#expect(layout.assignments[on][status]?.background == RGBA(r: 42, g: 157, b: 143, alpha: 255))
 }
 
-@Test func refusesAMediaFeatureItDoesNotRead() throws {
-	let bands = StyleBands(atoms: [StyleAtom(feature: "width", comparisons: 1, keyword: "none")], bands: [[false], [true]])
+@Test func aWidthBandNeedsThePageSizeAndDragonsLookup() throws {
+	let bands = StyleBands(atoms: [StyleAtom(feature: "width", comparisons: [(op: "ge", value: 600, num: 0, den: 0)], keyword: "none")], bands: [[false], [true]])
 	#expect(throws: PayloadError.self) { try bands.band(dark: false) }
+	#expect(StyleBands.library == nil)
+	#expect(throws: PayloadError.self) { try bands.band(dark: false, widthPx: 1206, heightPx: 2334, scale: 3) }
 }
 
 // The S5 rung's app style: body's background, light and dark, is each assignment's canvas.

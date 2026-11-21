@@ -1,0 +1,142 @@
+{
+ "gateDevicePx": 1,
+ "target": "ios",
+ "browser": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
+ "compared": 7,
+ "failed": 0,
+ "rows": [
+  {
+   "target": "ios",
+   "values": {},
+   "id": "html",
+   "maxDeltaDevicePx": 0,
+   "pass": true,
+   "web": {
+    "x": 0,
+    "y": 0,
+    "width": 1206,
+    "height": 555.4688
+   },
+   "dragon": {
+    "x": 0,
+    "y": 0,
+    "width": 1206,
+    "height": 555.4688
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "body",
+   "maxDeltaDevicePx": 0,
+   "pass": true,
+   "web": {
+    "x": 0,
+    "y": 0,
+    "width": 1206,
+    "height": 555.4688
+   },
+   "dragon": {
+    "x": 0,
+    "y": 0,
+    "width": 1206,
+    "height": 555.4688
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h0",
+   "maxDeltaDevicePx": 0,
+   "pass": true,
+   "web": {
+    "x": 0,
+    "y": 0,
+    "width": 1206,
+    "height": 555.4688
+   },
+   "dragon": {
+    "x": 0,
+    "y": 0,
+    "width": 1206,
+    "height": 555.4688
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h2",
+   "maxDeltaDevicePx": 0,
+   "pass": true,
+   "web": {
+    "x": 60,
+    "y": 144.2344,
+    "width": 1086,
+    "height": 87
+   },
+   "dragon": {
+    "x": 60,
+    "y": 144.2344,
+    "width": 1086,
+    "height": 87
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h2:text0",
+   "maxDeltaDevicePx": 0.0078,
+   "pass": true,
+   "web": {
+    "x": 60,
+    "y": 144.2344,
+    "width": 305.3672,
+    "height": 87
+   },
+   "dragon": {
+    "x": 60,
+    "y": 144.2344,
+    "width": 305.375,
+    "height": 87
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h3",
+   "maxDeltaDevicePx": 0,
+   "pass": true,
+   "web": {
+    "x": 60,
+    "y": 279.4688,
+    "width": 1086,
+    "height": 132
+   },
+   "dragon": {
+    "x": 60,
+    "y": 279.4688,
+    "width": 1086,
+    "height": 132
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h3:text0",
+   "maxDeltaDevicePx": 0.0078,
+   "pass": true,
+   "web": {
+    "x": 114,
+    "y": 315.4688,
+    "width": 586.1016,
+    "height": 60
+   },
+   "dragon": {
+    "x": 114,
+    "y": 315.4688,
+    "width": 586.1094,
+    "height": 60
+   }
+  }
+ ]
+}

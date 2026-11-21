@@ -7,7 +7,12 @@
 			{
 				"id": "state:chosen",
 				"name": "chosen",
-				"initial": "pear"
+				"initial": "pear",
+				"styled": true,
+				"domain": [
+					"pear",
+					"none"
+				]
 			}
 		],
 		"nodes": [
@@ -421,6 +426,11 @@
 				"host": "h3"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:chosen",
+					"value": "none"
+				},
 				{
 					"op": "attribute",
 					"node": "h8",

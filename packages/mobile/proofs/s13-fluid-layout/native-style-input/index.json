@@ -1,0 +1,186 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Field",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "hero"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "h1",
+			"parent": "h2",
+			"attributes": {}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Field notes"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "row"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "p",
+			"parent": "h4",
+			"attributes": {
+				"class": "cell"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Left half"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "p",
+			"parent": "h4",
+			"attributes": {
+				"class": "cell"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Right half"
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "bar"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h8",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "chips"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h9",
+			"element": "span",
+			"parent": "h8",
+			"attributes": {
+				"class": "chip"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h9:text0",
+			"parent": "h9",
+			"text": "Basil"
+		},
+		{
+			"kind": "element",
+			"id": "h10",
+			"element": "span",
+			"parent": "h8",
+			"attributes": {
+				"class": "chip"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h10:text0",
+			"parent": "h10",
+			"text": "Thyme"
+		},
+		{
+			"kind": "element",
+			"id": "h11",
+			"element": "span",
+			"parent": "h8",
+			"attributes": {
+				"class": "chip"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h11:text0",
+			"parent": "h11",
+			"text": "Sorrel"
+		},
+		{
+			"kind": "element",
+			"id": "h12",
+			"element": "span",
+			"parent": "h8",
+			"attributes": {
+				"class": "chip"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h12:text0",
+			"parent": "h12",
+			"text": "Lovage"
+		},
+		{
+			"kind": "element",
+			"id": "h13",
+			"element": "span",
+			"parent": "h8",
+			"attributes": {
+				"class": "chip"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h13:text0",
+			"parent": "h13",
+			"text": "Chervil"
+		},
+		{
+			"kind": "element",
+			"id": "h14",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "story"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h14:text0",
+			"parent": "h14",
+			"text": "The north bed took the frost hardest this week, so the basil moved under glass while the thyme and the sorrel stayed out and came through without a mark on them."
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n\tcolor: #1d3557;\n}\n\n.page {\n\tmax-width: 560px;\n\tmargin: 0 auto;\n\tpadding: 16px;\n}\n\n.hero {\n\tpadding: 3vw;\n\tbackground: #a8dadc;\n}\n\n.row {\n\tdisplay: flex;\n\tgap: 12px;\n\tmargin-top: 16px;\n}\n\n.cell {\n\tflex: 1;\n\tpadding: 10px;\n\tbackground: #f1faee;\n\tborder: 1px solid #457b9d;\n}\n\n.bar {\n\twidth: 60%;\n\theight: 12px;\n\tmargin-top: 16px;\n\tbackground: #e63946;\n}\n\n.chips {\n\tdisplay: flex;\n\tflex-wrap: wrap;\n\tgap: 8px;\n\tmargin-top: 16px;\n}\n\n.chip {\n\twidth: 104px;\n\tpadding: 6px 0;\n\ttext-align: center;\n\tbackground: #457b9d;\n\tcolor: #ffffff;\n\tfont-size: 14px;\n}\n\n.story {\n\tmargin-top: 16px;\n\tfont-size: 17px;\n\tline-height: 1.4;\n}\n",
+	"states": []
+}
