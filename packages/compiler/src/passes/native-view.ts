@@ -1607,12 +1607,18 @@ export function createNativeViewPayload(
 		prefix: string,
 		row: string | undefined,
 	): SharedInstance => {
+		// The module that defines the factory owns its state and methods; another that links it may list its state too.
+		const holds = (facts: ModuleFacts) =>
+			facts.graph.graphBindings.some((binding) => binding.sharedDefinitionId === definition.id);
+		const candidates = [module, ...moduleFactsByFile.values()];
 		const owner =
-			[module, ...moduleFactsByFile.values()].find((facts) =>
-				facts.graph.graphBindings.some(
-					(binding) => binding.sharedDefinitionId === definition.id,
-				),
-			) ?? module;
+			candidates.find(
+				(facts) =>
+					sharedDefinitionId(facts.graph.moduleId, definition.exportedName) === definition.id &&
+					holds(facts),
+			) ??
+			candidates.find(holds) ??
+			module;
 		const byName = new Map<string, string>();
 		const byBinding = new Map<string, string>();
 		const objects = new Map<string, ObjectRef>();
@@ -2545,6 +2551,7 @@ export function createNativeViewPayload(
 		name: string,
 		reading: boolean,
 		span: SourceSpan | undefined,
+		used?: ReadonlyArray<string>,
 	): Record<string, NativeScriptBinding> | null {
 		const members: Record<string, NativeScriptBinding> = {};
 		for (const [field, member] of instance.fields) {
@@ -2552,6 +2559,8 @@ export function createNativeViewPayload(
 			if (member.kind === 'cell') members[field] = { cell: member.cell };
 			else if (member.kind === 'method') {
 				if (reading) continue;
+				// A method the script never names is not bound, so a method the build cannot read does not refuse it.
+				if (used && !used.includes(field)) continue;
 				if (!member.span)
 					return refuseScript(
 						`${label} has no source the build read, so it cannot run as JavaScript`,
@@ -2600,7 +2609,7 @@ export function createNativeViewPayload(
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
 		let ok = true;
-		for (const { name, written, span, calledOnly } of fact.names) {
+		for (const { name, written, span, calledOnly, membersOnly } of fact.names) {
 			const prop = propOf(name, scope);
 			if (prop?.kind === 'callback') {
 				const callback = written ? undefined : prop.span && scriptFacts(prop.scope.module)?.handler(prop.span);
@@ -2638,7 +2647,7 @@ export function createNativeViewPayload(
 								candidate.instance.definition.name === name,
 						)?.instance;
 			if (owned && !scope.locals.has(name)) {
-				const members = sharedMembers(owned, name, reading, span);
+				const members = sharedMembers(owned, name, reading, span, membersOnly);
 				if (!members) {
 					ok = false;
 					continue;
@@ -2967,11 +2976,18 @@ export function createNativeViewPayload(
 			factsOf(entry.module)!.statements.forEach((statement, index) => {
 				if (statement.declares.includes(name)) include(entry, index);
 			});
-		const imported = (entry: Included, slot: number, name: string | null): void => {
+		const imported = (
+			entry: Included,
+			slot: number,
+			name: string | null,
+			members?: ReadonlyArray<string>,
+		): void => {
 			const reached = target(entry, slot);
 			if (!reached) return;
-			if (name === null) everything(reached);
-			else exported(reached, name);
+			if (name === null) {
+				if (members) for (const member of members) exported(reached, member);
+				else everything(reached);
+			} else exported(reached, name, members);
 		};
 		/** Whether a module exports `name`, itself or through `export *`. */
 		const exports = (
@@ -2991,12 +3007,18 @@ export function createNativeViewPayload(
 				return entry.name === name;
 			});
 		};
-		const exported = (entry: Included, name: string): void => {
-			if (entry.exports.has(name)) return;
+		const exported = (entry: Included, name: string, members?: ReadonlyArray<string>): void => {
 			const facts = factsOf(entry.module)!;
 			const direct = facts.exports.find(
 				(candidate) => !('star' in candidate) && candidate.name === name,
 			);
+			// `export * as toaster`, read only as `toaster.say`: the namespace carries just the members read.
+			if (members && direct && 'slot' in direct && direct.from === null) {
+				entry.exports.set(name, `__i[${direct.slot}]`);
+				imported(entry, direct.slot, null, members);
+				return;
+			}
+			if (entry.exports.has(name)) return;
 			if (direct && 'local' in direct) {
 				entry.exports.set(name, direct.local);
 				local(entry, direct.local);
@@ -3033,7 +3055,7 @@ export function createNativeViewPayload(
 			const entry = enter(module);
 			if (!entry) continue;
 			for (const name of fact.module) local(entry, name);
-			for (const use of fact.imports) imported(entry, use.slot, use.name);
+			for (const use of fact.imports) imported(entry, use.slot, use.name, use.members);
 		}
 		if (only) return undefined;
 		const inputs: NativeScriptModuleInput[] = order.map((entry) => {
@@ -6399,13 +6421,16 @@ export function createNativeViewPayload(
 		span: SourceSpan,
 		what: string,
 	): NativeScriptBinding | null {
-		const fact = scriptFacts(instance.module)?.method(span);
+		// An app-wide definition's state may be listed in the module that uses it; its methods are in the module that defines them.
+		const own = scriptFacts(instance.module)?.method(span);
+		const definer = own ? instance.module : (moduleFactsByFile.get(span.filename) ?? instance.module);
+		const fact = own ?? scriptFacts(definer)?.method(span);
 		if (!fact)
 			return refuseScript(
 				`${what} has no source the build read, so it cannot run as JavaScript`,
 				span,
 			);
-		const fn = scriptFunctionId(fact, instance.module, what);
+		const fn = scriptFunctionId(fact, definer, what);
 		const bindings = scriptBindings(fact, instance.scope, what);
 		if (fn === null || bindings === null) return null;
 		// `calendar.onChange?.(iso)`: a callback the root filled a slot with runs as JavaScript where it was written, reached

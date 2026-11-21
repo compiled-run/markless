@@ -147,6 +147,8 @@ export type SemanticScriptFunction = {
 		readonly span: SourceSpan;
 		/** The methods called on it (`cam.takePhoto()`), when every use is such a call; absent once any use is not. */
 		readonly calledOnly?: ReadonlyArray<string>;
+		/** The members it reads by name (`toasts.queue`), when every use is such a read; absent once any use is not. */
+		readonly membersOnly?: ReadonlyArray<string>;
 	}>;
 	/** Module-level names it reads as written, which its module's statements declare. */
 	readonly module: ReadonlyArray<string>;
@@ -166,7 +168,12 @@ export type SemanticScriptFunction = {
 	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
 };
 
-export type SemanticScriptImportUse = { readonly slot: number; readonly name: string | null };
+export type SemanticScriptImportUse = {
+	readonly slot: number;
+	readonly name: string | null;
+	/** The members read on it (`toaster.say`), when every use reads one by name: of a namespace, only those reach the script. */
+	readonly members?: ReadonlyArray<string>;
+};
 
 /** One top-level statement of a module as script code, with what it declares and reaches. */
 export type SemanticScriptStatement = {
