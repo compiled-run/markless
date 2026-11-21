@@ -1,6 +1,11 @@
 import type { NativeScript, NativeScriptService } from '@markless/serializer';
 import { DEVICE_CALLS } from '@markless/serializer/native-device';
 import {
+	NATIVE_SCRIPT_DOM_CLASSES,
+	NATIVE_SCRIPT_CLICK_FIELDS,
+	NATIVE_SCRIPT_KEY_FIELDS,
+	NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS,
+	NATIVE_DOCUMENT_BODY,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_SUBMITTED_FORM,
 	NATIVE_UNBOUND_HANDLE,
@@ -74,6 +79,57 @@ if (!host) {
 		signal.listeners.slice().forEach(function (fn) { fn.call(signal, event); });
 	};
 	if (typeof g.queueMicrotask !== 'function') g.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
+	// Events a script makes and dispatches on an element: the host raises them on that element once the script returns.
+	var EventBase = function (type, init) {
+		init = init || {};
+		this.type = String(type);
+		this.bubbles = init.bubbles === true;
+		this.cancelable = init.cancelable === true;
+		this.defaultPrevented = false;
+		this.isTrusted = false;
+		this.target = null;
+		this.currentTarget = null;
+	};
+	EventBase.prototype.preventDefault = function () { if (this.cancelable) this.defaultPrevented = true; };
+	EventBase.prototype.stopPropagation = function () {};
+	var eventKind = function (parent, fields) {
+		var Kind = function (type, init) {
+			parent.call(this, type, init);
+			for (var name in fields) this[name] = init && init[name] !== undefined ? init[name] : fields[name];
+		};
+		Kind.prototype = Object.create(parent.prototype);
+		return Kind;
+	};
+	g.Event = EventBase;
+	g.CustomEvent = eventKind(EventBase, { detail: null });
+	g.MouseEvent = eventKind(EventBase, { detail: 0, button: 0, buttons: 0, clientX: 0, clientY: 0, relatedTarget: null });
+	g.PointerEvent = eventKind(g.MouseEvent, { pointerId: 0, pointerType: '', isPrimary: false, pressure: 0 });
+	g.KeyboardEvent = eventKind(EventBase, { key: '', code: '', repeat: false, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false });
+	// The DOM's interfaces, so an element proxy answers instanceof as the browser's element does; none can be constructed.
+	var domClasses = ${JSON.stringify(NATIVE_SCRIPT_DOM_CLASSES)};
+	var defineClass = function (name) {
+		if (Object.prototype.hasOwnProperty.call(g, name) && g[name].__dom) return g[name];
+		var parent = domClasses[name] ? defineClass(domClasses[name]) : null;
+		var Class = function () { throw new TypeError('Illegal constructor'); };
+		if (parent) Class.prototype = Object.create(parent.prototype);
+		Object.defineProperty(Class, '__dom', { value: true });
+		Object.defineProperty(Class, 'name', { value: name });
+		g[name] = Class;
+		return Class;
+	};
+	for (var domName in domClasses) defineClass(domName);
+	if (typeof g.performance !== 'object' || typeof g.performance.now !== 'function') {
+		var origin = Date.now(), last = 0;
+		// Date.now() can step back when the device clock is set; elapsed time never does.
+		g.performance = { timeOrigin: origin, now: function () { return (last = Math.max(last, Date.now() - origin)); } };
+	}
+	if (typeof g.DOMException !== 'function') {
+		g.DOMException = function DOMException(message, name) {
+			this.message = message === undefined ? '' : String(message);
+			this.name = name === undefined ? 'Error' : String(name);
+		};
+		g.DOMException.prototype = Object.create(Error.prototype, { constructor: { value: g.DOMException, writable: true, configurable: true } });
+	}
 	var Headers = function (pairs) {
 		this.get = function (name) {
 			var key = String(name).toLowerCase(), found = [];
@@ -302,7 +358,13 @@ if (!host) {
 		if (!deviceCalls[call].object) host.devices[device] = callsOn(device, null);
 	});
 	host.deviceObject = callsOn;
+	g.getComputedStyle = function (element) {
+		if (!element || typeof element.__style !== 'function') throw new TypeError('getComputedStyle() takes an element');
+		return element.__style();
+	};
 	g.window = g.self = g;
+	// The page's one member a phone answers: the focused element (the body when none is), which the build allows alone.
+	g.document = { get activeElement() { return host.focus(); } };
 	host.Response = Response;
 	// The HTML structured clone, as Chromium runs it, for an engine that has none.
 	if (typeof g.structuredClone !== 'function') {
@@ -493,14 +555,19 @@ var pathOf = function (pattern, params) {
 	}).join('/');
 };
 // An element is a proxy that offers only what the host answers: the attributes it has now, whether it holds another
-// element, and the commands a handler's data can run. No tree walking, no selectors, no layout.
+// element, its box and direction as the host measured them when the entry began, and the commands a handler's data can
+// run. No tree walking, no selectors.
 var elementFacts = {};
+var BODY = ${JSON.stringify(NATIVE_DOCUMENT_BODY)};
 var proxies = {};
+// Which element holds each touch, as this entry's own capture calls left it; the host's facts answer the rest.
+var captured = {};
 var elementOf = function (id) {
 	if (typeof id !== 'string') return id;
 	if (id === ${JSON.stringify(NATIVE_UNBOUND_HANDLE)}) return undefined;
 	if (proxies[id]) return proxies[id];
 	var facts = function () {
+		if (id === BODY) return { attributes: {}, ancestors: [] };
 		if (!elementFacts[id]) throw new Error('the host described no element ' + id);
 		return elementFacts[id];
 	};
@@ -515,14 +582,50 @@ var elementOf = function (id) {
 			return node === id || (!!elementFacts[node] && elementFacts[node].ancestors.indexOf(id) >= 0);
 		},
 		focus: function (options) { command('focus', !!(options && options.preventScroll)); },
+		click: function () { host.out.raises.push({ node: id, type: 'click', bubbles: true }); },
+		dispatchEvent: function (event) {
+			var raised = { node: id, type: String(event.type), bubbles: event.bubbles === true };
+			if (event.detail !== null && typeof event.detail === 'object' && typeof event.detail.reason === 'string')
+				raised.reason = event.detail.reason;
+			if (event.relatedTarget && typeof event.relatedTarget.__node === 'string') raised.relatedTarget = event.relatedTarget.__node;
+			['pointerId', 'pointerType', 'isPrimary', 'button', 'buttons', 'clientX', 'clientY', 'key'].forEach(function (field) {
+				if (field in event) raised[field] = event[field];
+			});
+			host.out.raises.push(raised);
+			return !event.defaultPrevented;
+		},
+		hasPointerCapture: function (pointerId) {
+			return pointerId in captured ? captured[pointerId] === id : (facts().captures || []).indexOf(pointerId) >= 0;
+		},
+		setPointerCapture: function (pointerId) { captured[pointerId] = id; host.out.commands.push([id, 'setPointerCapture', pointerId]); },
+		releasePointerCapture: function (pointerId) {
+			if (proxy.hasPointerCapture(pointerId)) captured[pointerId] = null;
+			host.out.commands.push([id, 'releasePointerCapture', pointerId]);
+		},
 		scrollIntoView: function () { command('scrollIntoView', false); },
 		showModal: function () { command('showModal', false); },
 		close: function () { command('close', false); },
 		getBoundingClientRect: function () {
-			throw new Error('getBoundingClientRect() asks the host to measure while JavaScript waits, which a phone does not answer');
+			var box = facts().box;
+			if (!box) throw new Error('the host measured no box for ' + id);
+			return { x: box.x, y: box.y, left: box.x, top: box.y, width: box.width, height: box.height, right: box.x + box.width, bottom: box.y + box.height };
 		},
 	};
+	var tag = (typeof classes === 'object' && classes[id.split('@')[0]]) || 'HTMLElement';
+	if (g[tag] && g[tag].__dom) Object.setPrototypeOf(proxy, g[tag].prototype);
 	Object.defineProperty(proxy, '__node', { value: id });
+	Object.defineProperty(proxy, '__style', {
+		value: function () {
+			var direction = facts().direction || 'ltr';
+			return {
+				direction: direction,
+				getPropertyValue: function (name) {
+					if (name === 'direction') return direction;
+					throw new Error('a phone answers only an element\'s direction from getComputedStyle(), not ' + name);
+				},
+			};
+		},
+	});
 	proxies[id] = proxy;
 	return proxy;
 };
@@ -565,15 +668,19 @@ var begin = function (entry) {
 	host.origin = origin;
 	elementFacts = entry.elements || {};
 	proxies = {};
+	captured = {};
 	cells = join(entry.cells, entry.nonFinite);
 	unset = {};
 	forced = {};
 	(entry.unset || []).forEach(function (slot) { unset[slot] = true; });
 	before = {};
 	for (var slot in cells) before[slot] = stable(cells[slot]);
-	host.out = { timers: [], clears: [], requests: [], aborts: [], calls: [], logs: [], commands: [], pending: [], settled: [], navigate: null };
+	host.out = { timers: [], clears: [], requests: [], aborts: [], calls: [], logs: [], commands: [], pending: [], settled: [], raises: [], navigate: null };
 	host.place = navigation && entry.kind !== 'compute' ? { routes: navigation.routes, path: pathOf(navigation.here, entry.params || {}) } : null;
 	host.seed = entry.seed || null;
+	host.focused = entry.focused || null;
+	for (var known in entry.focusElements || {}) if (!elementFacts[known]) elementFacts[known] = entry.focusElements[known];
+	host.focus = function () { return elementOf(host.focused || BODY); };
 	host.counter = 0;
 };
 var fail = function (slot, error) {
@@ -587,17 +694,35 @@ var fail = function (slot, error) {
 var eventOf = function (given, frame) {
 	var entries = frame[${JSON.stringify(NATIVE_SCRIPT_SUBMITTED_FORM)}];
 	var target = entries ? new host.Form(entries) : { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
+	var detail;
+	if (given.detail !== null && typeof given.detail === 'object') {
+		detail = { reason: given.detail.reason };
+		// Escape has no press: the key is absent, as on the web.
+		if (given.detail.pressTarget != null) detail.pressTarget = elementOf(given.detail.pressTarget);
+	}
 	var event = {
 		type: given.type,
+		detail: detail,
 		target: target,
 		currentTarget: target,
 		key: given.key,
+		isTrusted: given.isTrusted !== false,
 		isComposing: false,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
 		stopPropagation: function () {},
 	};
-	${JSON.stringify(NATIVE_SCRIPT_POINTER_FIELDS)}.forEach(function (field) { if (field in given) event[field] = given[field]; });
+	${JSON.stringify([...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, ...NATIVE_SCRIPT_KEY_FIELDS])])}.forEach(function (field) { if (field in given) event[field] = given[field]; });
+	// A dismiss's detail is an object whose pressTarget is an element; a click's detail is its press count.
+	if (detail) event.detail = detail;
+	if (typeof given.pointerType === 'string') {
+		event.pressure = event.buttons > 0 ? 0.5 : 0;
+		event.getCoalescedEvents = function () { return event.type === 'pointermove' ? [event] : []; };
+	}
+	if (given.nodes)
+		${JSON.stringify(NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS)}.forEach(function (field) {
+			event[field] = given.nodes[field] == null ? null : elementOf(given.nodes[field]);
+		});
 	// A paste carries the pasted plain text, as the edit menu's paste does.
 	if ('text' in given)
 		event.clipboardData = { getData: function (type) { return type === 'text' || type === 'text/plain' ? given.text : ''; } };
@@ -734,7 +859,7 @@ g.__markless[id] = {
 		}
 		var out = host.out;
 		host.out = null;
-		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled };
+		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled, raises: out.raises };
 		if (out.calls.length > 0) left.calls = out.calls;
 		if (out.prevented) left.prevented = true;
 		if (out.navigate) left.navigate = out.navigate;
@@ -761,6 +886,8 @@ function contentId(text: string): string {
 export function nativeScriptOf(
 	modules: ReadonlyArray<NativeScriptModuleInput>,
 	services: ReadonlyArray<NativeScriptService>,
+	/** Each element's DOM interface by node id, given when the script names one of the DOM's classes. */
+	classes?: Readonly<Record<string, string>>,
 	/** For `navigate()`: the page's route pattern, and the app's route patterns in the router's order. */
 	navigation?: { readonly here: string; readonly routes: ReadonlyArray<string> },
 	/** The app's origin (app.json `origin`), which a URL from the root resolves against. */
@@ -784,6 +911,7 @@ export function nativeScriptOf(
 		'var modules = [];',
 		`var origin = ${JSON.stringify(origin ?? null)};`,
 		`var owners = ${JSON.stringify(owners)};`,
+		...(classes ? [`var classes = ${JSON.stringify(classes)};`] : []),
 		`var navigation = ${JSON.stringify(navigation ?? null)};`,
 		...definitions,
 		ENTRIES,

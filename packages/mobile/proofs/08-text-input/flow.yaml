@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: 08-text-input
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Greeting
 - assertVisible: Hello Sam
 - assertVisible: Sam

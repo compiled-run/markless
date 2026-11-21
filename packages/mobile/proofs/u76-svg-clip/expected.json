@@ -1,0 +1,15 @@
+{
+	"rung": 186,
+	"name": "An svg group's clip-path names a <clipPath> and its shapes clip what the group draws, as the browser clips it",
+	"steps": [
+		{
+			"visible": ["Moon phase", "Next phase", "Half moon"],
+			"absent": ["Full moon"]
+		},
+		{
+			"do": { "tap": "Next phase" },
+			"visible": ["Full moon"],
+			"absent": ["Half moon"]
+		}
+	]
+}

@@ -346,6 +346,9 @@ describe("the runner's checkout", () => {
 	});
 
 	it('reads a checkout behind origin/main from git, after fetching it', async () => {
+		// Inside a git hook GIT_DIR and GIT_INDEX_FILE name the repository being committed; every git here must use its own.
+		const inherited = Object.entries(process.env).filter(([name]) => name.startsWith('GIT_'));
+		for (const [name] of inherited) delete process.env[name];
 		const scratch = mkdtempSync(join(tmpdir(), 'runner-refresh-'));
 		// A pre-commit hook exports GIT_DIR and GIT_INDEX_FILE, which would aim git, here and in checkoutFacts, at the real repository.
 		const hookGit = Object.entries(process.env).filter(([key]) => key.startsWith('GIT_'));
@@ -378,6 +381,7 @@ describe("the runner's checkout", () => {
 		} finally {
 			Object.assign(process.env, Object.fromEntries(hookGit));
 			rmSync(scratch, { recursive: true, force: true });
+			for (const [name, value] of inherited) process.env[name] = value;
 		}
 	});
 });

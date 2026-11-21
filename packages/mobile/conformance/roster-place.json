@@ -1,0 +1,431 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "component-edge:3/shared:src/roster-place.tsrx#trackState/state:track.current",
+				"name": "track.current",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "h1",
+				"parent": "h6",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Bus route"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/h3",
+				"element": "section",
+				"parent": "h6"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/h4",
+				"element": "button",
+				"parent": "component-edge:3/h3"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:3/h4:text0",
+				"parent": "component-edge:3/h4",
+				"parts": [
+					{
+						"text": "Next stop"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/h5",
+				"element": "ol",
+				"parent": "component-edge:3/h3",
+				"defaultStyle": {
+					"indent": 40,
+					"marker": "decimal"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/component-edge:0/h0",
+				"element": "li",
+				"parent": "component-edge:3/h5"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/component-edge:0/h1",
+				"element": "p",
+				"parent": "component-edge:3/component-edge:0/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:3/component-edge:0/h1:text0",
+				"parent": "component-edge:3/component-edge:0/h1",
+				"parts": [
+					{
+						"expr": {
+							"literal": "Harbour"
+						}
+					},
+					{
+						"text": " is stop "
+					},
+					{
+						"expr": {
+							"binary": "+",
+							"left": {
+								"literal": 0
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/component-edge:0/h2",
+				"element": "p",
+				"parent": "component-edge:3/component-edge:0/h0",
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"binary": "===",
+								"left": {
+									"cell": "component-edge:3/shared:src/roster-place.tsrx#trackState/state:track.current"
+								},
+								"right": {
+									"literal": 0
+								}
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:3/component-edge:0/h2:text0",
+				"parent": "component-edge:3/component-edge:0/h2",
+				"parts": [
+					{
+						"expr": {
+							"literal": "Harbour"
+						}
+					},
+					{
+						"text": " is next"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/component-edge:1/h0",
+				"element": "li",
+				"parent": "component-edge:3/h5"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/component-edge:1/h1",
+				"element": "p",
+				"parent": "component-edge:3/component-edge:1/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:3/component-edge:1/h1:text0",
+				"parent": "component-edge:3/component-edge:1/h1",
+				"parts": [
+					{
+						"expr": {
+							"literal": "Market"
+						}
+					},
+					{
+						"text": " is stop "
+					},
+					{
+						"expr": {
+							"binary": "+",
+							"left": {
+								"literal": 1
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/component-edge:1/h2",
+				"element": "p",
+				"parent": "component-edge:3/component-edge:1/h0",
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"binary": "===",
+								"left": {
+									"cell": "component-edge:3/shared:src/roster-place.tsrx#trackState/state:track.current"
+								},
+								"right": {
+									"literal": 1
+								}
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:3/component-edge:1/h2:text0",
+				"parent": "component-edge:3/component-edge:1/h2",
+				"parts": [
+					{
+						"expr": {
+							"literal": "Market"
+						}
+					},
+					{
+						"text": " is next"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/component-edge:2/h0",
+				"element": "li",
+				"parent": "component-edge:3/h5"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/component-edge:2/h1",
+				"element": "p",
+				"parent": "component-edge:3/component-edge:2/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:3/component-edge:2/h1:text0",
+				"parent": "component-edge:3/component-edge:2/h1",
+				"parts": [
+					{
+						"expr": {
+							"literal": "Station"
+						}
+					},
+					{
+						"text": " is stop "
+					},
+					{
+						"expr": {
+							"binary": "+",
+							"left": {
+								"literal": 2
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/component-edge:2/h2",
+				"element": "p",
+				"parent": "component-edge:3/component-edge:2/h0",
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"binary": "===",
+								"left": {
+									"cell": "component-edge:3/shared:src/roster-place.tsrx#trackState/state:track.current"
+								},
+								"right": {
+									"literal": 2
+								}
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:3/component-edge:2/h2:text0",
+				"parent": "component-edge:3/component-edge:2/h2",
+				"parts": [
+					{
+						"expr": {
+							"literal": "Station"
+						}
+					},
+					{
+						"text": " is next"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:3/h4",
+				"event": "activate",
+				"handler": "handler:component-edge:3/event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:3/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:3/shared:src/roster-place.tsrx#trackState/state:track.current",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "component-edge:3/shared:src/roster-place.tsrx#trackState/state:track.current"
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h7:text0",
+			"Bus route"
+		],
+		[
+			"component-edge:3/h4:text0",
+			"Next stop"
+		],
+		[
+			"component-edge:3/component-edge:0/h1:text0",
+			"Harbour is stop 1"
+		],
+		[
+			"component-edge:3/component-edge:0/h2:text0",
+			"Harbour is next"
+		],
+		[
+			"component-edge:3/component-edge:1/h1:text0",
+			"Market is stop 2"
+		],
+		[
+			"component-edge:3/component-edge:1/h2:text0",
+			"Market is next"
+		],
+		[
+			"component-edge:3/component-edge:2/h1:text0",
+			"Station is stop 3"
+		],
+		[
+			"component-edge:3/component-edge:2/h2:text0",
+			"Station is next"
+		]
+	],
+	"initialAttributes": [
+		[
+			"component-edge:3/component-edge:0/h2",
+			"hidden",
+			null
+		],
+		[
+			"component-edge:3/component-edge:1/h2",
+			"hidden",
+			""
+		],
+		[
+			"component-edge:3/component-edge:2/h2",
+			"hidden",
+			""
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:3/h4"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "component-edge:3/component-edge:0/h2",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/component-edge:1/h2",
+					"name": "hidden",
+					"value": null
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:3/h4"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "component-edge:3/component-edge:1/h2",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/component-edge:2/h2",
+					"name": "hidden",
+					"value": null
+				}
+			]
+		}
+	]
+}

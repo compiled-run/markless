@@ -2,26 +2,26 @@ appId: ${APP_ID}
 name: j15-submit-helper
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Site log
 - assertVisible: Add
-- assertVisible: 'Last: none'
-- assertVisible: 'Log: empty'
+- assertVisible: "Last: none"
+- assertVisible: "Log: empty"
 - assertVisible: North yard
 - tapOn: Add
-- assertNotVisible: 'Last: none'
-- assertVisible: 'Last: z'
-- assertVisible: 'Log: z North yard'
-- assertNotVisible: 'Last: none'
+- assertNotVisible: "Last: none"
+- assertVisible: "Last: z"
+- assertVisible: "Log: z North yard"
+- assertNotVisible: "Last: none"
 - tapOn: Site
 - eraseText
 - inputText: Pump house
 - hideKeyboard
 - assertVisible: Pump house
-- assertVisible: 'Last: z'
+- assertVisible: "Last: z"
 - assertVisible: Pump house
 - tapOn: Add
-- assertNotVisible: 'Last: z'
-- assertVisible: 'Last: 10'
-- assertVisible: 'Log: z North yard, 10 Pump house'
-- assertNotVisible: 'Last: z'
+- assertNotVisible: "Last: z"
+- assertVisible: "Last: 10"
+- assertVisible: "Log: z North yard, 10 Pump house"
+- assertNotVisible: "Last: z"

@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u28-row-rebuild
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Fruit
 - assertVisible: Apple tapped 0
 - assertVisible: Size 1

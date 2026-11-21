@@ -1,0 +1,20 @@
+{
+	"rung": 185,
+	"name": "An svg's preserveAspectRatio places its viewBox as the browser does: none stretches it, slice fills and clips, xMinYMax aligns it bottom left",
+	"steps": [
+		{
+			"visible": ["Banner fit", "Change fit", "Stretched"],
+			"absent": ["Cropped", "Bottom left"]
+		},
+		{
+			"do": { "tap": "Change fit" },
+			"visible": ["Cropped"],
+			"absent": ["Stretched", "Bottom left"]
+		},
+		{
+			"do": { "tap": "Change fit" },
+			"visible": ["Bottom left"],
+			"absent": ["Stretched", "Cropped"]
+		}
+	]
+}

@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: r110-document-elements
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Metadata
 - assertVisible: Visits 0
 - assertNotVisible: Template content

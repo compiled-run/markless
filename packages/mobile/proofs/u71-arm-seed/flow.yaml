@@ -1,0 +1,46 @@
+appId: ${APP_ID}
+name: u71-arm-seed
+---
+- launchApp:
+    clearState: true
+- assertVisible: Notes
+- assertVisible: Note hi
+- assertVisible: Edit
+- assertVisible: Change note
+- assertNotVisible: Draft HI
+- assertNotVisible: Close
+- tapOn: Edit
+- assertVisible: Draft HI
+- assertVisible: Close
+- assertNotVisible: Edit
+- assertVisible: Draft HI
+- assertVisible: Close
+- assertVisible: Note hi
+- assertNotVisible: Edit
+- tapOn: Shout
+- assertNotVisible: Draft HI
+- assertVisible: Draft HI!
+- assertVisible: Close
+- assertNotVisible: Draft HI
+- tapOn: Close
+- assertNotVisible: Draft HI!
+- assertNotVisible: Close
+- assertVisible: Edit
+- assertVisible: Note hi
+- assertNotVisible: Draft HI!
+- assertNotVisible: Close
+- tapOn: Change note
+- assertNotVisible: Note hi
+- assertVisible: Note bye
+- assertVisible: Edit
+- assertNotVisible: Note hi
+- assertNotVisible: Draft BYE
+- tapOn: Edit
+- assertVisible: Draft BYE
+- assertNotVisible: Edit
+- assertVisible: Draft BYE
+- assertVisible: Close
+- assertVisible: Note bye
+- assertNotVisible: Draft HI!
+- assertNotVisible: Draft HI
+- assertNotVisible: Edit

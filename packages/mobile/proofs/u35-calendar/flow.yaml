@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u35-calendar
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Delivery
 - assertVisible: Delivery date
 - assertVisible: August 2026
@@ -23,7 +23,7 @@ name: u35-calendar
 - assertVisible: July 2026
 - assertVisible: Picked none
 - assertNotVisible: August 2026
-- tapOn: '9'
+- tapOn: "9"
 - assertNotVisible: Picked none
 - assertVisible: Picked 2026-07-09
 - assertVisible: July 2026

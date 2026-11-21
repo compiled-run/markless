@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u27-table-rows
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Folder
 - assertVisible: notes\.txt
 - assertVisible: photo\.png

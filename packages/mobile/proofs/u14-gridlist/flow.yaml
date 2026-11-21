@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u14-gridlist
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Files
 - assertVisible: Recent
 - assertVisible: README\.md
