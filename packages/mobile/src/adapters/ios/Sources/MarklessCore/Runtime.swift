@@ -1697,11 +1697,8 @@ public final class NativeRuntime {
 		let checkedBefore = checkedness
 		let selectedBefore = selectedness
 		let bindingsBefore = Dictionary(uniqueKeysWithValues: try ticked.map { ($0.id, try checkedBinding($0.id)) })
-		var beforeProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
-		if let edit, let host {
-			beforeProperties["\(host)\u{0}value"] = edit
-			edited[host] = edit
-		}
+		let beforeProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
+		if let edit, let host { edited[host] = edit }
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
 		let beforeTitle = try title()
@@ -1788,7 +1785,11 @@ public final class NativeRuntime {
 						let key = "\(instance.id)\u{0}\(binding.name)"
 						let (before, after) = binding.isProperty ? (beforeProperties, afterProperties) : (beforeAttributes, afterAttributes)
 						guard let old = before[key], let new = after[key], old != new else { return [] }
-						if binding.isProperty { return [.property(node: instance.id, name: binding.name, value: new ?? "")] }
+						if binding.isProperty {
+							// A `value` binding writes the field only when its own value changes, as on the web: typing alone never resets it.
+							if instance.id == host, let edit, new == edit { return [] }
+							return [.property(node: instance.id, name: binding.name, value: new ?? "")]
+						}
 						let shown: [NativeJournalEntry] = followsDefault && binding.name == "value" && edited[instance.id] == nil ? [.property(node: instance.id, name: "value", value: new ?? "")] : []
 						return [.attribute(node: instance.id, name: binding.name, value: new)] + shown
 					}
