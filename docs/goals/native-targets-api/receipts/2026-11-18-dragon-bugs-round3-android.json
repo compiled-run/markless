@@ -1,0 +1,174 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "02-styles",
+			"failure": null,
+			"installSeconds": 4.766841333999997,
+			"flowSeconds": 8.688929042000003
+		},
+		{
+			"name": "s1-page-styles",
+			"failure": null,
+			"installSeconds": 1.5231940830000095,
+			"flowSeconds": 13.057018207999993
+		},
+		{
+			"name": "s10-web-font-woff2",
+			"failure": null,
+			"installSeconds": 1.5086661249999889,
+			"flowSeconds": 5.763322583000001
+		},
+		{
+			"name": "s11-system-generics",
+			"failure": null,
+			"installSeconds": 1.3438058749999908,
+			"flowSeconds": 5.475085083000013
+		},
+		{
+			"name": "s12-no-font-family",
+			"failure": null,
+			"installSeconds": 1.3233134169999976,
+			"flowSeconds": 5.150467790999974
+		},
+		{
+			"name": "s2-shared-component",
+			"failure": null,
+			"installSeconds": 1.370097167,
+			"flowSeconds": 14.109627708000014
+		},
+		{
+			"name": "s3-state-styles",
+			"failure": null,
+			"installSeconds": 1.3494361250000075,
+			"flowSeconds": 21.133167917000012
+		},
+		{
+			"name": "s4-global-tokens",
+			"failure": null,
+			"installSeconds": 1.3943678749999964,
+			"flowSeconds": 12.667118207999971
+		},
+		{
+			"name": "s5-page-canvas",
+			"failure": null,
+			"installSeconds": 1.4442676659999998,
+			"flowSeconds": 13.280165167000028
+		},
+		{
+			"name": "s6-page-body",
+			"failure": null,
+			"installSeconds": 1.4010376249999972,
+			"flowSeconds": 13.407040917000035
+		},
+		{
+			"name": "s7-color-scheme",
+			"failure": null,
+			"installSeconds": 1.3784294169999776,
+			"flowSeconds": 10.944496374999988
+		},
+		{
+			"name": "s8-no-scheme",
+			"failure": null,
+			"installSeconds": 1.3564511659999843,
+			"flowSeconds": 6.1699387499999725
+		},
+		{
+			"name": "s9-web-font",
+			"failure": null,
+			"installSeconds": 1.5286563339999992,
+			"flowSeconds": 5.300065249999985
+		},
+		{
+			"name": "u1-base",
+			"failure": null,
+			"installSeconds": 1.330871541999979,
+			"flowSeconds": 12.363860832999984
+		},
+		{
+			"name": "u11-pagination",
+			"failure": null,
+			"installSeconds": 1.3565948750000099,
+			"flowSeconds": 20.41974995800003
+		},
+		{
+			"name": "u12-buttongroup",
+			"failure": null,
+			"installSeconds": 1.3620127920000231,
+			"flowSeconds": 44.67057395800005
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 1.2520003329999745,
+			"flowSeconds": 43.548973041000075
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 1.3710424169999313,
+			"flowSeconds": 18.815284125000005
+		},
+		{
+			"name": "u15-tabs-styled",
+			"failure": null,
+			"installSeconds": 1.3989901669999818,
+			"flowSeconds": 17.30340125000011
+		},
+		{
+			"name": "u17-borders-dashed",
+			"failure": null,
+			"installSeconds": 1.3522586250000168,
+			"flowSeconds": 8.87220754199999
+		},
+		{
+			"name": "u18-visually-hidden",
+			"failure": null,
+			"installSeconds": 1.3078699160000542,
+			"flowSeconds": 8.290292874999926
+		},
+		{
+			"name": "u19-anchored",
+			"failure": null,
+			"installSeconds": 1.4065511670000852,
+			"flowSeconds": 14.89874450000003
+		},
+		{
+			"name": "u2-collapsible",
+			"failure": null,
+			"installSeconds": 1.4990521249999291,
+			"flowSeconds": 14.066038291999954
+		},
+		{
+			"name": "u20-button-disabled",
+			"failure": null,
+			"installSeconds": 1.3348196250000037,
+			"flowSeconds": 19.686563666999923
+		},
+		{
+			"name": "u3-tabs",
+			"failure": null,
+			"installSeconds": 1.2639934580000118,
+			"flowSeconds": 17.107000999999933
+		},
+		{
+			"name": "u4-dialog",
+			"failure": null,
+			"installSeconds": 1.4132401670000982,
+			"flowSeconds": 30.082008625000018
+		},
+		{
+			"name": "u5-toggle",
+			"failure": null,
+			"installSeconds": 1.2733440829999745,
+			"flowSeconds": 12.551170125000063
+		},
+		{
+			"name": "u6-base-rows",
+			"failure": null,
+			"installSeconds": 1.3840217089999933,
+			"flowSeconds": 36.48536870899983
+		}
+	]
+}

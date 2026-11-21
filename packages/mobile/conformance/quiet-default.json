@@ -12,7 +12,8 @@
 			{
 				"id": "state:locked",
 				"name": "locked",
-				"initial": false
+				"initial": false,
+				"styled": true
 			}
 		],
 		"nodes": [
@@ -186,6 +187,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:locked",
+					"value": true
+				},
+				{
 					"op": "text",
 					"node": "h3:text0",
 					"value": "Page 2, locked"
@@ -205,6 +211,11 @@
 				"host": "h2"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:locked",
+					"value": false
+				},
 				{
 					"op": "text",
 					"node": "h3:text0",

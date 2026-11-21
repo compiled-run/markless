@@ -1,0 +1,10 @@
+{
+	"rung": "S13",
+	"name": "A fluid page: a centred column with a max width, a flex row of two halves, a percent bar, wrapping chips, padding in vw and a wrapping paragraph",
+	"steps": [
+		{
+			"visible": ["Field notes", "Left half", "Right half", "Basil", "Chervil"],
+			"title": "Field notes"
+		}
+	]
+}

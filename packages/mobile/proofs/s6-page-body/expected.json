@@ -1,0 +1,40 @@
+{
+	"rung": "S6",
+	"name": "A body background under an html background (body keeps its own box), and a translucent page background in dark mode, as Chrome paints them",
+	"steps": [
+		{
+			"visible": ["Tide table", "Open boats"],
+			"title": "Harbour"
+		},
+		{
+			"do": {
+				"tap": "Open boats"
+			},
+			"visible": ["Moorings", "Three boats are out"],
+			"absent": ["Tide table"],
+			"title": "Boats"
+		},
+		{
+			"do": {
+				"appearance": "dark"
+			},
+			"visible": ["Moorings", "Three boats are out"],
+			"title": "Boats"
+		},
+		{
+			"do": {
+				"back": "button"
+			},
+			"visible": ["Tide table", "Open boats"],
+			"absent": ["Moorings"],
+			"title": "Harbour"
+		},
+		{
+			"do": {
+				"appearance": "light"
+			},
+			"visible": ["Tide table", "Open boats"],
+			"title": "Harbour"
+		}
+	]
+}

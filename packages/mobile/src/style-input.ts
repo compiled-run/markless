@@ -1,5 +1,6 @@
 import type { NativeArmPlace, NativeViewPayload } from '@markless/serializer';
-import { isNativeStyleStateAttribute } from '@markless/serializer/native-view';
+import { fontFaceSources } from '@markless/compiler/native';
+import { isNativeStyleStateAttribute, nativeExprCells } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeBuild, NativeStylesheet } from './compile.ts';
 import { createNativeRuntime, evaluateWithScript, formatNativeValue } from './runtime.ts';
@@ -7,6 +8,9 @@ import { nodeScriptHost } from './node-engine.ts';
 import { isMeasuredSnapPoint, SHEET_AREAS, sheetViewports } from './sheet-areas.ts';
 
 export const NATIVE_STYLE_INPUT_VERSION = 'markless.native-style-input/0';
+
+/** A styled cell's value: true or false, or one of the strings the compiler found it can hold. */
+export type NativeStyleValue = boolean | string;
 
 /** What Markless hands Dragon for one component: its element tree, each text node's first string and its scoped CSS. */
 export type NativeStyleInput = {
@@ -21,7 +25,7 @@ export type NativeStyleInput = {
 				readonly attributes: Readonly<Record<string, string>>;
 				/** The element's class in every combination of `states`, when a binding sets it; null means no class attribute. */
 				readonly classByState?: ReadonlyArray<{
-					readonly when: Readonly<Record<string, boolean>>;
+					readonly when: Readonly<Record<string, NativeStyleValue>>;
 					readonly value: string | null;
 				}>;
 				/**
@@ -32,7 +36,7 @@ export type NativeStyleInput = {
 					Record<
 						string,
 						ReadonlyArray<{
-							readonly when: Readonly<Record<string, boolean>>;
+							readonly when: Readonly<Record<string, NativeStyleValue>>;
 							readonly value: string | null;
 						}>
 					>
@@ -46,20 +50,71 @@ export type NativeStyleInput = {
 				readonly id: string;
 				readonly parent: string;
 				readonly text: string;
+				/** The text in every combination of `states`, when it reads a state; Dragon lays out each string where it is shown. */
+				readonly textByState?: ReadonlyArray<{
+					readonly when: Readonly<Record<string, NativeStyleValue>>;
+					readonly value: string;
+				}>;
 				readonly arm?: NativeArmPlace;
 		  }
 	>;
 	/** The stylesheets the page imports (unscoped, in import order), then every shown component's scoped CSS. */
 	readonly css: string;
-	/** The cells class and `ui-*` attribute bindings read; Dragon compiles one style assignment per combination (booleans only for now). */
+	/** The cells class and `ui-*` attribute bindings read, each with every value it can hold; Dragon compiles one style assignment per combination. */
 	readonly states: ReadonlyArray<{
 		readonly cell: string;
-		readonly domain: readonly [false, true];
-		readonly initial: boolean;
+		readonly domain: ReadonlyArray<NativeStyleValue>;
+		readonly initial: NativeStyleValue;
 	}>;
 	/** A system sheet's content at one resting height: the content area's size per target, in CSS px. */
 	readonly viewports?: ReturnType<typeof sheetViewports>;
+	/**
+	 * Each relative `@font-face` src url of the stylesheets, as `css` spells it, and the font file it names, resolved against its
+	 * stylesheet's file. Written to disk with `file` relative to the input file (`nativeStyleInputAt`).
+	 */
+	readonly fonts?: ReadonlyArray<{ readonly url: string; readonly file: string }>;
 };
+
+const URL_ROOT = 'https://markless.invalid/';
+
+/** The font files the stylesheets' `@font-face` rules name by a relative url, resolved as the web resolves a stylesheet's url(). */
+export function stylesheetFonts(
+	stylesheets: ReadonlyArray<NativeStylesheet>,
+): NonNullable<NativeStyleInput['fonts']> {
+	const fonts = new Map<
+		string,
+		{ readonly url: string; readonly file: string; readonly sheet: string }
+	>();
+	for (const sheet of stylesheets) {
+		const absolute = sheet.file.startsWith('/');
+		const base = new URL(sheet.file.split('/').map(encodeURIComponent).join('/'), URL_ROOT);
+		for (const url of fontFaceSources(sheet.cssText)) {
+			if (URL.canParse(url) || url.startsWith('/')) continue;
+			const path = decodeURIComponent(new URL(url, base).pathname);
+			const file = absolute ? path : path.slice(1);
+			const seen = fonts.get(url);
+			if (seen && seen.file !== file)
+				throw new Error(
+					`${sheet.file} and ${seen.sheet} both name the font url ${url}, for ${file} and ${seen.file}; the joined CSS cannot tell them apart`,
+				);
+			fonts.set(url, { url, file, sheet: sheet.file });
+		}
+	}
+	return [...fonts.values()].map(({ url, file }) => ({ url, file }));
+}
+
+/** The input as written at a path: each font file given relative to the input file by `relativeFile`. */
+export function nativeStyleInputAt(
+	input: NativeStyleInput,
+	relativeFile: (file: string) => string,
+): NativeStyleInput {
+	return input.fonts
+		? {
+				...input,
+				fonts: input.fonts.map(({ url, file }) => ({ url, file: relativeFile(file) })),
+			}
+		: input;
+}
 
 type PayloadNode = NativeViewPayload['nodes'][number];
 
@@ -169,6 +224,7 @@ export function nativeStyleInput(
 	},
 	cells?: ReadonlySet<string>,
 ): NativeStyleInput {
+	const fonts = stylesheetFonts(stylesheets);
 	// What a script computes at the first render is laid out too: Dragon measures the text it gives. A route param reads as ''.
 	const host = payload.script ? nodeScriptHost() : undefined;
 	const params = Object.fromEntries((payload.route?.params ?? []).map((name) => [name, '']));
@@ -182,15 +238,19 @@ export function nativeStyleInput(
 					throw new Error('no script');
 				},
 			});
-	const states = payload.cells.flatMap((cell) => {
+	const states = payload.cells.flatMap((cell): NativeStyleInput['states'][number][] => {
 		if (!cell.styled || (cells && !cells.has(cell.id))) return [];
-		if (typeof cell.initial !== 'boolean')
-			throw new Error(
-				`${cell.name} decides a class or a ui-* attribute but is not a boolean; Dragon needs a finite domain`,
-			);
-		return [{ cell: cell.id, domain: [false, true] as const, initial: cell.initial }];
+		if (typeof cell.initial === 'boolean')
+			return [{ cell: cell.id, domain: [false, true], initial: cell.initial }];
+		if (typeof cell.initial === 'string' && cell.domain)
+			return [{ cell: cell.id, domain: cell.domain, initial: cell.initial }];
+		throw new Error(
+			`${cell.name} decides a class or a ui-* attribute, but not every value it can hold is known at build time; Dragon needs a finite domain`,
+		);
 	});
-	const combinations: Record<string, boolean>[] = states.reduce<Record<string, boolean>[]>(
+	const combinations: Record<string, NativeStyleValue>[] = states.reduce<
+		Record<string, NativeStyleValue>[]
+	>(
 		(all, state) =>
 			all.flatMap((partial) =>
 				state.domain.map((value) => ({ ...partial, [state.cell]: value })),
@@ -227,12 +287,44 @@ export function nativeStyleInput(
 					throw new Error(
 						`${payload.component}: text outside any element reaches Dragon with no box to lay it out in`,
 					);
+				const stateCells = new Set(states.map((state) => state.cell));
+				const reads = node.parts.flatMap((part) =>
+					'text' in part
+						? []
+						: 'cell' in part
+							? [part.cell]
+							: [...nativeExprCells(part.expr)],
+				);
+				const follows =
+					!node.arm && reads.length > 0 && reads.every((cell) => stateCells.has(cell));
+				const textByState = follows
+					? combinations.map((when) => ({
+							when,
+							value: node.parts
+								.map((part) =>
+									'text' in part
+										? part.text
+										: formatNativeValue(
+												'cell' in part
+													? when[part.cell]!
+													: evaluateAt(
+															part.expr,
+															new Map(Object.entries(when)),
+														),
+											),
+								)
+								.join(''),
+						}))
+					: [];
 				return [
 					{
 						kind: 'text',
 						id: node.id,
 						parent: sheet && parent === sheet.id ? sheet.parent! : parent,
 						text: initial.get(node.id) ?? unshownText(node.parts),
+						...(textByState.some((entry) => entry.value !== textByState[0]!.value)
+							? { textByState }
+							: {}),
 						...place,
 					},
 				];
@@ -242,7 +334,7 @@ export function nativeStyleInput(
 			);
 			const evaluate = (
 				expr: Parameters<typeof evaluateAt>[0],
-				when: Record<string, boolean>,
+				when: Record<string, NativeStyleValue>,
 			) => evaluateAt(expr, new Map([...initialCells, ...Object.entries(when)]));
 			const classByState = classBinding
 				? combinations.map((when) => {
@@ -256,7 +348,7 @@ export function nativeStyleInput(
 			const attributes: Record<string, string> = { ...node.attributes };
 			const attributesByState: Record<
 				string,
-				{ when: Record<string, boolean>; value: string | null }[]
+				{ when: Record<string, NativeStyleValue>; value: string | null }[]
 			> = {};
 			for (const binding of node.bindings ?? []) {
 				if (!('attribute' in binding) || !isNativeStyleStateAttribute(binding.attribute))
@@ -288,5 +380,6 @@ export function nativeStyleInput(
 		}),
 		css: [...stylesheets, ...styles].map((style) => style.cssText).join('\n'),
 		states,
+		...(fonts.length > 0 ? { fonts } : {}),
 	};
 }
