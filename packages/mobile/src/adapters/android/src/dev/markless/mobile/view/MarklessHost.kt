@@ -38,6 +38,7 @@ import android.widget.EditText
 import android.widget.HorizontalScrollView
 import android.widget.ScrollView
 import android.widget.TextView
+import dev.markless.mobile.core.MemoryStore
 import dev.markless.mobile.core.ScrollAlignment
 import dev.markless.mobile.core.ScrollBox
 import dev.markless.mobile.core.ScrollRange
@@ -45,6 +46,7 @@ import dev.markless.mobile.core.ScrollRect
 import dev.markless.mobile.core.nativeMaxLength
 import dev.markless.mobile.core.nativeRangeValue
 import dev.markless.mobile.core.scrollIntoView
+import dev.markless.mobile.core.ElementBox
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Instance
 import dev.markless.mobile.core.JournalEntry
@@ -157,11 +159,23 @@ class MarklessHost(
 	private val planned = style
 	/** Dragon's HarfBuzz over this phone's system fonts, made when a page first lays its rows out. */
 	private var rowShaper: RowShaper? = null
-	private var laidOutFor: Pair<Int, Int>? = null
+	/** The page size in device px and the slot values (export order) the page was last laid out at. */
+	private var laidOutFor: Triple<Int, Int, List<Double>>? = null
 	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
 	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
 		onScriptEntry = AppScriptEngine::entryRan
+		measure = this@MarklessHost::measureBox
+	}
+	/** Each style slot's current value, from the runtime at mount and then its `slot` entries. */
+	private val slotValues = HashMap(runtime.slots().toMap()).also { values ->
+		val slots = style?.slots.orEmpty()
+		if (slots.isNotEmpty() && planLayout == null) throw MarklessHostError("style values that follow state need Dragon's layout plan, which this host does not link")
+		val integer = payload.slots.associate { it.id to it.integer }
+		for (s in slots) {
+			if (s.id !in values) throw MarklessHostError("style export reads slot \"${s.id}\", which the payload does not have")
+			if (s.integer && integer[s.id] != true) throw MarklessHostError("style export laid slot \"${s.id}\" out at whole numbers only, but the payload's slot may take any number")
+		}
 	}
 	private val scriptServices = ScriptServices()
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
@@ -194,7 +208,8 @@ class MarklessHost(
 	private val scrollers = HashMap<String, Pair<List<FrameLayout>, MarklessBox>>()
 	private val dpr = context.resources.displayMetrics.density.toDouble()
 	private var enterPressedAt = Long.MIN_VALUE / 2
-	private val styledCells = payload.cells.filter { it.styled }.map { it.id }
+	// A style case is a state of the export as a styled cell is; the runtime answers its value.
+	private val styledCells = payload.cells.filter { it.styled }.map { it.id } + payload.styleCases.map { it.id }
 	/** Each @if or @try outside list rows: its style state is the arm it shows. */
 	private val styledBranches = payload.nodes.filter { it is Node.Branch && it.row == null }.map { it.id }
 
@@ -365,6 +380,22 @@ class MarklessHost(
 		raiseVisible()
 	}
 
+	/** An element's box in CSS pixels from the top left of the page's part of the screen, as `getBoundingClientRect()` gives it; null before it is laid out. */
+	private fun measureBox(id: String): ElementBox? {
+		val view = views[id] ?: return null
+		if (!view.isAttachedToWindow) return null
+		val viewport = root.parent as? View ?: root
+		val origin = IntArray(2).also(viewport::getLocationInWindow)
+		val at = IntArray(2).also(view::getLocationInWindow)
+		return ElementBox(
+			(at[0] - origin[0] - viewport.paddingLeft) / dpr,
+			(at[1] - origin[1] - viewport.paddingTop) / dpr,
+			view.width / dpr,
+			view.height / dpr,
+			view.layoutDirection == View.LAYOUT_DIRECTION_RTL,
+		)
+	}
+
 	/** Raises `visible` for each instance due one that has any of its box inside the page's part of the screen. */
 	private fun raiseVisible() {
 		if (!drawn || released || raisingVisible || root.windowVisibility != View.VISIBLE) return
@@ -522,6 +553,7 @@ class MarklessHost(
 	/** The journal applier: the only code that changes a retained view after the first build. */
 	fun apply(journal: List<JournalEntry>) {
 		dismissMessage()
+		var slotMoved = false
 		for (entry in journal) {
 			when (entry) {
 				is JournalEntry.Text -> if (flow != null) {
@@ -541,6 +573,10 @@ class MarklessHost(
 					if (!page.advance(entry.node, entry.value)) throw MarklessHostError("style export has no state for cell \"${entry.node}\"")
 					for (s in sheetLayouts.values) for (l in s.layouts) l.advance(entry.node, entry.value)
 					repaint()
+				}
+				is JournalEntry.Slot -> {
+					if (slotValues.put(entry.slot, entry.value) == null) throw MarklessHostError("journal sets slot \"${entry.slot}\", which the payload does not have")
+					slotMoved = slotMoved || planned?.slots.orEmpty().any { it.id == entry.slot }
 				}
 				// Each select's shown choice is read again once the whole journal is applied.
 				is JournalEntry.Selected -> {}
@@ -583,6 +619,7 @@ class MarklessHost(
 			}
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
+		if (slotMoved) laidOutFor?.let { layOutAt(it.first, it.second) }
 		syncSheets()
 		refreshRelations()
 		refreshSelects()
@@ -626,17 +663,19 @@ class MarklessHost(
 	fun layOutAt(widthPx: Int, heightPx: Int, rowsMoved: Boolean = false): Boolean {
 		val p = page ?: return false
 		val layout = planLayout ?: return false
-		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0 || (!rowsMoved && laidOutFor == widthPx to heightPx)) return false
+		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0) return false
+		val at = Triple(widthPx, heightPx, planned.slots.map { slotValues.getValue(it.id) })
+		if (!rowsMoved && laidOutFor == at) return false
 		val withRows = planned.planRepeats.isNotEmpty()
 		val shaper = if (withRows) rowShaper ?: RowShaper(planned.systemFaces).also { rowShaper = it } else null
 		val next = planned.laidOut(
-			Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout,
+			Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third,
 			rows = if (withRows) planned.shownRows(payload, runtime) else null,
 			rowsLayout = shaper?.let { RowShaper.rowsLayout(it) ?: throw MarklessHostError("a page with styled rows needs Dragon's rows layout in the app") },
 		)
 		style = next
 		p.relaid(next)
-		laidOutFor = widthPx to heightPx
+		laidOutFor = at
 		followBand(isDark(context.resources.configuration))
 		repaint()
 		Log.i(TAG, "laid out at ${next.viewportWidth}x${next.viewportHeight} dp, style assignment ${p.assignment}")
@@ -920,7 +959,11 @@ class MarklessHost(
 		val unseen = type == "hidden" || (type in TICKABLE && node.attributes["aria-hidden"] == "true")
 		if (unseen) inert.add(inst.id)
 		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (drawing != null) "drawing" else if (unstyled?.rule == true) "rule" else if (unseen) "unseen" else if (type in TICKABLE) type else node.element) {
-			"drawing" -> DrawingView(context, drawing!!, baseTextSize * (flow?.blockText(node.parent)?.size ?: 1.0)).also { named(it, inst.id, image = true) }
+			"drawing" -> DrawingView(context, drawing!!, baseTextSize * (flow?.blockText(node.parent)?.size ?: 1.0)).also {
+				// An svg's text is read as its own, as the browser exposes it; an svg without text is read only when named.
+				named(it, inst.id, image = drawing.label == null)
+				drawing.label?.let { label -> it.contentDescription = label; it.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES }
+			}
 			"rule" -> RuleView(context).also { named(it, inst.id) }
 			"unseen" -> View(context)
 			// The runtime owns checkedness: the widget never toggles itself, a press dispatches and the journal sets it.
@@ -985,6 +1028,10 @@ class MarklessHost(
 					// Chrome gives an email field the email keyboard.
 					if (node.attributes["type"] == "email") inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
 					isSingleLine = true
+					// After isSingleLine, whose transformation would show a password's text.
+					if (type == "password") inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+					// Chrome's keyboard for a number field: digits, a decimal mark and a sign.
+					if (type == "number") inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
 				} else {
 					// A textarea's Return is a new line, and Chrome's default `rows="2"` shows two lines.
 					inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
@@ -1020,11 +1067,13 @@ class MarklessHost(
 			EventName.Dismiss -> if (OVERLAY_ATTRIBUTE !in node.attributes) throw MarklessHostError("dismiss event on \"${node.id}\", which is neither a sheet nor an overlay")
 			// Raised by the field's focus listener, set where the field is built.
 			EventName.Focus, EventName.Blur -> if (view !is EditText) throw MarklessHostError("${e.event.wire} event on \"${node.id}\", which is not a text field")
-			EventName.Keydown -> (view as? MarklessField ?: throw MarklessHostError("keydown event on \"${node.id}\", which is not a text field")).onKey = { key -> prevents(runtime.dispatch(inst.id, EventName.Keydown, key)) }
+			// Off a text field a keydown comes only from a script, which the runtime raises.
+			EventName.Keydown -> (view as? MarklessField)?.onKey = { key -> prevents(runtime.dispatch(inst.id, EventName.Keydown, key)) }
 			EventName.Keyup -> (view as? MarklessField ?: throw MarklessHostError("keyup event on \"${node.id}\", which is not a text field")).onKeyUp = { key -> apply(runtime.dispatch(inst.id, EventName.Keyup, key)) }
 			EventName.Paste -> (view as? MarklessField ?: throw MarklessHostError("paste event on \"${node.id}\", which is not a text field")).onPaste = { text -> prevents(runtime.dispatch(inst.id, EventName.Paste, text)) }
-			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
-			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.Choose, EventName.ContextMenu -> {}
+			EventName.Cancel, EventName.Close, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
+			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.MouseOver, EventName.MouseOut,
+			EventName.MouseEnter, EventName.MouseLeave, EventName.MouseMove, EventName.MouseDown, EventName.MouseUp, EventName.Choose, EventName.ContextMenu -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->
 				val now = android.os.SystemClock.uptimeMillis()
@@ -1191,8 +1240,8 @@ class MarklessHost(
 				view.setOnClickListener { views[value]?.performClick() }
 			}
 			"aria-label" -> if (view is AudioButton) view.label(value) else {
-				view.contentDescription = value
-				if (view is DrawingView && current["aria-hidden"] != "true") view.importantForAccessibility = if (value != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO
+				view.contentDescription = value ?: (view as? DrawingView)?.label
+				if (view is DrawingView && current["aria-hidden"] != "true") view.importantForAccessibility = if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO
 			}
 			"alt" -> if (view is SizedImage) {
 				view.alt(value)

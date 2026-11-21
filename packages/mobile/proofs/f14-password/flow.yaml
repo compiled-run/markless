@@ -1,0 +1,39 @@
+appId: ${APP_ID}
+name: f14-password
+---
+- launchApp:
+    clearState: true
+- assertVisible: Account
+- assertVisible: 0 characters typed
+- assertVisible: Not signed in
+- assertNotVisible: Signed in as ann with 7 characters
+- tapOn: User
+- eraseText
+- inputText: ann
+- hideKeyboard
+- assertVisible: ann
+- assertVisible: 0 characters typed
+- assertVisible: Not signed in
+- assertNotVisible: 7 characters typed
+- assertVisible: ann
+- tapOn: Sign in
+- assertVisible: Please fill out this field\.
+- assertVisible: Not signed in
+- assertVisible: 0 characters typed
+- assertNotVisible: Signed in as ann with 7 characters
+- assertVisible: Please fill out this field\.
+- tapOn: Password
+- eraseText
+- inputText: hunter2
+- hideKeyboard
+- assertNotVisible: 0 characters typed
+- assertVisible: 7 characters typed
+- assertVisible: Not signed in
+- assertNotVisible: 0 characters typed
+- assertNotVisible: hunter2
+- tapOn: Sign in
+- assertNotVisible: Not signed in
+- assertVisible: Signed in as ann with 7 characters
+- assertVisible: 7 characters typed
+- assertNotVisible: Not signed in
+- assertNotVisible: hunter2

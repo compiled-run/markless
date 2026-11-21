@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u24-pagination-links
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Results
 - assertVisible: First
 - assertVisible: Second

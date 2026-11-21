@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: r134-app-functions
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Basic at \$5\.00
 - assertVisible: Team at \$12\.50
 - assertVisible: Scale at \$40\.05

@@ -1,0 +1,154 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:likes",
+				"name": "likes",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "app-root",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "app-header",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "h1",
+				"parent": "h1",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Conduit"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "router-outlet",
+				"parent": "h0",
+				"defaultStyle": {
+					"flow": "inline"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "app-page",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "p",
+				"parent": "h4"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Read the feed"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "button",
+				"parent": "h4"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Like "
+					},
+					{
+						"cell": "state:likes"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h6",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:likes",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:likes"
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h2:text0",
+			"Conduit"
+		],
+		[
+			"h5:text0",
+			"Read the feed"
+		],
+		[
+			"h6:text0",
+			"Like 0"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "Like 1"
+				}
+			]
+		}
+	]
+}

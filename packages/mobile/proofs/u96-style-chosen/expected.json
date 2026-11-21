@@ -1,0 +1,22 @@
+{
+	"rung": 196,
+	"name": "A style that is one of fixed texts chosen by state: Dragon lays out each, and the phone moves between them as it does a class",
+	"steps": [
+		{
+			"visible": ["Chosen style", "Middle row", "Marker", "Swap", "High"],
+			"placed": ["Marker", "Middle row"]
+		},
+		{
+			"do": { "tap": "Swap" },
+			"visible": ["Low"],
+			"absent": ["High"],
+			"placed": ["Middle row", "Marker"]
+		},
+		{
+			"do": { "tap": "Swap" },
+			"visible": ["High"],
+			"absent": ["Low"],
+			"placed": ["Marker", "Middle row"]
+		}
+	]
+}

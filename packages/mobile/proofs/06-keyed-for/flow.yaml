@@ -2,48 +2,48 @@ appId: ${APP_ID}
 name: 06-keyed-for
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Fruits
 - assertVisible: Apple
 - assertVisible: Pear
 - assertNotVisible: Plum
 - assertVisible:
-      text: Pear
-      below: Apple
+    text: Pear
+    below: Apple
 - tapOn: Add plum
 - assertVisible: Plum
 - assertVisible:
-      text: Pear
-      below: Apple
+    text: Pear
+    below: Apple
 - assertVisible:
-      text: Plum
-      below: Pear
+    text: Plum
+    below: Pear
 - assertVisible: Apple
 - assertVisible: Pear
 - assertVisible: Plum
 - assertVisible:
-      text: Pear
-      below: Apple
+    text: Pear
+    below: Apple
 - assertVisible:
-      text: Plum
-      below: Pear
+    text: Plum
+    below: Pear
 - tapOn: Remove apple
 - assertNotVisible: Apple
 - assertVisible:
-      text: Plum
-      below: Pear
+    text: Plum
+    below: Pear
 - assertVisible: Pear
 - assertVisible: Plum
 - assertNotVisible: Apple
 - assertVisible:
-      text: Plum
-      below: Pear
+    text: Plum
+    below: Pear
 - tapOn: Reverse
 - assertVisible:
-      text: Pear
-      below: Plum
+    text: Pear
+    below: Plum
 - assertVisible: Plum
 - assertVisible: Pear
 - assertVisible:
-      text: Pear
-      below: Plum
+    text: Pear
+    below: Plum

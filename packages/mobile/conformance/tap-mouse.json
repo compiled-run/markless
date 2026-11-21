@@ -1,0 +1,456 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:hovered",
+				"name": "hovered",
+				"initial": "nothing",
+				"styled": true,
+				"domain": [
+					"nothing",
+					"Apples",
+					"Pears"
+				]
+			},
+			{
+				"id": "state:left",
+				"name": "left",
+				"initial": "nothing",
+				"styled": true,
+				"domain": [
+					"nothing",
+					"Apples",
+					"Pears"
+				]
+			},
+			{
+				"id": "state:downs",
+				"name": "downs",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Fruit stand"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "ul",
+				"parent": "h0",
+				"defaultStyle": {
+					"indent": 40,
+					"marker": "disc"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "li",
+				"parent": "h2"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Apples"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "li",
+				"parent": "h2"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Pears"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Pointing at "
+					},
+					{
+						"cell": "state:hovered"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Moved off "
+					},
+					{
+						"cell": "state:left"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Pressed "
+					},
+					{
+						"cell": "state:downs"
+					},
+					{
+						"text": " times"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "mousedown",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "mouseenter",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h3",
+				"event": "mouseleave",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h4",
+				"event": "mouseenter",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "h4",
+				"event": "mouseleave",
+				"handler": "handler:event:4"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:downs",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "state:downs"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:hovered",
+						"value": {
+							"literal": "Apples"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:left",
+						"value": {
+							"literal": "Apples"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:hovered",
+						"value": {
+							"literal": "Pears"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:4",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:left",
+						"value": {
+							"literal": "Pears"
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Fruit stand"
+		],
+		[
+			"h3:text0",
+			"Apples"
+		],
+		[
+			"h4:text0",
+			"Pears"
+		],
+		[
+			"h5:text0",
+			"Pointing at nothing"
+		],
+		[
+			"h6:text0",
+			"Moved off nothing"
+		],
+		[
+			"h7:text0",
+			"Pressed 0 times"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h3",
+				"x": 20,
+				"y": 40
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h3",
+				"x": 20,
+				"y": 40
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:hovered",
+					"value": "Apples"
+				},
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "Pointing at Apples"
+				},
+				{
+					"op": "text",
+					"node": "h7:text0",
+					"value": "Pressed 1 times"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h4",
+				"x": 20,
+				"y": 80
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h4",
+				"x": 20,
+				"y": 80
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:hovered",
+					"value": "Pears"
+				},
+				{
+					"op": "state",
+					"cell": "state:left",
+					"value": "Apples"
+				},
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "Pointing at Pears"
+				},
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "Moved off Apples"
+				},
+				{
+					"op": "text",
+					"node": "h7:text0",
+					"value": "Pressed 2 times"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h4",
+				"x": 20,
+				"y": 80
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h4",
+				"x": 20,
+				"y": 80
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h7:text0",
+					"value": "Pressed 3 times"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h3",
+				"x": 20,
+				"y": 40
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointercancel",
+				"host": "h3",
+				"x": 20,
+				"y": 90
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h3",
+				"x": 20,
+				"y": 40
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h3",
+				"x": 20,
+				"y": 40
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:hovered",
+					"value": "Apples"
+				},
+				{
+					"op": "state",
+					"cell": "state:left",
+					"value": "Pears"
+				},
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "Pointing at Apples"
+				},
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "Moved off Pears"
+				},
+				{
+					"op": "text",
+					"node": "h7:text0",
+					"value": "Pressed 4 times"
+				}
+			]
+		}
+	]
+}

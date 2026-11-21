@@ -1,0 +1,18 @@
+{
+	"rung": 194,
+	"name": "A style value that follows state, as an integer: an item's flex order moves it through a list, laid out again on the phone by Dragon's plan",
+	"steps": [
+		{
+			"visible": ["Integer slot", "Item one", "Item two", "Moving item", "Later", "Rank -1"],
+			"placed": ["Moving item", "Item one", "Item two"]
+		},
+		{
+			"do": {
+				"tap": "Later"
+			},
+			"visible": ["Rank 1"],
+			"absent": ["Rank -1"],
+			"placed": ["Item one", "Item two", "Moving item"]
+		}
+	]
+}

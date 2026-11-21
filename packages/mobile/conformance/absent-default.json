@@ -1,0 +1,185 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "AbsentDefault",
+		"cells": [
+			{
+				"id": "component-edge:0/shared:src/absent-default.tsrx#barState/state:bar.value",
+				"name": "bar.value",
+				"initial": null
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "section",
+				"parent": "h4"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h1",
+				"element": "div",
+				"parent": "component-edge:0/h0"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h2",
+				"element": "p",
+				"parent": "component-edge:1/h1"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h2:text0",
+				"parent": "component-edge:1/h2",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"binary": "===",
+								"left": {
+									"cell": "component-edge:0/shared:src/absent-default.tsrx#barState/state:bar.value"
+								},
+								"right": {
+									"literal": null
+								}
+							},
+							"whenTrue": {
+								"template": [
+									"",
+									{
+										"literal": "Upload"
+									},
+									" waiting"
+								]
+							},
+							"whenFalse": {
+								"template": [
+									"",
+									{
+										"literal": "Upload"
+									},
+									" at ",
+									{
+										"cell": "component-edge:0/shared:src/absent-default.tsrx#barState/state:bar.value"
+									},
+									""
+								]
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h3",
+				"element": "button",
+				"parent": "component-edge:1/h1"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h3:text0",
+				"parent": "component-edge:1/h3",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"",
+								{
+									"literal": "Upload"
+								},
+								" +10"
+							]
+						}
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:1/h3",
+				"event": "activate",
+				"handler": "handler:component-edge:1/event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:1/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:0/shared:src/absent-default.tsrx#barState/state:bar.value",
+						"value": {
+							"binary": "+",
+							"left": {
+								"if": {
+									"binary": "===",
+									"left": {
+										"cell": "component-edge:0/shared:src/absent-default.tsrx#barState/state:bar.value"
+									},
+									"right": {
+										"literal": null
+									}
+								},
+								"whenTrue": {
+									"literal": 0
+								},
+								"whenFalse": {
+									"cell": "component-edge:0/shared:src/absent-default.tsrx#barState/state:bar.value"
+								}
+							},
+							"right": {
+								"literal": 10
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"component-edge:1/h2:text0",
+			"Upload waiting"
+		],
+		[
+			"component-edge:1/h3:text0",
+			"Upload +10"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h2:text0",
+					"value": "Upload at 10"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h2:text0",
+					"value": "Upload at 20"
+				}
+			]
+		}
+	]
+}

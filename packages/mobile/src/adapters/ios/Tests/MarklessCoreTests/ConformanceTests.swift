@@ -79,7 +79,7 @@ func reproducesConformanceVector(file: URL) throws {
 	let vector = try JSONValue.parse(Data(contentsOf: file))
 	guard case let .object(fields) = vector else { Issue.record("vector is not an object"); return }
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
-	let known = ["version", "payload", "params", "preferredLanguages", "now", "initial", "initialChecks", "initialSelections", "initialAttributes", "initialProperties", "initialArms", "initialRows", "initialSheets", "tasks", "start", "steps", "leave"]
+	let known = ["version", "payload", "params", "preferredLanguages", "now", "layout", "initial", "initialChecks", "initialSelections", "initialAttributes", "initialProperties", "initialArms", "initialRows", "initialSheets", "tasks", "start", "steps", "leave"]
 	#expect(fields.map(\.0).allSatisfy(known.contains), "unknown vector fields \(fields.map(\.0))")
 	#expect(field("version") == .string("markless.native-conformance/0"))
 	let params = try field("params").map { try NativeViewPayload.decodeParams(try Reader($0, at: "params")) } ?? []
@@ -88,6 +88,20 @@ func reproducesConformanceVector(file: URL) throws {
 	let runtime = NativeRuntime(
 		payload: try NativeViewPayload.decode(try #require(field("payload"))), params: params, preferredLanguages: languages,
 		now: { now ?? (Date().timeIntervalSince1970 * 1000).rounded(.down) }, scriptHost: conformanceScriptHost())
+	if case let .object(boxes)? = field("layout") {
+		let layout = try Dictionary(uniqueKeysWithValues: boxes.map { id, box in
+			guard case let .object(members) = box else { throw VectorError("layout.\(id) is not an object") }
+			let member = { (key: String) in members.first { $0.0 == key }?.1 }
+			func number(_ key: String) throws -> Double {
+				guard case let .number(value)? = member(key) else { throw VectorError("layout.\(id).\(key) is not a number") }
+				return value
+			}
+			return (id, NativeElementBox(
+				x: try number("x"), y: try number("y"), width: try number("width"), height: try number("height"),
+				rightToLeft: member("direction") == .string("rtl")))
+		})
+		runtime.measure = { layout[$0] }
+	}
 
 	let initial = JSONValue.array(try runtime.texts().map { .array([.string($0.node), .string($0.text)]) })
 	#expect(initial.jsonText == field("initial")?.jsonText)
@@ -215,4 +229,9 @@ func reproducesConformanceVector(file: URL) throws {
 	_ = try stack.dispatch(NativeAction(event: .activate, host: "h4"))
 	_ = try stack.dispatch(NativeAction(event: .activate, host: "h4"))
 	#expect(host.starts == 1)
+}
+
+struct VectorError: Error, CustomStringConvertible {
+	let description: String
+	init(_ description: String) { self.description = description }
 }

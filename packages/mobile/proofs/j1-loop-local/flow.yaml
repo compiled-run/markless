@@ -2,25 +2,25 @@ appId: ${APP_ID}
 name: j1-loop-local
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Slugs
-- assertVisible: 'Title: Hello, Native World!'
-- assertVisible: 'Slug: none'
-- assertVisible: 'Words: 0'
+- assertVisible: "Title: Hello, Native World!"
+- assertVisible: "Slug: none"
+- assertVisible: "Words: 0"
 - tapOn: Make slug
-- assertNotVisible: 'Slug: none'
-- assertVisible: 'Slug: hello-native-world'
-- assertVisible: 'Words: 3'
-- assertVisible: 'Title: Hello, Native World!'
-- assertNotVisible: 'Slug: none'
+- assertNotVisible: "Slug: none"
+- assertVisible: "Slug: hello-native-world"
+- assertVisible: "Words: 3"
+- assertVisible: "Title: Hello, Native World!"
+- assertNotVisible: "Slug: none"
 - tapOn: Longer
-- assertNotVisible: 'Title: Hello, Native World!'
-- assertVisible: 'Title: Hello, Native World! Again'
-- assertVisible: 'Slug: hello-native-world'
-- assertVisible: 'Words: 3'
-- assertNotVisible: 'Title: Hello, Native World!'
+- assertNotVisible: "Title: Hello, Native World!"
+- assertVisible: "Title: Hello, Native World! Again"
+- assertVisible: "Slug: hello-native-world"
+- assertVisible: "Words: 3"
+- assertNotVisible: "Title: Hello, Native World!"
 - tapOn: Make slug
-- assertNotVisible: 'Words: 3'
-- assertVisible: 'Slug: hello-native-world-again'
-- assertVisible: 'Words: 4'
-- assertNotVisible: 'Words: 3'
+- assertNotVisible: "Words: 3"
+- assertVisible: "Slug: hello-native-world-again"
+- assertVisible: "Words: 4"
+- assertNotVisible: "Words: 3"

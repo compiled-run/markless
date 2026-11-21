@@ -1,0 +1,43 @@
+{
+	"rung": 188,
+	"name": "A part's place among its family's parts, as the web counts it in render order",
+	"steps": [
+		{
+			"visible": [
+				"Bus route",
+				"Harbour is stop 1",
+				"Market is stop 2",
+				"Station is stop 3",
+				"Harbour is next"
+			],
+			"absent": [
+				"Market is next",
+				"Station is next"
+			]
+		},
+		{
+			"do": {
+				"tap": "Next stop"
+			},
+			"visible": [
+				"Market is next"
+			],
+			"absent": [
+				"Harbour is next",
+				"Station is next"
+			]
+		},
+		{
+			"do": {
+				"tap": "Next stop"
+			},
+			"visible": [
+				"Station is next"
+			],
+			"absent": [
+				"Harbour is next",
+				"Market is next"
+			]
+		}
+	]
+}

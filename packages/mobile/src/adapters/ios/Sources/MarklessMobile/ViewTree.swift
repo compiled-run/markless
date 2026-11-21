@@ -113,28 +113,36 @@ final class DrawingView: UIView {
 	override func draw(_ rect: CGRect) {
 		guard let context = UIGraphicsGetCurrentContext() else { return }
 		if let box = drawing.viewBox?.map({ CGFloat($0) }), box[2] > 0, box[3] > 0 {
-			// SVG 2 xMidYMid meet: one scale that fits both axes, the rest centred.
-			let scale = min(bounds.width / box[2], bounds.height / box[3])
-			context.translateBy(x: -box[0] * scale + (bounds.width - box[2] * scale) / 2, y: -box[1] * scale + (bounds.height - box[3] * scale) / 2)
-			context.scaleBy(x: scale, y: scale)
+			// SVG 2 §8.5: the viewBox placed in the box by preserveAspectRatio, xMidYMid meet when it has none.
+			switch drawing.aspect {
+			case .none?:
+				context.scaleBy(x: bounds.width / box[2], y: bounds.height / box[3])
+				context.translateBy(x: -box[0], y: -box[1])
+			default:
+				var (x, y, slice) = ("mid", "mid", false)
+				if case let .align(ax, ay, sliced)? = drawing.aspect { (x, y, slice) = (ax, ay, sliced) }
+				let fit = [bounds.width / box[2], bounds.height / box[3]]
+				let scale = slice ? fit.max()! : fit.min()!
+				let place = { (align: String, room: CGFloat) -> CGFloat in align == "min" ? 0 : align == "max" ? room : room / 2 }
+				if slice { context.clip(to: bounds) }
+				context.translateBy(
+					x: -box[0] * scale + place(x, bounds.width - box[2] * scale), y: -box[1] * scale + place(y, bounds.height - box[3] * scale))
+				context.scaleBy(x: scale, y: scale)
+			}
 		}
 		for shape in drawing.shapes {
-			let path = CGMutablePath()
-			var i = 0
-			let p = shape.path
-			while i < p.count {
-				switch Int(p[i]) {
-				case 0: path.move(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
-				case 1: path.addLine(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
-				case 3:
-					path.addCurve(to: CGPoint(x: p[i + 5], y: p[i + 6]), control1: CGPoint(x: p[i + 1], y: p[i + 2]), control2: CGPoint(x: p[i + 3], y: p[i + 4]))
-					i += 7
-				case 4: path.closeSubpath(); i += 1
-				default: i = p.count
-				}
-			}
+			let path = Self.path(shape.path)
 			context.saveGState()
+			for clip in shape.clip {
+				context.addPath(Self.path(clip))
+				context.clip(using: .winding)
+			}
 			if let t = shape.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
+			if let text = shape.text {
+				draw(text)
+				context.restoreGState()
+				continue
+			}
 			if let fill = shape.fill {
 				context.addPath(path)
 				context.setFillColor(color(fill).cgColor)
@@ -150,6 +158,90 @@ final class DrawingView: UIView {
 				context.strokePath()
 			}
 			context.restoreGState()
+		}
+	}
+
+	/// A verb-coded outline: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close.
+	private static func path(_ p: [Double]) -> CGMutablePath {
+		let path = CGMutablePath()
+		var i = 0
+		while i < p.count {
+			switch Int(p[i]) {
+			case 0: path.move(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
+			case 1: path.addLine(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
+			case 3:
+				path.addCurve(to: CGPoint(x: p[i + 5], y: p[i + 6]), control1: CGPoint(x: p[i + 1], y: p[i + 2]), control2: CGPoint(x: p[i + 3], y: p[i + 4]))
+				i += 7
+			case 4: path.closeSubpath(); i += 1
+			default: i = p.count
+			}
+		}
+		return path
+	}
+
+	/// Lays out an SVG `<text>`'s runs from the pen, each chunk placed by its anchor, as the browser lays them out.
+	private func draw(_ text: NativeDrawingText) {
+		typealias Piece = (string: NSAttributedString, width: CGFloat, font: UIFont, dy: CGFloat)
+		var chunks: [(x: CGFloat, y: CGFloat, pieces: [Piece])] = []
+		var pen = CGPoint.zero
+		for run in text.runs {
+			if run.x != nil || run.y != nil || chunks.isEmpty {
+				pen = CGPoint(x: run.x.map { CGFloat($0) } ?? pen.x, y: run.y.map { CGFloat($0) } ?? pen.y)
+				chunks.append((pen.x + CGFloat(run.dx ?? 0), pen.y + CGFloat(run.dy ?? 0), []))
+				pen.x += CGFloat(run.dx ?? 0)
+				pen.y += CGFloat(run.dy ?? 0)
+			} else {
+				pen.x += CGFloat(run.dx ?? 0)
+				pen.y += CGFloat(run.dy ?? 0)
+			}
+			let font = Self.font(run)
+			var attributes: [NSAttributedString.Key: Any] = [.font: font, .kern: run.letterSpacing]
+			attributes[.foregroundColor] = run.fill.map(color) ?? UIColor.clear
+			let string = NSAttributedString(string: run.text, attributes: attributes)
+			let width = string.size().width
+			chunks[chunks.count - 1].pieces.append((string, width, font, pen.y - chunks[chunks.count - 1].y))
+			pen.x += width
+		}
+		for chunk in chunks {
+			let total = chunk.pieces.reduce(0) { $0 + $1.width }
+			var x = chunk.x - (text.anchor == "middle" ? total / 2 : text.anchor == "end" ? total : 0)
+			for piece in chunk.pieces {
+				let f = piece.font
+				// Where the alphabetic baseline sits below the pen's y for each dominant-baseline, from the font's metrics.
+				let shift: CGFloat = switch text.baseline {
+				case "middle": f.xHeight / 2
+				case "central": (f.ascender + f.descender) / 2
+				case "hanging": f.ascender * 0.8
+				case "text-top": f.ascender
+				case "text-bottom", "ideographic": f.descender
+				default: 0
+				}
+				// UIKit draws a string from the top of its line, the font's ascender above the baseline.
+				piece.string.draw(at: CGPoint(x: x, y: chunk.y + piece.dy + shift - f.ascender))
+				x += piece.width
+			}
+		}
+	}
+
+	private static func font(_ run: NativeDrawingText.Run) -> UIFont {
+		let size = CGFloat(run.size)
+		let weight: UIFont.Weight = switch run.weight {
+		case ..<150: .ultraLight
+		case ..<250: .thin
+		case ..<350: .light
+		case ..<450: .regular
+		case ..<550: .medium
+		case ..<650: .semibold
+		case ..<750: .bold
+		case ..<850: .heavy
+		default: .black
+		}
+		switch run.family {
+		case "monospace": return UIFont.monospacedSystemFont(ofSize: size, weight: weight)
+		case "serif":
+			let base = UIFont.systemFont(ofSize: size, weight: weight)
+			return base.fontDescriptor.withDesign(.serif).map { UIFont(descriptor: $0, size: size) } ?? base
+		default: return UIFont.systemFont(ofSize: size, weight: weight)
 		}
 	}
 
@@ -543,8 +635,8 @@ final class ViewTree {
 			case let .sheet(node, open):
 				guard let sheet = sheets[node] else { throw HostError("journal names sheet \(node), which is not built") }
 				if open { sheet.open(from: presenter) } else { sheet.close() }
-			case .navigate, .title:
-				throw HostError("navigate and title entries reach the screen's controller, not its views")
+			case .navigate, .title, .slot:
+				throw HostError("navigate, title and slot entries reach the screen's controller, not its views")
 			case .call, .release, .fetch, .abort:
 				throw HostError("a \(entry.json.jsonText) entry reaches the page's device or script services, not its views")
 			case let .dialog(node, open):
@@ -1048,6 +1140,12 @@ final class ViewTree {
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = TextField()
+					if staticAttributes["type"] == "password" {
+						field.isSecureTextEntry = true
+						field.textContentType = .password
+					}
+					// Safari's keyboard for a number field: digits with the punctuation a number needs.
+					if staticAttributes["type"] == "number" { field.keyboardType = .numbersAndPunctuation }
 					field.lengthLimit = LengthLimit { [weak self] in nativeMaxLength(self?.attributes[id]?["maxlength"]) }
 					// Safari gives an email field the email keyboard with no capitals or corrections.
 					if staticAttributes["type"] == "email" {
@@ -1260,8 +1358,8 @@ final class ViewTree {
 			case (.input, _ as SelectButton):
 				// A select's change runs in the runtime when a choice is made (a `choose` action).
 				continue
-			case (.idle, _), (.visible, _), (.dismiss, _), (_, _) where event.event.isPointer:
-				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host.
+			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (.keydown, _), (_, _) where event.event.isPointer:
+				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host, close and a keydown off a text field by the runtime.
 				continue
 			case (.contextmenu, _):
 				// Safari on iOS raises no contextmenu for a long press, so neither does this host.
@@ -1313,10 +1411,12 @@ final class ViewTree {
 			button.isEnabled = current["disabled"] == nil
 			refreshLabel(of: button)
 		} else if let drawing = view as? DrawingView {
-			// A named svg is an image to VoiceOver; an unnamed one, or one inside a control, is decoration.
-			drawing.accessibilityLabel = current["aria-label"]
-			drawing.isAccessibilityElement = current["aria-label"] != nil && contexts[id]?.button == nil
-			drawing.accessibilityTraits = .image
+			// A named svg is an image to VoiceOver, and one with text reads its text, as the browser exposes them; an unnamed one
+			// without text, or one inside a control, is decoration.
+			let label = current["aria-label"] ?? drawing.drawing.label
+			drawing.accessibilityLabel = label
+			drawing.isAccessibilityElement = label != nil && contexts[id]?.button == nil
+			drawing.accessibilityTraits = current["aria-label"] != nil ? .image : .staticText
 		} else if let box = view as? ImageBox {
 			let src = current["src"]
 			// A photo the device took is a `file:` URL; any other src is a file the app packaged when it was built.

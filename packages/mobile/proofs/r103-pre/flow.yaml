@@ -2,24 +2,24 @@ appId: ${APP_ID}
 name: r103-pre
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Preformatted
-- assertVisible: 'lines: 1'
+- assertVisible: "lines: 1"
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - assertVisible: |-
-                let a = 1;
-                  let b = 2;
+    when:
+      platform: iOS
+    commands:
+      - assertVisible: |-
+          let a = 1;
+            let b = 2;
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - assertVisible: |-
-                let a = 1;
-                  let b = 2;
+    when:
+      platform: Android
+    commands:
+      - assertVisible: |-
+          let a = 1;
+            let b = 2;
 - tapOn: Add line
-- assertNotVisible: 'lines: 1'
-- assertVisible: 'lines: 2'
-- assertNotVisible: 'lines: 1'
+- assertNotVisible: "lines: 1"
+- assertVisible: "lines: 2"
+- assertNotVisible: "lines: 1"

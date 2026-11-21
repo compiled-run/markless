@@ -1,0 +1,53 @@
+appId: ${APP_ID}
+name: u69-arm-state
+---
+- launchApp:
+    clearState: true
+- assertVisible: Counters
+- assertVisible: Kept 0
+- assertVisible: Hide
+- assertVisible: Inside 0
+- assertVisible: Marks 0
+- assertNotVisible: Kept 1
+- assertNotVisible: Inside 2
+- assertNotVisible: Marks 1
+- tapOn: Kept 0
+- assertVisible: Kept 1
+- assertNotVisible: Kept 0
+- assertVisible: Kept 1
+- assertVisible: Inside 0
+- assertNotVisible: Kept 0
+- tapOn: Inside 0
+- assertNotVisible: Inside 0
+- assertVisible: Inside 1
+- assertVisible: Kept 1
+- assertNotVisible: Inside 0
+- tapOn: Inside 1
+- assertNotVisible: Inside 1
+- assertVisible: Inside 2
+- assertVisible: Kept 1
+- assertVisible: Marks 0
+- assertNotVisible: Inside 1
+- tapOn: Marks 0
+- assertNotVisible: Marks 0
+- assertVisible: Marks 1
+- assertVisible: Inside 2
+- assertNotVisible: Marks 0
+- tapOn: Hide
+- assertNotVisible: Inside 2
+- assertNotVisible: Marks 1
+- assertVisible: Show
+- assertVisible: Kept 1
+- assertNotVisible: Inside 2
+- assertNotVisible: Marks 1
+- assertNotVisible: Hide
+- tapOn: Show
+- assertVisible: Hide
+- assertNotVisible: Show
+- assertVisible: Inside 0
+- assertVisible: Marks 0
+- assertVisible: Kept 1
+- assertVisible: Hide
+- assertNotVisible: Inside 2
+- assertNotVisible: Marks 1
+- assertNotVisible: Show

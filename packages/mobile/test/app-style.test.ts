@@ -184,3 +184,14 @@ test("the pages' system faces are listed once each by id, and one id rebuilt two
 		]),
 	).toThrow('system face system:system-ui:700 is rebuilt two ways');
 });
+
+test("a page's slots ride on its route, and a page without them has none", () => {
+	const slots = [{ id: 'slot:h0#0', initial: 25 }];
+	const style = nativeAppStyle([
+		{ pattern: '/', exported: { ...page('Home', 10), slots } },
+		{ pattern: '/about', exported: page('About', 20) },
+	]);
+	const [home, about] = style.targets['ios']!.routes;
+	expect(home!.slots).toEqual(slots);
+	expect(about).not.toHaveProperty('slots');
+});

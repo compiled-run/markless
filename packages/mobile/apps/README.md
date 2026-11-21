@@ -38,6 +38,21 @@ styled, and a styled screen reaches a phone only with Dragon's style export. Dra
 Both are Dragon work. So no yardstick screen runs on a phone yet, and "match" (the screens run on both phones and
 compared with the web) cannot be measured until they do. shop's 0 is the `import.meta` throw, fixed by #957.
 
+## Running an app on the phones
+
+Each app folder is also a phone rung: `expected.json` is a user's journey through the whole app (list, detail, typing,
+state, back), and `flow.yaml` is the Maestro flow it renders to (`node packages/mobile/proofs/write-flows.ts`;
+`test/app-rungs.test.ts` fails when they drift). The shared runner builds the app with `compileNativeApp`, every page
+under `pages/` and the app's own `app.json`, and runs the journey with a screenshot at every step:
+
+```sh
+MARKLESS_DRAGON_DIR=<Dragon checkout at dragon.json's pin> heavy pnpm --filter @markless/mobile phones submit \
+  "$PWD/packages/mobile/apps/notes" --platform ios
+```
+
+A page that does not build fails the whole app at `build`, as an app build would. These rungs are not in the ladder,
+so `--all` and `--affected` do not run them.
+
 ## How it is measured
 
 - Web reference: `test/apps-web.test.ts` builds each app with the router, serves it from its production server and

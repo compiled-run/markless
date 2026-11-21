@@ -1,0 +1,394 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:closes",
+				"name": "closes",
+				"initial": 0
+			},
+			{
+				"id": "state:log",
+				"name": "log",
+				"initial": "Nothing yet"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Rename"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Rename file"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Closed "
+					},
+					{
+						"cell": "state:closes"
+					},
+					{
+						"text": " times"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"cell": "state:log"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "dialog",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "h2",
+				"parent": "h5",
+				"defaultStyle": {
+					"bold": true,
+					"size": 1.5
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "New name?"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "button",
+				"parent": "h5"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Save"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "button",
+				"parent": "h5"
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"text": "Never mind"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h5",
+				"event": "close",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h7",
+				"event": "activate",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h8",
+				"event": "activate",
+				"handler": "handler:event:3"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "dialog",
+						"node": "h5",
+						"method": "showModal"
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:closes",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "state:closes"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"template": [
+								"",
+								{
+									"cell": "state:log"
+								},
+								", then closed"
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "dialog",
+						"node": "h5",
+						"method": "close"
+					},
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"literal": "Saved"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "dialog",
+						"node": "h5",
+						"method": "close"
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Rename"
+		],
+		[
+			"h2:text0",
+			"Rename file"
+		],
+		[
+			"h3:text0",
+			"Closed 0 times"
+		],
+		[
+			"h4:text0",
+			"Nothing yet"
+		],
+		[
+			"h6:text0",
+			"New name?"
+		],
+		[
+			"h7:text0",
+			"Save"
+		],
+		[
+			"h8:text0",
+			"Never mind"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "dialog",
+					"node": "h5",
+					"open": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h7"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Closed 1 times"
+				},
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Saved, then closed"
+				},
+				{
+					"op": "dialog",
+					"node": "h5",
+					"open": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "dialog",
+					"node": "h5",
+					"open": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "cancel",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Closed 2 times"
+				},
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Saved, then closed, then closed"
+				},
+				{
+					"op": "dialog",
+					"node": "h5",
+					"open": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "dialog",
+					"node": "h5",
+					"open": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h8"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Closed 3 times"
+				},
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Saved, then closed, then closed, then closed"
+				},
+				{
+					"op": "dialog",
+					"node": "h5",
+					"open": false
+				}
+			]
+		}
+	]
+}
