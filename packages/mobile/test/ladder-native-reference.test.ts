@@ -245,6 +245,13 @@ function mirror(
 				const key = rowKeyIn(nodeOf, entry.node, id);
 				if (key !== undefined && entry.keys.includes(key)) texts.set(id, kept.get(id) ?? text);
 			}
+			// A row's copy is built with its bound attributes, as an arm's nodes are; a row that left takes its own with it.
+			for (const key of attributes.keys())
+				if (rowKeyIn(nodeOf, entry.node, key.split('\0')[0]!) !== undefined) attributes.delete(key);
+			for (const [node, name, value] of runtime.attributes()) {
+				const key = rowKeyIn(nodeOf, entry.node, node);
+				if (key !== undefined && entry.keys.includes(key)) attributes.set(`${node}\0${name}`, value);
+			}
 		} else if (entry.op === 'arm') {
 			chosen.set(entry.node, entry.index);
 			for (const [node, index] of runtime.arms())

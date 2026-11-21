@@ -23,7 +23,13 @@ import { iconSourceTransform, type IconsOptions } from '@markless/icons/vite';
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
 import { uiIconsOptions } from '@markless/ui-tools';
 import { NATIVE_APP_VERSION } from '@markless/serializer/native-view';
-import { nativeStyleInputs, nativeStyleRowAttribute, type NativeStyleInput } from './style-input.ts';
+import {
+	nativeStyleInputs,
+	nativeStyleRowAttribute,
+	readsRow,
+	rowAttributeOptions,
+	type NativeStyleInput,
+} from './style-input.ts';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
 
@@ -309,17 +315,6 @@ function unstyledOnly(
 ): CompilerDiagnostic[] {
 	if (!css.some((text) => text.length > 0)) return [];
 	const tested = new Set(css.flatMap((text) => [...selectorAttributes(text)]));
-	const rowCells = new Set(payload.cells.flatMap((cell) => (cell.row ? [cell.id] : [])));
-	// A row's item or its own state: what a list row reads, which differs from row to row.
-	const readsRow = (tree: unknown): boolean =>
-		Array.isArray(tree)
-			? tree.some(readsRow)
-			: tree !== null &&
-				typeof tree === 'object' &&
-				('item' in tree ||
-					'index' in tree ||
-					('cell' in tree && rowCells.has((tree as { cell: string }).cell)) ||
-					Object.values(tree).some(readsRow));
 	return payload.nodes.flatMap((node) => {
 		if (node.kind !== 'element') return [];
 		const span = sources.get(node.id)?.span;
@@ -334,10 +329,11 @@ function unstyledOnly(
 		return (node.bindings ?? []).flatMap((binding) =>
 			'attribute' in binding &&
 			nativeStyleRowAttribute(binding.attribute, tested) &&
-			readsRow(binding.value)
+			readsRow(payload, binding.value) &&
+			!rowAttributeOptions(binding.attribute, binding.value)
 				? [
 						nativeUnsupported(
-							`the \`${binding.attribute}\` of <${node.element}> ${node.id} follows its @for row on a styled page; Dragon styles each node once, not per row, yet`,
+							`the \`${binding.attribute}\` of <${node.element}> ${node.id} follows its @for row on a styled page through a value the build cannot list; Dragon styles a row by each value it can give, so write it as literals chosen by conditions`,
 							span,
 						),
 					]

@@ -56,6 +56,8 @@ import dev.markless.mobile.core.Store
 import dev.markless.mobile.style.Assignment
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.StyleExport
+import dev.markless.mobile.style.shownRows
+import dev.markless.mobile.style.rowStates
 import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.StyledNode
 import kotlin.math.roundToInt
@@ -151,6 +153,8 @@ class MarklessHost(
 		private set
 	/** The export as built, which Dragon's plan lays out again at each size. */
 	private val planned = style
+	/** Dragon's HarfBuzz over this phone's system fonts, made when a page first lays its rows out. */
+	private var rowShaper: RowShaper? = null
 	private var laidOutFor: Pair<Int, Int>? = null
 	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
 	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
@@ -185,12 +189,14 @@ class MarklessHost(
 	private val dpr = context.resources.displayMetrics.density.toDouble()
 	private var enterPressedAt = Long.MIN_VALUE / 2
 	private val styledCells = payload.cells.filter { it.styled }.map { it.id }
+	/** Each @if or @try outside list rows: its style state is the arm it shows. */
+	private val styledBranches = payload.nodes.filter { it is Node.Branch && it.row == null }.map { it.id }
 
 	/** One laid-out document (the page, or a sheet's content at one resting height) and the assignment it shows. */
 	private inner class Layout(export: StyleExport, everyCell: Boolean) {
 		var export = export
 			private set
-		var assignment = export.start(styledCells, runtime::value, isDark(context.resources.configuration), everyCell)
+		var assignment = export.start(styledCells, runtime::value, isDark(context.resources.configuration), everyCell, styledBranches, runtime::styleArm, export.rowStates(payload))
 		var absolutes: List<Map<String, Pair<Double, Double>>> = export.assignments.map { a -> absoluteOrigins(a.nodes) }
 			private set
 
@@ -543,6 +549,7 @@ class MarklessHost(
 						val key = entry.node.substringAfter('@')
 						rebuild { it.rowKey == key && inArm(it.node, branch) }
 					}
+					followArms()
 				}
 				is JournalEntry.Invalid -> invalid(entry.node, entry.message)
 				is JournalEntry.Timer -> scheduleTimer(entry.node, entry.ms)
@@ -572,6 +579,10 @@ class MarklessHost(
 		}
 		refreshRelations()
 		refreshSelects()
+		// A styled list's rows, a row's text or an attribute of a row's copy moved: the page is laid out again with its rows.
+		if (planned?.planRepeats?.isNotEmpty() == true && journal.any { it is JournalEntry.Rows || ((it is JournalEntry.Text || it is JournalEntry.Attribute) && '@' in it.node) }) {
+			laidOutFor?.let { (w, h) -> layOutAt(w, h, rowsMoved = true) }
+		}
 		onJournal?.invoke(journal)
 		scheduleLoadEvents()
 	}
@@ -605,11 +616,17 @@ class MarklessHost(
 	 * area. Chrome on Android lays a page out at a whole CSS px width, the screen's width in dp rounded up. Returns whether it
 	 * laid out again.
 	 */
-	fun layOutAt(widthPx: Int, heightPx: Int): Boolean {
+	fun layOutAt(widthPx: Int, heightPx: Int, rowsMoved: Boolean = false): Boolean {
 		val p = page ?: return false
 		val layout = planLayout ?: return false
-		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0 || laidOutFor == widthPx to heightPx) return false
-		val next = planned.laidOut(Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout)
+		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0 || (!rowsMoved && laidOutFor == widthPx to heightPx)) return false
+		val withRows = planned.planRepeats.isNotEmpty()
+		val shaper = if (withRows) rowShaper ?: RowShaper(planned.systemFaces).also { rowShaper = it } else null
+		val next = planned.laidOut(
+			Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout,
+			rows = if (withRows) planned.shownRows(payload, runtime) else null,
+			rowsLayout = shaper?.let { RowShaper.rowsLayout(it) ?: throw MarklessHostError("a page with styled rows needs Dragon's rows layout in the app") },
+		)
 		style = next
 		p.relaid(next)
 		laidOutFor = widthPx to heightPx
@@ -675,6 +692,20 @@ class MarklessHost(
 		s.current = at
 		repaint()
 		Log.i(TAG, "sheet $id at $snapPoint, style assignment ${layout.assignment}")
+	}
+
+	/** Moves each styled branch's style state to the arm it shows now, inner ones included, and lays the page out again. */
+	private fun followArms() {
+		if (page == null) return
+		var moved = false
+		for (b in styledBranches) {
+			val value = runtime.styleArm(b) ?: continue
+			for (l in allLayouts()) {
+				val before = l.assignment
+				if (l.advance(b, value)) moved = moved || l.assignment != before
+			}
+		}
+		if (moved) repaint()
 	}
 
 	private fun repaint() {

@@ -142,7 +142,39 @@ export default function List() @{
 	const tested = await build('li[aria-label] { padding: 4px; }');
 	expect(tested.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
 		expect.stringMatching(
-			/^the `aria-label` of <li> \S+ follows its @for row on a styled page; Dragon styles each node once, not per row, yet$/,
+			/^the `aria-label` of <li> \S+ follows its @for row on a styled page through a value the build cannot list; Dragon styles a row by each value it can give, so write it as literals chosen by conditions$/,
 		),
 	]);
+});
+
+test("a styled page lays a row's class out by each value it can give: literals chosen by its item", async () => {
+	const build = await compileNativeApp({
+		pages: [
+			{
+				page: 'pages/index.tsrx',
+				filename: 'packages/mobile/test/fixtures/pages/index.tsrx',
+				source: `import { state } from '@markless/core';
+
+export default function List() @{
+	let notes = state([{ id: 'a', pinned: true }, { id: 'b', pinned: false }]);
+	<main>
+		<style>
+			.note { padding: 4px; }
+			.pinned { padding: 8px; }
+		</style>
+		<ul>
+			@for (const note of notes; key note.id) {
+				<li class={note.pinned ? 'note pinned' : 'note'}>{note.id}</li>
+			}
+		</ul>
+	</main>
+}`,
+			},
+		],
+	});
+	expect(build.diagnostics).toEqual([]);
+	const input = build.styleInputs[0]!.input;
+	const rowState = input.states.find((state) => state.row !== undefined)!;
+	expect(rowState.domain).toEqual(['0', '1']);
+	expect(input.repeats?.length).toBe(1);
 });

@@ -970,6 +970,9 @@ class Runtime(
 	}
 
 	/** Every shown branch's chosen arm. */
+	/** A branch's style state: the arm it shows ("0", "1", …, or "none"); null while it is not shown. */
+	fun styleArm(branch: String): JsValue? = arms().firstOrNull { it.first == branch }?.let { JsValue.Str(it.second?.toString() ?: "none") }
+
 	fun arms(): List<Pair<String, Int?>> = payload.nodes.filterIsInstance<Node.Branch>().flatMap { b -> instances(b).map { it.id to armOf(b, it.scope) } }
 
 	/** Every shown list's row keys, in order. */

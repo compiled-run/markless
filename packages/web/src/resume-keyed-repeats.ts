@@ -271,6 +271,10 @@ export function wireKeyedRepeats(
 				items,
 			);
 		}
+		// A DOM property, as __marklessRowLocals: the handle registry's closure stays lean.
+		const onScreen = () => (follow && !follow.showing(rowRootsByKey) ? [] : [...rowRootsByKey.values()]);
+		const shown = (parent.__marklessRepeatRows ??= new Map()).set(repeat.id, onScreen);
+		input.storeContainerSubscription(() => shown.get(repeat.id) === onScreen && shown.delete(repeat.id));
 		if (!repeat.collectionGraphNodeId || repeat.fixed) continue;
 		const apply = (mint: RowMint | undefined): void => {
 			if (follow && !follow.showing(rowRootsByKey)) return;
