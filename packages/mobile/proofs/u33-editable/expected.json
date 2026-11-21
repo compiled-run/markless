@@ -1,0 +1,40 @@
+{
+	"rung": 141,
+	"name": "editable: a tap on the preview opens a session with the value in the field, and Return there takes the typed words",
+	"steps": [
+		{
+			"visible": ["Documents", "Document name", "Quarterly plan"]
+		},
+		{
+			"do": {
+				"tap": "Quarterly plan"
+			},
+			"visible": ["Document name"],
+			"fields": {
+				"Document name": "Quarterly plan"
+			}
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Document name",
+					"text": "Annual plan",
+					"keepKeyboard": true
+				}
+			},
+			"visible": ["Document name"],
+			"fields": {
+				"Document name": "Annual plan"
+			},
+			"absent": ["Quarterly plan"]
+		},
+		{
+			"do": {
+				"submit": "Document name"
+			},
+			"visible": ["Annual plan"],
+			"absent": ["Quarterly plan"],
+			"order": ["Documents", "Annual plan"]
+		}
+	]
+}

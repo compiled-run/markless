@@ -1,4 +1,5 @@
 import { PROTOCOL_CONTAINER_HOST_NODE_ID } from '@markless/serializer';
+import type { ProtocolRepeatKeyParts } from '@markless/serializer';
 import {
 	asNodes,
 	getIdentifierName,
@@ -91,9 +92,13 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 	if (!keySource) return null;
 
 	const indexName = getIdentifierName(node.index as AnyNode | undefined);
-	const keyPath = itemKeyPath(itemName, keySource) ?? aliasedItemPath(aliases, keySource);
+	const itemPath = (source: string) =>
+		itemKeyPath(itemName, source) ?? aliasedItemPath(aliases, source);
+	const keyPath = itemPath(keySource);
 	const isIndexKey = Boolean(indexName && keySource === indexName);
-	if (!keyPath && !isIndexKey) {
+	const keyParts =
+		keyPath || isIndexKey ? null : itemKeyParts(keyNode, state.source, itemPath);
+	if (!keyPath && !isIndexKey && !keyParts) {
 		state.graph.diagnostics.push(
 			repeatKeyUnstableDiagnostic({
 				keyNode,
@@ -277,6 +282,7 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 				}),
 		keySource,
 		keyPath: keyPath ?? [],
+		...(keyParts ? { keyParts } : {}),
 		...(isIndexKey ? { indexKey: true as const } : {}),
 		...(enclosing ? { enclosingRepeatId: enclosing.id } : {}),
 		...(enclosingItemPath ? { enclosingItemPath } : {}),
@@ -396,6 +402,57 @@ function itemKeyPath(itemName: string, keySource: string): ReadonlyArray<string>
 	if (segments[0] !== itemName) return null;
 
 	return segments.slice(1);
+}
+
+type KeyPieces = {
+	readonly pieces: ReadonlyArray<string | ReadonlyArray<string>>;
+	// The value is a string, so `+` beside it joins rather than adds.
+	readonly text: boolean;
+};
+
+// A template literal or string `+` join whose every value is a path on the row item, as text and path pieces.
+function itemKeyParts(
+	keyNode: AnyNode,
+	source: string,
+	itemPath: (source: string) => ReadonlyArray<string> | null,
+): ProtocolRepeatKeyParts | null {
+	const piecesOf = (candidate: AnyNode | undefined): KeyPieces | null => {
+		const node = unwrapTypeAssertion(candidate);
+		if (!node) return null;
+		if (node.type === 'Literal')
+			return typeof node.value === 'string' ? { pieces: [node.value], text: true } : null;
+		if (node.type === 'TemplateLiteral') {
+			const expressions = asNodes(node.expressions);
+			const pieces: Array<string | ReadonlyArray<string>> = [];
+			for (const [at, quasi] of asNodes(node.quasis).entries()) {
+				pieces.push((quasi.value as { cooked?: string } | undefined)?.cooked ?? '');
+				if (at >= expressions.length) continue;
+				const inner = piecesOf(expressions[at]);
+				if (!inner) return null;
+				pieces.push(...inner.pieces);
+			}
+			return { pieces, text: true };
+		}
+		if (node.type === 'BinaryExpression' && node.operator === '+') {
+			const left = piecesOf(node.left as AnyNode | undefined);
+			const right = left && piecesOf(node.right as AnyNode | undefined);
+			return right && (left.text || right.text)
+				? { pieces: [...left.pieces, ...right.pieces], text: true }
+				: null;
+		}
+		if (node.type !== 'Identifier' && node.type !== 'MemberExpression') return null;
+		const path = itemPath(expressionSource(node, source) ?? '');
+		return path ? { pieces: [path], text: false } : null;
+	};
+	const key = piecesOf(keyNode);
+	if (!key?.text) return null;
+	const parts: Array<string | ReadonlyArray<string>> = [];
+	for (const piece of key.pieces) {
+		if (piece === '') continue;
+		if (typeof piece === 'string' && typeof parts.at(-1) === 'string') parts[parts.length - 1] += piece;
+		else parts.push(piece);
+	}
+	return parts;
 }
 
 function firstRepeatRow(node: AnyNode): AnyNode | undefined {

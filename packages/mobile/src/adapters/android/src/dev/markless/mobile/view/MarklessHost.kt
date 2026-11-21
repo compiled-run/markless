@@ -434,9 +434,6 @@ class MarklessHost(
 	/** Reports a touch in window coordinates to the runtime as pointer events; call it before the views see the touch. */
 	fun touch(event: android.view.MotionEvent) = overlays.touch(event)
 
-	/** A scroll view took the touches that are down to scroll ([TakesTouches]): each is cancelled. */
-	fun scrollTookTouches() = overlays.cancelTouches()
-
 	private var lastPress: Triple<String, Long, Int>? = null
 
 	/** A press's count (`event.detail`): a second press on the same view within the double-tap time is 2, as Chrome counts a double tap. */
@@ -452,6 +449,8 @@ class MarklessHost(
 		apply(journal)
 		return journal.any { it is JournalEntry.PreventDefault }
 	}
+	/** A scroll view took the touches that are down to scroll ([TakesTouches]): each is cancelled. */
+	fun scrollTookTouches() = overlays.cancelTouches()
 
 	/** The journal applier: the only code that changes a retained view after the first build. */
 	fun apply(journal: List<JournalEntry>) {
@@ -798,7 +797,6 @@ class MarklessHost(
 			// The select's list shows its options; their views only keep their text current.
 			"option" -> MarklessBox(context).apply { visibility = View.GONE }
 			"input", "textarea" -> MarklessField(context).apply {
-				filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
 				val focusEvents = events[node.id].orEmpty().map { it.event }
 				setOnFocusChangeListener { v, focused ->
 					if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW)
@@ -806,6 +804,7 @@ class MarklessHost(
 					if (event in focusEvents) apply(runtime.dispatch(inst.id, event))
 				}
 				if (node.element == "input") {
+					filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
 					isSingleLine = true
 					// After isSingleLine, whose transformation would show a password's text.
 					if (type == "password") inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
@@ -1020,6 +1019,8 @@ class MarklessHost(
 	private fun command(view: View, command: String, preventScroll: Boolean) {
 		// As on the web: scrollIntoView aligns the element to the start; focus brings it into view unless told not to.
 		if (command == "scrollIntoView") return bringIntoView(view, dev.markless.mobile.core.SCROLL_INTO_VIEW)
+		// `select()` selects a field's whole text; it does not move focus, as on the web.
+		if (command == "select") return (view as? EditText ?: throw MarklessHostError("select() on a view that is not a text field")).selectAll()
 		if (!preventScroll) bringIntoView(view, dev.markless.mobile.core.FOCUS_INTO_VIEW)
 		if (view is EditText) {
 			view.requestFocus()

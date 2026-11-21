@@ -352,8 +352,11 @@ function repeatRecord(
 			: { collectionSource: repeat.collectionSource }),
 		collectionPath: repeat.collectionPath,
 		keyPath: repeat.keyPath,
+		...(repeat.keyParts ? { keyParts: repeat.keyParts } : {}),
 		// Pay-per-use: only `key row` needs the marker, a position key reads as unkeyed here.
-		...(!repeat.indexKey && repeat.keyPath.length === 0 ? { itemKey: true as const } : {}),
+		...(!repeat.indexKey && !repeat.keyParts && repeat.keyPath.length === 0
+			? { itemKey: true as const }
+			: {}),
 		rowChunkId,
 		...(slot?.emptyTemplateId ? { emptyChunkId: slot.emptyTemplateId } : {}),
 		rowElementCount: chunks.find((chunk) => chunk.id === rowChunkId)?.hosts.length ?? 0,

@@ -39,10 +39,10 @@ import {
 export type NativeAction =
 	/** A press; `detail` is how many presses in a row on it (a double tap's second is 2), 1 when left out. */
 	| { readonly event: 'activate'; readonly host: string; readonly detail?: number }
-	/** A person chose the option `host` (an instance id inside a list row) in its `<select>`'s list. */
-	| { readonly event: 'choose'; readonly host: string }
 	/** A text field took the keyboard (`focus`) or gave it up (`blur`). */
 	| { readonly event: 'focus' | 'blur'; readonly host: string }
+	/** A person chose the option `host` (an instance id inside a list row) in its `<select>`'s list. */
+	| { readonly event: 'choose'; readonly host: string }
 	/** The field's whole text after an edit. */
 	| { readonly event: 'input'; readonly host: string; readonly value: string }
 	/** A key of the on-screen keyboard in a text field, before it edits the text; `key` as the phone's browser names it. */
@@ -553,6 +553,8 @@ export function evaluateWithScript(
 							name,
 							'object' in binding
 								? { object: frameOf(binding.object) }
+								: 'method' in binding
+									? { method: binding.method, frame: frameOf(binding.bindings) }
 								: 'shared' in binding
 									? { shared: frameOf(binding.shared) }
 									: 'cell' in binding
@@ -607,7 +609,21 @@ export function createNativeRuntime(
 		fieldText: (node) => textOf(node),
 		now,
 	};
-	const values = new Map<string, Value>(
+	// Each write moves `version`, so a script computed is run again only once a cell may have changed.
+	let version = 0;
+	/** Cells still `undefined` on the web: a script reads them so until one is written. */
+	const unset = new Set<string>();
+	const values = new (class extends Map<string, Value> {
+		override set(key: string, value: Value) {
+			version++;
+			unset.delete(key);
+			return super.set(key, value);
+		}
+		override delete(key: string) {
+			version++;
+			return super.delete(key);
+		}
+	})(
 		payload.cells.map((cell) => [
 			cell.id,
 			cell.clock
@@ -620,6 +636,8 @@ export function createNativeRuntime(
 	const sessionCells = new Set(
 		payload.cells.flatMap((cell) => (cell.storage?.session ? [cell.id] : [])),
 	);
+	for (const cell of payload.cells)
+		if (cell.unset && !(cell.storage && store.has(cell.storage.key))) unset.add(cell.id);
 	const storageKeys = new Map(
 		payload.cells.flatMap((cell) =>
 			cell.storage ? [[cell.id, cell.storage.key] as const] : [],
@@ -706,6 +724,8 @@ export function createNativeRuntime(
 				name,
 				'object' in binding
 					? { object: frameOf(binding.object, eventValue, scope) }
+					: 'method' in binding
+						? { method: binding.method, frame: frameOf(binding.bindings, eventValue, scope) }
 					: 'shared' in binding
 						? { shared: frameOf(binding.shared, eventValue, scope) }
 						: 'cell' in binding
@@ -758,12 +778,15 @@ export function createNativeRuntime(
 					elements: given,
 					object,
 					shared,
+					frame,
 				} = entry as {
 					elements?: unknown;
 					object?: Record<string, unknown>;
 					shared?: Record<string, unknown>;
+					frame?: Record<string, unknown>;
 				};
 				if (object) visit(object);
+				if (frame) visit(frame);
 				if (shared) visit(shared);
 				if (given === undefined) continue;
 				if (Array.isArray(given)) given.forEach(add);
@@ -776,6 +799,7 @@ export function createNativeRuntime(
 	};
 	const entryCells = () => ({
 		cells: Object.fromEntries(values),
+		...(unset.size > 0 ? { unset: [...unset] } : {}),
 		...(script?.services.includes('crypto') && scriptHost?.seed
 			? { seed: scriptHost.seed() }
 			: {}),
@@ -955,30 +979,32 @@ export function createNativeRuntime(
 				? readFrame(binding.object, scope)
 				: 'shared' in binding
 					? readFrame(binding.shared, scope)
-					: 'cell' in binding
-						? read(binding.cell, scope)
-						: 'fields' in binding
-							? Object.values(binding.fields).map((cell) => read(cell, scope))
-							: 'elements' in binding
-								? evaluate(binding.elements, undefined, scope)
-								: evaluate(binding.value, undefined, scope),
+					: 'method' in binding
+						? readFrame(binding.bindings, scope)
+						: 'cell' in binding
+							? read(binding.cell, scope)
+							: 'fields' in binding
+								? Object.values(binding.fields).map((cell) => read(cell, scope))
+								: 'elements' in binding
+									? evaluate(binding.elements, undefined, scope)
+									: evaluate(binding.value, undefined, scope),
 		);
-	const compute: Compute = (fn, bindings, scope) =>
-		JSON.parse(
-			call(
-				'enter',
-				(() => {
-					const frame = frameOf(bindings, undefined, scope);
-					return {
-						kind: 'compute',
-						fn,
-						frame,
-						elements: elementFacts(frame),
-						...entryCells(),
-					};
-				})(),
-			),
-		) as Value;
+	// As on the web, a computed is not run again while nothing it reads has changed.
+	const computed = new Map<string, Value>();
+	let computedAt = -1;
+	const compute: Compute = (fn, bindings, scope) => {
+		if (computedAt !== version) {
+			computed.clear();
+			computedAt = version;
+		}
+		const frame = frameOf(bindings, undefined, scope);
+		const elements = elementFacts(frame);
+		const key = JSON.stringify([fn, frame, elements]);
+		if (computed.has(key)) return computed.get(key)!;
+		const value = JSON.parse(call('enter', { kind: 'compute', fn, frame, elements, ...entryCells() })) as Value;
+		computed.set(key, value);
+		return value;
+	};
 	/** Focus, the overlay stack (topmost last) and each overlay's focus origin, kept as the web's overlay behaviour keeps them. */
 	let focused: string | null = null;
 	let stack: string[] = [];
@@ -1084,26 +1110,35 @@ export function createNativeRuntime(
 			if (!owner) throw new Error(`${object.id} is owned by unknown node ${object.owner}`);
 			return shown(owner) ? [object.id] : [];
 		});
-	/** A row's key as hosts and journal entries spell it: `String()` of the item's key path. */
+	/** A row's key as hosts and journal entries spell it: `String()` of the item's key path, or its key parts joined. */
 	const rowsOf = (repeat: Extract<NativeNode, { kind: 'repeat' }>) => {
 		const list = evaluate(repeat.list);
 		if (!Array.isArray(list))
 			throw new Error(`${repeat.id} lists a value that is not an array`);
-		return list.map((item, index) => {
-			if (repeat.byIndex) return { key: String(index), item };
+		const valueAt = (item: Value, path: ReadonlyArray<string>) => {
 			let key: Value = item;
-			for (const step of repeat.key) {
+			for (const step of path) {
 				if (
 					key === null ||
 					typeof key !== 'object' ||
 					Array.isArray(key) ||
 					!Object.hasOwn(key, step)
 				)
-					throw new Error(`${repeat.id}: a row has no key at ${repeat.key.join('.')}`);
+					throw new Error(`${repeat.id}: a row has no key at ${path.join('.')}`);
 				key = (key as Record<string, Value>)[step]!;
 			}
-			return { key: String(key), item };
-		});
+			return key;
+		};
+		return list.map((item, index) => ({
+			key: repeat.byIndex
+				? String(index)
+				: repeat.keyParts
+					? repeat.keyParts
+							.map((part) => (typeof part === 'string' ? part : String(valueAt(item, part))))
+							.join('')
+					: String(valueAt(item, repeat.key)),
+			item,
+		}));
 	};
 	/** Every instance of a node now shown: one outside lists, one per row inside one (`<id>@<key>`). */
 	const instances = (
@@ -1157,6 +1192,25 @@ export function createNativeRuntime(
 			}
 		}
 	};
+	/** Each following cell's last value of what it follows: the write runs again only when that value changes, as on the web. */
+	const followed = new Map<string, string>();
+	const follow = () => {
+		for (let round = 0; round <= payload.cells.length; round++) {
+			let moved = false;
+			for (const cell of payload.cells) {
+				if (!cell.follows) continue;
+				const now = evaluate(cell.follows);
+				const text = JSON.stringify(now);
+				if (followed.get(cell.id) === text) continue;
+				followed.set(cell.id, text);
+				if (JSON.stringify(values.get(cell.id) ?? null) === text) continue;
+				values.set(cell.id, now);
+				moved = true;
+			}
+			if (!moved) return;
+		}
+		throw new Error('following cells kept changing each other');
+	};
 	const render = (parts: ReadonlyArray<NativeTextPart>, scope: NativeScope): string =>
 		parts
 			.map((part) =>
@@ -1200,10 +1254,20 @@ export function createNativeRuntime(
 		);
 	const attributes = () =>
 		bound('attribute', (name, value) => marklessAttributeValue(name, value));
-	const properties = () =>
-		bound('property', (_name, value) => String(value ?? '')).filter(
+	/** Text fields with no `value` binding whose text a handler wrote (`field.value = text`): their text is journalled too. */
+	const written = new Set<string>();
+	const properties = () => {
+		const fromBindings = bound('property', (_name, value) => String(value ?? '')).filter(
 			([, name]) => name === 'value',
 		) as (readonly [string, 'value', string])[];
+		const boundNodes = new Set(fromBindings.map(([node]) => node));
+		return [
+			...fromBindings,
+			...[...written]
+				.filter((node) => !boundNodes.has(node))
+				.map((node) => [node, 'value', edited.get(node) ?? ''] as const),
+		];
+	};
 
 	// Forms: what each text field holds, which submissions are still running, and the marks they set.
 	const forms = new Map((payload.forms ?? []).map((form) => [form.node, form]));
@@ -1232,10 +1296,10 @@ export function createNativeRuntime(
 	};
 	/** An attribute as the web has it now: a binding's value as written, else the attribute the element was built with. */
 	const attributeNow = (id: string, name: string): string | null => {
-		const node = elementOf(id);
+		const node = elementOf(nodeOf(id));
 		const binding = node.bindings?.find((one) => 'attribute' in one && one.attribute === name);
 		return binding
-			? marklessAttributeValue(name, evaluate(binding.value))
+			? marklessAttributeValue(name, evaluate(binding.value, undefined, id === node.id ? undefined : scopeOf(id)))
 			: (node.attributes?.[name] ?? null);
 	};
 	const propertyBinding = (id: string, name: string) =>
@@ -1530,9 +1594,8 @@ export function createNativeRuntime(
 	const shownOverlays = (): string[] => {
 		// Reading every attribute would start a script engine a page with no overlay may not need yet.
 		if (overlayNodes.length === 0) return [];
-		const now = keyed(attributes());
 		return overlayNodes.flatMap((node) =>
-			instances(node).length > 0 && now.get(`${node.id}\0hidden`) === null ? [node.id] : [],
+			instances(node).length > 0 && attributeNow(node.id, 'hidden') === null ? [node.id] : [],
 		);
 	};
 	const isHint = (overlay: string): boolean => {
@@ -1540,16 +1603,17 @@ export function createNativeRuntime(
 		return node?.kind === 'element' && node.attributes?.[OVERLAY_HINT_ATTRIBUTE] !== undefined;
 	};
 	const isModal = (overlay: string): boolean => {
-		const now = keyed(attributes());
-		return payload.nodes.some((node) => {
-			if (node.kind !== 'element' || !elements.contains(overlay, node.id)) return false;
-			const bound = now.get(`${node.id}\0${OVERLAY_MODAL_ATTRIBUTE}`);
-			return (
-				(bound !== undefined ? bound : node.attributes?.[OVERLAY_MODAL_ATTRIBUTE]) ===
-				OVERLAY_MODAL_VALUE
-			);
-		});
+		return payload.nodes.some(
+			(node) =>
+				node.kind === 'element' &&
+				elements.contains(overlay, node.id) &&
+				// A row's copies are keyed by row, so a row element is read as it was built.
+				(node.row ? node.attributes?.[OVERLAY_MODAL_ATTRIBUTE] : attributeNow(node.id, OVERLAY_MODAL_ATTRIBUTE)) === OVERLAY_MODAL_VALUE,
+		);
 	};
+	// Rows take their first values, and following cells theirs, before anything reads them, the overlays served shown included.
+	seedRows();
+	follow();
 	// Served shown: the document's focus is the body.
 	for (const overlay of shownOverlays()) {
 		stack.push(overlay);
@@ -1592,8 +1656,6 @@ export function createNativeRuntime(
 			} else if (cell.seed && reseed.delete(cell.id)) values.set(cell.id, evaluate(cell.seed));
 		}
 	};
-	seedRows();
-
 	return {
 		texts,
 		attributes: () => [
@@ -2106,6 +2168,22 @@ export function createNativeRuntime(
 				calls.push({ op: 'preventDefault' });
 				continue;
 			}
+			if (op.op === 'fieldText') {
+				let node = op.node;
+				if (typeof node !== 'string') {
+					const value = evaluate(node, eventValue, scope);
+					if (value === null) continue;
+					if (typeof value !== 'string' || !elements.isElement(value))
+						throw new Error('a field text written to a value that is not an element');
+					node = value;
+				}
+				const text = String(evaluate(op.value, eventValue, scope) ?? '');
+				edited.set(node, text);
+				written.add(node);
+				// An unbound field has no binding to diff, so the write is its own entry.
+				calls.push({ op: 'property', node, name: 'value', value: text });
+				continue;
+			}
 			if (op.op === 'dialog') {
 				if (!dialogs.has(op.node)) throw new Error(`${op.node} is not a dialog`);
 				setDialog(op.node, op.method === 'showModal');
@@ -2124,6 +2202,7 @@ export function createNativeRuntime(
 			}
 			if (op.op === 'script') {
 				const text = typeof eventValue === 'string' ? eventValue : eventValue?.value;
+				const frame = frameOf(op.bindings, text, scope);
 				const touch =
 					typeof eventValue === 'object'
 						? [...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, 'isTrusted'])].flatMap((field) => {
@@ -2131,7 +2210,6 @@ export function createNativeRuntime(
 								return value === undefined ? [] : [[field, value] as const];
 							})
 						: [];
-				const frame = frameOf(op.bindings, text, scope);
 				const nodes =
 					typeof eventValue === 'object' && eventValue.currentTarget !== undefined
 						? {
@@ -2279,6 +2357,19 @@ export function createNativeRuntime(
 				calls.push(...out);
 			}
 			closing.length = 0;
+			// A row that left takes its state with it; a later row with the same key starts from the first values.
+			const kept = new Set(
+				rows().flatMap(([list, keys]) => keys.map((key) => `${list}\0${key}`)),
+			);
+			for (const slot of values.keys()) {
+				const at = slot.indexOf('@');
+				const list = at < 0 ? undefined : rowOfCell.get(slot.slice(0, at));
+				if (list !== undefined && !kept.has(`${list}\0${slot.slice(at + 1)}`))
+					values.delete(slot);
+			}
+			resetChangedRows(itemsBefore);
+			seedRows();
+			follow();
 			calls.push(...syncAsync());
 			// An overlay becoming shown supersedes every shown hint it is not inside, before it joins the stack.
 			const shownFirst = shownOverlays();
@@ -2314,18 +2405,6 @@ export function createNativeRuntime(
 					modal: isModal(node),
 				})),
 			];
-			// A row that left takes its state with it; a later row with the same key starts from the first values.
-			const kept = new Set(
-				rows().flatMap(([list, keys]) => keys.map((key) => `${list}\0${key}`)),
-			);
-			for (const slot of values.keys()) {
-				const at = slot.indexOf('@');
-				const list = at < 0 ? undefined : rowOfCell.get(slot.slice(0, at));
-				if (list !== undefined && !kept.has(`${list}\0${slot.slice(at + 1)}`))
-					values.delete(slot);
-			}
-			resetChangedRows(itemsBefore);
-			seedRows();
 			forgetHidden();
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());

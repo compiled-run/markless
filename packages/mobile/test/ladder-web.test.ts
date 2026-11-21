@@ -251,15 +251,15 @@ async function act(page: Page, step: LadderStep) {
 		await field.pressSequentially(action.type.text);
 	} else if ('submit' in action)
 		await typedField(page, action.submit).press('Enter');
-	else if ('choose' in action)
-		await page
-			.getByRole('combobox', { name: action.choose.field, exact: true })
-			.selectOption({ label: action.choose.option });
 	else if ('erase' in action) {
 		const field = page.getByRole('textbox', { name: action.erase, exact: true });
 		await field.press('End');
 		await field.press('Backspace');
 	}
+	else if ('choose' in action)
+		await page
+			.getByRole('combobox', { name: action.choose.field, exact: true })
+			.selectOption({ label: action.choose.option });
 	else if ('relaunch' in action) await page.reload();
 	else if ('back' in action) await page.goBack();
 	else if ('escape' in action) await page.keyboard.press('Escape');

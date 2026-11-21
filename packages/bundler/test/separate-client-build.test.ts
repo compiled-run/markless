@@ -100,14 +100,15 @@ test(
 			});
 			await writeConfig(app, pidLog);
 
-			const together = await build(app, pidLog, false);
-			expect(together.pids.client).toBe(String(process.pid));
-			expect(together.pids.ssr).toBe(String(process.pid));
-
+			// The child's build first: built after the in-process one, it ran beside the memory that build keeps.
 			const separate = await build(app, pidLog, true);
 			expect(separate.pids.client).not.toBe(String(process.pid));
 			expect(separate.pids.ssr).toBe(String(process.pid));
 			expect(separate.pids.nitro).toBe(String(process.pid));
+
+			const together = await build(app, pidLog, false);
+			expect(together.pids.client).toBe(String(process.pid));
+			expect(together.pids.ssr).toBe(String(process.pid));
 
 			expect(together.files.size).toBeGreaterThan(0);
 			expect(separate.files).toEqual(together.files);

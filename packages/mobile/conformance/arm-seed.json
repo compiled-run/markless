@@ -28,7 +28,8 @@
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 0
-				}
+				},
+				"unset": true
 			}
 		],
 		"nodes": [
