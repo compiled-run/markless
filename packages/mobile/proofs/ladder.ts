@@ -76,7 +76,12 @@ export type LadderAction =
 	 * a box that scrolls that way, so the platform takes the touch for the scroll (the web's `pointercancel`); the phones and
 	 * the browser find that out for themselves, the reference ladder, which lays nothing out, is told.
 	 */
-	| { readonly drag: { readonly on: string; readonly direction: 'right' | 'up'; readonly scrolls?: true } };
+	| { readonly drag: { readonly on: string; readonly direction: 'right' | 'up'; readonly scrolls?: true } }
+	/**
+	 * Moves the slider (`<input type="range">`) with this accessible name to its end, as a finger does from its thumb (a
+	 * rung starts the slider at its midpoint, where the thumb is); the web presses End or Home on it.
+	 */
+	| { readonly slide: { readonly field: string; readonly to: 'max' | 'min' } };
 
 /** Where a phone flow presses the backdrop: above a centred surface, below the status bar. */
 export const BACKDROP_POINT = '50%,8%';
@@ -224,6 +229,8 @@ export type LadderRung = {
 	readonly web?: {
 		readonly steps?: readonly LadderStep[];
 		readonly absentFromOutput?: readonly string[];
+		/** Console errors the browser logs as part of what the rung proves (a 404 answer it loads), each once per time. */
+		readonly consoleErrors?: readonly string[];
 	};
 	/** The test runs the echo server (`ECHO_SERVER_PORT`) while the rung runs, on the web and on phones. */
 	readonly server?: 'echo';
@@ -527,6 +534,16 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 				swipe: {
 					from: { text: selector(action.drag.on) },
 					direction: action.drag.direction === 'right' ? 'RIGHT' : 'UP',
+					duration: 800,
+				},
+			},
+		];
+	if ('slide' in action)
+		return [
+			{
+				swipe: {
+					from: { text: selector(action.slide.field) },
+					direction: action.slide.to === 'max' ? 'RIGHT' : 'LEFT',
 					duration: 800,
 				},
 			},

@@ -19,9 +19,9 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": -6,
+			"delta": -1,
 			"reason": "#977: a list nested in a row the runtime just built adopts no rows from it; +135 B in resume-keyed-repeats",
-			"date": "2026-11-20"
+			"date": "2026-11-21"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -42,9 +42,9 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": -3,
+			"delta": -7,
 			"reason": "#977: a list nested in a row the runtime just built adopts no rows from it; +135 B in resume-keyed-repeats",
-			"date": "2026-11-20"
+			"date": "2026-11-21"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -54,9 +54,9 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 2,
+			"delta": 1,
 			"reason": "#977: a list nested in a row the runtime just built adopts no rows from it; +135 B in resume-keyed-repeats",
-			"date": "2026-11-20"
+			"date": "2026-11-21"
 		}
 	]
 }

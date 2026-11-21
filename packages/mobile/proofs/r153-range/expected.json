@@ -1,0 +1,27 @@
+{
+	"rung": 153,
+	"name": "A range input is a native slider: it moves on its steps, reports its value as the web's input events do, and raises change when let go",
+	"steps": [
+		{
+			"visible": ["Speaker", "Volume 5", "Quiet", "Saved nothing"],
+			"absent": ["Volume 10"]
+		},
+		{
+			"do": {
+				"slide": {
+					"field": "Volume",
+					"to": "max"
+				}
+			},
+			"visible": ["Volume 10", "Saved 10"],
+			"absent": ["Volume 5", "Saved nothing"]
+		},
+		{
+			"do": {
+				"tap": "Quiet"
+			},
+			"visible": ["Volume 3", "Saved 10"],
+			"absent": ["Volume 10"]
+		}
+	]
+}

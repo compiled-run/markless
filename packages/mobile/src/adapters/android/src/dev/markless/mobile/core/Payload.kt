@@ -42,7 +42,8 @@ sealed interface Expr {
 	/** Each part is a literal string or an expression read with `String(value)`. */
 	data class Template(val parts: List<Any>) : Expr
 	/** `length` of a string or array, or an own property of an object. */
-	data class Member(val value: Expr, val property: String) : Expr
+	/** [optional]: in an optional chain (`a?.b`), so a null object gives null, as JavaScript gives undefined. */
+	data class Member(val value: Expr, val property: String, val optional: Boolean = false) : Expr
 	/** An array's element at an index computed while the app runs; null when it is not an integer inside the array. */
 	data class At(val index: Expr, val list: Expr) : Expr
 	/** Each item, spread when [spread] (its value must be an array). */
@@ -181,6 +182,8 @@ enum class EventName(val wire: String, val pointer: Boolean = false, val touch: 
 	PointerDown("pointerdown", true, true), PointerMove("pointermove", true, true), PointerUp("pointerup", true, true), PointerCancel("pointercancel", true, true),
 	PointerOver("pointerover", true), PointerOut("pointerout", true), PointerEnter("pointerenter", true), PointerLeave("pointerleave", true),
 	Choose("choose"),
+	/** A range input let go after its value moved: the web's `change` on it. */
+	Commit("commit"),
 }
 
 sealed interface Op {
@@ -266,6 +269,73 @@ data class TooLong(val text: String, val digits: String = "0123456789") {
 	}
 }
 
+/**
+ * Chromium's message for an email field whose value is not an email address, one per reason: `{value}` is the whole value,
+ * `{symbol}` the first character not allowed, `{domain}` the part after the `@`.
+ */
+data class EmailMismatch(val noAt: String, val emptyLocal: String, val emptyDomain: String, val invalidLocal: String, val invalidDomain: String, val invalidDots: String, val other: String) {
+	/** Why [value] (as [emailValue] keeps it) is not an email address, in Chromium's words, or null when it is one or is empty. */
+	fun message(value: String): String? {
+		if (value.isEmpty()) return null
+		val at = value.indexOf('@')
+		val local = if (at < 0) value else value.substring(0, at)
+		val domain = if (at < 0) "" else value.substring(at + 1)
+		val localChars = codePoints(local)
+		if (at > 0 && localChars.all(::isLocal) && domain.split('.').all(::isLabel)) return null
+		fun fill(message: String, symbol: String = "") = Regex("\\{(value|symbol|domain)\\}").replace(message) {
+			when (it.groupValues[1]) { "value" -> value; "domain" -> domain; else -> symbol }
+		}
+		if (at < 0) return fill(noAt)
+		if (at == 0) return fill(emptyLocal)
+		if (domain.isEmpty()) return fill(emptyDomain)
+		localChars.firstOrNull { !isLocal(it) }?.let { return fill(invalidLocal, it) }
+		codePoints(domain).firstOrNull { !(isAlphanumeric(it) || it == "." || it == "-") }?.let { return fill(invalidDomain, it) }
+		if (domain.startsWith(".") || domain.endsWith(".") || domain.contains("..")) return fill(invalidDots)
+		return fill(other)
+	}
+
+	private companion object {
+		fun codePoints(text: String): List<String> = text.codePoints().toArray().map { String(Character.toChars(it)) }
+		fun isAlphanumeric(c: String) = c.length == 1 && (c[0] in 'a'..'z' || c[0] in 'A'..'Z' || c[0] in '0'..'9')
+		fun isLocal(c: String) = isAlphanumeric(c) || (c.length == 1 && c[0] in ".!#$%&'*+/=?^_`{|}~-")
+		fun isLabel(label: String) = label.length in 1..63 && isAlphanumeric(label.take(1)) && isAlphanumeric(label.takeLast(1)) && label.all { isAlphanumeric(it.toString()) || it == '-' }
+	}
+}
+
+/** An email field's value as the web keeps it: line breaks dropped, then ASCII whitespace trimmed from both ends. */
+fun emailValue(typed: String): String = typed.filter { it != '\n' && it != '\r' }.trim { it in " \t\n\r\u000C" }
+
+/**
+ * A range input's value as the web keeps it (`nativeRangeValue` in @markless/serializer): `min` 0 and `max` 100 by default
+ * (a `max` below `min` is `min`); a value that is not a number is the midpoint; clamped into the range and moved to the
+ * nearest step from `min` (the greater of two as near), at or below `max`; written as JavaScript writes the number.
+ */
+fun nativeRangeValue(value: String?, min: String?, max: String?, step: String?): String {
+	val numeric = Regex("^-?(\\d+(\\.\\d+)?|\\.\\d+)([eE][-+]?\\d+)?$")
+	fun number(text: String?): Double? = text?.takeIf { numeric.matches(it) }?.toDouble()
+	fun places(n: Double): Int {
+		val written = Js.toStr(JsValue.Num(n))
+		val mantissa = written.substringBefore('e')
+		val fraction = if ('.' in mantissa) mantissa.substringAfter('.').length else 0
+		val exponent = if ('e' in written) written.substringAfter('e').toInt() else 0
+		return maxOf(0, fraction - exponent)
+	}
+	val low = number(min) ?: 0.0
+	val high = maxOf(low, number(max) ?: 100.0)
+	val any = step?.trim()?.lowercase() == "any"
+	val size = if (any) null else number(step)?.takeIf { it > 0 } ?: 1.0
+	var v = minOf(high, maxOf(low, number(value) ?: (low + (high - low) / 2)))
+	if (size != null) {
+		val unit = Math.pow(10.0, maxOf(places(low), places(size), places(v)).toDouble())
+		fun whole(n: Double) = Math.round(n * unit).toDouble()
+		val stepUnits = whole(size)
+		var steps = Math.floor((whole(v) - whole(low)) / stepUnits + 0.5)
+		while (steps > 0 && whole(low) + steps * stepUnits > whole(high)) steps -= 1
+		v = (whole(low) + steps * stepUnits) / unit
+	}
+	return Js.toStr(JsValue.Num(v))
+}
+
 /** A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers; null (no limit) when it has none. */
 fun nativeMaxLength(attribute: String?): Int? {
 	if (attribute == null) return null
@@ -298,6 +368,8 @@ data class Payload(
 	val valueMissing: Map<String, ValueMissing> = emptyMap(),
 	/** [TooLong] by the locale the browser shows its own text in. */
 	val tooLong: Map<String, TooLong> = emptyMap(),
+	/** [EmailMismatch] by the locale the browser shows its own text in. */
+	val typeMismatch: Map<String, EmailMismatch> = emptyMap(),
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	val script: ScriptSource? = null,
 ) {
@@ -306,7 +378,7 @@ data class Payload(
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "script"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "typeMismatch", "script"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -369,6 +441,13 @@ data class Payload(
 				if (digits.length != 10) throw MarklessDecodeError("payload.tooLong.$locale.digits is not ten digits")
 				locale to TooLong(mo.field("text", "payload.tooLong.$locale").str("payload.tooLong.$locale.text"), digits)
 			} ?: emptyMap()
+			val typeMismatch = root["typeMismatch"]?.obj("payload.typeMismatch")?.entries?.associateTo(LinkedHashMap()) { (locale, m) ->
+				val mo = m.obj("payload.typeMismatch.$locale")
+				val keys = listOf("noAt", "emptyLocal", "emptyDomain", "invalidLocal", "invalidDomain", "invalidDots", "other")
+				mo.only(keys.toSet(), "payload.typeMismatch.$locale")
+				val t = keys.map { mo.field(it, "payload.typeMismatch.$locale").str("payload.typeMismatch.$locale.$it") }
+				locale to EmailMismatch(t[0], t[1], t[2], t[3], t[4], t[5], t[6])
+			} ?: emptyMap()
 			val script = root["script"]?.obj("payload.script")?.let { o ->
 				o.only(setOf("id", "source", "services"), "payload.script")
 				val services = o.field("services", "payload.script").arr("payload.script.services").map { it.str("payload.script.services[]") }
@@ -379,7 +458,7 @@ data class Payload(
 				val runsScript = cells.any { it.async != null } || handlers.any { h -> scriptOps(h.ops) } || nodes.any { n -> readsOf(n).any(::hasScript) } || title.orEmpty().any { it is TextPart.Value && hasScript(it.expr) }
 				if (runsScript) throw MarklessDecodeError("a script op or computed in a payload with no script")
 			}
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, script)
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, typeMismatch, script)
 		}
 
 		private fun readsOf(node: Node): List<Expr> = when (node) {
@@ -518,7 +597,11 @@ data class Payload(
 					Expr.Template(o.field("template", what).arr("$what.template").mapIndexed { n, p -> if (p is Json.Str) p.value else expr(p, "$what.template[$n]") })
 				}
 				o.containsKey("at") -> { o.only(setOf("at", "of"), what); Expr.At(sub("at"), sub("of")) }
-				o.containsKey("member") -> { o.only(setOf("member", "property"), what); Expr.Member(sub("member"), o.field("property", what).str("$what.property")) }
+				o.containsKey("member") -> {
+					o.only(setOf("member", "property", "optional"), what)
+					val optional = o["optional"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.optional must be true when present"); true } ?: false
+					Expr.Member(sub("member"), o.field("property", what).str("$what.property"), optional)
+				}
 				o.containsKey("array") -> {
 					o.only(setOf("array"), what)
 					Expr.ArrayLit(o.field("array", what).arr("$what.array").mapIndexed { n, a ->
@@ -723,8 +806,9 @@ data class Payload(
 				"sheet" -> {
 					o.only(setOf("kind", "id", "parent", "open", "snapPoints", "dismissible", "modal", "arm"), what)
 					val snapPoints = o.field("snapPoints", what).arr("$what.snapPoints").map { it.num("$what.snapPoints[]") }
+					val one = snapPoints.size == 1 && snapPoints[0] > 0 && snapPoints[0] <= 1
 					val two = snapPoints.size == 2 && snapPoints[0] > 0 && snapPoints[0] < 1 && snapPoints[1] == 1.0
-					if (snapPoints != listOf(1.0) && !two) throw MarklessDecodeError("$what has snapPoints $snapPoints; a sheet rests at [1] or [x, 1] with 0 < x < 1")
+					if (!one && !two) throw MarklessDecodeError("$what has snapPoints $snapPoints; a sheet rests at [x] with 0 < x <= 1 or [x, 1] with 0 < x < 1")
 					fun flag(k: String) = (o.field(k, what) as? Json.Bool ?: throw MarklessDecodeError("$what.$k must be a boolean")).value
 					Node.Sheet(id, o.field("parent", what).str("$what.parent"), expr(o.field("open", what), "$what.open"), snapPoints, flag("dismissible"), flag("modal"), armPlace(o, what))
 				}

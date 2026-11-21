@@ -22,8 +22,12 @@ import {
 import { iconSourceTransform, type IconsOptions } from '@markless/icons/vite';
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
 import { uiIconsOptions } from '@markless/ui-tools';
-import { NATIVE_APP_VERSION } from '@markless/serializer/native-view';
 import {
+	NATIVE_APP_VERSION,
+	NATIVE_NOT_FOUND_ROUTE,
+} from '@markless/serializer/native-view';
+import {
+	booleanCellsOf,
 	nativeStyleInputs,
 	nativeStyleRowAttribute,
 	readsRow,
@@ -264,6 +268,7 @@ export async function compileNativeComponent(input: {
 							pattern: entry.pattern,
 							params: entry.params.map((param) => param.name),
 						})),
+						...(input.manifest.statusPages.notFound ? { notFound: NATIVE_NOT_FOUND_ROUTE } : {}),
 						resolvePath: (path: string) => {
 							const matched = matchRouteManifest(path, input.manifest!);
 							return matched
@@ -330,7 +335,7 @@ function unstyledOnly(
 			'attribute' in binding &&
 			nativeStyleRowAttribute(binding.attribute, tested) &&
 			readsRow(payload, binding.value) &&
-			!rowAttributeOptions(binding.attribute, binding.value)
+			!rowAttributeOptions(binding.attribute, binding.value, booleanCellsOf(payload))
 				? [
 						nativeUnsupported(
 							`the \`${binding.attribute}\` of <${node.element}> ${node.id} follows its @for row on a styled page through a value the build cannot list; Dragon styles a row by each value it can give, so write it as literals chosen by conditions`,
@@ -380,6 +385,8 @@ export async function compileNativeApp(input: {
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
 	readonly target?: 'ios' | 'android';
+	/** Keep the routes whose page builds when others refuse (their diagnostics are still returned). */
+	readonly partial?: boolean;
 	/** The `icons` option of the app's `ui()` plugin, as `compileNativeComponent` takes it. */
 	readonly icons?: false | IconsOptions;
 }): Promise<NativeAppBuild> {
@@ -402,10 +409,24 @@ export async function compileNativeApp(input: {
 				input.readStylesheet,
 			)
 		: [];
-	for (const route of manifest.routes) {
+	// The app's 404 page rides as one more route, where links to paths no route matches open it.
+	const entries = [
+		...manifest.routes.map((route) => ({
+			file: route.file,
+			pattern: route.pattern,
+			params: route.params.map((param) => param.name),
+			routed: true,
+		})),
+		...(manifest.statusPages.notFound
+			? [{ file: manifest.statusPages.notFound, pattern: NATIVE_NOT_FOUND_ROUTE, params: [], routed: false }]
+			: []),
+	];
+	for (const route of entries) {
 		const page = input.pages.find((candidate) => candidate.page === route.file)!;
 		const build = await compileNativeComponent({
-			...page,
+			filename: page.filename,
+			source: page.source,
+			...(route.routed ? { page: page.page } : {}),
 			manifest,
 			...(input.readModule ? { readModule: input.readModule } : {}),
 			...(input.readStylesheet ? { readStylesheet: input.readStylesheet } : {}),
@@ -433,8 +454,9 @@ export async function compileNativeApp(input: {
 		}
 		routes.push({
 			pattern: route.pattern,
-			params: route.params.map((param) => param.name),
-			page: build.payload,
+			params: route.params,
+			// Each route's page names its route, as hosts check; the 404 page is routed here, not by the router.
+			page: route.routed ? build.payload : { ...build.payload, route: { pattern: route.pattern, params: [] } },
 		});
 		if (styled) {
 			const inputs = nativeStyleInputs(build.payload, build.styles, sheets);
@@ -447,8 +469,11 @@ export async function compileNativeApp(input: {
 		}
 	}
 	return {
-		payload: diagnostics.length > 0 ? null : { version: NATIVE_APP_VERSION, routes },
-		styleInputs: diagnostics.length > 0 ? [] : styleInputs,
+		payload:
+			diagnostics.length > 0 && !(input.partial && routes.length > 0)
+				? null
+				: { version: NATIVE_APP_VERSION, routes },
+		styleInputs: diagnostics.length > 0 && !input.partial ? [] : styleInputs,
 		manifest: deviceManifest([...features], input.device).manifest,
 		diagnostics,
 	};

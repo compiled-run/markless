@@ -5,8 +5,8 @@
 		"component": "App",
 		"cells": [
 			{
-				"id": "state:loaded",
-				"name": "loaded",
+				"id": "state:ready",
+				"name": "ready",
 				"initial": false,
 				"styled": true
 			},
@@ -18,12 +18,9 @@
 			{
 				"id": "state:picked",
 				"name": "picked",
-				"initial": "none",
+				"initial": "nothing",
 				"styled": true,
-				"domain": [
-					"none",
-					"large"
-				]
+				"domain": ["nothing", "red"]
 			}
 		],
 		"nodes": [
@@ -49,7 +46,7 @@
 				"parent": "h1",
 				"parts": [
 					{
-						"text": "Product"
+						"text": "Colours"
 					}
 				]
 			},
@@ -86,13 +83,13 @@
 					{
 						"expr": {
 							"if": {
-								"cell": "state:loaded"
+								"cell": "state:ready"
 							},
 							"whenTrue": {
-								"literal": "Unload"
+								"literal": "Hide choices"
 							},
 							"whenFalse": {
-								"literal": "Load"
+								"literal": "Show choices"
 							}
 						}
 					}
@@ -103,15 +100,44 @@
 				"id": "branch-site:0",
 				"parent": "h0",
 				"test": {
-					"cell": "state:loaded"
+					"cell": "state:ready"
 				},
 				"arms": 2
 			},
 			{
 				"kind": "element",
 				"id": "h4",
-				"element": "section",
+				"element": "button",
 				"parent": "h0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Choose a colour"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "sheet",
+				"id": "sheet:component-edge:0",
+				"parent": "h0",
+				"open": {
+					"cell": "state:choosing"
+				},
+				"snapPoints": [0.5],
+				"dismissible": true,
+				"modal": true,
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 0
@@ -121,7 +147,7 @@
 				"kind": "element",
 				"id": "h5",
 				"element": "h2",
-				"parent": "h4",
+				"parent": "sheet:component-edge:0",
 				"defaultStyle": {
 					"bold": true,
 					"size": 1.5
@@ -137,7 +163,7 @@
 				"parent": "h5",
 				"parts": [
 					{
-						"text": "Mug"
+						"text": "Pick one"
 					}
 				],
 				"arm": {
@@ -149,7 +175,7 @@
 				"kind": "element",
 				"id": "h6",
 				"element": "button",
-				"parent": "h4",
+				"parent": "sheet:component-edge:0",
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 0
@@ -161,7 +187,7 @@
 				"parent": "h6",
 				"parts": [
 					{
-						"text": "Choose size"
+						"text": "Red"
 					}
 				],
 				"arm": {
@@ -170,31 +196,10 @@
 				}
 			},
 			{
-				"kind": "sheet",
-				"id": "sheet:component-edge:0",
-				"parent": "h4",
-				"open": {
-					"cell": "state:choosing"
-				},
-				"snapPoints": [
-					1
-				],
-				"dismissible": true,
-				"modal": true,
-				"arm": {
-					"branch": "branch-site:0",
-					"index": 0
-				}
-			},
-			{
 				"kind": "element",
 				"id": "h7",
-				"element": "h2",
+				"element": "button",
 				"parent": "sheet:component-edge:0",
-				"defaultStyle": {
-					"bold": true,
-					"size": 1.5
-				},
 				"arm": {
 					"branch": "branch-site:0",
 					"index": 0
@@ -206,55 +211,7 @@
 				"parent": "h7",
 				"parts": [
 					{
-						"text": "Sizes"
-					}
-				],
-				"arm": {
-					"branch": "branch-site:0",
-					"index": 0
-				}
-			},
-			{
-				"kind": "element",
-				"id": "h8",
-				"element": "button",
-				"parent": "sheet:component-edge:0",
-				"arm": {
-					"branch": "branch-site:0",
-					"index": 0
-				}
-			},
-			{
-				"kind": "text",
-				"id": "h8:text0",
-				"parent": "h8",
-				"parts": [
-					{
-						"text": "Large"
-					}
-				],
-				"arm": {
-					"branch": "branch-site:0",
-					"index": 0
-				}
-			},
-			{
-				"kind": "element",
-				"id": "h9",
-				"element": "button",
-				"parent": "sheet:component-edge:0",
-				"arm": {
-					"branch": "branch-site:0",
-					"index": 0
-				}
-			},
-			{
-				"kind": "text",
-				"id": "h9:text0",
-				"parent": "h9",
-				"parts": [
-					{
-						"text": "Remove product"
+						"text": "Put away"
 					}
 				],
 				"arm": {
@@ -270,17 +227,17 @@
 				"handler": "handler:event:0"
 			},
 			{
-				"host": "h6",
+				"host": "h4",
 				"event": "activate",
 				"handler": "handler:event:1"
 			},
 			{
-				"host": "h8",
+				"host": "h6",
 				"event": "activate",
 				"handler": "handler:event:2"
 			},
 			{
-				"host": "h9",
+				"host": "h7",
 				"event": "activate",
 				"handler": "handler:event:3"
 			},
@@ -296,11 +253,11 @@
 				"ops": [
 					{
 						"op": "assign",
-						"cell": "state:loaded",
+						"cell": "state:ready",
 						"value": {
 							"unary": "!",
 							"value": {
-								"cell": "state:loaded"
+								"cell": "state:ready"
 							}
 						}
 					}
@@ -325,7 +282,7 @@
 						"op": "assign",
 						"cell": "state:picked",
 						"value": {
-							"literal": "large"
+							"literal": "red"
 						}
 					},
 					{
@@ -342,7 +299,7 @@
 				"ops": [
 					{
 						"op": "assign",
-						"cell": "state:loaded",
+						"cell": "state:ready",
 						"value": {
 							"literal": false
 						}
@@ -364,31 +321,11 @@
 		]
 	},
 	"initial": [
-		[
-			"h1:text0",
-			"Product"
-		],
-		[
-			"h2:text0",
-			"Picked none"
-		],
-		[
-			"h3:text0",
-			"Load"
-		]
+		["h1:text0", "Colours"],
+		["h2:text0", "Picked nothing"],
+		["h3:text0", "Show choices"]
 	],
-	"initialArms": [
-		[
-			"branch-site:0",
-			1
-		]
-	],
-	"initialSheets": [
-		[
-			"sheet:component-edge:0",
-			false
-		]
-	],
+	"initialArms": [["branch-site:0", 1]],
 	"steps": [
 		{
 			"action": {
@@ -398,13 +335,13 @@
 			"journal": [
 				{
 					"op": "state",
-					"cell": "state:loaded",
+					"cell": "state:ready",
 					"value": true
 				},
 				{
 					"op": "text",
 					"node": "h3:text0",
-					"value": "Unload"
+					"value": "Hide choices"
 				},
 				{
 					"op": "arm",
@@ -416,7 +353,7 @@
 		{
 			"action": {
 				"event": "activate",
-				"host": "h6"
+				"host": "h4"
 			},
 			"journal": [
 				{
@@ -429,64 +366,23 @@
 		{
 			"action": {
 				"event": "activate",
-				"host": "h8"
+				"host": "h7"
 			},
 			"journal": [
 				{
 					"op": "state",
-					"cell": "state:picked",
-					"value": "large"
-				},
-				{
-					"op": "text",
-					"node": "h2:text0",
-					"value": "Picked large"
-				},
-				{
-					"op": "sheet",
-					"node": "sheet:component-edge:0",
-					"open": false
-				}
-			]
-		},
-		{
-			"action": {
-				"event": "activate",
-				"host": "h6"
-			},
-			"journal": [
-				{
-					"op": "sheet",
-					"node": "sheet:component-edge:0",
-					"open": true
-				}
-			]
-		},
-		{
-			"action": {
-				"event": "activate",
-				"host": "h9"
-			},
-			"journal": [
-				{
-					"op": "state",
-					"cell": "state:loaded",
+					"cell": "state:ready",
 					"value": false
 				},
 				{
 					"op": "text",
 					"node": "h3:text0",
-					"value": "Load"
+					"value": "Show choices"
 				},
 				{
 					"op": "arm",
 					"node": "branch-site:0",
 					"index": 1
-				},
-				{
-					"op": "sheet",
-					"node": "sheet:component-edge:0",
-					"open": false
 				}
 			]
 		},
@@ -498,23 +394,67 @@
 			"journal": [
 				{
 					"op": "state",
-					"cell": "state:loaded",
+					"cell": "state:ready",
 					"value": true
 				},
 				{
 					"op": "text",
 					"node": "h3:text0",
-					"value": "Unload"
+					"value": "Hide choices"
 				},
 				{
 					"op": "arm",
 					"node": "branch-site:0",
 					"index": 0
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:picked",
+					"value": "red"
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Picked red"
 				},
 				{
 					"op": "sheet",
 					"node": "sheet:component-edge:0",
+					"open": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "sheet",
+					"node": "sheet:component-edge:0",
 					"open": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "dismiss",
+				"host": "sheet:component-edge:0"
+			},
+			"journal": [
+				{
+					"op": "sheet",
+					"node": "sheet:component-edge:0",
+					"open": false
 				}
 			]
 		}
