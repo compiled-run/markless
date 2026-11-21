@@ -251,7 +251,6 @@
 		"payload": false,
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: a style binding",
-			"MARKLESS_NATIVE_JAVASCRIPT: the computed `char` reads `at`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_JAVASCRIPT: the focus handler uses `HTMLInputElement`, which a phone's script engine does not provide"
 		]
 	},
@@ -414,7 +413,6 @@
 	"tour": {
 		"payload": false,
 		"diagnostics": [
-			"MARKLESS_NATIVE_JAVASCRIPT: the computed `isCurrent` reads `at`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <div> component-edge:6/component-edge:0/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:6/component-edge:0/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler reads `event.detail`, which a tap on a phone does not have",
