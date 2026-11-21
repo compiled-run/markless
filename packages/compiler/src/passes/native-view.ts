@@ -3972,19 +3972,16 @@ export function createNativeViewPayload(
 					scope.module.computeds.get('')?.get(expression.name);
 				if (computed?.kind === 'computed' && computed.async)
 					return asyncRead(computed, what, scope);
-				// A part's place in its family's roster, or how many parts it has: render order, settled once the tree is built.
-				const roster =
-					computed &&
-					(scope.module.graph.elementRosterPositions?.find((fact) => fact.computedGraphNodeId === computed.id) ??
-						scope.module.graph.elementRosterCounts?.find((fact) => fact.computedGraphNodeId === computed.id));
-				if (roster) {
-					const rosterKey = handleKey(roster.rosterGraphNodeId, scope);
-					const ownKey = 'handleGraphNodeId' in roster ? handleKey(roster.handleGraphNodeId, scope) : undefined;
-					if (rosterKey === undefined || ('handleGraphNodeId' in roster && ownKey === undefined))
+				// How many parts a family's roster has: render order, settled once the tree is built.
+				const count =
+					computed && scope.module.graph.elementRosterCounts?.find((fact) => fact.computedGraphNodeId === computed.id);
+				if (count) {
+					const rosterKey = handleKey(count.rosterGraphNodeId, scope);
+					if (rosterKey === undefined)
 						return refuse(`${what} reads \`${expression.name}\`, a roster whose handle this build cannot place`);
-					const placed: { literal: number } = { literal: 0 };
-					rosterReads.push({ expr: placed, roster: rosterKey, own: ownKey, what });
-					return placed;
+					const counted: { literal: number } = { literal: 0 };
+					rosterCounts.push({ expr: counted, roster: rosterKey, what });
+					return counted;
 				}
 				if (computed) {
 					if (inlining.has(computed.id))
@@ -4779,8 +4776,8 @@ export function createNativeViewPayload(
 		const inB = armsOf(b);
 		return [...armsOf(a)].some(([branch, index]) => inB.has(branch) && inB.get(branch) !== index);
 	};
-	/** Roster positions and counts read while the tree was walked, settled from the handles bound once it is built. */
-	const rosterReads: { expr: { literal: number }; roster: string; own: string | undefined; what: string }[] = [];
+	/** Roster sizes read while the tree was walked, settled from the handles bound once it is built. */
+	const rosterCounts: { expr: { literal: number }; roster: string; what: string }[] = [];
 	const dialogOps: { op: 'dialog'; node: string; method: 'showModal' | 'close' }[] = [];
 	const handleReferences: {
 		readonly node: string;
@@ -8356,24 +8353,13 @@ export function createNativeViewPayload(
 	}
 	lateLowering = false;
 
-	for (const read of rosterReads) {
+	for (const read of rosterCounts) {
 		const byId = nodeById();
 		const members = boundHandles.get(read.roster) ?? [];
 		// A part in an @if arm or a @for row joins and leaves the roster while the app runs, which a fixed number cannot follow.
-		if (members.some((id) => byId.get(id)?.arm || byId.get(id)?.row)) {
-			refuse(`${read.what}: a roster with a part inside an @if arm or @for row, whose place changes while the app runs`);
-			continue;
-		}
-		if (read.own === undefined) {
-			read.expr.literal = members.length;
-			continue;
-		}
-		const own = boundHandles.get(read.own) ?? [];
-		if (own.length !== 1) {
-			refuse(`${read.what}: a roster place whose own handle is not bound to exactly one element`);
-			continue;
-		}
-		read.expr.literal = members.indexOf(own[0]!);
+		if (members.some((id) => byId.get(id)?.arm || byId.get(id)?.row))
+			refuse(`${read.what}: a roster with a part inside an @if arm or @for row, whose size changes while the app runs`);
+		else read.expr.literal = members.length;
 	}
 	for (const op of dialogOps) {
 		const bound = boundHandles.get(op.node) ?? [];
