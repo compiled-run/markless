@@ -1,0 +1,20 @@
+{
+	"rung": 124,
+	"name": "@markless/ui pagination item links: an anchor with no href has no default action, so its click handler's preventDefault() is dropped and a tap goes to that page",
+	"steps": [
+		{
+			"visible": ["Results", "First", "Second", "Third", "Showing page 1"],
+			"absent": ["Showing page 2", "Showing page 3"]
+		},
+		{
+			"do": { "tap": "Third" },
+			"visible": ["Showing page 3"],
+			"absent": ["Showing page 1", "Showing page 2"]
+		},
+		{
+			"do": { "tap": "Second" },
+			"visible": ["Showing page 2"],
+			"absent": ["Showing page 1", "Showing page 3"]
+		}
+	]
+}

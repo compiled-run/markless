@@ -37,7 +37,7 @@ private func rejection(_ text: String) -> String? {
 	("\"component\":\"Counter\"", "\"component\":\"Counter\",\"script\":{\"id\":\"a\",\"source\":\"\",\"services\":[\"storage\"]}", "unknown script service \"storage\""),
 	("{\"literal\":1}", "{\"script\":\"fn:0\",\"bindings\":{\"n\":{\"slot\":\"state:count\"}}}", "a script binding is"),
 	("{\"op\":\"assign\"", "{\"op\":\"script\",\"fn\":\"fn:0\",\"bindings\":{},\"then\":[]},{\"op\":\"assign\"", "unknown field \"then\""),
-	("{\"literal\":1}", "{\"event\":\"detail\"}", "unknown event read \"detail\""),
+	("{\"literal\":1}", "{\"event\":\"wheel\"}", "unknown event read \"wheel\""),
 	("{\"literal\":1}", "{\"focused\":false}", "focused is only ever true"),
 	("{\"literal\":1}", "{\"contains\":{\"literal\":1}}", "unknown expression"),
 ])

@@ -1,0 +1,19 @@
+{
+	"rung": "N10",
+	"name": "An awaited navigate() from a handler opens the page, then replaces it, as on the web",
+	"steps": [
+		{ "visible": ["Unsaved draft", "Save"], "title": "Draft" },
+		{
+			"do": { "tap": "Save" },
+			"visible": ["Draft saved", "New draft"],
+			"absent": ["Unsaved draft"],
+			"title": "Saved"
+		},
+		{
+			"do": { "tap": "New draft" },
+			"visible": ["Unsaved draft", "Save"],
+			"absent": ["Draft saved"],
+			"title": "Draft"
+		}
+	]
+}

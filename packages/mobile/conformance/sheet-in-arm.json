@@ -7,7 +7,8 @@
 			{
 				"id": "state:ready",
 				"name": "ready",
-				"initial": false
+				"initial": false,
+				"styled": true
 			},
 			{
 				"id": "state:choosing",
@@ -17,7 +18,9 @@
 			{
 				"id": "state:picked",
 				"name": "picked",
-				"initial": "nothing"
+				"initial": "nothing",
+				"styled": true,
+				"domain": ["nothing", "red"]
 			}
 		],
 		"nodes": [
@@ -331,6 +334,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:ready",
+					"value": true
+				},
+				{
 					"op": "text",
 					"node": "h3:text0",
 					"value": "Hide choices"
@@ -362,6 +370,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:ready",
+					"value": false
+				},
+				{
 					"op": "text",
 					"node": "h3:text0",
 					"value": "Show choices"
@@ -380,6 +393,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:ready",
+					"value": true
+				},
+				{
 					"op": "text",
 					"node": "h3:text0",
 					"value": "Hide choices"
@@ -397,6 +415,11 @@
 				"host": "h6"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:picked",
+					"value": "red"
+				},
 				{
 					"op": "text",
 					"node": "h2:text0",

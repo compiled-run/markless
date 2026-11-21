@@ -1,0 +1,201 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-clfw02"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "pad mk-clfw02"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "p",
+			"parent": "h1",
+			"attributes": {
+				"class": "label mk-clfw02"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Drag me"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "line mk-clfw02"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Idle"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "line mk-clfw02"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Pointer none"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "line mk-clfw02"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Captured no"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "line mk-clfw02"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Still"
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "line mk-clfw02"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "Over 0 left 0"
+		},
+		{
+			"kind": "element",
+			"id": "h8",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "box mk-clfw02"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h9",
+			"element": "div",
+			"parent": "h8",
+			"attributes": {
+				"class": "tall mk-clfw02"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h10",
+			"element": "p",
+			"parent": "h9",
+			"attributes": {
+				"class": "label mk-clfw02"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h10:text0",
+			"parent": "h10",
+			"text": "Scroll me"
+		},
+		{
+			"kind": "element",
+			"id": "h11",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "line mk-clfw02"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h11:text0",
+			"parent": "h11",
+			"text": "Not scrolled",
+			"textByState": [
+				{
+					"when": {
+						"state:scrolled": "Not scrolled"
+					},
+					"value": "Not scrolled"
+				},
+				{
+					"when": {
+						"state:scrolled": "Touching"
+					},
+					"value": "Touching"
+				},
+				{
+					"when": {
+						"state:scrolled": "Taken by the scroll"
+					},
+					"value": "Taken by the scroll"
+				},
+				{
+					"when": {
+						"state:scrolled": "Lifted"
+					},
+					"value": "Lifted"
+				}
+			]
+		}
+	],
+	"css": ".page.mk-clfw02 {\n\t\t\t\tpadding: 16px;\n\t\t\t}\n\t\t\t.pad.mk-clfw02 {\n\t\t\t\theight: 120px;\n\t\t\t\tborder: 2px solid #1d1b16;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #b7e4c7;\n\t\t\t\ttouch-action: none;\n\t\t\t}\n\t\t\t.label.mk-clfw02 {\n\t\t\t\tmargin: 0;\n\t\t\t\tpadding: 12px;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.line.mk-clfw02 {\n\t\t\t\tmargin: 6px 0;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.box.mk-clfw02 {\n\t\t\t\theight: 160px;\n\t\t\t\toverflow-y: auto;\n\t\t\t\tborder: 2px solid #1d1b16;\n\t\t\t}\n\t\t\t.tall.mk-clfw02 {\n\t\t\t\theight: 600px;\n\t\t\t\tbackground: #e9ecef;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "state:scrolled",
+			"domain": [
+				"Not scrolled",
+				"Touching",
+				"Taken by the scroll",
+				"Lifted"
+			],
+			"initial": "Not scrolled"
+		}
+	]
+}

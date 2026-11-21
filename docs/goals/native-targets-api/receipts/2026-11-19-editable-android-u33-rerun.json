@@ -1,0 +1,12 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u33-editable",
+			"failure": null,
+			"installSeconds": 2.0600061249999997,
+			"flowSeconds": 23.392909333000002
+		}
+	]
+}

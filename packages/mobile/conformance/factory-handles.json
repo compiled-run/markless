@@ -1,0 +1,176 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "FactoryHandles",
+		"cells": [
+			{
+				"id": "component-edge:0/shared:src/factory-handles.tsrx#boxState/state:box.note",
+				"name": "box.note",
+				"initial": "unchecked",
+				"styled": true,
+				"domain": [
+					"unchecked",
+					"has field"
+				]
+			},
+			{
+				"id": "component-edge:2/shared:src/factory-handles.tsrx#boxState/state:box.note",
+				"name": "box.note",
+				"initial": "unchecked",
+				"styled": true,
+				"domain": [
+					"unchecked",
+					"no field"
+				]
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h1",
+				"element": "div",
+				"parent": "h3"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h0",
+				"element": "input",
+				"parent": "component-edge:0/h1",
+				"attributes": {
+					"aria-label": "Field"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h2",
+				"element": "button",
+				"parent": "component-edge:0/h1"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h2:text0",
+				"parent": "component-edge:0/h2",
+				"parts": [
+					{
+						"cell": "component-edge:0/shared:src/factory-handles.tsrx#boxState/state:box.note"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:2/h1",
+				"element": "div",
+				"parent": "h3"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:2/h2",
+				"element": "button",
+				"parent": "component-edge:2/h1"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:2/h2:text0",
+				"parent": "component-edge:2/h2",
+				"parts": [
+					{
+						"cell": "component-edge:2/shared:src/factory-handles.tsrx#boxState/state:box.note"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:0/h2",
+				"event": "activate",
+				"handler": "handler:component-edge:0/event:0"
+			},
+			{
+				"host": "component-edge:2/h2",
+				"event": "activate",
+				"handler": "handler:component-edge:2/event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:0/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:0/shared:src/factory-handles.tsrx#boxState/state:box.note",
+						"value": {
+							"literal": "has field"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:2/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:2/shared:src/factory-handles.tsrx#boxState/state:box.note",
+						"value": {
+							"literal": "no field"
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"component-edge:0/h2:text0",
+			"unchecked"
+		],
+		[
+			"component-edge:2/h2:text0",
+			"unchecked"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/shared:src/factory-handles.tsrx#boxState/state:box.note",
+					"value": "has field"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h2:text0",
+					"value": "has field"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:2/h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:2/shared:src/factory-handles.tsrx#boxState/state:box.note",
+					"value": "no field"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:2/h2:text0",
+					"value": "no field"
+				}
+			]
+		}
+	]
+}

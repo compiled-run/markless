@@ -1,0 +1,39 @@
+{
+	"rung": 201,
+	"name": "An async submit that awaits a promise whose resolve or reject is handed to setTimeout settles after the delay",
+	"steps": [
+		{
+			"visible": ["Draft", "Save", "Check name", "Not saved", "Not checked"]
+		},
+		{
+			"do": {
+				"tap": "Save"
+			},
+			"visible": ["Not checked"],
+			"absent": ["Not saved", "Saved"],
+			"disabled": ["Save"]
+		},
+		{
+			"do": {
+				"wait": 7000
+			},
+			"visible": ["Saved", "Save", "Not checked"],
+			"absent": ["Saving", "Uploading"]
+		},
+		{
+			"do": {
+				"tap": "Check name"
+			},
+			"visible": ["Checking", "Saved"],
+			"absent": ["Not checked"],
+			"disabled": ["Check name"]
+		},
+		{
+			"do": {
+				"wait": 7000
+			},
+			"visible": ["Name taken", "Check name"],
+			"absent": ["Checking", "Name free"]
+		}
+	]
+}

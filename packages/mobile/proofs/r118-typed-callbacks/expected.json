@@ -1,0 +1,10 @@
+{
+	"rung": "R118",
+	"name": "A callback prop whose parameters have types binds them by name, as the web runs it",
+	"steps": [
+		{ "visible": ["Typed callbacks", "Drink none, cups 0", "Wi-Fi is off"] },
+		{ "do": { "tap": "Tea" }, "visible": ["Drink tea, cups 3"], "absent": ["Drink none, cups 0"] },
+		{ "do": { "tap": "Coffee" }, "visible": ["Drink coffee, cups 9", "Wi-Fi is off"], "absent": ["Drink tea, cups 3"] },
+		{ "do": { "tap": "Wi-Fi" }, "visible": ["Wi-Fi is on"], "absent": ["Wi-Fi is off"] }
+	]
+}

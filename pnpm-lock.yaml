@@ -1083,12 +1083,18 @@ importers:
       '@markless/compiler':
         specifier: workspace:*
         version: link:../compiler
+      '@markless/icons':
+        specifier: workspace:*
+        version: link:../headless/icons
       '@markless/router':
         specifier: workspace:*
         version: link:../router
       '@markless/serializer':
         specifier: workspace:*
         version: link:../serializer
+      '@markless/ui-tools':
+        specifier: workspace:*
+        version: link:../headless/tools
       '@markless/web':
         specifier: workspace:*
         version: link:../web

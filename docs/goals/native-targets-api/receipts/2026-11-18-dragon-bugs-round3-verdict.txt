@@ -1,0 +1,5 @@
+28 rungs, Dragon cw/dragon-bugs at ec0066c55d:
+proof passed on iOS and Android
+
+S9 and S10 again after Dragon 53b78e9ced (iOS author fonts measured as Safari does):
+proof passed on iOS and Android

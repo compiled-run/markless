@@ -1,0 +1,32 @@
+appId: ${APP_ID}
+name: u29-field-focus
+---
+- launchApp:
+      clearState: true
+- assertVisible: Sign up
+- assertVisible: Not editing
+- assertVisible: Focused 0 times
+- assertVisible: Pressed 0
+- assertNotVisible: Editing email
+- assertNotVisible: Email left
+- assertNotVisible: Focused 1 times
+- tapOn: Email
+- eraseText
+- inputText: ada@example.com
+- hideKeyboard
+- assertVisible: Focused 1 times
+- assertNotVisible: Not editing
+- assertNotVisible: Focused 0 times
+- assertVisible: ada@example\.com
+- assertVisible: Focused 1 times
+- assertVisible: Pressed 0
+- assertNotVisible: Not editing
+- assertNotVisible: Focused 0 times
+- assertVisible: ada@example\.com
+- tapOn: Pressed 0
+- assertNotVisible: Pressed 0
+- assertVisible: Email left
+- assertVisible: Pressed 1
+- assertVisible: Focused 1 times
+- assertNotVisible: Editing email
+- assertNotVisible: Pressed 0
