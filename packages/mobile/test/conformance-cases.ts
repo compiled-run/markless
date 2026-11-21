@@ -812,6 +812,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'radio-follows',
+		fixture: 'proofs/r163-radio-follows/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'component-edge:4/h5' },
+			{ event: 'activate', host: 'component-edge:7/h5' },
+		],
+	},
+	{
 		name: 'ticked-keys',
 		fixture: 'test/fixtures/TickedKeys.tsrx',
 		actions: [
