@@ -208,6 +208,9 @@ export type NativeScript = {
 /** Every cell an expression reads. */
 export function nativeExprCells(expr: NativeExpr, into = new Set<string>()): Set<string> {
 	if ('cell' in expr) into.add(expr.cell);
+	// A script binding's `fields` names the cells of a state object the script reads.
+	if ('fields' in expr && expr.fields && typeof expr.fields === 'object')
+		for (const cell of Object.values(expr.fields as Record<string, unknown>)) if (typeof cell === 'string') into.add(cell);
 	for (const child of Object.values(expr)) {
 		if (Array.isArray(child)) {
 			for (const item of child)
