@@ -11,6 +11,7 @@ import {
 	DEVICE_TARGET_FACTS,
 	NATIVE_FACT_COLLECTORS,
 	nativeUnsupported,
+	selectorAttributes,
 	type NativeViewArtifact,
 } from '@markless/compiler/native';
 import {
@@ -22,11 +23,17 @@ import { iconSourceTransform, type IconsOptions } from '@markless/icons/vite';
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
 import { uiIconsOptions } from '@markless/ui-tools';
 import {
-	isNativeStyleStateAttribute,
 	NATIVE_APP_VERSION,
 	NATIVE_NOT_FOUND_ROUTE,
 } from '@markless/serializer/native-view';
-import { booleanCellsOf, nativeStyleInputs, readsRow, rowAttributeOptions, type NativeStyleInput } from './style-input.ts';
+import {
+	booleanCellsOf,
+	nativeStyleInputs,
+	nativeStyleRowAttribute,
+	readsRow,
+	rowAttributeOptions,
+	type NativeStyleInput,
+} from './style-input.ts';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
 
@@ -285,14 +292,29 @@ export async function compileNativeComponent(input: {
 		native.features,
 		input.device,
 	);
-	const styles = [...importedStyles, ...compiled.publicRenderPlan.styleScopes].filter(
-		(style, index, all) => all.findIndex((other) => other.scopeId === style.scopeId) === index,
-	);
 	const sheets = stylesheets.filter(
 		(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 	);
+	const authored = [...importedStyles, ...compiled.publicRenderPlan.styleScopes];
+	const styled = sheets.length > 0 || authored.some((style) => style.cssText.length > 0);
+	// A styled page gets every component module's <style> blocks it is built from, as the web bundle does (a family's
+	// defaults); an unstyled page keeps the phone's own look, which those defaults do not change.
+	const built: NativeBuild['styles'][number][] = [];
+	if (styled)
+		for (const file of graphs.keys()) {
+			const module = read.get(file);
+			if (file === input.filename || !module || !file.endsWith('.tsrx')) continue;
+			built.push(...(await compileTsrxModule({ ...module, symbols: [] })).publicRenderPlan.styleScopes);
+		}
+	const styles = [...importedStyles, ...built, ...compiled.publicRenderPlan.styleScopes].filter(
+		(style, index, all) => all.findIndex((other) => other.scopeId === style.scopeId) === index,
+	);
 	const unstyled = native.payload
-		? unstyledOnly(native.payload, native.elementSources, sheets.length > 0 || styles.some((style) => style.cssText.length > 0))
+		? unstyledOnly(
+				native.payload,
+				native.elementSources,
+				styled ? [...sheets, ...styles].map((style) => style.cssText) : [],
+			)
 		: [];
 	return {
 		payload: errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,
@@ -309,9 +331,10 @@ export async function compileNativeComponent(input: {
 function unstyledOnly(
 	payload: NativeViewPayload,
 	sources: NativeViewArtifact['elementSources'],
-	styled: boolean,
+	css: ReadonlyArray<string>,
 ): CompilerDiagnostic[] {
-	if (!styled) return [];
+	if (!css.some((text) => text.length > 0)) return [];
+	const tested = new Set(css.flatMap((text) => [...selectorAttributes(text)]));
 	return payload.nodes.flatMap((node) => {
 		if (node.kind !== 'element') return [];
 		const span = sources.get(node.id)?.span;
@@ -325,7 +348,7 @@ function unstyledOnly(
 		if (!node.row) return [];
 		return (node.bindings ?? []).flatMap((binding) =>
 			'attribute' in binding &&
-			(binding.attribute === 'class' || isNativeStyleStateAttribute(binding.attribute)) &&
+			nativeStyleRowAttribute(binding.attribute, tested) &&
 			readsRow(payload, binding.value) &&
 			!rowAttributeOptions(binding.attribute, binding.value, booleanCellsOf(payload))
 				? [
@@ -435,7 +458,11 @@ export async function compileNativeApp(input: {
 			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 		);
 		const styled = sheets.length > 0 || build.styles.some((style) => style.cssText.length > 0);
-		const unstyled = unstyledOnly(build.payload, build.elementSources, styled);
+		const unstyled = unstyledOnly(
+			build.payload,
+			build.elementSources,
+			[...sheets, ...build.styles].map((style) => style.cssText),
+		);
 		if (unstyled.length > 0) {
 			diagnostics.push(...unstyled.map((diagnostic) => ({ ...diagnostic, page: page.page })));
 			continue;

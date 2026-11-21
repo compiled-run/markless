@@ -1,0 +1,9 @@
+appId: ${APP_ID}
+name: u98-family-styles
+---
+- launchApp:
+      clearState: true
+- assertVisible: Family styles
+- assertVisible: Top row
+- assertVisible: Badge
+- assertVisible: Seed none

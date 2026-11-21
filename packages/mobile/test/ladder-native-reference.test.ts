@@ -11,6 +11,7 @@ import { buildRouteManifestFromFileIds, matchRouteManifest } from '@markless/rou
 import type {
 	NativeAppPayload,
 	NativeJournalEntry,
+	NativeNode,
 	NativeValue,
 	NativeViewPayload,
 } from '@markless/serializer';
@@ -38,6 +39,26 @@ import {
 	type LadderRung,
 	type LadderStep,
 } from '../proofs/ladder.ts';
+
+/**
+ * The key, at a `rows` entry's list, of the row an instance id sits in, when it sits in that copy of the list: an inner
+ * list's entry names its copy in one outer row (`<list>@<outer key>`), and its rows' ids are `<node>@<outer key>@<key>`.
+ */
+function rowKeyIn(
+	nodes: ReadonlyMap<string, NativeNode>,
+	list: string,
+	id: string,
+): string | undefined {
+	const at = id.indexOf('@');
+	if (at < 0) return undefined;
+	let under = false;
+	for (let row = nodes.get(id.slice(0, at))?.row; row && !under; row = nodes.get(row)?.row)
+		under = row === list.split('@')[0];
+	if (!under) return undefined;
+	const prefix = list.includes('@') ? `${list.slice(list.indexOf('@'))}@` : '@';
+	const suffix = id.slice(at);
+	return suffix.startsWith(prefix) ? suffix.slice(prefix.length).split('@')[0] : undefined;
+}
 
 /** What typing `text` into an emptied field leaves, as a phone's field limits it: `maxlength` UTF-16 code units, never half a surrogate pair. */
 const typedInto = (text: string, maxlength: string | null) => {
@@ -224,31 +245,24 @@ function mirror(
 		} else if (entry.op === 'rows') {
 			for (const [node, index] of runtime.arms())
 				if (!chosen.has(node)) chosen.set(node, index);
-			const rowNodes = payload.nodes
-				.filter((node) => node.row === entry.node)
-				.map((node) => node.id);
 			const kept = new Map<string, string>();
 			for (const [id, text] of texts) {
-				const at = id.indexOf('@');
-				if (at < 0 || !rowNodes.includes(id.slice(0, at))) continue;
+				const key = rowKeyIn(nodeOf, entry.node, id);
+				if (key === undefined) continue;
 				texts.delete(id);
-				if (entry.keys.includes(id.slice(at + 1))) kept.set(id, text);
+				if (entry.keys.includes(key)) kept.set(id, text);
 			}
-			const fresh = new Map(runtime.texts());
-			for (const key of entry.keys)
-				for (const node of rowNodes) {
-					const id = `${node}@${key}`;
-					const text = kept.get(id) ?? fresh.get(id);
-					if (text !== undefined) texts.set(id, text);
-				}
+			for (const [id, text] of runtime.texts()) {
+				const key = rowKeyIn(nodeOf, entry.node, id);
+				if (key !== undefined && entry.keys.includes(key)) texts.set(id, kept.get(id) ?? text);
+			}
 			// A row's copy is built with its bound attributes, as an arm's nodes are; a row that left takes its own with it.
-			const inRows = (id: string) => {
-				const at = id.indexOf('@');
-				return at >= 0 && rowNodes.includes(id.slice(0, at));
-			};
-			for (const key of attributes.keys()) if (inRows(key.split('\0')[0]!)) attributes.delete(key);
-			for (const [node, name, value] of runtime.attributes())
-				if (inRows(node) && entry.keys.includes(node.slice(node.indexOf('@') + 1))) attributes.set(`${node}\0${name}`, value);
+			for (const key of attributes.keys())
+				if (rowKeyIn(nodeOf, entry.node, key.split('\0')[0]!) !== undefined) attributes.delete(key);
+			for (const [node, name, value] of runtime.attributes()) {
+				const key = rowKeyIn(nodeOf, entry.node, node);
+				if (key !== undefined && entry.keys.includes(key)) attributes.set(`${node}\0${name}`, value);
+			}
 		} else if (entry.op === 'arm') {
 			chosen.set(entry.node, entry.index);
 			for (const [node, index] of runtime.arms())
@@ -378,13 +392,15 @@ function walkApp(
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
 		if (action && 'back' in action) {
-			expect(
-				appRuntime
-					.dispatch({ event: 'back' })
-					.filter((entry) => entry.op !== 'abort' && entry.op !== 'clearTimer'),
-				`step ${index}: Back journals only what it cancels`,
-			).toEqual([]);
+			const journal = appRuntime.dispatch({ event: 'back' });
 			stack.pop();
+			// The screen shown again takes what a page above it changed in the app-wide cells; nothing else changes.
+			const resumed = appRuntime.screens().at(-1)!.runtime.resume();
+			expect(resumed, `step ${index}: the screen shown again had resumed already`).toEqual([]);
+			const shownAgain = journal.filter((entry) => entry.op !== 'abort' && entry.op !== 'clearTimer');
+			const appWide = pageOf(appRuntime.screens().at(-1)!.route).cells.some((cell) => cell.app);
+			if (!appWide) expect(shownAgain, `step ${index}: Back journals only what it cancels`).toEqual([]);
+			for (const entry of shownAgain) stack.at(-1)!.apply(entry, -1);
 		} else if (
 			looksOnly(action) ||
 			(action && ('swipe' in action || 'scrollTo' in action || 'orientation' in action))
@@ -448,6 +464,8 @@ function walk(
 	let cameraPermission: 'unknown' | 'granted' | 'denied' = 'unknown';
 	let microphonePermission: 'unknown' | 'granted' | 'denied' = 'unknown';
 	let waiting: string[] = [];
+	// `location.current()` calls from handlers, waiting on the location prompt, by continuation.
+	let waitingCalls: string[] = [];
 	// Recorders: those recording and their seconds, and those whose start waits on the microphone prompt.
 	const recording = new Map<string, number>();
 	let waitingForMicrophone: string[] = [];
@@ -479,6 +497,18 @@ function walk(
 			: runtime.dispatch({
 					event: 'settle',
 					cell,
+					error: { name: 'NotAllowedError', message: 'Location was refused' },
+				});
+	const answerCall = (continuation: string) =>
+		permission === 'granted'
+			? runtime.dispatch({
+					event: 'resume',
+					continuation,
+					value: { ...position!, accuracy: 5 },
+				})
+			: runtime.dispatch({
+					event: 'reject',
+					continuation,
 					error: { name: 'NotAllowedError', message: 'Location was refused' },
 				});
 	const services = scriptServices();
@@ -734,6 +764,11 @@ function walk(
 						);
 				}
 				if (entry.call === 'sharesheet.open') sheet = entry.resume;
+				if (entry.call === 'location.current' && entry.resume) {
+					const continuation = entry.resume;
+					if (permission === 'unknown') waitingCalls.push(continuation);
+					else answered.push(() => answerCall(continuation));
+				}
 				if (
 					entry.call === 'camera.facing' &&
 					!facings.includes(String(entry.arguments[0]))
@@ -786,32 +821,28 @@ function walk(
 				mount();
 			} else if (entry.op === 'rows') {
 				for (const [node, index] of runtime.arms()) if (!chosen.has(node)) chosen.set(node, index);
-				const rowNodes = payload.nodes.filter((node) => node.row === entry.node).map((node) => node.id);
 				const kept = new Map<string, string>();
 				for (const [id, text] of texts) {
-					const instance = instanceOf(id);
-					if (!instance.suffix || !rowNodes.includes(instance.node)) continue;
+					const key = rowKeyIn(nodeOf, entry.node, id);
+					if (key === undefined) continue;
 					texts.delete(id);
-					if (entry.keys.includes(instance.suffix.slice(1))) kept.set(id, text);
+					if (entry.keys.includes(key)) kept.set(id, text);
 				}
-				const fresh = new Map(runtime.texts());
-				for (const key of entry.keys)
-					for (const node of rowNodes) {
-						const id = `${node}@${key}`;
-						const text = kept.get(id) ?? fresh.get(id);
-						if (text !== undefined) texts.set(id, text);
-					}
+				for (const [id, text] of runtime.texts()) {
+					const key = rowKeyIn(nodeOf, entry.node, id);
+					if (key !== undefined && entry.keys.includes(key)) texts.set(id, kept.get(id) ?? text);
+				}
 				// A row that stays keeps its attributes; a new row's are built from current values.
 				const keptAttributes = new Map<string, string | null>();
 				for (const [key, value] of attributes) {
-					const instance = instanceOf(key.split('\0')[0]!);
-					if (!instance.suffix || !rowNodes.includes(instance.node)) continue;
+					const row = rowKeyIn(nodeOf, entry.node, key.split('\0')[0]!);
+					if (row === undefined) continue;
 					attributes.delete(key);
-					if (entry.keys.includes(instance.suffix.slice(1))) keptAttributes.set(key, value);
+					if (entry.keys.includes(row)) keptAttributes.set(key, value);
 				}
 				for (const [node, name, value] of runtime.attributes()) {
-					const instance = instanceOf(node);
-					if (!instance.suffix || !rowNodes.includes(instance.node)) continue;
+					const row = rowKeyIn(nodeOf, entry.node, node);
+					if (row === undefined || !entry.keys.includes(row)) continue;
 					const key = `${node}\0${name}`;
 					attributes.set(key, keptAttributes.has(key) ? keptAttributes.get(key)! : value);
 				}
@@ -886,13 +917,15 @@ function walk(
 						apply(runtime.dispatch({ event: 'device', cell: cell.id, value }), index);
 		} else if (action && 'answer' in action) {
 			const given = action.answer === 'allow' ? 'granted' : 'denied';
-			if (payload.cells.some((cell) => cell.device?.startsWith('recorder.')))
+			if (waitingCalls.length > 0) permission = given;
+			else if (payload.cells.some((cell) => cell.device?.startsWith('recorder.')))
 				microphonePermission = given;
 			else if (payload.cells.some((cell) => cell.device?.startsWith('camera.')))
 				cameraPermission = given;
 			else permission = given;
 			refreshAccess(index);
 			for (const cell of waiting.splice(0)) apply(answer(cell), index);
+			for (const continuation of waitingCalls.splice(0)) apply(answerCall(continuation), index);
 			for (const object of waitingForMicrophone.splice(0))
 				if (given === 'granted') recording.set(object, 0);
 				else apply(setObject(object, 'recorder.active', false), index);
@@ -1053,7 +1086,7 @@ function walk(
 			if ('tap' in action && !activates && touched.length === 0)
 				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
 			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.
-			const handles = (node: string, event: 'input' | 'focus' | 'blur' | 'keydown') =>
+			const handles = (node: string, event: 'input' | 'focus' | 'blur' | 'keydown' | 'keyup') =>
 				payload.events.some((candidate) => candidate.host === node.split('@')[0] && candidate.event === event);
 			if ('type' in action && focused !== host) {
 				if (focused && handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
@@ -1078,7 +1111,28 @@ function walk(
 				apply(journal, index);
 				return journal.some((entry) => entry.op === 'preventDefault');
 			};
-			if ('type' in action) for (const key of action.type.text) keyed(key);
+			// A key's keyup runs after what the key did, or after its keydown left that out.
+			const keyedUp = (key: string) => {
+				if (handles(host, 'keyup')) apply(runtime.dispatch({ event: 'keyup', host, key }), index);
+			};
+			// With a keyup handler, typing is key by key, each key's edit between its keydown and its keyup, as on the web.
+			const byKey = 'type' in action && handles(host, 'keyup');
+			if ('type' in action && !byKey) for (const key of action.type.text) keyed(key);
+			if (byKey) {
+				// The field was erased before typing; keys past its maxlength still go down and up, and edit nothing.
+				const kept = [...text!];
+				let sofar = '';
+				for (const key of action.type.text) {
+					const prevented = keyed(key);
+					if (!prevented && [...sofar].length < kept.length) {
+						sofar += kept[[...sofar].length];
+						if (properties.has(host)) properties.set(host, sofar);
+						else typed.set(host, sofar);
+						if (handles(host, 'input')) apply(runtime.dispatch({ event: 'input', host, value: sofar }), index);
+					}
+					keyedUp(key);
+				}
+			}
 			// A double tap is two presses, the second counted 2.
 			if ('doubleTap' in action)
 				apply(runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 1 }), index);
@@ -1090,7 +1144,7 @@ function walk(
 					: 'doubleTap' in action
 						? runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 2 })
 					: 'type' in action
-						? handles(host, 'input')
+						? handles(host, 'input') && !byKey
 							? runtime.dispatch({ event: 'input', host, value: text! })
 							: []
 						: 'erase' in action
@@ -1101,6 +1155,15 @@ function walk(
 								? []
 								: runtime.dispatch({ event: 'enter', host });
 			apply(dispatched, index);
+			// A focus() a handler asks for gives a text field the keyboard, as the host does: its focus handler runs.
+			for (const entry of dispatched)
+				if (entry.op === 'command' && entry.command === 'focus' && entry.node !== focused) {
+					if (focused && handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+					focused = entry.node;
+					if (handles(entry.node, 'focus')) apply(runtime.dispatch({ event: 'focus', host: entry.node }), index);
+				}
+			if ('erase' in action) keyedUp('Backspace');
+			else if ('submit' in action) keyedUp('Enter');
 		}
 		raiseLoadEvents(index);
 		check(index, step);

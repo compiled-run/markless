@@ -1,0 +1,43 @@
+appId: ${APP_ID}
+name: 22-select-change
+---
+- launchApp:
+    clearState: true
+- assertVisible: Pick a car
+- assertVisible: Audi
+- assertVisible: small
+- assertVisible: Make none
+- assertVisible: Changes 0
+- assertVisible: Size none
+- assertNotVisible: Make toyota
+- assertNotVisible: Size LARGE
+- tapOn: Make
+- tapOn:
+    text: Toyota
+- assertVisible: Make toyota
+- assertNotVisible: Make none
+- assertNotVisible: Changes 0
+- assertVisible: Toyota
+- assertVisible: Make toyota
+- assertVisible: Changes 1
+- assertNotVisible: Make none
+- assertNotVisible: Changes 0
+- tapOn: Make
+- tapOn:
+    text: BMW
+- assertNotVisible: Make toyota
+- assertNotVisible: Changes 1
+- assertVisible: BMW
+- assertVisible: Make bmw
+- assertVisible: Changes 2
+- assertNotVisible: Make toyota
+- assertNotVisible: Changes 1
+- assertNotVisible: Size LARGE
+- tapOn: Size
+- tapOn:
+    text: large
+- assertVisible: Size LARGE
+- assertVisible: large
+- assertVisible: Size LARGE
+- assertVisible: Changes 2
+- assertNotVisible: Size none
