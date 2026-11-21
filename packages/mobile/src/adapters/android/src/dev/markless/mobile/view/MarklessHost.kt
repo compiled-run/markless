@@ -57,6 +57,7 @@ import dev.markless.mobile.style.Assignment
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.shownRows
+import dev.markless.mobile.style.rowStates
 import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.StyledNode
 import kotlin.math.roundToInt
@@ -195,7 +196,7 @@ class MarklessHost(
 	private inner class Layout(export: StyleExport, everyCell: Boolean) {
 		var export = export
 			private set
-		var assignment = export.start(styledCells, runtime::value, isDark(context.resources.configuration), everyCell, styledBranches, runtime::styleArm)
+		var assignment = export.start(styledCells, runtime::value, isDark(context.resources.configuration), everyCell, styledBranches, runtime::styleArm, export.rowStates(payload))
 		var absolutes: List<Map<String, Pair<Double, Double>>> = export.assignments.map { a -> absoluteOrigins(a.nodes) }
 			private set
 

@@ -37,6 +37,8 @@ import dev.markless.mobile.style.Bands
 import dev.markless.mobile.style.Rgba
 import dev.markless.mobile.style.GlyphRun
 import dev.markless.mobile.style.StyleExport
+import dev.markless.mobile.style.shownRows
+import dev.markless.mobile.style.rowStates
 import dev.markless.mobile.style.SystemFace
 import dev.markless.mobile.style.TextLine
 import dev.markless.mobile.style.StyleWrite
@@ -659,6 +661,25 @@ private fun overlays() {
 	refuses("focused other than true", payload.replace("{\"focusOrigin\":{\"literal\":\"h1\"}}", "{\"focused\":false}"), "focused must be true")
 }
 
+/** The S21 rung's app style and payload as the harness builds them (proofs/s21-styled-rows, Dragon branch cw/markless-rows). */
+private fun rowStyles(fixtures: File) {
+	val style = StyleExport.decodeApp(File(fixtures, "s21-styled-rows.native-app-style.json").readBytes()).getValue("/")
+	val page = AppPayload.decodeOrNull(Json.parse(File(fixtures, "s21-styled-rows.payload.json").readBytes()))!!.routes.single { it.route.pattern == "/" }.page
+	val runtime = Runtime(page)
+	val cells = page.cells.filter { it.styled }.map { it.id }
+	val branches = page.nodes.filter { it is Node.Branch && it.row == null }.map { it.id }
+	val rowStates = style.rowStates(page)
+	check("the export's row state is the row class", rowStates == setOf("h5#class")) { "$rowStates" }
+	val start = runCatching { style.start(cells, runtime::value, false, true, branches, runtime::styleArm, rowStates) }
+	check("a page with styled rows starts at the template's own row state", start.isSuccess) { start.exceptionOrNull().toString() }
+	val k = start.getOrNull() ?: return
+	val rows = style.shownRows(page, runtime)(k).getValue("repeat:0")
+	check("each row is listed by its key", rows.map { it.key } == listOf("a", "b")) { "${rows.map { it.key }}" }
+	// The template is laid out at the first value the class lists, `note pinned`: row b's.
+	check("each row takes the assignment its own class reaches", rows[1].assignment == k && rows[0].assignment != k) { "${rows.map { it.assignment }} from $k" }
+	check("a row's text is its own", rows[1].texts["h6:text0"] == "Call the plumber about the kitchen tap before Friday") { "${rows[1].texts}" }
+}
+
 fun main(args: Array<String>) {
 	routes()
 	arrays()
@@ -674,6 +695,7 @@ fun main(args: Array<String>) {
 	textLines(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	systemFonts(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	rowStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)
