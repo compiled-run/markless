@@ -754,6 +754,72 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'script-submit',
+		fixture: 'proofs/j42-submit-script/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h3' },
+			{ event: 'input', host: 'component-edge:0/h1', value: 'Groceries' },
+			{ event: 'activate', host: 'component-edge:0/h3' },
+			{ event: 'input', host: 'component-edge:0/h1', value: 'Call Ada' },
+			{ event: 'input', host: 'component-edge:0/h2', value: 'work' },
+			{ event: 'activate', host: 'component-edge:0/h3' },
+		],
+	},
+	{
+		name: 'script-submit-async',
+		fixture: 'proofs/j41-async-submit-script/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'input', host: 'h3', value: 'Pump house' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'input', host: 'h3', value: 'admin' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:2' },
+		],
+	},
+	{
+		name: 'spread-callback',
+		fixture: 'proofs/r117-spread-callback/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+		],
+	},
+	{
+		name: 'typed-callbacks',
+		fixture: 'proofs/r118-typed-callbacks/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h1' },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+		],
+	},
+	{
+		name: 'select-events',
+		fixture: 'proofs/r119-select-events/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'choose', host: 'h5' },
+			{ event: 'choose', host: 'h5' },
+			{ event: 'choose', host: 'h3' },
+			{ event: 'activate', host: 'h10' },
+		],
+	},
+	{
+		name: 'script-structured-clone',
+		fixture: 'proofs/j43-structured-clone/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'script-async',
 		fixture: 'proofs/j3-await-catch/App.tsrx',
 		modules: true,

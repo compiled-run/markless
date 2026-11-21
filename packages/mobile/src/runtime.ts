@@ -501,7 +501,9 @@ export function evaluateWithScript(
 											? { fields: binding.fields }
 											: 'elements' in binding
 												? { elements: evaluate(binding.elements, values) }
-												: { value: evaluate(binding.value, values) },
+												: 'callback' in binding
+													? binding
+													: { value: evaluate(binding.value, values) },
 						]),
 					);
 				const frame = frameOf(bindings);
@@ -667,7 +669,9 @@ export function createNativeRuntime(
 									}
 								: 'elements' in binding
 									? { elements: evaluate(binding.elements, eventValue, scope) }
-									: { value: evaluate(binding.value, eventValue, scope) },
+									: 'callback' in binding
+										? binding
+										: { value: evaluate(binding.value, eventValue, scope) },
 			]),
 		);
 	/**
@@ -731,9 +735,16 @@ export function createNativeRuntime(
 			: {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
-	const enter = (entry: Record<string, unknown>): NativeJournalEntry[] => {
+	/** Submissions held by a script promise not settled yet, by the engine's run number. */
+	const scriptRuns = new Map<number, Submission>();
+	const enter = (
+		entry: Record<string, unknown>,
+		submission?: Submission,
+	): NativeJournalEntry[] => {
 		call('enter', { ...entry, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
+			readonly pending: ReadonlyArray<number>;
+			readonly settled: ReadonlyArray<number>;
 			readonly writes: ReadonlyArray<readonly [string, Value]>;
 			readonly aborts: ReadonlyArray<number>;
 			readonly timers: ReadonlyArray<readonly [number, number]>;
@@ -757,6 +768,19 @@ export function createNativeRuntime(
 			if (key !== undefined) store.set(key, value);
 		}
 		logs.push(...result.logs);
+		// A submit handler's promise keeps its submission running until the entry it settles in, as the web keeps the form busy.
+		for (const run of result.pending)
+			if (submission) {
+				submission.pending++;
+				scriptRuns.set(run, submission);
+			}
+		for (const run of result.settled) {
+			const kept = scriptRuns.get(run);
+			if (!kept) continue;
+			scriptRuns.delete(run);
+			kept.pending--;
+			settled(kept);
+		}
 		return [
 			...result.aborts.map((id): NativeJournalEntry => ({ op: 'abort', id })),
 			...result.clears.map((id): NativeJournalEntry => ({
@@ -855,6 +879,8 @@ export function createNativeRuntime(
 								? Object.values(binding.fields).map((cell) => read(cell, scope))
 								: 'elements' in binding
 									? evaluate(binding.elements, undefined, scope)
+									: 'callback' in binding
+										? null
 									: evaluate(binding.value, undefined, scope),
 		);
 	// As on the web, a computed is not run again while nothing it reads has changed.
@@ -1508,11 +1534,18 @@ export function createNativeRuntime(
 				if (!instance) throw new Error(`${action.host} is not shown`);
 				return change(undefined, undefined, () => {
 					if (
-						attributeNow(select.id, 'disabled') === null &&
-						attributeIn(option, 'disabled', instance.scope) === null
+						attributeNow(select.id, 'disabled') !== null ||
+						attributeIn(option, 'disabled', instance.scope) !== null
 					)
-						chosenNow = action.host;
-					return [];
+						return [];
+					chosenNow = action.host;
+					// A choice that changes the select fires its input handler, as the web does, with the option's value.
+					const was = optionsOf(select.id).find((one) => selectedness.get(one.id))?.id;
+					const handler = payload.events.find(
+						(candidate) => candidate.host === select.id && candidate.event === 'input',
+					);
+					if (was === action.host || !handler) return [];
+					return run(handlers.get(handler.handler) ?? [], optionValue(instance), instance.scope);
 				});
 			}
 			if (action.event === 'timer' && action.timer.startsWith(SCRIPT_TIMER))
@@ -1958,7 +1991,7 @@ export function createNativeRuntime(
 							...(nodes ? { nodes } : {}),
 						},
 						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),
-					}),
+					}, submission),
 				);
 				continue;
 			}
