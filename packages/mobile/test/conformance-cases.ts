@@ -200,6 +200,36 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// Device calls from a handler's JavaScript: an awaited location then a tap, a camera object's photo, a refusal caught.
+		name: 'script-device',
+		fixture: 'proofs/j18-script-device/App.tsrx',
+		modules: true,
+		device: {
+			usage: { camera: 'Takes the photo you ask for.', location: 'Finds where you are.' },
+		},
+		actions: [
+			{ event: 'device', cell: 'object:component-edge:1/cam:ready', value: true },
+			{ event: 'activate', host: 'component-edge:1/h4' },
+			{
+				event: 'resume',
+				continuation: 'script:1',
+				value: { latitude: 51.5, longitude: -0.125, accuracy: 5 },
+			},
+			{ event: 'activate', host: 'component-edge:1/h5' },
+			{
+				event: 'resume',
+				continuation: 'script:2',
+				value: { url: 'file:///photo.png', width: 640, height: 480 },
+			},
+			{ event: 'activate', host: 'component-edge:1/h4' },
+			{
+				event: 'reject',
+				continuation: 'script:3',
+				error: { name: 'NotAllowedError', message: 'Location was refused' },
+			},
+		],
+	},
+	{
 		name: 'handler-catch',
 		fixture: 'proofs/d4b-photo-refused/App.tsrx',
 		device: { usage: { camera: 'Takes the photo you ask for.' } },
@@ -1128,6 +1158,52 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
+		// A list in each row of another: inner rows keyed within their outer row, a new outer row with its inner rows.
+		name: 'nested-for',
+		fixture: 'proofs/20-nested-for/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5@Veg' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h5@Nuts' },
+			{ event: 'activate', host: 'h4@Fruit@Pear' },
+			{ event: 'activate', host: 'h4@Veg@Fig' },
+		],
+	},
+	{
+		// A GET form on another site: typed text, a hidden field, the action's query and fragment, then the submit.
+		name: 'form-opens',
+		fixture: 'proofs/21-form-opens/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'input', host: 'h4', value: 'phone apps & more ✓' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'enter', host: 'h4' },
+		],
+	},
+	{
+		// A select's change: a different option runs it with that option's value, the same one again does not; data and JavaScript.
+		name: 'select-change',
+		fixture: 'proofs/22-select-change/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'choose', host: 'h4' },
+			{ event: 'choose', host: 'h4' },
+			{ event: 'choose', host: 'h5' },
+			{ event: 'choose', host: 'h8' },
+		],
+	},
+	{
+		// Rows read their index: reversed, a row's number follows its place; dropping the first renumbers the rest.
+		name: 'row-index',
+		fixture: 'proofs/24-row-index/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		// Rows keyed by position: two rows show the same line, then rows are added, changed and dropped at the end.
 		name: 'for-index-key',
 		fixture: 'proofs/18-for-index-key/App.tsrx',
@@ -1275,6 +1351,20 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h4' },
 			{ event: 'activate', host: 'h3' },
 			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		// A system sheet in an @if arm: open only while the arm is shown, closed with it, open again when it comes back.
+		name: 'sheet-in-arm-shop',
+		fixture: 'proofs/26-sheet-in-arm/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h8' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h9' },
+			{ event: 'activate', host: 'h3' },
 		],
 	},
 ];

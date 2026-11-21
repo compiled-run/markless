@@ -2066,7 +2066,7 @@ export function Find() @{
 		]);
 	});
 
-	it('places a @for inside an @if arm, with its @empty, in that arm, and still refuses one inside another @for', async () => {
+	it('places a @for inside an @if arm, with its @empty, in that arm, and one inside another @for', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Shelf() @{
 	let showing = state(true);
@@ -2098,9 +2098,7 @@ export function Shelves() @{
 		}
 	</section>
 }`);
-		expect(nested.diagnostics.map((diagnostic) => diagnostic.message)).toContain(
-			'@for inside another @for',
-		);
+		expect(nested.diagnostics).toEqual([]);
 	});
 
 	it('lowers @empty to a branch shown while the list has no rows', async () => {
@@ -3483,6 +3481,276 @@ export function Page() @{
 	});
 });
 
+describe('a @for row reading its index', () => {
+	it("lowers the index name to the row's position", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let fruits = state(['a', 'b']);
+	<main>@for (const fruit of fruits; index i; key fruit) { <p>{i + 1}</p> }</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const repeat = payload!.nodes.find((node) => node.kind === 'repeat')!;
+		expect(payload!.nodes.find((node) => node.kind === 'text' && node.row === repeat.id)).toMatchObject({
+			parts: [{ expr: { binary: '+', left: { index: repeat.id }, right: { literal: 1 } } }],
+		});
+	});
+});
+
+describe('<iframe>', () => {
+	const frame = async (attributes: string) =>
+		nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let page = state('https://example.com/');
+	<main><iframe ${attributes}></iframe></main>
+}`);
+
+	it('keeps an iframe of a fixed http(s) page with its attributes', async () => {
+		const { payload, diagnostics } = await frame('src="https://example.com/" title="Example" width="320"');
+		expect(diagnostics).toEqual([]);
+		expect(payload!.nodes.find((node) => node.kind === 'element' && node.element === 'iframe')).toMatchObject({
+			attributes: { src: 'https://example.com/', title: 'Example', width: '320' },
+		});
+	});
+
+	it("refuses one on the app's own server, one whose src follows state, and srcdoc, by name", async () => {
+		const messages = async (attributes: string) =>
+			(await frame(attributes)).diagnostics.map((d) => d.message);
+		expect(await messages('src="/docs"')).toEqual([
+			expect.stringContaining('an <iframe> whose `src` is "/docs"'),
+		]);
+		expect(await messages('src={page}')).toEqual(['an <iframe> whose `src` follows state']);
+		expect(await messages('srcdoc="<p>hi</p>"')).toEqual([
+			'an <iframe> with `srcdoc`, which a native web view does not show yet',
+		]);
+	});
+});
+
+describe("a <select>'s change handler", () => {
+	it("lowers to the select's input event, reading the chosen value; one that needs JavaScript runs as a script", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function shout(text: string): string {
+	let out = '';
+	for (const letter of text) out += letter.toUpperCase();
+	return out;
+}
+export function Page() @{
+	let make = state('');
+	let size = state('');
+	<main>
+		<select onChange={(event) => (make = (event.target as HTMLSelectElement).value)}>
+			<option>a</option><option>b</option>
+		</select>
+		<select onChange={(event) => (size = shout(event.currentTarget.value))}>
+			<option>c</option><option>d</option>
+		</select>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const [first, second] = payload!.nodes.filter(
+			(node) => node.kind === 'element' && node.element === 'select',
+		);
+		const opsOf = (host: string) =>
+			payload!.handlers.find(
+				(handler) =>
+					handler.id ===
+					payload!.events.find((event) => event.host === host && event.event === 'input')
+						?.handler,
+			)?.ops;
+		expect(opsOf(first!.id)).toEqual([{ op: 'assign', cell: 'state:make', value: { event: 'value' } }]);
+		expect(opsOf(second!.id)).toMatchObject([{ op: 'script', type: 'change' }]);
+	});
+});
+
+describe('a GET form on another site', () => {
+	const form = (attributes: string, button = '<button>Go</button>') =>
+		nativeView(`export function Page() @{
+	<form ${attributes}>
+		<input name="q" aria-label="Query" />
+		${button}
+	</form>
+}`);
+
+	it('opens its action in the browser when it has no submit handler, a scheme-relative action as https', async () => {
+		const external = await form('action="https://example.com/search?x=1#top" method="GET"');
+		expect(external.diagnostics).toEqual([]);
+		expect(external.payload!.forms).toEqual([
+			expect.objectContaining({ opens: 'https://example.com/search?x=1#top' }),
+		]);
+		const relative = await form('action="//hn.algolia.com/"');
+		expect(relative.payload!.forms).toEqual([
+			expect.objectContaining({ opens: 'https://hn.algolia.com/' }),
+		]);
+	});
+
+	it("refuses a POST, an action on the app's own server, and a named submit button by name", async () => {
+		const messages = async (attributes: string, button?: string) =>
+			(await form(attributes, button)).diagnostics.map((d) => d.message);
+		expect(await messages('action="https://example.com/login" method="post"')).toEqual([
+			expect.stringContaining('has no onSubmit handler'),
+		]);
+		expect(await messages('action="/search"')).toEqual([
+			expect.stringContaining('has no onSubmit handler'),
+		]);
+		expect(
+			await messages('action="https://example.com/"', '<button name="go" value="1">Go</button>'),
+		).toEqual([expect.stringContaining('has a `name`, which the web adds to the query')]);
+	});
+});
+
+describe('@for inside another @for', () => {
+	it('lowers an inner list in each outer row, its list read from the outer item and its rows reading both', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let groups = state([{ name: 'a', items: ['x', 'y'] }]);
+	<main>
+		@for (const group of groups; key group.name) {
+			<section>
+				@for (const item of group.items; key item) {
+					<p>{group.name}{item}</p>
+				}
+			</section>
+		}
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const [outer, inner] = payload!.nodes.filter((node) => node.kind === 'repeat');
+		expect(inner).toMatchObject({
+			row: outer!.id,
+			list: { member: { item: outer!.id }, property: 'items' },
+			key: [],
+		});
+		expect(payload!.nodes.find((node) => node.kind === 'text' && node.row === inner!.id)).toMatchObject({
+			parts: [{ expr: { member: { item: outer!.id }, property: 'name' } }, { expr: { item: inner!.id } }],
+		});
+	});
+
+	it("names an inner row's own copy of an element by both rows' keys", async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+function Entry({ title }) @{
+	const heading = element();
+	<section aria-labelledby={heading}>
+		<h2 el={heading}>{title}</h2>
+	</section>
+}
+export function Page() @{
+	let groups = state([{ name: 'a', items: ['x'] }]);
+	<main>
+		@for (const group of groups; key group.name) {
+			<div>
+				@for (const item of group.items; key item) { <Entry title={item} /> }
+			</div>
+		}
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const [outer, inner] = payload!.nodes.filter((node) => node.kind === 'repeat');
+		const section = payload!.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'section',
+		);
+		expect(section?.kind === 'element' && section.bindings?.[0]).toMatchObject({
+			attribute: 'aria-labelledby',
+			value: {
+				template: [
+					expect.stringMatching(/@$/),
+					{ member: { item: outer!.id }, property: 'name' },
+					'@',
+					{ item: inner!.id },
+				],
+			},
+		});
+	});
+});
+
+describe('storage() in child components', () => {
+	it('keeps one cell per key for a page and every copy of a child component, as the web keeps one value', async () => {
+		const { payload, diagnostics } = await nativeView(`import { storage } from '@markless/core';
+function Counter({ label }: { label: string }) @{
+	let taps = storage('taps', '0');
+	<button onClick={() => (taps = taps + '1')}>{label}{taps}</button>
+}
+export function Page() @{
+	let total = storage('taps', '0');
+	<main>
+		<p>{total}</p>
+		<Counter label="Left" />
+		<Counter label="Right" />
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const stored = payload!.cells.filter((cell) => cell.storage);
+		expect(stored).toHaveLength(1);
+		expect(stored[0]).toMatchObject({ initial: '0', storage: { key: 'taps' } });
+		expect(
+			payload!.handlers.map((handler) => handler.ops[0]?.op === 'assign' && handler.ops[0].cell),
+		).toEqual([stored[0]!.id, stored[0]!.id]);
+	});
+
+	it('refuses two first values for one key by name', async () => {
+		const { diagnostics } = await nativeView(`import { storage } from '@markless/core';
+function Badge() @{
+	let theme = storage('theme', 'dark');
+	<span>{theme}</span>
+}
+export function Page() @{
+	let theme = storage('theme', 'light');
+	<main>
+		<p>{theme}</p>
+		<Badge />
+	</main>
+}`);
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'storage `theme` of Badge starts at "dark", but another storage() with key "theme" starts at "light"',
+		]);
+	});
+});
+
+describe('@markless/device in JavaScript', () => {
+	it("calls the device through the host from a handler's JavaScript", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+import { haptics, location } from '@markless/device';
+export function Page() @{
+	let text = state('');
+	<button
+		onClick={async () => {
+			try {
+				text = (await location.current()).latitude.toFixed(2);
+				haptics.tap();
+			} catch (error) {
+				text = (error as Error).name;
+			}
+		}}
+	>
+		{text}
+	</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.script!.services).toContain('device');
+		expect(payload!.script!.source).toContain(
+			'globalThis["__marklessHost"]["devices"]["location"].current()',
+		);
+		expect(payload!.script!.source).toContain(
+			'globalThis["__marklessHost"]["devices"]["haptics"].tap()',
+		);
+	});
+
+	it('refuses a device value read in JavaScript by name', async () => {
+		const { diagnostics } = await nativeView(`import { state } from '@markless/core';
+import { location } from '@markless/device';
+function label(access: string): string {
+	let out = '';
+	for (const letter of access) out += letter.toUpperCase();
+	return out;
+}
+export function Page() @{
+	let text = state('');
+	<button onClick={() => { text = label(location.access); }}>{text}</button>
+}`);
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the click handler calls `location` from @markless/device inside JavaScript that runs on the phone, which it cannot reach there yet',
+		]);
+	});
+});
+
 describe('element proxies', () => {
 	const source = `import { element, shared, state } from '@markless/core';
 const pickerState = shared(
@@ -3800,7 +4068,6 @@ ${markup}
 		);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
-			'the change handler on the <select> h1, which a native build does not run yet',
 			'the <select> h1 has `multiple`, a list box a native build does not draw yet',
 			'the <select> h3 binds `value`; a native build chooses an option through its `selected`',
 			'the <hr> h5 sits inside a <select>, which a native build shows only <option>s of',

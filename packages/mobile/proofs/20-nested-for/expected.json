@@ -1,0 +1,51 @@
+{
+	"rung": 20,
+	"name": "A @for inside another @for's rows: inner rows read both items, and change by their own key within each outer row",
+	"steps": [
+		{
+			"visible": [
+				"Groups",
+				"Drop Fruit Apple",
+				"Drop Fruit Pear",
+				"Drop Veg Kale",
+				"Add to Fruit",
+				"Add to Veg"
+			],
+			"absent": ["Drop Veg Fig", "Drop Fruit Fig"]
+		},
+		{
+			"do": {
+				"tap": "Add to Veg"
+			},
+			"visible": ["Drop Veg Fig", "Drop Veg Kale", "Drop Fruit Pear"],
+			"absent": ["Drop Fruit Fig"]
+		},
+		{
+			"do": {
+				"tap": "Drop Fruit Pear"
+			},
+			"visible": ["Drop Fruit Apple", "Drop Veg Fig"],
+			"absent": ["Drop Fruit Pear", "Drop Fruit Fig"]
+		},
+		{
+			"do": {
+				"tap": "Add to Fruit"
+			},
+			"visible": ["Drop Fruit Fig", "Drop Fruit Apple", "Drop Veg Fig"],
+			"absent": ["Drop Fruit Pear"]
+		},
+		{
+			"do": {
+				"tap": "Drop Veg Fig"
+			},
+			"visible": ["Drop Veg Kale", "Drop Fruit Apple"],
+			"absent": ["Drop Veg Fig", "Drop Fruit Fig", "Drop Nuts Pecan"]
+		},
+		{
+			"do": {
+				"tap": "Add group"
+			},
+			"visible": ["Drop Nuts Pecan", "Add to Nuts", "Drop Veg Kale"]
+		}
+	]
+}

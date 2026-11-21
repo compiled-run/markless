@@ -1,0 +1,12 @@
+{
+	"rung": 23,
+	"name": "An <iframe> of a page on another site shows that page in the platform's web view, the page around it unchanged",
+	"steps": [
+		{
+			"visible": ["Embedded page", "Below the frame"],
+			"embedded": [
+				"This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes."
+			]
+		}
+	]
+}

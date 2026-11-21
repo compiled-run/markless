@@ -46,6 +46,19 @@ export function planRefresh(facts: CheckoutFacts): RefreshPlan {
 	return { kind: 'refresh', from: facts.head, to: facts.upstream, branch: facts.branch };
 }
 
+/**
+ * What `phones status` says about the runner's checkout. Every job's apps are built with this checkout's harness, so one
+ * kept behind origin/main builds them with old host code whatever the submitter's tree holds.
+ */
+export function describeCheckout(facts: CheckoutFacts, behind: number): string {
+	const at = `runner checkout ${facts.head.slice(0, 9)}`;
+	const plan = planRefresh(facts);
+	if (plan.kind === 'current') return `${at}: on ${upstreamRef}`;
+	if (plan.kind === 'refresh')
+		return `${at}: ${behind} commits behind ${upstreamRef}; the runner moves there between jobs`;
+	return `${at}: ${behind} commits behind ${upstreamRef} and stays there (${plan.reason}); jobs build with this harness, so move it by hand`;
+}
+
 /** A job is under way once any of its chunks left the queue; the runner restarts only when none is. */
 export const jobStarted = (chunks: ReadonlyArray<Chunk>): boolean =>
 	chunks.some((chunk) => chunk.state !== 'queued');
@@ -101,11 +114,12 @@ export function transitionRefresh(
 
 const git = async (cwd: string, args: string[]) => (await exec('git', args, { cwd })).stdout.trim();
 
-export async function checkoutFacts(cwd: string): Promise<CheckoutFacts> {
-	await exec('git', ['fetch', '--quiet', UPSTREAM.remote, UPSTREAM.branch], {
-		cwd,
-		timeoutMs: 120_000,
-	});
+export async function checkoutFacts(cwd: string, fetch = true): Promise<CheckoutFacts> {
+	if (fetch)
+		await exec('git', ['fetch', '--quiet', UPSTREAM.remote, UPSTREAM.branch], {
+			cwd,
+			timeoutMs: 120_000,
+		});
 	const head = await git(cwd, ['rev-parse', 'HEAD']);
 	const upstream = await git(cwd, ['rev-parse', upstreamRef]);
 	const branch =
@@ -121,6 +135,11 @@ export async function checkoutFacts(cwd: string): Promise<CheckoutFacts> {
 		allowFailure: true,
 	});
 	return { head, upstream, branch, dirty, headInUpstream: ancestor.code === 0 };
+}
+
+/** How many commits origin/main has that the checkout lacks, as last fetched. */
+export async function commitsBehind(cwd: string): Promise<number> {
+	return Number(await git(cwd, ['rev-list', '--count', `HEAD..${upstreamRef}`]));
 }
 
 /** Moves the checkout to `to` and installs; on a failed install it goes back to `from`, so the runner keeps working code. */

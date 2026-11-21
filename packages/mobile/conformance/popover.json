@@ -502,25 +502,87 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Popover"],
-		["h2:text0", "Changes 0"],
-		["component-edge:1/h1:text0", "Filters"],
-		["component-edge:3/h3:text0", "Show only"],
-		["component-edge:4/h4:text0", "Pick what the list shows"],
-		["component-edge:5/h5:text0", "Done"]
+		[
+			"h1:text0",
+			"Popover"
+		],
+		[
+			"h2:text0",
+			"Changes 0"
+		],
+		[
+			"component-edge:1/h1:text0",
+			"Filters"
+		],
+		[
+			"component-edge:3/h3:text0",
+			"Show only"
+		],
+		[
+			"component-edge:4/h4:text0",
+			"Pick what the list shows"
+		],
+		[
+			"component-edge:5/h5:text0",
+			"Done"
+		]
 	],
 	"initialAttributes": [
-		["component-edge:0/h0", "ui-open", null],
-		["component-edge:0/h0", "ui-closed", ""],
-		["component-edge:1/h1", "aria-expanded", "false"],
-		["component-edge:1/h1", "ui-open", null],
-		["component-edge:1/h1", "ui-closed", ""],
-		["component-edge:1/h1", "aria-controls", "component-edge:2/h2"],
-		["component-edge:2/h2", "hidden", ""],
-		["component-edge:2/h2", "ui-open", null],
-		["component-edge:2/h2", "ui-closed", ""],
-		["component-edge:2/h2", "aria-labelledby", "component-edge:3/h3"],
-		["component-edge:2/h2", "aria-describedby", "component-edge:4/h4"]
+		[
+			"component-edge:0/h0",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:0/h0",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:1/h1",
+			"aria-expanded",
+			"false"
+		],
+		[
+			"component-edge:1/h1",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:1/h1",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:1/h1",
+			"aria-controls",
+			"component-edge:2/h2"
+		],
+		[
+			"component-edge:2/h2",
+			"hidden",
+			""
+		],
+		[
+			"component-edge:2/h2",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:2/h2",
+			"ui-closed",
+			""
+		],
+		[
+			"component-edge:2/h2",
+			"aria-labelledby",
+			"component-edge:3/h3"
+		],
+		[
+			"component-edge:2/h2",
+			"aria-describedby",
+			"component-edge:4/h4"
+		]
 	],
 	"steps": [
 		{

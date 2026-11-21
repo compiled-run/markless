@@ -152,6 +152,11 @@ export type LadderStep = {
 	readonly camera?: 'on' | 'off';
 	/** Phones only: whether a recorder holds the microphone, from the test build's label `MICROPHONE_STATE_ID`. */
 	readonly microphone?: 'on' | 'off';
+	/**
+	 * Android only: texts an `<iframe>`'s web view shows from the page it loads. The payload does not hold them, a browser
+	 * test reads only the page around the frame, and Maestro's iOS driver did not read into a WKWebView (2026-11-20).
+	 */
+	readonly embedded?: readonly string[];
 	/** Texts on screen on one platform only: a `platform` check shows a different arm on each. */
 	readonly visibleOn?: Readonly<Partial<Record<'ios' | 'android' | 'web', readonly string[]>>>;
 	/**
@@ -353,7 +358,20 @@ const assertions = (step: LadderStep): unknown[] =>
 		? [{ assertVisible: { text: PERMISSION_PROMPTS[step.prompt] } }]
 		: step.system
 			? [{ assertVisible: { text: SYSTEM_SCREENS[step.system] } }]
-			: [...screenAssertions(step), ...platformAssertions(step)];
+			: [
+					...screenAssertions(step),
+					...platformAssertions(step),
+					...(step.embedded
+						? [
+								{
+									runFlow: {
+										when: { platform: MAESTRO_PLATFORM.android },
+										commands: step.embedded.map((text) => ({ assertVisible: selector(text) })),
+									},
+								},
+							]
+						: []),
+				];
 
 const MAESTRO_PLATFORM = { ios: 'iOS', android: 'Android' } as const;
 

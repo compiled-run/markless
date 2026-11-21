@@ -574,7 +574,8 @@ class MarklessHost(
 				is JournalEntry.Fetch -> scriptServices.fetch(entry.id, entry.request) { if (!released) apply(runtime.response(entry.id, it)) }
 				is JournalEntry.Abort -> scriptServices.abort(entry.id)
 				is JournalEntry.Rows -> {
-					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
+					// An inner list's copy in one outer row is `<list>@<outer key>`.
+					if (runtime.node(entry.node.substringBefore('@')) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
 					rebuild()
 				}
 			}
@@ -846,16 +847,23 @@ class MarklessHost(
 		return view
 	}
 
-	/** The instance id of [inst]'s parent: in the same row when the parent is a row node too. */
+	/** The instance id of [inst]'s parent: in the same row as [inst] at the parent's own depth when the parent is a row node. */
 	private fun parentOf(inst: Instance): String? {
 		val p = inst.node.parent ?: return null
-		return if (runtime.node(p).row != null) "$p@${inst.rowKey ?: throw MarklessHostError("\"${inst.id}\" is outside the rows of its parent \"$p\"")}" else p
+		val row = runtime.node(p).row ?: return p
+		return "$p@${inst.scope.keys[row] ?: throw MarklessHostError("\"${inst.id}\" is outside the rows of its parent \"$p\"")}"
 	}
 
-	/** Where an instance sits among its siblings: document order, with a list's rows at the list's place, in row order. */
+	/**
+	 * Where an instance sits among its siblings: document order, with a list's rows at the list's place, in row order. A row
+	 * of a list inside another list's row is ordered within that list's copy (`<list>@<outer key>`).
+	 */
 	private fun position(inst: Instance, rowIndex: Map<String, Map<String, Int>>): List<Int> {
 		val r = inst.node.row ?: return listOf(order.getValue(inst.node.id))
-		return listOf(order.getValue(r), rowIndex.getValue(r).getValue(inst.rowKey!!), order.getValue(inst.node.id))
+		val outer = runtime.node(r).row?.let { inst.scope.keys.getValue(it) }
+		val copy = if (outer == null) r else "$r@$outer"
+		val key = inst.scope.keys.getValue(r).let { if (outer == null) it else it.removePrefix("$outer@") }
+		return listOf(order.getValue(r), rowIndex.getValue(copy).getValue(key), order.getValue(inst.node.id))
 	}
 
 	/** Moves [box]'s retained children into position order; the views are kept, only their places change. */
@@ -940,6 +948,12 @@ class MarklessHost(
 				needDevice().view(obj, device).also { named(it, inst.id) }
 			}
 			"img" -> SizedImage(context).also { named(it, inst.id) }
+			"iframe" -> EmbeddedPage(
+				context,
+				node.attributes["src"] ?: throw MarklessHostError("<iframe> ${inst.id} has no src"),
+				node.attributes["width"]?.toIntOrNull() ?: 300,
+				node.attributes["height"]?.toIntOrNull() ?: 150,
+			).also { it.contentDescription = node.attributes["title"]; it.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES }
 			"audio" -> AudioButton(context).apply {
 				visibility = View.GONE
 				named(this, inst.id)

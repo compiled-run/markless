@@ -576,6 +576,8 @@ type Scope = {
 	readonly submitting?: string;
 	readonly locals: ReadonlySet<string>;
 	readonly items: ReadonlyMap<string, string>;
+	/** A `@for`'s `index` name, by the `repeat` node whose row position it reads. */
+	readonly indexes?: ReadonlyMap<string, string>;
 	readonly props: ReadonlyMap<string, Prop>;
 	/** Names whose members resolve to cells, handles and methods. */
 	readonly objects: ReadonlyMap<string, ObjectRef>;
@@ -1832,13 +1834,8 @@ export function createNativeViewPayload(
 				refuse(`top-level state \`${binding.name}\` in an imported module`);
 				continue;
 			}
-			if (!moduleLevel && prefix !== '' && binding.storage) {
-				refuse(
-					`storage \`${binding.name}\` declared inside the child component ${component}`,
-				);
-				continue;
-			}
-			const id = moduleLevel ? binding.id : `${prefix}${binding.id}`;
+			// Every storage() with one key is one value, as on the web: its cell is named after the key, not the instance.
+			const id = moduleLevel || binding.storage ? binding.id : `${prefix}${binding.id}`;
 			let value: unknown = nativeInitialOf(binding.initialValue);
 			noteUndefined(id, binding.initialValue);
 			let known = binding.initialValueKnown === true;
@@ -1925,6 +1922,16 @@ export function createNativeViewPayload(
 					kind: 'fields',
 					cells: splitCells(id, binding.name, value, row),
 				});
+				continue;
+			}
+			const kept = binding.storage ? initialOf(id) : undefined;
+			if (kept !== undefined && JSON.stringify(kept) !== JSON.stringify(value)) {
+				refuse(
+					`storage \`${binding.name}\` of ${component} starts at ${JSON.stringify(value)}, but another storage() with key "${binding.storage!.key}" starts at ${JSON.stringify(kept)}`,
+					binding.sourceSpan,
+				);
+				byName.set(binding.name, id);
+				byBinding.set(binding.id, id);
 				continue;
 			}
 			byName.set(binding.name, id);
@@ -2436,6 +2443,13 @@ export function createNativeViewPayload(
 		return false;
 	}
 
+	/** A script's `@markless/device` calls: the host makes each, and the app declares what each needs. */
+	function checkDevices(devices: SemanticScriptFunction['devices']): void {
+		if (devices.length === 0) return;
+		scriptServices.add('device');
+		for (const { call } of devices) features.add(DEVICE_CALLS[call as NativeDeviceCall].feature);
+	}
+
 	/** Whether every global a script reads is one a phone's engine has; refuses each other one by name, file and line. */
 	function checkGlobals(
 		globals: ReadonlyArray<SemanticScriptGlobal>,
@@ -2487,6 +2501,7 @@ export function createNativeViewPayload(
 		if (known) return known.id;
 		let ok = checkGlobals(fact.globals, what, forms);
 		if (!checkNavigates(fact.navigates, what)) ok = false;
+		checkDevices(fact.devices);
 		for (const use of fact.framework) {
 			ok = false;
 			refuseScript(
@@ -2580,7 +2595,7 @@ export function createNativeViewPayload(
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
 		let ok = true;
-		for (const { name, written, span } of fact.names) {
+		for (const { name, written, span, calledOnly } of fact.names) {
 			const prop = propOf(name, scope);
 			if (prop?.kind === 'callback') {
 				const callback = written ? undefined : prop.span && scriptFacts(prop.scope.module)?.handler(prop.span);
@@ -2627,10 +2642,23 @@ export function createNativeViewPayload(
 					object?.kind === 'instance' ? { object: members } : { shared: members };
 				continue;
 			}
-			if (scope.deviceObjects.has(name)) {
+			const device = object ? undefined : scope.deviceObjects.get(name);
+			if (
+				device &&
+				!written &&
+				calledOnly?.every((method) => {
+					const call = `${device.device}.${method}`;
+					return isDeviceCall(call) && 'object' in DEVICE_CALLS[call];
+				})
+			) {
+				scriptServices.add('device');
+				bindings[name] = { device: device.device, object: device.id };
+				continue;
+			}
+			if (device) {
 				ok = false;
 				refuseScript(
-					`${what} uses \`${name}\` (a device object), which JavaScript on a phone cannot reach yet`,
+					`${what} uses \`${name}\` (a device object) other than to call its methods, which JavaScript on a phone cannot do yet`,
 					span,
 				);
 				continue;
@@ -2926,6 +2954,7 @@ export function createNativeViewPayload(
 				);
 			checkGlobals(statement.globals, at, forms || scriptSubmits.size > 0);
 			checkNavigates(statement.navigates, at);
+			checkDevices(statement.devices);
 			for (const name of statement.uses) local(entry, name);
 			for (const use of statement.imports) imported(entry, use.slot, use.name);
 		};
@@ -3165,6 +3194,12 @@ export function createNativeViewPayload(
 			node.element === 'input' &&
 			TICKED_TYPES.has(node.attributes?.['type'] ?? '')
 		);
+	};
+
+	/** Whether a node is a `<select>`, whose `change` handler reads the chosen option's value as its event's. */
+	const isSelect = (id: string): boolean => {
+		const node = nodeById().get(id);
+		return node?.kind === 'element' && node.element === 'select';
 	};
 
 	/** Whether `inner` is `outer` or inside it. */
@@ -3736,6 +3771,8 @@ export function createNativeViewPayload(
 					);
 				const repeat = scope.items.get(expression.name);
 				if (repeat) return { item: repeat };
+				const positioned = scope.indexes?.get(expression.name);
+				if (positioned) return { index: positioned };
 				const prop = propOf(expression.name, scope);
 				if (prop?.kind === 'value') return prop.expr;
 				const text = prop?.kind === 'children' ? projectedText(prop.chunk) : undefined;
@@ -4624,7 +4661,8 @@ export function createNativeViewPayload(
 	/** Where each element node is written, for refusals found after lowering. */
 	const nodeSpans = new Map<string, SourceSpan | undefined>();
 	/** Each list's row key as an expression of its row item: how a row's instance ids are spelt (`<node>@<key>`). */
-	const rowKeys = new Map<string, NativeExpr>();
+	/** A row's key as its instance ids spell it: an inner row's is its outer row's, `@`, then its own. */
+	const rowKeys = new Map<string, ReadonlyArray<string | NativeExpr>>();
 	const textRuns = new Map<string, number>();
 	const lowered = new Set<string>();
 
@@ -4970,6 +5008,22 @@ export function createNativeViewPayload(
 							span,
 						);
 					if (consumed.includes(item.path)) continue;
+				}
+				if (element === 'iframe') {
+					// A phone shows a page another server answers; the app's own pages are not served to it.
+					const src = attributesAt(item.path).src?.trim();
+					const at = src !== undefined && URL.canParse(src) ? new URL(src) : undefined;
+					if (boundAt(item.path).some((name) => name === 'src' || name === 'srcdoc'))
+						refuse('an <iframe> whose `src` follows state', span);
+					else if (attributesAt(item.path).srcdoc !== undefined)
+						refuse('an <iframe> with `srcdoc`, which a native web view does not show yet', span);
+					else if (!at || (at.protocol !== 'https:' && at.protocol !== 'http:'))
+						refuse(
+							`an <iframe> whose \`src\` is ${src === undefined ? 'missing' : `"${src}"`}: a phone shows a fixed http(s) URL on another server, and the app's own pages are not served to it`,
+							span,
+						);
+					else features.add('web');
+					consumed.push(item.path);
 				}
 				const id = scope.prefix + item.id;
 				nodeSpans.set(id, span);
@@ -5655,10 +5709,6 @@ export function createNativeViewPayload(
 				close();
 				const repeat = scope.module.repeatsById.get(item.id);
 				const rowChunk = scope.module.chunks.get(item.row);
-				if (place.row) {
-					refuse('@for inside another @for');
-					continue;
-				}
 				const list = repeat?.collectionExpression
 					? renderValue(
 							repeat.collectionExpression,
@@ -5697,9 +5747,11 @@ export function createNativeViewPayload(
 						(object, property) => ({ member: object, property }),
 						{ item: repeatId },
 					);
-				if (!repeat.indexKey)
-					rowKeys.set(
-						repeatId,
+				// No expression reads a row's key when it is the row's index: such rows, and rows inside them, have none here.
+				const outerKey = place.row ? rowKeys.get(place.row) : [];
+				if (!repeat.indexKey && outerKey)
+					rowKeys.set(repeatId, [
+						...(place.row ? [...outerKey, '@'] : []),
 						repeat.keyParts
 							? {
 									template: repeat.keyParts.map((part) =>
@@ -5707,12 +5759,18 @@ export function createNativeViewPayload(
 									),
 								}
 							: itemAt(repeat.keyPath),
-					);
+					]);
 				lowerChunk(
 					rowChunk,
 					parent,
 					{ row: repeatId },
-					{ ...scope, items: new Map([...scope.items, [repeat.itemName, repeatId]]) },
+					{
+						...scope,
+						items: new Map([...scope.items, [repeat.itemName, repeatId]]),
+						...(repeat.indexName
+							? { indexes: new Map([...(scope.indexes ?? []), [repeat.indexName, repeatId]]) }
+							: {}),
+					},
 				);
 				if (item.empty) {
 					const emptyChunk = scope.module.chunks.get(item.empty);
@@ -6127,7 +6185,12 @@ export function createNativeViewPayload(
 				handlerCallsScript = false;
 			}
 		};
-		if (DATA_ONLY_EVENTS.has(event.eventName)) return helped();
+		// A select's change has no tap to join, so it runs as JavaScript when data cannot carry it.
+		if (
+			DATA_ONLY_EVENTS.has(event.eventName) &&
+			!(event.eventName === 'change' && pressed && isSelect(pressed.currentTarget))
+		)
+			return helped();
 		const submitting = event.eventName === 'submit';
 		// The web sends a form whose submit handler does not cancel it at once; only the analyzer's sync policy says it always does.
 		const form =
@@ -6284,6 +6347,7 @@ export function createNativeViewPayload(
 					globals: [],
 					framework: [],
 					navigates: [],
+					devices: [],
 					unsupported: [],
 					span: { filename: module.graph.filename, start: 0, end: 0 },
 				},
@@ -6477,6 +6541,9 @@ export function createNativeViewPayload(
 							},
 						}
 					: (event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))) ||
+						  (event.eventName === 'change' &&
+								pressed !== undefined &&
+								isSelect(pressed.currentTarget)) ||
 						  // A range's change carries its value as its input does.
 						  (event.eventName === 'change' && pressed !== undefined && isRange(pressed.currentTarget))
 						? { ...running, event: parameter }
@@ -6663,6 +6730,7 @@ export function createNativeViewPayload(
 			if ('cell' in binding) into.add(binding.cell);
 			else if ('fields' in binding)
 				for (const cell of Object.values(binding.fields)) into.add(cell);
+			else if ('device' in binding) continue;
 			else if ('object' in binding) scriptWrites(binding.object, into);
 			else if ('shared' in binding) scriptWrites(binding.shared, into);
 			else if ('method' in binding) scriptWrites(binding.bindings, into);
@@ -7887,7 +7955,7 @@ export function createNativeViewPayload(
 				continue;
 			}
 			parts.push(`${position > 0 ? ' ' : ''}${id}${row ? '@' : ''}`);
-			if (rowKey) parts.push(rowKey);
+			if (rowKey) parts.push(...rowKey);
 		}
 		const value: NativeExpr = parts.every((part) => typeof part === 'string')
 			? { literal: parts.join('') }
@@ -8156,8 +8224,9 @@ export function createNativeViewPayload(
 	 */
 	/**
 	 * A `<select>` is a pop-up list of its `<option>`s, one chosen. What a native build does not draw or run yet is refused
-	 * by name: a list box (`multiple`, `size`), a select whose choice a binding sets, handlers on either element, and
-	 * anything but text inside an option or options inside a select.
+	 * by name: a list box (`multiple`, `size`), a select whose choice a binding sets, handlers on either element other
+	 * than a select's `change` (run with the new value when a person picks another option), and anything but text inside
+	 * an option or options inside a select.
 	 */
 	function checkSelects() {
 		const byId = nodeById();
@@ -8169,7 +8238,10 @@ export function createNativeViewPayload(
 				for (const pending of pendingHandlers)
 					if (
 						pending.host === node.id &&
-						!(node.element === 'select' && SELECT_EVENTS.has(pending.event.eventName))
+						!(
+							node.element === 'select' &&
+							(pending.event.eventName === 'change' || SELECT_EVENTS.has(pending.event.eventName))
+						)
 					)
 						refuse(
 							`the ${pending.event.eventName} handler on ${where}, which a native build does not run yet`,
@@ -8347,6 +8419,17 @@ export function createNativeViewPayload(
 					  )
 					? 'bound'
 					: undefined;
+		/** A GET form's action on another site, as the URL the web leaves for; undefined for this app's own or a bound one. */
+		const externalAction = (form: Extract<NativeNode, { kind: 'element' }>): string | undefined => {
+			if (attribute(form, 'action') !== 'static' || attribute(form, 'method') === 'bound') return undefined;
+			const method = form.attributes?.['method']?.trim().toLowerCase();
+			if (method !== undefined && method !== 'get') return undefined;
+			const action = form.attributes!['action']!.trim();
+			// A scheme-relative action takes the page's scheme, which a site served over HTTPS gives it.
+			if (!URL.canParse(action.startsWith('//') ? `https:${action}` : action)) return undefined;
+			const url = new URL(action.startsWith('//') ? `https:${action}` : action);
+			return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : undefined;
+		};
 		const handlerOf = (host: string, event: NativeViewPayload['events'][number]['event']) => {
 			const entry = events.find(
 				(candidate) => candidate.host === host && candidate.event === event,
@@ -8482,18 +8565,29 @@ export function createNativeViewPayload(
 					if (type === 'email') emailChecked = true;
 				}
 			}
-			if (!submit) {
+			const opens = submit ? undefined : externalAction(form);
+			if (!submit && !opens) {
 				if (submitters.length > 0 || textFields.length === 1)
 					refuse(
 						`${where} has no onSubmit handler: the web sends it to its action and loads the answer (or sends a POST to an API route in place), and a phone app has no server or page to load`,
 					);
 				continue;
 			}
-			if (!prevents(submit.ops))
-				refuse(
-					`the submit handler on ${where} does not call \`event.preventDefault()\` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for`,
-				);
-			submit.ops = withoutPrevent(submit.ops);
+			if (opens) {
+				features.add(DEVICE_CALLS['browser.open'].feature);
+				for (const submitter of submitters)
+					if (attribute(byId.get(submitter) as Extract<NativeNode, { kind: 'element' }>, 'name'))
+						refuse(
+							`the submit button ${submitter} of ${where} has a \`name\`, which the web adds to the query a native build opens; leave it out`,
+						);
+			}
+			if (submit) {
+				if (!prevents(submit.ops))
+					refuse(
+						`the submit handler on ${where} does not call \`event.preventDefault()\` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for`,
+					);
+				submit.ops = withoutPrevent(submit.ops);
+			}
 			for (const submitter of submitters)
 				ensureHandler(submitter, 'activate', 'submit').ops.push({
 					op: 'submit',
@@ -8539,6 +8633,7 @@ export function createNativeViewPayload(
 				node: form.id,
 				fields,
 				submitters,
+				...(opens ? { opens } : {}),
 				...(form.attributes?.['novalidate'] !== undefined
 					? { noValidate: true as const }
 					: {}),

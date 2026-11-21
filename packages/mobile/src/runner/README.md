@@ -11,7 +11,7 @@ heavy pnpm --filter @markless/mobile phones submit 03-counter n2-orders  # named
 heavy pnpm --filter @markless/mobile phones submit --all                 # the whole ladder
 heavy pnpm --filter @markless/mobile phones submit --failed <job>        # each failed rung of <job>, only on the phone it failed on, rebuilt from your checkout
 pnpm --filter @markless/mobile phones wait <job>                         # exits 0 only if the job passed
-pnpm --filter @markless/mobile phones status                              # phones, and jobs not finished yet
+pnpm --filter @markless/mobile phones status                              # the runner's checkout, phones, and jobs not finished yet
 pnpm --filter @markless/mobile phones result <job> --copy-screenshots     # report again; copy screenshots into your rung folders
 pnpm --filter @markless/mobile phones affected [--base <rev>]             # which rungs, and why, without running them
 ```
@@ -73,7 +73,7 @@ pnpm --filter @markless/mobile phones stop            # the phones keep running 
 pnpm --filter @markless/mobile phones stop --phones   # and shut the pool's own phones down
 ```
 
-The runner runs its own copy of the run code, from the checkout that started it (`phones status` names that checkout).
+The runner runs its own copy of the run code, from the checkout that started it (`phones status` names that checkout, how far behind origin/main it is, and why the runner keeps it there when it does). That copy's harness also builds every job's apps (for example, whether Dragon's engine is linked into the host), so a checkout kept behind main builds them the old way whatever the submitter's tree holds.
 The data comes from each job's bundle, so the bundle carries your hosts, shells, flows and payloads. The code that
 installs an app and drives Maestro (`src/harness/{ios,android,maestro}.ts`, `src/runner/run-chunk.ts`) is the runner's.
 If you changed that code, restart the runner from your checkout before you submit, or run the harness directly as
