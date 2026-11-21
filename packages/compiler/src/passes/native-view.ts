@@ -17,6 +17,7 @@ import type {
 } from '@markless/serializer';
 import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
 import {
+	nativeNonFiniteSplit,
 	isNativeStyleStateAttribute,
 	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
 	nativeExprCells,
@@ -384,11 +385,24 @@ type Item =
 			readonly path: ReadonlyArray<number>;
 	  };
 
+/** `Number`'s constants: the finite ones as literals, the non-finite ones by name. */
+const NUMBER_CONSTANTS: Readonly<Record<string, NativeExpr>> = {
+	POSITIVE_INFINITY: { nonFinite: 'Infinity' },
+	NEGATIVE_INFINITY: { nonFinite: '-Infinity' },
+	NaN: { nonFinite: 'NaN' },
+	MAX_SAFE_INTEGER: { literal: Number.MAX_SAFE_INTEGER },
+	MIN_SAFE_INTEGER: { literal: Number.MIN_SAFE_INTEGER },
+	MAX_VALUE: { literal: Number.MAX_VALUE },
+	MIN_VALUE: { literal: Number.MIN_VALUE },
+	EPSILON: { literal: Number.EPSILON },
+};
+
+// A non-finite number is a value too: the payload carries it beside its JSON (nativeNonFiniteSplit).
 const isNativeValue = (value: unknown): value is NativeValue =>
 	value === null ||
 	typeof value === 'string' ||
 	typeof value === 'boolean' ||
-	(typeof value === 'number' && Number.isFinite(value)) ||
+	typeof value === 'number' ||
 	(Array.isArray(value) && value.every(isNativeValue)) ||
 	(typeof value === 'object' &&
 		Object.getPrototypeOf(value) === Object.prototype &&
@@ -1201,6 +1215,7 @@ function foldConstant(
 ): { readonly value: unknown } | undefined {
 	const fold = (inner: NativeExpr) => foldConstant(inner, initial);
 	if ('literal' in expr) return { value: expr.literal };
+	if ('nonFinite' in expr) return { value: Number(expr.nonFinite) };
 	const element = elementOf(expr);
 	if (element !== undefined) {
 		const token = elementToken(element);
@@ -3764,6 +3779,10 @@ export function createNativeViewPayload(
 				if (scope.locals.has(expression.name)) return { local: expression.name };
 				const bound = scope.args.get(expression.name);
 				if (bound) return bound;
+				if (expression.name === 'Infinity')
+					return { nonFinite: 'Infinity' };
+				if (expression.name === 'NaN')
+					return { nonFinite: 'NaN' };
 				if (scope.opaque === expression.name || scope.carried?.name === expression.name)
 					return refuse(`${what} reads its event`);
 				if (scope.deviceObjects.has(expression.name))
@@ -3984,6 +4003,15 @@ export function createNativeViewPayload(
 			}
 			case 'member': {
 				const holder = expression.object;
+				// Number's constants, as JavaScript gives them; the non-finite ones travel as their names.
+				if (
+					holder.kind === 'read' &&
+					holder.name === 'Number' &&
+					!scope.locals.has('Number') &&
+					!scope.args.has('Number') &&
+					Object.hasOwn(NUMBER_CONSTANTS, expression.property)
+				)
+					return NUMBER_CONSTANTS[expression.property]!;
 				if (
 					holder.kind === 'read' &&
 					scope.objects.has(holder.name) &&
@@ -8252,21 +8280,26 @@ export function createNativeViewPayload(
 		...(options.route
 			? { route: { pattern: options.route.pattern, params: options.route.params } }
 			: {}),
-		cells: cells.map((cell) => ({
-			...cell,
-			...(styledCells.has(cell.id) && !rowCells.has(cell.id)
-				? {
-						styled: true as const,
-						...(styledDomains.has(cell.id)
-							? { domain: styledDomains.get(cell.id)! }
-							: {}),
-					}
-				: {}),
-			...(undefinedFirst.has(cell.id) && !cell.row && cell.initial === null
-				? { unset: true as const }
-				: {}),
-			...(appCells.has(cell.id) ? { app: true as const } : {}),
-		})),
+		cells: cells.map((cell) => {
+			// JSON writes Infinity and NaN as null: the cell carries where they were beside its first value.
+			const { json, nonFinite } = nativeNonFiniteSplit(cell.initial);
+			return {
+				...cell,
+				...(nonFinite.length > 0 ? { initial: json as NativeValue, nonFinite } : {}),
+				...(styledCells.has(cell.id) && !rowCells.has(cell.id)
+					? {
+							styled: true as const,
+							...(styledDomains.has(cell.id)
+								? { domain: styledDomains.get(cell.id)! }
+								: {}),
+						}
+					: {}),
+				...(undefinedFirst.has(cell.id) && !cell.row && cell.initial === null
+					? { unset: true as const }
+					: {}),
+				...(appCells.has(cell.id) ? { app: true as const } : {}),
+			};
+		}),
 		nodes,
 		events,
 		handlers,
