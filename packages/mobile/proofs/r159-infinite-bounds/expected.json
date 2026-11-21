@@ -1,0 +1,9 @@
+{
+	"rung": 159,
+	"name": "a state that starts at Infinity or -Infinity holds it as the web does: shown as Infinity, compared and capped in handlers, and read by JavaScript",
+	"steps": [
+		{ "visible": ["Bounds", "max Infinity", "low -Infinity", "huge unbounded"] },
+		{ "do": { "tap": "Cap" }, "visible": ["max 100", "small bounded"], "absent": ["max Infinity"] },
+		{ "do": { "tap": "Uncap" }, "visible": ["max Infinity", "huge unbounded"], "absent": ["max 100"] }
+	]
+}

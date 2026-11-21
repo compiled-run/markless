@@ -135,13 +135,15 @@ describe('check', () => {
 		expect(result.output).toContain('over budget: largest shard peak RSS 2300 MB');
 	});
 
-	test('fails loudly when the suite got lighter than the band: the anchor is stale', () => {
+	test('a suite lighter than the band warns and does not fail: the change did not make it so', () => {
 		const result = check(anchored, [
 			{ shard: '1/2', cpuS: 80, peakRssMb: 2000 },
 			{ shard: '2/2', cpuS: 190, peakRssMb: 1500 },
 		]);
-		expect(result.status).toBe(1);
-		expect(result.output).toContain("stale anchor: total CPU at the anchors' speed 270 CPU-s");
+		expect(result.status).toBe(0);
+		expect(result.output).toContain(
+			"::warning::lighter: total CPU at the anchors' speed 270 CPU-s",
+		);
 	});
 
 	test('fails when the shards differ from the anchored ones', () => {
@@ -271,6 +273,197 @@ describe('check', () => {
 		]);
 		expect(empty.status).toBe(1);
 		expect(empty.output).toContain('no anchors');
+	});
+});
+
+const mainDir = (runs: Shard[][]) => {
+	const dir = mkdtempSync(join(tmpdir(), 'unit-budget-main-'));
+	scratch.push(dir);
+	runs.forEach((shards, order) => {
+		const id = String(100 + order);
+		shards.forEach((shard, index) => {
+			const folder = join(
+				dir,
+				`${String(order).padStart(2, '0')}-${id}`,
+				`unit-budget-shard${index}`,
+			);
+			mkdirSync(folder, { recursive: true });
+			writeFileSync(
+				join(folder, 'measurement.json'),
+				JSON.stringify({
+					version: 2,
+					platform: 'linux-x64',
+					cpuModel: 'test cpu',
+					cpus: 4,
+					sha: null,
+					run: id,
+					command: [],
+					exitCode: 0,
+					wallS: 100,
+					attempt: 1,
+					calibrationS: 1,
+					...shard,
+				}),
+			);
+		});
+	});
+	return dir;
+};
+
+// Ten landed runs of main, each with these two shards.
+const mainAt = (one: number, two: number, rss = 2000, runs = 10) =>
+	mainDir(
+		Array.from({ length: runs }, () => [
+			{ shard: '1/2', cpuS: one, peakRssMb: rss },
+			{ shard: '2/2', cpuS: two, peakRssMb: 1500 },
+		]),
+	);
+
+const checkAgainstMain = (budget: object, shards: Shard[], main: string) =>
+	run(
+		'check',
+		'--budget',
+		budgetFile(budget),
+		'--measurements',
+		measurementsDir(shards),
+		'--main',
+		main,
+	);
+
+describe("check against main's last landed runs", () => {
+	test("a run more than the margin above main's median fails, though inside the anchor's band", () => {
+		const result = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 95, peakRssMb: 2000 },
+				{ shard: '2/2', cpuS: 195, peakRssMb: 1500 },
+			],
+			mainAt(90, 180),
+		);
+		expect(result.status).toBe(1);
+		expect(result.output).toContain(
+			"over budget: total CPU at the anchors' speed 290 CPU-s against main's median of 270 CPU-s (+7.4%",
+		);
+		expect(result.output).toContain('more than the margin above main');
+	});
+
+	test("memory is held to main's median the same way", () => {
+		const result = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 100, peakRssMb: 2000 },
+				{ shard: '2/2', cpuS: 200, peakRssMb: 1500 },
+			],
+			mainAt(100, 200, 1800),
+		);
+		expect(result.status).toBe(1);
+		expect(result.output).toContain(
+			"over budget: largest shard peak RSS 2000 MB against main's median of 1800 MB (+11.1%",
+		);
+	});
+
+	test('the committed anchor plus the margin stays a ceiling, however far main has moved', () => {
+		const result = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 107, peakRssMb: 2000 },
+				{ shard: '2/2', cpuS: 213, peakRssMb: 1500 },
+			],
+			mainAt(110, 220),
+		);
+		expect(result.status).toBe(1);
+		expect(result.output).toContain(
+			"over budget: total CPU at the anchors' speed 320 CPU-s against main's median of 330 CPU-s (-3%",
+		);
+		expect(result.output).toContain('ceiling 315 CPU-s');
+		expect(result.output).toContain('over the ceiling no run may pass');
+	});
+
+	test("a run inside main's band passes, and one under it only warns", () => {
+		const inside = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 92, peakRssMb: 1900 },
+				{ shard: '2/2', cpuS: 184, peakRssMb: 1500 },
+			],
+			mainAt(90, 180, 1900),
+		);
+		expect(inside.status).toBe(0);
+		const under = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 80, peakRssMb: 1600 },
+				{ shard: '2/2', cpuS: 160, peakRssMb: 1500 },
+			],
+			mainAt(100, 200),
+		);
+		expect(under.status).toBe(0);
+		expect(under.output).toContain(
+			"::warning::lighter: total CPU at the anchors' speed 240 CPU-s",
+		);
+		expect(under.output).toContain('::warning::lighter: largest shard peak RSS 1600 MB');
+	});
+
+	test('warns when main has moved more than half the margin from the committed anchor', () => {
+		const result = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 103, peakRssMb: 2000 },
+				{ shard: '2/2', cpuS: 206, peakRssMb: 1500 },
+			],
+			mainAt(103, 206),
+		);
+		expect(result.status).toBe(0);
+		expect(result.output).toContain(
+			"::warning::main moved: total CPU at the anchors' speed on main's last 10 landed runs is 309 CPU-s, +3% from the committed anchor of 300 CPU-s, more than half the ±5% margin",
+		);
+		expect(result.output).toContain('accept --from 100 101 102 103 104 105 106 107 108 109');
+		expect(result.output).not.toContain('main moved: largest shard peak RSS');
+	});
+
+	test('with fewer than 10 usable landed runs the run is held to the committed anchors alone', () => {
+		const main = mainDir([
+			...Array.from({ length: 9 }, () => [
+				{ shard: '1/2', cpuS: 90, peakRssMb: 2000 },
+				{ shard: '2/2', cpuS: 180, peakRssMb: 1500 },
+			]),
+			[
+				{ shard: '1/2', cpuS: 90, peakRssMb: 2000, exitCode: 1 },
+				{ shard: '2/2', cpuS: 180, peakRssMb: 1500 },
+			],
+		]);
+		const result = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 95, peakRssMb: 2000 },
+				{ shard: '2/2', cpuS: 195, peakRssMb: 1500 },
+			],
+			main,
+		);
+		expect(result.status).toBe(0);
+		expect(result.output).toContain(
+			"main's last landed runs gave 9 of 10 usable unit budget measurements",
+		);
+		expect(result.output).toContain(
+			"total CPU at the anchors' speed: 290 CPU-s against an anchor of 300 CPU-s",
+		);
+	});
+
+	test('drift reports main against the anchors and warns past half the margin', () => {
+		const quiet = run('drift', '--budget', budgetFile(anchored), '--main', mainAt(101, 201));
+		expect(quiet.status).toBe(0);
+		expect(quiet.output).not.toContain('::warning::');
+		const moved = run(
+			'drift',
+			'--budget',
+			budgetFile(anchored),
+			'--main',
+			mainAt(100, 200, 2150),
+		);
+		expect(moved.status).toBe(0);
+		expect(moved.output).toContain(
+			"::warning::main moved: largest shard peak RSS on main's last 10 landed runs is 2150 MB, +7.5% from the committed anchor of 2000 MB",
+		);
 	});
 });
 

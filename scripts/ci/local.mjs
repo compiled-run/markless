@@ -73,6 +73,10 @@ const JOB_POLICY = {
 			mode: 'ci-only',
 			reason: 'compares the benchmark job artifacts; nothing to compare without them',
 		},
+		'carry-queue-markers': {
+			mode: 'ci-only',
+			reason: "runs on main's push runs: carries the merge queue's lane markers and warns when main's unit budget median moved from its anchors",
+		},
 	},
 	'ecosystem-ci.yml': Object.fromEntries(
 		['plan', 'build', 'suites', 'report'].map((job) => [

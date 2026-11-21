@@ -65,6 +65,8 @@ export type NativeBuiltin =
 export type NativeExpr =
 	| { readonly cell: string }
 	| { readonly literal: NativeScalar | null }
+	/** `Infinity`, `-Infinity` or `NaN` (the globals, `Number.POSITIVE_INFINITY` and the like), which a JSON literal cannot hold. */
+	| { readonly nonFinite: 'Infinity' | '-Infinity' | 'NaN' }
 	/**
 	 * `typeof` gives JavaScript's answer for a JSON value: 'string', 'number', 'boolean', or 'object' for an array, an
 	 * object and null. A native value spells `undefined` as null, so the compiler emits it only compared with 'string',
@@ -712,6 +714,52 @@ export type NativeOp =
 /** `select` selects a text field's whole text, as `field.select()` does. */
 export type NativeCommand = 'focus' | 'scrollIntoView' | 'select';
 
+/** The non-finite numbers JSON cannot hold: each with its path (object keys and array indices) inside a value. */
+export type NativeNonFinite = ReadonlyArray<
+	readonly [path: ReadonlyArray<string | number>, name: 'Infinity' | '-Infinity' | 'NaN']
+>;
+
+/**
+ * A value as JSON carries it: each Infinity, -Infinity or NaN written as null, and where each was. A value with none comes
+ * back as it is with an empty list.
+ */
+export function nativeNonFiniteSplit(value: unknown): {
+	readonly json: unknown;
+	readonly nonFinite: NativeNonFinite;
+} {
+	const found: Array<readonly [ReadonlyArray<string | number>, 'Infinity' | '-Infinity' | 'NaN']> = [];
+	const walk = (v: unknown, path: ReadonlyArray<string | number>): unknown => {
+		if (typeof v === 'number' && !Number.isFinite(v)) {
+			found.push([path, Number.isNaN(v) ? 'NaN' : v > 0 ? 'Infinity' : '-Infinity']);
+			return null;
+		}
+		if (Array.isArray(v)) return v.map((item, index) => walk(item, [...path, index]));
+		if (v !== null && typeof v === 'object')
+			return Object.fromEntries(Object.entries(v).map(([key, item]) => [key, walk(item, [...path, key])]));
+		return v;
+	};
+	const json = walk(value, []);
+	return { json: found.length === 0 ? value : json, nonFinite: found };
+}
+
+/** A value JSON carried, with each non-finite number nativeNonFiniteSplit took out put back at its path. */
+export function nativeNonFiniteJoin(json: unknown, nonFinite: NativeNonFinite | undefined): unknown {
+	if (!nonFinite || nonFinite.length === 0) return json;
+	const copy = structuredClone(json) as unknown;
+	const number = { Infinity: Infinity, '-Infinity': -Infinity, NaN: Number.NaN } as const;
+	let root = copy;
+	for (const [path, name] of nonFinite) {
+		if (path.length === 0) {
+			root = number[name];
+			continue;
+		}
+		let at = root as Record<string | number, unknown>;
+		for (const key of path.slice(0, -1)) at = at[key] as Record<string | number, unknown>;
+		at[path[path.length - 1]!] = number[name];
+	}
+	return root;
+}
+
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;
 	readonly component: string;
@@ -722,6 +770,8 @@ export type NativeViewPayload = {
 		readonly id: string;
 		readonly name: string;
 		readonly initial: NativeValue;
+		/** Where `initial` holds Infinity, -Infinity or NaN, which JSON writes as null (nativeNonFiniteSplit). */
+		readonly nonFinite?: NativeNonFinite;
 		readonly storage?: { readonly key: string };
 		/**
 		 * A cell of an app-wide `shared()`: the app holds one value for every page. A screen starts from the app's value,

@@ -602,8 +602,8 @@ class MarklessHost(
 		syncSheets()
 		refreshRelations()
 		refreshSelects()
-		// A styled list's rows, a row's text or an attribute of a row's copy moved: the page is laid out again with its rows.
-		if (planned?.planRepeats?.isNotEmpty() == true && journal.any { it is JournalEntry.Rows || ((it is JournalEntry.Text || it is JournalEntry.Attribute) && '@' in it.node) }) {
+		// A styled list's rows, a row's text or an attribute of a row's copy moved, or an arm that may hold a list opened: the page is laid out again with its rows.
+		if (planned?.planRepeats?.isNotEmpty() == true && journal.any { it is JournalEntry.Rows || it is JournalEntry.Arm || ((it is JournalEntry.Text || it is JournalEntry.Attribute) && '@' in it.node) }) {
 			laidOutFor?.let { (w, h) -> layOutAt(w, h, rowsMoved = true) }
 		}
 		onJournal?.invoke(journal)

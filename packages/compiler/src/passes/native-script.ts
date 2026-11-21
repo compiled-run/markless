@@ -546,15 +546,49 @@ var elementOf = function (id) {
 	return proxy;
 };
 var elementsOf = function (value) { return Array.isArray(value) ? value.map(elementOf) : elementOf(value); };
+// JSON writes Infinity and NaN as null: a value crosses with where each was, as nativeNonFiniteSplit and Join do.
+var split = function (value) {
+	var found = [];
+	var walk = function (v, path) {
+		if (typeof v === 'number' && !isFinite(v)) {
+			found.push([path, v !== v ? 'NaN' : v > 0 ? 'Infinity' : '-Infinity']);
+			return null;
+		}
+		if (Array.isArray(v)) return v.map(function (item, k) { return walk(item, path.concat([k])); });
+		if (v !== null && typeof v === 'object') {
+			var out = {};
+			for (var key in v) out[key] = walk(v[key], path.concat([key]));
+			return out;
+		}
+		return v;
+	};
+	return { json: walk(value, []), nonFinite: found };
+};
+var NON_FINITE = { 'Infinity': Infinity, '-Infinity': -Infinity, 'NaN': NaN };
+var join = function (json, nonFinite) {
+	var root = json;
+	(nonFinite || []).forEach(function (entry) {
+		var path = entry[0];
+		if (path.length === 0) { root = NON_FINITE[entry[1]]; return; }
+		var at = root;
+		for (var k = 0; k < path.length - 1; k++) at = at[path[k]];
+		at[path[path.length - 1]] = NON_FINITE[entry[1]];
+	});
+	return root;
+};
+var stable = function (value) {
+	var s = split(value);
+	return JSON.stringify([s.json, s.nonFinite]);
+};
 var begin = function (entry) {
 	elementFacts = entry.elements || {};
 	proxies = {};
-	cells = entry.cells;
+	cells = join(entry.cells, entry.nonFinite);
 	unset = {};
 	forced = {};
 	(entry.unset || []).forEach(function (slot) { unset[slot] = true; });
 	before = {};
-	for (var slot in cells) before[slot] = JSON.stringify(cells[slot]);
+	for (var slot in cells) before[slot] = stable(cells[slot]);
 	host.out = { timers: [], clears: [], requests: [], aborts: [], calls: [], logs: [], commands: [], pending: [], settled: [], navigate: null };
 	host.place = navigation && entry.kind !== 'compute' ? { routes: navigation.routes, path: pathOf(navigation.here, entry.params || {}) } : null;
 	host.seed = entry.seed || null;
@@ -630,7 +664,7 @@ var plain = function (value) {
 	if (value === undefined || value === null) return null;
 	var type = typeof value;
 	if (type === 'string' || type === 'boolean') return value;
-	if (type === 'number') return isFinite(value) ? value : String(value);
+	if (type === 'number') return value;
 	if (Array.isArray(value)) return value.map(plain);
 	var proto = type === 'object' ? Object.getPrototypeOf(value) : undefined;
 	if (proto === Object.prototype || proto === null) {
@@ -647,7 +681,7 @@ g.__markless[id] = {
 		if (entry.kind === 'compute') {
 			var value = fn(entry.fn)(frameOf(entry.frame))();
 			host.out = null;
-			return JSON.stringify(plain(value));
+			return JSON.stringify(split(plain(value)));
 		}
 		if (entry.kind === 'dispatch') {
 			var settled = function (error) { fail(entry['catch'], error); };
@@ -712,8 +746,9 @@ g.__markless[id] = {
 	leave: function () {
 		var writes = [];
 		for (var slot in cells) {
-			var now = JSON.stringify(cells[slot]);
-			if (now !== before[slot] || forced[slot]) writes.push([slot, now === undefined ? null : JSON.parse(now)]);
+			if (stable(cells[slot]) === before[slot] && !forced[slot]) continue;
+			var given = JSON.parse(JSON.stringify(split(cells[slot] === undefined ? null : cells[slot])));
+			writes.push(given.nonFinite.length > 0 ? [slot, given.json, given.nonFinite] : [slot, given.json]);
 		}
 		var out = host.out;
 		host.out = null;
