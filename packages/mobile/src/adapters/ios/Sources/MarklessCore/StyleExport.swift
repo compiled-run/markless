@@ -586,7 +586,8 @@ public struct StyleExport: Sendable {
 				let lists = planRepeats.map { r -> JSONValue in
 					.object([
 						("parent", .string(r.parent)), ("template", .array(r.template.map { .string($0) })),
-						("rows", .array((shown[r.id] ?? []).map { row in
+						// A list whose parent this assignment does not lay out (its arm is closed there) has no rows in it.
+						("rows", .array((assignments[k].nodes.contains { $0.id == (names[r.parent] ?? r.parent) && $0.frame != nil } ? shown[r.id] ?? [] : []).map { row in
 							.object([
 								("key", .string(row.key)), ("assignment", .number(Double(row.assignment))),
 								("texts", .array(row.texts.sorted { $0.key < $1.key }.map { .array([.string(dragonId[$0.key] ?? $0.key), .string($0.value)]) })),
