@@ -51,6 +51,12 @@ describe('router prefetch policy', () => {
 
 	test('the trigger and network lists a config writer detects are exported beside router()', () => {
 		expect(routerVite.PREFETCH_TRIGGERS).toBe(PREFETCH_TRIGGERS);
+		expect(routerVite.prefetchPolicy).toBe(prefetchPolicy);
+		expect(routerVite.prefetchPolicy({ viewport: 'all', budget: 0 })).toEqual({
+			levels: [2, 2, 1],
+			concurrency: 2,
+			budget: 0,
+		});
 		expect(routerVite.PREFETCH_NETWORKS).toBe(PREFETCH_NETWORKS);
 		expect(routerVite.PREFETCH_DEFAULTS).toBe(PREFETCH_DEFAULTS);
 		expect(routerVite.PREFETCH_LINK_CHOICES).toEqual(['intent', 'viewport']);

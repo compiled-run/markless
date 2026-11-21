@@ -233,7 +233,8 @@ URL itself answers the whole document.
 
 The router may fetch a linked page's fragment, and preload its code, before
 the click. `router({ prefetch })` sets when, as plain data (`RouterPrefetch` in
-`packages/router/src/vite/prefetch-policy.ts`). Each trigger runs on `'all'`
+`packages/router/src/vite/prefetch-policy.ts`; `prefetchPolicy` from `@markless/router/vite`
+checks and resolves one for tools that write it). Each trigger runs on `'all'`
 networks, `'fast'` ones, or `'none'`:
 
 - `intent` (default `'all'`): a mouse resting on a link, keyboard focus, a
