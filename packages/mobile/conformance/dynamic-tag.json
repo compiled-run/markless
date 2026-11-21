@@ -178,26 +178,11 @@
 		]
 	},
 	"initial": [
-		[
-			"h3:text0",
-			"Notes"
-		],
-		[
-			"component-edge:0/h0:text0",
-			"Tap the first note"
-		],
-		[
-			"component-edge:0/h1:text0",
-			"First taps: 0"
-		],
-		[
-			"component-edge:1/h0:text0",
-			"Tap the second note"
-		],
-		[
-			"component-edge:1/h1:text0",
-			"Second taps: 0"
-		]
+		["h3:text0", "Notes"],
+		["component-edge:0/h0:text0", "Tap the first note"],
+		["component-edge:0/h1:text0", "First taps: 0"],
+		["component-edge:1/h0:text0", "Tap the second note"],
+		["component-edge:1/h1:text0", "Second taps: 0"]
 	],
 	"steps": [
 		{

@@ -196,26 +196,11 @@
 		]
 	},
 	"initial": [
-		[
-			"h1:text0",
-			"Profile"
-		],
-		[
-			"h2:text0",
-			"Name: nobody"
-		],
-		[
-			"h3:text0",
-			"City: unknown"
-		],
-		[
-			"h4:text0",
-			"Sign in"
-		],
-		[
-			"h5:text0",
-			"Sign out"
-		]
+		["h1:text0", "Profile"],
+		["h2:text0", "Name: nobody"],
+		["h3:text0", "City: unknown"],
+		["h4:text0", "Sign in"],
+		["h5:text0", "Sign out"]
 	],
 	"steps": [
 		{

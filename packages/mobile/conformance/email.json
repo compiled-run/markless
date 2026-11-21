@@ -133,9 +133,7 @@
 												},
 												"arguments": [
 													{
-														"lambda": [
-															"formdata:entry"
-														],
+														"lambda": ["formdata:entry"],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -165,9 +163,7 @@
 														},
 														"arguments": [
 															{
-																"lambda": [
-																	"formdata:entry"
-																],
+																"lambda": ["formdata:entry"],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -253,9 +249,7 @@
 						"kind": "text"
 					}
 				],
-				"submitters": [
-					"h4"
-				]
+				"submitters": ["h4"]
 			}
 		],
 		"valueMissing": {
@@ -1034,30 +1028,13 @@
 		}
 	},
 	"initial": [
-		[
-			"h1:text0",
-			"Account"
-		],
-		[
-			"h4:text0",
-			"Send"
-		],
-		[
-			"h5:text0",
-			"Nothing sent"
-		]
+		["h1:text0", "Account"],
+		["h4:text0", "Send"],
+		["h5:text0", "Nothing sent"]
 	],
 	"initialAttributes": [
-		[
-			"h2",
-			"aria-busy",
-			null
-		],
-		[
-			"h4",
-			"aria-disabled",
-			null
-		]
+		["h2", "aria-busy", null],
+		["h4", "aria-disabled", null]
 	],
 	"steps": [
 		{

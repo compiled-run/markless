@@ -9,10 +9,7 @@
 				"name": "word",
 				"initial": "items",
 				"styled": true,
-				"domain": [
-					"items",
-					"boxes"
-				]
+				"domain": ["items", "boxes"]
 			},
 			{
 				"id": "state:quantities",
@@ -193,30 +190,12 @@
 		}
 	},
 	"initial": [
-		[
-			"h1:text0",
-			"Tally"
-		],
-		[
-			"component-edge:0/h0:text0",
-			"Items: 0"
-		],
-		[
-			"h2:text0",
-			"Add two"
-		],
-		[
-			"h3:text0",
-			"Rename"
-		]
+		["h1:text0", "Tally"],
+		["component-edge:0/h0:text0", "Items: 0"],
+		["h2:text0", "Add two"],
+		["h3:text0", "Rename"]
 	],
-	"initialAttributes": [
-		[
-			"component-edge:0/h0",
-			"hidden",
-			""
-		]
-	],
+	"initialAttributes": [["component-edge:0/h0", "hidden", ""]],
 	"steps": [
 		{
 			"action": {

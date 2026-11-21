@@ -184,30 +184,12 @@
 		]
 	},
 	"initial": [
-		[
-			"h1:text0",
-			"Speaker"
-		],
-		[
-			"h3:text0",
-			"Volume 5"
-		],
-		[
-			"h4:text0",
-			"Saved nothing"
-		],
-		[
-			"h5:text0",
-			"Quiet"
-		]
+		["h1:text0", "Speaker"],
+		["h3:text0", "Volume 5"],
+		["h4:text0", "Saved nothing"],
+		["h5:text0", "Quiet"]
 	],
-	"initialAttributes": [
-		[
-			"h2",
-			"value",
-			"5"
-		]
-	],
+	"initialAttributes": [["h2", "value", "5"]],
 	"steps": [
 		{
 			"action": {
