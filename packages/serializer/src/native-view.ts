@@ -172,9 +172,10 @@ export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>
 
 /**
  * Host services a payload's script uses, so a host provides only those: timers (`setTimeout` and the rest, through
- * `timer` entries), `fetch` (through `fetch` entries), `console`, and `crypto.randomUUID` (from a `seed` the host passes).
+ * `timer` entries), `fetch` (through `fetch` entries), `console`, `crypto.randomUUID` (from a `seed` the host passes),
+ * and `navigate` from @markless/router (through a `navigate` entry; the host passes the page's route `params`).
  */
-export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto';
+export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto' | 'navigate';
 
 /** The JavaScript a payload's `script` ops and script computeds run, in the platform's engine, started on first use. */
 export type NativeScript = {
