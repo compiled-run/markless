@@ -57,6 +57,7 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		57,
 		144,
 		145,
+		201,
 		'J1',
 		'J2',
 		'J3',
@@ -70,6 +71,7 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		'J13',
 		'J14',
 		'J15',
+		'J19',
 		'P1',
 		'R101',
 		'R102',
@@ -106,6 +108,11 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		112,
 		113,
 		114,
+		115,
+		116,
+		117,
+		118,
+		119,
 		120,
 		121,
 		122,
@@ -174,6 +181,7 @@ test('the navigation ladder has one app folder per rung, in rung order', () => {
 		'N2',
 		'N3',
 		'N4',
+		'N10',
 		138,
 		139,
 		140,
@@ -190,9 +198,26 @@ test('the styles ladder has one app folder per rung, in rung order', () => {
 		'S3',
 		'S4',
 		'S5',
+		'S6',
+		'S7',
+		'S8',
+		'S9',
+		'S10',
+		'S11',
+		'S12',
+		'S13',
+		'S14',
+		'S15',
 	]);
 	for (const folder of styleRungFolders())
 		expect(existsSync(join(proofsDir, folder, 'pages'))).toBe(true);
+});
+
+test.each(allRungFolders())('%s: a rung that turns the phone leaves it upright', (folder) => {
+	const turns = readRung(folder).steps.flatMap((step) =>
+		step.do && 'orientation' in step.do ? [step.do.orientation] : [],
+	);
+	if (turns.length > 0) expect(turns.at(-1)).toBe('portrait');
 });
 
 test.each(allRungFolders())(

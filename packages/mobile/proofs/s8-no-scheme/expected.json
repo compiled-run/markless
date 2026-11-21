@@ -1,0 +1,24 @@
+{
+	"rung": "S8",
+	"name": "A page with no color-scheme and no background stays white with black text in dark mode (the owner's ruling, as Safari shows it)",
+	"steps": [
+		{
+			"visible": ["Seeds by day", "No color-scheme: white in dark mode too"],
+			"title": "Day page"
+		},
+		{
+			"do": {
+				"appearance": "dark"
+			},
+			"visible": ["Seeds by day"],
+			"title": "Day page"
+		},
+		{
+			"do": {
+				"appearance": "light"
+			},
+			"visible": ["Seeds by day"],
+			"title": "Day page"
+		}
+	]
+}

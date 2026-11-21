@@ -1,0 +1,180 @@
+{
+ "gateDevicePx": 1,
+ "target": "ios",
+ "browser": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
+ "compared": 9,
+ "failed": 0,
+ "rows": [
+  {
+   "target": "ios",
+   "values": {},
+   "id": "html",
+   "maxDeltaDevicePx": 0.0313,
+   "pass": true,
+   "web": {
+    "x": 0,
+    "y": 0,
+    "width": 1206,
+    "height": 589.2188
+   },
+   "dragon": {
+    "x": 0,
+    "y": 0,
+    "width": 1206,
+    "height": 589.25
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "body",
+   "maxDeltaDevicePx": 0.0313,
+   "pass": true,
+   "web": {
+    "x": 0,
+    "y": 0,
+    "width": 1206,
+    "height": 589.2188
+   },
+   "dragon": {
+    "x": 0,
+    "y": 0,
+    "width": 1206,
+    "height": 589.25
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h0",
+   "maxDeltaDevicePx": 0.0313,
+   "pass": true,
+   "web": {
+    "x": 0,
+    "y": 0,
+    "width": 1206,
+    "height": 589.2188
+   },
+   "dragon": {
+    "x": 0,
+    "y": 0,
+    "width": 1206,
+    "height": 589.25
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h2",
+   "maxDeltaDevicePx": 0.0313,
+   "pass": true,
+   "web": {
+    "x": 60,
+    "y": 112.2188,
+    "width": 1086,
+    "height": 93
+   },
+   "dragon": {
+    "x": 60,
+    "y": 112.25,
+    "width": 1086,
+    "height": 93
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h2:text0",
+   "maxDeltaDevicePx": 0.0313,
+   "pass": true,
+   "web": {
+    "x": 60,
+    "y": 112.2188,
+    "width": 207.9873,
+    "height": 93
+   },
+   "dragon": {
+    "x": 60,
+    "y": 112.25,
+    "width": 208,
+    "height": 93
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h3",
+   "maxDeltaDevicePx": 0.0313,
+   "pass": true,
+   "web": {
+    "x": 60,
+    "y": 265.2188,
+    "width": 1086,
+    "height": 108
+   },
+   "dragon": {
+    "x": 60,
+    "y": 265.25,
+    "width": 1086,
+    "height": 108
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "h3:text0",
+   "maxDeltaDevicePx": 0.0313,
+   "pass": true,
+   "web": {
+    "x": 108,
+    "y": 289.2188,
+    "width": 432.1875,
+    "height": 60
+   },
+   "dragon": {
+    "x": 108,
+    "y": 289.25,
+    "width": 432.1875,
+    "height": 60
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "component-edge:0",
+   "maxDeltaDevicePx": 0.0313,
+   "pass": true,
+   "web": {
+    "x": 60,
+    "y": 421.2188,
+    "width": 1086,
+    "height": 108
+   },
+   "dragon": {
+    "x": 60,
+    "y": 421.25,
+    "width": 1086,
+    "height": 108
+   }
+  },
+  {
+   "target": "ios",
+   "values": {},
+   "id": "component-edge:0:text0",
+   "maxDeltaDevicePx": 0.0313,
+   "pass": true,
+   "web": {
+    "x": 96,
+    "y": 445.2188,
+    "width": 237.4688,
+    "height": 60
+   },
+   "dragon": {
+    "x": 96,
+    "y": 445.25,
+    "width": 237.4688,
+    "height": 60
+   }
+  }
+ ]
+}

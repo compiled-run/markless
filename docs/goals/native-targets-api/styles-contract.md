@@ -226,6 +226,10 @@ layout, not the component's look. Sizes per run: `proofs/s<n>-*/style-size.json`
 - **`html`/`body` backgrounds.** Closed by S5 (section 6b): Dragon's export gives each assignment its canvas colour and the
   hosts paint it behind the page and the bars.
 
+Dashed and dotted borders (rung u17, branch `cw/dragon-bugs`): Dragon's export now carries, for each box with a visible dashed or dotted side, the drawing operations its own native paint runs (`borderOps`, its port of Blink 145's side painter, every crisp border pixel equal to Chrome's at both proof devices); both hosts draw those operations as they come (iOS a `CALayer`, Android a `Drawable`) and refuse an unknown one by name. A rounded box with a dashed or dotted side stays refused by Dragon's compile (`rounded dashed borders are PNT1b`).
+
+Text lines (branch `cw/dragon-bugs-glyphs`): Dragon's export now carries, for each framed text node, its `lines` as Dragon's own native text views draw them (per line its top and baseline from the frame, and runs of HarfBuzz glyph ids with each glyph's x in one face at one size). Android draws those glyphs with `Canvas.drawGlyphs` over the text view, whose own text stays for accessibility only, because Minikin shapes word by word at spaces and loses contextual advances (Inter Bold's comma before a space, +1.21 px on "Basil, in stock"), which wrapped the last word out of view. A text node without lines, or whose text has changed from the one Dragon laid out, draws its own text as before. iOS reads and ignores the field: CoreText shapes the whole run as Dragon does.
+
 Host gaps found and closed on the way (both platforms): solid border sides that differ (`border-left: 6px solid`) were
 refused ("only four solid sides"); now drawn as one rectangle per side on square boxes (rounded boxes with differing
 sides stay refused). On iOS 26 and later a styled page's root reaches the screen edge, and its keyboard-dismiss pan took
@@ -248,6 +252,82 @@ means the build stops naming Dragon's reason; nothing is dropped silently.
 
 G1, G3 and G7 hinge on one question: whether the Markless hosts carry Dragon's generated on-device code (its layout engine,
 hit test and interaction runtime) rather than only the JSON export.
+
+## 6c. Dragon fixes for the gaps above (branch `cw/dragon-bugs`, Dragon `cw/dragon-bugs`)
+
+Status 2026-11-18. Owner direction: bugs Dragon has are fixed in Dragon. Base: this branch starts at `cw/native-integration`
+(`4af2ffeb8`), the one tree holding both the style rungs and the `@markless/ui` rungs; Dragon's branch merges
+`cw/native-style-gaps`, `cw/sheet-styled-content` and `cw/native-ui`. Every row's Dragon check compares with Chrome 145 by
+numbers; "iOS" and "Android" are the rung's flow on the simulator and emulator, with screenshots read beside Chrome's
+rendering of the same assignment (`screenshots/chrome*/`, from Dragon's `markless:style-compare --screenshots`).
+
+| Item                                                                                                                                                                                                 | Dragon (check against Chrome)                                                                                                                                                                                           | Rung                                                                                                   | iOS     | Android                                                                        | Still refused                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| States that are strings (tabs' selected value)                                                                                                                                                       | `markless-string-states.test.ts`: one assignment per value, every box within 1 device px                                                                                                                                | u15                                                                                                    | passing | passing                                                                        | a string cell whose values are not all known at build time (stays unstyled, as before)                                                                                                                      |
+| A text that follows such a state                                                                                                                                                                     | same test: each string laid out where it shows                                                                                                                                                                          | u15, u20                                                                                               | passing | passing                                                                        | text over an unbounded value (`Sent {count}`) keeps its first string's frame                                                                                                                                |
+| `body` background under `html`'s; see-through page background                                                                                                                                        | `markless-root-paint.test.ts`: canvas and body box equal Chrome's screenshot pixels                                                                                                                                     | S6                                                                                                     | passing | passing                                                                        | a see-through page background in a dark band (Chrome's dark base, below); a border or other paint on `html`/`body`                                                                                          |
+| `:disabled`, the `disabled` attribute                                                                                                                                                                | `markless-disabled.test.ts`: text and border colours equal Chrome's computed values, boxes within 1 device px; Chrome's `button[disabled]` UA row captured                                                              | u20                                                                                                    | passing | passing                                                                        | a button with no author background or border (platform theme, FORM-b), inline-level controls (RF-INL), the UA control font Arial                                                                            |
+| Anchor positioning (`anchor-name`, `anchor-scope`, `position-anchor`, `position-area`, `anchor()`, `anchor-size()`, `anchor-center`, `position-try-fallbacks` flips and areas, `position-try-order`) | Engine feature in Dragon's layout engine, translated to Swift and Kotlin (1,240 vectors reproduced); 10 `anchor-*` parity fixtures with 0 boxes off, ltr and rtl; WPT css-anchor-position: 10 of 10 runnable files pass | u19 (an authored page: popover and tooltip are refused by Markless's native compiler for their events) | passing | passing                                                                        | `@position-try` rules, `position-anchor: auto`, `position-visibility`, inline anchors, `anchor-size()` in margins and insets, non-px fallbacks, vertical writing modes, scroll-offset shifts, the top layer |
+| Positioned boxes' paint order                                                                                                                                                                        | Both hosts order a positioned or z-index box among its siblings by Dragon's paint-order bucket and rank (iOS layer `zPosition`, Android child drawing order, which touches follow)                                      | u19, u18                                                                                               | passing | passing                                                                        | a box whose stacking context is an ancestor past a box with later siblings or a clip; on iOS touches still follow tree order                                                                                |
+| Dashed and dotted borders                                                                                                                                                                            | `markless-dashed-borders.test.ts`: every crisp border-band pixel equals Chrome's at both phones' ratios                                                                                                                 | u17                                                                                                    | passing | passing (the Tap button's label is cut to "Ta", a host text-fit defect, below) | rounded dashed or dotted borders (PNT1b)                                                                                                                                                                    |
+| `<dialog>` and `::backdrop`                                                                                                                                                                          | `top-layer-dialog.test.ts`: dialog and contents within 1 device px after `showModal()`, backdrop in Chrome's colour                                                                                                     | none                                                                                                   | not run | not run                                                                        | every Markless dialog: Chrome forces `overflow: auto` on a modal dialog, and the export has no scroll containers until `cw/native-scroll` is integrated; `:modal`, `[popover]`                              |
+| The default link underline                                                                                                                                                                           | groundwork only (Dragon `cw/dragon-bugs-underline`, not merged): Skia's glyph intercepts ported, 47 of 55,694 underline pixels still differ from Chrome                                                                 | none                                                                                                   | not run | not run                                                                        | `skip-ink-intercepts` on every real face; and Dragon's state runtime draws no decoration at all (TDEC-b)                                                                                                    |
+
+Receipt: one harness run per platform on this branch at `61f86303b` (simulator `markless-dragon-bugs`, iPhone 17 on iOS 27.2;
+AVD `markless_dragon_bugs`, Pixel 7, API 36; Dragon `cw/dragon-bugs` at `65fd307109`): S1 to S6 and every `u` rung (u1 to u6,
+u11 to u15, u17 to u20), 21 of 21 on each, "proof passed on iOS and Android" (`receipts/2026-11-18-dragon-bugs-*`). An
+earlier run at `446b88bfe` (20 rungs, before u19) also passed on both.
+
+Round two (2026-11-18, owner rulings):
+
+| Item | Change | Rung | iOS | Android |
+| --- | --- | --- | --- | --- |
+| Dark mode opt-in | `color-scheme` on the root decides the used scheme per band (Dragon `canvas: 'host'`); dark takes Chrome's dark canvas (18, 18, 18) and dark UA colours; no opt-in stays white (owner; Safari agrees, Chrome paints 18, 18, 18) | S7, S8 | pass | pass |
+| Android label wraps | A button's label pads from its outward-rounded edges (u17 "Tap", rung 02 "Count 0"); every styled text draws Dragon's glyph lines (`lines` in the export) with `Canvas.drawGlyphs`, since Android shapes word by word and loses Inter's contextual comma before a space (S2 "Basil, in stock") | u17, 02, S2 | pass | pass |
+| Author web font | The style input carries each `@font-face` url's file (compiler fact `fontFaceSources`); Dragon measures with it; the harness ships it; TTF and OTF (TrueType outlines) work, WOFF/WOFF2 refused by name | S9 | pass | pass |
+| Scroll, forms, real elements | Base `cw/native-integration` merged; Dragon `cw/native-scroll` (#593) merged | all | pass | pass |
+
+Receipt: `receipts/2026-11-18-dragon-bugs-round2-*`, 25 rungs per platform (02, S1 to S9, the u rungs).
+
+- Pressed, `:focus-visible` and width `@media` are not built; what each would take is in `deferred-styles.md`.
+
+Round three (2026-11-18, owner rulings: system fonts measured at build time, WOFF2 accepted, an unprovided family falls back):
+
+| Item | Change | Rung | iOS | Android |
+| --- | --- | --- | --- | --- |
+| System fonts | `system-ui`, `sans-serif`, `serif`, `monospace` and no `font-family` are measured at build time from the platform's own font on the build machine: iOS through Core Text on the Mac (San Francisco's line metrics from the newest iOS simulator runtime's `SFUI.ttf`), Android from the SDK system image's `/system/fonts` files shaped with HarfBuzz. Nothing is bundled; the phone draws its own font at Dragon's glyph positions. `markless:style-export` uses system fonts by default; `--fonts pinned` keeps Inter | S11, S12 | pass | pass |
+| No `font-family` | The browser's default: Times New Roman on iOS (Safari), Noto Serif on Android (Chrome); no longer Inter | S12 | pass | pass |
+| WOFF2 (and WOFF) | Decoded at build time; the export ships the decoded TrueType file the hosts draw | S10 | pass | pass |
+| A family that is not provided | Skipped as the web does, with the build warning `DRAGON_FONT_FAMILY_NOT_PROVIDED` naming it; a build error only when nothing in the list resolves | S10 | pass | pass |
+| Author fonts on iOS | Shaped by Core Text at the CSS size with Safari's line rounding, since Safari, not Chrome, is iOS's web: Lato at 18px is 22 CSS px a line in Safari, 21.67 in Chrome. Android keeps Chrome's rules | S9, S10 | pass | pass |
+
+The web column for these rungs is the phone's own browser, not Chrome on the Mac: Safari 27.2 in the iOS simulator and
+Chrome 133 in the Android emulator, opened on the same page at the export's viewport (Dragon `markless:style-web-column`).
+Reports: `proofs/<rung>/native-style-web-column/<page>.{ios,android}.json`; browser screenshots:
+`proofs/<rung>/screenshots/web-column/<page>/`. Every styled rung (02, S1 to S12; 20 pages and assignments, 247 boxes per
+platform) has no box outside 1 device px; the largest differences are 0.0625 device px against Safari and 0.219 against
+Chrome on Android (S11). The older `native-style-compare/` files compare the pinned-Inter export with Chrome on the Mac
+and are kept as that record.
+
+Slack: both hosts extend each text view's drawing bounds by 1 device px, so glyphs that paint past their box (italic
+overhang, accents) are not clipped. Measured need: the largest box difference above (0.219 device px) and glyph paint
+differences against the browsers of up to 0.375 device px on Android.
+
+Out of scope (owner): other OS versions (one iOS runtime, 27.2, and one Android API level, 36, were installed; drift
+between versions is not measured), phone makers' replacement fonts on Android, and the text-size settings people change
+at run time (Dynamic Type, Bold Text, Display Zoom; Android font size, display size and bold text).
+
+Licence: Apple's San Francisco licence covers the downloadable font files (mock-ups only, no embedding). It does not
+mention reading metrics from the font at build time, so whether that is allowed is unknown. No Apple font file is shipped.
+
+Refused by name: weights outside 100 to 900, italic or oblique system faces on iOS, synthetic bold or italic, text that
+needs a fallback font, right-to-left text in a system face.
+
+Known difference: `ui-serif`, `ui-sans-serif`, `ui-monospace` and `ui-rounded` are family names to Chrome, so Dragon skips
+them with the not-provided warning; Safari on iOS draws them in Apple's own designs, so on iOS such a page differs from Safari.
+
+Receipt: `receipts/2026-11-18-dragon-bugs-round3-*`: 28 rungs per platform (02, S1 to S12, the u rungs), "proof passed on
+iOS and Android"; S9 and S10 again after the iOS author-font change, also passing on both.
 
 ## 7. Receipts
 

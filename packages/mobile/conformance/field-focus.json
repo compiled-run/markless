@@ -7,7 +7,15 @@
 			{
 				"id": "state:note",
 				"name": "note",
-				"initial": "idle"
+				"initial": "idle",
+				"styled": true,
+				"domain": [
+					"idle",
+					"typing a name",
+					"name left",
+					"typing notes",
+					"notes left"
+				]
 			},
 			{
 				"id": "state:visits",
@@ -169,6 +177,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:note",
+					"value": "typing a name"
+				},
+				{
 					"op": "text",
 					"node": "h3:text0",
 					"value": "typing a name, 1 visits"
@@ -181,6 +194,11 @@
 				"host": "h1"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:note",
+					"value": "name left"
+				},
 				{
 					"op": "text",
 					"node": "h3:text0",
@@ -195,6 +213,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:note",
+					"value": "typing notes"
+				},
+				{
 					"op": "text",
 					"node": "h3:text0",
 					"value": "typing notes, 1 visits"
@@ -208,6 +231,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:note",
+					"value": "notes left"
+				},
+				{
 					"op": "text",
 					"node": "h3:text0",
 					"value": "notes left, 1 visits"
@@ -220,6 +248,11 @@
 				"host": "h1"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:note",
+					"value": "typing a name"
+				},
 				{
 					"op": "text",
 					"node": "h3:text0",
