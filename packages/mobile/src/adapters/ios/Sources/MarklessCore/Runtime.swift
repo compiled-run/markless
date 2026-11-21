@@ -650,15 +650,18 @@ public final class NativeRuntime {
 		return .object(facts)
 	}
 
-	/// Every current value by slot (the page's cells in payload order, then row slots), and a seed when `crypto` is used.
+	/// Every current value by slot (the page's cells in payload order, then row slots), a seed when `crypto` is used, and
+	/// the route params when `navigate` is.
 	private func entryCells() -> [(String, JSONValue)] {
 		let ids = Set(payload.cells.map(\.id))
 		let cells = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0.json) } }
 			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!.json) }
 		let crypto = payload.script?.services.contains(.crypto) == true
+		let navigate = payload.script?.services.contains(.navigate) == true
 		return [("cells", .object(cells))]
 			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
 			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
+			+ (navigate ? [("params", .object(params.map { ($0.name, .string($0.value)) }))] : [])
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
@@ -667,7 +670,8 @@ public final class NativeRuntime {
 			_ = try callScript("enter", .object(entry + entryCells()))
 			return try callScript("leave")
 		}
-		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["commands"])
+		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
+			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["commands", "navigate"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
@@ -723,7 +727,10 @@ public final class NativeRuntime {
 			if name == "focus" { focused = node }
 			return .command(node: node, command: name, preventScroll: try parts[2].bool())
 		}
-		return aborts + clears + timers + requests + commands
+		guard result.has("navigate") else { return aborts + clears + timers + requests + commands }
+		let opened = try result["navigate"].object(["route", "params", "replace"])
+		let params = try opened["params"].keys().map { NativeRouteParam(name: $0, value: try opened["params"].field($0).string()) }
+		return aborts + clears + timers + requests + commands + [.navigate(route: try opened["route"].string(), params: params, replace: try opened["replace"].bool())]
 	}
 
 	/// Tells the engine which async values are shown and what they read, when that moved; it starts and aborts runs.
@@ -1162,6 +1169,12 @@ public final class NativeRuntime {
 			guard case .branch = node.kind else { return [] }
 			return try instances(of: node).map { ($0.id, try arm(of: node.id, in: $0.scope)) }
 		}
+	}
+
+	/// A branch's style state: the arm it shows ("0", "1", …, or "none"); nil while it is not shown.
+	public func styleArm(of branch: String) throws -> NativeValue? {
+		guard let shown = try arms().first(where: { $0.node == branch }) else { return nil }
+		return .string(shown.index.map(String.init) ?? "none")
 	}
 
 	/// Every shown list's row keys, in order.

@@ -1,0 +1,37 @@
+{
+	"rung": "S21",
+	"name": "Styled @for rows: each row, a class its item decides and the boxes after the list laid out on the phone as the web lays them out",
+	"steps": [
+		{
+			"visible": [
+				"Notes",
+				"Groceries",
+				"Call the plumber about the kitchen tap before Friday",
+				"End of list"
+			],
+			"absent": ["No notes yet", "Water the plants"],
+			"title": "Notes"
+		},
+		{
+			"do": {
+				"tap": "Add note"
+			},
+			"visible": ["Groceries", "Water the plants", "End of list"],
+			"absent": ["No notes yet"]
+		},
+		{
+			"do": {
+				"tap": "Clear notes"
+			},
+			"visible": ["No notes yet", "End of list"],
+			"absent": ["Groceries", "Water the plants"]
+		},
+		{
+			"do": {
+				"tap": "Add note"
+			},
+			"visible": ["Water the plants", "End of list"],
+			"absent": ["No notes yet"]
+		}
+	]
+}

@@ -607,6 +607,7 @@ final class ViewTree {
 				let built = try index.map { try build("\(templates[node] ?? node)#\($0)", in: container, at: &position, context) } ?? []
 				branches[node] = (branch.anchor, index, built)
 				settle(container, built: built, context)
+				try followArms()
 			case let .rows(node, keys):
 				guard let list = lists[node], let context = contexts[node] else { throw HostError("journal names list \(node), which is not shown") }
 				let container = list.anchor.superview ?? root
@@ -790,13 +791,41 @@ final class ViewTree {
 		label.textColor = .clear
 	}
 
+	/// Moves each styled branch's style state to the arm it shows now, inner ones included, and lays the page out again.
+	private func followArms() throws {
+		var moved = false
+		if let layout {
+			for cell in layout.stateCells {
+				guard let value = try runtime.styleArm(of: cell) else { continue }
+				let reached = try layout.next(from: assignment, cell: cell, value: value)
+				moved = moved || reached != assignment
+				assignment = reached
+			}
+		}
+		for (sheet, styles) in sheetStyles {
+			var next = styles
+			for (index, height) in styles.heights.enumerated() {
+				for cell in height.layout.stateCells {
+					guard let value = try runtime.styleArm(of: cell) else { continue }
+					next.assignments[index] = try height.layout.next(from: next.assignments[index], cell: cell, value: value)
+				}
+			}
+			moved = moved || next.assignments != styles.assignments
+			sheetStyles[sheet] = next
+		}
+		guard moved else { return }
+		try repaint { _ in true }
+		try sizePage()
+	}
+
 	private func style(of id: String) -> ResolvedStyle? {
 		guard let template = templates[id] else { return nil }
 		if let sheet = sheetOf[template] {
 			guard let styles = sheetStyles[sheet] else { return nil }
 			return styles.heights[styles.height].layout.assignments[styles.assignments[styles.height]][template]
 		}
-		return layout?.assignments[assignment][template]
+		// A row's copy has its own box once the page's rows are laid out; until then its template's.
+		return layout?.assignments[assignment][id] ?? layout?.assignments[assignment][template]
 	}
 
 	private func repaint(where included: (String) -> Bool) throws {

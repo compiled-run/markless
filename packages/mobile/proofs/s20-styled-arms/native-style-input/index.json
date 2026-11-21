@@ -1,0 +1,259 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Order",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "order mk-gf91et"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-gf91et"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Order 1024"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "toggle mk-gf91et"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Toggle details"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "section",
+			"parent": "h0",
+			"attributes": {
+				"class": "details mk-gf91et"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "p",
+			"parent": "h4",
+			"attributes": {
+				"class": "label mk-gf91et"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Shipping",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "p",
+			"parent": "h4",
+			"attributes": {
+				"class": "value mk-gf91et"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Two days",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "p",
+			"parent": "h4",
+			"attributes": {
+				"class": "late mk-gf91et"
+			},
+			"arm": {
+				"branch": "branch-site:1",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "Running late",
+			"arm": {
+				"branch": "branch-site:1",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h8",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "hint mk-gf91et"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 1
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h8:text0",
+			"parent": "h8",
+			"text": "Details are hidden",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 1
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h9",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "advance mk-gf91et"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h9:text0",
+			"parent": "h9",
+			"text": "Next step"
+		},
+		{
+			"kind": "element",
+			"id": "h10",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "badge packed mk-gf91et"
+			},
+			"arm": {
+				"branch": "branch-site:2",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h10:text0",
+			"parent": "h10",
+			"text": "Packed",
+			"arm": {
+				"branch": "branch-site:2",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h11",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "badge shipped mk-gf91et"
+			},
+			"arm": {
+				"branch": "branch-site:2",
+				"index": 1
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h11:text0",
+			"parent": "h11",
+			"text": "Shipped",
+			"arm": {
+				"branch": "branch-site:2",
+				"index": 1
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h12",
+			"element": "footer",
+			"parent": "h0",
+			"attributes": {
+				"class": "footer mk-gf91et"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h12:text0",
+			"parent": "h12",
+			"text": "Thanks for ordering"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.order.mk-gf91et {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f8f9fa;\n\t\t\t}\n\t\t\t.heading.mk-gf91et {\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #212529;\n\t\t\t}\n\t\t\t.toggle.mk-gf91et,\n\t\t\t.advance.mk-gf91et {\n\t\t\t\tdisplay: block;\n\t\t\t\twidth: 100%;\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder: 2px solid #264653;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #264653;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 17px;\n\t\t\t\ttext-align: left;\n\t\t\t}\n\t\t\t.details.mk-gf91et {\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 16px;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #264653;\n\t\t\t\tcolor: #ffffff;\n\t\t\t}\n\t\t\t.details .label.mk-gf91et {\n\t\t\t\tfont-size: 14px;\n\t\t\t\tcolor: #a8dadc;\n\t\t\t}\n\t\t\t.details .value.mk-gf91et {\n\t\t\t\tmargin-top: 4px;\n\t\t\t\tfont-size: 22px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.details .late.mk-gf91et {\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 8px 12px;\n\t\t\t\tbackground: #e76f51;\n\t\t\t}\n\t\t\t.hint.mk-gf91et {\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tcolor: #6c757d;\n\t\t\t\tfont-size: 15px;\n\t\t\t}\n\t\t\t.badge.mk-gf91et {\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder-radius: 999px;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.packed.mk-gf91et {\n\t\t\t\tbackground: #e9c46a;\n\t\t\t\tcolor: #212529;\n\t\t\t}\n\t\t\t.shipped.mk-gf91et {\n\t\t\t\tpadding: 20px 16px;\n\t\t\t\tbackground: #2a9d8f;\n\t\t\t\tcolor: #ffffff;\n\t\t\t}\n\t\t\t.footer.mk-gf91et {\n\t\t\t\tmargin-top: 24px;\n\t\t\t\tpadding-top: 12px;\n\t\t\t\tborder-top: 1px solid #adb5bd;\n\t\t\t\tcolor: #495057;\n\t\t\t\tfont-size: 15px;\n\t\t\t}",
+	"states": [],
+	"branches": [
+		{
+			"id": "branch-site:0",
+			"domain": [
+				"0",
+				"1"
+			],
+			"initial": "1"
+		},
+		{
+			"id": "branch-site:1",
+			"domain": [
+				"0",
+				"1"
+			],
+			"initial": "0",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"id": "branch-site:2",
+			"domain": [
+				"0",
+				"1",
+				"2"
+			],
+			"initial": "0"
+		}
+	]
+}

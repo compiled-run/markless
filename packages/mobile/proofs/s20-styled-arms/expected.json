@@ -1,0 +1,36 @@
+{
+	"rung": "S20",
+	"name": "Styled elements inside @if arms: each arm, a nested arm and the boxes after them are laid out as the web lays out the arm it shows",
+	"steps": [
+		{
+			"visible": ["Order 1024", "Details are hidden", "Packed", "Thanks for ordering"],
+			"absent": ["Shipping", "Shipped", "Running late"],
+			"title": "Order"
+		},
+		{
+			"do": { "tap": "Toggle details" },
+			"visible": ["Shipping", "Two days", "Packed", "Thanks for ordering"],
+			"absent": ["Details are hidden"]
+		},
+		{
+			"do": { "tap": "Next step" },
+			"visible": ["Shipping", "Shipped", "Thanks for ordering"],
+			"absent": ["Packed", "Running late"]
+		},
+		{
+			"do": { "tap": "Next step" },
+			"visible": ["Shipping", "Running late", "Thanks for ordering"],
+			"absent": ["Shipped", "Packed"]
+		},
+		{
+			"do": { "tap": "Toggle details" },
+			"visible": ["Details are hidden", "Thanks for ordering"],
+			"absent": ["Shipping", "Running late", "Packed", "Shipped"]
+		},
+		{
+			"do": { "tap": "Next step" },
+			"visible": ["Details are hidden", "Packed", "Thanks for ordering"],
+			"absent": ["Shipping", "Shipped"]
+		}
+	]
+}
