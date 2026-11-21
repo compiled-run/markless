@@ -18,7 +18,9 @@ import {
 	matchRouteManifest,
 	type RouteManifest,
 } from '@markless/router';
+import { iconSourceTransform, type IconsOptions } from '@markless/icons/vite';
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
+import { uiIconsOptions } from '@markless/ui-tools';
 import {
 	isNativeStyleStateAttribute,
 	NATIVE_APP_VERSION,
@@ -86,9 +88,33 @@ const withJsonModules =
 	});
 
 /** Compiles one `.tsrx` module through the real compiler, then lowers its analysis to the native view payload. */
+/** What the web build's `ui()` plugin does to each source before markless compiles it: icon tags become inline `<svg>`. */
+export type NativeSourceTransform = ReturnType<typeof iconSourceTransform>;
+
+let uiIcons: NativeSourceTransform | undefined;
+/** `ui()`'s icons, as an app's web build applies them unless its config turns them off; one per process, so packs load once. */
+const sourceTransformOf = (icons: false | IconsOptions | NativeSourceTransform | undefined) =>
+	icons === false
+		? undefined
+		: typeof icons === 'function'
+			? icons
+			: icons
+				? iconSourceTransform(uiIconsOptions(icons))
+				: (uiIcons ??= iconSourceTransform(uiIconsOptions()));
+
+const transformed = async (
+	module: { readonly filename: string; readonly source: string },
+	transform: NativeSourceTransform | undefined,
+) => {
+	const code = transform && (await transform(module.source, module.filename)).code;
+	return code === undefined ? module : { ...module, source: code };
+};
+
 export async function compileNativeComponent(input: {
 	readonly filename: string;
 	readonly source: string;
+	/** The `icons` option of the app's `ui()` plugin (`false`: off); by default its icon tags become inline `<svg>` as on the web. */
+	readonly icons?: false | IconsOptions | NativeSourceTransform;
 	/** The module's page file when it is a page (`pages/[fruit].tsrx`); the router derives its route. */
 	readonly page?: string;
 	/**
@@ -116,9 +142,11 @@ export async function compileNativeComponent(input: {
 		: undefined;
 	if (input.page && !route) throw new Error(`${input.page} is not a page the router routes`);
 	const readModule = withJsonModules(input.readModule);
+	const transform = sourceTransformOf(input.icons);
+	const own = await transformed(input, transform);
 	const rootInput = {
 		filename: input.filename,
-		source: input.source,
+		source: own.source,
 		symbols: [],
 		nativeFacts: NATIVE_FACT_COLLECTORS,
 		target: input.target ?? ('native' as const),
@@ -133,8 +161,9 @@ export async function compileNativeComponent(input: {
 	);
 	for (const entry of compiled.semanticGraph.moduleImports) {
 		if (entry.typeOnly || !entry.source.startsWith('.')) continue;
-		const module = readModule?.(entry.source, input.filename);
-		if (!module) continue;
+		const found = readModule?.(entry.source, input.filename);
+		if (!found) continue;
+		const module = await transformed(found, transform);
 		const plan = (await compileTsrxModule({ ...module, symbols: [] })).publicRenderPlan;
 		importedStyles.push(...plan.styleScopes);
 		stylesheets.push(
@@ -153,7 +182,8 @@ export async function compileNativeComponent(input: {
 	const read = new Map<string, { readonly filename: string; readonly source: string }>();
 	const resolve = (specifier: string, importer: string): string | undefined => {
 		const module = readModule?.(specifier, importer);
-		if (module) read.set(module.filename, module);
+		// The first read stays: it is rewritten as the web build rewrites it before it is analyzed.
+		if (module && !read.has(module.filename)) read.set(module.filename, module);
 		return module?.filename;
 	};
 	// A module is analyzed with the interfaces of the modules it imports, as the web build links them, so a shared()
@@ -162,7 +192,8 @@ export async function compileNativeComponent(input: {
 	const analyze = async (file: string, visiting: Set<string>): Promise<SemanticGraphArtifact> => {
 		const known = interfaces.get(file) ?? graphs.get(file);
 		if (known) return known;
-		const module = read.get(file)!;
+		const module = await transformed(read.get(file)!, transform);
+		read.set(file, module);
 		const importedModuleInterfaces: Record<string, ModuleGraphInterfaceArtifact> = {};
 		const plain = await buildSemanticGraph({ ...module, ...targetFacts });
 		visiting.add(file);
@@ -222,7 +253,7 @@ export async function compileNativeComponent(input: {
 					}
 				: {}),
 			modules: { graphs, resolve },
-			readSource: (file: string) => (file === input.filename ? input.source : read.get(file)?.source),
+			readSource: (file: string) => (file === input.filename ? own.source : read.get(file)?.source),
 			...(input.scriptHandlers ? { scriptHandlers: input.scriptHandlers } : {}),
 			...(input.manifest
 				? {
@@ -357,7 +388,10 @@ export async function compileNativeApp(input: {
 	readonly target?: 'ios' | 'android';
 	/** Keep the routes whose page builds when others refuse (their diagnostics are still returned). */
 	readonly partial?: boolean;
+	/** The `icons` option of the app's `ui()` plugin, as `compileNativeComponent` takes it. */
+	readonly icons?: false | IconsOptions;
 }): Promise<NativeAppBuild> {
+	const icons = sourceTransformOf(input.icons) ?? (false as const);
 	const manifest = buildRouteManifestFromFileIds(input.pages.map((page) => page.page));
 	const routes: NativeAppPayload['routes'][number][] = [];
 	const styleInputs: NativeAppBuild['styleInputs'][number][] = [];
@@ -399,6 +433,7 @@ export async function compileNativeApp(input: {
 			...(input.readStylesheet ? { readStylesheet: input.readStylesheet } : {}),
 			...(input.device ? { device: input.device } : {}),
 			...(input.target ? { target: input.target } : {}),
+			icons,
 		});
 		for (const feature of build.features) features.add(feature);
 		diagnostics.push(

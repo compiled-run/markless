@@ -1,0 +1,41 @@
+appId: ${APP_ID}
+name: j42-submit-script
+---
+- launchApp:
+    clearState: true
+- assertVisible: Notes
+- assertVisible: Save note
+- assertVisible: Nothing saved
+- tapOn: Save note
+- assertVisible: Please fill out this field\.
+- assertVisible: Nothing saved
+- assertVisible: Please fill out this field\.
+- tapOn: Title
+- eraseText
+- inputText: Groceries
+- hideKeyboard
+- assertVisible: Groceries
+- assertVisible: Nothing saved
+- assertVisible: Groceries
+- tapOn: Save note
+- assertNotVisible: Nothing saved
+- assertVisible: "Saved Groceries \\(home\\): 1 notes, 1 tags"
+- assertNotVisible: Nothing saved
+- tapOn: Title
+- eraseText
+- inputText: Call Ada
+- hideKeyboard
+- assertVisible: Call Ada
+- assertVisible: "Saved Groceries \\(home\\): 1 notes, 1 tags"
+- assertVisible: Call Ada
+- tapOn: Tag
+- eraseText
+- inputText: work
+- hideKeyboard
+- assertVisible: work
+- assertVisible: "Saved Groceries \\(home\\): 1 notes, 1 tags"
+- assertVisible: work
+- tapOn: Save note
+- assertNotVisible: "Saved Groceries \\(home\\): 1 notes, 1 tags"
+- assertVisible: "Saved Call Ada \\(work\\): 2 notes, 2 tags"
+- assertNotVisible: "Saved Groceries \\(home\\): 1 notes, 1 tags"

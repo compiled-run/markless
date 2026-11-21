@@ -23,8 +23,10 @@
 	},
 	"dependencies": {
 		"@markless/compiler": "workspace:*",
+		"@markless/icons": "workspace:*",
 		"@markless/router": "workspace:*",
 		"@markless/serializer": "workspace:*",
+		"@markless/ui-tools": "workspace:*",
 		"@markless/web": "workspace:*",
 		"yaml": "2.9.1"
 	},

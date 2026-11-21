@@ -2,8 +2,9 @@ package dev.markless.mobile.core
 
 class MarklessRuntimeError(message: String) : RuntimeException(message)
 
-/** The overlay protocol of `@markless/web/overlay-protocol`: the marker attribute and what makes an overlay modal. */
+/** The overlay protocol of `@markless/web/overlay-protocol`: the marker attribute, the hint mark, and what makes an overlay modal. */
 const val OVERLAY_ATTRIBUTE = "overlay"
+const val OVERLAY_HINT_ATTRIBUTE = "overlay-hint"
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
@@ -444,6 +445,7 @@ class Runtime(
 		data class Slot(val slot: String) : Bound
 		data class Fields(val fields: Map<String, String>) : Bound
 		data class Value(val value: JsValue) : Bound
+		data class Callback(val fn: String) : Bound
 		data class Elements(val value: JsValue) : Bound
 		data class Object(val members: Map<String, Bound>) : Bound
 		data class Shared(val members: Map<String, Bound>) : Bound
@@ -455,6 +457,7 @@ class Runtime(
 			is ScriptBinding.Cell -> Bound.Slot(slot(b.cell, scope))
 			is ScriptBinding.Fields -> Bound.Fields(b.fields.mapValuesTo(LinkedHashMap()) { slot(it.value, scope) })
 			is ScriptBinding.Value -> Bound.Value(evaluate(b.value, scope))
+			is ScriptBinding.Callback -> Bound.Callback(b.fn)
 			is ScriptBinding.Elements -> Bound.Elements(evaluate(b.value, scope))
 			is ScriptBinding.Object -> Bound.Object(bind(b.members, scope))
 			is ScriptBinding.Shared -> Bound.Shared(bind(b.members, scope))
@@ -467,6 +470,7 @@ class Runtime(
 			is Bound.Slot -> "{\"slot\":${jsonString(b.slot)}}"
 			is Bound.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}}"
 			is Bound.Value -> "{\"value\":${jsonValue(b.value)}}"
+			is Bound.Callback -> "{\"callback\":${jsonString(b.fn)}}"
 			is Bound.Elements -> "{\"elements\":${jsonValue(b.value)}}"
 			is Bound.Object -> "{\"object\":${frameJson(b.members)}}"
 			is Bound.Shared -> "{\"shared\":${frameJson(b.members)}}"
@@ -485,6 +489,7 @@ class Runtime(
 			is Bound.Slot -> jsonValue(nullish(values[b.slot]) ?: nullish(values[b.slot.substringBefore('@')]) ?: JsValue.Null)
 			is Bound.Fields -> b.fields.values.joinToString(",", "[", "]") { jsonValue(values[it] ?: values[it.substringBefore('@')] ?: JsValue.Null) }
 			is Bound.Value -> jsonValue(b.value)
+			is Bound.Callback -> "null"
 			is Bound.Elements -> jsonValue(b.value)
 			is Bound.Object -> readFrame(b.members)
 			is Bound.Shared -> readFrame(b.members)
@@ -535,8 +540,11 @@ class Runtime(
 		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
 	}
 
+	/** Submissions held by a script promise not settled yet, by the engine's run number. */
+	private val scriptRuns = HashMap<Int, Submission>()
+
 	/** One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries, in that order. */
-	private fun enter(fields: String): List<JournalEntry> {
+	private fun enter(fields: String, submission: Submission? = null): List<JournalEntry> {
 		val entry = "{$fields${entryCells()}}"
 		val started = System.nanoTime()
 		scriptCall("enter", entry)
@@ -561,6 +569,12 @@ class Runtime(
 			logs.add(level to text)
 			onScriptLog?.invoke(level, text)
 		}
+		// A submit handler's promise keeps its submission running until the entry it settles in, as the web keeps the form busy.
+		for (run in list("pending")) if (submission != null) {
+			submission.pending++
+			scriptRuns[id(run)] = submission
+		}
+		for (run in list("settled")) scriptRuns.remove(id(run))?.let { it.pending--; settled(it) }
 		return list("aborts").map { JournalEntry.Abort(id(it)) } +
 			list("clears").map { JournalEntry.ClearTimer("$SCRIPT_TIMER${id(it)}") } +
 			list("timers").map { t -> t.arr("leave().timers[]").let { JournalEntry.Timer("$SCRIPT_TIMER${id(it[0])}", it[1].num("leave().timers[][1]")) } } +
@@ -973,6 +987,9 @@ class Runtime(
 	private fun shownOverlays(): List<String> =
 		overlayNodes.filter { instances(it).isNotEmpty() && attributeNow(it.id, "hidden") == null }.map { it.id }
 
+	/** Whether [overlay] is a hint (a tooltip, a hovercard): `overlay-hint` beside `overlay`, as authored. */
+	private fun isHint(overlay: String): Boolean = (byId[overlay] as? Node.Element)?.attributes?.containsKey(OVERLAY_HINT_ATTRIBUTE) == true
+
 	/** Whether [overlay] or an element inside it has `aria-modal="true"`, its bound value first, else its static one. */
 	fun isModal(overlay: String): Boolean = payload.nodes.any { n ->
 		if (n !is Node.Element || !contains(overlay, n.id)) return@any false
@@ -1013,8 +1030,13 @@ class Runtime(
 			if (option?.element != "option" || select == null) throw MarklessRuntimeError("\"$host\" is not an option of a select")
 			val instance = optionsOf(select).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")
 			return change(null, null) {
-				if (attributeNow(select, "disabled") == null && attributeIn(option, "disabled", instance.scope) == null) chosenNow = host
-				emptyList()
+				if (attributeNow(select, "disabled") != null || attributeIn(option, "disabled", instance.scope) != null) return@change emptyList()
+				chosenNow = host
+				// A choice that changes the select fires its input handler, as the web does, with the option's value.
+				val was = optionsOf(select).firstOrNull { selectedness[it.id] == true }?.id
+				val handler = handlerFor(select, EventName.Input)?.let { handlers[it] }
+				if (was == host || handler == null) emptyList()
+				else withFields(mapOf("value" to JsValue.Str(optionValue(instance)))) { run(handler.ops, instance.scope) }
 			}
 		}
 		if (detail != null && event != EventName.Activate) throw MarklessRuntimeError("a ${event.wire} event carries no press count")
@@ -1132,10 +1154,11 @@ class Runtime(
 			if (event == EventName.PointerDown) {
 				raise(EventName.PointerOver, host)
 				crossing(EventName.PointerEnter, host, null, null)
-				// The overlay behaviour's document listener hears the press: the topmost overlay it landed outside is told.
-				val top = stack.lastOrNull()
-				if (top != null && !contains(top, host))
+				// The overlay behaviour's document listener hears the press: the topmost hint and the topmost other overlay it landed outside are told.
+				for (top in listOf(stack.lastOrNull { isHint(it) }, stack.lastOrNull { !isHint(it) })) {
+					if (top == null || contains(top, host)) continue
 					handlerFor(top, EventName.Dismiss)?.let { runs.add(it to mapOf("reason" to JsValue.Str("outside-press"), "pressTarget" to JsValue.Str(host))) }
+				}
 				raise(EventName.PointerDown, host)
 				return@change flush() ?: calls
 			}
@@ -1283,7 +1306,7 @@ class Runtime(
 				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
 				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$touch}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
-				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope)},\"event\":$event$catch"))
+				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope)},\"event\":$event$catch", submission))
 			}
 			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
 			is Op.FieldText -> {
@@ -1372,7 +1395,19 @@ class Runtime(
 		resetChangedRows(signaturesBefore)
 		seedRows()
 		follow()
-		val synced = calls + syncAsync()
+		val synced = (calls + syncAsync()).toMutableList()
+		// An overlay becoming shown supersedes every shown hint it is not inside, before it joins the stack.
+		val shownFirst = shownOverlays()
+		val working = stackBefore.filter { it in shownFirst }.toMutableList()
+		for (newcomer in shownFirst.filter { it !in stackBefore }) {
+			for (hint in working.filter { isHint(it) && !contains(it, newcomer) }) {
+				val handler = handlerFor(hint, EventName.Dismiss)?.let { handlers[it] } ?: continue
+				val taken = withFields(mapOf("reason" to JsValue.Str("superseded"), "pressTarget" to JsValue.Null)) { run(handler.ops, Scope.EMPTY) }
+				if (taken.firstOrNull() is JournalEntry.Navigate) return taken
+				synced.addAll(taken)
+			}
+			working.add(newcomer)
+		}
 		val shownNow = shownOverlays()
 		val released = stackBefore.filter { it !in shownNow }
 		val enlisted = shownNow.filter { it !in stackBefore }
