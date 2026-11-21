@@ -1,0 +1,28 @@
+{
+	"rung": 21,
+	"name": "A GET form on another site with no submit handler opens its action with the form's entries in the browser",
+	"steps": [
+		{ "visible": ["Search the web", "Search"], "fields": { "Query": "" }, "calls": [] },
+		{
+			"do": { "type": { "field": "Query", "text": "phone apps & more" } },
+			"visible": ["Search"],
+			"fields": { "Query": "phone apps & more" },
+			"calls": []
+		},
+		{
+			"do": { "tap": "Search" },
+			"visible": ["Search the web"],
+			"calls": ["browser.open"]
+		}
+	],
+	"web": {
+		"steps": [
+			{ "visible": ["Search the web", "Search"], "fields": { "Query": "" } },
+			{
+				"do": { "type": { "field": "Query", "text": "phone apps & more" } },
+				"visible": ["Search"],
+				"fields": { "Query": "phone apps & more" }
+			}
+		]
+	}
+}

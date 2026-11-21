@@ -103,7 +103,36 @@ export type NativeAction =
 	| { readonly event: 'response'; readonly id: number; readonly response: NativeFetchResponse };
 
 /** The prefix of a timer the script set, as its `timer` entries name it (`script:3`); other timers are `after` ops. */
+/**
+ * The URL a GET form leaves for: its action with the query replaced by the entries, each name and value encoded as
+ * `application/x-www-form-urlencoded` (UTF-8, a space as `+`, all but `*-._` and ASCII letters and digits escaped).
+ */
+export function nativeFormUrl(action: string, entries: ReadonlyArray<readonly [string, string]>): string {
+	const encode = (text: string) =>
+		[...new TextEncoder().encode(text)]
+			.map((byte) =>
+				byte === 0x20
+					? '+'
+					: (byte >= 0x30 && byte <= 0x39) ||
+						  (byte >= 0x41 && byte <= 0x5a) ||
+						  (byte >= 0x61 && byte <= 0x7a) ||
+						  byte === 0x2a ||
+						  byte === 0x2d ||
+						  byte === 0x2e ||
+						  byte === 0x5f
+						? String.fromCharCode(byte)
+						: `%${byte.toString(16).toUpperCase().padStart(2, '0')}`,
+			)
+			.join('');
+	const hash = action.indexOf('#');
+	const base = hash < 0 ? action : action.slice(0, hash);
+	const query = base.indexOf('?');
+	return `${query < 0 ? base : base.slice(0, query)}?${entries.map(([name, value]) => `${encode(name)}=${encode(value)}`).join('&')}${hash < 0 ? '' : action.slice(hash)}`;
+}
+
 export const SCRIPT_TIMER = 'script:';
+/** The continuation a device call from a script names: its answer goes back to the script. */
+export const SCRIPT_CALL = 'script:';
 
 /** Each screen's async values run under their own name in an engine the app's screens share. */
 let screens = 0;
@@ -177,6 +206,8 @@ export type NativeElements = {
 	readonly contains: (within: string, node: string) => boolean;
 	/** Whether `node` has captured the touch `pointer`. */
 	readonly captures: (node: string, pointer: number) => boolean;
+	/** Whether the element `node` was on screen when this run began: every `@if` arm it sits in was drawn. */
+	readonly drawn: (node: string) => boolean;
 };
 
 /** What names mean inside a list row or an arrow function: the row items by repeat id, the function's parameters. */
@@ -184,6 +215,8 @@ export type NativeScope = {
 	readonly items: ReadonlyMap<string, Value>;
 	/** The row keys by repeat id, where a row's own state is read. */
 	readonly keys?: ReadonlyMap<string, string>;
+	/** Each row's position in its list by repeat id, from 0: what a `@for`'s `index` reads. */
+	readonly positions?: ReadonlyMap<string, number>;
 	readonly locals: ReadonlyMap<string, Value>;
 	/** The page's route params. */
 	readonly params?: Readonly<Record<string, string>>;
@@ -250,6 +283,8 @@ export type NativeRuntime = {
 	readonly start: () => ReadonlyArray<NativeJournalEntry>;
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
 	readonly leave: () => ReadonlyArray<NativeJournalEntry>;
+	/** The screen shows again after Back: it takes the app's values of its app-wide cells that a page above it changed. */
+	readonly resume: () => ReadonlyArray<NativeJournalEntry>;
 };
 
 /** How the runtime gets a script engine and the bytes `crypto` draws from; a host owns both. */
@@ -307,6 +342,7 @@ export function evaluateNativeExpr(
 		const value = evaluate(expr.isElement);
 		return typeof value === 'string' && dom().isElement(value);
 	}
+	if ('drawn' in expr) return dom().drawn(expr.drawn) ? expr.drawn : null;
 	if ('captures' in expr) {
 		const node = evaluate(expr.captures);
 		const pointer = evaluate(expr.pointer);
@@ -329,6 +365,11 @@ export function evaluateNativeExpr(
 		if (!scope.items.has(expr.item))
 			throw new Error(`the row item of ${expr.item} read outside its row`);
 		return scope.items.get(expr.item)!;
+	}
+	if ('index' in expr) {
+		const position = scope.positions?.get(expr.index);
+		if (position === undefined) throw new Error(`the row index of ${expr.index} read outside its row`);
+		return position;
 	}
 	if ('local' in expr) {
 		if (!scope.locals.has(expr.local))
@@ -515,7 +556,9 @@ export function evaluateWithScript(
 					Object.fromEntries(
 						Object.entries(named).map(([name, binding]) => [
 							name,
-							'object' in binding
+							'device' in binding
+								? { device: binding.device, object: binding.object }
+								: 'object' in binding
 								? { object: frameOf(binding.object) }
 								: 'method' in binding
 									? { method: binding.method, frame: frameOf(binding.bindings) }
@@ -568,6 +611,8 @@ export function createNativeRuntime(
 	now: () => number = Date.now,
 	/** Where a page with JavaScript handlers gets its engine; started on first use, never for a page without a script. */
 	scriptHost?: NativeScriptHost,
+	/** The app's values of its app-wide `shared()` cells, one for every page: read at mount and on `resume`, written on every change. */
+	session: Map<string, Value> = new Map(),
 ): NativeRuntime {
 	const base: NativeScope = {
 		...EMPTY_SCOPE,
@@ -596,13 +641,20 @@ export function createNativeRuntime(
 			cell.id,
 			cell.clock
 				? now()
-				: cell.storage && store.has(cell.storage.key)
+				: cell.app && session.has(cell.id)
+					? session.get(cell.id)!
+					: cell.storage && store.has(cell.storage.key)
 					? store.get(cell.storage.key)!
 					: cell.initial,
 		]),
 	);
 	for (const cell of payload.cells)
-		if (cell.unset && !(cell.storage && store.has(cell.storage.key))) unset.add(cell.id);
+		if (cell.unset && !(cell.storage && store.has(cell.storage.key)) && !(cell.app && session.has(cell.id)))
+			unset.add(cell.id);
+	const appCells = payload.cells.filter((cell) => cell.app).map((cell) => cell.id);
+	const keepApp = () => {
+		for (const cell of appCells) if (!unset.has(cell)) session.set(cell, values.get(cell)!);
+	};
 	const storageKeys = new Map(
 		payload.cells.flatMap((cell) =>
 			cell.storage ? [[cell.id, cell.storage.key] as const] : [],
@@ -681,7 +733,9 @@ export function createNativeRuntime(
 		Object.fromEntries(
 			Object.entries(bindings).map(([name, binding]) => [
 				name,
-				'object' in binding
+				'device' in binding
+					? { device: binding.device, object: binding.object }
+					: 'object' in binding
 					? { object: frameOf(binding.object, eventValue, scope) }
 					: 'method' in binding
 						? { method: binding.method, frame: frameOf(binding.bindings, eventValue, scope) }
@@ -786,6 +840,12 @@ export function createNativeRuntime(
 				readonly request: Extract<NativeJournalEntry, { op: 'fetch' }>['request'];
 			}>;
 			readonly logs: ReadonlyArray<readonly [string, string]>;
+			readonly calls?: ReadonlyArray<{
+				readonly id?: number;
+				readonly call: Extract<NativeJournalEntry, { op: 'call' }>['call'];
+				readonly object?: string;
+				readonly arguments: ReadonlyArray<Value>;
+			}>;
 			readonly navigate?: {
 				readonly route: string;
 				readonly params: Readonly<Record<string, string>>;
@@ -843,6 +903,15 @@ export function createNativeRuntime(
 				id,
 				request,
 			})),
+			...(result.calls ?? []).map(
+				({ id, call, object, arguments: given }): NativeJournalEntry => ({
+					op: 'call',
+					call,
+					...(object !== undefined ? { object } : {}),
+					arguments: given,
+					...(id !== undefined ? { resume: `${SCRIPT_CALL}${id}` } : {}),
+				}),
+			),
 			...(result.commands ?? []).flatMap(([node, command, argument]): NativeJournalEntry[] => {
 				if (command === 'setPointerCapture' || command === 'releasePointerCapture') {
 					const touch = touches.get(argument as number);
@@ -974,7 +1043,9 @@ export function createNativeRuntime(
 	/** What a script function's names hold now. */
 	const readFrame = (bindings: NativeScriptBindings, scope: NativeScope): unknown[] =>
 		Object.values(bindings).map((binding) =>
-			'object' in binding
+			'device' in binding
+				? binding.object
+				: 'object' in binding
 				? readFrame(binding.object, scope)
 				: 'shared' in binding
 					? readFrame(binding.shared, scope)
@@ -1033,7 +1104,15 @@ export function createNativeRuntime(
 			return false;
 		},
 		captures: (node, pointer) => touches.get(pointer)?.capture === node,
+		drawn: (node) => {
+			const chosen = drawnArms ?? new Map(arms());
+			for (let at = nodesById.get(node)?.arm; at; at = nodesById.get(at.branch)?.arm)
+				if (chosen.get(at.branch) !== at.index) return false;
+			return true;
+		},
 	};
+	/** The arms on screen when the running action began; null between actions, when what shows is what the cells say. */
+	let drawnArms: Map<string, number | null> | null = null;
 	const evaluate = (
 		expr: NativeExpr,
 		eventValue?: string | NativeEventFields,
@@ -1068,8 +1147,8 @@ export function createNativeRuntime(
 			return shown(owner) ? [object.id] : [];
 		});
 	/** A row's key as hosts and journal entries spell it: `String()` of the item's key path, or its key parts joined. */
-	const rowsOf = (repeat: Extract<NativeNode, { kind: 'repeat' }>) => {
-		const list = evaluate(repeat.list);
+	const rowsOf = (repeat: Extract<NativeNode, { kind: 'repeat' }>, scope: NativeScope = base) => {
+		const list = evaluate(repeat.list, undefined, scope);
 		if (!Array.isArray(list))
 			throw new Error(`${repeat.id} lists a value that is not an array`);
 		const valueAt = (item: Value, path: ReadonlyArray<string>) => {
@@ -1097,22 +1176,32 @@ export function createNativeRuntime(
 			item,
 		}));
 	};
-	/** Every instance of a node now shown: one outside lists, one per row inside one (`<id>@<key>`). */
+	/**
+	 * Every instance of a node now shown: one outside lists, one per row inside one (`<id>@<key>`); a row of a list inside
+	 * another list's row is keyed by both rows (`<id>@<outer key>@<inner key>`).
+	 */
 	const instances = (
 		node: NativeNode,
 	): { readonly id: string; readonly scope: NativeScope }[] => {
 		if (!node.row) return shownIn(node, base) ? [{ id: node.id, scope: base }] : [];
 		const repeat = repeats.get(node.row);
-		if (!repeat || !shownIn(repeat, base)) return [];
-		return rowsOf(repeat)
-			.map(({ key, item }) => ({
-				id: `${node.id}@${key}`,
-				scope: {
-					...base,
-					items: new Map([[repeat.id, item]]),
-					keys: new Map([[repeat.id, key]]),
-				},
-			}))
+		if (!repeat) return [];
+		return instances(repeat)
+			.flatMap(({ scope }) => {
+				const outer = repeat.row ? scope.keys?.get(repeat.row) : undefined;
+				return rowsOf(repeat, scope).map(({ key, item }, position) => {
+					const suffix = outer === undefined ? key : `${outer}@${key}`;
+					return {
+						id: `${node.id}@${suffix}`,
+						scope: {
+							...scope,
+							items: new Map([...scope.items, [repeat.id, item]]),
+							keys: new Map([...(scope.keys ?? []), [repeat.id, suffix]]),
+							positions: new Map([...(scope.positions ?? []), [repeat.id, position]]),
+						},
+					};
+				});
+			})
 			.filter((instance) => shownIn(node, instance.scope));
 	};
 	/** For each row's state that has `rebuiltBy`, by slot (`<cell>@<key>`): those values now, as JSON. */
@@ -1290,7 +1379,10 @@ export function createNativeRuntime(
 			? [node]
 			: [],
 	);
+	// A box an arm hides is not built yet, so its binding (which may read what the arm's test guards) is not read.
 	const checkedBinding = (id: string) => {
+		const node = nodesById.get(id);
+		if (node && !shown(node)) return undefined;
 		const binding = propertyBinding(id, 'checked');
 		return binding ? Boolean(evaluate(binding.value)) : undefined;
 	};
@@ -1475,6 +1567,8 @@ export function createNativeRuntime(
 	const invalidity = (node: string, kind: NativeFieldKind): string | undefined => {
 		if (kind === 'hidden' || !shown(elementOf(node))) return undefined;
 		if (attributeNow(node, 'disabled') !== null) return undefined;
+		// A readonly text field is barred from constraint validation.
+		if (kind === 'text' && attributeNow(node, 'readonly') !== null) return undefined;
 		// A radio button is missing its value when any button of its group is required and none is checked.
 		const required =
 			kind === 'radio'
@@ -1540,7 +1634,9 @@ export function createNativeRuntime(
 	const rows = () =>
 		payload.nodes.flatMap((node) =>
 			node.kind === 'repeat' && shown(node)
-				? [[node.id, rowsOf(node).map((row) => row.key)] as const]
+				? instances(node).map(
+						({ id, scope }) => [id, rowsOf(node, scope).map((row) => row.key)] as const,
+					)
 				: [],
 		);
 	const sheets = () =>
@@ -1650,6 +1746,13 @@ export function createNativeRuntime(
 		engineStarts: () => engineStarts,
 		logs: () => logs,
 		start: () => (asyncCells.length === 0 ? [] : change(undefined, undefined, () => [])),
+		resume: () =>
+			appCells.some((cell) => session.has(cell) && !Object.is(session.get(cell), values.get(cell)))
+				? change(undefined, undefined, () => {
+						for (const cell of appCells) if (session.has(cell)) values.set(cell, session.get(cell)!);
+						return [];
+					})
+				: [],
 		leave: () =>
 			asyncSent === null
 				? []
@@ -1674,14 +1777,15 @@ export function createNativeRuntime(
 						attributeIn(option, 'disabled', instance.scope) !== null
 					)
 						return [];
+					const before = chosenOf(select.id)?.id;
 					chosenNow = action.host;
-					// A choice that changes the select fires its input handler, as the web does, with the option's value.
-					const was = optionsOf(select.id).find((one) => selectedness.get(one.id))?.id;
-					const handler = payload.events.find(
-						(candidate) => candidate.host === select.id && candidate.event === 'input',
+					// A different choice fires the select's `change` (an `input` event here), its value the new option's.
+					const changed = payload.events.find(
+						(event) => event.host === select.id && event.event === 'input',
 					);
-					if (was === action.host || !handler) return [];
-					return run(handlers.get(handler.handler) ?? [], optionValue(instance), instance.scope);
+					if (before === action.host || !changed) return [];
+					for (const one of optionsOf(select.id)) selectedness.set(one.id, one.id === action.host);
+					return run(handlers.get(changed.handler) ?? [], optionValue(instance), instance.scope);
 				});
 			}
 			if (action.event === 'timer' && action.timer.startsWith(SCRIPT_TIMER))
@@ -1694,6 +1798,19 @@ export function createNativeRuntime(
 			if (action.event === 'response')
 				return change(undefined, undefined, () =>
 					enter({ kind: 'response', request: action.id, response: action.response }),
+				);
+			if (
+				(action.event === 'resume' || action.event === 'reject') &&
+				action.continuation.startsWith(SCRIPT_CALL)
+			)
+				return change(undefined, undefined, () =>
+					enter({
+						kind: 'answer',
+						call: Number(action.continuation.slice(SCRIPT_CALL.length)),
+						...(action.event === 'resume'
+							? { value: action.value }
+							: { error: action.error }),
+					}),
 				);
 			if (action.event === 'resume') {
 				const continuation = continuations.get(action.continuation);
@@ -2182,6 +2299,14 @@ export function createNativeRuntime(
 			calls.push({ op: 'invalid', node: invalid.node, message: invalid.message });
 			return [];
 		}
+		if (form.opens !== undefined) {
+			calls.push({
+				op: 'call',
+				call: 'browser.open',
+				arguments: [nativeFormUrl(form.opens, entriesOf(op.form) as [string, string][])],
+			});
+			return [];
+		}
 		const sent = JSON.stringify(entriesOf(op.form));
 		const runs = running.get(op.form) ?? [];
 		if (runs.some((run) => run.sent === sent && run.submitter === op.submitter)) return [];
@@ -2233,6 +2358,7 @@ export function createNativeRuntime(
 				edited.set(host, eventValue);
 			}
 			const beforeArms = new Map(arms());
+			drawnArms = beforeArms;
 			const beforeRows = new Map(rows());
 			const beforeTitle = title();
 			const dialogsBefore = new Map(dialogs);
@@ -2241,7 +2367,12 @@ export function createNativeRuntime(
 			const focusBefore = focused;
 			const stackBefore = stack;
 			const itemsBefore = rowSignatures();
-			const calls = apply();
+			let calls: ReturnType<typeof apply>;
+			try {
+				calls = apply();
+			} finally {
+				drawnArms = null;
+			}
 			if (calls[0]?.op === 'navigate') return calls;
 			// A row that left takes its state with it; a later row with the same key starts from the first values.
 			const kept = new Set(
@@ -2305,13 +2436,15 @@ export function createNativeRuntime(
 			);
 			// A node shown before and after journals its change; a new arm or row is built from current values instead.
 			const nodes = payload.nodes.flatMap((node): NativeJournalEntry[] => {
-				if (node.kind === 'repeat') {
-					const before = beforeRows.get(node.id);
-					const after = afterRows.get(node.id);
-					return before && after && before.join('\0') !== after.join('\0')
-						? [{ op: 'rows', node: node.id, keys: after }]
-						: [];
-				}
+				if (node.kind === 'repeat')
+					// Each shown copy of the list: an inner list has one per row of its outer list (`<id>@<key>`).
+					return [...afterRows].flatMap(([id, after]): NativeJournalEntry[] => {
+						if (id !== node.id && !id.startsWith(`${node.id}@`)) return [];
+						const before = beforeRows.get(id);
+						return before && before.join('\0') !== after.join('\0')
+							? [{ op: 'rows', node: id, keys: after }]
+							: [];
+					});
 				if (node.kind === 'sheet') {
 					const before = beforeSheets.get(node.id);
 					const open = afterSheets.get(node.id);
@@ -2431,6 +2564,7 @@ export function createNativeRuntime(
 			const afterTitle = title();
 			// A field whose binding wrote it shows that value now, not what was typed before.
 			for (const entry of nodes) if (entry.op === 'property') edited.delete(entry.node);
+			keepApp();
 			return [
 				...styles,
 				...nodes,

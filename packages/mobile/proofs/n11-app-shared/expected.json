@@ -1,0 +1,20 @@
+{
+	"rung": "N11",
+	"name": "An app-wide shared() across pages: the next page starts from the app's value, and Back shows the value a page above changed, as the web keeps one instance across navigation",
+	"steps": [
+		{ "visible": ["Home page", "Home sees 0", "Bump at home", "Open other"], "title": "Home" },
+		{ "do": { "tap": "Bump at home" }, "visible": ["Home sees 1"], "absent": ["Home sees 0"] },
+		{
+			"do": { "tap": "Open other" },
+			"visible": ["Other page", "Other sees 1"],
+			"title": "Other"
+		},
+		{ "do": { "tap": "Bump here" }, "visible": ["Other sees 2"], "absent": ["Other sees 1"] },
+		{
+			"do": { "back": "button" },
+			"visible": ["Home page", "Home sees 2"],
+			"absent": ["Home sees 1"],
+			"title": "Home"
+		}
+	]
+}

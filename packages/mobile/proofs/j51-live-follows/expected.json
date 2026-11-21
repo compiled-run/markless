@@ -1,0 +1,26 @@
+{
+	"rung": "J51",
+	"name": "live regions whose aria-live and role follow state build and update",
+	"steps": [
+		{
+			"visible": ["Uploads", "Slide 1", "Upload saved", "Slides moving"],
+			"absent": ["Slide 2", "Upload failed", "Slides held"]
+		},
+		{
+			"do": { "tap": "Next" },
+			"visible": ["Slide 2", "Slides moving"],
+			"absent": ["Slide 1", "Slides held"]
+		},
+		{
+			"do": { "tap": "Hold slides" },
+			"visible": ["Slides held"],
+			"absent": ["Slides moving", "Slide 3"]
+		},
+		{
+			"do": { "tap": "Next" },
+			"visible": ["Slide 3", "Upload saved"],
+			"absent": ["Slide 2", "Upload failed"]
+		},
+		{ "do": { "tap": "Fail" }, "visible": ["Upload failed"], "absent": ["Upload saved"] }
+	]
+}

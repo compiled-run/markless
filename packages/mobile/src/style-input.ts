@@ -1,5 +1,5 @@
 import type { NativeArmPlace, NativeExpr, NativeViewPayload } from '@markless/serializer';
-import { fontFaceSources } from '@markless/compiler/native';
+import { fontFaceSources, selectorAttributes } from '@markless/compiler/native';
 import {
 	isNativeStyleStateAttribute,
 	NATIVE_NO_ARM,
@@ -152,6 +152,7 @@ export function readsRow(payload: NativeViewPayload, tree: unknown): boolean {
 			: at !== null &&
 				typeof at === 'object' &&
 				('item' in at ||
+					'index' in at ||
 					('cell' in at && rowCells.has((at as { cell: string }).cell)) ||
 					Object.values(at).some(reads));
 	return reads(tree);
@@ -206,6 +207,15 @@ export function nativeStyleInputAt(
 }
 
 type PayloadNode = NativeViewPayload['nodes'][number];
+
+/**
+ * Whether a bound attribute can give a node a different style: `class`, `hidden` (its UA rule), or another state attribute
+ * a selector of the page's CSS (`tested`) reads. Dragon styles a list row's node once, so only these must not differ by row.
+ */
+export const nativeStyleRowAttribute = (attribute: string, tested: ReadonlySet<string>): boolean =>
+	attribute === 'class' ||
+	attribute === 'hidden' ||
+	(isNativeStyleStateAttribute(attribute) && tested.has(attribute));
 
 /** The cells an expression reads. */
 const cellsOf = (expr: unknown, into: Set<string>): Set<string> => {
@@ -323,6 +333,9 @@ export function nativeStyleInput(
 	const rowText = (id: string): string =>
 		[...initial].find(([instance]) => instance.startsWith(`${id}@`))?.[1] || 'x';
 	const shownArms = new Map(mounted.arms());
+	const tested = new Set(
+		[...stylesheets, ...styles].flatMap((style) => [...selectorAttributes(style.cssText)]),
+	);
 	const evaluateAt = host
 		? evaluateWithScript(payload, host)
 		: evaluateWithScript(payload, {
@@ -346,7 +359,7 @@ export function nativeStyleInput(
 		if (node.kind !== 'element' || !node.row) continue;
 		for (const binding of node.bindings ?? []) {
 			if (!('attribute' in binding)) continue;
-			if (binding.attribute !== 'class' && !isNativeStyleStateAttribute(binding.attribute)) continue;
+			if (!nativeStyleRowAttribute(binding.attribute, tested)) continue;
 			if (!readsRow(payload, binding.value)) continue;
 			const options = rowAttributeOptions(binding.attribute, binding.value, booleanCellsOf(payload));
 			if (options) rowOptions.set(`${node.id}#${binding.attribute}`, { node: node.id, attribute: binding.attribute, options });
@@ -498,6 +511,7 @@ export function nativeStyleInput(
 			for (const binding of node.bindings ?? []) {
 				if (!('attribute' in binding) || !isNativeStyleStateAttribute(binding.attribute))
 					continue;
+				if (node.row && !nativeStyleRowAttribute(binding.attribute, tested)) continue;
 				const byState = combinations.map((when) => {
 					// A row's own value, absent (null) included: the binding reads a row's item, which no page state gives.
 					const row = byRow(binding.attribute, when);

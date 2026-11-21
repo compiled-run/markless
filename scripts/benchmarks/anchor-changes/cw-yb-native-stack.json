@@ -1,0 +1,62 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 63,
+			"reason": "#977: a list nested in a row the runtime just built adopts no rows from it; +135 B in resume-keyed-repeats",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -7,
+			"reason": "#977: a list nested in a row the runtime just built adopts no rows from it; +135 B in resume-keyed-repeats",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 63,
+			"reason": "#977: a list nested in a row the runtime just built adopts no rows from it; +135 B in resume-keyed-repeats",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 6,
+			"reason": "#977: a list nested in a row the runtime just built adopts no rows from it; +135 B in resume-keyed-repeats",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 3,
+			"reason": "#977: a list nested in a row the runtime just built adopts no rows from it; +135 B in resume-keyed-repeats",
+			"date": "2026-11-21"
+		}
+	]
+}
