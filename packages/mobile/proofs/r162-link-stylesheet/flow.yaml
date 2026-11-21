@@ -1,0 +1,12 @@
+appId: ${APP_ID}
+name: r162-link-stylesheet
+---
+- launchApp:
+      clearState: true
+- assertVisible: Linked styles
+- assertVisible: Visits 0
+- assertVisible: Visit
+- tapOn: Visit
+- assertNotVisible: Visits 0
+- assertVisible: Visits 1
+- assertNotVisible: Visits 0

@@ -1,0 +1,17 @@
+appId: ${APP_ID}
+name: u110-part-position
+---
+- launchApp:
+      clearState: true
+- assertVisible: Steps
+- assertVisible: 'Step 1: Pack'
+- assertVisible: 'Step 2: Ship'
+- assertVisible: 'Step 3: Track'
+- assertVisible: Current step 2
+- assertNotVisible: 'Step 0: Pack'
+- assertNotVisible: 'Step 4: Track'
+- tapOn: Next step
+- assertNotVisible: Current step 2
+- assertVisible: Current step 3
+- assertVisible: 'Step 3: Track'
+- assertNotVisible: Current step 2
