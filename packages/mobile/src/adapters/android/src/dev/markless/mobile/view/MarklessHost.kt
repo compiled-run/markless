@@ -819,7 +819,7 @@ class MarklessHost(
 				else -> continue
 			}
 			views[inst.id] = view
-			(node as? Node.Element)?.live?.let { view.accessibilityLiveRegion = if (it.assertive) View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE else View.ACCESSIBILITY_LIVE_REGION_POLITE }
+			(node as? Node.Element)?.let { liveRegion(it, view) }
 			built[inst.id] = inst
 			val parentId = parentOf(inst)
 			val outer = if (parentId != null) views[parentId] else pageBox
@@ -1178,6 +1178,21 @@ class MarklessHost(
 		return view
 	}
 
+	/** How TalkBack speaks a change inside the element: as built, or, when its live attributes follow state, as they read now. */
+	private fun liveRegion(node: Node.Element, view: View) {
+		val follows = node.liveFollows
+		val assertive = if (follows != null) when ((runtime.evaluate(follows.politeness) as? JsValue.Str)?.value) {
+			"assertive" -> true
+			"polite" -> false
+			else -> null
+		} else node.live?.assertive
+		view.accessibilityLiveRegion = when (assertive) {
+			true -> View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE
+			false -> View.ACCESSIBILITY_LIVE_REGION_POLITE
+			null -> View.ACCESSIBILITY_LIVE_REGION_NONE
+		}
+	}
+
 	/** Attributes per the contract's Android mapping; `class` reaches views only through Dragon's style states, and any other attribute is ignored. */
 	private fun attribute(id: String, name: String, value: String?) {
 		shapeOwners[id]?.let { drawn ->
@@ -1193,6 +1208,7 @@ class MarklessHost(
 		if (value == null) current.remove(name) else current[name] = value
 		if (id in inert && (name == "aria-hidden" || name == "hidden")) return
 		if (view is RangeBar && name in RangeBar.SHAPE) view.show(current)
+		if (name == "role" || name == "aria-live") (payload.nodes.firstOrNull { it.id == id.substringBefore('@') } as? Node.Element)?.takeIf { it.liveFollows != null }?.let { liveRegion(it, view) }
 		when (name) {
 			// A label names its control, so TalkBack reads it there and not a second time on the label; a press on it activates the control.
 			"for" -> if (value != null) {
@@ -1210,6 +1226,7 @@ class MarklessHost(
 			}
 			"controls" -> if (view is AudioButton) view.visibility = if (value == null) View.GONE else View.VISIBLE
 			"disabled" -> view.isEnabled = value == null
+			"readonly" -> if (view is MarklessField) view.readOnly = value != null
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
 			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else if (view is DrawingView) (if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO) else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO

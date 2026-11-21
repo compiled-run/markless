@@ -178,6 +178,8 @@ export type NativeElements = {
 	readonly contains: (within: string, node: string) => boolean;
 	/** Whether `node` has captured the touch `pointer`. */
 	readonly captures: (node: string, pointer: number) => boolean;
+	/** Whether the element `node` was on screen when this run began: every `@if` arm it sits in was drawn. */
+	readonly drawn: (node: string) => boolean;
 };
 
 /** What names mean inside a list row or an arrow function: the row items by repeat id, the function's parameters. */
@@ -312,6 +314,7 @@ export function evaluateNativeExpr(
 		const value = evaluate(expr.isElement);
 		return typeof value === 'string' && dom().isElement(value);
 	}
+	if ('drawn' in expr) return dom().drawn(expr.drawn) ? expr.drawn : null;
 	if ('captures' in expr) {
 		const node = evaluate(expr.captures);
 		const pointer = evaluate(expr.pointer);
@@ -988,7 +991,15 @@ export function createNativeRuntime(
 			return false;
 		},
 		captures: (node, pointer) => touches.get(pointer)?.capture === node,
+		drawn: (node) => {
+			const chosen = drawnArms ?? new Map(arms());
+			for (let at = nodesById.get(node)?.arm; at; at = nodesById.get(at.branch)?.arm)
+				if (chosen.get(at.branch) !== at.index) return false;
+			return true;
+		},
 	};
+	/** The arms on screen when the running action began; null between actions, when what shows is what the cells say. */
+	let drawnArms: Map<string, number | null> | null = null;
 	const evaluate = (
 		expr: NativeExpr,
 		eventValue?: string | NativeEventFields,
@@ -1439,6 +1450,8 @@ export function createNativeRuntime(
 	const invalidity = (node: string, kind: NativeFieldKind): string | undefined => {
 		if (kind === 'hidden' || !shown(elementOf(node))) return undefined;
 		if (attributeNow(node, 'disabled') !== null) return undefined;
+		// A readonly text field is barred from constraint validation.
+		if (kind === 'text' && attributeNow(node, 'readonly') !== null) return undefined;
 		// A radio button is missing its value when any button of its group is required and none is checked.
 		const required =
 			kind === 'radio'
@@ -2177,6 +2190,7 @@ export function createNativeRuntime(
 				edited.set(host, eventValue);
 			}
 			const beforeArms = new Map(arms());
+			drawnArms = beforeArms;
 			const beforeRows = new Map(rows());
 			const beforeTitle = title();
 			const dialogsBefore = new Map(dialogs);
@@ -2185,7 +2199,12 @@ export function createNativeRuntime(
 			const focusBefore = focused;
 			const stackBefore = stack;
 			const itemsBefore = rowSignatures();
-			const calls = apply();
+			let calls: ReturnType<typeof apply>;
+			try {
+				calls = apply();
+			} finally {
+				drawnArms = null;
+			}
 			if (calls[0]?.op === 'navigate') return calls;
 			// A row that left takes its state with it; a later row with the same key starts from the first values.
 			const kept = new Set(

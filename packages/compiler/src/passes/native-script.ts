@@ -3,6 +3,7 @@ import { DEVICE_CALLS } from '@markless/serializer/native-device';
 import {
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_SUBMITTED_FORM,
+	NATIVE_UNBOUND_HANDLE,
 } from '@markless/serializer/native-view';
 import { SVG_GEOMETRY_SOURCE } from './native-svg-geometry.ts';
 
@@ -495,6 +496,7 @@ var elementFacts = {};
 var proxies = {};
 var elementOf = function (id) {
 	if (typeof id !== 'string') return id;
+	if (id === ${JSON.stringify(NATIVE_UNBOUND_HANDLE)}) return undefined;
 	if (proxies[id]) return proxies[id];
 	var facts = function () {
 		if (!elementFacts[id]) throw new Error('the host described no element ' + id);

@@ -1,0 +1,23 @@
+appId: ${APP_ID}
+name: j45-array-destructuring
+---
+- launchApp:
+    clearState: true
+- assertVisible: Files
+- assertVisible: app\.ts
+- assertVisible: page\.ts
+- assertVisible: only\.ts
+- assertVisible: No third file after only\.ts
+- assertNotVisible: skip\.ts
+- assertNotVisible: No third file after app\.ts
+- assertNotVisible: Picked page\.ts
+- tapOn: page\.ts
+- assertVisible: Picked page\.ts
+- assertVisible: Picked page\.ts
+- assertNotVisible: skip\.ts
+- assertNotVisible: Picked only\.ts
+- tapOn: only\.ts
+- assertVisible: Picked only\.ts
+- assertVisible: Picked only\.ts
+- assertVisible: Picked page\.ts
+- assertNotVisible: skip\.ts

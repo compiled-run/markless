@@ -1,0 +1,14 @@
+appId: ${APP_ID}
+name: j50-shared-constant
+---
+- launchApp:
+    clearState: true
+- assertVisible: Sizes
+- assertVisible: Sizes Small and Large
+- assertVisible: Chosen Small
+- assertNotVisible: Chosen Large
+- tapOn: Switch size
+- assertVisible: Chosen Large
+- assertNotVisible: Chosen Small
+- assertVisible: Chosen Large
+- assertNotVisible: Chosen Small
