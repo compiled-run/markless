@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 339,
+	total: 340,
 	guided: 55,
 	groups: [
 		{
@@ -1850,6 +1850,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a list row reads a widget no one owns markless_repeat_row_component_widget_unresolved a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_NATIVE_ANDROID_ONLY',
+					title: 'A long-press handler runs only on Android',
+					chip: 'error',
+					kind: 'compile error or warning',
+					guided: false,
+					words: 'a long-press handler runs only on android markless_native_android_only a long-press handler runs only on android: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_NATIVE_MOUSE_ONLY',

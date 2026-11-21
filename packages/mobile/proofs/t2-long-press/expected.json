@@ -1,0 +1,25 @@
+{
+	"rung": "T2",
+	"name": "Long press: a finger held on a list item raises contextmenu on Android, as Chrome there does, and none on iOS, as Safari there raises none; both get the touch, and a tap afterwards still presses",
+	"steps": [
+		{
+			"visible": ["Milk", "Bread", "Not touched", "Nothing held", "Count 0"],
+			"absent": ["Touched Bread"]
+		},
+		{
+			"do": { "longPress": "Bread" },
+			"visible": ["Touched Bread", "Count 0"],
+			"absent": ["Not touched", "Count 1"],
+			"visibleOn": {
+				"android": ["Held Bread"],
+				"web": ["Held Bread"],
+				"ios": ["Nothing held"]
+			}
+		},
+		{
+			"do": { "tap": "Count 0" },
+			"visible": ["Count 1"],
+			"absent": ["Count 0"]
+		}
+	]
+}

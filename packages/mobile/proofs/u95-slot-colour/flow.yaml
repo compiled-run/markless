@@ -1,0 +1,17 @@
+appId: ${APP_ID}
+name: u95-slot-colour
+---
+- launchApp:
+      clearState: true
+- assertVisible: Colour slot
+- assertVisible: Swatch
+- assertVisible: Warmer
+- assertVisible: Warm 40
+- tapOn: Warmer
+- assertNotVisible: Warm 40
+- assertVisible: Warm 140
+- assertNotVisible: Warm 40
+- tapOn: Warmer
+- assertNotVisible: Warm 140
+- assertVisible: Warm 240
+- assertNotVisible: Warm 140

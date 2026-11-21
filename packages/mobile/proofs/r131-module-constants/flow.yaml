@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: r131-module-constants
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Plans
 - assertVisible: Basic \$5
 - assertVisible: Team \$12\.5

@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u18-visually-hidden
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Hidden text
 - assertVisible: Shown above
 - assertVisible: Taps 0

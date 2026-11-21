@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: 05-if
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Details
 - assertVisible: Show details
 - assertVisible: Nothing shown yet

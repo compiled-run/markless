@@ -1,6 +1,11 @@
 import type { NativeAppPayload, NativeJournalEntry, NativeViewPayload } from '@markless/serializer';
 import { createNativeAppRuntime, type NativeAppAction } from './app.ts';
-import { createNativeRuntime, type NativeAction, type NativeScriptHost } from './runtime.ts';
+import {
+	createNativeRuntime,
+	type NativeAction,
+	type NativeElementBox,
+	type NativeScriptHost,
+} from './runtime.ts';
 
 export const NATIVE_CONFORMANCE_VERSION = 'markless.native-conformance/0';
 
@@ -14,6 +19,8 @@ export type NativeConformance = {
 	readonly preferredLanguages?: ReadonlyArray<string>;
 	/** Present when the payload reads the clock: what the device's clock reads throughout, in ms since 1970 (UTC). */
 	readonly now?: number;
+	/** Present when a script measures elements: each one's box and direction, as a host's measure gives them throughout. */
+	readonly layout?: Readonly<Record<string, NativeElementBox>>;
 	readonly initial: ReadonlyArray<readonly [node: string, text: string]>;
 	/** Present when the payload binds attributes: `[node, name, value]`, value null when absent. */
 	readonly initialAttributes?: ReadonlyArray<
@@ -53,8 +60,18 @@ export function nativeConformance(
 	now?: number,
 	/** The engine a payload with a script runs in; a host's own (JavaScriptCore, Hermes) must give the same journals. */
 	scriptHost?: NativeScriptHost,
+	layout?: Readonly<Record<string, NativeElementBox>>,
 ): NativeConformance {
-	const runtime = createNativeRuntime(payload, new Map(), params, preferredLanguages, now === undefined ? undefined : () => now, scriptHost);
+	const runtime = createNativeRuntime(
+		payload,
+		new Map(),
+		params,
+		preferredLanguages,
+		now === undefined ? undefined : () => now,
+		scriptHost,
+		undefined,
+		layout && ((id) => layout[id] ?? null),
+	);
 	const initial = runtime.texts();
 	const initialAttributes = runtime.attributes();
 	const initialArms = runtime.arms();
@@ -73,6 +90,7 @@ export function nativeConformance(
 		...(params ? { params } : {}),
 		...(preferredLanguages ? { preferredLanguages } : {}),
 		...(now === undefined ? {} : { now }),
+		...(layout ? { layout } : {}),
 		initial,
 		...(initialAttributes.length > 0 ? { initialAttributes } : {}),
 		...(initialProperties.length > 0 ? { initialProperties } : {}),

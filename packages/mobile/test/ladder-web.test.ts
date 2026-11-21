@@ -156,6 +156,9 @@ function recordDeviceCalls() {
 
 // A visible text or an accessible name, the two ways a Maestro selector finds a view.
 // A closed select shows its chosen option's label, as the phones draw it.
+/** The field a person types into by its name: a text field, or a number field (a spinbutton). */
+const typedField = (page: Page, name: string): Locator =>
+	page.getByRole('textbox', { name, exact: true }).or(page.getByRole('spinbutton', { name, exact: true }));
 const shown = (page: Page, text: string): Locator =>
 	page
 		.getByText(text, { exact: true })
@@ -227,6 +230,35 @@ async function drag(page: Page, on: string, direction: 'right' | 'up') {
 	await cdp.detach();
 }
 
+/**
+ * A finger held on `on` past a phone's long-press time, then lifted. Chromium raises `contextmenu` for a held touch only
+ * through its touch emulator; CDP touch input ends in a click instead.
+ */
+async function longPress(page: Page, on: string) {
+	const box = await shown(page, on).first().boundingBox();
+	if (!box) throw new Error(`"${on}" is not on screen to press`);
+	const cdp = await page.context().newCDPSession(page);
+	const at = {
+		x: box.x + box.width / 2,
+		y: box.y + box.height / 2,
+		button: 'left' as const,
+		clickCount: 1,
+	};
+	await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+	await cdp.send('Emulation.setEmitTouchEventsForMouse', {
+		enabled: true,
+		configuration: 'mobile',
+	});
+	// The emulator answers a press only after its gesture ends, and a prevented contextmenu holds that answer back.
+	for (const type of ['mousePressed', 'mouseReleased'] as const) {
+		void cdp.send('Input.dispatchMouseEvent', { type, ...at }).catch(() => {});
+		await page.waitForTimeout(type === 'mousePressed' ? 1000 : 100);
+	}
+	await cdp.send('Emulation.setEmitTouchEventsForMouse', { enabled: false });
+	await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+	await cdp.detach();
+}
+
 async function act(page: Page, step: LadderStep) {
 	const action = step.do;
 	if (!action) return;
@@ -244,11 +276,11 @@ async function act(page: Page, step: LadderStep) {
 					: shown(page, tap);
 		await ('tap' in action ? target.click() : target.dblclick());
 	} else if ('type' in action) {
-		const field = page.getByRole('textbox', { name: action.type.field, exact: true });
+		const field = typedField(page, action.type.field);
 		await field.fill('');
 		await field.pressSequentially(action.type.text);
 	} else if ('submit' in action)
-		await page.getByRole('textbox', { name: action.submit, exact: true }).press('Enter');
+		await typedField(page, action.submit).press('Enter');
 	else if ('erase' in action) {
 		const field = page.getByRole('textbox', { name: action.erase, exact: true });
 		await field.press('End');
@@ -273,6 +305,7 @@ async function act(page: Page, step: LadderStep) {
 		await slider.focus();
 		await slider.press(action.slide.to === 'max' ? 'End' : 'Home');
 	}
+	else if ('longPress' in action) await longPress(page, action.longPress);
 	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });
 	else if ('orientation' in action) {
 		const { width, height } = page.viewportSize()!;
@@ -333,12 +366,12 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 		if (message !== step.invalid)
 			failed.push(`the focused field's validation message is ${JSON.stringify(message)}`);
 	}
-	if (step.order) {
+	for (const order of [step.order, step.placed]) {
+		if (!order) continue;
 		const tops: number[] = [];
-		for (const text of step.order)
-			tops.push((await onScreen(text).first().boundingBox())?.y ?? NaN);
+		for (const text of order) tops.push((await onScreen(text).first().boundingBox())?.y ?? NaN);
 		if (tops.some((top, index) => !(index === 0 || top > tops[index - 1]!)))
-			failed.push(`order ${step.order.join(', ')} is not top to bottom`);
+			failed.push(`order ${order.join(', ')} is not top to bottom`);
 	}
 	return failed;
 }

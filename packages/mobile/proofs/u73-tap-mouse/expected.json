@@ -1,0 +1,36 @@
+{
+	"rung": 183,
+	"name": "A tap fires a phone browser's mouse events: mouseenter on the tapped element, which keeps the mouse until a tap elsewhere fires its mouseleave, and a mousedown that bubbles",
+	"steps": [
+		{
+			"visible": [
+				"Fruit stand",
+				"Apples",
+				"Pears",
+				"Pointing at nothing",
+				"Moved off nothing",
+				"Pressed 0 times"
+			]
+		},
+		{
+			"do": { "tap": "Apples" },
+			"visible": ["Pointing at Apples", "Moved off nothing", "Pressed 1 times"],
+			"absent": ["Pointing at nothing", "Pressed 0 times"]
+		},
+		{
+			"do": { "tap": "Pears" },
+			"visible": ["Pointing at Pears", "Moved off Apples", "Pressed 2 times"],
+			"absent": ["Pointing at Apples", "Moved off nothing"]
+		},
+		{
+			"do": { "tap": "Pears" },
+			"visible": ["Pointing at Pears", "Moved off Apples", "Pressed 3 times"],
+			"absent": ["Pressed 2 times"]
+		},
+		{
+			"do": { "tap": "Apples" },
+			"visible": ["Pointing at Apples", "Moved off Pears", "Pressed 4 times"],
+			"absent": ["Pointing at Pears", "Moved off Apples"]
+		}
+	]
+}

@@ -1,0 +1,50 @@
+{
+	"rung": 216,
+	"name": "a JavaScript click handler reads event.detail: 1 for a tap, 0 for a click a script raised",
+	"steps": [
+		{
+			"visible": [
+				"Press here",
+				"Press by script",
+				"No click yet"
+			],
+			"absent": [
+				"Count 1 *",
+				"Count 0, no press"
+			]
+		},
+		{
+			"do": {
+				"tap": "Press here"
+			},
+			"visible": [
+				"Count 1 *"
+			],
+			"absent": [
+				"No click yet"
+			]
+		},
+		{
+			"do": {
+				"tap": "Press by script"
+			},
+			"visible": [
+				"Count 0, no press"
+			],
+			"absent": [
+				"Count 1 *"
+			]
+		},
+		{
+			"do": {
+				"tap": "Press here"
+			},
+			"visible": [
+				"Count 1 *"
+			],
+			"absent": [
+				"Count 0, no press"
+			]
+		}
+	]
+}

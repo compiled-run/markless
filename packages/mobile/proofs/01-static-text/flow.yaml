@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: 01-static-text
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Ladder
 - assertVisible: Static text on every platform
 - assertVisible: First rung

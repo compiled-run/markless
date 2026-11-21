@@ -7,8 +7,10 @@ import { dirname, join } from 'node:path';
 import { chromium, type Page } from '@playwright/test';
 import {
 	nativeEmailMismatch,
+	nativeNumberMessage,
 	nativeTooLongMessage,
 	type NativeEmailMismatch,
+	type NativeNumberMessages,
 } from '@markless/serializer/native-view';
 
 const executable = chromium.executablePath();
@@ -31,6 +33,29 @@ const kept = (() => {
 })();
 const table: Record<string, { text: string; checkbox: string; radio: string }> = {};
 const tooLong: Record<string, { text: string; digits?: string }> = {};
+const numbers: Record<string, NativeNumberMessages> = {};
+/** A number field's `validationMessage` with these attributes and this value set by script, or this text typed. */
+const numberMessage = async (page: Page, attributes: string, value: { set?: string; typed?: string }) => {
+	await page.setContent(`<input id="number" type="number" ${attributes}>`);
+	if (value.set !== undefined)
+		await page.evaluate((set) => {
+			(document.getElementById('number') as HTMLInputElement).value = set;
+		}, value.set);
+	if (value.typed !== undefined) {
+		await page.click('#number');
+		await page.keyboard.type(value.typed);
+	}
+	return page.evaluate(() => (document.getElementById('number') as HTMLInputElement).validationMessage);
+};
+/** `message` with each number in `values` (as Chromium writes them in `locale`) replaced by its `{name}`. */
+const numberTemplate = (message: string, values: Record<string, string>, locale: string) => {
+	let text = message;
+	for (const [name, written] of Object.entries(values)) {
+		if (!text.includes(written)) throw new Error(`${locale}: ${JSON.stringify(message)} does not hold ${written}`);
+		text = text.replace(written, `{${name}}`);
+	}
+	return text;
+};
 const emailMismatch: Record<string, NativeEmailMismatch> = {};
 /** An email field's message for `value`, with `part` (which the message quotes) written back as `{name}`. */
 const emailMessage = async (page: Page, value: string, part: string, name: string) => {
@@ -99,6 +124,12 @@ try {
 		emailMismatch[locale] = email;
 		const wide = await tooLongMessage(page, 1234, 56789);
 		const narrow = await tooLongMessage(page, 10, 100);
+		const underflow = await numberMessage(page, 'min="1234"', { set: '5' });
+		const overflow = await numberMessage(page, 'max="1234"', { set: '5678' });
+		const twoNearest = await numberMessage(page, 'min="1000" step="250"', { set: '1100' });
+		const oneNearest = await numberMessage(page, 'min="1000" step="250" max="1200"', { set: '1100' });
+		const fraction = await numberMessage(page, 'min="1.5"', { set: '1' });
+		const badInput = await numberMessage(page, '', { typed: '1e' });
 		await browser.close();
 		table[locale] = { text: text!, checkbox: checkbox!, radio: radio! };
 		const [max, length] = numbersOf(wide, locale).sort((a, b) => a.length - b.length) as [
@@ -122,6 +153,28 @@ try {
 				`${locale}: ${JSON.stringify(entry)} does not give ${JSON.stringify(narrow)}`,
 			);
 		tooLong[locale] = entry;
+		const write = (value: string) => value.replace(/[0-9]/g, (digit) => digits[Number(digit)]!);
+		// The decimal separator is what stands between the 1 and the 5 of 1.5, as this language writes it.
+		const one = write('1');
+		const five = write('5');
+		const at = fraction.indexOf(one);
+		const decimal = at < 0 ? undefined : fraction.slice(at + one.length, fraction.indexOf(five, at));
+		if (!decimal) throw new Error(`${locale}: no decimal separator in ${JSON.stringify(fraction)}`);
+		const number: NativeNumberMessages = {
+			underflow: numberTemplate(underflow, { min: write('1234') }, locale),
+			overflow: numberTemplate(overflow, { max: write('1234') }, locale),
+			step: numberTemplate(twoNearest, { low: write('1000'), high: write('1250') }, locale),
+			stepOne: numberTemplate(oneNearest, { value: write('1000') }, locale),
+			badInput,
+			...(digits === '0123456789' ? {} : { digits }),
+			...(decimal === '.' ? {} : { decimal }),
+		};
+		if (
+			nativeNumberMessage(number.underflow, number, { min: 1.5 }) !== fraction ||
+			nativeNumberMessage(number.step, number, { low: 1000, high: 1250 }) !== twoNearest
+		)
+			throw new Error(`${locale}: ${JSON.stringify(number)} does not give ${JSON.stringify(fraction)}`);
+		numbers[locale] = number;
 	}
 } finally {
 	execFileSync('defaults', ['delete', bundle, 'AppleLanguages']);
@@ -135,5 +188,5 @@ writeFileSync(
 			const version = browser.version();
 			await browser.close();
 			return `Chromium ${version}`;
-		})}; do not edit.\n\nimport type { NativeEmailMismatch, NativeTooLong } from './native-view.ts';\n\n/** Chromium's \`validationMessage\` for a required field with no value, by the language Chromium shows its own text in. */\nexport const NATIVE_VALUE_MISSING_BY_LOCALE: Readonly<Record<string, { readonly text: string; readonly checkbox: string; readonly radio: string }>> = ${JSON.stringify(table, null, '\t')};\n\n/** Chromium's \`validationMessage\` for a text field a person edited to longer than its maxlength, with \`{max}\` and \`{length}\` for the numbers. */\nexport const NATIVE_TOO_LONG_BY_LOCALE: Readonly<Record<string, NativeTooLong>> = ${JSON.stringify(tooLong, null, '\t')};\n\n/** Chromium's \`validationMessage\` for an email field whose value is not an email address, one per reason. */\nexport const NATIVE_EMAIL_MISMATCH_BY_LOCALE: Readonly<Record<string, NativeEmailMismatch>> = ${JSON.stringify(emailMismatch, null, '\t')};\n`,
+		})}; do not edit.\n\nimport type { NativeEmailMismatch, NativeNumberMessages, NativeTooLong } from './native-view.ts';\n\n/** Chromium's \`validationMessage\` for a required field with no value, by the language Chromium shows its own text in. */\nexport const NATIVE_VALUE_MISSING_BY_LOCALE: Readonly<Record<string, { readonly text: string; readonly checkbox: string; readonly radio: string }>> = ${JSON.stringify(table, null, '\t')};\n\n/** Chromium's \`validationMessage\` for a text field a person edited to longer than its maxlength, with \`{max}\` and \`{length}\` for the numbers. */\nexport const NATIVE_TOO_LONG_BY_LOCALE: Readonly<Record<string, NativeTooLong>> = ${JSON.stringify(tooLong, null, '\t')};\n\n/** Chromium's \`validationMessage\` for a number field out of its range, off its step, or holding text that is no number, with \`{min}\`, \`{max}\`, \`{low}\`, \`{high}\` and \`{value}\` for the numbers. */\nexport const NATIVE_NUMBER_MESSAGES_BY_LOCALE: Readonly<Record<string, NativeNumberMessages>> = ${JSON.stringify(numbers, null, '\t')};\n\n/** Chromium's \`validationMessage\` for an email field whose value is not an email address, one per reason. */\nexport const NATIVE_EMAIL_MISMATCH_BY_LOCALE: Readonly<Record<string, NativeEmailMismatch>> = ${JSON.stringify(emailMismatch, null, '\t')};\n`,
 );

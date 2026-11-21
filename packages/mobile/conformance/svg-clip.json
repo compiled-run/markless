@@ -1,0 +1,361 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:half",
+				"name": "half",
+				"initial": true
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Moon phase"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Next phase"
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:0",
+				"parent": "h0",
+				"test": {
+					"cell": "state:half"
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"viewBox": "0 0 120 50",
+					"width": "240",
+					"height": "100"
+				},
+				"drawing": {
+					"viewBox": [
+						0,
+						0,
+						120,
+						50
+					],
+					"width": 240,
+					"height": 100,
+					"shapes": [
+						{
+							"clip": [
+								[
+									0,
+									0,
+									0,
+									1,
+									25,
+									0,
+									1,
+									25,
+									50,
+									1,
+									0,
+									50,
+									4
+								]
+							],
+							"path": [
+								0,
+								49,
+								25,
+								3,
+								49,
+								38.254833995939045,
+								38.254833995939045,
+								49,
+								25,
+								49,
+								3,
+								11.745166004060957,
+								49,
+								1,
+								38.254833995939045,
+								1,
+								25,
+								3,
+								1,
+								11.745166004060957,
+								11.745166004060957,
+								1,
+								25,
+								1,
+								3,
+								38.254833995939045,
+								1,
+								49,
+								11.745166004060957,
+								49,
+								25,
+								4
+							],
+							"fill": {
+								"r": 204,
+								"g": 204,
+								"b": 153,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"path": [],
+							"fill": {
+								"r": 0,
+								"g": 0,
+								"b": 0,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 0,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"text": {
+								"anchor": "start",
+								"baseline": "alphabetic",
+								"runs": [
+									{
+										"text": "Half moon",
+										"x": 58,
+										"y": 30,
+										"size": 12,
+										"weight": 400,
+										"letterSpacing": 0,
+										"fill": {
+											"r": 0,
+											"g": 0,
+											"b": 0,
+											"alpha": 255
+										}
+									}
+								]
+							}
+						}
+					],
+					"label": "Half moon"
+				},
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h10",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"viewBox": "0 0 120 50",
+					"width": "240",
+					"height": "100"
+				},
+				"drawing": {
+					"viewBox": [
+						0,
+						0,
+						120,
+						50
+					],
+					"width": 240,
+					"height": 100,
+					"shapes": [
+						{
+							"path": [
+								0,
+								49,
+								25,
+								3,
+								49,
+								38.254833995939045,
+								38.254833995939045,
+								49,
+								25,
+								49,
+								3,
+								11.745166004060957,
+								49,
+								1,
+								38.254833995939045,
+								1,
+								25,
+								3,
+								1,
+								11.745166004060957,
+								11.745166004060957,
+								1,
+								25,
+								1,
+								3,
+								38.254833995939045,
+								1,
+								49,
+								11.745166004060957,
+								49,
+								25,
+								4
+							],
+							"fill": {
+								"r": 204,
+								"g": 204,
+								"b": 153,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"path": [],
+							"fill": {
+								"r": 0,
+								"g": 0,
+								"b": 0,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 0,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"text": {
+								"anchor": "start",
+								"baseline": "alphabetic",
+								"runs": [
+									{
+										"text": "Full moon",
+										"x": 58,
+										"y": 30,
+										"size": 12,
+										"weight": 400,
+										"letterSpacing": 0,
+										"fill": {
+											"r": 0,
+											"g": 0,
+											"b": 0,
+											"alpha": 255
+										}
+									}
+								]
+							}
+						}
+					],
+					"label": "Full moon"
+				},
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 1
+				}
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:half",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:half"
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Moon phase"
+		],
+		[
+			"h2:text0",
+			"Next phase"
+		]
+	],
+	"initialArms": [
+		[
+			"branch-site:0",
+			0
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 1
+				}
+			]
+		}
+	]
+}

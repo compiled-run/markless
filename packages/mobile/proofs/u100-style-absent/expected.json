@@ -1,0 +1,22 @@
+{
+	"rung": 200,
+	"name": "A style that is a fixed text or absent by state, and a template whose only varying part is a fixed text chosen by state: Dragon lays out each, as on the web",
+	"steps": [
+		{
+			"visible": ["Absent style", "Middle row", "Marker", "Second", "Swap", "High"],
+			"placed": ["Marker", "Second", "Middle row"]
+		},
+		{
+			"do": { "tap": "Swap" },
+			"visible": ["Low"],
+			"absent": ["High"],
+			"placed": ["Middle row", "Marker", "Second"]
+		},
+		{
+			"do": { "tap": "Swap" },
+			"visible": ["High"],
+			"absent": ["Low"],
+			"placed": ["Marker", "Second", "Middle row"]
+		}
+	]
+}

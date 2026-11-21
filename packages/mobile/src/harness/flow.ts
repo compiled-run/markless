@@ -69,5 +69,10 @@ export function instrumentFlow(
 		push(index, 'screenshot', { takeScreenshot: after });
 		return { action, before, after };
 	});
-	return { yaml: `${stringify(config)}---\n${stringify(out)}`, steps: named, commands: roles };
+	// Maestro reads no YAML aliases, which the writer makes for a command repeated by reference (a second Back).
+	return {
+		yaml: `${stringify(config)}---\n${stringify(out, { aliasDuplicateObjects: false })}`,
+		steps: named,
+		commands: roles,
+	};
 }
