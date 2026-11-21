@@ -1400,13 +1400,22 @@ test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders(
 	'%s: the app payload walks the steps as a stack of screens',
 	async (folder) => {
 		const rung = readRung(folder);
-		const build = await compileRungApp(
-			join(proofsDir, folder),
-			readAppConfig(join(proofsDir, folder)),
-		);
+		const build = await compileRungApp(join(proofsDir, folder), {
+			...readAppConfig(join(proofsDir, folder)),
+			...(rung.refusedPages ? { partial: true } : {}),
+		});
+		// Only the pages the rung names are refused, each by name; every other page builds clean.
+		const refused = new Set(rung.refusedPages ?? []);
 		expect(
-			build.diagnostics.map((diagnostic) => `${diagnostic.page}: ${diagnostic.message}`),
+			build.diagnostics
+				.filter((diagnostic) => !refused.has(diagnostic.page))
+				.map((diagnostic) => `${diagnostic.page}: ${diagnostic.message}`),
 		).toEqual([]);
+		for (const page of refused)
+			expect(
+				build.diagnostics.some((diagnostic) => diagnostic.page === page && diagnostic.severity === 'error'),
+				`${page} is refused`,
+			).toBe(true);
 		walkApp(
 			build.payload!,
 			rung.steps,
