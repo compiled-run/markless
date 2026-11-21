@@ -1,0 +1,606 @@
+{
+ "measured": "2026-11-19",
+ "page": "2026-11-19-press-cancel.html",
+ "runs": [
+  {
+   "name": "ios-safari-fresh-page",
+   "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
+   "driver": "Maestro tapOn, swipe 300 ms",
+   "steps": [
+    {
+     "step": "tap",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerover",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 11686
+      },
+      {
+       "el": "wrap",
+       "type": "pointerenter",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 11686
+      },
+      {
+       "el": "b",
+       "type": "pointerenter",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 11686
+      },
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 11686
+      },
+      {
+       "el": "b",
+       "type": "pointerup",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 11803
+      },
+      {
+       "el": "b",
+       "type": "pointerout",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 11803
+      },
+      {
+       "el": "b",
+       "type": "pointerleave",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 11803
+      },
+      {
+       "el": "wrap",
+       "type": "pointerleave",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 11803
+      },
+      {
+       "el": "b",
+       "type": "click",
+       "target": "b",
+       "pointerType": "mouse",
+       "t": 11816
+      }
+     ]
+    },
+    {
+     "step": "slide-down-scrolls",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerover",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 29090
+      },
+      {
+       "el": "wrap",
+       "type": "pointerenter",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 29090
+      },
+      {
+       "el": "b",
+       "type": "pointerenter",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 29090
+      },
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 29090
+      },
+      {
+       "el": "b",
+       "type": "pointercancel",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 29146
+      },
+      {
+       "el": "b",
+       "type": "pointerleave",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 29147
+      },
+      {
+       "el": "b",
+       "type": "pointerout",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 29147
+      }
+     ]
+    },
+    {
+     "step": "tap-after-scroll",
+     "events": []
+    }
+   ]
+  },
+  {
+   "name": "ios-safari-first-page",
+   "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
+   "driver": "Maestro tapOn, longPressOn, swipe 800 ms; the long press left a text selection, after which the swipes logged pointerdown alone",
+   "steps": [
+    {
+     "step": "tap",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerover",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 20827
+      },
+      {
+       "el": "wrap",
+       "type": "pointerenter",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 20827
+      },
+      {
+       "el": "b",
+       "type": "pointerenter",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 20827
+      },
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 20827
+      },
+      {
+       "el": "b",
+       "type": "pointerup",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 20943
+      },
+      {
+       "el": "b",
+       "type": "pointerout",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 20943
+      },
+      {
+       "el": "b",
+       "type": "pointerleave",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 20943
+      },
+      {
+       "el": "wrap",
+       "type": "pointerleave",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 20943
+      },
+      {
+       "el": "b",
+       "type": "click",
+       "target": "b",
+       "pointerType": "mouse",
+       "t": 20952
+      }
+     ]
+    },
+    {
+     "step": "hold",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerover",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 37654
+      },
+      {
+       "el": "wrap",
+       "type": "pointerenter",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 37654
+      },
+      {
+       "el": "b",
+       "type": "pointerenter",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 37654
+      },
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 37654
+      },
+      {
+       "el": "b",
+       "type": "pointerup",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 40654
+      },
+      {
+       "el": "wrap",
+       "type": "pointerleave",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 40654
+      },
+      {
+       "el": "b",
+       "type": "pointerout",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 40654
+      },
+      {
+       "el": "b",
+       "type": "pointerleave",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 40654
+      }
+     ]
+    },
+    {
+     "step": "slide-sideways",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerover",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 57890
+      },
+      {
+       "el": "wrap",
+       "type": "pointerenter",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 57890
+      },
+      {
+       "el": "b",
+       "type": "pointerenter",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 57890
+      },
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 57890
+      }
+     ]
+    },
+    {
+     "step": "slide-down-scrolls",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerover",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 75225
+      },
+      {
+       "el": "wrap",
+       "type": "pointerenter",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 75225
+      },
+      {
+       "el": "b",
+       "type": "pointerenter",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 75225
+      },
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 75225
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "android-chrome",
+   "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Mobile Safari/537.36",
+   "driver": "adb shell input tap and swipe",
+   "steps": [
+    {
+     "step": "tap",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerover",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 9180
+      },
+      {
+       "el": "wrap",
+       "type": "pointerenter",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 9180
+      },
+      {
+       "el": "b",
+       "type": "pointerenter",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 9180
+      },
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 9180
+      },
+      {
+       "el": "b",
+       "type": "pointerup",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 9180
+      },
+      {
+       "el": "b",
+       "type": "click",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 9180
+      },
+      {
+       "el": "wrap",
+       "type": "pointerleave",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 9180
+      },
+      {
+       "el": "b",
+       "type": "pointerout",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 9180
+      },
+      {
+       "el": "b",
+       "type": "pointerleave",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 9180
+      }
+     ]
+    },
+    {
+     "step": "hold",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerover",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 11232
+      },
+      {
+       "el": "wrap",
+       "type": "pointerenter",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 11232
+      },
+      {
+       "el": "b",
+       "type": "pointerenter",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 11232
+      },
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 11232
+      },
+      {
+       "el": "b",
+       "type": "contextmenu",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 11232
+      },
+      {
+       "el": "b",
+       "type": "pointercancel",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 11232
+      },
+      {
+       "el": "b",
+       "type": "pointerout",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 11232
+      },
+      {
+       "el": "b",
+       "type": "pointerleave",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 11232
+      },
+      {
+       "el": "wrap",
+       "type": "pointerleave",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 11232
+      }
+     ]
+    },
+    {
+     "step": "slide-down-scrolls",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerover",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 14784
+      },
+      {
+       "el": "wrap",
+       "type": "pointerenter",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 14784
+      },
+      {
+       "el": "b",
+       "type": "pointerenter",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 14784
+      },
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 14784
+      },
+      {
+       "el": "b",
+       "type": "pointercancel",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 14803
+      },
+      {
+       "el": "b",
+       "type": "pointerout",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 14803
+      },
+      {
+       "el": "b",
+       "type": "pointerleave",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 14803
+      },
+      {
+       "el": "wrap",
+       "type": "pointerleave",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 14803
+      }
+     ]
+    },
+    {
+     "step": "slide-sideways",
+     "events": [
+      {
+       "el": "b",
+       "type": "pointerover",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 1822
+      },
+      {
+       "el": "wrap",
+       "type": "pointerenter",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 1822
+      },
+      {
+       "el": "b",
+       "type": "pointerenter",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 1822
+      },
+      {
+       "el": "b",
+       "type": "pointerdown",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 1822
+      },
+      {
+       "el": "b",
+       "type": "pointercancel",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 1840
+      },
+      {
+       "el": "b",
+       "type": "pointerout",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 1840
+      },
+      {
+       "el": "b",
+       "type": "pointerleave",
+       "target": "b",
+       "pointerType": "touch",
+       "t": 1840
+      },
+      {
+       "el": "wrap",
+       "type": "pointerleave",
+       "target": "wrap",
+       "pointerType": "touch",
+       "t": 1840
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

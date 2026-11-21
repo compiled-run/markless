@@ -901,6 +901,21 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// numberbox's step buttons: a press steps and starts the hold's clock, the lift stops it; a press the platform takes
+		// for a scroll steps and is cancelled, which stops it too.
+		name: 'press-cancel',
+		fixture: 'proofs/u40-numberbox/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'pointerdown', host: 'component-edge:4/h5' },
+			{ event: 'pointerup', host: 'component-edge:4/h5' },
+			{ event: 'pointerdown', host: 'component-edge:2/h4' },
+			{ event: 'pointerup', host: 'component-edge:2/h4' },
+			{ event: 'pointerdown', host: 'component-edge:4/h5' },
+			{ event: 'pointercancel', host: 'component-edge:4/h5' },
+		],
+	},
+	{
 		name: 'script-loop',
 		fixture: 'proofs/j1-loop-local/App.tsrx',
 		modules: true,

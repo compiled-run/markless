@@ -334,6 +334,59 @@ function importSlots(semantic: ModuleSemantics) {
 	return { specifiers, spans, reach, slot, record };
 }
 
+/** `typeof name === 'undefined'` gives true, `typeof name !== 'undefined'` false (either side, strict or loose); else null. */
+function absentTest(test: AnyNode | null | undefined, name: string): boolean | null {
+	if (test?.type !== 'BinaryExpression') return null;
+	const equal = test.operator === '===' || test.operator === '==';
+	if (!equal && test.operator !== '!==' && test.operator !== '!=') return null;
+	const isTypeof = (side: AnyNode) =>
+		side.type === 'UnaryExpression' &&
+		side.operator === 'typeof' &&
+		(side.argument as AnyNode).type === 'Identifier' &&
+		(side.argument as AnyNode).name === name;
+	const isUndefined = (side: AnyNode) => side.type === 'Literal' && side.value === 'undefined';
+	const left = test.left as AnyNode;
+	const right = test.right as AnyNode;
+	return (isTypeof(left) && isUndefined(right)) || (isTypeof(right) && isUndefined(left)) ? equal : null;
+}
+
+/** A statement control never falls out of: a `return` or `throw`, or a block ending in one. */
+function exits(statement: AnyNode | null | undefined): boolean {
+	if (!statement) return false;
+	if (statement.type === 'ReturnStatement' || statement.type === 'ThrowStatement') return true;
+	return statement.type === 'BlockStatement' && exits((statement.body as AnyNode[]).at(-1));
+}
+
+/** Whether a read of the global `name` runs only past a `typeof name` test that found it defined. */
+function guardedByTypeof(semantic: ModuleSemantics, node: AnyNode, name: string): boolean {
+	const parentOf = (at: AnyNode) => semantic.parentOf(at as never) as AnyNode | null;
+	for (let child = node, parent = parentOf(node); parent; child = parent, parent = parentOf(parent)) {
+		if (parent.type === 'IfStatement' || parent.type === 'ConditionalExpression') {
+			const absent = absentTest(parent.test as AnyNode, name);
+			if ((absent === false && child === parent.consequent) || (absent === true && child === parent.alternate))
+				return true;
+		} else if (parent.type === 'LogicalExpression' && child === parent.right) {
+			const absent = absentTest(parent.left as AnyNode, name);
+			if ((parent.operator === '&&' && absent === false) || (parent.operator === '||' && absent === true)) return true;
+		} else if (parent.type === 'BlockStatement' || parent.type === 'Program') {
+			const body = parent.body as AnyNode[];
+			if (
+				body
+					.slice(0, body.indexOf(child))
+					.some(
+						(statement) =>
+							statement.type === 'IfStatement' &&
+							!statement.alternate &&
+							absentTest(statement.test as AnyNode, name) === true &&
+							exits(statement.consequent as AnyNode),
+					)
+			)
+				return true;
+		}
+	}
+	return false;
+}
+
 function globalOf(
 	semantic: ModuleSemantics,
 	reference: Reference,
@@ -341,7 +394,12 @@ function globalOf(
 ): SemanticScriptGlobal {
 	const node = reference.node as unknown as AnyNode;
 	const parent = semantic.parentOf(node as never) as AnyNode | null;
-	const typeofOnly = parent?.type === 'UnaryExpression' && parent.operator === 'typeof';
+	const reach =
+		parent?.type === 'UnaryExpression' && parent.operator === 'typeof'
+			? 'typeof'
+			: guardedByTypeof(semantic, node, reference.name)
+				? 'ifPresent'
+				: 'read';
 	const property =
 		GLOBAL_OBJECTS.has(reference.name) &&
 		parent?.type === 'MemberExpression' &&
@@ -353,7 +411,7 @@ function globalOf(
 	return {
 		name: reference.name,
 		span: spanOf(node as never, filename),
-		typeofOnly,
+		reach,
 		...(property ? { property } : {}),
 	};
 }
