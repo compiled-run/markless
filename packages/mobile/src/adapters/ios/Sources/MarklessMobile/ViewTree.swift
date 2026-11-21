@@ -4,10 +4,11 @@ import CoreText
 import MarklessCore
 import UIKit
 import UIKit.UIGestureRecognizerSubclass
+import WebKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"canvas", "details", "embed", "iframe", "object",
+	"canvas", "details", "embed", "object",
 	"picture", "summary", "video",
 ]
 
@@ -612,17 +613,20 @@ final class ViewTree {
 				settle(container, built: built, context)
 				try followArms()
 			case let .rows(node, keys):
-				guard let list = lists[node], let context = contexts[node] else { throw HostError("journal names list \(node), which is not shown") }
+				guard let list = lists[node], var context = contexts[node] else { throw HostError("journal names list \(node), which is not shown") }
+				// An inner list's copy reads its outer row's item as it is now, not as it was when the row was built.
+				let template = templates[node] ?? node
+				if let now = try nodes[template].flatMap({ try runtime.instances(of: $0).first { $0.id == node } }) { context.scope = now.scope }
 				let container = list.anchor.superview ?? root
 				var built = list.built
 				for key in list.keys where !keys.contains(key) {
 					for id in built.removeValue(forKey: key) ?? [] { remove(id) }
 				}
-				let items = Dictionary(try runtime.rows(of: templates[node] ?? node).map { ($0.key, $0.item) }, uniquingKeysWith: { $1 })
+				let items = Dictionary(try runtime.rows(of: template, in: context.scope).map { ($0.key, $0.item) }, uniquingKeysWith: { $1 })
 				var position = container.subviews.count
-				for key in keys where built[key] == nil {
+				for (place, key) in keys.enumerated() where built[key] == nil {
 					guard let item = items[key] else { throw HostError("\(node) has no current row \(key)") }
-					built[key] = try buildRow(templates[node] ?? node, key: key, item: item, in: container, at: &position, context)
+					built[key] = try buildRow(template, key: key, item: item, position: place, in: container, at: &position, context)
 				}
 				position = (container.subviews.firstIndex(of: list.anchor) ?? 0) + 1
 				var placed = Set<ObjectIdentifier>()
@@ -871,11 +875,13 @@ final class ViewTree {
 		[id] + (branches[id]?.built.flatMap(withArms) ?? [])
 	}
 
-	private func buildRow(_ list: String, key: String, item: NativeValue, in container: UIView, at index: inout Int, _ context: Context) throws -> [String] {
+	private func buildRow(_ list: String, key: String, item: NativeValue, position: Int, in container: UIView, at index: inout Int, _ context: Context) throws -> [String] {
+		// A row of a list inside another list's row is keyed by both (`<id>@<outer>@<key>`), as the runtime names it.
 		var row = context
-		row.suffix = "@\(key)"
+		row.suffix = "\(context.suffix)@\(key)"
 		row.scope.items[list] = item
-		row.scope.keys[list] = key
+		row.scope.keys[list] = String(row.suffix.dropFirst())
+		row.scope.positions[list] = position
 		return try build(list, in: container, at: &index, row)
 	}
 
@@ -969,6 +975,18 @@ final class ViewTree {
 						audio.heightAnchor.constraint(equalToConstant: 44).isActive = true
 					}
 					view = audio
+				} else if element == "iframe" {
+					// The browser's embedded page: the platform's web view at the iframe's size, 300 by 150 by default.
+					guard let link = staticAttributes["src"], let url = URL(string: link) else { throw HostError("<iframe> \(id) has no src") }
+					let page = WKWebView()
+					page.load(URLRequest(url: url))
+					page.isAccessibilityElement = false
+					page.accessibilityLabel = staticAttributes["title"]
+					if layout == nil {
+						page.widthAnchor.constraint(equalToConstant: staticAttributes["width"].flatMap(Double.init) ?? 300).isActive = true
+						page.heightAnchor.constraint(equalToConstant: staticAttributes["height"].flatMap(Double.init) ?? 150).isActive = true
+					}
+					view = page
 				} else if element == "img" {
 					let image = UIImageView()
 					image.contentMode = .scaleAspectFit
@@ -1148,14 +1166,13 @@ final class ViewTree {
 				let armViews = try arm.map { try build("\(template)#\($0)", in: container, at: &index, context) } ?? []
 				branches[id] = (marker, arm, armViews)
 			case .repeat:
-				if !context.suffix.isEmpty { throw HostError("a list inside a list row (\(id)) has no iOS host support yet") }
 				let marker = anchor(in: container, at: &index)
 				var rows: [String: [String]] = [:]
 				var keys: [String] = []
-				for row in try runtime.rows(of: template) {
+				for (position, row) in try runtime.rows(of: template, in: context.scope).enumerated() {
 					if rows[row.key] != nil { throw HostError("\(id) has two rows keyed \(row.key)") }
 					keys.append(row.key)
-					rows[row.key] = try buildRow(template, key: row.key, item: row.item, in: container, at: &index, context)
+					rows[row.key] = try buildRow(template, key: row.key, item: row.item, position: position, in: container, at: &index, context)
 				}
 				lists[id] = (marker, keys, rows)
 			case let .sheet(open, snapPoints, dismissible, modal):
@@ -1234,8 +1251,8 @@ final class ViewTree {
 				area.onPaste = { text in ask(NativeAction(event: .paste, host: id, value: text)) }
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
-			case (.input, _) where element == "select":
-				// A select's input handler runs when a choice lands, from the runtime's choose.
+			case (.input, _ as SelectButton):
+				// A select's change runs in the runtime when a choice is made (a `choose` action).
 				continue
 			case (.idle, _), (.visible, _), (.dismiss, _), (_, _) where event.event.isPointer:
 				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host.

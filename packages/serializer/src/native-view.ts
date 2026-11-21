@@ -107,6 +107,8 @@ export type NativeExpr =
 	| { readonly local: string }
 	/** The current row's item of a list (`repeat` node id). */
 	| { readonly item: string }
+	/** The current row's position in its list (`repeat` node id), from 0: a `@for`'s `index`. */
+	| { readonly index: string }
 	/** The page's route params, an object of strings (the page component's `params` prop). */
 	| { readonly route: 'params' }
 	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> }
@@ -158,6 +160,8 @@ export type NativeScriptBinding =
 	| { readonly cell: string }
 	| { readonly fields: Readonly<Record<string, string>> }
 	| { readonly value: NativeExpr }
+	/** A device object the component made (`cam`): the script calls its methods through the host. */
+	| { readonly device: NativeDeviceObject; readonly object: string }
 	/**
 	 * An element (its node id) or an array of them, which the function reads through proxies: `getAttribute`,
 	 * `hasAttribute`, `contains`, and the commands `focus` and `scrollIntoView`. The host answers each read from the
@@ -178,9 +182,10 @@ export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>
 /**
  * Host services a payload's script uses, so a host provides only those: timers (`setTimeout` and the rest, through
  * `timer` entries), `fetch` (through `fetch` entries), `console`, `crypto.randomUUID` (from a `seed` the host passes),
- * and `navigate` from @markless/router (through a `navigate` entry; the host passes the page's route `params`).
+ * `navigate` from @markless/router (through a `navigate` entry; the host passes the page's route `params`), and
+ * `@markless/device` calls (through `call` entries, answered with `resume` or `reject` actions).
  */
-export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto' | 'navigate';
+export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto' | 'navigate' | 'device';
 
 /** The JavaScript a payload's `script` ops and script computeds run, in the platform's engine, started on first use. */
 export type NativeScript = {
@@ -330,6 +335,8 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	textarea: {},
 	a: {},
 	img: {},
+	/** The platform's web view showing the page its `src` names, a fixed http(s) URL. */
+	iframe: {},
 	audio: {},
 	label: {},
 	dialog: {},
@@ -949,6 +956,11 @@ export type NativeForm = {
 	readonly noValidate?: true;
 	/** An author wrote `aria-disabled` on one of its submit buttons, so a running submission marks none of them. */
 	readonly authoredAriaDisabled?: true;
+	/**
+	 * A GET form with no submit handler whose action is on another site: submitting calls `browser.open` with this URL,
+	 * its query replaced by the form's entries (`application/x-www-form-urlencoded`), as the web leaves for that page.
+	 */
+	readonly opens?: string;
 };
 
 /** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */

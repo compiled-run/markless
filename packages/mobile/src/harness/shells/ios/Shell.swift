@@ -61,6 +61,8 @@ final class ProofDevice: NativeDevice {
 	func call(_ name: String, object: String?, _ arguments: [NativeValue], settle: (@MainActor (DeviceOutcome) -> Void)?) throws {
 		calls.append(name)
 		label.text = "calls: " + calls.joined(separator: ", ")
+		// The browser would cover the app the flow reads: the call is listed and goes no further.
+		if name == "browser.open" { return settle?(.value(.null)) ?? () }
 		if let object, name == "recorder.active" { return record(object, arguments.first == .bool(true)) }
 		guard let object, name.hasPrefix("camera.") else { return try platform.call(name, object: object, arguments, settle: settle) }
 		switch name {

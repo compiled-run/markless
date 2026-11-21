@@ -176,7 +176,8 @@ class MemoryStore(private val values: MutableMap<String, JsValue> = HashMap()) :
 
 /** What names mean inside a list row or an arrow function: the row items by repeat id, the function's parameters. */
 /** [keys]: the row keys by repeat id, where a row's own state is read. */
-data class Scope(val items: Map<String, JsValue> = emptyMap(), val locals: Map<String, JsValue> = emptyMap(), val keys: Map<String, String> = emptyMap()) {
+/** [positions]: each row's place in its list by repeat id, from 0, which a `@for`'s `index` reads. */
+data class Scope(val items: Map<String, JsValue> = emptyMap(), val locals: Map<String, JsValue> = emptyMap(), val keys: Map<String, String> = emptyMap(), val positions: Map<String, Int> = emptyMap()) {
 	companion object {
 		val EMPTY = Scope()
 	}
@@ -335,6 +336,7 @@ class Runtime(
 			}
 			is Expr.Literal -> e.value
 			is Expr.Item -> scope.items[e.repeat] ?: throw MarklessRuntimeError("the row item of ${e.repeat} read outside its row")
+			is Expr.Index -> JsValue.Num((scope.positions[e.repeat] ?: throw MarklessRuntimeError("the row index of ${e.repeat} read outside its row")).toDouble())
 			is Expr.Local -> scope.locals[e.name] ?: throw MarklessRuntimeError("the parameter ${e.name} read outside its function")
 			is Expr.Unary -> Js.unary(e.op, eval(e.value))
 			is Expr.Binary -> { val l = eval(e.left); Js.binary(e.op, l, eval(e.right)) }
@@ -445,6 +447,7 @@ class Runtime(
 		data class Slot(val slot: String) : Bound
 		data class Fields(val fields: Map<String, String>) : Bound
 		data class Value(val value: JsValue) : Bound
+		data class Device(val device: String, val obj: String) : Bound
 		data class Callback(val fn: String) : Bound
 		data class Elements(val value: JsValue) : Bound
 		data class Object(val members: Map<String, Bound>) : Bound
@@ -457,6 +460,7 @@ class Runtime(
 			is ScriptBinding.Cell -> Bound.Slot(slot(b.cell, scope))
 			is ScriptBinding.Fields -> Bound.Fields(b.fields.mapValuesTo(LinkedHashMap()) { slot(it.value, scope) })
 			is ScriptBinding.Value -> Bound.Value(evaluate(b.value, scope))
+			is ScriptBinding.Device -> Bound.Device(b.device, b.obj)
 			is ScriptBinding.Callback -> Bound.Callback(b.fn)
 			is ScriptBinding.Elements -> Bound.Elements(evaluate(b.value, scope))
 			is ScriptBinding.Object -> Bound.Object(bind(b.members, scope))
@@ -470,6 +474,7 @@ class Runtime(
 			is Bound.Slot -> "{\"slot\":${jsonString(b.slot)}}"
 			is Bound.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}}"
 			is Bound.Value -> "{\"value\":${jsonValue(b.value)}}"
+			is Bound.Device -> "{\"device\":${jsonString(b.device)},\"object\":${jsonString(b.obj)}}"
 			is Bound.Callback -> "{\"callback\":${jsonString(b.fn)}}"
 			is Bound.Elements -> "{\"elements\":${jsonValue(b.value)}}"
 			is Bound.Object -> "{\"object\":${frameJson(b.members)}}"
@@ -489,6 +494,7 @@ class Runtime(
 			is Bound.Slot -> jsonValue(nullish(values[b.slot]) ?: nullish(values[b.slot.substringBefore('@')]) ?: JsValue.Null)
 			is Bound.Fields -> b.fields.values.joinToString(",", "[", "]") { jsonValue(values[it] ?: values[it.substringBefore('@')] ?: JsValue.Null) }
 			is Bound.Value -> jsonValue(b.value)
+			is Bound.Device -> jsonString(b.obj)
 			is Bound.Callback -> "null"
 			is Bound.Elements -> jsonValue(b.value)
 			is Bound.Object -> readFrame(b.members)
@@ -591,6 +597,17 @@ class Runtime(
 				)
 				JournalEntry.Fetch(id(o.field("id", "leave().requests[]")), request)
 			} +
+			(result["calls"]?.arr("leave().calls") ?: emptyList()).map { c ->
+				val o = c.obj("leave().calls[]")
+				o.only(setOf("id", "call", "object", "arguments"), "leave().calls[]")
+				JournalEntry.Call(
+					o.field("call", "leave().calls[]").str("leave().calls[].call"),
+					o.field("arguments", "leave().calls[]").arr("leave().calls[].arguments").map { JsValue.fromJson(it) },
+					null,
+					o["object"]?.str("leave().calls[].object"),
+					o["id"]?.let { "$SCRIPT_CALL${id(it)}" },
+				)
+			} +
 			(if (result.containsKey("commands")) list("commands") else emptyList()).mapNotNull { c ->
 				val parts = c.arr("leave().commands[]")
 				val node = parts[0].str("leave().commands[][0]")
@@ -676,8 +693,8 @@ class Runtime(
 	/** Whether any instance of [node] shows. */
 	fun isShown(node: Node): Boolean = instances(node).isNotEmpty()
 
-	fun rowsOf(repeat: Node.Repeat): List<Row> {
-		val list = evaluate(repeat.list) as? JsValue.Arr ?: throw MarklessRuntimeError("${repeat.id} lists a value that is not an array")
+	fun rowsOf(repeat: Node.Repeat, scope: Scope = Scope.EMPTY): List<Row> {
+		val list = evaluate(repeat.list, scope) as? JsValue.Arr ?: throw MarklessRuntimeError("${repeat.id} lists a value that is not an array")
 		val keyPath = repeat.key ?: return list.items.mapIndexed { index, item -> Row(index.toString(), item) }
 		fun valueAt(item: JsValue, path: List<String>): JsValue {
 			var key = item
@@ -691,12 +708,20 @@ class Runtime(
 		}
 	}
 
-	/** Every shown instance of [node]: one outside lists, one per row inside one. */
+	/**
+	 * Every shown instance of [node]: one outside lists, one per row inside one; a row of a list inside another list's row
+	 * is keyed by both (`<id>@<outer>@<key>`), and its [Instance.rowKey] is that whole suffix.
+	 */
 	fun instances(node: Node): List<Instance> {
 		val r = node.row ?: return if (shownIn(node, Scope.EMPTY)) listOf(Instance(node.id, node, Scope.EMPTY)) else emptyList()
 		val repeat = byId[r] as? Node.Repeat ?: return emptyList()
-		if (!shownIn(repeat, Scope.EMPTY)) return emptyList()
-		return rowsOf(repeat).map { Instance("${node.id}@${it.key}", node, Scope(items = mapOf(repeat.id to it.item), keys = mapOf(repeat.id to it.key)), it.key) }.filter { shownIn(node, it.scope) }
+		return instances(repeat).flatMap { copy ->
+			val outer = repeat.row?.let { copy.scope.keys[it] }
+			rowsOf(repeat, copy.scope).mapIndexed { position, it ->
+				val suffix = if (outer == null) it.key else "$outer@${it.key}"
+				Instance("${node.id}@$suffix", node, copy.scope.copy(items = copy.scope.items + (repeat.id to it.item), keys = copy.scope.keys + (repeat.id to suffix), positions = copy.scope.positions + (repeat.id to position)), suffix)
+			}
+		}.filter { shownIn(node, it.scope) }
 	}
 
 	fun text(t: Node.Text, scope: Scope): String = text(t.parts, scope)
@@ -964,7 +989,7 @@ class Runtime(
 	fun arms(): List<Pair<String, Int?>> = payload.nodes.filterIsInstance<Node.Branch>().flatMap { b -> instances(b).map { it.id to armOf(b, it.scope) } }
 
 	/** Every shown list's row keys, in order. */
-	fun rows(): List<Pair<String, List<String>>> = payload.nodes.filterIsInstance<Node.Repeat>().filter { isShown(it) }.map { r -> r.id to rowsOf(r).map { it.key } }
+	fun rows(): List<Pair<String, List<String>>> = payload.nodes.filterIsInstance<Node.Repeat>().flatMap { r -> instances(r).map { it.id to rowsOf(r, it.scope).map { row -> row.key } } }
 
 	/** Every system sheet shown (its arm, if any, showing) and whether its `open` is truthy. */
 	fun sheets(): List<Pair<String, Boolean>> = payload.nodes.filterIsInstance<Node.Sheet>().filter { isShown(it) }.map { it.id to Js.truthy(evaluate(it.open)) }
@@ -1047,12 +1072,13 @@ class Runtime(
 			val instance = optionsOf(select).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")
 			return change(null, null) {
 				if (attributeNow(select, "disabled") != null || attributeIn(option, "disabled", instance.scope) != null) return@change emptyList()
+				val before = optionsOf(select).firstOrNull { selectedness[it.id] == true }?.id
 				chosenNow = host
-				// A choice that changes the select fires its input handler, as the web does, with the option's value.
-				val was = optionsOf(select).firstOrNull { selectedness[it.id] == true }?.id
-				val handler = handlerFor(select, EventName.Input)?.let { handlers[it] }
-				if (was == host || handler == null) emptyList()
-				else withFields(mapOf("value" to JsValue.Str(optionValue(instance)))) { run(handler.ops, instance.scope) }
+				// A different choice fires the select's `change` (an `input` event here), its value the new option's.
+				val changed = handlerFor(select, EventName.Input)
+				if (before == host || changed == null) return@change emptyList()
+				for (one in optionsOf(select)) selectedness[one.id] = one.id == host
+				withFields(mapOf("value" to JsValue.Str(optionValue(instance)))) { run(handlers[changed]?.ops.orEmpty(), instance.scope) }
 			}
 		}
 		if (detail != null && event != EventName.Activate) throw MarklessRuntimeError("a ${event.wire} event carries no press count")
@@ -1253,12 +1279,19 @@ class Runtime(
 
 	/** A device call a handler awaited answered: its continuation runs with the answer as its local. */
 	fun resume(continuation: String, value: JsValue): List<JournalEntry> {
+		scriptCallId(continuation)?.let { id ->
+			return change(null, null) { enter("\"kind\":\"answer\",\"call\":$id,\"value\":${jsonValue(value)}") }
+		}
 		val then = continuations[continuation] ?: throw MarklessRuntimeError("no continuation \"$continuation\"")
 		return change(null, null) { run(then.ops, Scope(locals = mapOf(then.local to value))) }
 	}
 
 	/** That call failed: the handler ends, and the nearest `@catch` around it (if any) takes `{ name, message }`. */
 	fun reject(continuation: String, name: String, message: String): List<JournalEntry> {
+		scriptCallId(continuation)?.let { id ->
+			val error = "{\"name\":${jsonString(name)},\"message\":${jsonString(message)}}"
+			return change(null, null) { enter("\"kind\":\"answer\",\"call\":$id,\"error\":$error") }
+		}
 		val then = continuations[continuation] ?: throw MarklessRuntimeError("no continuation \"$continuation\"")
 		val cell = then.catch ?: return emptyList()
 		return change(null, null) {
@@ -1441,9 +1474,11 @@ class Runtime(
 		val journal = ArrayList<JournalEntry>()
 		for (c in payload.cells) if (c.styled && !Js.strictEquals(cellsBefore.getValue(c.id), values.getValue(c.id))) journal.add(JournalEntry.State(c.id, values.getValue(c.id)))
 		for (node in payload.nodes) when (node) {
-			is Node.Repeat -> {
-				val b = beforeRows[node.id]; val a = afterRows[node.id]
-				if (b != null && a != null && b != a) journal.add(JournalEntry.Rows(node.id, a))
+			// Each shown copy of the list: an inner list has one per row of its outer list (`<id>@<key>`).
+			is Node.Repeat -> for ((id, a) in afterRows) {
+				if (id != node.id && !id.startsWith("${node.id}@")) continue
+				val b = beforeRows[id]
+				if (b != null && b != a) journal.add(JournalEntry.Rows(id, a))
 			}
 			is Node.Sheet -> {
 				val before = beforeSheets[node.id]
@@ -1496,6 +1531,11 @@ class Runtime(
 		if (op.submitter != null && attributeNow(op.submitter, "disabled") != null) return emptyList()
 		firstInvalid(form, op.submitter)?.let { (node, message) ->
 			calls.add(JournalEntry.Invalid(node, message))
+			return emptyList()
+		}
+		form.opens?.let { opens ->
+			val entries = (entriesOf(op.form) as JsValue.Arr).items.map { (it as JsValue.Arr).items.let { pair -> Js.toStr(pair[0]) to Js.toStr(pair[1]) } }
+			calls.add(JournalEntry.Call("browser.open", listOf(JsValue.Str(nativeFormUrl(opens, entries))), null))
 			return emptyList()
 		}
 		val sent = jsonValue(entriesOf(op.form))

@@ -57,6 +57,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case local(String)
 	/// The current row's item of a list (`repeat` id).
 	case item(String)
+	/// The current row's position in its list (`repeat` id), from 0: a `@for`'s `index`.
+	case index(String)
 	case call(NativeBuiltin, [NativeExpr])
 	/// A field of the event running the handler: an `input`'s text, a `dismiss`'s reason and press target, a pointer event's fields.
 	case event(NativeEventField)
@@ -84,7 +86,7 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked, .field: return []
+		case .literal, .event, .focused, .local, .item, .index, .routeParams, .formData, .checked, .field: return []
 		case let .unary(_, inner), let .member(inner, _), let .optionalMember(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .captures(node, pointer): return node.cells + pointer.cells
@@ -466,6 +468,8 @@ public struct NativeForm: Equatable, Sendable {
 	public let noValidate: Bool
 	/// An author wrote `aria-disabled` on one of its submit buttons, so a running submission marks none of them.
 	public let authoredAriaDisabled: Bool
+	/// A GET form on another site: submitting opens this URL, its query replaced by the form's entries, in the browser.
+	public var opens: String? = nil
 }
 
 /// A navigate op's param: a string fixed at build time, or an expression evaluated in the activated element's scope.
@@ -842,7 +846,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 				}
 		}
 		let forms: [NativeForm] = fields.has("forms") ? try fields["forms"].array().map { form in
-			let field = try form.object(required: ["node", "fields", "submitters"], optional: ["noValidate", "authoredAriaDisabled"])
+			let field = try form.object(required: ["node", "fields", "submitters"], optional: ["noValidate", "authoredAriaDisabled", "opens"])
 			let flag = { (key: String) throws -> Bool in
 				guard field.has(key) else { return false }
 				guard try field[key].bool() else { throw PayloadError(path: try field[key].path, reason: "\(key) is only ever true") }
@@ -859,7 +863,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 					return NativeForm.Field(node: try f["node"].string(), kind: fieldKind)
 				},
 				submitters: try field["submitters"].array().map { try $0.string() },
-				noValidate: try flag("noValidate"), authoredAriaDisabled: try flag("authoredAriaDisabled"))
+				noValidate: try flag("noValidate"), authoredAriaDisabled: try flag("authoredAriaDisabled"),
+				opens: field.has("opens") ? try field["opens"].string() : nil)
 		} : []
 		let valueMissing: [(locale: String, messages: NativeValueMissing)] = fields.has("valueMissing") ? try {
 			let reader = try fields["valueMissing"]
@@ -987,13 +992,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 				let fields = try binding.field("fields")
 				return NativeScriptBinding(name: name, kind: .fields(try fields.keys().map { NativeScriptField(name: $0, cell: try fields.field($0).string()) }))
 			case ["value"]: return NativeScriptBinding(name: name, kind: .value(try decodeExpr(try binding.field("value"))))
+			case let keys where Set(keys) == ["device", "object"]:
+				return NativeScriptBinding(name: name, kind: .device(device: try binding.field("device").string(), object: try binding.field("object").string()))
 			case ["elements"]: return NativeScriptBinding(name: name, kind: .elements(try decodeExpr(try binding.field("elements"))))
 			case ["object"]: return NativeScriptBinding(name: name, kind: .object(try decodeBindings(try binding.field("object"))))
 			case ["shared"]: return NativeScriptBinding(name: name, kind: .shared(try decodeBindings(try binding.field("shared"))))
 			case ["callback"]: return NativeScriptBinding(name: name, kind: .callback(try binding.field("callback").string()))
 			case ["bindings", "method"], ["method", "bindings"]:
 				return NativeScriptBinding(name: name, kind: .method(try binding.field("method").string(), try decodeBindings(try binding.field("bindings"))))
-			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { elements }, { object }, { shared }, { callback } or { method, bindings }")
+			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { device, object }, { elements }, { object }, { shared }, { callback } or { method, bindings }")
 			}
 		}
 	}
@@ -1098,6 +1105,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			guard name == "params" else { throw PayloadError(path: reader.path + ".route", reason: "unknown route read \"\(name)\"") }
 			return .routeParams
 		case ["item"]: return .item(try field("item").string())
+		case ["index"]: return .index(try field("index").string())
 		case ["formData"]: return .formData(try field("formData").string())
 		case ["checked"]: return .checked(try field("checked").string())
 		case ["bindings", "script"]: return .script(fn: try field("script").string(), bindings: try decodeBindings(try field("bindings")))
