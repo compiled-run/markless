@@ -1139,6 +1139,7 @@ function foldConstant(
 ): { readonly value: unknown } | undefined {
 	const fold = (inner: NativeExpr) => foldConstant(inner, initial);
 	if ('literal' in expr) return { value: expr.literal };
+	if ('nonFinite' in expr) return { value: Number(expr.nonFinite) };
 	const element = elementOf(expr);
 	if (element !== undefined) {
 		const token = elementToken(element);

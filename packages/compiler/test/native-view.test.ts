@@ -306,6 +306,25 @@ export function Bounds() @{
 		expect(text).toContain(`{"literal":${Number.MAX_SAFE_INTEGER}}`);
 	});
 
+	it('folds a non-finite constant a widget writes while rendering, as a prop default', async () => {
+		const { payload, diagnostics } = await nativeView(`import { shared, state } from '@markless/core';
+const boxState = shared(() => {
+	const box = state({ max: 0 });
+	return { ...box };
+}, { scope: 'subtree' });
+function BoxRoot({ max = Number.POSITIVE_INFINITY }: { max?: number }) @{
+	const s = boxState();
+	s.max = max;
+	<p>{String(s.max)}</p>
+}
+export function Page() @{
+	<main><BoxRoot /></main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const cell = payload?.cells.find((c) => c.name === 'box.max');
+		expect(cell && [cell.initial, cell.nonFinite]).toEqual([null, [[[], 'Infinity']]]);
+	});
+
 	it('refuses constructs with no native lowering yet', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Field() @{
