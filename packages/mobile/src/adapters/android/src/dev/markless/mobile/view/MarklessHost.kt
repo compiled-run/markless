@@ -498,8 +498,8 @@ class MarklessHost(
 		for ((id, inst) in built) if (inst.node is Node.Element) views[id]?.let { put(it, id) }
 	}
 
-	/** Reports a touch in window coordinates to the runtime as pointer events; call it before the views see the touch. */
-	fun touch(event: android.view.MotionEvent) = overlays.touch(event)
+	/** Reports a touch in window coordinates to the runtime as pointer events; call it before the views see the touch. True when a long press took the gesture. */
+	fun touch(event: android.view.MotionEvent): Boolean = overlays.touch(event)
 
 	private var lastPress: Triple<String, Long, Int>? = null
 
@@ -586,8 +586,8 @@ class MarklessHost(
 		syncSheets()
 		refreshRelations()
 		refreshSelects()
-		// A styled list's rows, a row's text or an attribute of a row's copy moved: the page is laid out again with its rows.
-		if (planned?.planRepeats?.isNotEmpty() == true && journal.any { it is JournalEntry.Rows || ((it is JournalEntry.Text || it is JournalEntry.Attribute) && '@' in it.node) }) {
+		// A styled list's rows, a row's text or an attribute of a row's copy moved, or an arm that may hold a list opened: the page is laid out again with its rows.
+		if (planned?.planRepeats?.isNotEmpty() == true && journal.any { it is JournalEntry.Rows || it is JournalEntry.Arm || ((it is JournalEntry.Text || it is JournalEntry.Attribute) && '@' in it.node) }) {
 			laidOutFor?.let { (w, h) -> layOutAt(w, h, rowsMoved = true) }
 		}
 		onJournal?.invoke(journal)
@@ -1024,7 +1024,7 @@ class MarklessHost(
 			EventName.Keyup -> (view as? MarklessField ?: throw MarklessHostError("keyup event on \"${node.id}\", which is not a text field")).onKeyUp = { key -> apply(runtime.dispatch(inst.id, EventName.Keyup, key)) }
 			EventName.Paste -> (view as? MarklessField ?: throw MarklessHostError("paste event on \"${node.id}\", which is not a text field")).onPaste = { text -> prevents(runtime.dispatch(inst.id, EventName.Paste, text)) }
 			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
-			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.Choose -> {}
+			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.Choose, EventName.ContextMenu -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->
 				val now = android.os.SystemClock.uptimeMillis()

@@ -148,6 +148,48 @@ fun jsonValue(v: JsValue): String = when (v) {
 	is JsValue.Obj -> v.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" }
 }
 
+/** JSON writes Infinity, -Infinity and NaN as null ([jsonValue]): each one's path and name, as JSON (nativeNonFiniteSplit). */
+fun nonFiniteJson(v: JsValue): String {
+	val found = ArrayList<String>()
+	fun walk(x: JsValue, path: List<String>) {
+		when (x) {
+			is JsValue.Num -> if (x.value.isNaN() || x.value.isInfinite()) found.add("[[${path.joinToString(",")}],${jsonString(if (x.value.isNaN()) "NaN" else if (x.value > 0) "Infinity" else "-Infinity")}]")
+			is JsValue.Arr -> x.items.forEachIndexed { k, item -> walk(item, path + k.toString()) }
+			is JsValue.Obj -> x.fields.forEach { (key, item) -> walk(item, path + jsonString(key)) }
+			else -> {}
+		}
+	}
+	walk(v, emptyList())
+	return found.joinToString(",", "[", "]")
+}
+
+/** A value JSON carried, with the non-finite numbers [nonFinite] lists put back at their paths (nativeNonFiniteJoin). */
+fun nonFiniteJoin(json: Json, nonFinite: Json?): JsValue {
+	var value = JsValue.fromJson(json)
+	for (entry in nonFinite?.arr("nonFinite").orEmpty()) {
+		val pair = entry.arr("a non-finite entry")
+		if (pair.size != 2) throw MarklessDecodeError("a non-finite entry is [path, name]")
+		val path = pair[0].arr("a non-finite path")
+		val number = when (val name = pair[1].str("a non-finite name")) {
+			"Infinity" -> Double.POSITIVE_INFINITY
+			"-Infinity" -> Double.NEGATIVE_INFINITY
+			"NaN" -> Double.NaN
+			else -> throw MarklessDecodeError("$name is not Infinity, -Infinity or NaN")
+		}
+		if (path.isEmpty()) { value = JsValue.Num(number); continue }
+		var at = value
+		for ((k, key) in path.withIndex()) {
+			val last = k == path.size - 1
+			when {
+				at is JsValue.Arr && key is Json.Num && key.value.toInt() in at.items.indices -> if (last) at.items[key.value.toInt()] = JsValue.Num(number) else at = at.items[key.value.toInt()]
+				at is JsValue.Obj && key is Json.Str && at.fields.containsKey(key.value) -> if (last) at.fields[key.value] = JsValue.Num(number) else at = at.fields[key.value]!!
+				else -> throw MarklessDecodeError("the non-finite path names nothing in the value")
+			}
+		}
+	}
+	return value
+}
+
 /**
  * The locale a browser with these preferred languages shows its own text in, among [available]: the first preference that
  * matches exactly, then without its script (`zh-Hant-TW` as `zh-TW`), then by language alone; else `en`.
@@ -405,7 +447,8 @@ class Runtime(
 				val entry = "{\"kind\":\"compute\",\"fn\":${jsonString(e.fn)},\"frame\":${frameOf(e.bindings, scope)},\"elements\":${elementFacts(e.bindings, scope)}$cells}"
 				computed[entry] ?: run {
 					val started = System.nanoTime()
-					val value = JsValue.fromJson(Json.parse(scriptCall("enter", entry)))
+					val result = Json.parse(scriptCall("enter", entry)).obj("compute")
+					val value = nonFiniteJoin(result.field("json", "compute"), result["nonFinite"])
 					onScriptEntry?.invoke(System.nanoTime() - started)
 					computed[entry] = value
 					value
@@ -555,6 +598,9 @@ class Runtime(
 		append(",\"cells\":")
 		append(values.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" })
 		if (unset.isNotEmpty()) append(",\"unset\":${unset.sorted().joinToString(",", "[", "]") { jsonString(it) }}")
+		// JSON writes Infinity and NaN as null: the entry lists where they were, each path starting with its slot.
+		val nonFinite = nonFiniteJson(JsValue.Obj(LinkedHashMap(values)))
+		if (nonFinite != "[]") append(",\"nonFinite\":$nonFinite")
 		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
 		if (payload.script?.services?.contains("navigate") == true)
 			append(",\"params\":" + params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" })
@@ -577,7 +623,7 @@ class Runtime(
 			val slot = pair[0].str("leave().writes[][0]")
 			val cell = slot.substringBefore('@')
 			if (payload.cells.none { it.id == cell }) throw MarklessRuntimeError("the script wrote unknown cell $cell")
-			val v = JsValue.fromJson(pair[1])
+			val v = nonFiniteJoin(pair[1], pair.getOrNull(2))
 			values[slot] = v
 			unset.remove(slot)
 			storageKeys[cell]?.let { store.set(it, v) }
@@ -1111,7 +1157,7 @@ class Runtime(
 		if (detail != null && event != EventName.Activate) throw MarklessRuntimeError("a ${event.wire} event carries no press count")
 		if ((event in VALUED) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
-		if (point != null && !event.touch) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
+		if (point != null && !event.touch && event != EventName.ContextMenu) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
 		if (event == EventName.Dismiss && reason != null) {
 			if (stack.lastOrNull() != host) throw MarklessRuntimeError("\"$host\" is not the topmost overlay")
 			val dismiss = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
@@ -1120,6 +1166,7 @@ class Runtime(
 			}
 		}
 		if (event.touch) return touch(host, event, point ?: TouchPoint())
+		if (event == EventName.ContextMenu) return contextMenu(host, point ?: TouchPoint())
 		if (event.pointer) throw MarklessRuntimeError("${event.wire} is raised by the runtime, not dispatched")
 		if (event == EventName.Cancel) {
 			if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
@@ -1171,6 +1218,29 @@ class Runtime(
 			at = byId[at]?.parent
 		}
 		return out
+	}
+
+	/** A long press on [host]: its `contextmenu` handler, then each one of the elements it is inside, innermost first. */
+	private fun contextMenu(host: String, point: TouchPoint): List<JournalEntry> {
+		val scope = (instances(node(host.substringBefore('@'))).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
+		return change(null, null) {
+			val calls = ArrayList<JournalEntry>()
+			for (node in chain(host)) {
+				val id = handlerFor(node.substringBefore('@'), EventName.ContextMenu) ?: continue
+				val handler = handlers[id] ?: throw MarklessRuntimeError("unknown handler \"$id\"")
+				val fields = mapOf(
+					"target" to JsValue.Str(host),
+					"currentTarget" to JsValue.Str(node),
+					"clientX" to JsValue.Num(point.x),
+					"clientY" to JsValue.Num(point.y),
+					"timeStamp" to JsValue.Num(point.time),
+				)
+				val out = withFields(fields) { run(handler.ops, scope) }
+				if (out.firstOrNull() is JournalEntry.Navigate) return@change out
+				calls.addAll(out)
+			}
+			calls
+		}
 	}
 
 	private fun touch(host: String, event: EventName, point: TouchPoint): List<JournalEntry> {

@@ -19,6 +19,9 @@ import {
 	nativeMaxLength,
 	nativeEmailMismatch,
 	nativeRangeValue,
+	nativeNonFiniteJoin,
+	nativeNonFiniteSplit,
+	type NativeNonFinite,
 	nativeEmailValue,
 	nativeTooLongMessage,
 } from '@markless/serializer/native-view';
@@ -87,6 +90,17 @@ export type NativeAction =
 			readonly y?: number;
 			readonly time?: number;
 	  }
+	/**
+	 * A long press on `host`, the innermost element under it, at `x`, `y` (points or dp from the screen's top left) and
+	 * `time` (ms since the screen appeared): Android's host sends it as Chrome raises `contextmenu`; iOS's never does.
+	 */
+	| {
+			readonly event: 'contextmenu';
+			readonly host: string;
+			readonly x?: number;
+			readonly y?: number;
+			readonly time?: number;
+	  }
 	/** The host's back gesture (or Escape) on an open `<dialog>`: it closes, as the browser's cancel does. */
 	| { readonly event: 'cancel'; readonly host: string }
 	/** The keyboard's return key in a single-line text field. */
@@ -135,6 +149,12 @@ export const SCRIPT_CALL = 'script:';
 
 /** Each screen's async values run under their own name in an engine the app's screens share. */
 let screens = 0;
+
+/** The cells as an engine entry carries them: their JSON, and where each non-finite number was (paths from the slot). */
+const bridgedCells = (values: ReadonlyMap<string, Value>) => {
+	const { json, nonFinite } = nativeNonFiniteSplit(Object.fromEntries(values));
+	return { cells: json, ...(nonFinite.length > 0 ? { nonFinite } : {}) };
+};
 
 /** Runs a script function a `{ script }` expression names, with its bindings resolved where it is read. */
 type Compute = (fn: string, bindings: NativeScriptBindings, scope: NativeScope) => Value;
@@ -401,6 +421,8 @@ export function evaluateNativeExpr(
 	}
 	if ('cell' in expr) return read(expr.cell, scope);
 	if ('literal' in expr) return expr.literal;
+	if ('nonFinite' in expr)
+		return expr.nonFinite === 'NaN' ? Number.NaN : expr.nonFinite === 'Infinity' ? Infinity : -Infinity;
 	if ('field' in expr) {
 		if (!scope.fieldText) throw new Error(`the text of ${expr.field} read outside a runtime`);
 		return scope.fieldText(expr.field);
@@ -551,15 +573,16 @@ export function evaluateWithScript(
 					kind: 'compute',
 					fn,
 					frame,
-					cells: Object.fromEntries(values),
+					...bridgedCells(values),
 					...(unset.length > 0 ? { unset } : {}),
 					...(host.seed ? { seed: host.seed() } : {}),
 				};
-				return JSON.parse(
+				const result = JSON.parse(
 					engine.evaluate(
 						`globalThis.__markless[${JSON.stringify(script.id)}].enter(${JSON.stringify(JSON.stringify(entry))})`,
 					),
-				) as Value;
+				) as { json: unknown; nonFinite: NativeNonFinite };
+				return nativeNonFiniteJoin(result.json, result.nonFinite) as Value;
 			},
 		);
 	return evaluate;
@@ -612,7 +635,7 @@ export function createNativeRuntime(
 					? session.get(cell.id)!
 					: cell.storage && store.has(cell.storage.key)
 					? store.get(cell.storage.key)!
-					: cell.initial,
+					: (nativeNonFiniteJoin(cell.initial, cell.nonFinite) as Value),
 		]),
 	);
 	for (const cell of payload.cells)
@@ -771,7 +794,7 @@ export function createNativeRuntime(
 		return facts;
 	};
 	const entryCells = () => ({
-		cells: Object.fromEntries(values),
+		...bridgedCells(values),
 		...(unset.size > 0 ? { unset: [...unset] } : {}),
 		...(script?.services.includes('crypto') && scriptHost?.seed
 			? { seed: scriptHost.seed() }
@@ -789,7 +812,7 @@ export function createNativeRuntime(
 		const result = JSON.parse(call('leave')) as {
 			readonly pending: ReadonlyArray<number>;
 			readonly settled: ReadonlyArray<number>;
-			readonly writes: ReadonlyArray<readonly [string, Value]>;
+			readonly writes: ReadonlyArray<readonly [string, Value, NativeNonFinite?]>;
 			readonly aborts: ReadonlyArray<number>;
 			readonly timers: ReadonlyArray<readonly [number, number]>;
 			readonly clears: ReadonlyArray<number>;
@@ -815,7 +838,8 @@ export function createNativeRuntime(
 			/** A key or paste handler called `preventDefault()` before it first awaited. */
 			readonly prevented?: true;
 		};
-		for (const [slot, value] of result.writes) {
+		for (const [slot, json, nonFinite] of result.writes) {
+			const value = nativeNonFiniteJoin(json, nonFinite) as Value;
 			const at = slot.indexOf('@');
 			const cell = at < 0 ? slot : slot.slice(0, at);
 			if (!values.has(cell)) throw new Error(`the script wrote unknown cell ${cell}`);
@@ -968,7 +992,11 @@ export function createNativeRuntime(
 		const elements = elementFacts(frame);
 		const key = JSON.stringify([fn, frame, elements]);
 		if (computed.has(key)) return computed.get(key)!;
-		const value = JSON.parse(call('enter', { kind: 'compute', fn, frame, elements, ...entryCells() })) as Value;
+		const result = JSON.parse(call('enter', { kind: 'compute', fn, frame, elements, ...entryCells() })) as {
+			json: unknown;
+			nonFinite: NativeNonFinite;
+		};
+		const value = nativeNonFiniteJoin(result.json, result.nonFinite) as Value;
 		computed.set(key, value);
 		return value;
 	};
@@ -1575,6 +1603,17 @@ export function createNativeRuntime(
 		payload.nodes
 			.flatMap((node) => (node.id === nodeOf(id) ? instances(node) : []))
 			.find((instance) => instance.id === id)?.scope;
+	/** The elements from `id` out to the root, innermost first; a row's copy keeps its own id. */
+	const chainOf = (id: string): string[] => {
+		const out: string[] = [];
+		for (
+			let node: string | null | undefined = nodeOf(id);
+			node;
+			node = nodesById.get(node)?.parent
+		)
+			out.push(node === nodeOf(id) ? id : node);
+		return out;
+	};
 	/** `idle` and `visible` handlers that ran, by `<event>\0<instance>`; an instance that leaves the screen is forgotten. */
 	const fired = new Set<string>();
 	const due = (event: 'idle' | 'visible'): string[] =>
@@ -1763,7 +1802,30 @@ export function createNativeRuntime(
 					dismiss ? run(handlers.get(dismiss.handler) ?? [], fields, base) : [],
 				);
 			}
-			if (RAISED.has(action.event)) throw new Error(`${action.event} is raised by the runtime, not sent by a host`);
+			if (RAISED.has(action.event))
+				throw new Error(`${action.event} is raised by the runtime, not sent by a host`);
+			if (action.event === 'contextmenu') {
+				const scope = scopeOf(action.host);
+				if (!scope) throw new Error(`${action.host} is not shown`);
+				return change(undefined, undefined, () => {
+					const calls: NativeJournalEntry[] = [];
+					for (const node of chainOf(action.host)) {
+						const own = handlerOf(nodeOf(node), 'contextmenu');
+						if (!own) continue;
+						const fields: NativeEventFields = {
+							target: action.host,
+							currentTarget: node,
+							clientX: action.x ?? 0,
+							clientY: action.y ?? 0,
+							timeStamp: action.time ?? 0,
+						};
+						const out = run(handlers.get(own.handler) ?? [], fields, scope);
+						if (out[0]?.op === 'navigate') return out;
+						calls.push(...out);
+					}
+					return calls;
+				});
+			}
 			if (TOUCHES.has(action.event) && 'host' in action) {
 				const touch = action as Extract<NativeAction, { readonly event: NativeTouch }>;
 				const scope = scopeOf(touch.host);
@@ -1783,13 +1845,7 @@ export function createNativeRuntime(
 						};
 					if (!down) touches.set(pointerId, state);
 					const at = { x: touch.x ?? 0, y: touch.y ?? 0 };
-					/** The elements from `id` out to the root, innermost first. */
-					const chain = (id: string): string[] => {
-						const out: string[] = [];
-						for (let node: string | null | undefined = nodeOf(id); node; node = nodesById.get(node)?.parent)
-							out.push(node === nodeOf(id) ? id : node);
-						return out;
-					};
+					const chain = chainOf;
 					const fieldsOf = (
 						type: NativePointerEventName,
 						target: string,

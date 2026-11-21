@@ -307,7 +307,8 @@ public final class MarklessViewController: UIViewController {
 		guard let style, !style.planRepeats.isEmpty else { return false }
 		return journal.contains { entry in
 			switch entry {
-			case .rows: return true
+			// An arm that opens may hold a list whose rows are laid out only once it shows.
+			case .rows, .arm: return true
 			case let .text(node, _), let .attribute(node, _, _): return node.contains("@")
 			default: return false
 			}

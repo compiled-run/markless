@@ -603,7 +603,8 @@ public final class NativeRuntime {
 			if let known = computed[key] { return known }
 			let value = try scriptHost.unwrap().entry {
 				let text = try callScript("enter", .object([("kind", .string("compute")), ("fn", .string(fn)), ("frame", frame), ("elements", elements)] + entryCells()))
-				return NativeValue(json: try JSONValue.parse(Data(text.utf8)))
+				let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "compute").object(["json", "nonFinite"])
+				return try NativeValue.nonFiniteJoin(result["json"].value, result["nonFinite"].value)
 			}
 			computed[key] = value
 			return value
@@ -675,11 +676,14 @@ public final class NativeRuntime {
 	/// the route params when `navigate` is.
 	private func entryCells() -> [(String, JSONValue)] {
 		let ids = Set(payload.cells.map(\.id))
-		let cells = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0.json) } }
-			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!.json) }
+		let slots = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0) } }
+			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!) }
+		// JSON writes Infinity and NaN as null: the entry lists where they were, each path starting with its slot.
+		let split = NativeValue.object(slots.map { (key: $0.0, value: $0.1) }).nonFiniteSplit
 		let crypto = payload.script?.services.contains(.crypto) == true
 		let navigate = payload.script?.services.contains(.navigate) == true
-		return [("cells", .object(cells))]
+		let nonFinite: [(String, JSONValue)] = if case let .array(found) = split.nonFinite, !found.isEmpty { [("nonFinite", split.nonFinite)] } else { [] }
+		return [("cells", split.json)] + nonFinite
 			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
 			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
 			+ (navigate ? [("params", .object(params.map { ($0.name, .string($0.value)) }))] : [])
@@ -695,11 +699,11 @@ public final class NativeRuntime {
 			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["calls", "commands", "navigate", "prevented"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
-			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
+			guard pair.count == 2 || pair.count == 3 else { throw write.fail("a write is [slot, value] or [slot, value, nonFinite]") }
 			let slot = try pair[0].string()
 			let cell = slot.firstIndex(of: "@").map { String(slot[..<$0]) } ?? slot
 			guard values[cell] != nil, payload.cells.contains(where: { $0.id == cell }) else { throw RuntimeError(reason: "the script wrote unknown cell \(cell)") }
-			let value = NativeValue(json: pair[1].value)
+			let value = try NativeValue.nonFiniteJoin(pair[1].value, pair.count == 3 ? pair[2].value : nil)
 			values[slot] = value
 			unset.remove(slot)
 			if let key = storageKeys[cell] { store.write(key, value) }
@@ -1312,6 +1316,9 @@ public final class NativeRuntime {
 		if action.event.isTouch {
 			return try touch(action, handlerOf: handlerOf)
 		}
+		if action.event == .contextmenu {
+			return try contextmenu(action, handlerOf: handlerOf)
+		}
 		// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 		let host = action.host.firstIndex(of: "@").map { String(action.host[..<$0]) } ?? action.host
 		guard let bound = payload.events.first(where: { $0.host == host && $0.event == action.event }), let node = nodesById[host] else {
@@ -1334,6 +1341,31 @@ public final class NativeRuntime {
 		if [.keydown, .keyup, .paste].contains(action.event) { targetText = try textOf(field: action.host) }
 		defer { eventValue = nil; edit = nil; eventFields = nil; targetText = nil }
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
+	}
+
+	/// A long press on the action's host: its `contextmenu` handler, then each one of the elements it is inside, innermost first.
+	private func contextmenu(_ action: NativeAction, handlerOf: (String, NativeEventName) -> NativeEvent?) throws -> [NativeJournalEntry] {
+		guard let node = nodesById[nodeOf(action.host)], let instance = try instances(of: node).first(where: { $0.id == action.host }) else {
+			throw RuntimeError(reason: "\(action.host) is not shown")
+		}
+		return try change(host: nil) {
+			defer { self.eventFields = nil }
+			var calls: [NativeJournalEntry] = []
+			var at: String? = self.nodeOf(action.host)
+			while let current = at {
+				let element = current == self.nodeOf(action.host) ? action.host : current
+				at = self.nodesById[current]?.parent
+				guard let own = handlerOf(current, .contextmenu) else { continue }
+				self.eventFields = [
+					.target: .string(action.host), .currentTarget: .string(element), .clientX: .number(action.x ?? 0),
+					.clientY: .number(action.y ?? 0), .timeStamp: .number(action.time ?? 0),
+				]
+				let taken = try self.run(self.handlers[own.handler] ?? [], in: instance.scope)
+				if case .navigate? = taken.first { return taken }
+				calls.append(contentsOf: taken)
+			}
+			return calls
+		}
 	}
 
 	/// A touch as a phone's browser raises it: `pointerover`, `pointerenter` outermost first, the overlay's outside press and

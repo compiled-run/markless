@@ -186,6 +186,8 @@ enum class EventName(val wire: String, val pointer: Boolean = false, val touch: 
 	Choose("choose"),
 	/** A range input let go after its value moved: the web's `change` on it. */
 	Commit("commit"),
+	/** A long press, as Chrome on Android raises `contextmenu`: carries a [TouchPoint] for its place, and reaches each element it is inside. */
+	ContextMenu("contextmenu"),
 }
 
 sealed interface Op {
@@ -591,6 +593,16 @@ data class Payload(
 			fun sub(k: String) = expr(o.field(k, what), "$what.$k")
 			return when {
 				o.containsKey("cell") -> { o.only(setOf("cell"), what); Expr.CellRef(o.field("cell", what).str("$what.cell")) }
+				// A JSON literal cannot hold these; in memory they are numbers like any other.
+				o.containsKey("nonFinite") -> {
+					o.only(setOf("nonFinite"), what)
+					Expr.Literal(JsValue.Num(when (val name = o.field("nonFinite", what).str("$what.nonFinite")) {
+						"Infinity" -> Double.POSITIVE_INFINITY
+						"-Infinity" -> Double.NEGATIVE_INFINITY
+						"NaN" -> Double.NaN
+						else -> throw MarklessDecodeError("$what.nonFinite: unknown \"$name\"")
+					}))
+				}
 				o.containsKey("literal") -> { o.only(setOf("literal"), what); Expr.Literal(o.field("literal", what).let { if (it == Json.Null) JsValue.Null else scalar(it, "$what.literal") }) }
 				o.containsKey("unary") -> { o.only(setOf("unary", "value"), what); Expr.Unary(oneOf(o, "unary", UNARY, what), sub("value")) }
 				o.containsKey("binary") -> { o.only(setOf("binary", "left", "right"), what); Expr.Binary(oneOf(o, "binary", BINARY, what), sub("left"), sub("right")) }
@@ -676,7 +688,7 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled", "domain", "device", "task", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows", "async", "app"), what)
+			o.only(setOf("id", "name", "initial", "nonFinite", "storage", "styled", "domain", "device", "task", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows", "async", "app"), what)
 			// The style export carries each state's domain; the payload's copy is Dragon's input, checked here and not kept.
 			o["domain"]?.arr("$what.domain")?.forEach { it.str("$what.domain[]") }
 			val unset = o["unset"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.unset must be true when present"); true } ?: false
@@ -691,7 +703,7 @@ data class Payload(
 				a.only(setOf("script", "bindings", "boundaries"), "$what.async")
 				AsyncValue(a.field("script", what).str("$what.async.script"), scriptBindings(a.field("bindings", what), "$what.async.bindings"), a.field("boundaries", what).arr("$what.async.boundaries").map { it.str("$what.async.boundaries[]") })
 			}
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, o["first"]?.let { expr(it, "$what.first") }, o["rebuiltBy"]?.arr("$what.rebuiltBy")?.mapIndexed { n, e -> expr(e, "$what.rebuiltBy[$n]") }, unset, o["follows"]?.let { expr(it, "$what.follows") }, async, o["app"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.app must be true") else true } ?: false)
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), nonFiniteJoin(o.field("initial", what), o["nonFinite"]), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, o["first"]?.let { expr(it, "$what.first") }, o["rebuiltBy"]?.arr("$what.rebuiltBy")?.mapIndexed { n, e -> expr(e, "$what.rebuiltBy[$n]") }, unset, o["follows"]?.let { expr(it, "$what.follows") }, async, o["app"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.app must be true") else true } ?: false)
 		}
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
