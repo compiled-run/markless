@@ -7,7 +7,8 @@
 			{
 				"id": "state:loaded",
 				"name": "loaded",
-				"initial": false
+				"initial": false,
+				"styled": true
 			},
 			{
 				"id": "state:choosing",
@@ -17,7 +18,12 @@
 			{
 				"id": "state:picked",
 				"name": "picked",
-				"initial": "none"
+				"initial": "none",
+				"styled": true,
+				"domain": [
+					"none",
+					"large"
+				]
 			}
 		],
 		"nodes": [
@@ -391,6 +397,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:loaded",
+					"value": true
+				},
+				{
 					"op": "text",
 					"node": "h3:text0",
 					"value": "Unload"
@@ -421,6 +432,11 @@
 				"host": "h8"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:picked",
+					"value": "large"
+				},
 				{
 					"op": "text",
 					"node": "h2:text0",
@@ -453,6 +469,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:loaded",
+					"value": false
+				},
+				{
 					"op": "text",
 					"node": "h3:text0",
 					"value": "Load"
@@ -475,6 +496,11 @@
 				"host": "h3"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:loaded",
+					"value": true
+				},
 				{
 					"op": "text",
 					"node": "h3:text0",

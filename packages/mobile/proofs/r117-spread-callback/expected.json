@@ -1,0 +1,13 @@
+{
+	"rung": "R117",
+	"name": "A callback a part spreads onto its element runs there after the part's own handler, as the web merges them",
+	"steps": [
+		{ "visible": ["Chips", "Red 0", "Blue 0", "Picked nothing"] },
+		{ "do": { "tap": "Red 0" }, "visible": ["Red 1", "Picked red"], "absent": ["Red 0", "Picked nothing"] },
+		{
+			"do": { "tap": "Blue 0" },
+			"visible": ["Blue 1", "Picked {\"blue\":\"red\"}"],
+			"absent": ["Blue 0", "Picked red"]
+		}
+	]
+}

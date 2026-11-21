@@ -1,0 +1,21 @@
+{
+	"rung": "S15",
+	"name": "@media (orientation): turning the phone shows the landscape layout, and turning it back shows the portrait one",
+	"steps": [
+		{
+			"visible": ["Held upright: one day at a time"],
+			"hidden": ["Turned on its side: the whole week"],
+			"title": "Week"
+		},
+		{
+			"do": { "orientation": "landscape" },
+			"visible": ["Turned on its side: the whole week"],
+			"hidden": ["Held upright: one day at a time"]
+		},
+		{
+			"do": { "orientation": "portrait" },
+			"visible": ["Held upright: one day at a time"],
+			"hidden": ["Turned on its side: the whole week"]
+		}
+	]
+}

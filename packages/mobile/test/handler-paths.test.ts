@@ -75,8 +75,9 @@ const look = (
 	const start = answering(runtime.start());
 	return {
 		initial: { start, ...screen() },
+		// Style-state entries follow what the build knows of a cell's values, which a cell JavaScript writes does not show.
 		steps: actions.map((action) => ({
-			journal: answering(runtime.dispatch(answer(action))),
+			journal: answering(runtime.dispatch(answer(action))).filter((entry) => entry.op !== 'state'),
 			...screen(),
 		})),
 	};

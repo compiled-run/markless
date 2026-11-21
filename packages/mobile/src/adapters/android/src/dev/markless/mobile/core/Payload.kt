@@ -87,6 +87,8 @@ sealed interface ScriptBinding {
 	data class Value(val value: Expr) : ScriptBinding
 	/** A device object the component made: the script calls its methods through `call` entries. */
 	data class Device(val device: String, val obj: String) : ScriptBinding
+	/** A function a parent passed as a prop: the script function it names, its own names bound as `<name>.<its name>`. */
+	data class Callback(val fn: String) : ScriptBinding
 	/** An element, or an array of them, the function reads through proxies the host answers. */
 	data class Elements(val value: Expr) : ScriptBinding
 	/** A family's shared object, member by member. */
@@ -453,6 +455,7 @@ data class Payload(
 				is ScriptBinding.Fields -> b.fields.values.toList()
 				is ScriptBinding.Value -> cellsOf(b.value)
 				is ScriptBinding.Device -> emptyList()
+				is ScriptBinding.Callback -> emptyList()
 				is ScriptBinding.Elements -> cellsOf(b.value)
 				is ScriptBinding.Object -> cellsOf(b.members)
 				is ScriptBinding.Shared -> cellsOf(b.members)
@@ -475,6 +478,7 @@ data class Payload(
 					bo.only(setOf("device", "object"), "$what.$name")
 					ScriptBinding.Device(bo.field("device", what).str("$what.$name.device"), bo.field("object", what).str("$what.$name.object"))
 				}
+				bo.containsKey("callback") -> { bo.only(setOf("callback"), "$what.$name"); ScriptBinding.Callback(bo.field("callback", what).str("$what.$name.callback")) }
 				bo.containsKey("elements") -> { bo.only(setOf("elements"), "$what.$name"); ScriptBinding.Elements(expr(bo.field("elements", what), "$what.$name.elements")) }
 				bo.containsKey("object") -> { bo.only(setOf("object"), "$what.$name"); ScriptBinding.Object(scriptBindings(bo.field("object", what), "$what.$name.object")) }
 				bo.containsKey("shared") -> { bo.only(setOf("shared"), "$what.$name"); ScriptBinding.Shared(scriptBindings(bo.field("shared", what), "$what.$name.shared")) }
@@ -584,7 +588,9 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled", "device", "task", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows", "async"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled", "domain", "device", "task", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows", "async"), what)
+			// The style export carries each state's domain; the payload's copy is Dragon's input, checked here and not kept.
+			o["domain"]?.arr("$what.domain")?.forEach { it.str("$what.domain[]") }
 			val unset = o["unset"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.unset must be true when present"); true } ?: false
 			val clock = o["clock"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.clock must be true when present"); true } ?: false
 			val styled = o["styled"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.styled must be true when present"); true } ?: false

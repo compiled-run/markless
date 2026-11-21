@@ -18,6 +18,7 @@ simulator and the emulator through the proof harness). No family source was chan
 | u4b | `modal` | stopped | stopped | stopped | stopped | |
 | u4c | `drawer` (the bottom sheet) | stopped | stopped | stopped | stopped | |
 | u5 | `toggle`: label, switch, thumb, description | pass | pass | pass | pass | none |
+| u18 | `base.visuallyhidden` on a styled page | pass | pass | not run yet | not run yet | Dragon: its inline `style` (clip-path, overflow, 1px absolute box), 28 boxes against Chrome, none outside 1 device px |
 | u11 | `pagination`: root, back and forward, three items with triggers; an author computed with a block body | pass | pass | pass | pass | none |
 | u12 | `buttongroup`: a required single group and a `multiple` one; the family's own helpers `heldValues` and `nextHeld` | pass | pass | pass | pass | none |
 | u13 | `accordion`: a single accordion and a `multiple` one whose value is a string, then a list (`typeof`) | pass | pass | pass | pass | none |
@@ -44,8 +45,7 @@ with `next` bound). Hosts: iOS built `<label>` (it refused it before) and its at
 as the web does (the Save button was disabled on iOS by `disabled={undefined}`; the new `guards.json` vector pins it).
 Dragon: `base.button` has a closed prop list with no `class`, so an author cannot style it; Chrome draws it with the
 platform button theme, which Dragon refuses (`FORM-b`, inline-block atomic inlines, the UA Arial font). u1 therefore runs on
-the hosts' stacking layout. `base.visuallyhidden` compiles but Dragon refuses its inline `style` attribute
-(`DRAGON_UNSUPPORTED_ATTRIBUTE ... the style-attribute package SOV`), so on a phone it would be drawn: left out of u1.
+the hosts' stacking layout. `base.visuallyhidden` was left out of u1 because Dragon refused its inline `style` attribute; rung u18 now carries it (below).
 
 **u2 collapsible.** Needed `shared(..., { scope: 'subtree' })`: one instance per root, reached by the trigger and the
 content the app passes as children (the instance follows the render tree, not the caller's scope); methods (`toggle()`),
@@ -352,3 +352,23 @@ depend on it.
 
 Family probe: on `cw/native-integration`, 5 of 46 families built a payload before this port, 7 after (modal and popover
 moved to "works"; none moved back).
+
+## u18: `base.visuallyhidden` (branch `cw/dragon-bugs-inline-style`)
+
+The part's look is its inline `style` (`clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space:
+nowrap; width: 1px`). Dragon now cascades a `style` attribute as element-attached author declarations (css-style-attr §4,
+css-cascade-5 §6.2), and its state runtime writes `clip-path: inset()` and the clip's exposed text, so the page compiles. The
+export gives the span `padding-box-clip`, `clip-path-inset` (50% each edge, an empty rect), `clip-text` and `paint-order` (an
+absolutely positioned box paints in `html`'s order). Hosts: both decode the four writes; iOS masks the box layer to the rect and
+sets `clipsToBounds` for the padding-box clip, Android clips the box view's canvas; neither touches accessibility, so the text
+stays readable by the screen reader as in Chrome. Paint-order re-hosting is not built in the hosts: a box that keeps a
+paint-order write is refused by name unless its clip leaves nothing to paint; an overflow clip on a box with borders (the padding
+box) is refused by name too. Chrome's rendering per phone: `proofs/u18-visually-hidden/screenshots/chrome/`; frames against
+Chrome: `proofs/u18-visually-hidden/native-style-compare.json` (28 boxes, none outside 1 device px). The flow does not assert the
+hidden text: it is on purpose not drawn, and visibility checks differ per column for a 1px box.
+
+`hidden="until-found"` (collapsible's default closed state) stays refused by Dragon by name: Chrome renders it with
+`content-visibility: hidden`, which keeps the box with its padding and border at size containment and lays its contents out
+(their boxes are reported, measured in Chrome 145) but skips painting them and hides them from accessibility; no native view write
+skips a box's contents yet. u2 keeps `disableUntilFound`.
+

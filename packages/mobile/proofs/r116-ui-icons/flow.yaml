@@ -1,0 +1,12 @@
+appId: ${APP_ID}
+name: r116-ui-icons
+---
+- launchApp:
+    clearState: true
+- assertVisible: Icons
+- assertVisible: Like
+- assertVisible: Liked 0 times
+- tapOn: Like
+- assertNotVisible: Liked 0 times
+- assertVisible: Liked 1 times
+- assertNotVisible: Liked 0 times

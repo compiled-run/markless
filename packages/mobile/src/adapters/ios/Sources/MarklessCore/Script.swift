@@ -24,6 +24,8 @@ public struct NativeScriptBinding: Equatable, Sendable {
 		case value(NativeExpr)
 		/// A device object the component made: the script calls its methods through `call` entries.
 		case device(device: String, object: String)
+		/// A function a parent passed as a prop: the script function it names, its own names bound as `<name>.<its name>`.
+		case callback(String)
 		/// An element, or an array of them, it reads through proxies the host answers.
 		case elements(NativeExpr)
 		/// A family's shared object, member by member.
@@ -40,7 +42,7 @@ public struct NativeScriptBinding: Equatable, Sendable {
 		switch kind {
 		case let .cell(cell): return [cell]
 		case let .fields(fields): return fields.map(\.cell)
-		case .device: return []
+		case .device, .callback: return []
 		case let .value(expr), let .elements(expr): return expr.cells
 		case let .object(members), let .shared(members), let .method(_, members): return members.flatMap(\.cells)
 		}

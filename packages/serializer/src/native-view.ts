@@ -168,7 +168,9 @@ export type NativeScriptBinding =
 	/** A shared object's method: the script function `method` returns, run over its own `bindings` when called. */
 	| { readonly method: string; readonly bindings: Readonly<Record<string, NativeScriptBinding>> }
 	/** A `shared()` accessor (`selectState`): a function that returns that object. */
-	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> };
+	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> }
+	/** A function a parent passed as a prop: the script function `callback`, its own names bound as `<name>.<its name>`. */
+	| { readonly callback: string };
 
 export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
 
@@ -187,6 +189,19 @@ export type NativeScript = {
 	readonly source: string;
 	readonly services: ReadonlyArray<NativeScriptService>;
 };
+
+/** Every cell an expression reads. */
+export function nativeExprCells(expr: NativeExpr, into = new Set<string>()): Set<string> {
+	if ('cell' in expr) into.add(expr.cell);
+	for (const child of Object.values(expr)) {
+		if (Array.isArray(child)) {
+			for (const item of child)
+				if (item && typeof item === 'object')
+					nativeExprCells((Array.isArray(item) ? item[1] : item) as NativeExpr, into);
+		} else if (child && typeof child === 'object') nativeExprCells(child as NativeExpr, into);
+	}
+	return into;
+}
 
 export type NativeTextPart =
 	| { readonly text: string }
@@ -681,6 +696,8 @@ export type NativeViewPayload = {
 		readonly storage?: { readonly key: string };
 		/** A class or `ui-*` attribute binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
 		readonly styled?: true;
+		/** A styled string cell's every value, its first value first, so Dragon lays out one assignment per value. */
+		readonly domain?: ReadonlyArray<string>;
 		/** A live device value (`network.online`): the host fills it at mount and sends a `device` action when it changes. */
 		readonly device?: NativeDeviceValue;
 		/** For a device object's field (`cam.ready`): the object (`object:cam`). */
@@ -989,11 +1006,12 @@ export const PLATFORM_PIECES_NAMESPACE = 'native';
 
 /**
  * Bound attributes that reach Dragon in every combination of the styled states, besides `class`: the ones a selector keys
- * state off (`[ui-open]`, `[aria-expanded]`) and `hidden`, whose UA rule Dragon applies. Others (`disabled`, `value`) stay
- * out of the style input, since Dragon does not model their rendering effect.
+ * state off (`[ui-open]`, `[aria-expanded]`), `hidden`, whose UA rule Dragon applies, and `disabled`, which selects `:disabled`
+ * and Chrome's disabled colours in Dragon. Others (`value`) stay out of the style input, since Dragon does not model their
+ * rendering effect.
  */
 export const isNativeStyleStateAttribute = (name: string): boolean =>
-	name === 'hidden' || name === 'role' || /^(ui|aria|data)-/.test(name);
+	name === 'hidden' || name === 'disabled' || name === 'role' || /^(ui|aria|data)-/.test(name);
 
 /** ECMAScript's own globals, which every engine a host runs has (JavaScriptCore, Hermes); `eval` is left out. */
 export const NATIVE_SCRIPT_LANGUAGE_GLOBALS: ReadonlyArray<string> = [
@@ -1060,6 +1078,7 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		setInterval: 'timers',
 		clearInterval: 'timers',
 		queueMicrotask: 'engine',
+		structuredClone: 'engine',
 		console: 'console',
 		fetch: 'fetch',
 		crypto: 'crypto',
@@ -1082,6 +1101,9 @@ export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> =
 	['currentTarget', 'value'],
 	['currentTarget', 'checked'],
 ];
+
+/** A submit handler's binding for its form's entries now, which its event's `target` and `currentTarget` carry for FormData. */
+export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */
 export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [

@@ -1,6 +1,7 @@
 import { writeSync } from 'node:fs';
 import { createBuilder } from 'vite';
 import { markless } from '@markless/bundler/vite';
+import { ui } from '../../../headless/components/src/vite.ts';
 import { router } from '../../src/vite/index.ts';
 import type { FixtureBuild } from './fixture-build.ts';
 
@@ -12,7 +13,10 @@ try {
 		logLevel: 'silent',
 		...(build.configFile
 			? { configFile: build.configFile }
-			: { configFile: false, plugins: [markless(build.markless), router()] }),
+			: {
+					configFile: false,
+					plugins: [...(build.ui ? [ui()] : []), markless(build.markless), router()],
+				}),
 		...(build.nitro && { nitro: build.nitro }),
 		...(build.build && { build: build.build }),
 	} as Parameters<typeof createBuilder>[0]);

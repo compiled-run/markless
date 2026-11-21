@@ -1,0 +1,41 @@
+appId: ${APP_ID}
+name: u61-overlay-hint
+---
+- launchApp:
+    clearState: true
+- assertVisible: Hints
+- assertVisible: Saves a draft
+- assertVisible: "Tip closed: not yet"
+- assertVisible: "Menu closed: not yet"
+- assertNotVisible: Draft options
+- tapOn: More
+- assertVisible: Draft options
+- assertNotVisible: Saves a draft
+- assertNotVisible: "Tip closed: not yet"
+- assertVisible: Draft options
+- assertVisible: "Tip closed: superseded"
+- assertNotVisible: Saves a draft
+- assertNotVisible: "Tip closed: not yet"
+- tapOn: Explain
+- assertVisible: Saves a draft
+- assertVisible: Saves a draft
+- assertVisible: Draft options
+- assertVisible: "Menu closed: not yet"
+- tapOn: Hints
+- assertNotVisible: Saves a draft
+- assertNotVisible: Draft options
+- assertVisible: "Tip closed: outside-press"
+- assertVisible: "Menu closed: outside-press"
+- assertNotVisible: Saves a draft
+- assertNotVisible: Draft options
+- tapOn: Show tip
+- assertVisible: Saves a draft
+- assertVisible: Saves a draft
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+      - assertNotVisible: Saves a draft
+      - assertVisible: "Tip closed: escape"
+      - assertNotVisible: Saves a draft
