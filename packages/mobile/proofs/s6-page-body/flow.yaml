@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: s6-page-body
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - setDarkMode: disabled
 - assertVisible: Tide table
 - assertVisible: Open boats
@@ -16,21 +16,21 @@ name: s6-page-body
 - assertVisible: Boats
 - setDarkMode: enabled
 - waitForAnimationToEnd:
-      timeout: 5000
+    timeout: 5000
 - assertVisible: Moorings
 - assertVisible: Three boats are out
 - assertVisible: Boats
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertNotVisible: Moorings
 - assertVisible: Harbour
 - assertVisible: Tide table
@@ -39,7 +39,7 @@ name: s6-page-body
 - assertVisible: Harbour
 - setDarkMode: disabled
 - waitForAnimationToEnd:
-      timeout: 5000
+    timeout: 5000
 - assertVisible: Tide table
 - assertVisible: Open boats
 - assertVisible: Harbour

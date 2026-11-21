@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: f20-await-timer
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Draft
 - assertVisible: Save
 - assertVisible: Check name
@@ -14,11 +14,11 @@ name: f20-await-timer
 - assertNotVisible: Not saved
 - assertNotVisible: Saved
 - assertVisible:
-      text: Save
-      enabled: false
+    text: Save
+    enabled: false
 - extendedWaitUntil:
-      visible: Saved
-      timeout: 17000
+    visible: Saved
+    timeout: 17000
 - assertVisible: Saved
 - assertVisible: Saved
 - assertVisible: Save
@@ -31,11 +31,11 @@ name: f20-await-timer
 - assertVisible: Saved
 - assertNotVisible: Not checked
 - assertVisible:
-      text: Check name
-      enabled: false
+    text: Check name
+    enabled: false
 - extendedWaitUntil:
-      visible: Name taken
-      timeout: 17000
+    visible: Name taken
+    timeout: 17000
 - assertNotVisible: Checking
 - assertVisible: Name taken
 - assertVisible: Check name

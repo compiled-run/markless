@@ -1,0 +1,45 @@
+{
+	"rung": 181,
+	"name": "A component an @if arm shows takes a first value from its props each time the arm opens, as the web renders it anew",
+	"steps": [
+		{
+			"visible": ["Notes", "Note hi", "Edit", "Change note"],
+			"absent": ["Draft HI", "Close"]
+		},
+		{
+			"do": {
+				"tap": "Edit"
+			},
+			"visible": ["Draft HI", "Close", "Note hi"],
+			"absent": ["Edit"]
+		},
+		{
+			"do": {
+				"tap": "Shout"
+			},
+			"visible": ["Draft HI!", "Close"],
+			"absent": ["Draft HI"]
+		},
+		{
+			"do": {
+				"tap": "Close"
+			},
+			"visible": ["Edit", "Note hi"],
+			"absent": ["Draft HI!", "Close"]
+		},
+		{
+			"do": {
+				"tap": "Change note"
+			},
+			"visible": ["Note bye", "Edit"],
+			"absent": ["Note hi", "Draft BYE"]
+		},
+		{
+			"do": {
+				"tap": "Edit"
+			},
+			"visible": ["Draft BYE", "Close", "Note bye"],
+			"absent": ["Draft HI!", "Draft HI", "Edit"]
+		}
+	]
+}

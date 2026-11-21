@@ -1,0 +1,168 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "mk-qmsryf"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-qmsryf"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Absent style"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "column mk-qmsryf"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "span",
+			"parent": "h2",
+			"attributes": {
+				"class": "row mk-qmsryf"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Middle row"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "span",
+			"parent": "h2",
+			"attributes": {
+				"class": "marker mk-qmsryf"
+			},
+			"attributesByState": {
+				"style": [
+					{
+						"when": {
+							"state:low": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:low": true
+						},
+						"value": "top: 240px;"
+					}
+				]
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Marker"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "span",
+			"parent": "h2",
+			"attributes": {
+				"class": "second mk-qmsryf"
+			},
+			"attributesByState": {
+				"style": [
+					{
+						"when": {
+							"state:low": false
+						},
+						"value": "left: 8px;"
+					},
+					{
+						"when": {
+							"state:low": true
+						},
+						"value": "top: 270px; left: 8px;"
+					}
+				]
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Second"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "tap mk-qmsryf"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Swap"
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-qmsryf"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "High",
+			"textByState": [
+				{
+					"when": {
+						"state:low": false
+					},
+					"value": "High"
+				},
+				{
+					"when": {
+						"state:low": true
+					},
+					"value": "Low"
+				}
+			]
+		}
+	],
+	"css": ".column.mk-qmsryf {\n\t\t\t\tposition: relative;\n\t\t\t\theight: 320px;\n\t\t\t\tmargin: 0 12px;\n\t\t\t\tbackground: #edf2f4;\n\t\t\t}\n\t\t\t.row.mk-qmsryf {\n\t\t\t\tposition: absolute;\n\t\t\t\tleft: 8px;\n\t\t\t\ttop: 140px;\n\t\t\t\tfont-size: 16px;\n\t\t\t\twhite-space: nowrap;\n\t\t\t}\n\t\t\t.marker.mk-qmsryf,\n\t\t\t.second.mk-qmsryf {\n\t\t\t\tposition: absolute;\n\t\t\t\ttop: 20px;\n\t\t\t\tfont-size: 16px;\n\t\t\t\twhite-space: nowrap;\n\t\t\t\tbackground: #ef476f;\n\t\t\t\tcolor: #ffffff;\n\t\t\t}\n\t\t\t.marker.mk-qmsryf {\n\t\t\t\tright: 8px;\n\t\t\t}\n\t\t\t.second.mk-qmsryf {\n\t\t\t\ttop: 60px;\n\t\t\t}\n\t\t\t.tap.mk-qmsryf {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin: 12px;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #22223b;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "state:low",
+			"domain": [false, true],
+			"initial": false
+		}
+	]
+}

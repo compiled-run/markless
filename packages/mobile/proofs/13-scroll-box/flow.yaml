@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: 13-scroll-box
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Scroll box
 - assertVisible: Box row 1
 - assertNotVisible: Tapped 1
@@ -10,25 +10,25 @@ name: 13-scroll-box
 - assertNotVisible: Page row 20
 - assertNotVisible: Tapped 0
 - repeat:
-      times: 80
-      while:
-          notVisible: Box row 30
-      commands:
-          - swipe:
-                start: 50%, 48%
-                end: 50%, 18%
+    times: 80
+    while:
+      notVisible: Box row 30
+    commands:
+      - swipe:
+          start: 50%, 48%
+          end: 50%, 18%
 - assertVisible: Box row 30
 - assertVisible: Box row 30
 - assertVisible: Scroll box
 - assertNotVisible: Page row 20
 - repeat:
-      times: 80
-      while:
-          notVisible: Tapped 0
-      commands:
-          - swipe:
-                start: 50%, 90%
-                end: 50%, 40%
+    times: 80
+    while:
+      notVisible: Tapped 0
+    commands:
+      - swipe:
+          start: 50%, 90%
+          end: 50%, 40%
 - assertVisible: Page row 20
 - assertNotVisible: Scroll box
 - assertVisible: Page row 20

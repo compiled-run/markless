@@ -1,0 +1,46 @@
+appId: ${APP_ID}
+name: u97-style-case
+---
+- launchApp:
+      clearState: true
+- assertVisible: Style case
+- assertVisible: Middle row
+- assertVisible: Marker
+- assertVisible: Open
+- assertVisible: Close
+- assertVisible: Closed
+- assertVisible:
+      text: Middle row
+      below: Marker
+- tapOn: Open
+- assertNotVisible: Closed
+- assertVisible:
+      text: Marker
+      below: Middle row
+- assertVisible: Shown
+- assertNotVisible: Closed
+- assertVisible:
+      text: Marker
+      below: Middle row
+- tapOn: Close
+- assertVisible: Closed
+- assertNotVisible: Shown
+- assertVisible:
+      text: Middle row
+      below: Marker
+- assertVisible: Closed
+- assertNotVisible: Shown
+- assertVisible:
+      text: Middle row
+      below: Marker
+- tapOn: Open
+- assertVisible: Shown
+- assertNotVisible: Closed
+- assertVisible:
+      text: Marker
+      below: Middle row
+- assertVisible: Shown
+- assertNotVisible: Closed
+- assertVisible:
+      text: Marker
+      below: Middle row

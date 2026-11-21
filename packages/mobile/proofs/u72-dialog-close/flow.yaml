@@ -1,0 +1,33 @@
+appId: ${APP_ID}
+name: u72-dialog-close
+---
+- launchApp:
+    clearState: true
+- assertVisible: Rename
+- assertVisible: Rename file
+- assertVisible: Closed 0 times
+- assertVisible: Nothing yet
+- assertNotVisible: New name\?
+- assertNotVisible: Save
+- tapOn: Rename file
+- assertVisible: New name\?
+- assertVisible: Save
+- assertVisible: New name\?
+- assertVisible: Save
+- assertVisible: Never mind
+- tapOn: Save
+- assertNotVisible: New name\?
+- assertVisible: Closed 1 times
+- assertVisible: Saved, then closed
+- assertNotVisible: New name\?
+- assertNotVisible: Nothing yet
+- tapOn: Rename file
+- assertVisible: New name\?
+- assertVisible: New name\?
+- assertVisible: Never mind
+- tapOn: Never mind
+- assertNotVisible: New name\?
+- assertVisible: Closed 2 times
+- assertVisible: Saved, then closed, then closed
+- assertNotVisible: New name\?
+- assertNotVisible: Closed 1 times

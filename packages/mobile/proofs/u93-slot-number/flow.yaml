@@ -1,0 +1,33 @@
+appId: ${APP_ID}
+name: u93-slot-number
+---
+- launchApp:
+      clearState: true
+- assertVisible: Number slot
+- assertVisible: Top label
+- assertVisible: End label
+- assertVisible: Middle mark
+- assertVisible: Grow
+- assertVisible: Grow 0
+- assertVisible:
+      text: End label
+      below: Top label
+- assertVisible:
+      text: Middle mark
+      below: End label
+- tapOn: Grow
+- assertNotVisible: Grow 0
+- assertVisible:
+      text: Middle mark
+      below: Top label
+- assertVisible:
+      text: End label
+      below: Middle mark
+- assertVisible: Grow 6
+- assertNotVisible: Grow 0
+- assertVisible:
+      text: Middle mark
+      below: Top label
+- assertVisible:
+      text: End label
+      below: Middle mark
