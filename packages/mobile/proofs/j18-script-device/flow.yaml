@@ -1,0 +1,73 @@
+appId: ${APP_ID}
+name: j18-script-device
+---
+- setLocation:
+    latitude: 51.5
+    longitude: -0.125
+- launchApp:
+    clearState: true
+    permissions:
+      location: unset
+      camera: unset
+- assertVisible:
+    text: Allow .?Proof.? to (access your camera|take pictures and record video)\?
+- tapOn:
+    text: Allow While Using App|While using the app|Allow
+- assertVisible: Camera ready
+- assertNotVisible: Camera starting
+- assertVisible:
+    id: markless-camera
+    text: camera on
+- assertVisible: Camera ready
+- assertVisible: Nowhere yet
+- assertNotVisible: Camera starting
+- assertVisible:
+    id: markless-camera
+    text: camera on
+- tapOn: Where am I
+- assertVisible:
+    text: Allow .?Proof.? to (use your|access this device.s) location\?
+- assertVisible:
+    text: Allow .?Proof.? to (use your|access this device.s) location\?
+- tapOn:
+    text: Allow While Using App|While using the app|Allow
+- assertNotVisible: Locating
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: location\\.current, haptics\\.tap"
+- assertVisible: At 51\.50, -0\.125
+- assertNotVisible: Locating
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: location\\.current, haptics\\.tap"
+- tapOn: Take photo
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: location\\.current, haptics\\.tap, camera\\.takePhoto"
+- assertVisible: Photo taken
+- assertVisible: At 51\.50, -0\.125
+- assertNotVisible: No photo
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: location\\.current, haptics\\.tap, camera\\.takePhoto"
+- stopApp
+- launchApp:
+    permissions:
+      location: unset
+- assertVisible: No photo
+- assertNotVisible: Photo taken
+- assertNotVisible: At 51\.50, -0\.125
+- assertVisible: Nowhere yet
+- assertVisible: No photo
+- assertNotVisible: Photo taken
+- assertNotVisible: At 51\.50, -0\.125
+- tapOn: Where am I
+- assertVisible:
+    text: Allow .?Proof.? to (use your|access this device.s) location\?
+- assertVisible:
+    text: Allow .?Proof.? to (use your|access this device.s) location\?
+- tapOn:
+    text: Don.t Allow|Don.t allow
+- assertNotVisible: Locating
+- assertVisible: "Refused: NotAllowedError"
+- assertNotVisible: Locating

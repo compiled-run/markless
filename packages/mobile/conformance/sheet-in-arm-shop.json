@@ -1,0 +1,506 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:loaded",
+				"name": "loaded",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "state:choosing",
+				"name": "choosing",
+				"initial": false
+			},
+			{
+				"id": "state:picked",
+				"name": "picked",
+				"initial": "none",
+				"styled": true,
+				"domain": [
+					"none",
+					"large"
+				]
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Product"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Picked "
+					},
+					{
+						"cell": "state:picked"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "state:loaded"
+							},
+							"whenTrue": {
+								"literal": "Unload"
+							},
+							"whenFalse": {
+								"literal": "Load"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:0",
+				"parent": "h0",
+				"test": {
+					"cell": "state:loaded"
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "section",
+				"parent": "h0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "h2",
+				"parent": "h4",
+				"defaultStyle": {
+					"bold": true,
+					"size": 1.5
+				},
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Mug"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "button",
+				"parent": "h4",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Choose size"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "sheet",
+				"id": "sheet:component-edge:0",
+				"parent": "h4",
+				"open": {
+					"cell": "state:choosing"
+				},
+				"snapPoints": [
+					1
+				],
+				"dismissible": true,
+				"modal": true,
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "h2",
+				"parent": "sheet:component-edge:0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 1.5
+				},
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Sizes"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "button",
+				"parent": "sheet:component-edge:0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"text": "Large"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "button",
+				"parent": "sheet:component-edge:0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"text": "Remove product"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			}
+		],
+		"events": [
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h6",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h8",
+				"event": "activate",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h9",
+				"event": "activate",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "sheet:component-edge:0",
+				"event": "dismiss",
+				"handler": "handler:sheet:component-edge:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:loaded",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:loaded"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:choosing",
+						"value": {
+							"literal": true
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:picked",
+						"value": {
+							"literal": "large"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:choosing",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:loaded",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:sheet:component-edge:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:choosing",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Product"
+		],
+		[
+			"h2:text0",
+			"Picked none"
+		],
+		[
+			"h3:text0",
+			"Load"
+		]
+	],
+	"initialArms": [
+		[
+			"branch-site:0",
+			1
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:loaded",
+					"value": true
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Unload"
+				},
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 0
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "sheet",
+					"node": "sheet:component-edge:0",
+					"open": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h8"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:picked",
+					"value": "large"
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Picked large"
+				},
+				{
+					"op": "sheet",
+					"node": "sheet:component-edge:0",
+					"open": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "sheet",
+					"node": "sheet:component-edge:0",
+					"open": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h9"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:loaded",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Load"
+				},
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 1
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:loaded",
+					"value": true
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Unload"
+				},
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 0
+				}
+			]
+		}
+	]
+}

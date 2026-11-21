@@ -70,7 +70,7 @@ export function wireNestedRepeats(
 		}
 		return rows;
 	};
-	const onRow: ResumeRepeatRowHook = (enclosing, rowRoot, rowKey, armHost, armsOnly) => {
+	const onRow: ResumeRepeatRowHook = (enclosing, rowRoot, rowKey, armHost, armsOnly, built) => {
 		const records = nested.get(enclosing.id);
 		if (!records) return;
 		const wireRows = (
@@ -99,6 +99,7 @@ export function wireNestedRepeats(
 						view: { ...input.view, keyedRepeats: [instance] },
 						elementsByHostId: new Map([[instance.parentHostNodeId, parent]]),
 						storeContainerSubscription: (release) => releases.push(release),
+						...(built && { built }),
 					},
 					rowComponentHost,
 					onRow,

@@ -57,6 +57,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case local(String)
 	/// The current row's item of a list (`repeat` id).
 	case item(String)
+	/// The current row's position in its list (`repeat` id), from 0: a `@for`'s `index`.
+	case index(String)
 	case call(NativeBuiltin, [NativeExpr])
 	/// A field of the event running the handler: an `input`'s text, a `dismiss`'s reason and press target, a pointer event's fields.
 	case event(NativeEventField)
@@ -70,6 +72,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case focusOrigin(NativeExpr)
 	/// Whether the value is an element id or the document body.
 	case isElement(NativeExpr)
+	/// The element `node`, in an `@if` arm, if it was on screen when the run began; else null.
+	case drawn(String)
 	/// The page's route params, an object of strings.
 	case routeParams
 	/// `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order.
@@ -84,7 +88,7 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked, .field: return []
+		case .literal, .event, .focused, .local, .item, .index, .routeParams, .formData, .checked, .field, .drawn: return []
 		case let .unary(_, inner), let .member(inner, _), let .optionalMember(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .captures(node, pointer): return node.cells + pointer.cells
@@ -162,6 +166,8 @@ public struct NativeNode: Equatable, Sendable {
 	public var drawing: NativeDrawing? = nil
 	/// A live region: a change to the text inside is announced.
 	public var live: NativeLive? = nil
+	/// A live region whose `role`, `aria-live` or `aria-atomic` follows state: its politeness and atomicity, evaluated when it speaks.
+	public var liveFollows: NativeLiveFollows? = nil
 
 	public var isElement: Bool { if case .element = kind { true } else { false } }
 	public var isText: Bool { if case .text = kind { true } else { false } }
@@ -466,6 +472,8 @@ public struct NativeForm: Equatable, Sendable {
 	public let noValidate: Bool
 	/// An author wrote `aria-disabled` on one of its submit buttons, so a running submission marks none of them.
 	public let authoredAriaDisabled: Bool
+	/// A GET form on another site: submitting opens this URL, its query replaced by the form's entries, in the browser.
+	public var opens: String? = nil
 }
 
 /// A navigate op's param: a string fixed at build time, or an expression evaluated in the activated element's scope.
@@ -557,6 +565,8 @@ public struct NativeCell: Equatable, Sendable {
 	public var unset = false
 	/// Written while rendering from a value that follows state: at mount, and again whenever that value changes.
 	public var follows: NativeExpr? = nil
+	/// A cell of an app-wide `shared()`: the app holds one value for every page (`NativeAppSession`).
+	public var app = false
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -612,7 +622,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "domain", "device", "task", "async", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "domain", "device", "task", "async", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows", "app"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
 			}
@@ -646,14 +656,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 				first: field.has("first") ? try decodeExpr(try field["first"]) : nil,
 				rebuiltBy: field.has("rebuiltBy") ? try field["rebuiltBy"].array().map(decodeExpr) : nil,
 				unset: field.has("unset"),
-				follows: field.has("follows") ? try decodeExpr(try field["follows"]) : nil)
+				follows: field.has("follows") ? try decodeExpr(try field["follows"]) : nil,
+				app: field.has("app") ? try field["app"].bool() : false)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()
 			let place = ["arm", "row"]
 			switch kind {
 			case "element":
-				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live"] + place)
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live", "liveFollows"] + place)
 				var attributes: [String: String] = [:]
 				if field.has("attributes") {
 					let reader = try field["attributes"]
@@ -675,7 +686,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 					object: field.has("object") ? try field["object"].string() : nil,
 					defaultStyle: field.has("defaultStyle") ? try decodeDefaultStyle(try field["defaultStyle"]) : nil,
 					drawing: field.has("drawing") ? try decodeDrawing(try field["drawing"]) : nil,
-					live: field.has("live") ? try decodeLive(try field["live"]) : nil)
+					live: field.has("live") ? try decodeLive(try field["live"]) : nil,
+					liveFollows: field.has("liveFollows") ? try decodeLiveFollows(try field["liveFollows"]) : nil)
 			case "text":
 				let field = try node.object(required: ["kind", "id", "parent", "parts"], optional: place)
 				let parts = try decodeParts(try field["parts"])
@@ -842,7 +854,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 				}
 		}
 		let forms: [NativeForm] = fields.has("forms") ? try fields["forms"].array().map { form in
-			let field = try form.object(required: ["node", "fields", "submitters"], optional: ["noValidate", "authoredAriaDisabled"])
+			let field = try form.object(required: ["node", "fields", "submitters"], optional: ["noValidate", "authoredAriaDisabled", "opens"])
 			let flag = { (key: String) throws -> Bool in
 				guard field.has(key) else { return false }
 				guard try field[key].bool() else { throw PayloadError(path: try field[key].path, reason: "\(key) is only ever true") }
@@ -859,7 +871,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 					return NativeForm.Field(node: try f["node"].string(), kind: fieldKind)
 				},
 				submitters: try field["submitters"].array().map { try $0.string() },
-				noValidate: try flag("noValidate"), authoredAriaDisabled: try flag("authoredAriaDisabled"))
+				noValidate: try flag("noValidate"), authoredAriaDisabled: try flag("authoredAriaDisabled"),
+				opens: field.has("opens") ? try field["opens"].string() : nil)
 		} : []
 		let valueMissing: [(locale: String, messages: NativeValueMissing)] = fields.has("valueMissing") ? try {
 			let reader = try fields["valueMissing"]
@@ -937,6 +950,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 		return NativeLive(assertive: politeness == "assertive", atomic: try live["atomic"].bool())
 	}
 
+	private static func decodeLiveFollows(_ reader: Reader) throws -> NativeLiveFollows {
+		let live = try reader.object(["politeness", "atomic"])
+		return NativeLiveFollows(politeness: try decodeExpr(try live["politeness"]), atomic: try decodeExpr(try live["atomic"]))
+	}
+
 	private static func decodeDrawing(_ reader: Reader) throws -> NativeDrawing {
 		let field = try reader.object(required: ["viewBox", "shapes"], optional: ["width", "height", "em"])
 		let viewBox = try field["viewBox"].isNull ? nil : try field["viewBox"].array().map { try $0.number() }
@@ -987,13 +1005,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 				let fields = try binding.field("fields")
 				return NativeScriptBinding(name: name, kind: .fields(try fields.keys().map { NativeScriptField(name: $0, cell: try fields.field($0).string()) }))
 			case ["value"]: return NativeScriptBinding(name: name, kind: .value(try decodeExpr(try binding.field("value"))))
+			case let keys where Set(keys) == ["device", "object"]:
+				return NativeScriptBinding(name: name, kind: .device(device: try binding.field("device").string(), object: try binding.field("object").string()))
 			case ["elements"]: return NativeScriptBinding(name: name, kind: .elements(try decodeExpr(try binding.field("elements"))))
 			case ["object"]: return NativeScriptBinding(name: name, kind: .object(try decodeBindings(try binding.field("object"))))
 			case ["shared"]: return NativeScriptBinding(name: name, kind: .shared(try decodeBindings(try binding.field("shared"))))
 			case ["callback"]: return NativeScriptBinding(name: name, kind: .callback(try binding.field("callback").string()))
 			case ["bindings", "method"], ["method", "bindings"]:
 				return NativeScriptBinding(name: name, kind: .method(try binding.field("method").string(), try decodeBindings(try binding.field("bindings"))))
-			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { elements }, { object }, { shared }, { callback } or { method, bindings }")
+			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { device, object }, { elements }, { object }, { shared }, { callback } or { method, bindings }")
 			}
 		}
 	}
@@ -1053,6 +1073,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["captures", "pointer"]: return .captures(node: try decodeExpr(try field("captures")), pointer: try decodeExpr(try field("pointer")))
 		case ["focusOrigin"]: return .focusOrigin(try decodeExpr(try field("focusOrigin")))
 		case ["isElement"]: return .isElement(try decodeExpr(try field("isElement")))
+		case ["drawn"]: return .drawn(try field("drawn").string())
 		case ["literal"]: return .literal(try field("literal").scalar())
 		case ["unary", "value"]: return .unary(try oneOf("unary", ["!", "-", "+", "typeof"]), try decodeExpr(try field("value")))
 		case ["binary", "left", "right"]:
@@ -1098,6 +1119,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			guard name == "params" else { throw PayloadError(path: reader.path + ".route", reason: "unknown route read \"\(name)\"") }
 			return .routeParams
 		case ["item"]: return .item(try field("item").string())
+		case ["index"]: return .index(try field("index").string())
 		case ["formData"]: return .formData(try field("formData").string())
 		case ["checked"]: return .checked(try field("checked").string())
 		case ["bindings", "script"]: return .script(fn: try field("script").string(), bindings: try decodeBindings(try field("bindings")))
@@ -1382,6 +1404,17 @@ public struct NativeDeviceObject: Equatable, Sendable {
 public struct NativeLive: Sendable, Equatable {
 	public let assertive: Bool
 	public let atomic: Bool
+
+	public init(assertive: Bool, atomic: Bool) {
+		self.assertive = assertive
+		self.atomic = atomic
+	}
+}
+
+/// A live region's politeness (`"polite"`, `"assertive"` or null) and atomicity as expressions over the attributes that follow state.
+public struct NativeLiveFollows: Sendable, Equatable {
+	public let politeness: NativeExpr
+	public let atomic: NativeExpr
 }
 
 /// One piece of a key joined from a row's fields: fixed text, or the value at a path on the item, as a template literal writes it.

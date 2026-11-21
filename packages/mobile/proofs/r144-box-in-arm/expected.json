@@ -1,0 +1,32 @@
+{
+	"rung": 144,
+	"name": "A checkbox inside an @if arm whose checked reads what the arm's test guards: built from it when the arm shows, as on the web",
+	"steps": [
+		{ "visible": ["Task", "No task", "Box: untouched"], "absent": ["Water plants"] },
+		{
+			"do": { "tap": "Load done" },
+			"visible": ["Water plants", "Box: untouched"],
+			"absent": ["No task"]
+		},
+		{
+			"do": { "tap": "Done" },
+			"visible": ["Water plants", "Box: cleared"],
+			"absent": ["Box: untouched"]
+		},
+		{
+			"do": { "tap": "Clear" },
+			"visible": ["No task", "Box: cleared"],
+			"absent": ["Water plants"]
+		},
+		{
+			"do": { "tap": "Load open" },
+			"visible": ["Feed cat", "Box: cleared"],
+			"absent": ["No task"]
+		},
+		{
+			"do": { "tap": "Done" },
+			"visible": ["Feed cat", "Box: ticked"],
+			"absent": ["Box: cleared"]
+		}
+	]
+}
