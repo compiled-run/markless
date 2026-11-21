@@ -7,7 +7,13 @@
 			{
 				"id": "state:drink",
 				"name": "drink",
-				"initial": "none"
+				"initial": "none",
+				"styled": true,
+				"domain": [
+					"none",
+					"tea",
+					"coffee"
+				]
 			},
 			{
 				"id": "state:cups",
@@ -17,7 +23,8 @@
 			{
 				"id": "state:wifi",
 				"name": "wifi",
-				"initial": false
+				"initial": false,
+				"styled": true
 			},
 			{
 				"id": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.checked",
@@ -553,6 +560,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:drink",
+					"value": "tea"
+				},
+				{
 					"op": "text",
 					"node": "h2:text0",
 					"value": "Drink tea, cups 3"
@@ -565,6 +577,11 @@
 				"host": "component-edge:0/h2"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:drink",
+					"value": "coffee"
+				},
 				{
 					"op": "text",
 					"node": "h2:text0",
