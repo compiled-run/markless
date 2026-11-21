@@ -1151,6 +1151,12 @@ public final class NativeRuntime {
 		}
 	}
 
+	/// A branch's style state: the arm it shows ("0", "1", …, or "none"); nil while it is not shown.
+	public func styleArm(of branch: String) throws -> NativeValue? {
+		guard let shown = try arms().first(where: { $0.node == branch }) else { return nil }
+		return .string(shown.index.map(String.init) ?? "none")
+	}
+
 	/// Every shown list's row keys, in order.
 	public func rows() throws -> [(node: String, keys: [String])] {
 		try payload.nodes.compactMap { node in
