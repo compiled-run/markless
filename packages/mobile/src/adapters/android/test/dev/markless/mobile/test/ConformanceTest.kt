@@ -30,6 +30,7 @@ import dev.markless.mobile.core.jsonValue
 import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
+import dev.markless.mobile.core.text
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.BandAtom
 import dev.markless.mobile.style.BandComparison
@@ -42,6 +43,7 @@ import dev.markless.mobile.style.rowStates
 import dev.markless.mobile.style.SystemFace
 import dev.markless.mobile.style.TextLine
 import dev.markless.mobile.style.StyleWrite
+import dev.markless.mobile.style.SelectArrow
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -698,6 +700,38 @@ private fun rowPressedStyles(fixtures: File) {
 	check("only the picked row takes the pressed assignment", rows.getOrNull()?.map { it.assignment == k } == listOf(false, true, false)) { "${rows.getOrNull()?.map { it.key to it.assignment }} from $k" }
 }
 
+/** The S24 rung's: a styled select's arrow write, and the arrow geometry Dragon's plan layout gives as a 4th element. */
+private fun selectArrows(fixtures: File) {
+	val bytes = File(fixtures, "s24-styled-select.native-app-style.json").readBytes()
+	val style = StyleExport.decodeApp(bytes).getValue("/")
+	val laid = File(fixtures, "s24-styled-select.layout.json").readText()
+	val select = style.assignments[0].byId.getValue("h3")
+	check("decodes a select's arrow write", select.writes.filterIsInstance<StyleWrite.SelectArrow>().map { it.color } == listOf(Rgba(29, 42, 36, 255))) { "${select.writes}" }
+	check("a select with appearance: none draws no arrow", !style.assignments[0].byId.getValue("h5").drawsSelectArrow) { "" }
+	check("the export plans no rows for a select's options", style.planRepeats.isEmpty()) { "${style.planRepeats}" }
+	val out = runCatching { style.laidOut(412.0, 870.0, 2.625, { laid }) }
+	check("reads the plan layout's menulist arrows", out.isSuccess) { out.exceptionOrNull().toString() }
+	out.getOrNull()?.let { e ->
+		check("the select takes Dragon's arrow", e.assignments[0].byId.getValue("h3").selectArrow == SelectArrow(2.0, listOf(923.0, 55.0, 933.0, 65.0, 944.0, 55.0))) { "${e.assignments[0].byId.getValue("h3").selectArrow}" }
+		check("only the select that draws one has an arrow", e.assignments[0].nodes.count { it.selectArrow != null } == 1) { "" }
+	}
+	val parts = (Json.parse(laid) as Json.Arr).items
+	fun layoutFails(name: String, result: String, fragment: String) {
+		val err = runCatching { style.laidOut(412.0, 870.0, 2.625, { result }) }.exceptionOrNull()?.message
+		check(name, err != null && err.contains(fragment)) { "error was: $err" }
+	}
+	layoutFails("a select-arrow write with no arrow geometry names the node", Json.Arr(parts.take(3)).text(), "\"h3\" draws a drop-down arrow, but Dragon's layout gives it no arrow geometry")
+	layoutFails("a 4th element other than menulist-arrows is refused", Json.Arr(parts.take(3) + Json.Arr(listOf(Json.Str("other"), Json.Arr(emptyList())))).text(), "expected [\"menulist-arrows\", arrows]")
+	val root = Json.parse(bytes) as Json.Obj
+	val target = (root.fields.getValue("targets") as Json.Obj).fields.getValue("android") as Json.Obj
+	val route = ((target.fields.getValue("routes") as Json.Arr).items[0] as Json.Obj).fields
+	route.remove("plan")
+	route.remove("planNames")
+	route.remove("planRepeats")
+	val err = runCatching { StyleExport.decodeApp(root.text().toByteArray()) }.exceptionOrNull()?.message
+	check("a select-arrow write in an export with no plan names the node", err?.contains("\"h3\" draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan") == true) { "error was: $err" }
+}
+
 fun main(args: Array<String>) {
 	routes()
 	arrays()
@@ -715,6 +749,7 @@ fun main(args: Array<String>) {
 	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	rowStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	rowPressedStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	selectArrows(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)

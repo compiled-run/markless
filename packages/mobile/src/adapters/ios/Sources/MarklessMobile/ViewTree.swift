@@ -1765,6 +1765,40 @@ final class SelectButton: UIButton {
 		display.text = label
 		accessibilityValue = label
 	}
+
+	private let arrow = CAShapeLayer()
+
+	/// On a styled page: the label in Dragon's box for it, vertically centred, and Dragon's arrow stroked over the background
+	/// and under the border, as Chrome paints a menulist-button.
+	func paint(arrow paint: ResolvedStyle.SelectArrowPaint?, label: ResolvedStyle.SelectLabel?, faces: [String: UIFontDescriptor]) throws {
+		if let label {
+			guard let face = faces[label.fontFamily] else { throw HostError("font \(label.fontFamily) was not registered") }
+			display.font = UIFont(descriptor: face, size: label.fontSize)
+			if let color = label.color { display.textColor = uiColor(color) }
+			display.lineBreakMode = .byClipping
+			display.frame = CGRect(x: label.frame.x, y: label.frame.y, width: label.frame.width, height: label.frame.height)
+		}
+		display.isHidden = label == nil
+		guard let paint else {
+			arrow.removeFromSuperlayer()
+			return
+		}
+		let a = paint.arrow
+		let point = { (k: Int) in CGPoint(x: (a.originX + a.points[k]) / paint.scale, y: (a.originY + a.points[k + 1]) / paint.scale) }
+		let path = CGMutablePath()
+		path.move(to: point(0))
+		for k in stride(from: 2, to: a.points.count, by: 2) { path.addLine(to: point(k)) }
+		arrow.path = path
+		arrow.fillColor = nil
+		arrow.strokeColor = uiColor(paint.color).cgColor
+		arrow.lineWidth = a.strokeWidth / paint.scale
+		arrow.lineCap = .butt
+		arrow.lineJoin = .miter
+		arrow.miterLimit = 4
+		arrow.frame = bounds
+		arrow.contentsScale = paint.scale
+		if arrow.superlayer == nil { layer.addSublayer(arrow) }
+	}
 }
 
 final class TopLayerView: UIView {
@@ -1977,6 +2011,10 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	if let drawing = view as? DrawingView {
 		// An svg's text colour is what its currentColor paints.
 		if let color = style.textColor { drawing.currentColor = uiColor(color) }
+		return
+	}
+	if let select = view as? SelectButton {
+		try select.paint(arrow: style.selectArrow, label: style.selectLabel, faces: faces)
 		return
 	}
 	guard let label = view as? UILabel else {
