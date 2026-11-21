@@ -403,6 +403,8 @@ public final class NativeRuntime {
 		// document's focus is the body.
 		try? seedRows()
 		try? follow()
+		// A box's `checked` binding reads cells only now settled (a group's value following its prop): it sets the box again.
+		for node in ticked { if let bound = try? checkedBinding(node.id) { checkedness[node.id] = bound } }
 		try? settleSelects()
 		if let shown = try? shownOverlays() {
 			stack = shown

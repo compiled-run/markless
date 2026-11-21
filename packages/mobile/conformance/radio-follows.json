@@ -1,0 +1,1028 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:size",
+				"name": "size",
+				"initial": "medium",
+				"styled": true,
+				"domain": ["medium", "small"]
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value",
+				"name": "group.value",
+				"initial": "",
+				"follows": {
+					"cell": "state:size"
+				}
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.orientation",
+				"name": "group.orientation",
+				"initial": "vertical"
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.loop",
+				"name": "group.loop",
+				"initial": true
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.disabled",
+				"name": "group.disabled",
+				"initial": false
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.required",
+				"name": "group.required",
+				"initial": false
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.invalid",
+				"name": "group.invalid",
+				"initial": false
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.name",
+				"name": "group.name",
+				"initial": ""
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.tabbable",
+				"name": "group.tabbable",
+				"initial": ""
+			},
+			{
+				"id": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value",
+				"name": "item.value",
+				"initial": "small"
+			},
+			{
+				"id": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.disabled",
+				"name": "item.disabled",
+				"initial": false
+			},
+			{
+				"id": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value",
+				"name": "item.value",
+				"initial": "medium"
+			},
+			{
+				"id": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.disabled",
+				"name": "item.disabled",
+				"initial": false
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Photo size"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/component-edge:0/h0",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"role": "radiogroup"
+				},
+				"bindings": [
+					{
+						"attribute": "aria-orientation",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.orientation"
+						}
+					},
+					{
+						"attribute": "aria-disabled",
+						"value": {
+							"if": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.disabled"
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": null
+							}
+						}
+					},
+					{
+						"attribute": "aria-required",
+						"value": {
+							"if": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.required"
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": null
+							}
+						}
+					},
+					{
+						"attribute": "aria-invalid",
+						"value": {
+							"if": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.invalid"
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": null
+							}
+						}
+					},
+					{
+						"attribute": "ui-horizontal",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.orientation"
+							},
+							"right": {
+								"literal": "horizontal"
+							}
+						}
+					},
+					{
+						"attribute": "ui-disabled",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.disabled"
+						}
+					},
+					{
+						"attribute": "ui-required",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.required"
+						}
+					},
+					{
+						"attribute": "aria-labelledby",
+						"value": {
+							"literal": "component-edge:1/h1"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h1",
+				"element": "label",
+				"parent": "component-edge:0/component-edge:0/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h1:text0",
+				"parent": "component-edge:1/h1",
+				"parts": [
+					{
+						"text": "Photo size"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:2/h4",
+				"element": "div",
+				"parent": "component-edge:0/component-edge:0/h0",
+				"bindings": [
+					{
+						"attribute": "ui-selected",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+							},
+							"right": {
+								"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+							}
+						}
+					},
+					{
+						"attribute": "ui-disabled",
+						"value": {
+							"logical": "||",
+							"left": {
+								"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.disabled"
+							},
+							"right": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.disabled"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/component-edge:1/h0",
+				"element": "span",
+				"parent": "component-edge:2/h4",
+				"attributes": {
+					"style": "clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px;"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/h8",
+				"element": "input",
+				"parent": "component-edge:3/component-edge:1/h0",
+				"attributes": {
+					"type": "radio"
+				},
+				"bindings": [
+					{
+						"attribute": "name",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.name"
+						}
+					},
+					{
+						"attribute": "value",
+						"value": {
+							"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+						}
+					},
+					{
+						"property": "checked",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+							},
+							"right": {
+								"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+							}
+						}
+					},
+					{
+						"attribute": "disabled",
+						"value": {
+							"logical": "||",
+							"left": {
+								"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.disabled"
+							},
+							"right": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.disabled"
+							}
+						}
+					},
+					{
+						"attribute": "required",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.required"
+						}
+					},
+					{
+						"attribute": "tabindex",
+						"value": {
+							"if": {
+								"logical": "||",
+								"left": {
+									"binary": "===",
+									"left": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+									},
+									"right": {
+										"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+									}
+								},
+								"right": {
+									"logical": "&&",
+									"left": {
+										"binary": "===",
+										"left": {
+											"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+										},
+										"right": {
+											"literal": ""
+										}
+									},
+									"right": {
+										"logical": "||",
+										"left": {
+											"binary": "===",
+											"left": {
+												"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.tabbable"
+											},
+											"right": {
+												"literal": ""
+											}
+										},
+										"right": {
+											"binary": "===",
+											"left": {
+												"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.tabbable"
+											},
+											"right": {
+												"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+											}
+										}
+									}
+								}
+							},
+							"whenTrue": {
+								"literal": 0
+							},
+							"whenFalse": {
+								"unary": "-",
+								"value": {
+									"literal": 1
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:4/h5",
+				"element": "div",
+				"parent": "component-edge:2/h4",
+				"bindings": [
+					{
+						"attribute": "ui-selected",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+							},
+							"right": {
+								"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+							}
+						}
+					},
+					{
+						"attribute": "ui-disabled",
+						"value": {
+							"logical": "||",
+							"left": {
+								"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.disabled"
+							},
+							"right": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.disabled"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:4/h5:text0",
+				"parent": "component-edge:4/h5",
+				"parts": [
+					{
+						"text": "Pick small"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:5/h4",
+				"element": "div",
+				"parent": "component-edge:0/component-edge:0/h0",
+				"bindings": [
+					{
+						"attribute": "ui-selected",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+							},
+							"right": {
+								"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+							}
+						}
+					},
+					{
+						"attribute": "ui-disabled",
+						"value": {
+							"logical": "||",
+							"left": {
+								"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.disabled"
+							},
+							"right": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.disabled"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:6/component-edge:1/h0",
+				"element": "span",
+				"parent": "component-edge:5/h4",
+				"attributes": {
+					"style": "clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px;"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:6/h8",
+				"element": "input",
+				"parent": "component-edge:6/component-edge:1/h0",
+				"attributes": {
+					"type": "radio"
+				},
+				"bindings": [
+					{
+						"attribute": "name",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.name"
+						}
+					},
+					{
+						"attribute": "value",
+						"value": {
+							"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+						}
+					},
+					{
+						"property": "checked",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+							},
+							"right": {
+								"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+							}
+						}
+					},
+					{
+						"attribute": "disabled",
+						"value": {
+							"logical": "||",
+							"left": {
+								"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.disabled"
+							},
+							"right": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.disabled"
+							}
+						}
+					},
+					{
+						"attribute": "required",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.required"
+						}
+					},
+					{
+						"attribute": "tabindex",
+						"value": {
+							"if": {
+								"logical": "||",
+								"left": {
+									"binary": "===",
+									"left": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+									},
+									"right": {
+										"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+									}
+								},
+								"right": {
+									"logical": "&&",
+									"left": {
+										"binary": "===",
+										"left": {
+											"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+										},
+										"right": {
+											"literal": ""
+										}
+									},
+									"right": {
+										"logical": "||",
+										"left": {
+											"binary": "===",
+											"left": {
+												"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.tabbable"
+											},
+											"right": {
+												"literal": ""
+											}
+										},
+										"right": {
+											"binary": "===",
+											"left": {
+												"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.tabbable"
+											},
+											"right": {
+												"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+											}
+										}
+									}
+								}
+							},
+							"whenTrue": {
+								"literal": 0
+							},
+							"whenFalse": {
+								"unary": "-",
+								"value": {
+									"literal": 1
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:7/h5",
+				"element": "div",
+				"parent": "component-edge:5/h4",
+				"bindings": [
+					{
+						"attribute": "ui-selected",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+							},
+							"right": {
+								"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+							}
+						}
+					},
+					{
+						"attribute": "ui-disabled",
+						"value": {
+							"logical": "||",
+							"left": {
+								"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.disabled"
+							},
+							"right": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.disabled"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:7/h5:text0",
+				"parent": "component-edge:7/h5",
+				"parts": [
+					{
+						"text": "Pick medium"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Size: "
+					},
+					{
+						"cell": "state:size"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:4/h5",
+				"event": "activate",
+				"handler": "handler:component-edge:4/event:0"
+			},
+			{
+				"host": "component-edge:7/h5",
+				"event": "activate",
+				"handler": "handler:component-edge:7/event:0"
+			},
+			{
+				"host": "component-edge:3/h8",
+				"event": "activate",
+				"handler": "handler:component-edge:3/h8/tick"
+			},
+			{
+				"host": "component-edge:6/h8",
+				"event": "activate",
+				"handler": "handler:component-edge:6/h8/tick"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:4/event:0",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"unary": "!",
+							"value": {
+								"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.disabled"
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "if",
+								"test": {
+									"logical": "||",
+									"left": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.disabled"
+									},
+									"right": {
+										"binary": "===",
+										"left": {
+											"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+										},
+										"right": {
+											"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+										}
+									}
+								},
+								"whenTrue": [],
+								"whenFalse": [
+									{
+										"op": "assign",
+										"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value",
+										"value": {
+											"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+										}
+									},
+									{
+										"op": "assign",
+										"cell": "state:size",
+										"value": {
+											"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+										}
+									}
+								]
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:7/event:0",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"unary": "!",
+							"value": {
+								"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.disabled"
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "if",
+								"test": {
+									"logical": "||",
+									"left": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.disabled"
+									},
+									"right": {
+										"binary": "===",
+										"left": {
+											"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+										},
+										"right": {
+											"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+										}
+									}
+								},
+								"whenTrue": [],
+								"whenFalse": [
+									{
+										"op": "assign",
+										"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value",
+										"value": {
+											"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+										}
+									},
+									{
+										"op": "assign",
+										"cell": "state:size",
+										"value": {
+											"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+										}
+									}
+								]
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:3/h8/tick",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"checked": "component-edge:3/h8"
+						},
+						"whenTrue": [],
+						"whenFalse": [
+							{
+								"op": "tick",
+								"node": "component-edge:3/h8"
+							},
+							{
+								"op": "if",
+								"test": {
+									"logical": "||",
+									"left": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.disabled"
+									},
+									"right": {
+										"binary": "===",
+										"left": {
+											"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+										},
+										"right": {
+											"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+										}
+									}
+								},
+								"whenTrue": [],
+								"whenFalse": [
+									{
+										"op": "assign",
+										"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value",
+										"value": {
+											"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+										}
+									},
+									{
+										"op": "assign",
+										"cell": "state:size",
+										"value": {
+											"cell": "component-edge:2/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+										}
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:6/h8/tick",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"checked": "component-edge:6/h8"
+						},
+						"whenTrue": [],
+						"whenFalse": [
+							{
+								"op": "tick",
+								"node": "component-edge:6/h8"
+							},
+							{
+								"op": "if",
+								"test": {
+									"logical": "||",
+									"left": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.disabled"
+									},
+									"right": {
+										"binary": "===",
+										"left": {
+											"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value"
+										},
+										"right": {
+											"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+										}
+									}
+								},
+								"whenTrue": [],
+								"whenFalse": [
+									{
+										"op": "assign",
+										"cell": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value",
+										"value": {
+											"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+										}
+									},
+									{
+										"op": "assign",
+										"cell": "state:size",
+										"value": {
+											"cell": "component-edge:5/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupItemState/state:item.value"
+										}
+									}
+								]
+							}
+						]
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		["h1:text0", "Photo size"],
+		["component-edge:1/h1:text0", "Photo size"],
+		["component-edge:4/h5:text0", "Pick small"],
+		["component-edge:7/h5:text0", "Pick medium"],
+		["h2:text0", "Size: medium"]
+	],
+	"initialAttributes": [
+		["component-edge:0/component-edge:0/h0", "aria-orientation", "vertical"],
+		["component-edge:0/component-edge:0/h0", "aria-disabled", null],
+		["component-edge:0/component-edge:0/h0", "aria-required", null],
+		["component-edge:0/component-edge:0/h0", "aria-invalid", null],
+		["component-edge:0/component-edge:0/h0", "ui-horizontal", null],
+		["component-edge:0/component-edge:0/h0", "ui-disabled", null],
+		["component-edge:0/component-edge:0/h0", "ui-required", null],
+		["component-edge:0/component-edge:0/h0", "aria-labelledby", "component-edge:1/h1"],
+		["component-edge:2/h4", "ui-selected", null],
+		["component-edge:2/h4", "ui-disabled", null],
+		["component-edge:3/h8", "name", ""],
+		["component-edge:3/h8", "value", "small"],
+		["component-edge:3/h8", "disabled", null],
+		["component-edge:3/h8", "required", null],
+		["component-edge:3/h8", "tabindex", "-1"],
+		["component-edge:4/h5", "ui-selected", null],
+		["component-edge:4/h5", "ui-disabled", null],
+		["component-edge:5/h4", "ui-selected", ""],
+		["component-edge:5/h4", "ui-disabled", null],
+		["component-edge:6/h8", "name", ""],
+		["component-edge:6/h8", "value", "medium"],
+		["component-edge:6/h8", "disabled", null],
+		["component-edge:6/h8", "required", null],
+		["component-edge:6/h8", "tabindex", "0"],
+		["component-edge:7/h5", "ui-selected", ""],
+		["component-edge:7/h5", "ui-disabled", null]
+	],
+	"initialChecks": [
+		["component-edge:3/h8", false],
+		["component-edge:6/h8", true]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:4/h5"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:size",
+					"value": "small"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h4",
+					"name": "ui-selected",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h8",
+					"name": "tabindex",
+					"value": "0"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:4/h5",
+					"name": "ui-selected",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:5/h4",
+					"name": "ui-selected",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:6/h8",
+					"name": "tabindex",
+					"value": "-1"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:7/h5",
+					"name": "ui-selected",
+					"value": null
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Size: small"
+				},
+				{
+					"op": "property",
+					"node": "component-edge:3/h8",
+					"name": "checked",
+					"value": true
+				},
+				{
+					"op": "property",
+					"node": "component-edge:6/h8",
+					"name": "checked",
+					"value": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:7/h5"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:size",
+					"value": "medium"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h4",
+					"name": "ui-selected",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:3/h8",
+					"name": "tabindex",
+					"value": "-1"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:4/h5",
+					"name": "ui-selected",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:5/h4",
+					"name": "ui-selected",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:6/h8",
+					"name": "tabindex",
+					"value": "0"
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:7/h5",
+					"name": "ui-selected",
+					"value": ""
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Size: medium"
+				},
+				{
+					"op": "property",
+					"node": "component-edge:3/h8",
+					"name": "checked",
+					"value": false
+				},
+				{
+					"op": "property",
+					"node": "component-edge:6/h8",
+					"name": "checked",
+					"value": true
+				}
+			]
+		}
+	]
+}

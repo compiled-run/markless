@@ -1242,6 +1242,8 @@ class Runtime(
 		// Rows take their first values, and following cells theirs, before anything reads them, the overlays shown at mount included.
 		seedRows()
 		follow()
+		// A box's `checked` binding reads cells only now settled (a group's value following its prop): it sets the box again.
+		for (n in ticked) checkedBinding(n.id)?.let { checkedness[n.id] = it }
 		stack = shownOverlays()
 		for (o in stack) origins[o] = NATIVE_DOCUMENT_BODY
 	}
