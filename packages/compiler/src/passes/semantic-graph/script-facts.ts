@@ -145,6 +145,8 @@ function cloneWith(node: AnyNode, replace: (node: AnyNode) => AnyNode | undefine
 	// `{ count }` reads `count`; once `count` is spelled `__s.count`, the property says so.
 	if (copy.type === 'Property' && copy.shorthand === true && copy.value !== node.value)
 		copy.shorthand = false;
+	if ((copy.type === 'ClassDeclaration' || copy.type === 'ClassExpression') && classLowering(copy as AnyNode) === null)
+		return lowerClass(copy as AnyNode);
 	// Hermes runs async functions but not async arrows: one becomes an async function bound to the `this` around it.
 	if (copy.type === 'ArrowFunctionExpression' && copy.async === true) {
 		const body = copy.body as AnyNode;
@@ -176,6 +178,85 @@ function cloneWith(node: AnyNode, replace: (node: AnyNode) => AnyNode | undefine
 		} as unknown as AnyNode;
 	}
 	return copy as AnyNode;
+}
+
+/**
+ * Hermes runs no class syntax. A class with no `extends`, accessors, private members or static blocks is lowered to a
+ * constructor function: its fields first in the constructor, as the class runs them, its methods on the prototype. Null
+ * when it can be lowered; else what stops it.
+ */
+function classLowering(node: AnyNode): string | null {
+	if (node.superClass) return 'a class that extends another';
+	for (const member of ((node.body as AnyNode).body as AnyNode[]) ?? []) {
+		if (member.type === 'StaticBlock') return 'a class with a `static` block';
+		if ((member.key as AnyNode | undefined)?.type === 'PrivateIdentifier') return 'a class with a private member';
+		if (member.type === 'MethodDefinition' && (member.kind === 'get' || member.kind === 'set'))
+			return 'a class with a getter or setter';
+		if (member.type !== 'MethodDefinition' && member.type !== 'PropertyDefinition')
+			return `a class member \`${String(member.type)}\``;
+	}
+	return null;
+}
+
+function lowerClass(node: AnyNode): AnyNode {
+	const name = (node.id as AnyNode | null)?.name as string | undefined;
+	const self = identifier(name ?? '__class');
+	const members = ((node.body as AnyNode).body as AnyNode[]) ?? [];
+	const keyed = (object: AnyNode, member: AnyNode): AnyNode => {
+		const key = member.key as AnyNode;
+		const named = member.computed !== true && key.type === 'Identifier';
+		return {
+			type: 'MemberExpression',
+			object,
+			property: named || member.computed === true ? key : { type: 'Literal', value: key.value },
+			computed: !named,
+			optional: false,
+		} as unknown as AnyNode;
+	};
+	const assign = (target: AnyNode, value: AnyNode): AnyNode =>
+		({
+			type: 'ExpressionStatement',
+			expression: { type: 'AssignmentExpression', operator: '=', left: target, right: value },
+		}) as unknown as AnyNode;
+	const undefinedValue = { type: 'UnaryExpression', operator: 'void', prefix: true, argument: { type: 'Literal', value: 0 } } as unknown as AnyNode;
+	const constructor = members.find((member) => member.type === 'MethodDefinition' && member.kind === 'constructor');
+	const fields = members
+		.filter((member) => member.type === 'PropertyDefinition' && !member.static)
+		.map((member) => assign(keyed({ type: 'ThisExpression' } as unknown as AnyNode, member), (member.value as AnyNode | null) ?? undefinedValue));
+	const ctor = (constructor?.value as AnyNode | undefined) ?? undefined;
+	const declaration = {
+		type: 'FunctionDeclaration',
+		id: self,
+		async: false,
+		generator: false,
+		params: ctor?.params ?? [],
+		body: { type: 'BlockStatement', body: [...fields, ...(((ctor?.body as AnyNode | undefined)?.body as AnyNode[]) ?? [])] },
+	} as unknown as AnyNode;
+	const prototype = { type: 'MemberExpression', object: self, property: identifier('prototype'), computed: false, optional: false } as unknown as AnyNode;
+	const rest = members.flatMap((member): AnyNode[] => {
+		if (member === constructor) return [];
+		if (member.type === 'MethodDefinition') return [assign(keyed(member.static ? self : prototype, member), member.value as AnyNode)];
+		return member.static ? [assign(keyed(self, member), (member.value as AnyNode | null) ?? undefinedValue)] : [];
+	});
+	const made = {
+		type: 'CallExpression',
+		callee: {
+			type: 'FunctionExpression',
+			id: null,
+			async: false,
+			generator: false,
+			params: [],
+			body: { type: 'BlockStatement', body: [declaration, ...rest, { type: 'ReturnStatement', argument: self }] },
+		},
+		arguments: [],
+		optional: false,
+	} as unknown as AnyNode;
+	if (node.type === 'ClassExpression') return made;
+	return {
+		type: 'VariableDeclaration',
+		kind: 'var',
+		declarations: [{ type: 'VariableDeclarator', id: self, init: { type: 'ParenthesizedExpression', expression: made } }],
+	} as unknown as AnyNode;
 }
 
 /** The node of the module's own analysis at the same place as a node of another parse of the same source. */
@@ -382,6 +463,10 @@ function unsupportedIn(
 	}
 	if (node.type === 'ImportExpression')
 		into.push({ construct: 'a dynamic `import()`', span: spanOf(node as never, filename) });
+	if (node.type === 'ClassDeclaration' || node.type === 'ClassExpression') {
+		const stops = classLowering(node);
+		if (stops) into.push({ construct: `${stops}, which Hermes cannot run`, span: spanOf(node as never, filename) });
+	}
 	if (node.type === 'TSEnumDeclaration' || node.type === 'TSModuleDeclaration')
 		into.push({
 			construct: node.type === 'TSEnumDeclaration' ? 'an `enum`' : 'a `namespace`',
@@ -848,6 +933,11 @@ export function scriptFactsOf(source: string, filename: string) {
 			for (const node of semantic.ancestors(at) as Iterable<AnyNode>)
 				if (node.type === 'JSXForExpression') return scriptFunctionOf(node.right as AnyNode, semantic, filename, true);
 			return undefined;
+		},
+		/** The function a `computed(...)` is given, written at `span` (a shared factory's returned `path: computed(...)`). */
+		computedAt: (span: SourceSpan): SemanticScriptFunction | undefined => {
+			const node = nodeOver(semantic, span);
+			return node && scriptFunctionOf(node, semantic, filename);
 		},
 		/** The function of `computed(...)` bound to `name` in `component` (module level when there is none). */
 		computed: (component: string | undefined, name: string): SemanticScriptFunction | undefined => {

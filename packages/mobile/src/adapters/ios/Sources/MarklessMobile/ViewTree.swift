@@ -94,13 +94,19 @@ final class Paragraph {
 /// A `<pre>` paragraph's sideways scroller: its line is never wrapped.
 final class PreformattedScroll: UIScrollView {}
 
-/// An inline `<svg>`: draws the shapes compiled when the app was built, fitted into its box as the web fits the viewBox.
+/// An inline `<svg>`: draws the shapes compiled when the app was built, then the shapes inside it that come from components,
+/// whose outline the engine gives while the app runs, fitted into its box as the web fits the viewBox.
 final class DrawingView: UIView {
 	let drawing: NativeDrawing
 	var currentColor: UIColor = .black { didSet { setNeedsDisplay() } }
+	/// min-x, min-y, width and height: the compiled one, or what a `viewBox` that follows state gives.
+	private(set) var viewBox: [Double]?
+	/// Shapes from inside it, in tree order, each with the outline it has now.
+	private var live: [(id: String, shape: NativeShape, path: [Double])] = []
 
 	init(_ drawing: NativeDrawing) {
 		self.drawing = drawing
+		viewBox = drawing.viewBox
 		super.init(frame: .zero)
 		isOpaque = false
 		backgroundColor = .clear
@@ -112,7 +118,7 @@ final class DrawingView: UIView {
 
 	override func draw(_ rect: CGRect) {
 		guard let context = UIGraphicsGetCurrentContext() else { return }
-		if let box = drawing.viewBox?.map({ CGFloat($0) }), box[2] > 0, box[3] > 0 {
+		if let box = viewBox?.map({ CGFloat($0) }), box.count == 4, box[2] > 0, box[3] > 0 {
 			// SVG 2 §8.5: the viewBox placed in the box by preserveAspectRatio, xMidYMid meet when it has none.
 			switch drawing.aspect {
 			case .none?:
@@ -130,8 +136,8 @@ final class DrawingView: UIView {
 				context.scaleBy(x: scale, y: scale)
 			}
 		}
-		for shape in drawing.shapes {
-			let path = Self.path(shape.path)
+		for (shape, p) in drawing.shapes.map({ ($0, $0.path) }) + live.map({ ($0.shape, $0.path) }) {
+			let path = Self.path(p)
 			context.saveGState()
 			for clip in shape.clip {
 				context.addPath(Self.path(clip))
@@ -159,6 +165,28 @@ final class DrawingView: UIView {
 			}
 			context.restoreGState()
 		}
+	}
+
+	/// The engine's numbers, space-separated, as the journal carries them; nil or empty draws nothing.
+	static func numbers(_ text: String?) -> [Double] {
+		(text ?? "").split(separator: " ").compactMap { Double($0) }
+	}
+
+	func addShape(_ id: String, _ shape: NativeShape, outline: String?) {
+		live.append((id, shape, shape.path.isEmpty ? Self.numbers(outline) : shape.path))
+		setNeedsDisplay()
+	}
+
+	func setOutline(_ id: String, _ outline: String?) {
+		guard let at = live.firstIndex(where: { $0.id == id }) else { return }
+		live[at].path = Self.numbers(outline)
+		setNeedsDisplay()
+	}
+
+	func setViewBox(_ text: String?) {
+		let box = Self.numbers(text)
+		viewBox = box.count == 4 ? box : nil
+		setNeedsDisplay()
 	}
 
 	/// A verb-coded outline: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close.
@@ -276,6 +304,10 @@ final class ViewTree {
 	private let slots: [String: [String]]
 	private let events: [String: [NativeEvent]]
 	private(set) var elements: [String: UIView] = [:]
+	/// Shapes inside an svg, by node: the drawing that draws each one.
+	private var shapeOwners: [String: DrawingView] = [:]
+	/// svgs whose viewBox follows state: the journal's `viewBox` attribute gives it.
+	private var followingViewBox: Set<String> = []
 	private(set) var labels: [String: UILabel] = [:]
 	private var contexts: [String: Context] = [:]
 	private var templates: [String: String] = [:]
@@ -621,6 +653,16 @@ final class ViewTree {
 				guard let field = elements[node] as? UITextField else { throw HostError("journal names input \(node), which is not a shown field") }
 				field.text = value
 			case let .attribute(node, name, value):
+				if let drawn = shapeOwners[node] {
+					attributes[node, default: [:]][name] = value
+					if name == "d" { drawn.setOutline(node, value) }
+					continue
+				}
+				if followingViewBox.contains(node), name == "viewBox", let drawn = elements[node] as? DrawingView {
+					attributes[node, default: [:]][name] = value
+					drawn.setViewBox(value)
+					continue
+				}
 				if flowing.contains(node) {
 					attributes[node, default: [:]][name] = value
 					continue
@@ -1025,14 +1067,32 @@ final class ViewTree {
 			contexts[id] = context
 			switch node.kind {
 			case let .element(element, staticAttributes, bindings):
+				if let shape = node.shape {
+					guard let drawn = container as? DrawingView else { throw HostError("the shape \(id) is not inside a drawing") }
+					var current = staticAttributes
+					for binding in bindings where !binding.isProperty {
+						current[binding.name] = marklessAttributeValue(binding.name, try runtime.evaluate(binding.value, in: context.scope))
+					}
+					attributes[id] = current
+					shapeOwners[id] = drawn
+					drawn.addShape(id, shape, outline: current["d"])
+					continue
+				}
 				if unimplementedElements.contains(element) { throw HostError("<\(element)> \(id) has no iOS view yet") }
 				let view: UIView
 				if let drawing = node.drawing {
 					let drawn = DrawingView(drawing)
+					let boundBox = try bindings.first { !$0.isProperty && $0.name == "viewBox" }.map {
+						marklessAttributeValue("viewBox", try runtime.evaluate($0.value, in: context.scope))
+					}
+					if let boundBox {
+						followingViewBox.insert(id)
+						drawn.setViewBox(boundBox)
+					}
 					drawn.isUserInteractionEnabled = context.button == nil
 					if layout == nil {
 						leaves.insert(ObjectIdentifier(drawn))
-						let ratio = drawing.viewBox.map { $0[3] / $0[2] }
+						let ratio = drawn.viewBox.map { $0[3] / $0[2] }
 						let unit = drawing.em ? Double(TextLook.baseSize * context.look.scale) : 1
 						switch (drawing.width.map { $0 * unit }, drawing.height.map { $0 * unit }) {
 						case let (width?, height?):
