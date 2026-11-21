@@ -2,20 +2,20 @@ appId: ${APP_ID}
 name: s2-shared-component
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Seed shelf
 - assertVisible: Basil, in stock
 - assertVisible: Thyme, low
 - assertVisible: Open basil
 - assertVisible:
-      text: Basil, in stock
-      below: Seed shelf
+    text: Basil, in stock
+    below: Seed shelf
 - assertVisible:
-      text: Thyme, low
-      below: Basil, in stock
+    text: Thyme, low
+    below: Basil, in stock
 - assertVisible:
-      text: Open basil
-      below: Thyme, low
+    text: Open basil
+    below: Thyme, low
 - assertVisible: Shelf
 - tapOn: Open basil
 - assertNotVisible: Seed shelf
@@ -27,9 +27,9 @@ name: s2-shared-component
 - assertNotVisible: Thyme, low
 - assertVisible: Basil
 - swipe:
-      start: 1%, 50%
-      end: 85%, 50%
-      duration: 400
+    start: 1%, 50%
+    end: 85%, 50%
+    duration: 400
 - assertVisible: Seed shelf
 - assertVisible: Thyme, low
 - assertNotVisible: Sweet basil

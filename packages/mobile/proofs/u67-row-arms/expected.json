@@ -1,0 +1,38 @@
+{
+	"rung": 177,
+	"name": "Each @for row shows its own @if arm, from its own item, and a press in one row flips that row's arm alone, as on the web",
+	"steps": [
+		{
+			"visible": ["Errands", "Finish Apples", "Bread done", "Add cheese", "Undo all"],
+			"absent": ["Apples done", "Finish Bread", "Finish Cheese"]
+		},
+		{
+			"do": {
+				"tap": "Finish Apples"
+			},
+			"visible": ["Apples done", "Bread done"],
+			"absent": ["Finish Apples", "Finish Cheese"]
+		},
+		{
+			"do": {
+				"tap": "Add cheese"
+			},
+			"visible": ["Finish Cheese", "Apples done", "Bread done"],
+			"absent": ["Finish Apples", "Finish Bread"]
+		},
+		{
+			"do": {
+				"tap": "Undo all"
+			},
+			"visible": ["Finish Apples", "Finish Bread", "Finish Cheese"],
+			"absent": ["Apples done", "Bread done"]
+		},
+		{
+			"do": {
+				"tap": "Finish Bread"
+			},
+			"visible": ["Bread done", "Finish Apples", "Finish Cheese"],
+			"absent": ["Finish Bread", "Apples done"]
+		}
+	]
+}

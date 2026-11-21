@@ -1,0 +1,51 @@
+{
+	"rung": 151,
+	"name": "A disabled <fieldset> disables the fields inside it, which then leave the form data, as on the web",
+	"steps": [
+		{
+			"visible": ["Gift", "Message", "Send", "Lock", "Not sent"],
+			"absent": ["Unlock", "Sent with note Red"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Note",
+					"text": "Red"
+				}
+			},
+			"visible": ["Not sent", "Lock"],
+			"fields": {
+				"Note": "Red"
+			},
+			"absent": ["Sent with note Red"]
+		},
+		{
+			"do": {
+				"tap": "Lock"
+			},
+			"visible": ["Unlock", "Not sent"],
+			"absent": ["Lock"]
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent with note null", "Unlock"],
+			"absent": ["Not sent"]
+		},
+		{
+			"do": {
+				"tap": "Unlock"
+			},
+			"visible": ["Lock", "Sent with note null"],
+			"absent": ["Unlock"]
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent with note Red", "Lock"],
+			"absent": ["Sent with note null"]
+		}
+	]
+}

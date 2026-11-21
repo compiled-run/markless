@@ -2,10 +2,10 @@ appId: ${APP_ID}
 name: r142-app-device
 ---
 - setLocation:
-      latitude: 51.5
-      longitude: -0.125
+    latitude: 51.5
+    longitude: -0.125
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Start here
 - assertVisible: Find me
 - assertNotVisible: 51\.5, -0\.125

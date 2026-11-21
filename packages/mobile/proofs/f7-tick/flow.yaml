@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: f7-tick
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Order
 - assertVisible: Place order
 - assertVisible: Newsletter off

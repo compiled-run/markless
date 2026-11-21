@@ -1,0 +1,33 @@
+appId: ${APP_ID}
+name: u66-state-seeds
+---
+- launchApp:
+    clearState: true
+- assertVisible: Seeds
+- assertVisible: Pear, Fig, Plum
+- assertVisible: First Pear
+- assertVisible: Total 2
+- assertVisible: Tally 20
+- assertNotVisible: Total 3
+- assertNotVisible: Tally 21
+- assertNotVisible: Pear, Fig, Plum, Kiwi
+- tapOn: Grow total
+- assertVisible: Total 3
+- assertNotVisible: Total 2
+- assertVisible: Total 3
+- assertVisible: Tally 20
+- assertNotVisible: Total 2
+- assertNotVisible: Tally 30
+- tapOn: Tally 20
+- assertNotVisible: Tally 20
+- assertVisible: Tally 21
+- assertVisible: Total 3
+- assertVisible: Pear, Fig, Plum
+- assertNotVisible: Tally 20
+- tapOn: Add kiwi
+- assertNotVisible: Pear, Fig, Plum
+- assertVisible: Pear, Fig, Plum, Kiwi
+- assertVisible: First Pear
+- assertVisible: Tally 21
+- assertNotVisible: Pear, Fig, Plum
+- assertNotVisible: First Kiwi

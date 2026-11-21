@@ -8,7 +8,7 @@
 			"element": "main",
 			"parent": null,
 			"attributes": {
-				"class": "mk-5ymd41"
+				"class": "mk-12z5pjz"
 			}
 		},
 		{
@@ -17,7 +17,7 @@
 			"element": "h1",
 			"parent": "h0",
 			"attributes": {
-				"class": "mk-5ymd41"
+				"class": "mk-12z5pjz"
 			}
 		},
 		{
@@ -32,7 +32,7 @@
 			"element": "div",
 			"parent": "h0",
 			"attributes": {
-				"class": "top mk-5ymd41"
+				"class": "top mk-12z5pjz"
 			}
 		},
 		{
@@ -47,7 +47,7 @@
 			"element": "section",
 			"parent": "h0",
 			"attributes": {
-				"class": "mk-11iar12"
+				"class": "mk-1og31wg"
 			}
 		},
 		{
@@ -56,7 +56,7 @@
 			"element": "span",
 			"parent": "component-edge:0/h0",
 			"attributes": {
-				"class": "mk-nzjzck tone mk-11iar12",
+				"class": "mk-oav61r tone mk-1og31wg",
 				"ui-badge": ""
 			}
 		},
@@ -72,7 +72,7 @@
 			"element": "p",
 			"parent": "component-edge:0/h0",
 			"attributes": {
-				"class": "mk-nzjzck"
+				"class": "mk-oav61r"
 			}
 		},
 		{
@@ -82,6 +82,6 @@
 			"text": "Seed none"
 		}
 	],
-	"css": ".tone.mk-11iar12 {\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #22223b;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 6px 12px;\n\t\t\t}\n@layer markless {\n\t\t\t\t\t[ui-badge].mk-nzjzck {\n\t\t\t\t\t\tdisplay: block;\n\t\t\t\t\t\tmargin: 12px;\n\t\t\t\t\t\tborder: 4px solid #06d6a0;\n\t\t\t\t\t}\n\t\t\t\t}\n.top.mk-5ymd41 {\n\t\t\t\theight: 60px;\n\t\t\t\tfont-size: 18px;\n\t\t\t}",
+	"css": ".tone.mk-1og31wg {\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #22223b;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 6px 12px;\n\t\t\t}\n@layer markless {\n\t\t\t\t\t[ui-badge].mk-oav61r {\n\t\t\t\t\t\tdisplay: block;\n\t\t\t\t\t\tmargin: 12px;\n\t\t\t\t\t\tborder: 4px solid #06d6a0;\n\t\t\t\t\t}\n\t\t\t\t}\n.top.mk-12z5pjz {\n\t\t\t\theight: 60px;\n\t\t\t\tfont-size: 18px;\n\t\t\t}",
 	"states": []
 }

@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: s4-global-tokens
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Inbox
 - assertVisible: Two messages wait\.
 - assertVisible: Open team
@@ -18,16 +18,16 @@ name: s4-global-tokens
 - assertNotVisible: Two messages wait\.
 - assertVisible: Team
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertVisible: Two messages wait\.
 - assertNotVisible: Ada, design
 - assertVisible: Inbox
