@@ -1056,6 +1056,11 @@ const isPrefix = (prefix: ReadonlyArray<number>, path: ReadonlyArray<number>): b
 
 /** Builds the native view of a module's root component from its semantic graph, or refuses with diagnostics. */
 export type NativeViewOptions = {
+	/**
+	 * A `<link rel="stylesheet">` with a fixed `href`: true when the build read that file (one the app serves), so it styles
+	 * the page as the browser's load does; else the link is refused.
+	 */
+	readonly linkStylesheet?: (href: string) => boolean;
 	/** The page's route when the module is a page: the router's pattern and its param names. */
 	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
 	/**
@@ -4747,26 +4752,37 @@ export function createNativeViewPayload(
 				);
 				return value ? [{ attribute: target.name, value }] : [];
 			}
-			if (
-				target.kind === 'class' &&
-				target.trueValue !== undefined &&
-				target.falseValue !== undefined &&
-				target.constantClass === undefined &&
-				target.leadingClass === undefined
-			) {
-				const test = exprOf(read.expression, 'the class test', scope);
-				return test
-					? [
-							{
-								attribute: 'class',
-								value: {
-									if: test,
-									whenTrue: { literal: target.trueValue },
-									whenFalse: { literal: target.falseValue },
-								},
-							},
-						]
-					: [];
+			if (target.kind === 'class') {
+				const given = renderValue(
+					read.expression,
+					() => readScript(scope.module, read.sourceSpan),
+					'the class',
+					scope,
+				);
+				if (!given) return [];
+				const value: NativeExpr =
+					target.trueValue !== undefined && target.falseValue !== undefined
+						? { if: given, whenTrue: { literal: target.trueValue }, whenFalse: { literal: target.falseValue } }
+						: given;
+				const lead = target.leadingClass || undefined;
+				const constant = target.constantClass || undefined;
+				// As the web writes it: `[leading, value, constant].filter(Boolean).join(' ')`, the scopes kept around the value.
+				const fixed = [lead, constant].filter(Boolean).join(' ');
+				return [
+					{
+						attribute: 'class',
+						value:
+							fixed === ''
+								? value
+								: {
+										if: value,
+										whenTrue: {
+											template: [...(lead ? [`${lead} `] : []), value, ...(constant ? [` ${constant}`] : [])],
+										},
+										whenFalse: { literal: fixed },
+									},
+					},
+				];
 			}
 			refuse(`a ${target.kind} binding${'name' in target ? ` (\`${target.name}\`)` : ''}`);
 			return [];
@@ -5133,7 +5149,13 @@ export function createNativeViewPayload(
 							);
 					} else if (element === 'link') {
 						const rel = written.rel?.trim().toLowerCase().split(/\s+/) ?? [];
-						if (bound.includes('rel') || rel.includes('stylesheet'))
+						const read =
+							!bound.includes('rel') &&
+							!bound.includes('href') &&
+							rel.includes('stylesheet') &&
+							written.href !== undefined &&
+							options.linkStylesheet?.(written.href) === true;
+						if (!read && (bound.includes('rel') || rel.includes('stylesheet')))
 							refuseAs(
 								'stylesheet',
 								`<link rel="stylesheet"${written.href ? ` href="${written.href}"` : ''}> loads styles while the page runs`,
@@ -5962,10 +5984,6 @@ export function createNativeViewPayload(
 				close();
 				const boundary = scope.module.boundaries.get(item.id);
 
-				if (item.arms.catch === undefined) {
-					refuse('a @try with no @catch; its error would leave this screen');
-					continue;
-				}
 				const branchId = scope.prefix + item.id;
 				const at = nodes.length;
 				const tasks = new Set<string>();
@@ -6054,7 +6072,7 @@ export function createNativeViewPayload(
 				}
 				// A handler that rejects keeps the shown content and opens @catch after it, as the web's spec says (a failed
 				// value on the first load still shows only @catch).
-				if (caught || refreshes) {
+				if ((caught || refreshes) && item.arms.catch !== undefined) {
 					const caughtId = `${branchId}:caught`;
 					const handlerFailed: NativeExpr = {
 						binary: '!==',
