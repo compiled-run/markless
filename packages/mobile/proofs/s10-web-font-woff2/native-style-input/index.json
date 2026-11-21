@@ -1,0 +1,72 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Almanac",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "almanac mk-1onfv6w"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-1onfv6w"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Tide almanac"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "body mk-1onfv6w"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Lato from WOFF2, regular weight"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "body mk-1onfv6w"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Waffles, quays and fjords"
+		}
+	],
+	"css": "@font-face {\n\tfont-family: 'Harbour Lato';\n\tsrc: url('./fonts/Lato-Regular.woff2') format('woff2');\n\tfont-weight: 400;\n}\n\n@font-face {\n\tfont-family: 'Harbour Lato';\n\tsrc: url('./fonts/Lato-Bold.woff2') format('woff2');\n\tfont-weight: 700;\n}\n\nbody {\n\tmargin: 0;\n\tfont-family: 'Nowhere Sans', 'Harbour Lato';\n}\n\n.almanac.mk-1onfv6w {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.heading.mk-1onfv6w {\n\t\t\t\tfont-size: 28px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.body.mk-1onfv6w {\n\t\t\t\tfont-size: 18px;\n\t\t\t}",
+	"states": [],
+	"fonts": [
+		{
+			"url": "./fonts/Lato-Regular.woff2",
+			"file": "../styles/fonts/Lato-Regular.woff2"
+		},
+		{
+			"url": "./fonts/Lato-Bold.woff2",
+			"file": "../styles/fonts/Lato-Bold.woff2"
+		}
+	]
+}

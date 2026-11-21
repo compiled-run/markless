@@ -1,0 +1,30 @@
+{
+	"rung": 171,
+	"name": "A hint surface on the overlay stack: another surface opening supersedes it, it never dismisses the surface beneath it, and an outside press reaches both",
+	"steps": [
+		{
+			"visible": ["Hints", "Saves a draft", "Tip closed: not yet", "Menu closed: not yet"],
+			"absent": ["Draft options"]
+		},
+		{
+			"do": { "tap": "More" },
+			"visible": ["Draft options", "Tip closed: superseded"],
+			"absent": ["Saves a draft", "Tip closed: not yet"]
+		},
+		{
+			"do": { "tap": "Explain" },
+			"visible": ["Saves a draft", "Draft options", "Menu closed: not yet"]
+		},
+		{
+			"do": { "tap": "Hints" },
+			"visible": ["Tip closed: outside-press", "Menu closed: outside-press"],
+			"absent": ["Saves a draft", "Draft options"]
+		},
+		{ "do": { "tap": "Show tip" }, "visible": ["Saves a draft"] },
+		{
+			"do": { "escape": true },
+			"visible": ["Tip closed: escape"],
+			"absent": ["Saves a draft"]
+		}
+	]
+}

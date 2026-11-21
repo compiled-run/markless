@@ -161,3 +161,38 @@ fun jsonString(value: String): String {
 	}
 	return b.append('"').toString()
 }
+
+/** A JSON number's text: whole numbers without a fraction. */
+fun jsonNumber(value: Double): String {
+	if (value.isNaN() || value.isInfinite()) throw MarklessDecodeError("$value is not a JSON number")
+	return if (value == Math.rint(value) && Math.abs(value) < 1e15) value.toLong().toString() else value.toString()
+}
+
+/** This value as JSON text. */
+fun Json.text(): String = StringBuilder().also { write(this, it) }.toString()
+
+private fun write(v: Json, out: StringBuilder) {
+	when (v) {
+		is Json.Obj -> {
+			out.append('{')
+			for ((n, e) in v.fields.entries.withIndex()) {
+				if (n > 0) out.append(',')
+				out.append(jsonString(e.key)).append(':')
+				write(e.value, out)
+			}
+			out.append('}')
+		}
+		is Json.Arr -> {
+			out.append('[')
+			for ((n, x) in v.items.withIndex()) {
+				if (n > 0) out.append(',')
+				write(x, out)
+			}
+			out.append(']')
+		}
+		is Json.Str -> out.append(jsonString(v.value))
+		is Json.Num -> out.append(jsonNumber(v.value))
+		is Json.Bool -> out.append(v.value)
+		Json.Null -> out.append("null")
+	}
+}

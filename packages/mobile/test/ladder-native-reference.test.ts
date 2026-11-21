@@ -281,6 +281,9 @@ function mirror(
 			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 			for (const text of step.absent ?? [])
 				expect(shown, `step ${index}`).not.toContain(text);
+			// Which texts a page's styles hide is Dragon's layout; the payload must still hold them.
+			for (const text of step.hidden ?? [])
+				expect([...open.values()], `step ${index}`).toContain(text);
 			if (step.order)
 				expect(shown.filter((text) => step.order!.includes(text))).toEqual(step.order);
 			if (step.title !== undefined)
@@ -363,8 +366,11 @@ function walkApp(
 				`step ${index}: Back journals only what it cancels`,
 			).toEqual([]);
 			stack.pop();
-		} else if (looksOnly(action) || (action && ('swipe' in action || 'scrollTo' in action))) {
-			// Neither the appearance nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
+		} else if (
+			looksOnly(action) ||
+			(action && ('swipe' in action || 'scrollTo' in action || 'orientation' in action))
+		) {
+			// Neither the appearance, a rotation, nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
 		} else if (action) {
 			const top = stack.at(-1)!;
 			const host = top.elementReading(
@@ -615,6 +621,12 @@ function walk(
 						.join(' '));
 		return label !== null && shownNode(node.id) ? [[id, label] as const] : [];
 	};
+	// A text field by its accessible name, as the web finds a textbox: a control named the same (a preview button) is not one.
+	const fieldReading = (text: string) =>
+		labels().find(([id, label]) => {
+			const element = nodeOf.get(id.split('@')[0]!);
+			return label === text && element?.kind === 'element' && (element.element === 'input' || element.element === 'textarea');
+		})?.[0] ?? elementReading(text);
 	const elementReading = (text: string) => {
 		const labelled = labels().find(([, label]) => label === text)?.[0];
 		if (labelled) return labelled;
@@ -947,7 +959,7 @@ function walk(
 						: 'erase' in action
 							? action.erase
 							: action.submit;
-			const host = elementReading(name);
+			const host = 'tap' in action || 'doubleTap' in action ? elementReading(name) : fieldReading(name);
 			if (!host)
 				throw new Error(
 					`step ${index}: nothing reads "${name}" to ${'tap' in action ? 'tap' : 'type into'}`,
@@ -1065,7 +1077,7 @@ function walk(
 	function check(index: number, step: LadderStep) {
 		expect(invalid, `step ${index}: the message of a blocked submit`).toBe(step.invalid);
 		for (const [field, value] of Object.entries(step.fields ?? {})) {
-			const host = elementReading(field);
+			const host = fieldReading(field);
 			expect(host && fieldText(host), `step ${index}: the field "${field}"`).toBe(value);
 		}
 		if (step.calls) expect(calls, `step ${index}: the device calls made`).toEqual(step.calls);

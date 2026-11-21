@@ -7,12 +7,22 @@
 			{
 				"id": "component-edge:0/shared:src/factory-handles.tsrx#boxState/state:box.note",
 				"name": "box.note",
-				"initial": "unchecked"
+				"initial": "unchecked",
+				"styled": true,
+				"domain": [
+					"unchecked",
+					"has field"
+				]
 			},
 			{
 				"id": "component-edge:2/shared:src/factory-handles.tsrx#boxState/state:box.note",
 				"name": "box.note",
-				"initial": "unchecked"
+				"initial": "unchecked",
+				"styled": true,
+				"domain": [
+					"unchecked",
+					"no field"
+				]
 			}
 		],
 		"nodes": [
@@ -133,6 +143,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "component-edge:0/shared:src/factory-handles.tsrx#boxState/state:box.note",
+					"value": "has field"
+				},
+				{
 					"op": "text",
 					"node": "component-edge:0/h2:text0",
 					"value": "has field"
@@ -145,6 +160,11 @@
 				"host": "component-edge:2/h2"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:2/shared:src/factory-handles.tsrx#boxState/state:box.note",
+					"value": "no field"
+				},
 				{
 					"op": "text",
 					"node": "component-edge:2/h2:text0",

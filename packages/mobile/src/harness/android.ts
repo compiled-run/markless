@@ -37,6 +37,7 @@ import {
 	filesUnder,
 	SHELL_CACHE_FORMAT,
 } from './tools.ts';
+import { assertDragonPin, dragonDir } from '../style-export.ts';
 
 export type BootedEmulator = {
 	readonly serial: string;
@@ -221,8 +222,10 @@ export async function buildAndroidShell(
 ): Promise<AndroidShell> {
 	const hostLock = join(hostSources, '..', 'libraries.lock.json');
 	const libraries = await androidLibraries(tools, existsSync(hostLock) ? hostLock : undefined);
+	const dragon = dragonKotlin();
 	const sources = [...filesUnder(hostSources, '.kt'), ...filesUnder(shellDir, '.kt')];
 	const key = contentKey(hostSources, sources, [
+		dragon.key,
 		tools.buildTools,
 		tools.androidJar,
 		tools.kotlinStdlib,
@@ -270,6 +273,7 @@ export async function buildAndroidShell(
 			'-d',
 			classes,
 			...sources,
+			...dragon.sources,
 		]);
 		await exec(join(tools.buildTools, 'd8'), [
 			'--min-api',
@@ -369,6 +373,20 @@ async function androidEngine(
 	]);
 	writeFileSync(join(root, 'done'), '');
 	return engine();
+}
+
+/**
+ * Dragon's translated layout engine and its Markless plan layout (the translated harness without its command-line `main`), from
+ * the Dragon checkout the styles come from; the host finds `dev.dragon.layout.HarnessKt` by name.
+ */
+function dragonKotlin() {
+	assertDragonPin();
+	const generated = join(dragonDir(), 'packages', 'layout', 'generated', 'kotlin');
+	const engine = filesUnder(join(generated, 'src', 'main', 'kotlin', 'dev', 'dragon', 'layout'), '.kt');
+	const harness = ['Harness.kt', 'Host.kt'].map((file) => join(generated, 'harness', 'dev', 'dragon', 'layout', file));
+	if (engine.length === 0 || !harness.every((file) => existsSync(file)))
+		throw new Error(`${generated} has no translated engine and harness; set MARKLESS_DRAGON_DIR to a Dragon checkout`);
+	return { key: contentKey(generated, [...engine, ...harness]), sources: [...engine, ...harness] };
 }
 
 const androidManifest = (
