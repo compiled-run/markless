@@ -431,7 +431,8 @@ if (!host) {
 	}
 	// The form a submit handler's event names: only FormData reads it, as its entries when the form was sent.
 	host.Form = function (entries) { Object.defineProperty(this, 'entries', { value: entries }); };
-	if (typeof g.FormData !== 'function') {
+	// Built in its own function: a hoisted var FormData would hide the global in every later payload's script.
+	if (typeof g.FormData !== 'function') (function () {
 		var FormData = function FormData(form, submitter) {
 			if (!(this instanceof FormData)) throw new TypeError("Failed to construct 'FormData': Please use the 'new' operator");
 			if (submitter !== undefined && submitter !== null) throw new TypeError("FormData on a phone does not read a submitter yet");
@@ -468,7 +469,7 @@ if (!host) {
 		FormData.prototype.values = function () { return iterate(this, function (entry) { return entry[1]; }); };
 		FormData.prototype[Symbol.iterator] = FormData.prototype.entries;
 		g.FormData = FormData;
-	}
+	})();
 }`;
 
 // One payload's script: its modules, its functions, and the entry points a host calls (`enter`, then `leave`).

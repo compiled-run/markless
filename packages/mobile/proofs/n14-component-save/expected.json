@@ -1,0 +1,38 @@
+{
+	"rung": "N14",
+	"name": "A component form on a pushed screen calls the page's async callback prop, which saves, awaits a timer and navigates, as on the web",
+	"steps": [
+		{
+			"visible": ["No notes yet", "Write your first note"],
+			"title": "All notes"
+		},
+		{
+			"do": {
+				"tap": "Write your first note"
+			},
+			"visible": ["New note", "Save note"],
+			"absent": ["No notes yet"],
+			"title": "New note"
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Title",
+					"text": "Groceries"
+				}
+			},
+			"visible": ["Save note"],
+			"fields": {
+				"Title": "Groceries"
+			}
+		},
+		{
+			"do": {
+				"tap": "Save note"
+			},
+			"visible": ["Groceries", "Not pinned", "Personal"],
+			"absent": ["Save note"],
+			"title": "Note"
+		}
+	]
+}
