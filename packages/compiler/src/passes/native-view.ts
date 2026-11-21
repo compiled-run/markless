@@ -18,6 +18,7 @@ import type {
 import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
 import {
 	isNativeStyleStateAttribute,
+	nativeExprCells,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 	NATIVE_DATA_SCRIPT_TYPES,
@@ -26,6 +27,7 @@ import {
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
+	NATIVE_SCRIPT_SUBMITTED_FORM,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
 	NATIVE_SCRIPT_HOST_GLOBALS,
 	NATIVE_SCRIPT_LANGUAGE_GLOBALS,
@@ -69,11 +71,14 @@ import type {
 	SemanticSharedDefinition,
 	SemanticScriptFunction,
 	SemanticScriptGlobal,
+	SemanticSyncPolicy,
 	SourceSpan,
 } from '../artifacts.ts';
+import { isEventAttribute, normalizeEventName } from '../ast/events.ts';
 import { compileDrawing, type DrawingElement } from './native-drawing.ts';
 import { nativeScriptOf, type NativeScriptModuleInput } from './native-script.ts';
 import { scriptFactsOf, type ScriptFacts } from './semantic-graph/script-facts.ts';
+import { sharedDefinitionId } from './semantic-graph/collect-shared.ts';
 
 export const NATIVE_UNSUPPORTED_CODE = 'MARKLESS_NATIVE_UNSUPPORTED';
 
@@ -422,7 +427,32 @@ type Prop =
 			readonly statements: ReadonlyArray<SemanticHandlerStatement> | undefined;
 			readonly parameters: ReadonlyArray<string>;
 			readonly scope: Scope;
+			/** Where the caller wrote the function, for JavaScript that calls it. */
+			readonly span?: SourceSpan;
 	  };
+
+/** A caller's event callback a part carries in its rest props, with the scope it was written in. */
+type Forwarded = {
+	readonly prop: Extract<SemanticComponentEdge['props'][number], { readonly kind: 'callback' | 'serializable' | 'opaque' }>;
+	readonly edge: string;
+	readonly scope: Scope;
+};
+
+/** A forwarded callback as the event it is on the element that spreads it, as the web's spread forwarding records it. */
+const forwardedEvent = ({ prop, edge }: Forwarded, host: string): SemanticEvent => ({
+	id: `forwarded:${edge}:${prop.name}`,
+	hostNodeId: host,
+	eventName: normalizeEventName(prop.name),
+	...(prop.source ? { handlerSource: prop.source } : {}),
+	...(prop.sourceSpan ? { handlerSpan: prop.sourceSpan } : {}),
+	...(prop.catchResets ? { handlerCatchResets: prop.catchResets } : {}),
+	...(prop.catchBoundaryId ? { handlerCatchBoundaryId: prop.catchBoundaryId } : {}),
+	...(prop.returnsPromise ? { handlerReturnsPromise: true as const } : {}),
+	handlerParameters: prop.nativeParameters ?? prop.parameters ?? [],
+	...(prop.nativeStatements ? { handlerStatements: prop.nativeStatements } : {}),
+	hasSyncPolicyCandidate: prop.hasSyncPolicyCandidate ?? false,
+	...(prop.syncPolicy ? { syncPolicy: prop.syncPolicy } : {}),
+});
 
 /** One rendered instance of a `shared()` definition: its cells, handles and methods, resolved for one subtree. */
 type SharedInstance = {
@@ -444,9 +474,15 @@ type Field =
 			readonly kind: 'method';
 			readonly statements: ReadonlyArray<SemanticHandlerStatement> | undefined;
 			readonly parameters: ReadonlyArray<string>;
+			readonly span?: SourceSpan;
 	  }
 	| { readonly kind: 'slot' }
-	| { readonly kind: 'expr'; readonly expression: SemanticExpression | undefined };
+	| {
+			readonly kind: 'expr';
+			readonly expression: SemanticExpression | undefined;
+			/** The factory's `computed(...)` it reads, by name, which can run as a script computed. */
+			readonly computed?: string;
+	  };
 
 /** A name whose members are what a native build reads: a state object split into one cell per field, or a shared instance. */
 type ObjectRef =
@@ -495,6 +531,8 @@ type Scope = {
 	readonly shared: ReadonlyMap<string, SharedInstance>;
 	/** Props the caller passed that the component does not declare: written where it spreads `{...rest}`. */
 	readonly rest?: ReadonlyArray<readonly [string, NativeExpr]>;
+	/** Event callbacks this instance was given and does not declare: they run on the element its rest spreads onto. */
+	readonly forwarded?: ReadonlyArray<Forwarded>;
 	/** This instance's device objects by local name (`cam`), each with its payload id. */
 	/** In a `shared()` factory's methods: the handles it declares (`const fieldEl = element()`), read by their own names. */
 	readonly handles?: ReadonlyMap<string, { readonly key: string; readonly plural: boolean }>;
@@ -626,6 +664,14 @@ const messageOfError = (expr: NativeExpr | null | undefined): NativeExpr | undef
 /** An op that marks where `event.preventDefault()` ran in a submit handler; checked, then taken out. */
 const PREVENT = { op: 'prevent' } as unknown as NativeOp;
 
+/** Whether a handler's sync policy cancels its event on every run, before any of its code can await or return. */
+const preventsAlways = (policy: SemanticSyncPolicy | undefined): boolean =>
+	!!policy &&
+	'when' in policy &&
+	policy.when.type === 'constant-truthy' &&
+	!!policy.when.value &&
+	policy.actions.includes('preventDefault');
+
 /** Whether every way through `ops` runs `preventDefault()` before the handler's synchronous part ends. */
 const prevents = (ops: ReadonlyArray<NativeOp>): boolean =>
 	ops.some(
@@ -659,10 +705,16 @@ function readsLive(expr: unknown): boolean {
 	);
 }
 
-/** Whether ops read what only data has: a text field's text (`{ field }`) or a press count (`{ event: 'detail' }`). */
+/** Whether ops use what only data has: a text field's text (`{ field }`, `fieldText`) or a press count (`{ event: 'detail' }`). */
 const mentionsDataOnly = (tree: unknown): boolean => {
 	if (!tree || typeof tree !== 'object') return false;
-	if (!Array.isArray(tree) && ('field' in tree || (tree as { event?: unknown }).event === 'detail')) return true;
+	if (
+		!Array.isArray(tree) &&
+		('field' in tree ||
+			(tree as { event?: unknown }).event === 'detail' ||
+			(tree as { op?: unknown }).op === 'fieldText')
+	)
+		return true;
 	return Object.values(tree).some(mentionsDataOnly);
 };
 
@@ -987,9 +1039,11 @@ export function nativeUnsupported(message: string, span?: SourceSpan): CompilerD
 }
 
 const LANGUAGE_GLOBALS = new Set(NATIVE_SCRIPT_LANGUAGE_GLOBALS);
-// A submit's default action and a box's checkedness are the host's; a script's event cannot report them back yet.
+// A box's checkedness is the host's; a script's event cannot report it back yet.
 // keydown and paste stay data: the engine journals no cancel of what the key or paste does.
-const DATA_ONLY_EVENTS = new Set(['submit', 'change', 'keydown', 'paste']);
+const DATA_ONLY_EVENTS = new Set(['change', 'keydown', 'paste']);
+/** A select's own events: a choice that changes it fires `input`, reading the chosen value. */
+const SELECT_EVENTS: ReadonlySet<string> = new Set(['input']);
 const RENDER_UNSTEADY = new Set(['Date', 'crypto', 'performance']);
 const GLOBAL_OBJECTS = new Set(NATIVE_SCRIPT_GLOBAL_OBJECTS);
 
@@ -999,7 +1053,6 @@ const isScalar = (value: unknown): value is NativeScalar | null =>
 	typeof value === 'boolean' ||
 	(typeof value === 'number' && Number.isFinite(value));
 
-/** Every cell an expression reads. */
 /** Whether an expression reads a row's item. */
 function readsItem(expr: NativeExpr): boolean {
 	if (!expr || typeof expr !== 'object') return false;
@@ -1051,17 +1104,7 @@ function findsHolder(loop: Extract<SemanticFunctionStatement, { kind: 'each' }>)
 	);
 }
 
-function cellsOf(expr: NativeExpr, into = new Set<string>()): Set<string> {
-	if ('cell' in expr) into.add(expr.cell);
-	for (const child of Object.values(expr)) {
-		if (Array.isArray(child)) {
-			for (const item of child)
-				if (item && typeof item === 'object')
-					cellsOf((Array.isArray(item) ? item[1] : item) as NativeExpr, into);
-		} else if (child && typeof child === 'object') cellsOf(child as NativeExpr, into);
-	}
-	return into;
-}
+const cellsOf = nativeExprCells;
 
 const BUILTIN_CALLS: Readonly<Record<string, (...args: never[]) => unknown>> = {
 	String,
@@ -1393,16 +1436,21 @@ export function createNativeViewPayload(
 	const cellIndex = new Map<string, number>();
 	/** Cells whose first value is `undefined` on the web; a native cell holds null there. */
 	const undefinedFirst = new Set<string>();
-	const holdsUndefined = (value: unknown): boolean =>
-		value === undefined ||
-		(value !== null && typeof value === 'object' && Object.values(value).some(holdsUndefined));
-	/** Whether ops read a cell whose first value is `undefined`. */
+	/** Whether ops read a row's cell whose first value is `undefined`: the engine sees a row's value as null there. */
 	const readsUndefinedFirst = (tree: unknown): boolean => {
 		if (!tree || typeof tree !== 'object') return false;
 		const cell = (tree as { cell?: unknown }).cell;
-		if (typeof cell === 'string' && undefinedFirst.has(cell)) return true;
+		if (
+			typeof cell === 'string' &&
+			undefinedFirst.has(cell) &&
+			cells[cellIndex.get(cell) ?? -1]?.row !== undefined
+		)
+			return true;
 		return Object.values(tree).some(readsUndefinedFirst);
 	};
+	const holdsUndefined = (value: unknown): boolean =>
+		value === undefined ||
+		(value !== null && typeof value === 'object' && Object.values(value).some(holdsUndefined));
 	const noteUndefined = (id: string, first: unknown) => {
 		if (!holdsUndefined(first)) return;
 		undefinedFirst.add(id);
@@ -1506,6 +1554,7 @@ export function createNativeViewPayload(
 					kind: 'method',
 					statements: property.nativeStatements,
 					parameters: property.parameters ?? [],
+					...(property.sourceSpan ? { span: property.sourceSpan } : {}),
 				});
 			} else if (property.kind === 'callback-slot') {
 				instance.fields.set(property.name, { kind: 'slot' });
@@ -1532,6 +1581,7 @@ export function createNativeViewPayload(
 					instance.fields.set(property.name, {
 						kind: 'expr',
 						expression: binding.nativeExpression,
+						computed: binding.name,
 					});
 			}
 		}
@@ -1562,6 +1612,31 @@ export function createNativeViewPayload(
 			deviceObjects: new Map(),
 		};
 		return instance;
+	};
+
+	const widgetRoots = new Map<string, string | undefined>();
+	/** The component that roots a definition's widgets: the first in its module whose body seeds it. */
+	const widgetRoot = (definition: SemanticSharedDefinition): string | undefined => {
+		if (widgetRoots.has(definition.id)) return widgetRoots.get(definition.id);
+		const owner = [...moduleFactsByFile.values()].find(
+			(facts) =>
+				sharedDefinitionId(facts.graph.moduleId, definition.exportedName) === definition.id,
+		);
+		let root: string | undefined;
+		for (const [component, uses] of owner?.sharedInstancesByComponent ?? []) {
+			const local = uses.find((use) => use.definitionId === definition.id)?.localName;
+			if (local === undefined) continue;
+			const seeds = owner!.componentFacts.get(component)?.native?.renderStatements ?? [];
+			if (
+				seeds.some((statement) => statement.kind === 'assign' && statement.target === local)
+			) {
+				root = component;
+				break;
+			}
+		}
+		const found = owner && root ? `${owner.graph.filename}#${root}` : undefined;
+		widgetRoots.set(definition.id, found);
+		return found;
 	};
 
 	/**
@@ -1613,8 +1688,13 @@ export function createNativeViewPayload(
 				refuse(`${definition.name}: shared() with scope \`${definition.scope ?? 'app'}\``);
 				continue;
 			}
+			// As on the web, each rendered copy of the definition's root component starts a widget of its own (a checkbox inside
+			// a checklist's checkbox), and every other part joins the nearest one above it.
+			const known = subtree.get(definition.id);
 			const instance =
-				subtree.get(definition.id) ?? createInstance(definition, module, prefix, row);
+				known && widgetRoot(definition) !== `${module.graph.filename}#${component}`
+					? known
+					: createInstance(definition, module, prefix, row);
 			subtree.set(definition.id, instance);
 			objects.set(use.localName, { kind: 'instance', instance });
 		}
@@ -1666,6 +1746,33 @@ export function createNativeViewPayload(
 				if (folded && lowered && cellsOf(lowered).size === 0) {
 					value = folded.value;
 					known = true;
+				} else if (
+					lowered &&
+					row &&
+					!binding.storage &&
+					cellsOf(lowered).size === 0 &&
+					readsItemOnly(lowered)
+				) {
+					// `state({ value })` in a part a row renders: its first value is the row's item, read when the row is built.
+					if ('object' in lowered) {
+						const fields = new Map<string, string>();
+						for (const [field, expr] of lowered.object) {
+							fields.set(field, `${id}.${field}`);
+							addCell({
+								id: `${id}.${field}`,
+								name: `${binding.name}.${field}`,
+								initial: null,
+								row,
+								first: expr,
+							});
+						}
+						objects.set(binding.name, { kind: 'fields', cells: fields });
+					} else {
+						byName.set(binding.name, id);
+						byBinding.set(binding.id, id);
+						addCell({ id, name: binding.name, initial: null, row, first: lowered });
+					}
+					continue;
 				}
 			}
 			if (!known || !isNativeValue(value)) {
@@ -1754,15 +1861,84 @@ export function createNativeViewPayload(
 			cells[cellIndex.get(cell)!] = { ...rowCell, first: lowered };
 			return;
 		}
+		if (cellsOf(lowered).size > 0 && rowCell.row === undefined) {
+			cells[cellIndex.get(cell)!] = { ...rowCell, follows: lowered };
+			undefinedFirst.delete(cell);
+			return;
+		}
 		if (!folded || cellsOf(lowered).size > 0 || !isNativeValue(folded.value)) {
 			refuse(
 				`${what} sets \`${statement.target}.${fieldName}\` from a value that follows state; pass a fixed value or leave the prop out`,
 			);
 			return;
 		}
+		// A prop the root was not given is `undefined` there too; any other value replaces the first one.
+		const absent =
+			statement.value.kind === 'read' &&
+			isPropName(statement.value.name, scope) &&
+			!propOf(statement.value.name, scope);
+		if (absent) undefinedFirst.add(cell);
+		else undefinedFirst.delete(cell);
 		setInitial(cell, folded.value);
 	};
 
+	/** A prop given a computed (a template expression, a family's derived member) or a shared state field, lowered where it is written. */
+	const graphValue = (
+		prop: Extract<
+			SemanticGraphArtifact['componentEdges'][number]['props'][number],
+			{ kind: 'graph-reference' }
+		>,
+		scope: Scope,
+	): NativeExpr | null => {
+		const what = `the \`${prop.name}\` prop`;
+		const own = scope.module.bindingsById.get(prop.graphNodeId);
+		if (
+			own?.kind === 'computed' &&
+			!own.sharedDefinitionId &&
+			prop.path.length === 0 &&
+			own.nativeExpression
+		) {
+			if (!prop.nativeExpression) return exprOf(own.nativeExpression, what, scope);
+			// Where data cannot lower it, the prop's own expression may still run as a script.
+			const data = attempt(() => exprOf(own.nativeExpression, what, scope));
+			if (data.failed) data.rollBack();
+			return data.failed ? null : data.value;
+		}
+		const local =
+			own?.kind === 'state' && !own.sharedDefinitionId
+				? scope.objects.get(own.name)
+				: undefined;
+		if (local?.kind === 'fields' && prop.path.length === 1 && local.cells.has(prop.path[0]!))
+			return { cell: local.cells.get(prop.path[0]!)! };
+		for (const object of scope.objects.values()) {
+			const instance = object.kind === 'instance' ? object.instance : object.instance;
+			if (
+				!instance ||
+				!prop.graphNodeId.startsWith(
+					`shared:${instance.module.graph.filename}#${instance.definition.name}/`,
+				)
+			)
+				continue;
+			const binding = instance.module.bindingsById.get(prop.graphNodeId);
+			for (const [name, field] of instance.fields) {
+				if (
+					binding?.kind === 'computed' &&
+					field.kind === 'expr' &&
+					field.computed === binding.name &&
+					prop.path.length === 0
+				)
+					return sharedExpr(instance, name, field.expression, field.computed);
+				if (
+					binding?.kind === 'state' &&
+					field.kind === 'cell' &&
+					prop.path.length === 1 &&
+					name === prop.path[0]
+				)
+					return { cell: field.cell };
+			}
+		}
+		return null;
+	};
 	const propOf = (name: string, scope: Scope): Prop | undefined =>
 		scope.props.get(scope.module.propNames.get(scope.component)?.get(name) ?? '');
 	const isPropName = (name: string, scope: Scope): boolean =>
@@ -2097,13 +2273,19 @@ export function createNativeViewPayload(
 		{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }
 	>();
 	const scriptServices = new Set<NativeScriptService>();
+	/** Forms whose submit handler runs as JavaScript: their script may build FormData from the form it is given. */
+	const scriptSubmits = new Set<string>();
 	const refuseScript = (message: string, span?: SourceSpan): null => {
 		diagnostics.push(nativeRefusal('javascript', message, span));
 		return null;
 	};
 
 	/** Whether every global a script reads is one a phone's engine has; refuses each other one by name, file and line. */
-	function checkGlobals(globals: ReadonlyArray<SemanticScriptGlobal>, what: string): boolean {
+	function checkGlobals(
+		globals: ReadonlyArray<SemanticScriptGlobal>,
+		what: string,
+		forms: boolean,
+	): boolean {
 		let ok = true;
 		for (const global of globals) {
 			if (global.typeofOnly) continue;
@@ -2111,6 +2293,7 @@ export function createNativeViewPayload(
 				GLOBAL_OBJECTS.has(global.name) && global.property !== undefined
 					? global.property
 					: global.name;
+			if (name === 'FormData' && forms) continue;
 			if (GLOBAL_OBJECTS.has(name) && name === 'globalThis' && global.property === undefined)
 				continue;
 			if (LANGUAGE_GLOBALS.has(name)) continue;
@@ -2141,11 +2324,12 @@ export function createNativeViewPayload(
 		fact: SemanticScriptFunction,
 		module: ModuleFacts,
 		what: string,
+		forms = false,
 	): string | null {
 		const key = `${fact.span.filename}\0${fact.span.start}`;
 		const known = scriptFunctions.get(key);
 		if (known) return known.id;
-		let ok = checkGlobals(fact.globals, what);
+		let ok = checkGlobals(fact.globals, what, forms);
 		for (const use of fact.framework) {
 			ok = false;
 			refuseScript(
@@ -2161,29 +2345,135 @@ export function createNativeViewPayload(
 			);
 		}
 		if (!ok) return null;
-		const id = `fn:${scriptFunctions.size}`;
-		scriptFunctions.set(key, { id, module, fact });
-		return id;
+		const entry = { id: `fn:${scriptFunctions.size}`, module, fact };
+		// What the function reaches in its modules is refused now, while the handler can still stay data.
+		const before = diagnostics.length;
+		const services = [...scriptServices];
+		buildScript([entry]);
+		scriptServices.clear();
+		for (const service of services) scriptServices.add(service);
+		if (diagnostics.slice(before).some((diagnostic) => diagnostic.severity === 'error'))
+			return null;
+		scriptFunctions.set(key, entry);
+		return entry.id;
 	}
 
 	/** What each name a script function reads from its component means there: a cell, a state object's cells, or a value. */
+	/**
+	 * A shared object's members as a script reads them: cells it may write, element handles as proxies, values, and its
+	 * methods as script functions; a computed, which only reads, gets the object without methods.
+	 */
+	function sharedMembers(
+		instance: SharedInstance,
+		name: string,
+		reading: boolean,
+		span: SourceSpan | undefined,
+	): Record<string, NativeScriptBinding> | null {
+		const members: Record<string, NativeScriptBinding> = {};
+		for (const [field, member] of instance.fields) {
+			const label = `\`${name}.${field}\``;
+			if (member.kind === 'cell') members[field] = { cell: member.cell };
+			else if (member.kind === 'method') {
+				if (reading) continue;
+				if (!member.span)
+					return refuseScript(
+						`${label} has no source the build read, so it cannot run as JavaScript`,
+						span,
+					);
+				const method = methodBinding(instance, member.span, label);
+				if (!method) return null;
+				members[field] = method;
+			} else if (member.kind === 'handle') {
+				// A computed never reads an element handle (the web refuses it), so only a handler's object carries them.
+				if (reading) continue;
+				const value = handleValue(member.key, member.plural, label);
+				if (!value) return null;
+				members[field] = { elements: value };
+			} else if (member.kind === 'expr' && member.expression) {
+				const value = sharedExpr(instance, field, member.expression, member.computed);
+				if (!value) return null;
+				members[field] = mentionsElement(value) ? { elements: value } : { value };
+			}
+		}
+		return members;
+	}
+
 	function scriptBindings(
 		fact: SemanticScriptFunction,
 		scope: Scope,
 		what: string,
+		reading = false,
+		forms = false,
+	): Record<string, NativeScriptBinding> | null {
+		const was = scriptReading;
+		scriptReading = true;
+		try {
+			return scriptBindingsOf(fact, scope, what, reading, forms);
+		} finally {
+			scriptReading = was;
+		}
+	}
+
+	function scriptBindingsOf(
+		fact: SemanticScriptFunction,
+		scope: Scope,
+		what: string,
+		reading: boolean,
+		forms: boolean,
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
 		let ok = true;
 		for (const { name, written, span } of fact.names) {
+			const prop = propOf(name, scope);
+			if (prop?.kind === 'callback') {
+				const callback = written ? undefined : prop.span && scriptFacts(prop.scope.module)?.handler(prop.span);
+				const label = `the \`${name}\` function ${what} calls`;
+				const fn = callback && scriptFunctionId(callback, prop.scope.module, label, forms);
+				const own = callback && fn && scriptBindings(callback, prop.scope, label, false, forms);
+				if (!fn || !own) {
+					ok = false;
+					if (!callback)
+						refuseScript(
+							written
+								? `${what} assigns \`${name}\`, which is not state`
+								: `${what} calls \`${name}\`, a function whose source the build did not read`,
+							span,
+						);
+					continue;
+				}
+				bindings[name] = { callback: fn };
+				for (const [inner, binding] of Object.entries(own))
+					bindings[`${name}.${inner}`] = binding;
+				continue;
+			}
 			const object = scope.objects.get(name);
 			if (object?.kind === 'fields') {
 				bindings[name] = { fields: Object.fromEntries(object.cells) };
 				continue;
 			}
-			if (object?.kind === 'instance' || scope.deviceObjects.has(name)) {
+			// A family's shared object, or the accessor that returns it, reaches the script member by member.
+			const owned =
+				object?.kind === 'instance'
+					? object.instance
+					: [...scope.objects.values()].find(
+							(candidate): candidate is Extract<ObjectRef, { kind: 'instance' }> =>
+								candidate.kind === 'instance' &&
+								candidate.instance.definition.name === name,
+						)?.instance;
+			if (owned && !scope.locals.has(name)) {
+				const members = sharedMembers(owned, name, reading, span);
+				if (!members) {
+					ok = false;
+					continue;
+				}
+				bindings[name] =
+					object?.kind === 'instance' ? { object: members } : { shared: members };
+				continue;
+			}
+			if (scope.deviceObjects.has(name)) {
 				ok = false;
 				refuseScript(
-					`${what} uses \`${name}\` (${object ? 'a shared() object' : 'a device object'}), which JavaScript on a phone cannot reach yet`,
+					`${what} uses \`${name}\` (a device object), which JavaScript on a phone cannot reach yet`,
 					span,
 				);
 				continue;
@@ -2213,13 +2503,9 @@ export function createNativeViewPayload(
 				}
 				continue;
 			}
+			// An element handle (or a list of them) reaches the script as proxies the host answers.
 			if (mentionsElement(read.value)) {
-				read.rollBack();
-				ok = false;
-				refuseScript(
-					`${what} uses the element \`${name}\`, which JavaScript on a phone cannot reach yet`,
-					span,
-				);
+				bindings[name] = { elements: read.value };
 				continue;
 			}
 			bindings[name] = { value: read.value };
@@ -2248,7 +2534,7 @@ export function createNativeViewPayload(
 			(global) => !global.typeofOnly && RENDER_UNSTEADY.has(global.property ?? global.name),
 		);
 		const fn = attempt(() => scriptFunctionId(script, scope.module, what));
-		const bindings = attempt(() => scriptBindings(script, scope, what));
+		const bindings = attempt(() => scriptBindings(script, scope, what, true));
 		if (fn.value !== null && bindings.value !== null && unsteady.length === 0)
 			return { script: fn.value, bindings: bindings.value };
 		// Neither runs it: the data path's refusal is the specific one; what the script lacks (a global, a framework call) adds to it.
@@ -2256,6 +2542,38 @@ export function createNativeViewPayload(
 		bindings.rollBack();
 		fn.rollBack();
 		const value = exprOf(expression, what, scope);
+		diagnostics.push(...reasons);
+		return value;
+	}
+
+	/**
+	 * A shared object's derived field: data where it lowers, else the factory's `computed(...)` it names, run as a script
+	 * computed over the factory's own state (a date or a locale's spelling, which data has no meaning for).
+	 */
+	function sharedExpr(
+		instance: SharedInstance,
+		field: string,
+		expression: SemanticExpression | undefined,
+		computed: string | undefined,
+	): NativeExpr | null {
+		const label = `${instance.definition.name}.${field}`;
+		const scope = { ...instance.scope, live: true };
+		const data = attempt(() => exprOf(expression, label, scope));
+		if (!data.failed || scriptMode === 'never' || computed === undefined) return data.value;
+		const fact = scriptFacts(instance.module)?.computed(undefined, computed);
+		if (!fact) return data.value;
+		data.rollBack();
+		const script = attempt(() => {
+			const fn = scriptFunctionId(fact, instance.module, `the computed \`${label}\``);
+			const bindings = scriptBindings(fact, scope, `the computed \`${label}\``, true);
+			return fn === null || bindings === null
+				? null
+				: ({ script: fn, bindings } as NativeExpr);
+		});
+		if (script.value && !script.failed) return script.value;
+		const reasons = script.refusals();
+		script.rollBack();
+		const value = exprOf(expression, label, scope);
 		diagnostics.push(...reasons);
 		return value;
 	}
@@ -2333,7 +2651,7 @@ export function createNativeViewPayload(
 				);
 			const label = `the computed \`${computed.name}\``;
 			const fn = scriptFunctionId(fact, scope.module, label);
-			const bindings = scriptBindings(fact, scope, label);
+			const bindings = scriptBindings(fact, scope, label, true);
 			return fn === null || bindings === null ? null : { script: fn, bindings };
 		});
 	}
@@ -2362,8 +2680,15 @@ export function createNativeViewPayload(
 	 * module's effects, and the exports something reads. A module the build was not given is asked for (`missingModules`);
 	 * one it cannot read is refused by name.
 	 */
-	function buildScript(): NativeViewPayload['script'] | undefined {
-		if (scriptFunctions.size === 0) return undefined;
+	/** The payload's script, or with `only`, just the walk over what those functions reach, refusing what cannot run. */
+	function buildScript(
+		only?: ReadonlyArray<{
+			readonly id: string;
+			readonly module: ModuleFacts;
+			readonly fact: SemanticScriptFunction;
+		}>,
+	): NativeViewPayload['script'] | undefined {
+		if (!only && scriptFunctions.size === 0) return undefined;
 		type Included = {
 			readonly module: ModuleFacts;
 			readonly index: number;
@@ -2441,7 +2766,7 @@ export function createNativeViewPayload(
 					`${at} uses ${construct.construct}, which a phone's script cannot run`,
 					construct.span,
 				);
-			checkGlobals(statement.globals, at);
+			checkGlobals(statement.globals, at, scriptSubmits.size > 0);
 			for (const name of statement.uses) local(entry, name);
 			for (const use of statement.imports) imported(entry, use.slot, use.name);
 		};
@@ -2511,13 +2836,13 @@ export function createNativeViewPayload(
 				} else exported(entry, candidate.name);
 			}
 		};
-		for (const { module, fact, id } of scriptFunctions.values()) {
+		for (const { module, fact } of only ?? scriptFunctions.values()) {
 			const entry = enter(module);
 			if (!entry) continue;
 			for (const name of fact.module) local(entry, name);
 			for (const use of fact.imports) imported(entry, use.slot, use.name);
-			void id;
 		}
+		if (only) return undefined;
 		const inputs: NativeScriptModuleInput[] = order.map((entry) => {
 			const facts = factsOf(entry.module)!;
 			const getters = [...entry.exports].filter(([name]) => !name.startsWith('*'));
@@ -2594,6 +2919,8 @@ export function createNativeViewPayload(
 	let tapRun = false;
 	/** Handles read in such a run as the tapped row's copy alone: how many rows there are is not known then. */
 	const rowCopies = new WeakSet<object>();
+	/** While a script's bindings are built: a handle list bound in a row is every row's copy. */
+	let scriptReading = false;
 	/** Whether the handler being lowered read the element a tap landed on. */
 	let pressedTargetRead = false;
 	/** The text field whose input handler is being lowered: its `value` there is what was typed. */
@@ -2610,6 +2937,24 @@ export function createNativeViewPayload(
 		// An element in an @if arm is bound only while its arm shows, which the app knows only while it runs.
 		if (bound.some((id) => byId.get(id)?.arm))
 			return refuse(`${what}, a handle bound inside an @if arm`);
+		if (scriptReading && plural && bound.some((id) => byId.get(id)?.row)) {
+			// JavaScript gets every row's copy, in the rows' order, as the web's handle list holds them.
+			const repeat = byId.get(bound[0]!)?.row;
+			const list = repeat ? byId.get(repeat) : undefined;
+			if (bound.length !== 1 || list?.kind !== 'repeat' || list.row || list.arm)
+				return refuse(
+					`${what}, a handle list bound inside a @for row that JavaScript reaches only for one element of a top-level @for`,
+				);
+			const key = list.key.reduce<NativeExpr>(
+				(object, property) => ({ member: object, property }),
+				{ local: '__row' },
+			);
+			return {
+				method: 'map',
+				target: list.list,
+				arguments: [{ lambda: ['__row'], body: { template: [`${bound[0]}@`, key] } }],
+			};
+		}
 		if (bound.some((id) => byId.get(id)?.row)) {
 			// In the run of a tap on one row, the row's copy is the only one that holds what was tapped.
 			const rows = new Set(bound.map((id) => byId.get(id)?.row));
@@ -3393,10 +3738,11 @@ export function createNativeViewPayload(
 					const field = object.instance.fields.get(expression.property);
 					if (field?.kind === 'cell') return { cell: field.cell };
 					if (field?.kind === 'expr')
-						return exprOf(
+						return sharedExpr(
+							object.instance,
+							expression.property,
 							field.expression,
-							`${object.instance.definition.name}.${expression.property}`,
-							{ ...object.instance.scope, live: true },
+							field.computed,
 						);
 					if (field?.kind === 'handle')
 						return handleValue(
@@ -3443,7 +3789,8 @@ export function createNativeViewPayload(
 					if (TOUCH_MODIFIERS.has(expression.property)) return { literal: false };
 					if (scope.typing === 'keydown' && expression.property === 'key')
 						return { event: 'key' };
-					if (scope.clicking && expression.property === 'detail') return { event: 'detail' };
+					if (scope.clicking && expression.property === 'detail')
+						return { event: 'detail' };
 					if (scope.typing === 'keydown' && expression.property === 'isComposing')
 						return { literal: false };
 					if (
@@ -4093,6 +4440,8 @@ export function createNativeViewPayload(
 		readonly event: SemanticEvent;
 		readonly scope: Scope;
 		readonly host: string;
+		/** A forwarded callback's run, added after what the handler already runs. */
+		readonly after?: true;
 	}[] = [];
 	const loweredEvents = new Set<string>();
 	const lowerChunk = (
@@ -4278,6 +4627,9 @@ export function createNativeViewPayload(
 					? [slot.name]
 					: [],
 			);
+		// A <select> hidden from sight and from screen readers only carries a value for its form: outside one it does nothing.
+		const hiddenFormValue = (path: ReadonlyArray<number>): boolean =>
+			attributesAt(path)['aria-hidden'] === 'true' && !boundAt(path).includes('aria-hidden');
 		/** Subtrees lowered whole (an `<svg>`) or never shown (`<template>`): their items are not lowered one by one. */
 		const consumed: ReadonlyArray<number>[] = [];
 		for (const item of items) {
@@ -4290,18 +4642,11 @@ export function createNativeViewPayload(
 				if (!element || element === '*') refuse(`host ${item.id} has no static tag`, span);
 				else if (
 					(!Object.hasOwn(NATIVE_ELEMENTS, element) && element !== 'title') ||
-					(element === 'select' &&
-						attributesAt(item.path)['aria-hidden'] === 'true' &&
-						!boundAt(item.path).includes('aria-hidden'))
+					(element === 'select' && hiddenFormValue(item.path))
 				) {
 					const written = attributesAt(item.path);
 					const bound = boundAt(item.path);
-					// A <select> hidden from sight and from screen readers only carries a value for its form: outside one it does nothing.
-					// It stays out even though phones now build a <select>: a native picker would show where the web hides it.
-					const formValueOnly =
-						element === 'select' &&
-						written['aria-hidden'] === 'true' &&
-						!bound.includes('aria-hidden');
+					const formValueOnly = element === 'select' && hiddenFormValue(item.path);
 					if (
 						element === 'script' ||
 						element === 'link' ||
@@ -4546,10 +4891,24 @@ export function createNativeViewPayload(
 						semantic === 'paste' &&
 						(!TEXT_ENTRY.has(element ?? '') || TICKED_TYPES.has(inputType ?? ''))
 					) {
-						refuse(
-							`a paste handler on <${element}>; a native build runs one only on a text field`,
-							event.handlerSpan,
-						);
+						const editable =
+							'contenteditable' in attributes ||
+							bindings.some(
+								(binding) =>
+									'attribute' in binding &&
+									binding.attribute === 'contenteditable',
+							);
+						// A phone's browser offers Paste only where text can be edited; elsewhere a paste is Cmd+V from a hardware keyboard.
+						if (!editable)
+							keyboardOnly(
+								`the paste handler on <${element}> ${id}`,
+								event.handlerSpan,
+							);
+						else
+							refuse(
+								`a paste handler on an editable <${element}>; a native build runs one only on a text field`,
+								event.handlerSpan,
+							);
 						continue;
 					}
 					if (semantic === 'submit' && element !== 'form') {
@@ -4566,6 +4925,35 @@ export function createNativeViewPayload(
 					events.push({ host: id, event: semantic, handler: handler.id });
 					handlers.push(handler);
 					pendingHandlers.push({ handler, event, scope, host: id });
+				}
+				// A caller's callback the part spreads here runs after the part's own handler, as the web merges the two.
+				for (const carried of spread ? (scope.forwarded ?? []) : []) {
+					const event = forwardedEvent(carried, item.id);
+					if (NOT_ON_PHONES.has(event.eventName)) continue;
+					if (
+						KEYBOARD_ONLY.has(event.eventName) &&
+						(!TEXT_ENTRY.has(element ?? '') || TICKED_TYPES.has(inputType ?? ''))
+					) {
+						keyboardOnly(`the ${event.eventName} handler on <${element}> ${id}`, event.handlerSpan);
+						continue;
+					}
+					const semantic = SEMANTIC_EVENTS[event.eventName];
+					if (!semantic || (semantic === 'submit' && element !== 'form')) {
+						refuse(
+							`the \`${carried.prop.name}\` callback spread onto <${element}> ${id}, which has no native meaning there yet`,
+							event.handlerSpan,
+						);
+						continue;
+					}
+					const own = events.find((entry) => entry.host === id && entry.event === semantic);
+					const handler = own
+						? handlers.find((entry) => entry.id === own.handler)!
+						: { id: `handler:${event.id}@${id}`, ops: [] as NativeOp[] };
+					if (!own) {
+						events.push({ host: id, event: semantic, handler: handler.id });
+						handlers.push(handler);
+					}
+					pendingHandlers.push({ handler, event, scope: carried.scope, host: id, after: true });
 				}
 				continue;
 			}
@@ -4755,9 +5143,11 @@ export function createNativeViewPayload(
 					target.module.propNames.get(target.component)?.values() ?? [],
 				);
 				const rest: [string, NativeExpr][] = [];
+				const forwarded: Forwarded[] = [];
 				const ownRest = scope.module.componentFacts.get(scope.component)?.native?.restProp;
 				for (const prop of edge.props) {
 					let value: Prop | undefined;
+					let fromGraph: NativeExpr | null = null;
 					if (
 						prop.kind === 'spread' &&
 						ownRest !== undefined &&
@@ -4767,14 +5157,25 @@ export function createNativeViewPayload(
 						for (const [name, expr] of scope.rest ?? [])
 							if (declared.has(name)) props.set(name, { kind: 'value', expr });
 							else rest.push([name, expr]);
+						for (const carried of scope.forwarded ?? [])
+							if (!declared.has(carried.prop.name)) forwarded.push(carried);
+							else
+								props.set(carried.prop.name, {
+									kind: 'callback',
+									statements: carried.prop.nativeStatements,
+									parameters: carried.prop.nativeParameters ?? carried.prop.parameters ?? [],
+									scope: carried.scope,
+									...(carried.prop.sourceSpan ? { span: carried.prop.sourceSpan } : {}),
+								});
 						continue;
 					}
 					if (prop.kind === 'callback') {
 						value = {
 							kind: 'callback',
 							statements: prop.nativeStatements,
-							parameters: prop.parameters ?? [],
+							parameters: prop.nativeParameters ?? prop.parameters ?? [],
 							scope,
+							...(prop.sourceSpan ? { span: prop.sourceSpan } : {}),
 						};
 					} else if (prop.kind === 'serializable' && isNativeValue(prop.value)) {
 						const expr = expressionOfValue(prop.value);
@@ -4811,6 +5212,34 @@ export function createNativeViewPayload(
 							expr: { cell: scope.cells.byBinding.get(prop.graphNodeId)! },
 						};
 					} else if (
+						prop.kind === 'graph-reference' &&
+						prop.graphBindingKind === 'prop' &&
+						prop.path.length === 1
+					) {
+						// A prop this part was given, passed on; one it was not given stays unset, so the child's default applies.
+						const given = propOf(prop.path[0]!, scope);
+						if (!given) {
+							if (!isPropName(prop.path[0]!, scope))
+								refuse(
+									`the \`${prop.name}\` prop of <${edge.childComponentName}>`,
+									prop.sourceSpan ?? edge.sourceSpan,
+								);
+							continue;
+						}
+						if (given.kind === 'children') {
+							refuse(
+								`the \`${prop.name}\` prop of <${edge.childComponentName}>, which passes on children`,
+								prop.sourceSpan ?? edge.sourceSpan,
+							);
+							continue;
+						}
+						value = given;
+					} else if (
+						prop.kind === 'graph-reference' &&
+						(fromGraph = graphValue(prop, scope))
+					) {
+						value = { kind: 'value', expr: fromGraph };
+					} else if (
 						(prop.kind === 'opaque' || prop.kind === 'graph-reference') &&
 						prop.nativeExpression
 					) {
@@ -4838,6 +5267,8 @@ export function createNativeViewPayload(
 					}
 					if (declared.has(prop.name)) props.set(prop.name, value);
 					else if (value.kind === 'value') rest.push([prop.name, value.expr]);
+					else if (value.kind === 'callback' && prop.kind === 'callback' && isEventAttribute(prop.name))
+						forwarded.push({ prop, edge: `${scope.prefix}${edge.id}`, scope });
 					else
 						refuse(
 							`the \`${prop.name}\` callback of <${edge.childComponentName}>, which it only spreads onto an element`,
@@ -4859,6 +5290,7 @@ export function createNativeViewPayload(
 				lowerChunk(template, parent, place, {
 					...childScope,
 					...(rest.length > 0 ? { rest } : {}),
+					...(forwarded.length > 0 ? { forwarded } : {}),
 					deviceObjects: childObjects.byName,
 					...(scope.catches ? { catches: scope.catches } : {}),
 				});
@@ -4919,15 +5351,24 @@ export function createNativeViewPayload(
 					list,
 					key: repeat.indexKey ? [] : repeat.keyPath,
 					...(repeat.indexKey ? { byIndex: true as const } : {}),
+					...(repeat.keyParts ? { keyParts: repeat.keyParts } : {}),
 					...place,
 				});
+				const itemAt = (path: ReadonlyArray<string>) =>
+					path.reduce<NativeExpr>(
+						(object, property) => ({ member: object, property }),
+						{ item: repeatId },
+					);
 				if (!repeat.indexKey)
 					rowKeys.set(
 						repeatId,
-						repeat.keyPath.reduce<NativeExpr>(
-							(object, property) => ({ member: object, property }),
-							{ item: repeatId },
-						),
+						repeat.keyParts
+							? {
+									template: repeat.keyParts.map((part) =>
+										typeof part === 'string' ? part : itemAt(part),
+									),
+								}
+							: itemAt(repeat.keyPath),
 					);
 				lowerChunk(
 					rowChunk,
@@ -5114,11 +5555,26 @@ export function createNativeViewPayload(
 			}
 			if (item.kind === 'branch') {
 				close();
+				const site = scope.module.branchSites.get(item.id);
 				if (place.row) {
-					refuse('@if inside a @for row');
+					// A test fixed at build time (`@if (children)` in a part) picks its arm once, for every row.
+					const fixed =
+						site?.kind === 'if' && site.armIndexSource === undefined
+							? attempt(() => testOf(site.testExpression, 'the @if test', scope))
+							: undefined;
+					const folded =
+						fixed?.value && !fixed.failed && cellsOf(fixed.value).size === 0
+							? foldConstant(fixed.value, initialOf)
+							: undefined;
+					fixed?.rollBack();
+					if (!folded) {
+						refuse('@if inside a @for row');
+						continue;
+					}
+					const armChunk = scope.module.chunks.get(item.arms[folded.value ? 0 : 1] ?? '');
+					if (armChunk) lowerChunk(armChunk, parent, place, scope);
 					continue;
 				}
-				const site = scope.module.branchSites.get(item.id);
 				if (!site) {
 					refuse(`the branch ${item.id}`);
 					continue;
@@ -5289,7 +5745,7 @@ export function createNativeViewPayload(
 				);
 				return;
 			}
-			const [parameter] = onChange.parameters ?? [];
+			const [parameter] = onChange.nativeParameters ?? onChange.parameters ?? [];
 			const handler = `handler:${id}`;
 			events.push({ host: id, event: 'dismiss', handler });
 			continuations = { base: handler, next: 0 };
@@ -5324,31 +5780,83 @@ export function createNativeViewPayload(
 	): NativeOp[] {
 		if (scriptMode === 'never' || !event.handlerSpan || !scriptFacts(scope.module))
 			return dataHandlerOps(event, scope, handler, pressed);
-		if (DATA_ONLY_EVENTS.has(event.eventName)) {
+		// A submit or change handler stays data where it can, with the app helpers it calls running as JavaScript.
+		const helped = () => {
 			handlerCallsScript = true;
 			try {
 				return dataHandlerOps(event, scope, handler, pressed);
 			} finally {
 				handlerCallsScript = false;
 			}
+		};
+		if (DATA_ONLY_EVENTS.has(event.eventName)) return helped();
+		const submitting = event.eventName === 'submit';
+		// The web sends a form whose submit handler does not cancel it at once; only the analyzer's sync policy says it always does.
+		const form =
+			submitting && pressed && preventsAlways(event.syncPolicy) ? pressed.currentTarget : undefined;
+		if (submitting && form === undefined) {
+			const data = attempt(helped);
+			if (data.failed)
+				refuseScript(
+					'the submit handler runs as JavaScript only when it calls `event.preventDefault()` first, outside any branch, as the web then never sends the form',
+					event.handlerSpan,
+				);
+			return data.value;
 		}
+		const ran = (op: NativeOp): NativeOp[] => {
+			if (form === undefined) return [op];
+			scriptSubmits.add(form);
+			return [PREVENT, op];
+		};
+		const lowered = () => (submitting ? helped() : dataHandlerOps(event, scope, handler, pressed));
 		if (scriptMode === 'all') {
 			// The engine has no fields and no press count, and sees an unset cell as null: such a handler stays data.
-			const data = attempt(() => dataHandlerOps(event, scope, handler, pressed));
-			if (!data.failed && (mentionsDataOnly(data.value) || readsUndefinedFirst(data.value)))
-				return data.value;
-			data.rollBack();
-			const scripted = attempt(() => scriptOp(event, scope));
-			if (scripted.value && !scripted.failed) return [scripted.value];
+			const first = attempt(lowered);
+			// A submit that data spells stays data: its timers are the host's, which an engine's cannot stand in for.
+			if (
+				!first.failed &&
+				(submitting || mentionsDataOnly(first.value) || readsUndefinedFirst(first.value))
+			)
+				return first.value;
+			first.rollBack();
+			const scripted = attempt(() => scriptOp(event, scope, form));
+			if (scripted.value && !scripted.failed) return ran(scripted.value);
 			scripted.rollBack();
-			return dataHandlerOps(event, scope, handler, pressed);
+			const data = attempt(lowered);
+			if (!data.failed) return data.value;
+			data.rollBack();
+			return mixedHandlerOps(event, scope, handler, pressed);
 		}
-		const data = attempt(() => dataHandlerOps(event, scope, handler, pressed));
+		const data = attempt(lowered);
 		if (!data.failed) return data.value;
 		data.rollBack();
+		const scripted = attempt(() => scriptOp(event, scope, form));
+		if (scripted.value && !scripted.failed) return ran(scripted.value);
+		scripted.rollBack();
+		// A handler whose JavaScript cannot reach what it reads (a family's shared state) stays data, and only the
+		// helpers it calls for their effects that data cannot spell run as JavaScript, their elements as proxies.
+		const mixed = attempt(() => mixedHandlerOps(event, scope, handler, pressed));
+		if (!mixed.failed) return mixed.value;
+		mixed.rollBack();
 		// When the script cannot run it either, what stops the script names what a phone lacks: those refusals stay.
-		const scripted = scriptOp(event, scope);
-		return scripted ? [scripted] : [];
+		const again = scriptOp(event, scope, form);
+		// A refused script still cancels its submit, so the form is not refused a second time for that.
+		return again ? ran(again) : form === undefined ? [] : [PREVENT];
+	}
+	/** While a handler is lowered as data with its helpers allowed to run as JavaScript. */
+	let scriptCalls = false;
+	function mixedHandlerOps(
+		event: SemanticEvent,
+		scope: Scope,
+		handler: string,
+		pressed?: NonNullable<Scope['pressed']>,
+	): NativeOp[] {
+		scriptCalls = true;
+		try {
+			return dataHandlerOps(event, scope, handler, pressed);
+		} finally {
+			scriptCalls = false;
+		}
 	}
 
 	/** Runs `run`, then says whether it refused, and can undo what it added (refusals, cells, dialog ops, features). */
@@ -5401,11 +5909,113 @@ export function createNativeViewPayload(
 		return value;
 	}
 
-	function scriptOp(event: SemanticEvent, scope: Scope): NativeOp | null {
-		return keepingFunctions(() => scriptOpOf(event, scope));
+	/**
+	 * A call, made for its effects, to a module function data cannot spell: the function runs as JavaScript in its module,
+	 * each argument passed as a value, or as proxies when it is an element or an array of elements.
+	 */
+	function scriptCallOf(
+		{ module, fn }: ModuleFunction,
+		args: ReadonlyArray<SemanticExpression>,
+		scope: Scope,
+		what: string,
+	): NativeOp | null {
+		const facts = scriptFacts(module);
+		if (!facts)
+			return (
+				refuseScript(`${what} calls \`${fn.name}\`, whose module has no script facts`), null
+			);
+		const names = args.map((_, index) => `__a${index}`);
+		const bindings: Record<string, NativeScriptBinding> = {};
+		for (const [index, argument] of args.entries()) {
+			const value = exprOf(argument, `${what}'s call to \`${fn.name}\``, scope);
+			if (!value) return null;
+			bindings[names[index]!] = mentionsElement(value) ? { elements: value } : { value };
+		}
+		const key = `${module.graph.filename}\0call:${fn.name}/${args.length}`;
+		let id = scriptFunctions.get(key)?.id;
+		if (!id) {
+			id = `fn:${scriptFunctions.size}`;
+			scriptFunctions.set(key, {
+				id,
+				module,
+				fact: {
+					code: `return function () { return ${fn.name}(${names.map((name) => `__s.${name}`).join(', ')}); };`,
+					names: [],
+					module: [fn.name],
+					imports: [],
+					globals: [],
+					framework: [],
+					unsupported: [],
+					span: { filename: module.graph.filename, start: 0, end: 0 },
+				},
+			});
+		}
+		const caught = scope.catches ? scope.catches.cell() : undefined;
+		return {
+			op: 'script',
+			fn: id,
+			type: 'call',
+			bindings,
+			...(caught ? { catch: caught } : {}),
+		};
 	}
 
-	function scriptOpOf(event: SemanticEvent, scope: Scope): NativeOp | null {
+	/** A shared object's method as a script reaches it: its function and the factory's members it reads. */
+	function methodBinding(
+		instance: SharedInstance,
+		span: SourceSpan,
+		what: string,
+	): NativeScriptBinding | null {
+		const fact = scriptFacts(instance.module)?.method(span);
+		if (!fact)
+			return refuseScript(
+				`${what} has no source the build read, so it cannot run as JavaScript`,
+				span,
+			);
+		const fn = scriptFunctionId(fact, instance.module, what);
+		const bindings = scriptBindings(fact, instance.scope, what);
+		if (fn === null || bindings === null) return null;
+		// `calendar.onChange?.(iso)`: a callback the root filled a slot with runs as JavaScript where it was written, reached
+		// on the factory's state objects the method reads.
+		const slots: Record<string, NativeScriptBinding> = {};
+		for (const [slotName, slot] of instance.slots) {
+			if (slot.kind !== 'callback') continue;
+			const label = `\`${slotName}\``;
+			const callback = slot.span && scriptFacts(slot.scope.module)?.handler(slot.span);
+			if (!callback)
+				return refuseScript(
+					`${what} reaches ${label}, whose function the build did not read, so it cannot run as JavaScript`,
+					span,
+				);
+			const callbackFn = scriptFunctionId(callback, slot.scope.module, label);
+			const callbackBindings = scriptBindings(callback, slot.scope, label);
+			if (callbackFn === null || callbackBindings === null) return null;
+			slots[slotName] = { method: callbackFn, bindings: callbackBindings };
+		}
+		if (Object.keys(slots).length > 0)
+			for (const [name, binding] of Object.entries(bindings)) {
+				if (!('fields' in binding) || instance.scope.objects.get(name)?.kind !== 'fields')
+					continue;
+				bindings[name] = {
+					object: {
+						...Object.fromEntries(
+							Object.entries(binding.fields).map(([field, cell]) => [
+								field,
+								{ cell },
+							]),
+						),
+						...slots,
+					},
+				};
+			}
+		return { method: fn, bindings };
+	}
+
+	function scriptOp(event: SemanticEvent, scope: Scope, form?: string): NativeOp | null {
+		return keepingFunctions(() => scriptOpOf(event, scope, form));
+	}
+
+	function scriptOpOf(event: SemanticEvent, scope: Scope, form?: string): NativeOp | null {
 		const fact = event.handlerSpan && scriptFacts(scope.module)?.handler(event.handlerSpan);
 		const what = `the ${event.eventName} handler`;
 		if (!fact)
@@ -5418,6 +6028,15 @@ export function createNativeViewPayload(
 		const touch = POINTER_EVENTS.has(semantic ?? '');
 		for (const read of fact.event ?? []) {
 			if (touch && NATIVE_SCRIPT_POINTER_FIELDS.includes(read.path[0] ?? '')) continue;
+			// A touch's script event carries no element, so `event.target` there is refused, not read as the generic member.
+			if (touch && read.path[0] && read.path[0] in EVENT_FIELDS.pointer) {
+				readsMissing = true;
+				refuseScript(
+					`${what} reads \`event.${read.path.join('.')}\`, an element, which JavaScript on a phone cannot hold yet`,
+					read.span,
+				);
+				continue;
+			}
 			const known = NATIVE_SCRIPT_EVENT_MEMBERS.some(
 				(members) =>
 					members.every(
@@ -5434,15 +6053,26 @@ export function createNativeViewPayload(
 				);
 				continue;
 			}
-			const doing = semantic === 'input' ? 'a text edit' : touch ? 'a touch' : 'a tap';
+			const doing =
+				semantic === 'input'
+					? 'a text edit'
+					: touch
+						? 'a touch'
+						: event.eventName === 'submit'
+							? 'a submit'
+							: 'a tap';
 			refuseScript(
 				`${what} reads \`event.${read.path.join('.')}\`, which ${doing} on a phone does not have`,
 				read.span,
 			);
 		}
-		const fn = scriptFunctionId(fact, scope.module, what);
-		const bindings = scriptBindings(fact, scope, what);
-		if (fn === null || bindings === null || readsMissing) return null;
+		const forms = form !== undefined;
+		const fn = scriptFunctionId(fact, scope.module, what, forms);
+		const own = scriptBindings(fact, scope, what, false, forms);
+		if (fn === null || own === null || readsMissing) return null;
+		const bindings = forms
+			? { ...own, [NATIVE_SCRIPT_SUBMITTED_FORM]: { value: { formData: form } } }
+			: own;
 		const caught =
 			(event.handlerCatchBoundaryId !== undefined ||
 				event.dispatchCatchBoundaryId !== undefined) &&
@@ -5491,7 +6121,10 @@ export function createNativeViewPayload(
 		const semantic = SEMANTIC_EVENTS[event.eventName];
 		const carried = semantic === 'dismiss' || POINTER_EVENTS.has(semantic ?? '');
 		const typing = semantic === 'keydown' || semantic === 'paste' ? { typing: semantic } : {};
-		const clicking = semantic === 'activate' && event.eventName === 'click' ? { clicking: true as const } : {};
+		const clicking =
+			semantic === 'activate' && event.eventName === 'click'
+				? { clicking: true as const }
+				: {};
 		const inner: Scope =
 			parameter === undefined
 				? { ...running, ...submitting, ...typing }
@@ -5675,14 +6308,23 @@ export function createNativeViewPayload(
 				writesOf(op.whenTrue, into);
 				writesOf(op.whenFalse, into);
 			} else if (op.op === 'call' && op.after) writesOf(op.after.ops, into);
-			else if (op.op === 'script')
-				for (const binding of Object.values(op.bindings)) {
-					if ('cell' in binding) into.add(binding.cell);
-					else if ('fields' in binding)
-						for (const cell of Object.values(binding.fields)) into.add(cell);
-				}
+			else if (op.op === 'script') scriptWrites(op.bindings, into);
 		}
 		return into;
+	};
+	/** Cells a script may write through its bindings, inside shared objects and their methods too. */
+	const scriptWrites = (
+		bindings: Readonly<Record<string, NativeScriptBinding>>,
+		into: Set<string>,
+	): void => {
+		for (const binding of Object.values(bindings)) {
+			if ('cell' in binding) into.add(binding.cell);
+			else if ('fields' in binding)
+				for (const cell of Object.values(binding.fields)) into.add(cell);
+			else if ('object' in binding) scriptWrites(binding.object, into);
+			else if ('shared' in binding) scriptWrites(binding.shared, into);
+			else if ('method' in binding) scriptWrites(binding.bindings, into);
+		}
 	};
 
 	/**
@@ -5833,6 +6475,13 @@ export function createNativeViewPayload(
 				return { ops, returns: true };
 			}
 			if (statement.kind === 'return') return { ops, returns: true };
+			if (statement.kind === 'await' && statement.value.kind === 'apply') {
+				const imported = scope.module.imports.get(statement.value.callee);
+				if (imported?.source === '@markless/router' && imported.importedName === 'navigate') {
+					ops.push(...navigateOps(statement.value.arguments, what, span));
+					continue;
+				}
+			}
 			const awaited = awaitOf(statement);
 			if (awaited === null) {
 				refuse(
@@ -6221,6 +6870,20 @@ export function createNativeViewPayload(
 				}
 				if (first.callee === 'setTimeout') {
 					const [callback, ms, ...more] = first.arguments;
+					const handedOn =
+						callback?.kind === 'read' &&
+						(callback.name === names.resolve || callback.name === names.reject)
+							? callback.name
+							: undefined;
+					if (handedOn !== undefined && more.length === 0) {
+						const delay = ms ? exprOf(ms, what, scope) : { literal: 0 };
+						if (!delay || !nothingAfter()) return null;
+						const settles: Settle =
+							handedOn === names.resolve
+								? { resolve: { literal: null } }
+								: { reject: { literal: null } };
+						return { after: delay, capture: [], settles };
+					}
 					if (
 						callback?.kind !== 'function' ||
 						callback.parameters.length > 0 ||
@@ -6344,7 +7007,7 @@ export function createNativeViewPayload(
 					: [];
 			}
 			if (
-				(command !== 'focus' && command !== 'scrollIntoView') ||
+				(command !== 'focus' && command !== 'scrollIntoView' && command !== 'select') ||
 				(statement.arguments ?? []).length > 0
 			) {
 				refuse(
@@ -6493,7 +7156,7 @@ export function createNativeViewPayload(
 					: [];
 			}
 			const onElement =
-				(command === 'focus' || command === 'scrollIntoView') &&
+				(command === 'focus' || command === 'scrollIntoView' || command === 'select') &&
 				(receiverField?.kind === 'handle' ||
 					(receiver.length === 0 &&
 						(scope.args.has(statement.name) || !scope.objects.has(statement.name))));
@@ -6533,7 +7196,7 @@ export function createNativeViewPayload(
 						{
 							op: 'command',
 							node: element,
-							command: command as 'focus' | 'scrollIntoView',
+							command: command as NativeCommand,
 							...(preventScroll ? { preventScroll: true as const } : {}),
 						},
 					];
@@ -6543,7 +7206,7 @@ export function createNativeViewPayload(
 				if (target && !options)
 					return commandOn(
 						target,
-						command as 'focus' | 'scrollIntoView',
+						command as NativeCommand,
 						false,
 						statement.optional === true,
 						what,
@@ -6621,40 +7284,62 @@ export function createNativeViewPayload(
 				return [];
 			}
 			if (!body?.statements) return notCallable();
-			// Arguments past the parameters are never read, so passing the event a callback ignores costs nothing.
-			const args = (statement.arguments ?? [])
-				.slice(0, body.parameters.length)
-				.map((argument) => exprOf(argument, `${what}'s call to \`${callee}\``, scope));
-			if (args.some((argument) => argument === null)) return [];
-			const { statements, parameters, scope: inner } = body;
-			if (calling) inlining.add(calling);
-			try {
-				return lowerBound(
-					parameters.map(
-						(name, index) => [name, args[index] ?? { literal: null }] as const,
-					),
-					(values) => {
-						const bound = new Map(inner.args);
-						parameters.forEach((name, index) => bound.set(name, values[index]!));
-						return lowerStatements(
-							statements,
-							{
-								...inner,
-								live: true,
-								args: bound,
-								locals: new Set(
-									[...inner.locals].filter((name) => !bound.has(name)),
-								),
-							},
-							what,
-							span,
-							depth + 1,
-						);
-					},
-				).ops;
-			} finally {
-				if (calling) inlining.delete(calling);
+			const helperOps = (
+				body: {
+					statements: ReadonlyArray<SemanticHandlerStatement> | undefined;
+					parameters: ReadonlyArray<string>;
+					scope: Scope;
+				},
+				calling: string | undefined,
+			): NativeOp[] => {
+				// Arguments past the parameters are never read, so passing the event a callback ignores costs nothing.
+				const args = (statement.arguments ?? [])
+					.slice(0, body.parameters.length)
+					.map((argument) => exprOf(argument, `${what}'s call to \`${callee}\``, scope));
+				if (args.some((argument) => argument === null)) return [];
+				const { statements, parameters, scope: inner } = body;
+				if (calling) inlining.add(calling);
+				try {
+					return lowerBound(
+						parameters.map(
+							(name, index) => [name, args[index] ?? { literal: null }] as const,
+						),
+						(values) => {
+							const bound = new Map(inner.args);
+							parameters.forEach((name, index) => bound.set(name, values[index]!));
+							return lowerStatements(
+								statements ?? [],
+								{
+									...inner,
+									live: true,
+									args: bound,
+									locals: new Set(
+										[...inner.locals].filter((name) => !bound.has(name)),
+									),
+								},
+								what,
+								span,
+								depth + 1,
+							);
+						},
+					).ops;
+				} finally {
+					if (calling) inlining.delete(calling);
+				}
+			};
+			// A helper called for its effects that data cannot spell runs as JavaScript, its element arguments as proxies.
+			if (calling && scriptCalls && path.length === 0) {
+				const fn = functionAt(scope.module, statement.name)!;
+				const data = attempt(() => helperOps(body!, calling!));
+				if (!data.failed) return data.value;
+				data.rollBack();
+				const scripted = attempt(() =>
+					scriptCallOf(fn, statement.arguments ?? [], scope, what),
+				);
+				if (scripted.value && !scripted.failed) return [scripted.value];
+				scripted.rollBack();
 			}
+			return helperOps(body, calling);
 		}
 		if (statement.path && statement.path.length > 0) {
 			const object = scope.objects.get(statement.target);
@@ -6670,6 +7355,35 @@ export function createNativeViewPayload(
 									return found?.kind === 'cell' ? found.cell : undefined;
 								})()
 							: undefined;
+			// `field.value = text` on a text field's element: its text, as the web's property write sets it.
+			if (
+				!cell &&
+				field === 'value' &&
+				(scope.args.has(statement.target) || !scope.objects.has(statement.target))
+			) {
+				const mark = diagnostics.length;
+				const target = exprOf({ kind: 'read', name: statement.target }, what, scope);
+				const element = elementOf(target);
+				const node = element !== undefined ? nodeById().get(element) : undefined;
+				if (
+					node?.kind === 'element' &&
+					TEXT_ENTRY.has(node.element) &&
+					!isTicked(element!) &&
+					node.attributes?.['type'] !== 'hidden'
+				) {
+					if (node.row) {
+						refuse(
+							`${what} writes the text of a field in a @for row, which a native build cannot name yet`,
+							span,
+						);
+						return [];
+					}
+					const value = exprOf(statement.value, what, scope);
+					return value ? [{ op: 'fieldText', node: element!, value }] : [];
+				}
+				if (target && 'literal' in target && target.literal === null) return [];
+				diagnostics.length = mark;
+			}
 			if (!cell) {
 				refuse(
 					`${what} assigns \`${statement.target}.${statement.path.join('.')}\`, which is not a field of state`,
@@ -6843,11 +7557,20 @@ export function createNativeViewPayload(
 	// A tap lands on the innermost element that handles it, so a handler that reads `event.target` runs once per element a
 	// part names inside its host (rows, triggers): the containment it asks about is the same for every element within one.
 	lateLowering = true;
-	for (const { handler, event, scope, host } of pendingHandlers) {
+	const extended = new Set(pendingHandlers.flatMap((pending) => (pending.after ? [pending.handler] : [])));
+	for (const { handler, event, scope, host, after } of pendingHandlers) {
 		pressedTargetRead = false;
 		tapRun = SEMANTIC_EVENTS[event.eventName] === 'activate';
-		handler.ops = handlerOps(event, scope, handler.id, { target: host, currentTarget: host });
-		if (!pressedTargetRead || SEMANTIC_EVENTS[event.eventName] !== 'activate') continue;
+		const ops = handlerOps(event, scope, handler.id, { target: host, currentTarget: host });
+		handler.ops = after ? [...handler.ops, ...ops] : ops;
+		if (after || !pressedTargetRead || SEMANTIC_EVENTS[event.eventName] !== 'activate') continue;
+		if (extended.has(handler)) {
+			refuse(
+				`the handler on ${host} reads where a press landed, and a caller's callback spread onto ${host} runs after it`,
+				event.handlerSpan,
+			);
+			continue;
+		}
 		const named = new Set([...boundHandles.values()].flat());
 		// What a tap on each element runs; a tap on an element with no handler of its own reaches the nearest one around it.
 		const runs = new Map<string, { readonly id: string; readonly spelled: string }>([
@@ -6964,10 +7687,54 @@ export function createNativeViewPayload(
 		op.node = element.id;
 	}
 
-	// Dragon lays out one style assignment per combination of these: every cell a class reads, and every true/false cell
-	// an attribute Dragon receives per state reads (`[ui-open]`, `[hidden]`).
+	// Dragon lays out one style assignment per combination of these: every cell a class reads, and every cell an attribute
+	// Dragon receives per state reads (`[ui-open]`, `[hidden]`) whose values are all known: true/false, or strings.
 	// A cell no handler writes keeps its first value, so it adds no assignment.
 	const written = writesOf(handlers.flatMap((handler) => handler.ops));
+	for (const cell of cells) if (cell.follows) written.add(cell.id);
+	const assigned = new Map<string, NativeExpr[]>();
+	// JavaScript can write any value, so a cell a script op may write has no domain known at build time.
+	const scriptWritten = new Set<string>();
+	const collectAssigned = (ops: ReadonlyArray<NativeOp>) => {
+		for (const op of ops) {
+			if (op.op === 'assign')
+				assigned.set(op.cell, [...(assigned.get(op.cell) ?? []), op.value]);
+			else if (op.op === 'if') {
+				collectAssigned(op.whenTrue);
+				collectAssigned(op.whenFalse);
+			} else if (op.op === 'call' && op.after) collectAssigned(op.after.ops);
+			else if (op.op === 'script') writesOf([op], scriptWritten);
+		}
+	};
+	collectAssigned(handlers.flatMap((handler) => handler.ops));
+	const changesOnlyByHandlers = (cell: NativeViewPayload['cells'][number]) =>
+		!cell.storage && !cell.device && !cell.task && !cell.object && !cell.row && !cell.follows;
+	/** A string cell's values when every one is known at build time: its first value, then each literal or unwritten cell assigned to it. */
+	const stringDomain = (id: string): string[] | undefined => {
+		const cell = cells[cellIndex.get(id) ?? -1];
+		if (
+			!cell ||
+			typeof cell.initial !== 'string' ||
+			!changesOnlyByHandlers(cell) ||
+			scriptWritten.has(id)
+		)
+			return undefined;
+		const values = [cell.initial];
+		for (const value of assigned.get(id) ?? []) {
+			const known =
+				'literal' in value
+					? value.literal
+					: 'cell' in value &&
+						  !written.has(value.cell) &&
+						  changesOnlyByHandlers(cells[cellIndex.get(value.cell) ?? -1] ?? cell)
+						? initialOf(value.cell)
+						: undefined;
+			if (typeof known !== 'string') return undefined;
+			if (!values.includes(known)) values.push(known);
+		}
+		return values;
+	};
+	const styledDomains = new Map<string, string[]>();
 	const styledCells = new Set<string>();
 	// A row's state has a value per row, which one style assignment per combination of states cannot follow.
 	const rowCells = new Set(cells.flatMap((cell) => (cell.row ? [cell.id] : [])));
@@ -6980,7 +7747,30 @@ export function createNativeViewPayload(
 					for (const cell of cellsOf(binding.value))
 						if (written.has(cell) && typeof initialOf(cell) === 'boolean')
 							styledCells.add(cell);
+						else if (written.has(cell)) {
+							const domain = stringDomain(cell);
+							if (domain) {
+								styledCells.add(cell);
+								styledDomains.set(cell, domain);
+							}
+						}
 			}
+	// A cell a text reads, when every value it can hold is known: Dragon lays the text out at each value, so a longer string
+	// is not drawn in the frame of the first one.
+	for (const node of nodes)
+		if (node.kind === 'text' && !node.row)
+			for (const part of node.parts) {
+				if ('text' in part) continue;
+				for (const cell of 'cell' in part ? [part.cell] : cellsOf(part.expr))
+					if (written.has(cell) && typeof initialOf(cell) === 'boolean')
+						styledCells.add(cell);
+					else if (written.has(cell) && stringDomain(cell)) styledCells.add(cell);
+			}
+	for (const id of styledCells)
+		if (!styledDomains.has(id) && typeof initialOf(id) === 'string') {
+			const domain = stringDomain(id);
+			if (domain) styledDomains.set(id, domain);
+		}
 
 	const script = buildScript();
 	return done({
@@ -6989,11 +7779,20 @@ export function createNativeViewPayload(
 		...(options.route
 			? { route: { pattern: options.route.pattern, params: options.route.params } }
 			: {}),
-		cells: cells.map((cell) =>
-			styledCells.has(cell.id) && !rowCells.has(cell.id)
-				? { ...cell, styled: true as const }
-				: cell,
-		),
+		cells: cells.map((cell) => ({
+			...cell,
+			...(styledCells.has(cell.id) && !rowCells.has(cell.id)
+				? {
+						styled: true as const,
+						...(styledDomains.has(cell.id)
+							? { domain: styledDomains.get(cell.id)! }
+							: {}),
+					}
+				: {}),
+			...(undefinedFirst.has(cell.id) && !cell.row && cell.initial === null
+				? { unset: true as const }
+				: {}),
+		})),
 		nodes,
 		events,
 		handlers,
@@ -7021,29 +7820,65 @@ export function createNativeViewPayload(
 			const where = `the <${node.element}> ${node.id}`;
 			if (node.element === 'select' || node.element === 'option')
 				for (const pending of pendingHandlers)
-					if (pending.host === node.id)
+					if (
+						pending.host === node.id &&
+						!(node.element === 'select' && SELECT_EVENTS.has(pending.event.eventName))
+					)
 						refuse(
 							`the ${pending.event.eventName} handler on ${where}, which a native build does not run yet`,
 							pending.event.handlerSpan,
 						);
 			if (node.element === 'select') {
 				if (node.row)
-					refuse(`${where} sits inside a @for row, which a native build does not draw yet`, span);
+					refuse(
+						`${where} sits inside a @for row, which a native build does not draw yet`,
+						span,
+					);
 				for (const name of ['multiple', 'size'])
 					if (node.attributes?.[name] !== undefined || node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === name))
 						refuse(`${where} has \`${name}\`, a list box a native build does not draw yet`, span);
-				if (node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === 'value'))
-					refuse(`${where} binds \`value\`; a native build chooses an option through its \`selected\``, span);
+				if (node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === 'value')) {
+					// Each option already follows the bound value through its `selected`, as the server marks it: that is the whole choice.
+					const options = nodes.filter(
+						(other) => other.kind === 'element' && other.element === 'option' && other.parent === node.id,
+					);
+					const followed =
+						options.length > 0 &&
+						options.every(
+							(option) =>
+								option.kind === 'element' &&
+								option.bindings?.some((binding) => 'property' in binding && binding.property === 'selected'),
+						);
+					if (!followed)
+						refuse(`${where} binds \`value\`; a native build chooses an option through its \`selected\``, span);
+					else {
+						const at = nodes.indexOf(node);
+						const rest = node.bindings.filter(
+							(binding) => !('attribute' in binding && binding.attribute === 'value'),
+						);
+						const { bindings: _bindings, ...plain } = node;
+						nodes[at] = rest.length > 0 ? { ...plain, bindings: rest } : plain;
+					}
+				}
 				continue;
 			}
 			const parent = node.parent === null ? undefined : byId.get(node.parent);
 			const inSelect = parent?.kind === 'element' && parent.element === 'select';
 			if (node.element === 'option' && !inSelect)
-				refuse(`${where} is not inside a <select>, which a native build does not show yet`, span);
+				refuse(
+					`${where} is not inside a <select>, which a native build does not show yet`,
+					span,
+				);
 			else if (node.element !== 'option' && inSelect)
-				refuse(`${where} sits inside a <select>, which a native build shows only <option>s of`, span);
+				refuse(
+					`${where} sits inside a <select>, which a native build shows only <option>s of`,
+					span,
+				);
 			else if (parent?.kind === 'element' && parent.element === 'option')
-				refuse(`${where} sits inside an <option>, which a native build shows only text of`, span);
+				refuse(
+					`${where} sits inside an <option>, which a native build shows only text of`,
+					span,
+				);
 		}
 	}
 
@@ -7166,7 +8001,11 @@ export function createNativeViewPayload(
 					refuse(`${field}, whose text a native build does not submit yet`);
 					continue;
 				}
-				if (node.element !== 'input' && node.element !== 'button' && node.element !== 'select')
+				if (
+					node.element !== 'input' &&
+					node.element !== 'button' &&
+					node.element !== 'select'
+				)
 					continue;
 				if (node.element === 'button' && node.attributes?.['type'] === 'button') continue;
 				if (node.row !== form.row) {

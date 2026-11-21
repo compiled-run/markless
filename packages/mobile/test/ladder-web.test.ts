@@ -129,7 +129,7 @@ async function serveRung(
 	// Vitest's NODE_ENV=test leaves import.meta.env.DEV true in a build.
 	process.env.NODE_ENV = 'production';
 	try {
-		await buildFixture({ root });
+		await buildFixture({ root, ui: true });
 	} finally {
 		if (nodeEnv === undefined) delete process.env.NODE_ENV;
 		else process.env.NODE_ENV = nodeEnv;
@@ -160,6 +160,7 @@ const shown = (page: Page, text: string): Locator =>
 	page
 		.getByText(text, { exact: true })
 		.or(page.getByLabel(text, { exact: true }))
+		.or(page.getByRole('img', { name: text, exact: true }))
 		.or(page.getByRole('combobox').filter({ has: page.locator('option:checked').getByText(text, { exact: true }) }));
 
 // The phone the style exports lay out for (Dragon's iOS viewport): a rung that scrolls scrolls here as on the phones.
@@ -248,15 +249,15 @@ async function act(page: Page, step: LadderStep) {
 		await field.pressSequentially(action.type.text);
 	} else if ('submit' in action)
 		await page.getByRole('textbox', { name: action.submit, exact: true }).press('Enter');
-	else if ('choose' in action)
-		await page
-			.getByRole('combobox', { name: action.choose.field, exact: true })
-			.selectOption({ label: action.choose.option });
 	else if ('erase' in action) {
 		const field = page.getByRole('textbox', { name: action.erase, exact: true });
 		await field.press('End');
 		await field.press('Backspace');
 	}
+	else if ('choose' in action)
+		await page
+			.getByRole('combobox', { name: action.choose.field, exact: true })
+			.selectOption({ label: action.choose.option });
 	else if ('relaunch' in action) await page.reload();
 	else if ('back' in action) await page.goBack();
 	else if ('escape' in action) await page.keyboard.press('Escape');
@@ -268,6 +269,15 @@ async function act(page: Page, step: LadderStep) {
 	}
 	else if ('drag' in action) await drag(page, action.drag.on, action.drag.direction);
 	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });
+	else if ('orientation' in action) {
+		const { width, height } = page.viewportSize()!;
+		const [short, long] = width < height ? [width, height] : [height, width];
+		await page.setViewportSize(
+			action.orientation === 'portrait'
+				? { width: short, height: long }
+				: { width: long, height: short },
+		);
+	}
 	else if ('swipe' in action && action.swipe !== 'up') {
 		const { from, to, until } = action.swipe;
 		for (let turn = 0; turn < (until ? SWIPES_UNTIL : 1); turn++) {
@@ -285,6 +295,10 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 		if ((await onScreenCount(page, text)) === 0) failed.push(`"${text}" is not on screen`);
 	for (const text of step.absent ?? [])
 		if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);
+	for (const text of step.hidden ?? []) {
+		if ((await shown(page, text).count()) === 0) failed.push(`"${text}" is not on the page`);
+		else if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);
+	}
 	for (const text of step.offScreen ?? []) {
 		if ((await shown(page, text).count()) === 0) failed.push(`"${text}" is not on the page`);
 		else if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);

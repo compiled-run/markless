@@ -132,12 +132,16 @@ test('a phone build chooses a row option by the literal select value it compares
 	});
 });
 
-test('a phone build refuses a bound select value by its own name, and nothing for the options', async () => {
+test("a phone build follows a bound select value through each option's selected, as the web's select.value chooses one", async () => {
 	const { payload, diagnostics } = await phone(
 		'<select value={size}><option value="s">Small</option><option value="m">Medium</option></select>',
 	);
-	expect(payload).toBeNull();
-	expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
-		'the <select> h1 binds `value`; a native build chooses an option through its `selected`',
+	expect(diagnostics).toEqual([]);
+	const select = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'select')!;
+	expect('bindings' in select ? select.bindings : undefined).toBeUndefined();
+	const options = payload!.nodes.filter((node) => node.kind === 'element' && node.element === 'option');
+	expect(options.map((option) => 'bindings' in option && option.bindings?.map((binding) => 'property' in binding && binding.property))).toEqual([
+		['selected'],
+		['selected'],
 	]);
 });

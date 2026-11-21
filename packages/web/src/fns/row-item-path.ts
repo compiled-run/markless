@@ -1,3 +1,8 @@
+import type { ProtocolRepeatKeyParts } from '@markless/serializer/protocol';
+
+// False when no @for of the app joins its key from fields, so each joined-key branch folds away.
+declare const __MARKLESS_JOINED_KEYS__: boolean;
+
 type RowItemPathContext = {
 	readonly graph: { read(graphNodeId: string, path?: ReadonlyArray<string>): unknown };
 	readonly locals?: Readonly<Record<string, unknown>>;
@@ -16,14 +21,22 @@ export function marklessRowItemPath(
 	itemName: string,
 	keyPath: ReadonlyArray<string> | null,
 	itemPath: ReadonlyArray<string>,
+	keyParts?: ProtocolRepeatKeyParts,
 ): string[] {
 	const collection = context.graph.read(graphNodeId, collectionPath);
 	const item = context.locals?.[itemName];
 	const items = Array.isArray(collection) ? collection : [];
 	let index = items.indexOf(item);
 	if (index < 0 && keyPath && item != null) {
-		const key = readPath(item, keyPath);
-		index = items.findIndex((candidate) => readPath(candidate, keyPath) === key);
+		if ((typeof __MARKLESS_JOINED_KEYS__ === 'undefined' || __MARKLESS_JOINED_KEYS__) && keyParts) {
+			const joined = (value: unknown) =>
+				keyParts.map((p) => (typeof p == 'string' ? p : `${readPath(value, p)}`)).join('');
+			const key = joined(item);
+			index = items.findIndex((candidate) => joined(candidate) === key);
+		} else {
+			const key = readPath(item, keyPath);
+			index = items.findIndex((candidate) => readPath(candidate, keyPath) === key);
+		}
 	}
 	if (index < 0) {
 		throw Object.assign(

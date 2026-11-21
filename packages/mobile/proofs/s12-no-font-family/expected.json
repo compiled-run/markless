@@ -1,0 +1,14 @@
+{
+	"rung": "S12",
+	"name": "No font-family anywhere: the browser's default serif (Times New Roman on iOS, Noto Serif on Android), measured at build time and drawn by the phone's own font, not Inter",
+	"steps": [
+		{
+			"visible": [
+				"Field notes",
+				"No font-family anywhere: the browser's default serif, on the web and on the phone",
+				"Waffles, quays and fjords"
+			],
+			"title": "Notes"
+		}
+	]
+}

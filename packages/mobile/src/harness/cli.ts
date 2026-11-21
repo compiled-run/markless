@@ -33,6 +33,7 @@ import { PROOF_REPORT_VERSION, proofVerdict, type ProofReport } from './report.t
 import { loadRung, type ProofRung } from './rung.ts';
 import { verdictCommand } from './verdict.ts';
 import { androidTools, cacheRoot } from './tools.ts';
+import { androidLayoutCheck, iosLayoutCheck, LAYOUT_ORIENTATIONS, type LayoutOrientation } from './layout-check.ts';
 import { dragonDir } from '../style-export.ts';
 
 const USAGE = `usage: markless-proof [options] <rung folder>...
@@ -53,7 +54,14 @@ failure there stops the run. \`host-tests\` runs only those.
   --android-host <dir>   a Kotlin source folder to use as the Android host instead
   --platform ios|android run one platform only (CI runs iOS on macOS and Android on Linux); not a proof by itself
   --report <dir>         write <dir>/<platform>.json for each platform run
-  --keep-devices         leave the devices this run booted running`;
+  --keep-devices         leave the devices this run booted running
+  --layout-check portrait[,landscape]
+                         after each rung's flow, open every styled page again in each orientation and compare every box the
+                         phone drew with the phone's own browser at the same width (Dragon markless:native-check); reports in
+                         <rung>/native-layout-check/
+  --host-tests-simulator <name>
+                         run the iOS host's own tests on this simulator instead (their style fixtures are laid out for an
+                         iPhone 17 at 3x, so rungs on another size of phone keep their host tests on one)`;
 
 const harnessDir = import.meta.dirname;
 const mobileDir = resolve(harnessDir, '..', '..');
@@ -146,6 +154,8 @@ async function main(argv: string[]): Promise<number> {
 			platform: { type: 'string' },
 			report: { type: 'string' },
 			'keep-devices': { type: 'boolean', default: false },
+			'host-tests-simulator': { type: 'string' },
+			'layout-check': { type: 'string' },
 			help: { type: 'boolean', default: false },
 		},
 	});
@@ -159,6 +169,14 @@ async function main(argv: string[]): Promise<number> {
 	if (platforms.length === 0)
 		throw new Error(`--platform is ios or android, not ${values.platform}`);
 	const runs = (platform: ProofPlatform) => platforms.includes(platform);
+	const layoutOrientations = (values['layout-check'] ?? '')
+		.split(',')
+		.filter(Boolean)
+		.map((o) => {
+			if (!(LAYOUT_ORIENTATIONS as ReadonlyArray<string>).includes(o))
+				throw new Error(`--layout-check takes ${LAYOUT_ORIENTATIONS.join(' and ')}, not ${o}`);
+			return o as LayoutOrientation;
+		});
 	const hosts = hostSources(values.host, platforms, values['ios-host'], values['android-host']);
 	const rungs: ProofRung[] = [];
 	for (const dir of positionals) rungs.push(await loadRung(resolve(dir)));
@@ -197,9 +215,15 @@ async function main(argv: string[]): Promise<number> {
 		);
 		// The stand-in host has no tests of its own.
 		if (values.host === 'adapters') {
+			const testsOn =
+				simulator && values['host-tests-simulator'] && values['host-tests-simulator'] !== simulator.name
+					? await bootSimulator(values['host-tests-simulator'])
+					: simulator;
 			const outcomes = await Promise.all([
-				simulator
-					? iosHostTests(hosts.iosPackage, simulator.udid, dragonCheckout())
+				testsOn
+					? iosHostTests(hosts.iosPackage, testsOn.udid, dragonCheckout()).finally(async () => {
+							if (testsOn !== simulator && !values['keep-devices']) await shutdownSimulator(testsOn);
+						})
 					: undefined,
 				runs('android') ? androidHostTests(hosts.androidSources) : undefined,
 			]);
@@ -297,6 +321,24 @@ async function main(argv: string[]): Promise<number> {
 							installSeconds: installed.seconds,
 							flowSeconds: result.seconds,
 						};
+						if (!result.failure && layoutOrientations.length > 0) {
+							const checks =
+								platform === 'ios'
+									? await iosLayoutCheck(simulator!.udid, rung.dir, layoutOrientations, join(work, 'layout-check'))
+									: await androidLayoutCheck(tools!.adb, emulator!.serial, rung.dir, layoutOrientations, join(work, 'layout-check'));
+							for (const check of checks) console.log(`  layout ${check.page} ${check.orientation}: ${check.line}`);
+							const failed = checks.filter((check) => !check.passed);
+							if (failed.length > 0)
+								outcome = {
+									...outcome,
+									failure: {
+										step: -1,
+										action: 'layout-check',
+										role: 'unknown',
+										message: failed.map((check) => `${check.page} ${check.orientation}: ${check.line}`).join('\n'),
+									},
+								};
+						}
 					}
 					results.get(platform)!.push({ name: rung.name, ...outcome });
 					const timing = `install ${fixed(outcome.installSeconds)} s, flow ${fixed(outcome.flowSeconds)} s`;
