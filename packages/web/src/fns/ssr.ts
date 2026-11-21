@@ -33,6 +33,8 @@ import {
 import {
 	marklessComposedGraphNodeId,
 	marklessInstancePath,
+	marklessPrefixedRepeatId,
+	marklessPrefixedRepeatParents,
 	marklessWidgetHandleId,
 	marklessRowPath,
 } from './instance-scope.ts';
@@ -1435,11 +1437,6 @@ function withEnclosedLists(ids: ReadonlyArray<string>, repeats: ReadonlyArray<Ss
 	}
 	return lists;
 }
-// Composition prefixes a nested list's enclosing record id as it prefixes the list's own.
-function prefixedEnclosingRow(repeat: { readonly enclosingRow?: SsrKeyedRepeatRecord['enclosingRow'] }, prefix: string) {
-	const at = repeat.enclosingRow;
-	return at ? { enclosingRow: { ...at, prefix: prefix + (at.prefix ?? '') } } : {};
-}
 // The page record ids of the lists whose parent element the branches' arms render.
 function marklessSsrArmListIds(branches: ReadonlyArray<SsrBranchRecord>): string[] {
 	return branches.flatMap((branch) =>
@@ -1717,8 +1714,7 @@ export function marklessSsrAppendChildView(context: {
 		);
 		context.keyedRepeats.push({
 			...repeat,
-			id: context.child.hostPrefix + repeat.id,
-			...prefixedEnclosingRow(repeat, context.child.hostPrefix),
+			...marklessPrefixedRepeatId(repeat, context.child.hostPrefix),
 			parentHostNodeId: context.child.hostPrefix + repeat.parentHostNodeId,
 			...(repeat.ownerHostNodeId
 				? { ownerHostNodeId: context.child.hostPrefix + repeat.ownerHostNodeId }
@@ -1966,8 +1962,7 @@ export function marklessSsrPrefixBoundaryArmRecords(
 				? [
 						{
 							...repeat,
-							id: child.hostPrefix + repeat.id,
-							...prefixedEnclosingRow(repeat, child.hostPrefix),
+							...marklessPrefixedRepeatId(repeat, child.hostPrefix),
 							parentHostNodeId: child.hostPrefix + repeat.parentHostNodeId,
 							...(repeat.ownerHostNodeId
 								? { ownerHostNodeId: child.hostPrefix + repeat.ownerHostNodeId }
@@ -2148,9 +2143,7 @@ export function marklessSsrPrefixArmRecord(arm: SsrArmRecordSet, child: SsrPrefi
 				marklessSsrBindBehavior(behavior, child, instancePath),
 			),
 		}),
-		...(arm.repeatParents && {
-			repeatParents: arm.repeatParents.map((list) => ({ ...list, repeatId: child.hostPrefix + list.repeatId })),
-		}),
+		...marklessPrefixedRepeatParents(arm, child.hostPrefix),
 	};
 }
 function marklessSsrBindBehavior<T extends SsrBehaviorRecord>(

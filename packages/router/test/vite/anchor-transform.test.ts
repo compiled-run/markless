@@ -49,6 +49,8 @@ export default function Nav({ mode }) @{
 		<Link href="/b" prefetch={false}>B</Link>
 		<Link href="/c" prefetch>C</Link>
 		<Link href="/d" prefetch={mode}>D</Link>
+		<Link href="/e" prefetch="intent">E</Link>
+		<Link href="/f" prefetch={'viewport'}>F</Link>
 	</nav>
 }`;
 		const plugin = anchorTransformPlugin();
@@ -65,7 +67,18 @@ export default function Nav({ mode }) @{
 		);
 		expect(result?.code).toContain('<a data-markless-router-link href="/c">C</a>');
 		expect(result?.code).toContain(
-			"data-markless-router-prefetch={(mode) === false ? 'none' : undefined}",
+			'<a data-markless-router-link href="/e" data-markless-router-prefetch="intent">E</a>',
+		);
+		expect(result?.code).toContain(
+			'<a data-markless-router-link href="/f" data-markless-router-prefetch="viewport">F</a>',
+		);
+		expect(result?.code).toContain(
+			"data-markless-router-prefetch={__marklessPrefetchAttribute(mode)}",
+		);
+		// A dynamic value is read once, through one helper import.
+		expect(result?.code.match(/\(mode\)|\bmode\b(?=\))/g)).toHaveLength(1);
+		expect(result?.code).toMatch(
+			/^import \{ __marklessPrefetchAttribute \} from "@markless\/router";/,
 		);
 	});
 
@@ -87,7 +100,7 @@ export default function Nav({ mode }) @{
 		expect(result?.code).toContain('<a href="/b" data-markless-router-prefetch="none">B</a>');
 		expect(result?.code).toContain('<a href="/c">C</a>');
 		expect(result?.code).toContain(
-			"<a href=\"/d\" data-markless-router-prefetch={(mode) === false ? 'none' : undefined}>D</a>",
+			"<a href=\"/d\" data-markless-router-prefetch={__marklessPrefetchAttribute(mode)}>D</a>",
 		);
 	});
 

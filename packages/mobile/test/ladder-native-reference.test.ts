@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { NATIVE_REFUSALS } from '@markless/compiler/native';
+import {
+	NATIVE_KEYBOARD_ONLY_CODE,
+	NATIVE_DROP_ONLY_CODE,
+	NATIVE_MOUSE_ONLY_CODE,
+	NATIVE_REFUSALS,
+} from '@markless/compiler/native';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '@markless/router';
 import type {
 	NativeAppPayload,
@@ -20,7 +25,7 @@ import {
 } from '../src/index.ts';
 import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
-import { nativeMaxLength } from '@markless/serializer/native-view';
+import { nativeMaxLength, nativeRangeValue } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
 import {
 	looksOnly,
@@ -44,7 +49,11 @@ const typedInto = (text: string, maxlength: string | null) => {
 // The native column before any device: each rung's payload, run by the reference runtime, must show what the
 // web build shows; a rung the compiler cannot lower yet must be refused by name, never emitted half right.
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
-const NATIVE_KEYBOARD_ONLY = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
+/** Whether a field's `value` property is bound; any other `value` write is a textarea's default value. */
+const bindsValue = (nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][number]>, id: string) => {
+	const node = nodeOf.get(id.split('@')[0]!);
+	return node?.kind === 'element' && (node.bindings ?? []).some((binding) => 'property' in binding && binding.property === 'value');
+};
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
 const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
 
@@ -205,8 +214,10 @@ function mirror(
 		else if (entry.op === 'title') title = entry.value;
 		else if (entry.op === 'attribute')
 			attributes.set(`${entry.node}\0${entry.name}`, entry.value);
-		else if (entry.op === 'property') properties.set(entry.node, entry.value);
-		else if (entry.op === 'navigate') {
+		else if (entry.op === 'property') {
+			// A textarea's default value reaches its text, which this column does not compare.
+			if (bindsValue(nodeOf, entry.node)) properties.set(entry.node, entry.value);
+		} else if (entry.op === 'navigate') {
 			// One page per rung: a navigation opens this page again with the link's params.
 			expect(entry.route, `step ${index}: the link's route`).toBe(payload.route?.pattern);
 			mount(createNativeRuntime(payload, store, entry.params));
@@ -230,6 +241,14 @@ function mirror(
 					const text = kept.get(id) ?? fresh.get(id);
 					if (text !== undefined) texts.set(id, text);
 				}
+			// A row's copy is built with its bound attributes, as an arm's nodes are; a row that left takes its own with it.
+			const inRows = (id: string) => {
+				const at = id.indexOf('@');
+				return at >= 0 && rowNodes.includes(id.slice(0, at));
+			};
+			for (const key of attributes.keys()) if (inRows(key.split('\0')[0]!)) attributes.delete(key);
+			for (const [node, name, value] of runtime.attributes())
+				if (inRows(node) && entry.keys.includes(node.slice(node.indexOf('@') + 1))) attributes.set(`${node}\0${name}`, value);
 		} else if (entry.op === 'arm') {
 			chosen.set(entry.node, entry.index);
 			for (const [node, index] of runtime.arms())
@@ -634,11 +653,16 @@ function walk(
 		return node ? parentOf(node) : undefined;
 	};
 	// A field's text: what its `value` binding or attribute gave it, then what was typed or the journal wrote.
+	const builtAttributes = new Map(attributes);
+	const shownDefaults = new Map<string, string>();
 	const staticValue = (id: string) => {
 		const node = nodeOf.get(id);
-		return node?.kind === 'element' && node.element === 'input' && !properties.has(id)
-			? (node.attributes?.['value'] ?? '')
-			: undefined;
+		if (node?.kind !== 'element' || properties.has(id)) return undefined;
+		if (node.element === 'input') return node.attributes?.['value'] ?? '';
+		// A textarea shows its `value` attribute as the host built it, then the default values the journal writes.
+		if (node.element === 'textarea')
+			return shownDefaults.get(id) ?? builtAttributes.get(`${id}\0value`) ?? node.attributes?.['value'] ?? '';
+		return undefined;
 	};
 	const typed = new Map<string, string>();
 	const checks = new Map(runtime.checks());
@@ -749,7 +773,10 @@ function walk(
 			else if (entry.op === 'property' && entry.name === 'selected')
 				selected.set(entry.node, entry.value);
 			else if (entry.op === 'property') {
-				properties.set(entry.node, entry.value);
+				const node = nodeOf.get(entry.node.split('@')[0]!);
+				const followsDefault = node?.kind === 'element' && node.element === 'textarea' && !bindsValue(nodeOf, entry.node);
+				if (followsDefault) shownDefaults.set(entry.node, entry.value);
+				else properties.set(entry.node, entry.value);
 				typed.delete(entry.node);
 			}
 			else if (entry.op === 'navigate') {
@@ -926,6 +953,21 @@ function walk(
 			if (!choice || choice.disabled)
 				throw new Error(`step ${index}: "${action.choose.field}" has no option "${action.choose.option}" to pick`);
 			apply(runtime.dispatch({ event: 'choose', host: choice.option }), index);
+		} else if (action && 'slide' in action) {
+			const slider = elementReading(action.slide.field);
+			if (!slider) throw new Error(`step ${index}: nothing reads "${action.slide.field}" to slide`);
+			// The phone reports the end the thumb reaches, on the slider's step, as an input.
+			const end = attributeNow(slider, action.slide.to === 'max' ? 'max' : 'min');
+			const value = nativeRangeValue(
+				end ?? (action.slide.to === 'max' ? '100' : '0'),
+				attributeNow(slider, 'min'),
+				attributeNow(slider, 'max'),
+				attributeNow(slider, 'step'),
+			);
+			apply(runtime.dispatch({ event: 'input', host: slider, value }), index);
+			// Let go, the slider raises change when its value moved, as the web's End key does.
+			if (payload.events.some((event) => event.host === slider && event.event === 'commit'))
+				apply(runtime.dispatch({ event: 'commit', host: slider, value }), index);
 		} else if (action && 'drag' in action) {
 			const host = elementReading(action.drag.on);
 			if (!host) throw new Error(`step ${index}: nothing reads "${action.drag.on}" to drag`);
@@ -1191,7 +1233,12 @@ test.each(
 				build.diagnostics.map((diagnostic) =>
 					diagnostic.severity === 'error' && refusalCodes.has(diagnostic.code)
 						? ['error', diagnostic.code]
-						: ['warning', NATIVE_KEYBOARD_ONLY],
+						: [
+								'warning',
+								[NATIVE_MOUSE_ONLY_CODE, NATIVE_DROP_ONLY_CODE].includes(diagnostic.code)
+									? diagnostic.code
+									: NATIVE_KEYBOARD_ONLY_CODE,
+							],
 				),
 			);
 			return;

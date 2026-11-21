@@ -88,8 +88,14 @@ type Session = {
 	readonly requests: string[];
 };
 
-async function open(browser: Browser, path = '/', base = origin): Promise<Session> {
+async function open(
+	browser: Browser,
+	path = '/',
+	base = origin,
+	headers?: Record<string, string>,
+): Promise<Session> {
 	const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+	if (headers) await page.setExtraHTTPHeaders(headers);
 	const errors: string[] = [];
 	const requests: string[] = [];
 	page.on('pageerror', (error) => errors.push(String(error)));
@@ -1367,7 +1373,10 @@ export function fragmentNavigationSuite(name: string, browserType: BrowserType):
 		test('the idle tier stops a page whose region passes its byte budget, and a hover fetches that page whole', async () => {
 			const whole = await (await fetch(`${origin}/_markless/fragment/large`)).arrayBuffer();
 			expect(whole.byteLength).toBeGreaterThan(256 * 1024);
-			const { page, errors, requests } = await open(browser, '/form');
+			// Sent uncompressed, so the page's bytes on the wire pass the budget the tier counts.
+			const { page, errors, requests } = await open(browser, '/form', origin, {
+				'accept-encoding': 'identity',
+			});
 			const largeFetches = () =>
 				requests.filter((request) => request === '/large fragment').length;
 			await page.waitForTimeout(3500);
@@ -1377,6 +1386,42 @@ export function fragmentNavigationSuite(name: string, browserType: BrowserType):
 			await page.locator('[data-large-link]').click();
 			await landedOn(page, 'large');
 			expect(await page.locator('[data-row="3999"]').count()).toBe(1);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('an instant click on a page the idle tier is still fetching adopts that fetch past its byte budget', async () => {
+			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+			// Uncompressed, so the large page's bytes on the wire pass the idle budget.
+			await page.setExtraHTTPHeaders({ 'accept-encoding': 'identity' });
+			const errors: string[] = [];
+			page.on('pageerror', (error) => errors.push(String(error)));
+			const largeFragments: string[] = [];
+			const documents: string[] = [];
+			page.on('request', (request) => {
+				const url = new URL(request.url());
+				if (fragmentPageUrl(url)?.pathname === '/large')
+					largeFragments.push(request.headers().purpose ?? 'click');
+				if (request.resourceType() === 'document') documents.push(url.pathname);
+			});
+			let idleFetching = () => {};
+			const idleFetch = new Promise<void>((done) => (idleFetching = done));
+			// The idle fetch is held until the click has adopted it.
+			await page.route(
+				(url) => fragmentPageUrl(url)?.pathname === '/large',
+				async (route) => {
+					idleFetching();
+					await new Promise((resolve) => setTimeout(resolve, 1000));
+					await route.continue();
+				},
+			);
+			await page.goto(origin + '/form');
+			await idleFetch;
+			await page.locator('[data-large-link]').click();
+			await landedOn(page, 'large');
+			expect(await page.locator('[data-row="3999"]').count()).toBe(1);
+			expect(largeFragments).toEqual(['prefetch']);
+			expect(documents).toEqual(['/form']);
 			expect(errors).toEqual([]);
 			await page.close();
 		});

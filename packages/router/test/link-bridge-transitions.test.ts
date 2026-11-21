@@ -86,6 +86,7 @@ function bridge() {
 			),
 		() => ({
 			code: [],
+			intent: 2,
 			hoverDwellMs: 100,
 			requestPrefix: '/_fragment',
 			prefetchAttribute: 'data-prefetch',
